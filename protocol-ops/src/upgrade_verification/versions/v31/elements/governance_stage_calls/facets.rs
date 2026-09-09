@@ -18,8 +18,8 @@ use alloy::{
     sol_types::SolCall,
 };
 use anyhow::Context;
-use std::collections::HashSet;
 
+use crate::common::evm_selectors::facet_selectors_from_bytecode;
 use crate::upgrade_verification::{
     artifacts::{CtmArtifact, CtmFlavor},
     verifiers::{VerificationResult, Verifiers},
@@ -449,15 +449,4 @@ pub(super) async fn verify_v31_chain_creation_facet_cuts(
     }
 
     errors
-}
-
-fn facet_selectors_from_bytecode(bytecode: &[u8]) -> HashSet<[u8; 4]> {
-    evmole::contract_info(evmole::ContractInfoArgs::new(bytecode).with_selectors())
-        .functions
-        .unwrap_or_default()
-        .into_iter()
-        .map(|function| function.selector)
-        // Exclude getName(); this is included for tooling only and is not part of the diamond cut.
-        .filter(|selector| selector != &[0x17, 0xd7, 0xde, 0x7c])
-        .collect()
 }

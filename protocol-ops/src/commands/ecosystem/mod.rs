@@ -20,6 +20,7 @@ use crate::{
     commands::ecosystem::simulator::GovernanceTomlToSimulatorArgs,
     commands::ecosystem::stage3::Stage3Args,
     commands::ecosystem::upgrade::{ListCtmsArgs, UpgradeGovernanceArgs, UpgradePrepareAllArgs},
+    commands::ecosystem::verify_deployment::VerifyDeploymentArgs,
     commands::ecosystem::verify_upgrade::VerifyUpgradeArgs,
 };
 
@@ -31,6 +32,7 @@ pub mod stage3;
 pub mod upgrade;
 pub mod upgrade_full;
 pub mod upgrade_inner;
+pub mod verify_deployment;
 pub mod verify_upgrade;
 pub mod zk_governance;
 
@@ -56,6 +58,14 @@ pub enum EcosystemCommands {
     /// Verify ecosystem upgrade artifacts produced by upgrade-prepare.
     #[command(name = "verify-upgrade")]
     VerifyUpgrade(VerifyUpgradeArgs),
+    /// Verify a *deployed* ecosystem against a local contracts build: every
+    /// contract's bytecode and immutables, the chain creation parameters a new
+    /// chain would get, the wiring the deploy scripts are supposed to have
+    /// established, and every owner / admin role grouped by holder. Read-only,
+    /// and discovers every address from the bridgehub — no deployment output
+    /// file needed.
+    #[command(name = "verify-deployment")]
+    VerifyDeployment(VerifyDeploymentArgs),
     /// Broadcast the bundles produced by `upgrade-prepare-all` to a real (or
     /// fork) RPC under the supplied EOA keys. Multi-bundle dispatcher around
     /// `dev execute-safe`: reads `manifest.json`, replays each bundle in order
@@ -82,6 +92,7 @@ pub async fn run(args: EcosystemCommands) -> anyhow::Result<()> {
         EcosystemCommands::UpgradePrepareAll(args) => upgrade::run_upgrade_prepare_all(args).await,
         EcosystemCommands::UpgradeGovernance(args) => upgrade::run_upgrade_governance(args).await,
         EcosystemCommands::VerifyUpgrade(args) => verify_upgrade::run(args).await,
+        EcosystemCommands::VerifyDeployment(args) => verify_deployment::run(args).await,
         EcosystemCommands::UpgradeBroadcast(args) => broadcast::run(args).await,
         EcosystemCommands::Stage3(args) => stage3::run(args).await,
         EcosystemCommands::ListCtms(args) => upgrade::run_list_ctms(args).await,

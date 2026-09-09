@@ -75,6 +75,100 @@ Commands that support **`--out`** write a **`CommandEnvelope`** snapshot after a
 
 You need a working Foundry toolchain (`forge`, `cast`, etc.) and repo contract artifacts as expected by the scripts this tool wraps. From the repo root, `l1-contracts` must be built (`forge build`).
 
+### Verifying a deployed ecosystem (`ecosystem verify-deployment`)
+
+Where PUVT (below) checks an _upgrade_ against the artifacts that produced it,
+`verify-deployment` checks a _live_ ecosystem against a local contracts build.
+It takes one address — the Bridgehub proxy — and discovers everything else on
+chain, so it works the same against an ecosystem somebody else deployed and
+needs no deployment output file. It is read-only (`eth_call`, `eth_getCode`,
+`eth_getStorageAt`, `eth_getLogs`) and safe to point at mainnet.
+
+Check out the commit the ecosystem was deployed from and build the contracts
+first — the tool compares against `l1-contracts/out` and `da-contracts/out`:
+
+```bash
+yarn da build:foundry && yarn l1 build:foundry
+
+cd protocol-ops
+cargo run --release --bin protocol_ops -- ecosystem verify-deployment \
+  --bridgehub 0xb9415d43c7753ccebaa1ac05c8baba36159ab13f \
+  --l1-rpc-url "$SEPOLIA_RPC_URL" \
+  --from-block 11579085 \
+  --era-chain-id 270 \
+  --weth 0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9 \
+  --zk-token-l1-address 0x… \
+  --expect-testnet-verifier true
+```
+
+`--from-block` must be at or before the ecosystem's first deployment block: the
+chain creation parameters, the pending-admin history and the DA pair whitelist
+all come from logs, and "no events found" is otherwise indistinguishable from
+"never set". The command checks this by requiring the bridgehub proxy's own
+construction event to fall inside the window, and fails if it does not. Hosted
+RPCs reject a scan from genesis, which is why there is no safe default.
+
+Every read — `eth_call`, `eth_getCode`, `eth_getStorageAt`, `eth_getLogs` —
+uses the latest block, captured once at the start of the run. That is always
+current state, never a historical block; holding it fixed for the run only stops
+a transaction landing mid-run from splitting the report across two states. The
+block is printed in the discovery header.
+
+Where a value has been set more than once — chain creation parameters are the
+common case — the newest is the one verified, and the command says how many
+revisions it saw.
+
+What it checks:
+
+| Section                  | What it proves                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Bytecode**             | Every discovered contract against the local build, with the artifact's own `immutableReferences` masked and CBOR metadata digests blanked at offsets taken from the local artifact only, so a forged tag cannot open a blanking window. Reports `exact` vs `metadata-only`, and warns when anything is metadata-only — that also means the genesis root and the L2 force-deployment hashes are not independently reproducible.                                                                                                                                                                                                                                                               |
+| **Immutables**           | Values read back out of deployed runtime code at the artifact's immutable offsets and checked against what discovery says they should be (bridgehub, chain id, WETH, asset router, verifier, …). Every use site of an immutable must carry the same value — masking hides a divergent one from the bytecode comparison. Unrecognised ones are printed.                                                                                                                                                                                                                                                                                                                                       |
+| **Wiring**               | Every setter the deploy scripts are supposed to have run: `setNativeTokenVault`, the three `L1Nullifier` setters, `setL1InteropHandler`, `CAH.setAddresses`, `ServerNotifier.setChainTypeManager`, `setDefaultUpgrade`, `registerEthToken`, and the three-call CTM registration. Also every proxy's EIP-1967 admin slot — a proxy running the right code under an unexpected admin is not verified.                                                                                                                                                                                                                                                                                          |
+| **Chain creation**       | Recomputes `storedBatchZero`, `initialCutHash` and `initialForceDeploymentHash` from the `NewChainCreationParams` event and binds them to what the CTM stores; then checks the diamond cut (exactly the six canonical facets, selectors against the deployed facets' dispatchers, freezability, no collisions) and every force-deployments field, including each L2 implementation, the `SystemContractProxy` it sits behind, and `l2TokenProxyBytecodeHash` — all three checked against `AllContractsHashes.json`, exactly.                                                                                                                                                                 |
+| **Verifier and genesis** | Which verifier flavour is deployed, and the deployed genesis root and prover VK hash against `configs/genesis/zksync-os/latest.json`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| **Data availability**    | The `RollupDAManager` allowlist — which is what `makePermanentRollup` checks, so only rollup-grade validators belong in it; a validium or external-DA validator there would let a chain lock itself in as a permanent rollup while publishing nothing to L1 — and whether each live chain's DA pair is one `makePermanentRollup()` would accept.                                                                                                                                                                                                                                                                                                                                             |
+| **Roles**                | `owner` / `pendingOwner` / `admin` / `pendingAdmin` / `securityCouncil` / `tokenMultiplierSetter` across the ecosystem and every registered chain. Every internal holder is **asserted** against the topology the deploy scripts establish, not merely listed; the ecosystem root comes in on `--expected-ecosystem-owner` / `--expected-security-council` / `--expected-min-delay`. Fails on stalled two-step handoffs and on a second Governance owning the CTM.                                                                                                                                                                                                                           |
+| **Registered chains**    | Each chain's protocol version, verifier, full selector-to-facet routing, `DiamondProxy` bytecode, base token (against `Bridgehub.baseTokenAssetId`), genesis batch, settlement layer, pending admin, diamond-freeze state, priority-tx gas limit and self-reported identity. Each chain's genesis upgrade transaction is decoded so the force deployments it was _actually_ created with are bound to the ones verified today — the CTM keeps only the current parameters, so a chain created before a `setChainCreationParams` runs different L2 code. Per-chain signing set and every operational role are enumerated by address. A transaction filterer is flagged as a censorship lever. |
+
+Expectations the tool cannot derive from chain state are flags:
+`--era-chain-id`, `--weth`, `--max-number-of-zk-chains` (default 100),
+`--expect-testnet-verifier`, `--zk-token-l1-address`. `--env` supplies the
+bridgehub and era chain id from `permanent-values/<env>.toml`.
+
+> **L2 bytecode is checked against `AllContractsHashes.json`, exactly.** The
+> chain creation params commit to the L2 core contracts by
+> `(blake2s, length, keccak)`, and those contracts never land on L1 — so the
+> reference is the repo's committed hash record, not whatever the local
+> `forge build` produced. Against a fixed record an exact match is achievable,
+> so anything else is an error. Metadata tolerance applies only to L1 contracts,
+> where the deployed bytecode is in hand and the difference can be shown to be
+> confined to the CBOR digest. Run `yarn calculate-hashes:fix` if the record is
+> stale.
+
+> **What the tool assumes.** It proves that the bytes on chain are the bytes in
+> this checkout and that the right parties hold every role. It does not judge
+> whether the checkout itself is trustworthy — that is what code review is for —
+> and it cannot recover the calls inside a _shadow_ governance operation, which
+> publishes only its id by design. A pending shadow operation therefore fails
+> the run without the tool being able to say what it would do. Verifying that an
+> expected holder is itself sound (a multisig's signer set, say) is out of scope:
+> the expected address is the trust anchor you supply, so the tool prints each
+> holder's code hash and leaves recognising it to you.
+
+> **Era CTMs are not supported.** Their force deployments use the Era
+> bytecode-hash encoding rather than the ZKsync OS `(bytes, bytes)` pair. The
+> command rejects them up front rather than aborting part-way through.
+
+> **`--zk-token-l1-address` is worth passing.** The ZK token asset id is
+> `keccak(abi.encode(originChainId, L2_NTV, token))`. Copying another
+> ecosystem's value points every chain at an asset nothing in this ecosystem
+> can bridge, and `InteropCenter` writes it once in `initL2` with no setter —
+> so it cannot be fixed on a chain that already exists. Without the flag the
+> tool can only report the value.
+
+Exit code is non-zero when there are errors; warnings do not fail the run.
+
 ### Running the Protocol Upgrade Verification Tool (PUVT)
 
 The PUVT requires we have already run the upgrade scripts that deploy all new protocol contracts. For v31 stage, regenerate the calldata and replay the prepare bundles on a pinned Sepolia fork, then run PUVT against the same fork.

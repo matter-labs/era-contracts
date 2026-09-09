@@ -254,44 +254,12 @@ impl GenesisConfig {
     }
 }
 
-#[derive(Default)]
-pub(crate) struct VerificationResult {
-    pub(crate) result: String,
-    pub(crate) warnings: u64,
-    pub(crate) errors: u64,
-}
+pub(crate) use crate::common::verification_report::VerificationResult;
 
+/// Assertion helpers that need the v31 [`Verifiers`] context. The plain
+/// pass / warn / fail reporting lives in [`crate::common::verification_report`]
+/// so the deployment-verification tree can share it.
 impl VerificationResult {
-    pub(crate) fn print_info(&self, info: &str) {
-        println!("{}", info);
-    }
-
-    pub(crate) fn report_ok(&self, info: &str) {
-        println!("{} {}", style("[OK]: ").green(), info);
-    }
-
-    pub(crate) fn report_warn(&mut self, warn: &str) {
-        self.warnings += 1;
-        println!("{} {}", style("[WARN]:").yellow(), warn);
-    }
-
-    pub(crate) fn report_error(&mut self, error: &str) {
-        self.errors += 1;
-        println!("{} {}", style("[ERROR]:").red(), error);
-    }
-
-    pub(crate) fn ensure_success(&self) -> anyhow::Result<()> {
-        if self.errors > 0 {
-            anyhow::bail!(
-                "verify-upgrade failed with {} error(s) and {} warning(s)",
-                self.errors,
-                self.warnings
-            );
-        }
-
-        Ok(())
-    }
-
     #[track_caller]
     pub(crate) fn expect_address(
         &mut self,
