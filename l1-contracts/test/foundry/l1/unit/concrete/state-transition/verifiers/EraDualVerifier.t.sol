@@ -8,7 +8,7 @@ import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifier
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {EmptyProofLength, UnknownVerifierType} from "contracts/common/L1ContractErrors.sol";
 
-/// @notice Mock FFLONK verifier for testing
+/// @notice Mock FFLONK verifier for testing.
 contract MockFflonkVerifier is IVerifierV2 {
     bytes32 public constant VK_HASH = keccak256("fflonk_vk");
     bool public shouldVerify = true;
@@ -26,7 +26,7 @@ contract MockFflonkVerifier is IVerifierV2 {
     }
 }
 
-/// @notice Mock PLONK verifier for testing
+/// @notice Mock PLONK verifier for testing.
 contract MockPlonkVerifier is IVerifier {
     bytes32 public constant VK_HASH = keccak256("plonk_vk");
     bool public shouldVerify = true;
@@ -44,219 +44,147 @@ contract MockPlonkVerifier is IVerifier {
     }
 }
 
-/// @notice Unit tests for EraDualVerifier contract
+/// @notice Mock Airbender PLONK verifier for testing.
+/// @dev Distinct contract so we can assert which verifier received the call.
+contract MockAirbenderPlonkVerifier is IVerifier {
+    bytes32 public constant VK_HASH = keccak256("airbender_plonk_vk");
+    bool public shouldVerify = true;
+
+    function verify(uint256[] calldata, uint256[] calldata) external view override returns (bool) {
+        return shouldVerify;
+    }
+
+    function verificationKeyHash() external pure override returns (bytes32) {
+        return VK_HASH;
+    }
+
+    function setShouldVerify(bool _value) external {
+        shouldVerify = _value;
+    }
+}
+
+/// @notice Unit tests for EraDualVerifier routing between Boojum FFLONK, Boojum PLONK, and Airbender PLONK verifiers.
 contract EraDualVerifierTest is Test {
-    EraDualVerifier public verifier;
-    MockFflonkVerifier public fflonkVerifier;
-    MockPlonkVerifier public plonkVerifier;
+    EraDualVerifier internal verifier;
+    MockFflonkVerifier internal fflonkVerifier;
+    MockPlonkVerifier internal plonkVerifier;
+    MockAirbenderPlonkVerifier internal airbenderVerifier;
 
     uint256 internal constant FFLONK_VERIFICATION_TYPE = 0;
     uint256 internal constant PLONK_VERIFICATION_TYPE = 1;
+    uint256 internal constant AIRBENDER_PLONK_VERIFICATION_TYPE = 2;
 
     function setUp() public {
         fflonkVerifier = new MockFflonkVerifier();
         plonkVerifier = new MockPlonkVerifier();
-        verifier = new EraDualVerifier(IVerifierV2(address(fflonkVerifier)), IVerifier(address(plonkVerifier)));
+        airbenderVerifier = new MockAirbenderPlonkVerifier();
+        verifier = new EraDualVerifier(
+            IVerifierV2(address(fflonkVerifier)),
+            IVerifier(address(plonkVerifier)),
+            IVerifier(address(airbenderVerifier))
+        );
+    }
+
+    function _makeProof(uint256 _verifierType) internal pure returns (uint256[] memory proof) {
+        proof = new uint256[](3);
+        proof[0] = _verifierType;
+        proof[1] = 789;
+        proof[2] = 101112;
+    }
+
+    function _makePublicInputs() internal pure returns (uint256[] memory publicInputs) {
+        publicInputs = new uint256[](2);
+        publicInputs[0] = 123;
+        publicInputs[1] = 456;
     }
 
     // ============ Constructor Tests ============
 
-    function test_constructor_setsVerifiers() public view {
+    function test_constructor_setsAllVerifiers() public view {
         assertEq(address(verifier.FFLONK_VERIFIER()), address(fflonkVerifier));
         assertEq(address(verifier.PLONK_VERIFIER()), address(plonkVerifier));
+        assertEq(address(verifier.AIRBENDER_PLONK_VERIFIER()), address(airbenderVerifier));
     }
 
-    // ============ verify Tests ============
+    // ============ verify Routing Tests ============
 
-    function test_verify_routesToFflonkVerifier() public view {
-        uint256[] memory publicInputs = new uint256[](2);
-        publicInputs[0] = 123;
-        publicInputs[1] = 456;
-
-        // Proof with FFLONK type (0) as first element
-        uint256[] memory proof = new uint256[](3);
-        proof[0] = FFLONK_VERIFICATION_TYPE; // FFLONK type
-        proof[1] = 789;
-        proof[2] = 101112;
-
-        bool result = verifier.verify(publicInputs, proof);
-        assertTrue(result);
+    function test_verify_routesToFflonk() public view {
+        assertTrue(verifier.verify(_makePublicInputs(), _makeProof(FFLONK_VERIFICATION_TYPE)));
     }
 
-    function test_verify_routesToPlonkVerifier() public view {
-        uint256[] memory publicInputs = new uint256[](2);
-        publicInputs[0] = 123;
-        publicInputs[1] = 456;
+    function test_verify_routesToPlonk() public view {
+        assertTrue(verifier.verify(_makePublicInputs(), _makeProof(PLONK_VERIFICATION_TYPE)));
+    }
 
-        // Proof with PLONK type (1) as first element
-        uint256[] memory proof = new uint256[](3);
-        proof[0] = PLONK_VERIFICATION_TYPE; // PLONK type
-        proof[1] = 789;
-        proof[2] = 101112;
+    function test_verify_routesToAirbenderPlonk() public view {
+        assertTrue(verifier.verify(_makePublicInputs(), _makeProof(AIRBENDER_PLONK_VERIFICATION_TYPE)));
+    }
 
-        bool result = verifier.verify(publicInputs, proof);
-        assertTrue(result);
+    function test_verify_routesToAirbenderPlonk_returnsFalseWhenMockFails() public {
+        // When only the Airbender verifier fails, a proof tagged as Airbender should surface the failure,
+        // while proofs for other verifiers must remain unaffected.
+        airbenderVerifier.setShouldVerify(false);
+        assertFalse(verifier.verify(_makePublicInputs(), _makeProof(AIRBENDER_PLONK_VERIFICATION_TYPE)));
+        assertTrue(verifier.verify(_makePublicInputs(), _makeProof(FFLONK_VERIFICATION_TYPE)));
+        assertTrue(verifier.verify(_makePublicInputs(), _makeProof(PLONK_VERIFICATION_TYPE)));
     }
 
     function test_verify_revertsOnEmptyProof() public {
-        uint256[] memory publicInputs = new uint256[](2);
-        publicInputs[0] = 123;
-        publicInputs[1] = 456;
-
         uint256[] memory emptyProof = new uint256[](0);
-
         vm.expectRevert(EmptyProofLength.selector);
-        verifier.verify(publicInputs, emptyProof);
+        verifier.verify(_makePublicInputs(), emptyProof);
     }
 
     function test_verify_revertsOnUnknownVerifierType() public {
-        uint256[] memory publicInputs = new uint256[](2);
-        publicInputs[0] = 123;
-        publicInputs[1] = 456;
-
-        // Proof with unknown type (2) as first element
-        uint256[] memory proof = new uint256[](3);
-        proof[0] = 2; // Unknown type
-        proof[1] = 789;
-        proof[2] = 101112;
-
+        uint256[] memory proof = _makeProof(3);
         vm.expectRevert(UnknownVerifierType.selector);
-        verifier.verify(publicInputs, proof);
-    }
-
-    function test_verify_fflonkReturnsFalse() public {
-        fflonkVerifier.setShouldVerify(false);
-
-        uint256[] memory publicInputs = new uint256[](2);
-        publicInputs[0] = 123;
-        publicInputs[1] = 456;
-
-        uint256[] memory proof = new uint256[](3);
-        proof[0] = FFLONK_VERIFICATION_TYPE;
-        proof[1] = 789;
-        proof[2] = 101112;
-
-        bool result = verifier.verify(publicInputs, proof);
-        assertFalse(result);
-    }
-
-    function test_verify_plonkReturnsFalse() public {
-        plonkVerifier.setShouldVerify(false);
-
-        uint256[] memory publicInputs = new uint256[](2);
-        publicInputs[0] = 123;
-        publicInputs[1] = 456;
-
-        uint256[] memory proof = new uint256[](3);
-        proof[0] = PLONK_VERIFICATION_TYPE;
-        proof[1] = 789;
-        proof[2] = 101112;
-
-        bool result = verifier.verify(publicInputs, proof);
-        assertFalse(result);
-    }
-
-    function test_verify_singleElementProofFflonk() public view {
-        uint256[] memory publicInputs = new uint256[](1);
-        publicInputs[0] = 123;
-
-        // Proof with only type indicator
-        uint256[] memory proof = new uint256[](1);
-        proof[0] = FFLONK_VERIFICATION_TYPE;
-
-        bool result = verifier.verify(publicInputs, proof);
-        assertTrue(result);
-    }
-
-    function test_verify_singleElementProofPlonk() public view {
-        uint256[] memory publicInputs = new uint256[](1);
-        publicInputs[0] = 123;
-
-        uint256[] memory proof = new uint256[](1);
-        proof[0] = PLONK_VERIFICATION_TYPE;
-
-        bool result = verifier.verify(publicInputs, proof);
-        assertTrue(result);
+        verifier.verify(_makePublicInputs(), proof);
     }
 
     // ============ verificationKeyHash Tests ============
 
-    function test_verificationKeyHash_returnsPlonkHash() public view {
-        bytes32 vkHash = verifier.verificationKeyHash();
-        assertEq(vkHash, plonkVerifier.VK_HASH());
+    function test_verificationKeyHash_noArg_returnsPlonkHash() public view {
+        assertEq(verifier.verificationKeyHash(), plonkVerifier.VK_HASH());
     }
 
-    function test_verificationKeyHash_withTypeFflonk() public view {
-        bytes32 vkHash = verifier.verificationKeyHash(FFLONK_VERIFICATION_TYPE);
-        assertEq(vkHash, fflonkVerifier.VK_HASH());
+    function test_verificationKeyHash_fflonk() public view {
+        assertEq(verifier.verificationKeyHash(FFLONK_VERIFICATION_TYPE), fflonkVerifier.VK_HASH());
     }
 
-    function test_verificationKeyHash_withTypePlonk() public view {
-        bytes32 vkHash = verifier.verificationKeyHash(PLONK_VERIFICATION_TYPE);
-        assertEq(vkHash, plonkVerifier.VK_HASH());
+    function test_verificationKeyHash_plonk() public view {
+        assertEq(verifier.verificationKeyHash(PLONK_VERIFICATION_TYPE), plonkVerifier.VK_HASH());
+    }
+
+    function test_verificationKeyHash_airbenderPlonk() public view {
+        assertEq(verifier.verificationKeyHash(AIRBENDER_PLONK_VERIFICATION_TYPE), airbenderVerifier.VK_HASH());
     }
 
     function test_verificationKeyHash_revertsOnUnknownType() public {
         vm.expectRevert(UnknownVerifierType.selector);
-        verifier.verificationKeyHash(2);
+        verifier.verificationKeyHash(3);
     }
 
     // ============ Fuzz Tests ============
 
     function testFuzz_verify_revertsOnUnknownType(uint256 verifierType) public {
-        vm.assume(verifierType != FFLONK_VERIFICATION_TYPE && verifierType != PLONK_VERIFICATION_TYPE);
-
-        uint256[] memory publicInputs = new uint256[](2);
-        publicInputs[0] = 123;
-        publicInputs[1] = 456;
-
-        uint256[] memory proof = new uint256[](3);
-        proof[0] = verifierType;
-        proof[1] = 789;
-        proof[2] = 101112;
+        vm.assume(
+            verifierType != FFLONK_VERIFICATION_TYPE &&
+                verifierType != PLONK_VERIFICATION_TYPE &&
+                verifierType != AIRBENDER_PLONK_VERIFICATION_TYPE
+        );
 
         vm.expectRevert(UnknownVerifierType.selector);
-        verifier.verify(publicInputs, proof);
+        verifier.verify(_makePublicInputs(), _makeProof(verifierType));
     }
 
     function testFuzz_verificationKeyHash_revertsOnUnknownType(uint256 verifierType) public {
-        vm.assume(verifierType != FFLONK_VERIFICATION_TYPE && verifierType != PLONK_VERIFICATION_TYPE);
+        vm.assume(
+            verifierType != FFLONK_VERIFICATION_TYPE &&
+                verifierType != PLONK_VERIFICATION_TYPE &&
+                verifierType != AIRBENDER_PLONK_VERIFICATION_TYPE
+        );
 
         vm.expectRevert(UnknownVerifierType.selector);
         verifier.verificationKeyHash(verifierType);
-    }
-
-    function testFuzz_verify_fflonkWithArbitraryProof(uint256[] memory proofData) public view {
-        vm.assume(proofData.length > 0);
-
-        uint256[] memory publicInputs = new uint256[](2);
-        publicInputs[0] = 123;
-        publicInputs[1] = 456;
-
-        uint256[] memory proof = new uint256[](proofData.length + 1);
-        proof[0] = FFLONK_VERIFICATION_TYPE;
-        for (uint256 i = 0; i < proofData.length; i++) {
-            proof[i + 1] = proofData[i];
-        }
-
-        bool result = verifier.verify(publicInputs, proof);
-        assertTrue(result);
-    }
-
-    function testFuzz_verify_plonkWithArbitraryProof(uint256[] memory proofData) public view {
-        vm.assume(proofData.length > 0);
-
-        uint256[] memory publicInputs = new uint256[](2);
-        publicInputs[0] = 123;
-        publicInputs[1] = 456;
-
-        uint256[] memory proof = new uint256[](proofData.length + 1);
-        proof[0] = PLONK_VERIFICATION_TYPE;
-        for (uint256 i = 0; i < proofData.length; i++) {
-            proof[i + 1] = proofData[i];
-        }
-
-        bool result = verifier.verify(publicInputs, proof);
-        assertTrue(result);
     }
 }

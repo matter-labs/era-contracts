@@ -9,7 +9,8 @@ use serde_json::Value;
 
 use crate::types::{CommitmentSlot, G2Elements};
 use crate::utils::{
-    convert_list_to_hexadecimal, create_hash_map, format_const, get_modexp_function,
+    convert_list_to_hexadecimal, create_hash_map, domain_params_from_n, format_const,
+    get_modexp_function,
 };
 
 lazy_static! {
@@ -43,13 +44,24 @@ pub fn insert_residue_elements_and_commitments(
     let residue_g2_elements = generate_residue_g2_elements(vk);
     let commitments = generate_commitments(vk);
 
+    // `DOMAIN_SIZE` / `OMEGA` are derived from the VK degree, never hardcoded
+    // (see `domain_params_from_n`).
+    let n = vk
+        .get("n")
+        .and_then(Value::as_u64)
+        .expect("VK is missing a numeric `n` field");
+    let domain = domain_params_from_n(n);
+
     let modexp_function = get_modexp_function();
     let verifier_contract_template = template.replace("{{modexp_function}}", &modexp_function);
 
     Ok(reg.render_template(
         &verifier_contract_template,
         &json!({"residue_g2_elements": residue_g2_elements, "c0": commitments,
-                        "vk_hash": vk_hash, "contract_name": contract_name}),
+                        "vk_hash": vk_hash, "contract_name": contract_name,
+                        "domain_size": domain.size_hex,
+                        "domain_size_log2": domain.log2,
+                        "omega": domain.omega_hex}),
     )?)
 }
 

@@ -24,6 +24,11 @@ use std::str::FromStr;
 enum Variant {
     Era,
     ZKsyncOS,
+    /// Airbender (RISC-V) FRI proof wrapped into a PLONK SNARK. Only a PLONK
+    /// verification key exists for it today, so this variant generates just the
+    /// PLONK verifier. Its input `snark_vk.json` is downloaded from the pinned
+    /// `eravm-airbender-verifier` release by `regenerate-airbender-verifier.sh`.
+    Airbender,
     Custom,
 }
 
@@ -34,8 +39,12 @@ impl FromStr for Variant {
         match s.to_lowercase().as_str() {
             "era" => Ok(Variant::Era),
             "zksync-os" | "zksyncos" => Ok(Variant::ZKsyncOS),
+            "airbender" => Ok(Variant::Airbender),
             "custom" => Ok(Variant::Custom),
-            _ => Err(format!("Invalid variant '{}'. Valid options: era, zksync-os, custom", s)),
+            _ => Err(format!(
+                "Invalid variant '{}'. Valid options: era, zksync-os, airbender, custom",
+                s
+            )),
         }
     }
 }
@@ -46,7 +55,7 @@ impl FromStr for Variant {
     about = "Tool for generating verifier contract using scheduler json key"
 )]
 struct Opt {
-    /// Variant to use: era, zksync-os, or custom
+    /// Variant to use: era, zksync-os, airbender, or custom
     #[structopt(long = "variant", default_value = "custom")]
     variant: Variant,
 
@@ -74,25 +83,53 @@ struct Opt {
 
 }
 
-fn resolve_paths(opt: &Opt) -> (String, String, String, String) {
+/// A single verifier contract to generate from a verification key.
+struct Job {
+    input_path: String,
+    output_path: String,
+}
+
+/// Resolve which contracts to generate for a variant. The PLONK job is always
+/// present; the FFLONK job is `None` for variants that have no FFLONK wrapper
+/// (currently Airbender).
+fn resolve_jobs(opt: &Opt) -> (Job, Option<Job>) {
     match opt.variant {
         Variant::Era => (
-            "data/Era_plonk_scheduler_key.json".to_string(),
-            "data/Era_fflonk_scheduler_key.json".to_string(),
-            "data/EraVerifierPlonk.sol".to_string(),
-            "data/EraVerifierFflonk.sol".to_string(),
+            Job {
+                input_path: "data/Era_plonk_scheduler_key.json".to_string(),
+                output_path: "data/EraVerifierPlonk.sol".to_string(),
+            },
+            Some(Job {
+                input_path: "data/Era_fflonk_scheduler_key.json".to_string(),
+                output_path: "data/EraVerifierFflonk.sol".to_string(),
+            }),
         ),
         Variant::ZKsyncOS => (
-            "data/ZKsyncOS_plonk_scheduler_key.json".to_string(),
-            "data/ZKsyncOS_fflonk_scheduler_key.json".to_string(),
-            "data/ZKsyncOSVerifierPlonk.sol".to_string(),
-            "data/ZKsyncOSVerifierFflonk.sol".to_string(),
+            Job {
+                input_path: "data/ZKsyncOS_plonk_scheduler_key.json".to_string(),
+                output_path: "data/ZKsyncOSVerifierPlonk.sol".to_string(),
+            },
+            Some(Job {
+                input_path: "data/ZKsyncOS_fflonk_scheduler_key.json".to_string(),
+                output_path: "data/ZKsyncOSVerifierFflonk.sol".to_string(),
+            }),
+        ),
+        Variant::Airbender => (
+            Job {
+                input_path: "data/airbender_snark_vk.json".to_string(),
+                output_path: "data/AirbenderVerifierPlonk.sol".to_string(),
+            },
+            None,
         ),
         Variant::Custom => (
-            opt.plonk_input_path.clone(),
-            opt.fflonk_input_path.clone(),
-            opt.plonk_output_path.clone(),
-            opt.fflonk_output_path.clone(),
+            Job {
+                input_path: opt.plonk_input_path.clone(),
+                output_path: opt.plonk_output_path.clone(),
+            },
+            Some(Job {
+                input_path: opt.fflonk_input_path.clone(),
+                output_path: opt.fflonk_output_path.clone(),
+            }),
         ),
     }
 }
@@ -101,64 +138,63 @@ fn resolve_contract_name(variant: &Variant) -> String {
     match variant {
         Variant::Era => "Era".to_string(),
         Variant::ZKsyncOS => "ZKsyncOS".to_string(),
+        Variant::Airbender => "Airbender".to_string(),
         Variant::Custom => "".to_string(),
     }
+}
+
+/// Generate a PLONK verifier contract from a scheduler/snark verification key.
+fn generate_plonk(job: &Job, contract_name: &str) -> Result<(), Box<dyn Error>> {
+    let reader = BufReader::new(File::open(&job.input_path)?);
+    let vk: HashMap<String, Value> = from_reader(reader)?;
+
+    let template = fs::read_to_string("data/plonk_verifier_contract_template.txt")?;
+
+    let vk_text = fs::read_to_string(&job.input_path)
+        .unwrap_or_else(|_| panic!("Unable to read from {}", &job.input_path));
+    let vk_typed: VerificationKey<Bn256, ZkSyncSnarkWrapperCircuit> =
+        serde_json::from_str(&vk_text).unwrap();
+    let vk_hash = hex::encode(calculate_verification_key_hash(vk_typed).to_fixed_bytes());
+
+    let contract =
+        plonk_insert_residue_elements_and_commitments(&template, &vk, &vk_hash, contract_name)?;
+
+    File::create(&job.output_path)?.write_all(contract.as_bytes())?;
+    println!("Wrote PLONK verifier to {} (vk hash 0x{})", job.output_path, vk_hash);
+    Ok(())
+}
+
+/// Generate an FFLONK verifier contract from a scheduler verification key.
+fn generate_fflonk(job: &Job, contract_name: &str) -> Result<(), Box<dyn Error>> {
+    let reader = BufReader::new(File::open(&job.input_path)?);
+    let vk: HashMap<String, Value> = from_reader(reader)?;
+
+    let template = fs::read_to_string("data/fflonk_verifier_contract_template.txt")?;
+
+    let vk_text = fs::read_to_string(&job.input_path)
+        .unwrap_or_else(|_| panic!("Unable to read from {}", &job.input_path));
+    let vk_typed: FflonkVerificationKey<Bn256, ZkSyncSnarkWrapperCircuitNoLookupCustomGate> =
+        serde_json::from_str(&vk_text).unwrap();
+    let vk_hash = hex::encode(calculate_fflonk_verification_key_hash(vk_typed).to_fixed_bytes());
+
+    let contract =
+        fflonk_insert_residue_elements_and_commitments(&template, &vk, &vk_hash, contract_name)?;
+
+    File::create(&job.output_path)?.write_all(contract.as_bytes())?;
+    println!("Wrote FFLONK verifier to {} (vk hash 0x{})", job.output_path, vk_hash);
+    Ok(())
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_args();
 
-    let (plonk_input_path, fflonk_input_path, plonk_output_path, fflonk_output_path) = resolve_paths(&opt);
     let contract_name = resolve_contract_name(&opt.variant);
+    let (plonk_job, fflonk_job) = resolve_jobs(&opt);
 
-    let plonk_reader = BufReader::new(File::open(&plonk_input_path)?);
-    let fflonk_reader = BufReader::new(File::open(&fflonk_input_path)?);
-
-    let plonk_vk: HashMap<String, Value> = from_reader(plonk_reader)?;
-    let fflonk_vk: HashMap<String, Value> = from_reader(fflonk_reader)?;
-
-    let plonk_verifier_contract_template =
-        fs::read_to_string("data/plonk_verifier_contract_template.txt")?;
-    let fflonk_verifier_contract_template =
-        fs::read_to_string("data/fflonk_verifier_contract_template.txt")?;
-
-    let plonk_verification_key = fs::read_to_string(&plonk_input_path)
-        .unwrap_or_else(|_| panic!("Unable to read from {}", &plonk_input_path));
-
-    let fflonk_verification_key = fs::read_to_string(&fflonk_input_path)
-        .unwrap_or_else(|_| panic!("Unable to read from {}", &fflonk_input_path));
-
-    let plonk_verification_key: VerificationKey<Bn256, ZkSyncSnarkWrapperCircuit> =
-        serde_json::from_str(&plonk_verification_key).unwrap();
-
-    let fflonk_verification_key: FflonkVerificationKey<Bn256, ZkSyncSnarkWrapperCircuitNoLookupCustomGate> =
-        serde_json::from_str(&fflonk_verification_key).unwrap();
-
-    let plonk_vk_hash =
-        hex::encode(calculate_verification_key_hash(plonk_verification_key).to_fixed_bytes());
-    
-    let fflonk_vk_hash =
-        hex::encode(calculate_fflonk_verification_key_hash(fflonk_verification_key).to_fixed_bytes());
-
-    let plonk_verifier_contract_template = plonk_insert_residue_elements_and_commitments(
-        &plonk_verifier_contract_template,
-        &plonk_vk,
-        &plonk_vk_hash,
-        &contract_name,
-    )?;
-
-    let fflonk_verifier_contract_template = fflonk_insert_residue_elements_and_commitments(
-        &fflonk_verifier_contract_template,
-        &fflonk_vk,
-        &fflonk_vk_hash,
-        &contract_name,
-    )?;
-
-    let mut plonk_file = File::create(plonk_output_path)?;
-    plonk_file.write_all(plonk_verifier_contract_template.as_bytes())?;
-
-    let mut fflonk_file = File::create(fflonk_output_path)?;
-    fflonk_file.write_all(fflonk_verifier_contract_template.as_bytes())?;
+    generate_plonk(&plonk_job, &contract_name)?;
+    if let Some(fflonk_job) = fflonk_job {
+        generate_fflonk(&fflonk_job, &contract_name)?;
+    }
 
     Ok(())
 }

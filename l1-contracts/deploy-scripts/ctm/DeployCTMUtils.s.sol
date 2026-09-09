@@ -74,6 +74,9 @@ struct Config {
     address ownerAddress;
     bytes32 zkTokenAssetId;
     bool testnetVerifier;
+    /// @notice When true (and not ZKsyncOS), the Airbender PLONK verifier is deployed and wired
+    ///         into the third slot of the Era dual verifier.
+    bool airbenderVerifier;
     bool supportL2LegacySharedBridgeTest;
     bool isZKsyncOS;
     ContractsConfig contracts;
@@ -134,6 +137,10 @@ abstract contract DeployCTMUtils is DeployUtils {
         // https://book.getfoundry.sh/cheatcodes/parse-toml
         config.ownerAddress = toml.readAddress("$.owner_address");
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
+        // Optional key: older configs may not set it, in which case Airbender support is disabled.
+        if (toml.keyExists("$.airbender_verifier")) {
+            config.airbenderVerifier = toml.readBool("$.airbender_verifier");
+        }
 
         config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
         if (toml.keyExists("$.is_zk_sync_os")) {
@@ -322,6 +329,8 @@ abstract contract DeployCTMUtils is DeployUtils {
             compareStrings(contractName, "EraVerifierPlonk") || compareStrings(contractName, "ZKsyncOSVerifierPlonk")
         ) {
             return abi.encode();
+        } else if (compareStrings(contractName, "AirbenderVerifierPlonk")) {
+            return abi.encode();
         } else if (compareStrings(contractName, "DefaultUpgrade")) {
             return abi.encode();
         } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
@@ -392,6 +401,7 @@ abstract contract DeployCTMUtils is DeployUtils {
                 eip7702Checker: ctmAddresses.admin.eip7702Checker,
                 verifierFflonk: ctmAddresses.stateTransition.verifiers.verifierFflonk,
                 verifierPlonk: ctmAddresses.stateTransition.verifiers.verifierPlonk,
+                airbenderVerifierPlonk: ctmAddresses.stateTransition.verifiers.airbenderVerifierPlonk,
                 // For L1 deployment we need to use the deployer as the owner of the verifier,
                 // because we set the dual verifier later. Use getBroadcasterAddress() to get
                 // the actual EOA when this is called from a contract created via `new` during the script.

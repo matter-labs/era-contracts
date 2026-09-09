@@ -113,7 +113,6 @@ contract TransactionValidatorTest is Test {
             500, // calldata length
             2, // factory deps
             800, // gas per pubdata
-            1 gwei, // max fee per gas
             false // not zkSyncOS
         );
 
@@ -126,21 +125,6 @@ contract TransactionValidatorTest is Test {
             500, // calldata length
             2, // factory deps
             800, // gas per pubdata
-            1 gwei, // max fee per gas
-            true // zkSyncOS
-        );
-
-        assertTrue(minGas > 0);
-    }
-
-    function test_getMinimalPriorityTransactionGasLimit_zkSyncOS_freeTransaction() public pure {
-        // Free transaction (max fee = 0) in zkSyncOS mode
-        uint256 minGas = TransactionValidator.getMinimalPriorityTransactionGasLimit(
-            1000, // encoding length
-            500, // calldata length
-            0, // factory deps
-            800, // gas per pubdata
-            0, // max fee per gas = 0 for free/special txs
             true // zkSyncOS
         );
 
@@ -153,7 +137,6 @@ contract TransactionValidatorTest is Test {
             500,
             0, // no factory deps
             800,
-            1 gwei,
             false
         );
 
@@ -162,7 +145,6 @@ contract TransactionValidatorTest is Test {
             500,
             5, // 5 factory deps
             800,
-            1 gwei,
             false
         );
 
@@ -176,7 +158,6 @@ contract TransactionValidatorTest is Test {
             50,
             0,
             800,
-            1 gwei,
             false
         );
 
@@ -185,7 +166,6 @@ contract TransactionValidatorTest is Test {
             5000,
             0,
             800,
-            1 gwei,
             false
         );
 

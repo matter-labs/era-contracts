@@ -299,6 +299,14 @@ contract UtilsFacet is ZKChainBase {
         s.zksyncOS = _zksyncOS;
     }
 
+    function util_setZKsyncOSMaxTxGasLimit(uint64 _maxTxGasLimit) external {
+        s.zksyncOSMaxTxGasLimit = _maxTxGasLimit;
+    }
+
+    function util_getZKsyncOSMaxTxGasLimit() external view returns (uint64) {
+        return s.zksyncOSMaxTxGasLimit;
+    }
+
     function util_setBaseTokenHasTotalSupply(bool _hasTotalSupply) external {
         s.baseTokenHasTotalSupply = _hasTotalSupply;
     }

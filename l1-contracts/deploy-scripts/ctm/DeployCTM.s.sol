@@ -224,6 +224,18 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         ctmAddresses.stateTransition.verifiers.verifierFflonk = deploySimpleContract(fflonkName, false);
         ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract(plonkName, false);
+
+        // The Airbender PLONK verifier occupies the third slot of the Era dual verifier. It must be
+        // deployed before the dual verifier so its address is included in the constructor args (see
+        // `getCTMCoreDeploymentConfig`). ZKsyncOS registers sub-verifiers separately, so the slot
+        // is skipped there.
+        if (config.airbenderVerifier && !config.isZKsyncOS) {
+            ctmAddresses.stateTransition.verifiers.airbenderVerifierPlonk = deploySimpleContract(
+                "AirbenderVerifierPlonk",
+                false
+            );
+        }
+
         ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName, false);
 
         // Use getDeployerAddress() to ensure the correct sender even when called from nested contracts
@@ -352,6 +364,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             ctmAddresses.stateTransition.proxies.chainTypeManager
         );
         vm.serializeAddress("state_transition", "verifier_addr", ctmAddresses.stateTransition.verifiers.verifier);
+        vm.serializeAddress(
+            "state_transition",
+            "airbender_verifier_addr",
+            ctmAddresses.stateTransition.verifiers.airbenderVerifierPlonk
+        );
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", ctmAddresses.stateTransition.genesisUpgrade);
         vm.serializeAddress("state_transition", "default_upgrade_addr", ctmAddresses.stateTransition.defaultUpgrade);
         vm.serializeAddress("state_transition", "eip7702_checker_addr", ctmAddresses.admin.eip7702Checker);
