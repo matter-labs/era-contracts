@@ -1,3 +1,5 @@
+# One-click regen for everything pre-merge-checks.yaml validates: hashes +
+# selectors + zkstack-out, then chain states (sequential so the pushes don't race).
 name: Update All Generated Artifacts
 
 on:
@@ -13,7 +15,7 @@ permissions:
 
 jobs:
   update-hashes:
-    name: Update contract hashes
+    name: Update hashes, selectors, zkstack-out
     uses: ./.github/workflows/update-hashes-on-demand.yaml
     with:
       pr_number: ${{ github.event.inputs.pr_number }}
