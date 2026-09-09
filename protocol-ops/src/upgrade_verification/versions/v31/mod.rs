@@ -44,8 +44,22 @@ pub(crate) const EXPECTED_ZKSYNC_OS_NEW_PROTOCOL_VERSION_STR: &str = "0.31.2";
 // generated and 268k blocks after its contracts were deployed — so the recorded
 // ceremony would revert (`setNewVersionUpgrade old protocol version mismatch`)
 // and the re-cut upgrades Era from v0.30.1.
-pub(crate) const EXPECTED_ERA_OLD_PROTOCOL_VERSION_STR: &str = "0.30.1";
-pub(crate) const EXPECTED_ZKSYNC_OS_OLD_PROTOCOL_VERSION_STR: &str = "0.30.1";
+// Source line each flavour upgrades from, as (major, minor) per environment.
+//
+// The patch digit is deliberately not pinned. It described a live CTM, so every
+// patch bump on someone else's chain made a pinned value wrong: ADI's ZKsync-OS
+// CTM went v0.30.1 -> v0.30.2 at block 25926020 and its calldata could no longer
+// be verified, while nothing about whether v31 applies had changed. Pinning the
+// patch is what made this table go stale three times.
+//
+// The minor still has to be per-environment, because the fleet genuinely
+// disagrees: mainnet's Era CTM is on the v0.30 line, testnet's is still on v0.29.
+// The artifact's own `old_protocol_version` is separately compared against the
+// live CTM, which is the stronger check; this table exists to catch v31 tooling
+// pointed at an ecosystem nowhere near the v0.30 line at all.
+const EXPECTED_ERA_OLD_PROTOCOL_LINE: (u64, u64) = (0, 30);
+const EXPECTED_ERA_OLD_PROTOCOL_LINE_TESTNET: (u64, u64) = (0, 29);
+const EXPECTED_ZKSYNC_OS_OLD_PROTOCOL_LINE: (u64, u64) = (0, 30);
 pub(crate) const MAX_NUMBER_OF_ZK_CHAINS: u32 = 100;
 pub(crate) const MAX_PRIORITY_TX_GAS_LIMIT: u32 = 72_000_000;
 
@@ -67,21 +81,29 @@ pub(crate) fn get_expected_new_protocol_version_for_ctm_flavor(
     ProtocolVersion::from_str(version).unwrap()
 }
 
-pub(crate) fn get_expected_old_protocol_version_for_ctm_flavor(
-    flavor: CtmFlavor,
-) -> ProtocolVersion {
-    let version = match flavor {
-        CtmFlavor::Era => EXPECTED_ERA_OLD_PROTOCOL_VERSION_STR,
-        CtmFlavor::ZksyncOs => EXPECTED_ZKSYNC_OS_OLD_PROTOCOL_VERSION_STR,
-    };
-    ProtocolVersion::from_str(version).unwrap()
+/// The `(major, minor)` line the given env's CTM of this flavour upgrades from.
+pub(crate) fn expected_old_protocol_line(env: VerifyUpgradeEnv, flavor: CtmFlavor) -> (u64, u64) {
+    match (env, flavor) {
+        (VerifyUpgradeEnv::Testnet, CtmFlavor::Era) => EXPECTED_ERA_OLD_PROTOCOL_LINE_TESTNET,
+        (_, CtmFlavor::Era) => EXPECTED_ERA_OLD_PROTOCOL_LINE,
+        (_, CtmFlavor::ZksyncOs) => EXPECTED_ZKSYNC_OS_OLD_PROTOCOL_LINE,
+    }
 }
 
+/// Human-readable form of [`expected_old_protocol_line`], e.g. `v0.30.x`.
+pub(crate) fn expected_old_protocol_line_label(env: VerifyUpgradeEnv, flavor: CtmFlavor) -> String {
+    let (major, minor) = expected_old_protocol_line(env, flavor);
+    format!("v{major}.{minor}.x")
+}
+
+/// Whether `version` sits on the source line [`expected_old_protocol_line`] names.
+/// Compares `(major, minor)` only — see the constants for why the patch is free.
 pub(crate) fn is_expected_old_protocol_version_for_ctm_flavor(
     version: ProtocolVersion,
+    env: VerifyUpgradeEnv,
     flavor: CtmFlavor,
 ) -> bool {
-    version == get_expected_old_protocol_version_for_ctm_flavor(flavor)
+    (version.major, version.minor) == expected_old_protocol_line(env, flavor)
 }
 
 /// Run the full v31 verification pipeline.
@@ -219,4 +241,80 @@ pub(crate) async fn verify(
     verify_governance_stage_calls(artifact, &verifiers, result).await?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn v(s: &str) -> ProtocolVersion {
+        ProtocolVersion::from_str(s).unwrap()
+    }
+
+    /// The fleet does not agree on one source line per flavour: mainnet's Era CTM
+    /// is on v0.30, testnet's is still on v0.29. A single per-flavour constant
+    /// cannot describe both, which is what made the testnet rehearsal fail its own
+    /// gate the moment the constant was moved for mainnet.
+    #[test]
+    fn the_era_source_line_is_per_environment() {
+        assert!(is_expected_old_protocol_version_for_ctm_flavor(
+            v("0.29.4"),
+            VerifyUpgradeEnv::Testnet,
+            CtmFlavor::Era
+        ));
+        assert!(is_expected_old_protocol_version_for_ctm_flavor(
+            v("0.30.1"),
+            VerifyUpgradeEnv::Mainnet,
+            CtmFlavor::Era
+        ));
+        // ... and each rejects the other's line.
+        assert!(!is_expected_old_protocol_version_for_ctm_flavor(
+            v("0.30.1"),
+            VerifyUpgradeEnv::Testnet,
+            CtmFlavor::Era
+        ));
+        assert!(!is_expected_old_protocol_version_for_ctm_flavor(
+            v("0.29.4"),
+            VerifyUpgradeEnv::Mainnet,
+            CtmFlavor::Era
+        ));
+    }
+
+    /// A patch bump on a live CTM must not invalidate the calldata. ADI's ZKsync-OS
+    /// CTM went v0.30.1 -> v0.30.2 at block 25926020, which under a pinned patch
+    /// digit meant its calldata could no longer be verified even though nothing
+    /// about whether v31 applies had changed.
+    #[test]
+    fn a_patch_bump_stays_on_the_same_source_line() {
+        for env in [VerifyUpgradeEnv::Adi, VerifyUpgradeEnv::Mainnet] {
+            for version in ["0.30.0", "0.30.1", "0.30.2", "0.30.9"] {
+                assert!(
+                    is_expected_old_protocol_version_for_ctm_flavor(
+                        v(version),
+                        env,
+                        CtmFlavor::ZksyncOs
+                    ),
+                    "{env:?} should accept ZKsync-OS {version}"
+                );
+            }
+            // A different minor is still a different line.
+            assert!(!is_expected_old_protocol_version_for_ctm_flavor(
+                v("0.29.4"),
+                env,
+                CtmFlavor::ZksyncOs
+            ));
+        }
+    }
+
+    #[test]
+    fn the_line_label_names_the_free_patch() {
+        assert_eq!(
+            expected_old_protocol_line_label(VerifyUpgradeEnv::Adi, CtmFlavor::ZksyncOs),
+            "v0.30.x"
+        );
+        assert_eq!(
+            expected_old_protocol_line_label(VerifyUpgradeEnv::Testnet, CtmFlavor::Era),
+            "v0.29.x"
+        );
+    }
 }

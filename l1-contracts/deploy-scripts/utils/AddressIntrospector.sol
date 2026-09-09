@@ -365,11 +365,31 @@ library AddressIntrospector {
         });
     }
 
+    /// @notice A representative live chain on `_ctm`: the one at the highest protocol
+    /// version among that CTM's chains.
+    ///
+    /// @dev Callers use this purely as a representative — one field feeds the
+    /// chain-creation params, the other two are post-upgrade smoke tests
+    /// (`prepareCreateNewChainCall`, `TESTONLY_prepareTestUpgradeChainCall`). None of
+    /// them require the chain to sit at exactly the version the CTM publishes.
+    ///
+    /// It used to require exactly that, and a CTM can legitimately publish a version
+    /// none of its chains has adopted yet: ADI's CTM went to v0.30.2 at block 25926020
+    /// while its only chain stayed on v0.30.1, so the lookup reverted and no calldata
+    /// could be generated at the chain tip — for a reason unrelated to the upgrade being
+    /// prepared. Canonical mainnet only satisfied the old rule because all six of its
+    /// ZKsync-OS chains happened to be current. A lagging chain is a normal state of the
+    /// world, so take the newest one rather than insisting on a match, and reserve the
+    /// revert for a CTM with no chains at all.
+    ///
+    /// `getProtocolVersion()` is read through the same `try` as `getChainTypeManager()`:
+    /// a chain too old to answer either is skipped rather than taken as version 0.
     function getUptoDateZkChainAddresses(IChainTypeManager _ctm) public view returns (ZkChainAddresses memory info) {
         IBridgehubBase _bridgehub = IBridgehubBase(_ctm.BRIDGE_HUB());
-        uint256 protocolVersion = _ctm.protocolVersion();
         address[] memory zkChains = _bridgehub.getAllZKChains();
 
+        address best = address(0);
+        uint256 bestVersion = 0;
         for (uint256 i = 0; i < zkChains.length; i++) {
             IZKChain zkChain = IZKChain(zkChains[i]);
             address chainCTM;
@@ -378,11 +398,24 @@ library AddressIntrospector {
             } catch {
                 continue;
             }
-            if (chainCTM == address(_ctm) && zkChain.getProtocolVersion() == protocolVersion) {
-                return getZkChainAddresses(zkChain);
+            if (chainCTM != address(_ctm)) {
+                continue;
+            }
+            uint256 chainVersion;
+            try zkChain.getProtocolVersion() returns (uint256 result) {
+                chainVersion = result;
+            } catch {
+                continue;
+            }
+            if (best == address(0) || chainVersion > bestVersion) {
+                best = zkChains[i];
+                bestVersion = chainVersion;
             }
         }
-        revert NoUptoDateZkChainFound();
+        if (best == address(0)) {
+            revert NoUptoDateZkChainFound();
+        }
+        return getZkChainAddresses(IZKChain(best));
     }
 
     // ============ Legacy Bridge Addresses ============
