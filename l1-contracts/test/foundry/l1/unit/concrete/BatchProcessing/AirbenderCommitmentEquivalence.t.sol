@@ -143,19 +143,10 @@ contract AirbenderCommitmentEquivalenceTest is Test {
     }
 
     /// With Boojum masked, the two words only that lane reproduces are pinned to zero rather than
-    /// carried as unverified operator input. Everything else in the commitment is shared with the
-    /// Airbender one, so what remains is covered by the Airbender proof.
+    /// carried as unverified operator input. Asserting only that the commitment changed would pass
+    /// with one of the two still live, so each is varied independently and must move nothing.
     function test_boojumDisabledZeroesItsOwnAuxWords() public {
         (bytes32[] memory commitments, bytes32[] memory hashes) = _callableBlobs();
-
-        // The same batch, committed once with the lane required and once with it masked.
-        committer.setDisabledProofSystems(0);
-        bytes32 withBoojum = committer.createBatchCommitment(
-            _callableBatch(),
-            CALLABLE_STATE_DIFF_HASH,
-            commitments,
-            hashes
-        );
 
         committer.setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_DISABLED);
         bytes32 masked = committer.createBatchCommitment(
@@ -164,17 +155,44 @@ contract AirbenderCommitmentEquivalenceTest is Test {
             commitments,
             hashes
         );
-        assertTrue(withBoojum != masked, "masking Boojum must drop its two aux words from the commitment");
+
+        CommitBatchInfo memory otherHeap = _callableBatch();
+        otherHeap.bootloaderHeapInitialContentsHash = keccak256("a different Boojum heap hash");
+        assertEq(
+            committer.createBatchCommitment(otherHeap, CALLABLE_STATE_DIFF_HASH, commitments, hashes),
+            masked,
+            "the Boojum heap hash must not reach a commitment built with that lane masked"
+        );
+
+        CommitBatchInfo memory otherEvents = _callableBatch();
+        otherEvents.eventsQueueStateHash = keccak256("a different events queue hash");
+        assertEq(
+            committer.createBatchCommitment(otherEvents, CALLABLE_STATE_DIFF_HASH, commitments, hashes),
+            masked,
+            "the events queue hash must not reach a commitment built with that lane masked"
+        );
+
+        // Both are live again once the lane is required, so the zeroing is the mask's doing.
+        committer.setDisabledProofSystems(0);
+        assertTrue(
+            committer.createBatchCommitment(otherHeap, CALLABLE_STATE_DIFF_HASH, commitments, hashes) !=
+                committer.createBatchCommitment(_callableBatch(), CALLABLE_STATE_DIFF_HASH, commitments, hashes),
+            "with the lane required the heap hash must change the commitment"
+        );
 
         // Zeroing must not collapse the two lanes onto one value: a single proof satisfying both
         // public inputs is exactly what the two-system requirement exists to prevent.
-        bytes32 airbender = committer.createAirbenderBatchCommitment(
-            _callableBatch(),
-            CALLABLE_STATE_DIFF_HASH,
-            commitments,
-            hashes
+        committer.setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_DISABLED);
+        assertTrue(
+            masked !=
+                committer.createAirbenderBatchCommitment(
+                    _callableBatch(),
+                    CALLABLE_STATE_DIFF_HASH,
+                    commitments,
+                    hashes
+                ),
+            "the two commitments must stay distinct"
         );
-        assertTrue(masked != airbender, "the two commitments must stay distinct");
     }
 
     /// Disabling Boojum leaves the Airbender lane required, so the batch still carries an Airbender
