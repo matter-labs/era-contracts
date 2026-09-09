@@ -1,4 +1,7 @@
 tools/verifier-gen/data
+# Emitted by tools/src/bin/serialize_test_proof.rs, whose header says not to edit it by hand, so
+# formatting it here would be undone by the next regeneration.
+l1-contracts/test/foundry/l1/unit/concrete/state-transition/verifiers/fixtures/AirbenderPlonkProofFixture.sol
 l1-contracts/contracts/state-transition/verifiers/EraVerifierPlonk.sol
 l1-contracts/contracts/state-transition/verifiers/EraVerifierFflonk.sol
 l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol

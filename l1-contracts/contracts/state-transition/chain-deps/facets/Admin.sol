@@ -66,7 +66,6 @@ import {
     ZKsyncOSMaxTxGasLimitTooLow
 } from "../../../common/L1ContractErrors.sol";
 import {IEraMultiProofVerifier} from "../../chain-interfaces/IEraMultiProofVerifier.sol";
-import {IVerifier} from "../../chain-interfaces/IVerifier.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {

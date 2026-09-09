@@ -42,22 +42,16 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// `ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT`
     function setZKsyncOSMaxTxGasLimit(uint64 _newMaxTxGasLimit) external;
 
-    /// @notice Turn one of this Era chain's proof systems on or off, keeping the chain live through a
-    /// prover incident. Never both: a call leaving no system required is rejected.
-    /// @dev Switching off applies while committed batches are still unverified, which is the situation it
-    /// exists for. Switching on requires a drained pipeline, and requiring the Airbender lane also needs
-    /// the multi-proof capability and one settled batch of the chain's own.
-    /// @param _proofSystem `BOOJUM_PROOF_SYSTEM_DISABLED` (1) or `AIRBENDER_PROOF_SYSTEM_DISABLED` (2).
-    /// A single system, not a mask, a bit index or a proof-envelope type.
-    /// @param _enabled Whether that system is required in order to settle a batch.
+    /// @notice Enables or disables one proof system for an Era chain. Never both: a call that would
+    /// leave no system required is rejected, as is enabling one with batches still unverified.
+    /// @param _proofSystem Single proof-system bit: BOOJUM_PROOF_SYSTEM_DISABLED (1) or
+    /// AIRBENDER_PROOF_SYSTEM_DISABLED (2).
+    /// @param _enabled Whether the selected proof system is enabled.
     function setProofSystemStatus(uint8 _proofSystem, bool _enabled) external;
 
-    /// @notice Sets whether this chain runs the multi-proof gate.
-    /// @dev Capability, not incident state: `Committer` requires the Airbender heap hash exactly when it
-    /// is set, unlike `setProofSystemStatus`, which says only that a system is temporarily down.
-    /// @dev Only changeable while the Airbender lane is masked off, in either direction, and only on a
-    /// chain whose installed verifier has that lane. No drained pipeline is needed: a masked-off gate
-    /// takes both input shapes and `ExecutorFacet` reads each batch's shape from its `StoredBatchInfo`.
+    /// @notice Sets whether this Era chain runs the multi-proof gate and commits Airbender data.
+    /// @dev A capability rather than incident state, unlike `setProofSystemStatus`. Changeable only
+    /// while the Airbender lane is disabled, and only on a chain whose verifier has that lane.
     /// @param _multiProofEnabled Whether the chain commits Airbender data and proves both lanes.
     function setMultiProofEnabled(bool _multiProofEnabled) external;
 
