@@ -104,6 +104,12 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
         // commitment. It also means the converse: with the lane enabled, such a batch cannot be
         // proved here at all — so enabling the lane on a chain with committed-but-unproven batches
         // stalls it until they are drained. `Admin.setDisabledProofSystems` enforces that.
+        //
+        // A two-word batch stays acceptable under a masked lane, and its Airbender segment then rides
+        // along unverified. Deliberate, and the opposite of the ZKsync OS lane, which refuses an
+        // envelope carrying a component it will not check: here the kill switch has to rescue batches
+        // already committed with Airbender data, and refusing them is what a stalled chain cannot
+        // afford. Unverified bytes cost calldata and decide nothing.
         if (
             _publicInputs.length != 2 && !(required & AIRBENDER_PROOF_SYSTEM_DISABLED == 0 && _publicInputs.length == 1)
         ) {

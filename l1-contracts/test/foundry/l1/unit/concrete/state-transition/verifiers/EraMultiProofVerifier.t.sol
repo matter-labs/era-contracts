@@ -374,4 +374,27 @@ contract EraMultiProofVerifierTest is Test {
         assertEq(verifier.acceptedProofType(), ERA_MULTI_PROOF_TYPE);
         assertFalse(verifier.isTestnetVerifier(), "the production gate must answer the flag, not omit it");
     }
+
+    /// One verifier instance serves every chain of a protocol version, so a mask belongs to the chain that
+    /// set it and to no other. Two chains, one gate, one proof: the chain requiring Airbender is refused by
+    /// the failing lane while the chain that masked it off settles. Caching the mask in the verifier would
+    /// pass every other test here and hand one chain's proof-system policy to all of them.
+    function test_maskIsReadPerCallingChain() public {
+        EraMultiProofVerifier shared = new EraMultiProofVerifier(
+            IVerifier(address(new LaneVerifier(false, true))),
+            IVerifier(address(new LaneVerifier(false, false)))
+        );
+
+        ChainStub requiresBoth = new ChainStub();
+        ChainStub airbenderMasked = new ChainStub();
+        airbenderMasked.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
+
+        vm.expectRevert(EraMultiProofVerifier.AirbenderVerificationFailed.selector);
+        requiresBoth.callVerify(shared, _publicInputs(), _default());
+
+        assertTrue(
+            airbenderMasked.callVerify(shared, _publicInputs(), _default()),
+            "the other chain's mask must not follow the verifier"
+        );
+    }
 }
