@@ -19,7 +19,7 @@ import {AIRBENDER_PROOF_SYSTEM_DISABLED, BOOJUM_PROOF_SYSTEM_DISABLED} from "con
 /// admin to keep the chain live through a prover incident, but never both: with both off a batch would
 /// settle without being proved at all.
 contract SetDisabledProofSystemsTest is AdminTest {
-    event NewDisabledProofSystems(uint8 oldDisabledProofSystems, uint8 newDisabledProofSystems);
+    event NewDisabledProofSystems(uint8 indexed oldDisabledProofSystems, uint8 indexed newDisabledProofSystems);
 
     /// A new chain starts with the Airbender lane masked off, because it also starts without the
     /// capability that lane needs: its batches carry no Airbender commitment until an admin declares

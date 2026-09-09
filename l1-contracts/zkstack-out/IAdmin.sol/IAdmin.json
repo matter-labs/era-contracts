@@ -617,13 +617,13 @@
       {
         "name": "oldDisabledProofSystems",
         "type": "uint8",
-        "indexed": false,
+        "indexed": true,
         "internalType": "uint8"
       },
       {
         "name": "newDisabledProofSystems",
         "type": "uint8",
-        "indexed": false,
+        "indexed": true,
         "internalType": "uint8"
       }
     ],

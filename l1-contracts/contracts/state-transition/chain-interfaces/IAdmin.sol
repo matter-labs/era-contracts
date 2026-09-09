@@ -170,7 +170,11 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     event NewZKsyncOSMaxTxGasLimit(uint64 oldMaxTxGasLimit, uint64 newMaxTxGasLimit);
 
     /// @notice The set of proof systems this chain does not require has changed
-    event NewDisabledProofSystems(uint8 oldDisabledProofSystems, uint8 newDisabledProofSystems);
+    /// @dev Both values indexed, matching the ZKsync OS lane's event of the same name. `indexed` does not
+    /// enter the signature, so the two already share a topic0 and one filter matches both; without this the
+    /// values would sit in topics on one lane and in the data field on the other, and a consumer decoding
+    /// from the wrong place reads zeros rather than failing.
+    event NewDisabledProofSystems(uint8 indexed oldDisabledProofSystems, uint8 indexed newDisabledProofSystems);
 
     /// @notice Whether the chain runs the multi-proof gate was changed.
     /// @param oldMultiProofEnabled The previous setting.
