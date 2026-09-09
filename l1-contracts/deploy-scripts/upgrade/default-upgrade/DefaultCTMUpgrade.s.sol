@@ -482,6 +482,15 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         upgradeConfig.upgradeCutPrepared = true;
     }
 
+    /// @notice The `RegistryBootstrapMigration` this run deploys, or zero for every edge that is
+    ///         not a bootstrap.
+    /// @dev Exists so `saveOutput` can NAME the migration: a bootstrap's stage calls target it,
+    ///      but it is not reachable from any other reported address, and a reviewer should not
+    ///      have to decode stage-1 calldata to find the object the edge runs.
+    function bootstrapMigrationAddress() public view virtual returns (address) {
+        return address(0);
+    }
+
     /// @notice The CTM domain's bound `CTMUpgradeExecutor`: the CTM's owner once the bootstrap edge
     ///         has handed the domain over. The three governance calls of this upgrade target it and
     ///         the upgrade timer is bound to it.
@@ -1120,6 +1129,19 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         vm.serializeAddress("registry", "ctm_release_addr", ctmAddresses.stateTransition.currentRelease);
         vm.serializeAddress("registry", "upgrade_timer_addr", upgradeAddresses.upgradeTimer);
         vm.serializeAddress("registry", "core_registry_addr", upgradeAddresses.coreRegistry);
+        address bootstrapMigrationAddr = bootstrapMigrationAddress();
+        vm.serializeAddress("registry", "bootstrap_migration_addr", bootstrapMigrationAddr);
+        // `ctm_upgrade_executor_addr` stays gated on the transition: protocol-ops reads a nonzero
+        // value there as "this prepare's stage calls ARE executor calls", which a bootstrap's are
+        // not (they are the two handovers and `migrate()`). The executor still has to be named,
+        // so it gets its own ungated key. Only the v34 override is safe to call pre-bootstrap —
+        // the default reads the CTM's live owner, which is not yet an executor.
+        bool executorKnown = upgradeAddresses.ctmTransition != address(0) || bootstrapMigrationAddr != address(0);
+        vm.serializeAddress(
+            "registry",
+            "bound_ctm_upgrade_executor_addr",
+            executorKnown ? boundCTMUpgradeExecutor() : address(0)
+        );
         string memory registry = vm.serializeAddress(
             "registry",
             "ctm_upgrade_executor_addr",

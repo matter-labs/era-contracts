@@ -60,9 +60,13 @@ cargo run --release --bin protocol_ops -- ecosystem verify-bootstrap \
   --expected-governance-owner 0x...
 ```
 
-Sharp edge: the protocol-ops prepare path does not emit `[registry] upgrade_timer_addr` (the
-in-forge path does), so the timer is taken from the manifest and the package field is only ever
-a cross-check.
+The prepare output names every object the edge runs, including the two a bootstrap has that a
+recurring upgrade does not: `bootstrap_migration_addr` and `bound_ctm_upgrade_executor_addr`.
+`ctm_transition_addr` and `ctm_upgrade_executor_addr` stay zero for a bootstrap on purpose —
+the edge has no transition, and protocol-ops reads a nonzero executor there as "this prepare's
+stage calls are executor calls", which a bootstrap's are not. The verifier still derives the
+migration from the stage-1 `migrate()` call and treats the reported field as a cross-check, so
+it checks the calldata governance will execute rather than the prepare's summary of it.
 
 ## What protocol-ops is
 

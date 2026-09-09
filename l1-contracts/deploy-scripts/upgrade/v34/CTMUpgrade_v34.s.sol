@@ -94,6 +94,11 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
         members[7] = "EIP7702Checker";
     }
 
+    /// @inheritdoc DefaultCTMUpgrade
+    function bootstrapMigrationAddress() public view virtual override returns (address) {
+        return address(bootstrapMigration);
+    }
+
     /// @notice The executor this run deploys — the CTM's owner only once `migrate()` has run.
     function boundCTMUpgradeExecutor() public view virtual override returns (address) {
         require(address(ctmUpgradeExecutor) != address(0), "CTM executor not deployed");

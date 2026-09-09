@@ -61,9 +61,23 @@ pub(crate) async fn verify(
 
     result.print_info("== Package ==");
     result.report_ok(&format!(
-        "bootstrap edge on CTM section [{}]: migration {}",
+        "bootstrap edge on CTM section [{}]: migration {} (from the stage-1 `migrate()` call)",
         package.ctm_key, package.migration
     ));
+    match package.reported_migration {
+        Some(reported) if reported == package.migration => {
+            result.report_ok("the reported bootstrap_migration_addr matches the executable calls")
+        }
+        Some(reported) => result.report_error(&format!(
+            "the package reports bootstrap_migration_addr {reported} but stage 1 calls \
+             `migrate()` on {}: the summary and the executable calls describe different edges",
+            package.migration
+        )),
+        None => result.report_warn(
+            "the package does not report bootstrap_migration_addr, so the migration is known \
+             only from the stage-1 calldata",
+        ),
+    }
 
     // ── 1. The migration itself, and its pinned manifest ──
     result.print_info("\n== Object provenance ==");
@@ -482,7 +496,7 @@ pub(crate) async fn verify(
         Some(_) => result.report_ok("the package's reported timer matches the manifest's pin"),
         None => result.report_warn(
             "the package does not report upgrade_timer_addr, so the timer is taken from the \
-             manifest alone (the protocol-ops prepare path omits this key today)",
+             manifest alone — a package produced before the prepare output named it",
         ),
     }
 

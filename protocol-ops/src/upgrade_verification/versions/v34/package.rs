@@ -1,12 +1,18 @@
 //! The reviewable inputs of a v34 bootstrap package.
 //!
 //! A package is the merged prepare TOML (`ecosystem upgrade-prepare-all`'s output) plus the
-//! live L1 it targets. Two of the objects a reviewer most needs are NOT named fields in that
-//! TOML: a bootstrap edge has no `CTMTransition`, so `[registry] ctm_transition_addr` and
-//! `ctm_upgrade_executor_addr` are both zero, and the `RegistryBootstrapMigration` address is
-//! never serialized. They are recovered from the stage-1 calls instead, which is the stronger
-//! reading anyway: the verifier then checks the calldata governance will actually execute
-//! rather than the prepare's summary of it.
+//! live L1 it targets.
+//!
+//! The migration is derived from the stage-1 `migrate()` call rather than read from a field,
+//! and stays so deliberately: the verifier should check the calldata governance will actually
+//! execute, not the prepare's summary of it. `[registry] bootstrap_migration_addr` is then a
+//! cross-check — a disagreement means the summary and the executable calls describe different
+//! edges, which is worth a finding of its own.
+//!
+//! `ctm_transition_addr` and `ctm_upgrade_executor_addr` are both zero for a bootstrap and that
+//! is correct, not missing: the edge has no transition, and protocol-ops reads a nonzero
+//! executor there as "this prepare's stage calls are executor calls", which a bootstrap's are
+//! not. The executor is reported under `bound_ctm_upgrade_executor_addr` instead.
 
 use std::path::Path;
 
@@ -36,8 +42,11 @@ pub(crate) struct BootstrapPackage {
     /// Absent from protocol-ops-driven prepare output today (the in-forge path emits it),
     /// so it is only ever a cross-check against the manifest's own pin.
     pub(crate) upgrade_timer: Option<Address>,
-    /// Recovered from the stage-1 `migrate()` call.
+    /// Recovered from the stage-1 `migrate()` call — the executable source of truth.
     pub(crate) migration: Address,
+    /// `[registry] bootstrap_migration_addr`, when the prepare named it: a cross-check on the
+    /// address recovered from calldata.
+    pub(crate) reported_migration: Option<Address>,
     /// The CTM key under `[ctms]` this package upgrades (e.g. `zksync_os`).
     pub(crate) ctm_key: String,
     pub(crate) stage0: Vec<GovernanceCall>,
@@ -100,6 +109,11 @@ impl BootstrapPackage {
         let stage2 = calls_at(&root, "stage2_calls")?;
 
         let migration = sole_migrate_target(&stage1)?;
+        let reported_migration = address_at(
+            &root,
+            &["ctms", &ctm_key, "registry", "bootstrap_migration_addr"],
+        )
+        .filter(|a| !a.is_zero());
 
         let external_actions = table(&root, &["external_actions"])
             .and_then(|v| v.as_array())
@@ -115,6 +129,7 @@ impl BootstrapPackage {
             release,
             upgrade_timer,
             migration,
+            reported_migration,
             ctm_key,
             stage0,
             stage1,
