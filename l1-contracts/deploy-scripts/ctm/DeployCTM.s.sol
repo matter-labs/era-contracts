@@ -55,8 +55,10 @@ import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeI
 contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     using stdToml for string;
 
+    /// @dev Nothing calls this: Rust drives `runInner`, CI `runWithBridgehub`, tests `runForTest`
+    ///      and `runForAnvilTest`. It stays only because `IDeployCTM` declares it, and that
+    ///      interface is compiled into `zkstack-out/` for the external `zkstack` CLI.
     function run() public virtual {
-        // Had to leave the function due to scripts that inherit this one, as well as for tests
         return ();
     }
 

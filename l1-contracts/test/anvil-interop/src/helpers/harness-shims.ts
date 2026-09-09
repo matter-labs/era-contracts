@@ -157,10 +157,10 @@ export async function installL2ChainAssetHandlerDev(provider: providers.JsonRpcP
 /**
  * Harness-only shim: reproduce the Gateway-side state transition that the Gateway
  * sequencer would apply when processing the L1→GW priority tx of
- * `GatewayPreparation.startMigrateChainFromGateway`.
+ * `AdminFunctions.startMigrateChainFromGateway`.
  *
  * Production reverse-migration sequence (end-to-end) is:
- *   1. L1 chain admin runs the `GatewayPreparation.startMigrateChainFromGateway`
+ *   1. L1 chain admin runs the `AdminFunctions.startMigrateChainFromGateway`
  *      Forge script → submits an L1→GW priority tx targeting the GW L2 chain admin
  *      with `L2AssetRouter.withdraw(ctmAssetId, BridgehubBurnCTMAssetData)` calldata.
  *   2. The Gateway sequencer picks up the priority tx → GW L2 chain admin → GW

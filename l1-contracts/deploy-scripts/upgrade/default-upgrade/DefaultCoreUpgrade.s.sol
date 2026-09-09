@@ -233,10 +233,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         return executor;
     }
 
-    function setOwners(address owner) public virtual {
-        config.ownerAddress = owner;
-    }
-
     function getNewProtocolVersion() public virtual returns (uint256) {
         return additionalConfig.newProtocolVersion;
     }
@@ -254,10 +250,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     function getDiscoveredBridgehub() public view returns (BridgehubAddresses memory) {
         return coreAddresses.bridgehub;
-    }
-
-    function getCoreAddresses() public view returns (CoreDeployedAddresses memory) {
-        return coreAddresses;
     }
 
     function initializeConfigWithArgs(
@@ -459,11 +451,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         string memory toml = vm.serializeString("root", "misc", misc);
 
         vm.writeToml(toml, outputPath);
-
-        saveOutputVersionSpecific();
     }
-
-    function saveOutputVersionSpecific() public virtual {}
 
     ////////////////////////////// Preparing calls /////////////////////////////////
 

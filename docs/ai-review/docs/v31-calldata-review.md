@@ -5,10 +5,14 @@
 - `protocol-ops/src/commands/ecosystem/verify_upgrade.rs` - PUVT entry point.
 - `protocol-ops/src/upgrade_verification/` - PUVT calldata and state verifiers.
 - `protocol-ops/README.md` - current PUVT build and run commands.
-- `l1-contracts/test/anvil-interop/run-fork-upgrade-test.ts` - stage calldata regeneration, replay, and PUVT flow
-  (`FORK_ENV_PRESET=stage`; replaces the removed `regen-and-verify-stage.sh` wrapper).
-- `l1-contracts/deploy-scripts/upgrade/v31/` - v31 upgrade script entry points.
-- `l1-contracts/deploy-scripts/upgrade/default-upgrade/` - shared v31 upgrade payload construction.
+- Stage calldata regeneration, replay and PUVT used to run through
+  `l1-contracts/test/anvil-interop/run-fork-upgrade-test.ts`. **That runner is gone**; drive PUVT
+  directly via `protocol-ops ecosystem verify-upgrade` against the package under review.
+- `l1-contracts/deploy-scripts/upgrade/v31/` - v31 upgrade script entry points. **No longer in the
+  tree**: the directory was removed once v31 shipped, so read it from the v31 release branch when
+  reviewing a v31 package.
+- `l1-contracts/deploy-scripts/upgrade/default-upgrade/` - shared upgrade payload construction. Note
+  that this has since moved on from what v31 shipped; check it out at the reviewed release's commit.
 - `l1-contracts/contracts/upgrades/` - governance and L2 upgrade structs used for decoding.
 - `l1-contracts/upgrade-envs/` - reviewed environment and permanent-value inputs.
 - `AllContractsHashes.json` - bytecode hash to artifact mapping.

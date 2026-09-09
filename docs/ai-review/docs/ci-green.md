@@ -112,14 +112,29 @@ npx ts-node setup-and-dump-state.ts
 
 Commit the regenerated `chain-states/` files alongside the contract change. CI currently does not regenerate states on PRs — it expects committed states to match the current mock contracts.
 
-### 1c. Upgrade tests (v31→v32)
+### 1c. Upgrade pipelines
 
-This exercises the full upgrade flow against the captured v31 chain states. It uses protocol-ops's split flow: `ecosystem upgrade-prepare-all` to deploy core + per-CTM contracts and emit merged governance calls, `ecosystem upgrade-governance` to replay stages 0/1/2, `ecosystem stage3` to register bridged tokens and populate `bridgedOut`, then `chain upgrade` per chain. In production a chain's priority-op lower bound must also be recorded (`RecordPriorityOpLowerBound.s.sol`) well before its `chain upgrade`; the test harness models the draft-v31 backfill prerequisite instead (see `harness-shims.ts`).
+Two runners cover the two shapes of upgrade, and CI runs each as its own job in
+`anvil-interop-ci.yaml`.
+
+`run-v33-to-v34-upgrade-test.ts` is the **bootstrap** edge: it drives protocol-ops's split
+flow (`ecosystem upgrade-prepare-all` to deploy core + per-CTM contracts and emit merged
+governance calls, `ecosystem upgrade-governance` to replay stages 0/1/2, then `chain upgrade`
+per chain), which installs the registry objects and hands ecosystem authority to the
+executors. It then chains follow-up hops through the same tooling to prove the installed
+model keeps working: a same-minor verifier patch, then a subsequent minor upgrade.
+
+`run-v34-to-v35-upgrade-test.ts` is the **steady-state** edge, driven at the object level
+rather than through the governance-calldata scripts. `REGEN_REGISTRIES=1` regenerates its
+manifest fixture.
 
 ```bash
 cd l1-contracts/test/anvil-interop
-npx ts-node run-v31-to-v32-upgrade-test.ts
+yarn ts-node run-v33-to-v34-upgrade-test.ts
+yarn ts-node run-v34-to-v35-upgrade-test.ts
 ```
+
+Pass `ANVIL_INTEROP_PORT_OFFSET=<n>` to either when another anvil set is already up.
 
 Prerequisites: same as anvil-interop tests (all foundry builds done). Plus:
 
@@ -128,7 +143,7 @@ Prerequisites: same as anvil-interop tests (all foundry builds done). Plus:
 
 Common failures:
 
-- **"Script not found: deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol"** or **`CTMUpgrade_v31.s.sol`** — `yarn l1 build:foundry` not run, or the test override path is wrong.
+- **"Script not found: deploy-scripts/upgrade/v34/CoreUpgrade_v34.s.sol"** or **`CTMUpgrade_v34.s.sol`** — `yarn l1 build:foundry` not run, or the test override path is wrong.
 - **"call to non-contract address 0x0…"** — usually the upgrade script reading an address before the contract is deployed/registered. Use `cast run <txhash>` against the still-running anvil to get the trace; see `AGENTS.md` "Debugging Failed Transactions with cast run" for the recipe.
 - **"vm.writeToml: path not allowed"** — script-out path concatenation issue. Check that `vm.projectRoot()` is concatenated once, not twice.
 

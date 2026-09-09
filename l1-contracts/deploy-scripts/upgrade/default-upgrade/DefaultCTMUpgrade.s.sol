@@ -114,10 +114,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     // solhint-disable-next-line gas-struct-packing
-    struct GatewayConfig {
-        uint256 chainId;
-    }
-
     struct NewlyGeneratedData {
         /// @dev The committed upgrade cut, READ from the upgrade object that composes it on-chain.
         bytes upgradeCutData;
@@ -152,7 +148,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
     // Input for the script
     AdditionalConfig internal newConfig;
-    GatewayConfig internal gatewayConfig;
 
     // Discovered addresses
     ZkChainAddresses internal discoveredRepresentativeZkChain;
@@ -671,18 +666,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         return coreAddresses.shared.bridgehubAdmin;
     }
 
-    function getGatewayConfig() public virtual returns (GatewayConfig memory) {
-        return gatewayConfig;
-    }
-
-    function getGovernanceUpgradeTimerInitialDelay() public view virtual returns (uint256) {
-        return newConfig.governanceUpgradeTimerInitialDelay;
-    }
-
-    function getTestnetVerifier() public view virtual returns (bool) {
-        return config.testnetVerifier;
-    }
-
     /// @notice This function is meant to only be used in tests
     function prepareCreateNewChainCall(uint256 chainId) public view virtual returns (Call[] memory result) {
         require(coreAddresses.bridgehub.proxies.bridgehub != address(0), "bridgehubProxyAddress is zero in newConfig");
@@ -1146,11 +1129,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         string memory toml = vm.serializeBytes("root", "chain_upgrade_diamond_cut", newlyGeneratedData.upgradeCutData);
 
         vm.writeToml(toml, outputPath);
-
-        saveOutputVersionSpecific();
     }
-
-    function saveOutputVersionSpecific() internal virtual {}
 
     function getCTMAddress() public view returns (address) {
         return newConfig.ctm;

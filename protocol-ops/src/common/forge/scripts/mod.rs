@@ -5,8 +5,8 @@ use alloy::sol_types::SolCall;
 use serde::{Deserialize, Serialize};
 
 use crate::common::abi::{
-    AdminFunctionsAbi, DeployGatewayTransactionFiltererAbi, GatewayUtilsAbi, ICoreUpgradeV31Abi,
-    IDeployCTMAbi, IDeployL1CoreContractsAbi, IFinalizeChainInitAbi, IGatewayVotePreparationAbi,
+    AdminFunctionsAbi, DeployGatewayTransactionFiltererAbi, GatewayUtilsAbi, IDeployCTMAbi,
+    IDeployL1CoreContractsAbi, IFinalizeChainInitAbi, IGatewayVotePreparationAbi,
     IRegisterOnAllChainsAbi,
 };
 
@@ -165,15 +165,6 @@ pub static REGISTER_ON_ALL_CHAINS_INVOCATION: ForgeScriptParams = ForgeScriptPar
 .with_ffi()
 .with_rpc_url();
 
-pub static STAGE3_CORE_UPGRADE_V31_INVOCATION: ForgeScriptParams = ForgeScriptParams::new(
-    "",
-    "",
-    "deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol:CoreUpgrade_v31",
-)
-.with_ffi()
-.with_rpc_url()
-.with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT);
-
 /// Links a typed [`SolCall`] to its [`ForgeScriptParams`] invocation.
 /// Implemented via the [`script_calls!`] table — do not implement by hand.
 pub trait ScriptCall: SolCall {
@@ -222,7 +213,6 @@ script_calls! {
     // DeployCTM
     IDeployCTMAbi::runInnerCall                                         => DEPLOY_CTM_INVOCATION,
     // v31 upgrade scripts
-    ICoreUpgradeV31Abi::stage3Call                                      => STAGE3_CORE_UPGRADE_V31_INVOCATION,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

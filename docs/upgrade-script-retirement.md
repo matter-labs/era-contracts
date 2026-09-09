@@ -51,10 +51,12 @@ be kept separate from documentation and reviewed with their owning batch.
   (`RegistryBootstrapMigration.t.sol`), and the in-forge bootstrap integration test decodes the
   cut the prepare shipped and reads it back field by field against the committed hash, the pinned
   engine, the release's verifier and the all-zero L2 transaction.
-- `AdminFunctions.upgradeChainFromCTM` and `DefaultChainUpgrade.run` select the modern
-  cut-READING entrypoint FIRST (`UpgradeChainCall.requiresCut`) and reconstruct a cut from the
-  CTM's historical log only for a pre-bootstrap chain. `DefaultChainUpgrade.executeUpgrade` is
-  deleted: the chain diamond's `executeUpgrade` is `onlyChainTypeManager`, so it could not succeed.
+- `AdminFunctions.upgradeChainFromCTM` selects the modern cut-READING entrypoint FIRST
+  (`UpgradeChainCall.requiresCut`) and reconstructs a cut from the CTM's historical log only for a
+  pre-bootstrap chain. `DefaultChainUpgrade.executeUpgrade` is deleted: the chain diamond's
+  `executeUpgrade` is `onlyChainTypeManager`, so it could not succeed. `DefaultChainUpgrade` held a
+  second copy of the same selection in its own `run`; that copy was removed in batch 2 once it was
+  established that nothing called it.
 - The upgrade output's `diamond_cut_data` is retired after tracing its consumers; the field is now
   optional in the verifier (shipped v31-v33 artifacts still carry it) and its cross-check is
   skipped when absent. `force_deployments_data` and `chain_upgrade_diamond_cut` stay: both have
@@ -112,6 +114,56 @@ on failure. Modern preparation must work without historical log access. Small-ch
 check both installed state and the deployment list: unchanged members must not be redeployed.
 
 ## Batch 2: move the remaining script-defined actions into the existing flow
+
+**Partially implemented.** The deletions whose responsibilities already had a replacement have
+landed; the address-discovery and gap-closing work below is still plan.
+
+What landed, each verified by naming the surviving owner of the responsibility rather than by
+absence of a caller:
+
+- `deploy-scripts/gateway/GatewayPreparation.sol` (690 lines, 18 entrypoints) is deleted. Nothing
+  imported it — the gateway flow runs through `_GatewayPreparationForTests.sol`, which extends
+  `GatewayGovernanceUtils` — and every function it declared has a live equivalent in
+  `AdminFunctions.s.sol` or `GatewayUtils.s.sol`.
+- `ICoreUpgradeV31.stage3` and its `protocol-ops ecosystem stage3` plumbing are deleted. The
+  command resolved to `deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol`, which no longer exists,
+  so it could not succeed; a sweep of every forge-script path the Rust table declares found this
+  to be the only unresolvable one. Its responsibility is discharged rather than moved: as
+  {protocol-docs/bridging.md} records, every ecosystem the current release can upgrade has already
+  been populated, and the driver tooling belongs on that release's branch. The four
+  `*-bridged-tokens.toml` fixtures go with it — their reader, `TokenMigrationUtils.s.sol`, is
+  already gone.
+- `deploy-scripts/provider/` (864 lines: a Solidity JSON-RPC client plus the eight FFI bash
+  scripts it shelled out to) is deleted. Nothing referenced it and nothing documented it; reading
+  receipts, logs and proofs from a node is done by the TypeScript and Rust tooling, which is also
+  where the repo has been moving shell invocations OUT of scripts.
+- `DefaultChainUpgrade.run`, `upgradeChainWithoutCut`, `setUpgradeTimestamp` and `getChainConfig`
+  are deleted (114 lines to 69). The first two duplicated the cut selection that
+  `AdminFunctions.upgradeChainFromCTM` owns; `setUpgradeTimestamp` duplicated
+  `AdminFunctions.adminScheduleUpgrade`, which is what `protocol-ops chain set-upgrade-timestamp`
+  actually drives. What remains is the legacy handed-cut path the Foundry integration tests use.
+
+- Eight dead members on the upgrade bases and the introspector: `getGatewayConfig`,
+  `getGovernanceUpgradeTimerInitialDelay` and `getTestnetVerifier` on `DefaultCTMUpgrade`,
+  `setOwners` and `getCoreAddresses` on `DefaultCoreUpgrade`, `getAllForChain` and its sole
+  callee `getZkChainFacetAddresses` on `AddressIntrospector`, and both copies of the empty
+  `saveOutputVersionSpecific` extension point (wired but never overridden by any version). The
+  one-field `GatewayConfig` struct and its never-written storage variable go with their getter.
+  None is declared in a script-interface, so none is part of the `zkstack` API surface.
+  `DeployCTM.run()` stays — nothing calls it, but `IDeployCTM` declares it — with its comment
+  corrected: it claimed to exist for inheriting scripts and tests, and neither is true.
+
+Three scripts with no in-repo caller were deliberately KEPT, because "no caller" is the wrong
+test for a hand-run entrypoint: `DeployPrividiumTransactionFilterer.s.sol` is the only deployment
+path for a live product contract, `tokens/DeployZKAndBridgeToL1.s.sol` is the ZK-token bring-up,
+and `utils/BlakeContractHashing.s.sol` answers a single ad-hoc hash that full regeneration does not.
+Each is an operator or developer command; none has a replacement.
+
+A boundary this batch established, which constrains what else may be deleted: every file in
+`contracts/script-interfaces/` is exported to `l1-contracts/zkstack-out/` and consumed by the
+external `zkstack` CLI. Absence of an in-repo caller is therefore NOT evidence that one of those
+declarations is dead — removing one is a cross-repo API break. `stage3` qualified only because the
+script behind it had already been deleted, which breaks it for every consumer equally.
 
 No new permanent registries and no deployment-inventory redesign in this release. `CTMRelease`,
 transitions, the existing `CoreRegistry` upgrade object and their current execution model stay as
