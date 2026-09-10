@@ -140,8 +140,6 @@ interface IGetters is IZKChainBase {
     /// chain, since one verifier instance serves every chain of a protocol version.
     function disabledProofSystems() external view returns (uint8);
 
-    /// @return Whether this Era chain settles behind both proof systems, and so commits the Airbender
-
     /// @return Whether a withdrawal has been finalized.
     /// @param _l2BatchNumber The L2 batch number within which the withdrawal happened.
     /// @param _l2MessageIndex The index of the L2->L1 message denoting the withdrawal.

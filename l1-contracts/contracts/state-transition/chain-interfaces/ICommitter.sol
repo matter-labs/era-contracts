@@ -14,6 +14,7 @@ import {L2DACommitmentScheme} from "../../common/Config.sol";
 /// @param priorityOperationsHash Hash of all priority operations from this batch
 /// @param bootloaderHeapInitialContentsHash Hash of the initial contents of the bootloader heap. In practice it serves as the commitment to the transactions in the batch.
 /// @param eventsQueueStateHash Hash of the events queue state. In practice it serves as the commitment to the events in the batch.
+/// @param airbenderBootloaderHeapHash The same bootloader heap hashed with Blake2s, which is how the Airbender lane commits to it. Zero on chains that do not require that lane.
 /// @param systemLogs concatenation of all L2 -> L1 system logs in the batch
 /// @param operatorDAInput Packed pubdata commitments/data.
 /// @dev pubdataCommitments format: This will always start with a 1 byte pubdataSource flag. Current allowed values are 0 (calldata) or 1 (blobs)
@@ -32,9 +33,6 @@ struct CommitBatchInfo {
     bytes32 priorityOperationsHash;
     bytes32 bootloaderHeapInitialContentsHash;
     bytes32 eventsQueueStateHash;
-    /// @dev The same heap, hashed the way Airbender hashes it. The only value the contract cannot
-    /// derive for itself, and the only new thing the lane asks the operator for. `0` on chains that
-    /// do not run the lane, which then commit `airbenderCommitment = 0` and prove Boojum alone.
     bytes32 airbenderBootloaderHeapHash;
     bytes systemLogs;
     bytes operatorDAInput;
