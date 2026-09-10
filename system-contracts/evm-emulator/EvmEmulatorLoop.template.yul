@@ -370,7 +370,7 @@ for { } true { } {
         let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(dstOffset, len))
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
-        dstOffset := add(dstOffset, MEM_OFFSET())
+        dstOffset := getMemPointer(dstOffset, len)
 
         // EraVM will revert if offset + length overflows uint32
         if gt(sourceOffset, MAX_POINTER_READ_OFFSET()) {
@@ -411,7 +411,7 @@ for { } true { } {
         let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(dstOffset, len))
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
-        dstOffset := add(dstOffset, MEM_OFFSET())
+        dstOffset := getMemPointer(dstOffset, len)
 
         if gt(sourceOffset, MAX_UINT64()) {
             sourceOffset := MAX_UINT64()
@@ -491,7 +491,7 @@ for { } true { } {
 
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
-        dstOffset := add(dstOffset, MEM_OFFSET())
+        dstOffset := getMemPointer(dstOffset, len)
 
         if gt(srcOffset, MAX_UINT64()) {
             srcOffset := MAX_UINT64()
@@ -537,7 +537,7 @@ for { } true { } {
         }
 
         swapActivePointerWithEvmReturndataPointer()
-        copyActivePtrData(add(MEM_OFFSET(), dstOffset), sourceOffset, len)
+        copyActivePtrData(getMemPointer(dstOffset, len), sourceOffset, len)
         swapActivePointerWithEvmReturndataPointer()
         ip := add(ip, 1)
     }
@@ -905,7 +905,7 @@ for { } true { } {
 
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
-        mcopy(add(destOffset, MEM_OFFSET()), add(offset, MEM_OFFSET()), size)
+        mcopy(getMemPointer(destOffset, size), getMemPointer(offset, size), size)
         ip := add(ip, 1)
     }
     case 0x5F { // OP_PUSH0
