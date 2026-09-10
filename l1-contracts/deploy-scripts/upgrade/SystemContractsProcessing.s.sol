@@ -25,7 +25,7 @@ uint256 constant FIXED_ADDRESS_CORE_CONTRACTS_COUNT = 12;
 uint256 constant ZKOS_EXTRA_SYSTEM_CONTRACTS_COUNT = 3;
 
 /// @dev Core contracts that only exist on ZKsync OS chains.
-uint256 constant ZKOS_ONLY_CONTRACTS_COUNT = 3;
+uint256 constant ZKOS_ONLY_CONTRACTS_COUNT = 2;
 
 library SystemContractsProcessing {
     /// @notice Deduplicates the array of bytecodes.
@@ -105,7 +105,6 @@ library SystemContractsProcessing {
         uint256 i;
         ids[i++] = L2EcosystemContract.L2InteropCommitmentTree;
         ids[i++] = L2EcosystemContract.AtomicFlowManager;
-        ids[i++] = L2EcosystemContract.L2EcosystemRegistry;
         // Same guard as `getFixedAddressCoreContracts`: under-filling would leave `L2EcosystemContract(0)` entries.
         require(i == ZKOS_ONLY_CONTRACTS_COUNT, "ZKsync-OS-only contract count mismatch");
     }

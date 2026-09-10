@@ -42,10 +42,7 @@ enum L2EcosystemContract {
     SystemContext,
     // The retired v31 GWAssetTracker's system proxy: its table row pins the neutralizing
     // implementation (`EmptyContract`) every release re-asserts at the reserved address.
-    RemovedGWAssetTracker,
-    // The L2-side ecosystem registry (ZKsync OS only): the queryable on-chain copy of the
-    // ecosystem's pinned `FixedForceDeploymentsData` at its fixed built-in address.
-    L2EcosystemRegistry
+    RemovedGWAssetTracker
 }
 
 /// @notice Canonical identifier for CTM / state-transition contracts.
