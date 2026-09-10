@@ -63,15 +63,6 @@ library AirbenderPlonkProofFixture {
     /// little-endian `u32` words. The wrapper packs these, reads them big-endian and
     /// drops the low 32 bits (`PUBLIC_INPUT_SHIFT`) to obtain `publicInputs()[0]`.
     function programOutput() internal pure returns (uint32[8] memory words) {
-        words = [
-            uint32(2604303468),
-            744665305,
-            404691326,
-            2316458990,
-            214810959,
-            1277434626,
-            3736938332,
-            764613735
-        ];
+        words = [uint32(2604303468), 744665305, 404691326, 2316458990, 214810959, 1277434626, 3736938332, 764613735];
     }
 }
