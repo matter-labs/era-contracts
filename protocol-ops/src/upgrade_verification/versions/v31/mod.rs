@@ -218,5 +218,8 @@ pub(crate) async fn verify(
 
     verify_governance_stage_calls(artifact, &verifiers, result).await?;
 
+    // Last, so it sees every expectation the elements above registered.
+    result.report_unverified_create2_deployments(&verifiers);
+
     Ok(())
 }
