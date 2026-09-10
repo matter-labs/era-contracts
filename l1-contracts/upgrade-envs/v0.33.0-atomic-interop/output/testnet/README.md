@@ -65,6 +65,8 @@ before the per-chain cuts.
 > one-shot contract there would make every such upgrade revert on preconditions that only ever
 > held during v31 -> v33.
 
+---
+
 > **Stages 0 and 1 are two separate ceremonies, ≥ 20 minutes apart.** Stage 0 arms the
 > `GovernanceUpgradeTimer`; stage 1's `checkDeadline()` only passes once `INITIAL_DELAY` has
 > elapsed. They cannot be replayed on one anvil fork — the simulator scenario handles this
@@ -156,19 +158,19 @@ phase rather than a fourth governance stage. It is additive and idempotent per a
 interrupted run is resumed by running it again. `PopulateBridgedOutScript` is the standalone
 forge entry point for the same library, useful for assets registered in the NTV later.
 
-**Ordering.** Stage 3 runs after governance stage 2 and *before* the per-chain diamond cuts, so
+**Ordering.** Stage 3 runs after governance stage 2 and _before_ the per-chain diamond cuts, so
 that by the time a chain's cut lands every asset it can withdraw is already populated. The full
 sequence is therefore:
 
-| phase | what | who signs |
-| --- | --- | --- |
-| deploy | the CREATE2 bundle in `transactions.txt` | any EOA |
-| ceremony 1 | governance stage 0 (arms the timer) | PUH |
-| ceremony 2 | governance stages 1 + 2, ≥ 20 min later | PUH |
-| stage 3 | `bridgedOut` population | any EOA |
-| per chain | `setUpgradeTimestamp` then the diamond cut | that chain's admin |
+| phase      | what                                       | who signs          |
+| ---------- | ------------------------------------------ | ------------------ |
+| deploy     | the CREATE2 bundle in `transactions.txt`   | any EOA            |
+| ceremony 1 | governance stage 0 (arms the timer)        | PUH                |
+| ceremony 2 | governance stages 1 + 2, ≥ 20 min later    | PUH                |
+| stage 3    | `bridgedOut` population                    | any EOA            |
+| per chain  | `setUpgradeTimestamp` then the diamond cut | that chain's admin |
 
-**Why PUVT does not check it.** PUVT verifies *calldata* — the governance bundles this artifact
+**Why PUVT does not check it.** PUVT verifies _calldata_ — the governance bundles this artifact
 carries. Stage 3 emits no calldata to verify: it is a broadcast loop whose input is the live set
 of registered assets and whose correct result is on-chain state, not bytes in a TOML. Asserting
 it belongs in an integration test that upgrades, observes a withdrawal fail, runs stage 3, and

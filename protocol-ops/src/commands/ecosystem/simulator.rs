@@ -1335,7 +1335,7 @@ mod value_conversion_tests {
 
     #[test]
     fn hex_values_are_accepted() {
-        // Safe bundles are decimal, but tolerate 0x rather than mis-parsing it.
+        // Safe bundles are decimal, but tolerate 0x rather than parsing it wrongly.
         assert_eq!(
             safe_bundle_value_to_eth_decimal(Some("0xde0b6b3a7640000")).unwrap(),
             "1"

@@ -20,7 +20,7 @@ simulator converter) read it.
 `upgrade-envs/v0.31.0-interopB/output/stage/`. The pipeline shape — prepare →
 fork rehearsal → PUVT → simulator emit, plus the real-network broadcast — is
 the same for any release, and `regen-upgrade-calldata.sh` takes the env as its
-argument, so substitute the release directory and env name. What does *not*
+argument, so substitute the release directory and env name. What does _not_
 carry over is release-specific: v31 has two CTMs (Era + ZKsyncOS) and so three
 CREATE2 salts, a `[new_gateway]` section, and a zk-governance redeploy. v33 has
 none of those — one ZKsync OS CTM, one salt, no Gateway, no PUH redeploy — so
