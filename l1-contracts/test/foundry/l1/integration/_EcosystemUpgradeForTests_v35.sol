@@ -25,7 +25,8 @@ contract CTMUpgradeForTests_v35 is CTMUpgrade_v35 {
         string memory _newConfigPath,
         string memory _outputPath,
         address _governance,
-        bytes32 _zkTokenAssetId
+        bytes32 _zkTokenAssetId,
+        bool _testnetVerifier
     ) public virtual override {
         // solhint-disable-next-line func-named-parameters
         super.initializeWithArgs(
@@ -36,7 +37,8 @@ contract CTMUpgradeForTests_v35 is CTMUpgrade_v35 {
             _newConfigPath,
             _outputPath,
             _governance,
-            _zkTokenAssetId
+            _zkTokenAssetId,
+            _testnetVerifier
         );
         string memory upgradeToml = vm.readFile(string.concat(vm.projectRoot(), _newConfigPath));
         if (upgradeToml.keyExists("$.contracts.new_protocol_version")) {

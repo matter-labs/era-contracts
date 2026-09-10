@@ -4,7 +4,7 @@
 //! CTM list with overrides, era chain id, deployer/owner, create2 factory).
 //! Rather than asking the user to pass every flag explicitly, commands that
 //! flatten an [`crate::common::EcosystemArgs`] expose `--env <name>` which
-//! reads `upgrade-envs/permanent-values/<env>.toml` (and the v31 upgrade input
+//! reads `upgrade-envs/permanent-values/<env>.toml` (and the release upgrade input
 //! TOML for env-specific values like `era_chain_id` / `owner_address`) and
 //! fills the missing args.
 //!
@@ -13,7 +13,7 @@
 //! Layout (relative to `l1-contracts/`):
 //!
 //!   upgrade-envs/permanent-values/<env>.toml      (bridgehub, ctms, create2)
-//!   upgrade-envs/v0.31.0-interopB/<env>.toml      (owner, era_chain_id)
+//!   upgrade-envs/v0.34.0-registry/<env>.toml      (owner, era_chain_id)
 //!
 //! The latter contains unquoted hex literals (e.g. `old_protocol_version =
 //! 0x1d…`) which `toml-rs` chokes on, so we parse it line-by-line for the
@@ -29,6 +29,8 @@ use serde::Deserialize;
 
 use crate::common::paths::resolve_l1_contracts_path;
 
+/// The release's upgrade-env directory. Salts, per-env inputs and the canonical output
+/// directory all live here; it moves with each release rather than trailing an older one.
 const UPGRADE_ENV_DIR: &str = "upgrade-envs/v0.34.0-registry";
 const PERMANENT_VALUES_DIR: &str = "upgrade-envs/permanent-values";
 
@@ -41,6 +43,7 @@ pub struct PermanentValues {
     pub l1_chain_id: Option<u64>,
     #[serde(default)]
     pub zk_token_asset_id: Option<B256>,
+    pub testnet_verifier: Option<bool>,
     pub core_contracts: CoreContracts,
     #[serde(default)]
     pub ctm_contracts: Option<CtmContracts>,
@@ -201,7 +204,7 @@ pub struct PermanentContracts {
     // NOTE: `create2_factory_salt` deliberately does NOT live here. The salt
     // rotates every regen (the CREATE2 deployer would collide with previously
     // deployed addresses if reused), so it belongs in the v31 input TOML
-    // (`upgrade-envs/v0.31.0-interopB/<env>.toml [contracts] create2_factory_salt`)
+    // (`upgrade-envs/v0.34.0-registry/<env>.toml [contracts] create2_factory_salt`)
     // alongside the rest of the per-regen inputs. See
     // `EnvConfig::upgrade_create2_factory_salt`.
 }
@@ -284,7 +287,7 @@ impl EnvConfig {
     }
 
     /// Per-upgrade-version CREATE2 salt from
-    /// `upgrade-envs/v0.31.0-interopB/<env>.toml [contracts]
+    /// `upgrade-envs/v0.34.0-registry/<env>.toml [contracts]
     /// create2_factory_salt`. Distinct from `create2_factory_salt()` (which
     /// reads the chain-permanent salt out of `permanent-values/`); this one
     /// is the salt used to deploy *this upgrade*'s implementations, recorded
@@ -301,7 +304,7 @@ impl EnvConfig {
     }
 
     /// Per-regen salt for legacy `Governance.sol` ceremonies, read from
-    /// `upgrade-envs/v0.31.0-interopB/<env>.toml [contracts] legacy_gov_salt`.
+    /// `upgrade-envs/v0.34.0-registry/<env>.toml [contracts] legacy_gov_salt`.
     /// Op ids in the legacy Gov state machine are content-addressed
     /// (`hash(targets, values, calldatas, predecessor, salt)`); rotating this
     /// salt every regen prevents the broadcaster from colliding with previously
@@ -317,7 +320,7 @@ impl EnvConfig {
     }
 
     /// Per-CTM CREATE2 salts from
-    /// `upgrade-envs/v0.31.0-interopB/<env>.toml [create2_factory_salts]`,
+    /// `upgrade-envs/v0.34.0-registry/<env>.toml [create2_factory_salts]`,
     /// keyed by CTM proxy. Empty if the env doesn't declare any (legacy
     /// local-fixture path — `upgrade_inner` will fall back to random
     /// salts in that case). Re-reads the TOML each call (see
@@ -370,6 +373,13 @@ impl EnvConfig {
         self.permanent.core_contracts.governance_kind
     }
 
+    /// Whether this environment's CTM verifier is the testnet one, which accepts unproven batches.
+    /// Declared per env — true everywhere except mainnet — and passed to the CTM upgrade script
+    /// rather than read there, so the decision lives in one place.
+    pub fn testnet_verifier(&self) -> Option<bool> {
+        self.permanent.testnet_verifier
+    }
+
     pub fn zk_token_asset_id(&self) -> Option<B256> {
         self.permanent.zk_token_asset_id
     }
@@ -380,7 +390,7 @@ impl EnvConfig {
 }
 
 /// Default output dir for an env, e.g.
-/// `upgrade-envs/v0.31.0-interopB/output/<env>/`. Outputs land directly under
+/// `upgrade-envs/v0.34.0-registry/output/<env>/`. Outputs land directly under
 /// the env dir — no `protocol-ops/` subfolder — so the artifacts a reviewer
 /// expects to find for stage / mainnet are immediately visible.
 pub fn default_protocol_ops_out_dir(env: &str) -> anyhow::Result<PathBuf> {

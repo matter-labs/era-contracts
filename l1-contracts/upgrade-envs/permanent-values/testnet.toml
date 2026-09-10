@@ -7,6 +7,10 @@ l1_chain_id = 11155111
 # against the live NTV (`tokenAddress(assetId)` round-trips to the token).
 zk_token_asset_id = "0xc479e9440a8b7ce560ba8bf25e74bdd07198bf9478156a228de961132d1f479d"
 
+# Whether this environment's CTM verifier is the testnet one. Env-wide, not per-CTM.
+# Non-mainnet envs run `ZKsyncOSTestnetVerifier`, which accepts unproven batches.
+testnet_verifier = true
+
 [permanent_contracts]
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 # `create2_factory_salt` lives in the v31 input TOML

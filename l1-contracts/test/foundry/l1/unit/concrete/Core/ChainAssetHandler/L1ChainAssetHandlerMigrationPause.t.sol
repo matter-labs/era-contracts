@@ -94,7 +94,7 @@ contract L1ChainAssetHandlerMigrationPauseTest is Test {
     /// @dev THE point of keying by CTM: two upgrades running at once do not share a flag, so
     ///      neither can lift the other's pause. This is the case the previous single-flag design
     ///      could not express.
-    function test_oneCTMsPauseIsIndependentOfAnothers() public {
+    function test_oneCTMsPauseIsIndependentOfTheOthers() public {
         _pauseCTM(executorA, ctmA);
         _pauseCTM(executorB, ctmB);
 

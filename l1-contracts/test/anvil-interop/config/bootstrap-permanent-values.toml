@@ -8,6 +8,10 @@ is_zk_sync_os = true
 # DataEncoding.encodeNTVAssetId(l1ChainId, zkTokenL1Address).
 zk_token_asset_id = "0x0000000000000000000000000000000000000000000000000000000000000001"
 
+# Whether this environment's CTM verifier is the testnet one. Env-wide, not per-CTM.
+# Anvil fixtures run `ZKsyncOSTestnetVerifier`, which accepts unproven batches.
+testnet_verifier = true
+
 [core_contracts]
 bridgehub_proxy_addr = "0x0000000000000000000000000000000000000000"
 

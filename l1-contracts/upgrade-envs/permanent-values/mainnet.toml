@@ -2,6 +2,10 @@ l1_chain_id = 1
 
 zk_token_asset_id = "0x83e2fbc0a739b3c765de4c2b4bf8072a71ea8fbb09c8cf579c71425d8bc8804a"
 
+# Whether this environment's CTM verifier is the testnet one. Env-wide, not per-CTM.
+# Mainnet runs the production verifier.
+testnet_verifier = false
+
 [permanent_contracts]
 create2_factory_addr = "0xf1Ebfaa992854ECcB01Ac1F60e5b5279095cca7F"
 # `create2_factory_salt` lives in the v31 input TOML
@@ -30,6 +34,7 @@ rollup_da_manager = "0xE689e79a06D3D09f99C21E534cCF6a8b7C9b3C45"
 # Era CTM (witness chain: 324)
 proxy = "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C"
 is_zk_sync_os = false
+
 bytecodes_supplier = "0xC9F20FC268Fc3e0e597660550033Bf2C24218fd8"
 rollup_da_manager = "0xE689e79a06D3D09f99C21E534cCF6a8b7C9b3C45"
 

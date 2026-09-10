@@ -59,7 +59,7 @@ pub struct VerifyUpgradeArgs {
     /// Stale entries (from older regens whose bytecode is no longer in
     /// AllContractsHashes) are silently skipped.
     ///
-    /// Defaults to `<l1-contracts>/upgrade-envs/v0.31.0-interopB/output/<env>/transactions.txt`
+    /// Defaults to `<l1-contracts>/upgrade-envs/v0.34.0-registry/output/<env>/transactions.txt`
     #[clap(long)]
     pub transactions_log: Option<PathBuf>,
 

@@ -1,13 +1,6 @@
 [
   {
     "type": "function",
-    "name": "acquireMigrationPause",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "bridgeBurn",
     "inputs": [
       {
@@ -70,23 +63,10 @@
   },
   {
     "type": "function",
-    "name": "clearMigrationPauseHold",
+    "name": "ctmMigrationPaused",
     "inputs": [
       {
-        "name": "_pauser",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "isUpgradePauser",
-    "inputs": [
-      {
-        "name": "_pauser",
+        "name": "_ctm",
         "type": "address",
         "internalType": "address"
       }
@@ -134,6 +114,25 @@
   },
   {
     "type": "function",
+    "name": "migrationPausedFor",
+    "inputs": [
+      {
+        "name": "_ctm",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "migrationsEnabled",
     "inputs": [],
     "outputs": [
@@ -147,6 +146,19 @@
   },
   {
     "type": "function",
+    "name": "pauseCTMMigration",
+    "inputs": [
+      {
+        "name": "_ctm",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "pauseMigration",
     "inputs": [],
     "outputs": [],
@@ -154,24 +166,12 @@
   },
   {
     "type": "function",
-    "name": "releaseMigrationPause",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "setUpgradePauser",
+    "name": "unpauseCTMMigration",
     "inputs": [
       {
-        "name": "_pauser",
+        "name": "_ctm",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "_allowed",
-        "type": "bool",
-        "internalType": "bool"
       }
     ],
     "outputs": [],
@@ -183,38 +183,6 @@
     "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "upgradePauseHeld",
-    "inputs": [
-      {
-        "name": "_pauser",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "upgradePauseHolds",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
   },
   {
     "type": "event",
@@ -317,32 +285,6 @@
   },
   {
     "type": "event",
-    "name": "MigrationPauseAcquired",
-    "inputs": [
-      {
-        "name": "pauser",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "MigrationPauseReleased",
-    "inputs": [
-      {
-        "name": "pauser",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "MigrationStarted",
     "inputs": [
       {
@@ -374,8 +316,46 @@
   },
   {
     "type": "event",
+    "name": "PausedCTMMigration",
+    "inputs": [
+      {
+        "name": "ctm",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "pauser",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "PausedMigration",
     "inputs": [
+      {
+        "name": "pauser",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "UnpausedCTMMigration",
+    "inputs": [
+      {
+        "name": "ctm",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
       {
         "name": "pauser",
         "type": "address",
@@ -394,25 +374,6 @@
         "type": "address",
         "indexed": true,
         "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "UpgradePauserSet",
-    "inputs": [
-      {
-        "name": "pauser",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "allowed",
-        "type": "bool",
-        "indexed": false,
-        "internalType": "bool"
       }
     ],
     "anonymous": false
