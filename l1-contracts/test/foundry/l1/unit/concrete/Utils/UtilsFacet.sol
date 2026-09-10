@@ -303,6 +303,14 @@ contract UtilsFacet is ZKChainBase {
         s.zksyncOSMaxTxGasLimit = _maxTxGasLimit;
     }
 
+    function util_setDisabledProofSystems(uint8 _disabledProofSystems) external {
+        s.disabledProofSystems = _disabledProofSystems;
+    }
+
+    function util_getDisabledProofSystems() external view returns (uint8) {
+        return s.disabledProofSystems;
+    }
+
     function util_getZKsyncOSMaxTxGasLimit() external view returns (uint64) {
         return s.zksyncOSMaxTxGasLimit;
     }

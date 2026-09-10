@@ -52,6 +52,9 @@ pub struct EcosystemInitArgs {
     /// Use testnet verifier (default: true)
     #[clap(long, default_value_t = true, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub with_testnet_verifier: bool,
+    /// Require both a Boojum and an Airbender proof to settle a batch (Era only).
+    #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
+    pub with_airbender_verifier: bool,
     /// Enable support for legacy bridge testing (default: false)
     #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub with_legacy_bridge: bool,
@@ -93,6 +96,7 @@ pub async fn run(args: EcosystemInitArgs) -> anyhow::Result<()> {
         era_chain_id,
         vm_type: args.vm_type,
         with_testnet_verifier: args.with_testnet_verifier,
+        with_airbender_verifier: args.with_airbender_verifier,
         with_legacy_bridge: args.with_legacy_bridge,
         zk_token_asset_id,
         create2_factory_salt: args.create2_factory_salt,
@@ -144,6 +148,7 @@ pub async fn ecosystem_init(
         vm_type: input.vm_type,
         reuse_gov_and_admin: true,
         with_testnet_verifier: input.with_testnet_verifier,
+        with_airbender_verifier: input.with_airbender_verifier,
         with_legacy_bridge: input.with_legacy_bridge,
         zk_token_asset_id: input.zk_token_asset_id,
         create2_factory_salt: input.create2_factory_salt,
@@ -165,6 +170,8 @@ pub struct EcosystemInitInput {
     pub era_chain_id: u64,
     pub vm_type: VMOption,
     pub with_testnet_verifier: bool,
+    /// Require both a Boojum and an Airbender proof to settle a batch (Era only).
+    pub with_airbender_verifier: bool,
     pub with_legacy_bridge: bool,
     pub zk_token_asset_id: Option<B256>,
     pub create2_factory_salt: Option<B256>,

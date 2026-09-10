@@ -337,7 +337,8 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode();
         } else if (
             compareStrings(contractName, "EraSettlementLayerV31Upgrade") ||
-            compareStrings(contractName, "ZKsyncOSSettlementLayerV31Upgrade")
+            compareStrings(contractName, "ZKsyncOSSettlementLayerV31Upgrade") ||
+            compareStrings(contractName, "EraSettlementLayerV32Upgrade")
         ) {
             return abi.encode();
         } else if (compareStrings(contractName, "Governance")) {
@@ -402,6 +403,8 @@ abstract contract DeployCTMUtils is DeployUtils {
                 verifierFflonk: ctmAddresses.stateTransition.verifiers.verifierFflonk,
                 verifierPlonk: ctmAddresses.stateTransition.verifiers.verifierPlonk,
                 airbenderVerifierPlonk: ctmAddresses.stateTransition.verifiers.airbenderVerifierPlonk,
+                airbenderVerifier: ctmAddresses.stateTransition.verifiers.airbenderVerifier,
+                boojumVerifier: ctmAddresses.stateTransition.verifiers.boojumVerifier,
                 // For L1 deployment we need to use the deployer as the owner of the verifier,
                 // because we set the dual verifier later. Use getBroadcasterAddress() to get
                 // the actual EOA when this is called from a contract created via `new` during the script.

@@ -85,3 +85,17 @@ async fn run_subcommand(cli_args: ProtocolOps) -> anyhow::Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod cli_tests {
+    use super::ProtocolOps;
+    use clap::CommandFactory;
+
+    /// Clap validates argument definitions at runtime, not at compile time, so a flag declared without
+    /// its `#[clap(long, ...)]` attribute type-checks and then panics on first use. `debug_assert`
+    /// performs those checks here instead of in production.
+    #[test]
+    fn cli_definition_is_valid() {
+        ProtocolOps::command().debug_assert();
+    }
+}

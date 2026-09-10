@@ -23,7 +23,8 @@ contract AuthorizationTest is ExecutorTest {
             dependencyRootsRollingHash: bytes32(0),
             l2LogsTreeRoot: Utils.randomBytes32("l2LogsTreeRoot"),
             timestamp: 0,
-            commitment: Utils.randomBytes32("commitment")
+            commitment: Utils.randomBytes32("commitment"),
+            airbenderCommitment: bytes32(0)
         });
 
         commitBatchInfo = CommitBatchInfo({
@@ -35,6 +36,7 @@ contract AuthorizationTest is ExecutorTest {
             priorityOperationsHash: Utils.randomBytes32("priorityOperationsHash"),
             bootloaderHeapInitialContentsHash: Utils.randomBytes32("bootloaderHeapInitialContentsHash"),
             eventsQueueStateHash: Utils.randomBytes32("eventsQueueStateHash"),
+            airbenderBootloaderHeapHash: bytes32(0),
             systemLogs: bytes(""),
             operatorDAInput: bytes("")
         });

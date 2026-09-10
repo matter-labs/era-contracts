@@ -62,6 +62,26 @@ uint256 constant COMMIT_TIMESTAMP_APPROXIMATION_DELTA = 1 hours;
 /// @dev Shift to apply to verify public input before verifying.
 uint256 constant PUBLIC_INPUT_SHIFT = 32;
 
+/// @dev Bit in `ZKChainStorage.disabledProofSystems` switching the Boojum proof system off. Covers both
+/// Boojum wrappers (FFLONK and PLONK), since the wrapper choice is not a different prover.
+uint8 constant BOOJUM_PROOF_SYSTEM_DISABLED = 1;
+
+/// @dev Bit in `ZKChainStorage.disabledProofSystems` switching the Airbender proof system off.
+uint8 constant AIRBENDER_PROOF_SYSTEM_DISABLED = 2;
+
+/// @dev Every known policy bit. A mask above this sets bits with no meaning, and a mask equal to it would
+/// leave the chain with no proof system at all; the setter rejects both.
+uint8 constant ALL_PROOF_SYSTEMS_DISABLED = BOOJUM_PROOF_SYSTEM_DISABLED | AIRBENDER_PROOF_SYSTEM_DISABLED;
+
+/// @dev `_proof[0]` value identifying the combined Era proof carrying both a Boojum and an Airbender
+/// sub-proof. Distinct from the Boojum router's own types (0, 1) and from the ZKsync OS lane's values, so a
+/// proof aimed at the wrong verifier is rejected rather than reinterpreted.
+uint256 constant ERA_MULTI_PROOF_TYPE = 4;
+
+/// @dev Number of words in an Airbender PLONK SNARK proof. The SNARK is fixed-size, so the combined
+/// envelope's total length is exact and there is no trailing remainder to interpret.
+uint256 constant AIRBENDER_SNARK_PROOF_LENGTH = 44;
+
 /// @dev The maximum number of L2 gas that a user can request for an L2 transaction
 uint256 constant MAX_GAS_PER_TRANSACTION = 80_000_000;
 

@@ -15,6 +15,8 @@ error AddressHasNoCode(address);
 error AddressMismatch(address expected, address supplied);
 // 0x42573d7a
 error AddressNotZero();
+// 0x615e82fc
+error AirbenderCommitmentRequired();
 // 0xb577eb6c
 error AlreadyDangerousContract(address);
 // 0x2a5989a0
@@ -204,12 +206,18 @@ error InvalidNTVBurnData();
 error InvalidNumberOfBlobs(uint256 expected, uint256 numCommitments, uint256 numHashes);
 // 0x99f6cc22
 error InvalidPackedPrecommitmentLength(uint256 length);
+// 0x1b6712bc
+error InvalidDisabledProofSystemsMask(uint8 mask);
 // 0x09bde339
 error InvalidProof();
+// 0x3e157423
+error InvalidPublicInputsLength();
 // 0x5a1c353a
 error InvalidProofFormat();
 // 0x48c5fa28
 error InvalidProofLengthForFinalNode();
+// 0xb846fbd8
+error InvalidProofSystem(uint8 proofSystem);
 // 0x5428eae7
 error InvalidProtocolVersion();
 // 0x6f1cf752
@@ -270,6 +278,8 @@ error MockVerifierNotSupported();
 error MsgValueMismatch(uint256 expectedMsgValue, uint256 providedMsgValue);
 // 0xb385a3da
 error MsgValueTooLow(uint256 required, uint256 provided);
+// 0x379ac44c
+error MultiProofChainCannotMigrate();
 // 0xedd74330
 error MustBeEraChain();
 // 0x8b7e144a

@@ -405,6 +405,11 @@
   },
   {
     "type": "error",
+    "name": "MultiProofChainCannotMigrate",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "NotAZKChain",
     "inputs": [
       {

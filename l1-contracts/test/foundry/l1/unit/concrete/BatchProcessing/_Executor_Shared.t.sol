@@ -13,7 +13,11 @@ import {
     L2_DA_COMMITMENT_SCHEME,
     TEST_ROLLUP_DA_MANAGER_OWNER
 } from "../Utils/Utils.sol";
-import {ETH_TOKEN_ADDRESS, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER} from "contracts/common/Config.sol";
+import {
+    ETH_TOKEN_ADDRESS,
+    TESTNET_COMMIT_TIMESTAMP_NOT_OLDER,
+    AIRBENDER_PROOF_SYSTEM_DISABLED
+} from "contracts/common/Config.sol";
 import {DummyEraBaseTokenBridge} from "contracts/dev-contracts/test/DummyEraBaseTokenBridge.sol";
 import {IAssetRouterShared} from "contracts/bridge/asset-router/IAssetRouterShared.sol";
 import {DummyChainTypeManagerForValidatorTimelock as DummyCTM} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
@@ -47,6 +51,7 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
+import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {PermissionlessValidator} from "contracts/state-transition/validators/PermissionlessValidator.sol";
 
 bytes32 constant EMPTY_PREPUBLISHED_COMMITMENT = 0x0000000000000000000000000000000000000000000000000000000000000000;
@@ -61,6 +66,7 @@ contract ExecutorTest is UtilsCallMockerTest {
     TestExecutor internal executor;
     TestCommitter internal committer;
     GettersFacet internal getters;
+    UtilsFacet internal utilsFacet;
     MailboxFacet internal mailbox;
     bytes32 internal newCommittedBlockBatchHash;
     bytes32 internal newCommittedBlockCommitment;
@@ -84,13 +90,14 @@ contract ExecutorTest is UtilsCallMockerTest {
     uint256[] internal proofInput;
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](15);
+        bytes4[] memory selectors = new bytes4[](16);
         uint256 i = 0;
         selectors[i++] = admin.setPendingAdmin.selector;
         selectors[i++] = admin.acceptAdmin.selector;
         selectors[i++] = admin.setValidator.selector;
         selectors[i++] = admin.setPorterAvailability.selector;
         selectors[i++] = admin.setPriorityTxMaxGasLimit.selector;
+        selectors[i++] = admin.setProofSystemStatus.selector;
         selectors[i++] = admin.changeFeeParams.selector;
         selectors[i++] = admin.setTokenMultiplier.selector;
         selectors[i++] = admin.upgradeChainFromVersion.selector;
@@ -125,9 +132,10 @@ contract ExecutorTest is UtilsCallMockerTest {
     }
 
     function getGettersSelectors() public view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](33);
+        bytes4[] memory selectors = new bytes4[](34);
         uint256 i = 0;
         selectors[i++] = getters.getVerifier.selector;
+        selectors[i++] = getters.disabledProofSystems.selector;
         selectors[i++] = getters.getAdmin.selector;
         selectors[i++] = getters.getPendingAdmin.selector;
         selectors[i++] = getters.getTotalBlocksCommitted.selector;
@@ -287,11 +295,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             abi.encode(bool(true))
         );
         DiamondInit diamondInit = new DiamondInit(isZKsyncOS());
-        EraTestnetVerifier testnetVerifier = new EraTestnetVerifier(
-            IVerifierV2(address(0)),
-            IVerifier(address(0)),
-            IVerifier(address(0))
-        );
+        EraTestnetVerifier testnetVerifier = new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)));
         // Mock the CTM to return a verifier for protocol version 0
         vm.mockCall(
             address(chainTypeManager),
@@ -311,7 +315,8 @@ contract ExecutorTest is UtilsCallMockerTest {
             dependencyRootsRollingHash: bytes32(0),
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             timestamp: 0,
-            commitment: bytes32("")
+            commitment: bytes32(""),
+            airbenderCommitment: bytes32(0)
         });
 
         InitializeData memory params = InitializeData({
@@ -340,7 +345,7 @@ contract ExecutorTest is UtilsCallMockerTest {
 
         bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, params);
 
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](5);
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](6);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(admin),
             action: Diamond.Action.Add,
@@ -372,6 +377,15 @@ contract ExecutorTest is UtilsCallMockerTest {
             selectors: getMailboxSelectors()
         });
 
+        // Lets a test reach chain state that no legitimate call can produce — a fabricated stored batch
+        // hash, say — through Solidity rather than raw slot arithmetic.
+        facetCuts[5] = Diamond.FacetCut({
+            facet: address(new UtilsFacet()),
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: Utils.getUtilsFacetSelectors()
+        });
+
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(diamondInit),
@@ -384,6 +398,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         executor = TestExecutor(address(diamondProxy));
         committer = TestCommitter(address(diamondProxy));
         getters = GettersFacet(address(diamondProxy));
+        utilsFacet = UtilsFacet(address(diamondProxy));
         mailbox = MailboxFacet(address(diamondProxy));
         admin = AdminFacet(address(diamondProxy));
         chainTypeManager.setZKChain(l2ChainId, address(diamondProxy));
@@ -397,6 +412,12 @@ contract ExecutorTest is UtilsCallMockerTest {
         // Allow to call executor directly, without going through ValidatorTimelock
         vm.prank(address(chainTypeManager));
         admin.setValidator(address(validator), true);
+
+        // These suites commit single-proof batches, so the Airbender lane is masked off. The tests
+        // that exercise the lane bring it up themselves.
+        if (!isZKsyncOS()) {
+            utilsFacet.util_setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
+        }
 
         // foundry's default value is 1 for the block's timestamp, it is expected
         // that block.timestamp > COMMIT_TIMESTAMP_NOT_OLDER + 1
@@ -413,6 +434,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             priorityOperationsHash: keccak256(""),
             bootloaderHeapInitialContentsHash: Utils.randomBytes32("bootloaderHeapInitialContentsHash"),
             eventsQueueStateHash: Utils.randomBytes32("eventsQueueStateHash"),
+            airbenderBootloaderHeapHash: bytes32(0),
             systemLogs: l2Logs,
             operatorDAInput: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         });

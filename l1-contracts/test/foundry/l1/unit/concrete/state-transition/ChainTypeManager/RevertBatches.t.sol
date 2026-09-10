@@ -29,6 +29,7 @@ import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Commi
 import {IL2GenesisUpgrade} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {AIRBENDER_PROOF_SYSTEM_DISABLED} from "contracts/common/Config.sol";
 
 contract RevertBatchesTest is ChainTypeManagerTest {
     // Items for logs & commits
@@ -76,7 +77,8 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             dependencyRootsRollingHash: bytes32(0),
             timestamp: 0,
-            commitment: bytes32(uint256(0x01))
+            commitment: bytes32(uint256(0x01)),
+            airbenderCommitment: bytes32(0)
         });
         vm.warp(TESTNET_COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
         currentTimestamp = block.timestamp;
@@ -89,6 +91,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             priorityOperationsHash: keccak256(""),
             bootloaderHeapInitialContentsHash: Utils.randomBytes32("bootloaderHeapInitialContentsHash"),
             eventsQueueStateHash: Utils.randomBytes32("eventsQueueStateHash"),
+            airbenderBootloaderHeapHash: bytes32(0),
             systemLogs: l2Logs,
             operatorDAInput: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         });
@@ -126,8 +129,11 @@ contract RevertBatchesTest is ChainTypeManagerTest {
         adminFacet = AdminFacet(address(newChainAddress));
 
         vm.stopPrank();
-        vm.prank(newChainAdmin);
+        vm.startPrank(newChainAdmin);
         adminFacet.setDAValidatorPair(address(rollupL1DAValidator), L2_DA_COMMITMENT_SCHEME);
+        // This suite commits single-proof batches.
+        adminFacet.setProofSystemStatus(AIRBENDER_PROOF_SYSTEM_DISABLED, false);
+        vm.stopPrank();
     }
 
     function test_SuccessfulBatchReverting() public {
@@ -226,7 +232,8 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             dependencyRootsRollingHash: bytes32(0),
             timestamp: currentTimestamp,
-            commitment: entries[EVENT_INDEX].topics[3]
+            commitment: entries[EVENT_INDEX].topics[3],
+            airbenderCommitment: bytes32(0)
         });
 
         IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);

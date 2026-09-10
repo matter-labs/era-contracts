@@ -91,9 +91,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         serverNotifier = makeAddr("serverNotifier");
         newChainAdmin = makeAddr("chainadmin");
         baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, baseToken);
-        testnetVerifier = address(
-            new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), IVerifier(address(0)))
-        );
+        testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
 
         bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
         chainAssetHandler = new L1ChainAssetHandler(governor, address(bridgehub));
