@@ -39,70 +39,62 @@ use the previous inner guest: they still validate against the SNARK backend,
 but the range verifier rejects them after this rotation. A fresh 0.0.5 proof
 session is required to validate successful settlement with the current pins.
 
-## Generating the snarkJS Plonk verifier
+## Preparing the backend
 
-The Plonk verifier is machine-generated from the ZiSK SNARK setup and is
-regenerated whenever the circuit changes, so it is built and deployed as a
-standalone contract.
+Deployment requires a standalone backend implementing `IZiskSnarkPlonkVerifier`.
+If one is already deployed for the selected verification key, use its address as
+`zisk_plonk_verifier_addr`. Reuse that backend across guest VK updates: the
+inner/aggregator program VKs and vadcop-final root are pinned in our
+`ZiskVerifier` wrapper. A new backend is needed only when its final PLONK
+circuit/setup verification key changes. Multiple wrappers on the same L1 can
+use the same backend.
 
-The Plonk verification key of the current ZiSK release is committed at
-`tools/verifier-gen/data/ZiSK_plonk_verification_key.json`, so the two steps below run
-from a clean checkout and CI runs them on every push. Refresh that key when
-the SNARK circuit changes: every `cargo-zisk prove --plonk` output file
-embeds it (the file is bincode of zisk-common's `Proof`, whose Plonk body
-carries the snarkJS key verbatim, and the `zksync-os-zisk` prover crate
-mirrors those struct shapes), and the `ziskup setup_snark -y` proving key
-holds the same key.
+If no compatible backend is deployed on the target L1, run from the repository root with Node.js,
+npm, and the pinned Foundry version installed:
 
-1. From `tools/verifier-gen/`, render the snarkJS Plonk verifier from the committed key.
-   This is the template render that `snarkjs zkey export solidityverifier`
-   runs on the key it reads out of a `.zkey`:
+```bash
+node tools/verifier-gen/zisk-backend.js deploy -- \
+  --rpc-url "$RPC_URL" --account deployer --broadcast
+```
 
-   ```bash
-   npm ci
-   node render_plonk_verifier.js data/ZiSK_plonk_verification_key.json data/PlonkVerifier.sol
-   ```
+The helper installs the pinned dependencies, renders the committed
+`tools/verifier-gen/data/ZiSK_plonk_verification_key.json`, compiles upstream's
+`PlonkVerifier`, and prints the config entry containing its deployed address.
+Use the usual `forge create` RPC and signer options after `--`.
 
-2. From `tools/verifier-gen/`, adapt it for this repository (pragma + contract name) and
-   generate the `ZiskVerifier` wrapper for the current guest VKs:
+Preparation is cached outside the checkout under
+`$XDG_CACHE_HOME/zksync-os/zisk-backend` (default `~/.cache/zksync-os/zisk-backend`).
+CI uses `$RUNNER_TEMP/zksync-os/zisk-backend`. Set `ZISK_BACKEND_CACHE` to choose
+another directory outside a Git checkout. The key includes the verification
+key, dependency pins, helper, and compiler settings. An incomplete or modified
+entry is rejected; remove that entry to rebuild it.
 
-   ```bash
-   cargo run -- --variant zisk \
-     --zisk_vk_path data/ZiSK_vk.json \
-     --zisk_output_path ../../l1-contracts/contracts/state-transition/verifiers/ZiskVerifier.sol \
-     --zisk_plonk_input_path data/PlonkVerifier.sol
-   ```
+For build-only preparation, `node tools/verifier-gen/zisk-backend.js prepare`
+prints the absolute artifact path. Source and artifacts stay in that directory;
+the upstream source and notices are preserved. The generated component remains
+under its upstream license. Keep these local outputs out of published packages.
 
-   The adapted verifier lands at
-   `l1-contracts/contracts/dev-contracts/generated/ZiskSnarkPlonkVerifier.sol`
-   (a gitignored path that `forge build` compiles when present).
+## Generating the range verifier
 
-3. Validate the result. For the cargo-zisk v0.18.0 key the adapted source's
-   SHA-256 is
-   `e21103887543396795edef162cbcba38c1c4cc0522686f6e109885f93e065735`. The
-   behavioral check is `forge test --match-contract ZiskVerifierRealProofTest`,
-   which drives real proofs through a real pairing.
+From `tools/verifier-gen/`, regenerate our wrapper after updating the guest VKs:
+
+```bash
+cargo run -- --variant zisk \
+  --zisk_vk_path data/ZiSK_vk.json \
+  --zisk_output_path ../../l1-contracts/contracts/state-transition/verifiers/ZiskVerifier.sol
+```
+
+This command only generates `ZiskVerifier`; backend preparation is independent.
 
 ## Deploying and wiring
 
-1. Deploy the generated verifier:
+Set `zisk_plonk_verifier_addr` in `config-deploy-ctm.toml`. With
+`multi_proof_verifier = true`, `DeployCTM` wires that backend into `ZiskVerifier`
+and `MultiProofVerifier`. Deployment rejects an address without code; the
+operator must select the backend for the intended verification key.
 
-   ```bash
-   forge create contracts/dev-contracts/generated/ZiskSnarkPlonkVerifier.sol:ZiskSnarkPlonkVerifier \
-     --rpc-url $RPC_URL --private-key $DEPLOYER_KEY
-   ```
-
-2. Put the deployed address into the deploy config
-   (`zisk_plonk_verifier_addr` in `config-deploy-ctm.toml`). With
-   `multi_proof_verifier = true`, `DeployCTM` deploys `ZiskVerifier` with
-   that address and wires it into `MultiProofVerifier`. The deploy refuses
-   an address that holds no code. A skipped step 1, or an address from a
-   different network, stops the deployment. It does not stop the first
-   settlement.
-
-To rotate the Plonk verifier after a circuit regeneration, repeat both
-steps and redeploy `ZiskVerifier` with the new address (its own pins are
-constants baked at generation time by the `tools/verifier-gen/` flow).
+After a SNARK circuit change, update the committed Plonk verification key,
+prepare/deploy the new backend, and redeploy `ZiskVerifier` with its address.
 
 ## The Airbender side
 
@@ -123,10 +115,23 @@ zero.
 
 `ZiskVerifierRealProofTest` drives a real aggregated cargo-zisk proof through
 `ZiskVerifier.verify`, so it exercises the on-chain reconstruction and the
-real pairing together. It runs whenever the generated verifier artifact is
-present (step 2 above); otherwise the suite reports as skipped. CI generates
-that artifact in the verifier-generator job and hands it to the foundry job
-through the build cache, so the suite runs there too.
+real pairing together. Run the full Foundry suite with a locally prepared
+backend from the repository root:
+
+```bash
+node tools/verifier-gen/zisk-backend.js test
+```
+
+Additional test flags may follow `--`, for example
+`-- --match-contract ZiskVerifierRealProofTest`. The helper sets
+`ZISK_PLONK_BYTECODE` from the prepared artifact and requires the real-proof
+suite's prerequisite. CI uses the same command without
+uploading the backend between jobs.
+
+Ordinary `yarn test:foundry` runs skip the real-proof suite when
+`ZISK_PLONK_BYTECODE` is unset. Invalid supplied bytecode fails setup.
+`ZISK_REQUIRE_REAL_PROOFS=true` also makes absent bytecode fail setup.
+
 `MultiProofRangeVectorTest` pins the same aggregation vector against a
 signal stand-in, which lets it assert the exact reconstructed signal and
 reject near-misses. The remaining multi-proof tests use mocks and run
