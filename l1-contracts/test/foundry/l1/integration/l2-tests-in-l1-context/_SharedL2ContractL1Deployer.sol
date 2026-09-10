@@ -83,31 +83,6 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
     // add this to be excluded from coverage report
     function test() internal virtual override(DeployCTMIntegrationScript, SharedL2ContractDeployer) {}
 
-    function getChainCreationFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    )
-        internal
-        virtual
-        override(DeployCTMIntegrationScript, DeployIntegrationUtils)
-        returns (Diamond.FacetCut[] memory)
-    {
-        // This standard-EVM harness reads selectors from ordinary Forge artifacts.
-        // It must not depend on the old Foundry-ZKsync test side effect that wrote
-        // script-out/diamond-selectors.toml.
-        return DeployIntegrationUtils.getChainCreationFacetCuts(stateTransition);
-    }
-
-    function getUpgradeAddedFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    )
-        internal
-        virtual
-        override(DeployCTMIntegrationScript, DeployIntegrationUtils)
-        returns (Diamond.FacetCut[] memory)
-    {
-        return DeployIntegrationUtils.getUpgradeAddedFacetCuts(stateTransition);
-    }
-
     function getInitializeCalldata(
         string memory contractName
     ) internal virtual override(DeployIntegrationUtils, DeployCTMUtils) returns (bytes memory) {

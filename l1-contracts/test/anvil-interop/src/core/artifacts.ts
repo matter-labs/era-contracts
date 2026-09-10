@@ -11,6 +11,11 @@ import * as path from "path";
 
 const ZKSTACK_OUT_ROOT = path.resolve(__dirname, "../../../../zkstack-out");
 const FORGE_OUT_ROOT = path.resolve(__dirname, "../../../../out");
+// Output of the `registry-deterministic` foundry profile (see l1-contracts/foundry.toml):
+// CBOR-metadata-free artifacts that are byte-identical across platforms. The registry-driven
+// upgrade runner deploys every codehash-pinned implementation from here so that registries
+// generated on one machine verify on any other (macOS regen vs Linux CI).
+const FORGE_DETERMINISTIC_OUT_ROOT = path.resolve(__dirname, "../../../../out-registry-deterministic");
 
 interface ForgeArtifact {
   abi: JsonFragment[];
@@ -51,5 +56,29 @@ export function loadBytecodeFromOut(artifactRelativePath: string): string {
  */
 export function loadCreationBytecodeFromOut(artifactRelativePath: string): string {
   const artifact = loadArtifactFromOut(artifactRelativePath);
+  return artifact.bytecode?.object || "0x";
+}
+
+function loadArtifactFromDeterministicOut(artifactRelativePath: string): ForgeArtifact {
+  const artifactPath = path.join(FORGE_DETERMINISTIC_OUT_ROOT, artifactRelativePath);
+  if (!fs.existsSync(artifactPath)) {
+    throw new Error(
+      `Deterministic artifact not found: ${artifactPath}. ` +
+        "Run `FOUNDRY_PROFILE=registry-deterministic forge build <sources>` first " +
+        "(the registry upgrade runner does this automatically)."
+    );
+  }
+  return JSON.parse(fs.readFileSync(artifactPath, "utf-8")) as ForgeArtifact;
+}
+
+/** Load deployed (runtime) bytecode from the deterministic (CBOR-metadata-free) build. */
+export function loadDeterministicBytecodeFromOut(artifactRelativePath: string): string {
+  const artifact = loadArtifactFromDeterministicOut(artifactRelativePath);
+  return artifact.deployedBytecode?.object || artifact.bytecode?.object || "0x";
+}
+
+/** Load creation (init) bytecode from the deterministic (CBOR-metadata-free) build. */
+export function loadDeterministicCreationBytecodeFromOut(artifactRelativePath: string): string {
+  const artifact = loadArtifactFromDeterministicOut(artifactRelativePath);
   return artifact.bytecode?.object || "0x";
 }

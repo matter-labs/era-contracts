@@ -43,23 +43,11 @@ import {InteropLibrary} from "./InteropLibrary.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2DACommitmentScheme, PubdataContent} from "contracts/common/Config.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {UpgradeChainCall} from "./utils/UpgradeChainCall.sol";
+import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
+import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
-
-/// @dev Protocol version threshold (packed `major << 32`) at which the Admin
-///      facet's `upgradeChainFromVersion` gained the leading `address _chainAddress`
-///      parameter. Chains still on a version below this expose only the legacy
-///      2-arg signature; calling the v31 variant against them hits the DiamondProxy
-///      fallback and reverts with `"F"`.
-uint256 constant V31_UPGRADE_CHAIN_FROM_VERSION_THRESHOLD = uint256(31) << 32;
-
-/// @notice Legacy 2-arg Admin interface used when the chain being upgraded is
-///         still on a pre-v31 protocol version (so its Admin facet only has
-///         the old selector). The abi-encoded call produced via this interface
-///         lands on the old facet; the new 3-arg selector would not.
-interface IAdminLegacy {
-    function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
-}
 
 /// @notice Minimal interface for OZ single-step Ownable contracts (e.g. ProxyAdmin).
 ///         Avoids calling `pendingOwner()` (Ownable2Step-only) on plain Ownable.
@@ -225,6 +213,9 @@ contract AdminFunctions is Script, IAdminFunctions {
         // chainIds.length (max possible), trimmed before serialization.
         Call[] memory acceptCalls = new Call[](chainIds.length);
         uint256 acceptCount = 0;
+        // From the bootstrap edge on, the CTM domain and the ecosystem ProxyAdmin are owned by the
+        // bound upgrade executors, which governance owns — the governed shape, not a drift.
+        bool registryDriven = false;
 
         for (uint256 i = 0; i < chainIds.length; i++) {
             address ctm = IL1Bridgehub(_bridgehub).chainTypeManager(chainIds[i]);
@@ -240,6 +231,10 @@ contract AdminFunctions is Script, IAdminFunctions {
 
             Ownable2Step ctmOwnable = Ownable2Step(ctm);
             address ctmOwner = ctmOwnable.owner();
+            if (_isUnderBoundCTMExecutor(ctm, ctmOwner, _governance)) {
+                registryDriven = true;
+                continue;
+            }
             if (ctmOwner != _governance && ctmOwnable.pendingOwner() != _governance) {
                 _issueAsOwner(ctmOwner, ctm, abi.encodeCall(Ownable2Step.transferOwnership, (_governance)), _wraps);
             }
@@ -264,11 +259,55 @@ contract AdminFunctions is Script, IAdminFunctions {
         address ctmDeploymentTracker = address(IL1Bridgehub(_bridgehub).l1CtmDeployer());
         address l1Nullifier = address(IL1AssetRouter(assetRouter).L1_NULLIFIER());
 
+        if (registryDriven && _isUnderBoundEcosystemExecutor(_bridgehub, _governance)) {
+            return;
+        }
         _ensureProxyAdminOwnedByGovernance(_bridgehub, _governance, _wraps);
         _ensureProxyAdminOwnedByGovernance(assetRouter, _governance, _wraps);
         _ensureProxyAdminOwnedByGovernance(chainAssetHandler, _governance, _wraps);
         _ensureProxyAdminOwnedByGovernance(ctmDeploymentTracker, _governance, _wraps);
         _ensureProxyAdminOwnedByGovernance(l1Nullifier, _governance, _wraps);
+    }
+
+    /// @dev Whether `_ctm` (a registry-era CTM, v34+) is owned by a `CTMUpgradeExecutor` bound to
+    ///      it and owned by `_governance`: the CTM domain — the CTM and its ProxyAdmin — then lives
+    ///      where the bootstrap edge put it. A registry-era CTM owned by any other contract is a
+    ///      misconfiguration this fails on (the executor getters revert on a stranger).
+    function _isUnderBoundCTMExecutor(
+        address _ctm,
+        address _ctmOwner,
+        address _governance
+    ) private view returns (bool) {
+        if (_ctmOwner == _governance || _ctmOwner.code.length == 0) {
+            return false;
+        }
+        if (IChainTypeManager(_ctm).protocolVersion() < UpgradeChainCall.V34_THRESHOLD) {
+            return false;
+        }
+        CTMUpgradeExecutor executor = CTMUpgradeExecutor(payable(_ctmOwner));
+        require(
+            address(executor.CHAIN_TYPE_MANAGER()) == _ctm,
+            "CTM owner is a contract but not the executor bound to it"
+        );
+        require(executor.owner() == _governance, "the CTM executor is not owned by governance");
+        return true;
+    }
+
+    /// @dev Whether the ecosystem `ProxyAdmin` (read off the Bridgehub proxy) is owned by an
+    ///      `EcosystemUpgradeExecutor` bound to it and owned by `_governance`.
+    function _isUnderBoundEcosystemExecutor(address _bridgehub, address _governance) private view returns (bool) {
+        address proxyAdmin = address(uint160(uint256(vm.load(_bridgehub, Utils.ADMIN_SLOT))));
+        address paOwner = IOwnableSingleStep(proxyAdmin).owner();
+        if (paOwner == _governance || paOwner.code.length == 0) {
+            return false;
+        }
+        EcosystemUpgradeExecutor executor = EcosystemUpgradeExecutor(payable(paOwner));
+        require(
+            address(executor.PROXY_ADMIN()) == proxyAdmin,
+            "ecosystem ProxyAdmin owner is not the executor bound to it"
+        );
+        require(executor.owner() == _governance, "the ecosystem executor is not owned by governance");
+        return true;
     }
 
     /// Helper: read the EIP-1967 admin slot of `_proxy`, and if its single-step
@@ -561,7 +600,7 @@ contract AdminFunctions is Script, IAdminFunctions {
             _adminAddr,
             _accessControlRestriction,
             _chainDiamondProxy,
-            abi.encodeCall(IAdmin.upgradeChainFromVersion, (_chainDiamondProxy, oldProtocolVersion, upgradeCutData)),
+            UpgradeChainCall.encode(_chainDiamondProxy, oldProtocolVersion, upgradeCutData),
             0
         );
     }
@@ -573,8 +612,8 @@ contract AdminFunctions is Script, IAdminFunctions {
     ///
     ///      The cut and the DA calls go out as ONE `ChainAdmin.multicall`. They cannot be split:
     ///      `setPubdataContent` only exists on the facets the cut installs, and between the cut and
-    ///      a later DA transaction the chain would commit v33 batches under the old pair — which
-    ///      for a no-DA validium do not prove.
+    ///      a later DA transaction the chain would commit the new version's batches under the old
+    ///      pair — which for a no-DA validium do not prove.
     function upgradeChainFromCTM(IAdminFunctions.ChainUpgradeParams calldata _params) public {
         address _chainAddress = _params.chainAddress;
         console.log("AdminFunctions: upgrading chain", _chainAddress);
@@ -594,19 +633,20 @@ contract AdminFunctions is Script, IAdminFunctions {
             "AdminFunctions: new protocol version must be greater than current"
         );
 
-        Diamond.DiamondCutData memory diamondCut = GetDiamondCutData.getDiamondCutData(
-            address(ctm),
-            currentProtocolVersion
-        );
-
-        // Select the Admin facet's `upgradeChainFromVersion` signature that
-        // actually lives on the chain we're about to call. Pre-v31 chains
-        // expose the legacy 2-arg variant; v31+ expose the new 3-arg one that
-        // carries `_chainAddress`. Using the wrong one hits the DiamondProxy
-        // fallback and reverts with `"F"`.
-        bytes memory upgradeCall = currentProtocolVersion < V31_UPGRADE_CHAIN_FROM_VERSION_THRESHOLD
-            ? abi.encodeCall(IAdminLegacy.upgradeChainFromVersion, (currentProtocolVersion, diamondCut))
-            : abi.encodeCall(IAdmin.upgradeChainFromVersion, (_chainAddress, currentProtocolVersion, diamondCut));
+        // Pick the call the chain's CURRENT generation exposes FIRST, and only reconstruct a cut
+        // for the legacy edge that is handed one. A v34+ chain reads the cut from its own CTM, and
+        // a registry-driven edge leaves nothing to reconstruct from (`upgradeCutDataBlock` is
+        // deprecated and zero), so fetching one first would revert on the supported path.
+        bytes memory callData;
+        if (UpgradeChainCall.requiresCut(currentProtocolVersion)) {
+            Diamond.DiamondCutData memory diamondCut = GetDiamondCutData.getDiamondCutData(
+                address(ctm),
+                currentProtocolVersion
+            );
+            callData = UpgradeChainCall.encode(_chainAddress, currentProtocolVersion, diamondCut);
+        } else {
+            callData = UpgradeChainCall.encodeWithoutCut(_chainAddress, currentProtocolVersion);
+        }
 
         uint256 callCount = 1;
         if (_params.shouldSetDaValidatorPair) {
@@ -617,7 +657,7 @@ contract AdminFunctions is Script, IAdminFunctions {
         }
         Call[] memory calls = new Call[](callCount);
         uint256 next;
-        calls[next++] = Call({target: _chainAddress, value: 0, data: upgradeCall});
+        calls[next++] = Call({target: _chainAddress, value: 0, data: callData});
         // After the cut, so the pair the first batch of the new version commits with is already
         // the new one.
         if (_params.shouldSetDaValidatorPair) {
@@ -782,10 +822,7 @@ contract AdminFunctions is Script, IAdminFunctions {
 
         Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
             data.l1GasPrice,
-            abi.encodeCall(
-                IAdmin.upgradeChainFromVersion,
-                (data.chainDiamondProxyOnGateway, data.oldProtocolVersion, upgradeCutData)
-            ),
+            UpgradeChainCall.encode(data.chainDiamondProxyOnGateway, data.oldProtocolVersion, upgradeCutData),
             Utils.MAX_PRIORITY_TX_GAS,
             new bytes[](0),
             data.chainDiamondProxyOnGateway,

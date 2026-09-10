@@ -37,10 +37,8 @@ contract InitializationTest is DiamondCutTest {
 
     function test_RevertWhen_DelegateCallWithWrongInitializeData() public {
         DiamondInit diamondInit = new DiamondInit(false);
-        bytes memory diamondInitData = abi.encodeWithSelector(
-            diamondInit.initialize.selector,
-            Utils.makeInitializeData(address(0))
-        );
+        // Zero admin makes the initializer revert.
+        bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, uint256(1), address(0));
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](0);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({

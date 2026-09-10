@@ -32,8 +32,8 @@ struct CoreUpgradeParams {
     string outputPath;
 }
 
-/// @notice Parameters for the standalone CTM upgrade entry point.
-///         Used by `CTMUpgrade_v31.noGovernancePrepare` when running per-CTM in a multi-CTM
+/// @notice Parameters for the standalone CTM upgrade entry point
+///         (`DefaultCTMUpgrade.noGovernancePrepare`) when running per-CTM in a multi-CTM
 ///         ecosystem (e.g. ZKsyncOS + EraVM on stage).
 // solhint-disable-next-line gas-struct-packing
 struct CTMUpgradeParams {
@@ -55,4 +55,13 @@ struct CTMUpgradeParams {
     ///         `performForceDeployedContractsInit`, so a zero value breaks the genesis of chains created
     ///         from this release.
     bytes32 zkTokenAssetId;
+    /// @notice The `EcosystemUpgradeExecutor` the core prepare of this upgrade deployed (its output
+    ///         TOML, `[registry].ecosystem_upgrade_executor_addr`). The CTM executor is BOUND to it —
+    ///         every transition's ecosystem leg runs through it — so the CTM prepare takes it as an
+    ///         input rather than re-deriving a deployment it did not make.
+    address ecosystemUpgradeExecutor;
+    /// @notice The `CoreRegistry` the core prepare of this upgrade deployed (its output TOML,
+    ///         `[registry].core_registry_addr`); zero when the upgrade has no ecosystem leg. The
+    ///         transition PINS it as its ecosystem leg, so the CTM prepare takes it as an input.
+    address coreRegistry;
 }

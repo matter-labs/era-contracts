@@ -1,0 +1,53 @@
+name: Setup anvil-interop environment
+description: >
+  Shared setup for every Anvil Interop CI job: Foundry, Node.js, root dependencies,
+  contract artifacts (variant selected via the `artifacts` input) and the
+  anvil-interop test dependencies. Checkout must happen before this action runs.
+
+inputs:
+  artifacts:
+    description: >
+      Which contract artifacts to build:
+      "dev" — anvil-interop dev artifacts only (interop tests on preloaded state);
+      "full" — da + l1 Foundry builds (upgrade tests).
+
+      There is deliberately no deterministic variant: the reproducible build that writes and
+      verifies the committed chain-state snapshots lives in build-anvil-interop-artifacts, so
+      the writer and the verifier cannot drift apart. A third copy here would defeat that.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install Foundry
+      uses: ./.github/actions/install-foundry
+
+    - name: Use Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: yarn
+
+    - name: Install dependencies
+      shell: bash
+      run: yarn
+
+    - name: Build anvil-interop dev artifacts
+      if: ${{ inputs.artifacts == 'dev' }}
+      shell: bash
+      run: yarn l1 build:anvil-interop-dev-artifacts
+
+    - name: Build da-contracts artifacts
+      if: ${{ inputs.artifacts == 'full' }}
+      shell: bash
+      run: yarn da build:foundry
+
+    - name: Build l1-contracts artifacts
+      if: ${{ inputs.artifacts == 'full' }}
+      shell: bash
+      run: yarn l1 build:foundry
+
+    - name: Install anvil-interop dependencies
+      shell: bash
+      working-directory: l1-contracts/test/anvil-interop
+      run: yarn install

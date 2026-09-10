@@ -2,43 +2,10 @@
 
 pragma solidity ^0.8.24;
 
-/// @notice How a built-in contract is deployed in ZKsyncOS upgrades.
-/// SystemProxy: deployed via conductContractUpgrade (behind a system proxy).
-/// Unsafe: force-deployed directly (no proxy upgrade flow).
-enum ZKsyncOSUpgradeType {
-    SystemProxy,
-    Unsafe
-}
-
-/// @notice Canonical identifier for core L2 contracts that participate in
-///         force-deployments and factory-dependency publishing.
-///         `CoreOnGatewayHelper.resolve` maps it to the ZKsyncOS contract / artifact name.
-enum CoreContract {
-    L2Bridgehub,
-    L2AssetRouter,
-    L2NativeTokenVault,
-    L2MessageRoot,
-    UpgradeableBeaconDeployer,
-    BaseTokenHolder,
-    L2ChainAssetHandler,
-    InteropCenter,
-    InteropAttributeParser,
-    L2InteropHandler,
-    L2AssetTracker,
-    L2WrappedBaseToken,
-    L2MessageVerification,
-    L2InteropRootStorage,
-    BeaconProxy,
-    L2V32Upgrade,
-    BridgedStandardERC20,
-    DiamondProxy,
-    ProxyAdmin,
-    TransparentUpgradeableProxy,
-    // Atomic-interop built-ins, part of `getZKsyncOSOnlyContracts`: the commitment tree's storage is read
-    // by the ZKsync OS bootloader, and Era chains have no atomic interop.
-    L2InteropCommitmentTree,
-    AtomicFlowManager
-}
+// The canonical definitions of `L2EcosystemContract` and `ZKsyncOSUpgradeType` live in the production
+// contracts tree (they key the upgrade registries); they are re-exported here so that all
+// deploy-script importers keep working unchanged.
+import {L2EcosystemContract, ZKsyncOSUpgradeType} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 /// @notice System contracts that have ZKsyncOS-specific implementations in l1-contracts.
 ///         These use EVM bytecodes (from l1-contracts/out/) for ZKsyncOS proxy upgrades.

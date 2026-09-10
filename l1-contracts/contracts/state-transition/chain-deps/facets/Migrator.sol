@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {IMigrator} from "../../chain-interfaces/IMigrator.sol";
+import {ISelfDescribingFacet} from "../../chain-interfaces/ISelfDescribingFacet.sol";
 import {
     L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS,
     L2DACommitmentScheme,
@@ -53,7 +54,7 @@ import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 /// @title Migrator Contract handles chain migration between settlement layers.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract MigratorFacet is ZKChainBase, IMigrator {
+contract MigratorFacet is ZKChainBase, IMigrator, ISelfDescribingFacet {
     using PriorityTree for PriorityTree.Tree;
     using PriorityQueue for PriorityQueue.Queue;
 
@@ -368,5 +369,29 @@ contract MigratorFacet is ZKChainBase, IMigrator {
         }
 
         commitment.batchHashes = batchHashes;
+    }
+
+    /// @inheritdoc ISelfDescribingFacet
+    /// @dev Packed list (4 bytes per selector) generated from this facet's ABI — every externally
+    ///      served function except the unregistered helper views `getName()` and `selectors()`
+    ///      (see `Utils.getAllSelectors`). Guarded against drift by FacetSelfDescription.t.sol.
+    ///      0x64b554ad forwardedBridgeBurn(address,address,bytes)
+    ///      0x75ceffdf forwardedBridgeConfirmTransferResult(uint256,uint8,bytes32,address,bytes)
+    ///      0x3f42d5dd forwardedBridgeMint(bytes,bool)
+    ///      0x42249f9f pauseDepositsBeforeInitiatingMigration()
+    ///      0x3b064e40 pauseDepositsOnGateway(uint256)
+    ///      0x41cf49bb prepareChainCommitment()
+    ///      0x63d8882a unpauseDeposits()
+    function selectors() public pure returns (bytes4[] memory result) {
+        bytes memory packed = hex"3b064e403f42d5dd41cf49bb42249f9f63d8882a64b554ad75ceffdf";
+        uint256 count = packed.length / 4;
+        result = new bytes4[](count);
+        for (uint256 i = 0; i < count; ++i) {
+            bytes4 selector;
+            assembly {
+                selector := mload(add(add(packed, 0x20), mul(i, 4)))
+            }
+            result[i] = selector;
+        }
     }
 }

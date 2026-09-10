@@ -285,15 +285,11 @@ contract ValidatorTimelockTest is Test {
             initCalldata: bytes("")
         });
 
-        vm.mockCall(
-            zkSync,
-            abi.encodeCall(IAdmin.upgradeChainFromVersion, (zkSync, oldProtocolVersion, diamondCut)),
-            ""
-        );
-        vm.expectCall(zkSync, abi.encodeCall(IAdmin.upgradeChainFromVersion, (zkSync, oldProtocolVersion, diamondCut)));
+        vm.mockCall(zkSync, abi.encodeCall(IAdmin.upgradeChainFromVersion, (zkSync, oldProtocolVersion)), "");
+        vm.expectCall(zkSync, abi.encodeCall(IAdmin.upgradeChainFromVersion, (zkSync, oldProtocolVersion)));
 
         vm.prank(alice);
-        validator.upgradeChainFromVersion(zkSync, oldProtocolVersion, diamondCut);
+        validator.upgradeChainFromVersion(zkSync, oldProtocolVersion);
     }
 
     function test_RevertWhen_upgradeChainFromVersionNotUpgrader() public {
@@ -306,7 +302,7 @@ contract ValidatorTimelockTest is Test {
 
         vm.prank(bob);
         vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, zkSync, upgraderRole, bob));
-        validator.upgradeChainFromVersion(zkSync, oldProtocolVersion, diamondCut);
+        validator.upgradeChainFromVersion(zkSync, oldProtocolVersion);
     }
 
     function test_executeBatchesSharedBridge() public {

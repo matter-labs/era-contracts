@@ -380,7 +380,11 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         bytes[] memory factoryDeps = new bytes[](0);
         vm.stopPrank();
         vm.startPrank(governor);
-        bridgehub.addChainTypeManager(address(chainContractAddress));
+        // The shared fixture already registers it (the ChainAssetHandler derives pause authority
+        // from registration), and `addChainTypeManager` refuses a repeat.
+        if (!bridgehub.chainTypeManagerIsRegistered(address(chainContractAddress))) {
+            bridgehub.addChainTypeManager(address(chainContractAddress));
+        }
         bridgehub.addTokenAssetId(DataEncoding.encodeNTVAssetId(block.chainid, baseToken));
         L1MessageRoot messageRootNew = L1MessageRoot(
             address(
@@ -440,15 +444,15 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
 
         bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, baseToken);
         mockDiamondInitInteropCenterCallsWithAddress(address(bridgehub), sharedBridge, baseTokenAssetId);
+        // The CTM builds the genesis cut from its registry: mock the registry to install the
+        // fixture facets (the CTM builds the genesis cut from its registry).
+        _mockGenesisRegistryFacets(facetCuts);
         vm.startPrank(governor);
         bridgehub.createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(chainContractAddress),
             _baseTokenAssetId: baseTokenAssetId,
-            _salt: 0,
-            _admin: newChainAdmin,
-            _initData: getCTMInitData(),
-            _factoryDeps: factoryDeps
+            _admin: newChainAdmin
         });
         vm.stopPrank();
     }

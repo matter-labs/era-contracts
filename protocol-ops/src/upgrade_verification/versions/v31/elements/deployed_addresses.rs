@@ -204,12 +204,6 @@ mod gateway_signatures {
             uint256 l1ChainId;
             bool testnetVerifier;
             bool isZKsyncOS;
-            bytes4[] adminSelectors;
-            bytes4[] executorSelectors;
-            bytes4[] mailboxSelectors;
-            bytes4[] gettersSelectors;
-            bytes4[] migratorSelectors;
-            bytes4[] committerSelectors;
             bytes32 genesisRoot;
             uint256 genesisRollupLeafIndex;
             bytes32 genesisBatchCommitment;
@@ -1516,12 +1510,6 @@ async fn verify_v31_new_gateway_ctm_provenance(
             l1ChainId: U256::from(l1_chain_id),
             testnetVerifier: source_ctm.contracts_config.is_testnet,
             isZKsyncOS: true,
-            adminSelectors: admin_cut.selectors.clone(),
-            executorSelectors: executor_cut.selectors.clone(),
-            mailboxSelectors: mailbox_cut.selectors.clone(),
-            gettersSelectors: getters_cut.selectors.clone(),
-            migratorSelectors: migrator_cut.selectors.clone(),
-            committerSelectors: committer_cut.selectors.clone(),
             genesisRoot: parse_bytes32_hex("genesis_root", &genesis_config.genesis_root)?,
             genesisRollupLeafIndex: U256::from(
                 genesis_config.genesis_rollup_leaf_index.unwrap_or_default(),

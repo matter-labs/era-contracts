@@ -68,6 +68,12 @@ library BytecodeUtils {
     }
 
     /// @notice Read and hash deployed bytecode (keccak256) in one call.
+    /// @dev This is the `EXTCODEHASH` a codehash PIN covers — the registry executors'
+    ///      `TRANSITION_CODEHASH` / `CORE_REGISTRY_CODEHASH` and the CTM's `releaseCodehash`
+    ///      anchor. Deploy a pinned object from {readBytecodeL1} on the SAME artifact: a pin taken
+    ///      here while the object is deployed from a script's own compiled copy diverges whenever
+    ///      the two compilations do (the CBOR metadata records the compilation's remappings, which
+    ///      is enough), and an executor that pins code its objects do not run is bricked for good.
     function getDeployedBytecodeHash(
         string memory _fileName,
         string memory _contractName

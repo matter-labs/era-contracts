@@ -80,11 +80,7 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     function activatePriorityMode() external;
 
     /// @inheritdoc IChainUpgrader
-    function upgradeChainFromVersion(
-        address _chainAddress,
-        uint256 _protocolVersion,
-        Diamond.DiamondCutData calldata _cutData
-    ) external override;
+    function upgradeChainFromVersion(address _chainAddress, uint256 _protocolVersion) external override;
 
     /// @notice Executes a proposed governor upgrade
     /// @dev Only the ChainTypeManager contract can execute the upgrade

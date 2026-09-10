@@ -1,13 +1,12 @@
+use crate::upgrade_verification::contract_hashes::{ContractHash, ContractHashes};
 use alloy::hex::{self, FromHex};
 use alloy::primitives::{keccak256, Address, Bytes, FixedBytes};
 use anyhow::Context;
-use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::fs;
 
 use super::{
     address_from_short_hex, compute_create2_address_zk, compute_hash_with_arguments,
-    get_contents_from_github, repo_relative_path,
+    get_contents_from_github,
 };
 
 const ERA_CONTRACTS_REPO: &str = "matter-labs/era-contracts";
@@ -308,49 +307,7 @@ impl BytecodeVerifier {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ContractHash {
-    #[serde(rename = "contractName")]
-    pub contract_name: String,
-    #[serde(rename = "evmBytecodeHash")]
-    pub evm_bytecode_hash: Option<String>,
-    #[serde(rename = "evmDeployedBytecodeHash")]
-    pub evm_deployed_bytecode_hash: Option<String>,
-    #[serde(rename = "evmDeployedBytecodeBlakeHash")]
-    #[serde(default)]
-    pub evm_deployed_bytecode_blake_hash: Option<String>,
-    #[serde(rename = "evmDeployedBytecodeLength")]
-    #[serde(default)]
-    pub evm_deployed_bytecode_length: Option<u32>,
-    #[serde(rename = "zkBytecodeHash")]
-    pub zk_bytecode_hash: Option<String>,
-}
-
-#[derive(Debug)]
-pub struct ContractHashes {
-    pub hashes: Vec<ContractHash>,
-}
-
 impl ContractHashes {
-    pub fn init_from_local() -> anyhow::Result<Self> {
-        const LOCAL_CONTRACT_HASHES_PATH: &str = "AllContractsHashes.json";
-
-        let path = repo_relative_path(LOCAL_CONTRACT_HASHES_PATH);
-        let contents = fs::read_to_string(&path).with_context(|| {
-            format!(
-                "failed to read {}; run `yarn calculate-hashes:fix` or \
-                 `npx ts-node scripts/calculate-hashes.ts` from the repository root, or pass \
-                 `--contracts-commit` to fetch AllContractsHashes.json from GitHub",
-                path.display()
-            )
-        })?;
-
-        Ok(Self {
-            hashes: serde_json::from_str(&contents)
-                .context("failed to parse local AllContractsHashes.json")?,
-        })
-    }
-
     /// Initializes the contract hashes by fetching and parsing the JSON from GitHub.
     pub async fn init_from_github(commit: &str) -> anyhow::Result<Self> {
         Self::init_from_github_repo(commit, ERA_CONTRACTS_REPO, ALL_CONTRACTS_HASHES_PATH).await

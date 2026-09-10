@@ -26,9 +26,9 @@ import "contracts/l2-upgrades/SystemContractProxyAdmin.sol";
 import "contracts/l2-upgrades/ISystemContractProxy.sol";
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
+import {AddressHasNoCode, InvalidChainId} from "contracts/common/L1ContractErrors.sol";
 import {L2ComplexUpgrader} from "contracts/l2-upgrades/L2ComplexUpgrader.sol";
 import {L2GenesisUpgrade} from "contracts/l2-upgrades/L2GenesisUpgrade.sol";
-import {InvalidChainId} from "contracts/common/L1ContractErrors.sol";
 
 /**
  * @title L2GenesisForceDeploymentsHelperTest
@@ -78,6 +78,9 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         // Deploy mock base token implementation
         MockContract mockBaseToken = new MockContract();
         vm.etch(L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, address(mockBaseToken).code);
+
+        // The REAL ecosystem registry at its ZKsync OS built-in address: the ZKOS init path pins
+        // the verbatim fixed-force-deployments bytes there FIRST, and asserts the code exists.
     }
 
     function testZKsyncOSSystemProxyUpgrade_Genesis() public {
@@ -151,9 +154,14 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         _deployMockContract(L2_INTEROP_CENTER_ADDR);
         _deployMockContract(L2_INTEROP_HANDLER_ADDR);
         _deployMockContract(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
-        // The atomic-interop built-ins arrive with the upgrade's force deployments on a pre-existing chain;
-        // etch their real code so the helper initializing them is observable.
+        // On a pre-existing chain the atomic-interop built-ins are already live AND initialized
+        // (their one-shot `initL2`s ran at the chain's v32 genesis); reproduce that state so the
+        // helper leaving them alone is observable — re-initializing would revert.
         _etchAtomicInteropBuiltIns();
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initL2();
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).initL2(fixedData.l1ChainId);
 
         vm.mockCall(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, abi.encodeWithSignature("owner()"), abi.encode(address(this)));
 
@@ -182,14 +190,12 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         );
         assertEq(etchedProxyAdmin.upgradeCallCount(), 0);
 
-        // The upgrade path initializes the atomic-interop built-ins, so an upgraded chain ends up with the
-        // same state a fresh one gets from genesis.
+        // The upgrade path leaves the built-ins alone: their `initL2`s are one-shot, and every
+        // chain the current release can upgrade already ran them at genesis. The state stays
+        // exactly what the pre-seeding above produced — a second init would have reverted.
         _assertAtomicInteropInitialized();
 
         _assertAssetRouterInitialized({_viaInitL2: false});
-
-        // Note: no ZKsync OS chain can arrive here with the built-ins already seeded — neither they nor
-        // their addresses existed in v31 — so the initialization is unconditional and one-shot.
     }
 
     function testEraForceDeployment() public {
@@ -251,6 +257,16 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
                 count++;
             }
         }
+    }
+
+    /// @dev Index of the first log with the given topic0; reverts when absent.
+    function _firstLogIndex(Vm.Log[] memory logs, bytes32 signature) internal pure returns (uint256) {
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics.length > 0 && logs[i].topics[0] == signature) {
+                return i;
+            }
+        }
+        revert("log not found");
     }
 
     function _createFixedForceDeploymentsData(bool isGenesis) internal returns (FixedForceDeploymentsData memory) {

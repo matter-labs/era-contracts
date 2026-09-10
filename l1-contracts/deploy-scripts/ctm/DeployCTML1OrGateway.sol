@@ -3,6 +3,10 @@
 pragma solidity 0.8.28;
 
 import {IZKsyncOSVerifier} from "contracts/state-transition/chain-interfaces/IZKsyncOSVerifier.sol";
+// The canonical definition of `CTMContract` lives in the production contracts tree (it keys the
+// per-CTM upgrade registries); it is re-exported here so that all deploy-script importers keep
+// working unchanged.
+import {CTMContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 struct CTMCoreDeploymentConfig {
     bool testnetVerifier;
@@ -16,31 +20,6 @@ struct CTMCoreDeploymentConfig {
     address verifierFflonk;
     address verifierPlonk;
     address permissionlessValidator;
-}
-
-/// @notice Canonical identifier for CTM / state-transition contracts.
-///         `DeployCTML1OrGateway.resolve` maps it to the ZKsyncOS contract / artifact name.
-enum CTMContract {
-    // ---- Diamond facets ----
-    AdminFacet,
-    MailboxFacet,
-    ExecutorFacet,
-    MigratorFacet,
-    CommitterFacet,
-    DiamondInit,
-    // ---- Infrastructure ----
-    ValidatorTimelock,
-    ChainTypeManager,
-    DefaultUpgrade,
-    // ---- Verifiers ----
-    VerifierPlonk,
-    DualVerifier,
-    TestnetVerifier,
-    // ---- Gateway CTM deployers ----
-    GatewayCTMDeployerCTM,
-    GatewayCTMDeployerVerifiers,
-    // ---- DA ----
-    BlobsL1DAValidatorZKsyncOS
 }
 
 library DeployCTML1OrGateway {
@@ -131,6 +110,16 @@ library DeployCTML1OrGateway {
             return CTMContract.TestnetVerifier;
         } else if (_compareStrings(_contractName, "ZKsyncOSVerifier")) {
             return CTMContract.DualVerifier;
+        } else if (
+            _compareStrings(_contractName, "DefaultUpgrade") ||
+            _compareStrings(_contractName, "DefaultUpgradeZKsyncOS") ||
+            _compareStrings(_contractName, "BootstrapUpgradeZKsyncOS")
+        ) {
+            return CTMContract.DefaultUpgrade;
+        } else if (_compareStrings(_contractName, "L1GenesisUpgrade")) {
+            return CTMContract.L1GenesisUpgrade;
+        } else if (_compareStrings(_contractName, "ServerNotifier")) {
+            return CTMContract.ServerNotifier;
         } else {
             revert(string.concat("Contract ", _contractName, " not CTM contract, creation calldata could not be set"));
         }
@@ -170,6 +159,7 @@ library DeployCTML1OrGateway {
         if (_c == CTMContract.DiamondInit) return "DiamondInit";
         if (_c == CTMContract.ValidatorTimelock) return "ValidatorTimelock";
         if (_c == CTMContract.BlobsL1DAValidatorZKsyncOS) return "BlobsL1DAValidatorZKsyncOS";
+        if (_c == CTMContract.ServerNotifier) return "ServerNotifier";
 
         revert("DeployCTML1OrGateway: unknown CTMContract");
     }

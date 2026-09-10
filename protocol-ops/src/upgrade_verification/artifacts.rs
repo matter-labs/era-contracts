@@ -283,7 +283,11 @@ fn expect_table(value: toml::Value, name: &str) -> anyhow::Result<Table> {
 
 #[derive(Debug, Clone, Deserialize, serde::Serialize)]
 pub(crate) struct ContractsConfig {
-    pub(crate) diamond_cut_data: String,
+    /// Retired by the registry-driven prepare: from v34 the CTM builds the chain-CREATION cut
+    /// itself, per chain creation, from its pinned release, so a prepare has nothing to say about
+    /// it. Still present in the shipped v31/v32/v33 artifacts this verifier also reads.
+    #[serde(default)]
+    pub(crate) diamond_cut_data: Option<String>,
     pub(crate) force_deployments_data: String,
     pub(crate) new_protocol_version: u64,
     pub(crate) old_protocol_version: u64,

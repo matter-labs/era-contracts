@@ -59,8 +59,8 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
     mapping(bytes32 assetId => SavedTotalSupply snapshot) public totalPreV31TotalSupply;
 
     /// @dev Slot previously holding `needBaseTokenTotalSupplyBackfill`. The ZKsync OS base-token
-    /// backfill it gated is complete on every chain that can take this upgrade, which is enforced on
-    /// L1 (see {V32UpgradeZKsyncOS}), so this release has no backfill entry point left.
+    /// backfill it gated is complete on every chain that can take this upgrade — the shipped v32
+    /// upgrade enforced it on L1 — so this release has no backfill entry point left.
     // slither-disable-next-line unused-state
     bool private __DEPRECATED_needBaseTokenTotalSupplyBackfill;
 

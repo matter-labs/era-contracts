@@ -7,6 +7,8 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
+import {CTMContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 library GetDiamondCutData {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
@@ -107,42 +109,25 @@ library GetDiamondCutData {
         return _getDiamondCutAndForceDeployment(ctm);
     }
 
+    /// @notice Reconstruct the genesis diamond cut and force-deployments descriptor for a CTM.
+    /// @dev From v32 the CTM no longer commits these wholesale (the `NewChainCreationParams` event
+    ///      is gone); instead it stores a pointer to its genesis `CTMRegistry` and reads everything
+    ///      from there per chain creation. We reproduce the same cut the CTM builds internally: an
+    ///      empty-facet cut pointing at `DiamondInit` (the CTM fills in the per-chain init calldata
+    ///      itself), and pull the force-deployments blob straight from the registry.
     function _getDiamondCutAndForceDeployment(
         address ctm
-    ) internal returns (bytes memory diamondCutData, bytes memory forceDeploymentsData) {
+    ) internal view returns (bytes memory diamondCutData, bytes memory forceDeploymentsData) {
         ChainTypeManagerBase chainTypeManager = ChainTypeManagerBase(ctm);
-        uint256 protocolVersion = chainTypeManager.protocolVersion();
-        uint256 blockWithData = chainTypeManager.newChainCreationParamsBlock(protocolVersion);
-        Vm.EthGetLogs[] memory logs = _fetchLogsFromBlock(
-            blockWithData,
-            ctm,
-            IChainTypeManager.NewChainCreationParams.selector
-        );
-        if (logs.length == 0) {
-            revert NoLogsFound(IChainTypeManager.NewChainCreationParams.selector);
-        }
+        ICTMRelease release = ICTMRelease(chainTypeManager.currentRelease());
 
-        // Decode the event data as a tuple of all event parameters
-        // Event: NewChainCreationParams(address, bytes32, uint64, bytes32, Diamond.DiamondCutData, bytes32, bytes, bytes32)
-        (
-            ,
-            ,
-            ,
-            ,
-            // genesisUpgrade
-            // genesisBatchHash
-            // genesisIndexRepeatedStorageChanges
-            // genesisBatchCommitment
-            Diamond.DiamondCutData memory newInitialCut, // newInitialCutHash
-            ,
-            bytes memory forceDeployments, // forceDeploymentHash
+        Diamond.DiamondCutData memory cut = Diamond.DiamondCutData({
+            facetCuts: new Diamond.FacetCut[](0),
+            initAddress: release.diamondInit(),
+            initCalldata: ""
+        });
 
-        ) = abi.decode(
-                logs[0].data,
-                (address, bytes32, uint64, bytes32, Diamond.DiamondCutData, bytes32, bytes, bytes32)
-            );
-
-        diamondCutData = abi.encode(newInitialCut);
-        forceDeploymentsData = forceDeployments;
+        diamondCutData = abi.encode(cut);
+        forceDeploymentsData = release.fixedForceDeploymentsData();
     }
 }

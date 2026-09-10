@@ -1,148 +1,102 @@
 # Upgrade Scripts
 
+The upgrade model (releases, transitions, executors, the v34 bootstrap edge) is described in
+[the architecture document](../../../docs/registry-driven-upgrades.md); this directory holds the
+prepare scripts that drive it. Start a security review from the
+[root README review guide](../../../README.md#reviewing-registry-driven-upgrades).
+
+## Layout
+
+- `default-upgrade/` — the version-independent, REGISTRY-DRIVEN prepare pipeline.
+  `DefaultCoreUpgrade` (ecosystem side) deploys the new ecosystem implementations and pins them
+  in a `CoreRegistry`; it emits no governance call. `DefaultCTMUpgrade` (per-CTM side) deploys
+  the release, a `GovernanceUpgradeTimer` bound to the live `CTMUpgradeExecutor` and a
+  `CTMTransition` naming the core prepare's registry, and emits exactly three governance calls:
+  `CTMUpgradeExecutor.stage0/1/2(transition)`. Anything else a version needs governance (or an
+  admin) to do goes through `declareExternalAction` (`ExternalActionsLib`) and is listed in the
+  output's `external_actions` — protocol-ops refuses a bundle carrying a call that is neither.
+  `DefaultChainUpgrade` is the per-chain leg, selecting the modern cut-reading call for a v34+
+  chain and reconstructing a cut only for one that predates it. A version script inherits these
+  and overrides only what its release changes.
+- `v35/` — the first registry-driven release: `CoreUpgrade_v35` deploys one fresh
+  `L1MessageRoot`; `CTMUpgrade_v35` overrides nothing. This demonstrates the recurring prepare
+  interface: the inherited pipeline reuses every release member whose code the version does not
+  change, so a CTM-side no-op deploys nothing and reuses the release object itself.
+- `v34/` — the bootstrap edge: `CoreUpgrade_v34` and `CTMUpgrade_v34` deploy the
+  `EcosystemUpgradeExecutor`, `CTMUpgradeExecutor` and `RegistryBootstrapMigration`, and declare
+  every call of the one-time edge (pause/unpause, timer start, the two handovers, `migrate()`,
+  the post-state gates, the two join authorizations) as bootstrap external actions.
+- `SystemContractsProcessing.s.sol` — builds the L2 force-deployment set shared by genesis and
+  upgrades.
+
+One-off scripts of shipped upgrades (the v31 stage emergency tooling, PUH governance one-offs)
+live on their release branches, not here.
+
+## Running a prepare
+
+Production and CI prepares run through protocol-ops, which drives the version scripts'
+`noGovernancePrepare` on a fork, emits deployer Safe bundles + the three governance stages, and
+writes the merged `ecosystem.toml`. The merger copies each prepare's bundles in source order and
+composes nothing; its own appends (PUH/Guardians wiring, CTM `acceptOwnership` normalization,
+the new-Gateway bundle) join the scripts' declarations under `external_actions`:
+
+```sh
+cargo run -p protocol_ops -- ecosystem upgrade-prepare-all --env <env> --l1-rpc-url <rpc>
+```
+
+Per-environment inputs live in `upgrade-envs/<version>/<env>.toml` (see
+`upgrade-envs/v0.34.0-registry/`), permanent values in `upgrade-envs/permanent-values/`.
+
+## Testing an upgrade end to end
+
+- `test/foundry/l1/integration/UpgradeTestv34_Local.t.sol` — the bootstrap edge through the real
+  prepare pipeline, in-forge.
+- `test/anvil-interop/run-v33-to-v34-upgrade-test.ts` — the same edge driven end to end by
+  protocol-ops against the frozen departing-version chain states, followed on the same chains by
+  two registry-driven hops through real prepares: a same-minor VERIFIER PATCH (run with the
+  bootstrap's L2 transaction still pending, which it must not disturb, and required to derive no
+  facet cut), then the v35 minor hop, whose prepare is required to REUSE the live release. Each
+  hop's merged artifact is asserted to be exactly the three executor calls, and the EIP-7702
+  checker is carried from one hop's output into the next hop's input the way a production env file
+  does.
+- `test/anvil-interop/run-v34-to-v35-upgrade-test.ts` — the registry-driven hop through the
+  bound executors with the objects deployed by the harness itself (the object-level test).
+
 ## Preparing the scripts for a new upgrade
 
-You can use the latest `EcosystemUpgrade_v**` script as a starting point. As a rule of thumb, all contracts that were changed in the release branch should be upgraded. In case the compiler version or compilation configuration has changed, all contracts have to be upgraded, as the bytecodehashes will change for these contract. In general, deployed contracts should reflect the latest changes to contracts in the repository.
+Start from `v35/` as the template: inherit the `Default*Upgrade` bases, override
+`deployNew*Contracts` with the contracts the release changes, and keep everything else derived.
+A release whose L2 built-ins change must also author the L2 remainder
+(`transitionAuthoredL2Plan`: the delegate's unsafe deployment, the pinned composer, the published
+factory dependencies — the v34 bootstrap shows the shape) because the release-pair derivation
+puts the changed built-ins in the L2 leg. See the Transition sections of
+`docs/registry-driven-upgrades.md` and `docs/upgrade-stage-lifecycle.md` §4.7.
 
-## Patch Upgrades
+## Script retirement review
 
-Patch upgrades tend to introduce minor fixes and so they only modify some contracts. More personal judgement should be used when defining a new patch upgrade scripts. You should have the following pointers in mind:
+The registry contracts compose the recurring and bootstrap payloads on-chain, a pinned composer
+defines the L2 delegate arguments, and the prepare scripts no longer keep a parallel definition of
+any of it. Retirement runs as batches, planned in
+[the retirement plan](../../../docs/upgrade-script-retirement.md); batch 1 has landed:
 
-- You may not need to redefine all four facet cuts, you can override `getUpgradeAddedFacetCuts` to specify only the ones that are needed for the upgrade. The old facets should equally be deleted via `getFacetCutsForDeletion`. Note that when creating a new chain all four facet cuts are needed, as done by `getChainCreationFacetCuts`.
-- You may need to override both `deployNewEcosystemContractsL1` and `deployNewEcosystemContractsGW` to only deploy the relevant contracts.
-- The addresses for contracts that are not deployed but needed (facets, verifier...) should be read from the input file via `initializeConfig`, and they should equal the latest values.
-- Some of the `prepareStage1GovernanceCalls` and `prepareGatewaySpecificStage1GovernanceCalls` may be overridden and left empty if they are not part of the upgrade.
+- The committed cut is READ from the object that composes it — `RegistryBootstrapMigration` for
+  the bootstrap edge, the transition's composer for a recurring one. The script-side proposal, L2
+  transaction and delegate-calldata composition are gone.
+- The per-chain call selects the modern, cut-READING entrypoint first
+  (`UpgradeChainCall.requiresCut`); a cut is reconstructed from the CTM's historical log only for a
+  chain that predates it.
+- An upgrade deploys only the release members whose code it changes: each member is compared with
+  what the current sources produce. Replacing a live member additionally requires the version to
+  name it in `changedReleaseMembers()`, so an artifact difference cannot widen the upgrade — it
+  fails the prepare instead.
+- Pinned registry objects are deployed from the same build artifact their codehash pin is read
+  from, and the prepare re-checks every object it deploys against the live executors' pins.
 
-You can check out [EcosystemUpgrade_v29_2.s.sol](./EcosystemUpgrade_v29_2.s.sol) as an example.
+What remains: an authoritative deployment inventory, fresh-deployment authority setup, an audited
+path for cross-contract follow-up wiring, and collapsing the version-specific prepare hierarchy.
 
-## Setup
-
-```sh
-yarn calculate-hashes:check
-```
-
-If this fails you have some issues with foundry or your setup. Try cleaning your contracts
-
-## Example of usage
-
-1. Create a file similar to one of those in the `/l1-contracts/upgrade-envs/` for our environment
-
-2. Simulate the deployment (Runs EcosystemUpgrade, simulates transactions, outputs the upgrade data, i.e. required addresses, config addresses, protocol version and the Diamond Cuts)
-
-   ```sh
-   UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.28.0-precompiles/stage.toml UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v28-ecosystem.toml forge script --sig "run()" EcosystemUpgrade --ffi --rpc-url $SEPOLIA --gas-limit 20000000000 --private-key $PRIVATE_KEY
-   ```
-
-3. Run the following to prepare the ecosystem (Similar to the above, broadcasts all the txs, and saves them in run-latest.json). This step only has to be ran once. The private key has to be provided for this step.
-
-   ```sh
-   UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.28.0-precompiles/stage.toml UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v28-ecosystem.toml forge script --sig "run()" EcosystemUpgrade --ffi --rpc-url $SEPOLIA --gas-limit 20000000000 --broadcast --slow --private-key $PRIVATE_KEY
-   ```
-
-4. Verify contracts based on logs
-
-5. Generate the yaml file for the upgrade (generating calldata)
-
-```sh
-UPGRADE_ECOSYSTEM_OUTPUT=script-out/v27-ecosystem.toml UPGRADE_ECOSYSTEM_OUTPUT_TRANSACTIONS=broadcast/EcosystemUpgrade.s.sol/<CHAIN_ID>/run-latest.json YAML_OUTPUT_FILE=script-out/yaml-output.yaml yarn upgrade-yaml-output-generator
-```
-
-e.g.:
-
-```sh
-UPGRADE_ECOSYSTEM_OUTPUT=script-out/v27-ecosystem.toml UPGRADE_ECOSYSTEM_OUTPUT_TRANSACTIONS=broadcast/EcosystemUpgrade.s.sol/11155111/run-latest.json YAML_OUTPUT_FILE=script-out/yaml-output.yaml yarn upgrade-yaml-output-generator
-```
-
-## Finalization of the upgrade
-
-This part will not be verified by governance as it can be done by anyone. To save up funds, we will use `MulticallWithGas` contract.
-
-### Deploying the multicall with gas contract (for v26 only)
-
-Firstly, you should deploy the `MulticallWithGas` contract.
-
-After that you should use the zkstack_cli tool to get the calldata for the `FinalizeUpgrade`'s `finalizeInit` function:
-
-```sh
-forge script --sig <data-generated-by-zkstack> FinalizeUpgrade.s.sol:FinalizeUpgrade --ffi --rpc-url <rpc-url> --gas-limit 20000000000 --broadcast --slow
-```
-
-## Local testing
-
-```sh
- anvil --fork-url $SEPOLIA
-```
-
-(same as testing without broadcast)
-
-```sh
-UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.27.0-evm/stage.toml UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v27-ecosystem.toml forge script --sig "run()" EcosystemUpgrade --ffi --rpc-url localhost:8545 --gas-limit 20000000000 --broadcast --slow --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-```
-
-Generate yaml file from toml:
-
-```sh
-UPGRADE_ECOSYSTEM_OUTPUT=script-out/v27-ecosystem.toml UPGRADE_ECOSYSTEM_OUTPUT_TRANSACTIONS=broadcast/EcosystemUpgrade.s.sol/11155111/run-latest.json YAML_OUTPUT_FILE=script-out/v27-stage-output.yaml yarn upgrade-yaml-output-generator
-```
-
-Now the protocol upgrade verification tool can be run against anvil and the output, e.g. (in the repo of the verifier) :
-
-```sh
-cargo run -- --ecosystem-yaml $ZKSYNC_HOME/contracts/l1-contracts/script-out/v27-stage-output.yaml --l1-rpc http://localhost:8545  --era-chain-id 270 --bridgehub-address 0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE
-```
-
-## Finalization of the upgrade
-
-This part will not be verified by governance as it can be done by anyone. To save up funds, we will use `MulticallWithGas` contract.
-
-### Deploying the multicall with gas contract (for v26 only)
-
-Firstly, you should deploy the `MulticallWithGas` contract.
-
-After that you should use the zkstack_cli tool to get the calldata for the `FinalizeUpgrade`'s `finalizeInit` function:
-
-```sh
-forge script --sig <data-generated-by-zkstack> FinalizeUpgrade.s.sol:FinalizeUpgrade --ffi --rpc-url <rpc-url> --gas-limit 20000000000 --broadcast --slow
-```
-
-## Exact steps for testnet
-
-- Create output/testnet directory
-
-```shell
-# (XXXX is your API key from alchemy)
-export SEPOLIA="https://eth-sepolia.g.alchemy.com/v2/XXXXXX
-
-UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.27.0-evm/testnet.toml  UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v27-ecosystem-testnet.toml forge script --sig "run()" EcosystemUpgrade --ffi --rpc-url $SEPOLIA --gas-limit 20000000000
-
-```
-
-- Get all the 'forge verify-call' entries from the logs, and put them in verification-logs file in the output dir
-- for stage & testnet - you have to also add the '--chain sepolia` to the end of each line
-
-Now it is time to actually send some data to sepolia - you'll need your own $WALLET_ADDRESS and $PRIVATE_TESTNET_KEY for this wallet
-
-```shell
-UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.27.0-evm/testnet.toml UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v27-ecosystem-testnet.toml forge script --sig "run()" EcosystemUpgrade --ffi --rpc-url $SEPOLIA --gas-limit 20000000000 --broadcast --slow --sender $WALLET_ADDRESS --private-keys $PRIVATE_TESTNET_KEY
-```
-
-```shell
-cp broadcast/EcosystemUpgrade.s.sol/11155111/run-latest.json upgrade-envs/v0.27.0-evm/output/testnet
-cp script-out/v27-ecosystem-testnet.toml upgrade-envs/v0.27.0-evm/output/testnet/v27-ecosystem.toml
-```
-
-Now generate the "yaml" file with all the data
-
-```shell
-YAML_OUTPUT_FILE=upgrade-envs/v0.27.0-evm/output/testnet/v27-ecosystem.yaml UPGRADE_ECOSYSTEM_OUTPUT=script-out/v27-ecosystem-testnet.toml UPGRADE_ECOSYSTEM_OUTPUT_TRANSACTIONS=broadcast/EcosystemUpgrade.s.sol/11155111/run-latest.json yarn upgrade-yaml-output-generator
-```
-
-**IMPORTANT** If you have to re-run generation it in the future, please manually include previous tx hashes from the yaml file into the new one. (this is due to the fact that bytecodes that were already published would not be re-sent - and the verification tool would not be able to confirm their correctness without the original tx that created it).
-
-Afterwards, please verify the contracts:
-
-```shell
-source upgrade-envs/v0.27.0-evm/output/testnet/verification-logs
-```
-
-Now, go to [protocol-upgrade-verification-tool](https://github.com/matter-labs/protocol-upgrade-verification-tool) - and proceed to verify the yaml file.
+Compilation, artifact loading, hashing, bytecode publication, simulation, signing and submission
+remain tooling responsibilities. Deleting a wrapper must preserve its authorization and state
+checks in the contract or in the explicit bootstrap path. The end-to-end gates are the frozen
+bootstrap pipeline and the recurring prepare pipeline listed above; individual-contract tests
+also check that unrelated installed state is preserved.

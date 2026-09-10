@@ -9,7 +9,8 @@ cache-forge/
 cache/
 foundry.lock
 node_modules/
-# also match node_modules symlinks (the trailing-slash pattern only matches real directories)
+# also match node_modules symlinks (worktrees link them to the main checkout; the
+# trailing-slash pattern only matches real directories)
 node_modules
 out/
 target/
@@ -69,3 +70,9 @@ l1-contracts/test/foundry/l1/integration/upgrade-envs/script-out/*.toml
 # Local secrets (never commit)
 .env
 protocol-ops/target-linux/
+
+# Deterministic sub-build used by the anvil registry-driven upgrade test (see
+# [profile.registry-deterministic] in l1-contracts/foundry.toml): CBOR-metadata-free
+# artifacts for the implementations whose codehashes the committed v32 registries pin.
+l1-contracts/out-registry-deterministic/
+l1-contracts/cache-forge-registry-deterministic/

@@ -361,10 +361,7 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
                     config.chainChainId,
                     ctmAddresses.stateTransition.proxies.chainTypeManager,
                     config.baseTokenAssetId,
-                    config.bridgehubCreateNewChainSalt,
-                    getDeployerAddress(),
-                    abi.encode(config.diamondCutData, config.forceDeploymentsData),
-                    getFactoryDeps()
+                    getDeployerAddress()
                 )
             )
         });

@@ -13,7 +13,7 @@
 //! Layout (relative to `l1-contracts/`):
 //!
 //!   upgrade-envs/permanent-values/<env>.toml      (bridgehub, ctms, create2)
-//!   upgrade-envs/v0.33.0-atomic-interop/<env>.toml      (owner, era_chain_id)
+//!   upgrade-envs/v0.34.0-registry/<env>.toml      (owner, era_chain_id)
 //!
 //! The latter contains unquoted hex literals (e.g. `old_protocol_version =
 //! 0x1d…`) which `toml-rs` chokes on, so we parse it line-by-line for the
@@ -31,7 +31,7 @@ use crate::common::paths::resolve_l1_contracts_path;
 
 /// The release's upgrade-env directory. Salts, per-env inputs and the canonical output
 /// directory all live here; it moves with each release rather than trailing an older one.
-const UPGRADE_ENV_DIR: &str = "upgrade-envs/v0.33.0-atomic-interop";
+const UPGRADE_ENV_DIR: &str = "upgrade-envs/v0.34.0-registry";
 const PERMANENT_VALUES_DIR: &str = "upgrade-envs/permanent-values";
 
 #[derive(Debug, Deserialize)]
@@ -204,17 +204,17 @@ pub struct PermanentContracts {
     // NOTE: `create2_factory_salt` deliberately does NOT live here. The salt
     // rotates every regen (the CREATE2 deployer would collide with previously
     // deployed addresses if reused), so it belongs in the v31 input TOML
-    // (`upgrade-envs/v0.33.0-atomic-interop/<env>.toml [contracts] create2_factory_salt`)
+    // (`upgrade-envs/v0.34.0-registry/<env>.toml [contracts] create2_factory_salt`)
     // alongside the rest of the per-regen inputs. See
-    // `EnvConfig::create2_factory_salt_for_upgrade`.
+    // `EnvConfig::upgrade_create2_factory_salt`.
 }
 
-/// Fields read from the release upgrade input TOML (best-effort regex parse —
+/// Fields read from the upgrade input TOML (best-effort regex parse —
 /// the file has unquoted hex literals that the TOML crate rejects).
 ///
-/// CREATE2 salts are *not* stored here; `EnvConfig::create2_factory_salt_for_upgrade`
-/// and `create2_factory_salt_for_upgrade_per_ctm` re-read them from
-/// `upgrade_input_path` on demand. That way the salt-keyed entries are not
+/// CREATE2 salts are *not* stored here; `EnvConfig::upgrade_create2_factory_salt`
+/// and `upgrade_create2_factory_salt_per_ctm` re-read them from
+/// `upgrade_input_toml_path` on demand. That way the salt-keyed entries are not
 /// duplicated in Rust state — the TOML is the only source of truth.
 #[derive(Debug, Default, Clone)]
 pub struct UpgradeInputs {
@@ -227,18 +227,18 @@ pub struct UpgradeInputs {
 pub struct EnvConfig {
     pub env: String,
     pub permanent_values_path: PathBuf,
-    pub upgrade_input_path: PathBuf,
+    pub upgrade_input_toml_path: PathBuf,
     pub permanent: PermanentValues,
-    pub upgrade_input: UpgradeInputs,
+    pub upgrade: UpgradeInputs,
 }
 
 impl EnvConfig {
     /// Load `<l1-contracts>/upgrade-envs/permanent-values/<env>.toml` and the
-    /// release upgrade input TOML for the same env. Both files must exist.
+    /// upgrade input TOML for the same env. Both files must exist.
     pub fn load(env: &str) -> anyhow::Result<Self> {
         let l1 = resolve_l1_contracts_path()?;
         let permanent_values_path = l1.join(PERMANENT_VALUES_DIR).join(format!("{env}.toml"));
-        let upgrade_input_path = l1.join(UPGRADE_ENV_DIR).join(format!("{env}.toml"));
+        let upgrade_input_toml_path = l1.join(UPGRADE_ENV_DIR).join(format!("{env}.toml"));
 
         let pv_content = fs::read_to_string(&permanent_values_path).with_context(|| {
             format!(
@@ -253,8 +253,8 @@ impl EnvConfig {
             )
         })?;
 
-        let upgrade_input = if upgrade_input_path.exists() {
-            parse_upgrade_input(&fs::read_to_string(&upgrade_input_path)?)
+        let upgrade = if upgrade_input_toml_path.exists() {
+            parse_upgrade_input(&fs::read_to_string(&upgrade_input_toml_path)?)
         } else {
             UpgradeInputs::default()
         };
@@ -262,9 +262,9 @@ impl EnvConfig {
         Ok(EnvConfig {
             env: env.to_string(),
             permanent_values_path,
-            upgrade_input_path,
+            upgrade_input_toml_path,
             permanent,
-            upgrade_input,
+            upgrade,
         })
     }
 
@@ -287,61 +287,59 @@ impl EnvConfig {
     }
 
     /// Per-upgrade-version CREATE2 salt from
-    /// `upgrade-envs/v0.33.0-atomic-interop/<env>.toml [contracts]
+    /// `upgrade-envs/v0.34.0-registry/<env>.toml [contracts]
     /// create2_factory_salt`. Distinct from `create2_factory_salt()` (which
     /// reads the chain-permanent salt out of `permanent-values/`); this one
     /// is the salt used to deploy *this upgrade*'s implementations, recorded
     /// alongside the rest of the v31 inputs so re-prepares are reproducible.
     /// Re-reads the TOML each call rather than caching, so editing the file
     /// between commands is reflected without restarting the CLI.
-    pub fn create2_factory_salt_for_upgrade(&self) -> anyhow::Result<Option<B256>> {
-        if !self.upgrade_input_path.exists() {
+    pub fn upgrade_create2_factory_salt(&self) -> anyhow::Result<Option<B256>> {
+        if !self.upgrade_input_toml_path.exists() {
             return Ok(None);
         }
-        let content = fs::read_to_string(&self.upgrade_input_path)
-            .with_context(|| format!("read {}", self.upgrade_input_path.display()))?;
+        let content = fs::read_to_string(&self.upgrade_input_toml_path)
+            .with_context(|| format!("read {}", self.upgrade_input_toml_path.display()))?;
         Ok(read_core_create2_salt(&content))
     }
 
     /// Per-regen salt for legacy `Governance.sol` ceremonies, read from
-    /// `upgrade-envs/v0.33.0-atomic-interop/<env>.toml [contracts] legacy_gov_salt`.
+    /// `upgrade-envs/v0.34.0-registry/<env>.toml [contracts] legacy_gov_salt`.
     /// Op ids in the legacy Gov state machine are content-addressed
     /// (`hash(targets, values, calldatas, predecessor, salt)`); rotating this
     /// salt every regen prevents the broadcaster from colliding with previously
     /// executed op ids that still sit in the on-chain `Done` map. When absent,
     /// returns `None` and the forge scripts default to `bytes32(0)`.
-    pub fn v31_legacy_gov_salt(&self) -> anyhow::Result<Option<B256>> {
-        if !self.upgrade_input_path.exists() {
+    pub fn upgrade_legacy_gov_salt(&self) -> anyhow::Result<Option<B256>> {
+        if !self.upgrade_input_toml_path.exists() {
             return Ok(None);
         }
-        let content = fs::read_to_string(&self.upgrade_input_path)
-            .with_context(|| format!("read {}", self.upgrade_input_path.display()))?;
+        let content = fs::read_to_string(&self.upgrade_input_toml_path)
+            .with_context(|| format!("read {}", self.upgrade_input_toml_path.display()))?;
         Ok(read_core_legacy_gov_salt(&content))
     }
 
     /// Per-CTM CREATE2 salts from
-    /// `upgrade-envs/v0.33.0-atomic-interop/<env>.toml [create2_factory_salts]`,
+    /// `upgrade-envs/v0.34.0-registry/<env>.toml [create2_factory_salts]`,
     /// keyed by CTM proxy. Empty if the env doesn't declare any (legacy
     /// local-fixture path — `upgrade_inner` will fall back to random
     /// salts in that case). Re-reads the TOML each call (see
-    /// `create2_factory_salt_for_upgrade`).
-    pub fn create2_factory_salt_for_upgrade_per_ctm(
-        &self,
-    ) -> anyhow::Result<HashMap<Address, B256>> {
-        if !self.upgrade_input_path.exists() {
+    /// `upgrade_create2_factory_salt`).
+    pub fn upgrade_create2_factory_salt_per_ctm(&self) -> anyhow::Result<HashMap<Address, B256>> {
+        if !self.upgrade_input_toml_path.exists() {
             return Ok(HashMap::new());
         }
-        let content = fs::read_to_string(&self.upgrade_input_path)
-            .with_context(|| format!("read {}", self.upgrade_input_path.display()))?;
+        let content = fs::read_to_string(&self.upgrade_input_toml_path)
+            .with_context(|| format!("read {}", self.upgrade_input_toml_path.display()))?;
         Ok(read_create2_salts_per_ctm(&content))
     }
 
     pub fn owner_address(&self) -> Option<Address> {
-        self.upgrade_input.owner_address
+        self.upgrade.owner_address
     }
 
     pub fn era_chain_id(&self) -> Option<u64> {
-        self.upgrade_input.era_chain_id
+        self.upgrade.era_chain_id
     }
 
     /// Whether this is the mainnet ecosystem. Drives testnet-vs-real contract
@@ -392,7 +390,7 @@ impl EnvConfig {
 }
 
 /// Default output dir for an env, e.g.
-/// `upgrade-envs/v0.33.0-atomic-interop/output/<env>/`. Outputs land directly under
+/// `upgrade-envs/v0.34.0-registry/output/<env>/`. Outputs land directly under
 /// the env dir — no `protocol-ops/` subfolder — so the artifacts a reviewer
 /// expects to find for stage / mainnet are immediately visible.
 pub fn default_protocol_ops_out_dir(env: &str) -> anyhow::Result<PathBuf> {
@@ -567,13 +565,13 @@ mod tests {
         let cfg = EnvConfig::load("stage").expect("load stage env config");
 
         let core_salt = cfg
-            .create2_factory_salt_for_upgrade()
+            .upgrade_create2_factory_salt()
             .expect("read core salt")
             .expect("stage.toml must declare [contracts] create2_factory_salt");
         assert_ne!(core_salt, B256::ZERO);
 
         let per_ctm = cfg
-            .create2_factory_salt_for_upgrade_per_ctm()
+            .upgrade_create2_factory_salt_per_ctm()
             .expect("read per-CTM salts");
         assert_eq!(per_ctm.len(), 2);
         let era: Address = "0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b"
@@ -595,13 +593,13 @@ mod tests {
         let cfg = EnvConfig::load("mainnet").expect("load mainnet env config");
 
         let core_salt = cfg
-            .create2_factory_salt_for_upgrade()
+            .upgrade_create2_factory_salt()
             .expect("read core salt")
             .expect("mainnet.toml must declare [contracts] create2_factory_salt");
         assert_ne!(core_salt, B256::ZERO);
 
         let per_ctm = cfg
-            .create2_factory_salt_for_upgrade_per_ctm()
+            .upgrade_create2_factory_salt_per_ctm()
             .expect("read per-CTM salts");
         assert_eq!(per_ctm.len(), 2);
         let era: Address = "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C"

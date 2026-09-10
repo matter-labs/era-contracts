@@ -3,18 +3,70 @@
 ## Relevant files
 
 - `protocol-ops/src/main.rs` — top-level CLI dispatcher.
-- `protocol-ops/src/commands/ecosystem/` — ecosystem-wide commands (`upgrade-prepare-all`, `upgrade-governance`, `stage3`, `list-ctms`, `governance-toml-to-simulator`, …).
-- `protocol-ops/src/commands/ecosystem/v31_upgrade_inner.rs` — canonical v31 prepare-phase orchestration (`V31UpgradeInner::prepare`).
-- `protocol-ops/src/commands/ecosystem/v31_upgrade_full.rs` — `V31UpgradeFull` = Inner + ecosystem precondition (`ensureCtmsAndProxyAdminsOwnedByGovernance`).
+- `protocol-ops/src/commands/ecosystem/` — ecosystem-wide commands (`upgrade-prepare-all`, `upgrade-governance`, `verify-bootstrap`, `list-ctms`, `governance-toml-to-simulator`, …).
+- `protocol-ops/src/commands/ecosystem/upgrade_inner.rs` — canonical prepare-phase orchestration (`UpgradeInner::prepare`).
+- `protocol-ops/src/commands/ecosystem/upgrade_full.rs` — `UpgradeFull` = Inner + ecosystem precondition (`ensureCtmsAndProxyAdminsOwnedByGovernance`).
 - `protocol-ops/src/commands/ecosystem/upgrade.rs` — CLI handlers (`run_upgrade_prepare_all`, `run_upgrade_governance`, `run_list_ctms`) and the free `replay_governance_stages` helper.
 - `protocol-ops/src/commands/ecosystem/simulator.rs` — converts prepared governance TOMLs into transaction-simulator JSON.
 - `protocol-ops/src/commands/chain/` — per-chain commands (`chain upgrade`, `chain gateway convert`, `chain gateway migrate-to`, …).
 - `protocol-ops/src/commands/dev/execute_safe.rs` — executes a Gnosis Safe Transaction Builder JSON bundle by signing each tx with a supplied private key and sending raw transactions to the given RPC URL.
 - `protocol-ops/src/common/forge/runner.rs` — `ForgeRunner`: owns the anvil fork lifecycle and records every broadcast tx into `runner.runs()` for per-sender Safe-bundle emission.
 - `protocol-ops/src/common/l1_contracts.rs` — auto-resolution helpers (CTM, governance, bytecodes supplier, validator timelock, etc.) — read live state directly from L1.
-- `protocol-ops/src/config/forge_interface/script_params.rs` — `ForgeScriptParams` invocation specs for each forge script the CLI invokes.
+- `protocol-ops/src/common/forge/scripts/mod.rs` — `ForgeScriptParams` invocation specs for each forge script the CLI invokes, and the `ScriptCall` table binding each typed call to its script.
 - `l1-contracts/deploy-scripts/AdminFunctions.s.sol` — Solidity helpers invoked by protocol-ops (e.g. `governanceExecuteCalls`, `ensureCtmsAndProxyAdminsOwnedByGovernance`). Auto-imported via the `IAdminFunctions` interface.
-- `l1-contracts/deploy-scripts/upgrade/v31/{CoreUpgrade_v31,CTMUpgrade_v31,ChainUpgrade_v31}.s.sol` — Solidity entry points for v31 deploys.
+- `l1-contracts/deploy-scripts/upgrade/v34/{CoreUpgrade_v34,CTMUpgrade_v34}.s.sol` — Solidity entry points for the current upgrade edge.
+
+## Verifying a package before it is signed
+
+Two verifiers, for two shapes of package.
+
+`ecosystem verify-upgrade` (`upgrade_verification/versions/v31/`) is the original PUVT: it
+re-derives ~60 governance calls and cross-checks each against live state, because for a v31
+package the reviewable artifact WAS the calldata. It also reconstructs each deployment from an
+append-only `transactions.txt` to establish provenance.
+
+`ecosystem verify-bootstrap` (`upgrade_verification/versions/v34/`) verifies a **registry
+bootstrap** package, and is much smaller because the registry model moved the reviewable content
+off the calldata and onto write-once objects. It needs only the merged prepare TOML and an L1
+RPC — no gateway RPC, no zk-governance commit, and no transaction log, since provenance is a
+runtime codehash the executors and the CTM enforce on-chain rather than a CREATE2 history to
+reconstruct. What it checks:
+
+- **Object provenance** — the code at each address, looked up in `AllContractsHashes.json`.
+  Code attributable to no contract is a WARNING (the usual cause is an un-regenerated hash file,
+  which makes every lookup miss at once); code attributable to a _different_ contract is an ERROR.
+- **The manifest's inline pins** against live code. A pin that does not hold cannot execute:
+  the executors reject an object whose code disagrees with its pin.
+- **Bound authority** — the executor's CTM, its ProxyAdmin, its ecosystem executor, its owner,
+  and that no nomination is outstanding. The owner check is the consequential one, so pass
+  `--expected-governance-owner` for anything that will actually be signed: after `migrate()` the
+  CTM domain belongs to that owner permanently.
+- **Departing state** — the CTM's live version against the manifest's expectation, and every
+  proxy row's `expectedOldImpl` against the implementation actually live behind that proxy.
+- **Calldata shape** — stage 0 pauses, stage 1 performs the two handovers plus `migrate()` and
+  (when present) the complete ecosystem leg, stage 2 asserts `validateApplied()` and unpauses.
+  The prepare's declared external actions are printed as the reviewable list rather than flagged:
+  a bootstrap edge's handovers and pause window are exactly the calls no object can describe.
+
+It deliberately does NOT re-derive facet cuts, L2 transactions or proposals — those come from the
+audited on-chain derivation, and a second implementation here would be one more thing to keep in
+sync. It also does not call the objects' own `validate()`: that runs against post-handover state,
+so pre-execution it reverts by design.
+
+```bash
+cargo run --release --bin protocol_ops -- ecosystem verify-bootstrap \
+  --ecosystem-toml <out>/prepare/ecosystem.toml \
+  --l1-rpc-url $L1_RPC \
+  --expected-governance-owner 0x...
+```
+
+The prepare output names every object the edge runs, including the two a bootstrap has that a
+recurring upgrade does not: `bootstrap_migration_addr` and `bound_ctm_upgrade_executor_addr`.
+`ctm_transition_addr` and `ctm_upgrade_executor_addr` stay zero for a bootstrap on purpose —
+the edge has no transition, and protocol-ops reads a nonzero executor there as "this prepare's
+stage calls are executor calls", which a bootstrap's are not. The verifier still derives the
+migration from the stage-1 `migrate()` call and treats the reported field as a cross-check, so
+it checks the calldata governance will execute rather than the prepare's summary of it.
 
 ## What protocol-ops is
 

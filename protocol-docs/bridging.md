@@ -179,12 +179,13 @@ tokens) and rejects fee-on-transfer tokens (`TokensWithFeesNotSupported`).
 A vault that is upgraded in place starts with `bridgedOut == 0` while still holding all of the escrow that
 was bridged out before the upgrade. Every withdrawal of an L1-native asset would therefore look like an
 inbound amount exceeding the outstanding one and be rejected as forged. `populateBridgedOut(assetIds)` folds
-the pre-upgrade accounting into `bridgedOut`, once per asset, and `stage3` of the upgrade runs it for the
-L1-native assets in the vault's `bridgedTokens` enumeration that have a non-zero pre-upgrade amount, batched
-across transactions (see `l1-contracts/deploy-scripts/upgrade/default-upgrade/BridgedOutPopulationLib.sol`;
-assets whose
-amount is zero are left out of the batches entirely, so their `bridgedOutPopulated` flag stays unset — there
-is nothing to fold in for them, now or later).
+the pre-upgrade accounting into `bridgedOut`, once per asset. The shipped v31 upgrade's `stage3` drove it
+for the L1-native assets in the vault's `bridgedTokens` enumeration that had a non-zero pre-upgrade amount,
+batched across transactions (assets whose amount is zero were left out of the batches entirely, so their
+`bridgedOutPopulated` flag stays unset — there is nothing to fold in for them, now or later); every
+ecosystem the current release can upgrade has been populated, so the driver tooling lives only on that
+release's branch. The entry point itself is permissionless and stays callable for any asset that still has
+a legacy amount.
 
 - For an asset the removed v31 `L1AssetTracker` registered, the amount is the complement of **L1's own
   bulkhead** there: L1 is the origin chain of these assets, so its bulkhead starts at `MAX_TOKEN_BALANCE`
@@ -272,12 +273,12 @@ to preserve the deployed storage layout.
   registered lazily on their first bridge operation, or eagerly by anyone via `registerLegacyToken`.
 - **ZKsync OS base token**: the pre-v31 supply of an upgraded ZKsync OS chain lives in
   `L2BaseTokenZKOS.zkosPreV31TotalSupply`, populated while the chain ran v31 (via the since-removed backfill
-  service transaction), so `totalSupply()` is always available here. This release carries no backfill path:
-  the v32 upgrade of a ZKsync OS chain is forbidden on L1 (`V32UpgradeZKsyncOS`) unless
-  `baseTokenHasTotalSupply` was set by the v31 backfill _and_ its L2 execution is proven — a
-  `PriorityOpLowerBound` registry permissionlessly pins a priority-op count observed after the flag was set,
-  and the upgrade requires all ops below it to be processed. Fresh chains have no pre-v31 history and keep
-  zero. The tracker's own backfill flag and entry point are gone, and its slot is deprecated.
+  service transaction), so `totalSupply()` is always available here. The shipped v32 upgrade was forbidden
+  on L1 unless `baseTokenHasTotalSupply` was set by the v31 backfill _and_ its L2 execution was proven (its
+  `PriorityOpLowerBound` registry permissionlessly pinned a priority-op count observed after the flag was
+  set, and the upgrade required all ops below it to be processed), so every chain the current release can
+  upgrade already carries a final value. Fresh chains have no pre-v31 history and keep zero. The tracker's
+  own backfill flag and entry point are gone, and its slot is deprecated.
 
 ## L1Nullifier and failed-deposit recovery
 

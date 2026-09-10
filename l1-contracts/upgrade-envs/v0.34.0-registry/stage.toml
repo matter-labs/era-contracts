@@ -1,0 +1,26 @@
+# v0.34.0 (registry-driven upgrades) — stage upgrade inputs.
+#
+# Ecosystem identities (owner / PUH, Era chain id, CTM addresses) are carried forward from the
+# v0.31.0-interopB stage inputs; the CREATE2 salts are fresh for this release (rotate them again if
+# a rehearsal consumes them — see append-only-tx-log notes in the protocol-ops docs). The departing
+# version below is informational: the prepare reads the live version from the CTM.
+old_protocol_version = 0x2100000000 # v33.0.0 (informational)
+pre_v32_introspection = false
+era_chain_id = 270
+owner_address = "0x8f08627524aeD610192132A425D6b9C32a1727EF"
+governance_upgrade_timer_initial_delay = 1200
+
+[contracts]
+new_protocol_version = 0x2200000000 # v34.0.0
+latest_protocol_version = 0x2200000000
+create2_factory_salt = "0x7a7be93322580cbdfad2e716773a9f46ccf39866c55d94c92a21c94e08ed6f25"
+create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+
+[legacy_gateway]
+chain_id = 123
+
+# Per-CTM CREATE2 salts: each CTM prepare deploys contracts whose constructor arguments are
+# env-wide constants, so distinct salts keep their addresses apart (Era CTM, ZKsync OS CTM).
+[create2_factory_salts]
+"0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b" = "0x8e70b7ce6c7e4a2279bcc7b689169a7ca9dd3c2406ed0f877d60333f60161663"
+"0x73bee414c6e006525f3cceedf6d8004c0370502e" = "0xcbfd435397b4726d402652f918600668f68f966354550b95864aec703cbba0fd"

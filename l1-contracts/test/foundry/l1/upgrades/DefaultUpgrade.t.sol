@@ -26,7 +26,7 @@ contract DefaultUpgradeTest is BaseUpgrade {
 
         // Set up CTM for verifier lookup
         baseZkSyncUpgrade.setChainTypeManager(mockChainTypeManager);
-        baseZkSyncUpgrade.mockProtocolVersionVerifier(protocolVersion, mockVerifier);
+        proposedUpgrade.verifier = mockVerifier;
     }
 
     function test_SuccessUpgrade() public {

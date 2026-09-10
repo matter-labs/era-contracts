@@ -252,9 +252,16 @@ library AddressIntrospector {
             verifiers: Verifiers({verifier: verifier, verifierFflonk: verifierFflonk, verifierPlonk: verifierPlonk}),
             facets: facets,
             genesisUpgrade: ctm.l1GenesisUpgrade(),
-            // `defaultUpgrade` is only stored in the CTM from v32 on.
-            defaultUpgrade: _isPreV32 ? address(0) : ctm.defaultUpgrade(),
-            chainTypeManagerProxyAdmin: Utils.getProxyAdminAddress(_ctmAddr)
+            // No live source exists: the engine is a per-upgrade deploy the CTM keeps no stable
+            // pointer to (a committed transition pins its own engine, but is keyed by departing
+            // version). Every prepare overwrites this with the engine it deploys, and
+            // `DefaultCTMUpgrade.saveOutput` refuses to serialize it unassigned.
+            defaultUpgrade: address(0),
+            chainTypeManagerProxyAdmin: Utils.getProxyAdminAddress(_ctmAddr),
+            // The release registry only exists on the CTM from v34 on — every earlier
+            // implementation has no `currentRelease` getter at all — so it is read only off a
+            // registry-era CTM and reported as zero otherwise.
+            currentRelease: ctm.protocolVersion() >= SemVer.packSemVer(0, 34, 0) ? ctm.currentRelease() : address(0)
         });
         info.l1Specific = L1SpecificStateTransitionAddresses({legacyValidatorTimelock: ctm.validatorTimelock()});
         info.admin = CTMAdminAddresses({
@@ -353,10 +360,6 @@ library AddressIntrospector {
         return zkChains[0];
     }
 
-    function getZkChainFacetAddresses(IZKChain _zkChain) public view returns (address[] memory) {
-        return _zkChain.facetAddresses();
-    }
-
     /// @notice Whether the ecosystem predates v32, i.e. its nullifier has no `l1InteropHandler` getter and
     /// the upgrade still has to deploy and wire the interop handler.
     /// @dev Reverts on an ecosystem with no registered chains: there is nothing to read a protocol version
@@ -376,34 +379,6 @@ library AddressIntrospector {
     function hasRegisteredChains(address _bridgehubProxy) public view returns (bool) {
         require(_bridgehubProxy != address(0) && _bridgehubProxy.code.length > 0, "Bridgehub contract does not exist");
         return IL1Bridgehub(_bridgehubProxy).getAllZKChains().length != 0;
-    }
-
-    /// @notice Convenience method to fetch everything for a specific chainId
-    function getAllForChain(
-        IL1Bridgehub _bridgehub,
-        uint256 _chainId
-    )
-        external
-        view
-        returns (
-            BridgehubAddresses memory bh,
-            StateTransitionDeployedAddresses memory ctm,
-            ZkChainAddresses memory zk,
-            address[] memory zkFacets,
-            BridgesDeployedAddresses memory bridges
-        )
-    {
-        bh = getBridgehubAddresses(_bridgehub);
-
-        address ctmAddr = _bridgehub.chainTypeManager(_chainId);
-        ctm = getCTMAddresses(ChainTypeManagerBase(ctmAddr)).stateTransition;
-
-        address zkAddr = _bridgehub.getZKChain(_chainId);
-        zk = getZkChainAddresses(IZKChain(zkAddr), _bridgehub);
-        zkFacets = getZkChainFacetAddresses(IZKChain(zkAddr));
-
-        address assetRouter = address(_bridgehub.assetRouter());
-        bridges = getBridgesDeployedAddresses(assetRouter);
     }
 
     // ============ Private Helpers ============

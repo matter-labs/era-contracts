@@ -22,18 +22,11 @@ struct GatewayCTMDeployerConfig {
     bool testnetVerifier;
     /// @notice Flag indicating whether to use ZKsync OS mode.
     bool isZKsyncOS;
-    /// @notice Array of function selectors for the Admin facet.
-    bytes4[] adminSelectors;
-    /// @notice Array of function selectors for the Executor facet.
-    bytes4[] executorSelectors;
-    /// @notice Array of function selectors for the Mailbox facet.
-    bytes4[] mailboxSelectors;
-    /// @notice Array of function selectors for the Getters facet.
-    bytes4[] gettersSelectors;
-    /// @notice Array of function selectors for the Migrator facet.
-    bytes4[] migratorSelectors;
-    /// @notice Array of function selectors for the Committer facet.
-    bytes4[] committerSelectors;
+    // Facet selector lists are intentionally absent: the genesis cut installs no facets directly.
+    // The Gateway CTM points at a genesis release (deployed and pinned by this deployer), and
+    // `DiamondInit` reads each facet's own `ISelfDescribingFacet.selectors()` at chain creation —
+    // mirroring the L1 registry-driven genesis path. ZKsync OS has no bootloader, default-account
+    // or EVM-emulator bytecode, so no base-system hashes ride here either.
     /// @notice Root hash of the genesis state.
     bytes32 genesisRoot;
     /// @notice Leaf index in the genesis rollup.
@@ -143,6 +136,9 @@ struct GatewayCTMFinalConfig {
     address genesisUpgrade;
     /// @notice Address of the Verifier contract (from Verifiers deployer).
     address verifier;
+    /// @notice The bootstrap `CTMRelease` (deployed directly). Its manifest is a constructor
+    ///         argument, so its CREATE2 address is a commitment to the genesis manifest.
+    address currentRelease;
 }
 
 /// @notice Result from CTM deployer.

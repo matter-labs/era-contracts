@@ -212,24 +212,9 @@
         "internalType": "bytes32"
       },
       {
-        "name": "_salt",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
         "name": "_admin",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "_initData",
-        "type": "bytes",
-        "internalType": "bytes"
-      },
-      {
-        "name": "_factoryDeps",
-        "type": "bytes[]",
-        "internalType": "bytes[]"
       }
     ],
     "outputs": [

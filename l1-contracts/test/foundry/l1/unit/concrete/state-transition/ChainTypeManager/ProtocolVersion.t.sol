@@ -3,8 +3,9 @@ pragma solidity 0.8.28;
 
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {ProtocolIdNotGreater} from "contracts/common/L1ContractErrors.sol";
+import {NoCommittedUpgradeCutForVersion} from "contracts/common/L1ContractErrors.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 contract ProtocolVersion is ChainTypeManagerTest {
     function setUp() public {
@@ -31,8 +32,7 @@ contract ProtocolVersion is ChainTypeManagerTest {
             getDiamondCutData(diamondInit),
             oldProtocolVersion,
             1000,
-            newProtocolVersionSemVer,
-            testnetVerifier
+            newProtocolVersionSemVer
         );
         vm.stopPrank();
 
@@ -49,7 +49,6 @@ contract ProtocolVersion is ChainTypeManagerTest {
         assertEq(newProtocolVersion, newProtocolVersionSemVer);
         assertEq(newProtocolVersionDeadline, type(uint256).max);
         assertEq(oldProtocolVersionDeadline, 1000);
-        assertEq(chainContractAddress.protocolVersionVerifier(newProtocolVersionSemVer), testnetVerifier);
     }
 
     // protocolVersionIsActive
@@ -62,28 +61,50 @@ contract ProtocolVersion is ChainTypeManagerTest {
         _mockMigrationPausedFromBridgehub();
 
         vm.startPrank(governor);
-        chainContractAddress.setNewVersionUpgrade(getDiamondCutData(diamondInit), 0, 0, 1, testnetVerifier);
+        chainContractAddress.setNewVersionUpgrade(getDiamondCutData(diamondInit), 0, 0, 1);
         vm.stopPrank();
 
         assertEq(chainContractAddress.protocolVersionIsActive(1), true);
     }
 
-    // setProtocolVersionDeadline
+    // protocolVersionDeadline resolution: the current version is open-ended; a version that was
+    // never current, has no committed transition and no stored write resolves to 0 (inactive).
+    function test_ProtocolVersionDeadlineResolution() public {
+        createNewChain(getDiamondCutData(diamondInit));
+
+        assertEq(chainContractAddress.protocolVersionDeadline(0), type(uint256).max, "current version is open-ended");
+
+        uint256 unknownVersion = SemVer.packSemVer(0, 99, 0);
+        assertEq(chainContractAddress.protocolVersionDeadline(unknownVersion), 0, "unknown version has no deadline");
+        assertEq(chainContractAddress.protocolVersionIsActive(unknownVersion), false, "unknown version inactive");
+    }
+
+    // setProtocolVersionDeadline: the deadline is operational state that keeps moving after the
+    // commit, so the owner can override the value a departed version's edge was committed with.
     function test_SuccessfulSetProtocolVersionDeadline() public {
         address chainAddress = createNewChain(getDiamondCutData(diamondInit));
-
-        uint256 deadlineBefore = chainContractAddress.protocolVersionDeadline(0);
-        assertEq(deadlineBefore, type(uint256).max);
-
-        uint256 newDeadline = 1000;
-
         _mockGetZKChainFromBridgehub(chainAddress);
+        _mockMigrationPausedFromBridgehub();
 
         vm.prank(governor);
-        chainContractAddress.setProtocolVersionDeadline(0, newDeadline);
+        chainContractAddress.setNewVersionUpgrade(getDiamondCutData(diamondInit), 0, 1000, SemVer.packSemVer(0, 1, 0));
+        assertEq(chainContractAddress.protocolVersionDeadline(0), 1000, "committed deadline");
 
-        uint256 deadline = chainContractAddress.protocolVersionDeadline(0);
-        assertEq(deadline, newDeadline);
+        vm.expectEmit(true, false, false, true);
+        emit IChainTypeManager.UpdateProtocolVersionDeadline(0, 2000);
+        vm.prank(governor);
+        chainContractAddress.setProtocolVersionDeadline(0, 2000);
+        assertEq(chainContractAddress.protocolVersionDeadline(0), 2000, "overridden deadline");
+
+        // A past override retires the version.
+        vm.warp(3000);
+        assertEq(chainContractAddress.protocolVersionIsActive(0), false, "expired after override");
+    }
+
+    function test_RevertWhen_SetProtocolVersionDeadlineByNonOwner() public {
+        vm.expectRevert("Ownable: caller is not the owner");
+        vm.prank(makeAddr("stranger"));
+        chainContractAddress.setProtocolVersionDeadline(0, 2000);
     }
 
     // executeUpgrade
@@ -105,7 +126,7 @@ contract ProtocolVersion is ChainTypeManagerTest {
     }
 
     // upgradeChainFromVersion
-    function test_SuccessfulUpgradeChainFromVersion() public {
+    function test_RevertWhen_UpgradeChainFromVersionWithoutCommittedTransition() public {
         address chainAddress = createNewChain(getDiamondCutData(diamondInit));
 
         Diamond.FacetCut[] memory customFacetCuts = new Diamond.FacetCut[](1);
@@ -124,15 +145,13 @@ contract ProtocolVersion is ChainTypeManagerTest {
             getDiamondCutDataWithCustomFacets(address(0), customFacetCuts),
             0,
             0,
-            1,
-            testnetVerifier
+            1
         );
 
-        vm.expectRevert(ProtocolIdNotGreater.selector);
-        chainContractAddress.upgradeChainFromVersion(
-            chainId,
-            0,
-            getDiamondCutDataWithCustomFacets(address(0), customFacetCuts)
-        );
+        // The edge above was committed via the legacy cut-taking setter, which registers no
+        // transition — and a v32 chain derives its cut from the committed transition, so the
+        // read fails before the chain's own version check would.
+        vm.expectRevert(abi.encodeWithSelector(NoCommittedUpgradeCutForVersion.selector, 0));
+        chainContractAddress.upgradeChainFromVersion(chainId, 0);
     }
 }

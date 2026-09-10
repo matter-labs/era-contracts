@@ -40,6 +40,11 @@ remappings = [
   "@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/",
   "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
   "test-utils/=test/foundry/l1/integration/utils/",
+  # Every remapping is recorded in each contract's CBOR metadata, so the set must not depend on the
+  # machine. Two OpenZeppelin submodules each vendor `erc4626-tests`; auto-detection keeps whichever
+  # the directory scan meets first, which differs between Linux and macOS and made every locally
+  # regenerated hash and the genesis image diverge from CI. Pin the copy CI resolves to.
+  "erc4626-tests/=lib/openzeppelin-contracts-upgradeable-v4/lib/erc4626-tests/",
 ]
 optimizer = true
 optimizer_runs = 9999999
@@ -55,6 +60,18 @@ allow_internal_expect_revert = true
 [profile.anvil-interop]
 cbor_metadata = false
 bytecode_hash = "none"
+
+# Deterministic sub-build for the anvil registry-driven upgrade test: the committed v32
+# registries (contracts/upgrades/registry/v32) pin the CODEHASHES of the implementations the
+# runner deploys, so those artifacts must be byte-identical across platforms (macOS regen vs
+# Linux CI). Same metadata settings as anvil-interop, but with a dedicated out/cache so it
+# never clobbers the default-profile artifacts the rest of the harness loads.
+# Usage: FOUNDRY_PROFILE=registry-deterministic forge build <sources>
+[profile.registry-deterministic]
+cbor_metadata = false
+bytecode_hash = "none"
+out = "out-registry-deterministic"
+cache_path = "cache-forge-registry-deterministic"
 
 [profile.invariant_tests_l1context]
 test = "test"

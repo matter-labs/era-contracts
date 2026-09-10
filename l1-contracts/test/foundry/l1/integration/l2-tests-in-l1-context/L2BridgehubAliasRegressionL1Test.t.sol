@@ -115,6 +115,10 @@ contract L2BridgehubAliasRegressionL1Test is Test, SharedL2ContractL1Deployer {
     ) public {
         // Avoid chainId 0 which might have special meaning
         vm.assume(testChainId > 0);
+        // Shared setup scopes a `baseTokenAssetId` call mock to the interop destination while
+        // constructing its example chain. A write to that key is real, but the mocked getter
+        // deliberately keeps returning the setup value, so it cannot observe this assertion.
+        vm.assume(testChainId != INTEROP_DESTINATION_CHAIN_ID);
         // Keep the storage assertion observable rather than accepting the mapping's default value.
         vm.assume(testBaseTokenAssetId != bytes32(0));
 
