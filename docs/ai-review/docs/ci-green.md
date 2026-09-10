@@ -19,9 +19,9 @@
 - **Pre-merge** (`pre-merge-checks`): the checks of committed _generated_ artifacts —
   `AllContractsHashes.json`, `l1-contracts/selectors`, `l1-contracts/zkstack-out`,
   `configs/genesis/zksync-os/latest.json`, and the anvil-interop chain-state snapshots
-  (`state-generation-check`). Any bytecode change invalidates these and the only fix is a regen
-  + commit, so they **skip while the PR is a draft** and run once
-  it is marked ready for review (plus on every later push while it stays non-draft). They also skip
+  (`state-generation-check`). Any bytecode change invalidates these and the only fix is to
+  regenerate and commit, so they **skip while the PR is a draft** and run once it is marked
+  ready for review (plus on every later push while it stays non-draft). They also skip
   on PRs that touch no artifact-affecting paths (documentation only). `pre-merge-verified`
   is the aggregate job that reports the tier's verdict and is the one to require on the base branch.
 
