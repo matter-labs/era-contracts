@@ -198,7 +198,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function setProofSystemStatus(uint8 _proofSystem, bool _enabled) external onlyAdmin onlySettlementLayer onlyEra {
-        // One system per call, named by its own bit; an unknown bit names no proof system.
         if (_proofSystem != BOOJUM_PROOF_SYSTEM_DISABLED && _proofSystem != AIRBENDER_PROOF_SYSTEM_DISABLED) {
             revert InvalidProofSystem(_proofSystem);
         }
@@ -214,10 +213,10 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert InvalidDisabledProofSystemsMask(newDisabledProofSystems);
         }
 
-        // Disabling may happen with unproven batches waiting — that is the point of the switch, and it
-        // only widens what the gate accepts. Enabling must not: a batch committed while the lane was off
-        // carries a single public input the enabled lane cannot read, so it would strand the chain.
-        // A call that leaves the system as it was changes nothing and needs no drain.
+        // Disabling may happen with unproven batches waiting — that is the point of the switch. Enabling
+        // must not: a batch committed while Airbender was off carries a single public input that lane
+        // cannot read, and one committed while Boojum was off has that lane's two aux words zeroed, so
+        // no Boojum proof for it can ever exist. A call that leaves the system as it was needs no drain.
         if (_enabled && (oldDisabledProofSystems & _proofSystem) != 0) {
             _enforceNoUnverifiedBatchesForChainConfigUpdate();
         }
