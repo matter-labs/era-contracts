@@ -163,7 +163,7 @@ contract L1ChainAssetHandlerMigrationPauseTest is Test {
     ///      against in the contract: it protects against accident, not against malicious
     ///      governance, which controls the executors anyway. Governance must therefore not run
     ///      overlapping upgrade lifecycles — see {docs/upgrade-stage-lifecycle.md}.
-    function test_onePauserUnpauseLiftsAnothersPause() public {
+    function test_onePauserUnpauseLiftsTheOthersPause() public {
         _register(pauserA);
         _register(pauserB);
 

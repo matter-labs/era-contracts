@@ -95,7 +95,7 @@ impl BootstrapPackage {
         };
 
         let release = address_at(&root, &["ctms", &ctm_key, "registry", "ctm_release_addr"])
-            .context("[ctms.*.registry] ctm_release_addr missing or unparseable")?;
+            .context("[ctms.*.registry] ctm_release_addr missing or unparsable")?;
         let upgrade_timer =
             address_at(&root, &["ctms", &ctm_key, "registry", "upgrade_timer_addr"])
                 .filter(|a| !a.is_zero());
