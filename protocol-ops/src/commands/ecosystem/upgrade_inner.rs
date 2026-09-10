@@ -1,4 +1,4 @@
-//! Canonical v31 prepare-phase orchestration.
+//! Canonical prepare-phase orchestration.
 //!
 //! `UpgradeInner::prepare` fires `the core script's noGovernancePrepare`
 //! once and `the CTM script's noGovernancePrepare` once per target CTM, all on
@@ -21,6 +21,9 @@ use alloy::primitives::{Address, Bytes, B256};
 use alloy::sol_types::SolCall;
 use anyhow::Context;
 
+// Every script generation exposes the same entry points (`noGovernancePrepare(CoreUpgradeParams)` /
+// `(CTMUpgradeParams)`), so this one driver serves them all; which one actually runs is decided by
+// the `--core-script-path` / `--ctm-script-path` inputs.
 use crate::common::abi::{ICTMUpgradeV31Abi, ICoreUpgradeV31Abi};
 use crate::common::wallets::Wallet;
 use crate::common::{forge::ForgeRunner, logger};
@@ -53,7 +56,7 @@ pub struct PrepareInputs {
     /// (notably `GovernanceUpgradeTimer`) have env-wide identical constructor
     /// args — same salt + same factory + same init code → same address →
     /// gov-replay's second `startTimer()` would revert. Supplied via the
-    /// `[create2_factory_salts]` table in `upgrade-envs/v0.31.0-interopB/
+    /// `[create2_factory_salts]` table in `upgrade-envs/<release-env-dir>/
     /// <env>.toml`; missing entries fall back to a random salt (legacy
     /// local-fixture path).
     pub create2_factory_salt_per_ctm: Option<HashMap<Address, B256>>,
@@ -61,14 +64,19 @@ pub struct PrepareInputs {
     pub upgrade_input_path: String,
     /// Output TOML path for the core forge call (relative to l1-contracts/).
     pub core_output_path: String,
-    /// `CoreUpgrade_v31` script path (relative to `l1-contracts/`).
+    /// Core upgrade script path (relative to `l1-contracts/`).
     pub core_script_path: String,
-    /// `CTMUpgrade_v31` script path (relative to `l1-contracts/`).
+    /// CTM upgrade script path (relative to `l1-contracts/`).
     pub ctm_script_path: String,
     /// ZK token asset ID used by CTM prepare. For named envs this comes from
     /// `upgrade-envs/permanent-values/<env>.toml`; otherwise it is explicitly
     /// supplied or falls back only for networks with a canonical value.
     pub zk_token_asset_id: B256,
+    /// Whether the CTM's verifier is the testnet one, which accepts unproven batches. Declared per
+    /// environment in `permanent-values/<env>.toml`; passed through rather than read in Solidity,
+    /// because only the testnet verifiers expose `IS_TESTNET_VERIFIER` and probing for it would need
+    /// a try/catch the contracts forbid.
+    pub testnet_verifier: bool,
 }
 
 /// Output of the prepare phase: the TOMLs each forge invocation wrote, in
@@ -139,8 +147,8 @@ impl<'a> UpgradeInner<'a> {
 
         let mut ctm_tomls = Vec::with_capacity(inputs.ctms.len());
         for ctm in &inputs.ctms {
-            // Only ZKsync OS chains can be upgraded onto this release: `CTMUpgrade_v31`'s
-            // `deployUsedUpgradeContract` rejects Era CTMs outright. The flavor is always
+            // Only ZKsync OS chains can be upgraded onto this release: `CTMUpgrade_v34`
+            // rejects Era CTMs outright. The flavor is always
             // resolved from L1; the optional config hint (`list-ctms` deliberately leaves it
             // unset) is treated as an assertion only — a wrong hint must never be able to select
             // an incompatible CTM implementation for governance calldata.
@@ -375,7 +383,7 @@ impl<'a> UpgradeInner<'a> {
         // same address. The downstream gov-replay then calls
         // `startTimer()` twice on the same contract and the second one
         // reverts. The CLI / env config plumbs a distinct salt per CTM
-        // proxy from `upgrade-envs/v0.31.0-interopB/<env>.toml
+        // proxy from `upgrade-envs/v0.34.0-registry/<env>.toml
         // [create2_salts.per_ctm]`; if not provided we fall back to a
         // fresh random (legacy local-fixture path).
         let create2_salt = inputs
@@ -411,6 +419,7 @@ impl<'a> UpgradeInner<'a> {
                         governance,
                         chainRegistrationSender: chain_registration_sender,
                         zkTokenAssetId: inputs.zk_token_asset_id,
+                        testnetVerifier: inputs.testnet_verifier,
                         ecosystemUpgradeExecutor: ecosystem_upgrade_executor,
                         coreRegistry: core_registry,
                     },

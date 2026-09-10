@@ -218,7 +218,7 @@ pub async fn prepare_new_gateway(
     // harness's* anvil (this nested fork dies when `ForgeRunner` drops).
     // Note also: no need to re-fund anything on this fork post-revert —
     // the harness-owned anvil is where bundle replay happens; funding for
-    // that lives in `v31-upgrade-test-runner.ts:fundDeployerZkForBundleReplay`.
+    // that lives in `upgrade-test-runner.ts:fundDeployerZkForBundleReplay`.
     evm_revert(&runner.rpc_url, &snap_id)
         .await
         .context("evm_revert after GW prep")?;
@@ -339,7 +339,7 @@ async fn replay_gov_stages_0_and_1(
 }
 
 /// Time bump (in seconds) between stage 0 and stage 1. Stage 0 starts the
-/// `GovernanceUpgradeTimer` with a delay set in the v31 upgrade input
+/// `GovernanceUpgradeTimer` with a delay set in the release upgrade input
 /// (1200s on stage). 24h is enough headroom for any reasonable delay
 /// without making block.timestamp wildly diverge from real wall time.
 const GOV_DEADLINE_BUMP_SECONDS: u64 = 24 * 60 * 60;

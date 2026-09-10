@@ -1,26 +1,48 @@
 name: "Restore this commit's build artifacts"
 description: >
-  Restores the artifacts `build` produced for this exact commit, for the jobs that consume them
-  rather than compile their own.
+  Restores the artifacts a `build` job produced for this exact commit, for the jobs that consume
+  them rather than compile their own.
 
-  It exists to hold the path list once. Cache entries are versioned by their paths, so a copy that
-  drifts by one line stops matching the saved entry — and with fail-on-cache-miss that is a hard
-  failure reading as infrastructure flake. This repo has already had that bug: a comment sitting
-  inside a `path:` block was parsed as a path, which is how a zkout entry went missing from one
-  job's list back when the zksolc artifacts still existed. The list is solc-only since that cut.
+  It exists to hold the path list once for every reader. Cache entries are versioned by their
+  paths, so a copy that drifts by one line stops matching the saved entry — and with
+  fail-on-cache-miss that is a hard failure reading as infrastructure flake. This repo has already
+  had that bug: a comment sitting inside a `path:` block was parsed as a path, which is how a zkout
+  entry went missing from one job's list back when the zksolc artifacts still existed. The list is
+  solc-only since that cut.
 
-  The paired save in `build` and the `build-artifacts` upload still carry their own copies, because
-  actions/cache's restore/save split has no mechanism for sharing inputs between them. Keep all
-  three in step.
+  Two copies of the list remain outside this action, both in build-contract-artifacts.yaml: the
+  `actions/cache/save` step and the `actions/upload-artifact` step. actions/cache's restore/save
+  split has no mechanism for sharing inputs between them, and upload-artifact is a different
+  action entirely. Keep all three in step.
+
+inputs:
+  key:
+    description: >
+      Cache key to restore. Defaults to the key l1-contracts-ci's build saves under. Callers whose
+      build may have saved elsewhere should pass `needs.<build-job>.outputs.cache-key`.
+    required: false
+    default: artifacts-l1-ci-${{ github.sha }}
+  fail-on-miss:
+    description: >
+      Fail the step when the key is absent (the default: a consumer job cannot work without the
+      artifacts). Set false to probe for an entry, then branch on the `cache-hit` output.
+    required: false
+    default: "true"
+
+outputs:
+  cache-hit:
+    description: "'true' when the key was restored, empty or 'false' otherwise."
+    value: ${{ steps.restore.outputs.cache-hit }}
 
 runs:
   using: composite
   steps:
     - name: Restore artifacts cache
+      id: restore
       uses: actions/cache/restore@v4
       with:
-        fail-on-cache-miss: true
-        key: artifacts-l1-ci-${{ github.sha }}
+        fail-on-cache-miss: ${{ inputs.fail-on-miss }}
+        key: ${{ inputs.key }}
         path: |
           da-contracts/cache-forge
           da-contracts/out

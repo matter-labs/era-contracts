@@ -448,7 +448,7 @@ pub struct UpgradePrepareAllArgs {
     pub upgrade_input_path: String,
 
     /// Override the core-prepare output TOML path (relative to l1-contracts
-    /// root). Defaults to the canonical `script-out/v31-upgrade-core.toml`.
+    /// root). Defaults to the canonical `script-out/upgrade-core.toml`.
     #[clap(long, default_value = UPGRADE_CORE_OUTPUT_PATH, hide = true)]
     pub core_output_path: String,
 
@@ -613,7 +613,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     // ── env preset auto-fills ────────────────────────────────────────
     let env_cfg = args.topology.env_config()?;
     if let Some(ref cfg) = env_cfg {
-        // Default --out to upgrade-envs/v0.31.0-interopB/output/<env>/protocol-ops/prepare/
+        // Default --out to upgrade-envs/v0.34.0-registry/output/<env>/protocol-ops/prepare/
         if args.shared.out.is_none() {
             args.shared.out = Some(
                 crate::common::env_config::default_protocol_ops_out_dir(&cfg.env)?.join("prepare"),
@@ -628,31 +628,34 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         // nobody can sign as that contract. The caller must pass
         // `--deployer-address <real-EOA>` (or derive it from the broadcast
         // signer's private key with `cast wallet address`).
-        // Default --upgrade-input-path to upgrade-envs/v0.31.0-interopB/<env>.toml
-        // when running with `--env`. The CLI default is `local.toml` (for
-        // local-anvil fixtures). On stage / mainnet / testnet the per-env
-        // file carries env-specific knobs the upgrade scripts rely on, such as
-        // the protocol versions and the bridgehub address. Only override when
-        // the caller hasn't explicitly passed `--upgrade-input-path`.
+        // Resolve --upgrade-input-path from --env, unless the caller passed one explicitly.
+        //
+        // Fails closed on a missing file rather than keeping the CLI default. The default is the
+        // *local* input, so a silent fallback would hand a real environment local's values for the
+        // keys the input does supply — `era_chain_id`, `pre_v32_introspection`,
+        // `governance_upgrade_timer_initial_delay`, and the gateway chain id that is baked into
+        // `L1MessageRoot` as `ERA_GATEWAY_CHAIN_ID`. Losing that last one would redeploy the message
+        // root with 0. Failing here also catches a mistyped `--env`.
         if args.upgrade_input_path == UPGRADE_LOCAL_INPUT_PATH {
             let per_env_rel = format!("/upgrade-envs/v0.34.0-registry/{}.toml", cfg.env);
             let per_env_abs = paths::contracts_root()
                 .join("l1-contracts")
                 .join(per_env_rel.trim_start_matches('/'));
-            if per_env_abs.exists() {
-                logger::info(format!("Using per-env upgrade input: {}", per_env_rel));
-                args.upgrade_input_path = per_env_rel;
-            } else {
-                logger::info(format!(
-                    "Per-env upgrade input not found at {} — falling back to default {}",
-                    per_env_abs.display(),
-                    UPGRADE_LOCAL_INPUT_PATH
-                ));
-            }
+            anyhow::ensure!(
+                per_env_abs.exists(),
+                "no upgrade input for --env {} at {}. Add it — an empty file is fine if the \
+                 environment needs nothing from the input — because this command will not fall back \
+                 to the local default, which would silently give this environment local's \
+                 `era_chain_id`, `governance_upgrade_timer_initial_delay` and gateway chain id.",
+                cfg.env,
+                per_env_abs.display()
+            );
+            logger::info(format!("Using per-env upgrade input: {per_env_rel}"));
+            args.upgrade_input_path = per_env_rel;
         }
     }
     // Auto-fill the CREATE2 salt from the per-version upgrade input
-    // (`upgrade-envs/v0.31.0-interopB/<env>.toml [contracts]
+    // (`upgrade-envs/v0.34.0-registry/<env>.toml [contracts]
     // create2_factory_salt`). Recording the salt in version control makes
     // re-prepares reproducible (same addresses every run regardless of who
     // runs it), so deployer-bundle broadcasts can land at addresses that
@@ -761,6 +764,25 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         None => crate::types::L1Network::from_l1_rpc(&args.shared.l1_rpc_url)?
             .zk_token_asset_id()?,
     };
+    // Declared per environment: true everywhere except mainnet. Required rather than defaulted —
+    // guessing it wrong installs a verifier that accepts unproven batches.
+    let testnet_verifier = match env_cfg.as_ref() {
+        Some(cfg) => cfg.testnet_verifier().ok_or_else(|| {
+            anyhow::anyhow!(
+                "permanent-values/{}.toml is missing top-level `testnet_verifier`; it must be \
+                 declared explicitly (true for every env except mainnet)",
+                cfg.env
+            )
+        })?,
+        None => {
+            logger::info(
+                "No --env given: assuming a local/anvil ecosystem and the testnet verifier"
+                    .to_string(),
+            );
+            true
+        }
+    };
+
     let mut runner = ForgeRunner::new(&args.shared)?;
     let deployer = runner.prepare_sender(deployer_address).await?;
 
@@ -792,6 +814,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         core_script_path: args.core_script_path.clone(),
         ctm_script_path: args.ctm_script_path.clone(),
         zk_token_asset_id,
+        testnet_verifier,
     };
     let proxies: Vec<crate::common::env_config::OwnableProxyEntry> = env_cfg
         .as_ref()

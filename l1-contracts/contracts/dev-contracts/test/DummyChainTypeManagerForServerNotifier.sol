@@ -15,6 +15,8 @@ contract DummyChainTypeManager {
 
     mapping(uint256 oldProtocolVersion => address transition) public upgradeTransition;
 
+    mapping(uint256 chainId => address zkChain) public zkChain;
+
     // solhint-disable-next-line var-name-mixedcase
     address public BRIDGE_HUB;
 
@@ -42,6 +44,14 @@ contract DummyChainTypeManager {
 
     function getProtocolVersion(uint256 _chainId) public view returns (uint256) {
         return protocolVersion[_chainId];
+    }
+
+    function getZKChain(uint256 _chainId) external view returns (address) {
+        return zkChain[_chainId];
+    }
+
+    function setZKChain(uint256 _chainId, address _zkChain) external {
+        zkChain[_chainId] = _zkChain;
     }
 
     function setChainAdmin(uint256 _chainId, address _chainAdmin) external {

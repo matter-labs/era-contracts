@@ -139,6 +139,13 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         ///      MUST be non-zero — `InteropCenter.initL2` reverts otherwise, which would abort the
         ///      L2 upgrade transaction.
         bytes32 zkTokenAssetId;
+        /// @dev Whether the CTM's verifier is the testnet one, which accepts unproven batches.
+        ///      Supplied by the caller alongside `isZKsyncOS`; protocol-ops reads it from
+        ///      `upgrade-envs/permanent-values/<env>.toml` (true for every env except mainnet).
+        ///      Not introspected off the deployed verifier: only the *testnet* verifiers declare
+        ///      `IS_TESTNET_VERIFIER`, so the call reverts on a production one, and probing for that
+        ///      would need the try/catch this repo forbids.
+        bool testnetVerifier;
     }
 
     // The output of the script
@@ -172,7 +179,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             _params.upgradeInputPath,
             _params.outputPath,
             _params.governance,
-            _params.zkTokenAssetId
+            _params.zkTokenAssetId,
+            _params.testnetVerifier
         );
         if (_params.chainRegistrationSender != address(0)) {
             coreAddresses.bridgehub.proxies.chainRegistrationSender = _params.chainRegistrationSender;
@@ -197,7 +205,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         string memory newConfigPath,
         string memory _outputPath,
         address governance,
-        bytes32 zkTokenAssetId
+        bytes32 zkTokenAssetId,
+        bool testnetVerifier
     ) public virtual {
         string memory root = vm.projectRoot();
         newConfigPath = string.concat(root, newConfigPath);
@@ -208,7 +217,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             create2FactorySalt,
             newConfigPath,
             governance,
-            zkTokenAssetId
+            zkTokenAssetId,
+            testnetVerifier
         );
 
         console.log("Initialized config from %s", newConfigPath);
@@ -268,7 +278,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         bytes32 create2FactorySalt,
         string memory newConfigPath,
         address governance,
-        bytes32 zkTokenAssetId
+        bytes32 zkTokenAssetId,
+        bool testnetVerifier
     ) internal virtual {
         string memory toml = vm.readFile(newConfigPath);
 
@@ -279,7 +290,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             ctmProxy: ctmProxy,
             bytecodesSupplier: bytecodesSupplier,
             create2FactorySalt: create2FactorySalt,
-            zkTokenAssetId: zkTokenAssetId
+            zkTokenAssetId: zkTokenAssetId,
+            testnetVerifier: testnetVerifier
         });
         ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(Utils.genesisConfigPath());
 

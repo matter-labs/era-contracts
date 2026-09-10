@@ -1,13 +1,6 @@
 [
   {
     "type": "function",
-    "name": "acquireMigrationPause",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "bridgeBurn",
     "inputs": [
       {
@@ -67,19 +60,6 @@
     ],
     "outputs": [],
     "stateMutability": "payable"
-  },
-  {
-    "type": "function",
-    "name": "clearMigrationPauseHold",
-    "inputs": [
-      {
-        "name": "_pauser",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -154,13 +134,6 @@
   },
   {
     "type": "function",
-    "name": "releaseMigrationPause",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "setUpgradePauser",
     "inputs": [
       {
@@ -183,38 +156,6 @@
     "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "upgradePauseHeld",
-    "inputs": [
-      {
-        "name": "_pauser",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "upgradePauseHolds",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
   },
   {
     "type": "event",
@@ -308,32 +249,6 @@
       },
       {
         "name": "zkChain",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "MigrationPauseAcquired",
-    "inputs": [
-      {
-        "name": "pauser",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "MigrationPauseReleased",
-    "inputs": [
-      {
-        "name": "pauser",
         "type": "address",
         "indexed": true,
         "internalType": "address"

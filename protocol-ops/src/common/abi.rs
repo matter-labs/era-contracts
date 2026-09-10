@@ -301,8 +301,10 @@ pub mod i_finalize_chain_init {
                 address l1DaValidator;
                 address tokenMultiplierSetter;
                 uint8 l2DaCommitmentScheme;
+                uint8 pubdataContent;
                 bool shouldUnpauseDeposits;
                 bool shouldSetDaValidatorPair;
+                bool shouldSetPubdataContent;
                 bool shouldMakePermanentRollup;
             }
 
