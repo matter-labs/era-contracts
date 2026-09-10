@@ -3,8 +3,8 @@ pragma solidity 0.8.28;
 
 import {EraSettlementLayerV32Upgrade} from "contracts/upgrades/EraSettlementLayerV32Upgrade.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {AIRBENDER_PROOF_SYSTEM_DISABLED} from "contracts/common/Config.sol";
 import {MustBeEraChain} from "contracts/common/L1ContractErrors.sol";
+import {NotAllBatchesExecuted} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
@@ -17,15 +17,21 @@ contract DummyEraSettlementLayerV32Upgrade is EraSettlementLayerV32Upgrade, Base
     function getDisabledProofSystems() public view returns (uint8) {
         return s.disabledProofSystems;
     }
+
+    function setTotalBatchesCommitted(uint256 _n) public {
+        s.totalBatchesCommitted = _n;
+    }
+
+    function setTotalBatchesExecuted(uint256 _n) public {
+        s.totalBatchesExecuted = _n;
+    }
 }
 
-/// @notice The v32 upgrade must leave an Era chain single-proof.
-/// @dev The upgrade installs the multi-proof gate, and `disabledProofSystems` is new in this version,
-/// so it reads zero on a chain arriving here — which requires both systems. Batches committed before
-/// the cut carry no Airbender commitment and the gate would refuse them, while `Committer` would
-/// start demanding a heap hash the sequencer is not sending. The mask has to be set by the same
-/// initializer that installs the facets, which is why it does not live in the v31 upgrade: the v32
-/// path deploys `DefaultUpgrade`, and that historical initializer never runs on it.
+/// @notice The v32 upgrade installs the multi-proof gate, so the chain requires both systems from
+/// the cut onwards.
+/// @dev `disabledProofSystems` is new in this version and reads zero, which requires both. A batch
+/// committed before the cut carries no Airbender commitment and the gate would refuse it, so the
+/// upgrade refuses to run with any in flight — the same rule the v31 upgrade applies.
 contract EraSettlementLayerV32UpgradeTest is BaseUpgrade {
     DummyEraSettlementLayerV32Upgrade internal upgradeContract;
     address internal mockChainTypeManager = makeAddr("mockChainTypeManager");
@@ -42,22 +48,34 @@ contract EraSettlementLayerV32UpgradeTest is BaseUpgrade {
         upgradeContract.mockProtocolVersionVerifier(protocolVersion, mockVerifier);
     }
 
-    function test_masksTheAirbenderLane() public {
-        // Pre-upgrade storage: the field is unused before the gate exists, so the upgrade must not
-        // rely on finding it already set.
-        assertEq(upgradeContract.getDisabledProofSystems(), 0);
+    function test_leavesBothProofSystemsRequired() public {
+        upgradeContract.upgrade(proposedUpgrade);
 
-        bytes32 result = upgradeContract.upgrade(proposedUpgrade);
-
-        assertEq(result, Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
         assertEq(
             upgradeContract.getDisabledProofSystems(),
-            AIRBENDER_PROOF_SYSTEM_DISABLED,
-            "a chain must come out of the upgrade with the Airbender lane masked"
+            0,
+            "the chain must come out of the upgrade requiring both proof systems"
         );
     }
 
-    /// The rest of the upgrade still has to happen, so the mask is not being set by a stub.
+    /// A batch committed but not executed carries no Airbender commitment, and the gate installed by
+    /// this cut would refuse it. The upgrade refuses to run rather than strand it.
+    function test_revertWhen_batchesStillInFlight() public {
+        upgradeContract.setTotalBatchesCommitted(5);
+        upgradeContract.setTotalBatchesExecuted(4);
+
+        vm.expectRevert(NotAllBatchesExecuted.selector);
+        upgradeContract.upgrade(proposedUpgrade);
+    }
+
+    function test_allowsAFullyExecutedPipeline() public {
+        upgradeContract.setTotalBatchesCommitted(5);
+        upgradeContract.setTotalBatchesExecuted(5);
+
+        assertEq(upgradeContract.upgrade(proposedUpgrade), Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
+    }
+
+    /// The rest of the upgrade still has to happen, so the guard is not short-circuiting it.
     function test_stillPerformsTheBaseUpgrade() public {
         upgradeContract.upgrade(proposedUpgrade);
 

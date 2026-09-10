@@ -4,13 +4,12 @@ pragma solidity 0.8.28;
 
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
-import {AIRBENDER_PROOF_SYSTEM_DISABLED} from "../common/Config.sol";
 import {MustBeEraChain} from "../common/L1ContractErrors.sol";
+import {NotAllBatchesExecuted} from "../state-transition/L1StateTransitionErrors.sol";
 
 /// @author Matter Labs
 /// @title EraSettlementLayerV32Upgrade
-/// @dev V32 upgrade for Era chains. The upgrade that installs the multi-proof gate must also mask
-/// its Airbender lane, in the same diamond cut.
+/// @dev V32 upgrade for Era chains, installing the multi-proof gate.
 /// @custom:security-contact security@matterlabs.dev
 contract EraSettlementLayerV32Upgrade is BaseZkSyncUpgrade {
     /// @notice The main function that will be delegate-called by the chain.
@@ -22,17 +21,12 @@ contract EraSettlementLayerV32Upgrade is BaseZkSyncUpgrade {
             revert MustBeEraChain();
         }
 
-        super.upgrade(_proposedUpgrade);
+        // The chain comes out of this cut requiring both proof systems, since `disabledProofSystems`
+        // is new in this version and reads zero. A batch committed before the cut carries no
+        // Airbender commitment and the gate would refuse it, so none may be in flight.
+        require(s.totalBatchesCommitted == s.totalBatchesExecuted, NotAllBatchesExecuted());
 
-        // `disabledProofSystems` is new in this version, so it reads zero on a chain arriving here,
-        // and zero requires both proof systems. Batches committed before the cut carry no Airbender
-        // commitment, so the gate would refuse them, and `Committer` would start demanding a heap
-        // hash the sequencer is not sending — the chain would stop proving and stop committing.
-        //
-        // Set in the initializer rather than in governance calldata so the mask cannot be left out
-        // of an upgrade bundle. The admin brings the lane up afterwards with `setProofSystemStatus`,
-        // on a drained pipeline.
-        s.disabledProofSystems = AIRBENDER_PROOF_SYSTEM_DISABLED;
+        super.upgrade(_proposedUpgrade);
 
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
