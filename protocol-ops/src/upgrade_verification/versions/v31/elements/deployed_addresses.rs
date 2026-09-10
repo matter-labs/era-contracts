@@ -1458,7 +1458,7 @@ async fn verify_v31_new_gateway_ctm_provenance(
     let initialize_data = InitializeDataNewChain::abi_decode(&diamond_cut.initCalldata)
         .context("decode new_gateway.diamond_cut_data.initCalldata as InitializeDataNewChain")?;
     let genesis_config = verifiers.genesis_config_for_ctm(source_ctm.flavor);
-    let gw_provider = verifiers.network_verifier.get_gw_provider();
+    let gw_provider = verifiers.network_verifier.get_gw_provider()?;
 
     // Direct Gateway L1->L2 CREATE2 deployments. These are present as raw
     // priority tx calldata and therefore can be checked by address.

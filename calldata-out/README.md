@@ -15,12 +15,12 @@
 - Extracted `_buildUpgradeChainFromCTMCall(address)` (the version-aware
   `upgradeChainFromVersion` call builder, reused by the plain upgrade).
 - Added `upgradeChainFromCTMAndSetDAValidatorPair(_chainAddress, _adminAddr,
-  _accessControlRestriction, _l1DaValidator, _l2DaCommitmentScheme)`. It builds a
+_accessControlRestriction, _l1DaValidator, _l2DaCommitmentScheme)`. It builds a
   2-element `Call[]` — `upgradeChainFromVersion` then `setDAValidatorPair` — and
   runs them through a **single `ChainAdmin.multicall`** via
   `Utils.adminExecuteCalls`. Ordering matters: the upgrade installs the v31
   AdminFacet first, so the subsequent `setDAValidatorPair(address,
-  L2DACommitmentScheme)` (a v31-only signature) hits the freshly-installed facet
+L2DACommitmentScheme)` (a v31-only signature) hits the freshly-installed facet
   in the same tx.
 
 ### Rust — `protocol-ops/src/commands/chain/upgrade.rs`
@@ -47,12 +47,12 @@
 `chain-301/01_chain.upgrade_0x5555555590930f501c88b73ea43b3eeb5a71643c.safe.json`
 is a Gnosis Safe Transaction Builder bundle with **one** transaction:
 
-| field | value |
-| --- | --- |
-| chainId | `11155111` (Sepolia) |
-| to (signer/exec) | `0x1d22308Cd438C3C4e30f3c5d5b3426bAb688208C` — Era chain's `ChainAdmin` |
-| owner that must sign | `0x5555555590930f501c88B73Ea43B3EEb5A71643c` — `ChainAdmin.owner()` |
-| method | `multicall((address,uint256,bytes)[],bool)` (`0x69340beb`), `requireSuccess = true` |
+| field                | value                                                                               |
+| -------------------- | ----------------------------------------------------------------------------------- |
+| chainId              | `11155111` (Sepolia)                                                                |
+| to (signer/exec)     | `0x1d22308Cd438C3C4e30f3c5d5b3426bAb688208C` — Era chain's `ChainAdmin`             |
+| owner that must sign | `0x5555555590930f501c88B73Ea43B3EEb5A71643c` — `ChainAdmin.owner()`                 |
+| method               | `multicall((address,uint256,bytes)[],bool)` (`0x69340beb`), `requireSuccess = true` |
 
 The multicall wraps exactly two inner calls, both targeting the Era diamond
 proxy `0xD3bc4353957bc0F138318384aa207C708A9455C4`:

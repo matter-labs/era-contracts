@@ -555,7 +555,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         // works on a fork via `anvil_impersonateAccount`; on a real chain
         // nobody can sign as that contract. The caller must pass
         // `--deployer-address <real-EOA>` (or derive it from the broadcast
-        // signer's private key — see `regen-and-verify.sh` for an
+        // signer's private key — see the `bundle regen` TypeScript command for an
         // example using `cast wallet address`).
         // Default --upgrade-input-path to upgrade-envs/v0.31.0-interopB/<env>.toml
         // when running with `--env`. The CLI default is `local.toml` (for
@@ -948,6 +948,9 @@ fn infer_core_is_zk_sync_os(entries: &[crate::common::env_config::CtmEntry]) -> 
 /// new_security_council = "0x..."
 /// new_emergency_upgrade_board = "0x..."
 /// ```
+// Eight inputs are what merging the core + per-CTM TOMLs into one file needs; a params
+// struct would only move the same eight names one line down.
+#[allow(clippy::too_many_arguments)]
 fn write_merged_ecosystem_toml(
     core_toml: &Path,
     ctm_entries: &[crate::commands::ecosystem::v31_upgrade_inner::CtmPrepareEntry],

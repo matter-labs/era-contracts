@@ -3,6 +3,12 @@ old_protocol_version = 0x1d00000000
 bridgehub_proxy_address = "0x6Cc160222EaFE8498E336f57b4f97303aD6d72CB"
 owner_address = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
 
+# Read by `DefaultCTMUpgrade` with a bare `toml.readBool`, so it must be present or the
+# upgrade reverts on this fixture. `true` matches the v30-to-v31 fixture
+# (`upgrade-envs/v0.30.0-zksync-os-blobs/localhost.toml`) and every other non-mainnet config:
+# a local anvil harness has no real proofs to check.
+testnet_verifier = true
+
 use_v29_introspection = true
 
 [chain]

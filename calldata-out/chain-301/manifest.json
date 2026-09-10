@@ -3,18 +3,14 @@
     {
       "file": "01_chain.upgrade_0x5555555590930f501c88b73ea43b3eeb5a71643c.safe.json",
       "index": 1,
-      "steps": [
-        "chain.upgrade"
-      ],
+      "steps": ["chain.upgrade"],
       "target": "0x5555555590930f501c88b73ea43b3eeb5a71643c",
       "tx_count": 1
     },
     {
       "file": "02_chain.upgrade_0x5555555590930f501c88b73ea43b3eeb5a71643c.safe.json",
       "index": 2,
-      "steps": [
-        "chain.upgrade"
-      ],
+      "steps": ["chain.upgrade"],
       "target": "0x5555555590930f501c88b73ea43b3eeb5a71643c",
       "tx_count": 1
     }

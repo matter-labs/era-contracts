@@ -4,6 +4,8 @@ pragma solidity ^0.8.24;
 // solhint-disable no-console, gas-custom-errors
 
 import {console2 as console} from "forge-std/Script.sol";
+import {Vm} from "forge-std/Vm.sol";
+import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 import {CTMUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
 import {CoreUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
@@ -131,6 +133,37 @@ contract UpgradeIntegrationTest_Local is
     address private _serverNotifierProxy;
     address private _serverNotifierProxyAdmin;
     address private _expectedServerNotifierProxyAdminOwner;
+
+    function executeCTMAdminCalls() internal override {
+        Ownable2Step notifier = Ownable2Step(_serverNotifierProxy);
+        address pendingOwner = notifier.pendingOwner();
+        assertEq(pendingOwner, _expectedServerNotifierProxyAdminOwner, "Unexpected pending notifier owner");
+        address previousOwner = notifier.owner();
+        vm.recordLogs();
+        super.executeCTMAdminCalls();
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bool ownershipTransferred;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (
+                logs[i].emitter == _serverNotifierProxy &&
+                logs[i].topics[0] == keccak256("OwnershipTransferred(address,address)")
+            ) {
+                assertEq(logs[i].topics[1], bytes32(uint256(uint160(previousOwner))));
+                assertEq(logs[i].topics[2], bytes32(uint256(uint160(pendingOwner))));
+                ownershipTransferred = true;
+            }
+        }
+        assertTrue(ownershipTransferred, "Missing notifier ownership transfer event");
+        assertEq(notifier.pendingOwner(), address(0), "Notifier ownership transfer still pending");
+    }
+
+    function test_CTMAdminCalls_AfterOwnershipAccepted() public {
+        // A subsequent preparation must not attempt to accept ownership again.
+        Call[] memory calls = ctmUpgrade.prepareDefaultCTMAdminCalls();
+        assertEq(calls.length, 1, "Already accepted ownership should only require the proxy upgrade");
+        assertEq(calls[0].target, _serverNotifierProxyAdmin, "Unexpected CTM admin target");
+        assertEq(calls[0].value, 0, "Unexpected CTM admin value");
+    }
 
     /// @notice Override to inject the mocked Core upgrade (skips setAssetTracker call).
     function createCoreUpgrade() internal override returns (CoreUpgrade_v31) {
@@ -278,6 +311,11 @@ contract UpgradeIntegrationTest_Local is
         );
 
         if (_serverNotifierProxy != address(0)) {
+            assertEq(
+                getOwnableOwner(_serverNotifierProxy),
+                _expectedServerNotifierProxyAdminOwner,
+                "ServerNotifier ownership not accepted by ChainAdmin"
+            );
             assertEq(
                 getOwnableOwner(_serverNotifierProxyAdmin),
                 _expectedServerNotifierProxyAdminOwner,

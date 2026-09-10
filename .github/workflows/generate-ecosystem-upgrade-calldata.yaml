@@ -1,5 +1,153 @@
 name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 
+# ═════════════════════════════════════════════════════════════════════════════
+# RUNBOOK — from "nothing" to "this chain is upgraded"
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# Terminology: the ECOSYSTEM upgrade (this workflow) deploys the new shared
+# contracts and moves the CTM's protocol version. Each individual CHAIN is then
+# upgraded separately (step 5) — a chain cannot go to v31 before its ecosystem
+# has.
+#
+# ── 0. Once per branch: make the generated artifacts match reviewed hashes ───
+# The prepare asserts that the factory deps it builds equal the hashes pinned in
+# `configs/genesis/<flavor>/latest.json`, `AllContractsHashes.json`, and the env
+# config. If committed generated files are stale, refresh them with:
+#
+#   gh workflow run update-generated-artifacts.yaml --ref <branch> -f pr_number=<PR#>
+#
+# It builds da → l1 → l2 → system-contracts on a clean runner (the order
+# `recompute_hashes.sh` prescribes), runs `calculate-hashes:fix`, regenerates the
+# anvil-interop chain states, and pushes the result to the PR branch. Needs the
+# `RELEASE_TOKEN` secret, and the PR's head must live in this repo (not a fork of
+# it). `git pull --ff-only` afterwards.
+#
+# ── 1. Generate the ecosystem calldata (THIS workflow) ──────────────────────
+#
+#   gh workflow run generate-ecosystem-upgrade-calldata.yaml --ref <branch> \
+#     -f environment=<env> \
+#     -f deployer_address=0x…                 # MUST be the EOA that will broadcast
+#     [-f fork_block=<n>]                     # see TROUBLESHOOTING
+#
+# `environment` is the basename of a config pair
+# (`upgrade-envs/permanent-values/<env>.toml` + `upgrade-envs/v0.31.0-interopB/<env>.toml`);
+# the L1 to fork is taken from that env's `l1_chain_id`. Nothing is signed and
+# nothing touches real L1 — this runs entirely against an anvil fork.
+#
+# `deployer_address` is part of the OUTPUT, not just of the rehearsal: the prepare
+# passes it as the initial owner of two proxies (`initialize(deployer)`) and to the
+# verifier's constructor, so those three CREATE2 addresses are a function of it.
+# Generate with the EOA that will actually broadcast — a placeholder produces a
+# bundle whose `ecosystem.toml` addresses nobody can reproduce. The bundle records it
+# as `deployer_address`, and the deploy workflow refuses to broadcast with a key for a
+# different account.
+#
+# Two artifacts come out:
+#
+#   ecosystem-upgrade-calldata-<env>      the review set: ecosystem.toml (addresses
+#                                         + governance stage 0/1/2 calldata),
+#                                         sim-inputs/, transaction-simulator.json
+#   ecosystem-upgrade-deploy-inputs-<env> the DEPLOY BUNDLE (see below): the
+#                                         deployer calls + provenance
+#
+# The `verify-bundle-handoff` job then re-deploys and re-verifies that bundle from
+# scratch with no contract build. If it is green, the bundle is provably enough to
+# deploy and verify from — that is the artifact to hand to whoever deploys.
+#
+# ── 2. Deploy the new contracts ─────────────────────────────────────────────
+# In CI (signs with `DEPLOYER_PRIVATE_KEY_<net>`):
+#
+#   gh workflow run deploy-ecosystem-upgrade.yaml --ref <branch> \
+#     -f environment=<env> -f generate_run_id=<step-1 run id>
+#
+# The L1 it signs against is read from the bundle's `l1.chain_id`, NOT inferred
+# from the env name. The key's address must be the deployer the bundle was
+# prepared for, or the job stops.
+#
+# Or locally from the downloaded bundle — same `protocol_ops` code path:
+#
+#   protocol_ops ecosystem replay-bundle \
+#     --bundle <unpacked-bundle> --rpc <l1-rpc> --key "$DEPLOYER_KEY"
+#
+# Broadcast ONLY the deployer's bundles; the governance-signed ones are the
+# ceremony (step 4). Both paths are idempotent — re-run after a partial deploy.
+# Do NOT re-generate to "refresh" a bundle: bytecode is specific to the build that
+# produced it, so a re-run yields different addresses and different calldata.
+#
+# ── 3. Verify what landed (PUVT), yourself ─────────────────────────────────
+# From the bundle, no compiler needed (check out the commit its
+# `bundle-metadata.json` names — PUVT matches deployed code against that commit's
+# `AllContractsHashes.json`):
+#
+#   cd protocol-ops && cargo build --release && cd ..
+#   protocol_ops ecosystem replay-bundle \
+#     --bundle <unpacked-bundle> --rpc <l1-rpc> --verify-only     # already deployed
+#   #  … or --fork-url <l1-rpc> to rehearse the whole thing on a throw-away fork
+#
+# ── 4. Execute the governance ceremony ────────────────────────────────────
+# `ecosystem.toml`'s `[governance_calls]` holds stages 0/1/2;
+# `transaction-simulator.json` is the ready-to-paste simulator input for a dry run
+# before signing. Stage timing is enforced on-chain by the GovernanceUpgradeTimer.
+# Re-run step 3 afterwards: pre-ceremony PUVT reports the expected exemptions for
+# contracts still owned by the old governor, and those must be gone after it.
+#
+# ── 5. Upgrade an individual chain ────────────────────────────────────────
+# Once the ecosystem is on the new version, per chain (`chain_name` is a key under
+# `chains:` in `environments/<env>/ecosystem.yaml`):
+#
+#   # a) the chain's upgrade calldata for its ChainAdmin
+#   gh workflow run generate-chain-upgrade-calldata.yaml --ref <branch> \
+#     -f environment=<env> -f protocol_ops_tag=<tag> \
+#     -f l1_rpc_url=<l1-rpc> -f chain_name=<chain>
+#
+#   # b) when the chain schedules the switch itself
+#   gh workflow run generate-chain-set-upgrade-timestamp-calldata.yaml --ref <branch> \
+#     -f environment=<env> -f protocol_ops_tag=<tag> -f l1_rpc_url=<l1-rpc> \
+#     -f chain_name=<chain> -f new_protocol_version=<packed> -f upgrade_timestamp=<unix>
+#
+# Both emit `safe-bundles-*` artifacts for the chain's admin multisig. Bundles
+# targeting the ecosystem deployer EOA instead go through
+# `execute-deployer-safe-bundles.yaml`. See `.github/workflows/README.md` for the
+# full workflow → `protocol_ops` subcommand map.
+#
+# ── TROUBLESHOOTING ───────────────────────────────────────────────────────
+# `default aa hash factory dep mismatch`      → the system-contracts build did not
+#                                               reproduce the pinned DefaultAccount.
+#                                               The builds must run under exactly
+#                                               the toolchain l1-contracts-ci's
+#                                               `build` job uses (foundry-zksync
+#                                               only, upstream Foundry installed
+#                                               only afterwards); check that order.
+# prepare reverts on owner-gated calls        → the ecosystem is already upgraded;
+# `old protocol version must be ...`            pin `fork_block` and rotate the
+# `.owner() mismatch: expected governance`      env's salts. See ALREADY-UPGRADED
+#                                               ECOSYSTEMS above — the usable
+#                                               window is narrow and all three
+#                                               symptoms come from picking it
+#                                               wrong.
+# `used salt ... not in the env-declared      → a rotated salt vs. a stale log.
+#  salt set`                                    This run's own log is salt-gated;
+#                                               the committed real-network log is
+#                                               passed as
+#                                               `--reference-transactions-log`
+#                                               and exempt. Seeing this means the
+#                                               PREPARE used an undeclared salt —
+#                                               it fell back to a random one, so
+#                                               the regen is not reproducible.
+# `No deploy bundle was published`            → the prepare died before the pack
+#                                               step; fix the generate job first.
+# deploy job: "bundle was prepared for X but    → the key in CI is not the EOA the
+# this key is Y"                                  bundle was generated for. Those two
+#                                                 must match: the deployer is in the
+#                                                 init code of some deployments, so a
+#                                                 different signer moves them.
+#                                                 Re-generate with
+#                                                 `-f deployer_address=Y`, or use X's
+#                                                 key.
+#
+# Full prose version: `docs/ecosystem-upgrade-deploy.md`.
+# ═════════════════════════════════════════════════════════════════════════════
+
 # Regenerates the v31 ecosystem upgrade calldata for one environment and
 # verifies it with PUVT, on a Linux runner so the compiled bytecode — and
 # therefore the CREATE2 addresses baked into `ecosystem.toml` — is
@@ -11,25 +159,65 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 # source — including any contract changes merged in since the last image was
 # published.
 #
-# Flow (the canonical `l1-contracts/test/anvil-interop/regen-and-verify.sh`):
+# Flow (the canonical `protocol_ops ecosystem rehearse-upgrade` command):
 #   anvil fork of the L1 RPC
 #     -> protocol_ops ecosystem upgrade-prepare-all   (writes ecosystem.toml)
+#     -> pack the deploy bundle                       (the transferable handoff)
 #     -> fund + fork-replay the prepare bundles
 #     -> protocol_ops ecosystem verify-upgrade (PUVT)
 #   then emit the git-portable `sim-inputs/` handoff set AND the ready-to-paste
 #   `transaction-simulator.json` (the full mainnet calldata artifact set, i.e.
 #   the same deliverables PR #2268 committed).
 # Artifacts uploaded: `ecosystem.toml` + `sim-inputs/` + `transaction-simulator.json`.
-# NOT `anvil.log` — it can contain the forked RPC URL.
 #
-# ─── ALREADY-DEPLOYED ECOSYSTEMS ───
-# Re-running the prepare against the chain tip of an ecosystem whose v31 upgrade
-# is ALREADY deployed reverts: the deployer no longer owns the ecosystem
-# contracts (ownership was handed to governance / the TransitionaryOwner at
-# deploy time), so the prepare's owner-gated setup calls fail. Pin `fork_block`
-# to a block BEFORE that deployment — the prepare then deploys fresh contracts
-# it owns, and because every address is CREATE2-deterministic the generated
-# calldata is byte-identical to what a tip run would produce.
+# ─── WHY THE DEPLOY BUNDLE IS THE POINT ───
+# Solidity output is not byte-stable across build environments (the default
+# foundry profile embeds path-dependent CBOR metadata), so the bytecode — and
+# with it every CREATE2 address and all the governance calldata — belongs to the
+# machine that compiled it. Nobody can "reproduce" this run elsewhere and get the
+# same addresses. What they CAN do is broadcast the exact deployer calls this run
+# computed: the `prepare/*.safe.json` transactions carry the CREATE2 init code
+# verbatim.
+# So this workflow publishes a self-contained DEPLOY BUNDLE
+# (`ecosystem-upgrade-deploy-inputs-<env>`): the deployer calls, `ecosystem.toml`,
+# the Etherscan verify commands, and a `bundle-metadata.json` pinning the
+# contracts commit / `AllContractsHashes.json` hash / fork height / toolchain
+# versions that the bytecode identity depends on. The `verify-bundle-handoff` job
+# below then proves the bundle is sufficient by deploying + PUVT-ing it from
+# nothing but that artifact, with NO contract build at all.
+#
+# ─── ALREADY-UPGRADED ECOSYSTEMS: PICKING `fork_block` ───
+# An ecosystem whose v31 upgrade has already EXECUTED cannot be rehearsed at the
+# chain tip: its CTMs now report v31, so the calldata's old-protocol-version gate
+# fails ("era CTM old protocol version must be v0.29.4, got v0.31.0"). Pin
+# `fork_block` instead, and pick it from three constraints, not one:
+#
+#   1. AFTER every governance step the v31 prepare treats as a prerequisite.
+#      These are separate proposals, executed shortly before the upgrade itself,
+#      that consolidate ownership under governance. Fork before them and PUVT
+#      reports the pre-consolidation owner, e.g. "zksync_os.ValidatorTimelock
+#      .owner() mismatch: expected governance ..., got 0x5555...643c".
+#   2. BEFORE the block that bumped the CTM protocol versions — that is the
+#      upgrade execution itself, and past it constraint 1's gate flips.
+#   3. Rotate the salts in `upgrade-envs/v0.31.0-interopB/<env>.toml` first (the
+#      config comments say to do this every regen anyway). The previous regen's
+#      CREATE2 addresses are already occupied at any post-deployment block, so a
+#      re-prepare with the old salts can only run at a block before that
+#      deployment — which violates constraint 1.
+#
+# Do NOT simply fork before the deployment. It satisfies constraint 2 and lets
+# the old salts work, but it breaks constraint 1 AND the committed
+# `output/<env>/transactions.txt` is then entirely in the future, so every entry
+# is unresolvable ("N tx(s) not found on the RPC") and the CREATE2 provenance
+# pass over the real broadcast is vacuous.
+#
+# Worked example — Sepolia `testnet`, whose v31 is live:
+#   deployment broadcast   blocks 11147277..11165542
+#   ownership consolidated block 11171956  (via the ProtocolUpgradeHandler)
+#   CTM versions bumped    block 11172145  (v0.29.4→v0.31.0, v0.30.1→v0.31.1)
+#   => usable window       11171956..11172144;  this workflow uses 11172144.
+# Read these off the chain with `eth_call` on `protocolVersion()` / `owner()` at
+# candidate heights (bisect between the deployment and the tip).
 #
 # ─── SECRET HYGIENE (the L1 RPC URL carries an API key) ───
 # The RPC URL can come from EITHER a repo secret (default, fully hidden) OR an
@@ -72,13 +260,9 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Target environment"
+        description: "Environment = basename of the config pair upgrade-envs/permanent-values/<env>.toml + upgrade-envs/v0.31.0-interopB/<env>.toml. Today: stage, testnet, mainnet, adi. The L1 to fork is chosen from that env's l1_chain_id (1 → mainnet, 11155111 → Sepolia)."
         required: true
-        type: choice
-        options:
-          - stage
-          - testnet
-          - mainnet
+        type: string
       l1_rpc_url:
         description: "L1 RPC URL (optional override; BLANK = use repo secret. NOTE: a typed value is visible in the run summary — not secret-grade)"
         required: false
@@ -90,9 +274,9 @@ on:
         default: "v0.1.5"
         type: string
       zk_governance_commit:
-        description: "zk-governance commit for PUVT bytecode metadata (PUH/Guardians/SecurityCouncil/EmergencyUpgradeBoard). Mainnet v31 = 9b06a16."
+        description: "Full zk-governance commit SHA for checkout and PUVT bytecode metadata (PUH/Guardians/SecurityCouncil/EmergencyUpgradeBoard)."
         required: false
-        default: "9b06a16"
+        default: "9b06a16159cd58add109f25598e79731450d1772"
         type: string
       fork_block:
         description: "L1 block to fork at (BLANK = chain tip). Pin to a block BEFORE the upgrade was deployed if the ecosystem is already live: re-running the prepare against post-deploy tip reverts because ownership has already been handed off from the deployer. CREATE2 addresses are deterministic, so the generated calldata is identical to a tip run."
@@ -100,7 +284,7 @@ on:
         default: ""
         type: string
       deployer_address:
-        description: "Deployer EOA address (public). This is a fork rehearsal — the deployer is impersonated, nothing is signed — so only the address is needed, not a key. BLANK = derive it from the DEPLOYER_PRIVATE_KEY_* secret."
+        description: "Deployer EOA address (public). Only the address is needed — this is a fork rehearsal, the deployer is impersonated and nothing is signed. It is NOT a free parameter though: it goes into the init code of a few deployments (initialize(deployer) on two proxies, and the verifier's constructor), so their CREATE2 addresses depend on it and whoever broadcasts MUST be this same EOA. The bundle records which deployments those are. BLANK = derive it from the DEPLOYER_PRIVATE_KEY_* secret."
         required: false
         default: ""
         type: string
@@ -117,12 +301,16 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: recursive
 
-      - name: Install Foundry (for Anvil)
-        uses: foundry-rs/foundry-toolchain@v1
+      - name: Checkout zk-governance at the reviewed commit
+        uses: actions/checkout@v4
         with:
-          version: v1.5.1
+          repository: zksync-association/zk-governance
+          ref: ${{ inputs.zk_governance_commit }}
+          path: zk-governance
+          submodules: recursive
+          persist-credentials: false
 
       - name: Install foundry-zksync (for forge --zksync)
         uses: ./.github/actions/install-zksync-foundry
@@ -143,22 +331,34 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      # `yarn l1 build:foundry` builds both EVM (out/) and EraVM (zkout/)
-      # artifacts; da + sc artifacts are referenced by the prepare/PUVT.
+      # Build ALL FOUR packages in the order `recompute_hashes.sh` and
+      # `update-hashes-on-demand.yaml` use to produce the committed
+      # `AllContractsHashes.json` — da → l1 → l2 → system-contracts. Keeping the
+      # calldata generation on the same sequence as the artifact generation is the
+      # cheapest way to not have to wonder whether a difference came from here.
       - name: Build da-contracts artifacts
         run: yarn da build:foundry
-      - name: Build system-contracts artifacts
-        run: yarn sc build:foundry
       - name: Build l1-contracts artifacts (EVM + zkout)
         run: yarn l1 build:foundry
+      - name: Build l2-contracts artifacts
+        run: yarn l2 build:foundry
+      - name: Build system-contracts artifacts
+        run: yarn sc build:foundry
+
+      # Upstream Foundry supplies anvil. Installed only now, after every contract build,
+      # so the builds see exactly the toolchain l1-contracts-ci's `build` job uses
+      # (foundry-zksync alone, no second forge or restored solc cache on PATH). That job's
+      # artifacts reproduce AllContractsHashes.json, and so does this build: run
+      # 33860270077 produced the pinned DefaultAccount hash unchanged.
+      - name: Install Foundry (for Anvil)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+          cache: false
 
       - name: Build protocol_ops
         working-directory: protocol-ops
         run: cargo build --release
-
-      - name: Install anvil-interop dependencies
-        working-directory: l1-contracts/test/anvil-interop
-        run: yarn install
 
       # Pick the per-network L1 RPC (secret), mask it, and resolve the deployer
       # EOA address. stage + testnet fork Sepolia; mainnet forks mainnet.
@@ -182,11 +382,28 @@ jobs:
           GW_RPC_URL: ${{ secrets.GW_RPC_URL }}
         run: |
           set -euo pipefail
-          if [ "$ENVIRONMENT" = "mainnet" ]; then
-            rpc="$RPC_MAINNET"; pk="$PK_MAINNET"
-          else
-            rpc="$RPC_SEPOLIA"; pk="$PK_SEPOLIA"
+          # The env is just a config-pair basename; fail early and legibly if the
+          # pair isn't committed, before spending a fork on it.
+          PV="l1-contracts/upgrade-envs/permanent-values/${ENVIRONMENT}.toml"
+          V31="l1-contracts/upgrade-envs/v0.31.0-interopB/${ENVIRONMENT}.toml"
+          for f in "$PV" "$V31"; do
+            if [ ! -f "$f" ]; then
+              echo "::error::No config for env '$ENVIRONMENT' at $f — commit the config pair first."; exit 1
+            fi
+          done
+          # Which L1 to fork comes from the env itself, so a new ecosystem needs no
+          # workflow edit. Capture the digits AFTER '=' so the '1' in the key name
+          # can't match.
+          L1_CHAIN_ID="$(sed -nE 's/^[[:space:]]*l1_chain_id[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' "$PV" | head -1)"
+          if [ -z "$L1_CHAIN_ID" ]; then
+            echo "::error::$PV has no top-level 'l1_chain_id ='"; exit 1
           fi
+          case "$L1_CHAIN_ID" in
+            1)        rpc="$RPC_MAINNET"; pk="${PK_MAINNET:-}"; net=mainnet ;;
+            11155111) rpc="$RPC_SEPOLIA"; pk="${PK_SEPOLIA:-}"; net=sepolia ;;
+            *) echo "::error::l1_chain_id=$L1_CHAIN_ID has no RPC secret wired (only 1 / 11155111)"; exit 1 ;;
+          esac
+          echo "env=$ENVIRONMENT l1_chain_id=$L1_CHAIN_ID -> forking $net"
           # Optional dispatch-time override wins over the secret (see the
           # CAVEAT in the header: the typed value is visible in the run summary).
           if [ -n "${INPUT_RPC:-}" ]; then
@@ -194,7 +411,7 @@ jobs:
             echo "Using L1 RPC from the dispatch input (masked in logs; visible in run summary)."
           fi
           if [ -z "$rpc" ]; then
-            echo "::error::No L1 RPC: pass the l1_rpc_url input or set L1_RPC_URL_SEPOLIA / L1_RPC_URL_MAINNET"
+            echo "::error::No L1 RPC for $net: pass the l1_rpc_url input or set the matching L1_RPC_URL_* secret"
             exit 1
           fi
           echo "::add-mask::$rpc"
@@ -210,9 +427,9 @@ jobs:
             exit 1
           fi
           echo "Deployer (impersonated on the fork): $deployer"
-          # Job-scoped. L1_FORK_URL stays masked; DEPLOYER_ADDR is public.
-          # Setting DEPLOYER_ADDR makes regen-and-verify.sh run in impersonation
-          # mode (no signing key required).
+          # Job-scoped. L1_FORK_URL stays masked; DEPLOYER_ADDR is public. Both are
+          # passed to `rehearse-upgrade` as flags below; the deployer is impersonated on
+          # the fork (no signing key required).
           {
             echo "L1_FORK_URL=$rpc"
             echo "DEPLOYER_ADDR=$deployer"
@@ -223,28 +440,40 @@ jobs:
           fi
 
       - name: Regenerate + verify calldata
-        working-directory: l1-contracts/test/anvil-interop
         env:
+          ENVIRONMENT: ${{ inputs.environment }}
           # zk-governance commit whose AllContractsHashes PUVT uses to verify the
           # redeployed PUH/Guardians/SecurityCouncil/EmergencyUpgradeBoard bytecodes.
           ZK_GOVERNANCE_COMMIT: ${{ inputs.zk_governance_commit }}
-          # Optional fork-block pin (blank = tip). regen-and-verify.sh reads this.
+          # Read by protocol_ops to find the zk-governance checkout above.
+          ZK_GOVERNANCE_DIR: ${{ github.workspace }}/zk-governance
+          # Optional fork-block pin (blank = tip).
           FORK_BLOCK: ${{ inputs.fork_block }}
+          # Recorded in the deploy bundle's metadata (part of the bytecode identity).
+          ZKSYNC_FOUNDRY_VERSION: ${{ inputs.zksync_foundry_version }}
         run: |
-          # L1_FORK_URL (masked) + DEPLOYER_ADDR come from $GITHUB_ENV. The script
-          # forks L1_FORK_URL into a local anvil and runs prepare/PUVT against
-          # localhost, so only anvil sees the real RPC. DEPLOYER_ADDR puts it in
-          # impersonation mode (no signing key needed).
-          ./regen-and-verify.sh "${{ inputs.environment }}"
+          set -euo pipefail
+          # L1_FORK_URL (masked), DEPLOYER_ADDR and GW_RPC_URL come from $GITHUB_ENV.
+          # The command forks L1_FORK_URL into a local anvil and runs prepare/PUVT
+          # against localhost, so only anvil sees the real RPC; the deployer is
+          # impersonated (no signing key needed).
+          args=(--env "$ENVIRONMENT" --fork-url "$L1_FORK_URL" --deployer-address "$DEPLOYER_ADDR")
+          args+=(--zk-governance-commit "$ZK_GOVERNANCE_COMMIT")
+          [ -z "${GW_RPC_URL:-}" ] || args+=(--gw-rpc-url "$GW_RPC_URL")
+          [ -z "$FORK_BLOCK" ] || args+=(--fork-block "$FORK_BLOCK")
+          [ -z "$ZKSYNC_FOUNDRY_VERSION" ] || args+=(--foundry-zksync-version "$ZKSYNC_FOUNDRY_VERSION")
+          ./protocol-ops/target/release/protocol_ops ecosystem rehearse-upgrade "${args[@]}"
 
       # Produce the same calldata artifact set PR #2268 committed for mainnet:
       # the git-portable `sim-inputs/` handoff set AND the ready-to-paste
       # `transaction-simulator.json`. Two `governance-toml-to-simulator` calls,
       # matching the documented mainnet flow.
       - name: Emit sim-inputs + transaction-simulator.json
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
         run: |
           set -euo pipefail
-          OUT="l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}"
+          OUT="l1-contracts/upgrade-envs/v0.31.0-interopB/output/$ENVIRONMENT"
           BIN=./protocol-ops/target/release/protocol_ops
           # $DEPLOYER_ADDR (resolved earlier) is the Camp-A signer. Its bundles
           # are dropped from the sim-inputs: they're broadcast to the real chain,
@@ -252,7 +481,7 @@ jobs:
           # replaying them would revert.
           # 1) Normalized manifest + Camp-B `*.safe.json` sim-input bundles.
           "$BIN" ecosystem governance-toml-to-simulator \
-            --env "${{ inputs.environment }}" \
+            --env "$ENVIRONMENT" \
             --include-manifest "$OUT/prepare/manifest.json" \
             --camp-a-signers "$DEPLOYER_ADDR" \
             --emit-sim-inputs "$OUT/sim-inputs"
@@ -260,11 +489,11 @@ jobs:
           #    PUH stage 0/1/2 governance ceremony + post-upgrade smoke tests).
           #    --include-manifest defaults to sim-inputs/manifest.json (step 1).
           "$BIN" ecosystem governance-toml-to-simulator \
-            --env "${{ inputs.environment }}" \
+            --env "$ENVIRONMENT" \
             --out "$OUT/transaction-simulator.json"
 
-      # Upload only the calldata deliverables. Deliberately NOT anvil.log /
-      # *-verification-logs.txt — anvil.log can echo the forked RPC URL.
+      # Upload only the calldata deliverables; the verification logs travel in the
+      # deploy bundle below.
       - name: Upload calldata artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -277,24 +506,148 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
-      # Inputs the "Deploy" workflow (step 2) consumes: the deployer prepare
-      # bundles it broadcasts to real L1, and the forge verify-contract command
-      # log it replays for Etherscan verification. Safe to publish — these hold
-      # only tx calldata + addresses, never keys or the RPC URL. NOT anvil.log.
-      - name: Upload deploy inputs (for the Deploy workflow)
+      # The DEPLOY BUNDLE: everything needed to broadcast this run's contracts and
+      # re-verify them, and nothing else. Packed by `rehearse-upgrade` during
+      # the regen (right after the prepare, so it exists even if PUVT fails):
+      #
+      #   prepare/manifest.json + prepare/*.safe.json  the deployer calls to send
+      #   ecosystem.toml                               addresses + gov stages
+      #   extra-verification-logs.txt                  Etherscan verify commands
+      #   bundle-metadata.json                         provenance (commit, hashes,
+      #                                                fork block, toolchain)
+      #
+      # Consumed by `deploy-ecosystem-upgrade.yaml` (real broadcast) and by the
+      # `verify-bundle-handoff` job below (fork rehearsal + PUVT). Safe to publish:
+      # tx calldata + addresses only, never keys or the RPC URL.
+      - name: Upload the deploy bundle (for the Deploy workflow + local replay)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ecosystem-upgrade-deploy-inputs-${{ inputs.environment }}
-          path: |
-            l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}/prepare/manifest.json
-            l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}/prepare/*.safe.json
-            l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}/extra-verification-logs.txt
-            l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}/ecosystem.toml
+          path: l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}/deploy-bundle/
           if-no-files-found: warn
-          retention-days: 30
+          # 90 days, matching the deploy workflow's result artifact: this is the
+          # operational record of which bytecode was deployed, and it cannot be
+          # regenerated (a later build produces different bytecode). Archive it
+          # elsewhere if it must outlive the retention window.
+          retention-days: 90
 
       - name: Cleanup anvil
         if: always()
         working-directory: l1-contracts/test/anvil-interop
         run: bash cleanup.sh
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Proof that the published deploy bundle is SUFFICIENT on its own.
+  #
+  # This job deliberately does NOT build the contracts (no foundry-zksync, no
+  # `yarn l1 build:foundry`): it has only the artifact, this checkout and
+  # `protocol_ops` — exactly what an operator downloading the bundle has. It
+  # forks L1 at the height recorded in `bundle-metadata.json`, replays every
+  # bundle under impersonation, and runs PUVT against the result.
+  #
+  # If this job is green, "deploy the contracts and run the PUVT yourself"
+  # provably works from the artifact alone. If the bundle were missing anything
+  # (a call, an address, the fork height, the bytecode identity), it fails here
+  # instead of failing on somebody's laptop.
+  # ─────────────────────────────────────────────────────────────────────────────
+  verify-bundle-handoff:
+    needs: regen
+    # Runs whenever the bundle exists — the regen job packs it before its own
+    # replay/PUVT steps, so a PUVT failure upstream still lets us check the
+    # handoff itself.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      # Tolerated so the next step can explain WHY there is no bundle: the pack
+      # runs right after the prepare, so a prepare that never finished leaves
+      # nothing to hand off (and the upload step, being `always()` +
+      # `if-no-files-found: warn`, still "succeeds" having uploaded nothing).
+      - name: Download the deploy bundle
+        id: download-bundle
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: ecosystem-upgrade-deploy-inputs-${{ inputs.environment }}
+          path: ${{ github.workspace }}/deploy-bundle
+
+      - name: Require a bundle to hand off
+        run: |
+          set -euo pipefail
+          if [ ! -f "$GITHUB_WORKSPACE/deploy-bundle/bundle-metadata.json" ]; then
+            echo '::error::No deploy bundle was published, so there is nothing to verify. The bundle is packed straight after `upgrade-prepare-all`, so the generate job failed at or before the prepare — fix that first.'
+            exit 1
+          fi
+
+      # Foundry supplies anvil + cast and `protocol_ops` supplies the replay. There is
+      # no forge --zksync or contract build: PUVT reads committed configuration,
+      # never `out/` or `zkout/`.
+      - name: Install Foundry (anvil + cast)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.91.1
+
+      - name: Build protocol_ops
+        working-directory: protocol-ops
+        run: cargo build --release
+
+      - name: Show the bundle's provenance
+        run: |
+          set -euo pipefail
+          echo "=== bundle-metadata.json"
+          cat "$GITHUB_WORKSPACE/deploy-bundle/bundle-metadata.json"
+          echo "=== files"
+          find "$GITHUB_WORKSPACE/deploy-bundle" -type f | sed "s|$GITHUB_WORKSPACE/||" | sort
+
+      - name: Select + mask the L1 RPC to fork (and the GW RPC for PUVT)
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          INPUT_RPC: ${{ inputs.l1_rpc_url }}
+          RPC_SEPOLIA: ${{ secrets.L1_RPC_URL_SEPOLIA }}
+          RPC_MAINNET: ${{ secrets.L1_RPC_URL_MAINNET }}
+          GW_RPC_URL: ${{ secrets.GW_RPC_URL }}
+        run: |
+          set -euo pipefail
+          # Which L1 the bundle belongs to is recorded IN the bundle — one more
+          # thing a consumer doesn't have to be told out of band.
+          L1_CHAIN_ID="$(jq -r '.l1.chain_id // empty' "$GITHUB_WORKSPACE/deploy-bundle/bundle-metadata.json")"
+          case "$L1_CHAIN_ID" in
+            1)        rpc="$RPC_MAINNET" ;;
+            11155111) rpc="$RPC_SEPOLIA" ;;
+            *) echo "::error::bundle l1.chain_id=$L1_CHAIN_ID has no RPC secret wired"; exit 1 ;;
+          esac
+          echo "bundle l1_chain_id=$L1_CHAIN_ID"
+          if [ -n "${INPUT_RPC:-}" ]; then rpc="$INPUT_RPC"; fi
+          if [ -z "$rpc" ]; then
+            echo "::error::No L1 RPC to fork (see the regen job's requirements)"; exit 1
+          fi
+          echo "::add-mask::$rpc"
+          echo "L1_FORK_URL=$rpc" >> "$GITHUB_ENV"
+          # PUVT's read-only gateway checks (gateway-enabled envs only). Blank
+          # falls back to the replay script's built-in, as it does for the regen.
+          if [ -n "${GW_RPC_URL:-}" ]; then
+            echo "::add-mask::$GW_RPC_URL"
+            echo "GW_RPC_URL=$GW_RPC_URL" >> "$GITHUB_ENV"
+          fi
+
+      # The same command an operator runs locally against a downloaded bundle.
+      - name: Replay the bundle on a fresh fork + PUVT
+        run: |
+          set -euo pipefail
+          # The command stops the fork anvil it started, so this job needs no
+          # separate cleanup step.
+          args=(--bundle "$GITHUB_WORKSPACE/deploy-bundle" --fork-url "$L1_FORK_URL")
+          [ -z "${GW_RPC_URL:-}" ] || args+=(--gw-rpc-url "$GW_RPC_URL")
+          ./protocol-ops/target/release/protocol_ops ecosystem replay-bundle "${args[@]}"

@@ -52,6 +52,27 @@ import {
 } from "./Types.sol";
 import {DeployCTML1OrGateway} from "../ctm/DeployCTML1OrGateway.sol";
 
+/// @dev `getDAValidatorPair()`'s second return value changed meaning when
+/// `ZKChainStorage.l2DAValidator` (an address) was replaced by the packed
+/// `l2DACommitmentScheme` enum: the getter went from returning `s.l2DAValidator` to
+/// returning `s.l2DACommitmentScheme`. Declaring the second value as `uint256` lets both
+/// layouts decode without reverting, so the caller can interpret it by release instead of
+/// having the ABI decoder reject a live chain's real answer.
+interface IZKChainDAValidatorPairRaw {
+    function getDAValidatorPair() external view returns (address l1DAValidator, uint256 l2Value);
+}
+
+/// @dev The per-chain migration onto `l2DACommitmentScheme` happens at a different release
+/// for each CTM flavour, so one boundary cannot describe both:
+///   * ZKsync-OS chains are migrated by `L1ZKsyncOSV30Upgrade`, at v30;
+///   * Era chains by `SettlementLayerV31UpgradeBase` (under `if (!s.zksyncOS)`), at v31.
+/// Below its own boundary a chain still answers with an `l2DAValidator` address and has no
+/// scheme at all. The chain cannot be asked which flavour it is — `getZKsyncOS()` was
+/// introduced in v31 and reverts on every earlier diamond, as does `ctm.isZKsyncOS()` — so
+/// v30, the one release where the two disagree, is resolved from the value itself.
+uint256 constant ZKSYNC_OS_L2_DA_SCHEME_MINOR = 30;
+uint256 constant ERA_L2_DA_SCHEME_MINOR = 31;
+
 library AddressIntrospector {
     error NoUptoDateZkChainFound();
 
@@ -302,8 +323,12 @@ library AddressIntrospector {
         L2DACommitmentScheme l2DAValidatorScheme = L2DACommitmentScheme.NONE;
 
         (, uint256 minor, ) = _zkChain.getSemverProtocolVersion();
-        if (minor > 29) {
-            (l1DAValidator, l2DAValidatorScheme) = _zkChain.getDAValidatorPair();
+        if (minor >= ZKSYNC_OS_L2_DA_SCHEME_MINOR) {
+            // `l1DAValidator` is the first return value in both layouts; only the second
+            // one moved, so read it raw and interpret it.
+            uint256 l2Value;
+            (l1DAValidator, l2Value) = IZKChainDAValidatorPairRaw(address(_zkChain)).getDAValidatorPair();
+            l2DAValidatorScheme = l2DACommitmentSchemeFromRaw(minor, l2Value);
         } else {
             (bool ok, bytes memory data) = address(_zkChain).staticcall(
                 abi.encodeWithSignature("getDAValidatorPair()")
@@ -383,6 +408,26 @@ library AddressIntrospector {
 
     function getEraChainId(address _assetRouter) public view returns (uint256 eraChainId) {
         return IL1AssetRouter(_assetRouter).ERA_CHAIN_ID();
+    }
+
+    /// @notice Interpret the second value of `getDAValidatorPair()` for a chain at protocol
+    /// version minor `_minor`.
+    /// @dev From `ERA_L2_DA_SCHEME_MINOR` on, every flavour has migrated, so the value is the
+    /// scheme; an out-of-range value there means corrupt storage and the conversion reverts,
+    /// which is what we want. At `ZKSYNC_OS_L2_DA_SCHEME_MINOR` the flavours disagree: a
+    /// ZKsync-OS chain reports a scheme, an Era chain still reports its `l2DAValidator`
+    /// address. Those are separated by magnitude — a scheme is at most
+    /// `type(L2DACommitmentScheme).max`, an address that low would have to be a precompile.
+    /// An un-migrated chain has no scheme, so it is reported as `NONE`, which is also the
+    /// value its v31 upgrade will write before the chain admin sets the pair again.
+    function l2DACommitmentSchemeFromRaw(
+        uint256 _minor,
+        uint256 _l2Value
+    ) internal pure returns (L2DACommitmentScheme) {
+        if (_minor >= ERA_L2_DA_SCHEME_MINOR || _l2Value <= uint256(type(L2DACommitmentScheme).max)) {
+            return L2DACommitmentScheme(_l2Value);
+        }
+        return L2DACommitmentScheme.NONE;
     }
 
     function getZkChainFacetAddresses(IZKChain _zkChain) public view returns (address[] memory) {
