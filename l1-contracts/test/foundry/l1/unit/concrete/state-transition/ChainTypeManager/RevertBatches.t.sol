@@ -29,6 +29,7 @@ import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Commi
 import {IL2GenesisUpgrade} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {AIRBENDER_PROOF_SYSTEM_DISABLED} from "contracts/common/Config.sol";
 
 contract RevertBatchesTest is ChainTypeManagerTest {
     // Items for logs & commits
@@ -128,8 +129,11 @@ contract RevertBatchesTest is ChainTypeManagerTest {
         adminFacet = AdminFacet(address(newChainAddress));
 
         vm.stopPrank();
-        vm.prank(newChainAdmin);
+        vm.startPrank(newChainAdmin);
         adminFacet.setDAValidatorPair(address(rollupL1DAValidator), L2_DA_COMMITMENT_SCHEME);
+        // This suite commits single-proof batches.
+        adminFacet.setProofSystemStatus(AIRBENDER_PROOF_SYSTEM_DISABLED, false);
+        vm.stopPrank();
     }
 
     function test_SuccessfulBatchReverting() public {

@@ -336,7 +336,7 @@ library Utils {
     }
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](19);
+        bytes4[] memory selectors = new bytes4[](20);
         uint256 i = 0;
         selectors[i++] = AdminFacet.setPendingAdmin.selector;
         selectors[i++] = AdminFacet.acceptAdmin.selector;
@@ -357,6 +357,7 @@ library Utils {
         selectors[i++] = AdminFacet.unfreezeDiamond.selector;
         selectors[i++] = AdminFacet.genesisUpgrade.selector;
         selectors[i++] = AdminFacet.setDAValidatorPair.selector;
+        selectors[i++] = AdminFacet.setProofSystemStatus.selector;
         return selectors;
     }
 

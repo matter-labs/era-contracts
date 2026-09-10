@@ -28,11 +28,9 @@ contract SetProofSystemStatusTest is AdminTest {
         utilsFacet.util_setTotalBatchesVerified(1);
     }
 
-    /// A new chain starts with the Airbender lane masked off, because it also starts without the
-    /// capability that lane needs: its batches carry no Airbender commitment until an admin declares
-    /// otherwise, and the lane cannot be required before then.
-    function test_defaultsToTheAirbenderLaneMaskedOff() public view {
-        assertEq(utilsFacet.util_getDisabledProofSystems(), AIRBENDER_PROOF_SYSTEM_DISABLED);
+    /// A new chain requires every proof system, the same posture an upgraded chain comes out in.
+    function test_defaultsToRequiringEverySystem() public view {
+        assertEq(utilsFacet.util_getDisabledProofSystems(), 0);
     }
 
     function test_revertWhen_calledByNonAdmin() public {
@@ -106,7 +104,7 @@ contract SetProofSystemStatusTest is AdminTest {
     /// Switching the second one off would leave the chain settling with no proof system at all. One bit
     /// alone cannot say that, so the rule is checked on the mask the call would produce.
     function test_revertWhen_disablingTheSecondSystem() public {
-        assertEq(utilsFacet.util_getDisabledProofSystems(), AIRBENDER_PROOF_SYSTEM_DISABLED);
+        utilsFacet.util_setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
         uint8 both = BOOJUM_PROOF_SYSTEM_DISABLED | AIRBENDER_PROOF_SYSTEM_DISABLED;
 
         vm.startPrank(utilsFacet.util_getAdmin());
@@ -117,6 +115,7 @@ contract SetProofSystemStatusTest is AdminTest {
     /// A chain that has settled nothing may still require the lane: its genesis batch is an ordinary
     /// predecessor, opened by the guest the same way the Boojum scheduler opens its own.
     function test_requiresAirbenderBeforeAnyBatchHasSettled() public {
+        utilsFacet.util_setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
         assertEq(utilsFacet.util_getTotalBatchesVerified(), 0);
 
         vm.startPrank(utilsFacet.util_getAdmin());
@@ -138,6 +137,7 @@ contract SetProofSystemStatusTest is AdminTest {
     /// was off carry a single public input the lane has nothing to read, so the gate refuses them and
     /// the chain stalls behind the oldest. Draining first is the only order that works.
     function test_revertWhen_requiringAirbenderWithUnverifiedBatches() public {
+        utilsFacet.util_setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
         utilsFacet.util_setTotalBatchesCommitted(5);
         utilsFacet.util_setTotalBatchesVerified(1);
 
@@ -161,9 +161,9 @@ contract SetProofSystemStatusTest is AdminTest {
     /// Enabling a system that is already on changes nothing, so the drain it would otherwise need does
     /// not apply. Requiring one here would refuse the call that merely restates the chain's own state.
     function test_enablingAnAlreadyEnabledSystemNeedsNoDrain() public {
+        utilsFacet.util_setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
         utilsFacet.util_setTotalBatchesCommitted(5);
         utilsFacet.util_setTotalBatchesVerified(1);
-        assertEq(utilsFacet.util_getDisabledProofSystems(), AIRBENDER_PROOF_SYSTEM_DISABLED);
 
         vm.startPrank(utilsFacet.util_getAdmin());
         vm.expectEmit(true, true, true, true);

@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import {MigratorTest} from "./_Migrator_Shared.t.sol";
 import {MultiProofChainCannotMigrate, NotCompatibleWithPriorityMode} from "contracts/common/L1ContractErrors.sol";
+import {AIRBENDER_PROOF_SYSTEM_DISABLED} from "contracts/common/Config.sol";
 
 contract ForwardedBridgeBurnMigratorTest is MigratorTest {
     function test_revertWhen_forwardedBridgeBurn_priorityModeAllowed() public {
@@ -29,7 +30,7 @@ contract ForwardedBridgeBurnMigratorTest is MigratorTest {
             abi.encodeWithSignature("chainAssetHandler()"),
             abi.encode(chainAssetHandler)
         );
-        utilsFacet.util_setDisabledProofSystems(0);
+        utilsFacet.util_setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
         // Read before arming the cheatcode: an argument evaluated afterwards is itself a call, and
         // `expectRevert` would match that instead of the one under test.
         address chainAdmin = utilsFacet.util_getAdmin();

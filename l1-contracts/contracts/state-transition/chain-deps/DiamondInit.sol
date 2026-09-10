@@ -13,8 +13,7 @@ import {
     DEFAULT_PRIORITY_TX_MAX_PUBDATA,
     DEFAULT_MINIMAL_L2_GAS_PRICE,
     DEFAULT_PUBDATA_PRICING_MODE,
-    DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT,
-    AIRBENDER_PROOF_SYSTEM_DISABLED
+    DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT
 } from "../../common/Config.sol";
 import {IDiamondInit, InitializeData} from "../chain-interfaces/IDiamondInit.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
@@ -128,13 +127,6 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.priorityTree.setup(s.__DEPRECATED_priorityQueue.getTotalPriorityTxs());
         s.precommitmentForTheLatestBatch = DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH;
         s.zksyncOS = IS_ZKSYNC_OS;
-
-        // A new Era chain starts single-proof, so its batches carry no Airbender commitment and the
-        // lane is masked off. The admin brings it up later with `setProofSystemStatus`, on a drained
-        // pipeline.
-        if (!IS_ZKSYNC_OS) {
-            s.disabledProofSystems = AIRBENDER_PROOF_SYSTEM_DISABLED;
-        }
 
         // All new chains (both ZKsync OS ones and not) have the totalSupply tracked for the base token of the chain.
         // The only exception are the legacy ZKsync OS chains.

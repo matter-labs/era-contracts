@@ -13,7 +13,11 @@ import {
     L2_DA_COMMITMENT_SCHEME,
     TEST_ROLLUP_DA_MANAGER_OWNER
 } from "../Utils/Utils.sol";
-import {ETH_TOKEN_ADDRESS, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER} from "contracts/common/Config.sol";
+import {
+    ETH_TOKEN_ADDRESS,
+    TESTNET_COMMIT_TIMESTAMP_NOT_OLDER,
+    AIRBENDER_PROOF_SYSTEM_DISABLED
+} from "contracts/common/Config.sol";
 import {DummyEraBaseTokenBridge} from "contracts/dev-contracts/test/DummyEraBaseTokenBridge.sol";
 import {IAssetRouterShared} from "contracts/bridge/asset-router/IAssetRouterShared.sol";
 import {DummyChainTypeManagerForValidatorTimelock as DummyCTM} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
@@ -408,6 +412,12 @@ contract ExecutorTest is UtilsCallMockerTest {
         // Allow to call executor directly, without going through ValidatorTimelock
         vm.prank(address(chainTypeManager));
         admin.setValidator(address(validator), true);
+
+        // These suites commit single-proof batches, so the Airbender lane is masked off. The tests
+        // that exercise the lane bring it up themselves.
+        if (!isZKsyncOS()) {
+            utilsFacet.util_setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
+        }
 
         // foundry's default value is 1 for the block's timestamp, it is expected
         // that block.timestamp > COMMIT_TIMESTAMP_NOT_OLDER + 1
