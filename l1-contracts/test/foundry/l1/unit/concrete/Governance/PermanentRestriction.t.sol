@@ -9,6 +9,7 @@ import {
     L2TransactionRequestIndirect
 } from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IL1InteropCenter} from "contracts/interop/IL1InteropCenter.sol";
 
 import {PermanentRestriction} from "contracts/governance/PermanentRestriction.sol";
 import {IPermanentRestriction} from "contracts/governance/IPermanentRestriction.sol";
@@ -87,8 +88,10 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         L1_CHAIN_ID = 5;
 
         // The restriction inspects `sendMessage` calls targeted at the L1InteropCenter; the restriction
-        // itself only decodes calldata, so a lightweight address stands in for the real contract.
+        // itself only decodes calldata, so a lightweight address stands in for the real contract. The
+        // Bridgehub only registers an interop center bound to it, hence the mocked `BRIDGE_HUB()`.
         l1InteropCenter = makeAddr("l1InteropCenter");
+        vm.mockCall(l1InteropCenter, abi.encodeCall(IL1InteropCenter.BRIDGE_HUB, ()), abi.encode(address(bridgehub)));
         vm.prank(governor);
         bridgehub.setInteropCenter(l1InteropCenter);
     }

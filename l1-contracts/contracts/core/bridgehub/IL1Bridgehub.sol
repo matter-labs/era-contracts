@@ -9,7 +9,9 @@ import {IBridgehubBase} from "./IBridgehubBase.sol";
 /// @dev Interface for L1-specific Bridgehub functionality
 interface IL1Bridgehub is IBridgehubBase {
     /// @notice Emitted when the L1InteropCenter address is set.
-    event InteropCenterSet(address indexed interopCenter);
+    /// @param oldInteropCenter The previously registered L1InteropCenter (zero on the first registration).
+    /// @param newInteropCenter The newly registered L1InteropCenter.
+    event InteropCenterSet(address indexed oldInteropCenter, address indexed newInteropCenter);
 
     /// @notice Get L1 chain ID
     function L1_CHAIN_ID() external view returns (uint256);
@@ -19,7 +21,8 @@ interface IL1Bridgehub is IBridgehubBase {
     /// authorize the L1InteropCenter by reading this field.
     function interopCenter() external view returns (address);
 
-    /// @notice Set the L1InteropCenter contract
+    /// @notice Set the L1InteropCenter contract.
+    /// @dev Reverts unless the contract reports this Bridgehub as its `BRIDGE_HUB()`.
     function setInteropCenter(address _interopCenter) external;
 
     /// @notice Create new chain

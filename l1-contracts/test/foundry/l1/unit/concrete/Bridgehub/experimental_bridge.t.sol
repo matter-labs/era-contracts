@@ -5,6 +5,8 @@ pragma solidity 0.8.28;
 import {ExperimentalBridgeTestBase} from "./_ExperimentalBridge_Shared.t.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IL1InteropCenter} from "contracts/interop/IL1InteropCenter.sol";
+import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -666,7 +668,9 @@ contract ExperimentalBridgeTest is ExperimentalBridgeTestBase {
         _useMockSharedBridge();
         _initializeBridgehub();
         vm.assume(randomCaller != bridgeOwner && randomCaller != L2_COMPLEX_UPGRADER_ADDR);
-        vm.assume(newInteropCenter != address(0));
+        vm.assume(newInteropCenter != address(0) && newInteropCenter.code.length == 0);
+        // The new interop center must report this Bridgehub as the one it routes through.
+        vm.mockCall(newInteropCenter, abi.encodeCall(IL1InteropCenter.BRIDGE_HUB, ()), abi.encode(address(bridgehub)));
 
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomCaller));
         vm.prank(randomCaller);
@@ -676,10 +680,26 @@ contract ExperimentalBridgeTest is ExperimentalBridgeTestBase {
         vm.prank(bridgeOwner);
         bridgehub.setInteropCenter(address(0));
 
-        vm.expectEmit(true, false, false, true, address(bridgehub));
-        emit IL1Bridgehub.InteropCenterSet(newInteropCenter);
+        address previousInteropCenter = bridgehub.interopCenter();
+        vm.expectEmit(true, true, false, true, address(bridgehub));
+        emit IL1Bridgehub.InteropCenterSet(previousInteropCenter, newInteropCenter);
         vm.prank(bridgeOwner);
         bridgehub.setInteropCenter(newInteropCenter);
         assertEq(bridgehub.interopCenter(), newInteropCenter);
+    }
+
+    function test_setInteropCenter_RevertWhen_boundToAnotherBridgehub(address otherBridgehub) public {
+        _useMockSharedBridge();
+        _initializeBridgehub();
+        vm.assume(otherBridgehub != address(bridgehub));
+
+        address foreignInteropCenter = makeAddr("foreignInteropCenter");
+        vm.mockCall(foreignInteropCenter, abi.encodeCall(IL1InteropCenter.BRIDGE_HUB, ()), abi.encode(otherBridgehub));
+
+        address registeredBefore = bridgehub.interopCenter();
+        vm.expectRevert(abi.encodeWithSelector(IncorrectBridgeHubAddress.selector, otherBridgehub));
+        vm.prank(bridgeOwner);
+        bridgehub.setInteropCenter(foreignInteropCenter);
+        assertEq(bridgehub.interopCenter(), registeredBefore, "registration must be unchanged");
     }
 }

@@ -8,6 +8,7 @@ import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/Enumerable
 import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {BridgehubBase} from "./BridgehubBase.sol";
 import {IL1Bridgehub} from "./IL1Bridgehub.sol";
+import {IL1InteropCenter} from "../../interop/IL1InteropCenter.sol";
 import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
@@ -137,13 +138,21 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     }
 
     /// @notice Sets the L1InteropCenter contract, the single entry point for L1->L2 transaction requests.
+    /// @dev Every downstream authorization (asset router, cross-chain senders, the chains' Mailboxes) resolves
+    /// `interopCenter()` here, so the registered contract must be bound to this Bridgehub: a contract routing
+    /// through another Bridgehub could otherwise drive this ecosystem's bridges with its own chain registry.
     /// @param _interopCenter the address of the L1InteropCenter
     function setInteropCenter(address _interopCenter) external onlyOwnerOrUpgrader {
         if (_interopCenter == address(0)) {
             revert ZeroAddress();
         }
+        address boundBridgehub = address(IL1InteropCenter(_interopCenter).BRIDGE_HUB());
+        if (boundBridgehub != address(this)) {
+            revert IncorrectBridgeHubAddress(boundBridgehub);
+        }
+        address oldInteropCenter = interopCenter;
         interopCenter = _interopCenter;
-        emit InteropCenterSet(_interopCenter);
+        emit InteropCenterSet(oldInteropCenter, _interopCenter);
     }
 
     /// @notice Sets contract addresses
