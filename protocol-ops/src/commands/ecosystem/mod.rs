@@ -14,6 +14,7 @@ use clap::Subcommand;
 
 use crate::{
     commands::ecosystem::broadcast::UpgradeBroadcastArgs,
+    commands::ecosystem::bundle::{RehearseUpgradeArgs, ReplayBundleArgs, VerifyBundleArgs},
     commands::ecosystem::init::EcosystemInitArgs,
     commands::ecosystem::simulator::GovernanceTomlToSimulatorArgs,
     commands::ecosystem::stage3::Stage3Args,
@@ -22,6 +23,7 @@ use crate::{
 };
 
 pub mod broadcast;
+pub mod bundle;
 pub mod init;
 pub mod new_gateway_prepare;
 pub mod simulator;
@@ -60,6 +62,14 @@ pub enum EcosystemCommands {
     /// signed by its declared `target`. Direct EOA broadcast — no Safe UI.
     #[command(name = "upgrade-broadcast")]
     UpgradeBroadcast(UpgradeBroadcastArgs),
+    /// Fork L1, run `upgrade-prepare-all`, pack the deploy bundle, replay every bundle under
+    /// impersonation and run PUVT. Nothing is signed; the fork is stopped afterwards.
+    RehearseUpgrade(RehearseUpgradeArgs),
+    /// Consume a deploy bundle: rehearse it on a fresh fork, broadcast the deployer's bundles
+    /// for real, or only run PUVT against a chain it was already broadcast to.
+    ReplayBundle(ReplayBundleArgs),
+    /// Check a deploy bundle's files against the digests in its `bundle-metadata.json`.
+    VerifyBundle(VerifyBundleArgs),
     /// Phase 3 of the ecosystem upgrade: legacy-token registration. Calls
     /// `CoreUpgrade_v31.stage3(bridgehub)`, which registers ETH + every
     /// v31-bridged token in NTV's bridgedTokens list and calls
@@ -85,6 +95,9 @@ pub async fn run(args: EcosystemCommands) -> anyhow::Result<()> {
         EcosystemCommands::UpgradeGovernance(args) => upgrade::run_upgrade_governance(args).await,
         EcosystemCommands::VerifyUpgrade(args) => verify_upgrade::run(args).await,
         EcosystemCommands::UpgradeBroadcast(args) => broadcast::run(args).await,
+        EcosystemCommands::RehearseUpgrade(args) => bundle::run_rehearse_upgrade(args).await,
+        EcosystemCommands::ReplayBundle(args) => bundle::run_replay_bundle(args).await,
+        EcosystemCommands::VerifyBundle(args) => bundle::run_verify_bundle(args),
         EcosystemCommands::Stage3(args) => stage3::run(args).await,
         EcosystemCommands::ListCtms(args) => upgrade::run_list_ctms(args).await,
         EcosystemCommands::GovernanceTomlToSimulator(args) => simulator::run(args).await,

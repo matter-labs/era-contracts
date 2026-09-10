@@ -25,8 +25,26 @@ use elements::{
     rpc_state::verify_v31_artifact_state,
 };
 
-pub(crate) const EXPECTED_NEW_PROTOCOL_VERSION_STR: &str = "0.31.0";
-pub(crate) const EXPECTED_ERA_OLD_PROTOCOL_VERSION_STR: &str = "0.29.4";
+// Target protocol versions, per CTM flavour. Each CTM upgrades to its own
+// flavour's chain-creation `latestProtocolVersion`, which comes from that
+// flavour's genesis config — `DefaultCTMUpgrade.getNewProtocolVersion()` returns
+// `config.contracts.chainCreationParams.latestProtocolVersion`. The two
+// flavours' genesis lines moved independently, so a single shared constant
+// cannot describe both: this branch ships Era genesis v0.32.2 (see the
+// `old_protocol_version` note in `upgrade-envs/v0.31.0-interopB/
+// foundry-upgrade.toml`) and ZKsync-OS genesis v0.31.2.
+pub(crate) const EXPECTED_ERA_NEW_PROTOCOL_VERSION_STR: &str = "0.32.2";
+pub(crate) const EXPECTED_ZKSYNC_OS_NEW_PROTOCOL_VERSION_STR: &str = "0.31.2";
+// Source protocol versions, per CTM flavour: the version each CTM is on when
+// v31 executes, checked against both the artifact's `old_protocol_version` and
+// the live CTM's `protocolVersion()`.
+//
+// Era is v0.30.1, not the v0.29.4 the July calldata was cut against. Mainnet's
+// Era CTM moved to v0.30.1 at block 25766158 — after that calldata was
+// generated and 268k blocks after its contracts were deployed — so the recorded
+// ceremony would revert (`setNewVersionUpgrade old protocol version mismatch`)
+// and the re-cut upgrades Era from v0.30.1.
+pub(crate) const EXPECTED_ERA_OLD_PROTOCOL_VERSION_STR: &str = "0.30.1";
 pub(crate) const EXPECTED_ZKSYNC_OS_OLD_PROTOCOL_VERSION_STR: &str = "0.30.1";
 pub(crate) const MAX_NUMBER_OF_ZK_CHAINS: u32 = 100;
 pub(crate) const MAX_PRIORITY_TX_GAS_LIMIT: u32 = 72_000_000;
@@ -39,8 +57,14 @@ pub(crate) const MAX_PRIORITY_TX_GAS_LIMIT: u32 = 72_000_000;
 /// `Bridgehub.settlementLayer(chainId) == L1` invariant on stage.
 pub(crate) const STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID: u64 = 270;
 
-pub(crate) fn get_expected_new_protocol_version() -> ProtocolVersion {
-    ProtocolVersion::from_str(EXPECTED_NEW_PROTOCOL_VERSION_STR).unwrap()
+pub(crate) fn get_expected_new_protocol_version_for_ctm_flavor(
+    flavor: CtmFlavor,
+) -> ProtocolVersion {
+    let version = match flavor {
+        CtmFlavor::Era => EXPECTED_ERA_NEW_PROTOCOL_VERSION_STR,
+        CtmFlavor::ZksyncOs => EXPECTED_ZKSYNC_OS_NEW_PROTOCOL_VERSION_STR,
+    };
+    ProtocolVersion::from_str(version).unwrap()
 }
 
 pub(crate) fn get_expected_old_protocol_version_for_ctm_flavor(
@@ -58,13 +82,6 @@ pub(crate) fn is_expected_old_protocol_version_for_ctm_flavor(
     flavor: CtmFlavor,
 ) -> bool {
     version == get_expected_old_protocol_version_for_ctm_flavor(flavor)
-}
-
-pub(crate) fn expected_old_protocol_version_label(flavor: CtmFlavor) -> &'static str {
-    match flavor {
-        CtmFlavor::Era => "v0.29.4",
-        CtmFlavor::ZksyncOs => "v0.30.1",
-    }
 }
 
 /// Run the full v31 verification pipeline.
@@ -89,10 +106,11 @@ pub(crate) async fn verify(
     env: VerifyUpgradeEnv,
     artifact: &EcosystemUpgradeArtifact,
     l1_rpc_url: &str,
-    gw_rpc_url: &str,
+    gw_rpc_url: Option<&str>,
     contracts_commit: Option<&str>,
     zk_governance_commit: &str,
     era_chain_id: u64,
+    legacy_era_chain_id: u64,
     legacy_gateway_chain_id: u64,
     legacy_gateway_chain_intervals: &[ChainInterval],
     new_gateway_chain_id: u64,
@@ -100,6 +118,10 @@ pub(crate) async fn verify(
     new_gateway_settlement_fee: U256,
     l1_chain_id: u64,
     tx_hashes: &[FixedBytes<32>],
+    // A prior regen's already-broadcast deployment log. Only enriches the
+    // address book — exempt from the salt gate, since its deploys carry that
+    // regen's (now-rotated) salts.
+    reference_tx_hashes: &[FixedBytes<32>],
     create2_factory: Address,
     expected_salts: &[FixedBytes<32>],
     zk_token_asset_id: FixedBytes<32>,
@@ -110,10 +132,11 @@ pub(crate) async fn verify(
         env,
         artifact,
         l1_rpc_url,
-        gw_rpc_url,
+        gw_rpc_url.map(str::to_string),
         contracts_commit,
         zk_governance_commit,
         era_chain_id,
+        legacy_era_chain_id,
         legacy_gateway_chain_id,
         legacy_gateway_chain_intervals,
         new_gateway_chain_id,
@@ -127,10 +150,10 @@ pub(crate) async fn verify(
         "v31 verifier context loaded with {} named addresses",
         verifiers.address_verifier.name_to_address.len()
     ));
-    result.report_ok(&format!(
-        "Gateway RPC chain ID: {}",
-        verifiers.network_verifier.get_gateway_chain_id()
-    ));
+    match verifiers.network_verifier.get_gateway_chain_id() {
+        Some(chain_id) => result.report_ok(&format!("Gateway RPC chain ID: {chain_id}")),
+        None => result.report_ok("Gateway RPC: none (gateway-less env)"),
+    }
 
     // Populate the create2 maps so deployment provenance can match
     // deployed addresses against expected init bytecode + constructor args.
@@ -145,12 +168,27 @@ pub(crate) async fn verify(
             network_verifier,
             ..
         } = &mut verifiers;
+        // This run's own log first, salt-gated: a prepare that missed its
+        // config salt and fell back to a random one must fail here.
         network_verifier
             .populate_create2_from_transactions_log(
                 tx_hashes,
                 &create2_factory,
                 &bridgehub_address,
                 expected_salts,
+                true,
+                bytecode_verifier,
+                result,
+            )
+            .await;
+        // Then the reference log, ungated (see `reference_tx_hashes`).
+        network_verifier
+            .populate_create2_from_transactions_log(
+                reference_tx_hashes,
+                &create2_factory,
+                &bridgehub_address,
+                expected_salts,
+                false,
                 bytecode_verifier,
                 result,
             )
@@ -164,10 +202,13 @@ pub(crate) async fn verify(
 
     verify_v31_artifact_state(artifact, &verifiers, create2_factory, result).await?;
 
+    // Deployment provenance verifies the core withdrawal contracts
+    // (L1AssetRouter/L1Nullifier/MailboxFacet), whose `eraChainId` ctor arg is
+    // the LEGACY era (270 on split-era testnet), not the registered era.
     verify_v31_provenance(
         artifact,
         &verifiers,
-        era_chain_id,
+        legacy_era_chain_id,
         legacy_gateway_chain_id,
         result,
     )
@@ -176,6 +217,9 @@ pub(crate) async fn verify(
     verify_per_chain_protocol_versions(artifact, &verifiers, result).await?;
 
     verify_governance_stage_calls(artifact, &verifiers, result).await?;
+
+    // Last, so it sees every expectation the elements above registered.
+    result.report_unverified_create2_deployments(&verifiers);
 
     Ok(())
 }

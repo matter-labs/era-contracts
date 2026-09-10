@@ -169,7 +169,16 @@ pub async fn apply_manifest_from(
             })?;
         }
 
-        execute_one_bundle(&bundle_path, l1_rpc_url, key, None).await?;
+        execute_one_bundle(
+            &bundle_path,
+            l1_rpc_url,
+            key,
+            None,
+            crate::commands::dev::execute_safe::gwei_to_wei(
+                crate::commands::dev::execute_safe::DEFAULT_MAX_GAS_PRICE_GWEI,
+            ),
+        )
+        .await?;
     }
 
     logger::success("All bundles applied.");

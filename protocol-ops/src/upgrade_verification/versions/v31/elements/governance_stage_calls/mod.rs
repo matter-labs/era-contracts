@@ -31,7 +31,7 @@ use crate::upgrade_verification::{
 };
 
 use super::super::get_expected_old_protocol_version_for_ctm_flavor;
-use super::{super::expected_old_protocol_version_label, call_list::CallList};
+use super::call_list::CallList;
 
 mod facets;
 mod helpers;
@@ -58,9 +58,13 @@ sol! {
     function initializeL1V31Upgrade();
     function setAssetTracker(address _l1AssetTracker);
     function setAddresses();
-    function updateSecurityCouncil(address _newSecurityCouncil);
-    function updateGuardians(address _newGuardians);
-    function updateEmergencyUpgradeBoard(address _newEmergencyUpgradeBoard);
+    function setAddressesV31(address _chainRegistrationSender);
+    // The PUH's `reinitializer` initializer, carried as the `upgradeAndCall`
+    // hook of the stage-0 implementation swap. Selector 0xc0c53b8b, which must
+    // stay equal to `PUH_INITIALIZE_SELECTOR` in
+    // `commands::ecosystem::zk_governance` (the generator side).
+    function initialize(address _securityCouncil, address _guardians, address _emergencyUpgradeBoard);
+    function updateDAPair(address l1DAValidator, uint8 l2DACommitmentScheme, bool status);
 
     // L2-side selectors carried as `l2Calldata` inside the new-Gateway
     // bring-up priority txs. Decoded by `verify_gateway_bring_up_calls` to
@@ -109,6 +113,7 @@ sol! {
 
     #[sol(rpc)]
     contract Ownable2Step {
+        function owner() external view returns (address);
         function pendingOwner() external view returns (address);
     }
 
@@ -212,7 +217,7 @@ pub(crate) async fn verify_per_chain_protocol_versions(
             result.report_error(&format!(
                 "{} CTM old protocol version must be {}, got {}",
                 ctm.flavor.label(),
-                expected_old_protocol_version_label(ctm.flavor),
+                get_expected_old_protocol_version_for_ctm_flavor(ctm.flavor),
                 protocol_label(artifact_old_protocol_version)
             ));
             setup_errors += 1;

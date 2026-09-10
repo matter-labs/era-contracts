@@ -28,18 +28,31 @@ contract CTMUpgradeV31ForTests is CTMUpgrade_v31 {
         // no-op
     }
 
-    /// @dev Replaces the heavy state_transition section with the two fields the
-    ///      anvil-interop test actually reads (diamond cut data + default upgrade addr).
+    /// @dev Replaces the heavy output with the fields required by the anvil-interop
+    ///      test runner and protocol-ops post-prepare ownership cleanup.
     function saveOutput(string memory outputPath) internal override {
         bytes memory upgradeCutData = getChainUpgradeDiamondCutData();
         address defaultUpgradeAddr = getAddresses().stateTransition.defaultUpgrade;
 
+        vm.serializeAddress("state_transition", "verifier_addr", getAddresses().stateTransition.verifiers.verifier);
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "default_upgrade_addr",
             defaultUpgradeAddr
         );
+        vm.serializeAddress(
+            "deployed_addresses",
+            "l1_rollup_da_manager",
+            getAddresses().daAddresses.daContracts.rollupDAManager
+        );
+        string memory deployedAddresses = vm.serializeAddress(
+            "deployed_addresses",
+            "l1_governance_upgrade_timer",
+            upgradeAddresses.upgradeTimer
+        );
+
         vm.serializeBytes("root", "chain_upgrade_diamond_cut", upgradeCutData);
+        vm.serializeString("root", "deployed_addresses", deployedAddresses);
         string memory toml = vm.serializeString("root", "state_transition", stateTransition);
         vm.writeToml(toml, outputPath);
     }

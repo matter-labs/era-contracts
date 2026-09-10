@@ -28,6 +28,7 @@ use anyhow::Context;
 use serde::Deserialize;
 
 use crate::common::paths::resolve_l1_contracts_path;
+use crate::types::L2DACommitmentScheme;
 
 const V31_UPGRADE_DIR: &str = "upgrade-envs/v0.31.0-interopB";
 const PERMANENT_VALUES_DIR: &str = "upgrade-envs/permanent-values";
@@ -41,6 +42,13 @@ pub struct PermanentValues {
     pub l1_chain_id: Option<u64>,
     #[serde(default)]
     pub zk_token_asset_id: Option<B256>,
+    /// Legacy ZKsync Era chain id baked into the core withdrawal contracts
+    /// (L1AssetRouter / L1Nullifier / MailboxFacet `eraChainId`). On most envs
+    /// this equals the registered `era_chain_id`; on split-era testnets it
+    /// differs (e.g. 270 legacy for withdrawals vs 301 the registered Era).
+    /// Absent → callers default to `era_chain_id`.
+    #[serde(default)]
+    pub legacy_era_chain_id: Option<u64>,
     pub core_contracts: CoreContracts,
     #[serde(default)]
     pub ctm_contracts: Option<CtmContracts>,
@@ -198,6 +206,18 @@ pub struct CtmEntry {
     pub bytecodes_supplier: Option<Address>,
     #[serde(default)]
     pub rollup_da_manager: Option<Address>,
+    /// Optional DA pair that must be allowed on the CTM's RollupDAManager as
+    /// part of the v31 governance flow. Used when an env pins a fresh
+    /// v31-compatible manager instead of reusing the currently discoverable
+    /// pre-v31 one.
+    #[serde(default)]
+    pub rollup_da_pair: Option<RollupDAPairConfig>,
+}
+
+#[derive(Debug, Deserialize, Clone, Copy)]
+pub struct RollupDAPairConfig {
+    pub l1_da_validator: Address,
+    pub l2_da_commitment_scheme: L2DACommitmentScheme,
 }
 
 #[derive(Debug, Deserialize)]
@@ -378,6 +398,12 @@ impl EnvConfig {
 
     pub fn zk_token_asset_id(&self) -> Option<B256> {
         self.permanent.zk_token_asset_id
+    }
+
+    /// Legacy ZKsync Era chain id for the core withdrawal contracts. None when
+    /// the env doesn't declare a split era (callers default to `era_chain_id`).
+    pub fn legacy_era_chain_id(&self) -> Option<u64> {
+        self.permanent.legacy_era_chain_id
     }
 
     pub fn new_gateway(&self) -> Option<&NewGatewayConfig> {

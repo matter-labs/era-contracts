@@ -3433,6 +3433,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "sha2",
  "strum 0.28.0",
  "tempfile",
  "thiserror 2.0.18",

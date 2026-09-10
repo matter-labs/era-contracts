@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use alloy::primitives::{keccak256, Address, FixedBytes};
+use alloy::primitives::{keccak256, Address, FixedBytes, U256};
 use clap::{Parser, ValueEnum};
 
 use crate::common::env_config::{default_protocol_ops_out_dir, EnvConfig, GovernanceKind};
@@ -31,9 +31,10 @@ pub struct VerifyUpgradeArgs {
     #[clap(long, default_value = "http://localhost:8545")]
     pub l1_rpc_url: String,
 
-    /// Gateway RPC URL used by read-only gateway-side checks.
+    /// Gateway RPC URL for the read-only gateway-side checks. Needed only for envs that
+    /// bring up a Gateway (`[new_gateway]`); gateway-less envs run without it.
     #[clap(long, alias = "gw-rpc")]
-    pub gw_rpc_url: String,
+    pub gw_rpc_url: Option<String>,
 
     /// Path to the v31 ecosystem upgrade TOML produced by `upgrade-prepare`.
     #[clap(long)]
@@ -63,6 +64,16 @@ pub struct VerifyUpgradeArgs {
     #[clap(long)]
     pub transactions_log: Option<PathBuf>,
 
+    /// A prior regen's already-broadcast deployment log for the same env, read
+    /// the same way as `--transactions-log` but exempt from the salt check.
+    /// Its deploys carry that regen's salts, and every regen rotates
+    /// `create2_factory_salt`, so gating them would flag the whole file.
+    /// Feeding it in still lets deployment provenance resolve contracts the
+    /// current prepare reuses rather than redeploys. Optional; a missing file
+    /// is treated as empty.
+    #[clap(long)]
+    pub reference_transactions_log: Option<PathBuf>,
+
     /// Print the ABI-encoded `UpgradeProposal { calls, executor: 0x0, salt: 0x0 }`
     /// for each governance stage (0/1/2) so an operator can byte-compare against
     /// the on-chain submitted governance proposal bytes. When set, the rest of
@@ -76,6 +87,9 @@ pub enum VerifyUpgradeEnv {
     Stage,
     Testnet,
     Mainnet,
+    /// ADI: a standalone ZKsync-OS ecosystem on Ethereum mainnet (L1 chainId 1), one
+    /// ZKsync-OS CTM and one chain (36900), owned by a legacy `Governance.sol`.
+    Adi,
 }
 
 impl VerifyUpgradeEnv {
@@ -84,11 +98,15 @@ impl VerifyUpgradeEnv {
             Self::Stage => "stage",
             Self::Testnet => "testnet",
             Self::Mainnet => "mainnet",
+            Self::Adi => "adi",
         }
     }
 
+    /// Whether to expect the real (non-testnet) verifier and governance bytecodes. True for
+    /// every ecosystem that sits on L1 mainnet, which is not the same as being THE canonical
+    /// mainnet ecosystem — ADI is its own ecosystem there, with `testnet_verifier = false`.
     pub fn is_mainnet(self) -> bool {
-        matches!(self, Self::Mainnet)
+        matches!(self, Self::Mainnet | Self::Adi)
     }
 
     pub fn is_stage(self) -> bool {
@@ -105,12 +123,15 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
             env_cfg.v31_input_path.display()
         )
     })?;
-    let legacy_gateway_chain_id = env_cfg.legacy_gateway_chain_id().ok_or_else(|| {
-        anyhow::anyhow!(
-            "{} is missing `[legacy_gateway] chain_id`",
-            env_cfg.permanent_values_path.display()
-        )
-    })?;
+    // Legacy Era chain id for the core withdrawal contracts. Defaults to
+    // `era_chain_id` on single-era envs; split-era testnets set it explicitly
+    // (e.g. 270 legacy vs 301 registered) in permanent-values.
+    let legacy_era_chain_id = env_cfg.legacy_era_chain_id().unwrap_or(era_chain_id);
+    // `[legacy_gateway]` is optional: gateway-less envs (e.g. a testnet that
+    // never had a Gateway) omit it. When absent the legacy GW chain id defaults
+    // to 0 — the v31 FixedForceDeployments check then expects eraGatewayChainId
+    // == 0 and stage 2 emits no decommission/blacklist prefix.
+    let legacy_gateway_chain_id = env_cfg.legacy_gateway_chain_id().unwrap_or(0);
     let legacy_gateway_chain_intervals = env_cfg.legacy_gateway_chain_intervals().to_vec();
     let l1_chain_id = env_cfg.l1_chain_id().ok_or_else(|| {
         anyhow::anyhow!(
@@ -130,15 +151,19 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
             env_cfg.permanent_values_path.display()
         )
     })?;
-    let new_gateway = env_cfg.new_gateway().ok_or_else(|| {
-        anyhow::anyhow!(
-            "{} is missing required `[new_gateway]` config for v31 verification",
-            env_cfg.permanent_values_path.display()
-        )
-    })?;
-    let new_gateway_chain_id = new_gateway.chain_id;
-    let new_gateway_representative_chain_id = new_gateway.ctm_representative_chain_id;
-    let new_gateway_settlement_fee = new_gateway.settlement_fee;
+    // `[new_gateway]` is optional: gateway-less envs omit it (no GW CTM deploy /
+    // whitelist). When absent we pass sentinels; the v31 verifier gates every
+    // new-Gateway check on the artifact's `[new_gateway]` block, which is
+    // likewise absent, so these values are never read.
+    let (new_gateway_chain_id, new_gateway_representative_chain_id, new_gateway_settlement_fee) =
+        match env_cfg.new_gateway() {
+            Some(ng) => (
+                ng.chain_id,
+                ng.ctm_representative_chain_id,
+                ng.settlement_fee,
+            ),
+            None => (0u64, 0u64, U256::ZERO),
+        };
 
     // Collect every pinned CREATE2 salt declared in the env config — the Core
     // salt from `[contracts] create2_factory_salt` plus the per-CTM salts under
@@ -158,6 +183,10 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         // so one salt is collision-free.
         expected_salts.push(keccak256(GOV_SALT_SEED));
     }
+    // The ecosystem TransitionaryOwner (aux ownership step) is deployed via
+    // CREATE2 with this fixed seed — see `TRANSITIONARY_OWNER_SALT` in
+    // `AdminFunctions.s.sol`. Declare it so its deployment passes the salt check.
+    expected_salts.push(keccak256(b"v31:transitionary-owner"));
 
     let transactions_log_path = match args.transactions_log.clone() {
         Some(path) => path,
@@ -177,7 +206,10 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         transactions_log_path.display()
     ));
     logger::info(format!("L1 RPC URL: {}", args.l1_rpc_url));
-    logger::info(format!("Gateway RPC URL: {}", args.gw_rpc_url));
+    logger::info(format!(
+        "Gateway RPC URL: {}",
+        args.gw_rpc_url.as_deref().unwrap_or("none")
+    ));
     if let Some(contracts_commit) = &args.contracts_commit {
         logger::info(format!("Contracts commit: {contracts_commit}"));
     } else {
@@ -219,16 +251,30 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         transactions_log_path.display()
     ));
 
+    let reference_tx_hashes = match args.reference_transactions_log.as_ref() {
+        Some(path) if path.is_file() => {
+            let hashes = transactions_log::read(path)?;
+            logger::info(format!(
+                "Loaded {} reference transaction hash(es) from {} (salt check not applied)",
+                hashes.len(),
+                path.display()
+            ));
+            hashes
+        }
+        _ => Vec::new(),
+    };
+
     let mut result = VerificationResult::default();
 
     let verification_result = crate::upgrade_verification::versions::v31::verify(
         args.env,
         &artifact,
         &args.l1_rpc_url,
-        &args.gw_rpc_url,
+        args.gw_rpc_url.as_deref(),
         args.contracts_commit.as_deref(),
         args.zk_governance_commit.as_str(),
         era_chain_id,
+        legacy_era_chain_id,
         legacy_gateway_chain_id,
         &legacy_gateway_chain_intervals,
         new_gateway_chain_id,
@@ -236,6 +282,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         new_gateway_settlement_fee,
         l1_chain_id,
         &tx_hashes,
+        &reference_tx_hashes,
         create2_factory,
         &expected_salts,
         zk_token_asset_id,

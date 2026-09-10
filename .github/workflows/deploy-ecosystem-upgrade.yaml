@@ -1,0 +1,507 @@
+name: "Ecosystem Upgrade: Deploy + Verify (v31)"
+
+# Step 2 of the two-step v31 ecosystem-upgrade flow. Step 1
+# (`generate-ecosystem-upgrade-calldata.yaml`) produces the calldata + the
+# deployer prepare bundles on a fork; THIS workflow takes those deployer
+# bundles and actually BROADCASTS them to a real L1, producing the
+# `transactions.txt` the PUVT (`ecosystem verify-upgrade`) consumes, then
+# verifies the freshly deployed contracts on Etherscan.
+# To verify an existing deployment without loading its signing key or sending
+# any transactions, dispatch with verify_only=true and run_verify=true using
+# the SAME generate_run_id that supplied the deployed bundle.
+#
+# It runs the SAME `protocol_ops` commands you'd run locally (see
+# `docs/ecosystem-upgrade-deploy.md`), so a local deploy and a CI deploy are
+# byte-for-byte the same tool — CI is just a convenience wrapper.
+#
+# What gets broadcast: ONLY the deployer's (Camp-A) bundles — the ones whose
+# `manifest.bundles[].target` is the deployer EOA. The legacy-Governance /
+# ProtocolUpgradeHandler (Camp-B) bundles are the governance ceremony and are
+# executed separately by their own multisig; `--skip-unkeyed` drops them here.
+#
+# The sender broadcasts strictly one tx at a time and is robust to public-L1
+# hazards: a stuck (underpriced) tx is re-broadcast at a higher gas price up to
+# `max_gas_price_gwei`, and if the sender's nonce is grabbed by another tx the
+# calldata is resubmitted at the next free nonce (see `submit_and_confirm` in
+# `protocol-ops/src/commands/dev/execute_safe.rs`).
+#
+# ─── WHICH L1, WHICH SECRETS ───
+# The target L1 is taken from the downloaded bundle's `bundle-metadata.json`
+# (`l1.chain_id`), NOT inferred from the `environment` name. This prevents a
+# mismatched name from selecting the wrong chain and key. So:
+#
+#   l1.chain_id = 1         → L1_RPC_URL_MAINNET + DEPLOYER_PRIVATE_KEY_MAINNET,
+#                             Etherscan `--chain mainnet`
+#   l1.chain_id = 11155111  → L1_RPC_URL_SEPOLIA + DEPLOYER_PRIVATE_KEY_SEPOLIA,
+#                             Etherscan `--chain sepolia`
+#
+# Unlike step 1 (a fork rehearsal that impersonates the deployer and signs
+# nothing), this step signs REAL transactions, so it needs the deployer key. The
+# job also refuses to start if that key's address isn't the deployer the bundle was
+# prepared for — otherwise `--skip-unkeyed` would drop every bundle and "succeed"
+# having deployed nothing.
+#
+# Optional:
+#   ETHERSCAN_API_KEY                         — for the Etherscan verify step
+# The L1 RPC URL comes from the secret (never a plaintext input) so its API key
+# is never shown in the run-summary UI.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment = the same config-pair basename you generated with (stage, testnet, mainnet, adi). Which L1 gets broadcast to is NOT derived from this name — it comes from the bundle's own `bundle-metadata.json` `l1.chain_id`."
+        required: true
+        type: string
+      generate_run_id:
+        description: "Run ID of the 'Ecosystem Upgrade Calldata' (step 1) run to download the deployer bundles from"
+        required: true
+        type: string
+      resume_deploy_run_id:
+        description: "Optional earlier deploy-workflow run whose partial receipt journal should be restored before retrying"
+        required: false
+        default: ""
+        type: string
+      max_gas_price_gwei:
+        description: "Gas-price ceiling (gwei) for the stuck-tx bump loop"
+        required: false
+        default: "500"
+        type: string
+      run_verify:
+        description: "Verify the deployed contracts on Etherscan after broadcasting"
+        required: false
+        default: true
+        type: boolean
+      verify_only:
+        description: "Verify already deployed contracts on Etherscan only: never load the deployer key or broadcast transactions"
+        required: false
+        default: false
+        type: boolean
+      zksync_foundry_version:
+        description: "foundry-zksync version (forge --zksync), used for the verify build"
+        required: false
+        default: "v0.1.5"
+        type: string
+
+permissions:
+  contents: read
+  actions: read # Download the deploy bundle from the generation workflow run.
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      # The generation workflow uploads its bundle with `if: always()` so a failed
+      # run still leaves diagnostics. Never turn that diagnostic artifact into a
+      # real deployment: require the exact handoff-proof job to have succeeded.
+      - name: Require a successful bundle handoff proof
+        uses: actions/github-script@v7
+        env:
+          GENERATE_RUN_ID: ${{ inputs.generate_run_id }}
+          RESUME_DEPLOY_RUN_ID: ${{ inputs.resume_deploy_run_id }}
+          VERIFY_ONLY: ${{ inputs.verify_only }}
+          RUN_VERIFY: ${{ inputs.run_verify }}
+        with:
+          script: |
+            if (process.env.VERIFY_ONLY === "true" &&
+                (process.env.RUN_VERIFY !== "true" || process.env.RESUME_DEPLOY_RUN_ID)) {
+              core.setFailed("verify_only requires run_verify=true and no resume_deploy_run_id");
+              return;
+            }
+            const runAttempt = Number(process.env.GITHUB_RUN_ATTEMPT);
+            if (runAttempt > 1) {
+              core.setFailed(
+                "Do not re-run this job in place after a partial broadcast. " +
+                  "Dispatch a new deploy run and set resume_deploy_run_id to this run ID.",
+              );
+              return;
+            }
+
+            const runId = Number(process.env.GENERATE_RUN_ID);
+            if (!Number.isSafeInteger(runId) || runId <= 0) {
+              core.setFailed(`generate_run_id must be a positive integer, got ${process.env.GENERATE_RUN_ID}`);
+              return;
+            }
+
+            const { owner, repo } = context.repo;
+            const { data: run } = await github.rest.actions.getWorkflowRun({
+              owner,
+              repo,
+              run_id: runId,
+            });
+            const expectedPath = ".github/workflows/generate-ecosystem-upgrade-calldata.yaml";
+            if (run.path !== expectedPath) {
+              core.setFailed(`run ${runId} used ${run.path}, expected ${expectedPath}`);
+              return;
+            }
+            if (run.event !== "workflow_dispatch" || run.conclusion !== "success") {
+              core.setFailed(
+                `generation run ${runId} must be a successful workflow_dispatch run; ` +
+                  `event=${run.event}, conclusion=${run.conclusion}`,
+              );
+              return;
+            }
+
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+              owner,
+              repo,
+              run_id: runId,
+              filter: "latest",
+              per_page: 100,
+            });
+            const handoffJobs = jobs.filter((job) => job.name === "verify-bundle-handoff");
+            if (handoffJobs.length !== 1 || handoffJobs[0].conclusion !== "success") {
+              const found = handoffJobs.map((job) => `${job.id}:${job.conclusion}`).join(", ") || "none";
+              core.setFailed(`run ${runId} has no single successful verify-bundle-handoff job (found ${found})`);
+              return;
+            }
+
+            core.exportVariable("GENERATE_HEAD_SHA", run.head_sha);
+            core.exportVariable("GENERATE_RUN_URL", run.html_url);
+            core.info(`Handoff proof passed: ${handoffJobs[0].html_url}`);
+
+            if (process.env.RESUME_DEPLOY_RUN_ID) {
+              const resumeRunId = Number(process.env.RESUME_DEPLOY_RUN_ID);
+              if (!Number.isSafeInteger(resumeRunId) || resumeRunId <= 0) {
+                core.setFailed(
+                  `resume_deploy_run_id must be a positive integer, got ${process.env.RESUME_DEPLOY_RUN_ID}`,
+                );
+                return;
+              }
+              const { data: resumeRun } = await github.rest.actions.getWorkflowRun({
+                owner,
+                repo,
+                run_id: resumeRunId,
+              });
+              const expectedResumePath = ".github/workflows/deploy-ecosystem-upgrade.yaml";
+              if (resumeRun.path !== expectedResumePath || resumeRun.event !== "workflow_dispatch") {
+                core.setFailed(
+                  `resume run ${resumeRunId} must be a workflow_dispatch run of ${expectedResumePath}; ` +
+                    `path=${resumeRun.path}, event=${resumeRun.event}`,
+                );
+                return;
+              }
+              core.exportVariable("RESUME_RUN_URL", resumeRun.html_url);
+            }
+
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Foundry (cast + forge for verify)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+
+      - name: Install foundry-zksync (for the verify build)
+        if: ${{ inputs.run_verify }}
+        uses: ./.github/actions/install-zksync-foundry
+        with:
+          version: ${{ inputs.zksync_foundry_version }}
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.91.1
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Test verification-only workflow guards
+        run: node --test .github/tests/deploy-verify-only.test.cjs
+
+      - name: Build protocol_ops
+        working-directory: protocol-ops
+        run: cargo build --release
+
+      # forge verify-contract compiles the source to compare against the
+      # on-chain bytecode, so it needs the EVM (out/) artifacts. Skipped when
+      # not verifying — the broadcast itself needs no contract build.
+      - name: Build contracts (for Etherscan verify)
+        if: ${{ inputs.run_verify }}
+        run: |
+          yarn da build:foundry
+          yarn l1 build:foundry
+
+      # The deploy bundle produced by step 1: the deployer calls, ecosystem.toml,
+      # the Etherscan verify log and `bundle-metadata.json`.
+      - name: Download the deploy bundle from the calldata (step 1) run
+        uses: actions/download-artifact@v4
+        with:
+          name: ecosystem-upgrade-deploy-inputs-${{ inputs.environment }}
+          path: ${{ github.workspace }}/deploy-inputs
+          run-id: ${{ inputs.generate_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Download the prior deploy receipt journal
+        if: ${{ !inputs.verify_only && inputs.resume_deploy_run_id != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ecosystem-upgrade-deploy-result-${{ inputs.environment }}
+          path: ${{ github.workspace }}/previous-deploy-result
+          run-id: ${{ inputs.resume_deploy_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Validate deploy bundle integrity
+        run: |
+          set -euo pipefail
+          META="$(find "$GITHUB_WORKSPACE/deploy-inputs" -name bundle-metadata.json -print -quit)"
+          if [ -z "$META" ]; then
+            echo "::error::bundle-metadata.json not found in the downloaded deploy inputs"
+            exit 1
+          fi
+          DEPLOY_BUNDLE_DIR="$(dirname "$META")"
+          ./protocol-ops/target/release/protocol_ops ecosystem verify-bundle "$DEPLOY_BUNDLE_DIR"
+          echo "DEPLOY_BUNDLE_DIR=$DEPLOY_BUNDLE_DIR" >> "$GITHUB_ENV"
+
+      # Tie the downloaded bytes back to the exact successful generation run.
+      # Broadcasting is commit-agnostic, but Etherscan verification recompiles
+      # from this checkout, so a different checkout is still warned separately.
+      - name: Check bundle provenance against the proven run
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          set -euo pipefail
+          META="$DEPLOY_BUNDLE_DIR/bundle-metadata.json"
+          cat "$META"
+          bundle_commit="$(jq -r '.contracts_commit // empty' "$META")"
+          bundle_run="$(jq -r '.generated_by.workflow_run // empty' "$META")"
+          bundle_env="$(jq -r '.env // empty' "$META")"
+          bundle_dirty="$(jq -r 'if has("contracts_worktree_dirty") then (.contracts_worktree_dirty | tostring) else empty end' "$META")"
+          if [ "$bundle_run" != "$GENERATE_RUN_URL" ]; then
+            echo "::error::bundle provenance run '$bundle_run' does not match proven run '$GENERATE_RUN_URL'"; exit 1
+          fi
+          if [ "$bundle_commit" != "$GENERATE_HEAD_SHA" ]; then
+            echo "::error::bundle commit '$bundle_commit' does not match generation head '$GENERATE_HEAD_SHA'"; exit 1
+          fi
+          if [ "$bundle_env" != "$ENVIRONMENT" ]; then
+            echo "::error::bundle env '$bundle_env' does not match requested env '$ENVIRONMENT'"; exit 1
+          fi
+          if [ "$bundle_dirty" != "false" ]; then
+            echo "::error::bundle was generated from a dirty or unknown worktree"; exit 1
+          fi
+          if [ "$bundle_commit" != "$GITHUB_SHA" ]; then
+            echo "::warning::bundle was generated from $bundle_commit but this run checked out $GITHUB_SHA — re-dispatch on that commit for a source-matching Etherscan verify."
+          fi
+
+      # A failed broadcast can already have mined some CREATE2 transactions.
+      # Restore its journal before retrying so idempotently skipped calls do not
+      # disappear from the PUVT's provenance input.
+      - name: Initialize or restore the deployment receipt journal
+        if: ${{ !inputs.verify_only }}
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          GENERATE_RUN_ID: ${{ inputs.generate_run_id }}
+          RESUME_DEPLOY_RUN_ID: ${{ inputs.resume_deploy_run_id }}
+        run: |
+          set -euo pipefail
+          OUTDIR="$GITHUB_WORKSPACE/deploy-result"
+          mkdir -p "$OUTDIR"
+          bundle_metadata_sha256="$(sha256sum "$DEPLOY_BUNDLE_DIR/bundle-metadata.json" | awk '{print $1}')"
+
+          if [ -n "$RESUME_DEPLOY_RUN_ID" ]; then
+            previous_meta="$(find "$GITHUB_WORKSPACE/previous-deploy-result" -name resume-metadata.json -print -quit)"
+            if [ -z "$previous_meta" ]; then
+              echo "::error::resume artifact has no resume-metadata.json"; exit 1
+            fi
+            jq -e \
+              --arg generation_run "$GENERATE_RUN_URL" \
+              --arg deployment_run "$RESUME_RUN_URL" \
+              --arg env "$ENVIRONMENT" \
+              --arg digest "$bundle_metadata_sha256" \
+              '.generation_run == $generation_run and
+               .deployment_run == $deployment_run and
+               .environment == $env and
+               .bundle_metadata_sha256 == $digest' \
+              "$previous_meta" >/dev/null || {
+                echo "::error::resume journal does not belong to this generation run, environment, and bundle"; exit 1;
+              }
+            previous_dir="$(dirname "$previous_meta")"
+            [ ! -f "$previous_dir/transactions.txt" ] || cp "$previous_dir/transactions.txt" "$OUTDIR/transactions.txt"
+            [ ! -f "$previous_dir/deploy-executed.json" ] || cp "$previous_dir/deploy-executed.json" "$OUTDIR/deploy-executed.json"
+            echo "Restored receipt journal from deploy run $RESUME_DEPLOY_RUN_ID"
+          fi
+
+          jq -n \
+            --arg generation_run "$GENERATE_RUN_URL" \
+            --arg deployment_run "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --arg env "$ENVIRONMENT" \
+            --arg digest "$bundle_metadata_sha256" \
+            '{generation_run: $generation_run, deployment_run: $deployment_run,
+              environment: $env, bundle_metadata_sha256: $digest}' \
+            > "$OUTDIR/resume-metadata.json"
+          {
+            echo "DEPLOY_OUTDIR=$OUTDIR"
+            echo "TXLOG=$OUTDIR/transactions.txt"
+          } >> "$GITHUB_ENV"
+
+      - name: Select Etherscan network for verification only
+        if: ${{ inputs.verify_only }}
+        run: |
+          set -euo pipefail
+          case "$(jq -r '.l1.chain_id' "$DEPLOY_BUNDLE_DIR/bundle-metadata.json")" in
+            1) echo "ETHERSCAN_CHAIN=mainnet" >> "$GITHUB_ENV" ;;
+            11155111) echo "ETHERSCAN_CHAIN=sepolia" >> "$GITHUB_ENV" ;;
+            *) echo "::error::Unsupported Etherscan chain"; exit 1 ;;
+          esac
+
+      # Which L1 to broadcast to comes from the BUNDLE, not from the env's name:
+      # `bundle-metadata.json` records the `l1.chain_id` the calldata was computed
+      # against, avoiding a name-based selection of the wrong chain and key.
+      - name: Select + mask RPC and deployer key (L1 from the bundle)
+        if: ${{ !inputs.verify_only }}
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          RPC_SEPOLIA: ${{ secrets.L1_RPC_URL_SEPOLIA }}
+          RPC_MAINNET: ${{ secrets.L1_RPC_URL_MAINNET }}
+          PK_SEPOLIA: ${{ secrets.DEPLOYER_PRIVATE_KEY_SEPOLIA }}
+          PK_MAINNET: ${{ secrets.DEPLOYER_PRIVATE_KEY_MAINNET }}
+        run: |
+          set -euo pipefail
+          META="$DEPLOY_BUNDLE_DIR/bundle-metadata.json"
+          L1_CHAIN_ID="$(jq -r '.l1.chain_id // empty' "$META")"
+          case "$L1_CHAIN_ID" in
+            1)        rpc="$RPC_MAINNET"; pk="$PK_MAINNET"; net=mainnet ;;
+            11155111) rpc="$RPC_SEPOLIA"; pk="$PK_SEPOLIA"; net=sepolia ;;
+            *) echo "::error::Cannot map l1_chain_id='$L1_CHAIN_ID' to a secret (only 1 / 11155111 are wired)"; exit 1 ;;
+          esac
+          echo "Broadcasting '$ENVIRONMENT' to L1 $net (chain id $L1_CHAIN_ID)"
+          if [ -z "$rpc" ]; then
+            echo "::error::Missing L1 RPC secret for $net (L1_RPC_URL_$(echo "$net" | tr a-z A-Z))"; exit 1
+          fi
+          if [ -z "$pk" ]; then
+            echo "::error::Missing deployer key secret for $net (DEPLOYER_PRIVATE_KEY_$(echo "$net" | tr a-z A-Z))"; exit 1
+          fi
+          echo "::add-mask::$rpc"
+          echo "::add-mask::$pk"
+          actual_chain_id="$(cast chain-id --rpc-url "$rpc")"
+          if [ "$actual_chain_id" != "$L1_CHAIN_ID" ]; then
+            echo "::error::RPC selected for $net reports chain id $actual_chain_id, bundle requires $L1_CHAIN_ID"
+            exit 1
+          fi
+          echo "RPC chain id verified: $actual_chain_id"
+          deployer="$(cast wallet address --private-key "$pk")"
+          echo "Deployer (real signer): $deployer"
+          # The bundle names the EOA whose bundles are the deployer's. If the key in
+          # CI is a different account, `--skip-unkeyed` would silently broadcast
+          # nothing, so say so now rather than "succeeding" with an empty deploy.
+          want="$(jq -r '.deployer_address // empty' "$META")"
+          if [ -z "$want" ]; then
+            echo "::error::bundle metadata has no deployer_address"; exit 1
+          fi
+          if [ "$(echo "$want" | tr 'A-Z' 'a-z')" != "$(echo "$deployer" | tr 'A-Z' 'a-z')" ]; then
+            echo "::error::bundle was prepared for deployer $want but this key is $deployer — its bundles would be skipped. Re-generate with -f deployer_address=$deployer, or use that account's key."
+            exit 1
+          fi
+          {
+            echo "L1_RPC_URL=$rpc"
+            echo "DEPLOYER_PK=$pk"
+            echo "DEPLOYER_ADDR=$deployer"
+            echo "ETHERSCAN_CHAIN=$net"
+          } >> "$GITHUB_ENV"
+
+      # Broadcast ONLY the deployer bundles (target == deployer), robustly, one
+      # at a time. Writes transactions.txt next to --out for the PUVT.
+      - name: Broadcast deployer bundles to L1
+        if: ${{ !inputs.verify_only }}
+        run: |
+          set -euo pipefail
+          MANIFEST="$DEPLOY_BUNDLE_DIR/prepare/manifest.json"
+          echo "Manifest: $MANIFEST"
+          ./protocol-ops/target/release/protocol_ops ecosystem upgrade-broadcast \
+            --manifest "$MANIFEST" \
+            --l1-rpc-url "$L1_RPC_URL" \
+            --key "${DEPLOYER_ADDR}=${DEPLOYER_PK}" \
+            --skip-unkeyed \
+            --max-gas-price-gwei "${{ inputs.max_gas_price_gwei }}" \
+            --out "$DEPLOY_OUTDIR/deploy-executed.json"
+          echo "=== transactions.txt ==="
+          cat "$TXLOG" || true
+
+      - name: Upload transactions.txt + executed log
+        if: ${{ always() && !inputs.verify_only }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ecosystem-upgrade-deploy-result-${{ inputs.environment }}
+          path: ${{ github.workspace }}/deploy-result
+          if-no-files-found: warn
+          retention-days: 90
+
+      # Etherscan verification. Replays the `forge verify-contract` commands step
+      # 1 logged — which already carry the exact `--constructor-args <hex>` taken
+      # from the CREATE2 init code, so nothing is guessed. Etherscan read APIs lag
+      # freshly deployed code, so `--retries/--delay` ride that out; any residual
+      # failure does not fail a deployment, but DOES fail verification-only runs.
+      - name: Verify contracts on Etherscan
+        if: ${{ inputs.run_verify }}
+        continue-on-error: ${{ !inputs.verify_only }}
+        env:
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+        working-directory: l1-contracts
+        run: |
+          set -uo pipefail
+          if [ -z "${ETHERSCAN_API_KEY:-}" ]; then
+            echo "::error::ETHERSCAN_API_KEY not set"; exit 1
+          fi
+          LOG="$DEPLOY_BUNDLE_DIR/extra-verification-logs.txt"
+          if [ ! -f "$LOG" ]; then
+            echo "::error::extra-verification-logs.txt not found"; exit 1
+          fi
+          # $ETHERSCAN_CHAIN was resolved from the bundle's l1.chain_id, not from
+          # the env's name (see the RPC step).
+          CHAIN="${ETHERSCAN_CHAIN:?}"
+          # Replay each logged `forge verify-contract …` command VERBATIM. Step 1
+          # already emits the exact `--constructor-args <hex>` for every contract
+          # that has them (derived from the CREATE2 init code it deployed — see
+          # Create2FactoryUtils.notifyAboutDeployment), so there is nothing to
+          # guess. We only append the chain + `--watch`; the key comes from
+          # $ETHERSCAN_API_KEY in the env. `--retries/--delay` ride out Etherscan
+          # indexing freshly-deployed code. Report partial failures explicitly;
+          # normal deployments tolerate them, verification-only runs do not.
+          verified=0
+          failed=0
+          readonly verification_attempts=3
+          readonly verification_retry_delay=10
+          while IFS= read -r cmd; do
+            echo "--- $cmd"
+            # These contracts are built by da-contracts, not l1-contracts.
+            # Keep the recorded address and constructor arguments unchanged.
+            read -r _forge _verify _address contract _rest <<< "$cmd"
+            verification_root="$PWD"
+            case "$contract" in
+              EIP7702Checker|RollupL1DAValidator) verification_root="../da-contracts" ;;
+            esac
+            success=false
+            for ((attempt=1; attempt<=verification_attempts; attempt++)); do
+              # --retries covers verification polling, but not an initial ABI
+              # request timeout. Retry the complete idempotent submission too.
+              if (cd "$verification_root" && eval "$cmd --chain $CHAIN --watch --retries 8 --delay 20"); then
+                success=true
+                break
+              fi
+              if [ "$attempt" -lt "$verification_attempts" ]; then
+                echo "Retrying verification ($attempt/$verification_attempts): $contract"
+                sleep "$verification_retry_delay"
+              fi
+            done
+            if [ "$success" = true ]; then
+              echo "  OK"
+              verified=$((verified + 1))
+            else
+              echo "::warning::verification failed after $verification_attempts attempts: $cmd"
+              failed=$((failed + 1))
+            fi
+          done < <(grep 'forge verify-contract' "$LOG" | sed 's/^.*forge verify-contract/forge verify-contract/' | sort -u)
+          echo "Etherscan verification: $verified succeeded, $failed failed"
+          if [ "$failed" -ne 0 ] || [ "$verified" -eq 0 ]; then
+            echo "::error::Etherscan verification incomplete"; exit 1
+          fi
