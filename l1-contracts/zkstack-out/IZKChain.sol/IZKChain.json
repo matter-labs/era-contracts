@@ -67,72 +67,6 @@
   },
   {
     "type": "function",
-    "name": "bridgehubRequestL2Transaction",
-    "inputs": [
-      {
-        "name": "_request",
-        "type": "tuple",
-        "internalType": "struct BridgehubL2TransactionRequest",
-        "components": [
-          {
-            "name": "sender",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "contractL2",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "mintValue",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "l2Value",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "l2Calldata",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "l2GasLimit",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "l2GasPerPubdataByteLimit",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "factoryDeps",
-            "type": "bytes[]",
-            "internalType": "bytes[]"
-          },
-          {
-            "name": "refundRecipient",
-            "type": "address",
-            "internalType": "address"
-          }
-        ]
-      }
-    ],
-    "outputs": [
-      {
-        "name": "canonicalTxHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "bridgehubRequestL2TransactionOnGateway",
     "inputs": [
       {
@@ -986,6 +920,72 @@
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "interopCenterRequestL2Transaction",
+    "inputs": [
+      {
+        "name": "_request",
+        "type": "tuple",
+        "internalType": "struct BridgehubL2TransactionRequest",
+        "components": [
+          {
+            "name": "sender",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "contractL2",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "mintValue",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "l2Value",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "l2Calldata",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "l2GasLimit",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "l2GasPerPubdataByteLimit",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "factoryDeps",
+            "type": "bytes[]",
+            "internalType": "bytes[]"
+          },
+          {
+            "name": "refundRecipient",
+            "type": "address",
+            "internalType": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "canonicalTxHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",

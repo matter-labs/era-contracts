@@ -980,7 +980,13 @@
     "name": "InteropCenterSet",
     "inputs": [
       {
-        "name": "interopCenter",
+        "name": "oldInteropCenter",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "newInteropCenter",
         "type": "address",
         "indexed": true,
         "internalType": "address"
