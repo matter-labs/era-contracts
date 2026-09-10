@@ -52,6 +52,9 @@ import {CTMContract, DeployCTML1OrGateway} from "./DeployCTML1OrGateway.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
+import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+
 import {IDeployCTM} from "contracts/script-interfaces/IDeployCTM.sol";
 import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
 import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
@@ -217,13 +220,19 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     function deployVerifiers() internal {
         (, string memory fflonkName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.VerifierFflonk);
         (, string memory plonkName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.VerifierPlonk);
+
+        ctmAddresses.stateTransition.verifiers.verifierFflonk = deploySimpleContract(fflonkName, false);
+        ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract(plonkName, false);
+
+        if (config.multiProofVerifier) {
+            deployMultiProofVerifiers();
+            return;
+        }
+
         (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(
             config.isZKsyncOS,
             config.testnetVerifier
         );
-
-        ctmAddresses.stateTransition.verifiers.verifierFflonk = deploySimpleContract(fflonkName, false);
-        ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract(plonkName, false);
         ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName, false);
 
         // Use getDeployerAddress() to ensure the correct sender even when called from nested contracts
@@ -237,6 +246,60 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             config.isZKsyncOS
         );
         vm.stopBroadcast();
+    }
+
+    /// @notice Deploy the multi-proof verifier lane, which requires BOTH an
+    ///         Airbender proof and a ZiSK proof for each state transition.
+    ///         The Airbender side is the ZKsync OS dual verifier, which holds
+    ///         the versioned FFLONK and PLONK sub-verifier registry that the
+    ///         deployment and upgrade tooling introspects.
+    function deployMultiProofVerifiers() internal {
+        // The Airbender proof is a ZKsync OS proof, so the lane needs the
+        // ZKsync OS verifiers.
+        require(config.isZKsyncOS, "multi_proof_verifier requires is_zk_sync_os");
+        // ZiskVerifier wraps a pre-deployed standalone snarkJS Plonk verifier
+        // (see verifiers/README.md for its generation and deployment) passed
+        // in by address.
+        require(
+            config.ziskPlonkVerifierAddr != address(0),
+            "set zisk_plonk_verifier_addr to the deployed snarkJS Plonk verifier"
+        );
+        (, string memory dualVerifierName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.DualVerifier);
+        multiProofAddresses.airbenderVerifier = deploySimpleContract(dualVerifierName, false);
+        multiProofAddresses.ziskVerifier = deploySimpleContract("ZiskVerifier", false);
+        multiProofAddresses.multiProofVerifier = deploySimpleContract("MultiProofVerifier", false);
+
+        // Use getDeployerAddress() to ensure the correct sender even when called from nested contracts
+        vm.startBroadcast(getDeployerAddress());
+        // Called as library (not through vms) to preserve msg.sender
+        DeployCTML1OrGateway.initializeVerifier(
+            multiProofAddresses.airbenderVerifier,
+            ctmAddresses.stateTransition.verifiers.verifierFflonk,
+            ctmAddresses.stateTransition.verifiers.verifierPlonk,
+            config.ownerAddress,
+            config.isZKsyncOS
+        );
+        // Single-VK lane: every proof, single batch or many, verifies through
+        // the range verifier, which reconstructs the ZiSK public values from
+        // its own pinned VKs. Default it to the ZiskVerifier just deployed; an
+        // operator may override with a separately deployed aggregator verifier
+        // via zisk_range_verifier_addr.
+        address ziskRangeVerifierAddr = config.ziskRangeVerifierAddr != address(0)
+            ? config.ziskRangeVerifierAddr
+            : multiProofAddresses.ziskVerifier;
+        MultiProofVerifier(multiProofAddresses.multiProofVerifier).setZiskRangeVerifier(
+            IVerifier(ziskRangeVerifierAddr)
+        );
+        MultiProofVerifier(multiProofAddresses.multiProofVerifier).transferOwnership(config.ownerAddress);
+        vm.stopBroadcast();
+
+        if (config.testnetVerifier) {
+            // Testnet: wrap MultiProofVerifier with MultiProofTestnetVerifier for mock proof support.
+            ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract("MultiProofTestnetVerifier", false);
+        } else {
+            // Prod: use MultiProofVerifier directly.
+            ctmAddresses.stateTransition.verifiers.verifier = multiProofAddresses.multiProofVerifier;
+        }
     }
 
     function setChainTypeManagerInServerNotifier() internal {
@@ -318,12 +381,17 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         IOwnable(ctmAddresses.stateTransition.proxies.serverNotifier).transferOwnership(ctmAddresses.chainAdmin);
         IOwnable(ctmAddresses.daAddresses.daContracts.rollupDAManager).transferOwnership(ctmAddresses.admin.governance);
 
-        // Called as library (not through vms) to preserve msg.sender
-        DeployCTML1OrGateway.transferVerifierOwnership(
-            ctmAddresses.stateTransition.verifiers.verifier,
-            ctmAddresses.admin.governance,
-            config.isZKsyncOS
-        );
+        // The multi-proof lane owns its verifier handover: the deploy transfers
+        // both the dual verifier and MultiProofVerifier to config.ownerAddress,
+        // and the testnet wrapper they sit behind holds no owner at all.
+        if (!config.multiProofVerifier) {
+            // Called as library (not through vms) to preserve msg.sender
+            DeployCTML1OrGateway.transferVerifierOwnership(
+                ctmAddresses.stateTransition.verifiers.verifier,
+                ctmAddresses.admin.governance,
+                config.isZKsyncOS
+            );
+        }
 
         IOwnable(ctmAddresses.daAddresses.daContracts.rollupDAManager).transferOwnership(ctmAddresses.admin.governance);
         vm.stopBroadcast();
@@ -352,6 +420,9 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             ctmAddresses.stateTransition.proxies.chainTypeManager
         );
         vm.serializeAddress("state_transition", "verifier_addr", ctmAddresses.stateTransition.verifiers.verifier);
+        if (multiProofAddresses.ziskVerifier != address(0)) {
+            vm.serializeAddress("state_transition", "zisk_verifier_addr", multiProofAddresses.ziskVerifier);
+        }
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", ctmAddresses.stateTransition.genesisUpgrade);
         vm.serializeAddress("state_transition", "default_upgrade_addr", ctmAddresses.stateTransition.defaultUpgrade);
         vm.serializeAddress("state_transition", "eip7702_checker_addr", ctmAddresses.admin.eip7702Checker);
