@@ -787,17 +787,11 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         }
     }
 
-    /// @dev Both lanes' auxiliary outputs, over one hashing of the logs and one encoding of the blob
-    /// region. Returns `bytes32(0)` for the Airbender shape when that lane is not required, which is
-    /// what leaves the batch without an Airbender commitment and makes `ExecutorFacet` emit the
-    /// single-input shape.
-    /// @dev A batch carries an Airbender shape exactly when the lane is required. Required and
-    /// missing is refused here rather than surfacing later as an unprovable batch. Not required, and
-    /// the heap hash is ignored rather than rejected: the kill switch takes effect on the next
-    /// commit, so a sequencer still sending the old shape must not be locked out of committing.
-    /// @dev The Boojum shape pins the two words only that lane reproduces to zero while it is masked.
-    /// Nothing verifies them then, and they would otherwise carry operator-chosen entropy into a
-    /// commitment that stays in the chain for good.
+    /// @dev Both lanes' auxiliary outputs, sharing one hashing of the logs and one blob encoding.
+    /// @dev A masked lane's input is ignored rather than rejected, so the kill switch cannot lock out
+    /// a sequencer still sending the old shape. Boojum's two exclusive words are zeroed rather than
+    /// kept: nothing verifies them while that lane is masked, and they would otherwise put
+    /// operator-chosen entropy into a commitment that stays in the chain.
     function _batchAuxiliaryOutputHashes(
         CommitBatchInfo memory _batch,
         bytes32 _stateDiffHash,
@@ -824,8 +818,8 @@ contract CommitterFacet is ZKChainBase, ICommitter {
             revert AirbenderCommitmentRequired();
         }
 
-        // Airbender computes the heap hash with Blake2s rather than Poseidon2 and pins the events
-        // queue to zero; everything else is shared with the shape above.
+        // Airbender uses Blake2s for the heap hash where Boojum uses Poseidon2, and pins the events
+        // queue to zero.
         // solhint-disable-next-line func-named-parameters
         airbenderAuxiliaryOutputHash = _auxiliaryOutputHash(
             l2ToL1LogsHash,
