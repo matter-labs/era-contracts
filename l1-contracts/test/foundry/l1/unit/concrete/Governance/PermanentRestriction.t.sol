@@ -380,7 +380,11 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         bytes[] memory factoryDeps = new bytes[](0);
         vm.stopPrank();
         vm.startPrank(governor);
-        bridgehub.addChainTypeManager(address(chainContractAddress));
+        // The shared fixture already registers it (the ChainAssetHandler derives pause authority
+        // from registration), and `addChainTypeManager` refuses a repeat.
+        if (!bridgehub.chainTypeManagerIsRegistered(address(chainContractAddress))) {
+            bridgehub.addChainTypeManager(address(chainContractAddress));
+        }
         bridgehub.addTokenAssetId(DataEncoding.encodeNTVAssetId(block.chainid, baseToken));
         L1MessageRoot messageRootNew = L1MessageRoot(
             address(

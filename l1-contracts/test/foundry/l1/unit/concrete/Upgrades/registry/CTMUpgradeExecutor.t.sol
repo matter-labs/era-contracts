@@ -113,11 +113,9 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest {
         ctmExecutor.acceptCTMOwnership();
         assertEq(chainContractAddress.owner(), address(ctmExecutor));
 
-        // The bootstrap-join authorizations: the executor may hold the migration pause on the
-        // fixture's real ChainAssetHandler (the one the CTM reads through its Bridgehub) and may
-        // drive its transitions' ecosystem legs through the ecosystem executor.
-        vm.prank(governor);
-        chainAssetHandler.setUpgradePauser(address(ctmExecutor), true);
+        // The one bootstrap-join authorization stage 0 requires: an authorized CTM executor on
+        // the ecosystem executor. Pausing its own CTM's migrations needs no registration — the
+        // ChainAssetHandler derives that from the CTM ownership the executor already holds.
         vm.prank(governor);
         ecosystemExecutor.setCTMExecutorAuthorization(address(ctmExecutor), true);
 
@@ -492,7 +490,10 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
         );
         assertEq(address(ctmExecutor.pendingTransition()), address(unpublished), "the lifecycle must stay open");
         _assertStage(ICTMUpgradeExecutor.UpgradeStage.Prepared);
-        assertTrue(chainAssetHandler.migrationPaused(), "migrations must stay paused");
+        assertTrue(
+            chainAssetHandler.migrationPausedFor(address(chainContractAddress)),
+            "this CTM's migrations must stay paused"
+        );
 
         L2PlanFixtures.publish(bytecodesSupplier, L2PlanFixtures.codes(unpublishedDelegate));
 

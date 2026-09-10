@@ -537,18 +537,11 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       console.log("  ✓ ecosystem ProxyAdmin owned by ecoExecutor");
     }
 
-    // Bootstrap JOIN (production: two explicit governance calls in the v34 stage-2 bundle): the
-    // CTM executor holds migrations paused through the shared ChainAssetHandler, and drives the
-    // ecosystem leg of its own transitions through the ecosystem executor.
     const cah = new ethers.Contract(live.chainAssetHandler, getAbi("L1ChainAssetHandler"), l1Provider);
-    const cahOwner: string = await cah.owner();
-    await impersonateAndRun(l1Provider, cahOwner, async (signer) => {
-      await sendAndCheck(
-        l1Provider,
-        cah.connect(signer).setUpgradePauser(deployed.ctmExecutor, true, { gasLimit: DEFAULT_GAS_LIMIT }),
-        "ChainAssetHandler.setUpgradePauser(ctmExecutor)"
-      );
-    });
+    // Bootstrap JOIN (production: one explicit governance call in the v34 stage-2 bundle): the
+    // CTM executor drives the ecosystem leg of its own transitions through the ecosystem
+    // executor. Pausing its own CTM's migrations needs no join — the ChainAssetHandler derives
+    // that authority from the CTM ownership `migrate()` handed over.
     await sendAndCheck(
       l1Provider,
       ecoExecutor.setCTMExecutorAuthorization(deployed.ctmExecutor, true, { gasLimit: DEFAULT_GAS_LIMIT }),
@@ -561,7 +554,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       ctmExecutor.stage0(objects.transition, { gasLimit: DEFAULT_GAS_LIMIT }),
       "ctmExecutor.stage0(transition)"
     );
-    assertTrue(await cah.migrationPaused(), "stage 0 leaves migrations paused");
+    assertTrue(await cah.migrationPausedFor(ctm.address), "stage 0 leaves THIS CTM's migrations paused");
     console.log("  ✓ stage0 executed (pending transition recorded, migrations paused, timer started)");
     await sendAndCheck(
       l1Provider,
@@ -585,7 +578,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       ctmExecutor.stage2(objects.transition, { gasLimit: DEFAULT_GAS_LIMIT }),
       "ctmExecutor.stage2(transition)"
     );
-    assertTrue(!(await cah.migrationPaused()), "stage 2 unpaused migrations");
+    assertTrue(!(await cah.migrationPausedFor(ctm.address)), "stage 2 unpaused this CTM's migrations");
     assertEq(await ctmExecutor.pendingTransition(), ethers.constants.AddressZero, "stage 2 cleared the lifecycle slot");
     console.log("  ✓ stage2 executed (applied-state checks, migrations unpaused)");
 

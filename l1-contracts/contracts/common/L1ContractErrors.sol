@@ -105,6 +105,8 @@ error ChainIdTooBig();
 error ChainMigrationsDisabled();
 // 0x5e361ef9
 error ChainRequiresValidatorsSignaturesForCommit();
+// 0x999db71b
+error ChainTypeManagerNotRegistered(address chainTypeManager);
 // 0x8746f42f
 error ConstructorsNotSupported();
 // 0xec273439
@@ -350,6 +352,8 @@ error NotAssetRouter(address sender, address assetRouter);
 error NotAZKChain(address addr);
 // 0x7fdf8632
 error NotCompatibleWithPriorityMode();
+// 0xbe85a635
+error NotCTMOwner(address caller, address ctm);
 // 0x5e67e793
 error NotCurrentSettlementLayer();
 // 0x2b1dc354
@@ -362,8 +366,6 @@ error NotInitializedReentrancyGuard();
 error NotL1(uint256 l1ChainId, uint256 blockChainId);
 // 0xc5441a63
 error NotL2ToL2(uint256 sourceChainId, uint256 destinationChainId);
-// 0x309dcd43
-error NotUpgradePauser(address caller);
 // 0xdf17e316
 error NotWhitelisted(address);
 // 0x9d7bb13f

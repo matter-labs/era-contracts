@@ -602,10 +602,9 @@ The prepare side of this edge is `deploy-scripts/upgrade/v34/` (`CTMUpgrade_v34`
 composition, then deploys the executor and the migration (manifest pinned from the run's own
 outputs) and collapses the stage-1 CTM leg to THREE governance calls — nominate the CTM, hand
 over its ProxyAdmin, and `migrate()`. Its stage-2 CTM leg is the migration's `validateApplied()` plus
-the two bootstrap-JOIN authorizations the recurring stage lifecycle needs and the executor cannot
-grant itself: `L1ChainAssetHandler.setUpgradePauser(executor, true)` and
-`EcosystemUpgradeExecutor.setCTMExecutorAuthorization(executor, true)` — explicit governance calls
-whose targets are bound data (the CAH through the Bridgehub; the ecosystem executor from the core
+the one bootstrap-JOIN authorization the recurring stage lifecycle needs and the executor cannot
+grant itself: `EcosystemUpgradeExecutor.setCTMExecutorAuthorization(executor, true)` — an explicit
+governance call whose target is bound data (the ecosystem executor from the core
 prepare's own output, handed to the CTM prepare as `CTMUpgradeParams.ecosystemUpgradeExecutor` — the
 CTM executor is constructed BOUND to it). `UpgradeTestv34_Local.t.sol`
 drives the whole edge through this pipeline in-forge, including the chain crossing via the

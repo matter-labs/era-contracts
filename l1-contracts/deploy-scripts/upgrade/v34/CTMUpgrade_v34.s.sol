@@ -388,17 +388,6 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
                 value: 0
             })
         );
-        address chainAssetHandler = IBridgehubBase(coreAddresses.bridgehub.proxies.bridgehub).chainAssetHandler();
-        declareExternalAction(
-            ExternalActionsLib.PHASE_STAGE_2,
-            "register the CTM executor as an upgrade pauser on the shared ChainAssetHandler",
-            "ChainAssetHandler owner (governance)",
-            Call({
-                target: chainAssetHandler,
-                data: abi.encodeCall(IChainAssetHandlerBase.setUpgradePauser, (address(ctmUpgradeExecutor), true)),
-                value: 0
-            })
-        );
         declareExternalAction(
             ExternalActionsLib.PHASE_STAGE_2,
             "authorize the CTM executor on the ecosystem executor",

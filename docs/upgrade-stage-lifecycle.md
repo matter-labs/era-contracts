@@ -194,33 +194,47 @@ storage). Migrations are deliberately LEFT PAUSED: an abandoned lifecycle is an 
 unintended state, so whether it is safe to resume migrations is governance's separate decision,
 made with `unpauseMigration`.
 
-### 4.3 Migration pause: ordinary pause/unpause, one flag
+### 4.3 Migration pause: two pauses, on two authorities
 
-The stages need a route to the shared `L1ChainAssetHandler`'s migration pause that does not hand a
-CTM executor unrestricted ecosystem authority.
+The stages need to stop chain migrations while a CTM's version moves — a chain crossing settlement
+layers mid-edge would land with an inconsistent version, which is why
+`ChainTypeManagerBase._commitVersionEdge` refuses to run unpaused.
 
-Implemented as plain authorization: the ChainAssetHandler keeps ONE `migrationPaused` flag and an
-owner-managed allowlist of addresses permitted to write it (`setUpgradePauser`). An allowlisted
-address calls the same `pauseMigration` / `unpauseMigration` governance already uses — there is no
-per-pauser hold, no counter, and no executor-side pause bookkeeping. Stage 0 pauses, stage 1
-refuses to commit unless migrations are paused (read live, so an unpause in between is caught),
-stage 2 unpauses. A CTM executor is registered once — an explicit governance call the v34 CTM
-prepare emits in its stage 2, bound to the bootstrap's pinned executor.
+The state lives on the shared `L1ChainAssetHandler`, because that is where migrations execute
+(`bridgeBurn` / `bridgeMint`). But it is keyed on TWO axes, because two different authorities have
+a legitimate reason to stop migrations:
 
-An earlier design gave each executor its own hold with a reference count, so one upgrade's stage 2
-could not lift a pause another upgrade — or the owner — still required. That was withdrawn: the
-only failure it prevents is two upgrade lifecycles running concurrently and the first to finish
-unpausing under the second, which is an accident, not an attack. It is no defense against
-malicious governance, which controls the executors anyway. Enforcing coordination that governance
-is already responsible for is not worth the storage and the API.
+| pause                                                 | who writes it                                                               | scope                                            |
+| ----------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------ |
+| `pauseMigration` / `unpauseMigration`                 | the CAH owner (ecosystem governance)                                        | every chain, whatever its CTM — incident control |
+| `pauseCTMMigration(ctm)` / `unpauseCTMMigration(ctm)` | that CTM's own owner, i.e. its bound `CTMUpgradeExecutor` during an upgrade | chains under that CTM                            |
 
-Two consequences are therefore explicit, and are pinned by tests rather than prevented:
+`migrationPausedFor(ctm)` is the OR of the two, and the gate on the migration entrypoints asks it
+about the CTM the migrating chain belongs to — resolved from the chain asset's id. A chain may only
+migrate between settlement layers under its OWN CTM (`SLHasDifferentCTM`), so one CTM is the whole
+answer; there is no cross-CTM case to consider.
 
-- **Governance must coordinate overlapping upgrades and incident pauses.** Any authorized caller
-  can lift a pause any other authorized caller set, in either direction. Do not run two upgrade
-  lifecycles concurrently, and do not leave an incident pause to overlap one.
-- **Abandoning an upgrade leaves migrations paused.** `abandonPendingTransition` clears bookkeeping
-  only; governance decides when to unpause.
+Authority for the per-CTM pause is DERIVED, not stored: a caller qualifies by being the current
+owner of a CTM the Bridgehub has registered. So there is no allowlist to maintain, replacing an
+executor moves the ability with the ownership, and no CTM-domain state sits in the ecosystem-domain
+handler.
+
+Two earlier designs were tried and are worth not re-proposing. The first gave each executor a HOLD
+with a reference count so one upgrade's completion could not lift a pause another still needed;
+that was keyed on the pauser's identity rather than on the thing being paused, and defended against
+accident on the wrong axis. Replacing it with a single flag was simpler but mixed the domains: the
+handler stored a registry of CTM-domain executors, and one CTM's stage 2 lifted the pause every
+other CTM — and an incident response — depended on. Keying by CTM removes both problems, because
+that is the axis the domain actually has.
+
+Consequences worth stating:
+
+- **Governance cannot clear a CTM's pause directly.** Only that CTM's owner can. Governance owns
+  the executor, so it reaches the pause through the executor's owner-gated `forward`, which logs
+  the call.
+- **The release-level ban is checked first.** `CHAIN_MIGRATIONS_ENABLED` is false in this release,
+  so on a production handler a migration reverts with `ChainMigrationsDisabled` before the pause is
+  consulted. The pause gate is exercised against the Dev handlers, which re-enable migrations.
 
 ### 4.4 ServerNotifier: an explicit row and an authorized path
 
@@ -245,9 +259,10 @@ admin parked on the spent one-shot object has no way out. The executor is the lo
 `RegistryBootstrapMigration` remains the entry edge and is reused as is. The recurring lifecycle
 applies from the first registry-driven transition after it (v34 → v35). Join conditions: after
 `migrate()` the executor owns the CTM and its ProxyAdmin; the ecosystem `ProxyAdmin` is handed to
-the ecosystem executor (today's 1.2); the CTM executor is registered as an upgrade pauser and, if
-4.4's first alternative is chosen, owns the notifier's ProxyAdmin. Each is one explicit
-authorization call bound to bootstrap data; none is required by a stage before it exists.
+the ecosystem executor (today's 1.2); and, if 4.4's first alternative is chosen, the CTM executor
+owns the notifier's ProxyAdmin. Each is one explicit authorization call bound to bootstrap data;
+none is required by a stage before it exists. Pausing its own CTM's migrations is NOT among them —
+that authority is derived from the CTM ownership `migrate()` hands over (4.3).
 
 Implemented: the bootstrap's payload is composed on-chain. `BootstrapManifest` pins the engine and
 an `AuthoredL2Plan` (the same shape transitions carry); `RegistryBootstrapMigration.upgradeCut()`

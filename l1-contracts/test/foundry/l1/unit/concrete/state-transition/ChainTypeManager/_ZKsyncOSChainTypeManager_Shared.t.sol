@@ -67,5 +67,11 @@ contract ZKsyncOSChainTypeManagerSharedTest is ChainTypeManagerTest {
         );
         zksyncOSChainTypeManager = ZKsyncOSChainTypeManager(address(transparentUpgradeableProxy));
         chainContractAddress = ZKsyncOSChainTypeManager(address(transparentUpgradeableProxy));
+
+        // This replaces the base fixture's CTM, so register the new one: the ChainAssetHandler
+        // derives the authority to pause a CTM's migrations from `chainTypeManagerIsRegistered`
+        // plus that CTM's owner, and its `_commitVersionEdge` reads the pause per-CTM.
+        vm.prank(governor);
+        bridgehub.addChainTypeManager(address(chainContractAddress));
     }
 }
