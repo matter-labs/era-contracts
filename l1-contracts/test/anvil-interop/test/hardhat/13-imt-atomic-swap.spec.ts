@@ -73,7 +73,7 @@ type AtomicStack = {
   tree: Contract;
   /** {AtomicFlowManager} at the canonical 0x10014. */
   manager: Contract;
-  /** {InteropCenter} at the canonical 0x1000d (the atomic SEND entry point). */
+  /** {L2InteropCenter} at the canonical 0x1000d (the atomic SEND entry point). */
   interopCenter: Contract;
   /** {L2InteropHandler} at the canonical 0x1000e (the atomic RECEIVE entry point). */
   interopHandler: Contract;
@@ -272,7 +272,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
   }
 
   /** A fresh, deterministic-per-send bundle salt. Random keeps it unique per (sender, salt) — the
-   *  uniqueness InteropCenter enforces — while staying known off-chain so the bundleHash is predictable. */
+   *  uniqueness L2InteropCenter enforces — while staying known off-chain so the bundleHash is predictable. */
   function freshBundleSalt(): string {
     return ethers.utils.hexlify(ethers.utils.randomBytes(32));
   }
@@ -327,7 +327,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
       gasLimit: ATOMIC_SEND_BUNDLE_GAS_LIMIT,
     });
 
-    // Cross-check the predicted bundleHash against the actual one the InteropCenter emitted.
+    // Cross-check the predicted bundleHash against the actual one the L2InteropCenter emitted.
     expect(sendResult.bundleHash.toLowerCase(), "predicted bundleHash matches emitted").to.equal(
       predictedBundleHash.toLowerCase()
     );

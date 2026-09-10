@@ -2,14 +2,12 @@
 
 pragma solidity ^0.8.24;
 
-import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
-import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
-import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
-import {IInteropCenter} from "./IInteropCenter.sol";
+import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
+import {IInteropCenter} from "../IInteropCenter.sol";
+import {InteropCenterBase} from "./InteropCenterBase.sol";
 
 import {
     L2_ASSET_ROUTER_ADDR,
@@ -18,15 +16,15 @@ import {
     L2_COMPLEX_UPGRADER_ADDR,
     L2_NATIVE_TOKEN_VAULT,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT
-} from "../common/l2-helpers/L2ContractInterfaces.sol";
+} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 
-import {SETTLEMENT_LAYER_RELAY_SENDER, ETH_TOKEN_ADDRESS} from "../common/Config.sol";
-import {DataEncoding} from "../common/libraries/DataEncoding.sol";
+import {SETTLEMENT_LAYER_RELAY_SENDER, ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
+import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {
     L2_BOOTLOADER_ADDRESS,
     L2_ATOMIC_FLOW_MANAGER_ADDR,
     L2_INTEROP_ATTRIBUTE_PARSER_ADDR
-} from "../common/l2-helpers/L2ContractAddresses.sol";
+} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {
     BUNDLE_IDENTIFIER,
     BundleAttributes,
@@ -37,8 +35,8 @@ import {
     InteropCall,
     InteropCallStarter,
     InteropCallStarterInternal
-} from "../common/Messaging.sol";
-import {MsgValueMismatch, NotL2ToL2, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
+} from "../../common/Messaging.sol";
+import {MsgValueMismatch, NotL2ToL2, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
 
 import {
     NonAtomicSendUnsupported,
@@ -51,43 +49,39 @@ import {
     IndirectCallOnlyToAssetRouter,
     IndirectCallValueMismatch,
     InteropBundleSaltAlreadyUsed,
-    InteropCallToL1NotToAssetRouter,
     InteroperableAddressChainReferenceNotEmpty,
     InteroperableAddressNotEmpty,
+    InteropCallToL1NotToAssetRouter,
     FeeWithdrawalFailed,
     InteropToSelfNotSupported,
     MultiCallToL1NotSupported,
     NonZeroValueToL1NotSupported,
     ZKTokenNotAvailable
-} from "./InteropErrors.sol";
+} from "../InteropErrors.sol";
 
-import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
-import {IInteropAttributeParser} from "./IInteropAttributeParser.sol";
-import {InteropDataEncoding} from "./InteropDataEncoding.sol";
-import {IAtomicFlowManager} from "../atomic-interop/IAtomicFlowManager.sol";
-import {ERC7930_V1_MIN_LENGTH} from "./InteropConstants.sol";
-import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
-import {IL2CrossChainSender} from "../bridge/interfaces/IL2CrossChainSender.sol";
-import {IAssetRouterShared} from "../bridge/asset-router/IAssetRouterShared.sol";
-import {IL2NativeTokenVault} from "../bridge/ntv/IL2NativeTokenVault.sol";
+import {IERC7786GatewaySource} from "../IERC7786GatewaySource.sol";
+import {IInteropAttributeParser} from "../IInteropAttributeParser.sol";
+import {InteropDataEncoding} from "../InteropDataEncoding.sol";
+import {IAtomicFlowManager} from "../../atomic-interop/IAtomicFlowManager.sol";
+import {ERC7930_V1_MIN_LENGTH} from "../InteropConstants.sol";
+import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
+import {IL2CrossChainSender} from "../../bridge/interfaces/IL2CrossChainSender.sol";
+import {IAssetRouterShared} from "../../bridge/asset-router/IAssetRouterShared.sol";
+import {IL2NativeTokenVault} from "../../bridge/ntv/IL2NativeTokenVault.sol";
 
 /// @dev Default fixed ZK fee per interop call; intentionally above the intended dynamic fee to
 /// incentivize the dynamic path. See {protocol-docs/interop.md#fee-model}.
 uint256 constant DEFAULT_ZK_INTEROP_FEE = 10e18;
 
-/// @title InteropCenter
+/// @title L2InteropCenter
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Primary entry point for interop between chains: forms interop bundles and dispatches them
-/// (L2->L1 message, or IMT commit for atomic bundles). Deployed on L2s only as of v31.
+/// (L2->L1 message, or IMT commit for atomic bundles). Deployed on L2s only; its L1 counterpart is the
+/// `L1InteropCenter`, which shares the ERC-7786 `sendMessage` entry point (see {InteropCenterBase}) but
+/// delivers messages to the ZK chains through the priority queue.
 /// See {protocol-docs/interop.md#zksync-interop-protocol}.
-contract InteropCenter is
-    IInteropCenter,
-    IERC7786GatewaySource,
-    ReentrancyGuard,
-    Ownable2StepUpgradeable,
-    PausableUpgradeable
-{
+contract L2InteropCenter is IInteropCenter, InteropCenterBase {
     using SafeERC20 for IERC20;
 
     /// @notice The chain ID of L1. This contract can be deployed on multiple layers, but this value
@@ -184,18 +178,19 @@ contract InteropCenter is
     }
 
     /*//////////////////////////////////////////////////////////////
-                    InteropCenter entry points
+                    L2InteropCenter entry points
     //////////////////////////////////////////////////////////////*/
-    /// @notice Sends a single ERC-7786 message to another chain (wrapped into a single-call bundle).
+    /// @dev Implements the shared ERC-7786 `sendMessage` entry point (see {InteropCenterBase}): sends a
+    ///      single message to another chain, wrapped into a single-call bundle.
     /// @param recipient ERC-7930 address of the message destination (must be an EIP-155 chain).
     /// @param payload Payload to send.
     /// @param attributes ERC-7786 attributes (call- and bundle-level are both accepted here).
     /// @return sendId `keccak256(bundleHash, 0)` — the ERC-7786 id of the single sent call.
-    function sendMessage(
+    function _sendMessage(
         bytes calldata recipient,
         bytes calldata payload,
         bytes[] calldata attributes
-    ) external payable whenNotPaused nonReentrant returns (bytes32 sendId) {
+    ) internal override returns (bytes32 sendId) {
         (uint256 recipientChainId, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(recipient);
         // The recipient must carry a concrete address; a chain-only ERC-7930 encoding parses to address(0),
         // which would collect value up-front yet never be executable and has no refund path.
@@ -432,7 +427,7 @@ contract InteropCenter is
 
             if (_totalBurnedCallsValue > 0) {
                 // TODO(EVM-1395): unify same-base-token interop funding with the L2AssetRouter/L2NTV path
-                // so InteropCenter does not need a dedicated BaseTokenHolder branch here.
+                // so L2InteropCenter does not need a dedicated BaseTokenHolder branch here.
                 L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: _totalBurnedCallsValue}(_destinationChainId);
             }
         } else {
@@ -866,20 +861,6 @@ contract InteropCenter is
     /// @notice The stateless attribute parser deployed at its fixed built-in address.
     function _parser() private pure returns (IInteropAttributeParser) {
         return IInteropAttributeParser(L2_INTEROP_ATTRIBUTE_PARSER_ADDR);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            PAUSE
-    //////////////////////////////////////////////////////////////*/
-
-    /// @inheritdoc IInteropCenter
-    function pause() external onlyOwner {
-        _pause();
-    }
-
-    /// @inheritdoc IInteropCenter
-    function unpause() external onlyOwner {
-        _unpause();
     }
 
     /*//////////////////////////////////////////////////////////////

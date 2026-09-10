@@ -83,7 +83,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
         L1_CHAIN_ID = _l1ChainId;
     }
 
-    /// @dev Only allows calls from the {InteropCenter}.
+    /// @dev Only allows calls from the {L2InteropCenter}.
     modifier onlyInteropCenter() {
         if (msg.sender != interopCenter()) {
             revert ManagerNotInteropCenter(msg.sender);

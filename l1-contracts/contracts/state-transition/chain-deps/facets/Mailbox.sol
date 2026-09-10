@@ -97,9 +97,9 @@ contract MailboxFacet is ZKChainBase, IMailbox {
     }
 
     /// @inheritdoc IMailbox
-    function bridgehubRequestL2Transaction(
+    function interopCenterRequestL2Transaction(
         BridgehubL2TransactionRequest calldata _request
-    ) external onlyBridgehub returns (bytes32 canonicalTxHash) {
+    ) external onlyL1InteropCenter returns (bytes32 canonicalTxHash) {
         canonicalTxHash = _requestL2TransactionSender(_request);
     }
 
@@ -268,7 +268,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         bool is7702AccountSender = false;
 
         if (block.chainid == L1_CHAIN_ID) {
-            is7702AccountSender = EIP_7702_CHECKER.isEIP7702Account(request.sender); // This is not the same as refundRecipient, as it appears to be the AR during TwoBridges.
+            is7702AccountSender = EIP_7702_CHECKER.isEIP7702Account(request.sender); // This is not the same as refundRecipient, as it appears to be the AR during the indirect-call flow.
             if (!refundAliasingFinalized) {
                 // The recipient resolves to the sender when the recipient was unset — reuse the sender check.
                 is7702AccountRefundRecipient = refundRecipient == request.sender

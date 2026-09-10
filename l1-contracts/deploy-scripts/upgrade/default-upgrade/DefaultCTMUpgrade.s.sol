@@ -104,8 +104,8 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         address ctmProxy;
         address bytecodesSupplier;
         bool isZKsyncOS;
-        /// @dev ZK token asset ID, used by `InteropCenter.initL2` for fixed-fee bundles.
-        ///      MUST be non-zero — `InteropCenter.initL2` reverts otherwise, which would abort the
+        /// @dev ZK token asset ID, used by `L2InteropCenter.initL2` for fixed-fee bundles.
+        ///      MUST be non-zero — `L2InteropCenter.initL2` reverts otherwise, which would abort the
         ///      L2 upgrade transaction.
         bytes32 zkTokenAssetId;
     }
@@ -173,7 +173,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         // permanent-values entry is informational for this path.
         setAddressesBasedOnCTM();
         config.isZKsyncOS = permanentConfig.isZKsyncOS;
-        // Must be non-zero: `InteropCenter.initL2` reverts on a zero asset ID. It runs on the genesis path
+        // Must be non-zero: `L2InteropCenter.initL2` reverts on a zero asset ID. It runs on the genesis path
         // of `performForceDeployedContractsInit` only, so this aborts the genesis of chains created from the
         // release rather than this upgrade — caught here so the misconfiguration surfaces during
         // preparation instead of at a chain's creation.

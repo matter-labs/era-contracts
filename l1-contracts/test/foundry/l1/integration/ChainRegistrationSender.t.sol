@@ -6,7 +6,7 @@ import {Vm} from "forge-std/Vm.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
-import {IBridgehubBase, L2TransactionRequestTwoBridgesOuter} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase, L2TransactionRequestIndirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {
     CHAIN_REGISTRATION_SENDER_ENCODING_VERSION,
     ChainRegistrationSender
@@ -19,6 +19,7 @@ import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
+import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
@@ -33,6 +34,8 @@ import {
 import {LogFinder} from "test-utils/LogFinder.sol";
 
 import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestConstants.sol";
+
+import {L1InteropRequests} from "foundry-test/l1/utils/L1InteropRequests.sol";
 
 contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using LogFinder for Vm.Log[];
@@ -126,7 +129,7 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
         addresses.chainRegistrationSender.registerChain(zkChainIds[0], zkChainIds[1]);
     }
 
-    /// @dev Runs requestL2TransactionTwoBridges through ChainRegistrationSender; only ETH for base-token gas.
+    /// @dev Runs the L1InteropCenter indirect-call flow through ChainRegistrationSender; only ETH for base-token gas.
     function _chainRegistrationSenderDeposit() private returns (bytes32, Vm.Log[] memory) {
         uint256 currentChainId = zkChainIds[0];
         address currentUser = users[0];
@@ -148,24 +151,24 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
 
         uint256 userEthBefore = currentUser.balance;
 
-        bytes memory secondBridgeCallData = bytes.concat(
+        bytes memory crossChainSenderCallData = bytes.concat(
             CHAIN_REGISTRATION_SENDER_ENCODING_VERSION,
             abi.encode(currentChainId)
         );
-        L2TransactionRequestTwoBridgesOuter memory requestTx = _createL2TransactionRequestTwoBridges({
+        L2TransactionRequestIndirect memory requestTx = _createL2TransactionRequestIndirect({
             _chainId: currentChainId,
             _mintValue: mintValue,
-            _secondBridgeValue: 0,
-            _secondBridgeAddress: address(addresses.chainRegistrationSender),
+            _crossChainSenderValue: 0,
+            _crossChainSender: address(addresses.chainRegistrationSender),
             _l2Value: 0,
             _l2GasLimit: l2GasLimit,
             _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            _secondBridgeCalldata: secondBridgeCallData
+            _crossChainSenderData: crossChainSenderCallData
         });
 
         vm.recordLogs();
         vm.prank(currentUser);
-        bytes32 resultantHash = addresses.bridgehub.requestL2TransactionTwoBridges{value: mintValue}(requestTx);
+        bytes32 resultantHash = L1InteropRequests.requestIndirect(addresses.l1InteropCenter, mintValue, requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         console2.log("balance before", userEthBefore);
@@ -190,10 +193,10 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
         );
         assertEq(uint256(baseTokenLog.topics[1]), zkChainIds[0], "Base token deposit event chainId mismatch");
 
-        // The TwoBridges path through ChainRegistrationSender does NOT update chainRegisteredOnChain.
+        // The indirect-call path through ChainRegistrationSender does NOT update chainRegisteredOnChain.
         assertFalse(
             addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]),
-            "chainRegisteredOnChain should remain false after TwoBridges deposit"
+            "chainRegisteredOnChain should remain false after Indirect deposit"
         );
     }
 
@@ -231,6 +234,16 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
             abi.encodeWithSelector(ChainsSettlementLayerMismatch.selector, firstSettlementLayer, secondSettlementLayer)
         );
         addresses.chainRegistrationSender.registerChain(zkChainIds[0], zkChainIds[1]);
+    }
+
+    function test_confirmL2Transaction_onlyInteropCenter() public {
+        address unauthorizedCaller = makeAddr("unauthorizedCaller");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, unauthorizedCaller));
+        vm.prank(unauthorizedCaller);
+        addresses.chainRegistrationSender.confirmL2Transaction(zkChainIds[0], bytes32(0), bytes32(0));
+
+        vm.prank(address(addresses.l1InteropCenter));
+        addresses.chainRegistrationSender.confirmL2Transaction(zkChainIds[0], bytes32(0), bytes32(0));
     }
 
     // add this to be excluded from coverage report

@@ -87,11 +87,11 @@ contract ReentrantRefundClaimer {
     }
 }
 
-/// @notice Atomic interop exercised through the REAL send entry point: `InteropCenter.sendBundle` with
+/// @notice Atomic interop exercised through the REAL send entry point: `L2InteropCenter.sendBundle` with
 /// the `atomicBundle` attribute drives a real `L2AssetRouter.initiateIndirectCall` burn and a real
 /// `AtomicFlowManager.append` -> `L2InteropCommitmentTree.insert`, and the timeout path recovers the
 /// burn through the real `authorizeRefund` -> `claimRefund` -> `L2AssetRouter.recoverAtomicCall` ->
-/// NTV re-mint chain. Everything runs on the shared L2-in-L1-context deployment (real InteropCenter,
+/// NTV re-mint chain. Everything runs on the shared L2-in-L1-context deployment (real L2InteropCenter,
 /// AssetRouter, NTV, Bridgehub registry and bridged token). Nothing on the proof path is mocked: the
 /// timeout absence proofs are aggregated into a real {L1MessageRoot}, imported into the real
 /// {L2InteropRootStorage}, and authenticated through the real {L2MessageVerification} (the invalid

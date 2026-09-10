@@ -50,7 +50,7 @@ abstract contract L2InteropExecuteBundleTestAbstract is L2InteropTestUtils {
 
         vm.recordLogs();
 
-        // Distinct salt for the wrapper bundle: both sends originate from `address(this)` and InteropCenter
+        // Distinct salt for the wrapper bundle: both sends originate from `address(this)` and L2InteropCenter
         // enforces a unique (sender, salt) pair.
         InteropLibrary.sendDirectCall(
             destinationChainId,

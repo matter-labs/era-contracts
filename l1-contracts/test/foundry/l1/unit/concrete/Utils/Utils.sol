@@ -397,7 +397,7 @@ library Utils {
     function getMailboxSelectors() public pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](5);
         uint256 i = 0;
-        selectors[i++] = MailboxFacet.bridgehubRequestL2Transaction.selector;
+        selectors[i++] = MailboxFacet.interopCenterRequestL2Transaction.selector;
         selectors[i++] = MailboxFacet.bridgehubRequestL2TransactionOnGateway.selector;
         selectors[i++] = MailboxFacet.l2TransactionBaseCost.selector;
         selectors[i++] = MailboxFacet.requestL2TransactionToGatewayMailbox.selector;

@@ -12,8 +12,7 @@ import {
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
-// import {IInteropCenter} from "contracts/interop/InteropCenter.sol";
-import {InteropCenter} from "contracts/interop/InteropCenter.sol";
+import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {AtomicFlowPreimage, ATOMIC_FLOW_PREIMAGE_VERSION} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
@@ -40,7 +39,7 @@ library InteropLibrary {
 
     /// @notice Create a single Interop call to the L2 asset router with the 7786 "indirectCall" attribute set.
     function buildSecondBridgeCall(
-        bytes memory secondBridgeCalldata,
+        bytes memory crossChainSenderData,
         address bridgeAddress
     ) internal pure returns (InteropCallStarter memory) {
         bytes[] memory callAttributes = new bytes[](1);
@@ -48,7 +47,7 @@ library InteropLibrary {
         return
             InteropCallStarter({
                 to: InteroperableAddress.formatEvmV1(bridgeAddress),
-                data: secondBridgeCalldata,
+                data: crossChainSenderData,
                 callAttributes: callAttributes
             });
     }
@@ -150,7 +149,7 @@ library InteropLibrary {
             );
         }
         attributes[attributesPointer++] = abi.encodeCall(IERC7786Attributes.useFixedFee, (useFixedFee));
-        // L2->L2 interop is atomic, so an `atomicBundle` attribute is mandatory or `InteropCenter` reverts
+        // L2->L2 interop is atomic, so an `atomicBundle` attribute is mandatory or `L2InteropCenter` reverts
         // `NonAtomicSendUnsupported`. The flow metadata below (flowId=1, deadline=max, lowNullifierIndex=0)
         // is a PLACEHOLDER that is only valid when the `AtomicFlowManager.append`/`requireFlowFinalized`
         // gate is mocked — which it is in the Foundry tests that use this helper. It is NOT usable for a real
@@ -243,7 +242,7 @@ library InteropLibrary {
         }
 
         bytes32 l2TokenAssetId = L2_NATIVE_TOKEN_VAULT.assetId(l2TokenAddress);
-        bytes memory secondBridgeCalldata = buildSecondBridgeCalldata(
+        bytes memory crossChainSenderData = buildSecondBridgeCalldata(
             l2TokenAssetId,
             amount,
             recipient,
@@ -251,11 +250,11 @@ library InteropLibrary {
         );
 
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
-        calls[0] = buildSecondBridgeCall(secondBridgeCalldata, L2_ASSET_ROUTER_ADDR); // Using the default address as second bridge.
+        calls[0] = buildSecondBridgeCall(crossChainSenderData, L2_ASSET_ROUTER_ADDR); // Using the default address as second bridge.
 
         // An L1 destination is an L2->L1 withdrawal: it must be NON-atomic (L1 has no atomic execution and
         // withdrawals are never revertable), so it carries only the salt attribute — never the `atomicBundle`
-        // attribute, which `InteropCenter` rejects for L1 with `AtomicBundleToL1NotSupported`. Any other
+        // attribute, which `L2InteropCenter` rejects for L1 with `AtomicBundleToL1NotSupported`. Any other
         // (L2) destination is atomic interop and carries the full attribute set.
         bytes[] memory bundleAttrs = destinationChainId == L2_INTEROP_CENTER.L1_CHAIN_ID()
             ? buildWithdrawalBundleAttributes(salt)
@@ -270,7 +269,7 @@ library InteropLibrary {
 
     /// @notice Build the single-attribute (`interopBundleSalt`) bundle-attribute array used by L2->L1
     /// withdrawal bundles.
-    /// @dev Each (sender, salt) pair may be used only once by the InteropCenter, so callers derive the salt
+    /// @dev Each (sender, salt) pair may be used only once by the L2InteropCenter, so callers derive the salt
     /// deterministically from the withdrawal content.
     /// @param _salt Salt mixed into the bundle's `interopBundleSalt`.
     function buildWithdrawalBundleAttributes(bytes32 _salt) internal pure returns (bytes[] memory attributes) {
@@ -278,7 +277,7 @@ library InteropLibrary {
         attributes[0] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (_salt));
     }
 
-    /// @notice ABI-encode the `InteropCenter.sendBundle` calldata for an L2->L1 withdrawal of a single
+    /// @notice ABI-encode the `L2InteropCenter.sendBundle` calldata for an L2->L1 withdrawal of a single
     /// registered (non-base-token) asset. Used where the call is wrapped into an admin L1->L2 transaction /
     /// ChainAdmin multicall rather than sent directly.
     /// @param _l1ChainId Destination L1 chain id.
@@ -293,7 +292,7 @@ library InteropLibrary {
     ) internal pure returns (bytes memory) {
         return
             abi.encodeCall(
-                InteropCenter.sendBundle,
+                IInteropCenter.sendBundle,
                 (
                     InteroperableAddress.formatEvmV1(_l1ChainId),
                     DataEncoding.encodeInteropWithdrawalCallStarters(_assetId, _transferData),
@@ -303,7 +302,7 @@ library InteropLibrary {
     }
 
     /// @notice Send an L2->L1 withdrawal bundle for a single registered (non-base-token) asset directly through
-    /// the InteropCenter. Wrap in `vm.broadcast()` when broadcasting.
+    /// the L2InteropCenter. Wrap in `vm.broadcast()` when broadcasting.
     /// @param _l1ChainId Destination L1 chain id.
     /// @param _assetId The withdrawn asset id (an ERC20 or the CTM/ZK asset — NOT a base-token asset).
     /// @param _transferData Bridgehub-burn transfer data for the asset.

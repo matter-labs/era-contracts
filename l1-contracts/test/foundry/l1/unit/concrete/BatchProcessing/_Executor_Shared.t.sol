@@ -169,7 +169,7 @@ contract ExecutorTest is UtilsCallMockerTest {
     function getMailboxSelectors() private view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](2);
         uint256 i = 0;
-        selectors[i++] = mailbox.bridgehubRequestL2Transaction.selector;
+        selectors[i++] = mailbox.interopCenterRequestL2Transaction.selector;
         selectors[i++] = mailbox.l2TransactionBaseCost.selector;
         return selectors;
     }

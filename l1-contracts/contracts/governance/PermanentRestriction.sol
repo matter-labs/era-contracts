@@ -13,10 +13,13 @@ import {
 } from "../common/L1ContractErrors.sol";
 
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
-import {BridgehubBurnCTMAssetData, L2TransactionRequestTwoBridgesOuter} from "../core/bridgehub/IBridgehubBase.sol";
+import {BridgehubBurnCTMAssetData} from "../core/bridgehub/IBridgehubBase.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {IAssetRouterBase, NEW_ENCODING_VERSION} from "../bridge/asset-router/IAssetRouterBase.sol";
+import {IERC7786GatewaySource} from "../interop/IERC7786GatewaySource.sol";
+import {IERC7786Attributes} from "../interop/IERC7786Attributes.sol";
+import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
 
 import {Call} from "./Common.sol";
 import {Restriction} from "./restriction/Restriction.sol";
@@ -288,7 +291,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     /// @dev If any other error is returned, it is assumed to be out of gas or some other unexpected
     /// error that should be bubbled up by the caller.
     function _getNewAdminFromMigration(Call calldata _call) internal view returns (address, bool) {
-        if (_call.target != address(BRIDGE_HUB)) {
+        if (_call.target != BRIDGE_HUB.interopCenter()) {
             return (address(0), false);
         }
 
@@ -296,7 +299,11 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
             return (address(0), false);
         }
 
-        if (bytes4(_call.data[:4]) != IL1Bridgehub.requestL2TransactionTwoBridges.selector) {
+        // The L1InteropCenter deliberately exposes `sendMessage` as its ONLY state-changing entry point (there is
+        // no L1 `sendBundle`), so matching this selector is sufficient. Any new L1InteropCenter entry point that
+        // can reach the indirect-call flow MUST be recognised here as well, otherwise a migration sent through
+        // it would bypass the L2 admin whitelist.
+        if (bytes4(_call.data[:4]) != IERC7786GatewaySource.sendMessage.selector) {
             return (address(0), false);
         }
 
@@ -304,33 +311,41 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
 
         // Assuming that correctly encoded calldata is provided, the following line must never fail,
         // since the correct selector was checked before.
-        L2TransactionRequestTwoBridgesOuter memory request = abi.decode(
+        (bytes memory recipient, bytes memory payload, bytes[] memory attributes) = abi.decode(
             _call.data[4:],
-            (L2TransactionRequestTwoBridgesOuter)
+            (bytes, bytes, bytes[])
         );
 
-        if (request.secondBridgeAddress != sharedBridge) {
+        if (!_hasIndirectCallAttribute(attributes)) {
             return (address(0), false);
         }
 
-        bytes memory secondBridgeData = request.secondBridgeCalldata;
-        if (secondBridgeData.length == 0) {
+        // A chain migration is an indirect call ("two bridges" flow) whose ERC-7930 recipient is the
+        // shared bridge (the asset router), with the payload being the second bridge calldata.
+        // slither-disable-next-line unused-return
+        (, address recipientAddress) = InteroperableAddress.parseEvmV1(recipient);
+        if (recipientAddress != sharedBridge) {
             return (address(0), false);
         }
 
-        if (secondBridgeData[0] != NEW_ENCODING_VERSION) {
+        bytes memory crossChainSenderData = payload;
+        if (crossChainSenderData.length == 0) {
             return (address(0), false);
         }
-        bytes memory encodedData = new bytes(secondBridgeData.length - 1);
+
+        if (crossChainSenderData[0] != NEW_ENCODING_VERSION) {
+            return (address(0), false);
+        }
+        bytes memory encodedData = new bytes(crossChainSenderData.length - 1);
         assembly {
-            mcopy(add(encodedData, 0x20), add(secondBridgeData, 0x21), mload(encodedData))
+            mcopy(add(encodedData, 0x20), add(crossChainSenderData, 0x21), mload(encodedData))
         }
 
         // From now on, we know that the used encoding version is `NEW_ENCODING_VERSION` that is
         // supported only in the new protocol version with Gateway support, so we can assume
         // that the methods like e.g. Bridgehub.ctmAssetIdToAddress must exist.
 
-        // This is the format of the `secondBridgeData` under the `NEW_ENCODING_VERSION`.
+        // This is the format of the `crossChainSenderData` under the `NEW_ENCODING_VERSION`.
         // If it fails, it would mean that the data is not correct and the call would eventually fail anyway.
         (bytes32 chainAssetId, bytes memory bridgehubData) = abi.decode(encodedData, (bytes32, bytes));
 
@@ -354,5 +369,18 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
         (address l2Admin, ) = abi.decode(burnData.ctmData, (address, bytes));
 
         return (l2Admin, true);
+    }
+
+    /// @notice Checks whether the message uses the indirect L1->L2 call flow.
+    /// @dev Merely targeting the asset router is not enough to identify a migration: a direct message may
+    /// target the same address and carry the same payload, but it does not execute the asset-router flow on L1.
+    function _hasIndirectCallAttribute(bytes[] memory _attributes) private pure returns (bool) {
+        uint256 attributesLength = _attributes.length;
+        for (uint256 i = 0; i < attributesLength; ++i) {
+            if (bytes4(_attributes[i]) == IERC7786Attributes.indirectCall.selector) {
+                return true;
+            }
+        }
+        return false;
     }
 }

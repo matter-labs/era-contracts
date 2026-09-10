@@ -4,6 +4,7 @@ import * as hre from "hardhat";
 import { Command } from "commander";
 import { Wallet, ethers } from "ethers";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
+import { encodeDirectInteropRequest, l1InteropCenterInterface } from "../../l1-contracts/src.ts/utils";
 import { REQUIRED_L2_GAS_PRICE_PER_PUBDATA, provider, priorityTxMaxGasLimit } from "./utils";
 import { ethTestConfig } from "./deploy-shared-bridge-on-l2-through-l1";
 
@@ -38,22 +39,28 @@ async function main() {
       console.log(`Using gas price: ${gasPrice}`);
 
       const deployer = new Deployer({ deployWallet: wallet });
-      const interopCenter = deployer.interopCenter(wallet);
 
-      const publishL2SharedBridgeTx = await interopCenter.requestL2TransactionDirect(
-        {
-          chainId,
-          l2Contract: ethers.constants.AddressZero,
-          mintValue: 0,
-          l2Value: 0,
-          l2Calldata: "0x",
-          l2GasLimit: priorityTxMaxGasLimit,
-          l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-          factoryDeps: [getContractBytecode("L2SharedBridge")],
-          refundRecipient: wallet.address,
-        },
-        { nonce, gasPrice }
-      );
+      // L1->L2 transactions are requested through the L1InteropCenter ERC-7786 `sendMessage`
+      // entry point (the former `L1Bridgehub.requestL2TransactionDirect`).
+      const bridgehub = deployer.bridgehubContract(wallet);
+      const interopCenterAddress = await bridgehub.interopCenter();
+      const interopCenter = new ethers.Contract(interopCenterAddress, l1InteropCenterInterface(), wallet);
+      const { recipient, payload, attributes } = encodeDirectInteropRequest({
+        chainId,
+        l2Contract: ethers.constants.AddressZero,
+        mintValue: 0,
+        l2Value: 0,
+        l2Calldata: "0x",
+        l2GasLimit: priorityTxMaxGasLimit,
+        l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+        factoryDeps: [getContractBytecode("L2SharedBridge")],
+        refundRecipient: wallet.address,
+      });
+
+      const publishL2SharedBridgeTx = await interopCenter.sendMessage(recipient, payload, attributes, {
+        nonce,
+        gasPrice,
+      });
       await publishL2SharedBridgeTx.wait();
     });
 

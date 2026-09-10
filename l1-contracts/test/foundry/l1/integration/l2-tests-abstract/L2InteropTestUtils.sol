@@ -47,7 +47,7 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
     /// local node, by the anvil-interop atomic-swap spec.
 
     /// @notice Returns a copy of `_attrs` with the mandatory ERC-7786 `atomicBundle` attribute appended.
-    /// @dev Every interop send must be atomic (see {InteropCenter}); without this attribute the send
+    /// @dev Every interop send must be atomic (see {L2InteropCenter}); without this attribute the send
     ///      reverts with `NonAtomicSendUnsupported`. The flow metadata is a placeholder because the
     ///      `AtomicFlowManager.append` gate is mocked in setUp. Use this to wrap inline attribute arrays;
     ///      arrays produced by {InteropLibrary.buildBundleAttributes} already include the attribute.
@@ -172,13 +172,13 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
         uint256 _amount,
         address _receiver
     ) internal view returns (InteropCallStarter[] memory calls) {
-        bytes memory secondBridgeCalldata = InteropLibrary.buildSecondBridgeCalldata(
+        bytes memory crossChainSenderData = InteropLibrary.buildSecondBridgeCalldata(
             L2_NATIVE_TOKEN_VAULT.assetId(_l2Token),
             _amount,
             _receiver,
             address(0)
         );
         calls = new InteropCallStarter[](1);
-        calls[0] = InteropLibrary.buildSecondBridgeCall(secondBridgeCalldata, L2_ASSET_ROUTER_ADDR);
+        calls[0] = InteropLibrary.buildSecondBridgeCall(crossChainSenderData, L2_ASSET_ROUTER_ADDR);
     }
 }

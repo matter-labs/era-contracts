@@ -39,7 +39,7 @@ In production, a v31 protocol upgrade proceeds as:
    - Force-deploys new L2 system contract bytecodes (via ContractDeployer on Era, or the
      bytecode deployer on ZKsyncOS)
    - Delegatecalls to `L2V32Upgrade.upgrade()` which initializes new contracts (NTV, Bridgehub,
-     AssetRouter, L2AssetTracker, ChainAssetHandler, InteropCenter, BaseToken, etc.)
+     AssetRouter, L2AssetTracker, ChainAssetHandler, L2InteropCenter, BaseToken, etc.)
 
 8. **Verification**: Protocol version on each chain is now `0x2000000000` (v32).
 

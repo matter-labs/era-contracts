@@ -59,7 +59,7 @@ abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeploy
     }
 
     /// @notice Drives a real `L1InteropHandler.executeBundle` for the current chain's base-token
-    /// withdrawal (reconstructed as the single-call interop bundle the L2 InteropCenter emits) and
+    /// withdrawal (reconstructed as the single-call interop bundle the L2InteropCenter emits) and
     /// asserts the balance outcomes. Replaces the removed legacy `L1AssetRouter.finalizeWithdrawal` flow.
     /// @dev Mock justification: L2 batch commitments/merkle trees are unavailable in this L1-only
     /// environment, so `proveL2MessageInclusionShared` is mocked to `true` — on the selector only,

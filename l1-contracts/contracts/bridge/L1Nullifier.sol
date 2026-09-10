@@ -152,7 +152,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     }
 
     /// @inheritdoc IL1Nullifier
-    function bridgehubConfirmL2TransactionForwarded(
+    function confirmL2TransactionForwarded(
         uint256 _chainId,
         bytes32 _txDataHash,
         bytes32 _txHash

@@ -38,7 +38,7 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 /// @notice The DESTINATION side of an atomic flow through the real execution entry point:
 /// `L2InteropHandler.executeAtomicBundle` with a finality proof for every leg. A real
-/// `InteropCenter.sendBundle` (asset-router burn + IMT commit) produces the bundle, the VM switches to
+/// `L2InteropCenter.sendBundle` (asset-router burn + IMT commit) produces the bundle, the VM switches to
 /// the destination chain id, and execution runs the atomicity gate
 /// (`AtomicFlowManager.requireFlowFinalized`), the bundle's calls (the destination NTV mint), and the
 /// replay guard — all real, against the real Bridgehub interop registry.

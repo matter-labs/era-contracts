@@ -91,6 +91,13 @@
   },
   {
     "type": "function",
+    "name": "deployL1InteropCenter",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "deployNewEcosystemContractsL1",
     "inputs": [],
     "outputs": [],
@@ -245,6 +252,11 @@
                     "internalType": "address"
                   },
                   {
+                    "name": "interopCenter",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
                     "name": "messageRoot",
                     "type": "address",
                     "internalType": "address"
@@ -273,6 +285,11 @@
                 "components": [
                   {
                     "name": "bridgehub",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "interopCenter",
                     "type": "address",
                     "internalType": "address"
                   },
@@ -457,6 +474,11 @@
                 "internalType": "address"
               },
               {
+                "name": "interopCenter",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
                 "name": "messageRoot",
                 "type": "address",
                 "internalType": "address"
@@ -485,6 +507,11 @@
             "components": [
               {
                 "name": "bridgehub",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "interopCenter",
                 "type": "address",
                 "internalType": "address"
               },
@@ -799,6 +826,36 @@
     "outputs": [
       {
         "name": "result",
+        "type": "tuple[]",
+        "internalType": "struct Call[]",
+        "components": [
+          {
+            "name": "target",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "value",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "data",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "prepareRegisterInteropCenterCalls",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "calls",
         "type": "tuple[]",
         "internalType": "struct Call[]",
         "components": [

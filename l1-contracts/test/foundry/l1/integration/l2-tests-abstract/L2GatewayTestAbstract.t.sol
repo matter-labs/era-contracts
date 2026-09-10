@@ -147,7 +147,7 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
             abi.encode(bytes32(uint256(1)))
         );
 
-        // The CTM-asset migration withdrawal rides the InteropCenter L2->L1 withdrawal-bundle path (see
+        // The CTM-asset migration withdrawal rides the L2InteropCenter L2->L1 withdrawal-bundle path (see
         // {protocol-docs/chain-lifecycle.md#role}); the bundle sender (ownerWallet) is the chain admin whose
         // authorization the migration burn checks.
         bytes32 withdrawalBundleSalt = keccak256("ctm-migration-withdrawal-salt");

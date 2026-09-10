@@ -166,7 +166,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
           "   The ZK token has not yet been bridged to the source chain; fixed ZK fee tests will be skipped."
         );
       } else {
-        expect(interopZkTokenAddress, "InteropCenter should resolve the seeded ZK token").to.equal(
+        expect(interopZkTokenAddress, "L2InteropCenter should resolve the seeded ZK token").to.equal(
           sourceZkTokenAddress
         );
         const zkBalance = await getTokenBalance(sourceProvider, sourceZkTokenAddress, getInteropSourceAddress());
@@ -679,7 +679,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
           value: excessValue,
         }),
       "excess msg.value",
-      customError("InteropCenter", "MsgValueMismatch(uint256,uint256)"),
+      customError("L2InteropCenter", "MsgValueMismatch(uint256,uint256)"),
       sourceProvider
     );
 

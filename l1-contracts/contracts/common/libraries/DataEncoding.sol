@@ -263,7 +263,7 @@ library DataEncoding {
     /// @notice Builds the single indirect-call `InteropCallStarter` for an L2->L1 withdrawal of the chain's
     /// BASE token. See {protocol-docs/interop.md#direct-vs-indirect-calls}.
     /// @dev The withdrawn amount rides as the `indirectCall` message value, so the caller of
-    /// `InteropCenter.sendBundle` MUST send `_amount` as the transaction value. `interopCallValue` stays zero
+    /// `L2InteropCenter.sendBundle` MUST send `_amount` as the transaction value. `interopCallValue` stays zero
     /// (`NonZeroValueToL1NotSupported`).
     /// @param _assetId The base-token assetId of the withdrawn token.
     /// @param _transferData The bridgehub-burn/transfer data for the base token; the amount it encodes must

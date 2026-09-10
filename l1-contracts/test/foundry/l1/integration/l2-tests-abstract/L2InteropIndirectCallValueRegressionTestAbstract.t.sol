@@ -23,7 +23,7 @@ import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 import {IL2CrossChainSender} from "contracts/bridge/interfaces/IL2CrossChainSender.sol";
 
 /// @title L2InteropIndirectCallValueRegressionTestAbstract
-/// @notice Regression tests for the indirect call value handling in InteropCenter.
+/// @notice Regression tests for the indirect call value handling in L2InteropCenter.
 /// @dev Stateless by design: the router's `initiateIndirectCall` is stubbed with `vm.mockCall` and
 /// pinned with exact-count `vm.expectCall`s, both keyed on the full encoded calldata and the exact
 /// msg.value — no mock contract, no storage. A send that forwards a wrong value misses the stub and
@@ -36,7 +36,7 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         finalRecipient = makeAddr("finalRecipient");
     }
 
-    /// @dev The exact calldata the InteropCenter sends to the indirect call starter for this test
+    /// @dev The exact calldata the L2InteropCenter sends to the indirect call starter for this test
     /// contract's sends (`interopCallValue` is forced to zero for indirect calls).
     function _starterCalldata(bytes memory _data) internal view returns (bytes memory) {
         return abi.encodeCall(IL2CrossChainSender.initiateIndirectCall, (destinationChainId, address(this), 0, _data));
@@ -154,7 +154,7 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
 
     /// @notice An indirect call carrying destination-side value is rejected outright: on the atomic
     /// timeout path such value would be refunded to `InteropCall.from` (the indirect sender), not the
-    /// actual payer, so `InteropCenter` forbids it (see `IndirectCallCannotCarryValue`).
+    /// actual payer, so `L2InteropCenter` forbids it (see `IndirectCallCannotCarryValue`).
     function test_regression_indirectCallWithInteropValueReverts() public {
         uint256 interopCallValue = 100;
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);

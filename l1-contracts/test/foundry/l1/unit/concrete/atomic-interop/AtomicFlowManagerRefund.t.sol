@@ -35,7 +35,7 @@ import {
 /// source-chain binding checks (the anti-double-mint, see {protocol-docs/atomicity/proofs.md#timeout})
 /// and `claimRefund`'s leg state machine.
 /// @dev Manager + commitment tree run at their canonical predeploys; the committed leg goes through
-/// the real `append` (pranked canonical InteropCenter). The MISSING leg declares a remote source
+/// the real `append` (pranked canonical L2InteropCenter). The MISSING leg declares a remote source
 /// (`MISSING_LEG_CHAIN`) so its absence proof runs end-to-end through real aggregation + import +
 /// {L2MessageVerification} (see {AtomicInteropProofBuilder}); only the force-failure negative and the
 /// intrinsically-local late-commit case stub the leaf verifier. Real fund recovery is covered by

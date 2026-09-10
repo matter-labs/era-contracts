@@ -5,11 +5,13 @@ import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {
     IBridgehubBase,
     L2TransactionRequestDirect,
-    L2TransactionRequestTwoBridgesOuter
+    L2TransactionRequestIndirect
 } from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
+import {L1InteropRequests} from "foundry-test/l1/utils/L1InteropRequests.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 
@@ -256,24 +258,26 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         // Store balances before withdrawal
         uint256 balanceBefore = IERC20(tokenL1Address).balanceOf(address(this));
 
-        bytes memory secondBridgeCalldata = bytes.concat(
+        bytes memory crossChainSenderData = bytes.concat(
             NEW_ENCODING_VERSION,
             abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this), tokenL1Address))
         );
         IERC20(tokenL1Address).approve(address(addresses.l1NativeTokenVault), 100);
 
         vm.recordLogs();
-        addresses.bridgehub.requestL2TransactionTwoBridges{value: 250000000000100}(
-            L2TransactionRequestTwoBridgesOuter({
+        L1InteropRequests.requestIndirect(
+            addresses.l1InteropCenter,
+            250000000000100,
+            L2TransactionRequestIndirect({
                 chainId: eraZKChainId,
                 mintValue: 250000000000100,
                 l2Value: 0,
                 l2GasLimit: 1000000,
                 l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
                 refundRecipient: address(0),
-                secondBridgeAddress: address(addresses.sharedBridge),
-                secondBridgeValue: 0,
-                secondBridgeCalldata: secondBridgeCalldata
+                crossChainSender: address(addresses.sharedBridge),
+                crossChainSenderValue: 0,
+                crossChainSenderData: crossChainSenderData
             })
         );
 
@@ -294,7 +298,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         uint256 ethBalanceBefore = address(this).balance;
         uint256 tokenBalanceBefore = IERC20(tokenL1Address).balanceOf(address(this));
 
-        bytes memory secondBridgeCalldata = bytes.concat(
+        bytes memory crossChainSenderData = bytes.concat(
             NEW_ENCODING_VERSION,
             abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this)))
         );
@@ -303,13 +307,15 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         IERC20(tokenL1Address).approve(address(addresses.l1NativeTokenVault), 100);
 
         vm.recordLogs();
-        addresses.bridgehub.requestL2TransactionDirect{value: 250000000000100}(
+        L1InteropRequests.requestDirect(
+            addresses.l1InteropCenter,
+            250000000000100,
             L2TransactionRequestDirect({
                 chainId: eraZKChainId,
                 mintValue: 250000000000100,
                 l2Contract: address(addresses.sharedBridge),
                 l2Value: 0,
-                l2Calldata: secondBridgeCalldata,
+                l2Calldata: crossChainSenderData,
                 l2GasLimit: 1000000,
                 l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
                 factoryDeps: new bytes[](0),
@@ -345,7 +351,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         );
         assertEq(
             keccak256(request.transaction.data),
-            keccak256(secondBridgeCalldata),
+            keccak256(crossChainSenderData),
             "L2 calldata should match the encoded bridge calldata"
         );
         assertEq(request.transaction.value, 0, "L2 value should be 0");
@@ -359,7 +365,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         depositToL1(ETH_TOKEN_ADDRESS);
         vm.prank(address(this));
         IERC20(tokenL1Address).transfer(randomCaller, 100);
-        bytes memory secondBridgeCalldata = bytes.concat(
+        bytes memory crossChainSenderData = bytes.concat(
             NEW_ENCODING_VERSION,
             abi.encode(l2TokenAssetId, abi.encode(uint256(100), randomCaller, tokenL1Address))
         );
@@ -369,28 +375,34 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         assertEq(IERC20(tokenL1Address).allowance(randomCaller, address(addresses.l1NativeTokenVault)), 100);
 
         {
-            L2TransactionRequestTwoBridgesOuter memory l2TxnReqTwoBridges = L2TransactionRequestTwoBridgesOuter({
+            L2TransactionRequestIndirect memory l2TxnReqIndirect = L2TransactionRequestIndirect({
                 chainId: eraZKChainId,
                 mintValue: 250000000000100,
                 l2Value: 0,
                 l2GasLimit: 1000000,
                 l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
                 refundRecipient: address(0),
-                secondBridgeAddress: address(addresses.sharedBridge),
-                secondBridgeValue: 0,
-                secondBridgeCalldata: secondBridgeCalldata
+                crossChainSender: address(addresses.sharedBridge),
+                crossChainSenderValue: 0,
+                crossChainSenderData: crossChainSenderData
             });
 
-            bytes memory calldataForExecutor = abi.encodeWithSelector(
-                IL1Bridgehub.requestL2TransactionTwoBridges.selector,
-                l2TxnReqTwoBridges
+            (bytes memory recipient, bytes memory payload, bytes[] memory attributes) = L1InteropRequests
+                .encodeIndirect(l2TxnReqIndirect);
+            bytes memory calldataForExecutor = abi.encodeCall(
+                IERC7786GatewaySource.sendMessage,
+                (recipient, payload, attributes)
             );
 
             vm.signAndAttachDelegation(address(simpleExecutor), randomCallerPk);
 
             vm.recordLogs();
             vm.prank(randomCaller);
-            SimpleExecutor(randomCaller).execute(address(addresses.bridgehub), 250000000000100, calldataForExecutor);
+            SimpleExecutor(randomCaller).execute(
+                address(addresses.l1InteropCenter),
+                250000000000100,
+                calldataForExecutor
+            );
         }
 
         Vm.Log[] memory logs = vm.getRecordedLogs();

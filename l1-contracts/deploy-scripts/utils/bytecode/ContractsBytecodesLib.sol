@@ -106,7 +106,7 @@ library ContractsBytecodesLib {
             "DefaultUpgrade",
             "DefaultUpgradeZKsyncOS",
             "V32UpgradeZKsyncOS",
-            "InteropCenter",
+            "L2InteropCenter",
             "InteropAttributeParser",
             "L2InteropHandler",
             "EraDualVerifier",

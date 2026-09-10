@@ -12,10 +12,10 @@ import {IAssetRouterBase, NEW_ENCODING_VERSION} from "./IAssetRouterBase.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
-import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
+import {INDIRECT_CALL_MAGIC_VALUE} from "../../common/Config.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
-import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../../core/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase, IndirectCallRequest} from "../../core/bridgehub/IBridgehubBase.sol";
 import {
     AssetHandlerDoesNotExist,
     AssetIdNotSupported,
@@ -80,7 +80,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
                             INITIATE BRIDGE Functions
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Allows the Bridgehub (L1) / InteropCenter (L2) to acquire the destination chain's `mintValue`.
+    /// @notice Allows the L1InteropCenter (L1) / L2InteropCenter (L2) to acquire the destination chain's `mintValue`.
     /// @dev Records nothing: if the L2 transaction fails, the base token is refunded to the L2
     /// `refundRecipient` rather than being claimable on L1. See {protocol-docs/bridging.md#deposit-initiation-source-side}.
     /// @param _chainId The chain ID of the ZK chain to which to deposit.
@@ -121,7 +121,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
         uint256 _value,
         bytes calldata _data,
         address _nativeTokenVault
-    ) internal virtual whenNotPaused returns (L2TransactionRequestTwoBridgesInner memory request) {
+    ) internal virtual whenNotPaused returns (IndirectCallRequest memory request) {
         bytes1 encodingVersion = _data[0];
         if (encodingVersion == NEW_ENCODING_VERSION) {
             return
@@ -143,7 +143,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
         uint256 _value,
         bytes calldata _data,
         address _nativeTokenVault
-    ) internal returns (L2TransactionRequestTwoBridgesInner memory request) {
+    ) internal returns (IndirectCallRequest memory request) {
         bytes1 encodingVersion = _data[0];
 
         (bytes32 assetId, bytes memory transferData) = _getTransferData(encodingVersion, _data);
@@ -343,11 +343,11 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
         bytes32 _assetId,
         bytes memory _bridgeMintCalldata,
         bytes32 _txDataHash
-    ) internal view virtual returns (L2TransactionRequestTwoBridgesInner memory request) {
+    ) internal view virtual returns (IndirectCallRequest memory request) {
         bytes memory l2TxCalldata = getDepositCalldata(_originalCaller, _assetId, _bridgeMintCalldata);
 
-        request = L2TransactionRequestTwoBridgesInner({
-            magicValue: TWO_BRIDGES_MAGIC_VALUE,
+        request = IndirectCallRequest({
+            magicValue: INDIRECT_CALL_MAGIC_VALUE,
             l2Contract: _l2AssetRouterAddress(_chainId),
             l2Calldata: l2TxCalldata,
             factoryDeps: new bytes[](0),

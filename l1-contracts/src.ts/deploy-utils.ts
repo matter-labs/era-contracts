@@ -4,7 +4,13 @@ import { ethers } from "ethers";
 import { Interface } from "ethers/lib/utils";
 import { SingletonFactoryFactory } from "../typechain";
 
-import { encodeNTVAssetId, getAddressFromEnv, getNumberFromEnv } from "./utils";
+import {
+  encodeDirectInteropRequest,
+  encodeNTVAssetId,
+  getAddressFromEnv,
+  getNumberFromEnv,
+  l1InteropCenterInterface,
+} from "./utils";
 import { REQUIRED_L2_GAS_PRICE_PER_PUBDATA, DEPLOYER_SYSTEM_CONTRACT_ADDRESS, ADDRESS_ONE } from "./constants";
 import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
 import { IERC20Factory } from "../typechain/IERC20Factory";
@@ -173,20 +179,26 @@ export async function create2DeployFromL1(
   }
   const factoryDeps = extraFactoryDeps ? [bytecode, ...extraFactoryDeps] : [bytecode];
 
-  return await bridgehub.requestL2TransactionDirect(
-    {
-      chainId,
-      l2Contract: DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
-      mintValue: expectedCost,
-      l2Value: 0,
-      l2Calldata: calldata,
-      l2GasLimit,
-      l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-      factoryDeps: factoryDeps,
-      refundRecipient: wallet.address,
-    },
-    { value: ethIsBaseToken ? expectedCost : 0, gasPrice }
-  );
+  // L1->L2 transactions are requested through the L1InteropCenter ERC-7786 `sendMessage`
+  // entry point (the former `L1Bridgehub.requestL2TransactionDirect`).
+  const interopCenterAddress = await bridgehub.interopCenter();
+  const interopCenter = new ethers.Contract(interopCenterAddress, l1InteropCenterInterface(), wallet);
+  const { recipient, payload, attributes } = encodeDirectInteropRequest({
+    chainId,
+    l2Contract: DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
+    mintValue: expectedCost,
+    l2Value: 0,
+    l2Calldata: calldata,
+    l2GasLimit,
+    l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    factoryDeps: factoryDeps,
+    refundRecipient: wallet.address,
+  });
+
+  return await interopCenter.sendMessage(recipient, payload, attributes, {
+    value: ethIsBaseToken ? expectedCost : 0,
+    gasPrice,
+  });
 }
 
 export interface DeployedAddresses {
@@ -263,6 +275,8 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
       CTMDeploymentTrackerProxy: getAddressFromEnv("CONTRACTS_CTM_DEPLOYMENT_TRACKER_PROXY_ADDR"),
       MessageRootImplementation: getAddressFromEnv("CONTRACTS_MESSAGE_ROOT_IMPL_ADDR"),
       MessageRootProxy: getAddressFromEnv("CONTRACTS_MESSAGE_ROOT_PROXY_ADDR"),
+      InteropCenterImplementation: getAddressFromEnv("CONTRACTS_INTEROP_CENTER_IMPL_ADDR"),
+      InteropCenterProxy: getAddressFromEnv("CONTRACTS_INTEROP_CENTER_PROXY_ADDR"),
     },
     StateTransition: {
       StateTransitionProxy: getAddressFromEnv("CONTRACTS_STATE_TRANSITION_PROXY_ADDR"),

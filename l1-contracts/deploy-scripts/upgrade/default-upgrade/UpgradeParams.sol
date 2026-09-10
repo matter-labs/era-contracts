@@ -14,8 +14,8 @@ struct EcosystemUpgradeParams {
     string upgradeInputPath;
     string ecosystemOutputPath;
     address governance;
-    /// @notice Asset ID of the ZK token used by the InteropCenter for fixed-fee bundles.
-    ///         MUST be non-zero — `InteropCenter.initL2` enforces it, and that runs on the genesis path of
+    /// @notice Asset ID of the ZK token used by the L2InteropCenter for fixed-fee bundles.
+    ///         MUST be non-zero — `L2InteropCenter.initL2` enforces it, and that runs on the genesis path of
     ///         `performForceDeployedContractsInit`, so a zero value breaks the genesis of chains created
     ///         from this release.
     bytes32 zkTokenAssetId;
@@ -46,8 +46,8 @@ struct CTMUpgradeParams {
     address governance;
     /// @notice Optional v31 core output override. Pre-v31 Bridgehub introspection cannot discover this address.
     address chainRegistrationSender;
-    /// @notice Asset ID of the ZK token used by the InteropCenter for fixed-fee bundles.
-    ///         MUST be non-zero — `InteropCenter.initL2` enforces it, and that runs on the genesis path of
+    /// @notice Asset ID of the ZK token used by the L2InteropCenter for fixed-fee bundles.
+    ///         MUST be non-zero — `L2InteropCenter.initL2` enforces it, and that runs on the genesis path of
     ///         `performForceDeployedContractsInit`, so a zero value breaks the genesis of chains created
     ///         from this release.
     bytes32 zkTokenAssetId;

@@ -171,13 +171,13 @@ contract L2BaseTokenZKOSTest is Test {
         L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: 1 ether}(0);
     }
 
-    /// @notice Verifies that BaseTokenHolder reports InteropCenter bridging burns to the tracker.
+    /// @notice Verifies that BaseTokenHolder reports L2InteropCenter bridging burns to the tracker.
     function test_baseTokenHolder_reportsInteropCenterBurnToTracker() public {
         // Deploy real BaseTokenHolder for integration tests
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
         uint256 burnAmount = 1 ether;
 
-        // InteropCenter calls burnAndStartBridging (simulating a bridging burn).
+        // L2InteropCenter calls burnAndStartBridging (simulating a bridging burn).
         vm.deal(L2_INTEROP_CENTER_ADDR, burnAmount);
         vm.prank(L2_INTEROP_CENTER_ADDR);
         L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}(1);
@@ -288,7 +288,7 @@ contract L2BaseTokenZKOSTest is Test {
         // A holder of pre-v31 supply bridges 150 wei out to L1: the value flows into the holder.
         // Upstream (#2364) drove this through `L2BaseToken.withdraw()`, which this release removed
         // with the rest of the legacy withdrawal path; base-token exits now go through the
-        // InteropCenter, which is the caller the holder still accepts.
+        // L2InteropCenter, which is the caller the holder still accepts.
         vm.deal(L2_INTEROP_CENTER_ADDR, 150);
         vm.prank(L2_INTEROP_CENTER_ADDR);
         L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: 150}(1);

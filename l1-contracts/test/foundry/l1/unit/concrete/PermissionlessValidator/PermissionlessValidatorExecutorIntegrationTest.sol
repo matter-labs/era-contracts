@@ -28,7 +28,7 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
         uint256 baseCost = mailbox.l2TransactionBaseCost(10_000_000, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
         vm.deal(prioritySender, baseCost);
         vm.prank(prioritySender);
-        dummyBridgehub.requestL2TransactionDirect{value: baseCost}(
+        dummyBridgehub.requestDirectL2Transaction{value: baseCost}(
             L2TransactionRequestDirect({
                 chainId: l2ChainId,
                 mintValue: baseCost,

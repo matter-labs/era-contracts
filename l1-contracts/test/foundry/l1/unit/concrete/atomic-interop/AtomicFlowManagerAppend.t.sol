@@ -47,7 +47,7 @@ contract MockBridgehubRegistry {
 /// @dev The manager and commitment tree sit at their canonical predeploys (real `commitmentTree()`
 /// wiring and appender ACL); the Bridgehub registry is a minimal stand-in and the root storage a dummy,
 /// feeding the registration and deadline gates. The caller ACL is exercised by pranking the canonical
-/// InteropCenter.
+/// L2InteropCenter.
 contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
     uint256 internal constant L1_CHAIN_ID = 5;
     uint64 internal constant DEADLINE = 1_700_000_000;
@@ -449,7 +449,7 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
         _appendAsInteropCenter(localLeg, preimage);
     }
 
-    /// @notice `append` is callable only by the canonical InteropCenter.
+    /// @notice `append` is callable only by the canonical L2InteropCenter.
     function test_append_RevertWhen_NotInteropCenter() public {
         bytes32 localLeg = keccak256("local leg");
         AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));

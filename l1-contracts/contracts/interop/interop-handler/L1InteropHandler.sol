@@ -26,7 +26,7 @@ import {
 /// @custom:security-contact security@matterlabs.dev
 /// @notice L1-side interop handler. It finalizes L2 -> L1 interop bundles proven by L1 **message inclusion**
 /// (`MessageInclusionProof`), symmetric to the L2 `L2InteropHandler` which instead proves atomic IMT finality.
-/// For this release an L1-destined bundle is restricted to a single asset WITHDRAWAL: the L2 InteropCenter only
+/// For this release an L1-destined bundle is restricted to a single asset WITHDRAWAL: the L2InteropCenter only
 /// accepts an indirect, zero-value call to the L2 AssetRouter, which resolves to a call targeting the L1 asset
 /// router's `finalizeDeposit`, delivered here via ERC-7786 `receiveMessage`. Arbitrary/direct L2 -> L1 calls are
 /// not allowed, keeping the L1-side surface to the asset router.
@@ -192,7 +192,7 @@ contract L1InteropHandler is InteropHandlerBase, Ownable2StepUpgradeable, Pausab
     }
 
     /// @notice Verifies the bundle: runs the shared destination-context / fresh-bundle validation, then checks
-    /// that its `BUNDLE_IDENTIFIER`-prefixed message was included, sent by the canonical L2 InteropCenter. Asset
+    /// that its `BUNDLE_IDENTIFIER`-prefixed message was included, sent by the canonical L2InteropCenter. Asset
     /// correctness across chains is guaranteed by ZK proofs, so no on-chain per-chain balance reconciliation is
     /// performed here.
     /// @param _bundle The abi-encoded InteropBundle struct to verify.

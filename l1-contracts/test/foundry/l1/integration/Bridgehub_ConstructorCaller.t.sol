@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {IL1Bridgehub, L2TransactionRequestDirect} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {L2TransactionRequestDirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
+import {L1InteropRequests} from "foundry-test/l1/utils/L1InteropRequests.sol";
 
 import {ConstructorForwarder} from "contracts/dev-contracts/ConstructorForwarder.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
@@ -32,7 +34,7 @@ contract Bridgehub_ConstructorCaller is BridgehubInvariantTests {
         }
     }
 
-    // Regression test for the default refund recipient resolution: a contract calling the Bridgehub
+    // Regression test for the default refund recipient resolution: a contract calling the L1InteropCenter
     // from its own constructor has no deployed code yet, so the `code.length`-based aliasing in the
     // Mailbox cannot recognize it as a contract. With `refundRecipient` unset, the refund recipient
     // must resolve to the same aliased L2 address as the sender.
@@ -64,17 +66,20 @@ contract Bridgehub_ConstructorCaller is BridgehubInvariantTests {
         // The refund recipient is deliberately left unset to exercise the default resolution.
         txRequest.refundRecipient = address(0);
 
-        bytes memory bridgehubCalldata = abi.encodeWithSelector(
-            IL1Bridgehub.requestL2TransactionDirect.selector,
+        (bytes memory recipient, bytes memory payload, bytes[] memory attributes) = L1InteropRequests.encodeDirect(
             txRequest
+        );
+        bytes memory interopCenterCalldata = abi.encodeCall(
+            IERC7786GatewaySource.sendMessage,
+            (recipient, payload, attributes)
         );
 
         vm.deal(address(this), mintValue);
         vm.recordLogs();
-        // The forwarder performs the Bridgehub call inside its own constructor.
+        // The forwarder performs the L1InteropCenter call inside its own constructor.
         ConstructorForwarder forwarder = new ConstructorForwarder{value: mintValue}(
-            address(addresses.bridgehub),
-            bridgehubCalldata
+            address(addresses.l1InteropCenter),
+            interopCenterCalldata
         );
 
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(vm.getRecordedLogs());

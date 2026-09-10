@@ -10,7 +10,7 @@ import {IL2NativeTokenVault} from "../ntv/IL2NativeTokenVault.sol";
 import {IL2AssetHandler} from "../interfaces/IL2AssetHandler.sol";
 import {IL2Bridgehub} from "../../core/bridgehub/IL2Bridgehub.sol";
 
-import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../../core/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase, IndirectCallRequest} from "../../core/bridgehub/IBridgehubBase.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
@@ -342,7 +342,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
     ) external payable onlyL2InteropCenter returns (InteropCallStarter memory interopCallStarter) {
         address ntvAddr = _nativeTokenVaultAddr();
 
-        L2TransactionRequestTwoBridgesInner memory request = _bridgehubDeposit({
+        IndirectCallRequest memory request = _bridgehubDeposit({
             _chainId: _chainId,
             _originalCaller: _originalCaller,
             _value: _value,
@@ -350,7 +350,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
             _nativeTokenVault: ntvAddr
         });
 
-        // Echo the requested `interopCallValue` back so the InteropCenter's `IndirectCallValueMismatch`
+        // Echo the requested `interopCallValue` back so the L2InteropCenter's `IndirectCallValueMismatch`
         // check passes. It is always zero for an indirect call; the bridged token amount travels in the
         // `finalizeDeposit` calldata built above, not as call value.
         bytes[] memory attributes = new bytes[](1);

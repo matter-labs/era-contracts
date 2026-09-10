@@ -138,7 +138,7 @@ export async function executeTokenTransfer(
     callAttributes: [indirectCallAttr(), interopCallValueAttr(BigNumber.from(0))],
   };
 
-  log(`\n⏱️  [${elapsed()}] Sending token transfer via InteropCenter...`);
+  log(`\n⏱️  [${elapsed()}] Sending token transfer via L2InteropCenter...`);
   log(`   Target: L2AssetRouter at ${L2_ASSET_ROUTER_ADDR}`);
 
   const interopFee = await getInteropProtocolFee(sourceProvider);

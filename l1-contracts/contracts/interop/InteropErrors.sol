@@ -25,6 +25,8 @@ error DirectCallToL1NotSupported();
 error EmptyBundle();
 // 0xe845be4c
 error ExecutingNotAllowed(bytes32 bundleHash, bytes callerAddress, bytes executionAddress);
+// 0x77eb8fcf
+error FactoryDepsNotAllowedForIndirectCall();
 // 0x16b0fa00
 error FeeWithdrawalFailed();
 // 0x4afc3319
@@ -53,6 +55,8 @@ error InteropToSelfNotSupported();
 error InvalidInteropBundleVersion();
 // 0xd5f13973
 error InvalidInteropCallVersion();
+// 0x9ccc7cc6
+error L1ToL2TransactionParamsMissing();
 // 0x32c2e156
 error MessageNotIncluded();
 // 0x6a430157

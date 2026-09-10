@@ -937,7 +937,7 @@ contract AdminFunctions is Script, IAdminFunctions {
             data.l2ChainId
         );
 
-        bytes memory secondBridgeData;
+        bytes memory crossChainSenderData;
         {
             bytes32 chainAssetId = L1Bridgehub(data.bridgehub).ctmAssetIdFromChainId(data.l2ChainId);
 
@@ -964,10 +964,10 @@ contract AdminFunctions is Script, IAdminFunctions {
                 })
             );
 
-            secondBridgeData = abi.encodePacked(NEW_ENCODING_VERSION, abi.encode(chainAssetId, bridgehubData));
+            crossChainSenderData = abi.encodePacked(NEW_ENCODING_VERSION, abi.encode(chainAssetId, bridgehubData));
         }
 
-        calls = Utils.prepareAdminL1L2TwoBridgesTransaction(
+        calls = Utils.prepareAdminL1L2IndirectTransaction(
             data.l1GasPrice,
             Utils.MAX_PRIORITY_TX_GAS,
             data.gatewayChainId,
@@ -975,7 +975,7 @@ contract AdminFunctions is Script, IAdminFunctions {
             gatewayChainInfo.l1AssetRouterProxy,
             gatewayChainInfo.l1AssetRouterProxy,
             0,
-            secondBridgeData,
+            crossChainSenderData,
             data.refundRecipient
         );
 

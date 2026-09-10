@@ -67,7 +67,7 @@ enum CoreContract {
     UpgradeableBeaconDeployer,
     BaseTokenHolder,
     L2ChainAssetHandler,
-    InteropCenter,
+    L2InteropCenter,
     InteropAttributeParser,
     L2InteropHandler,
     L2AssetTracker,

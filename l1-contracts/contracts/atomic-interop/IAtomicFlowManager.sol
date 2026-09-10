@@ -22,7 +22,7 @@ interface IAtomicFlowManager {
     /// @notice Records an atomic source leg: recomputes `flowId` from the supplied preimage, verifies
     /// the committing bundle is one of the flow's legs (declared with this chain as its source) and
     /// that every other leg declares an interop-registered source chain, then inserts the leg's commit
-    /// value into the interop IMT. State `Unset -> Committed`. Callable only by the {InteropCenter}.
+    /// value into the interop IMT. State `Unset -> Committed`. Callable only by the {L2InteropCenter}.
     /// @dev Taking the full preimage (not an opaque `flowId`) is what couples the committed leg to its
     /// flow; a wrong or stale preimage reverts the whole send instead of stranding the burned funds.
     /// See {protocol-docs/atomicity/flow.md#1-atomic-send-append}.

@@ -4,7 +4,11 @@ import { Interface } from "ethers/lib/utils";
 import { deployedAddressesFromEnv } from "../../l1-contracts/src.ts/deploy-utils";
 import type { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { ADDRESS_ONE } from "../../l1-contracts/src.ts/constants";
-import { getNumberFromEnv } from "../../l1-contracts/src.ts/utils";
+import {
+  encodeDirectInteropRequest,
+  getNumberFromEnv,
+  l1InteropCenterInterface,
+} from "../../l1-contracts/src.ts/utils";
 import { IBridgehubFactory } from "../../l1-contracts/typechain/IBridgehubFactory";
 import { web3Provider } from "../../l1-contracts/scripts/utils";
 
@@ -137,7 +141,7 @@ export async function requestL2TransactionDirect(
   const ntv = IL1NativeTokenVaultFactory.connect(deployedAddresses.Bridges.NativeTokenVaultProxy, wallet);
   gasPrice ??= await bridgehub.provider.getGasPrice();
 
-  const expectedCost = await interopCenter.l2TransactionBaseCost(
+  const expectedCost = await bridgehub.l2TransactionBaseCost(
     chainId,
     gasPrice,
     l2GasLimit,
@@ -154,20 +158,27 @@ export async function requestL2TransactionDirect(
     const tx = await baseToken.approve(baseTokenBridge, expectedCost);
     await tx.wait();
   }
-  return await interopCenter.requestL2TransactionDirect(
-    {
-      chainId,
-      l2Contract: l2Contract,
-      mintValue: expectedCost,
-      l2Value: 0,
-      l2Calldata: calldata,
-      l2GasLimit,
-      l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-      factoryDeps: factoryDeps ?? [],
-      refundRecipient: wallet.address,
-    },
-    { value: ethIsBaseToken ? expectedCost : 0, gasPrice }
-  );
+
+  // L1->L2 transactions are requested through the L1InteropCenter ERC-7786 `sendMessage`
+  // entry point (the former `L1Bridgehub.requestL2TransactionDirect`).
+  const interopCenterAddress = await bridgehub.interopCenter();
+  const interopCenter = new ethers.Contract(interopCenterAddress, l1InteropCenterInterface(), wallet);
+  const { recipient, payload, attributes } = encodeDirectInteropRequest({
+    chainId,
+    l2Contract: l2Contract,
+    mintValue: expectedCost,
+    l2Value: 0,
+    l2Calldata: calldata,
+    l2GasLimit,
+    l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    factoryDeps: factoryDeps ?? [],
+    refundRecipient: wallet.address,
+  });
+
+  return await interopCenter.sendMessage(recipient, payload, attributes, {
+    value: ethIsBaseToken ? expectedCost : 0,
+    gasPrice,
+  });
 }
 
 export async function create2DeployFromL2(

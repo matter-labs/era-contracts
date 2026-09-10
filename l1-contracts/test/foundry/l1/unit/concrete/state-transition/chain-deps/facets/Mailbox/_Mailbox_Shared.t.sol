@@ -132,9 +132,6 @@ contract MailboxTest is UtilsCallMockerTest {
         mailboxFacet = IMailbox(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);
         gettersFacet = IGetters(diamondProxy);
-
-        // utilsFacet.util_setBridgehub(bridgehub);
-        // utilsFacet.util_setInteropCenter(interopCenter);
     }
 
     // add this to be excluded from coverage report

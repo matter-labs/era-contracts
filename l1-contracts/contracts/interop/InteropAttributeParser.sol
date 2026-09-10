@@ -16,12 +16,12 @@ import {AttributeAlreadySet, AttributeViolatesRestriction} from "./InteropErrors
 /// @title InteropAttributeParser
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Stateless helper that parses ERC-7786 interop attributes on behalf of the {InteropCenter}. This logic
-/// used to live inline in the InteropCenter, but was split out into its own built-in system contract to keep the
-/// InteropCenter under the EIP-170 runtime code-size limit. It holds no state and has no constructor/initializer;
-/// it is force-deployed at the fixed `L2_INTEROP_ATTRIBUTE_PARSER_ADDR` and invoked by the InteropCenter as a
+/// @notice Stateless helper that parses ERC-7786 interop attributes on behalf of the {L2InteropCenter}. This logic
+/// used to live inline in the L2InteropCenter, but was split out into its own built-in system contract to keep the
+/// L2InteropCenter under the EIP-170 runtime code-size limit. It holds no state and has no constructor/initializer;
+/// it is force-deployed at the fixed `L2_INTEROP_ATTRIBUTE_PARSER_ADDR` and invoked by the L2InteropCenter as a
 /// constant address.
-/// @dev Deployed on the L2s only, like the InteropCenter.
+/// @dev Deployed on the L2s only, like the L2InteropCenter.
 contract InteropAttributeParser is IInteropAttributeParser {
     /// @inheritdoc IInteropAttributeParser
     function parseAttributes(
@@ -138,7 +138,7 @@ contract InteropAttributeParser is IInteropAttributeParser {
             ];
     }
 
-    /// @notice Returns the attribute selectors supported by the InteropCenter, in the canonical order used to
+    /// @notice Returns the attribute selectors supported by the L2InteropCenter, in the canonical order used to
     /// index the restriction masks and decode branches.
     function _getERC7786AttributeSelectors() internal pure returns (bytes4[SUPPORTED_INTEROP_ATTRIBUTES] memory) {
         return

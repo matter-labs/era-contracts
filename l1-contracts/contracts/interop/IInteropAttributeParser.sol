@@ -9,12 +9,12 @@ import {IInteropCenter} from "./IInteropCenter.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Interface of the stateless {InteropAttributeParser} built-in system contract. The parsing logic was
-/// split out of the {InteropCenter} to keep the latter under the EIP-170 runtime code-size limit; the parser
-/// holds no state and is deployed at a fixed built-in address so the InteropCenter can call it as a constant.
+/// split out of the {L2InteropCenter} to keep the latter under the EIP-170 runtime code-size limit; the parser
+/// holds no state and is deployed at a fixed built-in address so the L2InteropCenter can call it as a constant.
 interface IInteropAttributeParser {
     /// @notice Parses a flat ERC-7786 attribute array into the call- and bundle-level attributes, enforcing the
     /// per-attribute restriction implied by `_restriction`. Reverts on a duplicate, disallowed or unsupported
-    /// attribute. Mirrors the semantics `InteropCenter` previously implemented inline.
+    /// attribute. Mirrors the semantics `L2InteropCenter` previously implemented inline.
     /// @param _attributes The raw ERC-7786 attribute entries.
     /// @param _restriction Which attribute set is permitted in this context.
     /// @return callAttributes The parsed call-level attributes.

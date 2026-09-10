@@ -12,6 +12,7 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
+import {L1InteropCenter} from "contracts/interop/interop-center/L1InteropCenter.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {Call} from "contracts/governance/Common.sol";
@@ -49,6 +50,10 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     EcosystemUpgradeConfig internal upgradeConfig;
 
+    /// @notice Set when `deployL1InteropCenter` deployed a new L1InteropCenter proxy (the ecosystem predates it);
+    ///         stage 1 then registers that proxy on the Bridgehub.
+    bool internal l1InteropCenterProxyDeployed;
+
     function initializeWithArgs(
         address bridgehubProxyAddress,
         bool isZKsyncOS,
@@ -74,7 +79,38 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     }
 
     /// @notice Deploy everything that should be deployed
-    function deployNewEcosystemContractsL1() public virtual {}
+    function deployNewEcosystemContractsL1() public virtual {
+        deployL1InteropCenter();
+    }
+
+    /// @notice Deploys the L1InteropCenter, the single L1->L2 entry point that replaced the Bridgehub request
+    ///         functions. An ecosystem that predates it gets a fresh implementation and proxy (owned by governance
+    ///         from the start, see `getInitializeCalldata`), which stage 1 registers on the Bridgehub; an ecosystem
+    ///         that already has one only gets a new implementation, which stage 1 installs on the existing proxy.
+    /// @dev Idempotent: CREATE2 re-deploys return the existing address and an already-discovered proxy is kept.
+    function deployL1InteropCenter() public virtual {
+        if (coreAddresses.bridgehub.proxies.interopCenter == address(0)) {
+            (
+                coreAddresses.bridgehub.implementations.interopCenter,
+                coreAddresses.bridgehub.proxies.interopCenter
+            ) = deployTuppWithContract("L1InteropCenter", false);
+            l1InteropCenterProxyDeployed = true;
+        } else {
+            coreAddresses.bridgehub.implementations.interopCenter = deploySimpleContract("L1InteropCenter", false);
+        }
+    }
+
+    /// @dev A L1InteropCenter deployed during an upgrade needs no deployer-side configuration, so governance is
+    ///      its owner from the start (the fresh-deployment flow initializes with the deployer and hands over later).
+    function getInitializeCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal virtual override returns (bytes memory) {
+        if (compareStrings(contractName, "L1InteropCenter")) {
+            return abi.encodeCall(L1InteropCenter.initialize, (getOwnerAddress()));
+        }
+        return super.getInitializeCalldata(contractName, isZKBytecode);
+    }
 
     function getOwnerAddress() public virtual returns (address) {
         return config.ownerAddress;
@@ -233,6 +269,12 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
                 coreAddresses.bridgehub.proxies.chainRegistrationSender
             );
         }
+        vm.serializeAddress("bridgehub", "interop_center_proxy_addr", coreAddresses.bridgehub.proxies.interopCenter);
+        vm.serializeAddress(
+            "bridgehub",
+            "interop_center_implementation_addr",
+            coreAddresses.bridgehub.implementations.interopCenter
+        );
         vm.serializeAddress("bridgehub", "message_root_proxy_addr", coreAddresses.bridgehub.proxies.messageRoot);
         string memory bridgehubSerialized = vm.serializeAddress(
             "bridgehub",
@@ -364,7 +406,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](4);
+        Call[][] memory allCalls = new Call[][](5);
 
         // Re-assert the migration pause as the first stage-1 call. When this upgrade is executed via the
         // EmergencyUpgradeBoard, PUH.executeEmergencyUpgrade runs a built-in unfreeze/unpause pre-step that
@@ -374,9 +416,11 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         allCalls[0] = preparePauseGatewayMigrationsCall();
         console.log("prepareStage1GovernanceCalls: prepareUpgradeProxiesCalls");
         allCalls[1] = prepareUpgradeProxiesCalls();
-        allCalls[2] = provideSetNewVersionUpgradeCall();
+        // Must follow the Bridgehub implementation upgrade: `setInteropCenter` only exists on the new implementation.
+        allCalls[2] = prepareRegisterInteropCenterCalls();
+        allCalls[3] = provideSetNewVersionUpgradeCall();
         console.log("prepareStage1GovernanceCalls: prepareGatewaySpecificStage1GovernanceCalls");
-        allCalls[3] = prepareVersionSpecificStage1GovernanceCallsL1();
+        allCalls[4] = prepareVersionSpecificStage1GovernanceCallsL1();
 
         calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
@@ -420,9 +464,34 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         });
     }
 
+    /// @notice Registers a freshly deployed L1InteropCenter on the Bridgehub (`setInteropCenter`, owner-only), so
+    ///         that the asset router, the cross-chain senders and the chains' Mailboxes start authorizing it.
+    ///         Empty when the ecosystem already had an interop center: its proxy is upgraded by
+    ///         `prepareUpgradeProxiesCalls` instead.
+    function prepareRegisterInteropCenterCalls() public view virtual returns (Call[] memory calls) {
+        if (!l1InteropCenterProxyDeployed) {
+            return calls;
+        }
+        require(coreAddresses.bridgehub.proxies.interopCenter != address(0), "interopCenter proxy is zero");
+
+        calls = new Call[](1);
+        calls[0] = Call({
+            target: coreAddresses.bridgehub.proxies.bridgehub,
+            value: 0,
+            data: abi.encodeCall(L1Bridgehub.setInteropCenter, (coreAddresses.bridgehub.proxies.interopCenter))
+        });
+    }
+
     /// @notice Update implementations in proxies
     function prepareUpgradeProxiesCalls() public virtual returns (Call[] memory calls) {
-        calls = new Call[](7);
+        // An L1InteropCenter proxy that existed before this upgrade is upgraded to the freshly deployed
+        // implementation; a proxy deployed by this upgrade already runs it and is registered in stage 1 instead.
+        address interopCenterProxy = coreAddresses.bridgehub.proxies.interopCenter;
+        bool upgradeInteropCenter = interopCenterProxy != address(0) &&
+            !l1InteropCenterProxyDeployed &&
+            coreAddresses.bridgehub.implementations.interopCenter != Utils.getImplementation(interopCenterProxy);
+
+        calls = new Call[](upgradeInteropCenter ? 8 : 7);
 
         calls[0] = _buildCallProxyUpgrade(
             coreAddresses.bridgehub.proxies.bridgehub,
@@ -461,6 +530,13 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             coreAddresses.bridgehub.proxies.chainAssetHandler,
             coreAddresses.bridgehub.implementations.chainAssetHandler
         );
+
+        if (upgradeInteropCenter) {
+            calls[7] = _buildCallProxyUpgrade(
+                interopCenterProxy,
+                coreAddresses.bridgehub.implementations.interopCenter
+            );
+        }
     }
 
     function _buildCallProxyUpgrade(

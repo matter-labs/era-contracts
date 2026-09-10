@@ -35,7 +35,8 @@ export function encodeBridgeBurnData(amount: BigNumber, remoteReceiver: string, 
 /**
  * Matches `DataEncoding.encodeAssetRouterBridgehubDepositData(assetId, transferData)`.
  *
- * Used as `secondBridgeCalldata` in `requestL2TransactionTwoBridges`.
+ * Used as the `sendMessage` payload for indirect (former two-bridges) requests
+ * sent through the `L1InteropCenter`.
  */
 export function encodeAssetRouterBridgehubDepositData(assetId: string, transferData: string): string {
   return ethers.utils.hexConcat([NEW_ENCODING_VERSION, abiCoder.encode(["bytes32", "bytes"], [assetId, transferData])]);

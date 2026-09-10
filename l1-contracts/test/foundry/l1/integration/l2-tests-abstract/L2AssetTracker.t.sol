@@ -241,7 +241,7 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         );
     }
 
-    /// @notice Recovering an L1-destined bridge-out is unreachable (the InteropCenter rejects L1-destined
+    /// @notice Recovering an L1-destined bridge-out is unreachable (the L2InteropCenter rejects L1-destined
     /// atomic bundles at send, and no other revert path exists) and must revert: `totalWithdrawalsToL1`
     /// is consumed once during the L1->GW migration and must stay append-only.
     function test_assertBaseTokenRecoveryIsAccountingNeutral_revertWhenToL1() public {

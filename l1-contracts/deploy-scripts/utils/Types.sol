@@ -12,6 +12,7 @@ import {
 
 struct BridgehubContracts {
     address bridgehub;
+    address interopCenter;
     address messageRoot;
     address ctmDeploymentTracker;
     address chainAssetHandler;

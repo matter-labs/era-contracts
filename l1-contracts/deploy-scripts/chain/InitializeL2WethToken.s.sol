@@ -9,7 +9,8 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 
 import {Utils} from "../utils/Utils.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
-import {IL1Bridgehub, L2TransactionRequestDirect} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {L2TransactionRequestDirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 contract InitializeL2WethTokenScript is Script {
     using stdToml for string;
@@ -93,8 +94,15 @@ contract InitializeL2WethTokenScript is Script {
             refundRecipient: config.deployerAddress
         });
 
+        (address interopCenter, bytes memory sendMessageCalldata) = Utils.buildDirectSendMessageCall(
+            config.bridgehubProxyAddr,
+            l2TransactionRequestDirect
+        );
+
         vm.broadcast();
-        bridgehub.requestL2TransactionDirect{value: requiredValueToInitializeBridge}(l2TransactionRequestDirect);
+        // slither-disable-next-line low-level-calls
+        (bool success, ) = interopCenter.call{value: requiredValueToInitializeBridge}(sendMessageCalldata);
+        require(success, "L1InteropCenter sendMessage failed");
 
         console.log("L2 WETH token initialized");
     }

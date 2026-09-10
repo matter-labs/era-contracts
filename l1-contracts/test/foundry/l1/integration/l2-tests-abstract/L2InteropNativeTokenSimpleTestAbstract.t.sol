@@ -40,14 +40,14 @@ abstract contract L2InteropNativeTokenSimpleTestAbstract is L2InteropTestUtils {
         assertEq(
             IERC7786GatewaySource(address(l2InteropCenter)).supportsAttribute(IERC7786Attributes.indirectCall.selector),
             true,
-            "InteropCenter should support indirectCall attribute"
+            "L2InteropCenter should support indirectCall attribute"
         );
         assertEq(
             IERC7786GatewaySource(address(l2InteropCenter)).supportsAttribute(
                 IERC7786GatewaySource.supportsAttribute.selector
             ),
             false,
-            "InteropCenter should not support supportsAttribute as an attribute"
+            "L2InteropCenter should not support supportsAttribute as an attribute"
         );
     }
 }

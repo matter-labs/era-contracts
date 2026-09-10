@@ -6,11 +6,12 @@ pragma solidity ^0.8.21;
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {BundleAttributes, CallAttributes, InteropBundle, InteropCallStarter} from "../common/Messaging.sol";
 import {AtomicFlowPreimage} from "../atomic-interop/IAtomicInterop.sol";
+import {IInteropCenterBase} from "./IInteropCenterBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Interface of the {InteropCenter}. See {protocol-docs/interop.md#zksync-interop-protocol}.
-interface IInteropCenter {
+/// @notice Interface of the {L2InteropCenter}. See {protocol-docs/interop.md#zksync-interop-protocol}.
+interface IInteropCenter is IInteropCenterBase {
     /// @notice Send-side metadata for an atomic bundle, parsed from the `atomicBundle` attribute.
     /// Deliberately NOT part of the cross-chain {InteropBundle}: `bundleHash` must not depend on the
     /// flowId preimage (circular — the preimage's leg hashes include this bundle's own hash). See
@@ -116,13 +117,7 @@ interface IInteropCenter {
     /// @param _receiver Address to receive the fees.
     function claimZKFees(address _receiver) external;
 
-    /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
-    function pause() external;
-
-    /// @notice Unpauses the contract, re-enabling functions marked with `whenNotPaused`.
-    function unpause() external;
-
-    /// @notice One-shot initialization for the InteropCenter; must never run again after v31.
+    /// @notice One-shot initialization for the L2InteropCenter; must never run again after v31.
     ///      See {protocol-docs/interop.md#initialization-and-versioning-notes}.
     /// @param _l1ChainId The chain ID of L1.
     /// @param _owner The owner address.

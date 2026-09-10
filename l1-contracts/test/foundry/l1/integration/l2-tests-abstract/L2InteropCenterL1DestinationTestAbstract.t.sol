@@ -24,7 +24,7 @@ import {
 } from "contracts/interop/InteropErrors.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
-/// @notice Covers `InteropCenter` send-time destination and recipient restrictions (L1-destined bundles,
+/// @notice Covers `L2InteropCenter` send-time destination and recipient restrictions (L1-destined bundles,
 /// self-destination, zero addresses). See {protocol-docs/interop.md#restrictions}.
 /// @dev Kept in its own abstract (mixed into `L2InteropCenterTestAbstract`) rather than in
 /// `L2InteropLibraryBasicTestAbstract`: that abstract is also inherited by the zksync `L2InteropLibraryTest`, and
@@ -201,7 +201,7 @@ abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils
     function test_sendBundle_RevertWhen_InitiatedOnL1() public {
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = _l1CallStarter(L2_ASSET_ROUTER_ADDR, true, 0);
-        // Pretend the InteropCenter is running on L1.
+        // Pretend the L2InteropCenter is running on L1.
         vm.chainId(L1_CHAIN_ID);
         vm.expectRevert(CannotInitiateInteropOnL1.selector);
         l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(L1_CHAIN_ID), calls, _l1BundleAttributes());

@@ -1523,7 +1523,7 @@ function buildAddressToContract(isZKsyncOS: boolean): ReadonlyMap<string, Contra
     [L2_NATIVE_TOKEN_VAULT_ADDR.toLowerCase(), isZKsyncOS ? "L2NativeTokenVaultZKOS" : "L2NativeTokenVault"],
     [L2_CHAIN_ASSET_HANDLER_ADDR.toLowerCase(), "L2ChainAssetHandler"],
     [L2_ASSET_TRACKER_ADDR.toLowerCase(), "L2AssetTracker"],
-    [INTEROP_CENTER_ADDR.toLowerCase(), "InteropCenter"],
+    [INTEROP_CENTER_ADDR.toLowerCase(), "L2InteropCenter"],
     [INTEROP_ATTRIBUTE_PARSER_ADDR.toLowerCase(), "InteropAttributeParser"],
     [L2_INTEROP_HANDLER_ADDR.toLowerCase(), "L2InteropHandler"],
     [L2_BASE_TOKEN_HOLDER_ADDR.toLowerCase(), "BaseTokenHolder"],

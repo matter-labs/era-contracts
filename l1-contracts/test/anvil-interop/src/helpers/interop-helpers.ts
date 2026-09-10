@@ -1,7 +1,7 @@
 /**
  * Interop bundle and message helpers.
  *
- * Provides RPC wrappers for InteropCenter.sendBundle / sendMessage and
+ * Provides RPC wrappers for L2InteropCenter.sendBundle / sendMessage and
  * InteropHandler.executeBundle / verifyBundle / unbundleBundle, along with
  * ERC-7786 attribute encoding and contract deployment utilities.
  */
@@ -239,14 +239,14 @@ function extractRevertData(_err: unknown): string | undefined {
  * revert) and decode the hash out of the `InteropPreviewHash` reason.
  *
  * Two `eth_call` details make the assembly faithful:
- *  - The InteropCenter's balance is overridden to a large value so it can fund the forwarded
+ *  - The L2InteropCenter's balance is overridden to a large value so it can fund the forwarded
  *    `indirectCallMessageValue` of a cross-base-token indirect leg (msg.value is not forwarded to a preview);
  *    the forwarded amount is fixed by the call, so the predicted hash is identical to the real send's.
  *  - `_from` MUST be the address that will submit the real send: the preview derives the bundle salt and each
  *    call's `from` from `msg.sender`, so a mismatch would predict a different hash.
  * The state override and the reverted assembly are both discarded with the call; nothing persists.
  */
-// ~3.4e38 wei — far larger than any interop value leg, so the InteropCenter can always fund the
+// ~3.4e38 wei — far larger than any interop value leg, so the L2InteropCenter can always fund the
 // forwarded `indirectCallMessageValue` during the read-only preview.
 const PREVIEW_INTEROP_CENTER_BALANCE_OVERRIDE = "0xffffffffffffffffffffffffffffffff";
 export async function staticPreviewHash(
@@ -269,14 +269,14 @@ export async function staticPreviewHash(
     revertData = extractRevertData(e);
     if (!revertData) throw e;
   }
-  // The revert reason is `InteropPreviewHash(bytes32 bundleHash)`; decode via the imported InteropCenter ABI.
+  // The revert reason is `InteropPreviewHash(bytes32 bundleHash)`; decode via the imported L2InteropCenter ABI.
   return _interopCenter.interface.decodeErrorResult("InteropPreviewHash", revertData)[0] as string;
 }
 
 // ── Token transfer data encoding ───────────────────────────────
 
 /**
- * Encode the secondBridgeData for an ERC20 token transfer via L2AssetRouter.
+ * Encode the crossChainSenderData for an ERC20 token transfer via L2AssetRouter.
  * This is the `data` field of an indirect call starter targeting L2_ASSET_ROUTER_ADDR.
  */
 export function getTokenTransferData(assetId: string, amount: BigNumber, recipientAddress: string): string {
@@ -343,7 +343,7 @@ export async function registerL2NativeTokenIfNeeded(
   }
 }
 
-// ── InteropCenter.sendBundle wrapper ───────────────────────────
+// ── L2InteropCenter.sendBundle wrapper ───────────────────────────
 
 export interface CallStarter {
   to: string; // ERC-7930 encoded destination address
@@ -387,12 +387,12 @@ export interface InteropSendResult {
 }
 
 /**
- * Send an interop bundle via InteropCenter.sendBundle on the source chain.
+ * Send an interop bundle via L2InteropCenter.sendBundle on the source chain.
  * Returns the tx receipt and the extracted InteropBundle struct.
  */
 export async function sendInteropBundle(options: SendBundleOptions): Promise<InteropSendResult> {
   const wallet = new Wallet(getInteropSourcePrivateKey(), options.sourceProvider);
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("L2InteropCenter"), wallet);
 
   const destinationChainIdBytes = encodeEvmChain(options.destinationChainId);
   // Attributes carry a stable salt used for BOTH the hash prediction and the real send.
@@ -464,7 +464,7 @@ export async function sendInteropBundle(options: SendBundleOptions): Promise<Int
         break;
       }
     } catch {
-      // Not an InteropCenter log
+      // Not an L2InteropCenter log
     }
   }
   if (!interopBundle) {
@@ -497,11 +497,11 @@ export async function sendInteropBundle(options: SendBundleOptions): Promise<Int
 }
 
 /**
- * Simulate InteropCenter.sendBundle via callStatic to capture revert data without sending a tx.
+ * Simulate L2InteropCenter.sendBundle via callStatic to capture revert data without sending a tx.
  */
 export async function simulateInteropBundle(options: SendBundleOptions): Promise<void> {
   const wallet = new Wallet(getInteropSourcePrivateKey(), options.sourceProvider);
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("L2InteropCenter"), wallet);
 
   const destinationChainIdBytes = encodeEvmChain(options.destinationChainId);
   const baseAttributes = await ensureUniqueBundleSalt(options.bundleAttributes || [], wallet);
@@ -529,7 +529,7 @@ export async function simulateInteropBundle(options: SendBundleOptions): Promise
   });
 }
 
-// ── InteropCenter.sendMessage wrapper ──────────────────────────
+// ── L2InteropCenter.sendMessage wrapper ──────────────────────────
 
 export interface SendMessageOptions {
   sourceProvider: providers.JsonRpcProvider;
@@ -541,12 +541,12 @@ export interface SendMessageOptions {
 }
 
 /**
- * Send a single interop message via InteropCenter.sendMessage on the source chain.
+ * Send a single interop message via L2InteropCenter.sendMessage on the source chain.
  * Returns the tx receipt and the extracted InteropBundle struct (sendMessage wraps into a bundle).
  */
 export async function sendInteropMessage(options: SendMessageOptions): Promise<InteropSendResult> {
   const wallet = new Wallet(getInteropSourcePrivateKey(), options.sourceProvider);
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("L2InteropCenter"), wallet);
 
   const baseAttributes = await ensureUniqueBundleSalt(options.attributes, wallet);
   // Single-call sends are single-leg atomic flows too: predict the bundleHash (of the wrapping bundle)
@@ -583,7 +583,7 @@ export async function sendInteropMessage(options: SendMessageOptions): Promise<I
         break;
       }
     } catch {
-      // Not an InteropCenter log
+      // Not an L2InteropCenter log
     }
   }
   if (!interopBundle) {
@@ -775,10 +775,10 @@ export async function getCallStatus(
 }
 
 /**
- * Get the interop protocol fee from InteropCenter.
+ * Get the interop protocol fee from L2InteropCenter.
  */
 export async function getInteropProtocolFee(provider: providers.JsonRpcProvider): Promise<BigNumber> {
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("L2InteropCenter"), provider);
   return interopCenter.interopProtocolFee();
 }
 
@@ -790,14 +790,14 @@ export async function setInteropProtocolFee(provider: providers.JsonRpcProvider,
     throw new Error("setInteropProtocolFee uses Anvil bootloader impersonation and cannot run in live mode");
   }
 
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("L2InteropCenter"), provider);
   await impersonateAndRun(provider, L2_BOOTLOADER_ADDR, async (signer) => {
     const tx = await interopCenter.connect(signer).setInteropFee(fee, { gasLimit: 500_000 });
     await tx.wait();
   });
 
   const actualFee = await interopCenter.interopProtocolFee();
-  expect(actualFee.eq(fee), `InteropCenter fee should be ${fee.toString()}, got ${actualFee.toString()}`).to.be.true;
+  expect(actualFee.eq(fee), `L2InteropCenter fee should be ${fee.toString()}, got ${actualFee.toString()}`).to.be.true;
 }
 
 /**
@@ -807,7 +807,7 @@ export async function getAccumulatedProtocolFees(
   provider: providers.JsonRpcProvider,
   coinbase: string
 ): Promise<BigNumber> {
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("L2InteropCenter"), provider);
   return interopCenter.accumulatedProtocolFees(coinbase);
 }
 
@@ -845,26 +845,26 @@ export async function expectAccumulatedProtocolFeeDelta(
 }
 
 /**
- * Get the fixed ZK interop fee from InteropCenter.
+ * Get the fixed ZK interop fee from L2InteropCenter.
  */
 export async function getZkInteropFee(provider: providers.JsonRpcProvider): Promise<BigNumber> {
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("L2InteropCenter"), provider);
   return interopCenter.ZK_INTEROP_FEE();
 }
 
 /**
- * Get the configured ZK token asset ID from InteropCenter.
+ * Get the configured ZK token asset ID from L2InteropCenter.
  */
 export async function getZkTokenAssetId(provider: providers.JsonRpcProvider): Promise<string> {
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("L2InteropCenter"), provider);
   return interopCenter.ZK_TOKEN_ASSET_ID();
 }
 
 /**
- * Get the resolved ZK token address from InteropCenter.
+ * Get the resolved ZK token address from L2InteropCenter.
  */
 export async function getZkTokenAddress(provider: providers.JsonRpcProvider): Promise<string> {
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("L2InteropCenter"), provider);
   return interopCenter.getZKTokenAddress();
 }
 
@@ -872,7 +872,7 @@ export async function getZkTokenAddress(provider: providers.JsonRpcProvider): Pr
  * Get accumulated ZK fees for a coinbase address.
  */
 export async function getAccumulatedZkFees(provider: providers.JsonRpcProvider, coinbase: string): Promise<BigNumber> {
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("L2InteropCenter"), provider);
   return interopCenter.accumulatedZKFees(coinbase);
 }
 
