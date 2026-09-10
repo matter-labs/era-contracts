@@ -56,11 +56,21 @@ library AddressIntrospector {
         if (address(_bridgehub) == L2_BRIDGEHUB_ADDR) {
             return _getL2BridgehubAddresses();
         }
-        return _getL1BridgehubAddressesInternal(_bridgehub);
+        return _getL1BridgehubAddressesInternal(_bridgehub, false);
+    }
+
+    /// @notice Bridgehub discovery for a v31 ecosystem: the Bridgehub has no `interopCenter()` yet, so the
+    /// L1InteropCenter is reported as absent and the upgrade deploys and registers it.
+    function getBridgehubAddressesV31(IL1Bridgehub _bridgehub) public view returns (BridgehubAddresses memory info) {
+        if (address(_bridgehub) == L2_BRIDGEHUB_ADDR) {
+            return _getL2BridgehubAddresses();
+        }
+        return _getL1BridgehubAddressesInternal(_bridgehub, true);
     }
 
     function _getL1BridgehubAddressesInternal(
-        IL1Bridgehub _bridgehub
+        IL1Bridgehub _bridgehub,
+        bool _isPreV32
     ) private view returns (BridgehubAddresses memory info) {
         address bridgehubProxy = address(_bridgehub);
         address messageRoot = address(_bridgehub.messageRoot());
@@ -69,7 +79,9 @@ library AddressIntrospector {
 
         // Present from v31 on; zero until the ecosystem registers it.
         address chainRegistrationSenderAddr = IBridgehubBase(bridgehubProxy).chainRegistrationSender();
-        address interopCenterAddr = _bridgehub.interopCenter();
+        // `interopCenter()` only exists on the Bridgehub from v32 onward; skip the call for pre-v32 deployments
+        // (the upgrade then deploys and registers the L1InteropCenter itself).
+        address interopCenterAddr = _isPreV32 ? address(0) : _bridgehub.interopCenter();
 
         BridgehubContracts memory proxies = BridgehubContracts({
             bridgehub: bridgehubProxy,
@@ -81,7 +93,7 @@ library AddressIntrospector {
         });
         BridgehubContracts memory implementations = BridgehubContracts({
             bridgehub: Utils.getImplementation(bridgehubProxy),
-            interopCenter: Utils.getImplementation(interopCenterAddr),
+            interopCenter: interopCenterAddr == address(0) ? address(0) : Utils.getImplementation(interopCenterAddr),
             messageRoot: Utils.getImplementation(messageRoot),
             ctmDeploymentTracker: Utils.getImplementation(ctmDeploymentTrackerProxy),
             chainAssetHandler: Utils.getImplementation(chainAssetHandler),
@@ -182,16 +194,17 @@ library AddressIntrospector {
         coreAddresses.shared.governance = IOwnable(_bridgehubProxy).owner();
     }
 
-    /// @notice Discovery for a v31 ecosystem: the bridgehub already exposes `chainRegistrationSender`,
-    /// but the nullifier has no `l1InteropHandler` yet — that arrives with the v32 implementations.
-    /// @dev Calling `getCoreDeployedAddresses` on a v31 ecosystem reverts on the missing nullifier getter.
+    /// @notice Discovery for a v31 ecosystem: the bridgehub already exposes `chainRegistrationSender`, but
+    /// neither the nullifier's `l1InteropHandler` nor the bridgehub's `interopCenter` exist yet — both arrive
+    /// with the v32 implementations.
+    /// @dev Calling `getCoreDeployedAddresses` on a v31 ecosystem reverts on the missing getters.
     function getCoreDeployedAddressesV31(
         address _bridgehubProxy
     ) public view returns (CoreDeployedAddresses memory coreAddresses) {
         require(_bridgehubProxy != address(0), "Bridgehub address is zero");
         require(_bridgehubProxy.code.length > 0, "Bridgehub has no code");
 
-        coreAddresses.bridgehub = getBridgehubAddresses(IL1Bridgehub(_bridgehubProxy));
+        coreAddresses.bridgehub = getBridgehubAddressesV31(IL1Bridgehub(_bridgehubProxy));
 
         address assetRouter = address(IL1Bridgehub(_bridgehubProxy).assetRouter());
         require(assetRouter != address(0), "AssetRouter address is zero");
@@ -360,8 +373,8 @@ library AddressIntrospector {
         return _zkChain.facetAddresses();
     }
 
-    /// @notice Whether the ecosystem predates v32, i.e. its nullifier has no `l1InteropHandler` getter and
-    /// the upgrade still has to deploy and wire the interop handler.
+    /// @notice Whether the ecosystem predates v32, i.e. its nullifier has no `l1InteropHandler` getter and its
+    /// Bridgehub no `interopCenter` getter, so the upgrade still has to deploy and wire both contracts.
     /// @dev Reverts on an ecosystem with no registered chains: there is nothing to read a protocol version
     /// from, and answering anyway would silently pick a discovery path. Callers decide what such an
     /// ecosystem means for them — see `hasRegisteredChains`.

@@ -125,6 +125,11 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
         } else {
             coreAddresses.bridges.implementations.l1InteropHandler = deploySimpleContract("L1InteropHandler", false);
         }
+
+        // The L1InteropCenter is new in v32 as well: it replaced the Bridgehub's L1->L2 request functions, so an
+        // upgraded ecosystem must get one deployed and (in stage 1) registered on the Bridgehub, or every deposit
+        // would revert. See `DefaultCoreUpgrade.deployL1InteropCenter`.
+        deployL1InteropCenter();
     }
 
     /// @notice Configure contract connections after deployment

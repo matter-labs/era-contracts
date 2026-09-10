@@ -7,13 +7,15 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 
 import {CoreUpgrade_v31} from "deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
 import {AddressIntrospector} from "deploy-scripts/utils/AddressIntrospector.sol";
-import {BridgesDeployedAddresses} from "deploy-scripts/utils/Types.sol";
+import {BridgehubAddresses, BridgesDeployedAddresses} from "deploy-scripts/utils/Types.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";
+import {L1InteropCenter} from "contracts/interop/interop-center/L1InteropCenter.sol";
+import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
@@ -37,15 +39,31 @@ contract CoreUpgradeParityHarness is CoreUpgrade_v31 {
     function buildInteropHandlerWiringCalls() external returns (Call[] memory) {
         return _buildL1InteropHandlerWiringCalls();
     }
+
+    function setDiscoveredBridgehub(
+        address _bridgehub,
+        address _interopCenter,
+        bool _deployedL1InteropCenter
+    ) external {
+        coreAddresses.bridgehub.proxies.bridgehub = _bridgehub;
+        coreAddresses.bridgehub.proxies.interopCenter = _interopCenter;
+        l1InteropCenterProxyDeployed = _deployedL1InteropCenter;
+    }
+
+    function buildInteropCenterRegistrationCalls() external view returns (Call[] memory) {
+        return prepareRegisterInteropCenterCalls();
+    }
 }
 
 /// @notice Covers the stage-1 calls that bring a v31 ecosystem to the wiring a from-scratch v32 deployment
-/// has: the interop handler, which is new in v32.
+/// has: the interop handler and the L1InteropCenter, which are both new in v32.
 contract PreV32ParityCallsTest is Test {
     CoreUpgradeParityHarness internal upgradeScript;
     L1Nullifier internal l1Nullifier;
     L1AssetRouter internal assetRouter;
     L1InteropHandler internal interopHandler;
+    L1Bridgehub internal realBridgehub;
+    L1InteropCenter internal interopCenter;
 
     address internal owner;
     address internal bridgehub;
@@ -100,6 +118,29 @@ contract PreV32ParityCallsTest is Test {
                     address(interopHandlerImpl),
                     proxyAdmin,
                     abi.encodeCall(L1InteropHandler.initialize, (address(this)))
+                )
+            )
+        );
+
+        // A v31-shaped Bridgehub (nothing registered) plus the L1InteropCenter the upgrade would deploy for it,
+        // owned by governance from the start as `DefaultCoreUpgrade.getInitializeCalldata` arranges.
+        L1Bridgehub bridgehubImpl = new L1Bridgehub(owner, 100);
+        realBridgehub = L1Bridgehub(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(bridgehubImpl),
+                    proxyAdmin,
+                    abi.encodeCall(L1Bridgehub.initialize, (owner))
+                )
+            )
+        );
+        L1InteropCenter interopCenterImpl = new L1InteropCenter(IL1Bridgehub(address(realBridgehub)), owner);
+        interopCenter = L1InteropCenter(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(interopCenterImpl),
+                    proxyAdmin,
+                    abi.encodeCall(L1InteropCenter.initialize, (owner))
                 )
             )
         );
@@ -163,8 +204,96 @@ contract PreV32ParityCallsTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
+                        L1InteropCenter registration
+    //////////////////////////////////////////////////////////////*/
+
+    function test_registersTheNewInteropCenter() public {
+        upgradeScript.setDiscoveredBridgehub(address(realBridgehub), address(interopCenter), true);
+
+        Call[] memory calls = upgradeScript.buildInteropCenterRegistrationCalls();
+        assertEq(calls.length, 1, "one registration call");
+        assertEq(realBridgehub.interopCenter(), address(0), "v31 bridgehub starts without an interop center");
+
+        _executeAsOwners(calls);
+
+        assertEq(realBridgehub.interopCenter(), address(interopCenter), "interop center registered on the bridgehub");
+        assertEq(interopCenter.owner(), owner, "governance owns the interop center from the start");
+    }
+
+    function test_emitsNothingWhenTheInteropCenterPreExisted() public {
+        // Re-running the upgrade on a v32 ecosystem: the interop center already exists, so the script only
+        // deployed a new implementation (installed by the proxy upgrades) and registers nothing.
+        upgradeScript.setDiscoveredBridgehub(address(realBridgehub), address(interopCenter), false);
+
+        assertEq(upgradeScript.buildInteropCenterRegistrationCalls().length, 0, "nothing to register");
+    }
+
+    function test_revertWhen_NoInteropCenterAddress() public {
+        // A missing interop center would leave every L1->L2 request dead after the upgrade.
+        upgradeScript.setDiscoveredBridgehub(address(realBridgehub), address(0), true);
+
+        vm.expectRevert("interopCenter proxy is zero");
+        upgradeScript.buildInteropCenterRegistrationCalls();
+    }
+
+    /*//////////////////////////////////////////////////////////////
                         v31 address discovery
     //////////////////////////////////////////////////////////////*/
+
+    /// @dev A v31 Bridgehub has no `interopCenter()` at all, which a call into the missing function surfaces
+    /// as a revert — exactly what the version-aware discovery has to avoid.
+    function _makeBridgehubLookPreV32() internal {
+        vm.mockCallRevert(
+            address(realBridgehub),
+            abi.encodeWithSignature("interopCenter()"),
+            "function does not exist"
+        );
+    }
+
+    function test_discovery_v31PathSkipsTheInteropCenterGetter() public {
+        _makeBridgehubLookPreV32();
+
+        BridgehubAddresses memory bridgehubAddresses = AddressIntrospector.getBridgehubAddressesV31(
+            IL1Bridgehub(address(realBridgehub))
+        );
+
+        assertEq(bridgehubAddresses.proxies.bridgehub, address(realBridgehub), "bridgehub still discovered");
+        assertEq(bridgehubAddresses.proxies.interopCenter, address(0), "interop center reported as absent");
+        assertEq(bridgehubAddresses.implementations.interopCenter, address(0), "no implementation either");
+    }
+
+    function test_discovery_v32PathNeedsTheInteropCenterGetter() public {
+        _makeBridgehubLookPreV32();
+
+        vm.expectRevert("function does not exist");
+        AddressIntrospector.getBridgehubAddresses(IL1Bridgehub(address(realBridgehub)));
+    }
+
+    function test_discovery_v32PathIsUsedOnceTheInteropCenterGetterExists() public {
+        BridgehubAddresses memory bridgehubAddresses = AddressIntrospector.getBridgehubAddresses(
+            IL1Bridgehub(address(realBridgehub))
+        );
+        assertEq(
+            bridgehubAddresses.proxies.interopCenter,
+            address(0),
+            "unregistered ecosystem reports no interop center"
+        );
+
+        vm.prank(owner);
+        realBridgehub.setInteropCenter(address(interopCenter));
+
+        bridgehubAddresses = AddressIntrospector.getBridgehubAddresses(IL1Bridgehub(address(realBridgehub)));
+        assertEq(
+            bridgehubAddresses.proxies.interopCenter,
+            address(interopCenter),
+            "registered interop center discovered"
+        );
+        assertEq(
+            bridgehubAddresses.implementations.interopCenter,
+            Utils.getImplementation(address(interopCenter)),
+            "implementation resolved behind the proxy"
+        );
+    }
 
     /// @dev Discovery walks from the asset router to the vault; this fixture has no vault, so stand one in.
     function _mockNativeTokenVaultForDiscovery() internal {
