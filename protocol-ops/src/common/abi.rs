@@ -118,24 +118,6 @@ pub mod i_register_zk_chain {
 }
 pub use i_register_zk_chain::IRegisterZKChainAbi;
 
-pub mod i_deploy_l2_contracts {
-    alloy::sol!(
-        #[sol(rpc)]
-        IDeployL2ContractsAbi,
-        "../l1-contracts/zkstack-out/IDeployL2Contracts.sol/IDeployL2Contracts.json"
-    );
-}
-pub use i_deploy_l2_contracts::IDeployL2ContractsAbi;
-
-pub mod i_deploy_paymaster {
-    alloy::sol!(
-        #[sol(rpc)]
-        IDeployPaymasterAbi,
-        "../l1-contracts/zkstack-out/IDeployPaymaster.sol/IDeployPaymaster.json"
-    );
-}
-pub use i_deploy_paymaster::IDeployPaymasterAbi;
-
 pub mod i_gateway_vote_preparation {
     alloy::sol!(
         #[sol(rpc)]
@@ -153,15 +135,6 @@ pub mod admin_functions {
     );
 }
 pub use admin_functions::AdminFunctionsAbi;
-
-pub mod i_enable_evm_emulator {
-    alloy::sol!(
-        #[sol(rpc)]
-        IEnableEvmEmulatorAbi,
-        "../l1-contracts/zkstack-out/IEnableEvmEmulator.sol/IEnableEvmEmulator.json"
-    );
-}
-pub use i_enable_evm_emulator::IEnableEvmEmulatorAbi;
 
 pub mod deploy_gateway_transaction_filterer {
     alloy::sol!(
@@ -276,6 +249,8 @@ pub mod testnet_verifier {
     alloy::sol!(
         #[sol(rpc)]
         interface ITestnetVerifier {
+            function isTestnetVerifier() external view returns (bool);
+            // Legacy pre-v34 name (a public constant on testnet verifiers of those versions).
             function IS_TESTNET_VERIFIER() external view returns (bool);
         }
     );

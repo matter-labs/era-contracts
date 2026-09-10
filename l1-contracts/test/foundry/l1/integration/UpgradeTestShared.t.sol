@@ -51,6 +51,7 @@ contract UpgradeIntegrationTestBase is Test {
     address internal _eraDiamond;
     address internal _newChainDiamond;
     bytes32 internal _expectedUpgradeCutHash;
+    address internal _expectedNewVerifier;
     address internal _expectedNewChainAdmin;
     bytes32 internal _expectedBaseTokenAssetId;
     Call[] internal _ctmAdminCalls;
@@ -72,7 +73,6 @@ contract UpgradeIntegrationTestBase is Test {
         console.log("setupUpgrade: Initializing core upgrade");
         coreUpgrade.initializeWithArgs(
             params.bridgehubProxyAddress,
-            params.isZKsyncOS,
             params.create2FactorySalt,
             params.upgradeInputPath,
             CORE_OUTPUT
@@ -81,7 +81,6 @@ contract UpgradeIntegrationTestBase is Test {
         ctmUpgrade.initializeWithArgs(
             params.ctmProxy,
             params.bytecodesSupplier,
-            params.isZKsyncOS,
             params.rollupDAManager,
             params.create2FactorySalt,
             params.upgradeInputPath,
@@ -225,6 +224,7 @@ contract UpgradeIntegrationTestBase is Test {
             ctmUpgrade.getCTMAddress()
         );
         assertEq(uint256(npvv.topics[1]), ctmUpgrade.getNewProtocolVersion(), "Verifier protocol version mismatch");
+        _expectedNewVerifier = address(uint160(uint256(npvv.topics[2])));
 
         // Chain-op events
         chainOpsLogs.requireAtLeast("DiamondCut((address,uint8,bool,bytes4[])[],address,bytes)", 1);
@@ -345,10 +345,9 @@ contract UpgradeIntegrationTestBase is Test {
         address bytecodesSupplier = outputDeployCTMToml.readAddress(
             "$.deployed_addresses.state_transition.bytecodes_supplier_addr"
         );
-        bool isZKsyncOs = outputDeployCTMToml.readBool("$.is_zk_sync_os");
-        address rollupDAManager = isZKsyncOs
-            ? outputDeployCTMToml.readAddress("$.deployed_addresses.blobs_zksync_os_l1_da_validator_addr")
-            : outputDeployCTMToml.readAddress("$.deployed_addresses.l1_rollup_da_manager");
+        address rollupDAManager = outputDeployCTMToml.readAddress(
+            "$.deployed_addresses.blobs_zksync_os_l1_da_validator_addr"
+        );
         address governance = outputDeployL1Toml.readAddress("$.deployed_addresses.governance_addr");
 
         return
@@ -357,7 +356,6 @@ contract UpgradeIntegrationTestBase is Test {
                 ctmProxy: ctmProxy,
                 bytecodesSupplier: bytecodesSupplier,
                 rollupDAManager: rollupDAManager,
-                isZKsyncOS: isZKsyncOs,
                 create2FactorySalt: bytes32(0),
                 upgradeInputPath: ECOSYSTEM_UPGRADE_INPUT,
                 ecosystemOutputPath: ECOSYSTEM_OUTPUT,

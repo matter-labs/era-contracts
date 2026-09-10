@@ -2,26 +2,26 @@
 
 ## Relevant files
 
-- `.github/workflows/lint.yaml` — Solidity / TS lint, codespell, typos, `cargo fmt --check`, `cargo clippy -D warnings` for `protocol-ops`.
+- `.github/workflows/lint.yaml` — Solidity / TS lint, codespell, typos, `cargo fmt --check` for all Rust crates, and `cargo clippy -D warnings` for `protocol-ops`.
 - `.github/workflows/l1-contracts-ci.yaml` — l1-contracts build, foundry tests, verifier-generator check, coverage.
-- `.github/workflows/pre-merge-checks.yaml` — `check-hashes`, `check-selectors`, `check-zkstack-out`, `state-generation-check`, and the `pre-merge-verified` gate. Skipped while a PR is a draft (see "CI tiers" below).
-- `.github/workflows/build-contract-artifacts.yaml` — the shared `build` job (`workflow_call`) both of the above use; `.github/actions/restore-ci-artifacts` is how their other jobs read what it built.
+- `.github/workflows/pre-merge-checks.yaml` — `check-hashes`, `check-selectors`, `check-zkstack-out`, `check-zksync-os-genesis`, `state-generation-check`, and the `pre-merge-verified` gate. Skipped while a PR is a draft (see "CI tiers" below).
+- `.github/workflows/build-contract-artifacts.yaml` — the `build` job (`workflow_call`) `pre-merge-checks` uses; `l1-contracts-ci` keeps its own inline copy because its build is a coverage matrix. `.github/actions/restore-ci-artifacts` is how their other jobs read what either built.
 - `.github/workflows/l1-contracts-foundry-ci.yaml` — foundry test build + contract-size check.
 - `.github/workflows/anvil-interop-ci.yaml` — interop integration test, v31→v33 upgrade test.
-- `.github/workflows/l2-contracts-ci.yaml`, `system-contracts-ci.yaml` — peer projects.
 - `.github/workflows/update-generated-artifacts.yaml` — the one-dispatch regen (hashes + selectors + zkstack-out, then chain states) that clears every pre-merge check.
 - `recompute_hashes.sh` — one-shot rebuild + recompute + write hashes.
-- `package.json`, `l1-contracts/package.json`, `system-contracts/package.json`, `l2-contracts/package.json` — top-level scripts referenced below.
+- `package.json`, `l1-contracts/package.json`, `da-contracts/package.json` — top-level scripts referenced below.
 
 ## CI tiers: per-commit vs pre-merge
 
 - **Per-commit** (`l1-contracts-ci`, `anvil-interop-ci`, `lint`, `slither`, …): builds, tests, and
   static checks. They run on every push, drafts included.
 - **Pre-merge** (`pre-merge-checks`): the checks of committed _generated_ artifacts —
-  `AllContractsHashes.json`, `l1-contracts/selectors`, `l1-contracts/zkstack-out`, and the
-  anvil-interop chain-state snapshots (`state-generation-check`). Any bytecode change invalidates
-  these and the only fix is a regen + commit, so they **skip while the PR is a draft** and run once
-  it is marked ready for review (plus on every later push while it stays non-draft). They also skip
+  `AllContractsHashes.json`, `l1-contracts/selectors`, `l1-contracts/zkstack-out`,
+  `configs/genesis/zksync-os/latest.json`, and the anvil-interop chain-state snapshots
+  (`state-generation-check`). Any bytecode change invalidates these and the only fix is to
+  regenerate and commit, so they **skip while the PR is a draft** and run once it is marked
+  ready for review (plus on every later push while it stays non-draft). They also skip
   on PRs that touch no artifact-affecting paths (documentation only). `pre-merge-verified`
   is the aggregate job that reports the tier's verdict and is the one to require on the base branch.
 
@@ -35,8 +35,10 @@ Two consequences worth internalizing while iterating on a draft:
   a genesis-affecting contract change it can fail — or silently exercise the old code — until the
   snapshots are regenerated. Suspect snapshot staleness before debugging the contracts, and use
   `ANVIL_INTEROP_FRESH_DEPLOY=1` locally to run the suite against your actual code.
-- `check-hashes` / `check-selectors` / `check-zkstack-out` failing after a contract change means
-  exactly one thing: regenerate. It is not a signal about your code.
+- `check-hashes` / `check-selectors` / `check-zkstack-out` / `check-zksync-os-genesis` failing
+  after a contract change means exactly one thing: regenerate. It is not a signal about your code.
+  Note that **Update All Generated Artifacts** does not yet regenerate the ZKsync OS genesis
+  image; that one is still a manual run of `tools/zksync-os-genesis-gen`.
 
 When the PR is done: dispatch **Update All Generated Artifacts** with the PR number (one dispatch
 commits hashes + selectors + zkstack-out, then the chain states), then mark the PR ready for review
@@ -182,12 +184,14 @@ yarn prettier:fix                # All formats — adds trailing newlines, etc.
 yarn l1 errors-lint --check
 ```
 
-For `protocol-ops` (Rust):
+For Rust:
 
 ```bash
-cd protocol-ops
-cargo +stable fmt --check  # nightly disagrees with CI on edge cases
-cargo clippy --all-targets -- -D warnings
+# `+1.91.1` overrides crate-local nightly toolchains to match CI.
+for dir in protocol-ops tools/{upgrade-readiness-checker,verifier-gen,wallets-gen,zksync-os-genesis-gen}; do
+  (cd "$dir" && cargo +1.91.1 fmt --check)
+done
+(cd protocol-ops && cargo clippy --all-targets -- -D warnings)
 ```
 
 CI also runs `codespell` and `crate-ci/typos` as separate jobs (see `.github/workflows/lint.yaml`). They are easy to forget locally because neither is wired into `yarn lint:check`. Both must pass independently.
@@ -312,7 +316,11 @@ yarn lint:sol --fix --noPrompt
 yarn lint:ts --fix
 yarn prettier:fix
 yarn l1 errors-lint --check
-( cd protocol-ops && cargo +stable fmt --check && cargo clippy --all-targets -- -D warnings )
+# `+1.91.1` overrides crate-local nightly toolchains to match CI.
+for dir in protocol-ops tools/{upgrade-readiness-checker,verifier-gen,wallets-gen,zksync-os-genesis-gen}; do
+  (cd "$dir" && cargo +1.91.1 fmt --check)
+done
+( cd protocol-ops && cargo clippy --all-targets -- -D warnings )
 
 # 4. Selectors
 ( cd l1-contracts && yarn selectors --fix )

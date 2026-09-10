@@ -1,0 +1,28 @@
+name: Install Foundry
+description: >
+  Installs the Foundry toolchain version pinned in .github/foundry-versions.env, so CI, local
+  scripts and the Docker images cannot drift apart.
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve pinned Foundry version
+      id: resolve
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        set -euo pipefail
+        # shellcheck source=/dev/null
+        . "${ACTION_PATH}/../../foundry-versions.env"
+        if [ -z "${FOUNDRY_VERSION:-}" ]; then
+          echo "::error::install-foundry: FOUNDRY_VERSION is unset in .github/foundry-versions.env"
+          exit 1
+        fi
+        echo "version=${FOUNDRY_VERSION}" >> "$GITHUB_OUTPUT"
+        echo "Foundry ${FOUNDRY_VERSION}"
+
+    - name: Install Foundry
+      uses: foundry-rs/foundry-toolchain@v1
+      with:
+        version: ${{ steps.resolve.outputs.version }}

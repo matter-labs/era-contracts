@@ -10,6 +10,7 @@ on:
     paths:
       - "docker/protocol/Dockerfile.base"
       - ".github/workflows/build-docker-base.yaml"
+      - ".github/foundry-versions.env"
   workflow_dispatch:
     inputs:
       tag_override:
@@ -54,6 +55,9 @@ jobs:
           echo "latest_tag=$LATEST_TAG" >> "$GITHUB_OUTPUT"
           echo "sha_tag=$SHA_TAG" >> "$GITHUB_OUTPUT"
 
+      # `Dockerfile.base` reads the foundry pins straight from
+      # `.github/foundry-versions.env` (COPYed into the image), so there are no
+      # version build args to pass here.
       - name: Build & Push Base Image
         uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6.15.0
         with:

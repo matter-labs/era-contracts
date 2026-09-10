@@ -75,11 +75,6 @@ sol! {
         function getProtocolVersion() external view returns (uint256);
     }
 
-    #[sol(rpc)]
-    contract ZKChainFeeParams {
-        function getPriorityTxMaxGasLimit() external view returns (uint256);
-    }
-
     /// Minimal `Ownable` view — usable against any contract that exposes a
     /// public `owner()` getter (TransparentUpgradeableProxy admins, plain
     /// Ownable proxies, etc.).

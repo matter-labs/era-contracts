@@ -9,6 +9,10 @@ import {CTMUpgrade_v33} from "../../../../deploy-scripts/upgrade/v33/CTMUpgrade_
 import {CoreUpgrade_v33} from "../../../../deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
+import {IZKsyncOSVerifier} from "contracts/state-transition/chain-interfaces/IZKsyncOSVerifier.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
+import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../../../deploy-scripts/utils/Types.sol";
 import {PublishFactoryDepsResult} from "../../../../deploy-scripts/utils/bytecode/BytecodePublisher.s.sol";
@@ -25,30 +29,16 @@ import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE} from "contracts/core/m
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {Utils} from "../../../../deploy-scripts/utils/Utils.sol";
+import {IPriorityOpLowerBound} from "contracts/upgrades/IPriorityOpLowerBound.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {DefaultUpgradeZKsyncOS} from "contracts/upgrades/DefaultUpgradeZKsyncOS.sol";
+import {Bytes} from "contracts/vendor/Bytes.sol";
 
 /// @notice Test-only CTM upgrade that mocks large bytecode reads to avoid MemoryOOG
 contract CTMUpgrade_v33_Test is CTMUpgrade_v33 {
-    /// @notice This fixture is an Era ecosystem, and this release's per-chain upgrade
-    ///         (`V32UpgradeZKsyncOS`) is ZKsync OS-only. The fixture exists to exercise the
-    ///         ecosystem-side flow — proxy upgrades, stage calls, wiring — so it falls back to the plain
-    ///         `DefaultUpgrade` for the chain step rather than skipping the chain upgrade entirely. The
-    ///         per-chain force-deployments-data substitution that ZKsync OS chains get is covered by the
-    ///         anvil v31 -> v33 scenario (`test/anvil-interop/run-upgrade-test.ts`).
-    function deployUsedUpgradeContract() internal override returns (address) {
-        return deploySimpleContract("DefaultUpgrade", false);
-    }
-
-    /// @dev Substituting `DefaultUpgrade` above means no `PriorityOpLowerBound` registry is deployed —
-    ///      it exists only to be embedded as an immutable in `V32UpgradeZKsyncOS`. There is therefore no
-    ///      address to record, so this fixture records none. The production hook keeps its
-    ///      `require(priorityOpLowerBound != address(0))`: on a real ZKsync OS run a missing registry
-    ///      means the upgrade contract was built against address zero, which must fail loudly.
-    function serializeVersionSpecificStateTransition() internal override {}
-
-    /// @notice Override to return dummy bytecode hashes instead of reading huge JSON files
-    function getL2BytecodeHash(string memory /* contractName */) public view override returns (bytes32) {
-        // Return a valid dummy bytecode hash (must have version byte 0x01 and odd length marker)
-        return bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000001));
+    /// @notice Exposes the deployed PriorityOpLowerBound registry for the test's chain-upgrade precondition.
+    function exposedPriorityOpLowerBound() external view returns (address) {
+        return priorityOpLowerBound;
     }
 
     /// @notice Override to skip bytecode publishing which reads large JSON files.
@@ -57,10 +47,8 @@ contract CTMUpgrade_v33_Test is CTMUpgrade_v33 {
 
         factoryDepsResult.factoryDepsHashes = new uint256[](45);
 
-        factoryDepsResult.factoryDepsHashes[0] = uint256(config.contracts.chainCreationParams.bootloaderHash);
-        factoryDepsResult.factoryDepsHashes[1] = uint256(config.contracts.chainCreationParams.defaultAAHash);
-        factoryDepsResult.factoryDepsHashes[2] = uint256(config.contracts.chainCreationParams.evmEmulatorHash);
-
+        // Slots 0-2 are the bootloader / default-account / EVM-emulator hashes, which ZKsync OS
+        // leaves at zero.
         bytes32 dummyHash = bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000001));
         for (uint256 i = 3; i < 45; i++) {
             factoryDepsResult.factoryDepsHashes[i] = uint256(dummyHash);
@@ -70,7 +58,7 @@ contract CTMUpgrade_v33_Test is CTMUpgrade_v33 {
     }
 
     /// @notice Override to skip bytecode-heavy force deployment generation in getProposedUpgrade.
-    /// The base implementation reads all zkout bytecodes, causing MemoryOOG.
+    /// The base implementation reads every force-deployment bytecode, causing MemoryOOG.
     /// We return an empty upgrade instead.
     function getProposedUpgrade(
         StateTransitionDeployedAddresses memory stateTransition,
@@ -86,9 +74,9 @@ contract CTMUpgrade_v33_Test is CTMUpgrade_v33 {
                 _factoryDepsResult,
                 protocolUpgradeNonce
             ),
-            bootloaderHash: chainCreationParams.bootloaderHash,
-            defaultAccountHash: chainCreationParams.defaultAAHash,
-            evmEmulatorHash: chainCreationParams.evmEmulatorHash,
+            bootloaderHash: bytes32(0),
+            defaultAccountHash: bytes32(0),
+            evmEmulatorHash: bytes32(0),
             verifier: address(0),
             verifierParams: ProposedUpgradeLib.emptyVerifierParams(),
             l1ContractsUpgradeCalldata: new bytes(0),
@@ -99,12 +87,18 @@ contract CTMUpgrade_v33_Test is CTMUpgrade_v33 {
     }
 }
 
-/// @notice Test-only Core upgrade.
-/// @dev v33's stage-1 override is already only the `L1InteropHandler` wiring — the core-proxy
-///      upgrades moved into `DefaultCoreUpgrade` — so there is nothing left for the fixture to skip
-///      and no override is needed. On this fixture the wiring collapses to nothing anyway (the
-///      ecosystem already has a handler); the calls themselves are covered by `PreV32ParityCalls.t.sol`.
-contract CoreUpgrade_v33_Test is CoreUpgrade_v33 {}
+/// @notice Test-only Core upgrade that skips governance calls the local fixture cannot satisfy.
+contract CoreUpgrade_v33_Test is CoreUpgrade_v33 {
+    /// @notice Override to skip the ownership-acceptance and `setAddresses` calls, which need ownership
+    ///         hand-offs the fixture does not perform.
+    /// @dev The interop-handler wiring is kept: it is what makes a v31 ecosystem match a from-scratch v32
+    ///      one. In this fixture it collapses to nothing — the ecosystem already has a wired handler — so
+    ///      the calls themselves are covered by `PreV32ParityCalls.t.sol`, not here.
+    function prepareVersionSpecificStage1GovernanceCallsL1() public override returns (Call[] memory calls) {
+        console.log("Test mode: keeping only the L1InteropHandler wiring in stage 1");
+        return super.prepareVersionSpecificStage1GovernanceCallsL1();
+    }
+}
 
 // Note: there is no longer a separate `EcosystemUpgrade_v31_Test` orchestrator subclass.
 // The local-fork integration test injects mocked Core and CTM upgrades by overriding
@@ -140,10 +134,12 @@ contract UpgradeIntegrationTest_Local is
     TokenDeployer
 {
     using stdToml for string;
+    using Bytes for bytes;
 
     address private _serverNotifierProxy;
     address private _serverNotifierProxyAdmin;
     address private _expectedServerNotifierProxyAdminOwner;
+    bytes32 private _expectedRewrittenUpgradeTxHash;
 
     /// @notice Override to inject the mocked Core upgrade (keeps only the interop-handler wiring in stage 1).
     function createCoreUpgrade() internal override returns (CoreUpgrade_v33) {
@@ -156,7 +152,7 @@ contract UpgradeIntegrationTest_Local is
     }
 
     /// @notice Bump the CTM's protocol version from the upgrade input TOML so the local fixture
-    ///         exercises an upgrade to one minor above the genesis version (currently v33 → v34).
+    ///         exercises an upgrade to one minor above the genesis version (currently v32 → v33).
     ///         See `foundry-upgrade.toml`.
     /// @dev    Replaces the former `overrideProtocolVersionForLocalTesting` hook on the
     ///         deleted `DefaultEcosystemUpgrade` orchestrator.
@@ -168,20 +164,49 @@ contract UpgradeIntegrationTest_Local is
     }
 
     /// Substitute the batch history a live chain would have: a committed and executed batch (both at 1),
-    /// plus the L1MessageRoot per-chain placeholder that v31 set for this chain. This fixture runs the plain
-    /// `DefaultUpgrade` (see the override above), so it is the surrounding flow — the message root's
-    /// per-chain reads — that needs the state rather than a guard in the upgrade itself; a chain upgraded by
-    /// `DefaultUpgradeZKsyncOS` would additionally have to satisfy its outstanding-batches check.
+    /// plus the L1MessageRoot per-chain placeholder that v31 set for this chain. Equal committed and executed
+    /// counts are required by `DefaultUpgradeZKsyncOS`.
     /// Committing and executing a real batch needs a prover and a sequencer, so there is no public API to
     /// reach this state in a foundry fixture. See the fork-only-violation note at the top of this file.
     function beforeChainUpgrade() internal override {
-        address eraChainDiamond = addresses.bridgehub.getZKChain(eraZKChainId);
-        vm.store(eraChainDiamond, bytes32(ZK_CHAIN_TOTAL_BATCHES_EXECUTED_SLOT), bytes32(uint256(1)));
-        vm.store(eraChainDiamond, bytes32(ZK_CHAIN_TOTAL_BATCHES_COMMITTED_SLOT), bytes32(uint256(1)));
+        address sourceChainDiamond = addresses.bridgehub.getZKChain(eraZKChainId);
+        vm.store(sourceChainDiamond, bytes32(ZK_CHAIN_TOTAL_BATCHES_EXECUTED_SLOT), bytes32(uint256(1)));
+        vm.store(sourceChainDiamond, bytes32(ZK_CHAIN_TOTAL_BATCHES_COMMITTED_SLOT), bytes32(uint256(1)));
 
         address messageRoot = address(addresses.bridgehub.messageRoot());
         bytes32 v31MappingSlot = keccak256(abi.encode(eraZKChainId, L1_MESSAGE_ROOT_V31_UPGRADE_BATCH_NUMBER_SLOT));
         vm.store(messageRoot, v31MappingSlot, bytes32(V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE));
+
+        // v32 upgrade precondition: the chain's priority-op lower bound must be recorded before the
+        // upgrade executes (permissionless; production runs RecordPriorityOpLowerBound.s.sol).
+        IPriorityOpLowerBound(CTMUpgrade_v33_Test(address(ctmUpgrade)).exposedPriorityOpLowerBound())
+            .lowerBoundPriorityOp(sourceChainDiamond);
+    }
+
+    function _snapshotExpectedZKsyncOSUpgradeTxHash() private {
+        Diamond.DiamondCutData memory cut = abi.decode(
+            ctmUpgrade.getChainUpgradeDiamondCutData(),
+            (Diamond.DiamondCutData)
+        );
+        address defaultUpgrade = ctmUpgrade.getAddresses().stateTransition.defaultUpgrade;
+        assertEq(cut.initAddress, defaultUpgrade, "Wrong per-chain upgrade implementation");
+
+        ProposedUpgrade memory proposedUpgrade = abi.decode(cut.initCalldata.slice(4), (ProposedUpgrade));
+        bytes32 placeholderHash = keccak256(abi.encode(proposedUpgrade.l2ProtocolUpgradeTx));
+        proposedUpgrade.l2ProtocolUpgradeTx.data = DefaultUpgradeZKsyncOS(cut.initAddress).getL2UpgradeTxData(
+            address(addresses.bridgehub),
+            eraZKChainId,
+            true,
+            proposedUpgrade.l2ProtocolUpgradeTx.data
+        );
+        _expectedRewrittenUpgradeTxHash = keccak256(abi.encode(proposedUpgrade.l2ProtocolUpgradeTx));
+        assertNotEq(_expectedRewrittenUpgradeTxHash, placeholderHash, "OS rewrite was a no-op");
+    }
+
+    /// @dev The genesis fixture deploys a testnet verifier; the production-verifier variant
+    /// overrides this together with the ecosystem mutation in `setupUpgrade`.
+    function _expectTestnetEcosystem() internal pure virtual returns (bool) {
+        return true;
     }
 
     function setUp() public {
@@ -195,11 +220,16 @@ contract UpgradeIntegrationTest_Local is
         console.log("setUp: Tokens registered");
 
         _deployEra();
-        console.log("setUp: Era deployed");
+        console.log("setUp: Existing ZKsync OS chain deployed");
         chainId = eraZKChainId;
         acceptPendingAdmin();
+        assertTrue(addresses.chainTypeManager.isZKsyncOS(), "Fixture CTM is not ZKsync OS");
+        assertTrue(
+            IGetters(addresses.bridgehub.getZKChain(eraZKChainId)).getZKsyncOS(),
+            "Existing chain fixture is not ZKsync OS"
+        );
         console.log("setUp: Pending admin accepted");
-        ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/v0.33.0-atomic-interop/foundry-upgrade.toml";
+        ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/v0.31.0-interopB/foundry-upgrade.toml";
         ECOSYSTEM_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-l1.toml";
         ECOSYSTEM_OUTPUT = "/script-out/foundry-upgrade/local-core.toml";
         CTM_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-ctm.toml";
@@ -209,6 +239,7 @@ contract UpgradeIntegrationTest_Local is
         console.log("setUp: Paths configured");
         setupUpgrade(true);
         console.log("setUp: Upgrade setup complete");
+        _snapshotExpectedZKsyncOSUpgradeTxHash();
 
         _serverNotifierProxy = ctmUpgrade.getAddresses().stateTransition.proxies.serverNotifier;
         if (_serverNotifierProxy != address(0)) {
@@ -219,17 +250,17 @@ contract UpgradeIntegrationTest_Local is
 
         address bridgehub = coreUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
         console.log("setUp: Got bridgehub address", bridgehub);
-        bytes32 eraBaseTokenAssetId = IBridgehubBase(bridgehub).baseTokenAssetId(eraZKChainId);
-        _expectedBaseTokenAssetId = eraBaseTokenAssetId;
-        console.log("setUp: Got era base token asset ID");
+        bytes32 sourceBaseTokenAssetId = IBridgehubBase(bridgehub).baseTokenAssetId(eraZKChainId);
+        _expectedBaseTokenAssetId = sourceBaseTokenAssetId;
+        console.log("setUp: Got existing chain base token asset ID");
 
-        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.baseTokenAssetId, 0), abi.encode(eraBaseTokenAssetId));
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.baseTokenAssetId, 0), abi.encode(sourceBaseTokenAssetId));
         console.log("setUp: Mock call setup");
         internalTest();
         console.log("setUp: Internal test complete");
     }
 
-    function test_DefaultUpgrade_Local() public {
+    function test_DefaultUpgradeZKsyncOS_Local() public {
         // Heavy execution and event assertions live in setUp -> internalTest()
         // (RAM constraint). This body validates persisted state outcomes.
         address ctm = ctmUpgrade.getCTMAddress();
@@ -237,15 +268,22 @@ contract UpgradeIntegrationTest_Local is
 
         // Protocol version bumps
         assertEq(IChainTypeManager(ctm).protocolVersion(), _expectedNewVersion, "CTM protocolVersion not bumped");
-        assertEq(IGetters(_eraDiamond).getProtocolVersion(), _expectedNewVersion, "Era chain not upgraded");
+        assertEq(IGetters(_eraDiamond).getProtocolVersion(), _expectedNewVersion, "Existing chain not upgraded");
+        assertTrue(IGetters(_eraDiamond).getZKsyncOS(), "Existing chain is not ZKsync OS after upgrade");
+        assertEq(
+            IGetters(_eraDiamond).getL2SystemContractsUpgradeTxHash(),
+            _expectedRewrittenUpgradeTxHash,
+            "Diamond did not record the rewritten OS transaction"
+        );
 
-        // Era chain identity preserved across upgrade
-        assertEq(IGetters(_eraDiamond).getChainId(), eraZKChainId, "Era diamond points at wrong chainId");
+        // Existing chain identity preserved across upgrade
+        assertEq(IGetters(_eraDiamond).getChainId(), eraZKChainId, "Existing diamond points at wrong chainId");
 
         // New chain registered, bound to the upgraded CTM, and exposes the right chainId/admin
         assertTrue(_newChainDiamond != address(0), "New chain ID not registered");
         assertEq(IGetters(_newChainDiamond).getChainId(), NEW_CHAIN_ID, "New diamond points at wrong chainId");
         assertEq(IGetters(_newChainDiamond).getProtocolVersion(), _expectedNewVersion, "New chain wrong version");
+        assertTrue(IGetters(_newChainDiamond).getZKsyncOS(), "New chain is not ZKsync OS");
         assertEq(IBridgehubBase(bridgehub).chainTypeManager(NEW_CHAIN_ID), ctm, "New chain not linked to CTM");
         assertEq(
             IChainTypeManager(ctm).getChainAdmin(NEW_CHAIN_ID),
@@ -253,7 +291,7 @@ contract UpgradeIntegrationTest_Local is
             "New chain admin mismatch"
         );
 
-        // Base-token asset id matches the era one (the mock at chainId=0 in setUp propagates it on creation)
+        // Base-token asset id matches the existing chain (the chainId=0 mock in setUp propagates it on creation)
         assertEq(
             IBridgehubBase(bridgehub).baseTokenAssetId(NEW_CHAIN_ID),
             _expectedBaseTokenAssetId,
@@ -266,9 +304,21 @@ contract UpgradeIntegrationTest_Local is
             _expectedUpgradeCutHash,
             "Stored upgradeCutHash mismatch"
         );
-        assertTrue(
-            IChainTypeManager(ctm).protocolVersionVerifier(_expectedNewVersion) != address(0),
-            "Missing verifier for new version"
+        address newVerifier = IChainTypeManager(ctm).protocolVersionVerifier(_expectedNewVersion);
+        assertEq(newVerifier, _expectedNewVerifier, "Stored verifier differs from the emitted one");
+        assertEq(
+            newVerifier,
+            ctmUpgrade.getAddresses().stateTransition.verifiers.verifier,
+            "Registered verifier differs from the one the script deployed"
+        );
+        // DefaultCTMUpgrade.initializeConfig must resolve the verifier kind from the ecosystem's
+        // deployed verifier and install a matching one for the new version; the production-verifier
+        // variant below flips the expectation.
+        assertEq(ctmUpgrade.getTestnetVerifier(), _expectTestnetEcosystem(), "Script resolved the wrong verifier kind");
+        assertEq(
+            IZKsyncOSVerifier(newVerifier).isTestnetVerifier(),
+            _expectTestnetEcosystem(),
+            "New version registered with the wrong verifier kind"
         );
         assertGt(
             IChainTypeManager(ctm).protocolVersionDeadline(_expectedNewVersion),
@@ -317,5 +367,27 @@ contract UpgradeIntegrationTest_Local is
                 "ServerNotifier implementation not upgraded"
             );
         }
+    }
+}
+
+/// @notice The same end-to-end upgrade against an ecosystem whose current verifier is a production
+/// one: `DefaultCTMUpgrade.initializeConfig` must resolve testnetVerifier=false and the upgrade
+/// must install a production verifier for the new version. Guards against the resolution being
+/// hardcoded or ignored, which the testnet fixture alone cannot detect.
+contract UpgradeIntegrationTest_LocalProductionVerifier is UpgradeIntegrationTest_Local {
+    function _expectTestnetEcosystem() internal pure override returns (bool) {
+        return false;
+    }
+
+    function setupUpgrade(bool skipFactoryDepsCheck) public override {
+        // The genesis fixture registers a testnet verifier; swap in a production one via the CTM
+        // owner before the upgrade scripts read it.
+        ChainTypeManagerBase ctm_ = ChainTypeManagerBase(address(addresses.chainTypeManager));
+        address productionVerifier = address(new ZKsyncOSVerifier(IVerifier(address(0))));
+        uint256 currentVersion = ctm_.protocolVersion();
+        address ctmOwner = ctm_.owner();
+        vm.prank(ctmOwner);
+        ctm_.setProtocolVersionVerifier(currentVersion, productionVerifier);
+        super.setupUpgrade(skipFactoryDepsCheck);
     }
 }

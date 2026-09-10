@@ -10,16 +10,15 @@ import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
+import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 
 contract AdminTest is UtilsCallMockerTest {
     IAdmin internal adminFacet;
     UtilsFacet internal utilsFacet;
-    address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    address internal testnetVerifier = address(new ZKsyncOSTestnetVerifier(IVerifier(address(0))));
     DummyBridgehub internal dummyBridgehub;
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
@@ -67,7 +66,7 @@ contract AdminTest is UtilsCallMockerTest {
         dummyBridgehub = new DummyBridgehub();
         mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), bytes32(0));
         mockChainTypeManagerVerifier(testnetVerifier);
-        address diamondProxy = Utils.makeDiamondProxy(facetCuts, address(dummyBridgehub));
+        address diamondProxy = Utils.makeZKsyncOSDiamondProxy(facetCuts, address(dummyBridgehub));
         adminFacet = IAdmin(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);
     }

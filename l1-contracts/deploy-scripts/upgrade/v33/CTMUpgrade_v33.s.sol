@@ -11,6 +11,8 @@ import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisFo
 
 import {IL2V32Upgrade} from "contracts/upgrades/IL2V32Upgrade.sol";
 
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+
 import {Call} from "contracts/governance/Common.sol";
 
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
@@ -38,20 +40,16 @@ contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
     /// @notice Priority-op lower-bound registry, deployed alongside the per-chain upgrade contract
     ///         which embeds it as an immutable. Lives here rather than in `DeployCTMUtils` because
     ///         nothing outside this release knows about it.
-    address internal priorityOpLowerBound;
 
     /// @inheritdoc DeployCTMUtils
     /// @dev Supplies the registry to `V32UpgradeZKsyncOS`'s constructor; everything else falls
     ///      through to the shared implementation.
-    function getCreationCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
+    function getCreationCalldata(string memory contractName) internal view virtual override returns (bytes memory) {
         if (keccak256(bytes(contractName)) == keccak256(bytes("V32UpgradeZKsyncOS"))) {
             require(priorityOpLowerBound != address(0), "PriorityOpLowerBound not deployed");
             return abi.encode(priorityOpLowerBound);
         }
-        return super.getCreationCalldata(contractName, isZKBytecode);
+        return super.getCreationCalldata(contractName);
     }
 
     /// @inheritdoc DefaultCTMUpgrade
@@ -65,7 +63,10 @@ contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
     ///      release's per-chain upgrade, so a run that got further would either fail late or, worse,
     ///      produce a bundle for an upgrade that cannot be applied.
     function noGovernancePrepare(CTMUpgradeParams memory _params) public virtual override {
-        require(_params.isZKsyncOS, "v33 is a ZKsync OS-only release; EraVM CTMs are not supported");
+        require(
+            IChainTypeManager(_params.ctmProxy).isZKsyncOS(),
+            "v33 is a ZKsync OS-only release; EraVM CTMs are not supported"
+        );
         super.noGovernancePrepare(_params);
     }
 
@@ -75,11 +76,11 @@ contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
     ///      refuses to produce anything for Era instead.
     function deployUsedUpgradeContract() internal virtual override returns (address) {
         // The registry must exist first: the upgrade contract embeds its address as an immutable.
-        priorityOpLowerBound = deploySimpleContract("PriorityOpLowerBound", false);
+        priorityOpLowerBound = deploySimpleContract("PriorityOpLowerBound");
         console.log("Deployed PriorityOpLowerBound at", priorityOpLowerBound);
 
         console.log("Deploying V32UpgradeZKsyncOS");
-        return deploySimpleContract("V32UpgradeZKsyncOS", false);
+        return deploySimpleContract("V32UpgradeZKsyncOS");
     }
 
     function getAdditionalFactoryDependencyContracts()
@@ -97,8 +98,6 @@ contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
         override
         returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory additional)
     {
-        require(config.isZKsyncOS, "Upgrading Era chains onto this release is not supported");
-
         // L2V32Upgrade is deployed as a standalone contract at the derived address used as the delegate
         // target in `forceDeployAndUpgradeUniversal`, so it uses `ZKsyncOSUnsafeForceDeployment` rather
         // than `ZKsyncOSSystemProxyUpgrade`.
@@ -111,7 +110,7 @@ contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
         });
     }
 
-    function getZKsyncOSL2UpgradeTargetAndData(
+    function getL2UpgradeTargetAndData(
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
     ) internal virtual override returns (address, bytes memory) {
         // The delegateTo address is a derived address (not the constant L2_VERSION_SPECIFIC_UPGRADER_ADDR)
@@ -124,12 +123,7 @@ contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
         // DefaultUpgradeZKsyncOS.getL2UpgradeTxData at upgrade time.
         bytes memory upgradeCalldata = abi.encodeCall(
             IL2V32Upgrade.upgrade,
-            (
-                config.isZKsyncOS,
-                coreAddresses.bridgehub.proxies.ctmDeploymentTracker,
-                generatedData.forceDeploymentsData,
-                ""
-            )
+            (true, coreAddresses.bridgehub.proxies.ctmDeploymentTracker, generatedData.forceDeploymentsData, "")
         );
 
         return getComplexUpgraderTargetAndData(_deployments, delegateTo, upgradeCalldata);

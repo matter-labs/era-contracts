@@ -175,7 +175,7 @@ export function filterCoverageFiles(
   return coverageData.filter((file) => {
     const p = file.filePath;
 
-    // Must start with contracts/ (excludes ../system-contracts/, lib/, etc.)
+    // Must start with contracts/ (excludes frozen-system-constants/, lib/, etc.)
     if (!p.startsWith("contracts/")) {
       return false;
     }

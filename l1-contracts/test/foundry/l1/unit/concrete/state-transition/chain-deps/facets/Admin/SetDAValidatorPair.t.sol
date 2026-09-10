@@ -57,6 +57,7 @@ contract SetDAValidatorPair is AdminTest {
         address admin = utilsFacet.util_getAdmin();
 
         // BLOBS_ZKSYNC_OS is ZKsync-OS-only and must be rejected on an Era VM chain.
+        utilsFacet.util_setZksyncOS(false);
         vm.startPrank(admin);
         vm.expectRevert(NotZKsyncOS.selector);
         adminFacet.setDAValidatorPair(address(1), L2DACommitmentScheme.BLOBS_ZKSYNC_OS);

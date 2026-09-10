@@ -218,20 +218,6 @@ async fn find_representative_chain_diamond(
 
     let expected_protocol = U256::from(ctm.contracts_config.old_protocol_version);
 
-    if ctm.flavor == CtmFlavor::Era {
-        let chain_id = U256::from(verifiers.era_chain_id);
-        if let Some(representative) = inspect_chain_for_facet_cut_reconstruction(
-            chain_id,
-            ctm_proxy,
-            expected_protocol,
-            verifiers,
-        )
-        .await?
-        {
-            return Ok(Some(representative));
-        }
-    }
-
     let chain_ids = match verifiers
         .network_verifier
         .try_get_all_zk_chain_ids(verifiers.bridgehub_address)

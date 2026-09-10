@@ -20,7 +20,6 @@ const deployCTMData = toml.parse(fs.readFileSync(outputDeployCTM, "utf-8"));
 
 // Extract values and build the output structure
 const outputData = {
-  era_chain_id: deployL1Data.era_chain_id,
   core_contracts: {
     bridgehub_proxy_addr: deployL1Data.deployed_addresses.bridgehub.bridgehub_proxy_addr,
   },
@@ -32,9 +31,7 @@ const outputData = {
 };
 
 // Write the output TOML file (manually format since toml package only parses)
-const outputToml = `era_chain_id = ${outputData.era_chain_id}
-
-[core_contracts]
+const outputToml = `[core_contracts]
 bridgehub_proxy_addr = "${outputData.core_contracts.bridgehub_proxy_addr}"
 
 [ctm_contracts]
@@ -46,6 +43,5 @@ l1_bytecodes_supplier_addr = "${outputData.ctm_contracts.l1_bytecodes_supplier_a
 fs.writeFileSync(permanentValuesOut, outputToml);
 
 console.log(`✓ Successfully copied values to ${permanentValuesOut}`);
-console.log(`  - era_chain_id: ${outputData.era_chain_id}`);
 console.log(`  - bridgehub_proxy_addr: ${outputData.core_contracts.bridgehub_proxy_addr}`);
 console.log(`  - ctm_proxy_addr: ${outputData.ctm_contracts.ctm_proxy_addr}`);

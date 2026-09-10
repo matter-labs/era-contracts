@@ -279,9 +279,10 @@ async fn resolve_da_move(
     let ctm = crate::common::l1_contracts::resolve_ctm_proxy(l1_rpc_url, bridgehub, chain_id)
         .await
         .context("resolving CTM from L1")?;
-    let vm_type = crate::common::l1_contracts::resolve_vm_type(l1_rpc_url, ctm)
-        .await
-        .context("resolving the chain's VM from the CTM")?;
+    anyhow::ensure!(
+        crate::common::l1_contracts::resolve_is_zksync_os(l1_rpc_url, ctm).await?,
+        "Only ZKsync OS chains are supported"
+    );
 
     let pair = match args.da_mode {
         Some(da_mode) => Some(DaPair {
@@ -290,14 +291,12 @@ async fn resolve_da_move(
                 .context("--da-mode requires --l1-da-validator")?,
             l2_da_commitment_scheme: args
                 .l2_da_commitment_scheme
-                .unwrap_or_else(|| L2DACommitmentScheme::from_da_and_vm_types(da_mode, vm_type)),
+                .unwrap_or_else(|| L2DACommitmentScheme::from_da_type(da_mode)),
         }),
         None => None,
     };
     // Follows from the kind of chain `--da-mode` says it now is; it has no knob of its own.
-    let pubdata_content = args
-        .da_mode
-        .and_then(|da_mode| PubdataContent::from_da_and_vm_types(da_mode, vm_type));
+    let pubdata_content = args.da_mode.map(PubdataContent::from_da_type);
 
     let da_move = DaMove {
         pair,

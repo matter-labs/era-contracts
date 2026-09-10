@@ -35,7 +35,7 @@ contract CoreUpgradeParityHarness is CoreUpgrade_v33 {
     /// @dev The initializer the deploy step hands the handler's proxy. Exposed so a test can deploy a
     ///      proxy exactly as the script does and assert the resulting owner.
     function interopHandlerInitializer() external returns (bytes memory) {
-        return getInitializeCalldata("L1InteropHandler", false);
+        return getInitializeCalldata("L1InteropHandler");
     }
 
     function setOwner(address _owner) external {

@@ -91,10 +91,12 @@ pub async fn run(args: ChainSetDaValidatorPairArgs) -> anyhow::Result<()> {
             )
             .await
             .context("resolving the chain's CTM from L1")?;
-            let vm_type =
-                crate::common::l1_contracts::resolve_vm_type(&runner.rpc_url, ctm_proxy).await?;
-            logger::info(format!("VM type (from L1): {vm_type:?}"));
-            L2DACommitmentScheme::from_da_and_vm_types(args.da_mode, vm_type)
+            anyhow::ensure!(
+                crate::common::l1_contracts::resolve_is_zksync_os(&runner.rpc_url, ctm_proxy)
+                    .await?,
+                "Only ZKsync OS chains are supported"
+            );
+            L2DACommitmentScheme::from_da_type(args.da_mode)
         }
     };
     // `AdminFunctions.setDAValidatorPair` → `Utils.adminExecuteCalls` internally

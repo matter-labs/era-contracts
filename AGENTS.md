@@ -11,7 +11,7 @@ Instead, use the `cleanup.sh` script in the anvil-interop directory, which targe
 ## Code style requirements
 
 1. Avoid using magic numbers. Most constant numbers especially for system params / well known chain ids must be represented as a constant.
-2. All constants should be placed in the dedicated file (e.g. `common/Config.sol` in `l1-contracts`, `Constants.sol` in `system-contracts`, etc). if you do not know where to put the constant to, please closely analyze the corresponding project. If this file can not be found, please create one.
+2. All constants should be placed in the dedicated file (e.g. `common/Config.sol` in `l1-contracts`). if you do not know where to put the constant to, please closely analyze the corresponding project. If this file can not be found, please create one.
 3. Function parameters must be prefixed with `_` (e.g. `_value`, `_owner`). This convention applies to all functions across all contracts.
 4. Always use `{ }` for `if` blocks — never inline the body (`if (cond) revert X();` is forbidden; write `if (cond) { revert X(); }`). The same applies to `for`/`while` bodies.
 5. Never write doc comments (`///` natspec) for custom errors — error files contain only the `// 0x<selector>` lines maintained by the errors lint. Put any rationale at the revert site instead. When a new file with errors is added, it MUST be registered in the errors lint (`CONTRACTS_DIRECTORIES` in `l1-contracts/scripts/errors-lint.ts`) and `yarn errors-lint --fix` must be run.
@@ -220,18 +220,28 @@ When debugging Solidity compilation or script failures:
 
 ## Running Foundry Tests
 
-### Installing foundry-zksync
+### Installing Foundry
 
-The tests require `foundry-zksync` (ZKSync's fork of Foundry) to be installed. Download the specific version used in CI:
+The repository builds and tests with upstream Foundry (ordinary EVM, no `--zksync`). One pinned
+version covers forge, cast and anvil alike, and it lives in
+[`.github/foundry-versions.env`](.github/foundry-versions.env) — CI installs it through
+`.github/actions/install-foundry`, `recompute_hashes.sh` reads the same file, and the Docker base
+image takes it as a build arg. Install it with:
 
 ```bash
-mkdir ./foundry-zksync
-curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/foundry-zksync-v0.0.30/foundry_zksync_v0.0.30_linux_amd64.tar.gz
-tar zxf foundry_zksync_v0.0.30_linux_amd64.tar.gz -C ./foundry-zksync
-chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
-rm foundry_zksync_v0.0.30_linux_amd64.tar.gz
-export PATH="$PWD/foundry-zksync:$PATH"
+curl -L https://foundry.paradigm.xyz | bash
+foundryup --install "$(. .github/foundry-versions.env && echo "$FOUNDRY_VERSION")"
 ```
+
+Note the version must be upstream Foundry, not the `foundry-zksync` fork: both report a `1.x.y`
+version, and building or generating `selectors` with the fork mismatches CI in both directions
+without saying so.
+
+Never bump the pin in a workflow directly — change it in `.github/foundry-versions.env` and
+regenerate whatever it invalidates. A bump changes solc metadata in every artifact, so
+`AllContractsHashes.json` always needs regenerating (`zkstack-out` and `selectors` are ABI-derived
+and unaffected — measured, not assumed). Anvil's trace schema must stay compatible with the
+committed anvil-interop chain states; regenerate those too if a bump changes it.
 
 ### Building Artifacts
 
@@ -243,12 +253,6 @@ yarn da build:foundry
 
 # Build l1-contracts
 yarn l1 build:foundry
-
-# Build system-contracts
-yarn sc build:foundry
-
-# Build l2-contracts
-yarn l2 build:foundry
 ```
 
 ### Running Tests
@@ -256,10 +260,6 @@ yarn l2 build:foundry
 ```bash
 # Run l1-contracts foundry tests
 cd l1-contracts
-yarn test:foundry
-
-# Run system-contracts foundry tests
-cd system-contracts
 yarn test:foundry
 ```
 
@@ -281,7 +281,7 @@ ANVIL_INTEROP_FRESH_DEPLOY=1 yarn test:hardhat:interop
 ANVIL_INTEROP_KEEP_CHAINS=1 yarn test:hardhat:interop
 ```
 
-After modifying mock system contracts (e.g., `MockL2ToL1Messenger`, `MockMintBaseTokenHook`), regenerate chain states:
+After modifying mock system contracts (e.g., `MockL1MessengerHook`, `MockMintBaseTokenHook`), regenerate chain states:
 
 ```bash
 cd l1-contracts
@@ -292,7 +292,7 @@ npx ts-node setup-and-dump-state.ts
 
 ### Common Issues
 
-1. **Missing zkout files**: If tests fail with "zkout/BeaconProxy.sol/BeaconProxy.json not found", ensure you've built all artifacts with the steps above.
+1. **Stale compilation cache**: after large batches of file restores/deletions, forge's incremental cache can go inconsistent (e.g. a deployer's embedded `type(X).creationCode` differing from X's own artifact). Run `rm -rf cache out` (or `forge clean`) and rebuild before chasing phantom failures, and always clean-build before hash checks.
 
 2. **Config lock errors**: Some tests may fail with "Can't acquire config lock". This is usually a transient issue - try running the tests again.
 
@@ -303,7 +303,7 @@ npx ts-node setup-and-dump-state.ts
    ```bash
    cd l1-contracts
    forge build
-   yarn copy-to-zkstack-out.ts
+   yarn copy-to-zkstack-out
    cd ..
    yarn prettier:fix  # Required to add trailing newlines to JSON files
    ```

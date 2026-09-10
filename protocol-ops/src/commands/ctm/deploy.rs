@@ -13,14 +13,13 @@ use crate::common::{
     traits::{ReadConfig, SaveConfig},
     wallets::Wallet,
 };
-use crate::types::{L1Network, VMOption};
+use crate::types::L1Network;
 
 /// Input parameters for deploying CTM contracts.
 #[derive(Debug, Clone, Serialize)]
 pub struct CtmDeployInput {
     pub bridgehub: Address,
     pub owner: Address,
-    pub vm_type: VMOption,
     pub reuse_gov_and_admin: bool,
     pub with_testnet_verifier: bool,
     pub zk_token_asset_id: Option<B256>,
@@ -53,9 +52,6 @@ pub fn deploy(
         &initial_deployment_config,
         input.with_testnet_verifier,
         zk_token_asset_id,
-        // The legacy shared-bridge test support this gated was removed.
-        false,
-        input.vm_type,
     );
 
     let input_path = runner.input_path(&DEPLOY_CTM_INVOCATION)?;

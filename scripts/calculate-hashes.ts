@@ -4,19 +4,12 @@ import _ from "lodash";
 import os from "os";
 import { join } from "path";
 import * as blakejs from "blakejs";
-import { hashBytecode } from "zksync-ethers/build/utils";
 
-const SOLIDITY_SOURCE_CODE_PATHS = ["system-contracts/", "l2-contracts/", "l1-contracts/", "da-contracts/"];
-const YUL_SOURCE_CODE_PATHS = ["system-contracts/"];
+const SOLIDITY_SOURCE_CODE_PATHS = ["l1-contracts/", "da-contracts/"];
 const OUTPUT_FILE_PATH = "AllContractsHashes.json";
 
-const SKIPPED_FOLDERS = [
-  "l1-contracts/deploy-scripts",
-  "l1-contracts/test",
-  "l1-contracts/contracts/dev-contracts",
-  "system-contracts/bootloader/tests/bootloader",
-];
-const FORCE_INCLUDE = ["Create2AndTransfer.sol", "L1MessageRootStageSepolia.sol"];
+const SKIPPED_FOLDERS = ["l1-contracts/deploy-scripts", "l1-contracts/test", "l1-contracts/contracts/dev-contracts"];
+const FORCE_INCLUDE = ["Create2AndTransfer.sol"];
 
 // Opens a Solidity file and returns all the contracts/libraries created inside of it.
 function parseSolFile(filePath: string): string[] {
@@ -45,7 +38,6 @@ function getCanonicalPathsFromFile(directory: string, fileName: string, fullPath
 
   for (const item of parsed) {
     res.push(`/${folderName}out/${fileName}/${item}.json`);
-    res.push(`/${folderName}zkout/${fileName}/${item}.json`);
   }
 
   return res;
@@ -117,15 +109,9 @@ type EvmCompilations = {
   evmDeployedBytecodeLength: number | null;
 };
 
-type ZKCompilation = {
-  zkBytecodePath: string | null;
-  zkBytecodeHash: string | null;
-};
-
 type SourceAndEvmCompilationDetails = SourceContractDetails & EvmCompilations;
-type SourceAndZKCompilationDetails = SourceContractDetails & ZKCompilation;
 
-type ContractsInfo = SourceContractDetails & EvmCompilations & ZKCompilation;
+type ContractsInfo = SourceAndEvmCompilationDetails;
 
 const findDirsEndingWith = (path: string, endingWith: string): fs.Dirent[] => {
   const absolutePath = makePathAbsolute(path);
@@ -138,16 +124,7 @@ const findDirsEndingWith = (path: string, endingWith: string): fs.Dirent[] => {
   }
 };
 
-const SOLIDITY_ARTIFACTS_ZK_DIR = "zkout";
 const SOLIDITY_ARTIFACTS_DIR = "out";
-
-const getBytecodeHashFromZkJson = (jsonFileContents: { bytecode: { object: string } }) => {
-  try {
-    return ethers.utils.hexlify(hashBytecode("0x" + jsonFileContents.bytecode.object));
-  } catch (err) {
-    return "0x";
-  }
-};
 
 type EvmJsonFileContents = {
   bytecode: { object: string };
@@ -190,51 +167,6 @@ const getBytecodeInfoFromEvmJson = (jsonFileContents: EvmJsonFileContents): EVMB
   } catch (err) {
     return defaultEVMBytecodeInfo();
   }
-};
-
-const getZkSolidityContractsDetailsWithArtifactsDir = (workDir: string): SourceAndZKCompilationDetails[] => {
-  const artifactsDir = SOLIDITY_ARTIFACTS_ZK_DIR;
-  const bytecodesDir = join(workDir, artifactsDir);
-  const dirsEndingWithSol = findDirsEndingWith(bytecodesDir, ".sol").filter(
-    (dirent) => !dirent.name.endsWith(".t.sol") && !dirent.name.endsWith(".s.sol") && !dirent.name.endsWith("Test.sol")
-  );
-
-  const compiledFiles = dirsEndingWithSol
-    .map((d) => {
-      const contractFiles = fs
-        .readdirSync(join(d.path, d.name), { withFileTypes: true })
-        .filter((dirent) => dirent.isFile() && dirent.name.endsWith(".json") && !dirent.name.includes("dbg"))
-        .map((dirent) => dirent.name);
-
-      return contractFiles.map((c) => {
-        return join(d.path, d.name, c);
-      });
-    })
-    .flat();
-
-  return (
-    compiledFiles
-      .map((jsonFile) => {
-        const jsonFileContents = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
-        const zkBytecodeHash = getBytecodeHashFromZkJson(jsonFileContents);
-
-        const zkBytecodePath = jsonFile.startsWith(join(__dirname, ".."))
-          ? jsonFile.replace(join(__dirname, ".."), "")
-          : jsonFile;
-
-        const contractName = (jsonFile.split("/").pop() || "").replace(".json", "");
-
-        return {
-          contractName: join(workDir, contractName),
-          zkBytecodePath,
-          zkBytecodeHash,
-        };
-      })
-      // ---------------------------------------------------------------------
-      //  Filter out empty bytecode + check skipping logic
-      // ---------------------------------------------------------------------
-      .filter((c) => c.zkBytecodeHash != "0x" && !shouldSkipFolderOrFile(c.zkBytecodePath))
-  );
 };
 
 const getEVMSolidityContractsDetailsWithArtifactsDir = (workDir: string): SourceAndEvmCompilationDetails[] => {
@@ -282,101 +214,6 @@ const getEVMSolidityContractsDetailsWithArtifactsDir = (workDir: string): Source
       //  Filter out empty bytecode + check skipping logic
       // ---------------------------------------------------------------------
       .filter((c) => c.evmBytecodeHash != "0x" && !shouldSkipFolderOrFile(c.evmBytecodePath))
-  );
-};
-
-const getSolidityContractsDetails = (dir: string): ContractsInfo[] => {
-  const zkContracts = getZkSolidityContractsDetailsWithArtifactsDir(dir);
-  const contracts = getEVMSolidityContractsDetailsWithArtifactsDir(dir);
-
-  const mergedContracts: ContractsInfo[] = [];
-
-  zkContracts.forEach((contract) => {
-    const newContract: ContractsInfo = {
-      contractName: contract.contractName,
-      zkBytecodeHash: contract.zkBytecodeHash,
-      zkBytecodePath: contract.zkBytecodePath,
-      evmBytecodeHash: null,
-      evmBytecodePath: null,
-      evmDeployedBytecodeHash: null,
-      evmDeployedBytecodeBlakeHash: null,
-      evmDeployedBytecodeLength: null,
-    };
-    mergedContracts.push(newContract);
-  });
-
-  contracts.forEach((contract) => {
-    const existingContract = mergedContracts.find((c) => c.contractName === contract.contractName);
-
-    if (existingContract) {
-      existingContract.evmBytecodeHash = contract.evmBytecodeHash;
-      existingContract.evmBytecodePath = contract.evmBytecodePath;
-      existingContract.evmDeployedBytecodeHash = contract.evmDeployedBytecodeHash;
-      existingContract.evmDeployedBytecodeBlakeHash = contract.evmDeployedBytecodeBlakeHash;
-      existingContract.evmDeployedBytecodeLength = contract.evmDeployedBytecodeLength;
-    } else {
-      const newContract: ContractsInfo = {
-        contractName: contract.contractName,
-        evmBytecodeHash: contract.evmBytecodeHash,
-        evmBytecodePath: contract.evmBytecodePath,
-        evmDeployedBytecodeHash: contract.evmDeployedBytecodeHash,
-        evmDeployedBytecodeBlakeHash: contract.evmDeployedBytecodeBlakeHash,
-        evmDeployedBytecodeLength: contract.evmDeployedBytecodeLength,
-        zkBytecodeHash: null,
-        zkBytecodePath: null,
-      };
-      mergedContracts.push(newContract);
-    }
-  });
-
-  return mergedContracts;
-};
-
-const getYulContractsDetails = (dir: string): ContractsInfo[] => {
-  const bytecodesDir = join(dir, SOLIDITY_ARTIFACTS_ZK_DIR);
-  const dirsEndingWithYul = findDirsEndingWith(bytecodesDir, ".yul").filter(
-    (dirent) => !dirent.name.endsWith(".t.sol")
-  );
-
-  const compiledFiles = dirsEndingWithYul
-    .map((d) => {
-      const contractFiles = fs
-        .readdirSync(join(d.path, d.name), { withFileTypes: true, recursive: true })
-        .filter((dirent) => dirent.isFile() && dirent.name.endsWith(".json") && !dirent.name.includes("dbg"));
-
-      return contractFiles.map((c) => {
-        return join(c.path, c.name);
-      });
-    })
-    .flat();
-
-  return (
-    compiledFiles
-      .map((jsonFile) => {
-        const jsonFileContents = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
-        const zkBytecodeHash = getBytecodeHashFromZkJson(jsonFileContents);
-
-        const zkBytecodePath = jsonFile.startsWith(join(__dirname, ".."))
-          ? jsonFile.replace(join(__dirname, ".."), "")
-          : jsonFile;
-
-        const contractName = (jsonFile.split("/").pop() || "").replace(".json", "");
-
-        return {
-          contractName,
-          zkBytecodePath,
-          zkBytecodeHash,
-          evmBytecodePath: null,
-          evmBytecodeHash: null,
-          evmDeployedBytecodeHash: null,
-          evmDeployedBytecodeBlakeHash: null,
-          evmDeployedBytecodeLength: null,
-        };
-      })
-      // ---------------------------------------------------------------------
-      //  Filter out empty bytecode + check skipping logic
-      // ---------------------------------------------------------------------
-      .filter((c) => c.zkBytecodeHash != "0x" && !shouldSkipFolderOrFile(c.zkBytecodePath))
   );
 };
 
@@ -441,23 +278,30 @@ const findDifferences = (newHashes: ContractsInfo[], oldHashes: ContractsInfo[])
 };
 
 const main = async () => {
-  const args = process.argv;
-  if (args.length > 3 || (args.length == 3 && !args.includes("--check-only"))) {
+  const args = process.argv.slice(2);
+  const allowedArgs = new Set(["--check-only"]);
+  if (args.some((arg) => !allowedArgs.has(arg)) || new Set(args).size !== args.length) {
     console.log(
-      `This command can be used with no arguments or with the --check-only flag. Use the --check-only flag to check the hashes without updating the ${OUTPUT_FILE_PATH} file.`
+      `Usage: calculate-hashes.ts [--check-only]. Use --check-only to check without updating ${OUTPUT_FILE_PATH}.`
     );
     process.exit(1);
   }
   const checkOnly = args.includes("--check-only");
-
-  const solidityContractsDetails = _.flatten(SOLIDITY_SOURCE_CODE_PATHS.map(getSolidityContractsDetails));
-  const yulContractsDetails = _.flatten(YUL_SOURCE_CODE_PATHS.map(getYulContractsDetails));
-  const systemContractsDetails = [...solidityContractsDetails, ...yulContractsDetails];
-
-  console.log("New hashes: ", systemContractsDetails.length);
-
-  const newSystemContractsHashes = systemContractsDetails;
   const oldSystemContractsHashes = readSystemContractsHashesFile(OUTPUT_FILE_PATH);
+
+  // Strict manifest: exactly the ordinary-EVM artifacts this branch builds. Rows for
+  // artifacts that can no longer be rebuilt (EraVM zkout, removed workspaces) are not carried.
+  const newSystemContractsHashes: ContractsInfo[] = _.flatten(
+    SOLIDITY_SOURCE_CODE_PATHS.map((sourcePath) => {
+      const hashes = getEVMSolidityContractsDetailsWithArtifactsDir(sourcePath);
+      if (hashes.length === 0) {
+        throw new Error(`No EVM artifacts found for ${sourcePath}; run its build:foundry script first.`);
+      }
+      return hashes;
+    })
+  );
+
+  console.log("New hashes: ", newSystemContractsHashes.length);
   if (_.isEqual(newSystemContractsHashes, oldSystemContractsHashes)) {
     console.log(`Calculated hashes match the hashes in the ${OUTPUT_FILE_PATH} file.`);
     console.log("Exiting...");
@@ -483,6 +327,6 @@ main()
   .then(() => process.exit(0))
   .catch((err) => {
     console.error("Error:", err.message || err);
-    console.log("Please make sure to run `yarn sc build` before running this script.");
+    console.log("Please make sure the contract projects selected for hashing have been built first.");
     process.exit(1);
   });

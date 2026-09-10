@@ -80,7 +80,7 @@ pub const L2_BASE_TOKEN_HOLDER_ADDR: Address = l2_addr(0x11);
 
 /// L2 system contract addresses (`SYSTEM_CONTRACTS_OFFSET + <offset>`).
 /// Sourced from `L2ContractAddresses.sol` where available; the rest live in
-/// `system-contracts/contracts/Constants.sol`.
+/// `l1-contracts/frozen-system-constants/Constants.sol`.
 pub const L2_BOOTLOADER_ADDRESS: Address = system_contract_addr(0x01);
 pub const L2_ACCOUNT_CODE_STORAGE_ADDR: Address = system_contract_addr(0x02);
 pub const L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR: Address = system_contract_addr(0x04);
@@ -98,11 +98,11 @@ pub const CODE_ORACLE_SYSTEM_CONTRACT: Address = system_contract_addr(0x12);
 pub const EVM_GAS_MANAGER: Address = system_contract_addr(0x13);
 pub const EVM_PREDEPLOYS_MANAGER: Address = system_contract_addr(0x14);
 /// Solidity hardcodes this as `address(0x8010)` rather than the offset form;
-/// see the comment in `system-contracts/Constants.sol`. The value is still
+/// see the comment in `frozen-system-constants/Constants.sol`. The value is still
 /// `SYSTEM_CONTRACTS_OFFSET + 0x10`.
 pub const KECCAK256_SYSTEM_CONTRACT: Address = literal_addr(0x8010);
 
-/// EVM precompile addresses. Sourced from `system-contracts/Constants.sol`
+/// EVM precompile addresses. Sourced from `frozen-system-constants/Constants.sol`
 /// where they're declared as `address(0xNN)` literals (no offset).
 pub const ECRECOVER_SYSTEM_CONTRACT: Address = literal_addr(0x01);
 pub const SHA256_SYSTEM_CONTRACT: Address = literal_addr(0x02);
@@ -113,18 +113,15 @@ pub const ECMUL_SYSTEM_CONTRACT: Address = literal_addr(0x07);
 pub const ECPAIRING_SYSTEM_CONTRACT: Address = literal_addr(0x08);
 
 /// v31 L2 protocol upgrade transaction parameters.
-/// `txType` differs between Era VM (254) and ZKsync OS (126); gas + pubdata
-/// limits are fixed by v31 deploy scripts and travel with the artifact.
-pub const ERA_SYSTEM_UPGRADE_TX_TYPE: u64 = 254;
+/// ZKsync OS upgrade txs use txType 126 (Era VM's 254 is gone with the Era
+/// CTM); gas + pubdata limits are fixed by v31 deploy scripts and travel
+/// with the artifact.
 pub const ZKSYNC_OS_SYSTEM_UPGRADE_TX_TYPE: u64 = 126;
 pub const L2_UPGRADE_GAS_LIMIT: u64 = 72_000_000;
 pub const L2_UPGRADE_GAS_PER_PUBDATA_BYTE_LIMIT: u64 = 800;
 
-/// AllContractsHashes file-name keys consulted by the bytecode verifier.
+/// AllContractsHashes file-name key consulted by the bytecode verifier.
 pub const L2_V32_UPGRADE_CONTRACT: &str = "l1-contracts/L2V32Upgrade";
-pub const BOOTLOADER_CONTRACT: &str = "Bootloader";
-pub const DEFAULT_ACCOUNT_CONTRACT: &str = "system-contracts/DefaultAccount";
-pub const EVM_EMULATOR_CONTRACT: &str = "EvmEmulator";
 
 #[cfg(test)]
 mod tests {
@@ -218,7 +215,7 @@ mod tests {
             "../../../l1-contracts/contracts/common/l2-helpers/L2ContractAddresses.sol"
         );
         const SYSTEM_CONSTANTS: &str =
-            include_str!("../../../system-contracts/contracts/Constants.sol");
+            include_str!("../../../l1-contracts/frozen-system-constants/Constants.sol");
 
         let mut addrs = parse_solidity_addresses(L2_CONTRACT_ADDRESSES);
         // Later inserts overwrite — fine because any duplicate names across

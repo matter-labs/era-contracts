@@ -78,7 +78,7 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         // Derived from the same genesis config the CTM was deployed from, rather than hardcoded:
         // the packed version moves on every protocol bump, and a literal here silently rots.
         uint256 expectedProtocolVersion = ChainCreationParamsLib
-            .getChainCreationParams(Utils.genesisConfigPath(false), false)
+            .getChainCreationParams(Utils.genesisConfigPath())
             .latestProtocolVersion;
 
         uint256 protocolVersion = addresses.chainTypeManager.getProtocolVersion(chainId);

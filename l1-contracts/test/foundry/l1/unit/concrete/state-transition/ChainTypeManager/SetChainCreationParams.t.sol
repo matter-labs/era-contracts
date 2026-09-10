@@ -24,7 +24,7 @@ contract SetChainCreationParamsTest is ChainTypeManagerTest {
         address newGenesisUpgrade = makeAddr("newGenesisUpgrade");
         bytes32 genesisBatchHash = bytes32(uint256(0x02));
         uint64 genesisIndexRepeatedStorageChanges = 2;
-        bytes32 genesisBatchCommitment = bytes32(uint256(0x02));
+        bytes32 genesisBatchCommitment = bytes32(uint256(0x01));
 
         ChainCreationParams memory newChainCreationParams = ChainCreationParams({
             genesisUpgrade: newGenesisUpgrade,

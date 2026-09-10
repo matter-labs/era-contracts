@@ -64,24 +64,21 @@ contract CoreUpgrade_v33 is Script, DefaultCoreUpgrade, ICoreUpgradeV33 {
             (
                 coreAddresses.bridges.implementations.l1InteropHandler,
                 coreAddresses.bridges.proxies.l1InteropHandler
-            ) = deployTuppWithContract("L1InteropHandler", false);
+            ) = deployTuppWithContract("L1InteropHandler");
             deployedL1InteropHandler = true;
         } else {
-            coreAddresses.bridges.implementations.l1InteropHandler = deploySimpleContract("L1InteropHandler", false);
+            coreAddresses.bridges.implementations.l1InteropHandler = deploySimpleContract("L1InteropHandler");
         }
     }
 
     /// @inheritdoc DeployL1CoreUtils
     /// @dev Hands the interop handler straight to governance; see {deployVersionSpecificEcosystemContractsL1}.
     ///      Every other contract keeps the shared deployment behaviour.
-    function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual override returns (bytes memory) {
+    function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory) {
         if (keccak256(bytes(contractName)) == keccak256(bytes("L1InteropHandler"))) {
             return abi.encodeCall(L1InteropHandler.initialize, (getOwnerAddress()));
         }
-        return super.getInitializeCalldata(contractName, isZKBytecode);
+        return super.getInitializeCalldata(contractName);
     }
 
     /// @notice Stage-1 calls that wire a freshly deployed `L1InteropHandler` into the bridges.

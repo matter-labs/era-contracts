@@ -296,7 +296,6 @@ library L2GenesisForceDeploymentsHelper {
         // solhint-disable-next-line func-named-parameters
         L2AssetRouter(L2_ASSET_ROUTER_ADDR).initL2(
             _fixedForceDeploymentsData.l1ChainId,
-            _fixedForceDeploymentsData.eraChainId,
             IL1AssetRouter(_fixedForceDeploymentsData.l1AssetRouter),
             _additionalForceDeploymentsData.baseTokenBridgingData.assetId,
             _fixedForceDeploymentsData.aliasedL1Governance
@@ -345,7 +344,6 @@ library L2GenesisForceDeploymentsHelper {
         // solhint-disable-next-line func-named-parameters
         L2AssetRouter(L2_ASSET_ROUTER_ADDR).updateL2(
             _fixedForceDeploymentsData.l1ChainId,
-            _fixedForceDeploymentsData.eraChainId,
             IL1AssetRouter(_fixedForceDeploymentsData.l1AssetRouter),
             _additionalForceDeploymentsData.baseTokenBridgingData.assetId,
             _fixedForceDeploymentsData.aliasedL1Governance

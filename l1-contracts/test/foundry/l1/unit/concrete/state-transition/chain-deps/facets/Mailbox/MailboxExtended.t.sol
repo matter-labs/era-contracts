@@ -10,8 +10,7 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
@@ -70,9 +69,9 @@ contract MailboxOnGatewayTest is UtilsCallMockerTest {
             abi.encode(1)
         );
 
-        address testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+        address testnetVerifier = address(new ZKsyncOSTestnetVerifier(IVerifier(address(0))));
         mockChainTypeManagerVerifier(testnetVerifier);
-        address diamondProxy = Utils.makeDiamondProxy(facetCuts, bridgehub);
+        address diamondProxy = Utils.makeZKsyncOSDiamondProxy(facetCuts, bridgehub);
 
         mailboxFacet = IMailbox(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);

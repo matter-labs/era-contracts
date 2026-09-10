@@ -61,12 +61,7 @@ mod core_signatures {
             );
         }
         contract V31L1Nullifier {
-            constructor(
-                address _bridgehub,
-                address _messageRoot,
-                uint256 _eraChainId,
-                address _eraDiamondProxy
-            );
+            constructor(address _bridgehub, address _messageRoot);
         }
         contract V31L1MessageRoot {
             constructor(address _bridgehub, uint256 _eraGatewayChainId, address _chainAssetHandler);
@@ -123,9 +118,6 @@ mod ctm_signatures {
                 address _permissionlessValidator
             );
         }
-        contract V31DualVerifier {
-            constructor(address _fflonkVerifier, address _plonkVerifier);
-        }
         contract V31ZKsyncOSVerifier {
             constructor(address _plonkVerifier);
         }
@@ -179,13 +171,6 @@ mod gateway_signatures {
         }
 
         #[derive(Debug)]
-        struct InitializeDataNewChain {
-            bytes32 l2BootloaderBytecodeHash;
-            bytes32 l2DefaultAccountBytecodeHash;
-            bytes32 l2EvmEmulatorBytecodeHash;
-        }
-
-        #[derive(Debug)]
         struct GatewayDADeployerConfig {
             bytes32 salt;
             address aliasedGovernanceAddress;
@@ -216,7 +201,6 @@ mod gateway_signatures {
         struct GatewayCTMDeployerConfig {
             address aliasedGovernanceAddress;
             bytes32 salt;
-            uint256 eraChainId;
             uint256 l1ChainId;
             bool testnetVerifier;
             bool isZKsyncOS;
@@ -226,9 +210,6 @@ mod gateway_signatures {
             bytes4[] gettersSelectors;
             bytes4[] migratorSelectors;
             bytes4[] committerSelectors;
-            bytes32 bootloaderHash;
-            bytes32 defaultAccountHash;
-            bytes32 evmEmulatorHash;
             bytes32 genesisRoot;
             uint256 genesisRollupLeafIndex;
             bytes32 genesisBatchCommitment;
@@ -487,20 +468,6 @@ pub(crate) async fn verify_v31_provenance(
         .await
         .unwrap_or_else(|err| panic!("Failed to call L1AssetRouter.nativeTokenVault(): {err}"));
 
-    // The era_chain_id-dependent constructors (L1AssetRouter / L1Nullifier)
-    // require both the chain id and the chain's diamond proxy. The env provides
-    // era_chain_id; the diamond proxy must resolve from Bridgehub.
-    let era_diamond_proxy = verifiers
-        .network_verifier
-        .try_get_chain_diamond_from_bridgehub(bridgehub_addr, U256::from(era_chain_id))
-        .await
-        .unwrap_or_else(|err| {
-            panic!("Failed to call Bridgehub.getZKChain({era_chain_id}) for provenance: {err}")
-        });
-    if era_diamond_proxy == Address::ZERO {
-        panic!("Bridgehub.getZKChain({era_chain_id}) returned address(0) for provenance");
-    }
-
     let governance = bridgehub
         .owner()
         .call()
@@ -513,13 +480,11 @@ pub(crate) async fn verify_v31_provenance(
         weth,
         nullifier,
         ntv_proxy,
-        era_diamond_proxy,
         governance,
     };
     verify_core_provenance(
         artifact,
         verifiers,
-        era_chain_id,
         legacy_gateway_chain_id,
         result,
         core_context,
@@ -808,14 +773,12 @@ struct CoreProvenanceContext {
     weth: Address,
     nullifier: Address,
     ntv_proxy: Address,
-    era_diamond_proxy: Address,
     governance: Address,
 }
 
 async fn verify_core_provenance(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
-    era_chain_id: u64,
     legacy_gateway_chain_id: u64,
     result: &mut VerificationResult,
     context: CoreProvenanceContext,
@@ -916,22 +879,20 @@ async fn verify_core_provenance(
                 context.weth,
                 context.bridgehub_addr,
                 context.nullifier,
-                U256::from(era_chain_id),
-                context.era_diamond_proxy,
+                // The deploy scripts pass ERA_CHAIN_ID_UNUSED / ERA_DIAMOND_PROXY_UNUSED
+                // (deploy-scripts/utils/Types.sol): nothing this release line deploys has an
+                // Era chain, so generated packages record zero for both words.
+                U256::ZERO,
+                Address::ZERO,
             ))
             .abi_encode(),
             "l1-contracts/L1AssetRouter",
         ),
-        // L1Nullifier impl(bridgehub, messageRoot, eraChainId, eraDiamondProxy).
+        // L1Nullifier impl(bridgehub, messageRoot).
         (
             nullifier_impl,
-            V31L1Nullifier::constructorCall::new((
-                context.bridgehub_addr,
-                message_root_proxy,
-                U256::from(era_chain_id),
-                context.era_diamond_proxy,
-            ))
-            .abi_encode(),
+            V31L1Nullifier::constructorCall::new((context.bridgehub_addr, message_root_proxy))
+                .abi_encode(),
             "l1-contracts/L1Nullifier",
         ),
         // L1Bridgehub impl(_owner=governance, _maxNumberOfZKChains).
@@ -1017,10 +978,7 @@ async fn verify_ctm_provenance(
         ],
     )?;
 
-    let ctm_file = match ctm.flavor {
-        CtmFlavor::Era => "l1-contracts/EraChainTypeManager",
-        CtmFlavor::ZksyncOs => "l1-contracts/ZKsyncOSChainTypeManager",
-    };
+    let ctm_file = "l1-contracts/ZKsyncOSChainTypeManager";
 
     // Single dispatch table: (address, encoded ctor args, expected file).
     let checks: Vec<(Address, Vec<u8>, &str)> = vec![
@@ -1133,11 +1091,10 @@ async fn verify_ctm_provenance(
     Ok(())
 }
 
-/// Per-CTM, per-flavor provenance for the contracts that ship one copy per
-/// CTM (verifiers, DiamondInit, default_upgrade, genesis_upgrade, getters/
-/// executor/admin facets, ServerNotifier, EIP7702Checker). The v31 upgrade
-/// deploys these once for Era and once for ZKsyncOS, so verification
-/// iterates per CTM and uses each CTM's own `flavor`.
+/// Per-CTM provenance for the contracts that ship one copy per CTM
+/// (verifiers, DiamondInit, default_upgrade, genesis_upgrade, getters/
+/// executor/admin facets, ServerNotifier, EIP7702Checker). Verification
+/// iterates per `[ctms.<flavor>]` entry (ZKsync OS only on this build).
 ///
 /// All required addresses come from the CTM's own `[ctms.<flavor>]`
 /// section via `required_address`.
@@ -1149,27 +1106,14 @@ fn verify_ctm_base_provenance(
 ) -> Result<()> {
     use ctm_signatures::*;
 
-    let is_zksync_os = matches!(ctm.flavor, CtmFlavor::ZksyncOs);
     let scope = format!("ctms.{}", ctm.flavor.label());
 
-    // Per-flavor verifier file names. `AllContractsHashes.json` ships
-    // per-flavor verifiers since v30, so we match each CTM's deploys
-    // against the matching set.
-    let (verifier_plonk_file, verifier_fflonk_file, main_verifier_file, testnet_verifier_file) =
-        match ctm.flavor {
-            CtmFlavor::Era => (
-                "l1-contracts/EraVerifierPlonk",
-                Some("l1-contracts/EraVerifierFflonk"),
-                "l1-contracts/EraDualVerifier",
-                "l1-contracts/EraTestnetVerifier",
-            ),
-            CtmFlavor::ZksyncOs => (
-                "l1-contracts/ZKsyncOSVerifierPlonk",
-                None,
-                "l1-contracts/ZKsyncOSVerifier",
-                "l1-contracts/ZKsyncOSTestnetVerifier",
-            ),
-        };
+    // ZKsync OS verifier file names — `AllContractsHashes.json` ships
+    // per-flavor verifiers since v30; only the ZKsync OS set remains on
+    // this OS-only build.
+    let verifier_plonk_file = "l1-contracts/ZKsyncOSVerifierPlonk";
+    let main_verifier_file = "l1-contracts/ZKsyncOSVerifier";
+    let testnet_verifier_file = "l1-contracts/ZKsyncOSTestnetVerifier";
     // No-arg CTM contracts. `eip7702_checker_addr` lives in the da-contracts
     // tree; everything else is l1-contracts.
     let no_args: &[(&[&str], &str)] = &[
@@ -1183,7 +1127,7 @@ fn verify_ctm_base_provenance(
             &["state_transition", "getters_facet_addr"],
             "l1-contracts/GettersFacet",
         ),
-        // {Era,ZKsyncOS}VerifierPlonk() — no ctor args.
+        // ZKsyncOSVerifierPlonk() — no ctor args.
         (
             &["state_transition", "verifier_plonk_addr"],
             verifier_plonk_file,
@@ -1204,63 +1148,43 @@ fn verify_ctm_base_provenance(
         result.expect_create2_params(verifiers, &addr, Vec::<u8>::new(), expected_file);
     }
 
-    if let Some(verifier_fflonk_file) = verifier_fflonk_file {
-        let verifier_fflonk = required_address(
-            &ctm.value,
-            &scope,
-            &["state_transition", "verifier_fflonk_addr"],
-        )?;
-        result.expect_create2_params(
-            verifiers,
-            &verifier_fflonk,
-            Vec::<u8>::new(),
-            verifier_fflonk_file,
-        );
-    }
+    // PriorityOpLowerBound() — no ctor args; the registry the per-chain upgrade embeds.
+    let priority_op_lower_bound = required_address(
+        &ctm.value,
+        &scope,
+        &["state_transition", "priority_op_lower_bound_addr"],
+    )?;
+    result.expect_create2_params(
+        verifiers,
+        &priority_op_lower_bound,
+        Vec::<u8>::new(),
+        "l1-contracts/PriorityOpLowerBound",
+    );
 
-    // Only ZKsync OS chains can be upgraded onto this release, so the per-chain upgrade contract
-    // and its registry exist for ZKsync OS CTMs only.
-    if is_zksync_os {
-        // PriorityOpLowerBound() — no ctor args; the registry the per-chain upgrade embeds.
-        let priority_op_lower_bound = required_address(
-            &ctm.value,
-            &scope,
-            &["state_transition", "priority_op_lower_bound_addr"],
-        )?;
-        result.expect_create2_params(
-            verifiers,
-            &priority_op_lower_bound,
-            Vec::<u8>::new(),
-            "l1-contracts/PriorityOpLowerBound",
-        );
+    // V32UpgradeZKsyncOS(IPriorityOpLowerBound) — the per-chain upgrade contract embeds the
+    // registry address as its single constructor argument, encoded as a left-padded 32-byte word.
+    let default_upgrade = required_address(
+        &ctm.value,
+        &scope,
+        &["state_transition", "default_upgrade_addr"],
+    )?;
+    let mut default_upgrade_ctor = vec![0u8; 32];
+    default_upgrade_ctor[12..].copy_from_slice(priority_op_lower_bound.as_slice());
+    result.expect_create2_params(
+        verifiers,
+        &default_upgrade,
+        default_upgrade_ctor,
+        "l1-contracts/V32UpgradeZKsyncOS",
+    );
 
-        // V32UpgradeZKsyncOS(IPriorityOpLowerBound) — the per-chain upgrade contract embeds the
-        // registry address as its single constructor argument, encoded as a left-padded 32-byte word.
-        let default_upgrade = required_address(
-            &ctm.value,
-            &scope,
-            &["state_transition", "default_upgrade_addr"],
-        )?;
-        let mut default_upgrade_ctor = vec![0u8; 32];
-        default_upgrade_ctor[12..].copy_from_slice(priority_op_lower_bound.as_slice());
-        result.expect_create2_params(
-            verifiers,
-            &default_upgrade,
-            default_upgrade_ctor,
-            "l1-contracts/V32UpgradeZKsyncOS",
-        );
-    }
-
-    // DiamondInit(bool _isZKsyncOS) — encoded as a single 32-byte word.
+    // DiamondInit(bool _isZKsyncOS) — encoded as a single 32-byte word (true).
     let diamond_init = required_address(
         &ctm.value,
         &scope,
         &["state_transition", "diamond_init_addr"],
     )?;
     let mut encoded = vec![0u8; 32];
-    if is_zksync_os {
-        encoded[31] = 1;
-    }
+    encoded[31] = 1;
     result.expect_create2_params(
         verifiers,
         &diamond_init,
@@ -1301,9 +1225,7 @@ fn verify_ctm_base_provenance(
         "l1-contracts/AdminFacet",
     );
 
-    // Main verifier / *TestnetVerifier. Era receives both verifier implementations;
-    // ZKsync OS receives only PLONK.
-    //
+    // Main verifier / ZKsyncOSTestnetVerifier. ZKsync OS receives only PLONK.
     let verifier = required_address(&ctm.value, &scope, &["state_transition", "verifier_addr"])?;
     let plonk = required_address(
         &ctm.value,
@@ -1315,16 +1237,7 @@ fn verify_ctm_base_provenance(
     } else {
         main_verifier_file
     };
-    let encoded = if is_zksync_os {
-        V31ZKsyncOSVerifier::constructorCall::new((plonk,)).abi_encode()
-    } else {
-        let fflonk = required_address(
-            &ctm.value,
-            &scope,
-            &["state_transition", "verifier_fflonk_addr"],
-        )?;
-        V31DualVerifier::constructorCall::new((fflonk, plonk)).abi_encode()
-    };
+    let encoded = V31ZKsyncOSVerifier::constructorCall::new((plonk,)).abi_encode();
     result.expect_create2_params(verifiers, &verifier, encoded, verifier_file);
 
     Ok(())
@@ -1356,7 +1269,6 @@ async fn verify_v31_new_gateway_ctm_provenance(
     };
 
     let source_ctm = source_ctm_for_new_gateway(artifact, verifiers)?;
-    let is_zksync_os = matches!(source_ctm.flavor, CtmFlavor::ZksyncOs);
     let aliased_governance = apply_l2_to_l1_alias(verifiers.bridgehub_owner);
     let gateway_salt = verifiers.gateway_ctm_create2_salt;
 
@@ -1413,17 +1325,23 @@ async fn verify_v31_new_gateway_ctm_provenance(
     expect_gateway_facet_cut(result, "migrator", migrator_cut, migrator, false);
     expect_gateway_facet_cut(result, "committer", committer_cut, committer, true);
 
-    let initialize_data = InitializeDataNewChain::abi_decode(&diamond_cut.initCalldata)
-        .context("decode new_gateway.diamond_cut_data.initCalldata as InitializeDataNewChain")?;
+    // The chain-creation init tail is empty from v34 onwards (InitializeDataNewChain removed).
+    if diamond_cut.initCalldata.is_empty() {
+        result.report_ok("new_gateway.diamond_cut_data.initCalldata is empty (expected from v34)");
+    } else {
+        result.report_error(&format!(
+            "new_gateway.diamond_cut_data.initCalldata must be empty from v34 onwards, got {} bytes",
+            diamond_cut.initCalldata.len()
+        ));
+    }
     let genesis_config = verifiers.genesis_config_for_ctm(source_ctm.flavor);
     let gw_provider = verifiers.network_verifier.get_gw_provider();
 
     // Direct Gateway L1->L2 CREATE2 deployments. These are present as raw
     // priority tx calldata and therefore can be checked by address.
+    // DiamondInit(bool _isZKsyncOS = true).
     let mut diamond_init_args = vec![0u8; 32];
-    if is_zksync_os {
-        diamond_init_args[31] = 1;
-    }
+    diamond_init_args[31] = 1;
     let direct_checks: Vec<(Address, Vec<u8>, &str)> = vec![
         (
             admin,
@@ -1561,11 +1479,7 @@ async fn verify_v31_new_gateway_ctm_provenance(
         );
     }
 
-    let verifiers_file = if is_zksync_os {
-        "l1-contracts/GatewayCTMDeployerVerifiersZKsyncOS"
-    } else {
-        "l1-contracts/GatewayCTMDeployerVerifiers"
-    };
+    let verifiers_file = "l1-contracts/GatewayCTMDeployerVerifiersZKsyncOS";
     let verifiers_deployer = expect_create2_params_by_file(
         verifiers,
         result,
@@ -1575,7 +1489,7 @@ async fn verify_v31_new_gateway_ctm_provenance(
             salt: gateway_salt,
             aliasedGovernanceAddress: aliased_governance,
             testnetVerifier: source_ctm.contracts_config.is_testnet,
-            isZKsyncOS: is_zksync_os,
+            isZKsyncOS: true,
         }
         .abi_encode(),
     );
@@ -1594,40 +1508,25 @@ async fn verify_v31_new_gateway_ctm_provenance(
         );
     }
 
-    let ctm_deployer_file = if is_zksync_os {
-        "l1-contracts/GatewayCTMDeployerCTMZKsyncOS"
-    } else {
-        "l1-contracts/GatewayCTMDeployerCTM"
-    };
+    let ctm_deployer_file = "l1-contracts/GatewayCTMDeployerCTMZKsyncOS";
     let gateway_ctm_config = GatewayCTMFinalConfig {
         baseConfig: GatewayCTMDeployerConfig {
             aliasedGovernanceAddress: aliased_governance,
             salt: gateway_salt,
-            eraChainId: U256::from(era_chain_id),
             l1ChainId: U256::from(l1_chain_id),
             testnetVerifier: source_ctm.contracts_config.is_testnet,
-            isZKsyncOS: is_zksync_os,
+            isZKsyncOS: true,
             adminSelectors: admin_cut.selectors.clone(),
             executorSelectors: executor_cut.selectors.clone(),
             mailboxSelectors: mailbox_cut.selectors.clone(),
             gettersSelectors: getters_cut.selectors.clone(),
             migratorSelectors: migrator_cut.selectors.clone(),
             committerSelectors: committer_cut.selectors.clone(),
-            bootloaderHash: initialize_data.l2BootloaderBytecodeHash,
-            defaultAccountHash: initialize_data.l2DefaultAccountBytecodeHash,
-            evmEmulatorHash: initialize_data.l2EvmEmulatorBytecodeHash,
             genesisRoot: parse_bytes32_hex("genesis_root", &genesis_config.genesis_root)?,
             genesisRollupLeafIndex: U256::from(
                 genesis_config.genesis_rollup_leaf_index.unwrap_or_default(),
             ),
-            genesisBatchCommitment: if is_zksync_os {
-                zksync_os_genesis_batch_commitment()
-            } else {
-                parse_optional_bytes32_hex(
-                    "genesis_batch_commitment",
-                    genesis_config.genesis_batch_commitment.as_deref(),
-                )?
-            },
+            genesisBatchCommitment: zksync_os_genesis_batch_commitment(),
             forceDeploymentsData: Bytes::from(force_deployments_data),
             protocolVersion: U256::from(source_ctm.contracts_config.new_protocol_version),
         },
@@ -1870,13 +1769,6 @@ fn parse_bytes32_hex(label: &str, value: &str) -> Result<FixedBytes<32>> {
         .with_context(|| format!("{label} must be a 0x-prefixed 32-byte hex string"))
 }
 
-fn parse_optional_bytes32_hex(label: &str, value: Option<&str>) -> Result<FixedBytes<32>> {
-    match value {
-        Some(value) => parse_bytes32_hex(label, value),
-        None => Ok(FixedBytes::<32>::ZERO),
-    }
-}
-
 fn zksync_os_genesis_batch_commitment() -> FixedBytes<32> {
     FixedBytes::<32>::from(U256::from(1).to_be_bytes::<32>())
 }
@@ -1884,4 +1776,79 @@ fn zksync_os_genesis_batch_commitment() -> FixedBytes<32> {
 fn hex_bytes(label: &str, value: &str) -> Result<Vec<u8>> {
     hex::decode(value.trim_start_matches("0x"))
         .with_context(|| format!("{label} must be 0x-prefixed hex"))
+}
+
+#[cfg(test)]
+mod tests {
+    use alloy::sol_types::{SolConstructor, SolStruct};
+
+    use super::gateway_signatures::GatewayCTMDeployerConfig;
+
+    // This mirror already drifted from the Solidity struct once (a stray `eraChainId` field),
+    // silently breaking the gateway CTM CREATE2-address verification; keep it pinned to the
+    // Solidity source of truth (same intent as the fixed_force_deployment.rs layout test).
+    #[test]
+    fn gateway_ctm_deployer_config_matches_solidity_layout() {
+        let solidity_source = include_str!(
+            "../../../../../../l1-contracts/contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol"
+        );
+        let struct_body = solidity_source
+            .split_once("struct GatewayCTMDeployerConfig {")
+            .expect("canonical Solidity struct must exist")
+            .1
+            .split_once('}')
+            .expect("canonical Solidity struct must be closed")
+            .0;
+        let solidity_signature = format!(
+            "GatewayCTMDeployerConfig({})",
+            struct_body
+                .lines()
+                .map(str::trim)
+                .filter(|line| line.ends_with(';'))
+                .map(|line| line.trim_end_matches(';'))
+                .collect::<Vec<_>>()
+                .join(",")
+        );
+        assert_eq!(
+            GatewayCTMDeployerConfig::eip712_root_type().as_ref(),
+            solidity_signature.as_str(),
+            "protocol-ops GatewayCTMDeployerConfig must follow the canonical Solidity fields"
+        );
+    }
+
+    // The L1Nullifier mirror drifted when the constructor dropped its Era arguments (the Rust side
+    // kept encoding four words against the two the deploy scripts record); pin the mirror's
+    // parameter list to the Solidity constructor.
+    #[test]
+    fn l1_nullifier_constructor_matches_solidity_source() {
+        let solidity_source =
+            include_str!("../../../../../../l1-contracts/contracts/bridge/L1Nullifier.sol");
+        let params = solidity_source
+            .split_once("constructor(")
+            .expect("L1Nullifier constructor must exist")
+            .1
+            .split_once(')')
+            .expect("constructor parameter list must be closed")
+            .0;
+        assert_eq!(
+            params.trim(),
+            "IL1Bridgehub _bridgehub, IMessageRootBase _messageRoot",
+            "protocol-ops V31L1Nullifier must follow L1Nullifier's constructor"
+        );
+        // Tie the Rust mirror itself to the source: both constructor parameters are single
+        // words, so the encoding the verifier compares against must be exactly one word per
+        // Solidity parameter. Reverting the mirror to the four-argument shape fails here (and
+        // the two-tuple `constructorCall::new` above stops compiling).
+        let solidity_arity = params.split(',').count();
+        let encoded = super::core_signatures::V31L1Nullifier::constructorCall::new((
+            alloy::primitives::Address::ZERO,
+            alloy::primitives::Address::ZERO,
+        ))
+        .abi_encode();
+        assert_eq!(
+            encoded.len(),
+            solidity_arity * 32,
+            "V31L1Nullifier must encode one word per Solidity constructor parameter"
+        );
+    }
 }

@@ -783,9 +783,9 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         return
             abi.encodePacked(
                 s.zkPorterIsAvailable,
-                s.l2BootloaderBytecodeHash,
-                s.l2DefaultAccountBytecodeHash,
-                s.l2EvmEmulatorBytecodeHash
+                s.__DEPRECATED_l2BootloaderBytecodeHash,
+                s.__DEPRECATED_l2DefaultAccountBytecodeHash,
+                s.__DEPRECATED_l2EvmEmulatorBytecodeHash
             );
     }
 

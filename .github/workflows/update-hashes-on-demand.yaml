@@ -58,8 +58,8 @@ jobs:
           node-version-file: .nvmrc
           cache: yarn
 
-      - name: Install foundry-zksync
-        uses: ./.github/actions/install-zksync-foundry
+      - name: Install Foundry
+        uses: ./.github/actions/install-foundry
 
       - name: Install dependencies
         run: yarn
@@ -77,8 +77,6 @@ jobs:
 
           yarn --cwd da-contracts build:foundry
           yarn --cwd l1-contracts build:foundry
-          yarn --cwd l2-contracts build:foundry
-          yarn --cwd system-contracts build:foundry
 
           yarn calculate-hashes:fix
 

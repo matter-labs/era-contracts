@@ -1,4 +1,4 @@
-// TODO: drop once the scaffolding kept for R2 (fee-params) and S2d
+// TODO: drop once the scaffolding kept for S2d
 // (`check_gw_create2_deploy`) is resolved.
 #![allow(dead_code, private_interfaces)]
 
@@ -26,7 +26,6 @@ use elements::{
 };
 
 pub(crate) const EXPECTED_NEW_PROTOCOL_VERSION_STR: &str = "0.32.0";
-pub(crate) const EXPECTED_ERA_OLD_PROTOCOL_VERSION_STR: &str = "0.31.0";
 pub(crate) const EXPECTED_ZKSYNC_OS_OLD_PROTOCOL_VERSION_STR: &str = "0.31.0";
 pub(crate) const MAX_NUMBER_OF_ZK_CHAINS: u32 = 100;
 pub(crate) const MAX_PRIORITY_TX_GAS_LIMIT: u32 = 72_000_000;
@@ -47,7 +46,6 @@ pub(crate) fn get_expected_old_protocol_version_for_ctm_flavor(
     flavor: CtmFlavor,
 ) -> ProtocolVersion {
     let version = match flavor {
-        CtmFlavor::Era => EXPECTED_ERA_OLD_PROTOCOL_VERSION_STR,
         CtmFlavor::ZksyncOs => EXPECTED_ZKSYNC_OS_OLD_PROTOCOL_VERSION_STR,
     };
     ProtocolVersion::from_str(version).unwrap()
@@ -62,7 +60,6 @@ pub(crate) fn is_expected_old_protocol_version_for_ctm_flavor(
 
 pub(crate) fn expected_old_protocol_version_label(flavor: CtmFlavor) -> &'static str {
     match flavor {
-        CtmFlavor::Era => "v0.31.0",
         CtmFlavor::ZksyncOs => "v0.31.0",
     }
 }
@@ -72,11 +69,11 @@ pub(crate) fn expected_old_protocol_version_label(flavor: CtmFlavor) -> &'static
 /// Ordering mirrors the legacy PUVT (`UpgradeOutput::verify` in
 /// `protocol-upgrade-verification-tool`):
 ///
-///   1. Verifier construction (incl. SystemConfig.json fee-params init).
+///   1. Verifier construction.
 ///   2. CREATE2 provenance map population — v31-specific prep that must precede
 ///      provenance consumption below.
 ///   3. RPC state checks — chain ids, Create2Factory bytecode, proxy admins,
-///      live core wiring, validator timelocks, fee params, settlement layer.
+///      live core wiring, validator timelocks, settlement layer.
 ///      Subsumes legacy's early chain-id sanity (legacy steps 2–3).
 ///   4. Deployment provenance — every named v31 deploy + the new-GW CTM
 ///      provenance flow (legacy step 4).

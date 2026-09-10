@@ -78,8 +78,6 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
     /// (v30.1) and Era (older) CTM on Sepolia). Drop with the version branch.
     bytes32 constant SERVER_NOTIFIER_ADDRESS_SLOT = bytes32(uint256(164));
 
-    uint256 internal eraChainId;
-
     uint256 internal gatewayChainId;
     bytes internal forceDeploymentsData;
 
@@ -103,26 +101,25 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         forceDeploymentsData = toml.readBytes(".force_deployments_data");
 
         setAddressesBasedOnBridgehub(ctmRepresentativeChainId, bridgehubProxy);
-        // Get eraChainId from AssetRouter
-        address assetRouter = address(IL1Bridgehub(bridgehubProxy).assetRouter());
-        eraChainId = AddressIntrospector.getEraChainId(assetRouter);
 
         address aliasedGovernor = AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress);
+        // TODO: drop `isZKsyncOS` from `GatewayCTMDeployerConfig` in the next release — this
+        // OS-only line no longer needs the flag, but the deployed gateway deployers still assert
+        // it (`GatewayCTMDeployerVerifiersZKsyncOS` / `GatewayCTMDeployerCTMZKsyncOS`), so
+        // removing it means touching those contracts.
         gatewayCTMDeployerConfig = GatewayCTMDeployerConfig({
             aliasedGovernanceAddress: aliasedGovernor,
             salt: toml.readBytes32("$.contracts.create2_factory_salt"),
             l1ChainId: config.l1ChainId,
             testnetVerifier: config.testnetVerifier,
-            isZKsyncOS: config.isZKsyncOS,
+            // Only ZKsync-OS-based gateway CTMs are supported on this release.
+            isZKsyncOS: true,
             adminSelectors: Utils.getAllSelectorsForFacet("Admin"),
             executorSelectors: Utils.getAllSelectorsForFacet("Executor"),
             mailboxSelectors: Utils.getAllSelectorsForFacet("Mailbox"),
             gettersSelectors: Utils.getAllSelectorsForFacet("Getters"),
             migratorSelectors: Utils.getAllSelectorsForFacet("Migrator"),
             committerSelectors: Utils.getAllSelectorsForFacet("Committer"),
-            bootloaderHash: config.contracts.chainCreationParams.bootloaderHash,
-            defaultAccountHash: config.contracts.chainCreationParams.defaultAAHash,
-            evmEmulatorHash: config.contracts.chainCreationParams.evmEmulatorHash,
             genesisRoot: config.contracts.chainCreationParams.genesisRoot,
             genesisRollupLeafIndex: uint64(config.contracts.chainCreationParams.genesisRollupLeafIndex),
             genesisBatchCommitment: config.contracts.chainCreationParams.genesisBatchCommitment,
@@ -202,14 +199,14 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         // Deploy ValidatorTimelock (implementation + proxy)
         runGatewayL1L2Transaction(create2FactoryAddress, deployerCalldata.validatorTimelockCalldata);
 
-        // Deploy Verifiers (Era or ZKsyncOS verifiers based on config)
+        // Deploy the ZKsyncOS verifiers
         runGatewayL1L2Transaction(create2FactoryAddress, deployerCalldata.verifiersCalldata);
 
         // Deploy direct contracts (AdminFacet, MailboxFacet, ExecutorFacet, GettersFacet,
         // DiamondInit, L1GenesisUpgrade, Multicall3)
         _deployDirectContracts(directCalldata, create2FactoryAddress);
 
-        // Deploy CTM and ServerNotifier (Era or ZKsyncOS CTM based on config)
+        // Deploy the ZKsyncOS CTM and ServerNotifier
         runGatewayL1L2Transaction(create2FactoryAddress, deployerCalldata.ctmCalldata);
 
         _saveExpectedGatewayContractsToOutput(expectedGatewayContracts);
@@ -283,9 +280,9 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
 
     function deployServerNotifier() internal returns (address implementation, address proxy) {
         // We will not store the address of the ProxyAdmin as it is trivial to query if needed.
-        address ecosystemProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.chainAdmin, false);
+        address ecosystemProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.chainAdmin);
 
-        (implementation, proxy) = deployTuppWithContractAndProxyAdmin("ServerNotifier", ecosystemProxyAdmin, false);
+        (implementation, proxy) = deployTuppWithContractAndProxyAdmin("ServerNotifier", ecosystemProxyAdmin);
     }
 
     /// Read the CTM's existing ServerNotifier proxy from chain. v31+ CTMs

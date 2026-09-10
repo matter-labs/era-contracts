@@ -88,7 +88,6 @@ export type V31UpgradeScenario = {
   stateVersion: string;
   permanentValuesTemplatePath: string;
   upgradeInputTemplatePath: string;
-  isZKsyncOS: boolean;
   targetRoles: ChainRole[];
   // Protocol version the chains must report once the upgrade has been applied.
   expectedProtocolVersion: string;
@@ -214,7 +213,6 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
       settlementLayerUpgradeAddr,
       ctmAddr: ctmAddresses.chainTypeManager,
       upgradeChainAddresses,
-      isZKsyncOS: scenario.isZKsyncOS,
       protocolOpsOutDir: path.join(upgradeHarnessInputs.protocolOpsOutDir, "chains"),
     });
     console.log("\n── Chain upgrades complete, verifying final protocol versions ──");
@@ -606,8 +604,6 @@ export async function runEcosystemUpgradeScripts(params: {
       params.upgradeHarnessInputs.bytecodesSupplierAddress,
       "--rollup-da-manager-address",
       params.upgradeHarnessInputs.rollupDaManagerAddress,
-      "--is-zk-sync-os",
-      String(params.upgradeHarnessInputs.isZKsyncOS),
       "--create2-factory-salt",
       params.upgradeHarnessInputs.create2FactorySalt,
       "--upgrade-input-path",
@@ -669,7 +665,6 @@ export async function runChainUpgradesAndRelayL2(params: {
   settlementLayerUpgradeAddr: string;
   ctmAddr: string;
   upgradeChainAddresses: Array<{ chainId: number; diamondProxy: string }>;
-  isZKsyncOS: boolean;
   protocolOpsOutDir: string;
 }): Promise<void> {
   const {
@@ -678,7 +673,6 @@ export async function runChainUpgradesAndRelayL2(params: {
     bridgehubAddr,
     settlementLayerUpgradeAddr,
     upgradeChainAddresses,
-    isZKsyncOS,
     protocolOpsOutDir,
   } = params;
 
@@ -702,13 +696,11 @@ export async function runChainUpgradesAndRelayL2(params: {
 
     // ZKsync OS chains must additionally have the v31 base-token backfill behind them
     // (flag + executed-priority-op lower bound); model the missing history on the fork.
-    if (isZKsyncOS) {
-      await modelV31BackfillPrerequisite({
-        l1Provider,
-        diamondProxyAddr: chain.diamondProxy,
-        settlementLayerUpgradeAddr,
-      });
-    }
+    await modelV31BackfillPrerequisite({
+      l1Provider,
+      diamondProxyAddr: chain.diamondProxy,
+      settlementLayerUpgradeAddr,
+    });
 
     runProtocolOps([
       "chain",
@@ -738,7 +730,9 @@ export async function runChainUpgradesAndRelayL2(params: {
     const rewrittenUpgradeTxData = await settlementLayerUpgrade.getL2UpgradeTxData(
       bridgehubAddr,
       chain.chainId,
-      isZKsyncOS,
+      // `DefaultUpgradeZKsyncOS.getL2UpgradeTxData(..., bool isZKsyncOS, ...)` is audited; this
+      // release only upgrades ZKsync OS chains.
+      true,
       originalUpgradeTxData
     );
 
@@ -761,7 +755,7 @@ export async function runChainUpgradesAndRelayL2(params: {
     }
     const l2Provider = createProvider(l2Chain.rpcUrl);
 
-    const l2TxHash = await prepareAndRelayL2Upgrade(l2Provider, rewrittenUpgradeTxData, isZKsyncOS);
+    const l2TxHash = await prepareAndRelayL2Upgrade(l2Provider, rewrittenUpgradeTxData);
     console.log(`  ✅ L2 upgrade relay tx: ${l2TxHash}`);
     printCastRunTrace(l2TxHash, l2Chain.rpcUrl);
 
@@ -853,7 +847,6 @@ export async function runChainUpgradesPerCtm(params: {
       ["state_transition", "default_upgrade_addr"],
       "per-chain upgrade contract address"
     );
-    const isZKsyncOS = (ctmOutputToml as { is_zk_sync_os?: boolean }).is_zk_sync_os === true;
 
     await runChainUpgradesAndRelayL2({
       l1Provider,
@@ -862,7 +855,6 @@ export async function runChainUpgradesPerCtm(params: {
       settlementLayerUpgradeAddr,
       ctmAddr,
       upgradeChainAddresses: chains,
-      isZKsyncOS,
       protocolOpsOutDir,
     });
   }
@@ -878,8 +870,7 @@ export async function runChainUpgradesPerCtm(params: {
  */
 async function prepareAndRelayL2Upgrade(
   l2Provider: ethers.providers.JsonRpcProvider,
-  upgradeTxData: string,
-  isZKsyncOS: boolean
+  upgradeTxData: string
 ): Promise<string> {
   // Decode to extract addresses for pre-deployment, then send the ORIGINAL calldata.
   // MockContractDeployer (no-op) handles the force deployment calls from both the outer
@@ -887,7 +878,7 @@ async function prepareAndRelayL2Upgrade(
   const { forceDeployEntries, delegateTo } = decodeUpgradeTxData(upgradeTxData);
 
   // Pre-deploy all L2 contracts via anvil_setCode
-  await deployL2Contracts(l2Provider, forceDeployEntries, delegateTo, isZKsyncOS);
+  await deployL2Contracts(l2Provider, forceDeployEntries, delegateTo);
 
   // Send the original upgrade calldata to ComplexUpgrader.
   // The outer force deployments no-op (MockContractDeployer), then upgrade() delegatecalls
@@ -930,11 +921,11 @@ async function prepareAndRelayL2Upgrade(
 async function deployL2Contracts(
   l2Provider: ethers.providers.JsonRpcProvider,
   forceDeployEntries: ForceDeployEntry[],
-  delegateTo: string,
-  isZKsyncOS: boolean
+  delegateTo: string
 ): Promise<void> {
-  // MockContractDeployer: no-op fallback at ContractDeployer address so that
-  // forceDeployEra() and conductContractUpgrade() calls succeed silently.
+  // MockContractDeployer: typed no-op `setBytecodeDetailsEVM` at the ContractDeployer address so
+  // conductContractUpgrade() calls succeed. It implements the production IZKOSContractDeployer
+  // interface and has no fallback, so any call with a stale or unexpected selector reverts loudly.
   await l2Provider.send("anvil_setCode", [L2_CONTRACT_DEPLOYER_ADDR, getBytecode("MockContractDeployer")]);
 
   // SystemContractProxyAdmin: _setupProxyAdmin() calls owner() and forceSetOwner().
@@ -952,7 +943,7 @@ async function deployL2Contracts(
 
   // Deploy EVM bytecodes at all addresses from the force deployment calldata.
   // For ZKsyncOS SystemProxyUpgrade entries, deploy behind a real SystemContractProxy.
-  const contractMap = buildAddressToContract(isZKsyncOS);
+  const contractMap = buildAddressToContract();
   for (const entry of forceDeployEntries) {
     // ZKsyncOSUnsafeForceDeployment entries are direct deployments (e.g. the SystemContractProxyAdmin
     // at L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, and L2V32Upgrade at a random delegate address).
@@ -975,7 +966,7 @@ async function deployL2Contracts(
       throw new Error(`No contract mapping for ZKsyncOS force deploy address ${entry.address}`);
     }
 
-    if (isZKsyncOS && entry.upgradeType === UPGRADE_TYPE_ZKOS_SYSTEM_PROXY) {
+    if (entry.upgradeType === UPGRADE_TYPE_ZKOS_SYSTEM_PROXY) {
       if (!entry.deployedBytecodeInfo) {
         throw new Error(`ZKsyncOSSystemProxyUpgrade entry ${entry.address} missing deployedBytecodeInfo`);
       }
@@ -988,17 +979,12 @@ async function deployL2Contracts(
   // Deploy the delegateTo target (L2V32Upgrade).
   await l2Provider.send("anvil_setCode", [delegateTo, getBytecode("L2V32Upgrade")]);
 
-  // L2BaseToken: for Era it's deployed directly as L2BaseTokenEra (not in force deployment list).
-  // For ZKsyncOS it's in the force deployment list as ZKsyncOSSystemProxyUpgrade and handled above.
-  if (!isZKsyncOS) {
-    await l2Provider.send("anvil_setCode", [L2_BASE_TOKEN_ADDR, getBytecode("L2BaseTokenEra")]);
-  }
+  // L2BaseToken is in the force deployment list as ZKsyncOSSystemProxyUpgrade, handled above.
 
   // L2BaseToken.initL2 (called on the genesis path of performForceDeployedContractsInit) mints an initial balance into the
-  // BaseTokenHolder. For Era it reads the pre-existing __DEPRECATED_totalSupply; for ZKsyncOS it
-  // mints via the MINT_BASE_TOKEN_HOOK system hook, which is a no-op mock in the anvil harness.
-  // In both cases L2BaseToken then transfers ETH to the holder, so it needs a non-zero balance
-  // on the anvil chain or the transfer reverts with "Address: insufficient balance".
+  // BaseTokenHolder. For ZKsyncOS it mints via the MINT_BASE_TOKEN_HOOK system hook, which is a
+  // no-op mock in the anvil harness. L2BaseToken then transfers ETH to the holder, so it needs a
+  // non-zero balance on the anvil chain or the transfer reverts with "Address: insufficient balance".
   await l2Provider.send("anvil_setBalance", [L2_BASE_TOKEN_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE]);
 
   // Seed critical storage values on L2 contracts that were deployed via anvil_setCode
@@ -1447,7 +1433,6 @@ export function prepareUpgradeHarnessInputs(
   bytecodesSupplierAddress: string;
   rollupDaManagerAddress: string;
   create2FactorySalt: string;
-  isZKsyncOS: boolean;
   ctmProxyAddress: string;
   cleanup: () => void;
 } {
@@ -1464,14 +1449,11 @@ export function prepareUpgradeHarnessInputs(
   if (!primaryChainId) throw new Error(`No chains loaded for ${scenario.label}`);
 
   let permanentValues = fs.readFileSync(path.join(l1ContractsDir, scenario.permanentValuesTemplatePath), "utf8");
-  permanentValues = replaceTomlBareValue(permanentValues, "era_chain_id", String(primaryChainId));
   permanentValues = replaceTomlStringValue(permanentValues, "bridgehub_proxy_addr", state.l1Addresses.bridgehub);
   permanentValues = replaceTomlStringValue(permanentValues, "ctm_proxy_addr", state.ctmAddresses.chainTypeManager);
-  permanentValues = replaceTomlBareValue(permanentValues, "is_zk_sync_os", scenario.isZKsyncOS ? "true" : "false");
   fs.writeFileSync(permanentValuesPath, permanentValues);
 
   let upgradeInput = fs.readFileSync(path.join(l1ContractsDir, scenario.upgradeInputTemplatePath), "utf8");
-  upgradeInput = replaceTomlBareValue(upgradeInput, "era_chain_id", String(primaryChainId));
   upgradeInput = replaceTomlStringValue(upgradeInput, "bridgehub_proxy_address", state.l1Addresses.bridgehub);
   upgradeInput = replaceTomlStringValue(upgradeInput, "owner_address", state.l1Addresses.governance);
   upgradeInput = replaceTomlBareValue(upgradeInput, "sample_chain_id", String(primaryChainId));
@@ -1509,7 +1491,6 @@ export function prepareUpgradeHarnessInputs(
       permanentValuesToml.ctm_contracts?.l1_bytecodes_supplier_addr ?? ethers.constants.AddressZero,
     rollupDaManagerAddress: permanentValuesToml.ctm_contracts?.rollup_da_manager ?? ethers.constants.AddressZero,
     create2FactorySalt: permanentValuesToml.permanent_contracts?.create2_factory_salt ?? ethers.constants.HashZero,
-    isZKsyncOS: scenario.isZKsyncOS,
     ctmProxyAddress: state.ctmAddresses.chainTypeManager,
     cleanup: () => fs.rmSync(tempDir, { recursive: true, force: true }),
   };
@@ -1518,12 +1499,12 @@ export function prepareUpgradeHarnessInputs(
 // ── Misc helpers ─────────────────────────────────────────────────────
 
 /** Build the address→contract map for the given VM type. */
-function buildAddressToContract(isZKsyncOS: boolean): ReadonlyMap<string, ContractName> {
+function buildAddressToContract(): ReadonlyMap<string, ContractName> {
   const entries: Array<[string, ContractName]> = [
     [L2_MESSAGE_ROOT_ADDR.toLowerCase(), "L2MessageRoot"],
     [L2_BRIDGEHUB_ADDR.toLowerCase(), "L2Bridgehub"],
     [L2_ASSET_ROUTER_ADDR.toLowerCase(), "L2AssetRouter"],
-    [L2_NATIVE_TOKEN_VAULT_ADDR.toLowerCase(), isZKsyncOS ? "L2NativeTokenVaultZKOS" : "L2NativeTokenVault"],
+    [L2_NATIVE_TOKEN_VAULT_ADDR.toLowerCase(), "L2NativeTokenVaultZKOS"],
     [L2_CHAIN_ASSET_HANDLER_ADDR.toLowerCase(), "L2ChainAssetHandler"],
     [L2_ASSET_TRACKER_ADDR.toLowerCase(), "L2AssetTracker"],
     [INTEROP_CENTER_ADDR.toLowerCase(), "InteropCenter"],
@@ -1534,19 +1515,17 @@ function buildAddressToContract(isZKsyncOS: boolean): ReadonlyMap<string, Contra
     [L2_MESSAGE_VERIFICATION_ADDR.toLowerCase(), "L2MessageVerification"],
     [L2_INTEROP_ROOT_STORAGE_ADDR.toLowerCase(), "L2InteropRootStorage"],
   ];
-  if (isZKsyncOS) {
-    entries.push(
-      // Atomic-interop built-ins: force-deployed by this release's upgrade on ZKsync OS chains.
-      [L2_INTEROP_COMMITMENT_TREE_ADDR.toLowerCase(), "L2InteropCommitmentTree"],
-      [L2_ATOMIC_FLOW_MANAGER_ADDR.toLowerCase(), "AtomicFlowManager"],
-      [L2_BASE_TOKEN_ADDR.toLowerCase(), "L2BaseTokenZKOS"],
-      [L2_TO_L1_MESSENGER_ADDR.toLowerCase(), "L1MessengerZKOS"],
-      [SYSTEM_CONTEXT_ADDR.toLowerCase(), "SystemContext"],
-      [L2_CONTRACT_DEPLOYER_ADDR.toLowerCase(), "ZKOSContractDeployer"],
-      // The removed v31 GWAssetTracker: the upgrade swaps its proxy's implementation for EmptyContract.
-      [L2_REMOVED_GW_ASSET_TRACKER_ADDR.toLowerCase(), "EmptyContract"]
-    );
-  }
+  entries.push(
+    // Atomic-interop built-ins: force-deployed by this release's upgrade on ZKsync OS chains.
+    [L2_INTEROP_COMMITMENT_TREE_ADDR.toLowerCase(), "L2InteropCommitmentTree"],
+    [L2_ATOMIC_FLOW_MANAGER_ADDR.toLowerCase(), "AtomicFlowManager"],
+    [L2_BASE_TOKEN_ADDR.toLowerCase(), "L2BaseTokenZKOS"],
+    [L2_TO_L1_MESSENGER_ADDR.toLowerCase(), "L1MessengerZKOS"],
+    [SYSTEM_CONTEXT_ADDR.toLowerCase(), "SystemContext"],
+    [L2_CONTRACT_DEPLOYER_ADDR.toLowerCase(), "ZKOSContractDeployer"],
+    // The removed v31 GWAssetTracker: the upgrade swaps its proxy's implementation for EmptyContract.
+    [L2_REMOVED_GW_ASSET_TRACKER_ADDR.toLowerCase(), "EmptyContract"]
+  );
   return new Map(entries);
 }
 

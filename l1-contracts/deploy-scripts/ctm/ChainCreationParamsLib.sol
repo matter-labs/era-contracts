@@ -14,8 +14,7 @@ library ChainCreationParamsLib {
     Vm internal constant vm = Vm(VM_ADDRESS);
 
     function getChainCreationParams(
-        string memory _config,
-        bool isZKsyncOs
+        string memory _config
     ) internal returns (ChainCreationParamsConfig memory chainCreationParams) {
         string memory json = vm.readFile(_config);
         uint32 major = uint32(json.readUint("$.protocol_semantic_version.major"));
@@ -23,15 +22,6 @@ library ChainCreationParamsLib {
         uint32 patch = uint32(json.readUint("$.protocol_semantic_version.patch"));
         chainCreationParams.latestProtocolVersion = SemVer.packSemVer(major, minor, patch);
         chainCreationParams.genesisRoot = json.readBytes32("$.genesis_root");
-        if (isZKsyncOs) {
-            chainCreationParams.genesisBatchCommitment = bytes32(uint256(1));
-        } else {
-            // These fields are used only for zksync era
-            chainCreationParams.genesisRollupLeafIndex = json.readUint("$.genesis_rollup_leaf_index");
-            chainCreationParams.genesisBatchCommitment = json.readBytes32("$.genesis_batch_commitment");
-            chainCreationParams.defaultAAHash = json.readBytes32("$.default_aa_hash");
-            chainCreationParams.bootloaderHash = json.readBytes32("$.bootloader_hash");
-            chainCreationParams.evmEmulatorHash = json.readBytes32("$.evm_emulator_hash");
-        }
+        chainCreationParams.genesisBatchCommitment = bytes32(uint256(1));
     }
 }

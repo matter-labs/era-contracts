@@ -7,7 +7,6 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {ZKChainBase} from "../state-transition/chain-deps/facets/ZKChainBase.sol";
 import {IVerifier} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
-import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {TransactionValidator} from "../state-transition/libraries/TransactionValidator.sol";
 import {ProposedUpgrade} from "../state-transition/libraries/ProposedUpgradeLib.sol";
 import {MAX_ALLOWED_MINOR_VERSION_DELTA, MAX_NEW_FACTORY_DEPS} from "../common/Config.sol";
@@ -17,9 +16,6 @@ import {
     L2UpgradeNonceNotEqualToNewProtocolVersion,
     NewProtocolMajorVersionNotZero,
     PatchCantSetUpgradeTxn,
-    PatchUpgradeCantSetBootloader,
-    PatchUpgradeCantSetDefaultAccount,
-    PatchUpgradeCantSetEvmEmulator,
     PreviousProtocolMajorVersionNotZero,
     PreviousUpgradeNotCleaned,
     PreviousUpgradeNotFinalized,
@@ -37,15 +33,6 @@ import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 abstract contract BaseZkSyncUpgrade is ZKChainBase {
     /// @notice Changes the protocol version
     event NewProtocolVersion(uint256 indexed previousProtocolVersion, uint256 indexed newProtocolVersion);
-
-    /// @notice Сhanges to the bytecode that is used in L2 as a bootloader (start program)
-    event NewL2BootloaderBytecodeHash(bytes32 indexed previousBytecodeHash, bytes32 indexed newBytecodeHash);
-
-    /// @notice Сhanges to the bytecode that is used in L2 as a default account
-    event NewL2DefaultAccountBytecodeHash(bytes32 indexed previousBytecodeHash, bytes32 indexed newBytecodeHash);
-
-    /// @notice Сhanges to the bytecode that is used in L2 as an EVM emulator
-    event NewL2EvmEmulatorBytecodeHash(bytes32 indexed previousBytecodeHash, bytes32 indexed newBytecodeHash);
 
     /// @notice Verifier address changed
     event NewVerifier(address indexed oldVerifier, address indexed newVerifier);
@@ -91,12 +78,6 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
             _proposedUpgrade.newProtocolVersion
         );
         _setVerifier(IVerifier(ctmVerifier));
-        _setBaseSystemContracts(
-            _proposedUpgrade.bootloaderHash,
-            _proposedUpgrade.defaultAccountHash,
-            _proposedUpgrade.evmEmulatorHash,
-            isPatchOnly
-        );
 
         // The upgrades that happen not on settlement layers are to update the logic of the facets
         // only and do not include the upgrade transaction.
@@ -107,72 +88,6 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         _postUpgrade(_proposedUpgrade.postUpgradeCalldata);
 
         emit UpgradeComplete(_proposedUpgrade.newProtocolVersion, txHash, _proposedUpgrade);
-    }
-
-    /// @notice Change default account bytecode hash, that is used on L2
-    /// @param _l2DefaultAccountBytecodeHash The hash of default account L2 bytecode
-    /// @param _patchOnly Whether only the patch part of the protocol version semver has changed
-    function _setL2DefaultAccountBytecodeHash(bytes32 _l2DefaultAccountBytecodeHash, bool _patchOnly) private {
-        if (_l2DefaultAccountBytecodeHash == bytes32(0)) {
-            return;
-        }
-
-        if (_patchOnly) {
-            revert PatchUpgradeCantSetDefaultAccount();
-        }
-
-        L2ContractHelper.validateBytecodeHash(_l2DefaultAccountBytecodeHash);
-
-        // Save previous value into the stack to put it into the event later
-        bytes32 previousDefaultAccountBytecodeHash = s.l2DefaultAccountBytecodeHash;
-
-        // Change the default account bytecode hash
-        s.l2DefaultAccountBytecodeHash = _l2DefaultAccountBytecodeHash;
-        emit NewL2DefaultAccountBytecodeHash(previousDefaultAccountBytecodeHash, _l2DefaultAccountBytecodeHash);
-    }
-
-    /// @notice Change EVM emulator bytecode hash, that is used on L2
-    /// @param _l2EvmEmulatorBytecodeHash The hash of EVM emulator L2 bytecode
-    /// @param _patchOnly Whether only the patch part of the protocol version semver has changed
-    function _setL2EvmEmulatorBytecodeHash(bytes32 _l2EvmEmulatorBytecodeHash, bool _patchOnly) private {
-        if (_l2EvmEmulatorBytecodeHash == bytes32(0)) {
-            return;
-        }
-
-        if (_patchOnly) {
-            revert PatchUpgradeCantSetEvmEmulator();
-        }
-
-        L2ContractHelper.validateBytecodeHash(_l2EvmEmulatorBytecodeHash);
-
-        // Save previous value into the stack to put it into the event later
-        bytes32 previousL2EvmEmulatorBytecodeHash = s.l2EvmEmulatorBytecodeHash;
-
-        // Change the EVM emulator bytecode hash
-        s.l2EvmEmulatorBytecodeHash = _l2EvmEmulatorBytecodeHash;
-        emit NewL2EvmEmulatorBytecodeHash(previousL2EvmEmulatorBytecodeHash, _l2EvmEmulatorBytecodeHash);
-    }
-
-    /// @notice Change bootloader bytecode hash, that is used on L2
-    /// @param _l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
-    /// @param _patchOnly Whether only the patch part of the protocol version semver has changed
-    function _setL2BootloaderBytecodeHash(bytes32 _l2BootloaderBytecodeHash, bool _patchOnly) private {
-        if (_l2BootloaderBytecodeHash == bytes32(0)) {
-            return;
-        }
-
-        if (_patchOnly) {
-            revert PatchUpgradeCantSetBootloader();
-        }
-
-        L2ContractHelper.validateBytecodeHash(_l2BootloaderBytecodeHash);
-
-        // Save previous value into the stack to put it into the event later
-        bytes32 previousBootloaderBytecodeHash = s.l2BootloaderBytecodeHash;
-
-        // Change the bootloader bytecode hash
-        s.l2BootloaderBytecodeHash = _l2BootloaderBytecodeHash;
-        emit NewL2BootloaderBytecodeHash(previousBootloaderBytecodeHash, _l2BootloaderBytecodeHash);
     }
 
     /// @notice Change the address of the verifier smart contract
@@ -189,22 +104,6 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         IVerifier oldVerifier = s.verifier;
         s.verifier = _newVerifier;
         emit NewVerifier(address(oldVerifier), address(_newVerifier));
-    }
-
-    /// @notice Updates the bootloader hash and the hash of the default account
-    /// @param _bootloaderHash The hash of the new bootloader bytecode. If zero, it will not be updated.
-    /// @param _defaultAccountHash The hash of the new default account bytecode. If zero, it will not be updated.
-    /// @param _evmEmulatorHash The hash of the new EVM emulator bytecode. If zero, it will not be updated.
-    /// @param _patchOnly Whether only the patch part of the protocol version semver has changed.
-    function _setBaseSystemContracts(
-        bytes32 _bootloaderHash,
-        bytes32 _defaultAccountHash,
-        bytes32 _evmEmulatorHash,
-        bool _patchOnly
-    ) internal {
-        _setL2BootloaderBytecodeHash(_bootloaderHash, _patchOnly);
-        _setL2DefaultAccountBytecodeHash(_defaultAccountHash, _patchOnly);
-        _setL2EvmEmulatorBytecodeHash(_evmEmulatorHash, _patchOnly);
     }
 
     /// @notice Sets the hash of the L2 system contract upgrade transaction for the next batch to be committed

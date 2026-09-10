@@ -1,5 +1,8 @@
-# Shared foundry build of all contract projects + artifacts cache save.
-# Called as the `build` job by l1-contracts-ci.yaml and pre-merge-checks.yaml.
+# Shared foundry build of the contract projects + artifacts cache save.
+# Called as the `build` job by pre-merge-checks.yaml. l1-contracts-ci.yaml keeps its own
+# inline copy of these steps because its build is a `plan`-driven matrix (PR head plus a
+# coverage baseline revision) whose YAML anchors the coverage jobs alias — neither of which
+# a job-level `uses:` can express. Keep the two recipes in step.
 name: Build contract artifacts
 
 on:
@@ -58,9 +61,9 @@ jobs:
           key: ${{ inputs.reuse-key }}
           fail-on-miss: "false"
 
-      - name: Install foundry-zksync
+      - name: Install Foundry
         if: steps.reuse.outputs.cache-hit != 'true'
-        uses: ./.github/actions/install-zksync-foundry
+        uses: ./.github/actions/install-foundry
 
       - name: Use Node.js
         if: steps.reuse.outputs.cache-hit != 'true'
@@ -96,19 +99,6 @@ jobs:
         run: |
           yarn build:foundry
 
-      - name: Build l2 contracts
-        if: steps.reuse.outputs.cache-hit != 'true'
-        working-directory: l2-contracts
-        run: |
-          yarn build:foundry
-
-      - name: Build system contracts
-        if: steps.reuse.outputs.cache-hit != 'true'
-        working-directory: system-contracts
-        run: |
-          yarn install
-          yarn build:foundry
-
       # Reads the cross-commit solc cache, never writes it. A PR's later runs can restore what its
       # earlier runs saved, so a PR could plant a forged artifact plus a manifest vouching for it and
       # have check-hashes attest to bytecode that never came from its sources. Constraining the writer
@@ -124,10 +114,6 @@ jobs:
             da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
-            l1-contracts/zkout
-            l2-contracts/cache-forge
-            l2-contracts/zkout
-            system-contracts/zkout
 
       - name: Upload artifacts for download
         if: inputs.upload-artifacts
@@ -139,7 +125,3 @@ jobs:
             da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
-            l1-contracts/zkout
-            l2-contracts/cache-forge
-            l2-contracts/zkout
-            system-contracts/zkout

@@ -34,12 +34,6 @@ struct GatewayCTMDeployerConfig {
     bytes4[] migratorSelectors;
     /// @notice Array of function selectors for the Committer facet.
     bytes4[] committerSelectors;
-    /// @notice Hash of the bootloader bytecode.
-    bytes32 bootloaderHash;
-    /// @notice Hash of the default account bytecode.
-    bytes32 defaultAccountHash;
-    /// @notice Hash of the EVM emulator bytecode.
-    bytes32 evmEmulatorHash;
     /// @notice Root hash of the genesis state.
     bytes32 genesisRoot;
     /// @notice Leaf index in the genesis rollup.

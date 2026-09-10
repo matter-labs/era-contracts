@@ -10,7 +10,6 @@ runV31UpgradeScenario({
   stateVersion: "v0.31.0",
   permanentValuesTemplatePath: "test/anvil-interop/config/v31-permanent-values.toml",
   upgradeInputTemplatePath: "test/anvil-interop/config/v31-to-v33-upgrade.toml",
-  isZKsyncOS: true,
   expectedProtocolVersion: TARGET_PROTOCOL_VERSION,
   // The fixture leaves the ChainAssetHandler with the deployer as owner; governance has to own it to run
   // the stage-0 `pauseMigration()` call.
@@ -29,6 +28,6 @@ runV31UpgradeScenario({
     process.exit(0);
   })
   .catch((error) => {
-    console.error("V31 -> V32 upgrade test failed:", error.message || error);
+    console.error("V31 -> V33 upgrade test failed:", error.message || error);
     process.exit(1);
   });

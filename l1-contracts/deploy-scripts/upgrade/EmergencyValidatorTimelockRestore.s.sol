@@ -49,8 +49,7 @@ contract EmergencyValidatorTimelockRestore is EmergencyStageUpgradeCalldata, Cre
         vtImpl = deployViaCreate2AndNotify(
             type(MultisigCommitter).creationCode,
             abi.encode(ZKOS_BRIDGEHUB),
-            "MultisigCommitter",
-            false
+            "MultisigCommitter"
         );
         console2.log("New MultisigCommitter (VT) implementation:", vtImpl);
         console2.log("Feed this into runCalldata(address) to emit the emergency calldata.");

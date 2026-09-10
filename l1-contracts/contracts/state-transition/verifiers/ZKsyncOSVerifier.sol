@@ -76,6 +76,11 @@ contract ZKsyncOSVerifier is IVerifier, IZKsyncOSVerifier {
         revert MockVerifierNotSupported();
     }
 
+    /// @inheritdoc IZKsyncOSVerifier
+    function isTestnetVerifier() external pure virtual returns (bool) {
+        return false;
+    }
+
     /// @inheritdoc IVerifier
     /// @dev Used for backward compatibility with older Verifier implementation. Returns PLONK verification key hash.
     function verificationKeyHash() external view returns (bytes32) {

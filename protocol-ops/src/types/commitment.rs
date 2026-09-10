@@ -4,14 +4,6 @@ use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use strum::Display;
 
-use crate::types::VMOption;
-
-/// What kind of chain this is, as far as its pubdata is concerned. It fixes how much pubdata the
-/// chain commits ([`PubdataContent`]) and the on-chain `PubdataPricingMode` (`Rollup` for
-/// `Rollup`, `Validium` for everything else).
-///
-/// It does not fix *how* that pubdata is delivered to L1: every variant defaults to blobs, and
-/// `--l2-da-commitment-scheme` overrides that independently — see [`L2DACommitmentScheme`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, ValueEnum)]
 pub enum DAValidatorType {
     /// Commits and publishes the whole pubdata.
@@ -63,17 +55,13 @@ impl PubdataContent {
     /// pubdata. This is a default: `--pubdata-content` overrides it, and every combination with a
     /// delivery scheme is expressible.
     ///
-    /// Era chains have no such setting (`Admin.setPubdataContent` is ZKsync OS only), hence the `Option`.
-    pub fn from_da_and_vm_types(da_type: DAValidatorType, vm_type: VMOption) -> Option<Self> {
-        if !vm_type.is_zksync_os() {
-            return None;
-        }
-        Some(match da_type {
+    pub fn from_da_type(da_type: DAValidatorType) -> Self {
+        match da_type {
             DAValidatorType::LogsOnlyValidium => PubdataContent::LogsOnly,
             DAValidatorType::Rollup | DAValidatorType::Avail | DAValidatorType::Eigen => {
                 PubdataContent::FullPubdata
             }
-        })
+        }
     }
 
     pub fn to_u8(self) -> u8 {
@@ -84,7 +72,7 @@ impl PubdataContent {
 /// How a chain's committed pubdata is delivered to L1 — the on-chain `L2DACommitmentScheme`, and
 /// the second DA axis.
 ///
-/// Callers normally never name a variant: [`Self::from_da_and_vm_types`] derives blobs for every
+/// Callers normally never name a variant: [`Self::from_da_type`] derives blobs for every
 /// [`DAValidatorType`] on ZKsync OS. Naming one is how a chain gets a different delivery than its
 /// kind implies: commit-tx calldata (`blobs-and-pubdata-keccak256`), nothing at all
 /// (`discouraged-empty-no-da`), or the scheme a gateway-settling chain needs.
@@ -109,23 +97,20 @@ pub enum L2DACommitmentScheme {
 }
 
 impl L2DACommitmentScheme {
-    /// Resolve the L2 DA commitment scheme for a chain that settles **directly
-    /// on L1**.
+    /// Resolve the L2 DA commitment scheme for a ZKsync OS chain that settles
+    /// **directly on L1**.
     ///
     /// Do NOT use this for gateway-settling chains — use
     /// [`Self::for_gateway_settling`] instead.  Gateway-settling chains relay
     /// their pubdata through the gateway and the server encodes them with
     /// `pubdata_mode = RelayedL2Calldata`, which maps to
-    /// `BlobsAndPubdataKeccak256` (scheme 3) regardless of VM type.  Passing
+    /// `BlobsAndPubdataKeccak256` (scheme 3).  Passing
     /// `BlobsZKSyncOS` (scheme 4) from this function into
     /// `set_da_validator_pair` causes `MismatchL2DACommitmentScheme` errors on
     /// every batch commit.
-    pub fn from_da_and_vm_types(da_type: DAValidatorType, vm_type: VMOption) -> Self {
+    pub fn from_da_type(da_type: DAValidatorType) -> Self {
         match da_type {
-            DAValidatorType::Rollup => match vm_type {
-                VMOption::EraVM => L2DACommitmentScheme::BlobsAndPubdataKeccak256,
-                VMOption::ZKSyncOsVM => L2DACommitmentScheme::BlobsZKSyncOS,
-            },
+            DAValidatorType::Rollup => L2DACommitmentScheme::BlobsZKSyncOS,
             DAValidatorType::Avail | DAValidatorType::Eigen => {
                 L2DACommitmentScheme::PubdataKeccak256
             }
@@ -133,10 +118,7 @@ impl L2DACommitmentScheme {
             // interop commitment tree leaves in it — reaches L1 through the same blobs a rollup
             // uses, unless the caller names another scheme. The Era VM has no pubdata-content
             // axis, so there a validium is the classic no-DA one.
-            DAValidatorType::LogsOnlyValidium => match vm_type {
-                VMOption::EraVM => L2DACommitmentScheme::EmptyNoDA,
-                VMOption::ZKSyncOsVM => L2DACommitmentScheme::BlobsZKSyncOS,
-            },
+            DAValidatorType::LogsOnlyValidium => L2DACommitmentScheme::BlobsZKSyncOS,
         }
     }
 
@@ -146,8 +128,8 @@ impl L2DACommitmentScheme {
     /// Gateway-settling chains relay their pubdata through the gateway L2.
     /// The ZKsync OS server uses `pubdata_mode = RelayedL2Calldata` for these
     /// chains, which maps to `BlobsAndPubdataKeccak256` (scheme 3).
-    /// [`Self::from_da_and_vm_types`] would return `BlobsZKSyncOS` (scheme 4)
-    /// for ZKsync OS chains, which is incorrect for this case.
+    /// [`Self::from_da_type`] would return `BlobsZKSyncOS` (scheme 4),
+    /// which is incorrect for this case.
     pub fn for_gateway_settling(da_type: DAValidatorType) -> Self {
         match da_type {
             DAValidatorType::Rollup => L2DACommitmentScheme::BlobsAndPubdataKeccak256,
@@ -200,42 +182,17 @@ mod tests {
     fn zksync_os_defaults_to_blobs_whatever_the_chain_is() {
         for da in [DAValidatorType::Rollup, DAValidatorType::LogsOnlyValidium] {
             assert_eq!(
-                L2DACommitmentScheme::from_da_and_vm_types(da, VMOption::ZKSyncOsVM),
+                L2DACommitmentScheme::from_da_type(da),
                 L2DACommitmentScheme::BlobsZKSyncOS
             );
         }
         assert_eq!(
-            PubdataContent::from_da_and_vm_types(DAValidatorType::Rollup, VMOption::ZKSyncOsVM),
-            Some(PubdataContent::FullPubdata)
+            PubdataContent::from_da_type(DAValidatorType::Rollup),
+            PubdataContent::FullPubdata
         );
         assert_eq!(
-            PubdataContent::from_da_and_vm_types(
-                DAValidatorType::LogsOnlyValidium,
-                VMOption::ZKSyncOsVM
-            ),
-            Some(PubdataContent::LogsOnly)
-        );
-    }
-
-    /// Era has no pubdata-content axis at all, and its validiums are the classic no-DA ones.
-    #[test]
-    fn era_has_no_pubdata_content() {
-        for da in [
-            DAValidatorType::Rollup,
-            DAValidatorType::LogsOnlyValidium,
-            DAValidatorType::Avail,
-        ] {
-            assert_eq!(
-                PubdataContent::from_da_and_vm_types(da, VMOption::EraVM),
-                None
-            );
-        }
-        assert_eq!(
-            L2DACommitmentScheme::from_da_and_vm_types(
-                DAValidatorType::LogsOnlyValidium,
-                VMOption::EraVM
-            ),
-            L2DACommitmentScheme::EmptyNoDA
+            PubdataContent::from_da_type(DAValidatorType::LogsOnlyValidium),
+            PubdataContent::LogsOnly
         );
     }
 

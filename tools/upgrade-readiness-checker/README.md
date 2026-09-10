@@ -48,10 +48,3 @@ cargo run --release -- \
 The minor/patch pair is packed into the u256 the CTM stores (`(minor << 32) | patch`).
 
 All flags also accept environment variables (see `--help`).
-
-## Running from GitHub Actions
-
-See [`.github/workflows/upgrade-readiness-check.yaml`](../../.github/workflows/upgrade-readiness-check.yaml).
-Manually triggered; posts to Slack when the tool exits (success or failure).
-The Slack webhook is read from the `UPGRADE_READINESS_SLACK_WEBHOOK_URL` repo
-secret.

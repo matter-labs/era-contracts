@@ -26,6 +26,9 @@ import "contracts/l2-upgrades/SystemContractProxyAdmin.sol";
 import "contracts/l2-upgrades/ISystemContractProxy.sol";
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
+import {L2ComplexUpgrader} from "contracts/l2-upgrades/L2ComplexUpgrader.sol";
+import {L2GenesisUpgrade} from "contracts/l2-upgrades/L2GenesisUpgrade.sol";
+import {InvalidChainId} from "contracts/common/L1ContractErrors.sol";
 
 /**
  * @title L2GenesisForceDeploymentsHelperTest
@@ -126,6 +129,8 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
             L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
         );
         assertEq(etchedProxyAdmin.upgradeCallCount(), 0);
+
+        _assertAssetRouterInitialized({_viaInitL2: true});
     }
 
     function testZKsyncOSSystemProxyUpgrade_NonGenesis() public {
@@ -180,6 +185,8 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         // The upgrade path initializes the atomic-interop built-ins, so an upgraded chain ends up with the
         // same state a fresh one gets from genesis.
         _assertAtomicInteropInitialized();
+
+        _assertAssetRouterInitialized({_viaInitL2: false});
 
         // Note: no ZKsync OS chain can arrive here with the built-ins already seeded — neither they nor
         // their addresses existed in v31 — so the initialization is unconditional and one-shot.
@@ -249,7 +256,6 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
     function _createFixedForceDeploymentsData(bool isGenesis) internal returns (FixedForceDeploymentsData memory) {
         FixedForceDeploymentsData memory data;
         data.l1ChainId = L1_CHAIN_ID;
-        data.eraChainId = ERA_CHAIN_ID;
         data.aliasedL1Governance = aliasedL1GovernanceAddress;
         data.maxNumberOfZKChains = MAX_ZK_CHAINS;
         data.l1AssetRouter = l1AssetRouterAddress;
@@ -310,7 +316,6 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
     function _createEraFixedForceDeploymentsData() internal returns (FixedForceDeploymentsData memory) {
         FixedForceDeploymentsData memory data;
         data.l1ChainId = L1_CHAIN_ID;
-        data.eraChainId = ERA_CHAIN_ID;
         data.aliasedL1Governance = aliasedL1GovernanceAddress;
         data.maxNumberOfZKChains = MAX_ZK_CHAINS;
         data.l1AssetRouter = l1AssetRouterAddress;
@@ -329,6 +334,19 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         data.zkTokenAssetId = DataEncoding.encodeNTVAssetId(ERA_CHAIN_ID, makeAddr("zkToken"));
 
         return data;
+    }
+
+    /// @dev Asserts the L2AssetRouter mock received the current-signature init/update call with the
+    /// fixture's arguments; without explicit handlers a calldata regression would silently succeed
+    /// through the mock's permissive fallback.
+    function _assertAssetRouterInitialized(bool _viaInitL2) internal view {
+        MockContract router = MockContract(payable(L2_ASSET_ROUTER_ADDR));
+        assertEq(router.assetRouterInitL2Calls(), _viaInitL2 ? 1 : 0);
+        assertEq(router.assetRouterUpdateL2Calls(), _viaInitL2 ? 0 : 1);
+        assertEq(router.assetRouterL1ChainId(), L1_CHAIN_ID);
+        assertEq(router.assetRouterL1AssetRouter(), l1AssetRouterAddress);
+        assertEq(router.assetRouterBaseTokenAssetId(), keccak256("baseTokenAsset"));
+        assertEq(router.assetRouterAliasedOwner(), aliasedL1GovernanceAddress);
     }
 
     function _createAdditionalForceDeploymentsData()
@@ -396,6 +414,66 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
             L1_CHAIN_ID,
             "flow manager not initialized"
         );
+    }
+
+    /// @dev Exercises the `L2GenesisUpgrade` entry point the way genesis actually reaches it: the force
+    /// deployer calls the complex upgrader, which delegatecalls into the genesis upgrade. The tests above
+    /// call `performForceDeployedContractsInit` directly, so they do not cover this wrapper.
+    function test_SuccessfulGenesisUpgrade() public {
+        _setUpGenesisUpgradeEntryPoint();
+
+        bytes memory genesisUpgradeCalldata = abi.encodeWithSelector(
+            IL2GenesisUpgrade.genesisUpgrade.selector,
+            true, // _isZKsyncOS
+            ERA_CHAIN_ID,
+            ctmDeployerAddress,
+            abi.encode(_createFixedForceDeploymentsData(true)),
+            abi.encode(_createAdditionalForceDeploymentsData())
+        );
+
+        // The genesis upgrade is delegatecalled, so it emits from the complex upgrader's address.
+        vm.expectEmit(true, false, false, true, L2_COMPLEX_UPGRADER_ADDR);
+        emit IL2GenesisUpgrade.UpgradeComplete(ERA_CHAIN_ID);
+
+        vm.recordLogs();
+        vm.prank(L2_FORCE_DEPLOYER_ADDR);
+        L2ComplexUpgrader(L2_COMPLEX_UPGRADER_ADDR).upgrade(L2_GENESIS_UPGRADE_ADDR, genesisUpgradeCalldata);
+
+        // The wrapper must actually drive the force-deployment init, not just emit.
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertEq(_countLogs(logs, FORCE_DEPLOYED_CONTRACTS_INITIALIZED_SIG), 1);
+        _assertAtomicInteropInitialized();
+    }
+
+    function test_RevertWhen_GenesisUpgradeChainIdZero() public {
+        _setUpGenesisUpgradeEntryPoint();
+
+        bytes memory genesisUpgradeCalldata = abi.encodeWithSelector(
+            IL2GenesisUpgrade.genesisUpgrade.selector,
+            true, // _isZKsyncOS
+            uint256(0),
+            ctmDeployerAddress,
+            abi.encode(_createFixedForceDeploymentsData(true)),
+            abi.encode(_createAdditionalForceDeploymentsData())
+        );
+
+        vm.expectRevert(InvalidChainId.selector);
+        vm.prank(L2_FORCE_DEPLOYER_ADDR);
+        L2ComplexUpgrader(L2_COMPLEX_UPGRADER_ADDR).upgrade(L2_GENESIS_UPGRADE_ADDR, genesisUpgradeCalldata);
+    }
+
+    /// @dev Places the real upgrader/genesis-upgrade bytecode at their canonical addresses. Under the
+    /// delegatecall the helper sees `address(this)` as the complex upgrader, so the proxy admin owner
+    /// must be mocked to that address rather than to the test contract.
+    function _setUpGenesisUpgradeEntryPoint() internal {
+        vm.etch(L2_COMPLEX_UPGRADER_ADDR, address(new L2ComplexUpgrader()).code);
+        vm.etch(L2_GENESIS_UPGRADE_ADDR, address(new L2GenesisUpgrade()).code);
+        vm.mockCall(
+            L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
+            abi.encodeWithSignature("owner()"),
+            abi.encode(L2_COMPLEX_UPGRADER_ADDR)
+        );
+        _etchAllDeferredContracts();
     }
 }
 
@@ -481,8 +559,46 @@ contract MockContract {
     // L2ChainAssetHandler.initL2 (constants are resolved internally)
     function initL2(uint256, address) external {}
 
-    // L2AssetRouter.updateL2
-    function updateL2(uint256, uint256, address, bytes32, address) external {}
+    // L2AssetRouter.initL2 / updateL2 (current signatures); arguments are recorded so the tests
+    // can assert the generated router calldata instead of relying on the permissive fallback.
+    uint256 public assetRouterInitL2Calls;
+    uint256 public assetRouterUpdateL2Calls;
+    uint256 public assetRouterL1ChainId;
+    address public assetRouterL1AssetRouter;
+    bytes32 public assetRouterBaseTokenAssetId;
+    address public assetRouterAliasedOwner;
+
+    function initL2(
+        uint256 _l1ChainId,
+        address _l1AssetRouter,
+        bytes32 _baseTokenAssetId,
+        address _aliasedOwner
+    ) external {
+        ++assetRouterInitL2Calls;
+        _recordAssetRouterArgs(_l1ChainId, _l1AssetRouter, _baseTokenAssetId, _aliasedOwner);
+    }
+
+    function updateL2(
+        uint256 _l1ChainId,
+        address _l1AssetRouter,
+        bytes32 _baseTokenAssetId,
+        address _aliasedOwner
+    ) external {
+        ++assetRouterUpdateL2Calls;
+        _recordAssetRouterArgs(_l1ChainId, _l1AssetRouter, _baseTokenAssetId, _aliasedOwner);
+    }
+
+    function _recordAssetRouterArgs(
+        uint256 _l1ChainId,
+        address _l1AssetRouter,
+        bytes32 _baseTokenAssetId,
+        address _aliasedOwner
+    ) private {
+        assetRouterL1ChainId = _l1ChainId;
+        assetRouterL1AssetRouter = _l1AssetRouter;
+        assetRouterBaseTokenAssetId = _baseTokenAssetId;
+        assetRouterAliasedOwner = _aliasedOwner;
+    }
 
     // L2NativeTokenVault.updateL2
     function updateL2(

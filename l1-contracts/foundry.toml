@@ -1,5 +1,5 @@
 [profile.default]
-allow_paths = ["../l2-contracts/contracts", "../lib", "../system-contracts/contracts"]
+allow_paths = ["../lib"]
 src = "contracts"
 out = "out"
 libs = ["./lib"]
@@ -18,24 +18,12 @@ fs_permissions = [
     { access = "read-write", path = "./upgrade-envs/permanent-values/local.toml" },
     { access = "read-write", path = "./upgrade-envs/" },
     { access = "read-write", path = "./script-out" },
-    { access = "read", path = "../system-contracts/bootloader/build/artifacts" },
-    { access = "read", path = "../system-contracts/artifacts-zk/" },
-    { access = "read", path = "../system-contracts/contracts-preprocessed/precompiles/artifacts" },
-    { access = "read", path = "../system-contracts/contracts-preprocessed/artifacts" },
-    { access = "read", path = "../system-contracts/scripts/evm-predeploys-data" },
-    { access = "read", path = "../system-contracts/zkout" },
-    { access = "read", path = "../l2-contracts/artifacts-zk/" },
-    { access = "read", path = "../l2-contracts/zkout/" },
-    { access = "read", path = "../l1-contracts/artifacts-zk/" },
     { access = "read", path = "../l1-contracts/script-out/" },
     { access = "read", path = "../l1-contracts/broadcast/" },
     { access = "read", path = "../da-contracts/" },
-    { access = "read", path = "../system-contracts/zkout/" },
     { access = "read", path = "./script-config" },
     { access = "read", path = "./upgrade-envs/" },
     { access = "read", path = "./out" },
-    { access = "read", path = "zkout" },
-    { access = "read", path = "./deploy-scripts/evm-predeploys/evm-predeploy-datas" },
     { access = "read", path = "../configs/genesis/" },
     { access = "read", path = "../configs/" },
 ]
@@ -46,8 +34,9 @@ remappings = [
   "forge-std/=lib/forge-std/src/",
   "murky/=lib/murky/src/",
   "foundry-test/=test/foundry/",
-  "l2-contracts/=../l2-contracts/contracts/",
-    "system-contracts/=../system-contracts/",
+  # The audited L1 sources import the frozen system constants by their historical
+  # `system-contracts/...` path; the workspace is gone, the file lives in-tree.
+  "system-contracts/contracts/Constants.sol=frozen-system-constants/Constants.sol",
   "@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/",
   "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
   "test-utils/=test/foundry/l1/integration/utils/",
@@ -67,49 +56,21 @@ allow_internal_expect_revert = true
 cbor_metadata = false
 bytecode_hash = "none"
 
-[profile.default.zksync]
-enable_eravm_extensions = true
-zksolc = "1.5.11"
-
 [profile.invariant_tests_l1context]
 test = "test"
 ignored_error_codes = ["missing-receive-ether", "code-size", 2018, 5667, 2519, 6321, 3149, 3860]
 optimizer = false
-[profile.invariant_tests_l1context.zksync]
-suppressed_warnings = ["txorigin"]
 [profile.invariant_tests_l1context.invariant]
 runs = 10
 depth = 1000
-
-[profile.invariant_tests_l2context]
-test = "test"
-ignored_error_codes = ["missing-receive-ether", "code-size", 2018, 5667, 2519, 6321, 3149, 3860]
-optimizer = false
-[profile.invariant_tests_l2context.zksync]
-suppressed_warnings = ["txorigin"]
-[profile.invariant_tests_l2context.invariant]
-runs = 1
-depth = 100
 
 [profile.invariant_tests_l1context_ci]
 test = "test"
 ignored_error_codes = ["missing-receive-ether", "code-size", 2018, 5667, 2519, 6321, 3149, 3860]
 optimizer = false
-[profile.invariant_tests_l1context_ci.zksync]
-suppressed_warnings = ["txorigin"]
 [profile.invariant_tests_l1context_ci.invariant]
 runs = 10
 depth = 10000
-
-[profile.invariant_tests_l2context_ci]
-test = "test"
-ignored_error_codes = ["missing-receive-ether", "code-size", 2018, 5667, 2519, 6321, 3149, 3860]
-optimizer = false
-[profile.invariant_tests_l2context_ci.zksync]
-suppressed_warnings = ["txorigin"]
-[profile.invariant_tests_l2context_ci.invariant]
-runs = 2
-depth = 1000
 
 [lint]
 lint_on_build = false

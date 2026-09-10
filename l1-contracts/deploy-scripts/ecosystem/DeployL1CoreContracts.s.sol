@@ -78,12 +78,11 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
 
         initializeConfig(inputPath);
 
-        (coreAddresses.shared.governance) = deploySimpleContract("Governance", false);
-        (coreAddresses.shared.bridgehubAdmin) = deploySimpleContract("ChainAdminOwnable", false);
+        (coreAddresses.shared.governance) = deploySimpleContract("Governance");
+        (coreAddresses.shared.bridgehubAdmin) = deploySimpleContract("ChainAdminOwnable");
         coreAddresses.shared.transparentProxyAdmin = deployWithCreate2AndOwner(
             "ProxyAdmin",
-            coreAddresses.shared.governance,
-            false
+            coreAddresses.shared.governance
         );
 
         // The single owner chainAdmin does not have a separate control restriction contract.
@@ -92,11 +91,11 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         (
             coreAddresses.bridgehub.implementations.bridgehub,
             coreAddresses.bridgehub.proxies.bridgehub
-        ) = deployTuppWithContract("L1Bridgehub", false);
+        ) = deployTuppWithContract("L1Bridgehub");
         (
             coreAddresses.bridgehub.implementations.chainAssetHandler,
             coreAddresses.bridgehub.proxies.chainAssetHandler
-        ) = deployTuppWithContract("L1ChainAssetHandler", false);
+        ) = deployTuppWithContract("L1ChainAssetHandler");
         {
             string memory messageRootContract = vm.envOr("USE_DUMMY_MESSAGE_ROOT", false)
                 ? "DummyL1MessageRoot"
@@ -104,46 +103,39 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             (
                 coreAddresses.bridgehub.implementations.messageRoot,
                 coreAddresses.bridgehub.proxies.messageRoot
-            ) = deployTuppWithContract(messageRootContract, false);
+            ) = deployTuppWithContract(messageRootContract);
         }
 
         (
             coreAddresses.bridges.implementations.l1Nullifier,
             coreAddresses.bridges.proxies.l1Nullifier
-        ) = deployTuppWithContract("L1Nullifier", false);
+        ) = deployTuppWithContract("L1Nullifier");
         (
             coreAddresses.bridges.implementations.l1AssetRouter,
             coreAddresses.bridges.proxies.l1AssetRouter
-        ) = deployTuppWithContract("L1AssetRouter", false);
-        (coreAddresses.bridges.bridgedStandardERC20Implementation) = deploySimpleContract(
-            "BridgedStandardERC20",
-            false
-        );
-        coreAddresses.bridges.bridgedTokenBeacon = deployWithCreate2AndOwner(
-            "BridgedTokenBeacon",
-            config.ownerAddress,
-            false
-        );
+        ) = deployTuppWithContract("L1AssetRouter");
+        (coreAddresses.bridges.bridgedStandardERC20Implementation) = deploySimpleContract("BridgedStandardERC20");
+        coreAddresses.bridges.bridgedTokenBeacon = deployWithCreate2AndOwner("BridgedTokenBeacon", config.ownerAddress);
         (
             coreAddresses.bridges.implementations.l1NativeTokenVault,
             coreAddresses.bridges.proxies.l1NativeTokenVault
-        ) = deployTuppWithContract("L1NativeTokenVault", false);
+        ) = deployTuppWithContract("L1NativeTokenVault");
         (
             coreAddresses.bridges.implementations.l1InteropHandler,
             coreAddresses.bridges.proxies.l1InteropHandler
-        ) = deployTuppWithContract("L1InteropHandler", false);
+        ) = deployTuppWithContract("L1InteropHandler");
         setL1NativeTokenVaultParams();
 
         updateSharedBridge();
         (
             coreAddresses.bridgehub.implementations.ctmDeploymentTracker,
             coreAddresses.bridgehub.proxies.ctmDeploymentTracker
-        ) = deployTuppWithContract("CTMDeploymentTracker", false);
+        ) = deployTuppWithContract("CTMDeploymentTracker");
 
         (
             coreAddresses.bridgehub.implementations.chainRegistrationSender,
             coreAddresses.bridgehub.proxies.chainRegistrationSender
-        ) = deployTuppWithContract("ChainRegistrationSender", false);
+        ) = deployTuppWithContract("ChainRegistrationSender");
         setBridgehubParams();
 
         updateOwners();
@@ -155,7 +147,6 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         IL1Bridgehub bridgehub = IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub);
         L1ChainAssetHandler chainAssetHandler = L1ChainAssetHandler(coreAddresses.bridgehub.proxies.chainAssetHandler);
         vm.startBroadcast(getDeployerAddress());
-        bridgehub.addTokenAssetId(bridgehub.baseTokenAssetId(config.eraChainId));
         BridgehubBase(address(bridgehub)).setAddresses(
             coreAddresses.bridges.proxies.l1AssetRouter,
             ICTMDeploymentTracker(coreAddresses.bridgehub.proxies.ctmDeploymentTracker),
@@ -313,7 +304,6 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
 
         vm.serializeString("root", "contracts", contracts);
         vm.serializeUint("root", "l1_chain_id", config.l1ChainId);
-        vm.serializeUint("root", "era_chain_id", config.eraChainId);
         vm.serializeAddress("root", "deployer_addr", config.deployerAddress);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);

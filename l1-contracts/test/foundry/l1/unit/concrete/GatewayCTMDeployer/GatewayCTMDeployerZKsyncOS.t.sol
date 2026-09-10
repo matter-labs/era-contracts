@@ -127,9 +127,6 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
             gettersSelectors: new bytes4[](2),
             migratorSelectors: new bytes4[](2),
             committerSelectors: new bytes4[](2),
-            bootloaderHash: bytes32(uint256(0xabc)),
-            defaultAccountHash: bytes32(uint256(0xdef)),
-            evmEmulatorHash: bytes32(uint256(0xdef)),
             genesisRoot: bytes32(uint256(0x123)),
             genesisRollupLeafIndex: 10,
             // For ZKsyncOS mode, the genesis batch commitment must be equal to 1
