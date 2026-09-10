@@ -182,7 +182,8 @@ uint256 constant PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
 /// @dev the address used to identify eth as the base token for chains.
 address constant ETH_TOKEN_ADDRESS = address(1);
 
-/// @dev the value returned in initiateIndirectCall in the Indirect function.
+/// @dev The magic value an `IL1CrossChainSender.initiateIndirectCall` implementation must return, proving to the
+/// L1InteropCenter that the callee implements the indirect-call protocol.
 bytes32 constant INDIRECT_CALL_MAGIC_VALUE = bytes32(uint256(keccak256("INDIRECT_CALL_MAGIC_VALUE")) - 1);
 
 /// @dev https://eips.ethereum.org/EIPS/eip-1352

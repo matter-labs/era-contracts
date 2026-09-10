@@ -328,24 +328,24 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
             return (address(0), false);
         }
 
-        bytes memory secondBridgeData = payload;
-        if (secondBridgeData.length == 0) {
+        bytes memory crossChainSenderData = payload;
+        if (crossChainSenderData.length == 0) {
             return (address(0), false);
         }
 
-        if (secondBridgeData[0] != NEW_ENCODING_VERSION) {
+        if (crossChainSenderData[0] != NEW_ENCODING_VERSION) {
             return (address(0), false);
         }
-        bytes memory encodedData = new bytes(secondBridgeData.length - 1);
+        bytes memory encodedData = new bytes(crossChainSenderData.length - 1);
         assembly {
-            mcopy(add(encodedData, 0x20), add(secondBridgeData, 0x21), mload(encodedData))
+            mcopy(add(encodedData, 0x20), add(crossChainSenderData, 0x21), mload(encodedData))
         }
 
         // From now on, we know that the used encoding version is `NEW_ENCODING_VERSION` that is
         // supported only in the new protocol version with Gateway support, so we can assume
         // that the methods like e.g. Bridgehub.ctmAssetIdToAddress must exist.
 
-        // This is the format of the `secondBridgeData` under the `NEW_ENCODING_VERSION`.
+        // This is the format of the `crossChainSenderData` under the `NEW_ENCODING_VERSION`.
         // If it fails, it would mean that the data is not correct and the call would eventually fail anyway.
         (bytes32 chainAssetId, bytes memory bridgehubData) = abi.decode(encodedData, (bytes32, bytes));
 

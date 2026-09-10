@@ -25,7 +25,7 @@ error ChainNotReadyForMigration(uint256 chainId);
 // 0x824e4e26
 error ChainsSettlementLayerMismatch(uint256 chainToRegisterSL, uint256 chainRegisteredOnSL);
 // 0xd7c176e8
-error CrossChainSenderAddressTooLow(address secondBridgeAddress, address minSecondBridgeAddress);
+error CrossChainSenderAddressTooLow(address crossChainSender, address minCrossChainSender);
 // 0x5d03f19d
 error CurrentBatchNumberAlreadySet();
 // 0x68d91b49
@@ -83,7 +83,7 @@ error OnlyChainAssetHandler(address sender, address chainAssetHandler);
 // 0xec76af13
 error OnlyGateway();
 // 0x2b5e524f
-error OnlyInteropCenter(address msgSender, address bridgehub);
+error OnlyInteropCenter(address msgSender, address interopCenter);
 // 0x8d14ca84
 error OnlyL1();
 // 0x6b75db8c

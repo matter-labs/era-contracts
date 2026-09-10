@@ -229,7 +229,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
     /// using the Indirect path.
     /// @dev ETH is sent as `msg.value` to cover the base token gas cost (`mintValue`).
     /// The ERC20 token is transferred via the second bridge by approving the shared bridge
-    /// and encoding the token address and amount in `secondBridgeCalldata`.
+    /// and encoding the token address and amount in `crossChainSenderData`.
     /// Updates per-user, per-chain, and global deposit tracking for both ETH and the ERC20.
     function depositERC20ToEthChain(uint256 l2Value, address tokenAddress) private useGivenToken(tokenAddress) {
         uint256 gasPrice = 10000000;
@@ -252,16 +252,20 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
         uint256 userEthBefore = currentUser.balance;
         uint256 userTokenBefore = currentToken.balanceOf(currentUser);
 
-        bytes memory secondBridgeCallData = abi.encode(currentTokenAddress, l2Value, chainContracts[currentChainId]);
+        bytes memory crossChainSenderCallData = abi.encode(
+            currentTokenAddress,
+            l2Value,
+            chainContracts[currentChainId]
+        );
         L2TransactionRequestIndirect memory requestTx = _createL2TransactionRequestIndirect({
             _chainId: currentChainId,
             _mintValue: mintValue,
-            _secondBridgeValue: 0,
-            _secondBridgeAddress: address(addresses.sharedBridge),
+            _crossChainSenderValue: 0,
+            _crossChainSender: address(addresses.sharedBridge),
             _l2Value: 0,
             _l2GasLimit: l2GasLimit,
             _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            _secondBridgeCalldata: secondBridgeCallData
+            _crossChainSenderData: crossChainSenderCallData
         });
 
         vm.recordLogs();
@@ -313,7 +317,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
     /// @notice Deposits ETH to a ZK chain that uses an ERC20 as its base token,
     /// using the Indirect path.
     /// @dev The ERC20 base token is minted and approved for `mintValue` (gas costs).
-    /// ETH is sent as `secondBridgeValue` via `msg.value`. This is a dual-token flow:
+    /// ETH is sent as `crossChainSenderValue` via `msg.value`. This is a dual-token flow:
     /// ERC20 pays for L2 gas, ETH is the actual deposit value.
     function depositEthToERC20Chain(uint256 l2Value) private useBaseToken {
         uint256 gasPrice = 10000000;
@@ -335,16 +339,20 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
         uint256 userEthBefore = currentUser.balance;
         uint256 userTokenBefore = currentToken.balanceOf(currentUser);
 
-        bytes memory secondBridgeCallData = abi.encode(ETH_TOKEN_ADDRESS, uint256(0), chainContracts[currentChainId]);
+        bytes memory crossChainSenderCallData = abi.encode(
+            ETH_TOKEN_ADDRESS,
+            uint256(0),
+            chainContracts[currentChainId]
+        );
         L2TransactionRequestIndirect memory requestTx = _createL2TransactionRequestIndirect({
             _chainId: currentChainId,
             _mintValue: mintValue,
-            _secondBridgeValue: l2Value,
-            _secondBridgeAddress: address(addresses.sharedBridge),
+            _crossChainSenderValue: l2Value,
+            _crossChainSender: address(addresses.sharedBridge),
             _l2Value: 0,
             _l2GasLimit: l2GasLimit,
             _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            _secondBridgeCalldata: secondBridgeCallData
+            _crossChainSenderData: crossChainSenderCallData
         });
 
         vm.recordLogs();
@@ -357,7 +365,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
         assertNotEq(request.txHash, bytes32(0), "Priority tx hash should not be zero");
 
         // Verify balances
-        // ETH consumed via secondBridgeValue
+        // ETH consumed via crossChainSenderValue
         assertEq(currentUser.balance, userEthBefore - l2Value, "User ETH should decrease by l2Value");
         // ERC20 base token consumed for gas (mintValue)
         assertEq(
@@ -396,7 +404,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
     /// @notice Deposits an ERC20 token to a ZK chain that also uses an ERC20 as its base token,
     /// using the Indirect path.
     /// @dev Two separate ERC20 tokens are involved: the base token (for gas via `mintValue`)
-    /// and the deposit token (for the L2 value via `secondBridgeCalldata`). Both are minted
+    /// and the deposit token (for the L2 value via `crossChainSenderData`). Both are minted
     /// and approved independently. No ETH is sent with the call.
     /// Caller is responsible for ensuring `currentToken` differs from `baseTokenAddress`.
     function depositERC20ToERC20Chain(uint256 l2Value, address baseTokenAddress) private {
@@ -423,16 +431,20 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
         uint256 userBaseBefore = baseToken.balanceOf(currentUser);
         uint256 userTokenBefore = currentToken.balanceOf(currentUser);
 
-        bytes memory secondBridgeCallData = abi.encode(currentTokenAddress, l2Value, chainContracts[currentChainId]);
+        bytes memory crossChainSenderCallData = abi.encode(
+            currentTokenAddress,
+            l2Value,
+            chainContracts[currentChainId]
+        );
         L2TransactionRequestIndirect memory requestTx = _createL2TransactionRequestIndirect({
             _chainId: currentChainId,
             _mintValue: mintValue,
-            _secondBridgeValue: 0,
-            _secondBridgeAddress: address(addresses.sharedBridge),
+            _crossChainSenderValue: 0,
+            _crossChainSender: address(addresses.sharedBridge),
             _l2Value: 0,
             _l2GasLimit: l2GasLimit,
             _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            _secondBridgeCalldata: secondBridgeCallData
+            _crossChainSenderData: crossChainSenderCallData
         });
 
         vm.recordLogs();

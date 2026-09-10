@@ -158,7 +158,7 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
 
         vm.mockCall(
             address(mockChainContract),
-            abi.encodeWithSelector(mockChainContract.bridgehubRequestL2Transaction.selector),
+            abi.encodeWithSelector(mockChainContract.interopCenterRequestL2Transaction.selector),
             abi.encode(canonicalHash)
         );
 
@@ -200,8 +200,8 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
         uint256 l2GasLimit,
         uint256 l2GasPerPubdataByteLimit,
         address refundRecipient,
-        uint256 secondBridgeValue,
-        bytes memory secondBridgeCalldata,
+        uint256 crossChainSenderValue,
+        bytes memory crossChainSenderData,
         bytes32 magicValue
     ) public {
         _useMockSharedBridge();
@@ -220,8 +220,8 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
             l2GasLimit: l2GasLimit,
             l2GasPerPubdataByteLimit: l2GasPerPubdataByteLimit,
             refundRecipient: refundRecipient,
-            secondBridgeValue: secondBridgeValue,
-            secondBridgeCalldata: secondBridgeCalldata
+            crossChainSenderValue: crossChainSenderValue,
+            crossChainSenderData: crossChainSenderData
         });
 
         l2TxnReq2BridgeOut.chainId = _setUpZKChainForChainId(l2TxnReq2BridgeOut.chainId);
@@ -231,7 +231,7 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
 
         assertTrue(bridgehub.getZKChain(l2TxnReq2BridgeOut.chainId) == address(mockChainContract));
 
-        uint256 callerMsgValue = l2TxnReq2BridgeOut.mintValue + l2TxnReq2BridgeOut.secondBridgeValue;
+        uint256 callerMsgValue = l2TxnReq2BridgeOut.mintValue + l2TxnReq2BridgeOut.crossChainSenderValue;
         address randomCaller = makeAddr("RANDOM_CALLER");
         vm.deal(randomCaller, callerMsgValue);
 
@@ -244,7 +244,7 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
         });
 
         vm.mockCall(
-            secondBridgeAddress,
+            crossChainSender,
             abi.encodeWithSelector(IL1CrossChainSender.initiateIndirectCall.selector),
             abi.encode(request)
         );
@@ -267,9 +267,9 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
             l2GasLimit: 1_000_000,
             l2GasPerPubdataByteLimit: 800,
             refundRecipient: makeAddr("REFUND_RECIPIENT"),
-            secondBridgeAddress: secondBridgeAddress,
-            secondBridgeValue: 0.1 ether,
-            secondBridgeCalldata: abi.encode("deposit data")
+            crossChainSender: crossChainSender,
+            crossChainSenderValue: 0.1 ether,
+            crossChainSenderData: abi.encode("deposit data")
         });
         _setUpBaseTokenForChainId(request.chainId, true, address(0));
 
@@ -285,18 +285,14 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
         // This unit test isolates L1InteropCenter routing from the downstream bridge and mailbox
         // implementations; their exact calls are asserted below, including values and calldata.
         vm.mockCall(
-            secondBridgeAddress,
+            crossChainSender,
             abi.encodeWithSelector(IL1CrossChainSender.initiateIndirectCall.selector),
             abi.encode(outputRequest)
         );
-        vm.mockCall(
-            secondBridgeAddress,
-            abi.encodeWithSelector(IL1CrossChainSender.confirmL2Transaction.selector),
-            hex""
-        );
+        vm.mockCall(crossChainSender, abi.encodeWithSelector(IL1CrossChainSender.confirmL2Transaction.selector), hex"");
         vm.mockCall(
             address(mockChainContract),
-            abi.encodeWithSelector(mockChainContract.bridgehubRequestL2Transaction.selector),
+            abi.encodeWithSelector(mockChainContract.interopCenterRequestL2Transaction.selector),
             abi.encode(canonicalHash)
         );
 
@@ -306,7 +302,7 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
             request
         );
 
-        uint256 msgValue = request.mintValue + request.secondBridgeValue;
+        uint256 msgValue = request.mintValue + request.crossChainSenderValue;
         vm.deal(caller, msgValue);
         vm.recordLogs();
         vm.prank(caller);
@@ -341,7 +337,7 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
                     abi.encode(
                         InteroperableAddress.formatEvmV1(block.chainid, _caller),
                         InteroperableAddress.formatEvmV1(_request.chainId, _outputRequest.l2Contract),
-                        _request.secondBridgeCalldata,
+                        _request.crossChainSenderData,
                         _request.l2Value,
                         _attributes
                     )
@@ -367,19 +363,19 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
             )
         );
         vm.expectCall(
-            secondBridgeAddress,
-            _request.secondBridgeValue,
+            crossChainSender,
+            _request.crossChainSenderValue,
             abi.encodeCall(
                 IL1CrossChainSender.initiateIndirectCall,
-                (_request.chainId, _caller, _request.l2Value, _request.secondBridgeCalldata)
+                (_request.chainId, _caller, _request.l2Value, _request.crossChainSenderData)
             )
         );
         vm.expectCall(
             address(mockChainContract),
             abi.encodeWithSelector(
-                mockChainContract.bridgehubRequestL2Transaction.selector,
+                mockChainContract.interopCenterRequestL2Transaction.selector,
                 BridgehubL2TransactionRequest({
-                    sender: secondBridgeAddress,
+                    sender: crossChainSender,
                     contractL2: _outputRequest.l2Contract,
                     mintValue: _request.mintValue,
                     l2Value: _request.l2Value,
@@ -392,7 +388,7 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
             )
         );
         vm.expectCall(
-            secondBridgeAddress,
+            crossChainSender,
             abi.encodeCall(
                 IL1CrossChainSender.confirmL2Transaction,
                 (_request.chainId, _outputRequest.txDataHash, _canonicalHash)
@@ -408,9 +404,9 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
         uint256 l2GasLimit,
         uint256 l2GasPerPubdataByteLimit,
         address refundRecipient,
-        uint256 secondBridgeValue,
+        uint256 crossChainSenderValue,
         uint160 secondBridgeAddressValue,
-        bytes memory secondBridgeCalldata
+        bytes memory crossChainSenderData
     ) public {
         _useMockSharedBridge();
         _initializeBridgehub();
@@ -424,8 +420,8 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
             l2GasLimit: l2GasLimit,
             l2GasPerPubdataByteLimit: l2GasPerPubdataByteLimit,
             refundRecipient: refundRecipient,
-            secondBridgeValue: secondBridgeValue,
-            secondBridgeCalldata: secondBridgeCalldata
+            crossChainSenderValue: crossChainSenderValue,
+            crossChainSenderData: crossChainSenderData
         });
 
         l2TxnReq2BridgeOut.chainId = _setUpZKChainForChainId(l2TxnReq2BridgeOut.chainId);
@@ -435,7 +431,7 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
 
         assertTrue(bridgehub.getZKChain(l2TxnReq2BridgeOut.chainId) == address(mockChainContract));
 
-        uint256 callerMsgValue = l2TxnReq2BridgeOut.mintValue + l2TxnReq2BridgeOut.secondBridgeValue;
+        uint256 callerMsgValue = l2TxnReq2BridgeOut.mintValue + l2TxnReq2BridgeOut.crossChainSenderValue;
         address randomCaller = makeAddr("RANDOM_CALLER");
         vm.deal(randomCaller, callerMsgValue);
 
@@ -445,7 +441,7 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
 
         vm.mockCall(
             address(mockChainContract),
-            abi.encodeWithSelector(mockChainContract.bridgehubRequestL2Transaction.selector),
+            abi.encodeWithSelector(mockChainContract.interopCenterRequestL2Transaction.selector),
             abi.encode(canonicalHash)
         );
 
@@ -457,27 +453,27 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
             txDataHash: bytes32("")
         });
         secondBridgeAddressValue = uint160(bound(uint256(secondBridgeAddressValue), 0, uint256(type(uint16).max)));
-        address secondBridgeAddress = address(secondBridgeAddressValue);
+        address crossChainSender = address(secondBridgeAddressValue);
 
         vm.mockCall(
             address(secondBridgeAddressValue),
-            l2TxnReq2BridgeOut.secondBridgeValue,
+            l2TxnReq2BridgeOut.crossChainSenderValue,
             abi.encodeWithSelector(
                 IL1CrossChainSender.initiateIndirectCall.selector,
                 l2TxnReq2BridgeOut.chainId,
                 randomCaller,
                 l2TxnReq2BridgeOut.l2Value,
-                l2TxnReq2BridgeOut.secondBridgeCalldata
+                l2TxnReq2BridgeOut.crossChainSenderData
             ),
             abi.encode(outputRequest)
         );
 
-        l2TxnReq2BridgeOut.secondBridgeAddress = address(secondBridgeAddressValue);
+        l2TxnReq2BridgeOut.crossChainSender = address(secondBridgeAddressValue);
         uint256 sentValue = randomCaller.balance;
         vm.expectRevert(
             abi.encodeWithSelector(
                 CrossChainSenderAddressTooLow.selector,
-                secondBridgeAddress,
+                crossChainSender,
                 MIN_CROSS_CHAIN_SENDER_ADDRESS
             )
         );
@@ -532,11 +528,7 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
         attributes[2] = abi.encodeCall(IERC7786Attributes.factoryDeps, (new bytes[](1)));
 
         vm.expectRevert(FactoryDepsNotAllowedForIndirectCall.selector);
-        l1InteropCenter.sendMessage(
-            InteroperableAddress.formatEvmV1(eraChainId, secondBridgeAddress),
-            hex"",
-            attributes
-        );
+        l1InteropCenter.sendMessage(InteroperableAddress.formatEvmV1(eraChainId, crossChainSender), hex"", attributes);
     }
 
     function test_sendMessage_RevertWhen_unsupportedAttribute() public {

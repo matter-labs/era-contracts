@@ -32,15 +32,15 @@ library L1InteropRequests {
     function encodeIndirect(
         L2TransactionRequestIndirect memory _request
     ) internal pure returns (bytes memory recipient, bytes memory payload, bytes[] memory attributes) {
-        recipient = InteroperableAddress.formatEvmV1(_request.chainId, _request.secondBridgeAddress);
-        payload = _request.secondBridgeCalldata;
+        recipient = InteroperableAddress.formatEvmV1(_request.chainId, _request.crossChainSender);
+        payload = _request.crossChainSenderData;
         attributes = new bytes[](3);
         attributes[0] = abi.encodeCall(
             IERC7786Attributes.l1ToL2TransactionParams,
             (_request.mintValue, _request.l2GasLimit, _request.l2GasPerPubdataByteLimit, _request.refundRecipient)
         );
         attributes[1] = abi.encodeCall(IERC7786Attributes.interopCallValue, (_request.l2Value));
-        attributes[2] = abi.encodeCall(IERC7786Attributes.indirectCall, (_request.secondBridgeValue));
+        attributes[2] = abi.encodeCall(IERC7786Attributes.indirectCall, (_request.crossChainSenderValue));
     }
 
     /// @dev The `sendMessage` equivalent of the former `L1Bridgehub.requestL2TransactionDirect`.

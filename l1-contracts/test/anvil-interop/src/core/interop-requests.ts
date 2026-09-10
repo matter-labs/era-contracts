@@ -32,9 +32,9 @@ export interface L2TransactionRequestIndirect {
   l2GasLimit: BigNumberish;
   l2GasPerPubdataByteLimit: BigNumberish;
   refundRecipient: string;
-  secondBridgeAddress: string;
-  secondBridgeValue: BigNumberish;
-  secondBridgeCalldata: BytesLike;
+  crossChainSender: string;
+  crossChainSenderValue: BigNumberish;
+  crossChainSenderData: BytesLike;
 }
 
 /** Arguments for `L1InteropCenter.sendMessage(recipient, payload, attributes)`. */
@@ -101,8 +101,8 @@ export function encodeDirectInteropRequest(request: L2TransactionRequestDirect):
 export function encodeIndirectInteropRequest(request: L2TransactionRequestIndirect): InteropSendMessageArgs {
   const iface = attributesInterface();
   return {
-    recipient: formatEvmV1(request.chainId, request.secondBridgeAddress),
-    payload: ethers.utils.hexlify(request.secondBridgeCalldata),
+    recipient: formatEvmV1(request.chainId, request.crossChainSender),
+    payload: ethers.utils.hexlify(request.crossChainSenderData),
     attributes: [
       iface.encodeFunctionData("l1ToL2TransactionParams", [
         request.mintValue,
@@ -111,7 +111,7 @@ export function encodeIndirectInteropRequest(request: L2TransactionRequestIndire
         request.refundRecipient,
       ]),
       iface.encodeFunctionData("interopCallValue", [request.l2Value]),
-      iface.encodeFunctionData("indirectCall", [request.secondBridgeValue]),
+      iface.encodeFunctionData("indirectCall", [request.crossChainSenderValue]),
     ],
   };
 }

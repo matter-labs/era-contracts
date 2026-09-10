@@ -56,21 +56,21 @@ contract L2TxMocker is Test {
     function _createL2TransactionRequestIndirect(
         uint256 _chainId,
         uint256 _mintValue,
-        uint256 _secondBridgeValue,
-        address _secondBridgeAddress,
+        uint256 _crossChainSenderValue,
+        address _crossChainSender,
         uint256 _l2Value,
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit,
-        bytes memory _secondBridgeCalldata
+        bytes memory _crossChainSenderData
     ) internal returns (L2TransactionRequestIndirect memory request) {
         request.chainId = _chainId;
         request.mintValue = _mintValue;
-        request.secondBridgeAddress = _secondBridgeAddress;
-        request.secondBridgeValue = _secondBridgeValue;
+        request.crossChainSender = _crossChainSender;
+        request.crossChainSenderValue = _crossChainSenderValue;
         request.l2Value = _l2Value;
         request.l2GasLimit = _l2GasLimit;
         request.l2GasPerPubdataByteLimit = _l2GasPerPubdataByteLimit;
-        request.secondBridgeCalldata = _secondBridgeCalldata;
+        request.crossChainSenderData = _crossChainSenderData;
 
         //mocks
         request.refundRecipient = mockRefundRecipient;

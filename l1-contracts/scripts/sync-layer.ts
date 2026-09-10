@@ -435,9 +435,9 @@ async function registerSLContractsOnL1(deployer: Deployer) {
     l2GasLimit: priorityTxMaxGasLimit,
     l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
     refundRecipient: deployer.deployWallet.address,
-    secondBridgeAddress: assetRouter.address,
-    secondBridgeValue: 0,
-    secondBridgeCalldata:
+    crossChainSender: assetRouter.address,
+    crossChainSenderValue: 0,
+    crossChainSenderData:
       "0x02" + ethers.utils.defaultAbiCoder.encode(["bytes32", "address"], [assetId, L2_BRIDGEHUB_ADDRESS]).slice(2),
   });
   const receipt2 = await deployer.executeUpgrade(
@@ -475,9 +475,9 @@ async function registerSLContractsOnL1(deployer: Deployer) {
     l2GasLimit: priorityTxMaxGasLimit,
     l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
     refundRecipient: deployer.deployWallet.address,
-    secondBridgeAddress: ctmDeploymentTracker.address,
-    secondBridgeValue: 0,
-    secondBridgeCalldata:
+    crossChainSender: ctmDeploymentTracker.address,
+    crossChainSenderValue: 0,
+    crossChainSenderData:
       "0x01" + ethers.utils.defaultAbiCoder.encode(["address", "address"], [l1CTM.address, l2CTMAddress]).slice(2),
   });
   const receipt4 = await deployer.executeUpgrade(

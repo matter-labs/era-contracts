@@ -10,7 +10,7 @@ import {TransactionFiltererTrue} from "contracts/dev-contracts/test/DummyTransac
 import {TransactionFiltererFalse} from "contracts/dev-contracts/test/DummyTransactionFiltererFalse.sol";
 import {TransactionNotAllowed, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
-contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
+contract MailboxInteropCenterRequestL2TransactionTest is MailboxTest {
     function setUp() public virtual {
         setupDiamondProxy();
     }
@@ -33,7 +33,7 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
 
         vm.deal(interopCenter, 100 ether);
         vm.prank(interopCenter);
-        bytes32 canonicalTxHash = mailboxFacet.bridgehubRequestL2Transaction(req);
+        bytes32 canonicalTxHash = mailboxFacet.interopCenterRequestL2Transaction(req);
         assertTrue(canonicalTxHash != bytes32(0), "canonicalTxHash should not be 0");
     }
 
@@ -51,7 +51,7 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
 
         vm.deal(interopCenter, 100 ether);
         vm.prank(interopCenter);
-        bytes32 canonicalTxHash = mailboxFacet.bridgehubRequestL2Transaction(req);
+        bytes32 canonicalTxHash = mailboxFacet.interopCenterRequestL2Transaction(req);
         assertTrue(canonicalTxHash != bytes32(0), "canonicalTxHash should not be 0");
     }
 
@@ -70,7 +70,7 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
         vm.deal(interopCenter, 100 ether);
         vm.prank(interopCenter);
         vm.expectRevert(TransactionNotAllowed.selector);
-        mailboxFacet.bridgehubRequestL2Transaction(req);
+        mailboxFacet.interopCenterRequestL2Transaction(req);
     }
 
     function test_revertWhen_notInteropCenter() public {
@@ -81,7 +81,7 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
         vm.deal(sender, 100 ether);
         vm.prank(address(sender));
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, sender));
-        mailboxFacet.bridgehubRequestL2Transaction(req);
+        mailboxFacet.interopCenterRequestL2Transaction(req);
     }
 
     function test_revertWhen_calledByBridgehub() public {
@@ -95,7 +95,7 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
 
         vm.prank(bridgehub);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, bridgehub));
-        mailboxFacet.bridgehubRequestL2Transaction(req);
+        mailboxFacet.interopCenterRequestL2Transaction(req);
     }
 
     function getBridgehubRequestL2TransactionRequest() private returns (BridgehubL2TransactionRequest memory req) {
@@ -130,7 +130,7 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
 
         vm.deal(interopCenter, 100 ether);
         vm.prank(interopCenter);
-        bytes32 canonicalTxHash = mailboxFacet.bridgehubRequestL2Transaction(req);
+        bytes32 canonicalTxHash = mailboxFacet.interopCenterRequestL2Transaction(req);
         assertTrue(canonicalTxHash != bytes32(0), "canonicalTxHash should not be 0");
 
         bytes32 newRootHash = gettersFacet.getPriorityTreeRoot();

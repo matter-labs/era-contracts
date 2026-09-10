@@ -295,7 +295,7 @@ contract GatewayPreparation is Script {
         address ctmAddress = IL1Bridgehub(config.bridgehub).ctmAssetIdToAddress(assetId);
         require(ctmAddress == config.chainTypeManagerProxy, "CTM asset id does not match the expected CTM address");
 
-        bytes memory secondBridgeData = abi.encodePacked(
+        bytes memory crossChainSenderData = abi.encodePacked(
             SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION,
             abi.encode(assetId, L2_BRIDGEHUB_ADDRESS)
         );
@@ -310,7 +310,7 @@ contract GatewayPreparation is Script {
             config.sharedBridgeProxy,
             config.sharedBridgeProxy,
             0,
-            secondBridgeData
+            crossChainSenderData
         );
 
         saveOutput(l2TxHash);
@@ -319,7 +319,7 @@ contract GatewayPreparation is Script {
     function registerAssetIdInBridgehub(address gatewayCTMAddress, bytes32 governanoceOperationSalt) public {
         initializeConfig();
 
-        bytes memory secondBridgeData = abi.encodePacked(
+        bytes memory crossChainSenderData = abi.encodePacked(
             NEW_ENCODING_VERSION,
             abi.encode(config.chainTypeManagerProxy, gatewayCTMAddress)
         );
@@ -334,7 +334,7 @@ contract GatewayPreparation is Script {
             config.sharedBridgeProxy,
             config.ctmDeploymentTracker,
             0,
-            secondBridgeData
+            crossChainSenderData
         );
 
         saveOutput(l2TxHash);
@@ -411,7 +411,10 @@ contract GatewayPreparation is Script {
             })
         );
 
-        bytes memory secondBridgeData = abi.encodePacked(NEW_ENCODING_VERSION, abi.encode(chainAssetId, bridgehubData));
+        bytes memory crossChainSenderData = abi.encodePacked(
+            NEW_ENCODING_VERSION,
+            abi.encode(chainAssetId, bridgehubData)
+        );
 
         bytes32 l2TxHash = Utils.runAdminL1L2IndirectTransaction(
             _getL1GasPrice(),
@@ -423,7 +426,7 @@ contract GatewayPreparation is Script {
             config.sharedBridgeProxy,
             config.sharedBridgeProxy,
             0,
-            secondBridgeData,
+            crossChainSenderData,
             msg.sender
         );
 

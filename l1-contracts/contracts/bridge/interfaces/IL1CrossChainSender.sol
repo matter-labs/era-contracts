@@ -13,7 +13,7 @@ interface IL1CrossChainSender {
     /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
     /// @param _value The `msg.value` to be deposited on the target chain.
     /// @param _data The calldata for the second bridge deposit.
-    /// @return request The data used by the bridgehub to create L2 transaction request to specific ZK chain.
+    /// @return request The data used by the L1InteropCenter to create the L2 transaction request for the destination ZK chain.
     function initiateIndirectCall(
         uint256 _chainId,
         address _originalCaller,

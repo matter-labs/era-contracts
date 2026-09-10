@@ -276,7 +276,7 @@ export async function staticPreviewHash(
 // ── Token transfer data encoding ───────────────────────────────
 
 /**
- * Encode the secondBridgeData for an ERC20 token transfer via L2AssetRouter.
+ * Encode the crossChainSenderData for an ERC20 token transfer via L2AssetRouter.
  * This is the `data` field of an indirect call starter targeting L2_ASSET_ROUTER_ADDR.
  */
 export function getTokenTransferData(assetId: string, amount: BigNumber, recipientAddress: string): string {

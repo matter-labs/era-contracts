@@ -141,7 +141,7 @@ abstract contract GatewayGovernanceUtils is Script {
                 _gatewayGovernanceConfig.ctmDeploymentTrackerProxy
             );
 
-            bytes memory secondBridgeData = abi.encodePacked(
+            bytes memory crossChainSenderData = abi.encodePacked(
                 SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION,
                 abi.encode(chainAssetId, L2_CHAIN_ASSET_HANDLER_ADDR)
             );
@@ -156,7 +156,7 @@ abstract contract GatewayGovernanceUtils is Script {
                     _gatewayGovernanceConfig.l1AssetRouterProxy,
                     _gatewayGovernanceConfig.l1AssetRouterProxy,
                     0,
-                    secondBridgeData,
+                    crossChainSenderData,
                     prepareGWGovCallsStruct._refundRecipient
                 )
             );
@@ -165,7 +165,7 @@ abstract contract GatewayGovernanceUtils is Script {
         // Setting the address of the GW ChainTypeManager as the correct ChainTypeManager to handle
         // chains that migrate from L1.
         {
-            bytes memory secondBridgeData = abi.encodePacked(
+            bytes memory crossChainSenderData = abi.encodePacked(
                 NEW_ENCODING_VERSION,
                 abi.encode(_gatewayGovernanceConfig.chainTypeManagerProxy, prepareGWGovCallsStruct._gatewayCTMAddress)
             );
@@ -180,7 +180,7 @@ abstract contract GatewayGovernanceUtils is Script {
                     _gatewayGovernanceConfig.l1AssetRouterProxy,
                     _gatewayGovernanceConfig.ctmDeploymentTrackerProxy,
                     0,
-                    secondBridgeData,
+                    crossChainSenderData,
                     prepareGWGovCallsStruct._refundRecipient
                 )
             );

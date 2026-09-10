@@ -306,7 +306,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
             abi.encode(address(l2Bridgehub))
         );
         vm.prank(address(l2Bridgehub));
-        MailboxFacet(chainAddress).bridgehubRequestL2Transaction(
+        MailboxFacet(chainAddress).interopCenterRequestL2Transaction(
             BridgehubL2TransactionRequest({
                 sender: address(0),
                 contractL2: address(0),

@@ -195,7 +195,10 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
                 chainData: abi.encode(IZKChain(diamondProxy).getProtocolVersion())
             })
         );
-        bytes memory secondBridgeData = abi.encodePacked(NEW_ENCODING_VERSION, abi.encode(chainAssetId, bridgehubData));
+        bytes memory crossChainSenderData = abi.encodePacked(
+            NEW_ENCODING_VERSION,
+            abi.encode(chainAssetId, bridgehubData)
+        );
 
         // Compute required value (baseCost * 2 as in Utils.prepareL1L2TransactionIndirect)
         uint256 l1GasPrice = _getL1GasPrice();
@@ -223,9 +226,9 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
                 l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
                 l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
                 refundRecipient: chainAdmin,
-                secondBridgeAddress: l1AssetRouter,
-                secondBridgeValue: 0,
-                secondBridgeCalldata: secondBridgeData
+                crossChainSender: l1AssetRouter,
+                crossChainSenderValue: 0,
+                crossChainSenderData: crossChainSenderData
             })
         );
         vm.stopBroadcast();

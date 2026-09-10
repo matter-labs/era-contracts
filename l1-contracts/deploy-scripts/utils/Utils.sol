@@ -513,9 +513,9 @@ library Utils {
         uint256 l2GasLimit,
         uint256 chainId,
         address bridgehubAddress,
-        address secondBridgeAddress,
-        uint256 secondBridgeValue,
-        bytes memory secondBridgeCalldata,
+        address crossChainSender,
+        uint256 crossChainSenderValue,
+        bytes memory crossChainSenderData,
         address refundRecipient
     ) internal view returns (L2TransactionRequestIndirect memory l2TransactionRequest, uint256 requiredValueToDeploy) {
         IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubAddress);
@@ -539,9 +539,9 @@ library Utils {
             l2GasLimit: l2GasLimit,
             l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
             refundRecipient: refundRecipient,
-            secondBridgeAddress: secondBridgeAddress,
-            secondBridgeValue: secondBridgeValue,
-            secondBridgeCalldata: secondBridgeCalldata
+            crossChainSender: crossChainSender,
+            crossChainSenderValue: crossChainSenderValue,
+            crossChainSenderData: crossChainSenderData
         });
     }
 
@@ -578,12 +578,12 @@ library Utils {
             (request.mintValue, request.l2GasLimit, request.l2GasPerPubdataByteLimit, request.refundRecipient)
         );
         attributes[1] = abi.encodeCall(IERC7786Attributes.interopCallValue, (request.l2Value));
-        attributes[2] = abi.encodeCall(IERC7786Attributes.indirectCall, (request.secondBridgeValue));
+        attributes[2] = abi.encodeCall(IERC7786Attributes.indirectCall, (request.crossChainSenderValue));
         data = abi.encodeCall(
             IERC7786GatewaySource.sendMessage,
             (
-                InteroperableAddress.formatEvmV1(request.chainId, request.secondBridgeAddress),
-                request.secondBridgeCalldata,
+                InteroperableAddress.formatEvmV1(request.chainId, request.crossChainSender),
+                request.crossChainSenderData,
                 attributes
             )
         );
@@ -749,9 +749,9 @@ library Utils {
         uint256 chainId,
         address bridgehubAddress,
         address l1SharedBridgeProxy,
-        address secondBridgeAddress,
-        uint256 secondBridgeValue,
-        bytes memory secondBridgeCalldata,
+        address crossChainSender,
+        uint256 crossChainSenderValue,
+        bytes memory crossChainSenderData,
         address refundRecipient
     ) internal view returns (Call[] memory calls) {
         (
@@ -762,9 +762,9 @@ library Utils {
                 l2GasLimit,
                 chainId,
                 bridgehubAddress,
-                secondBridgeAddress,
-                secondBridgeValue,
-                secondBridgeCalldata,
+                crossChainSender,
+                crossChainSenderValue,
+                crossChainSenderData,
                 refundRecipient
             );
 
@@ -867,9 +867,9 @@ library Utils {
         uint256 chainId,
         address bridgehubAddress,
         address l1SharedBridgeProxy,
-        address secondBridgeAddress,
-        uint256 secondBridgeValue,
-        bytes memory secondBridgeCalldata,
+        address crossChainSender,
+        uint256 crossChainSenderValue,
+        bytes memory crossChainSenderData,
         address refundRecipient
     ) internal view returns (Call[] memory calls) {
         // 1) Prepare the L2TransactionRequestIndirect (same logic as before)
@@ -881,9 +881,9 @@ library Utils {
                 l2GasLimit,
                 chainId,
                 bridgehubAddress,
-                secondBridgeAddress,
-                secondBridgeValue,
-                secondBridgeCalldata,
+                crossChainSender,
+                crossChainSenderValue,
+                crossChainSenderData,
                 refundRecipient
             );
 
@@ -962,9 +962,9 @@ library Utils {
         uint256 chainId,
         address bridgehubAddress,
         address l1SharedBridgeProxy,
-        address secondBridgeAddress,
-        uint256 secondBridgeValue,
-        bytes memory secondBridgeCalldata,
+        address crossChainSender,
+        uint256 crossChainSenderValue,
+        bytes memory crossChainSenderData,
         address refundRecipient
     ) internal returns (bytes32 txHash) {
         // 1) Prepare the calls
@@ -974,9 +974,9 @@ library Utils {
             chainId,
             bridgehubAddress,
             l1SharedBridgeProxy,
-            secondBridgeAddress,
-            secondBridgeValue,
-            secondBridgeCalldata,
+            crossChainSender,
+            crossChainSenderValue,
+            crossChainSenderData,
             refundRecipient
         );
 
@@ -1064,9 +1064,9 @@ library Utils {
         uint256 chainId,
         address bridgehubAddress,
         address l1SharedBridgeProxy,
-        address secondBridgeAddress,
-        uint256 secondBridgeValue,
-        bytes memory secondBridgeCalldata
+        address crossChainSender,
+        uint256 crossChainSenderValue,
+        bytes memory crossChainSenderData
     ) internal returns (bytes32 txHash) {
         (
             L2TransactionRequestIndirect memory l2TransactionRequest,
@@ -1076,9 +1076,9 @@ library Utils {
                 l2GasLimit,
                 chainId,
                 bridgehubAddress,
-                secondBridgeAddress,
-                secondBridgeValue,
-                secondBridgeCalldata,
+                crossChainSender,
+                crossChainSenderValue,
+                crossChainSenderData,
                 msg.sender
             );
 

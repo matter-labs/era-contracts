@@ -141,7 +141,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
         vm.deal(prioritySender, baseCost);
         requestTimestamp = block.timestamp;
         vm.prank(prioritySender);
-        dummyBridgehub.requestL2TransactionDirect{value: baseCost}(
+        dummyBridgehub.requestDirectL2Transaction{value: baseCost}(
             L2TransactionRequestDirect({
                 chainId: l2ChainId,
                 mintValue: baseCost,

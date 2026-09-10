@@ -297,16 +297,16 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
             l2GasLimit: 0,
             l2GasPerPubdataByteLimit: 0,
             refundRecipient: address(0),
-            secondBridgeAddress: address(0),
-            secondBridgeValue: 0,
-            secondBridgeCalldata: hex""
+            crossChainSender: address(0),
+            crossChainSenderValue: 0,
+            crossChainSenderData: hex""
         });
         if (!correctSecondBridge) {
             // 0 is not correct second bridge
             call.data = indirectCall ? _encodeIndirectSendMessage(outer) : _encodeDirectSendMessage(outer);
             return call;
         }
-        outer.secondBridgeAddress = sharedBridge;
+        outer.crossChainSender = sharedBridge;
 
         uint8 encoding = correctEncodingVersion ? 1 : 12;
 
@@ -320,7 +320,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
                 chainData: abi.encode(IZKChain(IBridgehubBase(bridgehub).getZKChain(chainId)).getProtocolVersion())
             })
         );
-        outer.secondBridgeCalldata = abi.encodePacked(bytes1(encoding), abi.encode(chainAssetId, bridgehubData));
+        outer.crossChainSenderData = abi.encodePacked(bytes1(encoding), abi.encode(chainAssetId, bridgehubData));
 
         call.data = indirectCall ? _encodeIndirectSendMessage(outer) : _encodeDirectSendMessage(outer);
     }
@@ -584,7 +584,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
     }
 
     function test_tryGetNewAdminFromMigration_EmptySecondBridgeCalldata() public {
-        // Create a call with empty secondBridgeCalldata
+        // Create a call with empty crossChainSenderData
         L2TransactionRequestIndirect memory outer = L2TransactionRequestIndirect({
             chainId: chainId,
             mintValue: 0,
@@ -592,9 +592,9 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
             l2GasLimit: 0,
             l2GasPerPubdataByteLimit: 0,
             refundRecipient: address(0),
-            secondBridgeAddress: sharedBridge,
-            secondBridgeValue: 0,
-            secondBridgeCalldata: hex"" // Empty calldata
+            crossChainSender: sharedBridge,
+            crossChainSenderValue: 0,
+            crossChainSenderData: hex"" // Empty calldata
         });
 
         Call memory call = Call({target: l1InteropCenter, value: 0, data: _encodeIndirectSendMessage(outer)});

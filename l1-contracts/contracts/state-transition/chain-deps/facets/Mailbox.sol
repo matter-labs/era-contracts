@@ -97,7 +97,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
     }
 
     /// @inheritdoc IMailbox
-    function bridgehubRequestL2Transaction(
+    function interopCenterRequestL2Transaction(
         BridgehubL2TransactionRequest calldata _request
     ) external onlyL1InteropCenter returns (bytes32 canonicalTxHash) {
         canonicalTxHash = _requestL2TransactionSender(_request);

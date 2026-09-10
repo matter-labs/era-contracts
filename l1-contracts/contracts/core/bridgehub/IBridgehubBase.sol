@@ -26,9 +26,9 @@ struct L2TransactionRequestIndirect {
     uint256 l2GasLimit;
     uint256 l2GasPerPubdataByteLimit;
     address refundRecipient;
-    address secondBridgeAddress;
-    uint256 secondBridgeValue;
-    bytes secondBridgeCalldata;
+    address crossChainSender;
+    uint256 crossChainSenderValue;
+    bytes crossChainSenderData;
 }
 
 struct IndirectCallRequest {

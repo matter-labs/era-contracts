@@ -250,16 +250,20 @@ contract BridgehubInvariantTests_1 is SharedBridgehubWithdrawal {
         currentToken.mint(currentUser, l2Value);
         currentToken.approve(address(addresses.sharedBridge), l2Value);
 
-        bytes memory secondBridgeCallData = abi.encode(currentTokenAddress, l2Value, chainContracts[currentChainId]);
+        bytes memory crossChainSenderCallData = abi.encode(
+            currentTokenAddress,
+            l2Value,
+            chainContracts[currentChainId]
+        );
         L2TransactionRequestIndirect memory requestTx = _createL2TransactionRequestIndirect({
             _chainId: currentChainId,
             _mintValue: mintValue,
-            _secondBridgeValue: 0,
-            _secondBridgeAddress: address(addresses.sharedBridge),
+            _crossChainSenderValue: 0,
+            _crossChainSender: address(addresses.sharedBridge),
             _l2Value: 0,
             _l2GasLimit: l2GasLimit,
             _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            _secondBridgeCalldata: secondBridgeCallData
+            _crossChainSenderData: crossChainSenderCallData
         });
 
         vm.recordLogs();
@@ -300,16 +304,20 @@ contract BridgehubInvariantTests_1 is SharedBridgehubWithdrawal {
         currentToken.mint(currentUser, mintValue);
         currentToken.approve(address(addresses.sharedBridge), mintValue);
 
-        bytes memory secondBridgeCallData = abi.encode(ETH_TOKEN_ADDRESS, uint256(0), chainContracts[currentChainId]);
+        bytes memory crossChainSenderCallData = abi.encode(
+            ETH_TOKEN_ADDRESS,
+            uint256(0),
+            chainContracts[currentChainId]
+        );
         L2TransactionRequestIndirect memory requestTx = _createL2TransactionRequestIndirect({
             _chainId: currentChainId,
             _mintValue: mintValue,
-            _secondBridgeValue: l2Value,
-            _secondBridgeAddress: address(addresses.sharedBridge),
+            _crossChainSenderValue: l2Value,
+            _crossChainSender: address(addresses.sharedBridge),
             _l2Value: 0,
             _l2GasLimit: l2GasLimit,
             _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            _secondBridgeCalldata: secondBridgeCallData
+            _crossChainSenderData: crossChainSenderCallData
         });
 
         vm.recordLogs();
@@ -355,16 +363,20 @@ contract BridgehubInvariantTests_1 is SharedBridgehubWithdrawal {
         currentToken.mint(currentUser, l2Value);
         currentToken.approve(address(addresses.sharedBridge), l2Value);
 
-        bytes memory secondBridgeCallData = abi.encode(currentTokenAddress, l2Value, chainContracts[currentChainId]);
+        bytes memory crossChainSenderCallData = abi.encode(
+            currentTokenAddress,
+            l2Value,
+            chainContracts[currentChainId]
+        );
         L2TransactionRequestIndirect memory requestTx = _createL2TransactionRequestIndirect({
             _chainId: currentChainId,
             _mintValue: mintValue,
-            _secondBridgeValue: 0,
-            _secondBridgeAddress: address(addresses.sharedBridge),
+            _crossChainSenderValue: 0,
+            _crossChainSender: address(addresses.sharedBridge),
             _l2Value: 0,
             _l2GasLimit: l2GasLimit,
             _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            _secondBridgeCalldata: secondBridgeCallData
+            _crossChainSenderData: crossChainSenderCallData
         });
 
         vm.recordLogs();

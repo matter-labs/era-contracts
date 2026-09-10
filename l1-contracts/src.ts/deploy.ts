@@ -1353,9 +1353,9 @@ export class Deployer {
       l2GasLimit: l2GasLimit,
       l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
       refundRecipient: await this.deployWallet.getAddress(),
-      secondBridgeAddress: this.addresses.Bridges.SharedBridgeProxy,
-      secondBridgeValue: 0,
-      secondBridgeCalldata: sharedBridgeData,
+      crossChainSender: this.addresses.Bridges.SharedBridgeProxy,
+      crossChainSenderValue: 0,
+      crossChainSenderData: sharedBridgeData,
     });
     const receipt = await this.executeChainAdminMulticall([
       {

@@ -83,7 +83,8 @@ contract DummyBridgehub {
         return 0;
     }
 
-    function requestL2TransactionDirect(
+    /// @dev Acts as the L1InteropCenter for tests: deposits the base token and requests the priority transaction.
+    function requestDirectL2Transaction(
         L2TransactionRequestDirect calldata _request
     ) external payable returns (bytes32 canonicalTxHash) {
         IAssetRouterShared(sharedBridge).bridgehubDepositBaseToken{value: msg.value}(
@@ -93,7 +94,7 @@ contract DummyBridgehub {
             _request.mintValue
         );
 
-        canonicalTxHash = IZKChain(zkChain).bridgehubRequestL2Transaction(
+        canonicalTxHash = IZKChain(zkChain).interopCenterRequestL2Transaction(
             BridgehubL2TransactionRequest({
                 sender: msg.sender,
                 contractL2: _request.l2Contract,

@@ -181,7 +181,7 @@ export async function depositERC20ToL2(params: DepositERC20Params): Promise<Depo
   const gasPrice = ANVIL_INTEROP_PRIORITY_TX_L1_GAS_PRICE_WEI;
   const mintValue = await bridgehub.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, l2GasPerPubdataByteLimit);
 
-  const secondBridgeCalldata = encodeAssetRouterBridgehubDepositData(
+  const crossChainSenderData = encodeAssetRouterBridgehubDepositData(
     assetId,
     encodeBridgeBurnData(amount, recipient, tokenAddress)
   );
@@ -199,9 +199,9 @@ export async function depositERC20ToL2(params: DepositERC20Params): Promise<Depo
     l2GasLimit,
     l2GasPerPubdataByteLimit,
     refundRecipient: recipient,
-    secondBridgeAddress: assetRouter.address,
-    secondBridgeValue: 0,
-    secondBridgeCalldata,
+    crossChainSender: assetRouter.address,
+    crossChainSenderValue: 0,
+    crossChainSenderData,
   });
 
   const tx = await interopCenter.sendMessage(messageRecipient, payload, attributes, {

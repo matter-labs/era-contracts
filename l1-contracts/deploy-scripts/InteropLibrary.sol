@@ -39,7 +39,7 @@ library InteropLibrary {
 
     /// @notice Create a single Interop call to the L2 asset router with the 7786 "indirectCall" attribute set.
     function buildSecondBridgeCall(
-        bytes memory secondBridgeCalldata,
+        bytes memory crossChainSenderData,
         address bridgeAddress
     ) internal pure returns (InteropCallStarter memory) {
         bytes[] memory callAttributes = new bytes[](1);
@@ -47,7 +47,7 @@ library InteropLibrary {
         return
             InteropCallStarter({
                 to: InteroperableAddress.formatEvmV1(bridgeAddress),
-                data: secondBridgeCalldata,
+                data: crossChainSenderData,
                 callAttributes: callAttributes
             });
     }
@@ -242,7 +242,7 @@ library InteropLibrary {
         }
 
         bytes32 l2TokenAssetId = L2_NATIVE_TOKEN_VAULT.assetId(l2TokenAddress);
-        bytes memory secondBridgeCalldata = buildSecondBridgeCalldata(
+        bytes memory crossChainSenderData = buildSecondBridgeCalldata(
             l2TokenAssetId,
             amount,
             recipient,
@@ -250,7 +250,7 @@ library InteropLibrary {
         );
 
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
-        calls[0] = buildSecondBridgeCall(secondBridgeCalldata, L2_ASSET_ROUTER_ADDR); // Using the default address as second bridge.
+        calls[0] = buildSecondBridgeCall(crossChainSenderData, L2_ASSET_ROUTER_ADDR); // Using the default address as second bridge.
 
         // An L1 destination is an L2->L1 withdrawal: it must be NON-atomic (L1 has no atomic execution and
         // withdrawals are never revertable), so it carries only the salt attribute — never the `atomicBundle`

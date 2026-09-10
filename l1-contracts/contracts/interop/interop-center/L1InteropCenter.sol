@@ -138,7 +138,7 @@ contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
             (sendId, actualRecipient) = _requestL2TransactionIndirect({
                 _destinationChainId: _destinationChainId,
                 _zkChain: zkChain,
-                _secondBridgeAddress: _recipientAddress,
+                _crossChainSender: _recipientAddress,
                 _payload: _payload,
                 _attributes: _attributes
             });
@@ -221,12 +221,12 @@ contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
     function _requestL2TransactionIndirect(
         uint256 _destinationChainId,
         IZKChain _zkChain,
-        address _secondBridgeAddress,
+        address _crossChainSender,
         bytes calldata _payload,
         L1MessageAttributes memory _attributes
     ) private returns (bytes32 canonicalTxHash, address l2Contract) {
-        if (_secondBridgeAddress <= MIN_CROSS_CHAIN_SENDER_ADDRESS) {
-            revert CrossChainSenderAddressTooLow(_secondBridgeAddress, MIN_CROSS_CHAIN_SENDER_ADDRESS);
+        if (_crossChainSender <= MIN_CROSS_CHAIN_SENDER_ADDRESS) {
+            revert CrossChainSenderAddressTooLow(_crossChainSender, MIN_CROSS_CHAIN_SENDER_ADDRESS);
         }
 
         {
@@ -255,7 +255,7 @@ contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
         }
 
         // slither-disable-next-line arbitrary-send-eth
-        IndirectCallRequest memory outputRequest = IL1CrossChainSender(_secondBridgeAddress).initiateIndirectCall{
+        IndirectCallRequest memory outputRequest = IL1CrossChainSender(_crossChainSender).initiateIndirectCall{
             value: _attributes.indirectCallMessageValue
         }(_destinationChainId, msg.sender, _attributes.interopCallValue, _payload);
 
@@ -268,7 +268,7 @@ contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
         canonicalTxHash = _sendRequest(
             _zkChain,
             BridgehubL2TransactionRequest({
-                sender: _secondBridgeAddress,
+                sender: _crossChainSender,
                 contractL2: outputRequest.l2Contract,
                 mintValue: _attributes.mintValue,
                 l2Value: _attributes.interopCallValue,
@@ -280,7 +280,7 @@ contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
             })
         );
 
-        IL1CrossChainSender(_secondBridgeAddress).confirmL2Transaction(
+        IL1CrossChainSender(_crossChainSender).confirmL2Transaction(
             _destinationChainId,
             outputRequest.txDataHash,
             canonicalTxHash
@@ -318,7 +318,7 @@ contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
         // slither-disable-next-line unused-return
         (address refundRecipient, ) = AddressAliasHelper.actualRefundRecipient(_request.refundRecipient, msg.sender);
         _request.refundRecipient = refundRecipient;
-        canonicalTxHash = _zkChain.bridgehubRequestL2Transaction(_request);
+        canonicalTxHash = _zkChain.interopCenterRequestL2Transaction(_request);
     }
 
     /// @notice Resolves a registered ZK chain or reverts before any value-moving external calls are made.

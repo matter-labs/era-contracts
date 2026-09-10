@@ -151,19 +151,19 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
 
         uint256 userEthBefore = currentUser.balance;
 
-        bytes memory secondBridgeCallData = bytes.concat(
+        bytes memory crossChainSenderCallData = bytes.concat(
             CHAIN_REGISTRATION_SENDER_ENCODING_VERSION,
             abi.encode(currentChainId)
         );
         L2TransactionRequestIndirect memory requestTx = _createL2TransactionRequestIndirect({
             _chainId: currentChainId,
             _mintValue: mintValue,
-            _secondBridgeValue: 0,
-            _secondBridgeAddress: address(addresses.chainRegistrationSender),
+            _crossChainSenderValue: 0,
+            _crossChainSender: address(addresses.chainRegistrationSender),
             _l2Value: 0,
             _l2GasLimit: l2GasLimit,
             _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            _secondBridgeCalldata: secondBridgeCallData
+            _crossChainSenderData: crossChainSenderCallData
         });
 
         vm.recordLogs();

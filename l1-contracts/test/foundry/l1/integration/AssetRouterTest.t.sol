@@ -258,7 +258,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         // Store balances before withdrawal
         uint256 balanceBefore = IERC20(tokenL1Address).balanceOf(address(this));
 
-        bytes memory secondBridgeCalldata = bytes.concat(
+        bytes memory crossChainSenderData = bytes.concat(
             NEW_ENCODING_VERSION,
             abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this), tokenL1Address))
         );
@@ -275,9 +275,9 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
                 l2GasLimit: 1000000,
                 l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
                 refundRecipient: address(0),
-                secondBridgeAddress: address(addresses.sharedBridge),
-                secondBridgeValue: 0,
-                secondBridgeCalldata: secondBridgeCalldata
+                crossChainSender: address(addresses.sharedBridge),
+                crossChainSenderValue: 0,
+                crossChainSenderData: crossChainSenderData
             })
         );
 
@@ -298,7 +298,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         uint256 ethBalanceBefore = address(this).balance;
         uint256 tokenBalanceBefore = IERC20(tokenL1Address).balanceOf(address(this));
 
-        bytes memory secondBridgeCalldata = bytes.concat(
+        bytes memory crossChainSenderData = bytes.concat(
             NEW_ENCODING_VERSION,
             abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this)))
         );
@@ -315,7 +315,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
                 mintValue: 250000000000100,
                 l2Contract: address(addresses.sharedBridge),
                 l2Value: 0,
-                l2Calldata: secondBridgeCalldata,
+                l2Calldata: crossChainSenderData,
                 l2GasLimit: 1000000,
                 l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
                 factoryDeps: new bytes[](0),
@@ -351,7 +351,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         );
         assertEq(
             keccak256(request.transaction.data),
-            keccak256(secondBridgeCalldata),
+            keccak256(crossChainSenderData),
             "L2 calldata should match the encoded bridge calldata"
         );
         assertEq(request.transaction.value, 0, "L2 value should be 0");
@@ -365,7 +365,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         depositToL1(ETH_TOKEN_ADDRESS);
         vm.prank(address(this));
         IERC20(tokenL1Address).transfer(randomCaller, 100);
-        bytes memory secondBridgeCalldata = bytes.concat(
+        bytes memory crossChainSenderData = bytes.concat(
             NEW_ENCODING_VERSION,
             abi.encode(l2TokenAssetId, abi.encode(uint256(100), randomCaller, tokenL1Address))
         );
@@ -382,9 +382,9 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
                 l2GasLimit: 1000000,
                 l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
                 refundRecipient: address(0),
-                secondBridgeAddress: address(addresses.sharedBridge),
-                secondBridgeValue: 0,
-                secondBridgeCalldata: secondBridgeCalldata
+                crossChainSender: address(addresses.sharedBridge),
+                crossChainSenderValue: 0,
+                crossChainSenderData: crossChainSenderData
             });
 
             (bytes memory recipient, bytes memory payload, bytes[] memory attributes) = L1InteropRequests

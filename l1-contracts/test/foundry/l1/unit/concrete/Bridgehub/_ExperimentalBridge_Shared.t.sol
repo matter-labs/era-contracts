@@ -100,7 +100,7 @@ abstract contract ExperimentalBridgeTestBase is Test {
     L1AssetRouter mockSecondSharedBridge;
     L1AssetRouter sharedBridge;
     address sharedBridgeAddress;
-    address secondBridgeAddress;
+    address crossChainSender;
     address l1NullifierAddress;
     L1AssetRouter secondBridge;
     TestnetERC20Token testToken;
@@ -212,7 +212,7 @@ abstract contract ExperimentalBridgeTestBase is Test {
         secondBridge = _deployAssetRouter(mockL1WethAddress, eraDiamondProxy);
 
         sharedBridgeAddress = address(sharedBridge);
-        secondBridgeAddress = address(secondBridge);
+        crossChainSender = address(secondBridge);
         testToken18 = new TestnetERC20Token("ZKSTT", "ZkSync Test Token", 18);
         testToken6 = new TestnetERC20Token("USDC", "USD Coin", 6);
         testToken8 = new TestnetERC20Token("WBTC", "Wrapped Bitcoin", 8);
@@ -290,7 +290,7 @@ abstract contract ExperimentalBridgeTestBase is Test {
     function _useFullSharedBridge() internal {
         ntv = _deployNTV(address(sharedBridge));
 
-        secondBridgeAddress = address(sharedBridge);
+        crossChainSender = address(sharedBridge);
     }
 
     function _useMockSharedBridge() internal {
@@ -362,7 +362,7 @@ abstract contract ExperimentalBridgeTestBase is Test {
 
         vm.mockCall(
             address(mockChainContract),
-            abi.encodeWithSelector(mockChainContract.bridgehubRequestL2Transaction.selector),
+            abi.encodeWithSelector(mockChainContract.interopCenterRequestL2Transaction.selector),
             abi.encode(canonicalHash)
         );
 
@@ -383,15 +383,15 @@ abstract contract ExperimentalBridgeTestBase is Test {
         uint256 l2GasLimit,
         uint256 l2GasPerPubdataByteLimit,
         address refundRecipient,
-        uint256 secondBridgeValue,
-        bytes memory secondBridgeCalldata
+        uint256 crossChainSenderValue,
+        bytes memory crossChainSenderData
     ) internal view returns (L2TransactionRequestIndirect memory) {
         L2TransactionRequestIndirect memory l2Req;
 
-        // Don't let the mintValue + secondBridgeValue go beyond type(uint256).max since that calculation is required to be done by our test: test_requestL2TransactionIndirect_ETHCase
+        // Don't let the mintValue + crossChainSenderValue go beyond type(uint256).max since that calculation is required to be done by our test: test_requestL2TransactionIndirect_ETHCase
 
         mintValue = bound(mintValue, 0, (type(uint256).max) / 2);
-        secondBridgeValue = bound(secondBridgeValue, 0, (type(uint256).max) / 2);
+        crossChainSenderValue = bound(crossChainSenderValue, 0, (type(uint256).max) / 2);
 
         l2Req.chainId = chainId;
         l2Req.mintValue = mintValue;
@@ -399,9 +399,9 @@ abstract contract ExperimentalBridgeTestBase is Test {
         l2Req.l2GasLimit = l2GasLimit;
         l2Req.l2GasPerPubdataByteLimit = l2GasPerPubdataByteLimit;
         l2Req.refundRecipient = refundRecipient;
-        l2Req.secondBridgeAddress = secondBridgeAddress;
-        l2Req.secondBridgeValue = secondBridgeValue;
-        l2Req.secondBridgeCalldata = secondBridgeCalldata;
+        l2Req.crossChainSender = crossChainSender;
+        l2Req.crossChainSenderValue = crossChainSenderValue;
+        l2Req.crossChainSenderData = crossChainSenderData;
 
         return l2Req;
     }
