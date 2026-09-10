@@ -136,6 +136,20 @@ interface IInteropCenter is IInteropCenterBase {
         uint64 _expirationTimestamp
     ) external;
 
+    /// @notice Sends an interop bundle.
+    /// @param _destinationChainId Chain ID to send to: an ERC-7930 address that MUST have an empty
+    ///                            address field, encoding an EVM destination chain ID.
+    /// @param _callStarters Array of call descriptors. The ERC-7930 address in each callStarter.to
+    ///                      MUST have an empty ChainReference field (all calls go to
+    ///                      _destinationChainId, so a per-call chain ID would be redundant).
+    /// @param _bundleAttributes Attributes of the bundle.
+    /// @return bundleHash Hash of the sent bundle.
+    function sendBundle(
+        bytes calldata _destinationChainId,
+        InteropCallStarter[] calldata _callStarters,
+        bytes[] calldata _bundleAttributes
+    ) external payable returns (bytes32 bundleHash);
+
     /// @notice Simulates {sendBundle} and reports the `bundleHash` it would produce for the same caller and
     ///         inputs, without collecting value or committing to the atomic interop IMT.
     /// @dev Quoter pattern: this ALWAYS reverts with `InteropPreviewHash(bundleHash)` — it never returns and

@@ -10,7 +10,7 @@ import {
 } from "../../common/Config.sol";
 import {ChainIdNotRegistered, MsgValueMismatch, WrongMagicValue, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {CrossChainSenderAddressTooLow} from "../../core/bridgehub/L1BridgehubErrors.sol";
-import {BridgehubL2TransactionRequest, InteropCallStarter} from "../../common/Messaging.sol";
+import {BridgehubL2TransactionRequest} from "../../common/Messaging.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
@@ -28,10 +28,8 @@ import {IL1InteropCenter, L1MessageAttributes} from "../IL1InteropCenter.sol";
 import {InteropCenterBase} from "./InteropCenterBase.sol";
 import {
     AttributeAlreadySet,
-    AttributeViolatesRestriction,
     FactoryDepsNotAllowedForIndirectCall,
-    L1ToL2TransactionParamsMissing,
-    SingleCallBundleRequired
+    L1ToL2TransactionParamsMissing
 } from "../InteropErrors.sol";
 
 /// @title L1InteropCenter
@@ -52,14 +50,23 @@ import {
 ///   (a "second bridge", e.g. the L1 asset router) that receives the payload on L1 and constructs the actual
 ///   destination-side call. This is the flow used for token deposits: each contract handling user ERC20 tokens
 ///   needs its own approvals, and this mode lets the user approve, for each token, only its respective bridge.
+/// @dev `sendMessage` is deliberately the ONLY state-changing entry point: an L1->L2 message always maps to exactly
+/// one priority transaction, so the multi-call `sendBundle` of the L2 counterpart has no L1 equivalent. Keeping a
+/// single entry point also keeps the calldata shape that governance restrictions inspect (see
+/// `PermanentRestriction`) unique; any additional entry point reaching the indirect-call flow would have to be
+/// recognised there as well.
 /// @dev The contract relies on the L1 Bridgehub as the registry of chains and base tokens; the downstream
 /// contracts (asset router, cross-chain senders and the chains' Mailboxes) authorize this contract by
 /// resolving `interopCenter()` on the Bridgehub.
+/// @dev Pausing this contract is independent of pausing the Bridgehub: the Bridgehub's pause no longer gates
+/// L1->L2 requests, so incident response must pause the L1InteropCenter to halt deposits.
 contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
-    enum L1AttributeParsingRestrictions {
-        OnlyCallAttributes,
-        OnlyBundleAttributes,
-        CallAndBundleAttributes
+    /// @dev Indexes of the supported attributes in `_getERC7786AttributeSelectors`; used to reject duplicates.
+    enum L1Attribute {
+        InteropCallValue,
+        IndirectCall,
+        L1ToL2TransactionParams,
+        FactoryDeps
     }
 
     /// @notice The L1 Bridgehub, used as the registry of chains, base tokens and ZK chain addresses.
@@ -111,45 +118,6 @@ contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
             _payload: _payload,
             _attributes: attributes,
             _eventAttributes: _attributes
-        });
-    }
-
-    /// @dev L1 accepts the shared bundle interface but delivers exactly one call as one priority transaction.
-    function _sendBundle(
-        bytes calldata _destinationChainId,
-        InteropCallStarter[] calldata _callStarters,
-        bytes[] calldata _bundleAttributes
-    ) internal override returns (bytes32 sendId) {
-        uint256 callCount = _callStarters.length;
-        require(callCount == 1, SingleCallBundleRequired(callCount));
-
-        _ensureEmptyAddress(_destinationChainId);
-        // slither-disable-next-line unused-return
-        (uint256 destinationChainId, ) = InteroperableAddress.parseEvmV1Calldata(_destinationChainId);
-
-        InteropCallStarter calldata callStarter = _callStarters[0];
-        _ensureEmptyChainReference(callStarter.to);
-        // slither-disable-next-line unused-return
-        (, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(callStarter.to);
-
-        L1MessageAttributes memory attributes = _parseL1Attributes(
-            _bundleAttributes,
-            L1AttributeParsingRestrictions.OnlyBundleAttributes
-        );
-        L1MessageAttributes memory callAttributes = _parseL1Attributes(
-            callStarter.callAttributes,
-            L1AttributeParsingRestrictions.OnlyCallAttributes
-        );
-        attributes.interopCallValue = callAttributes.interopCallValue;
-        attributes.indirectCall = callAttributes.indirectCall;
-        attributes.indirectCallMessageValue = callAttributes.indirectCallMessageValue;
-
-        sendId = _sendSingleCall({
-            _destinationChainId: destinationChainId,
-            _recipientAddress: recipientAddress,
-            _payload: callStarter.data,
-            _attributes: attributes,
-            _eventAttributes: callStarter.callAttributes
         });
     }
 
@@ -369,16 +337,8 @@ contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
     function parseL1Attributes(
         bytes[] calldata _attributes
     ) public pure override returns (L1MessageAttributes memory l1MessageAttributes) {
-        l1MessageAttributes = _parseL1Attributes(_attributes, L1AttributeParsingRestrictions.CallAndBundleAttributes);
-    }
-
-    function _parseL1Attributes(
-        bytes[] calldata _attributes,
-        L1AttributeParsingRestrictions _restriction
-    ) private pure returns (L1MessageAttributes memory l1MessageAttributes) {
-        bytes4[SUPPORTED_L1_INTEROP_ATTRIBUTES] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
-        // We can only pass each attribute once.
-        bool[] memory attributeUsed = new bool[](ATTRIBUTE_SELECTORS.length);
+        // Each attribute may be passed at most once.
+        bool[SUPPORTED_L1_INTEROP_ATTRIBUTES] memory attributeUsed;
 
         // The `l1ToL2TransactionParams` attribute is required, since without it the L1->L2 priority
         // transaction that delivers the message can not be formed.
@@ -389,29 +349,14 @@ contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
             bytes4 selector = bytes4(_attributes[i]);
 
             if (selector == IERC7786Attributes.interopCallValue.selector) {
-                require(
-                    _restriction != L1AttributeParsingRestrictions.OnlyBundleAttributes,
-                    AttributeViolatesRestriction(selector, uint256(_restriction))
-                );
-                require(!attributeUsed[0], AttributeAlreadySet(selector));
-                attributeUsed[0] = true;
+                _markAttributeUsed(attributeUsed, L1Attribute.InteropCallValue, selector);
                 l1MessageAttributes.interopCallValue = AttributesDecoder.decodeUint256(_attributes[i]);
             } else if (selector == IERC7786Attributes.indirectCall.selector) {
-                require(
-                    _restriction != L1AttributeParsingRestrictions.OnlyBundleAttributes,
-                    AttributeViolatesRestriction(selector, uint256(_restriction))
-                );
-                require(!attributeUsed[1], AttributeAlreadySet(selector));
-                attributeUsed[1] = true;
+                _markAttributeUsed(attributeUsed, L1Attribute.IndirectCall, selector);
                 l1MessageAttributes.indirectCall = true;
                 l1MessageAttributes.indirectCallMessageValue = AttributesDecoder.decodeUint256(_attributes[i]);
             } else if (selector == IERC7786Attributes.l1ToL2TransactionParams.selector) {
-                require(
-                    _restriction != L1AttributeParsingRestrictions.OnlyCallAttributes,
-                    AttributeViolatesRestriction(selector, uint256(_restriction))
-                );
-                require(!attributeUsed[2], AttributeAlreadySet(selector));
-                attributeUsed[2] = true;
+                _markAttributeUsed(attributeUsed, L1Attribute.L1ToL2TransactionParams, selector);
                 hasL1ToL2TransactionParams = true;
                 (
                     l1MessageAttributes.mintValue,
@@ -420,22 +365,24 @@ contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
                     l1MessageAttributes.refundRecipient
                 ) = AttributesDecoder.decodeL1ToL2TransactionParams(_attributes[i]);
             } else if (selector == IERC7786Attributes.factoryDeps.selector) {
-                require(
-                    _restriction != L1AttributeParsingRestrictions.OnlyCallAttributes,
-                    AttributeViolatesRestriction(selector, uint256(_restriction))
-                );
-                require(!attributeUsed[3], AttributeAlreadySet(selector));
-                attributeUsed[3] = true;
+                _markAttributeUsed(attributeUsed, L1Attribute.FactoryDeps, selector);
                 l1MessageAttributes.factoryDeps = AttributesDecoder.decodeBytesArray(_attributes[i]);
             } else {
                 revert IERC7786GatewaySource.UnsupportedAttribute(selector);
             }
         }
 
-        require(
-            _restriction == L1AttributeParsingRestrictions.OnlyCallAttributes || hasL1ToL2TransactionParams,
-            L1ToL2TransactionParamsMissing()
-        );
+        require(hasL1ToL2TransactionParams, L1ToL2TransactionParamsMissing());
+    }
+
+    /// @dev Records that `_attribute` was seen, reverting if it was already passed.
+    function _markAttributeUsed(
+        bool[SUPPORTED_L1_INTEROP_ATTRIBUTES] memory _attributeUsed,
+        L1Attribute _attribute,
+        bytes4 _selector
+    ) private pure {
+        require(!_attributeUsed[uint256(_attribute)], AttributeAlreadySet(_selector));
+        _attributeUsed[uint256(_attribute)] = true;
     }
 
     /// @notice Checks if the attribute selector is supported by the L1InteropCenter.
@@ -453,6 +400,7 @@ contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
     }
 
     /// @notice Returns the attribute selectors supported by the L1InteropCenter.
+    /// @dev The order matches the `L1Attribute` enum.
     /// @return The attribute selectors supported by the L1InteropCenter.
     function _getERC7786AttributeSelectors() internal pure returns (bytes4[SUPPORTED_L1_INTEROP_ATTRIBUTES] memory) {
         return

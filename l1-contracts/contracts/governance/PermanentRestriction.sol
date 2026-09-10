@@ -299,6 +299,10 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
             return (address(0), false);
         }
 
+        // The L1InteropCenter deliberately exposes `sendMessage` as its ONLY state-changing entry point (there is
+        // no L1 `sendBundle`), so matching this selector is sufficient. Any new L1InteropCenter entry point that
+        // can reach the indirect-call flow MUST be recognised here as well, otherwise a migration sent through
+        // it would bypass the L2 admin whitelist.
         if (bytes4(_call.data[:4]) != IERC7786GatewaySource.sendMessage.selector) {
             return (address(0), false);
         }

@@ -13,13 +13,11 @@ import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 import {IL1CrossChainSender} from "contracts/bridge/interfaces/IL1CrossChainSender.sol";
 import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
-import {L1InteropCenter} from "contracts/interop/interop-center/L1InteropCenter.sol";
+import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {
     AttributeAlreadySet,
-    AttributeViolatesRestriction,
     FactoryDepsNotAllowedForIndirectCall,
-    L1ToL2TransactionParamsMissing,
-    SingleCallBundleRequired
+    L1ToL2TransactionParamsMissing
 } from "contracts/interop/InteropErrors.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {L1InteropRequests} from "foundry-test/l1/utils/L1InteropRequests.sol";
@@ -318,79 +316,6 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
         _assertMessageSent(vm.getRecordedLogs(), request, outputRequest, caller, canonicalHash, attributes);
     }
 
-    function test_sendBundle_indirect_forwardsAndConfirmsExactRequest() public {
-        _useMockSharedBridge();
-        _initializeBridgehub();
-
-        address caller = makeAddr("INDIRECT_BUNDLE_CALLER");
-        L2TransactionRequestIndirect memory request = L2TransactionRequestIndirect({
-            chainId: _setUpZKChainForChainId(502),
-            mintValue: 1 ether,
-            l2Value: 0.25 ether,
-            l2GasLimit: 1_000_000,
-            l2GasPerPubdataByteLimit: 800,
-            refundRecipient: makeAddr("REFUND_RECIPIENT"),
-            secondBridgeAddress: secondBridgeAddress,
-            secondBridgeValue: 0.1 ether,
-            secondBridgeCalldata: abi.encode("deposit data")
-        });
-        _setUpBaseTokenForChainId(request.chainId, true, address(0));
-
-        IndirectCallRequest memory outputRequest = IndirectCallRequest({
-            magicValue: INDIRECT_CALL_MAGIC_VALUE,
-            l2Contract: makeAddr("L2_CONTRACT"),
-            l2Calldata: abi.encodeCall(SimpleExecutor.execute, (makeAddr("TARGET"), 0, hex"1234")),
-            factoryDeps: _singleFactoryDependency(),
-            txDataHash: keccak256("TX_DATA")
-        });
-        bytes32 canonicalHash = keccak256("CANONICAL_TX_HASH");
-
-        vm.mockCall(
-            secondBridgeAddress,
-            abi.encodeWithSelector(IL1CrossChainSender.initiateIndirectCall.selector),
-            abi.encode(outputRequest)
-        );
-        vm.mockCall(
-            secondBridgeAddress,
-            abi.encodeWithSelector(IL1CrossChainSender.confirmL2Transaction.selector),
-            hex""
-        );
-        vm.mockCall(
-            address(mockChainContract),
-            abi.encodeWithSelector(mockChainContract.bridgehubRequestL2Transaction.selector),
-            abi.encode(canonicalHash)
-        );
-        _expectIndirectCalls(request, caller, outputRequest, canonicalHash);
-
-        bytes[] memory callAttributes = new bytes[](2);
-        callAttributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, (request.l2Value));
-        callAttributes[1] = abi.encodeCall(IERC7786Attributes.indirectCall, (request.secondBridgeValue));
-        InteropCallStarter[] memory calls = new InteropCallStarter[](1);
-        calls[0] = InteropCallStarter({
-            to: InteroperableAddress.formatEvmV1(request.secondBridgeAddress),
-            data: request.secondBridgeCalldata,
-            callAttributes: callAttributes
-        });
-        bytes[] memory bundleAttributes = new bytes[](1);
-        bundleAttributes[0] = abi.encodeCall(
-            IERC7786Attributes.l1ToL2TransactionParams,
-            (request.mintValue, request.l2GasLimit, request.l2GasPerPubdataByteLimit, request.refundRecipient)
-        );
-
-        uint256 msgValue = request.mintValue + request.secondBridgeValue;
-        vm.deal(caller, msgValue);
-        vm.recordLogs();
-        vm.prank(caller);
-        bytes32 sendId = l1InteropCenter.sendBundle{value: msgValue}(
-            InteroperableAddress.formatEvmV1(request.chainId),
-            calls,
-            bundleAttributes
-        );
-
-        assertEq(sendId, canonicalHash);
-        _assertMessageSent(vm.getRecordedLogs(), request, outputRequest, caller, canonicalHash, callAttributes);
-    }
-
     function _singleFactoryDependency() private pure returns (bytes[] memory factoryDeps) {
         factoryDeps = new bytes[](1);
         factoryDeps[0] = hex"010203";
@@ -564,147 +489,6 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
     // L1InteropCenter entry point
     /////////////////////////////////////////////////////////
 
-    function test_sendBundle_direct_forwardsExactRequestAndEmitsMessageSent() public {
-        _useMockSharedBridge();
-        _initializeBridgehub();
-
-        address caller = makeAddr("BUNDLE_CALLER");
-        bytes[] memory factoryDeps = _singleFactoryDependency();
-        (L2TransactionRequestDirect memory request, bytes32 canonicalHash) = _prepareETHL2TransactionDirectRequest({
-            mockChainId: 501,
-            mockMintValue: 1 ether,
-            mockL2Contract: makeAddr("L2_CONTRACT"),
-            mockL2Value: 0.25 ether,
-            mockL2Calldata: abi.encodeCall(SimpleExecutor.execute, (makeAddr("TARGET"), 0, hex"1234")),
-            mockL2GasLimit: 1_000_000,
-            mockL2GasPerPubdataByteLimit: 800,
-            mockFactoryDeps: factoryDeps,
-            randomCaller: caller
-        });
-
-        bytes[] memory callAttributes = new bytes[](1);
-        callAttributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, (request.l2Value));
-        InteropCallStarter[] memory calls = new InteropCallStarter[](1);
-        calls[0] = InteropCallStarter({
-            to: InteroperableAddress.formatEvmV1(request.l2Contract),
-            data: request.l2Calldata,
-            callAttributes: callAttributes
-        });
-        bytes[] memory bundleAttributes = new bytes[](2);
-        bundleAttributes[0] = abi.encodeCall(
-            IERC7786Attributes.l1ToL2TransactionParams,
-            (request.mintValue, request.l2GasLimit, request.l2GasPerPubdataByteLimit, request.refundRecipient)
-        );
-        bundleAttributes[1] = abi.encodeCall(IERC7786Attributes.factoryDeps, (request.factoryDeps));
-
-        vm.expectCall(
-            sharedBridgeAddress,
-            request.mintValue,
-            abi.encodeCall(
-                IAssetRouterShared.bridgehubDepositBaseToken,
-                (request.chainId, ETH_TOKEN_ASSET_ID, caller, request.mintValue)
-            )
-        );
-        vm.expectCall(
-            address(mockChainContract),
-            abi.encodeWithSelector(
-                mockChainContract.bridgehubRequestL2Transaction.selector,
-                BridgehubL2TransactionRequest({
-                    sender: caller,
-                    contractL2: request.l2Contract,
-                    mintValue: request.mintValue,
-                    l2Value: request.l2Value,
-                    l2Calldata: request.l2Calldata,
-                    l2GasLimit: request.l2GasLimit,
-                    l2GasPerPubdataByteLimit: request.l2GasPerPubdataByteLimit,
-                    factoryDeps: request.factoryDeps,
-                    refundRecipient: caller
-                })
-            )
-        );
-        vm.expectEmit(true, false, false, true, address(l1InteropCenter));
-        emit IERC7786GatewaySource.MessageSent({
-            sendId: canonicalHash,
-            sender: InteroperableAddress.formatEvmV1(block.chainid, caller),
-            recipient: InteroperableAddress.formatEvmV1(request.chainId, request.l2Contract),
-            payload: request.l2Calldata,
-            value: request.l2Value,
-            attributes: callAttributes
-        });
-
-        vm.deal(caller, request.mintValue);
-        // Prank `tx.origin` too: an unset refund recipient resolves to the caller itself only for the tx
-        // originator (a no-code caller that is not `tx.origin` is treated as a constructor caller and aliased).
-        vm.prank(caller, caller);
-        bytes32 sendId = l1InteropCenter.sendBundle{value: request.mintValue}(
-            InteroperableAddress.formatEvmV1(request.chainId),
-            calls,
-            bundleAttributes
-        );
-
-        assertEq(sendId, canonicalHash);
-    }
-
-    function test_sendBundle_RevertWhen_callCountIsNotOne() public {
-        _useMockSharedBridge();
-        _initializeBridgehub();
-
-        InteropCallStarter[] memory calls = new InteropCallStarter[](0);
-        vm.expectRevert(abi.encodeWithSelector(SingleCallBundleRequired.selector, 0));
-        l1InteropCenter.sendBundle(hex"", calls, new bytes[](0));
-
-        calls = new InteropCallStarter[](2);
-        vm.expectRevert(abi.encodeWithSelector(SingleCallBundleRequired.selector, 2));
-        l1InteropCenter.sendBundle(hex"", calls, new bytes[](0));
-    }
-
-    function test_sendBundle_RevertWhen_callAttributeIsAtBundleLevel() public {
-        _useMockSharedBridge();
-        _initializeBridgehub();
-
-        InteropCallStarter[] memory calls = _emptyBundleCall();
-        bytes[] memory bundleAttributes = new bytes[](1);
-        bundleAttributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, (1));
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                AttributeViolatesRestriction.selector,
-                IERC7786Attributes.interopCallValue.selector,
-                uint256(L1InteropCenter.L1AttributeParsingRestrictions.OnlyBundleAttributes)
-            )
-        );
-        l1InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(eraChainId), calls, bundleAttributes);
-    }
-
-    function test_sendBundle_RevertWhen_bundleAttributeIsAtCallLevel() public {
-        _useMockSharedBridge();
-        _initializeBridgehub();
-
-        InteropCallStarter[] memory calls = _emptyBundleCall();
-        calls[0].callAttributes = new bytes[](1);
-        calls[0].callAttributes[0] = abi.encodeCall(IERC7786Attributes.l1ToL2TransactionParams, (0, 0, 0, address(0)));
-        bytes[] memory bundleAttributes = new bytes[](1);
-        bundleAttributes[0] = abi.encodeCall(IERC7786Attributes.l1ToL2TransactionParams, (0, 0, 0, address(0)));
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                AttributeViolatesRestriction.selector,
-                IERC7786Attributes.l1ToL2TransactionParams.selector,
-                uint256(L1InteropCenter.L1AttributeParsingRestrictions.OnlyCallAttributes)
-            )
-        );
-        l1InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(eraChainId), calls, bundleAttributes);
-    }
-
-    function _emptyBundleCall() private pure returns (InteropCallStarter[] memory calls) {
-        calls = new InteropCallStarter[](1);
-        calls[0] = InteropCallStarter({
-            to: InteroperableAddress.formatEvmV1(address(1)),
-            data: hex"",
-            callAttributes: new bytes[](0)
-        });
-    }
-
     function test_bridgehubDepositBaseToken_RevertWhen_notInteropCenter(address randomCaller) public {
         _useFullSharedBridge();
         _initializeBridgehub();
@@ -813,8 +597,6 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
 
         vm.expectRevert("Pausable: paused");
         l1InteropCenter.sendMessage(hex"", hex"", new bytes[](0));
-        vm.expectRevert("Pausable: paused");
-        l1InteropCenter.sendBundle(hex"", new InteropCallStarter[](0), new bytes[](0));
 
         vm.prank(bridgeOwner);
         l1InteropCenter.unpause();
@@ -870,6 +652,22 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
 
         // The sendId of an L1->L2 message is the canonical hash of the priority transaction that delivers it.
         assertEq(sendId, hash);
+    }
+
+    /// @dev `sendMessage` is the only state-changing entry point of the L1InteropCenter. A `sendBundle` would route a
+    /// single indirect call through the same flow while escaping the `sendMessage` calldata shape that governance
+    /// restrictions inspect (`PermanentRestriction._getNewAdminFromMigration`), so it must not exist on L1.
+    function test_sendBundle_isNotExposedOnL1() public {
+        _useMockSharedBridge();
+        _initializeBridgehub();
+
+        bytes memory sendBundleCalldata = abi.encodeCall(
+            IInteropCenter.sendBundle,
+            (InteroperableAddress.formatEvmV1(eraChainId), new InteropCallStarter[](1), new bytes[](0))
+        );
+        (bool success, bytes memory returndata) = address(l1InteropCenter).call(sendBundleCalldata);
+        assertFalse(success, "sendBundle must not be callable on the L1InteropCenter");
+        assertEq(returndata.length, 0, "an unknown selector must revert without a fallback");
     }
 
     function test_supportsAttribute() public {

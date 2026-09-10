@@ -12,7 +12,7 @@ import {
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
-import {IInteropCenterBase} from "contracts/interop/IInteropCenterBase.sol";
+import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {AtomicFlowPreimage, ATOMIC_FLOW_PREIMAGE_VERSION} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
@@ -292,7 +292,7 @@ library InteropLibrary {
     ) internal pure returns (bytes memory) {
         return
             abi.encodeCall(
-                IInteropCenterBase.sendBundle,
+                IInteropCenter.sendBundle,
                 (
                     InteroperableAddress.formatEvmV1(_l1ChainId),
                     DataEncoding.encodeInteropWithdrawalCallStarters(_assetId, _transferData),

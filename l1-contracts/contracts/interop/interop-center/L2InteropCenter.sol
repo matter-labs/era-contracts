@@ -49,6 +49,8 @@ import {
     IndirectCallOnlyToAssetRouter,
     IndirectCallValueMismatch,
     InteropBundleSaltAlreadyUsed,
+    InteroperableAddressChainReferenceNotEmpty,
+    InteroperableAddressNotEmpty,
     InteropCallToL1NotToAssetRouter,
     FeeWithdrawalFailed,
     InteropToSelfNotSupported,
@@ -61,6 +63,7 @@ import {IERC7786GatewaySource} from "../IERC7786GatewaySource.sol";
 import {IInteropAttributeParser} from "../IInteropAttributeParser.sol";
 import {InteropDataEncoding} from "../InteropDataEncoding.sol";
 import {IAtomicFlowManager} from "../../atomic-interop/IAtomicFlowManager.sol";
+import {ERC7930_V1_MIN_LENGTH} from "../InteropConstants.sol";
 import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
 import {IL2CrossChainSender} from "../../bridge/interfaces/IL2CrossChainSender.sol";
 import {IAssetRouterShared} from "../../bridge/asset-router/IAssetRouterShared.sol";
@@ -233,12 +236,12 @@ contract L2InteropCenter is IInteropCenter, InteropCenterBase {
         sendId = keccak256(abi.encodePacked(bundleHash, uint256(0)));
     }
 
-    /// @dev Implements the shared `sendBundle` entry point (see {InteropCenterBase}) for the L2 transport.
-    function _sendBundle(
+    /// @inheritdoc IInteropCenter
+    function sendBundle(
         bytes calldata _destinationChainId,
         InteropCallStarter[] calldata _callStarters,
         bytes[] calldata _bundleAttributes
-    ) internal override returns (bytes32 bundleHash) {
+    ) external payable whenNotPaused nonReentrant returns (bytes32 bundleHash) {
         _ensureEmptyAddress(_destinationChainId);
 
         // slither-disable-next-line unused-return
@@ -345,6 +348,42 @@ contract L2InteropCenter is IInteropCenter, InteropCenterBase {
     /*//////////////////////////////////////////////////////////////
                             Internal functions
     //////////////////////////////////////////////////////////////*/
+
+    /// @notice Verifies that the ERC-7930 address has an empty ChainReference field.
+    /// @dev Ensures that CallStarters in `sendBundle` do not include a ChainReference, as required by our
+    ///      implementation. The ChainReference length is stored at byte offset 0x04 in the ERC-7930 format.
+    /// @dev Takes `bytes memory` so one implementation serves both user-supplied (calldata, implicitly
+    ///      copied — these addresses are tens of bytes) and runtime-produced (an indirect call starter's
+    ///      returned recipient) values.
+    /// @param _interoperableAddress The ERC-7930 address to verify.
+    function _ensureEmptyChainReference(bytes memory _interoperableAddress) internal pure {
+        require(
+            _interoperableAddress.length >= ERC7930_V1_MIN_LENGTH,
+            InteroperableAddress.InteroperableAddressParsingError(_interoperableAddress)
+        );
+        require(
+            uint8(_interoperableAddress[0x04]) == 0,
+            InteroperableAddressChainReferenceNotEmpty(_interoperableAddress)
+        );
+    }
+
+    /// @notice Verifies that the ERC-7930 address has an empty address field.
+    /// @dev This function is used to ensure that the address does not contain an address field.
+    ///      The address length is stored at byte offset (0x05 + chainReferenceLength) in the ERC-7930 format.
+    /// @param _interoperableAddress The ERC-7930 address to verify.
+    function _ensureEmptyAddress(bytes calldata _interoperableAddress) internal pure {
+        require(
+            _interoperableAddress.length >= ERC7930_V1_MIN_LENGTH,
+            InteroperableAddress.InteroperableAddressParsingError(_interoperableAddress)
+        );
+        uint8 chainReferenceLength = uint8(_interoperableAddress[0x04]);
+        require(
+            _interoperableAddress.length >= ERC7930_V1_MIN_LENGTH + chainReferenceLength,
+            InteroperableAddress.InteroperableAddressParsingError(_interoperableAddress)
+        );
+        uint8 addressLength = uint8(_interoperableAddress[0x05 + chainReferenceLength]);
+        require(addressLength == 0, InteroperableAddressNotEmpty(_interoperableAddress));
+    }
 
     /// @notice Strict L2->L2 destination check used by the generic single-message `sendMessage` entry point.
     /// @dev Unlike the `sendBundle` destination check, this never allows an L1 destination; the L2->L1 path
