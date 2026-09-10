@@ -292,12 +292,30 @@ function main() {
 
   const allDiffs: string[] = [];
 
-  for (const versionDir of fs.readdirSync(committedDir).sort()) {
+  // The union, not just the committed side: a protocol bump adds a version directory that exists
+  // only in the generated tree, and iterating the committed tree alone reports "up to date" for it.
+  // Callers use this verdict to decide whether snapshots need committing, so a generated-only
+  // version has to register as a difference.
+  const isVersionDir = (root: string, name: string) => {
+    const p = path.join(root, name);
+    return fs.existsSync(p) && fs.statSync(p).isDirectory();
+  };
+  const versionDirs = [
+    ...new Set([
+      ...fs.readdirSync(committedDir).filter((d) => isVersionDir(committedDir, d)),
+      ...fs.readdirSync(generatedDir).filter((d) => isVersionDir(generatedDir, d)),
+    ]),
+  ].sort();
+
+  for (const versionDir of versionDirs) {
     const committedVersion = path.join(committedDir, versionDir);
     const generatedVersion = path.join(generatedDir, versionDir);
 
-    if (!fs.statSync(committedVersion).isDirectory()) continue;
-    if (!fs.existsSync(generatedVersion) || !fs.statSync(generatedVersion).isDirectory()) {
+    if (!isVersionDir(committedDir, versionDir)) {
+      allDiffs.push(`Missing version directory in committed: ${versionDir}`);
+      continue;
+    }
+    if (!isVersionDir(generatedDir, versionDir)) {
       allDiffs.push(`Missing version directory in generated: ${versionDir}`);
       continue;
     }
