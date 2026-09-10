@@ -151,10 +151,9 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
             ecosystemExecutor,
             Utils.transitionCodehash()
         );
-        // The bootstrap-join authorizations every stage-0 requires: pause holder on the fixture's
-        // real ChainAssetHandler, authorized CTM executor on the ecosystem executor.
-        vm.prank(governor);
-        chainAssetHandler.setUpgradePauser(address(ctmExecutor), true);
+        // The one bootstrap-join authorization stage 0 requires: an authorized CTM executor on
+        // the ecosystem executor. Pausing its own CTM's migrations needs no registration — the
+        // ChainAssetHandler derives that from the CTM ownership the executor already holds.
         vm.prank(governor);
         ecosystemExecutor.setCTMExecutorAuthorization(address(ctmExecutor), true);
 
@@ -329,7 +328,10 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         ctmExecutor.stage0(ICTMTransition(address(_transition)));
         ctmExecutor.stage1(ICTMTransition(address(_transition)));
         vm.stopPrank();
-        assertTrue(chainAssetHandler.migrationPaused(), "the executor's hold must pause migrations");
+        assertTrue(
+            chainAssetHandler.migrationPausedFor(address(chainContractAddress)),
+            "stage 0 must pause its own CTM's migrations"
+        );
     }
 
     /// @dev The whole hop: commit, cross the chain, complete (the hold is released again).

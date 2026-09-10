@@ -19,6 +19,7 @@ import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {UpgradeIntegrationTestBase} from "./UpgradeTestShared.t.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
@@ -290,25 +291,25 @@ contract UpgradeIntegrationTest_v34_Local is
         assertEq(IGetters(_newChainDiamond).getProtocolVersion(), _expectedNewVersion, "new chain wrong version");
 
         // The bootstrap's CTM stage 2, every call a declared external action: the migration's own
-        // post-state gate, the two bootstrap-JOIN authorizations the recurring stage lifecycle
-        // needs and the executor cannot grant itself (upgrade pauser on the shared
-        // ChainAssetHandler, CTM-executor authorization on the ecosystem executor), and the
-        // unpaused read. The harness already executed the prepared stage-2 bundle green in
+        // post-state gate, the one bootstrap-JOIN authorization the recurring stage lifecycle
+        // needs and the executor cannot grant itself (CTM-executor authorization on the ecosystem
+        // executor — the migration pause needs no registration, being derived from the CTM
+        // ownership `migrate()` just handed over), and the unpaused read. The harness already executed the prepared stage-2 bundle green in
         // `internalTest`; assert the emitted call list shape, that the gate still holds against
         // the final state, and that both joins landed.
         address bridgehub = coreUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
         address chainAssetHandler = IBridgehubBase(bridgehub).chainAssetHandler();
         EcosystemUpgradeExecutor ecosystemExecutor = v34.ecosystemUpgradeExecutor();
         Call[] memory stage2 = v34.prepareStage2GovernanceCalls();
-        assertEq(stage2.length, 4, "v34 CTM stage 2: post-state gate, two join authorizations, unpaused read");
+        assertEq(stage2.length, 3, "v34 CTM stage 2: post-state gate, the join authorization, unpaused read");
         assertEq(
-            stage2[3].data,
+            stage2[2].data,
             abi.encodeCall(UpgradeStageValidator.checkMigrationsUnpaused, ()),
             "stage 2 must end with the unpaused read"
         );
         assertEq(
             v34.externalActionDescriptions().length,
-            9,
+            8,
             "the bootstrap's CTM prepare declares every one of its governance and admin calls"
         );
         assertEq(stage2[0].target, address(v34.bootstrapMigration()), "stage 2 must target the migration");
@@ -317,29 +318,26 @@ contract UpgradeIntegrationTest_v34_Local is
             abi.encodeCall(v34.bootstrapMigration().validateApplied, ()),
             "stage 2 must call validateApplied"
         );
-        assertEq(stage2[1].target, chainAssetHandler, "stage 2 must target the Bridgehub's ChainAssetHandler");
+        assertEq(stage2[1].target, address(ecosystemExecutor), "stage 2 must target the ecosystem executor");
         assertEq(
             stage2[1].data,
-            abi.encodeCall(IChainAssetHandlerBase.setUpgradePauser, (executor, true)),
-            "stage 2 must register the executor as an upgrade pauser"
-        );
-        assertEq(stage2[2].target, address(ecosystemExecutor), "stage 2 must target the ecosystem executor");
-        assertEq(
-            stage2[2].data,
             abi.encodeCall(EcosystemUpgradeExecutor.setCTMExecutorAuthorization, (executor, true)),
             "stage 2 must authorize the executor on the ecosystem executor"
         );
         v34.bootstrapMigration().validateApplied();
         assertTrue(
-            IChainAssetHandlerBase(chainAssetHandler).isUpgradePauser(executor),
-            "the executor must be a registered upgrade pauser after stage 2"
-        );
-        assertTrue(
             ecosystemExecutor.isAuthorizedCTMExecutor(executor),
             "the executor must be authorized on the ecosystem executor after stage 2"
         );
-        // The join is wiring only: nothing pauses migrations until a transition's stage 0.
-        assertFalse(IChainAssetHandlerBase(chainAssetHandler).migrationPaused(), "no pause before stage 0");
+        // No pauser registration to assert: the ChainAssetHandler derives the authority from CTM
+        // ownership, which `migrate()` already handed to the executor. What the join must leave is
+        // an UNPAUSED CTM — nothing pauses until a transition's stage 0.
+        assertEq(
+            IOwnable(ctm).owner(),
+            executor,
+            "the executor owns the CTM, which is what lets it pause that CTM's migrations"
+        );
+        assertFalse(IChainAssetHandlerBase(chainAssetHandler).migrationPausedFor(ctm), "no pause before stage 0");
     }
 
     /// @dev Decodes an `upgrade(ProposedUpgrade)` init payload; external so the selector can be

@@ -244,6 +244,15 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         );
         chainContractAddress = ZKsyncOSChainTypeManager(address(transparentUpgradeableProxy));
 
+        // A real ecosystem always has its CTM registered on the Bridgehub, and the
+        // ChainAssetHandler now relies on it: the authority to pause a CTM's migrations is
+        // derived from `chainTypeManagerIsRegistered` plus that CTM's own owner.
+        // Guarded: some suites register it themselves, and `addChainTypeManager` refuses a repeat.
+        if (!bridgehub.chainTypeManagerIsRegistered(address(chainContractAddress))) {
+            vm.prank(governor);
+            bridgehub.addChainTypeManager(address(chainContractAddress));
+        }
+
         rollupL1DAValidator = Utils.deployL1RollupDAValidatorBytecode();
     }
 
@@ -394,7 +403,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
             abi.encodeWithSignature("chainAssetHandler()"),
             abi.encode(mockChainAssetHandler)
         );
-        vm.mockCall(mockChainAssetHandler, abi.encodeWithSignature("migrationPaused()"), abi.encode(true));
+        vm.mockCall(mockChainAssetHandler, abi.encodeWithSignature("migrationPausedFor(address)"), abi.encode(true));
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////

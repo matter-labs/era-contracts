@@ -289,7 +289,7 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
         pendingTransition = _transition;
         pendingStage = UpgradeStage.Prepared;
 
-        _chainAssetHandler().pauseMigration();
+        _chainAssetHandler().pauseCTMMigration(address(CHAIN_TYPE_MANAGER));
         timer.startTimer();
         emit UpgradePrepared(address(_transition), timer.deadline());
     }
@@ -303,7 +303,7 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
         _requirePending(_transition, UpgradeStage.Prepared);
         GovernanceUpgradeTimer(_transition.upgradeTimer()).checkDeadline();
         // Checked here for a clear failure; the CTM's own version commit refuses to run unpaused.
-        if (!_chainAssetHandler().migrationPaused()) {
+        if (!_chainAssetHandler().migrationPausedFor(address(CHAIN_TYPE_MANAGER))) {
             revert MigrationsNotPaused();
         }
         // Ecosystem leg first — the order the merged governance bundle always had: the CTM leg
@@ -333,7 +333,7 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
         }
         delete pendingTransition;
         pendingStage = UpgradeStage.None;
-        _chainAssetHandler().unpauseMigration();
+        _chainAssetHandler().unpauseCTMMigration(address(CHAIN_TYPE_MANAGER));
         emit UpgradeCompleted(address(_transition));
     }
 

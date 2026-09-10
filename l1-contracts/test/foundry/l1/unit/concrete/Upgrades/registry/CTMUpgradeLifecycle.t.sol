@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
+import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {
     ITransparentUpgradeableProxy,
@@ -37,7 +38,7 @@ import {
     EcosystemLegNotNamedByTransition,
     MigrationsNotPaused,
     NoPendingTransition,
-    NotUpgradePauser,
+    NotCTMOwner,
     ProxyUpgradeRowMismatch,
     RegistryCodehashMismatch,
     TimerNotBoundToExecutor,
@@ -146,7 +147,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
             implNew
         );
         assertEq(address(ctmExecutor.pendingTransition()), address(0));
-        assertFalse(chainAssetHandler.migrationPaused());
+        assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)));
     }
 
     function test_rejectEcosystemReplacementDuringLifecycle() public {
@@ -256,7 +257,29 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
     function _assertPendingAndPaused(CTMTransition _transition, ICTMUpgradeExecutor.UpgradeStage _stage) internal view {
         assertEq(address(ctmExecutor.pendingTransition()), address(_transition), "the lifecycle must stay open");
         _assertStage(_stage);
-        assertTrue(chainAssetHandler.migrationPaused(), "migrations must stay paused");
+        assertTrue(chainAssetHandler.migrationPausedFor(address(chainContractAddress)), "migrations must stay paused");
+    }
+
+    /// @dev The escape hatch is how governance reaches a CTM-scoped pause: the ChainAssetHandler
+    ///      accepts only the CTM's owner, which is the executor, and governance owns the executor.
+    function _forwardPauseCTM() internal {
+        vm.prank(governor);
+        ctmExecutor.forward(
+            _singleCall(
+                address(chainAssetHandler),
+                abi.encodeCall(IChainAssetHandlerBase.pauseCTMMigration, (address(chainContractAddress)))
+            )
+        );
+    }
+
+    function _forwardUnpauseCTM() internal {
+        vm.prank(governor);
+        ctmExecutor.forward(
+            _singleCall(
+                address(chainAssetHandler),
+                abi.encodeCall(IChainAssetHandlerBase.unpauseCTMMigration, (address(chainContractAddress)))
+            )
+        );
     }
 
     function _assertCtmUntouched() internal view {
@@ -276,11 +299,14 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         CTMTransition full = _deployFullTransition();
         GovernanceUpgradeTimer timer = GovernanceUpgradeTimer(full.upgradeTimer());
         uint256 oldVersion = chainContractAddress.protocolVersion();
-        assertFalse(chainAssetHandler.migrationPaused(), "fixture: migrations start unpaused");
+        assertFalse(
+            chainAssetHandler.migrationPausedFor(address(chainContractAddress)),
+            "fixture: migrations start unpaused"
+        );
 
         // Stage 0: migrations pause, the timer starts and the transition is recorded.
         vm.expectEmit(true, true, true, true, address(chainAssetHandler));
-        emit IChainAssetHandlerBase.PausedMigration(address(ctmExecutor));
+        emit IChainAssetHandlerBase.PausedCTMMigration(address(chainContractAddress), address(ctmExecutor));
         vm.expectEmit(true, true, true, true, address(timer));
         emit GovernanceUpgradeTimer.TimerStarted(block.timestamp, block.timestamp);
         vm.expectEmit(true, true, true, true, address(ctmExecutor));
@@ -318,13 +344,13 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
 
         // Stage 2: the applied-state checks pass, then restoration.
         vm.expectEmit(true, true, true, true, address(chainAssetHandler));
-        emit IChainAssetHandlerBase.UnpausedMigration(address(ctmExecutor));
+        emit IChainAssetHandlerBase.UnpausedCTMMigration(address(chainContractAddress), address(ctmExecutor));
         vm.expectEmit(true, true, true, true, address(ctmExecutor));
         emit CTMUpgradeExecutor.UpgradeCompleted(address(full));
         _stage2(full);
 
         _assertLifecycleIdle();
-        assertFalse(chainAssetHandler.migrationPaused(), "stage 2 unpauses migrations");
+        assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)), "stage 2 unpauses migrations");
         // The post-state checks keep holding on their own after completion.
         ctmExecutor.validateTransitionApplied(ICTMTransition(address(full)));
         ecosystemExecutor.validateUpgradeApplied(ICoreRegistry(address(coreRegistry)));
@@ -402,7 +428,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         vm.expectRevert(abi.encodeWithSelector(TransitionNotPending.selector, address(transition), address(0)));
         vm.prank(governor);
         ctmExecutor.stage2(ICTMTransition(address(transition)));
-        assertFalse(chainAssetHandler.migrationPaused());
+        assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)));
     }
 
     function test_revertWhen_stagesCalledByStranger() public {
@@ -439,7 +465,10 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         vm.expectRevert(abi.encodeWithSelector(UpgradeLifecycleBusy.selector, address(transition)));
         vm.prank(governor);
         ctmExecutor.stage0(ICTMTransition(address(other)));
-        assertTrue(chainAssetHandler.migrationPaused(), "the busy check must not disturb the pause");
+        assertTrue(
+            chainAssetHandler.migrationPausedFor(address(chainContractAddress)),
+            "the busy check must not disturb the pause"
+        );
 
         // Completion frees the slot: the next hop (departing from the new release and version)
         // prepares normally.
@@ -475,7 +504,10 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         ctmExecutor.abandonPendingTransition();
 
         _assertLifecycleIdle();
-        assertTrue(chainAssetHandler.migrationPaused(), "abandoning must not resume migrations");
+        assertTrue(
+            chainAssetHandler.migrationPausedFor(address(chainContractAddress)),
+            "abandoning must not resume migrations"
+        );
         _assertCtmUntouched();
         // The corrected transition (the row now departs from where the proxy actually is).
         TransitionManifest memory corrected = _fullManifest();
@@ -502,25 +534,32 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         ctmExecutor.abandonPendingTransition();
 
         _assertLifecycleIdle();
-        assertTrue(chainAssetHandler.migrationPaused(), "abandoning must not resume migrations");
+        assertTrue(
+            chainAssetHandler.migrationPausedFor(address(chainContractAddress)),
+            "abandoning must not resume migrations"
+        );
         assertEq(chainContractAddress.protocolVersion(), newVersion, "the committed version bump stands");
         assertEq(chainContractAddress.upgradeTransition(oldVersion), address(transition), "the commit stands");
         assertEq(chainContractAddress.currentRelease(), address(release), "the release pin stands");
     }
 
-    /// @dev Abandoning touches the pause flag not at all, so it also works from an ecosystem the
-    ///      owner already unpaused mid-lifecycle: only the lifecycle slot is cleared.
-    function test_abandon_afterTheOwnerUnpaused_onlyFreesTheSlot() public {
+    /// @dev Abandoning touches the pause not at all, so it also works from a CTM whose pause was
+    ///      already lifted mid-lifecycle: only the lifecycle slot is cleared.
+    /// @dev Lifting it needs the executor, since the pause is keyed by the CTM the executor owns.
+    ///      Governance reaches that through the executor's owner-gated escape hatch.
+    function test_abandon_afterTheCTMPauseWasLifted_onlyFreesTheSlot() public {
         _stage0(transition);
-        vm.prank(governor);
-        chainAssetHandler.unpauseMigration();
-        assertFalse(chainAssetHandler.migrationPaused());
+        _forwardUnpauseCTM();
+        assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)));
 
         vm.prank(governor);
         ctmExecutor.abandonPendingTransition();
 
         _assertLifecycleIdle();
-        assertFalse(chainAssetHandler.migrationPaused(), "abandoning must not pause either");
+        assertFalse(
+            chainAssetHandler.migrationPausedFor(address(chainContractAddress)),
+            "abandoning must not pause either"
+        );
     }
 
     function test_revertWhen_abandonWithoutAPendingTransition() public {
@@ -559,21 +598,23 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         assertEq(unbound.deadline(), 0, "the timer must not have been started");
     }
 
-    function test_revertWhen_stage0ExecutorNotRegisteredAsPauser() public {
+    /// @dev The pause authority is DERIVED from CTM ownership, so there is no registration to
+    ///      forget — but an executor that does not (yet) own its CTM cannot pause it, which is
+    ///      exactly the pre-bootstrap state. `stage0` therefore fails until the handover is done.
+    function test_revertWhen_stage0BeforeTheExecutorOwnsItsCTM() public {
+        // Hand the CTM back to governance: the executor is bound to it but no longer owns it.
+        vm.prank(address(ctmExecutor));
+        Ownable2Step(address(chainContractAddress)).transferOwnership(governor);
         vm.prank(governor);
-        chainAssetHandler.setUpgradePauser(address(ctmExecutor), false);
+        Ownable2Step(address(chainContractAddress)).acceptOwnership();
 
-        vm.expectRevert(abi.encodeWithSelector(NotUpgradePauser.selector, address(ctmExecutor)));
+        vm.expectRevert(
+            abi.encodeWithSelector(NotCTMOwner.selector, address(ctmExecutor), address(chainContractAddress))
+        );
         vm.prank(governor);
         ctmExecutor.stage0(ICTMTransition(address(transition)));
         _assertLifecycleIdle();
-        assertFalse(chainAssetHandler.migrationPaused());
-
-        // The join is one owner call away.
-        vm.prank(governor);
-        chainAssetHandler.setUpgradePauser(address(ctmExecutor), true);
-        _stage0(transition);
-        _assertPendingAndPaused(transition, ICTMUpgradeExecutor.UpgradeStage.Prepared);
+        assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)));
     }
 
     function test_revertWhen_stage0ExecutorNotAuthorizedOnEcosystemExecutor() public {
@@ -668,15 +709,12 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         assertEq(chainContractAddress.protocolVersion(), newVersion);
     }
 
-    /// @dev Stage 1 reads the pause flag live rather than trusting that stage 0 set it: if the
-    ///      owner unpauses in between, the commit refuses until migrations are paused again.
-    ///      Recovering needs one owner call, and stage 2 then completes normally — with one flag,
-    ///      stage 2 has nothing of its own to release.
-    function test_revertWhen_stage1MigrationsNotPaused_afterTheOwnerUnpaused() public {
+    /// @dev Stage 1 reads the pause live rather than trusting that stage 0 set it: if this CTM's
+    ///      pause is lifted in between, the commit refuses until it is paused again.
+    function test_revertWhen_stage1MigrationsNotPaused_afterTheCTMPauseWasLifted() public {
         _stage0(transition);
-        vm.prank(governor);
-        chainAssetHandler.unpauseMigration();
-        assertFalse(chainAssetHandler.migrationPaused());
+        _forwardUnpauseCTM();
+        assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)));
 
         vm.expectRevert(MigrationsNotPaused.selector);
         vm.prank(governor);
@@ -684,15 +722,14 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         _assertCtmUntouched();
         _assertStage(ICTMUpgradeExecutor.UpgradeStage.Prepared);
 
-        // Pausing again makes the commit admissible.
-        vm.prank(governor);
-        chainAssetHandler.pauseMigration();
+        // Pausing this CTM again makes the commit admissible.
+        _forwardPauseCTM();
         _stage1(transition);
         assertEq(chainContractAddress.protocolVersion(), newVersion);
 
         _stage2(transition);
         _assertLifecycleIdle();
-        assertFalse(chainAssetHandler.migrationPaused(), "stage 2 unpauses migrations");
+        assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)), "stage 2 unpauses migrations");
     }
 
     // ─────────────────────────── all-or-nothing stage 1 ───────────────────────────
@@ -828,47 +865,46 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
 
     // ─────────────────────────── pause composition ───────────────────────────
 
-    /// @dev EXPLICIT accepted behavior. There is ONE pause flag, so this lifecycle's stage 2
-    ///      unpauses migrations even though a second upgrade still requires them paused.
-    ///      Governance must not run overlapping upgrade lifecycles; the contract does not enforce
-    ///      it, because per-executor holds would only have defended against accident and
-    ///      governance already controls every executor.
-    function test_stage2UnpausesEvenWhileAnotherUpgradeNeedsThePause() public {
-        // A second upgrade (another CTM's executor) pauses across this whole lifecycle.
-        address otherExecutor = makeAddr("otherCtmExecutor");
+    /// @dev The separation the per-CTM pause buys: an ECOSYSTEM pause is incident control and a
+    ///      completing upgrade must not lift it. Under the previous single-flag design stage 2
+    ///      cleared it, which is the defect this keying fixes. (One CTM's pause being independent
+    ///      of another's is proved directly, with two CTMs, in
+    ///      `L1ChainAssetHandlerMigrationPause.t.sol`.)
+    function test_stage2LeavesTheEcosystemPauseInPlace() public {
         vm.prank(governor);
-        chainAssetHandler.setUpgradePauser(otherExecutor, true);
-        vm.prank(otherExecutor);
         chainAssetHandler.pauseMigration();
 
         _runLifecycle(transition);
 
         assertFalse(
-            chainAssetHandler.migrationPaused(),
-            "one flag: this upgrade's completion lifts the pause the other upgrade still needs"
+            chainAssetHandler.ctmMigrationPaused(address(chainContractAddress)),
+            "stage 2 lifts this CTM's own pause"
+        );
+        assertTrue(
+            chainAssetHandler.migrationPausedFor(address(chainContractAddress)),
+            "but the ecosystem pause is not an upgrade's to lift"
         );
     }
 
-    /// @dev The same consequence for an owner-set pause: completion lifts it too, so an incident
-    ///      pause must not be left to overlap an upgrade lifecycle.
-    function test_stage2UnpausesTheOwnersPauseToo() public {
+    /// @dev And the converse: lifting the ecosystem pause mid-lifecycle does not resume this CTM,
+    ///      because stage 0 paused the CTM itself. Under one flag this unpause took effect and
+    ///      stage 1 then refused; now the lifecycle is unaffected.
+    function test_ecosystemUnpauseDuringLifecycleLeavesTheCTMPaused() public {
         vm.prank(governor);
         chainAssetHandler.pauseMigration();
-
-        _runLifecycle(transition);
-
-        assertFalse(chainAssetHandler.migrationPaused(), "one flag: completion lifts the owner's pause");
-    }
-
-    /// @dev And in the other direction: the owner's unpause mid-lifecycle really does unpause, so
-    ///      stage 1 refuses until migrations are paused again
-    ///      (see {test_revertWhen_stage1MigrationsNotPaused_afterTheOwnerUnpaused}).
-    function test_ownerUnpauseDuringLifecycleUnpauses() public {
         _stage0(transition);
-        assertTrue(chainAssetHandler.migrationPaused());
 
         vm.prank(governor);
         chainAssetHandler.unpauseMigration();
-        assertFalse(chainAssetHandler.migrationPaused(), "one flag: the owner's unpause takes effect");
+        assertTrue(
+            chainAssetHandler.migrationPausedFor(address(chainContractAddress)),
+            "stage 0's own pause survives the ecosystem unpause"
+        );
+
+        // So the commit is still admissible and the lifecycle completes normally.
+        _stage1(transition);
+        assertEq(chainContractAddress.protocolVersion(), newVersion);
+        _stage2(transition);
+        _assertLifecycleIdle();
     }
 }

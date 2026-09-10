@@ -416,8 +416,10 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     ///      `protocolVersion` forward.
     /// @dev Note: non-sequential protocol versions are allowed (e.g., minor/patch jumps).
     function _commitVersionEdge(uint256 _oldProtocolVersion, uint256 _newProtocolVersion) internal {
-        // Migrations must be paused before setting new version upgrades
-        if (!IChainAssetHandlerBase(IL1Bridgehub(BRIDGE_HUB).chainAssetHandler()).migrationPaused()) {
+        // This CTM's migrations must be paused before its version moves: a chain crossing
+        // settlement layers mid-edge would land with an inconsistent version. Asked per-CTM —
+        // another CTM's upgrade is no reason to block this one, and vice versa.
+        if (!IChainAssetHandlerBase(IL1Bridgehub(BRIDGE_HUB).chainAssetHandler()).migrationPausedFor(address(this))) {
             revert MigrationsNotPaused();
         }
         uint256 previousProtocolVersion = protocolVersion;

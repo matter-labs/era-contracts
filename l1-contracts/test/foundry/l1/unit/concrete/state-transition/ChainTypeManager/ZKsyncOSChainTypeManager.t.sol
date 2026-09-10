@@ -250,7 +250,11 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         chainContractAddress = _deployChainTypeManager();
 
         // Mock migration paused check
-        vm.mockCall(address(chainAssetHandler), abi.encodeWithSignature("migrationPaused()"), abi.encode(true));
+        vm.mockCall(
+            address(chainAssetHandler),
+            abi.encodeWithSignature("migrationPausedFor(address)"),
+            abi.encode(true)
+        );
 
         Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),

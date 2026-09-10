@@ -143,13 +143,13 @@ contract CTMUpgradeForeignAdminRowTest is CTMUpgradeExecutorFixture {
     function _assertPendingAndPaused(CTMTransition _transition, ICTMUpgradeExecutor.UpgradeStage _stage) internal view {
         assertEq(address(ctmExecutor.pendingTransition()), address(_transition), "the lifecycle must stay open");
         _assertStage(_stage);
-        assertTrue(chainAssetHandler.migrationPaused(), "migrations must stay paused");
+        assertTrue(chainAssetHandler.migrationPausedFor(address(chainContractAddress)), "migrations must stay paused");
     }
 
     function _assertLifecycleIdle() internal view {
         assertEq(address(ctmExecutor.pendingTransition()), address(0), "the lifecycle slot must be cleared");
         _assertStage(ICTMUpgradeExecutor.UpgradeStage.None);
-        assertFalse(chainAssetHandler.migrationPaused(), "stage 2 unpauses migrations");
+        assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)), "stage 2 unpauses migrations");
     }
 
     // ─────────────────────────── left to the administrator ───────────────────────────
