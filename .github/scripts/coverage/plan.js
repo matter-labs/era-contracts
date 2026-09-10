@@ -5,35 +5,12 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { createHash } = require("node:crypto");
 const { execFileSync } = require("node:child_process");
-const { isDeepStrictEqual } = require("node:util");
-const ts = require("typescript");
-const toml = require("smol-toml");
 const { totals } = require("./check");
 
 const ROOT = path.resolve(__dirname, "../../..");
 const WORKFLOW = ".github/workflows/l1-contracts-ci.yaml";
 const SPEC_DIRECTORY = "l1-contracts/test/anvil-interop/test/hardhat";
 const RECIPE_FILES = [WORKFLOW, ".github/scripts/coverage/plan.js", ".nvmrc", ".github/foundry-versions.env"];
-// These run from the measured checkout; workflow-level pins and the Foundry command are shared.
-// Test discovery, deployment fixtures and dependencies (including remappings) remain revision-specific.
-const MEASUREMENT_PATHS = [
-  "da-contracts/foundry.toml",
-  "l1-contracts/foundry.toml",
-  "l1-contracts/hardhat.config.ts",
-  "l1-contracts/tsconfig.json",
-  "l1-contracts/scripts/merge-coverage.ts",
-  "l1-contracts/test/anvil-interop/tsconfig.json",
-  "l1-contracts/test/anvil-interop/run-coverage.ts",
-  "l1-contracts/test/anvil-interop/merge-shard-lcov.ts",
-  "l1-contracts/test/anvil-interop/src/coverage/",
-  "l1-contracts/test/anvil-interop/src/core/utils.ts",
-  "l1-contracts/test/anvil-interop/src/daemons/anvil-manager.ts",
-];
-const MEASUREMENT_SCRIPTS = {
-  "da-contracts/package.json": ["build:foundry"],
-  "l1-contracts/package.json": ["build:foundry", "coverage:merge"],
-  "l1-contracts/test/anvil-interop/package.json": ["merge:shards"],
-};
 const SHA = /^[a-f0-9]{40}$/;
 const GROUP_COUNT = 2;
 const WAIT_MS = 120000;
@@ -54,57 +31,6 @@ function recipeHash(_read, _coverageCommand = coverageCommand(_read)) {
   }
   hash.update("coverage:foundry\0").update(_coverageCommand).update("\0");
   return hash.digest("hex");
-}
-
-function measurementSource(_file, _text) {
-  if (_file.endsWith(".ts")) {
-    const source = ts.createSourceFile(_file, _text, ts.ScriptTarget.Latest, true);
-    // Keep directive-bearing files verbatim: comments can affect compilation or instrumentation.
-    if (
-      source.parseDiagnostics.length ||
-      source.pragmas.size ||
-      source.commentDirectives?.length ||
-      /\b(?:istanbul|c8|v8)\s+ignore\b|[#@]\s*(?:source(?:Mapping)?URL|__PURE__)/.test(_text)
-    ) {
-      return _text;
-    }
-    return ts.createPrinter({ removeComments: true }).printFile(source);
-  }
-  if (_file.endsWith("/foundry.toml")) {
-    const config = toml.parse(_text, { integersAsBigInt: true });
-    for (const profile of Object.values(config.profile || {})) {
-      delete profile.remappings;
-    }
-    return config;
-  }
-  return _text;
-}
-
-function toolingChanges(_git, _base, _head) {
-  const changed = _git("diff", "--name-only", "--no-renames", "-z", _base, _head, "--", ...MEASUREMENT_PATHS)
-    .split("\0")
-    .filter(Boolean)
-    .filter((file) => {
-      try {
-        return !isDeepStrictEqual(
-          measurementSource(file, _git("show", `${_base}:${file}`)),
-          measurementSource(file, _git("show", `${_head}:${file}`))
-        );
-      } catch {
-        // Added, deleted or unparseable tooling still requires a baseline transition.
-        return true;
-      }
-    });
-  for (const [file, names] of Object.entries(MEASUREMENT_SCRIPTS)) {
-    const base = JSON.parse(_git("show", `${_base}:${file}`)).scripts;
-    const head = JSON.parse(_git("show", `${_head}:${file}`)).scripts;
-    for (const name of names) {
-      if (base?.[name] !== head?.[name]) {
-        changed.push(`${file} (${name})`);
-      }
-    }
-  }
-  return changed;
 }
 
 function sourceRevisions(_eventName, _event, _sha) {
@@ -225,15 +151,8 @@ async function main() {
   };
   const directory = path.join(env.RUNNER_TEMP, "coverage-base");
   ensureCommit(plan.base_sha);
-  const changes = toolingChanges(git, plan.base_sha, env.GITHUB_SHA);
-  if (changes.length && !plan.pr_sha) {
-    throw new Error(
-      `Coverage unavailable: requested source uses different measurement tooling: ${changes.join(", ")}. ` +
-        "Select a workflow ref with matching measurement tooling."
-    );
-  }
   let cached = false;
-  if (plan.pr_sha && !changes.length) {
+  if (plan.pr_sha) {
     cached = await restoreBaseline(
       { sha: plan.base_sha, recipe, repo: env.GITHUB_REPOSITORY, directory },
       {
@@ -255,7 +174,6 @@ async function main() {
   );
   const outputs = {
     ...plan,
-    tooling_changes: JSON.stringify(changes),
     revisions: JSON.stringify(plan.revisions),
     anvil: JSON.stringify({ include: anvil }),
     recipe,
@@ -287,5 +205,4 @@ module.exports = {
   restoreBaseline,
   recipeHash,
   coverageCommand,
-  toolingChanges,
 };

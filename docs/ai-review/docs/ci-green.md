@@ -22,6 +22,8 @@ Iterate on a draft PR, then regenerate artifacts once the code and tests are sta
 
 For a same-repository PR, dispatch **Update All Generated Artifacts** before marking it ready for review. This includes ZKsync OS genesis regeneration. Fork PRs must regenerate locally; the workflow rejects fork heads.
 
+Coverage compares combined Foundry and Anvil line coverage against the exact base commit. CI reuses a valid base report or generates it alongside the PR. Changes to helpers, comments, remappings, or coverage tooling do not block that comparison by themselves. Each revision uses its own test and coverage code, so review changes to measurement logic alongside the reported delta. Missing or invalid reports and coverage decreases still fail.
+
 ## Toolchain
 
 Use the Node version from `.nvmrc` and upstream Foundry from `.github/foundry-versions.env`. Do not use foundry-zksync or `forge --zksync`.
