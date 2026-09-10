@@ -852,6 +852,25 @@ async fn verify_v31_rollup_da_managers(
                 )
                 .await;
 
+            // Runtime bytecode cannot see constructor arguments. Trailing init-code bytes are
+            // ignored by the EVM but hashed by CREATE2, so a phantom argument changes the
+            // deployed address while leaving the runtime comparison above perfectly green —
+            // which is exactly how a 32-byte suffix reached the mainnet RollupL1DAValidator.
+            // Neither contract declares a constructor, so canonical init code is the creation
+            // code alone and the observed constructor params must be empty.
+            result.expect_create2_params(
+                verifiers,
+                &rollup_da_manager,
+                Vec::<u8>::new(),
+                "l1-contracts/RollupDAManager",
+            );
+            result.expect_create2_params(
+                verifiers,
+                &rollup_l1_da_validator,
+                Vec::<u8>::new(),
+                "da-contracts/RollupL1DAValidator",
+            );
+
             let scheme = L2DACommitmentScheme::BlobsAndPubdataKeccak256 as u8;
             let manager = RollupDAManager::new(rollup_da_manager, provider.clone());
             match manager
