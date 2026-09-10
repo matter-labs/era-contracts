@@ -30,15 +30,13 @@ jobs:
       node_version: ${{ steps.plan.outputs.node_version }}
       foundry_version: ${{ steps.plan.outputs.foundry_version }}
       coverage_command: ${{ steps.plan.outputs.coverage_command }}
-      tooling_changes: ${{ steps.plan.outputs.tooling_changes }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: yarn
-      - name: Install dependencies
-        run: yarn install --frozen-lockfile --ignore-scripts
+      - name: Test coverage planning and comparison
+        run: node --test .github/scripts/coverage/coverage.test.js
       - name: Select coverage revisions
         id: plan
         env:
@@ -508,13 +506,13 @@ jobs:
         with:
           node-version: ${{ needs.plan.outputs.node_version }}
       - name: Download PR coverage
-        if: needs.coverage-merge.result == 'success' && needs.plan.outputs.tooling_changes == '[]'
+        if: needs.coverage-merge.result == 'success'
         uses: actions/download-artifact@v4
         with:
           name: coverage-reports
           path: coverage-pr
       - name: Download base coverage
-        if: needs.coverage-merge.result == 'success' && needs.plan.outputs.tooling_changes == '[]'
+        if: needs.coverage-merge.result == 'success'
         uses: actions/download-artifact@v4
         with:
           name: coverage-base

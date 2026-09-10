@@ -44,6 +44,8 @@ When the PR is done: dispatch **Update All Generated Artifacts** with the PR num
 commits hashes + selectors + zkstack-out, then the chain states), then mark the PR ready for review
 and merge once `pre-merge-verified` is green.
 
+Coverage compares combined Foundry and Anvil line coverage against the exact base commit. CI reuses a valid base report or generates it alongside the PR. Changes to helpers, comments, remappings, or coverage tooling do not block that comparison by themselves. Each revision uses its own test and coverage code, so review changes to measurement logic alongside the reported delta. Missing or invalid reports and coverage decreases still fail.
+
 ## TL;DR — the order to fix things
 
 CI checks form a dependency chain. Fix in this order:
