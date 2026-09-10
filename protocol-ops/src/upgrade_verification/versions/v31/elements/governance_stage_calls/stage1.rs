@@ -60,8 +60,11 @@ const STAGE1_PER_CTM_LEN: usize = 6;
 const PER_CTM_OFFSET_CHECK_DEADLINE: usize = 0;
 const PER_CTM_OFFSET_CHECK_MIGRATIONS_PAUSED: usize = 1;
 const PER_CTM_OFFSET_UPGRADE_CTM: usize = 2;
-const PER_CTM_OFFSET_SET_CHAIN_CREATION_PARAMS: usize = 3;
-const PER_CTM_OFFSET_SET_NEW_VERSION_UPGRADE: usize = 4;
+// setNewVersionUpgrade must precede setChainCreationParams: the latter keys
+// newChainCreationParamsBlock on the version currently set on the CTM, so the reverse order
+// leaves the target version's pointer at zero and clobbers the predecessor's.
+const PER_CTM_OFFSET_SET_NEW_VERSION_UPGRADE: usize = 3;
+const PER_CTM_OFFSET_SET_CHAIN_CREATION_PARAMS: usize = 4;
 const PER_CTM_OFFSET_UPGRADE_VALIDATOR_TIMELOCK: usize = 5;
 
 #[derive(Debug, Clone, Copy)]
@@ -404,8 +407,8 @@ impl GovernanceStage1Calls {
         //   +0 timer.checkDeadline()
         //   +1 stage-validator.checkMigrationsPaused()
         //   +2 CTM proxy admin.upgrade(CTM proxy, new impl)
-        //   +3 CTM proxy.setChainCreationParams(...)
-        //   +4 CTM proxy.setNewVersionUpgrade(...)
+        //   +3 CTM proxy.setNewVersionUpgrade(...)
+        //   +4 CTM proxy.setChainCreationParams(...)
         //   +5 VT proxy admin.upgrade(VT proxy, new impl)
         for ctm in ctms.iter() {
             let Some(block) =
