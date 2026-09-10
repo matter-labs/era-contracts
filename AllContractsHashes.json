@@ -580,6 +580,16 @@
     "evmDeployedBytecodeLength": null
   },
   {
+    "contractName": "system-contracts/ZeroLenMemoryOffset",
+    "zkBytecodeHash": "0x0100004b85907f63e7ad84dc7c927f0fcd19ffd0b8b169c3d8e6323a1b608054",
+    "zkBytecodePath": "/system-contracts/zkout/ZeroLenMemoryOffset.sol/ZeroLenMemoryOffset.json",
+    "evmBytecodeHash": null,
+    "evmBytecodePath": null,
+    "evmDeployedBytecodeHash": null,
+    "evmDeployedBytecodeBlakeHash": null,
+    "evmDeployedBytecodeLength": null
+  },
+  {
     "contractName": "system-contracts/console",
     "zkBytecodeHash": "0x010000073d8b8c8b9fb32e6d32e5a3d6596d8a3b0209bbc51db95c8f1e9aeb1a",
     "zkBytecodePath": "/system-contracts/zkout/console.sol/console.json",
