@@ -1,0 +1,105 @@
+name: Signed commit via GitHub API
+description: >-
+  Stages the given paths and commits them to the given branch through the GraphQL
+  createCommitOnBranch mutation. GitHub signs the commit with its own key, so it shows as
+  Verified and satisfies the org's required-signatures rule without any signing key in CI.
+  Use a GitHub App installation token: the commit is attributed to <app>[bot] and, unlike
+  GITHUB_TOKEN, the resulting push triggers the PR's workflows.
+
+inputs:
+  token:
+    description: GitHub App installation token with contents:write on this repository.
+    required: true
+  branch:
+    description: Branch to commit to (the PR head ref). Must be the currently checked-out branch.
+    required: true
+  headline:
+    description: Commit message headline.
+    required: true
+  body:
+    description: Commit message body.
+    required: false
+    default: ""
+  paths:
+    description: Space-separated pathspecs to stage with `git add -A`.
+    required: true
+
+outputs:
+  commit-oid:
+    description: OID of the created commit, or empty when there was nothing to commit.
+    value: ${{ steps.commit.outputs.commit-oid }}
+
+runs:
+  using: composite
+  steps:
+    - name: Stage generated files
+      shell: bash
+      env:
+        BRANCH: ${{ inputs.branch }}
+        PATHS: ${{ inputs.paths }}
+      run: |
+        set -euo pipefail
+        current="$(git rev-parse --abbrev-ref HEAD)"
+        if [ "$current" != "$BRANCH" ]; then
+          echo "::error::Checked-out branch is '$current', expected '$BRANCH'"
+          exit 1
+        fi
+        # shellcheck disable=SC2086  # word-splitting of PATHS is intended
+        git add -A -- $PATHS
+        git --no-pager diff --cached --stat
+
+    - name: Create signed commit through the GitHub API
+      id: commit
+      uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+      env:
+        BRANCH: ${{ inputs.branch }}
+        HEADLINE: ${{ inputs.headline }}
+        BODY: ${{ inputs.body }}
+      with:
+        github-token: ${{ inputs.token }}
+        script: |
+          const fs = require('fs');
+          const { execFileSync } = require('child_process');
+          const git = (...args) => execFileSync('git', args, { encoding: 'utf8' });
+
+          // NUL-separated paths (safe for any file name); a rename is reported as a deletion plus
+          // an addition. Lower-case `d` in --diff-filter excludes deletions.
+          const staged = (filter) =>
+            git('diff', '--cached', '--name-only', '-z', '--no-renames', `--diff-filter=${filter}`)
+              .split('\0')
+              .filter(Boolean);
+          const deletions = staged('D').map((path) => ({ path }));
+          const additions = staged('d').map((path) => ({
+            path,
+            contents: fs.readFileSync(path).toString('base64'),
+          }));
+
+          if (additions.length + deletions.length === 0) {
+            core.info('No changes to commit');
+            core.setOutput('commit-oid', '');
+            return;
+          }
+          const payloadMiB = additions.reduce((n, a) => n + a.contents.length, 0) / 2 ** 20;
+          core.info(`${additions.length} added/modified, ${deletions.length} deleted, ${payloadMiB.toFixed(2)} MiB base64 payload`);
+
+          // The branch head must still be what we built against; otherwise the mutation fails
+          // instead of silently overwriting a newer push.
+          const expectedHeadOid = git('rev-parse', 'HEAD').trim();
+          const { createCommitOnBranch: { commit } } = await github.graphql(
+            `mutation ($input: CreateCommitOnBranchInput!) {
+               createCommitOnBranch(input: $input) { commit { oid url } }
+             }`,
+            {
+              input: {
+                branch: {
+                  repositoryNameWithOwner: `${context.repo.owner}/${context.repo.repo}`,
+                  branchName: process.env.BRANCH,
+                },
+                expectedHeadOid,
+                message: { headline: process.env.HEADLINE, body: process.env.BODY || null },
+                fileChanges: { additions, deletions },
+              },
+            },
+          );
+          core.setOutput('commit-oid', commit.oid);
+          core.notice(`Signed commit ${commit.oid} on ${process.env.BRANCH}: ${commit.url}`);
