@@ -124,13 +124,11 @@ PUVT reads that file, fetches each tx via `--l1-rpc-url`, and reconstructs the d
 
 ```bash
 export L1_RPC_URL=http://127.0.0.1:48546
-export GW_RPC_URL=<gateway-rpc-url>
 
 cargo run --release --bin protocol_ops -- ecosystem verify-upgrade \
   --env stage \
   --ecosystem-toml "../l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml" \
   --l1-rpc-url "$L1_RPC_URL" \
-  --gw-rpc-url "$GW_RPC_URL" \
   --zk-governance-commit 41ad762d7478c80e1e8c3a2c8cabbdfca9f7ffce
 ```
 

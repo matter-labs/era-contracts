@@ -61,6 +61,16 @@ contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
     }
 
     /// @inheritdoc DefaultCTMUpgrade
+    /// @dev v33's per-chain upgrade is not a single call. `V32UpgradeZKsyncOS` requires a recorded
+    ///      priority-op lower bound and all batches executed, and the real rollout sets an upgrade
+    ///      timestamp on the ServerNotifier before the cut. A lone generated `test_upgrade_chain`
+    ///      call would either revert or, worse, pass while skipping those steps. The per-chain
+    ///      upgrade is produced by `protocol_ops chain upgrade` instead.
+    function TESTONLY_emitsTestUpgradeChainCall() internal view virtual override returns (bool) {
+        return false;
+    }
+
+    /// @inheritdoc DefaultCTMUpgrade
     /// @dev Refuses an EraVM CTM before anything is deployed. There is no Era counterpart to this
     ///      release's per-chain upgrade, so a run that got further would either fail late or, worse,
     ///      produce a bundle for an upgrade that cannot be applied.
@@ -77,6 +87,14 @@ contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
         // The registry must exist first: the upgrade contract embeds its address as an immutable.
         priorityOpLowerBound = deploySimpleContract("PriorityOpLowerBound", false);
         console.log("Deployed PriorityOpLowerBound at", priorityOpLowerBound);
+
+        // v33 is the exception {DefaultCTMUpgrade.getCtmStoredDefaultUpgrade} describes: the cut
+        // below delegates to the one-shot `V32UpgradeZKsyncOS`, which requires a recorded
+        // priority-op lower bound and a fully executed batch queue — preconditions that only hold
+        // while a chain is crossing v31 -> v33. So the CTM keeps a generic contract instead, and
+        // later verifier-only upgrades reuse that.
+        ctmStoredDefaultUpgrade = deploySimpleContract("DefaultUpgradeZKsyncOS", false);
+        console.log("Deployed DefaultUpgradeZKsyncOS at", ctmStoredDefaultUpgrade);
 
         console.log("Deploying V32UpgradeZKsyncOS");
         return deploySimpleContract("V32UpgradeZKsyncOS", false);

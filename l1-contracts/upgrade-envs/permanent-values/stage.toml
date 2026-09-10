@@ -30,7 +30,7 @@ ctm_proxy_addr = "0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b"
 l1_bytecodes_supplier_addr = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
 rollup_da_manager = "0x5af0d94e50b271005AF1687e363FD104771EAe9d"
 
-# v31 multi-CTM list, consumed by `scripts/v31-simulate-upgrade.ts`.
+# Multi-CTM list, consumed by `protocol_ops` via `--env` (see `EnvConfig::ctms`).
 # Schema mirrors `protocol-ops ecosystem upgrade-prepare-all --ctm-config`:
 #   proxy, is_zk_sync_os, bytecodes_supplier, rollup_da_manager.
 # Stage is currently pre-v31 — overrides are required because the v31 getters

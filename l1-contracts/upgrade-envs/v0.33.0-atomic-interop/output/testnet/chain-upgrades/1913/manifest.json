@@ -1,0 +1,47 @@
+{
+  "bundles": [
+    {
+      "file": "01_chain.set-upgrade-timestamp_0x5555555590930f501c88b73ea43b3eeb5a71643c.safe.json",
+      "index": 1,
+      "steps": ["chain.set-upgrade-timestamp"],
+      "target": "0x5555555590930f501c88b73ea43b3eeb5a71643c",
+      "tx_count": 1
+    },
+    {
+      "file": "02_chain.upgrade_0x5555555590930f501c88b73ea43b3eeb5a71643c.safe.json",
+      "index": 2,
+      "steps": ["chain.upgrade"],
+      "target": "0x5555555590930f501c88b73ea43b3eeb5a71643c",
+      "tx_count": 1
+    }
+  ],
+  "metadata": [
+    {
+      "command": "chain.set-upgrade-timestamp",
+      "input": {},
+      "output": {
+        "access_control_restriction": "0x0000000000000000000000000000000000000000",
+        "admin_address": "0xa7f9a1a7b6b68fbf68adc938104a096006794ad7",
+        "bridgehub": "0xc4fd2580c3487bba18d63f50301020132342fdbd",
+        "chain_id": 1913,
+        "upgrade_timestamp": "1"
+      }
+    },
+    {
+      "command": "chain.upgrade",
+      "input": {},
+      "output": {
+        "access_control_restriction": "0x0000000000000000000000000000000000000000",
+        "admin_address": "0xa7f9a1a7b6b68fbf68adc938104a096006794ad7",
+        "chain_address": "0x36bc396a55f386d06e43683b77707b9999c7efac",
+        "da_move": {
+          "pair": {
+            "l1_da_validator": "0x5df2db3eaf761f2fb5c1ba045222310b9cd1457f",
+            "l2_da_commitment_scheme": "BlobsZKSyncOS"
+          },
+          "pubdata_content": "LogsOnly"
+        }
+      }
+    }
+  ]
+}

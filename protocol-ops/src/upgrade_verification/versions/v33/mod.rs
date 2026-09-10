@@ -1,0 +1,172 @@
+// TODO: drop once the scaffolding kept for R2 (fee-params) and S2d
+// (`check_gw_create2_deploy`) is resolved.
+#![allow(dead_code, private_interfaces)]
+
+use std::str::FromStr;
+
+use alloy::primitives::{Address, FixedBytes};
+
+use crate::{
+    commands::ecosystem::verify_upgrade::VerifyUpgradeEnv,
+    upgrade_verification::{
+        artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
+        verifiers::{VerificationResult, Verifiers},
+    },
+};
+
+pub(crate) mod elements;
+pub(crate) mod utils;
+
+use elements::{
+    ctm_admin_calls::verify_ctm_admin_calls,
+    deployed_addresses::verify_v33_provenance,
+    governance_stage_calls::{verify_governance_stage_calls, verify_per_chain_protocol_versions},
+    protocol_version::ProtocolVersion,
+    rpc_state::verify_v33_artifact_state,
+};
+
+pub(crate) const EXPECTED_NEW_PROTOCOL_VERSION_STR: &str = "0.33.0";
+pub(crate) const EXPECTED_ZKSYNC_OS_OLD_PROTOCOL_VERSION_STR: &str = "0.31.0";
+pub(crate) const MAX_NUMBER_OF_ZK_CHAINS: u32 = 100;
+pub(crate) const MAX_PRIORITY_TX_GAS_LIMIT: u32 = 72_000_000;
+
+/// Stage Sepolia's Era chain (270) is the single registered chain still
+/// settling on the legacy stage Gateway at v33 upgrade time.
+/// `L1MessageRootStageSepolia._v33InitializeInner` skips it (see
+/// `l1-contracts/contracts/dev-contracts/L1MessageRootStageSepolia.sol`),
+/// so PUVT must apply the same skip when pre-flighting the
+/// `Bridgehub.settlementLayer(chainId) == L1` invariant on stage.
+pub(crate) const STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID: u64 = 270;
+
+pub(crate) fn get_expected_new_protocol_version() -> ProtocolVersion {
+    ProtocolVersion::from_str(EXPECTED_NEW_PROTOCOL_VERSION_STR).unwrap()
+}
+
+pub(crate) fn get_expected_old_protocol_version_for_ctm_flavor(
+    flavor: CtmFlavor,
+) -> ProtocolVersion {
+    let version = match flavor {
+        CtmFlavor::ZksyncOs => EXPECTED_ZKSYNC_OS_OLD_PROTOCOL_VERSION_STR,
+    };
+    ProtocolVersion::from_str(version).unwrap()
+}
+
+/// Whether `version` is the release this upgrade starts from.
+///
+/// Compares major.minor and ignores the patch: a CTM sitting on a patch release of the source
+/// version (testnet's ZKsync OS CTM is on v0.31.1) is still on v31, and this upgrade applies to
+/// it unchanged — the diamond cut is keyed on the CTM's own reported version, not on a pinned
+/// patch. Requiring an exact match rejected a legitimately-patched ecosystem.
+pub(crate) fn is_expected_old_protocol_version_for_ctm_flavor(
+    version: ProtocolVersion,
+    flavor: CtmFlavor,
+) -> bool {
+    let expected = get_expected_old_protocol_version_for_ctm_flavor(flavor);
+    version.major == expected.major && version.minor == expected.minor
+}
+
+pub(crate) fn expected_old_protocol_version_label(flavor: CtmFlavor) -> &'static str {
+    match flavor {
+        CtmFlavor::ZksyncOs => "v0.31.x",
+    }
+}
+
+/// Run the full v33 verification pipeline.
+///
+/// Ordering mirrors the legacy PUVT (`UpgradeOutput::verify` in
+/// `protocol-upgrade-verification-tool`):
+///
+///   1. Verifier construction (incl. SystemConfig.json fee-params init).
+///   2. CREATE2 provenance map population — v33-specific prep that must precede
+///      provenance consumption below.
+///   3. RPC state checks — chain ids, Create2Factory bytecode, proxy admins,
+///      live core wiring, validator timelocks, fee params, settlement layer.
+///      Subsumes legacy's early chain-id sanity (legacy steps 2–3).
+///   4. Deployment provenance — every named v33 deploy + the new-GW CTM
+///      provenance flow (legacy step 4).
+///   5. Per-chain protocol-version sweep — was bundled inside legacy
+///      `deployed_addresses.verify`; sits next to provenance for the same
+///      reason.
+///   6. Stage 0 / 1 / 2 governance calls (legacy steps 7–9). Last.
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn verify(
+    env: VerifyUpgradeEnv,
+    artifact: &EcosystemUpgradeArtifact,
+    l1_rpc_url: &str,
+    contracts_commit: Option<&str>,
+    zk_governance_commit: &str,
+    era_chain_id: u64,
+    message_root_era_gateway_chain_id: u64,
+    l1_chain_id: u64,
+    tx_hashes: &[FixedBytes<32>],
+    create2_factory: Address,
+    expected_salts: &[FixedBytes<32>],
+    zk_token_asset_id: FixedBytes<32>,
+    result: &mut VerificationResult,
+) -> anyhow::Result<()> {
+    result.print_info("== Config verification ==");
+    let mut verifiers = Verifiers::new_v33(
+        env,
+        artifact,
+        l1_rpc_url,
+        contracts_commit,
+        zk_governance_commit,
+        era_chain_id,
+        l1_chain_id,
+        zk_token_asset_id,
+    )
+    .await?;
+    result.report_ok(&format!(
+        "v33 verifier context loaded with {} named addresses",
+        verifiers.address_verifier.name_to_address.len()
+    ));
+
+    // Populate the create2 maps so deployment provenance can match
+    // deployed addresses against expected init bytecode + constructor args.
+    // Each tx is fetched from L1 RPC; stale entries (whose bytecode no longer
+    // matches AllContractsHashes after a regen) are silently skipped — the
+    // address-book lookup in `expect_create2_params` hard-errors only if a
+    // load-bearing deployment is missing.
+    let count = {
+        let bridgehub_address = verifiers.bridgehub_address;
+        let Verifiers {
+            bytecode_verifier,
+            network_verifier,
+            ..
+        } = &mut verifiers;
+        network_verifier
+            .populate_create2_from_transactions_log(
+                tx_hashes,
+                &create2_factory,
+                &bridgehub_address,
+                expected_salts,
+                bytecode_verifier,
+                result,
+            )
+            .await;
+        network_verifier.create2_known_bytecodes.len()
+    };
+    result.report_ok(&format!(
+        "Loaded {} CREATE2 deployments from transactions log",
+        count,
+    ));
+
+    verify_v33_artifact_state(artifact, &verifiers, create2_factory, result).await?;
+
+    verify_v33_provenance(
+        artifact,
+        &verifiers,
+        era_chain_id,
+        message_root_era_gateway_chain_id,
+        result,
+    )
+    .await?;
+
+    verify_per_chain_protocol_versions(artifact, &verifiers, result).await?;
+
+    verify_governance_stage_calls(artifact, &verifiers, result).await?;
+
+    verify_ctm_admin_calls(artifact, &verifiers, result).await?;
+
+    Ok(())
+}

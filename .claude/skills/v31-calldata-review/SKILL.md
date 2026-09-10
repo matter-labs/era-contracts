@@ -37,7 +37,7 @@ or chain inventories up front if they can be derived.
 
 1. Build `protocol_ops` from the reviewed commit/tool commit.
 2. If calldata is not already provided, generate it with the reviewed
-   `protocol_ops` command or `l1-contracts/test/anvil-interop/regen-and-verify-stage.sh`.
+   `protocol_ops` command or `l1-contracts/test/anvil-interop/regen-upgrade-calldata.sh`.
 3. Preserve the exact generated/provided package as the object under review.
 4. Replay prepare bundles on an Anvil fork when `executed-bundles.json` is
    needed for CREATE2 provenance.

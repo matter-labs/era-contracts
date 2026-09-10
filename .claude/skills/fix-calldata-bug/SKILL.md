@@ -13,7 +13,7 @@ and — when a Claude runs on each — across two agents.
 
 The companion skills carry the mechanics this one orchestrates:
 
-- `regenerate-v31-stage-calldata` — the prepare → fork-broadcast → PUVT → sim-emit cycle.
+- `regenerate-upgrade-calldata` — the prepare → fork-rehearsal → PUVT → sim-emit cycle.
 - `v31-calldata-review` — generate → PUVT → manual/AI review.
 
 ## Core principle: split by reproducibility
@@ -77,7 +77,7 @@ the deploys must exist on real Sepolia first or the rehearsal reverts.
 2. **Build the binary** — `cargo build` (not `cargo check`; check produces no
    binary, and the regen runs the compiled `target/debug/protocol_ops`). Confirm
    with `strings target/debug/protocol_ops | grep <new-flag-or-env-var>`.
-3. Dry-run on a Sepolia fork to prove the fix: `regen-and-verify-stage.sh`
+3. Dry-run on a Sepolia fork to prove the fix: `regen-upgrade-calldata.sh`
    (`L1_FORK_URL=…`, `DEPLOYER_PK_FILE=…`). Goal = prepare succeeds + PUVT green.
    **Discard its `ecosystem.toml`** — macOS addresses aren't the committed ones.
 4. Commit + push the **code** branches (era-contracts; zk-governance if its deploy
@@ -90,11 +90,11 @@ The VPS agent (or you, over ssh):
 
 1. `git pull` the exact code commits pushed in phase 1 (verify HEAD matches — the
    commit sha is the contract between the agents).
-2. Run the canonical regen (`regenerate-v31-stage-calldata`, native on Linux or
+2. Run the canonical regen (`regenerate-upgrade-calldata`, native on Linux or
    its Docker path) → fresh `ecosystem.toml` + `prepare/`.
 3. Emit the handoff set: `governance-toml-to-simulator --env <env> --emit-sim-inputs <…>/sim-inputs`.
 4. Refresh CI-derived artifacts (selectors, zkstack-out, AllContractsHashes.json) per
-   `regenerate-v31-stage-calldata`'s CI table.
+   `regenerate-upgrade-calldata`'s CI table.
 5. Commit **artifacts only** (`ecosystem.toml`, `sim-inputs/`, the CI-derived files) —
    **no code** (it came from local). Push.
 

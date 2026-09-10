@@ -39,7 +39,7 @@
  *   ts-node scripts/regen-via-docker.ts sim-emit <output.json>
  *   ts-node scripts/regen-via-docker.ts shell
  *
- * See `.claude/skills/regenerate-v31-stage-calldata/SKILL.md`
+ * See `.claude/skills/regenerate-upgrade-calldata/SKILL.md`
  * (Core principle + Iteration via Docker) for the full pipeline context.
  */
 import { spawnSync } from "child_process";
@@ -51,6 +51,10 @@ import { ethers } from "ethers";
 
 const CONTRACTS_DIR = path.resolve(__dirname, "..");
 const ENV_DIR = "upgrade-envs/v0.33.0-atomic-interop";
+// This wrapper is stage-only: it mounts `stage.toml` and reads/writes
+// `output/stage/`. `regen-upgrade-calldata.sh` takes the env as its first
+// argument, so it has to be passed explicitly.
+const ENV_NAME = "stage";
 const OUT_DIR_HOST = path.join(CONTRACTS_DIR, "l1-contracts", ENV_DIR, "output");
 const OUT_DIR_CONTAINER = `/contracts/l1-contracts/${ENV_DIR}/output`;
 const IMAGE = process.env.PROTOCOL_OPS_IMAGE ?? "ghcr.io/matter-labs/protocol-ops:v31-camp-split";
@@ -178,11 +182,11 @@ function dockerRun(args: string[], opts: SpawnSyncOptions = {}): number {
 
 function cmdRegen(pk: string, rpc: string, binMount: string[]): number {
   // Forward any iteration-skip flags the wrapper script understands. Useful
-  // for re-running just PUVT (`SKIP_PREPARE=1 SKIP_BROADCAST=1`) after
+  // for re-running just PUVT (`SKIP_PREPARE=1 SKIP_REHEARSAL=1`) after
   // refreshing only the protocol_ops binary, or skipping PUVT for fast
   // iteration on the sim layer.
   const passthrough: string[] = [];
-  for (const k of ["SKIP_PREPARE", "SKIP_BROADCAST", "SKIP_PUVT", "KEEP_ANVIL"]) {
+  for (const k of ["SKIP_PREPARE", "SKIP_REHEARSAL", "SKIP_PUVT", "KEEP_ANVIL"]) {
     if (process.env[k]) {
       passthrough.push("-e", `${k}=${process.env[k]}`);
     }
@@ -206,7 +210,8 @@ function cmdRegen(pk: string, rpc: string, binMount: string[]): number {
     "/contracts/l1-contracts",
     IMAGE,
     "bash",
-    "test/anvil-interop/regen-and-verify-stage.sh",
+    "test/anvil-interop/regen-upgrade-calldata.sh",
+    ENV_NAME,
   ];
   return dockerRun(args);
 }
@@ -508,7 +513,7 @@ function cmdSimEmit(pk: string, binMount: string[], outJson: string): number {
     "ecosystem",
     "governance-toml-to-simulator",
     "--env",
-    "stage",
+    ENV_NAME,
     "--governance-toml",
     `/contracts/l1-contracts/${ENV_DIR}/output/stage/ecosystem.toml`,
     "--include-manifest",
@@ -566,7 +571,7 @@ async function main(): Promise<void> {
         "",
         "  # phases 1 + 1.5 — prepare + fork-replay + PUVT",
         "  cd l1-contracts/test/anvil-interop && \\",
-        "    DEPLOYER_PK_FILE=~/.test_pk L1_FORK_URL=<sepolia-rpc> ./regen-and-verify-stage.sh",
+        "    DEPLOYER_PK_FILE=~/.test_pk L1_FORK_URL=<sepolia-rpc> ./regen-upgrade-calldata.sh stage",
         "",
         "  # phase 2 — real-Sepolia broadcast",
         "  protocol_ops ecosystem upgrade-broadcast --manifest <prepare>/manifest.json \\",
@@ -575,7 +580,7 @@ async function main(): Promise<void> {
         "  # phase 3 — sim-inputs / sim JSON",
         "  protocol_ops ecosystem governance-toml-to-simulator --env <env> [--emit-sim-inputs <dir> | --out <json>]",
         "",
-        "See .claude/skills/regenerate-v31-stage-calldata (native Linux path).",
+        "See .claude/skills/regenerate-upgrade-calldata (native Linux path).",
         "Override with FORCE_DOCKER_REGEN=1 only if you truly need the Docker path on Linux.",
       ].join("\n")
     );

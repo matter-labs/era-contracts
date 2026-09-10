@@ -173,10 +173,10 @@ mod tests {
 
                         [core]
 
-                        [ctms.era]
+                        [ctms.zksync_os]
                         chain_upgrade_diamond_cut = "0x1234"
 
-                        [ctms.era.contracts_config]
+                        [ctms.zksync_os.contracts_config]
                         diamond_cut_data = "0xabcd"
                         force_deployments_data = "0x1234"
                         old_protocol_version = 1
@@ -200,10 +200,10 @@ mod tests {
                         [core]
                         chain_admin_addr = "0x0000000000000000000000000000000000000001"
 
-                        [ctms.era]
+                        [ctms.zksync_os]
                         chain_upgrade_diamond_cut = "0x1234"
 
-                        [ctms.era.contracts_config]
+                        [ctms.zksync_os.contracts_config]
                         diamond_cut_data = "0xabcd"
                         force_deployments_data = "0x1234"
                         old_protocol_version = 1
@@ -211,10 +211,10 @@ mod tests {
                         governance_upgrade_timer_initial_delay = 0
                         is_testnet = false
 
-                        [ctms.era.deployed_addresses]
+                        [ctms.zksync_os.deployed_addresses]
                         chain_admin = "0x0000000000000000000000000000000000000002"
 
-                        [ctms.era.deployed_addresses.bridgehub]
+                        [ctms.zksync_os.deployed_addresses.bridgehub]
                         bridgehub_proxy_addr = "0x0000000000000000000000000000000000000003"
                         "#;
 
@@ -232,10 +232,10 @@ mod tests {
 
                         [core]
 
-                        [ctms.era]
+                        [ctms.zksync_os]
                         chain_upgrade_diamond_cut = "0x1234"
 
-                        [ctms.era.contracts_config]
+                        [ctms.zksync_os.contracts_config]
                         diamond_cut_data = "0xabcd"
                         force_deployments_data = "0x1234"
                         old_protocol_version = 1
@@ -243,7 +243,7 @@ mod tests {
                         governance_upgrade_timer_initial_delay = 0
                         is_testnet = false
 
-                        [ctms.era.deployed_addresses]
+                        [ctms.zksync_os.deployed_addresses]
                         chain_admin = "not-an-address"
                         "#;
 

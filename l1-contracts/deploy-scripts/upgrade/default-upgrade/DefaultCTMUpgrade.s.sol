@@ -639,10 +639,22 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         vm.writeToml(ctmAdminCallsSerialized, upgradeConfig.outputPath, ".ctm_admin_calls");
     }
 
-    function prepareDefaultTestUpgradeCalls() public {
-        (Call[] memory testUpgradeChainCall, address ZKChainAdmin) = TESTONLY_prepareTestUpgradeChainCall();
-        vm.serializeAddress("test_upgrade_calls", "test_upgrade_chain_caller", ZKChainAdmin);
-        vm.serializeBytes("test_upgrade_calls", "test_upgrade_chain", abi.encode(testUpgradeChainCall));
+    /// @notice Whether to emit the `test_upgrade_chain` smoke call into `[test_upgrade_calls]`.
+    /// @dev A release whose per-chain upgrade needs preconditions the artifact cannot express —
+    ///      v33 requires a recorded priority-op lower bound and an upgrade timestamp — should not
+    ///      pretend a single generated call covers it. Turning this off keeps the artifact honest;
+    ///      the per-chain upgrade is then produced by `protocol_ops chain upgrade`, which emits the
+    ///      real bundle, and the simulator scenario acknowledges the absence explicitly.
+    function TESTONLY_emitsTestUpgradeChainCall() internal view virtual returns (bool) {
+        return true;
+    }
+
+    function prepareDefaultTestUpgradeCalls() public virtual {
+        if (TESTONLY_emitsTestUpgradeChainCall()) {
+            (Call[] memory testUpgradeChainCall, address ZKChainAdmin) = TESTONLY_prepareTestUpgradeChainCall();
+            vm.serializeAddress("test_upgrade_calls", "test_upgrade_chain_caller", ZKChainAdmin);
+            vm.serializeBytes("test_upgrade_calls", "test_upgrade_chain", abi.encode(testUpgradeChainCall));
+        }
         (Call[] memory testCreateChainCall, address bridgehubAdmin) = TESTONLY_prepareCreateChainCall();
         vm.serializeAddress("test_upgrade_calls", "test_create_chain_caller", bridgehubAdmin);
 
@@ -809,14 +821,35 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
             ctmAddresses.stateTransition.proxies.chainTypeManager != address(0),
             "stateTransitionManagerAddress is zero in newConfig"
         );
-        require(ctmAddresses.stateTransition.defaultUpgrade != address(0), "defaultUpgrade is zero in newConfig");
+        address storedDefaultUpgrade = getCtmStoredDefaultUpgrade();
+        require(storedDefaultUpgrade != address(0), "defaultUpgrade is zero in newConfig");
         calls = new Call[](1);
 
         calls[0] = Call({
             target: ctmAddresses.stateTransition.proxies.chainTypeManager,
-            data: abi.encodeCall(IChainTypeManager.setDefaultUpgrade, (ctmAddresses.stateTransition.defaultUpgrade)),
+            data: abi.encodeCall(IChainTypeManager.setDefaultUpgrade, (storedDefaultUpgrade)),
             value: 0
         });
+    }
+
+    /// @notice The upgrade contract to leave stored on the CTM as its `defaultUpgrade`.
+    /// @dev Zero means "same as the contract this release's cut delegates to", which is the normal
+    ///      case. A release only sets this when its own cut is one-shot — see
+    ///      {getCtmStoredDefaultUpgrade}.
+    address internal ctmStoredDefaultUpgrade;
+
+    /// @notice The upgrade contract to leave stored on the CTM as its `defaultUpgrade`.
+    /// @dev Defaults to this release's own upgrade contract, which is correct whenever that
+    ///      contract carries no one-off logic. A release whose cut *does* carry one-off logic sets
+    ///      {ctmStoredDefaultUpgrade} to a separately deployed generic contract instead:
+    ///      `setDefaultUpgrade` is what *later* upgrades reuse when they need no custom logic of
+    ///      their own, so storing a one-shot contract there would make every such upgrade revert
+    ///      on preconditions that only ever held during this release. v33 is such a release.
+    function getCtmStoredDefaultUpgrade() internal virtual returns (address) {
+        return
+            ctmStoredDefaultUpgrade == address(0)
+                ? ctmAddresses.stateTransition.defaultUpgrade
+                : ctmStoredDefaultUpgrade;
     }
 
     function prepareNewChainCreationParamsCall() public virtual returns (Call[] memory calls) {
@@ -1081,6 +1114,9 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
                 ctmAddresses.stateTransition.implementations.serverNotifier
             );
         }
+        // What the CTM ends up storing. Equal to `default_upgrade_addr` unless this release's
+        // cut is one-shot, in which case the two deliberately differ.
+        vm.serializeAddress("state_transition", "ctm_stored_default_upgrade_addr", getCtmStoredDefaultUpgrade());
         serializeVersionSpecificStateTransition();
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
