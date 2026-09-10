@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
+// 0x979e85dd
+error AtomicBundleToL1NotSupported();
 // 0x9031f751
 error AttributeAlreadySet(bytes4 selector);
 // 0xbcb41ec7
@@ -11,8 +13,8 @@ error BundleAlreadyProcessed(bytes32 bundleHash);
 error CallAlreadyExecuted(bytes32 bundleHash, uint256 callIndex);
 // 0xc087b727
 error CallNotExecutable(bytes32 bundleHash, uint256 callIndex);
-// 0xa8ab28c8
-error CannotInitiateInteropOnL1(uint256 destinationChainId);
+// 0xe9380b27
+error CannotInitiateInteropOnL1();
 // 0xf729f26d
 error CanNotUnbundle(bytes32 bundleHash);
 // 0x2d159f39
@@ -27,6 +29,10 @@ error ExecutingNotAllowed(bytes32 bundleHash, bytes callerAddress, bytes executi
 error FactoryDepsNotAllowedForIndirectCall();
 // 0x16b0fa00
 error FeeWithdrawalFailed();
+// 0x4afc3319
+error IndirectCallCannotCarryValue(uint256 value);
+// 0x8014ad84
+error IndirectCallOnlyToAssetRouter(address target);
 // 0x62d214aa
 error IndirectCallValueMismatch(uint256 expected, uint256 actual);
 // 0xbfa9bcca
@@ -37,10 +43,14 @@ error InteropCallToL1NotToAssetRouter(address target);
 error InteroperableAddressChainReferenceNotEmpty(bytes interoperableAddress);
 // 0x884f49ba
 error InteroperableAddressNotEmpty(bytes interoperableAddress);
-// 0x9b021130
-error InteropToSelfNotSupported();
+// 0x290dc1c0
+error InteropPreviewHash(bytes32 bundleHash);
 // 0x2d48e8cf
 error InteropRootAlreadyExists();
+// 0x8a011102
+error InteropRootTimestampIsZero();
+// 0x9b021130
+error InteropToSelfNotSupported();
 // 0xeae192ef
 error InvalidInteropBundleVersion();
 // 0xd5f13973
@@ -51,8 +61,12 @@ error L1ToL2TransactionParamsMissing();
 error MessageNotIncluded();
 // 0x6a430157
 error MultiCallToL1NotSupported(uint256 callCount);
+// 0x1db1b07e
+error NonAtomicSendUnsupported();
 // 0xd72e81d8
 error NonZeroValueToL1NotSupported(uint256 value);
+// 0x5af78ecd
+error ShadowAccountNotSupported();
 // 0x2f59bd0d
 error SidesLengthNotOne();
 // 0x96adc841

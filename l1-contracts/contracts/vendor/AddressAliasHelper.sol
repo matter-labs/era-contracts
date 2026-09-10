@@ -42,52 +42,56 @@ library AddressAliasHelper {
         }
     }
 
-    /// @notice Utility function used to calculate the correct refund recipient
-    /// @param _refundRecipient the address that should receive the refund
+    /// @notice Utility function used to resolve an unset refund recipient to the original caller's L2 identity.
+    /// The resolution rules are described in {protocol-docs/bridging.md}.
+    /// @param _refundRecipient the address that should receive the refund, or zero if unset
     /// @param _originalCaller the address that triggered the tx to L2
-    /// @return _recipient the corrected address that should receive the refund
+    /// @return _recipient the resolved refund recipient
+    /// @return _aliasingFinalized true if `_recipient` needs no further aliasing; when false, the Mailbox
+    /// must finish the aliasing via `applyRefundRecipientAlias`
     function actualRefundRecipient(
         address _refundRecipient,
         address _originalCaller
-    ) internal pure returns (address _recipient) {
-        if (_refundRecipient == address(0)) {
-            // If the `_refundRecipient` is not provided, we use the `_originalCaller` as the recipient.
-            // solhint-disable avoid-tx-origin
-            // slither-disable-next-line tx-origin
-            _recipient = _originalCaller;
-            // solhint-enable avoid-tx-origin
-        } else {
-            _recipient = _refundRecipient;
+    ) internal view returns (address _recipient, bool _aliasingFinalized) {
+        if (_refundRecipient != address(0)) {
+            // An explicitly provided recipient may still be a contract that needs to be aliased.
+            return (_refundRecipient, false);
         }
+        // If the `_refundRecipient` is not provided, we use the `_originalCaller` as the recipient.
+        // solhint-disable avoid-tx-origin
+        // slither-disable-next-line tx-origin
+        if (_originalCaller == tx.origin) {
+            // The caller is an EOA, which controls the same address on L2.
+            return (_originalCaller, true);
+        }
+        // solhint-enable avoid-tx-origin
+        if (_originalCaller.code.length != 0) {
+            // IMPORTANT: callers with deployed code are left as is — the Mailbox is still expected to finish
+            // the aliasing via `applyRefundRecipientAlias`. The reason is that only the Mailbox has the
+            // ability to check whether an account is an EIP-7702 one (and so must be exempted from aliasing);
+            // this helper cannot make that distinction, as EIP-7702 accounts also have non-empty code.
+            return (_originalCaller, false);
+        }
+        // A caller without deployed code that is not the tx originator (i.e. a contract calling from its
+        // constructor) is an L1 contract that only controls its aliased address on L2. It cannot be an
+        // EIP-7702 account (those carry non-empty code), so the aliasing is final and must not be applied
+        // a second time even if a contract happens to exist at the aliased address.
+        return (AddressAliasHelper.applyL1ToL2Alias(_originalCaller), true);
     }
 
-    /// @notice Utility function used to calculate the correct refund recipient (only to be used in Mailbox)
+    /// @notice Utility function used to apply the L1 -> L2 alias to a refund recipient whose aliasing was
+    /// not finalized by `actualRefundRecipient` (only to be used in Mailbox)
     /// @param _refundRecipient the address that should receive the refund
-    /// @param _originalCaller the address that triggered the tx to L2
     /// @param _is7702AccountRefundRecipient true, if the _refundRecipient is EIP 7702 Account
-    /// @param _is7702AccountSender true, if the _sender is EIP 7702 Account
     /// @return _recipient the corrected address that should receive the refund
-    function actualRefundRecipientMailbox(
+    function applyRefundRecipientAlias(
         address _refundRecipient,
-        address _originalCaller,
-        bool _is7702AccountRefundRecipient,
-        bool _is7702AccountSender
+        bool _is7702AccountRefundRecipient
     ) internal view returns (address _recipient) {
-        if (_refundRecipient == address(0)) {
-            // If the `_refundRecipient` is not provided, we use the `_originalCaller` as the recipient.
-            // Or if the `_sender` is EIP7702, then we also do not want to apply aliasing to original caller.
-            // solhint-disable avoid-tx-origin
-            // slither-disable-next-line tx-origin
-            _recipient = (_originalCaller == tx.origin || _is7702AccountSender)
-                ? _originalCaller
-                : AddressAliasHelper.applyL1ToL2Alias(_originalCaller);
-            // solhint-enable avoid-tx-origin
-        } else {
-            // If the `_refundRecipient` is a smart contract, we apply the L1 to L2 alias to prevent foot guns.
-            // Also we check that refund recipient is not EIP7702 account, as this would result in incorrect aliasing
-            _recipient = (_refundRecipient.code.length == 0 || _is7702AccountRefundRecipient)
-                ? _refundRecipient
-                : AddressAliasHelper.applyL1ToL2Alias(_refundRecipient);
-        }
+        // If the `_refundRecipient` is a smart contract, we apply the L1 to L2 alias to prevent foot guns.
+        // Also we check that refund recipient is not EIP7702 account, as this would result in incorrect aliasing
+        _recipient = (_refundRecipient.code.length == 0 || _is7702AccountRefundRecipient)
+            ? _refundRecipient
+            : AddressAliasHelper.applyL1ToL2Alias(_refundRecipient);
     }
 }

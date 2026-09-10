@@ -11,12 +11,12 @@
 //! entries and is env-dependent, so the verifier scans dynamically.
 //!
 //! [`verify_gateway_bring_up_calls`] handles the mandatory 13-call new-Gateway
-//! appendix that `write_merged_ecosystem_toml` appends (registerLegacyToken
-//! prefix + new-GW whitelist via `setSettlementLayerStatus` + GatewayVotePreparation
-//! block: approve-then-priority-tx for `addChainTypeManager`,
+//! appendix that `write_merged_ecosystem_toml` appends (new-GW whitelist via
+//! `setSettlementLayerStatus` + GatewayVotePreparation block:
+//! approve-then-priority-tx for `addChainTypeManager`,
 //! `setAssetDeploymentTracker`, `registerCTMAssetOnL1`, two-bridges
-//! set-asset-handler calls, RollupDAManager/ServerNotifier ownership accepts,
-//! and the new GW settlement-fee setter).
+//! set-asset-handler calls, and RollupDAManager/ServerNotifier ownership
+//! accepts).
 
 use alloy::{
     hex,

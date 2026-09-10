@@ -1,14 +1,29 @@
 // SPDX-License-Identifier: MIT
-// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+// We use a floating point pragma here so it can be used within other projects that interact with the
+// ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
-import {BundleAttributes, CallAttributes, InteropBundle} from "../common/Messaging.sol";
+import {BundleAttributes, CallAttributes, InteropBundle, InteropCallStarter} from "../common/Messaging.sol";
+import {AtomicFlowPreimage} from "../atomic-interop/IAtomicInterop.sol";
 import {IInteropCenterBase} from "./IInteropCenterBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
+/// @notice Interface of the {L2InteropCenter}. See {protocol-docs/interop.md#zksync-interop-protocol}.
 interface IInteropCenter is IInteropCenterBase {
+    /// @notice Send-side metadata for an atomic bundle, parsed from the `atomicBundle` attribute.
+    /// Deliberately NOT part of the cross-chain {InteropBundle}: `bundleHash` must not depend on the
+    /// flowId preimage (circular — the preimage's leg hashes include this bundle's own hash). See
+    /// {protocol-docs/interop.md#atomic-bundles}.
+    struct AtomicSend {
+        AtomicFlowPreimage flowPreimage;
+        uint256 lowNullifierIndex;
+        bool isAtomic;
+    }
+
+    /// @notice Emitted once per sent bundle (`l2l1MsgHash` is zero for atomic bundles, which are not
+    /// published to L1).
     event InteropBundleSent(bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle interopBundle);
 
     event NewAssetRouter(address indexed oldAssetRouter, address indexed newAssetRouter);
@@ -102,12 +117,8 @@ interface IInteropCenter is IInteropCenterBase {
     /// @param _receiver Address to receive the fees.
     function claimZKFees(address _receiver) external;
 
-    /// @notice One-shot initialization for the L2InteropCenter.
-    /// @dev L2InteropCenter is introduced in v31, so this is called for BOTH new chains (genesis)
-    ///      and existing chains being upgraded to v31. In both cases the contract storage is
-    ///      fresh (the SystemProxy is freshly deployed), so the reentrancy guard and
-    ///      `ZK_TOKEN_ASSET_ID` must be set here. After v31, this function MUST NOT be called
-    ///      again — the `reentrancyGuardInitializer` and `_disableInitializers()` guards prevent it.
+    /// @notice One-shot initialization for the L2InteropCenter; must never run again after v31.
+    ///      See {protocol-docs/interop.md#initialization-and-versioning-notes}.
     /// @param _l1ChainId The chain ID of L1.
     /// @param _owner The owner address.
     /// @param _zkTokenAssetId The ZK token asset ID.
@@ -123,6 +134,37 @@ interface IInteropCenter is IInteropCenterBase {
         uint256 _chainId,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
+    ) external;
+
+    /// @notice Simulates {sendBundle} and reports the `bundleHash` it would produce for the same caller and
+    ///         inputs, without collecting value or committing to the atomic interop IMT.
+    /// @dev Quoter pattern: this ALWAYS reverts with `InteropPreviewHash(bundleHash)` — it never returns and
+    ///      can never commit state. This is deliberate: to make the hash byte-exact it runs the same stateful
+    ///      assembly as {sendBundle}, including the value-burning `initiateIndirectCall` for indirect legs;
+    ///      reverting guarantees that burn is rolled back no matter who calls it or from what context (so it
+    ///      cannot be weaponised to move funds). Invoke it via a static `eth_call` / `callStatic` and read the
+    ///      hash out of the revert reason. Callers derive the atomic `flowId` (which commits to `bundleHash`)
+    ///      from this value before the real send. Requires no `msg.value` and no `atomicBundle` attribute, and
+    ///      does not consume the `interopBundleSalt` uniqueness slot.
+    /// @param _destinationChainId Same as {sendBundle}.
+    /// @param _callStarters Same as {sendBundle}.
+    /// @param _bundleAttributes Same as {sendBundle}.
+    function previewBundleHash(
+        bytes calldata _destinationChainId,
+        InteropCallStarter[] calldata _callStarters,
+        bytes[] calldata _bundleAttributes
+    ) external;
+
+    /// @notice Simulates {sendMessage} and reports the `bundleHash` of the single-call bundle it would produce
+    ///         for the same caller and inputs. Same quoter contract as {previewBundleHash}: it ALWAYS reverts
+    ///         with `InteropPreviewHash(bundleHash)` and must be invoked via a static `eth_call` / `callStatic`.
+    /// @param _recipient Same as {sendMessage}.
+    /// @param _payload Same as {sendMessage}.
+    /// @param _attributes Same as {sendMessage}.
+    function previewMessageHash(
+        bytes calldata _recipient,
+        bytes calldata _payload,
+        bytes[] calldata _attributes
     ) external;
 
     /// @notice Parses the attributes of the call or bundle.

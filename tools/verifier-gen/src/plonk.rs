@@ -9,7 +9,8 @@ use serde_json::Value;
 
 use crate::types::{CommitmentSlot, G2Elements};
 use crate::utils::{
-    convert_list_to_hexadecimal, create_hash_map, format_const, format_mstore, get_modexp_function,
+    convert_list_to_hexadecimal, create_hash_map, format_const, format_mstore,
+    get_domain_constants, get_modexp_function,
 };
 
 lazy_static! {
@@ -89,12 +90,18 @@ pub fn insert_residue_elements_and_commitments(
     let verifier_contract_template =
         verifier_contract_template.replace("{{modexp_function}}", &modexp_function);
 
+    let n = vk["n"].as_u64().expect("vk must contain n");
+    let (domain_size, domain_size_log, omega) = get_domain_constants(n);
+
     Ok(reg.render_template(
         &verifier_contract_template,
         &json!({"residue_g2_elements": residue_g2_elements,
                         "commitments": commitments,
                         "vk_hash": vk_hash,
-                        "contract_name": contract_name}),
+                        "contract_name": contract_name,
+                        "omega": omega,
+                        "domain_size": format!("0x{domain_size:x}"),
+                        "domain_size_log": domain_size_log}),
     )?)
 }
 

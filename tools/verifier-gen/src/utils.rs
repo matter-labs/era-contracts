@@ -1,5 +1,29 @@
+use circuit_definitions::snark_wrapper::franklin_crypto::bellman::pairing::bn256::Fr;
+use circuit_definitions::snark_wrapper::franklin_crypto::bellman::plonk::domains::Domain;
+use circuit_definitions::snark_wrapper::franklin_crypto::bellman::{PrimeField, PrimeFieldRepr};
 use serde_json::Value;
 use std::collections::HashMap;
+
+/// `DOMAIN_SIZE`/`OMEGA` for a VK with `n = domain_size - 1`, via the same `Domain`
+/// construction the Rust verifier uses. These must come from the VK: the wrapper domain
+/// differs per proof system, and `verificationKeyHash()` does not cover these constants,
+/// so a hardcoded mismatch passes the hash check yet rejects every valid proof.
+pub fn get_domain_constants(n: u64) -> (u64, u32, String) {
+    let domain_size = n + 1;
+    let domain: Domain<Fr> = Domain::new_for_size(domain_size).expect("invalid domain size");
+    assert_eq!(domain.size, domain_size, "vk n + 1 must be a power of two");
+    let mut omega_be = Vec::new();
+    domain
+        .generator
+        .into_repr()
+        .write_be(&mut omega_be)
+        .expect("failed to serialize omega");
+    (
+        domain_size,
+        domain_size.trailing_zeros(),
+        format!("0x{}", hex::encode(omega_be)),
+    )
+}
 
 pub fn format_mstore(hex_value: &str, slot: &str) -> String {
     format!("            mstore({}, 0x{})\n", slot, hex_value)

@@ -7,9 +7,7 @@ import {
   ANVIL_FUND_BALANCE,
   INTEROP_BUNDLE_TUPLE_TYPE,
   INTEROP_CENTER_ADDR,
-  L1_MESSAGE_SENT_EVENT_SIG,
   L1_TO_L2_ALIAS_OFFSET,
-  L2_ASSET_TRACKER_ADDR,
   L2_BRIDGEHUB_ADDR,
   L2_INTEROP_HANDLER_ADDR,
   NEW_PRIORITY_REQUEST_EVENT_SIG,
@@ -22,7 +20,6 @@ import type {
   ChainInfo,
   ChainRole,
   DeploymentState,
-  FinalizeWithdrawalParams,
   InteropBundle,
   L2ChainInfo,
   PriorityRequestData,
@@ -233,11 +230,12 @@ export function applyL1ToL2Alias(l1Address: string): string {
  */
 export function buildWithdrawalMerkleProof(settlementLayerChainId: number): string[] {
   if (settlementLayerChainId > 0) {
-    // New format: metadata + logLeafSibling + batchLeafProofMask + packedBatchInfo + slChainId
+    // New format: metadata + logLeafSibling + l1Timestamp + batchLeafProofMask + packedBatchInfo + slChainId
     // Metadata: version=0x01, logLeafProofLen=1, batchLeafProofLen=0, finalProofNode=0
     return [
       "0x0101000000000000000000000000000000000000000000000000000000000000",
       ethers.constants.HashZero, // log leaf merkle sibling (dummy)
+      ethers.constants.HashZero, // l1Timestamp (bound into the batch leaf; dummy here)
       ethers.constants.HashZero, // batchLeafProofMask = 0
       ethers.constants.HashZero, // packed(settlementLayerBatchNumber=0, batchRootMask=0)
       ethers.utils.hexZeroPad(ethers.utils.hexlify(settlementLayerChainId), 32),
@@ -262,40 +260,6 @@ export async function getSettlementLayerChainId(
   const slChainIdNum = slChainId.toNumber();
   const isGatewaySettled = slChainIdNum !== 0 && slChainIdNum !== runtimeConfig.l1ChainId;
   return isGatewaySettled ? slChainIdNum : 0;
-}
-
-/**
- * Extract FinalizeWithdrawalParams from an L2 transaction receipt.
- *
- * Parses the L1MessageSent event from the L1MessengerZKOS and builds
- * the finalization params needed to call receiveL1ToGatewayMigrationOnL1 on L1.
- * Uses an empty merkle proof (relies on DummyL1MessageRoot returning true).
- */
-export function buildFinalizeWithdrawalParams(
-  l2Receipt: ethers.providers.TransactionReceipt,
-  chainId: number
-): FinalizeWithdrawalParams {
-  // Parse L1MessageSent event from L1MessengerZKOS
-  const l1MessageSentTopic = ethers.utils.id(L1_MESSAGE_SENT_EVENT_SIG);
-  const l1MessageSentLog = l2Receipt.logs.find((logEntry) => logEntry.topics[0] === l1MessageSentTopic);
-
-  if (!l1MessageSentLog) {
-    throw new Error("L1MessageSent event not found in L2 tx receipt. Check L1MessengerZKOS emits the event.");
-  }
-
-  // Decode the message bytes from the event data
-  // Event: L1MessageSent(address indexed _sender, bytes32 indexed _hash, bytes _message)
-  const messageBytes = ethers.utils.defaultAbiCoder.decode(["bytes"], l1MessageSentLog.data)[0] as string;
-
-  return {
-    chainId,
-    l2BatchNumber: 0,
-    l2MessageIndex: 0,
-    l2Sender: L2_ASSET_TRACKER_ADDR,
-    l2TxNumberInBatch: 0,
-    message: messageBytes,
-    merkleProof: [], // Empty proof — DummyL1MessageRoot always returns true
-  };
 }
 
 /**
@@ -534,14 +498,14 @@ export async function relayPriorityRequestsToChain(
  * Build a mock InteropProof struct for test bundle execution.
  * In the test environment, proof verification is bypassed, so we only need the correct shape.
  */
-export function buildMockInteropProof(sourceChainId: number) {
+export function buildMockInteropProof(sourceChainId: number, senderAddress?: string) {
   return {
     chainId: sourceChainId,
     l1BatchNumber: 0,
     l2MessageIndex: 0,
     message: {
       txNumberInBatch: 0,
-      sender: INTEROP_CENTER_ADDR,
+      sender: senderAddress ?? INTEROP_CENTER_ADDR,
       data: "0x",
     },
     proof: [],
@@ -550,7 +514,7 @@ export function buildMockInteropProof(sourceChainId: number) {
 
 /**
  * Extract InteropBundleSent events from a receipt and execute each bundle on the
- * destination chain via L2InteropHandler.executeBundle().
+ * destination chain via L2InteropHandler.executeAtomicBundle().
  *
  * Used for real interop flows only. L1-originated deposits should stay on the
  * NewPriorityRequest relay path even when they pass through the gateway chain.
@@ -601,7 +565,7 @@ export async function extractAndRelayInteropBundles(
     const interopHandler = new ethers.Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
     let result: { txHash: string; success: boolean };
     try {
-      const tx = await interopHandler.executeBundle(bundleData, mockProof, { gasLimit: 5_000_000 });
+      const tx = await interopHandler.executeAtomicBundle(bundleData, mockProof, { gasLimit: 5_000_000 });
       const r = await tx.wait();
       result = { txHash: r.transactionHash, success: r.status === 1 };
     } catch (error) {

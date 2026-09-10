@@ -89,7 +89,9 @@ contract L1InteropHandlerTest is Test {
     function setUp() public {
         messageRoot = address(new MockMessageRoot());
         recipient = new MockInteropRecipient();
-        handlerImpl = new L1InteropHandler(IMessageRootBase(messageRoot));
+        // The handler pins every L1 bundle-call target to its immutable `L1_ASSET_ROUTER`; inject the mock
+        // recipient as that router so the dispatch tests (which target `address(recipient)`) resolve to it.
+        handlerImpl = new L1InteropHandler(IMessageRootBase(messageRoot), address(recipient));
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(handlerImpl),
             proxyAdmin,
@@ -145,7 +147,7 @@ contract L1InteropHandlerTest is Test {
         handler.unpause();
 
         handler.executeBundle(bundle, proof);
-        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(SOURCE_CHAIN_ID, bundle);
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundle);
         assertTrue(
             handler.bundleStatus(bundleHash) == BundleStatus.FullyExecuted,
             "bundle must finalize after unpause"
@@ -176,7 +178,7 @@ contract L1InteropHandlerTest is Test {
         handler.pause();
 
         handler.verifyBundle(bundle, proof);
-        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(SOURCE_CHAIN_ID, bundle);
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundle);
         assertTrue(handler.bundleStatus(bundleHash) == BundleStatus.Verified, "bundle must verify while paused");
     }
 
@@ -195,7 +197,7 @@ contract L1InteropHandlerTest is Test {
             _ethAssetId(),
             payload
         );
-        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(SOURCE_CHAIN_ID, bundle);
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundle);
 
         vm.expectEmit(true, false, false, false, address(handler));
         emit IInteropHandlerBase.BundleExecuted(bundleHash);
@@ -217,7 +219,7 @@ contract L1InteropHandlerTest is Test {
         );
         handler.executeBundle(bundle, proof);
 
-        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(SOURCE_CHAIN_ID, bundle);
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundle);
         vm.expectRevert(abi.encodeWithSelector(BundleAlreadyProcessed.selector, bundleHash));
         handler.executeBundle(bundle, proof);
     }
@@ -247,7 +249,7 @@ contract L1InteropHandlerTest is Test {
             wrongAssetId,
             hex""
         );
-        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(SOURCE_CHAIN_ID, bundle);
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundle);
 
         vm.expectRevert(
             abi.encodeWithSelector(WrongDestinationBaseTokenAssetId.selector, bundleHash, _ethAssetId(), wrongAssetId)
@@ -282,7 +284,7 @@ contract L1InteropHandlerTest is Test {
             hex""
         );
         proof.chainId = SOURCE_CHAIN_ID + 1; // no longer matches bundle.sourceChainId
-        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(SOURCE_CHAIN_ID, bundle);
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundle);
         vm.expectRevert(
             abi.encodeWithSelector(WrongSourceChainId.selector, bundleHash, SOURCE_CHAIN_ID, SOURCE_CHAIN_ID + 1)
         );
@@ -319,7 +321,7 @@ contract L1InteropHandlerTest is Test {
             _ethAssetId(),
             hex""
         );
-        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(SOURCE_CHAIN_ID, bundle);
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundle);
 
         handler.verifyBundle(bundle, proof);
         assertTrue(handler.bundleStatus(bundleHash) == BundleStatus.Verified, "bundle should be verified");

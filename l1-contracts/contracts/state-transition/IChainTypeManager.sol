@@ -98,6 +98,9 @@ interface IChainTypeManager {
     /// @notice Verifier address changed for a protocol version
     event NewProtocolVersionVerifier(uint256 indexed protocolVersion, address indexed verifier);
 
+    /// @notice Default upgrade contract changed
+    event NewDefaultUpgrade(address indexed oldDefaultUpgrade, address indexed newDefaultUpgrade);
+
     function isZKsyncOS() external pure returns (bool);
 
     function BRIDGE_HUB() external view returns (address);
@@ -131,6 +134,10 @@ interface IChainTypeManager {
     function protocolVersionVerifier(uint256 _protocolVersion) external view returns (address);
 
     function setProtocolVersionVerifier(uint256 _protocolVersion, address _verifier) external;
+
+    function defaultUpgrade() external view returns (address);
+
+    function setDefaultUpgrade(address _defaultUpgrade) external;
 
     function getProtocolVersion(uint256 _chainId) external view returns (uint256);
 
@@ -166,12 +173,11 @@ interface IChainTypeManager {
         address _verifier
     ) external;
 
-    function createNewPatchUpgrade(
+    function createNewVerifierOnlyUpgrade(
         uint256 _oldProtocolVersion,
         uint256 _oldProtocolVersionDeadline,
         uint256 _newProtocolVersion,
-        address _verifier,
-        address _upgradeContract
+        address _verifier
     ) external;
 
     function setUpgradeDiamondCut(Diamond.DiamondCutData calldata _cutData, uint256 _oldProtocolVersion) external;

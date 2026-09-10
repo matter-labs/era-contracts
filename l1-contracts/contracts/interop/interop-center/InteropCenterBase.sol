@@ -54,14 +54,22 @@ abstract contract InteropCenterBase is
         bytes[] calldata _bundleAttributes
     ) internal virtual returns (bytes32 sendId);
 
-    /// @notice Verifies that an ERC-7930 address has an empty chain-reference field.
-    function _ensureEmptyChainReference(bytes calldata _interoperableAddress) internal pure {
+    /// @notice Verifies that the ERC-7930 address has an empty ChainReference field.
+    /// @dev Ensures that CallStarters in `sendBundle` do not include a ChainReference, as required by our
+    ///      implementation. The ChainReference length is stored at byte offset 0x04 in the ERC-7930 format.
+    /// @dev Takes `bytes memory` so one implementation serves both user-supplied (calldata, implicitly
+    ///      copied — these addresses are tens of bytes) and runtime-produced (an indirect call starter's
+    ///      returned recipient) values.
+    /// @param _interoperableAddress The ERC-7930 address to verify.
+    function _ensureEmptyChainReference(bytes memory _interoperableAddress) internal pure {
         require(
             _interoperableAddress.length >= ERC7930_V1_MIN_LENGTH,
             InteroperableAddress.InteroperableAddressParsingError(_interoperableAddress)
         );
-        uint8 chainReferenceLength = uint8(_interoperableAddress[0x04]);
-        require(chainReferenceLength == 0, InteroperableAddressChainReferenceNotEmpty(_interoperableAddress));
+        require(
+            uint8(_interoperableAddress[0x04]) == 0,
+            InteroperableAddressChainReferenceNotEmpty(_interoperableAddress)
+        );
     }
 
     /// @notice Verifies that an ERC-7930 address has an empty address field.

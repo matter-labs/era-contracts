@@ -32,9 +32,9 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
 
       const senderL1Before = await l1Provider.getBalance(senderAddr);
 
-      // ETH escrows in the L1NativeTokenVault regardless of settlement layer, so bridgedOut[ETH]
-      // moves the same way as for a direct-settled chain (this replaces the removed
-      // L1AssetTracker.chainBalance[gwChainId] check, which relied on per-chain attribution).
+      // L1 accounting is the aggregate L1NativeTokenVault.bridgedOut[ETH] — no per-chain
+      // attribution ({protocol-docs/bridging.md#native-token-vault}), so it moves the same way as for a
+      // direct-settled chain.
       const l1Ntv = state.l1Addresses!.l1NativeTokenVault;
       const ethAssetId = await getL1BaseTokenAssetId(getL1RpcUrl(state), l1Ntv);
       const bridgedOutBefore = await getL1BridgedOut(getL1RpcUrl(state), l1Ntv, ethAssetId);

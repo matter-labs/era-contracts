@@ -8,7 +8,7 @@ import {Script} from "forge-std/Script.sol";
 import {L2_VERSION_SPECIFIC_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 
-import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
+import {IL2V32Upgrade} from "contracts/upgrades/IL2V32Upgrade.sol";
 
 import {CoreContract} from "../../ecosystem/CoreContract.sol";
 import {DefaultGatewayUpgrade} from "../default-upgrade/DefaultGatewayUpgrade.s.sol";
@@ -21,7 +21,7 @@ contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
         returns (CoreContract[] memory additionalDependencyContracts)
     {
         additionalDependencyContracts = new CoreContract[](1);
-        additionalDependencyContracts[0] = CoreContract.L2V31Upgrade;
+        additionalDependencyContracts[0] = CoreContract.L2V32Upgrade;
     }
 
     function getAdditionalFactoryDependencyContracts()
@@ -46,7 +46,7 @@ contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
     }
 
     function getV31L2UpgradeCalldata() internal view returns (bytes memory) {
-        return abi.encodeCall(IL2V31Upgrade.upgrade, (config.isZKsyncOS, address(0), "", ""));
+        return abi.encodeCall(IL2V32Upgrade.upgrade, (config.isZKsyncOS, address(0), "", ""));
     }
 
     function getEraL2UpgradeTargetAndData(

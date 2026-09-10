@@ -47,7 +47,6 @@ async function main() {
         "L2NativeTokenVaultZKOS",
         "L2ChainAssetHandler",
         "UpgradeableBeaconDeployer",
-        "L2V30TestnetSystemProxiesUpgrade",
       ];
 
       const output: Record<string, { bytecode_hash: string; bytecode: string }> = {};

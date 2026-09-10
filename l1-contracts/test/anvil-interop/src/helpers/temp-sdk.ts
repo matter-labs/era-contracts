@@ -451,7 +451,8 @@ async function waitForInteropRootNonZero(
       );
     }
 
-    currentRoot = await interopRootStorage.interopRoots(gwChainId, gwBlockNumber);
+    const interopRootInfo = await interopRootStorage.interopRoots(gwChainId, gwBlockNumber);
+    currentRoot = interopRootInfo.root;
     if (currentRoot === ethers.constants.HashZero) {
       await sleep(destProvider.pollingInterval);
     }
@@ -491,7 +492,9 @@ function getSettlementLayerProofData(proof: string[]): { chainId: number; batchN
     return undefined;
   }
 
-  const packedBatchInfoIndex = 1 + logLeafProofLen + 1 + batchLeafProofLen;
+  // Layout after the log-leaf proof: [l1Timestamp][batchLeafProofMask][batchLeafProof...][packedBatchInfo].
+  // The extra +1 accounts for the l1Timestamp word now bound into the batch leaf.
+  const packedBatchInfoIndex = 1 + logLeafProofLen + 1 + 1 + batchLeafProofLen;
   const settlementLayerChainIdIndex = packedBatchInfoIndex + 1;
   if (proof.length <= settlementLayerChainIdIndex) {
     throw new Error("Proof metadata points outside the proof array");

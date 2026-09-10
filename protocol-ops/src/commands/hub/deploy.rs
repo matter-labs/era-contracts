@@ -16,7 +16,6 @@ use serde::Serialize;
 pub struct DeployInput {
     pub owner: Address,
     pub era_chain_id: u64,
-    pub with_legacy_bridge: bool,
     pub create2_factory_salt: Option<B256>,
 }
 
@@ -36,7 +35,8 @@ pub fn deploy(
         input.owner,
         &initial_config,
         input.era_chain_id,
-        input.with_legacy_bridge,
+        // The legacy shared-bridge test support this gated was removed.
+        false,
     );
 
     let input_path = runner.input_path(&DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION)?;

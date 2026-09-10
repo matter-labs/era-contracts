@@ -1,16 +1,5 @@
 [
   {
-    "type": "constructor",
-    "inputs": [
-      {
-        "name": "_l1ChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "nonpayable"
-  },
-  {
     "type": "function",
     "name": "executeBatchesSharedBridge",
     "inputs": [
@@ -260,6 +249,22 @@
       },
       {
         "name": "priorityOpsDataLength",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidInteropRootTimestamp",
+    "inputs": [
+      {
+        "name": "expectedTimestamp",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "providedTimestamp",
         "type": "uint256",
         "internalType": "uint256"
       }

@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {MAX_LOW_INDEX_SEARCH_ATTEMPTS} from "../Config.sol";
+import {IMT_EMPTY_LEAF_HASH} from "../Config.sol";
 import {
     IMTAlreadyInitialized,
     IMTLowLeafIndexOutOfBounds,
@@ -35,26 +35,31 @@ struct IMT {
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
+/// @notice Append-only indexed Merkle tree supporting both membership and non-membership proofs
+/// via the low-nullifier technique. See {protocol-docs/message-root.md#indexed-merkle-tree-indexedmerkletree}.
 library IndexedMerkleTree {
     using FullMerkle for FullMerkle.FullTree;
 
     /// @notice Initialize an {IMT} and reserve index 0 for the sentinel zero leaf.
+    /// @dev Empty positions are padded with {IMT_EMPTY_LEAF_HASH} (not `hashLeaf({0,0,0})`), so a padded index
+    /// can't be used as a `{0,0,0}` low leaf to forge non-inclusion; index 0 is still the real `{0,0,0}` leaf.
     function setup(IMT storage self) internal {
         if (self.tree._leafNumber != 0) {
             revert IMTAlreadyInitialized();
         }
 
-        bytes32 zeroLeafHash = hashLeaf(IMTLeaf({value: 0, nextIndex: 0, nextValue: 0}));
-        self.tree.setup(zeroLeafHash);
-        self.tree.pushNewLeaf(zeroLeafHash);
+        self.tree.setup(IMT_EMPTY_LEAF_HASH);
+        self.tree.pushNewLeaf(hashLeaf(IMTLeaf({value: 0, nextIndex: 0, nextValue: 0})));
         self.leaves[0] = IMTLeaf({value: 0, nextIndex: 0, nextValue: 0});
     }
 
     /// @notice Insert a new value in the tree.
     /// @param _value The value to be inserted.
     /// @param _lowLeafIndex The index of a leaf expected to precede `_value`.
-    /// @dev If `_lowLeafIndex` is incorrect, the function will attempt to find the correct low leaf by traversing the linked list
-    /// up to `MAX_LOW_INDEX_SEARCH_ATTEMPTS` times.
+    /// @dev If `_lowLeafIndex` is stale, the function traverses the linked list forward until it reaches
+    /// the correct low leaf. The walk is deliberately unbounded — see
+    /// {protocol-docs/message-root.md#indexed-merkle-tree-indexedmerkletree} for why bounding it would
+    /// make inserts grievable.
     /// @return newIndex The index of the inserted leaf.
     /// @return newRoot The root after insertion.
     function insert(
@@ -82,11 +87,7 @@ library IndexedMerkleTree {
             revert IMTLowLeafValueTooLarge(lowLeaf.value, _value);
         }
 
-        for (uint256 attempts = 0; lowLeaf.nextValue != 0 && lowLeaf.nextValue < _value; ++attempts) {
-            if (attempts == MAX_LOW_INDEX_SEARCH_ATTEMPTS) {
-                revert IMTLowLeafNextTooSmall(lowLeaf.nextValue, _value);
-            }
-
+        while (lowLeaf.nextValue != 0 && lowLeaf.nextValue < _value) {
             lowLeafIndex = lowLeaf.nextIndex;
             lowLeaf = self.leaves[lowLeafIndex];
         }

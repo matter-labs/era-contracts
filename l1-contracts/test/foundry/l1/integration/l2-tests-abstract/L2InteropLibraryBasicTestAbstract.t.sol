@@ -103,7 +103,9 @@ abstract contract L2InteropLibraryBasicTestAbstract is L2InteropTestUtils {
                     "MessageSent payload should match call data"
                 );
                 assertEq(value, 0, "MessageSent value should be zero for direct call");
-                assertEq(attrs.length, 3, "MessageSent should keep merged attributes from sendDirectCall");
+                // executionAddress + unbundlerAddress + useFixedFee + the mandatory atomicBundle attribute
+                // (all interop is atomic). salt is omitted (bytes32(0)).
+                assertEq(attrs.length, 4, "MessageSent should keep merged attributes from sendDirectCall");
             }
         }
         assertTrue(foundBundle, "InteropBundleSent should be emitted");

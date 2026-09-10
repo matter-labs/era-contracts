@@ -19,7 +19,13 @@ import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {ETH_TOKEN_ADDRESS, INDIRECT_CALL_MAGIC_VALUE} from "../../common/Config.sol";
 import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
-import {AddressAlreadySet, NonEmptyMsgValue, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {
+    AddressAlreadySet,
+    AssetDeploymentTrackerNotSet,
+    NonEmptyMsgValue,
+    Unauthorized,
+    ZeroAddress
+} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
@@ -31,8 +37,8 @@ import {TxStatus} from "../../common/Messaging.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev Handles the L1 side of asset routing for L1 <-> ZK chain bridging,
-/// supporting both ETH and ERC20 tokens.
+/// @notice The L1 side of asset routing for L1 <-> ZK chain bridging, supporting both ETH and ERC20
+/// tokens. See {protocol-docs/bridging.md#asset-routing-burn--mint}.
 /// @dev Designed for use with a proxy for upgradability.
 contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -88,13 +94,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                 (_chainId == ERA_CHAIN_ID && msg.sender == address(ERA_DIAMOND_PROXY)),
             Unauthorized(msg.sender)
         );
-        _;
-    }
-
-    /// @notice Checks that the message sender is the legacy bridge.
-    /// @notice Checks that the message sender is the native token vault.
-    modifier onlyNativeTokenVault() {
-        require(msg.sender == address(nativeTokenVault), Unauthorized(msg.sender));
         _;
     }
 
@@ -190,6 +189,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         bytes32 _assetId,
         address _assetHandlerAddressOnCounterpart
     ) internal view returns (IndirectCallRequest memory request) {
+        require(assetDeploymentTracker[_assetId] != address(0), AssetDeploymentTrackerNotSet(_assetId));
         IL1AssetDeploymentTracker(assetDeploymentTracker[_assetId]).bridgeCheckCounterpartAddress(
             _chainId,
             _assetId,
@@ -214,6 +214,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                             INITIATE DEPOSIT Functions
     //////////////////////////////////////////////////////////////*/
 
+    /// @inheritdoc AssetRouterBase
     function bridgehubDepositBaseToken(
         uint256 _chainId,
         bytes32 _assetId,

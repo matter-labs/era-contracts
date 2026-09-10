@@ -633,7 +633,9 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
         });
 
         vm.deal(caller, request.mintValue);
-        vm.prank(caller);
+        // Prank `tx.origin` too: an unset refund recipient resolves to the caller itself only for the tx
+        // originator (a no-code caller that is not `tx.origin` is treated as a constructor caller and aliased).
+        vm.prank(caller, caller);
         bytes32 sendId = l1InteropCenter.sendBundle{value: request.mintValue}(
             InteroperableAddress.formatEvmV1(request.chainId),
             calls,

@@ -123,7 +123,7 @@
   },
   {
     "type": "function",
-    "name": "createNewPatchUpgrade",
+    "name": "createNewVerifierOnlyUpgrade",
     "inputs": [
       {
         "name": "_oldProtocolVersion",
@@ -144,11 +144,6 @@
         "name": "_verifier",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "_upgradeContract",
-        "type": "address",
-        "internalType": "address"
       }
     ],
     "outputs": [],
@@ -166,6 +161,19 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "defaultUpgrade",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -753,6 +761,19 @@
             "internalType": "bytes"
           }
         ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setDefaultUpgrade",
+    "inputs": [
+      {
+        "name": "_defaultUpgrade",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [],
@@ -1375,6 +1396,25 @@
         "type": "bytes32",
         "indexed": false,
         "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "NewDefaultUpgrade",
+    "inputs": [
+      {
+        "name": "oldDefaultUpgrade",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "newDefaultUpgrade",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
       }
     ],
     "anonymous": false

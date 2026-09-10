@@ -9,7 +9,7 @@ import {stdJson} from "forge-std/StdJson.sol";
 
 import {FinalizeL1DepositParams, MessageInclusionProof, L2Message} from "contracts/common/Messaging.sol";
 import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
-import {IInteropHandlerBase} from "contracts/interop/interop-handler/IInteropHandlerBase.sol";
+import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";
 import {Utils} from "../utils/Utils.sol";
 import {
     AltL2ToL1Log,
@@ -46,7 +46,7 @@ contract ZKSProvider is Script {
 
         // Send the transaction
         vm.startBroadcast();
-        IInteropHandlerBase(nullifier.l1InteropHandler()).executeBundle(
+        L1InteropHandler(nullifier.l1InteropHandler()).executeBundle(
             UnsafeBytes.readRemainingBytes(params.message, 1),
             MessageInclusionProof({
                 chainId: params.chainId,

@@ -19,6 +19,7 @@ import {IDiamondInit, InitializeData} from "../chain-interfaces/IDiamondInit.sol
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {IChainTypeManager} from "../IChainTypeManager.sol";
 import {PriorityQueue} from "../libraries/PriorityQueue.sol";
+import {ChainBatchRootTree} from "../../common/libraries/ChainBatchRootTree.sol";
 import {PriorityTree} from "../libraries/PriorityTree.sol";
 import {EmptyAssetId, EmptyBytes32, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
@@ -119,6 +120,9 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.priorityTree.setup(s.__DEPRECATED_priorityQueue.getTotalPriorityTxs());
         s.precommitmentForTheLatestBatch = DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH;
         s.zksyncOS = IS_ZKSYNC_OS;
+        if (IS_ZKSYNC_OS) {
+            s.l2LogsRootHashes[0] = ChainBatchRootTree.genesisChainBatchRoot();
+        }
 
         // All new chains (both ZKsync OS ones and not) have the totalSupply tracked for the base token of the chain.
         // The only exception are the legacy ZKsync OS chains.

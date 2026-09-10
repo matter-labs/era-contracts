@@ -170,6 +170,25 @@
     "stateMutability": "nonpayable"
   },
   {
+    "type": "function",
+    "name": "upgradeVerifierOnly",
+    "inputs": [
+      {
+        "name": "_newProtocolVersion",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
     "type": "event",
     "name": "NewL2BootloaderBytecodeHash",
     "inputs": [

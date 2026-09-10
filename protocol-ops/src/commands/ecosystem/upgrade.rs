@@ -547,13 +547,9 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         // Default --upgrade-input-path to upgrade-envs/v0.31.0-interopB/<env>.toml
         // when running with `--env`. The CLI default is `local.toml` (for
         // local-anvil fixtures). On stage / mainnet / testnet the per-env
-        // file carries env-specific knobs the upgrade scripts rely on —
-        // most importantly `message_root_stage_sepolia_variant = true` for
-        // stage, which switches `CoreUpgrade_v31._messageRootContractName()`
-        // to the variant that skips chain 270's still-on-GW-123 settlement
-        // check. Without this override, stage's L1MessageRoot upgrade reverts
-        // during stage-1 governance with `NotAllChainsOnL1`. Only override
-        // when the caller hasn't explicitly passed `--upgrade-input-path`.
+        // file carries env-specific knobs the upgrade scripts rely on, such as
+        // the protocol versions and the bridgehub address. Only override when
+        // the caller hasn't explicitly passed `--upgrade-input-path`.
         if args.upgrade_input_path == UPGRADE_V31_INTEROP_LOCAL_INPUT_PATH {
             let per_env_rel = format!("/upgrade-envs/v0.31.0-interopB/{}.toml", cfg.env);
             let per_env_abs = paths::contracts_root()

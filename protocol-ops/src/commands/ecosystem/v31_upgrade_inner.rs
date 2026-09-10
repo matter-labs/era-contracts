@@ -143,6 +143,29 @@ impl<'a> V31UpgradeInner<'a> {
 
         let mut ctm_tomls = Vec::with_capacity(inputs.ctms.len());
         for ctm in &inputs.ctms {
+            // Only ZKsync OS chains can be upgraded onto this release: `CTMUpgrade_v31`'s
+            // `deployUsedUpgradeContract` rejects Era CTMs outright. The flavor is always
+            // resolved from L1; the optional config hint (`list-ctms` deliberately leaves it
+            // unset) is treated as an assertion only — a wrong hint must never be able to select
+            // an incompatible CTM implementation for governance calldata.
+            let ctm_is_zk_sync_os =
+                crate::common::l1_contracts::resolve_is_zksync_os(&runner.rpc_url, ctm.proxy)
+                    .await
+                    .context("Failed to resolve isZKsyncOS from CTM")?;
+            if let Some(hint) = ctm.is_zk_sync_os {
+                anyhow::ensure!(
+                    hint == ctm_is_zk_sync_os,
+                    "CTM {:#x}: config marks is_zk_sync_os = {hint} but the CTM reports {ctm_is_zk_sync_os}",
+                    ctm.proxy
+                );
+            }
+            if !ctm_is_zk_sync_os {
+                logger::info(format!(
+                    "skipping Era CTM {:#x}: only ZKsync OS chains can be upgraded onto this release",
+                    ctm.proxy
+                ));
+                continue;
+            }
             let (path, is_zk_sync_os) = self
                 .prepare_ctm(runner, deployer, inputs, ctm)
                 .await
@@ -152,6 +175,9 @@ impl<'a> V31UpgradeInner<'a> {
                 toml: path,
                 is_zk_sync_os,
             });
+        }
+        if ctm_tomls.is_empty() {
+            anyhow::bail!("no ZKsync OS CTMs to prepare — every configured CTM is Era");
         }
 
         Ok(V31PrepareOutput {

@@ -569,8 +569,7 @@ contract CommittingTest is ExecutorTest {
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        // BlockCommit is now followed by a ReportCommittedBatchProtocolVersion event for every committed batch
-        // (its values are asserted in test_emitsProtocolVersionEvent).
+        // A ReportCommittedBatchProtocolVersion event follows BlockCommit (see test_emitsProtocolVersionEvent).
         assertEq(entries.length, 2 + EVENT_INDEX);
         assertEq(entries[EVENT_INDEX].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
         assertEq(entries[EVENT_INDEX].topics[1], bytes32(uint256(1))); // batchNumber
@@ -688,8 +687,7 @@ contract CommittingTest is ExecutorTest {
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        // BlockCommit is now followed by a ReportCommittedBatchProtocolVersion event for every committed batch
-        // (its values are asserted in test_emitsProtocolVersionEvent).
+        // A ReportCommittedBatchProtocolVersion event follows BlockCommit (see test_emitsProtocolVersionEvent).
         assertEq(entries.length, 2 + EVENT_INDEX);
         assertEq(entries[EVENT_INDEX].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
         assertEq(entries[EVENT_INDEX].topics[1], bytes32(uint256(1))); // batchNumber
@@ -759,8 +757,7 @@ contract CommittingTest is ExecutorTest {
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        // BlockCommit is now followed by a ReportCommittedBatchProtocolVersion event for every committed batch
-        // (its values are asserted in test_emitsProtocolVersionEvent).
+        // A ReportCommittedBatchProtocolVersion event follows BlockCommit (see test_emitsProtocolVersionEvent).
         assertEq(entries.length, 2 + EVENT_INDEX);
         assertEq(entries[EVENT_INDEX].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
         assertEq(entries[EVENT_INDEX].topics[1], bytes32(uint256(1))); // batchNumber
@@ -1175,21 +1172,34 @@ contract CommittingTest is ExecutorTest {
 
     function test_recalculateinteropRootRollingHash() public {
         InteropRoot[] memory interopRoots = new InteropRoot[](2);
-        InteropRoot memory interopRoot1 = InteropRoot({chainId: 260, blockOrBatchNumber: 1, sides: new bytes32[](1)});
+        InteropRoot memory interopRoot1 = InteropRoot({
+            chainId: 260,
+            blockOrBatchNumber: 1,
+            timestamp: 1700000001,
+            sides: new bytes32[](1)
+        });
         interopRoot1.sides[0] = 0xfb2eb93318710c98f501f6ff6b11c373baccd0ffcaefe15f97debe09cb7939e1;
         interopRoots[0] = interopRoot1;
-        InteropRoot memory interopRoot2 = InteropRoot({chainId: 506, blockOrBatchNumber: 17, sides: new bytes32[](1)});
+        InteropRoot memory interopRoot2 = InteropRoot({
+            chainId: 506,
+            blockOrBatchNumber: 17,
+            timestamp: 1700000017,
+            sides: new bytes32[](1)
+        });
         interopRoot2.sides[0] = 0xf83b13aa476ef3253e6acff5779276da7924fabaec9a8c39274cf021efe1255a;
         interopRoots[1] = interopRoot2;
         bytes32 rollingHash = 0x0000000000000000000000000000000000000000000000000000000000000000;
         for (uint256 i = 0; i < interopRoots.length; i++) {
             InteropRoot memory interopRoot = interopRoots[i];
+            // The `uint256(128)` is the ABI head offset of `sides` inside `abi.encode(InteropRoot)`
+            // (4 fields: chainId, blockOrBatchNumber, timestamp, sides pointer).
             console.logBytes(
                 abi.encodePacked(
                     rollingHash,
                     interopRoot.chainId,
                     interopRoot.blockOrBatchNumber,
-                    uint256(96),
+                    interopRoot.timestamp,
+                    uint256(128),
                     interopRoot.sides.length,
                     interopRoot.sides
                 )
@@ -1199,7 +1209,8 @@ contract CommittingTest is ExecutorTest {
                     rollingHash,
                     interopRoot.chainId,
                     interopRoot.blockOrBatchNumber,
-                    uint256(96),
+                    interopRoot.timestamp,
+                    uint256(128),
                     interopRoot.sides.length,
                     interopRoot.sides
                 )

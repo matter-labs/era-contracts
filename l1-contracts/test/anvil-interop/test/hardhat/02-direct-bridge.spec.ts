@@ -35,7 +35,7 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
       const senderL1Before = await l1Provider.getBalance(senderAddr);
       const recipientL2Before = await l2Provider.getBalance(recipientAddr);
 
-      // Snapshot L1NativeTokenVault.bridgedOut[ETH] (replaces the removed L1AssetTracker.chainBalance check).
+      // Snapshot L1NativeTokenVault.bridgedOut[ETH]
       const l1Ntv = state.l1Addresses!.l1NativeTokenVault;
       const ethAssetId = await getL1BaseTokenAssetId(state.chains!.l1!.rpcUrl, l1Ntv);
       const bridgedOutBefore = await getL1BridgedOut(state.chains!.l1!.rpcUrl, l1Ntv, ethAssetId);

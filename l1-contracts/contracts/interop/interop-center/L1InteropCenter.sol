@@ -344,8 +344,12 @@ contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
         BridgehubL2TransactionRequest memory _request
     ) private returns (bytes32 canonicalTxHash) {
         // Although the aliasing might happen in the Mailbox, we still want to determine the refund recipient
-        // here, as the Mailbox won't have the original caller.
-        _request.refundRecipient = AddressAliasHelper.actualRefundRecipient(_request.refundRecipient, msg.sender);
+        // here, as the Mailbox won't have the original caller. Dropping the finality flag here is a deliberate
+        // trade-off: the request struct cannot carry it, see {protocol-docs/bridging.md} for the
+        // double-alias caveat this leaves open.
+        // slither-disable-next-line unused-return
+        (address refundRecipient, ) = AddressAliasHelper.actualRefundRecipient(_request.refundRecipient, msg.sender);
+        _request.refundRecipient = refundRecipient;
         canonicalTxHash = _zkChain.bridgehubRequestL2Transaction(_request);
     }
 

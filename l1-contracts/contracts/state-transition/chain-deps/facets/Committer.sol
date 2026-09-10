@@ -267,9 +267,6 @@ contract CommitterFacet is ZKChainBase, ICommitter {
                 _lastCommittedBatchData.batchHash,
                 _lastCommittedBatchData.commitment
             );
-            // Emitting the protocol version this batch was committed with, together with the system upgrade
-            // transaction hash applied in it. `s.protocolVersion` is read here so that the value corresponds to
-            // the protocol version actually used for this batch's commitment at commit time.
             emit ReportCommittedBatchProtocolVersion(
                 _lastCommittedBatchData.batchNumber,
                 s.protocolVersion,
@@ -318,10 +315,6 @@ contract CommitterFacet is ZKChainBase, ICommitter {
                 _lastCommittedBatchData.batchHash,
                 _lastCommittedBatchData.commitment
             );
-            // Emitting the protocol version this batch was committed with, together with the system upgrade
-            // transaction hash applied in it (`upgradeTxHash`, which for ZKsync OS is also folded into the batch
-            // commitment). `s.protocolVersion` is read here so that the value corresponds to the protocol version
-            // actually used for this batch's commitment at commit time.
             emit ReportCommittedBatchProtocolVersion(
                 _lastCommittedBatchData.batchNumber,
                 s.protocolVersion,
@@ -495,12 +488,13 @@ contract CommitterFacet is ZKChainBase, ICommitter {
             revert SettlementLayerChainIdMismatch();
         }
 
-        // The batch proof public input can be calculated as keccak256(state_commitment_before & state_commitment_after & batch_output_hash)
+        // The batch proof public input can be calculated as
+        // keccak256(state_commitment_before & state_commitment_after & chain_config & batch_output_hash),
+        // where chain_config is the chain id and the runtime chain config words (see `_getBatchProofPublicInputZKsyncOS`).
         // batch output hash commits to information about batch that needs to be opened on l1.
         // So below we are calculating batch output hash to later include it in the batch public input and thereby verify batch values correctness.
         bytes32 batchOutputHash = keccak256(
             abi.encodePacked(
-                _newBatch.chainId,
                 _newBatch.firstBlockTimestamp,
                 _newBatch.lastBlockTimestamp,
                 uint256(_newBatch.daCommitmentScheme),

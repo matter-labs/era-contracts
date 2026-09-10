@@ -24,6 +24,12 @@ contract L1ChainAssetHandlerDev is L1ChainAssetHandler {
         migrationNumber[_chainId] = _migrationNumber;
     }
 
+    /// @dev Re-enables chain migrations (disabled in production via `CHAIN_MIGRATIONS_ENABLED` in
+    /// `Config.sol`) so tests keep exercising the migration machinery.
+    function _chainMigrationsEnabled() internal view override returns (bool) {
+        return true;
+    }
+
     // add this to be excluded from coverage report
     function test() internal virtual {}
 }

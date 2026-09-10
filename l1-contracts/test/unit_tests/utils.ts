@@ -560,7 +560,8 @@ export function encodeCommitBatchesData(
     [STORED_BATCH_INFO_ABI_STRING, `${COMMIT_BATCH_INFO_ABI_STRING}[]`],
     [storedBatchInfo, commitBatchInfos]
   );
-  const commitData = hexConcat(["0x00", encodedCommitDataWithoutVersion]);
+  // Commit wire encoding version (BatchDecoder.SUPPORTED_ENCODING_VERSION).
+  const commitData = hexConcat(["0x01", encodedCommitDataWithoutVersion]);
   return [commitBatchInfos[0].batchNumber, commitBatchInfos[commitBatchInfos.length - 1].batchNumber, commitData];
 }
 
@@ -573,39 +574,34 @@ export function encodeProveBatchesData(
     [STORED_BATCH_INFO_ABI_STRING, `${STORED_BATCH_INFO_ABI_STRING}[]`, "uint256[]"],
     [prevBatch, committedBatches, proof]
   );
-  const proveData = hexConcat(["0x00", encodedProveDataWithoutVersion]);
+  // Prove wire encoding version (BatchDecoder.SUPPORTED_ENCODING_VERSION).
+  const proveData = hexConcat(["0x01", encodedProveDataWithoutVersion]);
   return [committedBatches[0].batchNumber, committedBatches[committedBatches.length - 1].batchNumber, proveData];
 }
 
 export function encodeExecuteBatchesData(
   batchesData: Array<StoredBatchInfo>,
-  priorityOpsBatchInfo: Array<PriorityOpsBatchInfo>,
-  settlementFeePayer: string = ethers.constants.AddressZero
+  priorityOpsBatchInfo: Array<PriorityOpsBatchInfo>
 ): [BigNumberish, BigNumberish, string] {
   const emptyInteropRoots = batchesData.map(() => []);
-  const emptyLogs = batchesData.map(() => []);
-  const emptyMessages = batchesData.map(() => []);
-  const emptyMultichainBatchRoots = batchesData.map(() => ethers.constants.HashZero);
+  // The wire data is the abi-encoding of one `BatchDecoder.DecodedExecuteData` struct.
   const encodedExecuteDataWithoutVersion = defaultAbiCoder.encode(
     [
-      `${STORED_BATCH_INFO_ABI_STRING}[]`,
-      `${PRIORITY_OPS_BATCH_INFO_ABI_STRING}[]`,
-      "tuple(uint256 chainId, uint256 blockOrBatchNumber, bytes32[] sides)[][]",
-      "tuple(uint8 l2ShardId, bool isService, uint16 txNumberInBatch, address sender, bytes32 key, bytes32 value)[][]",
-      "bytes[][]",
-      "bytes32[]",
-      "address",
+      "tuple(" +
+        `${STORED_BATCH_INFO_ABI_STRING}[] batchesData, ` +
+        `${PRIORITY_OPS_BATCH_INFO_ABI_STRING}[] priorityOpsData, ` +
+        "tuple(uint256 chainId, uint256 blockOrBatchNumber, uint256 timestamp, bytes32[] sides)[][] dependencyRoots" +
+        ")",
     ],
     [
-      batchesData,
-      priorityOpsBatchInfo,
-      emptyInteropRoots,
-      emptyLogs,
-      emptyMessages,
-      emptyMultichainBatchRoots,
-      settlementFeePayer,
+      {
+        batchesData,
+        priorityOpsData: priorityOpsBatchInfo,
+        dependencyRoots: emptyInteropRoots,
+      },
     ]
   );
-  const executeData = hexConcat(["0x01", encodedExecuteDataWithoutVersion]);
+  // Execute wire encoding version (BatchDecoder.SUPPORTED_ENCODING_VERSION_EXECUTE).
+  const executeData = hexConcat(["0x02", encodedExecuteDataWithoutVersion]);
   return [batchesData[0].batchNumber, batchesData[batchesData.length - 1].batchNumber, executeData];
 }

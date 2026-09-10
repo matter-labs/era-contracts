@@ -13,8 +13,7 @@ import {
     TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber,
     TotalBatchesExecutedZero,
     LocallyNoChainsAtGenesis,
-    V31UpgradeChainBatchNumberAlreadySet,
-    NotAllChainsOnL1
+    V31UpgradeChainBatchNumberAlreadySet
 } from "../bridgehub/L1BridgehubErrors.sol";
 import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
 import {ZeroAddress} from "../../common/L1ContractErrors.sol";
@@ -81,21 +80,12 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
         return v31UpgradeChainBatchNumber[_chainId] == V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE;
     }
 
-    /// @dev This initializer is used in the v31 upgrade. It is expected that it does not call `_initialize`, since
-    /// all the actions from there should've been already performed during the previous deployment.
-    function initializeL1V31Upgrade() external reinitializer(2) {
-        uint256[] memory allZKChains = IBridgehubBase(BRIDGE_HUB).getAllZKChainChainIDs();
-        _v31InitializeInner(allZKChains);
-    }
-
-    function _v31InitializeInner(uint256[] memory _allZKChains) internal virtual {
-        uint256 allZKChainsLength = _allZKChains.length;
-        for (uint256 i = 0; i < allZKChainsLength; ++i) {
-            require(IBridgehubBase(_bridgehub()).settlementLayer(_allZKChains[i]) == block.chainid, NotAllChainsOnL1());
-            v31UpgradeChainBatchNumber[_allZKChains[i]] = V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE;
-        }
-    }
-
+    /// @notice Stamps the chain's v31 upgrade batch number, replacing the placeholder v31 wrote for it.
+    /// @dev Still reachable, and must stay: a chain whose per-chain v31 upgrade has not landed yet calls this
+    /// through the v31 upgrade contract deployed for it, and that call happens against whatever
+    /// implementation this proxy is running — including this one. Verified 2026-08-05 that chains in this
+    /// state exist on stage and testnet. The placeholder itself is only ever written by v31; this release has
+    /// no writer for it (see `dev-contracts/L1MessageRootDev` for the test-only stand-in).
     function saveV31UpgradeChainBatchNumber(uint256 _chainId) external onlyChain(_chainId) {
         // While it is checked in other places that all chains settle on L1 at the time of the v31 upgrade,
         // we have this double check just in case.

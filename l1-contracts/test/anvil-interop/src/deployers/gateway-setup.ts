@@ -3,9 +3,19 @@ import * as path from "path";
 import type { CoreDeployedAddresses, CTMDeployedAddresses } from "../core/types";
 import { GatewayDeployer } from "./gateway-deployer";
 import { getAbi } from "../core/contracts";
-import { L2_BRIDGEHUB_ADDR, ANVIL_DEFAULT_ACCOUNT_ADDR, SYSTEM_CONTEXT_ADDR } from "../core/const";
+import {
+  ANVIL_DEFAULT_ACCOUNT_ADDR,
+  L2_BRIDGEHUB_ADDR,
+  L2_CHAIN_ASSET_HANDLER_ADDR,
+  SYSTEM_CONTEXT_ADDR,
+} from "../core/const";
 import { applyL1ToL2Alias, impersonateAndRun, scanAndRelayPriorityRequests, timeIt } from "../core/utils";
-import { setSettlementLayerViaBootloader, transferOwnable2Step } from "../helpers/harness-shims";
+import {
+  installL1ChainAssetHandlerDev,
+  installL2ChainAssetHandlerDev,
+  setSettlementLayerViaBootloader,
+  transferOwnable2Step,
+} from "../helpers/harness-shims";
 import {
   mergeGatewayVoteOutput,
   prepareGatewayChainConfig,
@@ -128,6 +138,9 @@ export class GatewaySetup {
 
     // Step 7: Migrate chains to gateway via Forge scripts
     if (gwSettledChainIds && gwSettledChainIds.length > 0) {
+      await this.runTimedStep("install migration-enabled Dev chain asset handlers", async () => {
+        await this.installMigrationEnabledChainAssetHandlers(gatewayContext);
+      });
       await this.migrateChains(chainId, gwSettledChainIds, gatewayContext, l2ChainRpcUrls);
     }
 
@@ -207,6 +220,34 @@ export class GatewaySetup {
     const gwDiamondProxy = await this.getGwDiamondProxy(chainId);
     console.log(`   GW diamond proxy on L1: ${gwDiamondProxy}`);
     return { gwProvider, gwDiamondProxy };
+  }
+
+  /**
+   * Install the test-only (migration-enabled) chain asset handlers used by the Gateway migration
+   * fixture; production v32 handlers reject bridgeBurn/bridgeMint. The production implementations
+   * stay in place through Gateway deployment and registration — only the handlers that participate
+   * in Step 7 are swapped.
+   */
+  private async installMigrationEnabledChainAssetHandlers(gatewayContext?: GatewayContext): Promise<void> {
+    const l1HandlerProxy = await installL1ChainAssetHandlerDev(this.l1Provider, this.l1Addresses.bridgehub);
+    const l1Handler = new Contract(l1HandlerProxy, getAbi("L1ChainAssetHandlerDev"), this.l1Provider);
+    if (!(await l1Handler.migrationsEnabled())) {
+      throw new Error("L1ChainAssetHandlerDev installation did not enable chain migrations");
+    }
+    console.log(`   L1ChainAssetHandlerDev installed behind proxy ${l1HandlerProxy}`);
+
+    if (gatewayContext) {
+      await installL2ChainAssetHandlerDev(gatewayContext.gwProvider);
+      const l2Handler = new Contract(
+        L2_CHAIN_ASSET_HANDLER_ADDR,
+        getAbi("L2ChainAssetHandlerDev"),
+        gatewayContext.gwProvider
+      );
+      if (!(await l2Handler.migrationsEnabled())) {
+        throw new Error("L2ChainAssetHandlerDev installation did not enable chain migrations on Gateway");
+      }
+      console.log(`   L2ChainAssetHandlerDev installed at ${L2_CHAIN_ASSET_HANDLER_ADDR} on Gateway`);
+    }
   }
 
   private async relayPriorityRequestsToGateway(

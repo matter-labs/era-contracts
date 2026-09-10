@@ -4,20 +4,17 @@ pragma solidity ^0.8.20;
 
 // solhint-disable gas-custom-errors
 
-import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
-import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 
 import {IL2NativeTokenVault} from "../../../../../contracts/bridge/ntv/IL2NativeTokenVault.sol";
-import {IBaseToken} from "contracts/common/l2-helpers/IBaseToken.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_ASSET_ROUTER,
@@ -33,7 +30,9 @@ import {
     L2_NATIVE_TOKEN_VAULT_ADDR,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS, SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
+import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
@@ -41,7 +40,6 @@ import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {BridgehubMintCTMAssetData, IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {IL2AssetRouter} from "../../../../../contracts/bridge/asset-router/IL2AssetRouter.sol";
-import {IL1Nullifier} from "../../../../../contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "../../../../../contracts/bridge/asset-router/IL1AssetRouter.sol";
 
 import {
@@ -102,6 +100,9 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
 
     bytes32 internal baseTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
 
+    /// @dev The destination chain the interop harnesses send to (`destinationChainId` in {L2InteropTestUtils}).
+    uint256 internal constant INTEROP_DESTINATION_CHAIN_ID = 271;
+
     bytes internal exampleChainCommitment;
 
     IChainTypeManager internal chainTypeManager;
@@ -113,6 +114,24 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
 
     function setUp() public virtual {
         setUpInner(false);
+        // Interop is atomic-only: the L2InteropCenter calls `AtomicFlowManager.append` on send and the
+        // InteropHandler calls `AtomicFlowManager.requireFlowFinalized` on execute. The AtomicFlowManager is
+        // not deployed in these Foundry contexts, so mock both (void) calls to succeed. This mock is inert for
+        // non-interop suites (they never touch that address), so installing it unconditionally in the single
+        // shared `setUp` frees every concrete entrypoint from setUp/MRO boilerplate — the alternative
+        // (an overridable hook) still triggers a diamond-override on every interop concrete.
+        _mockAtomicFlowManager();
+    }
+
+    /// @notice Installs the void mocks for the AtomicFlowManager gates. Overridable so suites that deploy the
+    /// real AtomicFlowManager (e.g. the atomic send/refund tests) can opt out and exercise the real logic.
+    function _mockAtomicFlowManager() internal virtual {
+        vm.mockCall(L2_ATOMIC_FLOW_MANAGER_ADDR, abi.encodeWithSelector(IAtomicFlowManager.append.selector), "");
+        vm.mockCall(
+            L2_ATOMIC_FLOW_MANAGER_ADDR,
+            abi.encodeWithSelector(IAtomicFlowManager.requireFlowFinalized.selector),
+            ""
+        );
     }
 
     function setUpInner(bool _skip) public virtual {
@@ -188,17 +207,12 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
             abi.encode(bytes32(uint256(1)))
         );
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
-            abi.encode(baseTokenAssetId)
-        );
-        bytes32 realBaseTokenAssetId = L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID();
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeCall(IBridgehubBase.baseTokenAssetId, block.chainid),
-            abi.encode(realBaseTokenAssetId)
-        );
+        // Register this chain and the harness destination in the L2 Bridgehub's interop registry
+        // through the production entry point; every other chain id reads as unregistered (bytes32(0)).
+        vm.startPrank(SERVICE_TRANSACTION_SENDER);
+        l2Bridgehub.registerChainForInterop(block.chainid, L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID());
+        l2Bridgehub.registerChainForInterop(INTEROP_DESTINATION_CHAIN_ID, baseTokenAssetId);
+        vm.stopPrank();
 
         vm.mockCall(
             L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,

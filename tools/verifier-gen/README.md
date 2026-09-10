@@ -1,4 +1,4 @@
-# Tool for generating Plonk & Fflonk verifier contracts using json verification keys
+# Tool for generating verifier contracts using JSON verification keys
 
 ## Usage
 
@@ -19,7 +19,7 @@ This will:
 
 ### 2. ZKsyncOS Variant
 
-Automatically uses ZKsyncOS-prefixed key files and generates ZKsyncOS-prefixed output files:
+Generates the PLONK verifier used by ZKsync OS:
 
 ```shell
 cargo run --bin zksync_verifier_contract_generator --release -- --variant zksync-os
@@ -27,8 +27,8 @@ cargo run --bin zksync_verifier_contract_generator --release -- --variant zksync
 
 This will:
 
-- Use input files: `data/ZKsyncOS_plonk_scheduler_key.json`, `data/ZKsyncOS_fflonk_scheduler_key.json`
-- Generate outputs: `data/ZKsyncOSVerifierPlonk.sol`, `data/ZKsyncOSVerifierFflonk.sol`
+- Use input file: `data/ZKsyncOS_plonk_scheduler_key.json`
+- Generate output: `data/ZKsyncOSVerifierPlonk.sol`
 
 ### 3. Custom Variant (Default)
 

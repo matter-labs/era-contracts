@@ -16,22 +16,17 @@ contract AddressAliasHelperTest {
         return AddressAliasHelper.undoL1ToL2Alias(_l2Address);
     }
 
-    function actualRefundRecipient(address _recipient, address _prevMessageSender) external view returns (address) {
+    function actualRefundRecipient(
+        address _recipient,
+        address _prevMessageSender
+    ) external view returns (address, bool) {
         return AddressAliasHelper.actualRefundRecipient(_recipient, _prevMessageSender);
     }
 
-    function actualRefundRecipientMailbox(
+    function applyRefundRecipientAlias(
         address _recipient,
-        address _prevMessageSender,
-        bool _is7702AccountRefundRecipient,
-        bool _is7702AccountSender
+        bool _is7702AccountRefundRecipient
     ) external view returns (address) {
-        return
-            AddressAliasHelper.actualRefundRecipientMailbox(
-                _recipient,
-                _prevMessageSender,
-                _is7702AccountRefundRecipient,
-                _is7702AccountSender
-            );
+        return AddressAliasHelper.applyRefundRecipientAlias(_recipient, _is7702AccountRefundRecipient);
     }
 }

@@ -6,9 +6,27 @@
         "name": "_messageRoot",
         "type": "address",
         "internalType": "contract IMessageRootBase"
+      },
+      {
+        "name": "_l1AssetRouter",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "L1_ASSET_ROUTER",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -553,6 +571,17 @@
   },
   {
     "type": "error",
+    "name": "InteropCallToL1NotToAssetRouter",
+    "inputs": [
+      {
+        "name": "target",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "InteropWithdrawalNonZeroValue",
     "inputs": [
       {
@@ -601,7 +630,23 @@
   },
   {
     "type": "error",
+    "name": "MultiCallToL1NotSupported",
+    "inputs": [
+      {
+        "name": "callCount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "PayloadTooShort",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ShadowAccountNotSupported",
     "inputs": []
   },
   {

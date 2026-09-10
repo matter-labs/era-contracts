@@ -42,9 +42,6 @@ contract L1NullifierTest is Test {
     address public assetRouter;
     address public nativeTokenVault;
 
-    uint256 public constant ERA_CHAIN_ID = 9;
-    address public eraDiamondProxy;
-
     TestERC20 public token;
 
     function setUp() public {
@@ -55,15 +52,12 @@ contract L1NullifierTest is Test {
         interopCenter = makeAddr("interopCenter");
         assetRouter = makeAddr("assetRouter");
         nativeTokenVault = makeAddr("nativeTokenVault");
-        eraDiamondProxy = makeAddr("eraDiamondProxy");
 
         token = new TestERC20();
 
         l1NullifierImpl = new L1NullifierDev({
             _bridgehub: IL1Bridgehub(bridgehub),
-            _messageRoot: IMessageRootBase(messageRoot),
-            _eraChainId: ERA_CHAIN_ID,
-            _eraDiamondProxy: eraDiamondProxy
+            _messageRoot: IMessageRootBase(messageRoot)
         });
 
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
@@ -86,9 +80,7 @@ contract L1NullifierTest is Test {
     function test_Initialize_RevertWhen_OwnerIsZeroAddress() public {
         L1NullifierDev impl = new L1NullifierDev({
             _bridgehub: IL1Bridgehub(bridgehub),
-            _messageRoot: IMessageRootBase(messageRoot),
-            _eraChainId: ERA_CHAIN_ID,
-            _eraDiamondProxy: eraDiamondProxy
+            _messageRoot: IMessageRootBase(messageRoot)
         });
 
         vm.expectRevert(ZeroAddress.selector);

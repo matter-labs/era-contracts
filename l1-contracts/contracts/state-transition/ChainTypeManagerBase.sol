@@ -15,14 +15,20 @@ import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} 
 import {IZKChain} from "./chain-interfaces/IZKChain.sol";
 import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
-import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE} from "../common/Config.sol";
+import {
+    DEFAULT_L2_LOGS_TREE_ROOT_HASH,
+    EMPTY_STRING_KECCAK,
+    L2_TO_L1_LOG_SERIALIZE_SIZE,
+    MAX_ALLOWED_MINOR_VERSION_DELTA
+} from "../common/Config.sol";
 import {
     AdminZero,
     InitialForceDeploymentMismatch,
-    NotAPatchUpgrade,
+    NotAVerifierOnlyUpgrade,
     OutdatedProtocolVersion
 } from "./L1StateTransitionErrors.sol";
 import {
+    AddressHasNoCode,
     ChainAlreadyLive,
     HashMismatch,
     MigrationsNotPaused,
@@ -35,7 +41,7 @@ import {IChainAssetHandlerBase} from "../core/chain-asset-handler/IChainAssetHan
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {TxStatus} from "../common/Messaging.sol";
-import {ProposedUpgrade, ProposedUpgradeLib} from "./libraries/ProposedUpgradeLib.sol";
+
 import {IDefaultUpgrade} from "../upgrades/IDefaultUpgrade.sol";
 
 /// @title Chain Type Manager Base contract
@@ -112,6 +118,10 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @dev Updating this mapping only affects CTM storage; it does NOT update already deployed chains.
     /// @dev Emergency verifier changes still require a chain upgrade (diamond cut).
     mapping(uint256 protocolVersion => address) public protocolVersionVerifier;
+
+    /// @dev The upgrade contract used for upgrades that need no custom upgrade logic.
+    /// @dev Populated starting from v32.
+    address public defaultUpgrade;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
@@ -330,6 +340,19 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         _setProtocolVersionVerifier(_protocolVersion, _verifier);
     }
 
+    /// @notice Sets the upgrade contract used by upgrades that need no custom upgrade logic, e.g. verifier-only ones
+    /// @param _defaultUpgrade The new default upgrade contract address
+    function setDefaultUpgrade(address _defaultUpgrade) external onlyOwner {
+        // The address is delegatecalled by every chain that runs the upgrade, so a codeless one would make
+        // the upgrade a silent no-op. This also covers the zero address.
+        if (_defaultUpgrade.code.length == 0) {
+            revert AddressHasNoCode(_defaultUpgrade);
+        }
+        address oldDefaultUpgrade = defaultUpgrade;
+        defaultUpgrade = _defaultUpgrade;
+        emit NewDefaultUpgrade(oldDefaultUpgrade, _defaultUpgrade);
+    }
+
     /// @dev Internal function to set verifier address for a protocol version
     /// @param _protocolVersion The protocol version
     /// @param _verifier The verifier address
@@ -363,53 +386,51 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         });
     }
 
-    /// @notice Creates a patch upgrade for verifier-only upgrades (no facet changes)
-    /// @dev This function creates a DiamondCutData with empty facet cuts but with an upgrade contract.
+    /// @notice Creates a verifier-only upgrade (no facet changes) to a new minor or patch version
+    /// @dev This function creates a DiamondCutData with empty facet cuts that runs the stored `defaultUpgrade`
+    /// contract, which picks the new verifier up from `protocolVersionVerifier`.
     /// @dev ChainCreationParams remain unchanged - only the upgrade cut hash is set.
     /// @param _oldProtocolVersion the old protocol version
     /// @param _oldProtocolVersionDeadline the deadline for the old protocol version
     /// @param _newProtocolVersion the new protocol version
     /// @param _verifier the verifier address for the new protocol version
-    /// @param _upgradeContract the address of the upgrade contract to execute
-    function createNewPatchUpgrade(
+    function createNewVerifierOnlyUpgrade(
         uint256 _oldProtocolVersion,
         uint256 _oldProtocolVersionDeadline,
         uint256 _newProtocolVersion,
-        address _verifier,
-        address _upgradeContract
+        address _verifier
     ) external onlyOwner {
-        if (_upgradeContract == address(0)) {
+        address upgradeContract = defaultUpgrade;
+        if (upgradeContract == address(0)) {
             revert ZeroAddress();
         }
-        // Validate this is a patch upgrade (major and minor versions must be the same).
-        // Note: Non-sequential patch jumps are allowed (e.g., 0.25.1 -> 0.25.4) to support
-        // skipping intermediate patch versions when needed.
-        {
-            (uint32 oldMajor, uint32 oldMinor, uint32 oldPatch) = SemVer.unpackSemVer(
-                SafeCast.toUint96(_oldProtocolVersion)
-            );
-            (uint32 newMajor, uint32 newMinor, uint32 newPatch) = SemVer.unpackSemVer(
-                SafeCast.toUint96(_newProtocolVersion)
-            );
-            if (oldMajor != newMajor || oldMinor != newMinor || newPatch <= oldPatch) {
-                revert NotAPatchUpgrade(_oldProtocolVersion, _newProtocolVersion);
-            }
+        // slither-disable-next-line unused-return
+        (uint32 oldMajor, uint32 oldMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(_oldProtocolVersion));
+        // slither-disable-next-line unused-return
+        (uint32 newMajor, uint32 newMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(_newProtocolVersion));
+        // The version must grow, the major part must stay the same, and the minor jump must respect the same
+        // limit the per-chain upgrade enforces, so that an upgrade accepted here cannot fail on the chain level.
+        // The minor versions are compared unpacked, just like `BaseZkSyncUpgrade` does, since the packed
+        // versions also carry the patch part and their difference would mix the two deltas.
+        // Note: Non-sequential minor/patch jumps are allowed (e.g., 0.25.1 -> 0.25.4) to support
+        // skipping intermediate versions when needed.
+        if (
+            _newProtocolVersion <= _oldProtocolVersion ||
+            newMajor != oldMajor ||
+            newMinor > oldMinor + MAX_ALLOWED_MINOR_VERSION_DELTA
+        ) {
+            revert NotAVerifierOnlyUpgrade(_oldProtocolVersion, _newProtocolVersion);
         }
-
-        // Construct minimal ProposedUpgrade for patch (VK-only) upgrade
-        ProposedUpgrade memory proposedUpgrade = ProposedUpgradeLib.emptyProposedUpgrade(_newProtocolVersion);
-
-        bytes memory upgradeCalldata = abi.encodeCall(IDefaultUpgrade.upgrade, (proposedUpgrade));
 
         // Create diamond cut data with empty facet cuts but with upgrade contract
         Diamond.FacetCut[] memory emptyFacetCuts = new Diamond.FacetCut[](0);
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: emptyFacetCuts,
-            initAddress: _upgradeContract,
-            initCalldata: upgradeCalldata
+            initAddress: upgradeContract,
+            initCalldata: abi.encodeCall(IDefaultUpgrade.upgradeVerifierOnly, (_newProtocolVersion))
         });
 
-        // For patch upgrades, chain creation params don't change — carry forward from the old version.
+        // For verifier-only upgrades, chain creation params don't change — carry forward from the old version.
         newChainCreationParamsBlock[_newProtocolVersion] = newChainCreationParamsBlock[_oldProtocolVersion];
 
         _setNewVersionUpgrade({

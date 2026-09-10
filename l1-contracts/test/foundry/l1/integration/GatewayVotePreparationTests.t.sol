@@ -207,7 +207,7 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
 
         // Build full initCalldata: selector + InitializeData fields.
         // Use L2_BRIDGEHUB_ADDR as bridgehub so initialize() takes the L2 branch
-        // (sets nativeTokenVault/assetTracker from L2 constants, no external calls).
+        // (sets nativeTokenVault from L2 constants, no external calls).
         bytes memory initData1 = bytes.concat(
             IDiamondInit.initialize.selector,
             bytes32(uint256(GATEWAY_CHAIN_ID)), // chainId

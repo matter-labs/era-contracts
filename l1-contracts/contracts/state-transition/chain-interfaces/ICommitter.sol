@@ -115,15 +115,12 @@ interface ICommitter is IZKChainBase {
 
     /// @notice Reports the protocol version a batch was committed with, together with the system upgrade
     /// transaction hash applied in that batch (if any).
-    /// @dev Emitted for every committed batch (both Era and ZKsync OS) so that, from on-chain data alone, an
-    /// external observer can determine which protocol version a batch was committed under. For ZKsync OS the
-    /// `upgradeTxHash` is additionally folded into the batch commitment, so it also enables independent
-    /// recomputation of the commitment.
+    /// @dev Emitted for every committed batch (both Era and ZKsync OS). For ZKsync OS the `upgradeTxHash` is
+    /// additionally folded into the batch commitment, enabling independent recomputation of the commitment.
     /// @param batchNumber Number of the batch committed.
-    /// @param protocolVersion The protocol version the chain used to commit this batch, captured at commit time so
-    /// that it stays unambiguous even after later protocol upgrades change the chain's current protocol version.
-    /// @param upgradeTxHash Hash of the system upgrade transaction applied in this batch. It is non-zero only for
-    /// the first batch committed after a protocol upgrade, and `bytes32(0)` otherwise.
+    /// @param protocolVersion The protocol version the batch was committed with.
+    /// @param upgradeTxHash Hash of the system upgrade transaction applied in this batch; non-zero only for
+    /// the first batch committed after a protocol upgrade.
     event ReportCommittedBatchProtocolVersion(
         uint64 indexed batchNumber,
         uint256 indexed protocolVersion,

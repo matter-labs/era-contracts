@@ -118,7 +118,6 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
         GatewayCTMDeployerConfig memory config = GatewayCTMDeployerConfig({
             aliasedGovernanceAddress: address(0x123),
             salt: keccak256("test-salt"),
-            eraChainId: 1001,
             l1ChainId: 1,
             testnetVerifier: true,
             isZKsyncOS: true, // ZKsyncOS mode enabled
@@ -194,6 +193,22 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
 
         // Compare calculated addresses with actual deployed addresses
         DeployedContractsComparator.compareDeployedContracts(calculatedContracts, actualContracts);
+
+        assertEq(
+            actualContracts.stateTransition.verifiers.verifierFflonk,
+            address(0),
+            "ZKsync OS must not deploy an FFLONK verifier"
+        );
+        assertNotEq(
+            actualContracts.stateTransition.verifiers.verifierPlonk,
+            address(0),
+            "ZKsync OS PLONK verifier must be deployed"
+        );
+        assertNotEq(
+            actualContracts.stateTransition.verifiers.verifier,
+            address(0),
+            "ZKsync OS main verifier must be deployed"
+        );
     }
 
     function _deployAllDeployers(

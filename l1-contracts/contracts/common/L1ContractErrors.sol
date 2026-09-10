@@ -23,6 +23,8 @@ error AlreadyPermanentRollup();
 error AlreadyWhitelisted(address);
 // 0x5e85ae73
 error AmountMustBeGreaterThanZero();
+// 0x76fc80ad
+error AssetDeploymentTrackerNotSet(bytes32 assetId);
 // 0xfde974f4
 error AssetHandlerDoesNotExist(bytes32 assetId);
 // 0x64107968
@@ -31,6 +33,8 @@ error AssetHandlerNotRegistered(bytes32 assetId);
 error AssetIdAlreadyRegistered();
 // 0x1294e9e1
 error AssetIdMismatch(bytes32 expected, bytes32 supplied);
+// 0xda72d995
+error AssetIdNotRegistered(bytes32 assetId);
 // 0x04a0b7e9
 error AssetIdNotSupported(bytes32 assetId);
 // 0x9b821ed7
@@ -41,8 +45,8 @@ error BaseTokenGasPriceDenominatorNotSet();
 error BaseTokenHolderAlreadyInitialized();
 // 0xd3cd4bd2
 error BaseTokenHolderMintFailed();
-// 0x7f9159de
-error BaseTokenPreV31TotalSupplyAlreadySet();
+// 0x8361ff70
+error BaseTokenNativeToThisChain();
 // 0x00a6b592
 error BaseTokenPreV31TotalSupplyNotSet();
 // 0xe3ec2bc9
@@ -71,6 +75,8 @@ error CantExecuteUnprovenBatches();
 error CantRevertExecutedBatch();
 // 0x78d2ed02
 error ChainAlreadyLive();
+// 0xd054a77e
+error ChainBalanceMustBeZeroBeforeMigration(uint256 chainId, bytes32 assetId, uint256 chainBalance);
 // 0x24591d89
 error ChainIdAlreadyExists();
 // 0x717a1656
@@ -83,6 +89,8 @@ error ChainIdMismatch();
 error ChainIdNotRegistered(uint256 chainId);
 // 0x8f620a06
 error ChainIdTooBig();
+// 0x41888953
+error ChainMigrationsDisabled();
 // 0x5e361ef9
 error ChainRequiresValidatorsSignaturesForCommit();
 // 0x8746f42f
@@ -178,6 +186,8 @@ error IncorrectBatchBounds(
 error IncorrectBatchChainId(uint256, uint256);
 // 0xdd381a4c
 error IncorrectBridgeHubAddress(address bridgehub);
+// 0x07859b3b
+error InsufficientChainBalance(uint256 chainId, bytes32 assetId, uint256 amount);
 // 0x03eb8b54
 error InsufficientFunds(uint256 required, uint256 actual);
 // 0xd70c44f6
@@ -192,6 +202,10 @@ error InvalidCaller(address);
 error InvalidChainId();
 // 0x92daded2
 error InvalidDAForPermanentRollup();
+// 0xd95d4d82
+error PubdataContentLockedForPermanentRollup();
+// 0x3731bfa2
+error NonFullPubdataContentForPermanentRollup();
 // 0x4fbe5dba
 error InvalidDelay();
 // 0x3f98a77e
@@ -210,8 +224,6 @@ error InvalidNumberOfBlobs(uint256 expected, uint256 numCommitments, uint256 num
 error InvalidPackedPrecommitmentLength(uint256 length);
 // 0x09bde339
 error InvalidProof();
-// 0x5a1c353a
-error InvalidProofFormat();
 // 0x48c5fa28
 error InvalidProofLengthForFinalNode();
 // 0x5428eae7
@@ -234,6 +246,10 @@ error L2TimestampTooBig();
 error LengthIsNotDivisibleBy32(uint256 length);
 // 0x1b6825bb
 error LogAlreadyProcessed(uint8);
+// 0xe4623697
+error LowerBoundAlreadyRecorded();
+// 0x5c25a57b
+error LowerBoundNotRecorded();
 // 0x43e266b0
 error MalformedBytecode(BytecodeError);
 // 0xafbb7a4e
@@ -256,6 +272,8 @@ error MerkleWrongLength(uint256 newLeavesLength, uint256 leafNumber);
 error MigrationPaused();
 // 0x4e98b356
 error MigrationsNotPaused();
+// 0x7e472272
+error MissingBaseTokenAssetId();
 // 0xfa44b527
 error MissingSystemLogs(uint256 expected, uint256 actual);
 // 0x1508fb47
@@ -292,6 +310,8 @@ error NonSequentialBatch();
 error NonSequentialVersion();
 // 0x0e0ff4d9
 error NonZeroBlobToVerifyZKsyncOS(uint256 index, bytes32 blobLinearHash, bytes32 blobOpeningCommitment);
+// 0x31967fc6
+error NonZeroCarriedHash();
 // 0xfa5cd00f
 error NotAllowed(address addr);
 // 0x64846fe4
@@ -316,8 +336,6 @@ error NotL1(uint256 l1ChainId, uint256 blockChainId);
 error NotL2ToL2(uint256 sourceChainId, uint256 destinationChainId);
 // 0xdf17e316
 error NotWhitelisted(address);
-// 0xf3ed9dfa
-error OnlyEraSupported();
 // 0x9d7bb13f
 error OnlyNormalMode();
 // 0xd702c443
@@ -360,6 +378,8 @@ error ProtocolIdNotGreater();
 error PubdataGreaterThanLimit(uint256 limit, uint256 length);
 // 0x63c36549
 error QueueIsEmpty();
+// 0x881fba9f
+error RecoverToL1NotSupported();
 // 0xab143c06
 error Reentrancy();
 // 0x667d17de
@@ -474,6 +494,12 @@ error ZeroChainId();
 error ZeroUpgradeTimestamp();
 // 0x601b6882
 error ZKChainLimitReached();
+// 0xb2cabab5
+error ZKsyncOSChainConfigUpdateWithUnverifiedBatches(uint256 batchesVerified, uint256 batchesCommitted);
+// 0x1df14b10
+error ZKsyncOSMaxTxGasLimitTooHigh();
+// 0x7e34baaf
+error ZKsyncOSMaxTxGasLimitTooLow();
 // 0x646ac57e
 error ZKsyncOSNotForceDeployForExistingContract(address);
 // 0xb24b1ccb
