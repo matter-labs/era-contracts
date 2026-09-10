@@ -39,10 +39,10 @@ pub(crate) struct Verifiers {
     pub bytecode_verifier: BytecodeVerifier,
     pub network_verifier: NetworkVerifier,
     pub zksync_os_genesis_config: GenesisConfig,
-    /// Era chain id from the env's v31 input TOML. Consumed only by
-    /// v31-ceremony checks: the PUH/Guardians `ERA_CHAIN_ID` constructor
-    /// arg (real ABI of the external zk-governance contracts) and the
-    /// v31-generation L1AssetRouter wiring checks.
+    /// Era chain id from the env's upgrade input TOML. Consumed only by the
+    /// PUH/Guardians checks (`ERA_CHAIN_ID` constructor arg and getter — the
+    /// real ABI of the external zk-governance contracts). The L1AssetRouter no
+    /// longer exposes an Era chain id, so no router wiring check reads this.
     pub era_chain_id: u64,
     pub legacy_gateway_chain_id: u64,
     pub legacy_gateway_chain_intervals: Vec<ChainInterval>,

@@ -1,23 +1,42 @@
 name: "Restore this commit's build artifacts"
 description: >
-  Restores the artifacts `build` produced for this exact commit, for the jobs that consume them
-  rather than compile their own.
+  Restores the artifacts a `build` job produced for this exact commit, for the jobs that consume
+  them rather than compile their own.
+
+  Keep the paths identical to the cache save and artifact upload lists in
+  l1-contracts-ci.yaml and build-contract-artifacts.yaml.
 
   Cache entries are versioned by their paths. Keep comments outside `path:` blocks: YAML treats
   them as paths inside these block scalars.
 
-  The paired save in `build` and the `build-artifacts` upload still carry their own copies, because
-  actions/cache's restore/save split has no mechanism for sharing inputs between them. Keep all
-  three in step.
+inputs:
+  key:
+    description: >
+      Cache key to restore. Defaults to the key l1-contracts-ci's build saves under. Callers whose
+      build may have saved elsewhere should pass `needs.<build-job>.outputs.cache-key`.
+    required: false
+    default: artifacts-l1-ci-${{ github.sha }}
+  fail-on-miss:
+    description: >
+      Fail the step when the key is absent (the default: a consumer job cannot work without the
+      artifacts). Set false to probe for an entry, then branch on the `cache-hit` output.
+    required: false
+    default: "true"
+
+outputs:
+  cache-hit:
+    description: "'true' when the key was restored, empty or 'false' otherwise."
+    value: ${{ steps.restore.outputs.cache-hit }}
 
 runs:
   using: composite
   steps:
     - name: Restore artifacts cache
+      id: restore
       uses: actions/cache/restore@v4
       with:
-        fail-on-cache-miss: true
-        key: artifacts-l1-ci-${{ github.sha }}
+        fail-on-cache-miss: ${{ inputs.fail-on-miss }}
+        key: ${{ inputs.key }}
         path: |
           da-contracts/cache-forge
           da-contracts/out

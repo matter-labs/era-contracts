@@ -77,7 +77,10 @@ returns `bridgeMintData`; the destination-side handler's `bridgeMint` consumes t
 - `bridgehubDepositBaseToken` lets the Bridgehub (L1) / `InteropCenter` (L2) acquire the destination
   chain's `mintValue`: it burns the base token through the
   handler but records nothing, because a failed transaction refunds the base token to the L2
-  `refundRecipient` rather than being claimable on L1.
+  `refundRecipient` rather than being claimable on L1. The historical exception for the Era diamond
+  proxy (`onlyBridgehubOrEra`, serving the retired legacy `Mailbox.requestL2Transaction` path) is gone:
+  a deployed diamond that still exposes that path must be upgraded off it before the shared router is
+  upgraded to this implementation, otherwise its legacy direct deposits revert with `Unauthorized`.
 
 ### Priority-transaction factory dependencies
 

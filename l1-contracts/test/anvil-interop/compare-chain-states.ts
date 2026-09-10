@@ -119,8 +119,8 @@ function isComparableDiamondSlot(
   return slotNumber >= DIAMOND_FACETS_ARRAY_START && slotNumber < DIAMOND_FACETS_ARRAY_START + facetCount;
 }
 
-// `ChainTypeManagerBase.upgradeCutDataBlock` and `.newChainCreationParamsBlock` (storage indices 166
-// and 167, per `forge inspect ChainTypeManagerBase storage-layout`) map a *packed* protocol version
+// `ChainTypeManager.upgradeCutDataBlock` and `.newChainCreationParamsBlock` (storage indices 166
+// and 167, per `forge inspect ChainTypeManager storage-layout`) map a *packed* protocol version
 // to the block at which that version's data was registered. The stored value is a block number, so
 // it drifts run-to-run like the slots below — and the keccak slot itself moves on every genesis
 // protocol-version bump, since the version is the mapping key: the v31 and v32 keys were listed here

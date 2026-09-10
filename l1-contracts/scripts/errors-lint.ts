@@ -17,7 +17,7 @@ const CONTRACTS_DIRECTORIES: Record<string, string[]> = {
   ],
   "./deploy-scripts": ["utils/ZkSyncScriptErrors.sol", "ecosystem/DeployScriptErrors.sol"],
   "../da-contracts/contracts": ["DAContractsErrors.sol"],
-  "contracts/l2-system": ["zksync-os/errors/SystemContractErrors.sol"],
+  "./contracts/l2-system": ["zksync-os/errors/SystemContractErrors.sol"],
 };
 
 // ---------- Helpers: signature DB ----------

@@ -43,7 +43,7 @@ library L2ContractHelper {
         // nonce, so its list prefix always fits in the single-byte short-list form.
         bytes32 hash = keccak256(
             abi.encodePacked(
-                bytes1(uint8(RLP_SHORT_LIST_PREFIX + RLP_ENCODED_ADDRESS_LENGTH + encodedNonce.length)),
+                uint8(RLP_SHORT_LIST_PREFIX + RLP_ENCODED_ADDRESS_LENGTH + encodedNonce.length),
                 RLP_ADDRESS_PREFIX,
                 _sender,
                 encodedNonce

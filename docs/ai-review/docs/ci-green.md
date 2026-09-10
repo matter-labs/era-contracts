@@ -3,13 +3,24 @@
 ## Relevant files
 
 - `.github/workflows/lint.yaml` — repository lint, error lint, formatting for all Rust crates, protocol-ops Clippy and tests, codespell, and typos.
-- `.github/workflows/l1-contracts-ci.yaml` — DA/L1 builds and tests, generated ABI, genesis, hash, selector, and coverage checks.
+- `.github/workflows/l1-contracts-ci.yaml` — DA/L1 builds and tests, verifier-generator checks, and coverage checks.
+- `.github/workflows/pre-merge-checks.yaml` — generated ABI, genesis, hash, selector, and chain-state checks, with the aggregate `pre-merge-verified` gate.
+- `.github/workflows/build-contract-artifacts.yaml` — reusable production build for pre-merge checks.
+- `.github/actions/build-anvil-interop-artifacts/action.yaml` — shared deterministic build for snapshot generation and verification.
 - `.github/workflows/l1-contracts-foundry-ci.yaml` — deploy-script compilation, contract-size checks, and deployment-script smoke tests.
-- `.github/workflows/anvil-interop-ci.yaml` — interop tests, the v31 to v33 upgrade test, and chain-state determinism.
+- `.github/workflows/anvil-interop-ci.yaml` — interop tests and the v31 to v33 upgrade test.
 - `.github/workflows/update-generated-artifacts.yaml` — manual workflow for regenerating artifacts on a same-repository PR.
 - `.github/foundry-versions.env` — the Foundry pin used by CI and local regeneration.
 - `package.json`, `l1-contracts/package.json`, and `da-contracts/package.json` — supported local commands.
 - `AGENTS.md` — mandatory Foundry and Anvil cleanup rules.
+
+## CI tiers
+
+Builds, tests, and static checks run on every push, including draft PRs. The generated-artifact checks in `pre-merge-checks.yaml` run when a PR is ready for review and touches artifact-affecting paths. Require the aggregate `pre-merge-verified` job on the base branch.
+
+Iterate on a draft PR, then regenerate artifacts once the code and tests are stable. The Anvil integration tests load committed snapshots, so they can exercise old bytecode until regeneration. Use `ANVIL_INTEROP_FRESH_DEPLOY=1` locally to test a genesis-affecting change against current sources.
+
+For a same-repository PR, dispatch **Update All Generated Artifacts** before marking it ready for review. This includes ZKsync OS genesis regeneration. Fork PRs must regenerate locally; the workflow rejects fork heads.
 
 ## Toolchain
 

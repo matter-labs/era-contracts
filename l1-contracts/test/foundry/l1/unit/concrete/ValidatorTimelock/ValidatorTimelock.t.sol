@@ -48,6 +48,7 @@ contract ValidatorTimelockTest is Test {
     uint256 lastBatchNumber;
     uint32 executionDelay;
 
+    bytes32 precommitterRole;
     bytes32 committerRole;
     bytes32 reverterRole;
     bytes32 proverRole;
@@ -84,6 +85,7 @@ contract ValidatorTimelockTest is Test {
         vm.prank(owner);
         validator.addValidatorForChainId(eraChainId, dan);
 
+        precommitterRole = validator.PRECOMMITTER_ROLE();
         committerRole = validator.COMMITTER_ROLE();
         reverterRole = validator.REVERTER_ROLE();
         proverRole = validator.PROVER_ROLE();
@@ -458,7 +460,7 @@ contract ValidatorTimelockTest is Test {
     }
 
     function test_addValidatorRoles_PartialRoles() public {
-        // The deprecated precommitter flag is ignored; only the committer role is added.
+        // The retired precommitter flag is still honoured: both the precommitter and committer roles are added.
         IValidatorTimelock.ValidatorRotationParams memory params = IValidatorTimelock.ValidatorRotationParams({
             rotatePrecommitterRole: true,
             rotateCommitterRole: true,
@@ -469,6 +471,7 @@ contract ValidatorTimelockTest is Test {
         });
 
         // Bob should not have any roles initially
+        assertFalse(validator.hasRoleForChainId(chainId, precommitterRole, bob));
         assertFalse(validator.hasRoleForChainId(chainId, committerRole, bob));
         assertFalse(validator.hasRoleForChainId(chainId, reverterRole, bob));
         assertFalse(validator.hasRoleForChainId(chainId, proverRole, bob));
@@ -477,7 +480,8 @@ contract ValidatorTimelockTest is Test {
         vm.prank(owner);
         validator.addValidatorRoles(zkSync, bob, params);
 
-        // Only the committer role should be granted
+        // Precommitter and committer roles should be granted
+        assertTrue(validator.hasRoleForChainId(chainId, precommitterRole, bob));
         assertTrue(validator.hasRoleForChainId(chainId, committerRole, bob));
         assertFalse(validator.hasRoleForChainId(chainId, reverterRole, bob));
         assertFalse(validator.hasRoleForChainId(chainId, proverRole, bob));
@@ -527,6 +531,36 @@ contract ValidatorTimelockTest is Test {
         assertFalse(validator.hasRoleForChainId(chainId, reverterRole, bob));
         assertFalse(validator.hasRoleForChainId(chainId, proverRole, bob));
         assertTrue(validator.hasRoleForChainId(chainId, executorRole, bob));
+    }
+
+    function test_removeValidator_RevokesRetiredPrecommitterRole() public {
+        // A grant that predates the removal of the precommit path.
+        IValidatorTimelock.ValidatorRotationParams memory onlyPrecommitter = IValidatorTimelock
+            .ValidatorRotationParams({
+                rotatePrecommitterRole: true,
+                rotateCommitterRole: false,
+                rotateReverterRole: false,
+                rotateProverRole: false,
+                rotateExecutorRole: false,
+                rotateUpgraderRole: false
+            });
+        vm.prank(owner);
+        validator.addValidatorRoles(zkSync, bob, onlyPrecommitter);
+        assertTrue(validator.hasRoleForChainId(chainId, precommitterRole, bob));
+
+        // The all-roles convenience wrapper clears it, so stale grants do not need raw revokeRole calls.
+        vm.prank(owner);
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit AccessControlEnumerablePerChainAddressUpgradeable.RoleRevoked(zkSync, precommitterRole, bob);
+        validator.removeValidatorForChainId(chainId, bob);
+        assertFalse(validator.hasRoleForChainId(chainId, precommitterRole, bob));
+    }
+
+    function test_addValidator_DoesNotGrantRetiredPrecommitterRole() public {
+        vm.prank(owner);
+        validator.addValidatorForChainId(chainId, bob);
+        _assertAllRoles(chainId, bob, true);
+        assertFalse(validator.hasRoleForChainId(chainId, precommitterRole, bob));
     }
 
     function test_RevertWhen_addValidatorRolesNotChain() public {

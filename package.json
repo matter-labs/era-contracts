@@ -26,6 +26,7 @@
     "markdownlint-cli": "^0.33.0",
     "prettier": "^3.8.1",
     "prettier-plugin-solidity": "^2.2.1",
+    "smol-toml": "1.8.0",
     "solhint": "^6.0.3",
     "viem": "2.48.4"
   },
