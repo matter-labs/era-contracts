@@ -49,30 +49,22 @@ inner/aggregator program VKs and vadcop-final root are pinned in our
 circuit/setup verification key changes. Multiple wrappers on the same L1 can
 use the same backend.
 
-If no compatible backend is deployed on the target L1, run from the repository root with Node.js,
-npm, and the pinned Foundry version installed:
+Backend preparation and optional deployment live in
+[zk-deployer](https://github.com/matter-labs/zksync-os-integration-tests/blob/d1be31737c3d68346cf36495ec0991cefd5233e3/bin/zk-deployer/README.md).
+It reads this checkout's `tools/verifier-gen/data/ZiSK_plonk_verification_key.json`,
+fetches the pinned upstream dependencies, and builds outside Git checkouts.
+The upstream source and notices are preserved; generated outputs retain their
+upstream license and stay out of published packages.
+
+To prepare, deploy, or test directly from a zk-deployer checkout:
 
 ```bash
-node tools/verifier-gen/zisk-backend.js deploy -- \
+node bin/zk-deployer/tools/zisk-backend/zisk-backend.js deploy /path/to/era-contracts -- \
   --rpc-url "$RPC_URL" --account deployer --broadcast
 ```
 
-The helper installs the pinned dependencies, renders the committed
-`tools/verifier-gen/data/ZiSK_plonk_verification_key.json`, compiles upstream's
-`PlonkVerifier`, and prints the config entry containing its deployed address.
-Use the usual `forge create` RPC and signer options after `--`.
-
-Preparation is cached outside the checkout under
-`$XDG_CACHE_HOME/zksync-os/zisk-backend` (default `~/.cache/zksync-os/zisk-backend`).
-CI uses `$RUNNER_TEMP/zksync-os/zisk-backend`. Set `ZISK_BACKEND_CACHE` to choose
-another directory outside a Git checkout. The key includes the verification
-key, dependency pins, helper, and compiler settings. An incomplete or modified
-entry is rejected; remove that entry to rebuild it.
-
-For build-only preparation, `node tools/verifier-gen/zisk-backend.js prepare`
-prints the absolute artifact path. Source and artifacts stay in that directory;
-the upstream source and notices are preserved. The generated component remains
-under its upstream license. Keep these local outputs out of published packages.
+The helper prints `zisk_plonk_verifier_addr` for the deployment config. Its
+`prepare` command only builds and prints the external artifact path.
 
 ## Generating the range verifier
 
@@ -116,17 +108,17 @@ zero.
 `ZiskVerifierRealProofTest` drives a real aggregated cargo-zisk proof through
 `ZiskVerifier.verify`, so it exercises the on-chain reconstruction and the
 real pairing together. Run the full Foundry suite with a locally prepared
-backend from the repository root:
+backend from a zk-deployer checkout:
 
 ```bash
-node tools/verifier-gen/zisk-backend.js test
+node bin/zk-deployer/tools/zisk-backend/zisk-backend.js test /path/to/era-contracts
 ```
 
 Additional test flags may follow `--`, for example
 `-- --match-contract ZiskVerifierRealProofTest`. The helper sets
 `ZISK_PLONK_BYTECODE` from the prepared artifact and requires the real-proof
-suite's prerequisite. CI uses the same command without
-uploading the backend between jobs.
+suite's prerequisite. CI checks out a pinned zk-deployer revision and uses the
+same command without uploading the backend between jobs.
 
 Ordinary `yarn test:foundry` runs skip the real-proof suite when
 `ZISK_PLONK_BYTECODE` is unset. Invalid supplied bytecode fails setup.
