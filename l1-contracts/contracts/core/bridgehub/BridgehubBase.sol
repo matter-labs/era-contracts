@@ -519,6 +519,8 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
+    /// @dev Does not gate L1->L2 requests: those enter through the L1InteropCenter, which has its own pause switch
+    /// (`interopCenter()` on the L1 Bridgehub). Incident response has to pause both to halt deposits and chain creation.
     function pause() external onlyOwner {
         _pause();
     }

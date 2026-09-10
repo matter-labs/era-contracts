@@ -31,6 +31,7 @@ import {CrossChainSenderAddressTooLow} from "contracts/core/bridgehub/L1Bridgehu
 import {
     ChainIdNotRegistered,
     MsgValueMismatch,
+    SlotOccupied,
     Unauthorized,
     WrongMagicValue
 } from "contracts/common/L1ContractErrors.sol";
@@ -660,6 +661,53 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
         (bool success, bytes memory returndata) = address(l1InteropCenter).call(sendBundleCalldata);
         assertFalse(success, "sendBundle must not be callable on the L1InteropCenter");
         assertEq(returndata.length, 0, "an unknown selector must revert without a fallback");
+    }
+
+    function test_requestL2TransactionIndirect_RevertWhen_incorrectNonETHParams(
+        uint256 chainId,
+        uint256 mintValue,
+        uint256 l2Value,
+        uint256 crossChainSenderValue,
+        uint256 msgValue,
+        uint256 randomValue
+    ) public useRandomToken(randomValue) {
+        _useMockSharedBridge();
+        _initializeBridgehub();
+
+        chainId = bound(chainId, 1, type(uint48).max);
+
+        L2TransactionRequestIndirect memory request = _createMockL2TransactionRequestIndirectOuter({
+            chainId: chainId,
+            mintValue: mintValue,
+            l2Value: l2Value,
+            l2GasLimit: 1_000_000,
+            l2GasPerPubdataByteLimit: 800,
+            refundRecipient: address(0),
+            crossChainSenderValue: crossChainSenderValue,
+            crossChainSenderData: hex""
+        });
+        request.chainId = _setUpZKChainForChainId(request.chainId);
+        // The helper bounds the value; the request carries what the interop center will compare against.
+        vm.assume(msgValue != request.crossChainSenderValue);
+        // With an ERC20 base token the mint value is pulled through the asset router, so only the value for
+        // the cross-chain sender may travel as `msg.value`.
+        _setUpBaseTokenForChainId(request.chainId, false, address(testToken));
+
+        address caller = makeAddr("NON_ETH_INDIRECT_CALLER");
+        vm.deal(caller, msgValue);
+        vm.expectRevert(abi.encodeWithSelector(MsgValueMismatch.selector, request.crossChainSenderValue, msgValue));
+        vm.prank(caller);
+        L1InteropRequests.requestIndirect(l1InteropCenter, msgValue, request);
+    }
+
+    function test_initialize_RevertWhen_calledTwice() public {
+        _useMockSharedBridge();
+        _initializeBridgehub();
+
+        // `initialize` is the proxy's one-shot initializer, guarded by the reentrancy-guard initializer that the
+        // constructor (or the first `initialize`) already consumed.
+        vm.expectRevert(SlotOccupied.selector);
+        l1InteropCenter.initialize(bridgeOwner);
     }
 
     function test_supportsAttribute() public {
