@@ -23,6 +23,11 @@
 # `diamond_init_*`, `v28_protocol_version`, the priority-tx gas knobs) are gone — v33 is
 # ZKsync OS-only and nothing on this path reads them. Chain-creation params come from
 # `configs/genesis/zksync-os/latest.json`.
+#
+# Also dropped (EVM-1689): the `V29` section (`encoded_old_validator_timelocks`,
+# `encoded_old_gateway_validator_timelocks`), a hand-copied record of the pre-v29 validator
+# timelock set carried along since `v0.29.0-interopA-ff`. Nothing read it — `env_config.rs`
+# parses fixed keys only and no script resolves `$.V29` — so do not copy it into the next env.
 
 era_chain_id = 324
 testnet_verifier = false
@@ -66,7 +71,3 @@ chain_id = 9075
 [create2_factory_salts]
 "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C" = "0xd93600da02313bab9de70ef4ca32f1397e32764b5c1d4fcec317717fff515cc9"
 "0x1adf137f59949c9081157d5dE1e002D1c992071F" = "0x2bb3435f739fae8c8edc3d8b91f33261b972ef3301ab8edcc3cd48237ca6bbd9"
-
-[V29]
-encoded_old_validator_timelocks = "0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000050000000000000000000000003db52ce065f728011ac6732222270b3f2360d919000000000000000000000000a0425d71cb1d6fb80e65a5361a04096e0672de03000000000000000000000000a8cb082a5a689e0d594d7da1e2d72a3d63adc1bd0000000000000000000000005d8ba173dc6c3c90c8f7c04c9288bef5fdbad06e0000000000000000000000008c0bfc04ada21fd496c55b8c50331f904306f564"
-encoded_old_gateway_validator_timelocks = "0x00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000001000000000000000000000000b83fdd24f40cb2aa5cc9c2a2a0c06e50fa9b4cea"
