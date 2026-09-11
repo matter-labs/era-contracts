@@ -66,27 +66,23 @@ contract ZiskVerifierRealProofTest is Test {
     ZiskVerifier internal ziskVerifier;
     bool internal plonkVerifierAvailable;
 
-    /// @dev External trampoline so a missing artifact is catchable.
-    function deployGeneratedPlonkVerifier() external returns (address) {
-        return deployCode("ZiskSnarkPlonkVerifier.sol:ZiskSnarkPlonkVerifier");
-    }
-
-    /// @dev The snarkJS Plonk verifier is generated and compiled locally
-    ///      (see verifiers/README.md); when its artifact is absent every test
-    ///      in this suite skips.
     modifier requiresPlonkVerifier() {
         vm.skip(!plonkVerifierAvailable);
         _;
     }
 
     function setUp() public {
-        address plonkVerifier;
-        try this.deployGeneratedPlonkVerifier() returns (address deployed) {
-            plonkVerifier = deployed;
-            plonkVerifierAvailable = true;
-        } catch {
+        bytes memory bytecode = vm.envOr("ZISK_PLONK_BYTECODE", bytes(""));
+        if (bytecode.length == 0) {
+            require(!vm.envOr("ZISK_REQUIRE_REAL_PROOFS", false), "ZISK_PLONK_BYTECODE is required");
             return;
         }
+        address plonkVerifier;
+        assembly {
+            plonkVerifier := create(0, add(bytecode, 32), mload(bytecode))
+        }
+        require(plonkVerifier.code.length != 0, "Backend deployment failed");
+        plonkVerifierAvailable = true;
         ziskVerifier = new ZiskVerifier(IZiskSnarkPlonkVerifier(plonkVerifier));
     }
 
