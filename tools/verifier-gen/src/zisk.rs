@@ -19,8 +19,8 @@
 //! - Hardcodes `aggregatorProgramVK` (ROM Merkle root of the aggregator guest
 //!   ELF — it enters public-values bytes [0..32] only)
 //! - Hardcodes `rootCVadcopFinal` (vadcop final root — changes on SNARK circuit
-//!   regen; one value serves the digest and public-values bytes [288..320])
-//! - Reconstructs the 320-byte public values from those pins and the batch
+//!   regen; one value serves the digest and public-values bytes [544..576])
+//! - Reconstructs the 576-byte public values from those pins and the batch
 //!   public inputs, then computes `sha256(publicValues) % RFIELD`
 //! - Calls the inner snarkJS PlonkVerifier for the actual SNARK check
 
@@ -76,14 +76,7 @@ fn extend_with_limbs(preimage: &mut Vec<u8>, limbs: &[u64; 4]) {
 }
 
 /// Generate ZiskVerifier.sol from VK JSON and template.
-///
-/// Optionally copies and adapts the snarkJS-generated PlonkVerifier.sol
-/// (adjusting pragma and contract name for era-contracts conventions).
-pub fn generate_zisk_verifier(
-    vk_path: &str,
-    output_path: &str,
-    plonk_input_path: Option<&str>,
-) -> Result<(), Box<dyn Error>> {
+pub fn generate_zisk_verifier(vk_path: &str, output_path: &str) -> Result<(), Box<dyn Error>> {
     let vk_json = fs::read_to_string(vk_path)?;
     let vk: ZiskVk = serde_json::from_str(&vk_json)?;
 
@@ -107,7 +100,7 @@ pub fn generate_zisk_verifier(
 
     // Compute VK hash = keccak256(innerProgramVK || aggregatorProgramVK ||
     // rootCVadcopFinal), u64 limbs serialized big-endian — the same byte order
-    // the 320-byte public values use on the wire. Every pin enters the hash, so
+    // the 576-byte public values use on the wire. Every pin enters the hash, so
     // a rotation of any one of them rotates the hash.
     let mut vk_hash_preimage = Vec::with_capacity(96);
     extend_with_limbs(&mut vk_hash_preimage, &vk.inner_program_vk);
@@ -137,27 +130,6 @@ pub fn generate_zisk_verifier(
     }
     println!("  rootCVadcopFinal: {:?}", vk.root_cv_adcop_final);
     println!("  VK hash: 0x{}", vk_hash);
-
-    // Optionally copy and adapt the snarkJS PlonkVerifier
-    if let Some(plonk_path) = plonk_input_path {
-        let plonk_sol = fs::read_to_string(plonk_path)?;
-        // Adjust the pragma and contract name for era-contracts conventions;
-        // the snarkJS header is preserved verbatim.
-        let adapted = plonk_sol
-            .replace("pragma solidity >=0.7.0 <0.9.0;", "pragma solidity 0.8.28;")
-            .replace("contract PlonkVerifier", "contract ZiskSnarkPlonkVerifier");
-
-        // Gitignored: compiled when present (local builds, the real-proof
-        // test), deployed standalone, and referenced by address on-chain.
-        let plonk_output =
-            "../../l1-contracts/contracts/dev-contracts/generated/ZiskSnarkPlonkVerifier.sol";
-        if let Some(parent) = std::path::Path::new(plonk_output).parent() {
-            fs::create_dir_all(parent)?;
-        }
-        fs::write(plonk_output, &adapted)?;
-        println!("Generated ZiskSnarkPlonkVerifier at: {plonk_output}");
-        println!("  deploy standalone and pass the address to ZiskVerifier's constructor");
-    }
 
     Ok(())
 }
