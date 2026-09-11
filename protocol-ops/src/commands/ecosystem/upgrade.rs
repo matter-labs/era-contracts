@@ -757,8 +757,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     };
 
     // Merge core + per-CTM governance calls + (when present) the in-memory
-    // PUH/Guardians stage-0 calls + (when present) the new-Gateway bring-up
-    // bundle into a single `<env-out>/ecosystem.toml`. The Solidity
+    // PUH/Guardians stage-0 calls into a single `<env-out>/ecosystem.toml`. The Solidity
     // scripts each emit their own toml under `script-out/` (forge
     // requirement), but downstream (PUVT + governance replay) only consumes
     // the merged file.
