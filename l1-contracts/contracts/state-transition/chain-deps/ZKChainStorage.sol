@@ -114,7 +114,7 @@ struct ZKChainStorage {
     VerifierParams __DEPRECATED_verifierParams;
     /// @dev Deprecated slot, retained to preserve the storage layout. Formerly `l2BootloaderBytecodeHash`
     /// (EraVM bootloader bytecode hash, a zkp-circuit input); ZKsync OS chains have no bootloader.
-    /// Read only by the EraVM-only commit path (unreachable for ZKsync OS chains); no longer written.
+    /// No current path reads or writes it.
     /// @dev STORAGE SLOT: 23
     bytes32 __DEPRECATED_l2BootloaderBytecodeHash;
     /// @dev Deprecated slot, retained to preserve the storage layout. Formerly `l2DefaultAccountBytecodeHash`
@@ -122,10 +122,11 @@ struct ZKChainStorage {
     /// Same lifecycle as {__DEPRECATED_l2BootloaderBytecodeHash}.
     /// @dev STORAGE SLOT: 24
     bytes32 __DEPRECATED_l2DefaultAccountBytecodeHash;
-    /// @dev Indicates that the porter may be touched on L2 transactions.
-    /// @dev Used as an input to zkp-circuit.
+    /// @dev Deprecated slot, retained to preserve the storage layout. Formerly `zkPorterIsAvailable`
+    /// (whether the zkPorter shard could be touched on L2 transactions, a zkp-circuit input); zkPorter
+    /// never shipped and ZKsync OS has no such shard. The value was false on every deployed chain.
     /// @dev STORAGE SLOT: 25
-    bool zkPorterIsAvailable;
+    bool __DEPRECATED_zkPorterIsAvailable;
     /// @dev The maximum number of the L2 gas that a user can request for L1 -> L2 transactions
     /// @dev This is the maximum number of L2 gas that is available for the "body" of the transaction, i.e.
     /// without overhead for proving the batch.
@@ -227,12 +228,16 @@ struct ZKChainStorage {
     /// Same lifecycle as {__DEPRECATED_l2BootloaderBytecodeHash}.
     /// @dev STORAGE SLOT: 58
     bytes32 __DEPRECATED_l2EvmEmulatorBytecodeHash;
-    /// @notice The precommitment for the latest uncommitted batch (i.e. totalBatchesCommitted + 1).
-    /// @dev Whenever the `totalBatchesCommitted` changes, this variable is reset to `DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH`
-    /// (the value of the constant can be found in Config.sol).
+    /// @dev Deprecated slot, retained to preserve the storage layout. Formerly
+    /// `precommitmentForTheLatestBatch` — the rolling precommitment of the latest uncommitted
+    /// batch, an EraVM-only feature (ZKsync OS chains always rejected precommits). Deployed
+    /// chains hold the non-zero default sentinel `bytes32(uint256(1))` here; fresh chains no
+    /// longer initialize it, and nothing reads it.
     /// @dev STORAGE SLOT: 59
-    bytes32 precommitmentForTheLatestBatch;
-    /// @dev ZKsync OS flag, if `true` state transition is done with ZKsync OS, otherwise Era VM
+    bytes32 __DEPRECATED_precommitmentForTheLatestBatch;
+    /// @dev Whether the chain was initialized as ZKsync OS. Retained as compatibility state so
+    /// legacy Era chains continue to report `false` while ZKsync OS chains report `true`; current
+    /// runtime logic does not branch on this value.
     /// @dev STORAGE SLOT: 60 (packed: bool + enum + address — shares with l2DACommitmentScheme + __DEPRECATED_assetTracker)
     bool zksyncOS;
     /// @dev The scheme of L2 DA commitment. Different L1 validators may use different schemes.

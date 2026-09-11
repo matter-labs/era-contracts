@@ -12,10 +12,6 @@ import {PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/
 import {L2TransactionRequestDirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
-    function isZKsyncOS() internal pure override returns (bool) {
-        return true;
-    }
-
     function setUp() public {
         _activatePriorityMode();
     }
@@ -147,7 +143,7 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
         info.dependencyRootsRollingHash = bytes32(0);
     }
 
-    /// @dev Replicates the stored batch info that _commitOneBatchZKsyncOS produces for the given commit info.
+    /// @dev Replicates the stored batch info that _commitOneBatch produces for the given commit info.
     function _buildStoredBatchInfoZKsyncOS(
         CommitBatchInfoZKsyncOS memory commitInfo
     ) internal view returns (IExecutor.StoredBatchInfo memory) {
@@ -165,7 +161,7 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
             });
     }
 
-    /// @dev Mirror the batchOutputHash formula from Committer._commitOneBatchZKsyncOS.
+    /// @dev Mirror the batchOutputHash formula from Committer._commitOneBatch.
     /// Note: the chain id is not part of the batch output; it is committed via the chain config
     /// section of the batch proof public input instead.
     function _batchOutputHash(CommitBatchInfoZKsyncOS memory c) internal pure returns (bytes32) {

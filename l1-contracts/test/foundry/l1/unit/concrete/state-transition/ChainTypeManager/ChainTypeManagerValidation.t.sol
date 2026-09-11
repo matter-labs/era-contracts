@@ -16,7 +16,7 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {
     IChainTypeManager,
     ChainCreationParams,
@@ -44,11 +44,11 @@ import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCall
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 
-contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
+contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
     using stdStorage for StdStorage;
 
-    ZKsyncOSChainTypeManager internal chainTypeManager;
-    ZKsyncOSChainTypeManager internal chainContractAddress;
+    ChainTypeManager internal chainTypeManager;
+    ChainTypeManager internal chainContractAddress;
     L1GenesisUpgrade internal genesisUpgradeContract;
     L1Bridgehub internal bridgehub;
     L1ChainAssetHandler internal chainAssetHandler;
@@ -121,13 +121,8 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         chainAssetHandler.setAddresses();
 
         vm.startPrank(address(bridgehub));
-        chainTypeManager = new ZKsyncOSChainTypeManager(
-            address(bridgehub),
-            interopCenterAddress,
-            address(0),
-            address(0)
-        );
-        diamondInit = address(new DiamondInit(true));
+        chainTypeManager = new ChainTypeManager(address(bridgehub), interopCenterAddress, address(0), address(0));
+        diamondInit = address(new DiamondInit());
         genesisUpgradeContract = new L1GenesisUpgrade();
 
         facetCuts.push(
@@ -177,7 +172,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
 
     function _deployChainTypeManager(
         ChainCreationParams memory chainCreationParams
-    ) internal returns (ZKsyncOSChainTypeManager) {
+    ) internal returns (ChainTypeManager) {
         vm.startPrank(address(bridgehub));
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
             owner: governor,
@@ -194,7 +189,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             abi.encodeCall(IChainTypeManager.initialize, ctmInitializeData)
         );
         vm.stopPrank();
-        return ZKsyncOSChainTypeManager(address(transparentUpgradeableProxy));
+        return ChainTypeManager(address(transparentUpgradeableProxy));
     }
 
     function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
@@ -206,13 +201,9 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
     // ============================================================
 
     function test_constructor() public {
-        ZKsyncOSChainTypeManager ctm = new ZKsyncOSChainTypeManager(
-            address(bridgehub),
-            interopCenterAddress,
-            address(0),
-            address(0)
-        );
+        ChainTypeManager ctm = new ChainTypeManager(address(bridgehub), interopCenterAddress, address(0), address(0));
         assertEq(ctm.BRIDGE_HUB(), address(bridgehub));
+        assertTrue(ctm.isZKsyncOS());
     }
 
     // ============================================================

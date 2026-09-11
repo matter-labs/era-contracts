@@ -6,12 +6,11 @@ import {Utils} from "../Utils/Utils.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract AuthorizationTest is ExecutorTest {
     IExecutor.StoredBatchInfo private storedBatchInfo;
-    CommitBatchInfo private commitBatchInfo;
 
     function setUp() public {
         storedBatchInfo = IExecutor.StoredBatchInfo({
@@ -25,32 +24,18 @@ contract AuthorizationTest is ExecutorTest {
             timestamp: 0,
             commitment: Utils.randomBytes32("commitment")
         });
-
-        commitBatchInfo = CommitBatchInfo({
-            batchNumber: 0,
-            timestamp: 0,
-            indexRepeatedStorageChanges: 0,
-            newStateRoot: Utils.randomBytes32("newStateRoot"),
-            numberOfLayer1Txs: 0,
-            priorityOperationsHash: Utils.randomBytes32("priorityOperationsHash"),
-            bootloaderHeapInitialContentsHash: Utils.randomBytes32("bootloaderHeapInitialContentsHash"),
-            eventsQueueStateHash: Utils.randomBytes32("eventsQueueStateHash"),
-            systemLogs: bytes(""),
-            operatorDAInput: bytes("")
-        });
     }
 
     function test_RevertWhen_CommittingByUnauthorisedAddress() public {
-        CommitBatchInfo[] memory commitBatchInfoArray = new CommitBatchInfo[](1);
-        commitBatchInfoArray[0] = commitBatchInfo;
+        CommitBatchInfoZKsyncOS[] memory commitBatchInfoArray = new CommitBatchInfoZKsyncOS[](1);
+        commitBatchInfoArray[0] = newCommitBatchInfoZKsyncOS;
+        commitBatchInfoArray[0].batchNumber = 0;
 
         vm.prank(randomSigner);
 
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomSigner));
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            storedBatchInfo,
-            commitBatchInfoArray
-        );
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(storedBatchInfo, commitBatchInfoArray);
         committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 

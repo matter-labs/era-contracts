@@ -552,11 +552,6 @@
   },
   {
     "type": "error",
-    "name": "TxnBodyGasLimitNotEnoughGas",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "ValidateTxnNotEnoughGas",
     "inputs": []
   },

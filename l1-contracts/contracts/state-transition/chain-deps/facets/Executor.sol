@@ -5,13 +5,12 @@ pragma solidity 0.8.28;
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
 import {IMessageRootBase} from "../../../core/message-root/IMessageRoot.sol";
-import {EMPTY_STRING_KECCAK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
+import {EMPTY_STRING_KECCAK} from "../../../common/Config.sol";
 import {IExecutor} from "../../chain-interfaces/IExecutor.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
 import {
-    CanOnlyProcessOneBatch,
     CantExecuteUnprovenBatches,
     InvalidMessageRoot,
     InvalidProof,
@@ -222,25 +221,18 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // Check that the batch passed by the validator is indeed the first unverified batch
         _checkBatchHashMismatch(prevBatch, currentTotalBatchesVerified, true);
 
-        bytes32 prevBatchCommitment = prevBatch.commitment;
         bytes32 prevBatchStateCommitment = prevBatch.batchHash;
         for (uint256 i = 0; i < committedBatchesLength; ++i) {
             currentTotalBatchesVerified = currentTotalBatchesVerified.uncheckedInc();
             _checkBatchHashMismatch(committedBatches[i], currentTotalBatchesVerified, false);
 
-            bytes32 currentBatchCommitment = committedBatches[i].commitment;
             bytes32 currentBatchStateCommitment = committedBatches[i].batchHash;
-            if (s.zksyncOS) {
-                proofPublicInput[i] = _getBatchProofPublicInputZKsyncOS(
-                    prevBatchStateCommitment,
-                    currentBatchStateCommitment,
-                    currentBatchCommitment
-                );
-            } else {
-                proofPublicInput[i] = _getBatchProofPublicInput(prevBatchCommitment, currentBatchCommitment);
-            }
+            proofPublicInput[i] = _getBatchProofPublicInput(
+                prevBatchStateCommitment,
+                currentBatchStateCommitment,
+                committedBatches[i].commitment
+            );
 
-            prevBatchCommitment = currentBatchCommitment;
             prevBatchStateCommitment = currentBatchStateCommitment;
         }
         if (currentTotalBatchesVerified > s.totalBatchesCommitted) {
@@ -254,20 +246,14 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     function _verifyProof(uint256[] memory proofPublicInput, uint256[] memory _proof) internal view {
-        // We only allow processing of 1 batch proof at a time on Era Chains.
-        // We allow processing multiple proofs at once on ZKsync OS Chains.
-        if (!s.zksyncOS && proofPublicInput.length != 1) {
-            revert CanOnlyProcessOneBatch();
-        }
-
         bool successVerifyProof = s.verifier.verify(proofPublicInput, _proof);
         if (!successVerifyProof) {
             revert InvalidProof();
         }
     }
 
-    /// @dev Gets zk proof public input for ZKSync OS.
-    function _getBatchProofPublicInputZKsyncOS(
+    /// @dev Gets the proof public input for a batch.
+    function _getBatchProofPublicInput(
         bytes32 _prevBatchStateCommitment,
         bytes32 _currentBatchStateCommitment,
         bytes32 _currentBatchCommitment
@@ -291,15 +277,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     )
                 )
             );
-    }
-
-    /// @dev Gets zk proof public input for Era
-    function _getBatchProofPublicInput(
-        bytes32 _prevBatchCommitment,
-        bytes32 _currentBatchCommitment
-    ) internal pure returns (uint256) {
-        return
-            uint256(keccak256(abi.encodePacked(_prevBatchCommitment, _currentBatchCommitment))) >> PUBLIC_INPUT_SHIFT;
     }
 
     /// @inheritdoc IExecutor

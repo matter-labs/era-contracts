@@ -7,17 +7,18 @@ import {Diamond} from "../../libraries/Diamond.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "../../IChainTypeManager.sol";
 import {ServerNotifier} from "../../../governance/ServerNotifier.sol";
+import {ChainTypeManager} from "../../ChainTypeManager.sol";
+
+import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {Facets} from "contracts/common/StateTransitionTypes.sol";
 import {GatewayCTMDeployerConfig, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "./GatewayCTMDeployer.sol";
 
-/// @title GatewayCTMDeployerCTMBase
+/// @title GatewayCTMDeployerCTM
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Base contract for Gateway CTM deployer.
-/// @dev Contains shared logic for deploying ServerNotifier and CTM.
-/// Subclasses implement _deployCTMImplementation to deploy the specific CTM type.
-abstract contract GatewayCTMDeployerCTMBase {
+/// @notice Gateway CTM deployer: deploys ServerNotifier and the ZKsync OS CTM, links them together.
+contract GatewayCTMDeployerCTM {
     GatewayCTMFinalResult internal deployedResult;
 
     /// @notice Returns the deployed contracts from this deployer.
@@ -26,9 +27,7 @@ abstract contract GatewayCTMDeployerCTMBase {
         result = deployedResult;
     }
 
-    /// @notice Initializes the deployer and deploys all contracts.
-    /// @param _config The deployment configuration.
-    function _deployInner(GatewayCTMFinalConfig memory _config) internal {
+    constructor(GatewayCTMFinalConfig memory _config) {
         bytes32 salt = _config.baseConfig.salt;
 
         GatewayCTMFinalResult memory result;
@@ -64,13 +63,6 @@ abstract contract GatewayCTMDeployerCTMBase {
         );
     }
 
-    /// @notice Deploys the ChainTypeManager implementation contract.
-    /// @dev Must be implemented by subclasses to deploy the specific CTM type.
-    /// @dev PermissionlessValidator is hardcoded to address(0) since Priority Mode is L1-only.
-    /// @param _salt Salt used for CREATE2 deployments.
-    /// @return The address of the deployed CTM implementation.
-    function _deployCTMImplementation(bytes32 _salt) internal virtual returns (address);
-
     /// @notice Deploys the ChainTypeManager contract.
     /// @param _salt Salt used for CREATE2 deployments.
     /// @param _config The deployment config.
@@ -80,7 +72,10 @@ abstract contract GatewayCTMDeployerCTMBase {
         GatewayCTMFinalConfig memory _config,
         GatewayCTMFinalResult memory _result
     ) internal {
-        _result.chainTypeManagerImplementation = _deployCTMImplementation(_salt);
+        // PermissionlessValidator is address(0) since Priority Mode is L1-only
+        _result.chainTypeManagerImplementation = address(
+            new ChainTypeManager{salt: _salt}(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), address(0))
+        );
 
         GatewayCTMDeployerConfig memory baseConfig = _config.baseConfig;
         Facets memory facets = _config.facets;

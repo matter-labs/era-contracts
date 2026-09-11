@@ -116,8 +116,7 @@ impl L2DACommitmentScheme {
             }
             // A logs-only validium delivers less pubdata, not none: the log region — with the
             // interop commitment tree leaves in it — reaches L1 through the same blobs a rollup
-            // uses, unless the caller names another scheme. The Era VM has no pubdata-content
-            // axis, so there a validium is the classic no-DA one.
+            // uses, unless the caller names another scheme.
             DAValidatorType::LogsOnlyValidium => L2DACommitmentScheme::BlobsZKSyncOS,
         }
     }

@@ -100,11 +100,6 @@
             "internalType": "bytes32"
           },
           {
-            "name": "allowEvmEmulator",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
             "name": "l1SharedBridgeProxy",
             "type": "address",
             "internalType": "address"

@@ -5,37 +5,6 @@ pragma solidity ^0.8.21;
 import {IZKChainBase} from "./IZKChainBase.sol";
 import {L2DACommitmentScheme} from "../../common/Config.sol";
 
-/// @notice Data needed to commit new batch
-/// @param batchNumber Number of the committed batch
-/// @param timestamp Unix timestamp denoting the start of the batch execution
-/// @param indexRepeatedStorageChanges The serial number of the shortcut index that's used as a unique identifier for storage keys that were used twice or more
-/// @param newStateRoot The state root of the full state tree
-/// @param numberOfLayer1Txs Number of priority operations to be processed
-/// @param priorityOperationsHash Hash of all priority operations from this batch
-/// @param bootloaderHeapInitialContentsHash Hash of the initial contents of the bootloader heap. In practice it serves as the commitment to the transactions in the batch.
-/// @param eventsQueueStateHash Hash of the events queue state. In practice it serves as the commitment to the events in the batch.
-/// @param systemLogs concatenation of all L2 -> L1 system logs in the batch
-/// @param operatorDAInput Packed pubdata commitments/data.
-/// @dev pubdataCommitments format: This will always start with a 1 byte pubdataSource flag. Current allowed values are 0 (calldata) or 1 (blobs)
-///                             kzg: list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes) = 144 bytes
-///                             calldata: pubdataCommitments.length - 1 - 32 bytes of pubdata
-///                                       and 32 bytes appended to serve as the blob commitment part for the aux output part of the batch commitment
-/// @dev For 2 blobs we will be sending 288 bytes of calldata instead of the full amount for pubdata.
-/// @dev When using calldata, we only need to send one blob commitment since the max number of bytes in calldata fits in a single blob and we can pull the
-///     linear hash from the system logs
-struct CommitBatchInfo {
-    uint64 batchNumber;
-    uint64 timestamp;
-    uint64 indexRepeatedStorageChanges;
-    bytes32 newStateRoot;
-    uint256 numberOfLayer1Txs;
-    bytes32 priorityOperationsHash;
-    bytes32 bootloaderHeapInitialContentsHash;
-    bytes32 eventsQueueStateHash;
-    bytes systemLogs;
-    bytes operatorDAInput;
-}
-
 /// @notice Commit batch info for ZKsync OS
 /// @param batchNumber Number of the committed batch
 /// @param newStateCommitment State commitment of the new state.
@@ -68,27 +37,10 @@ struct CommitBatchInfoZKsyncOS {
     uint256 slChainId;
 }
 
-/// @notice Container for a list of transaction statuses to precommit.
-/// @param txs A packed array of individual transaction status commitments for the batch. Each is expected to be
-/// of length 33 and have the following format: <32-byte tx hash, 1-byte status>. where status is either 0 (failed) or 1 (success).
-/// @param untrustedLastL2BlockNumberHint The "hint" for what the last L2 block number that these txs represent is.
-struct PrecommitInfo {
-    bytes packedTxsCommitments;
-    uint256 untrustedLastL2BlockNumberHint;
-}
-
 /// @title The interface of the ZKsync Committer contract responsible for batch commitment operations.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface ICommitter is IZKChainBase {
-    /// @notice Precommits the status of all L2 transactions for the next batch on the shared bridge.
-    /// @param _chainAddress The address of the DiamondProxy of the chain. Note, that it is not used in the implementation,
-    /// because it is expected to be equal to the `address(this)`, but it is kept here to maintain the same interface on both
-    /// `ValidatorTimelock` and `Executor` for easier and cheaper implementation of the timelock.
-    /// @param _batchNumber The sequential batch number to precommit (must equal `s.totalBatchesCommitted + 1`).
-    /// @param _precommitData ABI‐encoded transaction status list for the precommit.
-    function precommitSharedBridge(address _chainAddress, uint256 _batchNumber, bytes calldata _precommitData) external;
-
     /// @notice Function called by the operator to commit new batches. It is responsible for:
     /// - Verifying the correctness of their timestamps.
     /// - Processing their L2->L1 logs.
@@ -115,8 +67,8 @@ interface ICommitter is IZKChainBase {
 
     /// @notice Reports the protocol version a batch was committed with, together with the system upgrade
     /// transaction hash applied in that batch (if any).
-    /// @dev Emitted for every committed batch (both Era and ZKsync OS). For ZKsync OS the `upgradeTxHash` is
-    /// additionally folded into the batch commitment, enabling independent recomputation of the commitment.
+    /// @dev Emitted for every committed batch. The `upgradeTxHash` is additionally folded into the
+    /// batch commitment, enabling independent recomputation of the commitment.
     /// @param batchNumber Number of the batch committed.
     /// @param protocolVersion The protocol version the batch was committed with.
     /// @param upgradeTxHash Hash of the system upgrade transaction applied in this batch; non-zero only for
@@ -125,17 +77,6 @@ interface ICommitter is IZKChainBase {
         uint64 indexed batchNumber,
         uint256 indexed protocolVersion,
         bytes32 indexed upgradeTxHash
-    );
-
-    /// @notice Emitted when a new precommitment is set for a batch.
-    /// @param batchNumber The batch number for which the precommitment was recorded.
-    /// @param untrustedLastL2BlockNumberHint The hint to what L2 block number the precommitment should correspond to. Note, that there are no
-    /// guarantees on its correctness, it is just a way for the server to make external nodes' indexing simpler.
-    /// @param precommitment The resulting rolling hash of all transaction statuses.
-    event BatchPrecommitmentSet(
-        uint256 indexed batchNumber,
-        uint256 indexed untrustedLastL2BlockNumberHint,
-        bytes32 precommitment
     );
 
     /// @notice Reports the block range for a zksync os batch.

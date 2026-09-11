@@ -322,7 +322,7 @@
         "internalType": "address"
       },
       {
-        "name": "l2TokenProxyBytecodeHash",
+        "name": "beaconProxyRuntimeCodeHash",
         "type": "bytes32",
         "indexed": true,
         "internalType": "bytes32"

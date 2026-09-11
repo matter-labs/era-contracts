@@ -4,16 +4,16 @@ pragma solidity 0.8.28;
 
 import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
 
-import {ZKsyncOSChainTypeManager} from "../../state-transition/ZKsyncOSChainTypeManager.sol";
+import {ChainTypeManager} from "../../state-transition/ChainTypeManager.sol";
 
 /// @title DummyExecutor
 /// @notice A test smart contract implementing the IExecutor interface to simulate Executor behavior for testing purposes.
-contract DummyChainTypeManagerWBH is ZKsyncOSChainTypeManager {
+contract DummyChainTypeManagerWBH is ChainTypeManager {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
     address zkChain;
     /// @notice Constructor
-    constructor(address bridgeHub) ZKsyncOSChainTypeManager(bridgeHub, address(0), address(0), address(0)) {}
+    constructor(address bridgeHub) ChainTypeManager(bridgeHub, address(0), address(0), address(0)) {}
 
     function setZKChain(uint256 _chainId, address _zkChain) external {
         zkChain = _zkChain;

@@ -307,9 +307,6 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
             revert OnlyBridgehub(msg.sender, _bridgehub());
         }
         IGetters zkChain = IGetters(IBridgehubBase(_bridgehub()).getZKChain(_chainId));
-        if (!zkChain.getZKsyncOS()) {
-            return;
-        }
         // A ZKsync OS chain always stores its genesis root in DiamondInit; a zero read is a bug.
         bytes32 genesisChainBatchRoot = zkChain.l2LogsRootHash(0);
         require(genesisChainBatchRoot != bytes32(0), ChainBatchRootZero());

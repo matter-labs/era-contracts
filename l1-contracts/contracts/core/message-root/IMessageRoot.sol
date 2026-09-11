@@ -91,7 +91,7 @@ interface IMessageRootBase is IMessageVerification {
     function addChainBatchRootV32(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) external;
 
     /// @notice One-time, Bridgehub-only seeding of a freshly created chain's genesis (batch 0) chain
-    /// batch root, pulled from the chain itself; a no-op for EraVM chains.
+    /// batch root, pulled from the chain itself.
     /// See {protocol-docs/chain-lifecycle.md#genesis-batch-root-seeding}.
     /// @param _chainId The ID of the chain whose genesis root is seeded.
     function seedGenesisRoot(uint256 _chainId) external;

@@ -162,15 +162,15 @@ contract DeployZKScript is Script {
     }
 
     /// TODO(EVM-748): make that function support non-ETH based chains
-    function supplyEraWallet(address _bridgehub, uint256 _chainId, address addr, uint256 amount) public {
+    function supplyWallet(address _bridgehub, uint256 _chainId, address _recipient, uint256 _amount) public {
         initializeConfig(_bridgehub, _chainId);
 
         Utils.runL1L2Transaction(
             hex"",
             Utils.MAX_PRIORITY_TX_GAS,
-            amount,
+            _amount,
             new bytes[](0),
-            addr,
+            _recipient,
             config.chainId,
             config.bridgehub,
             config.l1SharedBridge,

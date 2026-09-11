@@ -129,6 +129,8 @@ pub async fn deploy_puh_guardians(
     deployer: &Wallet,
     inputs: &ZkGovernanceInputs<'_>,
 ) -> anyhow::Result<ZkGovernanceOutcome> {
+    // The current ProtocolUpgradeHandler proves messages from the Era chain, and Guardians
+    // sends L1-to-L2 requests to it, so their redeployment must preserve `ERA_CHAIN_ID`.
     let era_chain_id = inputs.env.and_then(|c| c.era_chain_id()).ok_or_else(|| {
         anyhow::anyhow!("--env must supply era_chain_id for PUH/Guardians redeploy")
     })?;
@@ -198,7 +200,7 @@ pub async fn deploy_puh_guardians(
     let zksync_os_ctm = inputs.zksync_os_ctm.ok_or_else(|| {
         anyhow::anyhow!(
             "zksync_os_ctm is required for PUH/Guardians redeploy — \
-             pass it from the CTM prepare output (the CTM with is_zk_sync_os=true)"
+             pass it from the CTM prepare output"
         )
     })?;
     logger::info(format!("ZKsync OS CTM: {zksync_os_ctm:#x}"));

@@ -34,7 +34,6 @@ import {
     L2DACommitmentScheme
 } from "contracts/common/Config.sol";
 import {InvalidProofSystem, Unauthorized} from "contracts/common/L1ContractErrors.sol";
-import {NotZKsyncOS} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 /// @notice Exercises the per-chain switch through production facets and verifier wrappers.
 /// @dev Only the SNARK backends and unrelated initialization dependencies are mocked.
@@ -58,7 +57,7 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
             new ZiskVerifier(IZiskSnarkPlonkVerifier(ziskPlonk))
         );
         vm.warp(TESTNET_COMMIT_TIMESTAMP_NOT_OLDER + 1);
-        chain = _deployChain(true, 10);
+        chain = _deployChain(10);
     }
 
     function test_default_requiresBothProofs() public {
@@ -74,14 +73,6 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, validator));
         IAdmin(chain).setProofSystemStatus(ZISK_PROOF_SYSTEM_DISABLED, false);
         assertEq(IGetters(chain).disabledProofSystems(), 0);
-    }
-
-    function test_eraChain_cannotDisable() public {
-        address eraChain = _deployChain(false, 11);
-        vm.prank(owner);
-        vm.expectRevert(NotZKsyncOS.selector);
-        IAdmin(eraChain).setProofSystemStatus(ZISK_PROOF_SYSTEM_DISABLED, false);
-        assertEq(IGetters(eraChain).disabledProofSystems(), 0);
     }
 
     function testFuzz_invalidProofSystem_preservesState(
@@ -143,7 +134,7 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
     }
 
     function test_sharedVerifier_switchIsChainLocal() public {
-        address secondChain = _deployChain(true, 11);
+        address secondChain = _deployChain(11);
         assertEq(address(IGetters(chain).getVerifier()), address(verifier));
         assertEq(address(IGetters(secondChain).getVerifier()), address(verifier));
         IExecutor.StoredBatchInfo memory first = _commit(chain, genesis);
@@ -164,7 +155,7 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
     }
 
     function test_getProofMode_distinguishesDeploymentsWithZeroMask() public {
-        address singleChain = _deployChain(true, 11, address(new ZKsyncOSVerifier(IVerifier(airbenderPlonk))));
+        address singleChain = _deployChain(11, address(new ZKsyncOSVerifier(IVerifier(airbenderPlonk))));
         assertEq(IGetters(chain).disabledProofSystems(), 0);
         assertEq(IGetters(singleChain).disabledProofSystems(), 0);
         assertEq(IGetters(chain).getProofMode(), 5);
@@ -173,16 +164,10 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
         _prove(singleChain, genesis, batch);
     }
 
-    function test_getProofMode_rejectsEraChain() public {
-        address eraChain = _deployChain(false, 11);
-        vm.expectRevert(NotZKsyncOS.selector);
-        IGetters(eraChain).getProofMode();
-    }
-
     function test_testnet_realProofs_followDiamondModeAndRemainChainLocal() public {
         MultiProofTestnetVerifier wrapper = new MultiProofTestnetVerifier(verifier);
-        address firstChain = _deployChain(true, 11, address(wrapper));
-        address secondChain = _deployChain(true, 12, address(wrapper));
+        address firstChain = _deployChain(11, address(wrapper));
+        address secondChain = _deployChain(12, address(wrapper));
         assertEq(IGetters(firstChain).getProofMode(), 5);
         IExecutor.StoredBatchInfo memory first = _commit(firstChain, genesis);
         IExecutor.StoredBatchInfo memory second = _commit(secondChain, genesis);
@@ -222,11 +207,11 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
         assertEq(IGetters(_chain).disabledProofSystems(), _mask);
     }
 
-    function _deployChain(bool _isZKsyncOS, uint256 _chainId) internal returns (address) {
-        return _deployChain(_isZKsyncOS, _chainId, address(verifier));
+    function _deployChain(uint256 _chainId) internal returns (address) {
+        return _deployChain(_chainId, address(verifier));
     }
 
-    function _deployChain(bool _isZKsyncOS, uint256 _chainId, address _verifier) internal returns (address result) {
+    function _deployChain(uint256 _chainId, address _verifier) internal returns (address result) {
         address bridgehub = makeAddr("bridgehub");
         InitializeData memory init = Utils.makeInitializeData(bridgehub);
         init.chainId = _chainId;
@@ -265,7 +250,7 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
                 block.chainid,
                 Diamond.DiamondCutData({
                     facetCuts: cuts,
-                    initAddress: address(new DiamondInit(_isZKsyncOS)),
+                    initAddress: address(new DiamondInit()),
                     initCalldata: abi.encodeCall(DiamondInit.initialize, (init))
                 })
             )

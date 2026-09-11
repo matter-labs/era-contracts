@@ -2,11 +2,10 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {IL2ToL1MessengerEra} from "./IL2ToL1MessengerEra.sol";
+import {IL2ToL1Messenger} from "./IL2ToL1Messenger.sol";
 import {IL2InteropRootStorage} from "../../interop/IL2InteropRootStorage.sol";
 import {IMessageVerification} from "../interfaces/IMessageVerification.sol";
-import {IBaseToken} from "./IBaseToken.sol";
-import {IL2ContractDeployer} from "../interfaces/IL2ContractDeployer.sol";
+import {IL2BaseToken} from "../../l2-system/interfaces/IL2BaseToken.sol";
 import {IL2NativeTokenVault} from "../../bridge/ntv/IL2NativeTokenVault.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {IChainAssetHandlerBase} from "../../core/chain-asset-handler/IChainAssetHandler.sol";
@@ -20,13 +19,9 @@ import {IMessageRootBase} from "../../core/message-root/IMessageRoot.sol";
 
 // solhint-disable no-unused-import
 import {
-    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
-    L2_FORCE_DEPLOYER_ADDR,
-    L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
-    L2_COMPRESSOR_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,
     L2_BRIDGEHUB_ADDR,
     L2_ASSET_ROUTER_ADDR,
@@ -40,22 +35,16 @@ import {
     L2_INTEROP_HANDLER_ADDR,
     L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
-    L2_INTEROP_COMMITMENT_TREE_ADDR,
-    L2_INTEROP_ATTRIBUTE_PARSER_ADDR,
-    MAX_BUILT_IN_CONTRACT_ADDR,
-    L2_BOOTLOADER_ADDRESS
+    L2_INTEROP_ATTRIBUTE_PARSER_ADDR
 } from "./L2ContractAddresses.sol";
 
-/// @dev The address of the L2 deployer system contract.
-IL2ContractDeployer constant L2_CONTRACT_DEPLOYER = IL2ContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR);
-
 /// @dev The address of the special smart contract that can send arbitrary length message as an L2 log
-IL2ToL1MessengerEra constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT = IL2ToL1MessengerEra(
+IL2ToL1Messenger constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT = IL2ToL1Messenger(
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
 );
 
 /// @dev The eth token system contract
-IBaseToken constant L2_BASE_TOKEN_SYSTEM_CONTRACT = IBaseToken(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+IL2BaseToken constant L2_BASE_TOKEN_SYSTEM_CONTRACT = IL2BaseToken(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
 
 /// @dev The system context system contract
 ISystemContext constant L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT = ISystemContext(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR);

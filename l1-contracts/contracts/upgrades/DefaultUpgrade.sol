@@ -19,7 +19,7 @@ contract DefaultUpgrade is BaseZkSyncUpgrade {
     /// @notice Runs an upgrade that only moves the chain to `_newProtocolVersion` and, with it, to the verifier
     /// the CTM stores for that version.
     /// @dev Takes the version rather than a whole {ProposedUpgrade} so that the all-zero struct is built here
-    /// instead of in the {ChainTypeManagerBase}, which is close to the contract size limit.
+    /// instead of in the {ChainTypeManager}, which is close to the contract size limit.
     /// @param _newProtocolVersion The protocol version to upgrade to.
     function upgradeVerifierOnly(uint256 _newProtocolVersion) external virtual returns (bytes32) {
         return upgrade(ProposedUpgradeLib.emptyProposedUpgrade(_newProtocolVersion));

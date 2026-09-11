@@ -17,7 +17,7 @@ import {
 /// This is needed to ensure easier future-compatible encoding.
 uint8 constant RELAYED_SL_DA_VALIDATOR_VERSION = 0;
 
-/// @notice The DA validator intended to be used in Era-environment.
+/// @notice The DA validator used by chains settling on the gateway: it relays the pubdata to L1.
 /// @dev For compatibility reasons it accepts calldata in the same format as the `RollupL1DAValidator`, but unlike the latter it
 /// does not support blobs.
 /// @dev Note that it does not provide any compression whatsoever.

@@ -52,21 +52,6 @@ fn expect_address_eq(
     }
 }
 
-fn expect_debug_eq<T: std::fmt::Debug + PartialEq>(
-    result: &mut VerificationResult,
-    label: &str,
-    actual: &T,
-    expected: &T,
-) {
-    if actual == expected {
-        result.report_ok(&format!("{label} matches expected value ({expected:?})"));
-    } else {
-        result.report_error(&format!(
-            "{label} mismatch: expected {expected:?}, got {actual:?}"
-        ));
-    }
-}
-
 /// RPC state checks
 ///
 /// This is intentionally the *non-overlapping* slice of legacy PUVT's
@@ -88,8 +73,8 @@ fn expect_debug_eq<T: std::fmt::Debug + PartialEq>(
 /// weaker and produced misleading errors for every contract with immutables;
 /// Phase 6 supersedes it.
 ///
-/// Bytecode-supplier `publishingBlock` checks for the L2 upgrade tx
-/// `factoryDeps` are restored separately inside
+/// Bytecode-supplier `evmPublishingBlock` checks for the L2 upgrade tx
+/// `factoryDeps` live inside
 /// `set_new_version_upgrade::verify_factory_deps` so they sit alongside the
 /// rest of the L2 upgrade tx checks.
 pub(crate) async fn verify_v31_artifact_state(
@@ -109,7 +94,8 @@ pub(crate) async fn verify_v31_artifact_state(
     verify_v31_validator_timelocks(artifact, verifiers, result).await?;
     verify_v31_timer_admin_state(artifact, verifiers, result).await?;
     verify_v31_ctm_permissionless_validator(artifact, verifiers, result).await?;
-    verify_v31_ctm_flavor(artifact, verifiers, result).await?;
+    // The exact ChainTypeManager creation bytecode and constructor arguments are verified
+    // by deployment provenance, so no additional runtime flavor probe is needed here.
     verify_v31_chain_settlement_layers(verifiers, result).await;
 
     Ok(())
@@ -324,16 +310,6 @@ async fn verify_v31_core_wiring(
             "Failed to call L1AssetRouter.owner() for core wiring checks: {err}"
         )),
     }
-    let era_chain_id = U256::from(verifiers.era_chain_id);
-    match asset_router.ERA_CHAIN_ID().call().await {
-        Ok(actual) => {
-            expect_debug_eq(result, "L1AssetRouter.eraChainId()", &actual, &era_chain_id);
-        }
-        Err(err) => result.report_error(&format!(
-            "Failed to call L1AssetRouter.eraChainId() for core wiring checks: {err}"
-        )),
-    };
-
     match asset_router.legacyBridge().call().await {
         Ok(actual) => expect_address_eq(
             result,
@@ -595,46 +571,6 @@ async fn verify_v31_ctm_permissionless_validator(
             )),
             Err(err) => result.report_error(&format!(
                 "Failed to call {label}.chain_type_manager_implementation PERMISSIONLESS_VALIDATOR(): {err}"
-            )),
-        }
-    }
-    Ok(())
-}
-
-/// `isZKsyncOS()` is `external pure` on the v31 CTM impl so it's safe to call
-/// directly on the implementation contract (no proxy, no init required). This
-/// guards against the artifact pointing at a non-ZKsync-OS (e.g. Era) CTM
-/// implementation — an artifact-side swap that all other per-CTM checks would
-/// happily pass through.
-async fn verify_v31_ctm_flavor(
-    artifact: &EcosystemUpgradeArtifact,
-    verifiers: &Verifiers,
-    result: &mut VerificationResult,
-) -> Result<()> {
-    let provider = verifiers.network_verifier.get_l1_provider();
-    for ctm in &artifact.ctms {
-        let label = ctm.flavor.label();
-        let scope = format!("ctms.{label}");
-        let ctm_impl = required_address(
-            &ctm.value,
-            &scope,
-            &["state_transition", "chain_type_manager_implementation_addr"],
-        )?;
-        // Only the zksync_os flavor exists on this build.
-        let expected = true;
-        match ChainTypeManager::new(ctm_impl, provider.clone())
-            .isZKsyncOS()
-            .call()
-            .await
-        {
-            Ok(actual) if actual == expected => result.report_ok(&format!(
-                "{label}.chain_type_manager_implementation.isZKsyncOS() = {actual} matches artifact flavor"
-            )),
-            Ok(actual) => result.report_error(&format!(
-                "{label}.chain_type_manager_implementation.isZKsyncOS() = {actual} disagrees with artifact flavor (expected {expected})"
-            )),
-            Err(err) => result.report_error(&format!(
-                "Failed to call {label}.chain_type_manager_implementation.isZKsyncOS(): {err}"
             )),
         }
     }

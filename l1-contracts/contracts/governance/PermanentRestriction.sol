@@ -9,7 +9,8 @@ import {
     RemovingPermanentRestriction,
     TooHighDeploymentNonce,
     UnallowedImplementation,
-    ZeroAddress
+    ZeroAddress,
+    ZeroDeploymentNonce
 } from "../common/L1ContractErrors.sol";
 
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
@@ -106,15 +107,22 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     }
 
     /// @notice Whitelists a certain L2 admin.
-    /// @param deploymentNonce The deployment nonce of the `L2_ADMIN_FACTORY` used for the deployment.
-    function allowL2Admin(uint256 deploymentNonce) external {
-        if (deploymentNonce > MAX_ALLOWED_NONCE) {
+    /// @param _deploymentNonce The EVM account nonce of `L2_ADMIN_FACTORY` consumed by the deployment.
+    /// @dev A newly created contract account starts at nonce 1, so the factory's first `deployAdmin`
+    /// call consumes nonce 1. Callers should read the factory's account nonce before it deploys the admin.
+    /// @dev Nonce 0 is rejected: under EIP-161 a contract account never deploys at nonce 0, so it could
+    /// only ever whitelist an address nothing can be deployed to.
+    function allowL2Admin(uint256 _deploymentNonce) external {
+        if (_deploymentNonce == 0) {
+            revert ZeroDeploymentNonce();
+        }
+        if (_deploymentNonce > MAX_ALLOWED_NONCE) {
             revert TooHighDeploymentNonce();
         }
 
-        // We do not do any additional validations for constructor data or the bytecode,
-        // we expect that only admins of the allowed format are to be deployed.
-        address expectedAddress = L2ContractHelper.computeCreateAddress(L2_ADMIN_FACTORY, deploymentNonce);
+        // We do not do any additional validations for constructor data or the bytecode;
+        // `L2_ADMIN_FACTORY` only deploys admins of the allowed format.
+        address expectedAddress = L2ContractHelper.computeCreateAddress(L2_ADMIN_FACTORY, _deploymentNonce);
 
         if (allowedL2Admins[expectedAddress]) {
             revert AlreadyWhitelisted(expectedAddress);

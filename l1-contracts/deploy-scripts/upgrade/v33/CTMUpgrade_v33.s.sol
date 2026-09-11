@@ -123,7 +123,7 @@ contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
         // DefaultUpgradeZKsyncOS.getL2UpgradeTxData at upgrade time.
         bytes memory upgradeCalldata = abi.encodeCall(
             IL2V32Upgrade.upgrade,
-            (true, coreAddresses.bridgehub.proxies.ctmDeploymentTracker, generatedData.forceDeploymentsData, "")
+            (coreAddresses.bridgehub.proxies.ctmDeploymentTracker, generatedData.forceDeploymentsData, "")
         );
 
         return getComplexUpgraderTargetAndData(_deployments, delegateTo, upgradeCalldata);

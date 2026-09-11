@@ -5,7 +5,6 @@ pragma solidity 0.8.28;
 import {Diamond} from "../libraries/Diamond.sol";
 import {ZKChainBase} from "./facets/ZKChainBase.sol";
 import {
-    DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH,
     L2_TO_L1_LOG_SERIALIZE_SIZE,
     DEFAULT_BATCH_OVERHEAD_L1_GAS,
     DEFAULT_MAX_PUBDATA_PER_BATCH,
@@ -34,12 +33,8 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
     using PriorityTree for PriorityTree.Tree;
     using PriorityQueue for PriorityQueue.Queue;
 
-    bool public immutable IS_ZKSYNC_OS;
-
     /// @dev Initialize the implementation to prevent any possibility of a Parity hack.
-    constructor(bool _isZKOS) reentrancyGuardInitializer {
-        IS_ZKSYNC_OS = _isZKOS;
-    }
+    constructor() reentrancyGuardInitializer {}
 
     /// @notice ZK chain diamond contract initialization
     /// @return Magic 32 bytes, which indicates that the contract logic is expected to be used as a diamond proxy
@@ -101,14 +96,11 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
             minimalL2GasPrice: DEFAULT_MINIMAL_L2_GAS_PRICE
         });
         s.priorityTree.setup(s.__DEPRECATED_priorityQueue.getTotalPriorityTxs());
-        s.precommitmentForTheLatestBatch = DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH;
-        s.zksyncOS = IS_ZKSYNC_OS;
-        if (IS_ZKSYNC_OS) {
-            s.l2LogsRootHashes[0] = ChainBatchRootTree.genesisChainBatchRoot();
-        }
+        s.l2LogsRootHashes[0] = ChainBatchRootTree.genesisChainBatchRoot();
+        s.zksyncOS = true;
 
-        // All new chains (both ZKsync OS ones and not) have the totalSupply tracked for the base token of the chain.
-        // The only exception are the legacy ZKsync OS chains.
+        // All new chains track the total supply of their base token. Legacy chains upgraded in place
+        // are initialized through a separate upgrade path.
         s.baseTokenHasTotalSupply = true;
 
         // While this does not provide a protection in the production, it is needed for local testing

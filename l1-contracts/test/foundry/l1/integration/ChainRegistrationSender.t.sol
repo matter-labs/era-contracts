@@ -13,6 +13,8 @@ import {
 } from "contracts/core/chain-registration/ChainRegistrationSender.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
@@ -79,20 +81,6 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
             abi.encodeWithSelector(IL1MessageRoot.v31UpgradeChainBatchNumber.selector),
             abi.encode(10)
         );
-
-        _settleFirstBatchRoot(zkChainIds[0]);
-    }
-
-    /// @dev Freshly created EraVM chains have an empty tree in the MessageRoot (only ZKsync OS
-    /// chains get a seeded genesis batch leaf), so they only become registrable for interop after
-    /// their first settled batch. Settle one batch root through the real executor entry point.
-    function _settleFirstBatchRoot(uint256 _chainId) internal {
-        vm.prank(getZKChainAddress(_chainId));
-        IMessageRootBase(address(ecosystemAddresses.bridgehub.proxies.messageRoot)).addChainBatchRootV32(
-            _chainId,
-            1,
-            keccak256("first-settled-chain-batch-root")
-        );
     }
 
     /// @notice Freshly deployed chains settle directly on L1. Registration must succeed in this real
@@ -117,6 +105,17 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
 
         // NewPriorityRequest from the mailbox proves the registration service transaction was queued.
         logs.requireOne(NEW_PRIORITY_REQUEST_SIGNATURE);
+    }
+
+    function test_serviceTransaction_revertWhenCalledByDiamond() public {
+        address chain = getZKChainAddress(zkChainIds[0]);
+        bytes32 priorityRoot = IGetters(chain).getPriorityTreeRoot();
+
+        vm.prank(chain);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, chain));
+        MailboxFacet(chain).requestL2ServiceTransaction(l2ContractAddresses[0], "");
+
+        assertEq(IGetters(chain).getPriorityTreeRoot(), priorityRoot);
     }
 
     function test_chainRegistrationSender_revertWhen_alreadyRegistered() public {
@@ -198,7 +197,8 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
     }
 
     /// @notice A chain with an empty tree in the MessageRoot cannot be registered for interop (see
-    /// {protocol-docs/chain-lifecycle.md#interop-registration-chainregistrationsender}). The happy path settles a batch first; here the empty tree is mocked.
+    /// {protocol-docs/chain-lifecycle.md#interop-registration-chainregistrationsender}). Fresh chains
+    /// have a seeded genesis leaf; this test mocks the invalid empty-tree state.
     function test_chainRegistrationSender_revertWhen_chainHasNoBatchesInMessageRoot() public {
         vm.mockCall(
             address(ecosystemAddresses.bridgehub.proxies.messageRoot),
