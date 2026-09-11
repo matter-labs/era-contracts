@@ -28,8 +28,11 @@
 # `encoded_old_gateway_validator_timelocks`), a hand-copied record of the pre-v29 validator
 # timelock set carried along since `v0.29.0-interopA-ff`. Nothing read it — `env_config.rs`
 # parses fixed keys only and no script resolves `$.V29` — so do not copy it into the next env.
-# Likewise `support_l2_legacy_shared_bridge_test`: its only readers were the from-scratch deploy
-# scripts (`DeployL1CoreUtils` / `DeployCTMUtils`), which never see this file, and #2400 removed them.
+# Likewise `support_l2_legacy_shared_bridge_test`: its only readers were the from-scratch
+# deploy scripts (`DeployL1CoreUtils` / `DeployCTMUtils`), which never see this file, and #2400
+# removed them. And `[gateway] chain_id`: the v33 flow has no Gateway step — `DefaultCoreUpgrade`
+# no longer reads a legacy-Gateway chain id, so the redeployed `L1MessageRoot` gets
+# `ERA_GATEWAY_CHAIN_ID = 0`.
 
 era_chain_id = 324
 testnet_verifier = false
@@ -58,15 +61,6 @@ protocol_upgrade_handler_implementation_address = "0x36625Bd3dDB469377C6e9893712
 
 [tokens]
 token_weth_address = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
-
-# Kept deliberately: `DefaultCoreUpgrade` reads this into `config.legacyGatewayChainId`, which is
-# baked into the redeployed `L1MessageRoot` as its `ERA_GATEWAY_CHAIN_ID` immutable. Dropping it
-# would silently redeploy that implementation with 0.
-# The `[gateway.gateway_state_transition]` addresses that used to sit here are gone — they are
-# *written* by `GatewayVotePreparation`, never read from the upgrade input.
-[gateway]
-chain_id = 9075
-
 
 [create2_factory_salts]
 "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C" = "0xd93600da02313bab9de70ef4ca32f1397e32764b5c1d4fcec317717fff515cc9"
