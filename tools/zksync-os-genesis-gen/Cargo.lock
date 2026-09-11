@@ -1662,7 +1662,7 @@ checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 [[package]]
 name = "basic_bootloader"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.3-private#c8709ca5c7e6de65707a922cb1c24fcbe4da2601"
+source = "git+https://github.com/matter-labs/zksync-os-private?tag=v0.5.5#3f243a4899f318433a385f7dcd67761746c262d3"
 dependencies = [
  "airbender-crypto",
  "arrayvec",
@@ -1681,7 +1681,7 @@ dependencies = [
 [[package]]
 name = "basic_system"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.3-private#c8709ca5c7e6de65707a922cb1c24fcbe4da2601"
+source = "git+https://github.com/matter-labs/zksync-os-private?tag=v0.5.5#3f243a4899f318433a385f7dcd67761746c262d3"
 dependencies = [
  "airbender-crypto",
  "arrayvec",
@@ -1907,7 +1907,7 @@ dependencies = [
 [[package]]
 name = "callable_oracles"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.3-private#c8709ca5c7e6de65707a922cb1c24fcbe4da2601"
+source = "git+https://github.com/matter-labs/zksync-os-private?tag=v0.5.5#3f243a4899f318433a385f7dcd67761746c262d3"
 dependencies = [
  "airbender-crypto",
  "basic_bootloader",
@@ -1953,7 +1953,7 @@ dependencies = [
 [[package]]
 name = "cc-traits"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.3-private#c8709ca5c7e6de65707a922cb1c24fcbe4da2601"
+source = "git+https://github.com/matter-labs/zksync-os-private?tag=v0.5.5#3f243a4899f318433a385f7dcd67761746c262d3"
 
 [[package]]
 name = "cfg-if"
@@ -2279,7 +2279,7 @@ dependencies = [
 [[package]]
 name = "cycle_marker"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.3-private#c8709ca5c7e6de65707a922cb1c24fcbe4da2601"
+source = "git+https://github.com/matter-labs/zksync-os-private?tag=v0.5.5#3f243a4899f318433a385f7dcd67761746c262d3"
 
 [[package]]
 name = "darling"
@@ -2333,7 +2333,7 @@ dependencies = [
 [[package]]
 name = "delegated_u256"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.3-private#c8709ca5c7e6de65707a922cb1c24fcbe4da2601"
+source = "git+https://github.com/matter-labs/zksync-os-private?tag=v0.5.5#3f243a4899f318433a385f7dcd67761746c262d3"
 dependencies = [
  "ruint",
  "serde",
@@ -2562,7 +2562,7 @@ checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 [[package]]
 name = "evm_interpreter"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.3-private#c8709ca5c7e6de65707a922cb1c24fcbe4da2601"
+source = "git+https://github.com/matter-labs/zksync-os-private?tag=v0.5.5#3f243a4899f318433a385f7dcd67761746c262d3"
 dependencies = [
  "airbender-crypto",
  "arrayvec",
@@ -2685,7 +2685,7 @@ dependencies = [
 [[package]]
 name = "forward_system"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.3-private#c8709ca5c7e6de65707a922cb1c24fcbe4da2601"
+source = "git+https://github.com/matter-labs/zksync-os-private?tag=v0.5.5#3f243a4899f318433a385f7dcd67761746c262d3"
 dependencies = [
  "airbender-crypto",
  "alloy",
@@ -3717,7 +3717,7 @@ dependencies = [
 [[package]]
 name = "modexp"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.3-private#c8709ca5c7e6de65707a922cb1c24fcbe4da2601"
+source = "git+https://github.com/matter-labs/zksync-os-private?tag=v0.5.5#3f243a4899f318433a385f7dcd67761746c262d3"
 
 [[package]]
 name = "nix"
@@ -3827,7 +3827,7 @@ checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
 [[package]]
 name = "oracle_provider"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.3-private#c8709ca5c7e6de65707a922cb1c24fcbe4da2601"
+source = "git+https://github.com/matter-labs/zksync-os-private?tag=v0.5.5#3f243a4899f318433a385f7dcd67761746c262d3"
 dependencies = [
  "riscv_transpiler",
  "zk_ee",
@@ -5216,7 +5216,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 [[package]]
 name = "storage_models"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.3-private#c8709ca5c7e6de65707a922cb1c24fcbe4da2601"
+source = "git+https://github.com/matter-labs/zksync-os-private?tag=v0.5.5#3f243a4899f318433a385f7dcd67761746c262d3"
 dependencies = [
  "zk_ee",
 ]
@@ -5343,7 +5343,7 @@ dependencies = [
 [[package]]
 name = "system_hooks"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.3-private#c8709ca5c7e6de65707a922cb1c24fcbe4da2601"
+source = "git+https://github.com/matter-labs/zksync-os-private?tag=v0.5.5#3f243a4899f318433a385f7dcd67761746c262d3"
 dependencies = [
  "arrayvec",
  "cycle_marker",
@@ -5741,7 +5741,7 @@ checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
 [[package]]
 name = "u256"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.3-private#c8709ca5c7e6de65707a922cb1c24fcbe4da2601"
+source = "git+https://github.com/matter-labs/zksync-os-private?tag=v0.5.5#3f243a4899f318433a385f7dcd67761746c262d3"
 dependencies = [
  "delegated_u256",
  "ruint",
@@ -6373,7 +6373,7 @@ dependencies = [
 [[package]]
 name = "zk_ee"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.3-private#c8709ca5c7e6de65707a922cb1c24fcbe4da2601"
+source = "git+https://github.com/matter-labs/zksync-os-private?tag=v0.5.5#3f243a4899f318433a385f7dcd67761746c262d3"
 dependencies = [
  "airbender-crypto",
  "arrayvec",
@@ -6406,7 +6406,7 @@ dependencies = [
 [[package]]
 name = "zksync_os_api"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.3-private#c8709ca5c7e6de65707a922cb1c24fcbe4da2601"
+source = "git+https://github.com/matter-labs/zksync-os-private?tag=v0.5.5#3f243a4899f318433a385f7dcd67761746c262d3"
 dependencies = [
  "airbender-crypto",
  "alloy",

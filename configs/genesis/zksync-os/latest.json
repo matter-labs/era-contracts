@@ -278,11 +278,11 @@
   "protocol_semantic_version": {
     "major": 0,
     "minor": 33,
-    "patch": 0
+    "patch": 1
   },
   "execution_version": 5,
   "prover": {
     "fflonk_snark_wrapper_vk_hash": "0x49eae0bf5c7ea580f4979b366e52b386adc5f42e2ce50fc1d3c4de9a86052bff",
-    "recursion_scheduler_level_vk_hash": "0x29651d5f044e1671ff820f85018ed87b26f57402222eb31dd453206e2379bc9c"
+    "recursion_scheduler_level_vk_hash": "0xf27b70fb2ac27736c92f8445fffe8ff9554ad5ea5fd9297a6f1fa2759848915f"
   }
 }
