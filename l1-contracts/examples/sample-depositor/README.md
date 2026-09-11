@@ -150,6 +150,17 @@ L2_WITHDRAWAL_TX_HASH=<tx hash of step 4> \
 The script waits for the proof (up to `PROOF_TIMEOUT_MS`, default 60 min), simulates `executeBundle`, sends it,
 and checks that the bundle is `FullyExecuted`. The recipient then holds the tokens on L1.
 
+## Verified on live chains
+
+The flow above was run on 2026-09-11 against Sepolia and the ZKsync OS testnet alpha chain (8022833, direct
+L1 settlement, v33 ecosystem): a fresh test token and depositor on Sepolia (`0x922675abab3afe357f5fd0a0b6feadaf859056df`,
+`0x7d638686c9e3bb100b5ee1962f6690d349252ae5`), the withdrawer on the alpha chain (`0x7d638686c9e3bb100b5ee1962f6690d349252ae5`), a 1000-token deposit
+(L1 tx `0x8e27e2401c0123128eb78790ae75c17a26c42d8f726f154a90e69e2b8d32e16b`, executed on L2 within ~2 minutes, bridged token
+`0x85175cBd5ac1Ea0E3D518b6b05B43780E5b433d6`), then three withdrawals (100 / 250 / 400) to two L1 recipients, each finalized
+with `finalize-withdrawal.ts` ~25 minutes after its L2 block (first one: L2 tx
+`0x4aec5b84a70e9745ec053642f560b9ac6c5eb9a6ff35a9da12c95aef2f78a328`, L1 finalization `0x32027b11b375dff2db51820d1ab43027e55a4711b65e5521e1be1a087b3d3d91`).
+Final `bridgedOut` on L1 equalled the 250 tokens left on L2.
+
 ## Limitations
 
 - Only ZK chains whose base token is ETH are supported: the depositor pays the L2 gas with the ETH sent along.
