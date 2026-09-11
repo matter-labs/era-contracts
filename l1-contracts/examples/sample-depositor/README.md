@@ -90,8 +90,14 @@ prints the addresses (they are also in `broadcast/DeploySampleDepositor.s.sol/11
 
 ```bash
 export L2_RPC_URL=https://...
-forge script examples/sample-depositor/script/DeploySampleWithdrawer.s.sol --rpc-url $L2_RPC_URL --broadcast
+forge script examples/sample-depositor/script/DeploySampleWithdrawer.s.sol --rpc-url $L2_RPC_URL --broadcast \
+  --gas-estimate-multiplier 600
 ```
+
+On ZKsync OS chains `eth_estimateGas` does not account for the pubdata a transaction publishes (contract
+bytecode above all), so forge's default headroom runs out of gas: this deployment estimated at 1.3M gas and
+consumed 5.0M on the testnet. Scale the estimate generously for every transaction sent to the ZK chain; unused
+gas is refunded.
 
 ### 3. Bridge tokens to the withdrawer
 
@@ -104,7 +110,16 @@ The script quotes the L2 gas with `Bridgehub.l2TransactionBaseCost` at `L1_GAS_P
 `L2_GAS_LIMIT` (default 2,000,000) and sends that much ETH along; the surplus is refunded on L2 to
 `REFUND_RECIPIENT` (default: the owner). The quote must not be below the gas price the L1 transaction is mined
 with, otherwise the Bridgehub rejects the deposit. The chain's server executes the priority transaction within a
-few minutes; the bridged token then shows up at
+few minutes. Its L2 hash is the `txHash` of the `NewPriorityRequest` event in the L1 receipt (the hash forge
+prints comes from its simulation and differs):
+
+```bash
+cast receipt <l1 tx hash> --json --rpc-url $L1_RPC_URL | jq -r \
+  '.logs[] | select(.topics[0]=="0x4531cd5795773d7101c17bdeb9f5ab7f47d7056017506f937083be5d6e77a382") | "0x"+.data[66:130]'
+cast receipt <that hash> status --rpc-url $L2_RPC_URL
+```
+
+The bridged token then shows up at
 
 ```bash
 cast call 0x0000000000000000000000000000000000010004 "l2TokenAddress(address)(address)" $TOKEN --rpc-url $L2_RPC_URL
@@ -115,7 +130,8 @@ cast call <l2 token> "balanceOf(address)(uint256)" <withdrawer> --rpc-url $L2_RP
 
 ```bash
 WITHDRAWER=0x... L1_TOKEN=$TOKEN AMOUNT=10000000 L1_RECIPIENT=0x... \
-  forge script examples/sample-depositor/script/WithdrawToL1.s.sol --rpc-url $L2_RPC_URL --broadcast
+  forge script examples/sample-depositor/script/WithdrawToL1.s.sol --rpc-url $L2_RPC_URL --broadcast \
+  --gas-estimate-multiplier 600
 ```
 
 `L1_TOKEN` is resolved to the bridged token through the `L2NativeTokenVault`; pass `L2_TOKEN` to name it directly.

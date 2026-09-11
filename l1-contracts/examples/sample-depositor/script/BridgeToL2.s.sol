@@ -52,7 +52,9 @@ contract BridgeToL2 is Script {
         vm.stopBroadcast();
 
         console2.log("L2 gas paid (wei):", mintValue);
-        console2.log("Canonical L1 -> L2 tx hash:");
+        // Forge prints the hash of its *simulation*; the broadcast one differs (it commits to the priority
+        // queue position and the L1 gas price). Read it from the `NewPriorityRequest` event of the L1 receipt.
+        console2.log("Canonical L1 -> L2 tx hash (simulation):");
         console2.logBytes32(canonicalTxHash);
     }
 }
