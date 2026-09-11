@@ -82,16 +82,20 @@ function collectSkipStorageAccounts(versionDir: string): Set<string> {
 // it drifts run-to-run like the slots below — and the keccak slot itself moves on every genesis
 // protocol-version bump, since the version is the mapping key: the v31 and v32 keys were listed here
 // as raw hashes and the bump to v33 (#2429) broke the check again. Derive the slots from the version
-// instead, over a range wide enough that the next bump needs no new hash here.
+// instead, including the full current OS version so patch releases are covered too.
 const CTM_VERSION_KEYED_BLOCK_SLOT_INDICES = [166, 167];
 const CTM_VERSION_KEYED_MINOR_FROM = 25;
 const CTM_VERSION_KEYED_MINOR_TO = 45;
 
 function ctmVersionKeyedBlockSlots(): string[] {
   const slots: string[] = [];
+  const genesisPath = path.resolve(__dirname, "../../../configs/genesis/zksync-os/latest.json");
+  const { major, minor, patch } = JSON.parse(fs.readFileSync(genesisPath, "utf-8")).protocol_semantic_version;
+  const versions = new Set<bigint>([(BigInt(major) << 64n) | (BigInt(minor) << 32n) | BigInt(patch)]);
   for (let minor = CTM_VERSION_KEYED_MINOR_FROM; minor <= CTM_VERSION_KEYED_MINOR_TO; minor++) {
-    // SemVer.packSemVer(0, minor, 0) — the mapping key.
-    const packedProtocolVersion = minor * 2 ** 32;
+    versions.add(BigInt(minor) << 32n);
+  }
+  for (const packedProtocolVersion of versions) {
     for (const slotIndex of CTM_VERSION_KEYED_BLOCK_SLOT_INDICES) {
       slots.push(
         utils.keccak256(utils.defaultAbiCoder.encode(["uint256", "uint256"], [packedProtocolVersion, slotIndex]))
@@ -147,7 +151,7 @@ interface ChainStateData {
   accounts?: Record<string, ChainStateAccount>;
 }
 
-function compareChainState(
+export function compareChainState(
   data1: ChainStateData,
   data2: ChainStateData,
   name: string,
@@ -351,4 +355,4 @@ function main() {
   }
 }
 
-main();
+if (require.main === module) main();
