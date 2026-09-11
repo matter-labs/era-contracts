@@ -26,75 +26,6 @@ import {
     NotSettlementLayer
 } from "contracts/state-transition/L1StateTransitionErrors.sol";
 
-contract MailboxOnGatewayTest is UtilsCallMockerTest {
-    IMailbox internal mailboxFacet;
-    UtilsFacet internal utilsFacet;
-    address bridgehub;
-    address chainAssetHandler;
-    uint256 constant eraChainId = 9;
-    uint256 constant l1ChainId = 1;
-    uint256 constant gatewayChainId = 505; // Different from L1
-
-    function setUp() public {
-        // Set up on a non-L1 chain (Gateway)
-        vm.chainId(gatewayChainId);
-
-        bridgehub = makeAddr("bridgehub");
-        chainAssetHandler = makeAddr("chainAssetHandler");
-
-        // Deploy without EIP7702Checker since we're not on L1
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: address(new MailboxFacet(l1ChainId, address(chainAssetHandler), IEIP7702Checker(address(0)), false)),
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: Utils.getMailboxSelectors()
-        });
-        facetCuts[1] = Diamond.FacetCut({
-            facet: address(new UtilsFacet()),
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: Utils.getUtilsFacetSelectors()
-        });
-
-        mockDiamondInitInteropCenterCallsWithAddress(bridgehub, address(0), bytes32(0));
-        vm.mockCall(
-            address(bridgehub),
-            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
-            abi.encode(chainAssetHandler)
-        );
-        vm.mockCall(
-            address(chainAssetHandler),
-            abi.encodeWithSelector(IChainAssetHandlerBase.migrationNumber.selector),
-            abi.encode(1)
-        );
-
-        address testnetVerifier = address(new ZKsyncOSTestnetVerifier(IVerifier(address(0))));
-        mockChainTypeManagerVerifier(testnetVerifier);
-        address diamondProxy = Utils.makeDiamondProxy(facetCuts, bridgehub);
-
-        mailboxFacet = IMailbox(diamondProxy);
-        utilsFacet = UtilsFacet(diamondProxy);
-
-        utilsFacet.util_setBridgehub(bridgehub);
-        utilsFacet.util_setChainId(eraChainId);
-    }
-
-    function test_onlyL1Modifier_RevertsOnGateway() public {
-        // Any function with onlyL1 modifier should revert when called on Gateway
-        // requestL2ServiceTransaction uses onlyL1 modifier
-        // Mock the chainRegistrationSender call to return the test caller
-        vm.mockCall(
-            address(bridgehub),
-            abi.encodeWithSelector(IBridgehubBase.chainRegistrationSender.selector),
-            abi.encode(address(this))
-        );
-
-        vm.expectRevert(abi.encodeWithSelector(NotL1.selector, gatewayChainId));
-        IMailbox(address(mailboxFacet)).requestL2ServiceTransaction(address(0x123), bytes(""));
-    }
-}
-
 contract MailboxConstructorTest is Test {
     function test_Constructor_RevertWhen_EIP7702CheckerIsZeroOnL1() public {
         // On L1, EIP7702Checker cannot be zero
@@ -103,9 +34,9 @@ contract MailboxConstructorTest is Test {
         new MailboxFacet(1, address(0x123), IEIP7702Checker(address(0)), false);
     }
 
-    function test_Constructor_RevertWhen_EIP7702CheckerIsNotZeroOnGateway() public {
-        // On Gateway, EIP7702Checker must be zero
-        vm.chainId(505); // Gateway chain ID
+    function test_Constructor_RevertWhen_EIP7702CheckerIsNotZeroOnSettlementLayer() public {
+        // On a settlement layer, EIP7702Checker must be zero
+        vm.chainId(505); // non-L1 chain ID
         IEIP7702Checker eip7702Checker = IEIP7702Checker(makeAddr("eip7702Checker"));
         vm.expectRevert(AddressNotZero.selector);
         new MailboxFacet(1, address(0x123), eip7702Checker, false);
@@ -118,8 +49,8 @@ contract MailboxConstructorTest is Test {
         assertNotEq(address(mailbox), address(0));
     }
 
-    function test_Constructor_Success_OnGatewayWithoutChecker() public {
-        vm.chainId(505); // Gateway chain ID
+    function test_Constructor_Success_OnSettlementLayerWithoutChecker() public {
+        vm.chainId(505); // non-L1 chain ID
         MailboxFacet mailbox = new MailboxFacet(1, address(0x123), IEIP7702Checker(address(0)), false);
         assertNotEq(address(mailbox), address(0));
     }

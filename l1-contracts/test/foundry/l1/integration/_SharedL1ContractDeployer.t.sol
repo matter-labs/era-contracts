@@ -76,10 +76,6 @@ contract L1ContractDeployer is UtilsCallMockerTest {
             "ZK_CHAIN_OUT",
             "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-era.toml"
         );
-        vm.setEnv(
-            "GATEWAY_PREPARATION_L1_CONFIG",
-            "/test/foundry/l1/integration/deploy-scripts/script-config/gateway-preparation-l1.toml"
-        );
         ecosystemAddresses = deployEcosystem();
         ctmScript = new DeployCTMIntegrationScript();
         ctmScript.runForTest(ecosystemAddresses.bridgehub.proxies.bridgehub, false);

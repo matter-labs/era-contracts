@@ -78,7 +78,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
 
     uint256 internal constant L1_CHAIN_ID = 10; // it cannot be 9, the default block.chainid
     uint256 internal ERA_CHAIN_ID = 270;
-    uint256 internal GATEWAY_CHAIN_ID = 506;
+    uint256 internal NON_L1_SETTLEMENT_LAYER_CHAIN_ID = 506;
     uint256 internal mintChainId = 300;
     address internal l1AssetRouter = makeAddr("l1AssetRouter");
     address internal aliasedL1AssetRouter = AddressAliasHelper.applyL1ToL2Alias(l1AssetRouter);
@@ -163,7 +163,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
                 broadcast: _skip,
                 l1ChainId: L1_CHAIN_ID,
                 eraChainId: ERA_CHAIN_ID,
-                gatewayChainId: GATEWAY_CHAIN_ID,
+                settlementLayerChainId: NON_L1_SETTLEMENT_LAYER_CHAIN_ID,
                 l1AssetRouter: l1AssetRouter,
                 l2TokenBeacon: address(beacon),
                 aliasedOwner: ownerWallet,
@@ -204,7 +204,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         // Fund L2InteropHandler with ETH so it can send value with receiveMessage calls
         vm.deal(L2_INTEROP_HANDLER_ADDR, 1000 ether);
 
-        // Mock currentSettlementLayerChainId for gateway mode check in L2InteropHandler
+        // Mock currentSettlementLayerChainId for the settlement-layer check in L2InteropHandler
         vm.mockCall(
             address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
             abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),

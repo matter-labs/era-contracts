@@ -42,7 +42,7 @@ contract UpgradeIntegrationTestBase is Test {
     string public ECOSYSTEM_OUTPUT = "file_3.toml";
     string public CTM_INPUT = "/upgrade-envs/v0.33.0-atomic-interop/foundry-upgrade.toml";
     string public CORE_OUTPUT = "/script-out/foundry-upgrade/upgrade-core.toml";
-    string public CTM_OUTPUT = "/script-out/foundry-upgrade/mainnet-gateway.toml";
+    string public CTM_OUTPUT = "/script-out/foundry-upgrade/upgrade-ctm.toml";
     string public CHAIN_INPUT;
     string public CHAIN_OUTPUT;
 
@@ -160,7 +160,7 @@ contract UpgradeIntegrationTestBase is Test {
 
         console.log("Starting upgrade stage 2 (core + CTM merged)!");
         governanceMulticall(coreUpgrade.getOwnerAddress(), upgradeStage2Calls);
-        // Stage 2 must unpause migrations on L1 (DefaultCoreUpgrade.prepareUnpauseGatewayMigrationsCall).
+        // Stage 2 must unpause migrations on L1 (DefaultCoreUpgrade.prepareUnpauseMigrationsCall).
         assertFalse(IChainAssetHandlerBase(chainAssetHandler).migrationPaused(), "Stage 2 should unpause migrations");
 
         console.log("Ecosystem upgrade is prepared, now all the chains have to upgrade to the new version");
@@ -176,7 +176,7 @@ contract UpgradeIntegrationTestBase is Test {
         // Hook for test-specific setup before chain upgrade
         beforeChainUpgrade();
 
-        console.log("Upgrading gateway");
+        console.log("Upgrading chain");
         // Re-arm so chain-side events (DiamondCut, NewChain, NewZKChain) are captured.
         vm.recordLogs();
 

@@ -6,8 +6,6 @@ pragma solidity ^0.8.21;
 error AdminZero();
 // 0xca1c3cbc
 error AlreadyMigrated();
-// 0x125d99b0
-error BlobHashBlobCommitmentMismatchValue();
 // 0xafda12bf
 error CommitBasedInteropNotSupported();
 // 0xc02d3ee3
@@ -40,16 +38,12 @@ error InvalidNumberOfBatchHashes(uint256 batchHashesLength, uint256 expected);
 error InvalidNumberOfBlobs(uint256 blobsProvided, uint256 maxBlobsSupported);
 // 0x5513177c
 error InvalidPubdataHash(bytes32 fullPubdataHash, bytes32 providedPubdataHash);
-// 0x5717f940
-error InvalidPubdataSource(uint8 pubdataSource);
 // 0x90f67ecf
 error InvalidStartIndex(uint256 treeStartIndex, uint256 commitmentStartIndex);
 // 0x0f67bc0a
 error InvalidUnprocessedIndex(uint256 treeUnprocessedIndex, uint256 commitmentUnprocessedIndex);
 // 0x2e89f517
 error L1DAValidatorAddressIsZero();
-// 0x7fbff2dd
-error L1DAValidatorInvalidSender(address msgSender);
 // 0x9b5f85eb
 error MessageRootIsZero();
 // 0xf148c8da

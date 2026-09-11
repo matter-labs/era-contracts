@@ -21,7 +21,7 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IRollupDAManager} from "../interfaces/IRollupDAManager.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
-import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";
+import {CoreOnL2Helper} from "../ecosystem/CoreOnL2Helper.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
@@ -44,7 +44,7 @@ import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {CTMDeployedAddresses, Config, DeployCTMUtils} from "./DeployCTMUtils.s.sol";
 import {CoreContract} from "../ecosystem/CoreContract.sol";
-import {CTMContract, DeployCTML1OrGateway} from "./DeployCTML1OrGateway.sol";
+import {CTMContract, DeployCTMContracts} from "./DeployCTMContracts.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
@@ -182,7 +182,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         initializeGeneratedData();
 
         deployStateTransitionDiamondFacets();
-        (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(CTMContract.ChainTypeManager);
+        (, string memory ctmContractName) = DeployCTMContracts.resolve(CTMContract.ChainTypeManager);
         (
             ctmAddresses.stateTransition.implementations.chainTypeManager,
             ctmAddresses.stateTransition.proxies.chainTypeManager
@@ -213,8 +213,8 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function deployVerifiers() internal {
-        (, string memory plonkName) = DeployCTML1OrGateway.resolve(CTMContract.VerifierPlonk);
-        (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(config.testnetVerifier);
+        (, string memory plonkName) = DeployCTMContracts.resolve(CTMContract.VerifierPlonk);
+        (, string memory verifierName) = DeployCTMContracts.resolveMainVerifier(config.testnetVerifier);
 
         ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract(plonkName);
         ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName);
@@ -453,7 +453,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         bytes[10] memory bytecodes;
         for (uint256 i = 0; i < contracts.length; i++) {
-            (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(contracts[i]);
+            (string memory fileName, string memory contractName) = CoreOnL2Helper.resolve(contracts[i]);
             bytecodes[i] = BytecodeUtils.readDeployedBytecodeL1(fileName, contractName);
             vm.writeLine(tmpFile, vm.toString(bytecodes[i]));
         }
@@ -517,7 +517,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     /// @dev Get bytecode info, using cached blake hashes.
     function _getBytecodeInfo(CoreContract _c) internal virtual returns (bytes memory) {
-        (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(_c);
+        (string memory fileName, string memory contractName) = CoreOnL2Helper.resolve(_c);
         return _getProxyUpgradeBytecodeInfo(fileName, contractName);
     }
 

@@ -615,51 +615,6 @@ contract ForwardedBridgeFunctionsTest is MigratorTest {
         migratorFacet.forwardedBridgeMint(data, true);
     }
 
-    function test_forwardedBridgeMint_RevertWhen_NotMigrated_OnGateway_ContractAlreadyDeployed() public {
-        _setupReceivingSettlementPausedState();
-
-        // Switch to Gateway chain (not L1)
-        uint256 gatewayChainId = 505;
-        vm.chainId(gatewayChainId);
-
-        address ctm = utilsFacet.util_getChainTypeManager();
-        uint256 currentProtocolVersion = utilsFacet.util_getProtocolVersion();
-        vm.mockCall(
-            ctm,
-            abi.encodeWithSelector(IChainTypeManager.protocolVersion.selector),
-            abi.encode(currentProtocolVersion)
-        );
-
-        // Ensure settlement layer is address(0) (not migrated)
-        assertEq(utilsFacet.util_getSettlementLayer(), address(0));
-
-        PriorityTreeCommitment memory priorityTreeCommitment = PriorityTreeCommitment({
-            nextLeafIndex: 0,
-            startIndex: 0,
-            unprocessedIndex: 0,
-            sides: new bytes32[](0)
-        });
-
-        ZKChainCommitment memory commitment = ZKChainCommitment({
-            totalBatchesExecuted: 0,
-            totalBatchesVerified: 0,
-            totalBatchesCommitted: 0,
-            l2SystemContractsUpgradeTxHash: bytes32(0),
-            l2SystemContractsUpgradeBatchNumber: 0,
-            batchHashes: new bytes32[](1),
-            priorityTree: priorityTreeCommitment,
-            isPermanentRollup: false,
-            precommitmentForTheLatestBatch: bytes32(0)
-        });
-
-        bytes memory data = abi.encode(commitment);
-
-        // On Gateway, with _contractAlreadyDeployed=true but settlementLayer=address(0), should revert with NotMigrated
-        vm.prank(chainAssetHandler);
-        vm.expectRevert(NotMigrated.selector);
-        migratorFacet.forwardedBridgeMint(data, true);
-    }
-
     // add this to be excluded from coverage report
     function test() internal override {}
 }

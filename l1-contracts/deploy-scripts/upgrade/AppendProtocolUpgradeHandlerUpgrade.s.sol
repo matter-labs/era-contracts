@@ -18,7 +18,7 @@ contract AppendProtocolUpgradeHandlerUpgrade is Script {
 
     function run() public {
         string memory root = vm.projectRoot();
-        string memory config = vm.envString("GATEWAY_UPGRADE_ECOSYSTEM_INPUT");
+        string memory config = vm.envString("UPGRADE_ECOSYSTEM_INPUT");
 
         string memory configPath = string.concat(root, config);
 

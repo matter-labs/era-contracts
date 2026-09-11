@@ -283,11 +283,6 @@
             "internalType": "address"
           },
           {
-            "name": "gatewayChainId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
             "name": "ownerAddress",
             "type": "address",
             "internalType": "address"

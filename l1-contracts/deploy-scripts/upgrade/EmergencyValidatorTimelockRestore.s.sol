@@ -25,7 +25,7 @@ import {MultisigCommitter} from "contracts/state-transition/validators/MultisigC
 ///
 /// @dev The L1 ChainAssetHandler migration relaxation was intentionally dropped from this proposal: the
 /// same-CTM restriction is also enforced in the Migrator, so a CAH-only impl swap does not enable
-/// L1 -> other-CTM-Gateway migration. That needs a separate change.
+/// L1 -> other-CTM settlement-layer migration. That needs a separate change.
 ///
 /// Flow (two steps):
 ///   1. VPS deploys the implementation (broadcast) — already deployed at 0x3Ccb407b… on Sepolia:

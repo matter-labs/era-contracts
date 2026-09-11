@@ -33,7 +33,7 @@ import {CTMDeployedAddresses} from "../../ctm/DeployCTMUtils.s.sol";
 import {BytecodePublisher, PublishFactoryDepsResult} from "../../utils/bytecode/BytecodePublisher.s.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {CoreContract} from "../../ecosystem/CoreContract.sol";
-import {CoreOnGatewayHelper} from "../../ecosystem/CoreOnGatewayHelper.sol";
+import {CoreOnL2Helper} from "../../ecosystem/CoreOnL2Helper.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
@@ -45,7 +45,7 @@ import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {DefaultL2UpgradeStrategy} from "./DefaultL2UpgradeStrategy.sol";
 import {ICTMUpgrade} from "contracts/script-interfaces/ICTMUpgrade.sol";
 import {CTMUpgradeParams} from "./UpgradeParams.sol";
-import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
+import {CTMContract, DeployCTMContracts} from "../../ctm/DeployCTMContracts.sol";
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
@@ -75,11 +75,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         uint256 governanceUpgradeTimerInitialDelay;
         bool hasPreV32IntrospectionOverride;
         bool usePreV32IntrospectionOverride;
-    }
-
-    // solhint-disable-next-line gas-struct-packing
-    struct GatewayConfig {
-        uint256 chainId;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -124,7 +119,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
 
     // Input for the script
     AdditionalConfig internal newConfig;
-    GatewayConfig internal gatewayConfig;
 
     // Discovered addresses
     ZkChainAddresses internal discoveredRepresentativeZkChain;
@@ -324,7 +318,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         );
 
         // The constructor receives the new BytecodesSupplier and PermissionlessValidator proxy addresses.
-        (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(CTMContract.ChainTypeManager);
+        (, string memory ctmContractName) = DeployCTMContracts.resolve(CTMContract.ChainTypeManager);
         console.log("Deploying ChainTypeManager:", ctmContractName);
         ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmContractName);
 
@@ -405,10 +399,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
 
     function getBridgehubAdmin() public virtual returns (address admin) {
         return coreAddresses.shared.bridgehubAdmin;
-    }
-
-    function getGatewayConfig() public virtual returns (GatewayConfig memory) {
-        return gatewayConfig;
     }
 
     function getGovernanceUpgradeTimerInitialDelay() public view virtual returns (uint256) {
@@ -523,7 +513,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     }
 
     function publishBytecodes() public virtual {
-        bytes[] memory allDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(
+        bytes[] memory allDeps = CoreOnL2Helper.getFullListOfFactoryDependencies(
             getAdditionalFactoryDependencyContracts()
         );
         BytecodesSupplier supplier = BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier);
@@ -542,9 +532,9 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         returns (Call[] memory stage0Calls, Call[] memory stage1Calls, Call[] memory stage2Calls)
     {
         // Default upgrade is done it 3 stages:
-        // 0. Pause migration to/from Gateway, other stage 0 calls.
+        // 0. Pause chain migrations, other stage 0 calls.
         // 1. Perform upgrade
-        // 2. Unpause migration to/from Gateway
+        // 2. Unpause chain migrations
         stage0Calls = prepareStage0GovernanceCalls();
         vm.serializeBytes("governance_calls", "stage0_calls", abi.encode(stage0Calls));
         stage1Calls = prepareStage1GovernanceCalls();
@@ -628,7 +618,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         calls[0] = call;
     }
 
-    /// @notice The zeroth step of upgrade. By default it just stops gateway migrations
+    /// @notice The zeroth step of upgrade. By default it just pauses chain migrations
     function prepareStage0GovernanceCalls() public virtual returns (Call[] memory calls) {
         Call[][] memory allCalls = new Call[][](2);
 
@@ -654,7 +644,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         allCalls[5] = provideSetNewVersionUpgradeCall();
         console.log("prepareStage1GovernanceCalls: prepareDAValidatorCall");
         allCalls[6] = prepareDAValidatorCall();
-        console.log("prepareStage1GovernanceCalls: prepareGatewaySpecificStage1GovernanceCalls");
+        console.log("prepareStage1GovernanceCalls: prepareVersionSpecificStage1GovernanceCallsL1");
         allCalls[7] = prepareVersionSpecificStage1GovernanceCallsL1();
         calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
@@ -713,7 +703,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         calls[0] = ctmCall;
     }
 
-    function preparePauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
+    function preparePauseMigrationsCall() public view virtual returns (Call[] memory result) {
         require(
             coreAddresses.bridgehub.proxies.chainAssetHandler != address(0),
             "chainAssetHandlerProxy is zero in newConfig"

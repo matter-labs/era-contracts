@@ -344,9 +344,9 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
         returns (Call[] memory stage0Calls, Call[] memory stage1Calls, Call[] memory stage2Calls)
     {
         // Default upgrade is done it 3 stages:
-        // 0. Pause migration to/from Gateway
+        // 0. Pause chain migrations
         // 1. Perform upgrade
-        // 2. Unpause migration to/from Gateway
+        // 2. Unpause chain migrations
         stage0Calls = prepareStage0GovernanceCalls();
         vm.serializeBytes("governance_calls", "stage0_calls", abi.encode(stage0Calls));
         stage1Calls = prepareStage1GovernanceCalls();
@@ -371,7 +371,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
         return calls;
     }
 
-    function prepareUnpauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
+    function prepareUnpauseMigrationsCall() public view virtual returns (Call[] memory result) {
         require(coreAddresses.bridgehub.proxies.bridgehub != address(0), "bridgehubProxyAddress is zero in newConfig");
 
         result = new Call[](1);
@@ -382,11 +382,11 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
         });
     }
 
-    /// @notice The zeroth step of upgrade. By default it just stops gateway migrations
+    /// @notice The zeroth step of upgrade. By default it just pauses chain migrations
     function prepareStage0GovernanceCalls() public virtual returns (Call[] memory calls) {
         Call[][] memory allCalls = new Call[][](3);
 
-        allCalls[0] = preparePauseGatewayMigrationsCall();
+        allCalls[0] = preparePauseMigrationsCall();
         allCalls[1] = prepareVersionSpecificStage0GovernanceCallsL1();
         allCalls[2] = prepareDefaultEcosystemAdminCalls();
 
@@ -402,11 +402,11 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
         // calls ChainAssetHandler.unpauseMigration(), clearing the pause set in stage 0; stage 1's
         // checkMigrationsPaused() would then revert with MigrationsNotPaused(). Harmless on the normal
         // governance path (the pause from stage 0 is simply re-asserted).
-        allCalls[0] = preparePauseGatewayMigrationsCall();
+        allCalls[0] = preparePauseMigrationsCall();
         console.log("prepareStage1GovernanceCalls: prepareUpgradeProxiesCalls");
         allCalls[1] = prepareUpgradeProxiesCalls();
         allCalls[2] = provideSetNewVersionUpgradeCall();
-        console.log("prepareStage1GovernanceCalls: prepareGatewaySpecificStage1GovernanceCalls");
+        console.log("prepareStage1GovernanceCalls: prepareVersionSpecificStage1GovernanceCallsL1");
         allCalls[3] = prepareVersionSpecificStage1GovernanceCallsL1();
 
         calls = UpgradeUtils.mergeCallsArray(allCalls);
@@ -417,7 +417,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
         Call[][] memory allCalls = new Call[][](2);
 
         allCalls[0] = prepareVersionSpecificStage2GovernanceCallsL1();
-        allCalls[1] = prepareUnpauseGatewayMigrationsCall();
+        allCalls[1] = prepareUnpauseMigrationsCall();
 
         calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
@@ -440,7 +440,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
     // TODO looks like we have to set it for bridgehub too
     function provideSetNewVersionUpgradeCall() public virtual returns (Call[] memory calls) {}
 
-    function preparePauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
+    function preparePauseMigrationsCall() public view virtual returns (Call[] memory result) {
         require(coreAddresses.bridgehub.proxies.chainAssetHandler != address(0), "chainAssetHandlerProxy is zero");
 
         result = new Call[](1);

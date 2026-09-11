@@ -20,8 +20,8 @@ contract SystemContextWithChainAssetHandlerTest is SystemContextTest {
     /// @dev A dummy L1 chain ID distinct from block.chainid (default 31337 in Foundry).
     uint256 internal constant L1_CHAIN_ID = 1;
 
-    /// @dev An example gateway chain ID used as an alternate settlement layer.
-    uint256 internal constant GATEWAY_CHAIN_ID = 506;
+    /// @dev An example chain ID used as an alternate settlement layer.
+    uint256 internal constant OTHER_SETTLEMENT_LAYER_CHAIN_ID = 506;
 
     function setUp() public override {
         super.setUp();
@@ -41,7 +41,7 @@ contract SystemContextWithChainAssetHandlerTest is SystemContextTest {
     /// correct *previous* and *new* chain IDs when the settlement layer changes.
     function test_setSettlementLayerChainId_callsL2ChainAssetHandlerWithCorrectParams() public {
         uint256 previousChainId = 0; // initial state
-        uint256 newChainId = GATEWAY_CHAIN_ID;
+        uint256 newChainId = OTHER_SETTLEMENT_LAYER_CHAIN_ID;
 
         vm.expectCall(
             L2_CHAIN_ASSET_HANDLER_ADDR,
@@ -61,7 +61,7 @@ contract SystemContextWithChainAssetHandlerTest is SystemContextTest {
     /// @notice Verifies that when the same value is set again the guard check prevents any call
     /// to L2ChainAssetHandler (no logs emitted, no state change).
     function test_setSettlementLayerChainId_noopWhenValueUnchanged() public {
-        uint256 chainId = GATEWAY_CHAIN_ID;
+        uint256 chainId = OTHER_SETTLEMENT_LAYER_CHAIN_ID;
 
         // First call – establishes the value.
         vm.prank(L2_BOOTLOADER_ADDRESS);
@@ -105,7 +105,7 @@ contract SystemContextWithChainAssetHandlerTest is SystemContextTest {
     }
 
     /// @notice Verifies that migrationNumber increments when the settlement layer actually changes
-    /// (e.g. from L1 to Gateway), demonstrating the real L2ChainAssetHandler is invoked.
+    /// (e.g. from L1 to another settlement layer), demonstrating the real L2ChainAssetHandler is invoked.
     function test_setSettlementLayerChainId_migrationNumberIncrements() public {
         // First: settle on L1 (no migration recorded – initial case).
         vm.prank(L2_BOOTLOADER_ADDRESS);
@@ -113,9 +113,9 @@ contract SystemContextWithChainAssetHandlerTest is SystemContextTest {
 
         uint256 migNumBefore = chainAssetHandlerAtAddr.migrationNumber(block.chainid);
 
-        // Now migrate to Gateway: previous == L1_CHAIN_ID, current == GATEWAY_CHAIN_ID.
+        // Now migrate away from L1: previous == L1_CHAIN_ID, current == OTHER_SETTLEMENT_LAYER_CHAIN_ID.
         vm.prank(L2_BOOTLOADER_ADDRESS);
-        systemContext.setSettlementLayerChainId(GATEWAY_CHAIN_ID);
+        systemContext.setSettlementLayerChainId(OTHER_SETTLEMENT_LAYER_CHAIN_ID);
 
         assertEq(
             chainAssetHandlerAtAddr.migrationNumber(block.chainid),
@@ -130,6 +130,6 @@ contract SystemContextWithChainAssetHandlerTest is SystemContextTest {
         address notSystemContext = makeAddr("notSystemContext");
         vm.prank(notSystemContext);
         vm.expectRevert(abi.encodeWithSelector(NotSystemContext.selector, notSystemContext));
-        IL2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).setSettlementLayerChainId(0, GATEWAY_CHAIN_ID);
+        IL2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).setSettlementLayerChainId(0, OTHER_SETTLEMENT_LAYER_CHAIN_ID);
     }
 }

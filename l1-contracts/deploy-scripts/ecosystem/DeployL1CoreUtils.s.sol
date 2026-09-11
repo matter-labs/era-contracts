@@ -30,7 +30,6 @@ struct Config {
     uint256 l1ChainId;
     address ownerAddress;
     address deployerAddress;
-    uint256 legacyGatewayChainId;
     ContractsConfig contracts;
     TokensConfig tokens;
 }
@@ -72,12 +71,6 @@ contract DeployL1CoreUtils is DeployUtils {
         config.contracts.maxNumberOfChains = toml.readUint("$.contracts.max_number_of_chains");
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
-        // Legacy Era gateway chain ID, baked into L1MessageRoot as immutable
-        // ERA_GATEWAY_CHAIN_ID and used by L1ChainAssetHandler.setHistoricalMigrationInterval
-        // to gate intervals settled on the legacy GW. Optional: absent on fresh deployments.
-        if (vm.keyExistsToml(toml, "$.gateway.chain_id")) {
-            config.legacyGatewayChainId = toml.readUint("$.gateway.chain_id");
-        }
     }
 
     ////////////////////////////// Contract deployment modes /////////////////////////////////
@@ -101,7 +94,7 @@ contract DeployL1CoreUtils is DeployUtils {
             return
                 abi.encode(
                     coreAddresses.bridgehub.proxies.bridgehub,
-                    config.legacyGatewayChainId,
+                    0, // legacy settlement-layer chain id: none
                     coreAddresses.bridgehub.proxies.chainAssetHandler
                 );
         } else if (compareStrings(contractName, "CTMDeploymentTracker")) {

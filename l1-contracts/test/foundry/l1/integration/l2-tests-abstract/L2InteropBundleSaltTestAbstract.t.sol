@@ -29,8 +29,8 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
         return keccak256(abi.encodePacked(_sender, _userSalt));
     }
 
-    /// @notice Enables gateway mode so that `sendBundle` does not revert.
-    function _setupGatewayMode() internal {
+    /// @notice Mocks a non-L1 settlement-layer chain id so that `sendBundle` does not revert.
+    function _setupSettlementLayerMode() internal {
         vm.mockCall(
             address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
             abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
@@ -114,7 +114,7 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
     /// @dev The atomicity/destination check is the first thing `_sendBundle` does — before any value
     /// collection or bundle assembly — so the revert precedes (and therefore rolls back) any burn.
     function test_sendBundle_revertsWhen_noAtomicBundleAttribute() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
         InteropCallStarter[] memory calls = _buildSimpleCall();
         // Attributes with ONLY a salt — no `atomicBundle`.
         bytes[] memory attrs = new bytes[](1);
@@ -125,7 +125,7 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
     }
 
     function test_previewBundleHash_matchesSentBundleHash() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
         address sender = makeAddr("previewSender");
         bytes32 userSalt = keccak256("preview-salt-1");
         bytes[] memory attrs = _buildBundleAttributesWithSalt(userSalt, true);
@@ -147,7 +147,7 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
 
     /// @notice The user-provided salt is stored in the bundle attributes and mixed into `interopBundleSalt`.
     function test_sendBundle_usesUserProvidedSalt() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
         address sender = makeAddr("saltSender");
         bytes32 userSalt = keccak256("user-salt-1");
 
@@ -163,7 +163,7 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
 
     /// @notice Omitting the salt attribute is equivalent to passing `bytes32(0)` (usable once per sender).
     function test_sendBundle_omittedSaltAttributeTreatedAsZero() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
         address sender = makeAddr("noSaltSender");
 
         (InteropBundle memory bundle, ) = _sendAndDecodeBundle(sender, _buildBundleAttributesWithSalt(0, false));
@@ -182,7 +182,7 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
 
     /// @notice Two bundles that differ only by the user salt have different bundle hashes.
     function test_sendBundle_differentSaltsProduceDifferentBundleHashes() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
         address sender = makeAddr("saltSender");
 
         (, bytes32 hash1) = _sendAndDecodeBundle(sender, _buildBundleAttributesWithSalt(keccak256("a"), true));
@@ -194,7 +194,7 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
     /// @notice Reusing a (sender, salt) pair reverts with `InteropBundleSaltAlreadyUsed`, even when the new
     /// bundle's content differs.
     function test_sendBundle_revertsWhenSaltReused() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
         address sender = makeAddr("saltSender");
         bytes32 userSalt = keccak256("repeated-salt");
 
@@ -210,7 +210,7 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
 
     /// @notice The same sender can send another bundle (even an identical one) as long as it provides a fresh salt.
     function test_sendBundle_freshSaltAllowsResend() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
         address sender = makeAddr("saltSender");
 
         (, bytes32 hash1) = _sendAndDecodeBundle(sender, _buildBundleAttributesWithSalt(keccak256("salt-1"), true));
@@ -224,7 +224,7 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
     /// @notice The salt is scoped per-sender: the derived `interopBundleSalt` differs across senders, and the
     /// `isInteropBundleSaltUsed` replay mapping is keyed per (sender, salt).
     function test_sendBundle_sameSaltIsIsolatedPerSender() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
         address senderA = makeAddr("senderA");
         address senderB = makeAddr("senderB");
         bytes32 userSalt = keccak256("shared-salt");
