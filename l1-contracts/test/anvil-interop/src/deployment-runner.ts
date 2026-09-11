@@ -1,11 +1,11 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as zlib from "zlib";
+import type { providers } from "ethers";
 import { Contract, ContractFactory, Wallet, ethers } from "ethers";
 import type { AnvilManager } from "./daemons/anvil-manager";
 import { ForgeDeployer } from "./deployers/deployer";
 import { ChainRegistry } from "./deployers/chain-registry";
-import { GatewaySetup } from "./deployers/gateway-setup";
 import type {
   AnvilConfig,
   AnvilChainConfig,
@@ -17,7 +17,7 @@ import type {
   L2ChainInfo,
   PriorityRequestData,
 } from "./core/types";
-import { getChainIdsByRole, timeIt, createProvider } from "./core/utils";
+import { impersonateAndRun, timeIt, createProvider } from "./core/utils";
 import { getAbi, getCreationBytecode } from "./core/contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS, INTEROP_CENTER_ADDR } from "./core/const";
 import { getInteropSourcePrivateKey, isLiveInteropMode } from "./core/accounts";
@@ -173,12 +173,10 @@ export class DeploymentRunner {
   async setupLiveState(): Promise<DeploymentState> {
     console.log("\n=== Live Interop State Setup ===\n");
 
-    const gwRpcUrl = this.getRequiredEnv("LIVE_GW_RPC");
     const chainARpcUrl = this.getRequiredEnv("LIVE_CHAIN_A_RPC");
     const chainBRpcUrl = this.getRequiredEnv("LIVE_CHAIN_B_RPC");
 
-    const [gwChainId, chainAId, chainBId] = await Promise.all([
-      this.resolveLiveChainId("Gateway", gwRpcUrl),
+    const [chainAId, chainBId] = await Promise.all([
       this.resolveLiveChainId("Chain A", chainARpcUrl),
       this.resolveLiveChainId("Chain B", chainBRpcUrl),
     ]);
@@ -265,14 +263,12 @@ export class DeploymentRunner {
       chains: {
         l1: null,
         l2: [
-          { chainId: gwChainId, rpcUrl: gwRpcUrl, port: LIVE_CHAIN_PORT_PLACEHOLDER },
           { chainId: chainAId, rpcUrl: chainARpcUrl, port: LIVE_CHAIN_PORT_PLACEHOLDER },
           { chainId: chainBId, rpcUrl: chainBRpcUrl, port: LIVE_CHAIN_PORT_PLACEHOLDER },
         ],
         config: [
-          { chainId: gwChainId, port: LIVE_CHAIN_PORT_PLACEHOLDER, role: "gateway", settlement: "l1" },
-          { chainId: chainAId, port: LIVE_CHAIN_PORT_PLACEHOLDER, role: "gwSettled", settlement: "gateway" },
-          { chainId: chainBId, port: LIVE_CHAIN_PORT_PLACEHOLDER, role: "gwSettled", settlement: "gateway" },
+          { chainId: chainAId, port: LIVE_CHAIN_PORT_PLACEHOLDER, role: "directSettled", settlement: "l1" },
+          { chainId: chainBId, port: LIVE_CHAIN_PORT_PLACEHOLDER, role: "directSettled", settlement: "l1" },
         ],
       },
       l1Addresses: this.emptyLiveL1Addresses({
@@ -324,17 +320,22 @@ export class DeploymentRunner {
     return chainConfig;
   }
 
+  /**
+   * Interop peers of `chainId`: every other L2 chain that shares its settlement layer. All L2 chains
+   * settle directly on L1 (`settlement` defaults to `"l1"`), so each chain is registered with every
+   * other L2 chain in the config.
+   */
   private computeInteropChainIds(chainId: number, chainConfigs: AnvilChainConfig[]): number[] {
     const l2Chains = chainConfigs.filter((chainConfig) => chainConfig.role !== "l1");
     const thisChain = l2Chains.find((chainConfig) => chainConfig.chainId === chainId);
-    if (!thisChain || thisChain.settlement === "l1" || !thisChain.settlement || thisChain.role !== "gwSettled") {
+    if (!thisChain) {
       return [];
     }
+    const settlement = thisChain.settlement ?? "l1";
 
     return l2Chains
       .filter((chainConfig) => chainConfig.chainId !== chainId)
-      .filter((chainConfig) => chainConfig.role === "gwSettled")
-      .filter((chainConfig) => chainConfig.settlement === thisChain.settlement)
+      .filter((chainConfig) => (chainConfig.settlement ?? "l1") === settlement)
       .map((chainConfig) => chainConfig.chainId);
   }
 
@@ -425,9 +426,6 @@ export class DeploymentRunner {
       throw new Error("Deployment state incomplete for wrapped ZK seeding");
     }
 
-    const gatewayChain = state.chains.l2.find((chain) =>
-      state.chains!.config.some((cfg) => cfg.chainId === chain.chainId && cfg.role === "gateway")
-    );
     const targetConfigs = state.chains.config.filter(
       (chainConfig) =>
         chainConfig.role !== "l1" && (!chainConfig.baseToken || chainConfig.baseToken === ETH_TOKEN_ADDRESS)
@@ -449,17 +447,8 @@ export class DeploymentRunner {
         l1Addresses: state.l1Addresses,
         tokenAddress: state.zkToken.l1Address,
         amount,
-        gwRpcUrl: chainConfig.role === "gwSettled" ? gatewayChain?.rpcUrl : undefined,
       });
     }
-  }
-
-  private getGatewayChainOrThrow(gatewayChainId: number, l2Chains: L2ChainInfo[]): L2ChainInfo {
-    const gwChain = l2Chains.find((chain) => chain.chainId === gatewayChainId);
-    if (!gwChain) {
-      throw new Error(`Gateway chain ${gatewayChainId} not found in started L2 chains`);
-    }
-    return gwChain;
   }
 
   private async initializeL2Chain(
@@ -644,7 +633,7 @@ export class DeploymentRunner {
     return { chainAddresses };
   }
 
-  async step6RegisterInteropChains(
+  async step5RegisterInteropChains(
     l1RpcUrl: string,
     l2Chains: L2ChainInfo[],
     chainConfigs: AnvilConfig["chains"],
@@ -652,7 +641,7 @@ export class DeploymentRunner {
     ctmAddresses: CTMDeployedAddresses,
     chainAddresses: ChainAddresses[]
   ): Promise<void> {
-    console.log("\n=== Step 6: Register Interop Chains ===\n");
+    console.log("\n=== Step 5: Register Interop Chains ===\n");
 
     const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
     const registry = new ChainRegistry(l1RpcUrl, privateKey, l1Addresses, ctmAddresses);
@@ -858,6 +847,12 @@ export class DeploymentRunner {
     // Step 2: Deploy L1 contracts
     const { l1Addresses, ctmAddresses } = await this.step2DeployL1(chains.l1.rpcUrl);
 
+    // Finalize the two-step ownership handover of the L1 core contracts to Governance. Runs after
+    // registerCTM, whose test path still broadcasts addChainTypeManager from the deployer-owner.
+    const ownershipDone = timeIt("transferBridgehubOwnershipToGovernance");
+    await this.transferBridgehubOwnershipToGovernance(chains.l1.rpcUrl, l1Addresses);
+    ownershipDone();
+
     // Deploy custom ERC20 base tokens on L1 (before chain registration needs them)
     await this.deployCustomBaseTokens(chains.l1.rpcUrl, config.chains);
 
@@ -870,24 +865,8 @@ export class DeploymentRunner {
       ctmAddresses
     );
 
-    // Step 5: Setup gateway if configured
-    const gatewayConfig = config.chains.find((c) => c.role === "gateway");
-    if (gatewayConfig) {
-      const gwChain = this.getGatewayChainOrThrow(gatewayConfig.chainId, chains.l2);
-      const l2ChainRpcUrls = this.toRpcUrlMap(chains.l2);
-      const gwSettledChainIds = getChainIdsByRole(config.chains, "gwSettled");
-      await this.step5SetupGateway(
-        chains.l1.rpcUrl,
-        gatewayConfig.chainId,
-        l1Addresses,
-        ctmAddresses,
-        gwChain?.rpcUrl,
-        gwSettledChainIds,
-        l2ChainRpcUrls
-      );
-    }
-
-    await this.step6RegisterInteropChains(
+    // Step 5: Register interop peers on every L2 chain
+    await this.step5RegisterInteropChains(
       chains.l1.rpcUrl,
       chains.l2,
       chains.config,
@@ -899,30 +878,56 @@ export class DeploymentRunner {
     return { chains, l1Addresses, ctmAddresses, chainAddresses };
   }
 
-  async step5SetupGateway(
+  /**
+   * Transfer bridgehub ownership to the Governance contract.
+   *
+   * DeployL1CoreContracts.updateOwners() calls bridgehub.transferOwnership(governance)
+   * which sets pendingOwner = governance. We impersonate the Governance contract on
+   * Anvil and call acceptOwnership() to finalize the transfer.
+   *
+   * This is needed because Utils.executeCalls() calls IOwnable(governor).owner() → EOA,
+   * then IGovernance(governor).scheduleTransparent() + execute(). It expects the governor
+   * to be a Governance contract, not an EOA. It also matches production, where Governance owns
+   * these contracts, so the dumped chain states carry the production ownership.
+   */
+  private async transferBridgehubOwnershipToGovernance(
     l1RpcUrl: string,
-    gatewayChainId: number,
-    l1Addresses: CoreDeployedAddresses,
-    ctmAddresses: CTMDeployedAddresses,
-    gwRpcUrl?: string,
-    gwSettledChainIds?: number[],
-    l2ChainRpcUrls?: Map<number, string>
-  ): Promise<{ gatewayCTMAddr: string }> {
-    console.log("\n=== Step 5: Setting Up Gateway ===\n");
+    l1Addresses: CoreDeployedAddresses
+  ): Promise<void> {
+    const l1Provider = createProvider(l1RpcUrl);
+    const governanceAddr = l1Addresses.governance;
+    const ownable2StepAbi = getAbi("Ownable2Step");
+    // Contracts that need ownership transfer.
+    // DeployL1CoreContracts.updateOwners() calls transferOwnership(governance)
+    // on all of these, setting pendingOwner. We accept to finalize.
+    const contracts = [
+      { name: "Bridgehub", addr: l1Addresses.bridgehub },
+      { name: "L1AssetRouter", addr: l1Addresses.l1SharedBridge },
+      { name: "CTMDeploymentTracker", addr: l1Addresses.ctmDeploymentTracker },
+    ];
 
-    const gatewaySetup = new GatewaySetup(l1RpcUrl, l1Addresses, ctmAddresses);
+    await impersonateAndRun(l1Provider, governanceAddr, async (govSigner) => {
+      for (const c of contracts) {
+        const contract = new Contract(c.addr, ownable2StepAbi, l1Provider);
+        await this.ensureGovernanceOwnership(contract, c.name, governanceAddr, govSigner);
+      }
+    });
+  }
 
-    const gatewaySetupResult = await gatewaySetup.designateAsGateway(
-      gatewayChainId,
-      gwRpcUrl,
-      gwSettledChainIds,
-      l2ChainRpcUrls
-    );
-    const gatewayCTMAddr = gatewaySetupResult.gatewayCTMAddr;
-
-    console.log(`  Gateway CTM: ${gatewayCTMAddr}`);
-
-    return { gatewayCTMAddr };
+  private async ensureGovernanceOwnership(
+    contract: Contract,
+    contractName: string,
+    governanceAddr: string,
+    govSigner: providers.JsonRpcSigner
+  ): Promise<void> {
+    const currentOwner: string = await contract.owner();
+    if (currentOwner.toLowerCase() === governanceAddr.toLowerCase()) {
+      console.log(`   ${contractName} owner is already Governance`);
+      return;
+    }
+    const tx = await contract.connect(govSigner).acceptOwnership({ gasLimit: 500_000 });
+    await tx.wait();
+    console.log(`   ${contractName} ownership transferred to Governance`);
   }
 
   /**

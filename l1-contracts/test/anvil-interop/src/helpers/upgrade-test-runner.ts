@@ -85,6 +85,10 @@ export type V31UpgradeScenario = {
   permanentValuesTemplatePath: string;
   upgradeInputTemplatePath: string;
   targetRoles: ChainRole[];
+  // Optional allow-list applied on top of `targetRoles`. Roles are read from the current
+  // anvil-config.json, so a frozen fixture whose chains had a different settlement shape when it was
+  // generated names its upgradable chains explicitly.
+  targetChainIds?: number[];
   // Protocol version the chains must report once the upgrade has been applied.
   expectedProtocolVersion: string;
   clearGenesisUpgradeTxHash?: boolean;
@@ -106,7 +110,12 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
       throw new Error(`${scenario.stateVersion} chain states not found. Generate them first.`);
     }
     const { chains, l1Addresses, ctmAddresses, chainAddresses } = await runner.loadChainStates(anvilManager, stateDir);
-    const upgradeChainAddresses = selectUpgradeChains(chainAddresses, chains.config, scenario.targetRoles);
+    const upgradeChainAddresses = selectUpgradeChains(
+      chainAddresses,
+      chains.config,
+      scenario.targetRoles,
+      scenario.targetChainIds
+    );
     if (upgradeChainAddresses.length === 0) {
       throw new Error(`No chains matched upgrade roles ${scenario.targetRoles.join(", ")} for ${scenario.label}`);
     }
@@ -1372,12 +1381,14 @@ function buildAddressToContract(): ReadonlyMap<string, ContractName> {
 function selectUpgradeChains(
   chainAddresses: Array<{ chainId: number; diamondProxy: string }>,
   chainConfigs: Array<{ chainId: number; role: ChainRole }>,
-  targetRoles: ChainRole[]
+  targetRoles: ChainRole[],
+  targetChainIds?: number[]
 ): Array<{ chainId: number; diamondProxy: string }> {
   const roles = new Map(chainConfigs.map((c) => [c.chainId, c.role]));
   return chainAddresses.filter((chain) => {
     const role = roles.get(chain.chainId);
     if (!role) throw new Error(`Missing chain role for chain ${chain.chainId}`);
+    if (targetChainIds && !targetChainIds.includes(chain.chainId)) return false;
     return targetRoles.includes(role);
   });
 }

@@ -14,13 +14,13 @@ The v31→v33 upgrade proceeds as:
    (Bridgehub, MessageRoot, Nullifier, AssetRouter, NTV, CTM, facets, etc.)
    via Create2. The ChainRegistrationSender proxy is reused; only a fresh implementation is deployed.
 
-2. **Governance stage 0**: Pause gateway migrations (`pauseMigration()` on ChainAssetHandler).
+2. **Governance stage 0**: Pause chain migrations (`pauseMigration()` on ChainAssetHandler).
 
 3. **Governance stage 1**: Upgrade all proxy implementations via the TransparentProxyAdmin
    (including the ChainRegistrationSender implementation swap), set the new version
    upgrade contract.
 
-4. **Governance stage 2**: Unpause gateway migrations, version-specific post-upgrade calls.
+4. **Governance stage 2**: Unpause chain migrations, version-specific post-upgrade calls.
 
 5. **Stage 3**: Post-governance, pre-chain-upgrade. Populates the NTV's `bridgedOut` accounting
    (`BridgedOutPopulationLib`) before the per-chain upgrades.

@@ -628,7 +628,7 @@ export async function getInteropExecutionData(
   _sourceChainId: number
 ): Promise<InteropExecutionData> {
   // Atomic interop: the proof is a per-leg IMT inclusion proof ({AtomicFinalityProof}) built from the
-  // source chain's commitment tree, not a live gateway message-inclusion proof. The flow metadata
+  // source chain's commitment tree, not a live settlement-layer message-inclusion proof. The flow metadata
   // (flowId/deadline/source chain) was recorded when the bundle was sent. `_destProvider` and
   // `_sourceChainId` are therefore unused here; they are kept for signature parity with `executeBundle`.
   void _destProvider;

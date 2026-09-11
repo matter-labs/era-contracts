@@ -2,7 +2,7 @@ import { expect } from "chai";
 import type { providers } from "ethers";
 import { BigNumber, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { getChainIdsByRole, getL2Chain, createProvider } from "../../src/core/utils";
+import { getEthBaseTokenInteropChainIds, getL2Chain, createProvider } from "../../src/core/utils";
 import { getAbi } from "../../src/core/contracts";
 import {
   getInteropRecipientAddress,
@@ -67,16 +67,16 @@ const ANVIL_INTEROP_PROTOCOL_FEE = BigNumber.from(ANVIL_INTEROP_PROTOCOL_FEE_WEI
  * multiple rounds, and enforced by unbundlerAddress / call-status rules while
  * still delivering successful base-token and ERC20 transfers.
  *
- * Topology: gwSettledChainIds[0] = source, gwSettledChainIds[1] = destination
+ * Topology: interopChainIds[0] = source, interopChainIds[1] = destination (ETH-base-token chains)
  */
 describe("09 - Interop Unbundle (failing calls)", function () {
   this.timeout(0);
 
   const runner = new DeploymentRunner();
   let state: ReturnType<typeof runner.loadState>;
-  let gwSettledChainIds: number[];
+  let interopChainIds: number[];
 
-  // Chain topology: source = gwSettledChainIds[0], destination = gwSettledChainIds[1]
+  // Chain topology: source = interopChainIds[0], destination = interopChainIds[1]
   let sourceChainId: number;
   let destChainId: number;
   let sourceProvider: providers.JsonRpcProvider;
@@ -110,13 +110,13 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     if (!state.chains || !state.l1Addresses || !state.chainAddresses || !state.testTokens) {
       throw new Error("Deployment state incomplete. Run setup first.");
     }
-    gwSettledChainIds = getChainIdsByRole(state.chains.config, "gwSettled");
-    if (gwSettledChainIds.length < 2) {
-      throw new Error("Need at least 2 GW-settled chains for unbundle tests");
+    interopChainIds = getEthBaseTokenInteropChainIds(state.chains.config);
+    if (interopChainIds.length < 2) {
+      throw new Error("Need at least 2 ETH-base-token L1-settled chains for unbundle tests");
     }
 
-    sourceChainId = gwSettledChainIds[0];
-    destChainId = gwSettledChainIds[1];
+    sourceChainId = interopChainIds[0];
+    destChainId = interopChainIds[1];
 
     const sourceChain = getL2Chain(state.chains, sourceChainId);
     const destChain = getL2Chain(state.chains, destChainId);

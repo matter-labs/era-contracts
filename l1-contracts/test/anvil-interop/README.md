@@ -1,6 +1,6 @@
 # Multi-Chain Anvil Interop Tests
 
-End-to-end tests for ZKsync interoperability across 6 Anvil chains: L1 contract deployment, L1<->L2 bridging (ETH + ERC20), L2<->L2 interop transfers, and gateway setup with chain migration.
+End-to-end tests for ZKsync interoperability across 6 Anvil chains: L1 contract deployment, L1<->L2 bridging (ETH + ERC20), and L2<->L2 interop (token transfers, bundles, messages, unbundling, atomic swaps). Every L2 chain settles directly on L1.
 
 ## Chain Topology
 
@@ -11,14 +11,12 @@ End-to-end tests for ZKsync interoperability across 6 Anvil chains: L1 contract 
 └──────┬───────┘
        │
        ├──► L2  (10)  port 4050 — settled directly on L1
-       │
-       ├──► GW  (11)  port 4051 — gateway chain (settled on L1, settlement layer for L2A/L2B/L2C)
-       │     │
-       │     ├──► L2A (12)  port 4052 — settled via GW
-       │     ├──► L2B (13)  port 4053 — settled via GW
-       │     └──► L2C (14)  port 4054 — custom-base-token chain settled via GW
-       │
-       └──► (L2A, L2B, and L2C also registered on L1 but migrated to GW)
+       ├──► L2  (11)  port 4051 — settled directly on L1
+       ├──► L2  (12)  port 4052 — settled directly on L1
+       ├──► L2  (13)  port 4053 — settled directly on L1
+       └──► L2  (14)  port 4054 — custom-base-token chain, settled directly on L1
+
+Every L2 chain is registered as an interop peer of every other L2 chain.
 ```
 
 ## Quick Start
@@ -37,7 +35,7 @@ yarn test:hardhat:interop --keep-chains
 
 ## Pregenerated Chain States
 
-Tests load pregenerated Anvil snapshots from `chain-states/v0.34.0/` by default (the current protocol version, configured as `stateVersion` in `config/anvil-config.json`). This skips the full deployment and cuts test time from ~5 min to ~85s.
+Tests load pregenerated Anvil snapshots from `chain-states/v0.35.0/` by default (the current protocol version, configured as `stateVersion` in `config/anvil-config.json`). This skips the full deployment and cuts test time from ~5 min to ~85s.
 
 The runner auto-detects pregenerated state by checking for `chain-states/<protocol-version>/addresses.json`. If found, it gunzips each `<chainId>.json.gz` dump and starts each Anvil process with `--load-state`. If not found (or `ANVIL_INTEROP_FRESH_DEPLOY=1`), it runs the full deployment.
 
@@ -92,7 +90,6 @@ cd contracts/l1-contracts
 
 ANVIL_INTEROP_LIVE=1 \
 LIVE_L1_RPC=<l1-rpc> \
-LIVE_GW_RPC=<gateway-rpc> \
 LIVE_CHAIN_A_RPC=<source-chain-rpc> \
 LIVE_CHAIN_B_RPC=<destination-chain-rpc> \
 LIVE_SOURCE_PRIVATE_KEY=<sender-private-key> \
@@ -109,7 +106,6 @@ Live environment variables:
 | Variable                           | Default / Effect                                                             |
 | ---------------------------------- | ---------------------------------------------------------------------------- |
 | `LIVE_L1_RPC`                      | Required L1 RPC for token deployment and L1->L2 deposits                     |
-| `LIVE_GW_RPC`                      | Required Gateway RPC; chain ID is discovered from this RPC                   |
 | `LIVE_CHAIN_A_RPC`                 | Required source-chain RPC; chain ID is discovered from this RPC              |
 | `LIVE_CHAIN_B_RPC`                 | Required destination-chain RPC; chain ID is discovered from this RPC         |
 | `LIVE_SOURCE_PRIVATE_KEY`          | Required source signer for setup and specs                                   |
@@ -124,12 +120,13 @@ Live environment variables:
 
 | Spec                         | What it tests                                                                                                                                                |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `01-deployment-verification` | L1 contracts deployed, CTM registered, all 4 L2 chains have diamond proxies, L2 system contracts present, test tokens deployed, initial chainBalance is zero |
+| `01-deployment-verification` | L1 contracts deployed, CTM registered, all 5 L2 chains have diamond proxies, L2 system contracts present, test tokens deployed, initial chainBalance is zero |
 | `02-direct-bridge`           | L1->L2 ETH deposit + L2->L1 ETH withdrawal on chain 10 (direct L1 settlement), net flow assertions                                                           |
-| `03-interop-transfer`        | Unsupported interop routes revert; only GW-settled L2<->GW-settled L2 interop is intentionally registered                                                    |
-| `04-gateway-setup`           | GW chain contracts deployed, interop chains registered on GW L2Bridgehub, GW designated as settlement layer on L1                                            |
-| `05-gateway-bridge`          | L1->L2A ETH deposit + L2A->L1 ETH withdrawal on chain 12 (via GW)                                                                                            |
-| `06-gateway-interop`         | L2A<->L2B interop transfers between GW-settled L2 chains                                                                                                     |
+| `03-interop-transfer`        | L2<->L2 interop token transfers between L1-settled chains (every L2 chain is registered as a peer of every other)                                            |
+| `07-interop-bundles`         | `sendBundle` / `executeBundle`: direct, indirect and mixed bundles, fixed ZK fees, replay and executionAddress guardrails                                    |
+| `08-interop-messages`        | `sendMessage` / `executeBundle`: base-token, native and bridged ERC20 messages, cross-base-token transfers with chain 14                                     |
+| `09-interop-unbundle`        | `verifyBundle` / `unbundleBundle`: non-atomic recovery of bundles with a failing call                                                                        |
+| `13-imt-atomic-swap`         | Atomic A<->B swap over the interop commitment tree, timeout/refund paths and proof negatives                                                                 |
 
 ## Coverage
 
@@ -211,11 +208,11 @@ pass as "these specs added no coverage". Both union paths use the same `lcov-mer
 
 ### CLI Parameters
 
-| Parameter           | Effect                                                                                                                                                      |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--spec <file>`     | Run only the specified spec file(s). Can be repeated (e.g., `--spec 02-direct-bridge.spec.ts --spec 05-gateway-bridge.spec.ts`). Disables parallel workers. |
-| `--port-offset <N>` | Offset all chain ports by N (equivalent to `ANVIL_INTEROP_PORT_OFFSET`). Useful for avoiding conflicts with other Anvil instances.                          |
-| `--keep-chains`     | Keep Anvil processes running after tests finish (equivalent to `ANVIL_INTEROP_KEEP_CHAINS=1`). Disables parallel workers.                                   |
+| Parameter           | Effect                                                                                                                                                       |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--spec <file>`     | Run only the specified spec file(s). Can be repeated (e.g., `--spec 02-direct-bridge.spec.ts --spec 07-interop-bundles.spec.ts`). Disables parallel workers. |
+| `--port-offset <N>` | Offset all chain ports by N (equivalent to `ANVIL_INTEROP_PORT_OFFSET`). Useful for avoiding conflicts with other Anvil instances.                           |
+| `--keep-chains`     | Keep Anvil processes running after tests finish (equivalent to `ANVIL_INTEROP_KEEP_CHAINS=1`). Disables parallel workers.                                    |
 
 ## Debugging
 
@@ -237,13 +234,13 @@ test/anvil-interop/
 ├── run-upgrade-test.ts            # V31 → V33 upgrade test
 ├── cleanup.sh                     # Kill Anvil processes, reset state
 ├── config/
-│   ├── anvil-config.json          # Chain IDs, ports, gateway designation
+│   ├── anvil-config.json          # Chain IDs, ports, roles, state version
 │   ├── l1-deployment.toml         # L1 contract deployment params
 │   ├── ctm-deployment.toml        # ChainTypeManager params
 │   ├── permanent-values.toml      # Immutable protocol values
 │   └── chain-{10,11,12,13,14}.toml # Per-chain deployment params (generated)
 ├── chain-states/
-│   └── v0.34.0/                   # Pregenerated Anvil state snapshots (current, regenerated)
+│   └── v0.35.0/                   # Pregenerated Anvil state snapshots (current, regenerated)
 │       ├── 31337.json.gz          # L1 state dump (gzip; kept out of diffs)
 │       ├── {10,11,12,13,14}.json.gz # L2 chain state dumps (gzip)
 │       └── addresses.json         # All contract addresses + test tokens
@@ -255,14 +252,12 @@ test/anvil-interop/
 │   │   ├── contracts.ts           # ABI loading from compiled artifacts
 │   │   ├── utils.ts               # Helpers (relay, merkle proofs, ABI loading)
 │   │   ├── data-encoding.ts       # Encode/decode L1/L2 data formats
-│   │   ├── forge.ts               # Forge command wrapper
-│   │   └── toml-handling.ts       # TOML file parsing/merging
+│   │   └── forge.ts               # Forge command wrapper
 │   ├── deployers/
 │   │   ├── deployer.ts            # L1 contract deployment via forge scripts
 │   │   ├── chain-registry.ts      # Register L2 chains on L1 CTM + capture genesis priority txs
-│   │   ├── l2-genesis-upgrade-deployer.ts  # Pre-deploy mocks + relay real genesis priority tx
-│   │   ├── gateway-setup.ts       # Gateway designation + chain migration
-│   │   └── gateway-deployer.ts    # Verify GW system contracts
+│   │   ├── interop-chain-registrar.ts      # Register interop peers on each L2Bridgehub
+│   │   └── l2-genesis-upgrade-deployer.ts  # Pre-deploy mocks + relay real genesis priority tx
 │   ├── daemons/
 │   │   └── anvil-manager.ts       # Start/stop Anvil processes
 │   └── helpers/
@@ -275,9 +270,10 @@ test/anvil-interop/
 │   ├── 01-deployment-verification.spec.ts
 │   ├── 02-direct-bridge.spec.ts
 │   ├── 03-interop-transfer.spec.ts
-│   ├── 04-gateway-setup.spec.ts
-│   ├── 05-gateway-bridge.spec.ts
-│   └── 06-gateway-interop.spec.ts
+│   ├── 07-interop-bundles.spec.ts
+│   ├── 08-interop-messages.spec.ts
+│   ├── 09-interop-unbundle.spec.ts
+│   └── 13-imt-atomic-swap.spec.ts
 └── outputs/                       # Deployment outputs (gitignored)
 ```
 
@@ -316,17 +312,15 @@ Contracts are first bootstrapped at hardcoded addresses via `anvil_setCode` and 
 | ----------------------------- | ------------------------ | ------------------------------------- |
 | Genesis upgrade relay         | `L2_FORCE_DEPLOYER_ADDR` | Bootloader executes upgrade tx        |
 | Interop chain registration    | Default Anvil EOA        | Real L1 service-tx flow relayed to L2 |
-| GW chain registration         | `ChainAssetHandler`      | Governance flow                       |
 | Settlement layer notification | `L2_BOOTLOADER_ADDR`     | Bootloader at batch start             |
 | Governance calls              | Governance contract      | Multi-sig / timelock                  |
-| GW L2Bridgehub ownership      | Aliased CTM governance   | Shared governance from deployment     |
 
 ### Other Shortcuts
 
-- **GW L2Bridgehub ownership transfer**: CTM deploys a per-chain Governance, but `fullRegistration` sends from ecosystem Governance. The test transfers ownership before relay.
-- **Interop registration scope**: the harness only intentionally registers GW-settled L2 chains for interop. Routes involving the gateway chain or a direct-settled chain revert in the harness.
+- **L1 core ownership acceptance**: `DeployL1CoreContracts` only nominates Governance as the pending owner of Bridgehub, L1AssetRouter and CTMDeploymentTracker; the harness impersonates Governance to `acceptOwnership()` right after the L1 deploy so the dumped states carry production ownership.
+- **Interop registration scope**: every L2 chain settles on L1, so the harness registers each L2 chain as an interop peer of every other L2 chain (via `ChainRegistrationSender`, relayed to each L2Bridgehub).
 - **L2 genesis deployment via anvil_setCode**: System contracts are bootstrapped at hardcoded addresses, not via real genesis state. Production chains get that state directly from genesis.
-- **Synthetic merkle proofs**: Encode settlement layer chain ID but contain no real cryptographic data
+- **Synthetic merkle proofs**: the single-element direct-L1-settlement form; no real cryptographic data
 - **Interop proofs**: Correct struct shape but empty proof arrays
 - **processLogsAndMessages impersonation**: The diamond proxy is impersonated instead of the operator (production uses the operator role)
 - **Settlement layer notification via impersonation**: `SystemContext.setSettlementLayerChainId` is called by impersonating the bootloader. On ZKsync OS, this is only emitted during actual migration between settlement layers (and during genesis/v31 upgrades), not at every batch

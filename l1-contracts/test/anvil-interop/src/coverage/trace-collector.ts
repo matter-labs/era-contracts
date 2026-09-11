@@ -92,9 +92,9 @@ export function assertTracesUsable(stats: {
   hitSourceFiles: number;
 }): void {
   if (stats.transactions === 0) {
-    // Not a failure at this level: some specs only read. 04-gateway-setup and
-    // 01-deployment-verification assert over state the pre-generated snapshots already contain, so
-    // they transact nothing and a per-shard error here fails them on principle — as an earlier
+    // Not a failure at this level: some specs only read. 01-deployment-verification asserts over
+    // state the pre-generated snapshots already contain, so it transacts nothing and a per-shard
+    // error here fails it on principle — as an earlier
     // version of this guard did. Whether a *run* saw no transactions at all is the meaningful
     // signal, and assertMergedCoverageUsable checks that once the shards are merged.
     console.warn("  ⚠️  No transactions on these chains; this shard contributes no coverage.");

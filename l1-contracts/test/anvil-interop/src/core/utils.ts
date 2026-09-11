@@ -5,10 +5,10 @@ import * as path from "path";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
   ANVIL_FUND_BALANCE,
+  ETH_TOKEN_ADDRESS,
   INTEROP_BUNDLE_TUPLE_TYPE,
   INTEROP_CENTER_ADDR,
   L1_TO_L2_ALIAS_OFFSET,
-  L2_BRIDGEHUB_ADDR,
   L2_INTEROP_HANDLER_ADDR,
   NEW_PRIORITY_REQUEST_EVENT_SIG,
 } from "./const";
@@ -23,7 +23,7 @@ import { getAbi } from "./contracts";
  * the wall clock by ~5%, while polling at 100ms took `09-interop-unbundle` from 158s to 48s.
  *
  * Aggressive polling is only safe against a local node. Live mode (`ANVIL_INTEROP_LIVE=1`) points
- * the same helpers at real `LIVE_*_RPC` endpoints via `setupLiveState()` and `getGatewayProvider()`,
+ * the same helpers at real `LIVE_*_RPC` endpoints via `setupLiveState()`,
  * where a proof or finalization wait can run for minutes: at 100ms that is ten requests per second
  * per waiter, and those loops do not handle rate limiting, so one 429 would abort the run. Remote
  * URLs therefore keep ethers' 4000ms default — unchanged from before this helper existed.
@@ -214,6 +214,17 @@ export function getChainIdsByRole(config: AnvilChainConfig[], role: ChainRole): 
   return config.filter((c) => c.role === role).map((c) => c.chainId);
 }
 
+/**
+ * Interop-capable L2 chains whose base token is ETH: the `directSettled` chains without a custom
+ * `baseToken`. Specs pick their source/destination pair from this list so a custom-base-token chain
+ * is never selected by config order.
+ */
+export function getEthBaseTokenInteropChainIds(config: AnvilChainConfig[]): number[] {
+  return config
+    .filter((c) => c.role === "directSettled" && (!c.baseToken || c.baseToken === ETH_TOKEN_ADDRESS))
+    .map((c) => c.chainId);
+}
+
 export function formatChainInfo(chainId: number, port: number, isL1: boolean): string {
   const type = isL1 ? "L1" : "L2";
   return `${type} Chain ${chainId} on port ${port}`;
@@ -268,32 +279,23 @@ export function applyL1ToL2Alias(l1Address: string): string {
  * Build the merkle proof for withdrawal finalization.
  *
  * DummyL1MessageRoot bypasses verification, but getProofData() still parses the
- * proof structure to extract settlementLayerChainId.
- *
- * For direct settlement (chain on L1): old format → settlementLayerChainId = 0
- * For gateway settlement: new format → settlementLayerChainId = GW chain ID
+ * proof structure to extract settlementLayerChainId. Every chain in the harness settles directly
+ * on L1, so the proof is the single non-zero element that getProofData() reads as
+ * finalProofNode=true → settlementLayerChainId=0. The caller still reads the settlement layer live
+ * from L1 Bridgehub; a chain settling elsewhere is rejected rather than mis-encoded.
  */
 export function buildWithdrawalMerkleProof(settlementLayerChainId: number): string[] {
-  if (settlementLayerChainId > 0) {
-    // New format: metadata + logLeafSibling + l1Timestamp + batchLeafProofMask + packedBatchInfo + slChainId
-    // Metadata: version=0x01, logLeafProofLen=1, batchLeafProofLen=0, finalProofNode=0
-    return [
-      "0x0101000000000000000000000000000000000000000000000000000000000000",
-      ethers.constants.HashZero, // log leaf merkle sibling (dummy)
-      ethers.constants.HashZero, // l1Timestamp (bound into the batch leaf; dummy here)
-      ethers.constants.HashZero, // batchLeafProofMask = 0
-      ethers.constants.HashZero, // packed(settlementLayerBatchNumber=0, batchRootMask=0)
-      ethers.utils.hexZeroPad(ethers.utils.hexlify(settlementLayerChainId), 32),
-    ];
-  } else {
-    // Old format: single non-zero element → finalProofNode=true → settlementLayerChainId=0
-    return ["0x0000000100000001000000010000000100000001000000010000000100000001"];
+  if (settlementLayerChainId !== 0) {
+    throw new Error(
+      `Chain settles on chain ${settlementLayerChainId}; the harness only builds withdrawal proofs for chains settling directly on L1`
+    );
   }
+  return ["0x0000000100000001000000010000000100000001000000010000000100000001"];
 }
 
 /**
- * Determine the settlement layer chain ID for a given chain.
- * Returns 0 for direct L1 settlement, or the GW chain ID for gateway settlement.
+ * Determine the settlement layer chain ID for a given chain, read live from L1 Bridgehub.
+ * Returns 0 for direct L1 settlement, or the settlement layer's chain ID otherwise.
  */
 export async function getSettlementLayerChainId(
   l1Provider: providers.JsonRpcProvider,
@@ -303,8 +305,8 @@ export async function getSettlementLayerChainId(
   const bridgehub = new ethers.Contract(bridgehubAddr, getAbi("IL1Bridgehub"), l1Provider);
   const slChainId = await bridgehub.settlementLayer(chainId);
   const slChainIdNum = slChainId.toNumber();
-  const isGatewaySettled = slChainIdNum !== 0 && slChainIdNum !== runtimeConfig.l1ChainId;
-  return isGatewaySettled ? slChainIdNum : 0;
+  const settlesOnL1 = slChainIdNum === 0 || slChainIdNum === runtimeConfig.l1ChainId;
+  return settlesOnL1 ? 0 : slChainIdNum;
 }
 
 /**
@@ -382,7 +384,6 @@ interface PriorityRelayResolvedPath {
   bridgehubAddr: string;
   chainId: number;
   chainRpcUrl: string;
-  gwRpcUrl?: string;
 }
 
 async function relayPriorityRequestsToTargets(
@@ -416,61 +417,25 @@ async function relayPriorityRequestsToTargets(
 async function resolvePriorityRelayPath(path: PriorityRelayResolvedPath): Promise<{
   l2Provider: providers.JsonRpcProvider;
   l1DiamondProxy: string;
-  settlementLayerChainId: number;
-  gwProvider?: providers.JsonRpcProvider;
-  gwDiamondProxy?: string;
-  nestedL1DiamondProxy?: string;
 }> {
   const l1Provider = createProvider(path.l1RpcUrl);
   const l2Provider = createProvider(path.chainRpcUrl);
-  const bridgehub = new ethers.Contract(path.bridgehubAddr, getAbi("L1Bridgehub"), l1Provider);
+  // Read live: every harness chain settles directly on L1, and a chain that does not would need a
+  // relay hop through its settlement layer, which this harness no longer implements.
   const settlementLayerChainId = await getSettlementLayerChainId(l1Provider, path.bridgehubAddr, path.chainId);
-  const relayChainId = settlementLayerChainId === 0 ? path.chainId : settlementLayerChainId;
-  const l1DiamondProxy: string = await bridgehub.getZKChain(relayChainId);
-
-  if (l1DiamondProxy === ethers.constants.AddressZero) {
-    const targetLabel =
-      settlementLayerChainId === 0
-        ? `target chain ${path.chainId}`
-        : `gateway settlement layer ${settlementLayerChainId} for chain ${path.chainId}`;
-    throw new Error(`No L1 diamond proxy registered for ${targetLabel}`);
-  }
-
-  if (settlementLayerChainId === 0) {
-    return { l2Provider, l1DiamondProxy, settlementLayerChainId };
-  }
-
-  if (!path.gwRpcUrl) {
+  if (settlementLayerChainId !== 0) {
     throw new Error(
-      `Chain ${path.chainId} settles through gateway chain ${settlementLayerChainId}; gwRpcUrl is required`
+      `Chain ${path.chainId} settles on chain ${settlementLayerChainId}; the harness only relays priority requests for chains settling directly on L1`
     );
   }
 
-  // For GW-settled chains, the nested chain also has an L1 diamond proxy.
-  // The L1 receipt contains NewPriorityRequest from BOTH:
-  //   - The GW's L1 diamond proxy (wrapped tx for the GW chain)
-  //   - The nested chain's L1 diamond proxy (original tx for the L2 chain)
-  const nestedL1DiamondProxy: string = await bridgehub.getZKChain(path.chainId);
-  if (nestedL1DiamondProxy === ethers.constants.AddressZero) {
-    throw new Error(`No L1 diamond proxy registered for nested chain ${path.chainId}`);
+  const bridgehub = new ethers.Contract(path.bridgehubAddr, getAbi("L1Bridgehub"), l1Provider);
+  const l1DiamondProxy: string = await bridgehub.getZKChain(path.chainId);
+  if (l1DiamondProxy === ethers.constants.AddressZero) {
+    throw new Error(`No L1 diamond proxy registered for target chain ${path.chainId}`);
   }
 
-  const gwProvider = createProvider(path.gwRpcUrl);
-  const gwBridgehub = new ethers.Contract(L2_BRIDGEHUB_ADDR, getAbi("L2Bridgehub"), gwProvider);
-  const gwDiamondProxy: string = await gwBridgehub.getZKChain(path.chainId);
-
-  if (gwDiamondProxy === ethers.constants.AddressZero) {
-    throw new Error(`No GW diamond proxy registered for chain ${path.chainId}`);
-  }
-
-  return {
-    l2Provider,
-    l1DiamondProxy,
-    settlementLayerChainId,
-    gwProvider,
-    gwDiamondProxy,
-    nestedL1DiamondProxy,
-  };
+  return { l2Provider, l1DiamondProxy };
 }
 
 /**
@@ -478,7 +443,7 @@ async function resolvePriorityRelayPath(path: PriorityRelayResolvedPath): Promis
  *
  * Supports two modes:
  * - explicit targets: relay the receipt's requests to the given diamond proxy / provider pairs
- * - resolved chain path: look up settlement on L1Bridgehub and relay to L2 directly or via GW
+ * - resolved chain path: look up the chain's L1 diamond proxy on L1Bridgehub and relay to its L2
  *
  * @returns Array of relay transaction hashes
  */
@@ -493,37 +458,8 @@ export async function extractAndRelayNewPriorityRequests(
     return relayPriorityRequestsToTargets(receipt, chainsOrPath, log);
   }
 
-  const { l2Provider, l1DiamondProxy, settlementLayerChainId, gwProvider, nestedL1DiamondProxy } =
-    await resolvePriorityRelayPath(chainsOrPath);
-
-  if (settlementLayerChainId === 0) {
-    return relayPriorityRequestsToTargets(receipt, [{ diamondProxy: l1DiamondProxy, provider: l2Provider }], log);
-  }
-
-  // Hop 1: relay L1→GW (the wrapped forwarding transaction from the GW's L1 diamond proxy)
-  const gwTxHashes = await relayPriorityRequestsToTargets(
-    receipt,
-    [{ diamondProxy: l1DiamondProxy, provider: gwProvider! }],
-    log
-  );
-
-  // Hop 2: relay to the final L2 chain.
-  //
-  // On L1, the nested chain's diamond proxy emits NewPriorityRequest with the
-  // *actual* L2 transaction data, and then forwards a wrapped copy to the GW's
-  // L1 diamond proxy. The GW receipt only contains NewRelayedPriorityTransaction
-  // (no full tx data), so we cannot extract the hop-2 payload from it.
-  //
-  // Instead we extract the NewPriorityRequest events emitted by the nested
-  // chain's L1 diamond proxy directly from the original L1 receipt, and relay
-  // those to the L2 chain after hop 1 has been confirmed.
-  const l2TxHashes = await relayPriorityRequestsToTargets(
-    receipt,
-    [{ diamondProxy: nestedL1DiamondProxy!, provider: l2Provider }],
-    log
-  );
-
-  return [...gwTxHashes, ...l2TxHashes];
+  const { l2Provider, l1DiamondProxy } = await resolvePriorityRelayPath(chainsOrPath);
+  return relayPriorityRequestsToTargets(receipt, [{ diamondProxy: l1DiamondProxy, provider: l2Provider }], log);
 }
 
 /**
@@ -561,8 +497,8 @@ export function buildMockInteropProof(sourceChainId: number, senderAddress?: str
  * Extract InteropBundleSent events from a receipt and execute each bundle on the
  * destination chain via L2InteropHandler.executeAtomicBundle().
  *
- * Used for real interop flows only. L1-originated deposits should stay on the
- * NewPriorityRequest relay path even when they pass through the gateway chain.
+ * Used for real interop flows only. L1-originated deposits stay on the
+ * NewPriorityRequest relay path.
  *
  * @returns Array of relay tx hashes on the destination chain
  */
@@ -624,60 +560,6 @@ export async function extractAndRelayInteropBundles(
       log(`   Interop bundle relayed: cast run ${result.txHash} -r ${destProvider.connection.url}`);
     } else {
       throw new Error("Interop bundle execution failed on destination chain");
-    }
-  }
-
-  return txHashes;
-}
-
-/**
- * Scan L1 blocks for NewPriorityRequest events on a diamond proxy and relay them to the GW chain.
- *
- * @returns Array of relay transaction hashes (successful relays only)
- */
-export async function scanAndRelayPriorityRequests(
-  l1Provider: providers.JsonRpcProvider,
-  gwDiamondProxy: string,
-  gwProvider: providers.JsonRpcProvider,
-  fromBlock: number,
-  toBlock: number | "latest",
-  logger?: (line: string) => void
-): Promise<string[]> {
-  const log = logger || console.log;
-  const newPriorityRequestTopic = ethers.utils.id(NEW_PRIORITY_REQUEST_EVENT_SIG);
-
-  const logs = await l1Provider.getLogs({
-    address: gwDiamondProxy,
-    topics: [newPriorityRequestTopic],
-    fromBlock,
-    toBlock,
-  });
-
-  if (logs.length === 0) {
-    log(`   No NewPriorityRequest events found in blocks [${fromBlock}, ${toBlock}]`);
-    return [];
-  }
-
-  log(`   Found ${logs.length} NewPriorityRequest event(s) in blocks [${fromBlock}, ${toBlock}]`);
-
-  const mailboxIface = new ethers.utils.Interface(getAbi("MailboxFacet"));
-
-  const txHashes: string[] = [];
-  for (const logEntry of logs) {
-    const parsed = mailboxIface.parseLog({ topics: logEntry.topics, data: logEntry.data });
-    const toUint256 = ethers.BigNumber.from(parsed.args.transaction.to);
-    const fromUint256 = ethers.BigNumber.from(parsed.args.transaction.from);
-    const from = ethers.utils.getAddress(ethers.utils.hexZeroPad(fromUint256.toHexString(), 20));
-    const to = ethers.utils.getAddress(ethers.utils.hexZeroPad(toUint256.toHexString(), 20));
-    const calldata = parsed.args.transaction.data;
-
-    log(`   Relaying priority request from ${from} to ${to}`);
-    const result = await relayTx(gwProvider, from, to, calldata);
-    if (result.success) {
-      txHashes.push(result.txHash);
-      log(`   Relay tx: cast run ${result.txHash} -r ${gwProvider.connection.url}`);
-    } else {
-      log("   Relay tx failed (non-fatal)");
     }
   }
 
