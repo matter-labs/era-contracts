@@ -82,7 +82,7 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         );
         ecosystemAddresses = deployEcosystem();
         ctmScript = new DeployCTMIntegrationScript();
-        ctmScript.runForTest(ecosystemAddresses.bridgehub.proxies.bridgehub, false);
+        ctmScript.runForTest(ecosystemAddresses.bridgehub.proxies.bridgehub);
         ctmAddresses = ctmScript.getAddresses();
         registerCTM(
             ecosystemAddresses.bridgehub.proxies.bridgehub,

@@ -6,6 +6,9 @@ description: >
   Keep the paths identical to the cache save and artifact upload lists in
   l1-contracts-ci.yaml and build-contract-artifacts.yaml.
 
+  Cache entries are versioned by their paths. Keep comments outside `path:` blocks: YAML treats
+  them as paths inside these block scalars.
+
 inputs:
   key:
     description: >

@@ -77,16 +77,17 @@ const REQUIRED_CONTRACTS = [
   "L2InteropCommitmentTree.sol",
 ];
 
-async function copyContractAbi(src: string, dest: string): Promise<void> {
+async function copyContractAbi(src: string, dest: string): Promise<number> {
   await fs.mkdir(dest, { recursive: true });
   const entries = await fs.readdir(src, { withFileTypes: true });
+  let abiCount = 0;
 
   for (const entry of entries) {
     const srcPath = path.join(src, entry.name);
     const destPath = path.join(dest, entry.name);
 
     if (entry.isDirectory()) {
-      await copyContractAbi(srcPath, destPath);
+      abiCount += await copyContractAbi(srcPath, destPath);
     } else if (entry.name.endsWith(".json")) {
       // Read the JSON file and reduce it to ABI-only JSON.
       const content = await fs.readFile(srcPath, "utf-8");
@@ -94,40 +95,46 @@ async function copyContractAbi(src: string, dest: string): Promise<void> {
 
       if (json.abi) {
         await fs.writeFile(destPath, JSON.stringify(json.abi, null, 2));
+        abiCount += 1;
       } else {
-        console.warn(`Warning: No ABI found in ${srcPath}`);
+        throw new Error(`No ABI found in ${srcPath}`);
       }
     } else {
       // Copy non-JSON files as-is
       await fs.copyFile(srcPath, destPath);
     }
   }
+  return abiCount;
 }
 
 async function main() {
   const l1ContractsDir = path.resolve(__dirname, "..");
   const outDir = path.join(l1ContractsDir, "out");
   const zkstackOutDir = path.join(l1ContractsDir, "zkstack-out");
+  const stagingDir = path.join(l1ContractsDir, "zkstack-out.tmp");
 
   console.log("Copying contract ABIs to zkstack-out...");
 
-  // Remove existing zkstack-out directory to avoid stale files
-  await fs.rm(zkstackOutDir, { recursive: true, force: true });
-  await fs.mkdir(zkstackOutDir, { recursive: true });
-
-  // Copy each required contract directory, extracting ABIs from JSON files
-  for (const contract of REQUIRED_CONTRACTS) {
-    const srcPath = path.join(outDir, contract);
-    const destPath = path.join(zkstackOutDir, contract);
-
-    try {
-      await fs.access(srcPath);
-      await copyContractAbi(srcPath, destPath);
+  // Build a complete replacement separately so a malformed artifact cannot leave the committed
+  // output half-rewritten. Only swap it into place after every ABI has been extracted successfully.
+  await fs.rm(stagingDir, { recursive: true, force: true });
+  await fs.mkdir(stagingDir, { recursive: true });
+  try {
+    for (const contract of REQUIRED_CONTRACTS) {
+      const srcPath = path.join(outDir, contract);
+      const destPath = path.join(stagingDir, contract);
+      if ((await copyContractAbi(srcPath, destPath)) === 0) {
+        throw new Error(`No ABI artifacts found in ${srcPath}`);
+      }
       console.log(`Copied ${contract}`);
-    } catch (error) {
-      console.warn(`Warning: ${contract} not found in out`);
     }
+  } catch (error) {
+    await fs.rm(stagingDir, { recursive: true, force: true });
+    throw error;
   }
+
+  await fs.rm(zkstackOutDir, { recursive: true, force: true });
+  await fs.rename(stagingDir, zkstackOutDir);
 
   console.log("Done copying contract ABIs to zkstack-out");
 }

@@ -22,6 +22,9 @@ async function main(): Promise<void> {
     // can be started with --dump-state flags from the beginning.
     const version = runner.getProtocolVersionString();
     const stateDir = path.join(__dirname, "chain-states", version);
+    // The version is validated by getProtocolVersionString(), so this removes only the selected fixture set.
+    // Starting empty ensures chains removed from config do not survive as stale snapshots.
+    fs.rmSync(stateDir, { recursive: true, force: true });
     const dumpStatePaths = runner.buildDumpStatePaths(stateDir);
 
     // Run full deployment + test tokens + TBM with pinned inputs:

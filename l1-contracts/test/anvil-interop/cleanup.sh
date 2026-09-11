@@ -27,21 +27,16 @@ done
 # Stop all Anvil instances - try graceful shutdown first using PIDs
 echo "Stopping Anvil instances..."
 
-# Try to use PID file for graceful shutdown
-if [ -f "$PID_FILE" ]; then
-    echo "Found PID file, attempting graceful shutdown..."
-    # Extract PIDs and kill them
-    pids=$(cat "$PID_FILE" | grep -o '"[0-9]*":' | grep -o '[0-9]*' || true)
-    for pid in $pids; do
-        if kill -0 "$pid" 2>/dev/null; then
-            echo "  Stopping Anvil process $pid..."
-            kill -TERM "$pid" 2>/dev/null || true
-        fi
-    done
-    sleep 2
-    # Remove PID file
-    rm -f "$PID_FILE"
-fi
+# Use current listeners; PID files can outlive their processes and contain recycled PIDs.
+for PORT in $ANVIL_PORTS; do
+    PID=$(lsof -ti :$PORT -sTCP:LISTEN 2>/dev/null || true)
+    if [ -n "$PID" ]; then
+        echo "  Stopping process on port $PORT (PID: $PID)..."
+        kill -TERM $PID 2>/dev/null || true
+    fi
+done
+sleep 2
+rm -f "$PID_FILE"
 
 # Fallback: Kill processes LISTENING on known Anvil ports only (not system-wide)
 # -sTCP:LISTEN ensures we only kill Anvil server processes, not Node.js clients

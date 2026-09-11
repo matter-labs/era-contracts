@@ -76,8 +76,8 @@ export class DeploymentRunner {
    */
   getProtocolVersionString(): string {
     const cfg = JSON.parse(fs.readFileSync(this.configPath, "utf-8")) as { stateVersion?: string };
-    if (!cfg.stateVersion) {
-      throw new Error(`stateVersion missing in ${this.configPath}`);
+    if (!cfg.stateVersion || !/^v\d+\.\d+\.\d+$/.test(cfg.stateVersion)) {
+      throw new Error(`stateVersion in ${this.configPath} must match v<major>.<minor>.<patch>`);
     }
     return cfg.stateVersion;
   }

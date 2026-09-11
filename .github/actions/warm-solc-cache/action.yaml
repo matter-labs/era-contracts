@@ -8,8 +8,8 @@ description: >
   between them.
 
   On trusting a cache: this action only ever READS. The single writer is verify-merged-commit.yaml,
-  which builds with the cache disabled and saves only after the hash, selector and zkstack-out
-  checks pass. Nothing a `pull_request` run produces is ever offered to a later run.
+  which builds with the cache disabled and saves the artifacts produced by that clean build. Nothing
+  a `pull_request` run produces is ever offered to a later run.
 
   That asymmetry is deliberate, and per-ref scoping alone is not enough to replace it. GitHub does
   stop a fork PR from writing the base scope, but it lets a PR's later runs restore what its own

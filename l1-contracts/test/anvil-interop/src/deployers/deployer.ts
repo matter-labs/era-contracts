@@ -103,8 +103,8 @@ export class ForgeDeployer {
       PERMANENT_VALUES_INPUT: ANVIL_INTEROP_PERMANENT_VALUES_RELATIVE,
     };
 
-    const sig = "runForAnvilTest(address,bool)";
-    const args = `${bridgehubAddr} false`;
+    const sig = "runForAnvilTest(address)";
+    const args = bridgehubAddr;
 
     await runForgeScript({
       scriptPath: ANVIL_INTEROP_DEPLOY_CTM_SCRIPT,
