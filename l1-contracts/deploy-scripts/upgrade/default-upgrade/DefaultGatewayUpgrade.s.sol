@@ -25,7 +25,7 @@ import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
@@ -102,11 +102,8 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
     // TODO We need for composing upgrade transaction. but seems we don't need an upgrade transaction on gateway
     PublishFactoryDepsResult internal factoryDepsResult;
 
-    /// @dev Gateway upgrades don't cache FixedForceDeploymentsData — returns empty so
-    /// buildZKsyncOSForceDeployments falls through to loading from disk.
-    function getFixedForceDeploymentsData() internal virtual override returns (FixedForceDeploymentsData memory) {
-        // Return empty struct — buildZKsyncOSForceDeployments will load bytecodes from disk.
-    }
+    /// @dev Leave the cache empty so `getBaseForceDeployments` loads bytecodes from disk.
+    function getFixedForceDeploymentsData() internal virtual override returns (FixedForceDeploymentsData memory) {}
 
     EcosystemUpgradeConfig internal upgradeConfig;
 
@@ -256,7 +253,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
         coreAddresses = AddressIntrospector.getCoreDeployedAddresses(address(bridgehub));
         config.ownerAddress = coreAddresses.shared.governance;
         address ctm = bridgehub.chainTypeManager(representativeChainId);
-        ctmDeployedAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
+        ctmDeployedAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManager(ctm));
         discoveredRepresentativeZkChain = AddressIntrospector.getZkChainAddresses(
             IZKChain(bridgehub.getZKChain(representativeChainId))
         );

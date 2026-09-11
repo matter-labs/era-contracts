@@ -225,7 +225,6 @@ export class ChainRegistry {
         governance_min_delay: 0,
         validator_sender_operator_eth: ownerAddress,
         validator_sender_operator_blobs_eth: ownerAddress,
-        allow_evm_emulator: false,
       },
     };
 

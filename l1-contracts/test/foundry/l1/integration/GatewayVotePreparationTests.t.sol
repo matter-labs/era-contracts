@@ -262,7 +262,6 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
         assertTrue(config.gettersSelectors.length > 0, "Getters selectors should be populated");
         assertTrue(config.genesisRoot != bytes32(0), "Genesis root should be set");
         assertTrue(config.protocolVersion != 0, "Protocol version should be set");
-        assertTrue(config.isZKsyncOS, "Config should be in ZKsyncOS mode");
     }
 
     function _writeGatewayVotePreparationConfig() internal {

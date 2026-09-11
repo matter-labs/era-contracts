@@ -300,11 +300,11 @@ Source of truth for the Anvil predeploy layout lives in
 | Mock                        | Address   | Replaces              | Difference                                           |
 | --------------------------- | --------- | --------------------- | ---------------------------------------------------- |
 | `MockL2MessageVerification` | `0x10009` | L2MessageVerification | All proof checks return `true`                       |
-| `MockL1MessengerHook`       | `0x7001`  | L1_MESSENGER_HOOK     | No-op; real L1MessengerZKOS still emits events       |
+| `MockL1MessengerHook`       | `0x7001`  | L1_MESSENGER_HOOK     | No-op; real L1Messenger still emits events           |
 | `MockMintBaseTokenHook`     | `0x7100`  | MINT_BASE_TOKEN_HOOK  | No-op; L2BaseToken pre-funded via `anvil_setBalance` |
 | `DummyL1MessageRoot`        | L1        | L1MessageRoot         | All proof verification returns `true`                |
 
-Real contracts used: `SystemContext` at `0x800b`, `L1MessengerZKOS` at `0x8008`, `L2BaseTokenZKOS` at `0x800a`, all other L2 system contracts at their production addresses.
+Real contracts used: `SystemContext` at `0x800b`, `L1Messenger` at `0x8008`, `L2BaseToken` at `0x800a`, all other L2 system contracts at their production addresses.
 
 ### L2 Deployment: Synthetic Prestate + Real Genesis Upgrade
 

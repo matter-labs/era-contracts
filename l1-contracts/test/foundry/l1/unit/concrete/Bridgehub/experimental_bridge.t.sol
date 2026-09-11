@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
 import {console2 as console} from "forge-std/Script.sol";
 
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
@@ -109,7 +110,7 @@ contract ExperimentalBridgeTest is Test {
     address mockL2Contract;
 
     uint256 l1ChainId;
-    uint256 eraChainId;
+    uint256 zkTokenOriginChainId;
     uint256 gatewayChainId;
 
     address deployerAddress;
@@ -138,7 +139,7 @@ contract ExperimentalBridgeTest is Test {
 
     function setUp() public {
         l1ChainId = 1;
-        eraChainId = 320;
+        zkTokenOriginChainId = 320;
         gatewayChainId = 506;
         deployerAddress = makeAddr("DEPLOYER_ADDRESS");
         bridgeOwner = makeAddr("BRIDGE_OWNER");
@@ -146,7 +147,11 @@ contract ExperimentalBridgeTest is Test {
         bridgehub = L1Bridgehub(address(dummyBridgehub));
         interopCenter = new InteropCenter();
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        interopCenter.initL2(l1ChainId, bridgeOwner, DataEncoding.encodeNTVAssetId(eraChainId, makeAddr("zkToken")));
+        interopCenter.initL2(
+            l1ChainId,
+            bridgeOwner,
+            DataEncoding.encodeNTVAssetId(zkTokenOriginChainId, makeAddr("zkToken"))
+        );
         messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
@@ -164,13 +169,12 @@ contract ExperimentalBridgeTest is Test {
         mockL2Contract = makeAddr("mockL2Contract");
         // mocks to use in bridges instead of using a dummy one
         address mockL1WethAddress = makeAddr("Weth");
-        address eraDiamondProxy = makeAddr("eraDiamondProxy");
 
         l1Nullifier = new L1Nullifier(bridgehub, messageRoot);
         l1NullifierAddress = address(l1Nullifier);
 
-        mockSharedBridge = _deployAssetRouter(mockL1WethAddress, eraDiamondProxy);
-        mockSecondSharedBridge = _deployAssetRouter(mockL1WethAddress, eraDiamondProxy);
+        mockSharedBridge = _deployAssetRouter(mockL1WethAddress);
+        mockSecondSharedBridge = _deployAssetRouter(mockL1WethAddress);
 
         // kl todo: clean this up. NTV id deployed below in deployNTV. its was a mess before this upgrade.
         ntv = _deployNTVWithoutEthToken(address(mockSharedBridge));
@@ -194,8 +198,8 @@ contract ExperimentalBridgeTest is Test {
             )
         );
 
-        sharedBridge = _deployAssetRouter(mockL1WethAddress, eraDiamondProxy);
-        secondBridge = _deployAssetRouter(mockL1WethAddress, eraDiamondProxy);
+        sharedBridge = _deployAssetRouter(mockL1WethAddress);
+        secondBridge = _deployAssetRouter(mockL1WethAddress);
 
         sharedBridgeAddress = address(sharedBridge);
         secondBridgeAddress = address(secondBridge);
@@ -236,17 +240,8 @@ contract ExperimentalBridgeTest is Test {
     /// @dev Deploys a real `L1AssetRouter` and transfers ownership to `bridgeOwner`,
     /// mirroring the production ownership handover. Used everywhere the tests previously
     /// relied on the (now removed) `DummySharedBridge` dev stub.
-    function _deployAssetRouter(
-        address _l1WethAddress,
-        address _eraDiamondProxy
-    ) internal returns (L1AssetRouter assetRouter) {
-        assetRouter = new L1AssetRouter(
-            _l1WethAddress,
-            address(bridgehub),
-            l1NullifierAddress,
-            eraChainId,
-            _eraDiamondProxy
-        );
+    function _deployAssetRouter(address _l1WethAddress) internal returns (L1AssetRouter assetRouter) {
+        assetRouter = new L1AssetRouter(_l1WethAddress, address(bridgehub), l1NullifierAddress);
         address defaultOwner = assetRouter.owner();
         vm.prank(defaultOwner);
         assetRouter.transferOwnership(bridgeOwner);
@@ -852,11 +847,10 @@ contract ExperimentalBridgeTest is Test {
         vm.assume(chainId != block.chainid);
         vm.assume(randomCaller != deployerAddress && randomCaller != bridgeOwner);
         // `newChainAddress` gets a vm.mockCall below, and forge's own addresses cannot be mocked:
-        // with newChainAddress = address(vm), the Bridgehub's getZKsyncOS() call is intercepted as a
-        // cheatcode instead of returning the mocked `false`, so it takes the ZKsyncOS branch and
-        // emits NewInteropRoot before NewChain — failing the expectEmit with
-        // "NewInteropRoot != expected NewChain". Precompiles cannot be mocked usefully either.
-        // Excluding them keeps this about the Bridgehub rather than about what the fuzzer picked.
+        // with newChainAddress = address(vm), the Bridgehub's genesis-root getter call is
+        // intercepted as a cheatcode instead of returning the mocked root, derailing the seeding
+        // flow. Precompiles cannot be mocked usefully either. Excluding them keeps this about the
+        // Bridgehub rather than about what the fuzzer picked.
         assumeAddressIsNot(newChainAddress, AddressType.ZeroAddress, AddressType.Precompile, AddressType.ForgeAddress);
 
         _initializeBridgehub();
@@ -894,9 +888,13 @@ contract ExperimentalBridgeTest is Test {
             abi.encode(newChainAddress)
         );
         // The Bridgehub seeds the fresh chain's genesis root right after registration by pulling
-        // from the chain's getters; `newChainAddress` is a fuzzed address, so mock the VM flag to
-        // the EraVM no-op branch.
-        vm.mockCall(newChainAddress, abi.encodeWithSelector(IGetters.getZKsyncOS.selector), abi.encode(false));
+        // from the chain's getters; `newChainAddress` is a fuzzed address, so mock the genesis
+        // batch root it would report.
+        vm.mockCall(
+            newChainAddress,
+            abi.encodeWithSelector(IGetters.l2LogsRootHash.selector, uint256(0)),
+            abi.encode(ChainBatchRootTree.genesisChainBatchRoot())
+        );
 
         vm.expectEmit(true, true, true, true, address(bridgehub));
         emit NewChain(chainId, address(mockCTM), admin);

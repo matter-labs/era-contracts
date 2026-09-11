@@ -81,7 +81,7 @@ struct WritePriorityOpParams {
 /// formats
 /// @param data The calldata that is transmitted for the transaction call
 /// @param signature An abstract set of bytes that are used for transaction authorization
-/// @param factoryDeps The set of L2 bytecode hashes whose preimages were shown on L1
+/// @param factoryDeps Bytecode hashes for system upgrades; empty for ordinary priority transactions.
 /// @param paymasterInput The arbitrary-length data that is used as a calldata to the paymaster pre-call
 /// @param reservedDynamic The arbitrary-length field for usage in a future extension of transaction formats
 struct L2CanonicalTransaction {
@@ -120,7 +120,7 @@ struct L2CanonicalTransaction {
 /// @param l2Calldata The calldata for the L2 transaction.
 /// @param l2GasLimit The limit of the L2 gas for the L2 transaction
 /// @param l2GasPerPubdataByteLimit The price for a single pubdata byte in L2 gas.
-/// @param factoryDeps The array of L2 bytecodes that the tx depends on.
+/// @param factoryDeps Must be empty.
 /// @param refundRecipient The recipient of the refund for the transaction on L2. If the transaction fails, then
 /// this address will receive the `l2Value`.
 // solhint-disable-next-line gas-struct-packing
@@ -143,8 +143,8 @@ struct BridgehubL2TransactionRequest {
 /// @param timestamp The block timestamp at which the imported root was created on the dependency
 /// chain. Double checked against `MessageRoot.historicalRoot` during batch execution.
 /// See {protocol-docs/message-root.md#interop-root-import-and-the-batch-execution-double-check}.
-/// @param sides The sides of the dynamic incremental merkle tree emitted in the L2ToL1Messenger for precommit based interop
-/// For proof and commit based interop, the sides contain a single root.
+/// @param sides The imported root. The retired precommit encoding used this field for incremental-tree
+/// sides; current proof and commit encodings contain a single root.
 struct InteropRoot {
     uint256 chainId;
     uint256 blockOrBatchNumber;

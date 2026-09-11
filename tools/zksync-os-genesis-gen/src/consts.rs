@@ -182,7 +182,7 @@ pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 25] = [
     ),
     (
         L2_NATIVE_TOKEN_VAULT_ADDR,
-        ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2NativeTokenVaultZKOS")),
+        ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2NativeTokenVault")),
     ),
     (
         L2_NTV_BEACON_DEPLOYER_ADDR,
@@ -219,15 +219,15 @@ pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 25] = [
     // System contracts (0x8000 range)
     (
         L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
-        ContractDeployment::SystemProxy(ContractSource::L1ContractName("ZKOSContractDeployer")),
+        ContractDeployment::SystemProxy(ContractSource::L1ContractName("ContractDeployer")),
     ),
     (
         L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-        ContractDeployment::SystemProxy(ContractSource::L1ContractName("L1MessengerZKOS")),
+        ContractDeployment::SystemProxy(ContractSource::L1ContractName("L1Messenger")),
     ),
     (
         L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-        ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2BaseTokenZKOS")),
+        ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2BaseToken")),
     ),
     (
         L2_SYSTEM_CONTEXT_ADDR,

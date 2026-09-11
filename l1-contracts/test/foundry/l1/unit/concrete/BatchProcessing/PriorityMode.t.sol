@@ -3,12 +3,10 @@ pragma solidity 0.8.28;
 
 import {Utils} from "../Utils/Utils.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
-import {IL1DAValidator, L1DAValidatorOutput} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
-import {IExecutor, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {
     InvalidTxCountInPriorityMode,
-    OnlyNormalMode,
     PriorityModeActivationTooEarly,
     PriorityModeIsNotAllowed,
     PriorityModeRequiresPermanentRollup,
@@ -19,10 +17,6 @@ import {PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/
 import {L2TransactionRequestDirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 contract PriorityModeExecutorTest is ExecutorTest {
-    function isZKsyncOS() internal pure override returns (bool) {
-        return true;
-    }
-
     function test_revertWhen_activatePriorityMode_notAllowed() public {
         vm.expectRevert(PriorityModeIsNotAllowed.selector);
         admin.activatePriorityMode();
@@ -69,14 +63,6 @@ contract PriorityModeExecutorTest is ExecutorTest {
         vm.prank(validator);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, validator));
         committer.commitBatchesSharedBridge(address(0), 0, 0, "");
-    }
-
-    function test_revertWhen_precommitInPriorityMode() public {
-        _activatePriorityMode();
-
-        vm.prank(validator);
-        vm.expectRevert(OnlyNormalMode.selector);
-        committer.precommitSharedBridge(address(0), 1, "");
     }
 
     function test_revertWhen_priorityModeBatchHasL2Txs() public {
@@ -153,22 +139,6 @@ contract PriorityModeExecutorTest is ExecutorTest {
                 factoryDeps: new bytes[](0),
                 refundRecipient: prioritySender
             })
-        );
-    }
-
-    function _mockDAForCommit(uint256 batchNumber) internal {
-        bytes32[] memory blobHashes = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
-        bytes32[] memory blobCommitments = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
-        L1DAValidatorOutput memory daOutput = L1DAValidatorOutput({
-            stateDiffHash: bytes32(0),
-            blobsLinearHashes: blobHashes,
-            blobsOpeningCommitments: blobCommitments
-        });
-        // Match any checkDA call for this batch regardless of DA input encoding
-        vm.mockCall(
-            rollupL1DAValidator,
-            abi.encodeWithSelector(IL1DAValidator.checkDA.selector, l2ChainId, batchNumber),
-            abi.encode(daOutput)
         );
     }
 }

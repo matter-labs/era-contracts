@@ -47,8 +47,7 @@ import {
     ManagerSettlementLayerNotL1,
     ProofSourceChainMismatch
 } from "./AtomicInteropErrors.sol";
-import {Unauthorized} from "../l2-system/zksync-os/errors/ZKOSContractErrors.sol";
-import {RecoverToL1NotSupported} from "../common/L1ContractErrors.sol";
+import {RecoverToL1NotSupported, Unauthorized} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

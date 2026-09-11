@@ -39,3 +39,9 @@ args to `protocol_ops` unless the first post-flag word is `forge`/`cast`).
 - **Artifact names**:
   - per-chain workflows: `safe-bundles-{operation}-{chain_name}-{environment}`
   - ecosystem-wide workflows (`upgrade-prepare`, `upgrade-governance`): `safe-bundles-{operation}-{environment}` (no `chain_name`)
+
+## CI tiers
+
+PR CI is split into a per-commit tier and a pre-merge tier (the committed-generated-artifact
+checks, skipped while a PR is a draft). That split, and the one-dispatch regen that clears it,
+are documented in [docs/ai-review/docs/ci-green.md](../../docs/ai-review/docs/ci-green.md).

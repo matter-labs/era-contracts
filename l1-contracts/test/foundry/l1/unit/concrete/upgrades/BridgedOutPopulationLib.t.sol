@@ -92,11 +92,9 @@ contract BridgedOutPopulationLibTest is Test {
         owner = makeAddr("owner");
         bridgehub = makeAddr("bridgehub");
         address proxyAdmin = makeAddr("proxyAdmin");
-        address eraDiamondProxy = makeAddr("eraDiamondProxy");
         address weth = makeAddr("weth");
         address tokenBeacon = makeAddr("tokenBeacon");
         address chainAssetHandler = makeAddr("chainAssetHandler");
-        uint256 eraChainId = 9;
 
         L1NullifierDev nullifierImpl = new L1NullifierDev({
             _bridgehub: IL1Bridgehub(bridgehub),
@@ -115,9 +113,7 @@ contract BridgedOutPopulationLibTest is Test {
         L1AssetRouter assetRouterImpl = new L1AssetRouter({
             _l1WethToken: weth,
             _bridgehub: bridgehub,
-            _l1Nullifier: address(l1Nullifier),
-            _eraChainId: eraChainId,
-            _eraDiamondProxy: eraDiamondProxy
+            _l1Nullifier: address(l1Nullifier)
         });
         assetRouter = L1AssetRouter(
             payable(

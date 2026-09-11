@@ -20,8 +20,8 @@ use crate::common::{forge::ForgeRunner, logger, wallets::Wallet};
 pub struct EcosystemInitArgs {
     /// Per-env preset (`stage` / `testnet` / `mainnet` / `local`). Loads
     /// `upgrade-envs/permanent-values/<env>.toml` and supplies defaults for
-    /// `--zk-token-asset-id`, `--era-chain-id`, and `--owner` when those flags
-    /// are omitted. Explicit flags still win.
+    /// `--zk-token-asset-id` and `--owner` when those flags are omitted.
+    /// Explicit flags still win.
     #[clap(long, help_heading = "Topology")]
     pub env: Option<String>,
 

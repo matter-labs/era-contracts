@@ -219,7 +219,7 @@
         "internalType": "address"
       },
       {
-        "name": "params",
+        "name": "_params",
         "type": "tuple",
         "internalType": "struct IValidatorTimelock.ValidatorRotationParams",
         "components": [
@@ -414,29 +414,6 @@
   },
   {
     "type": "function",
-    "name": "precommitSharedBridge",
-    "inputs": [
-      {
-        "name": "_chainAddress",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_l2BlockNumber",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_l2Block",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "proveBatchesSharedBridge",
     "inputs": [
       {
@@ -514,7 +491,7 @@
         "internalType": "address"
       },
       {
-        "name": "params",
+        "name": "_params",
         "type": "tuple",
         "internalType": "struct IValidatorTimelock.ValidatorRotationParams",
         "components": [
@@ -646,31 +623,6 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
-  },
-  {
-    "type": "event",
-    "name": "BatchPrecommitmentSet",
-    "inputs": [
-      {
-        "name": "batchNumber",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "untrustedLastL2BlockNumberHint",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "precommitment",
-        "type": "bytes32",
-        "indexed": false,
-        "internalType": "bytes32"
-      }
-    ],
-    "anonymous": false
   },
   {
     "type": "event",

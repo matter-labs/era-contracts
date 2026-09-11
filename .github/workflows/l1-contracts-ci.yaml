@@ -30,12 +30,13 @@ jobs:
       node_version: ${{ steps.plan.outputs.node_version }}
       foundry_version: ${{ steps.plan.outputs.foundry_version }}
       coverage_command: ${{ steps.plan.outputs.coverage_command }}
-      tooling_changes: ${{ steps.plan.outputs.tooling_changes }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
+      - name: Test coverage planning and comparison
+        run: node --test .github/scripts/coverage/coverage.test.js
       - name: Select coverage revisions
         id: plan
         env:
@@ -129,137 +130,8 @@ jobs:
             l1-contracts/cache-forge
             l1-contracts/out
 
-  # Kept as its own job rather than folded into `build` so a stale zkstack-out does not block
-  # every downstream job — but it now reuses `build`'s artifacts instead of repeating that whole
-  # compile from cold, which was most of what the job spent.
-  check-zkstack-out:
-    if: github.event_name == 'pull_request'
-    needs: [build]
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install Foundry
-        uses: ./.github/actions/install-foundry
-
-      - name: Use Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          cache: yarn
-
-      - name: Install dependencies
-        run: yarn
-
-      - name: Restore this commit's artifacts
-        uses: ./.github/actions/restore-ci-artifacts
-
-      - name: Build and check zkstack-out
-        working-directory: l1-contracts
-        run: |
-          rm -rf zkstack-out
-          yarn build:foundry
-
-          # Fail if regenerated zkstack-out differs from what was committed
-          if [ -n "$(git status --porcelain -- zkstack-out)" ]; then
-            echo "::error::l1-contracts/zkstack-out is out of date. Run 'cd l1-contracts && yarn build:foundry' and commit the changes."
-            git --no-pager status --porcelain -- zkstack-out
-            git --no-pager diff -- zkstack-out || true
-            exit 1
-          fi
-
-  # The production OS genesis embeds deployed bytecode from the Forge artifacts. Regenerate it
-  # from this commit's build so contract changes cannot leave the committed genesis image stale.
-  check-zksync-os-genesis:
-    if: github.event_name == 'pull_request'
-    needs: [build]
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        working-directory: tools/zksync-os-genesis-gen
-        run: rustup toolchain install
-
-      - name: Cache cargo build
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          workspaces: tools/zksync-os-genesis-gen
-
-      - name: Restore this commit's artifacts
-        uses: ./.github/actions/restore-ci-artifacts
-
-      - name: Regenerate ZKsync OS genesis
-        working-directory: tools/zksync-os-genesis-gen
-        run: |
-          cargo run --locked --release --bin zksync-os-genesis-gen -- \
-            --output-file ../../configs/genesis/zksync-os/latest.json
-
-      - name: Check ZKsync OS genesis
-        run: |
-          if [ -n "$(git status --porcelain -- configs/genesis/zksync-os/latest.json)" ]; then
-            echo "::error::configs/genesis/zksync-os/latest.json is out of date. From Linux, rebuild with the pinned default Foundry profile, then run the ZKsync OS genesis generator."
-            git --no-pager status --porcelain -- configs/genesis/zksync-os/latest.json
-            git --no-pager diff --stat -- configs/genesis/zksync-os/latest.json
-            exit 1
-          fi
-
-  check-hashes:
-    if: github.event_name == 'pull_request'
-    needs: [build]
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-
-      - name: Use Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          cache: yarn
-      - name: Install dependencies
-        run: yarn
-
-      - name: Restore this commit's artifacts
-        uses: ./.github/actions/restore-ci-artifacts
-
-      - name: Check hashes
-        run: yarn calculate-hashes:check
-
-  check-selectors:
-    if: github.event_name == 'pull_request'
-    needs: [build]
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Use Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          cache: yarn
-      - name: Install dependencies
-        run: yarn
-
-      - name: Install foundry
-        uses: ./.github/actions/install-foundry
-
-      - name: Restore this commit's artifacts
-        uses: ./.github/actions/restore-ci-artifacts
-
-      - name: Check selectors
-        run: yarn l1 selectors --check
+  # check-hashes, check-selectors, check-zkstack-out and check-zksync-os-genesis live in
+  # pre-merge-checks.yaml (skipped on draft PRs).
 
   test-foundry:
     if: github.event_name == 'pull_request'
@@ -651,13 +523,13 @@ jobs:
         with:
           node-version: ${{ needs.plan.outputs.node_version }}
       - name: Download PR coverage
-        if: needs.coverage-merge.result == 'success' && needs.plan.outputs.tooling_changes == '[]'
+        if: needs.coverage-merge.result == 'success'
         uses: actions/download-artifact@v4
         with:
           name: coverage-reports
           path: coverage-pr
       - name: Download base coverage
-        if: needs.coverage-merge.result == 'success' && needs.plan.outputs.tooling_changes == '[]'
+        if: needs.coverage-merge.result == 'success'
         uses: actions/download-artifact@v4
         with:
           name: coverage-base

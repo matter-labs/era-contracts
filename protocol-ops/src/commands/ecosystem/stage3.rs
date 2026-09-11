@@ -1,24 +1,9 @@
-//! `protocol-ops ecosystem stage3` — Phase 3: bridged-token registration and
-//! `bridgedOut` population.
+//! `protocol-ops ecosystem stage3` populates `L1NativeTokenVault.bridgedOut`
+//! from legacy per-chain balances through `CoreUpgrade_v33.stage3`.
 //!
-//! Runs `the core upgrade script's stage3(bridgehubProxy)` on the env's bridgehub:
-//!   - registers ETH + every entry in the v31-bridged-tokens config in the
-//!     NTV's `bridgedTokens` list;
-//!   - populates the NTV's `bridgedOut` accounting from the pre-upgrade
-//!     accounting — the removed v31 asset tracker's L1 bulkhead where the asset
-//!     was registered there, the vault's own deprecated per-chain balances
-//!     otherwise — without which withdrawals of an L1-native asset with a
-//!     pre-upgrade legacy balance revert after the upgrade. Idempotent per
-//!     asset, so an interrupted run is resumed by simply running the phase again.
-//!
-//! Sequencing: runs *before* the per-chain upgrades (Phase 4), so that by the time
-//! a chain's diamond upgrade lands, every L1-native asset it can withdraw is
-//! already in the NTV's `bridgedTokens` enumeration and populated.
-//!
-//! Any signer can run this — no governance privileges needed. The caller
-//! must pass `--sender <EOA>`. We deliberately do not fall back to the
-//! env's `owner_address` because on stage / mainnet that's the
-//! ProtocolUpgradeHandler contract (governance), not a signable EOA.
+//! Run after governance and before the per-chain upgrades. Any signable EOA
+//! can call it; `--sender` is required because the environment's owner may be
+//! a governance contract.
 
 use alloy::primitives::Address;
 use anyhow::Context;

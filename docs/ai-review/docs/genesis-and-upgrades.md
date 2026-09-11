@@ -8,19 +8,21 @@
 
 ## Context
 
-There are two types of ZKsync-like systems and both should be supported by our code: EraVM based and ZKsync OS based.
+Every chain this repository can deploy or upgrade runs ZKsync OS. EraVM chains are not
+deployable, configurable, or upgradable from this codebase. Runtime compatibility retains
+storage tombstones and wire-format reservations. Version-scoped upgrade tooling remains
+under its historical version directories.
 
-### ZKsync OS
+### Genesis
 
-ZKsync OS based genesis is defined by the Genesis tool listed above. The main motivation for its structure is to avoid doing force deployments on top of addresses that have code already. Whenever we need to upgrade a contract, we should either deploy a new one and migrate the functionality to the new address or deploy the implementation and upgrade the actual contract. In any case, the main goal is to never force deploy on top of an address that had a bytecode before as it messes up with block explorers.
+Genesis is defined by the Genesis tool listed above. The main motivation for its structure is to avoid doing force deployments on top of addresses that have code already. Whenever we need to upgrade a contract, we should either deploy a new one and migrate the functionality to the new address or deploy the implementation and upgrade the actual contract. In any case, the main goal is to never force deploy on top of an address that had a bytecode before as it messes up with block explorers.
 
 Thus, inside the genesis tool, all contracts should be predeployed as SystemProxies owned by the SystemProxyAdmin. Any exceptions should be clearly explained in the comments of the tool.
 
-The above means that inside the deployment and upgrade preparation scripts whenever a deployment is done for ZKsync OS, we MUST avoid UnsafeForceDeployment as much as possible and prefer the SystemProxy upgrades instead.
-
-### ZKsync Era
-
-The genesis is defined in the [other repo](https://github.com/matter-labs/zksync-era/blob/draft-v31/core/lib/types/src/system_contracts.rs). The main difference is that we don't use system proxies for Era and use Force deployments instead.
+The above means that inside the deployment and upgrade preparation scripts, deployments MUST
+avoid `ZKsyncOSUnsafeForceDeployment` as much as possible and prefer the
+`ZKsyncOSSystemProxyUpgrade` variant instead. Ordinal 0 of `ContractUpgradeType`
+(`__DEPRECATED_EraForceDeployment`) is a retired wire reservation: supplying it reverts.
 
 ### Upgrade process
 
@@ -37,15 +39,16 @@ Common pitfalls: a contract added to genesis has not been added to the upgrade s
 The upgrade that is incoming is v32 (an in-place v31 → v32 upgrade; only ZKsync OS chains are
 supported). Its per-chain upgrade contract is:
 
-- V32UpgradeZKsyncOS.sol (extends DefaultUpgradeZKsyncOS; no Era counterpart)
+- V32UpgradeZKsyncOS.sol (extends DefaultUpgradeZKsyncOS)
 
 And the corresponding L2 upgrade contract that should be used is:
 
 - L2V32Upgrade.sol
 
-The only assumptions that the upgrade logic can use is that the:
-
-- ComplexUpgrader contract is present and force deployment via a hook (ZKsync OS only) or via a call to the ContractDeployer system contract (EraVM only) works.
+The only assumption the upgrade logic can use is that the ComplexUpgrader contract is present
+and force deployment via the ZKsync OS hook works
+(`forceDeployAndUpgradeUniversal`; the Era-generation `forceDeployAndUpgrade` entry point no
+longer exists).
 
 Additionally, the v32 upgrade of a **ZKsync OS** chain (`V32UpgradeZKsyncOS`) assumes
 the chain completed its base-token backfill on v31: on L1 the upgrade requires
@@ -54,23 +57,10 @@ the chain completed its base-token backfill on v31: on L1 the upgrade requires
 before its L2 entry point disappears. Chains that never ran the v31 backfill cannot
 take this upgrade.
 
-Note, that on ZKsync Era, the old version of the ComplexUpgrader is used, which only supports this function:
-
-```
-    function forceDeployAndUpgrade(
-        ForceDeployment[] calldata _forceDeployments,
-        address _delegateTo,
-        bytes calldata _calldata
-    ) external payable override onlyForceDeployer {
-        DEPLOYER_SYSTEM_CONTRACT.forceDeployOnAddresses(_forceDeployments);
-
-        upgrade(_delegateTo, _calldata);
-    }
-```
-
 ## Common pitfalls
 
-- Using Era-like force deployments / hash calculation for ZKsync OS scripts (without explicit warnings that ZKsyncOS is not supported or script name indicating so).
+- Reintroducing Era-generation patterns (`forceDeployOnAddresses`, Era bytecode-hash
+  computation) into scripts or contracts: nothing in the current tree may depend on them.
 - Deviations between genesis and upgrades (mentioned above). Please review the code and verify exhaustively that the contracts/state force deployed, upgraded, initialized, or assumed during the upgrade correctly correspond to the genesis gen, and vice versa.
 
 Do a bidirectional inventory check:

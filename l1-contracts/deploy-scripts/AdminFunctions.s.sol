@@ -3,7 +3,6 @@ pragma solidity ^0.8.21;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {Vm} from "forge-std/Vm.sol";
-import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 
 import {
     IAdminFunctions,

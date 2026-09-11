@@ -106,7 +106,7 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
-    function getProofMode() external view onlyZKsyncOS returns (uint256) {
+    function getProofMode() external view returns (uint256) {
         return IZKsyncOSVerifier(address(s.verifier)).getProofMode(s.disabledProofSystems);
     }
 

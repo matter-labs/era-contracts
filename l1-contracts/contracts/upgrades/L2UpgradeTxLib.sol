@@ -10,7 +10,6 @@ import {INativeTokenVaultBase} from "../bridge/ntv/INativeTokenVaultBase.sol";
 import {IL2V32Upgrade} from "./IL2V32Upgrade.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 import {UnexpectedUpgradeSelector} from "../common/L1ContractErrors.sol";
-import {UnexpectedZKsyncOSFlag} from "./ZkSyncUpgradeErrors.sol";
 import {ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {TokenBridgingData, TokenMetadata} from "../common/Messaging.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
@@ -31,26 +30,19 @@ library L2UpgradeTxLib {
     /// extract ecosystem-wide fields, then re-encode with per-chain additionalForceDeploymentsData.
     /// @param _bridgehub The address of the bridgehub.
     /// @param _chainId The chain ID to build the upgrade data for.
-    /// @param _zksyncOS Whether the chain is a ZKsyncOS chain, passed from diamond storage.
     /// @param _existingUpgradeCalldata The placeholder L2V32Upgrade.upgrade() calldata.
     function buildL2V32UpgradeCalldata(
         address _bridgehub,
         uint256 _chainId,
-        bool _zksyncOS,
         bytes memory _existingUpgradeCalldata
     ) internal view returns (bytes memory) {
-        // Decode the placeholder to extract isZKsyncOS, ctmDeployer, and fixedForceDeploymentsData
+        // Decode the placeholder to extract ctmDeployer and fixedForceDeploymentsData
         // (these are ecosystem-wide and don't change per chain).
-        (bool isZKsyncOS, address ctmDeployer, bytes memory fixedForceDeploymentsData, ) = abi.decode(
+        (address ctmDeployer, bytes memory fixedForceDeploymentsData, ) = abi.decode(
             // ignore placeholder additionalForceDeploymentsData
             _existingUpgradeCalldata.slice(4),
-            (bool, address, bytes, bytes)
+            (address, bytes, bytes)
         );
-
-        // Validate that the wrapped calldata matches the chain type from diamond storage.
-        if (isZKsyncOS != _zksyncOS) {
-            revert UnexpectedZKsyncOSFlag(_zksyncOS, isZKsyncOS);
-        }
 
         // Construct per-chain ZKChainSpecificForceDeploymentsData from L1 state.
         bytes memory additionalForceDeploymentsData = buildChainSpecificForceDeploymentsData(_bridgehub, _chainId);
@@ -58,25 +50,22 @@ library L2UpgradeTxLib {
         return
             abi.encodeCall(
                 IL2V32Upgrade.upgrade,
-                (isZKsyncOS, ctmDeployer, fixedForceDeploymentsData, additionalForceDeploymentsData)
+                (ctmDeployer, fixedForceDeploymentsData, additionalForceDeploymentsData)
             );
     }
 
-    /// @notice Rewrite a ZKsync OS chain's L2 upgrade transaction data with its per-chain data.
+    /// @notice Rewrite a chain's L2 upgrade transaction data with its per-chain data.
     /// @dev The ecosystem-wide transaction wraps `IL2V32Upgrade.upgrade` in
     /// `IComplexUpgrader.forceDeployAndUpgradeUniversal`; only the innermost per-chain field changes, so the
     /// wrapper is unwrapped, `buildL2V32UpgradeCalldata` substitutes the data, and the wrapper is rebuilt.
     /// @param _bridgehub The address of the bridgehub.
     /// @param _chainId The chain ID to build the upgrade data for.
-    /// @param _zksyncOS Whether the chain is a ZKsyncOS chain, passed from diamond storage.
     /// @param _existingTxData The L2 upgrade tx data the CTM upgrade produced.
-    function rewriteZKsyncOSUpgradeTxData(
+    function rewriteUpgradeTxData(
         address _bridgehub,
         uint256 _chainId,
-        bool _zksyncOS,
         bytes memory _existingTxData
     ) internal view returns (bytes memory) {
-        validateZKsyncOSFlag(_zksyncOS, true);
         validateUpgradeSelector(_existingTxData, IComplexUpgrader.forceDeployAndUpgradeUniversal.selector);
 
         (
@@ -86,12 +75,7 @@ library L2UpgradeTxLib {
         ) = abi.decode(_existingTxData.slice(4), (IComplexUpgrader.UniversalContractUpgradeInfo[], address, bytes));
 
         validateWrappedUpgrade(existingUpgradeCalldata);
-        bytes memory l2UpgradeCalldata = buildL2V32UpgradeCalldata(
-            _bridgehub,
-            _chainId,
-            _zksyncOS,
-            existingUpgradeCalldata
-        );
+        bytes memory l2UpgradeCalldata = buildL2V32UpgradeCalldata(_bridgehub, _chainId, existingUpgradeCalldata);
 
         return
             abi.encodeCall(
@@ -154,13 +138,6 @@ library L2UpgradeTxLib {
     function validateWrappedUpgrade(bytes memory _existingUpgradeCalldata) internal pure {
         if (bytes4(_existingUpgradeCalldata) != IL2V32Upgrade.upgrade.selector) {
             revert UnexpectedUpgradeSelector();
-        }
-    }
-
-    /// @notice Validate that the chain type matches the upgrade wrapper type.
-    function validateZKsyncOSFlag(bool _zksyncOS, bool _expectedZKsyncOS) internal pure {
-        if (_zksyncOS != _expectedZKsyncOS) {
-            revert UnexpectedZKsyncOSFlag(_expectedZKsyncOS, _zksyncOS);
         }
     }
 

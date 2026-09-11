@@ -11,6 +11,7 @@ import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.s
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 import {EmptyAssetId, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 contract InitializeTest is DiamondInitTest {
     function test_revertWhen_verifierIsZeroAddress() public {
@@ -23,7 +24,7 @@ contract InitializeTest is DiamondInitTest {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(true)),
+            initAddress: address(new DiamondInit()),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -36,7 +37,7 @@ contract InitializeTest is DiamondInitTest {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(true)),
+            initAddress: address(new DiamondInit()),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -49,7 +50,7 @@ contract InitializeTest is DiamondInitTest {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(true)),
+            initAddress: address(new DiamondInit()),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -62,7 +63,7 @@ contract InitializeTest is DiamondInitTest {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(true)),
+            initAddress: address(new DiamondInit()),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -75,7 +76,7 @@ contract InitializeTest is DiamondInitTest {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(true)),
+            initAddress: address(new DiamondInit()),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -88,7 +89,7 @@ contract InitializeTest is DiamondInitTest {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(true)),
+            initAddress: address(new DiamondInit()),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -106,7 +107,7 @@ contract InitializeTest is DiamondInitTest {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(true)),
+            initAddress: address(new DiamondInit()),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -132,5 +133,39 @@ contract InitializeTest is DiamondInitTest {
         assertEq(vm.load(address(diamondProxy), bytes32(uint256(23))), bytes32(0)); // __DEPRECATED_l2BootloaderBytecodeHash
         assertEq(vm.load(address(diamondProxy), bytes32(uint256(24))), bytes32(0)); // __DEPRECATED_l2DefaultAccountBytecodeHash
         assertEq(vm.load(address(diamondProxy), bytes32(uint256(58))), bytes32(0)); // __DEPRECATED_l2EvmEmulatorBytecodeHash
+        assertEq(vm.load(address(diamondProxy), bytes32(uint256(25))), bytes32(0)); // __DEPRECATED_zkPorterIsAvailable
+        assertEq(vm.load(address(diamondProxy), bytes32(uint256(59))), bytes32(0)); // __DEPRECATED_precommitmentForTheLatestBatch
+        // Slot 60 packs zksyncOS (byte 0) + l2DACommitmentScheme (byte 1) +
+        // __DEPRECATED_assetTracker (bytes 2-21). Fresh OS chains set zksyncOS to true.
+        assertEq(vm.load(address(diamondProxy), bytes32(uint256(60))), bytes32(uint256(1)));
+    }
+
+    /// @dev Pins the intra-slot packing of slot 60: writing the scheme through the storage struct
+    /// must land in byte 1 exactly, preserving the live `zksyncOS` flag at byte 0 and the
+    /// `__DEPRECATED_assetTracker` tombstone at bytes 2-21. A packing shift would corrupt or
+    /// misread compatibility state on an upgraded chain.
+    function test_slot60PackingPinnedAroundDeprecatedNeighbors() public {
+        vm.mockCall(
+            initializeData.chainTypeManager,
+            abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, initializeData.protocolVersion),
+            abi.encode(testnetVerifier)
+        );
+
+        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(new DiamondInit()),
+            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+        });
+
+        DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
+        UtilsFacet utilsFacet = UtilsFacet(address(diamondProxy));
+
+        utilsFacet.util_setL2DACommitmentScheme(L2DACommitmentScheme.PUBDATA_KECCAK256);
+
+        assertEq(
+            vm.load(address(diamondProxy), bytes32(uint256(60))),
+            bytes32(uint256(1) | (uint256(uint8(L2DACommitmentScheme.PUBDATA_KECCAK256)) << 8))
+        );
+        assertTrue(utilsFacet.util_getL2DACommimentScheme() == L2DACommitmentScheme.PUBDATA_KECCAK256);
     }
 }

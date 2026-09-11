@@ -173,11 +173,6 @@
   },
   {
     "type": "error",
-    "name": "CanOnlyProcessOneBatch",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "CantExecuteUnprovenBatches",
     "inputs": []
   },
