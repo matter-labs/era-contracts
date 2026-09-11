@@ -1,6 +1,6 @@
 use alloy::{
     hex::{self, FromHex},
-    primitives::{Address, Bytes, FixedBytes, U256},
+    primitives::{Address, Bytes, FixedBytes},
     sol,
     sol_types::SolCall,
 };
@@ -12,7 +12,6 @@ use std::panic::Location;
 
 use crate::{
     commands::ecosystem::verify_upgrade::VerifyUpgradeEnv,
-    common::env_config::{ChainInterval, EnvConfig},
     upgrade_verification::{
         artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
         versions::v31::utils::{
@@ -44,17 +43,8 @@ pub(crate) struct Verifiers {
     /// real ABI of the external zk-governance contracts). The L1AssetRouter no
     /// longer exposes an Era chain id, so no router wiring check reads this.
     pub era_chain_id: u64,
-    pub legacy_gateway_chain_id: u64,
-    pub legacy_gateway_chain_intervals: Vec<ChainInterval>,
-    pub new_gateway_chain_id: u64,
-    pub new_gateway_representative_chain_id: u64,
-    pub new_gateway_representative_ctm: Address,
     pub expected_l1_chain_id: u64,
     pub zk_token_asset_id: FixedBytes<32>,
-    /// CREATE2 salt used by the new-gateway CTM deployer contracts.
-    /// Derived from `[create2_factory_salts]` in the env input TOML,
-    /// keyed by `new_gateway_representative_ctm` (the L1 CTM proxy).
-    pub gateway_ctm_create2_salt: FixedBytes<32>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -77,14 +67,9 @@ impl Verifiers {
         env: VerifyUpgradeEnv,
         artifact: &EcosystemUpgradeArtifact,
         l1_rpc: impl Into<String>,
-        gw_rpc: impl Into<String>,
         contracts_commit: Option<&str>,
         zk_governance_commit: &str,
         era_chain_id: u64,
-        legacy_gateway_chain_id: u64,
-        legacy_gateway_chain_intervals: &[ChainInterval],
-        new_gateway_chain_id: u64,
-        new_gateway_representative_chain_id: u64,
         expected_l1_chain_id: u64,
         zk_token_asset_id: FixedBytes<32>,
     ) -> anyhow::Result<Self> {
@@ -109,44 +94,7 @@ impl Verifiers {
         )?;
         let bytecode_verifier =
             BytecodeVerifier::init_v31(contracts_commit, zk_governance_commit).await?;
-        let network_verifier = NetworkVerifier::new_v31(l1_rpc.into(), gw_rpc.into()).await?;
-        anyhow::ensure!(
-            network_verifier.get_gateway_chain_id() == new_gateway_chain_id,
-            "gateway RPC chain id {} does not match env [new_gateway].chain_id {}",
-            network_verifier.get_gateway_chain_id(),
-            new_gateway_chain_id,
-        );
-        let new_gateway_representative_ctm = network_verifier
-            .try_get_chain_type_manager_from_bridgehub(
-                bridgehub_address,
-                U256::from(new_gateway_representative_chain_id),
-            )
-            .await
-            .map_err(|e| {
-                anyhow::anyhow!(
-                    "failed to fetch Bridgehub.chainTypeManager({new_gateway_representative_chain_id}) \
-                     for [new_gateway].ctm_representative_chain_id: {e}"
-                )
-            })?;
-        anyhow::ensure!(
-            new_gateway_representative_ctm != Address::ZERO,
-            "Bridgehub.chainTypeManager({new_gateway_representative_chain_id}) returned zero; \
-             [new_gateway].ctm_representative_chain_id must point to the CTM hosted by the new Gateway",
-        );
-
-        // Look up the per-CTM CREATE2 salt for the new gateway's source CTM.
-        // Keyed by L1 CTM proxy address in [create2_factory_salts] of the
-        // env input TOML. Falls back to zero if the env doesn't declare it
-        // (e.g., a legacy env where the gateway used salt 0).
-        let gateway_ctm_create2_salt = {
-            let per_ctm = EnvConfig::load(env.as_str())
-                .and_then(|cfg| cfg.create2_factory_salt_for_upgrade_per_ctm())
-                .unwrap_or_default();
-            per_ctm
-                .get(&new_gateway_representative_ctm)
-                .copied()
-                .unwrap_or_default()
-        };
+        let network_verifier = NetworkVerifier::new_v31(l1_rpc.into()).await?;
 
         // `Bridgehub.owner()` is the L1 governance executor (the PUH proxy on
         // PUH-governed envs). It is the authoritative source for the
@@ -188,14 +136,8 @@ impl Verifiers {
             network_verifier,
             zksync_os_genesis_config,
             era_chain_id,
-            legacy_gateway_chain_id,
-            legacy_gateway_chain_intervals: legacy_gateway_chain_intervals.to_vec(),
-            new_gateway_chain_id,
-            new_gateway_representative_chain_id,
-            new_gateway_representative_ctm,
             expected_l1_chain_id,
             zk_token_asset_id,
-            gateway_ctm_create2_salt,
         })
     }
 
@@ -209,9 +151,6 @@ impl Verifiers {
 #[derive(Debug, Clone, Deserialize)]
 pub struct GenesisConfig {
     pub genesis_root: String,
-    /// Absent from ZKsync OS genesis configs; consumers default it to 0.
-    #[serde(default)]
-    pub genesis_rollup_leaf_index: Option<u64>,
 }
 
 impl GenesisConfig {

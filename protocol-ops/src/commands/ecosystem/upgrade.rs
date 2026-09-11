@@ -527,10 +527,8 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         //
         // Fails closed on a missing file rather than keeping the CLI default. The default is the
         // *local* input, so a silent fallback would hand a real environment local's values for the
-        // keys the input does supply — `era_chain_id`, `pre_v32_introspection`,
-        // `governance_upgrade_timer_initial_delay`, and the gateway chain id that is baked into
-        // `L1MessageRoot` as `ERA_GATEWAY_CHAIN_ID`. Losing that last one would redeploy the message
-        // root with 0. Failing here also catches a mistyped `--env`.
+        // keys the input does supply — `era_chain_id`, `pre_v32_introspection` and
+        // `governance_upgrade_timer_initial_delay`. Failing here also catches a mistyped `--env`.
         if args.upgrade_input_path == UPGRADE_V33_LOCAL_INPUT_PATH {
             let per_env_rel = format!("{UPGRADE_V33_ENV_DIR}/{}.toml", cfg.env);
             let per_env_abs = paths::contracts_root()
@@ -541,7 +539,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
                 "no upgrade input for --env {} at {}. Add it — an empty file is fine if the \
                  environment needs nothing from the input — because this command will not fall back \
                  to the local default, which would silently give this environment local's \
-                 `era_chain_id`, `governance_upgrade_timer_initial_delay` and gateway chain id.",
+                 `era_chain_id` and `governance_upgrade_timer_initial_delay`.",
                 cfg.env,
                 per_env_abs.display()
             );

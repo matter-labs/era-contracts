@@ -55,62 +55,6 @@ pub struct PermanentValues {
     /// Empty/absent on envs where every current owner is already an EOA.
     #[serde(default, rename = "ownable_proxies")]
     pub ownable_proxies: Vec<OwnableProxyEntry>,
-    /// The Gateway the v31 ceremony brought up. Read only by `ecosystem verify-upgrade`
-    /// (the v31 PUVT) to cross-check that ceremony's stage-2 bring-up calls; the prepare
-    /// flow no longer deploys a gateway (v33 is ZKsync OS-only and has no gateway step).
-    #[serde(default)]
-    pub new_gateway: Option<NewGatewayConfig>,
-    /// Historical gateway configuration for chains that settled on the legacy
-    /// Gateway before v31.
-    #[serde(default)]
-    pub legacy_gateway: Option<LegacyGatewayConfig>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct LegacyGatewayConfig {
-    pub chain_id: u64,
-    /// Per-chain historical migration intervals that PUVT cross-checks against
-    /// every `setHistoricalMigrationInterval` call in stage 2's decommission
-    /// prefix. One TOML entry per call; order is preserved.
-    #[serde(default)]
-    pub chain_intervals: Vec<ChainInterval>,
-}
-
-/// Mirrors a `[[legacy_gateway.chain_intervals]]` entry in
-/// `permanent-values/<env>.toml`. The Solidity struct
-/// `MigrationInterval` ([IChainAssetHandler.sol]) is built from these fields
-/// plus `settlementLayerChainId = legacy_gateway.chain_id` and
-/// `isActive = false` (these are historical/completed intervals).
-#[derive(Debug, Deserialize, Clone)]
-pub struct ChainInterval {
-    pub chain_id: u64,
-    pub migrate_to_sl_batch: u64,
-    pub migrate_from_sl_batch: u64,
-    pub sl_batch_lower_bound: u64,
-    pub sl_batch_upper_bound: u64,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct NewGatewayConfig {
-    /// Chain ID of the gateway being brought up (e.g. 2708 for stage).
-    pub chain_id: u64,
-    /// Where unused L1→L2 priority-tx gas was refunded in the v31 ceremony. Defaulted to
-    /// the deployer EOA when absent (EOAs are not aliased across L1→L2).
-    ///
-    /// NOTE: setting this to a contract (e.g. governance / PUH) makes refunds
-    /// land at the aliased contract address on L2, which is generally
-    /// uncontrolled — funds get stuck.
-    #[serde(default)]
-    pub refund_recipient: Option<Address>,
-    /// Chain ID whose registered CTM `GatewayVotePreparation` should treat as
-    /// the "source" — the deployed GW CTM is a variant of this CTM. Pick the
-    /// chain whose CTM is the one the new gateway will host.
-    pub ctm_representative_chain_id: u64,
-    /// Optional pre-deployed server notifier address. When present, the
-    /// `GatewayVotePreparation` skips the redeploy + ownership-transfer
-    /// preamble. Leave absent on first GW bring-up.
-    #[serde(default)]
-    pub server_notifier: Option<Address>,
 }
 
 #[derive(Debug, Deserialize, Clone, Copy)]
@@ -343,18 +287,6 @@ impl EnvConfig {
         self.env == "mainnet"
     }
 
-    pub fn legacy_gateway_chain_id(&self) -> Option<u64> {
-        self.permanent.legacy_gateway.as_ref().map(|gw| gw.chain_id)
-    }
-
-    pub fn legacy_gateway_chain_intervals(&self) -> &[ChainInterval] {
-        self.permanent
-            .legacy_gateway
-            .as_ref()
-            .map(|gw| gw.chain_intervals.as_slice())
-            .unwrap_or(&[])
-    }
-
     pub fn l1_chain_id(&self) -> Option<u64> {
         self.permanent.l1_chain_id
     }
@@ -376,10 +308,6 @@ impl EnvConfig {
 
     pub fn zk_token_asset_id(&self) -> Option<B256> {
         self.permanent.zk_token_asset_id
-    }
-
-    pub fn new_gateway(&self) -> Option<&NewGatewayConfig> {
-        self.permanent.new_gateway.as_ref()
     }
 }
 
@@ -521,12 +449,9 @@ fn match_quoted_h256(line: &str, key: &str) -> Option<B256> {
 mod tests {
     use super::*;
 
-    /// Smoke-tests that `permanent-values/stage.toml` (which is the env used
-    /// for the v31 prepare-all rehearsal on Sepolia stage) deserializes into
-    /// `PermanentValues` end-to-end — including the optional `[new_gateway]`
-    /// block and its U256 hex literal. Catches any future TOML drift before
-    /// it shows up as a runtime parse error from `protocol-ops ecosystem
-    /// upgrade-prepare-all --env stage`.
+    /// Smoke-tests that `permanent-values/stage.toml` deserializes into `PermanentValues`
+    /// end-to-end. Catches any future TOML drift before it shows up as a runtime parse error
+    /// from `protocol-ops ecosystem upgrade-prepare-all --env stage`.
     #[test]
     fn stage_permanent_values_parses() {
         let path = resolve_l1_contracts_path()
@@ -537,16 +462,12 @@ mod tests {
             fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
         let pv: PermanentValues =
             toml::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
-        let ng = pv
-            .new_gateway
-            .expect("permanent-values/stage.toml must carry [new_gateway]");
-        let legacy_gateway = pv
-            .legacy_gateway
-            .expect("permanent-values/stage.toml must carry [legacy_gateway]");
-        assert_eq!(legacy_gateway.chain_id, 123);
-        assert_eq!(ng.chain_id, 2709);
-        // GW 2708 is a ZKsync OS chain → CTM source is Atlas (witness 2702).
-        assert_eq!(ng.ctm_representative_chain_id, 2702);
+        let ctms = pv
+            .ctm_contracts
+            .expect("permanent-values/stage.toml must carry [ctm_contracts]");
+        assert_eq!(ctms.ctms.len(), 1, "stage upgrades a single (Atlas) CTM");
+        assert_eq!(pv.ownable_proxies.len(), 2);
+        assert_eq!(pv.l1_chain_id, Some(11155111));
     }
 
     /// Confirms `EnvConfig`'s on-demand readers pick up the
