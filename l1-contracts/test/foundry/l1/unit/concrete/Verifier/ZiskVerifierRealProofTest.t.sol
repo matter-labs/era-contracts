@@ -6,41 +6,45 @@ import {IZiskSnarkPlonkVerifier} from "contracts/state-transition/chain-interfac
 import {ZiskVerifier} from "contracts/state-transition/verifiers/ZiskVerifier.sol";
 
 /// @notice Real-crypto anchor for the ZiSK verifier stack.
-/// @dev Both fixtures come from one cargo-zisk v0.18.0 session over four
-///      sealed ZKsync OS batches (2026-08-21). Each holds a 768-byte BN254
-///      PLONK SNARK plus the 320-byte public values `programVK(32) || guest
-///      publics(256) || rootCVadcopFinal(32)`, whose single public signal is
-///      `sha256(publicValues) % r`.
+/// @dev A fixture holds a 768-byte BN254 PLONK SNARK plus the 576-byte public
+///      values `programVK(32) || guest publics(512) || rootCVadcopFinal(32)`,
+///      whose single public signal is `sha256(publicValues) % r`. The
+///      guest-publics section is 64 little-endian u64 slots, one per guest
+///      public; a guest public holds a 32-bit value, so each slot carries four
+///      significant bytes and four zero pad bytes.
 ///
 ///      The BATCH fixture is the inner state-transition proof of batch 1, so
-///      its wire bytes [0..32] hold the INNER programVK and [32..64] the raw
-///      batch commitment. The AGGREGATED fixture proves the whole range, so
-///      its wire bytes [0..32] hold the AGGREGATOR programVK and [32..64] the
-///      binding digest `keccak256(innerProgramVK || rootCVadcopFinal ||
-///      chainedPI)`.
+///      its wire bytes [0..32] hold the INNER programVK and its first eight
+///      guest-public slots, bytes [32..96], the raw batch commitment. The
+///      AGGREGATED fixture proves the whole range, so its wire bytes [0..32]
+///      hold the AGGREGATOR programVK and its first eight slots the binding
+///      digest `keccak256(innerProgramVK || rootCVadcopFinal || chainedPI)`.
 ///
-///      These fixtures predate guest 0.0.5. They anchor the unchanged SNARK
-///      backend and show that the range verifier rejects the previous guest
-///      after its VK rotates. Successful settlement with the current guest
-///      still requires a fresh proof session.
+///      `ZiskVerifier.verify` rebuilds exactly those 576 aggregated bytes from
+///      its own pins and the batch public inputs, so the aggregated fixture
+///      drives the production path end to end: the reconstruction AND the real
+///      pairing. MultiProofRangeVectorTest pins the same vector against a
+///      signal stand-in, which is what lets it name the exact expected signal.
+/// @dev Fixtures: ZiSK 1.2.0-alpha, guest 0.0.6-alpha.1, GPU run
+///      https://github.com/matter-labs/zksync-os-zisk/actions/runs/34199276557.
 contract ZiskVerifierRealProofTest is Test {
     /// @dev Real 768-byte BN254 PLONK SNARK of batch 1 (inner guest).
     bytes internal constant BATCH_PROOF =
-        hex"23b0566bab58cc5252e65f98ab5cf30b3c3fb2afd71b45e2d64228fed7f4b77a2e5432bf507d3baabd49a3eaf0d0c4687ad4f043d56a866b2cd127f5a10cd48803b69f0a9a1a78e343dc669e7b8900e416c9d9fc585d02f2c7fba02dd35ea30222a22cec979d09104dc83bbb2a376e1dd885c1066cf4526aec23edf43c11b1e1133fa88f71fba7719d989237d0746bad7c5734953b30c9ed446a3b74caf640bd1c88216727194ceae2973cb8bbb25500a31b9630cfc9437f59516a8960e4285c20bb6dae7716b3f06d5f251684bce645ac29f7f25ccbf8c5295b7e53a97fa9ca25d95b64ae7459f436d12e813e6801bf632420472f6f7b79b7677ce78dc6acc721b408d830b757dbeeb7665cf71fd6daa99891c753e10e42084f321600a9eb9c1fd91005f8deee95950c09cc33ea7c8168aa0ffae6030554c82234fa08ade38023a264f547fc538f71f2277417d9e61d7dc78e477e284f0d736977789c122ed818c5959fd850df1833d5ddce7fde6494fa20fb594a8d320c66842bef58f0b6e72a2af93a85ea80c97b02b1c6cd386acd001c6ca6b594ebf39305e2fc3e98a7de0a3958010ea03c4e5ef5af9f79037bbfaf73625978bfae34c018d5bfcc861d3c176c7013f95357bd9bc3dec9f55cb0a1b4075643bfa3a02ebd851eebb29a4a8008fbc3df9e10ce910eddf0fd6f11cc76366710873ef5d2549252cd660434e0f1245d5b38a984b55dda02487292d9dbef87236aba92c0127daa1af6e9e5783f3a16ff21354570100694734e50fc03ef8c82510367db3e3dc4403e69ea56cfb18b265a1c0e1658851ba6162fdc9b55a220422da5b3b3f8b356d85d4454ab311b3d11feae791c471b421790702a56c361f7421deeaf2fcd7f8681f7efaf220e26b913af155e9a822bece1caf1bcb4fab419bbdbe83f3f9f94f3e9dedb21687e5b5903f12e5c28d2703b4add8b4679f0a335d84ccc67236e736318148fee826e90502df4914dedba044118277d26be0fae371f12b93a5caef98cb228aa9cca090c56158d38b6fc2e6e8d953c3d5f2f0631f15b72c2b7ca587fdbbb2c22d312c30ed4";
+        hex"11b7c092160e200d9174bebe64a41488f6b959cc2b6ab329cc575280e8b7ec2104c61f3eb092a8e2f12f8e842c72275cdfcab7766b79d61c0e9b20621fd06d8206375f94cb0797ccc8c9cb97edac5cca977cd56ad44d308610b52da7902395250f2a2dfcb84de848dc19c9f653c08264a02413b49ea631bb100028f73e03b621183e5167f1e687a73bde692d880f14b9965f88193a9f393bd75edeb82a2e6c171a02b7654c544d792417377f333c99a67a510404addfdddd29cbb36b8a6451171b64bb78128fc440b1ff69f6dd3d2e696c2a55eb86d952bcde85830db50e209618d29bc6c477bac2b3eb8fac5e0465c38215d9ef23bd489a54ce9c8b5eea910f17eb155d316a07239c3b8ee28d1a27bec381abb6c32c6fdfe5fc83dc2330d7bb236464f52ef74d7cac48c509beb8ca4e66c9c297cf8a39d141b555717869e6e82c60ee827ade6dd40c32c76e50126ca6bf37d767a6dfba4a8ec44e619a3effc21d3b8c46e9dbd27eec95c06b62f47109253e2baf46d36a7d15f7dd152f13106c03e10b0f7e2b2ca81a59f24f10d4803206f3af403c3d71f3f65af3e90d35375e2e42827622d622d32efa44468dfbbeececcec9bbf8e41193c1955ca5124b9b4918f818c338f81a8b198491f5bc8360bfdf3a665e569193538307088f7395ce0824461be965c6c5f47927c6be54846b5fd4addbc22c74d534e2778e9ba8868d8208733a795361cb8192df7266e8e9e4d1eba7ce1d44df637c0607e251a6bb68f9111ef5e125468bf37d4c49273188dca4cfeb952f0cd3a12682edce13cca7110f12b20429cf11f9189abe5769c5755831a5fc49489614bd3fd2af06bfec70d0621aafe58d45dd3cf2ad0f471878220fa1d7f1c3920a6b1c0579a1081ac8eb62eb1165b12f20c006d6bb689ec864352cb1bf852219715fba23c70a584c5c484f83001ccf88003abb76eac44b64c8255459c0e63b248735ef46df54de0d24ceefcd1de85c8d9477e2b4eb292623d338868ceee9919919fb922a403d128e86c2f90a0517c5c03bdc22e676945b025b7cf5d7d575707aa6ac98741e1e5d9ee185d16d";
 
-    /// @dev The batch-1 proof's 320-byte public values. Word 1 is that batch's
-    ///      raw commitment, not the aggregator's binding digest.
+    /// @dev The batch-1 proof's public values. Bytes [32..96] carry that
+    ///      batch's raw commitment, not the aggregator's binding digest.
     bytes internal constant BATCH_PUBLIC_VALUES =
-        hex"8168c5d383a50a9c7a40561b82bf679cc6dfdab0308417b4fea653362d78d08063c7606faee0ee9eff230fec391e64c0c82a0277947973ce7f6f1c9088c821dd0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000cf2a309856f107b143836ada112806da71ae11567fa3f2d2050baba5381c7b7d";
+        hex"189d6b11c50ef1db9885fed376479ed97dde719a59574a7946d8d612e25da97a63c7606f00000000aee0ee9e00000000ff230fec00000000391e64c000000000c82a027700000000947973ce000000007f6f1c900000000088c821dd0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000564c2b1bcbd5932c81cfad1fa786a98372eb3d6495257c2d944544334f84382f";
 
     /// @dev Real 768-byte BN254 PLONK SNARK of the aggregated range 1..4.
     bytes internal constant AGGREGATED_PROOF =
-        hex"0999e0be17626d02f67f9d67e9b23362bd82a4d7f74ac422f4d4c8b7d67ed5c8277e62b31534d47c30071cabfa721a7a854744cd6189290e3fdacd4ea306b1551e8f8a74f6c5aff259b6d4dff78c306f5ddc58fe8b97d7f94dd0108362bfc3550d6434de694c6f3a24cb87ef58131ef942009f1da0df63a462078c5e2b0e890f1e2fc2cac2fae5c017d2af1b18b1e8cbba0459d5ee962e3a279187e8ffa9a800070b7b9ac6954cf40f48d010aa2d10ee842ab46e23cb35adfdd71d882a5ecfdc07d36a96bcdddd1735a283f53a989a578524eac4bd260714aea5dd392e8eb0c7190e50b0045b523f7fdec15186409a53e9c1e75b3bb3aa1947e3173b58b26df52029d756ad78e0549d8ed7f8bdc8fdcd038c138c95a4c15adc96cf4ce1b1c37d146e9b5ab7ab2feacf82cf4fe4d75f37165a606b8adbeb070e490dff326a766c08c5ac551b80972bd320af58a1bd3f8f720ad0f30784f9bb8c835df4a98ad40e2a47861884c163c42d454696141c28268713bdea968eff668b5d13dfe51b74062eb56dbf7784a263d9adc2c16e0adddbd30162b0d6858d6234f9d51118f149d02d21997a43e6a52eda951cecbda8d76372fa14e18ee97329e992e584f4feb9ae16c374f0699d7c20726054ada7969f079c0221bf7d1105e09e0a1098d69f9c701717da727af190e1ee8b87425a0825fd154872ef9010559c45830cc64131c75f106ccebe6dcd4baa03364d5e4d11573058a4765a41f05172919f2068c751e4102b03a137a9e5937795a0dbb78df4f932bc56642f5d6fc0f1ffdf635a5f2637c6165b8b103e655db70f718c5b72a8ac0bcc4d5b09ed70bb59f15acf98287698dd099f6df6afb18356aabdd639734f80e773d46d5685a9d1875955334c6bbda45223f271fd9e63bf7bbfdb390341c7bf20a5123bf379338ba0a8c63dbdbcaf9e4316cb6a5bfc4bf6a418d02cca2d13ad8f31fcecc4fc715b803d366847289c90831505c708f3559fdd310a0f1b34df12d71a1cd30cb0d9fab275ff547260e914550acd848064e5675e101c7732543c40c4c15cf88aca79c5dc3ad831a5f0aa899f";
+        hex"1dcaa6a00fa96beab435594a96f056be131ad004cee482572c43bd0642249ea202ff4c4af999e285237ce455a5dc165a67fdbbe6862b2fed7ca9a0bb333f4f862e7758220044098eea632a0a8d308107f20b54bf8a3a7cb986ce28da4b07c72f25db151486d4db93a156f41416d1c754fc1030cebe558faf29bdd6d9d621f14a01479de2ff2566e47dfbdb12defe35f0c9d54ea381267557736e9d6a005ebdaf14f46ea6a6d839ec4bf8648380fd31810dea69c59c99c8c3c631fa9fb4b829d2124a6607064f316393dfa4e343be3fa1dbee5e227970107d466252afd83770941b1ece44f8188b899179ad8eb2ae60a0bc33ff9cc1cf826bda01aa0c373361a90f462902b6e76058fd4bf61581e3416f1491362f7084110f36a9f5284b90d4660badc32a7f227aa193c8f9a975665a3f9075d0fdc19ea4f4050026ef1696f17b1abf4bab0828a783e8327970c2bf8fc91e6dceafce8fd0ff97dfab632aab0bcf005b235651a4ae52c4939fd354cd8ecf423f6f730a537d1e330d7ee6d920a997236b6ff96a070c430ad88382644205e5827c0573ab0d8f306f7e3b2b2ad55fa70e911137fa4661f70b13e21ac15e51cc96ad7b37ea9a8e4408b4c573eb2c465316c0b286acd597d0b21a2d2dcc54741bfba3ade3844e017e3364506e2525d5e3169e3588cf455c7d40a0b7d5738fa4bafdaa976c4c8ffb8f9efc684da80daca214c7151ee764b4924e81fa0079549fa692b80841929d7fb73eb2e2e937ebdb7f01d94745b8af4f1bd701bf8c203752df48a6817d34eb525830334b8c22788849182d6c0b51133f715fb5cb0963ac18cf6ea6b57180dc92e04c1b196404182cbe16174e01ee3a7aa19eda746aa72b3b682f6caa50a0c0a50abf7a199e6abfc28701b52dc081fc40d64154b92f3ebe67046bd7dbb79cf876210dbda8d064d7ebe80a3de01ee604b181f7e0a90a7d40028e40bacab77265508a3996b75bfae1a8982156271b42fd50e5c4f1a6d404aefc5d79cb6b0c41b0b6d151ecb465163e00fe26fa845126dcecb51f9750512f28e92938a39fa1a000289662423930d36bbbca";
 
-    /// @dev The aggregated proof's 320-byte public values: the exact bytes
+    /// @dev The aggregated proof's public values: the exact bytes
     ///      `ZiskVerifier.verify` reconstructs for this range.
     bytes internal constant AGGREGATED_PUBLIC_VALUES =
-        hex"f68b9862e424e377af7b4220a419ce45bc52ce70b0a37aea486a15a5ca38b738f29341c341f2622ba86a21bbb36dde9742e1983e531c278fd1cee04c6f823e2c0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000cf2a309856f107b143836ada112806da71ae11567fa3f2d2050baba5381c7b7d";
+        hex"10f0e91f54ad66e4e95713a1b4b9fda44ea3b06e51ed3430ef775ba8bef4a7c877808e0600000000c21c5f160000000008738e030000000045b0074f000000000bc67ef90000000037abfc87000000003b2499ea00000000b7953ce40000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000564c2b1bcbd5932c81cfad1fa786a98372eb3d6495257c2d944544334f84382f";
 
     /// @dev The four batch commitments the aggregated proof ingested, in batch
     ///      order. MultiProofRangeVectorTest pins the same vector.
@@ -52,30 +56,33 @@ contract ZiskVerifierRealProofTest is Test {
     /// @dev BN254 scalar field modulus (must equal ZiskVerifier._RFIELD).
     uint256 internal constant RFIELD = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
 
+    /// @dev Byte length of the ZiSK public-values preimage.
+    uint256 internal constant PUBLIC_VALUES_BYTES = 576;
+    /// @dev Word index of `rootCVadcopFinal`, public-values bytes [544..576].
+    uint256 internal constant ROOT_C_WORD = 17;
+    /// @dev Word index of the first all-zero guest-public slot, bytes [96..544].
+    uint256 internal constant FIRST_ZERO_WORD = 3;
+
     ZiskVerifier internal ziskVerifier;
     bool internal plonkVerifierAvailable;
 
-    /// @dev External trampoline so a missing artifact is catchable.
-    function deployGeneratedPlonkVerifier() external returns (address) {
-        return deployCode("ZiskSnarkPlonkVerifier.sol:ZiskSnarkPlonkVerifier");
-    }
-
-    /// @dev The snarkJS Plonk verifier is generated and compiled locally
-    ///      (see verifiers/README.md); when its artifact is absent every test
-    ///      in this suite skips.
     modifier requiresPlonkVerifier() {
         vm.skip(!plonkVerifierAvailable);
         _;
     }
 
     function setUp() public {
-        address plonkVerifier;
-        try this.deployGeneratedPlonkVerifier() returns (address deployed) {
-            plonkVerifier = deployed;
-            plonkVerifierAvailable = true;
-        } catch {
+        bytes memory bytecode = vm.envOr("ZISK_PLONK_BYTECODE", bytes(""));
+        if (bytecode.length == 0) {
+            require(!vm.envOr("ZISK_REQUIRE_REAL_PROOFS", false), "ZISK_PLONK_BYTECODE is required");
             return;
         }
+        address plonkVerifier;
+        assembly {
+            plonkVerifier := create(0, add(bytecode, 32), mload(bytecode))
+        }
+        require(plonkVerifier.code.length != 0, "Backend deployment failed");
+        plonkVerifierAvailable = true;
         ziskVerifier = new ZiskVerifier(IZiskSnarkPlonkVerifier(plonkVerifier));
     }
 
@@ -99,7 +106,7 @@ contract ZiskVerifierRealProofTest is Test {
         }
     }
 
-    /// @dev Word `_index` of a 320-byte public-values fixture.
+    /// @dev Word `_index` of a public-values fixture.
     function _word(bytes memory _publicValues, uint256 _index) internal pure returns (bytes32 word) {
         assembly {
             word := mload(add(_publicValues, add(32, mul(_index, 32))))
@@ -122,33 +129,40 @@ contract ZiskVerifierRealProofTest is Test {
         pis[3] = uint256(COMMITMENT_4);
     }
 
-    /// @dev Guest 0.0.5 rotates only the inner VK. The historical fixtures
-    ///      retain the same aggregator, root, and zero-padding layout.
+    /// @dev The exposed wire-form pins are exactly the fixtures' public-values
+    ///      bytes [0..32] and [544..576]; the pad bytes and the zero region the
+    ///      reconstruction assumes are present in a real aggregated output; and
+    ///      the VK hash commits to all three pins.
     function test_pinnedWireForms_and_layout() public requiresPlonkVerifier {
+        assertEq(BATCH_PUBLIC_VALUES.length, PUBLIC_VALUES_BYTES, "batch fixture length");
+        assertEq(AGGREGATED_PUBLIC_VALUES.length, PUBLIC_VALUES_BYTES, "aggregated fixture length");
+
         // The batch fixture is an inner state-transition proof, so its wire
         // [0..32] holds the inner pin; the aggregated proof attests to the
         // aggregator ELF, so its wire [0..32] holds the aggregator pin.
-        assertEq(
-            ziskVerifier.innerProgramVK(),
-            0xac3a6494410ce230354e5ffae7c97f94bb5488d6e1764818c9d75156ce1dc59e,
-            "guest 0.0.5 innerProgramVK"
-        );
-        assertNotEq(ziskVerifier.innerProgramVK(), _word(BATCH_PUBLIC_VALUES, 0), "previous guest VK");
-        assertEq(
-            ziskVerifier.verificationKeyHash(),
-            0xb70fd0a92d1375cc2f2a4e5e6907aa9af3131da257843088374bb0d834c61141,
-            "guest 0.0.5 release hash"
-        );
+        assertEq(ziskVerifier.innerProgramVK(), _word(BATCH_PUBLIC_VALUES, 0), "innerProgramVK");
         assertEq(ziskVerifier.aggregatorProgramVK(), _word(AGGREGATED_PUBLIC_VALUES, 0), "aggregatorProgramVK");
 
         // One cargo-zisk setup produces both proofs, so both wires end with
         // the same vadcop-final root.
-        assertEq(ziskVerifier.rootCVadcopFinal(), _word(BATCH_PUBLIC_VALUES, 9), "batch rootCVadcopFinal");
-        assertEq(ziskVerifier.rootCVadcopFinal(), _word(AGGREGATED_PUBLIC_VALUES, 9), "aggregated rootCVadcopFinal");
+        assertEq(ziskVerifier.rootCVadcopFinal(), _word(BATCH_PUBLIC_VALUES, ROOT_C_WORD), "batch rootCVadcopFinal");
+        assertEq(
+            ziskVerifier.rootCVadcopFinal(),
+            _word(AGGREGATED_PUBLIC_VALUES, ROOT_C_WORD),
+            "aggregated rootCVadcopFinal"
+        );
 
-        // Reconstruction leaves bytes [64..288] (words 2..8) zero; the
-        // aggregated fixture confirms that region is zero in a real output.
-        for (uint256 i = 2; i < 9; i++) {
+        // A guest public holds a 32-bit value, so the last four bytes of each
+        // of the eight slots the digest occupies are pad.
+        for (uint256 slot = 0; slot < 8; slot++) {
+            for (uint256 offset = 4; offset < 8; offset++) {
+                assertEq(AGGREGATED_PUBLIC_VALUES[32 + slot * 8 + offset], bytes1(0), "digest slot pad");
+            }
+        }
+
+        // Reconstruction leaves bytes [96..544] zero; the aggregated fixture
+        // confirms that region is zero in a real output.
+        for (uint256 i = FIRST_ZERO_WORD; i < ROOT_C_WORD; i++) {
             assertEq(_word(AGGREGATED_PUBLIC_VALUES, i), bytes32(0), "zero region");
         }
 
@@ -165,13 +179,15 @@ contract ZiskVerifierRealProofTest is Test {
         );
     }
 
-    /// @dev The historical SNARK remains valid, but its binding digest names
-    ///      the previous guest and must fail against the rotated verifier.
-    function test_realAggregatedProof_previousGuest_rejected() public requiresPlonkVerifier {
+    /// @dev The production path over a real aggregated proof: ZiskVerifier
+    ///      reconstructs the 576 public values from its pins and the range's
+    ///      batch public inputs, then the generated Plonk verifier checks the
+    ///      pairing. Nothing here is mocked.
+    function test_realAggregatedProof_reconstructedAndVerified() public requiresPlonkVerifier {
         assertTrue(
-            ziskVerifier.PLONK_VERIFIER().verifyProof(_proof24(AGGREGATED_PROOF), [_signal(AGGREGATED_PUBLIC_VALUES)])
+            ziskVerifier.verify(_rangePublicInputs(), _proofWords(AGGREGATED_PROOF)),
+            "aggregated fixture must match the pins and the reconstruction"
         );
-        assertFalse(ziskVerifier.verify(_rangePublicInputs(), _proofWords(AGGREGATED_PROOF)));
     }
 
     /// @dev A range that differs in one batch reconstructs a different digest,
@@ -185,9 +201,12 @@ contract ZiskVerifierRealProofTest is Test {
 
     /// @dev The generated Plonk verifier accepts a real inner proof for its own
     ///      signal — anchoring the pairing, the sha256 field-reduction and the
-    ///      320-byte preimage byte order on the per-batch side too.
+    ///      preimage byte order on the per-batch side too.
     function test_realProof_fixtureSignal_accepts() public requiresPlonkVerifier {
-        assertTrue(ziskVerifier.PLONK_VERIFIER().verifyProof(_proof24(BATCH_PROOF), [_signal(BATCH_PUBLIC_VALUES)]));
+        assertTrue(
+            ziskVerifier.PLONK_VERIFIER().verifyProof(_proof24(BATCH_PROOF), [_signal(BATCH_PUBLIC_VALUES)]),
+            "batch fixture must match the deployed Plonk verification key"
+        );
     }
 
     /// @dev Corrupting a proof scalar (an opening evaluation, still a valid

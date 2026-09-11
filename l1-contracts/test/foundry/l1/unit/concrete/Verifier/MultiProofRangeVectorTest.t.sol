@@ -7,6 +7,7 @@ import {IZiskSnarkPlonkVerifier} from "contracts/state-transition/chain-interfac
 import {ZiskVerifier} from "contracts/state-transition/verifiers/ZiskVerifier.sol";
 import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
 import {NonZeroCarriedHash} from "contracts/common/L1ContractErrors.sol";
+import {PUBLIC_INPUT_SHIFT} from "contracts/common/Config.sol";
 
 /// @dev Mock verifier that always returns true (Airbender side; exercised with
 ///      real-proof fixtures elsewhere).
@@ -38,25 +39,22 @@ contract ExpectSignalPlonkVerifier is IZiskSnarkPlonkVerifier {
     }
 }
 
-/// @notice Range reconstruction with the published guest 0.0.5 pins.
-/// @dev Batch inputs come from the historical four-batch binding vector. The
-///      digest is recomputed with the current inner VK; this is a signal test,
-///      not a fresh proof fixture. Real-proof tests separately check that the
-///      previous guest's valid aggregated proof is rejected after rotation.
+/// @notice Range reconstruction with the regenerated ZiSK 1.2.0-alpha pins.
+/// @dev Shares the four-batch GPU session with ZiskVerifierRealProofTest.
 contract MultiProofRangeVectorTest is Test {
     /// @dev Inner state-transition guest programVK: the first field of the
     ///      binding digest. It is NOT the aggregated proof's wire [0..32].
-    bytes32 internal constant INNER_PROGRAM_VK = 0xac3a6494410ce230354e5ffae7c97f94bb5488d6e1764818c9d75156ce1dc59e;
+    bytes32 internal constant INNER_PROGRAM_VK = 0x189d6b11c50ef1db9885fed376479ed97dde719a59574a7946d8d612e25da97a;
     /// @dev Aggregator guest programVK: the aggregated proof's wire
     ///      public-values bytes [0..32].
     bytes32 internal constant AGGREGATOR_PROGRAM_VK =
-        0xf68b9862e424e377af7b4220a419ce45bc52ce70b0a37aea486a15a5ca38b738;
+        0x10f0e91f54ad66e4e95713a1b4b9fda44ea3b06e51ed3430ef775ba8bef4a7c8;
     /// @dev Vadcop-final root: the second field of the binding digest, and
-    ///      wire public-values bytes [288..320].
-    bytes32 internal constant ROOT_C_VADCOP_FINAL = 0xcf2a309856f107b143836ada112806da71ae11567fa3f2d2050baba5381c7b7d;
+    ///      wire public-values bytes [544..576].
+    bytes32 internal constant ROOT_C_VADCOP_FINAL = 0x564c2b1bcbd5932c81cfad1fa786a98372eb3d6495257c2d944544334f84382f;
 
-    /// @dev The four per-batch commitments (wire bytes [32..64] of each
-    ///      per-batch ZiSK proof), in batch order.
+    /// @dev The four per-batch commitments (the first eight guest-public slots
+    ///      of each per-batch ZiSK proof), in batch order.
     bytes32 internal constant COMMITMENT_1 = 0x63c7606faee0ee9eff230fec391e64c0c82a0277947973ce7f6f1c9088c821dd;
     bytes32 internal constant COMMITMENT_2 = 0x7d6a5ed6ffda210164c11dd6f6fccbd35c4ff70632e845a5bf256e3ec48940b9;
     bytes32 internal constant COMMITMENT_3 = 0xd5a7b4485d1aece18348655132e73c86b23fa0f251adb173f80123d05a914f15;
@@ -67,11 +65,18 @@ contract MultiProofRangeVectorTest is Test {
     ///      settlement layer and the aggregator guest both compute it.
     bytes32 internal constant CHAINED_PI = 0x00000000108311cf154dafcd8fbeb3d29ff924941d60db59f523d33baa5d2ca5;
     /// @dev keccak256(INNER_PROGRAM_VK || ROOT_C_VADCOP_FINAL || CHAINED_PI):
-    ///      the aggregated proof's public-values bytes [32..64].
-    bytes32 internal constant DIGEST = 0xd687526f9d54dd562513745059cfff34f47ed1b746ad619656a025245019fc60;
+    ///      the aggregated proof carries it across the first eight guest-public
+    ///      slots, public-values bytes [32..96].
+    bytes32 internal constant DIGEST = 0x77808e06c21c5f1608738e0345b0074f0bc67ef937abfc873b2499eab7953ce4;
 
     /// @dev BN254 scalar field modulus (must equal ZiskVerifier._RFIELD).
     uint256 internal constant RFIELD = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
+
+    /// @dev Byte length of the ZiSK guest-publics section: 64 u64 slots.
+    uint256 internal constant GUEST_PUBLICS_BYTES = 512;
+    /// @dev Byte length of the ZiSK public-values preimage: the guest-publics
+    ///      section between the two 32-byte pins.
+    uint256 internal constant PUBLIC_VALUES_BYTES = 64 + GUEST_PUBLICS_BYTES;
 
     MultiProofVerifier internal verifier;
     ZiskVerifier internal ziskVerifier;
@@ -107,14 +112,30 @@ contract MultiProofRangeVectorTest is Test {
         pis[3] = uint256(COMMITMENT_4);
     }
 
+    /// @dev The guest-publics section that carries `_digest`: 64 little-endian
+    ///      u64 slots, one per guest public. A guest public holds a 32-bit
+    ///      value, so a slot takes four digest bytes and four zero pad bytes.
+    ///      The digest fills the first eight slots and the aggregator guest
+    ///      leaves the rest zero. Spelled out byte by byte here, so it checks
+    ///      the verifier's word arithmetic rather than repeating it.
+    function _guestPublics(bytes32 _digest) internal pure returns (bytes memory publics) {
+        publics = new bytes(GUEST_PUBLICS_BYTES);
+        for (uint256 slot = 0; slot < 8; ++slot) {
+            for (uint256 offset = 0; offset < 4; ++offset) {
+                publics[slot * 8 + offset] = _digest[slot * 4 + offset];
+            }
+        }
+    }
+
     /// @dev The single PLONK public signal the on-chain reconstruction must
     ///      produce for the pinned range: sha256 over the reconstructed
-    ///      320-byte preimage (aggregatorProgramVK || DIGEST || 224 zeros ||
-    ///      rootCVadcopFinal), reduced mod the BN254 scalar field. The wire
-    ///      carries the AGGREGATOR pin; the INNER pin is inside DIGEST.
+    ///      576-byte preimage (aggregatorProgramVK || guest publics carrying
+    ///      DIGEST || rootCVadcopFinal), reduced mod the BN254 scalar field.
+    ///      The wire carries the AGGREGATOR pin; the INNER pin is inside
+    ///      DIGEST.
     function _expectedSignal() internal pure returns (uint256) {
-        bytes memory preimage = abi.encodePacked(AGGREGATOR_PROGRAM_VK, DIGEST, new bytes(224), ROOT_C_VADCOP_FINAL);
-        require(preimage.length == 320, "preimage length");
+        bytes memory preimage = abi.encodePacked(AGGREGATOR_PROGRAM_VK, _guestPublics(DIGEST), ROOT_C_VADCOP_FINAL);
+        require(preimage.length == PUBLIC_VALUES_BYTES, "preimage length");
         return uint256(sha256(preimage)) % RFIELD;
     }
 
@@ -123,8 +144,8 @@ contract MultiProofRangeVectorTest is Test {
     ///      digest. The real reconstruction must never produce this signal.
     function _swappedPinSignal() internal pure returns (uint256) {
         bytes32 swappedDigest = keccak256(abi.encodePacked(AGGREGATOR_PROGRAM_VK, ROOT_C_VADCOP_FINAL, CHAINED_PI));
-        bytes memory preimage = abi.encodePacked(INNER_PROGRAM_VK, swappedDigest, new bytes(224), ROOT_C_VADCOP_FINAL);
-        require(preimage.length == 320, "preimage length");
+        bytes memory preimage = abi.encodePacked(INNER_PROGRAM_VK, _guestPublics(swappedDigest), ROOT_C_VADCOP_FINAL);
+        require(preimage.length == PUBLIC_VALUES_BYTES, "preimage length");
         return uint256(sha256(preimage)) % RFIELD;
     }
 
@@ -194,6 +215,35 @@ contract MultiProofRangeVectorTest is Test {
 
         vm.expectRevert(MultiProofVerifier.ZiskVerificationFailed.selector);
         verifier.verify(pis, _rangeProof(0));
+    }
+
+    /// @dev The reconstruction spreads the binding digest over the first eight
+    ///      guest-public slots. Driven by the deployed verifier's OWN pins, so
+    ///      it holds the layout independently of the pinned vector above. The
+    ///      near miss is a digest written as 32 contiguous bytes: the signal a
+    ///      reconstruction that ignores the u64 slot width would produce.
+    function test_reconstruction_spreadsDigestOverGuestPublics() public {
+        uint256[] memory pis = _publicInputs();
+        bytes32 rootC = ziskVerifier.rootCVadcopFinal();
+        bytes32 chainedPi = bytes32(uint256(keccak256(abi.encodePacked(pis))) >> PUBLIC_INPUT_SHIFT);
+        bytes32 digest = keccak256(abi.encodePacked(ziskVerifier.innerProgramVK(), rootC, chainedPi));
+        bytes32 aggregatorVk = ziskVerifier.aggregatorProgramVK();
+
+        uint256 spreadSignal = uint256(sha256(abi.encodePacked(aggregatorVk, _guestPublics(digest), rootC))) % RFIELD;
+        uint256 contiguousSignal = uint256(
+            sha256(abi.encodePacked(aggregatorVk, digest, new bytes(GUEST_PUBLICS_BYTES - 32), rootC))
+        ) % RFIELD;
+        assertTrue(spreadSignal != contiguousSignal, "slot width must change the signal");
+
+        ZiskVerifier expectsSpread = new ZiskVerifier(
+            IZiskSnarkPlonkVerifier(address(new ExpectSignalPlonkVerifier(spreadSignal)))
+        );
+        assertTrue(expectsSpread.verify(pis, _ziskSnarkWords()), "digest spread over guest publics");
+
+        ZiskVerifier expectsContiguous = new ZiskVerifier(
+            IZiskSnarkPlonkVerifier(address(new ExpectSignalPlonkVerifier(contiguousSignal)))
+        );
+        assertFalse(expectsContiguous.verify(pis, _ziskSnarkWords()), "contiguous digest");
     }
 
     /// @dev The two program VK pins have one role each and are not
