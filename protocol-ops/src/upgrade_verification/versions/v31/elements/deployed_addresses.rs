@@ -646,7 +646,7 @@ async fn verify_core_provenance(
             "l1-contracts/L1ChainAssetHandler",
         ),
         // L1MessageRoot(_bridgehub, _eraGatewayChainId, _chainAssetHandler). The v33 flow
-        // deploys no Gateway; `DefaultCoreUpgrade` passes 0 for `_eraGatewayChainId`.
+        // has no settlement-layer step; `DefaultCoreUpgrade` passes 0 for `_eraGatewayChainId`.
         (
             message_root_impl,
             V31L1MessageRoot::constructorCall::new((

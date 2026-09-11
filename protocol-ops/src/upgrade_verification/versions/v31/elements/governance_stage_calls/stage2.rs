@@ -3,8 +3,8 @@
 //! Canonical shape:
 //!   `[ unpauseMigration, (checkProtocolUpgradePresence, checkMigrationsUnpaused) × N CTMs ]`
 //!
-//! v31 carried two Gateway sections around this core (a legacy-Gateway decommission prefix and a
-//! new-Gateway bring-up appendix); v33 deploys no Gateway, so stage 2 is exactly the core.
+//! v31 carried two settlement-layer sections around this core (a decommission prefix and a
+//! bring-up appendix); v33 has neither, so stage 2 is exactly the core.
 
 use crate::upgrade_verification::{
     artifacts::EcosystemUpgradeArtifact,

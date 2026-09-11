@@ -65,10 +65,9 @@ impl BytecodeVerifier {
     }
 
     /// Tries to parse `maybe_bytecode` as init code by testing every possible 32-byte
-    /// constructor-argument suffix. Gateway ZKsync OS deployer constructors
-    /// carry dynamic structs and selector arrays, and zk-governance
-    /// Guardians carries a dynamic members array, so the legacy 0..9 word
-    /// scan is too narrow for those CREATE2 deploys.
+    /// constructor-argument suffix. zk-governance Guardians carries a dynamic
+    /// members array, so the legacy 0..9 word scan is too narrow for that
+    /// CREATE2 deploy.
     pub fn try_parse_bytecode(&self, maybe_bytecode: &[u8]) -> Option<(String, Vec<u8>)> {
         // We do not know how many extra 32-byte arguments there are,
         // so we try all values up to the caller-provided bound.

@@ -17,7 +17,7 @@ pub const ADMIN_FUNCTIONS_SCRIPT_PATH: &str = "deploy-scripts/AdminFunctions.s.s
 pub const FINALIZE_CHAIN_INIT_SCRIPT_PATH: &str = "deploy-scripts/chain/FinalizeChainInit.s.sol";
 
 /// v33 upgrade flow. Unlike the v31 scripts these extend the `Default*` bases directly: the
-/// v30 -> v31 one-off work (stage-2 legacy-Gateway decommission, stage-3 bridged-token
+/// v30 -> v31 one-off work (stage-2 settlement-layer decommission, stage-3 bridged-token
 /// migration) has no v33 counterpart and must not be replayed. See
 /// `deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol`.
 pub const CORE_UPGRADE_V33_SCRIPT_PATH: &str = "deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol";
