@@ -57,6 +57,13 @@ interface IGetters is IZKChainBase {
     // @return Address of transaction filterer
     function getTransactionFilterer() external view returns (address);
 
+    /// @notice Returns the real proof format accepted by this ZKsync OS chain.
+    /// @return The accepted real proof type: 2 for Airbender or 5 for multiprover.
+    function getProofMode() external view returns (uint256);
+
+    /// @return Bit mask of the proof systems disabled on this chain.
+    function disabledProofSystems() external view returns (uint8);
+
     /// @return The total number of priority operations that were added to the priority queue, including all processed ones
     function getTotalPriorityTxs() external view returns (uint256);
 

@@ -97,6 +97,9 @@ uint256 constant PUBLIC_INPUT_SHIFT = 32;
 /// @dev Proof type used by the ZKsync OS PLONK verifier.
 uint256 constant ZKSYNC_OS_PLONK_VERIFICATION_TYPE = 2;
 
+/// @dev Proof type containing both Airbender and ZiSK proofs.
+uint256 constant ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE = 5;
+
 /// @dev Proof type used by the proof-skipping ZKsync OS testnet verifier.
 uint256 constant ZKSYNC_OS_MOCK_VERIFICATION_TYPE = 3;
 
@@ -108,6 +111,18 @@ uint256 constant ZKSYNC_OS_MOCK_PROOF_LENGTH = 2;
 
 /// @dev Marker expected as the first word in a proof-skipping ZKsync OS testnet proof.
 uint256 constant ZKSYNC_OS_MOCK_PROOF_MAGIC = 13;
+
+/// @dev Number of words in the ZiSK BN254 PLONK proof and its padded testnet mock component.
+uint256 constant ZISK_SNARK_PROOF_LENGTH = 24;
+
+/// @dev Bit in `ZKChainStorage.disabledProofSystems` switching the Airbender proof system off. A ZKsync OS
+/// chain may never set it, because Airbender is the lane its settlement rests on; it is defined here so the
+/// bit is reserved across every lane and one value can not mean two proof systems.
+uint8 constant AIRBENDER_PROOF_SYSTEM_DISABLED = 2;
+
+/// @dev Bit in `ZKChainStorage.disabledProofSystems` switching the ZiSK proof system off. The only bit a
+/// ZKsync OS chain accepts (see `Admin.setProofSystemStatus`).
+uint8 constant ZISK_PROOF_SYSTEM_DISABLED = 4;
 
 /// @dev Padding value for empty/unused leaves in an {IndexedMerkleTree}. Deliberately NOT a valid
 /// `hashLeaf(IMTLeaf)` output, so an unused padded index can't be presented as a `{0,0,0}` low leaf to forge

@@ -14,6 +14,7 @@ import {
     PRICE_UPDATE_INTERVAL,
     PRIORITY_EXPIRATION,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    ZISK_PROOF_SYSTEM_DISABLED,
     ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
     ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT
 } from "../../../common/Config.sol";
@@ -38,6 +39,7 @@ import {
     FeeParamsChangeTooLarge,
     HashMismatch,
     InvalidDAForPermanentRollup,
+    InvalidProofSystem,
     InvalidL2DACommitmentScheme,
     InvalidPubdataPricingMode,
     NonFullPubdataContentForPermanentRollup,
@@ -384,6 +386,20 @@ contract AdminFacet is ZKChainBase, IAdmin {
         _enforceNoUnverifiedBatchesForChainConfigUpdate();
         emit NewPubdataContent(s.pubdataContent, _pubdataContent);
         s.pubdataContent = _pubdataContent;
+    }
+
+    /// @inheritdoc IAdmin
+    function setProofSystemStatus(uint8 _proofSystem, bool _enabled) external onlyAdmin {
+        if (_proofSystem != ZISK_PROOF_SYSTEM_DISABLED) {
+            revert InvalidProofSystem(_proofSystem);
+        }
+        // The emergency switch must also work while committed batches wait for a proof.
+        uint8 oldDisabledProofSystems = s.disabledProofSystems;
+        uint8 newDisabledProofSystems = _enabled
+            ? oldDisabledProofSystems & ~_proofSystem
+            : oldDisabledProofSystems | _proofSystem;
+        s.disabledProofSystems = newDisabledProofSystems;
+        emit NewDisabledProofSystems(oldDisabledProofSystems, newDisabledProofSystems);
     }
 
     /// @inheritdoc IAdmin

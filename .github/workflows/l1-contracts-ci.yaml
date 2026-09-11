@@ -135,7 +135,7 @@ jobs:
 
   test-foundry:
     if: github.event_name == 'pull_request'
-    needs: [build]
+    needs: [build, check-verifier-generator-l1]
     runs-on: ubuntu-latest
 
     steps:
@@ -159,9 +159,17 @@ jobs:
       - name: Restore this commit's artifacts
         uses: ./.github/actions/restore-ci-artifacts
 
-      - name: Run tests
-        working-directory: ./l1-contracts
-        run: yarn test:foundry
+      - name: Checkout backend tooling
+        uses: actions/checkout@v4
+        with:
+          repository: matter-labs/zksync-os-integration-tests
+          ref: d1be31737c3d68346cf36495ec0991cefd5233e3 # ZiSK backend preparation
+          path: .external/zk-deployer
+          persist-credentials: false
+          sparse-checkout: bin/zk-deployer/tools/zisk-backend
+
+      - name: Run tests with external ZiSK backend
+        run: node .external/zk-deployer/bin/zk-deployer/tools/zisk-backend/zisk-backend.js test "$GITHUB_WORKSPACE"
 
       - name: Run DA tests
         working-directory: ./da-contracts
@@ -203,6 +211,15 @@ jobs:
 
       - name: Compare ZKsyncOSVerifierPlonk.sol
         run: diff tools/verifier-gen/data/ZKsyncOSVerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol
+
+      - name: Generate ZiSK verifier
+        working-directory: tools/verifier-gen
+        run: |
+          cargo run --bin zksync_verifier_contract_generator --release -- \
+            --variant zisk
+
+      - name: Compare ZiskVerifier.sol
+        run: diff tools/verifier-gen/data/ZiskVerifier.sol l1-contracts/contracts/state-transition/verifiers/ZiskVerifier.sol
 
   # Foundry coverage and the minimum-coverage gate. Independent of the Anvil interop legs
   # below, which only add hits on top of this report and are not gated.

@@ -45,7 +45,7 @@ Only the directory for the current protocol version, selected by `stateVersion`,
 
 The per-chain state dumps are committed **gzip-compressed** (`<chainId>.json.gz`). These snapshots are multi-MB; storing them as raw JSON floods every regeneration with an enormous, unreviewable diff. GitHub renders `.gz` as binary ("Binary file not shown"), keeping them out of PR diffs, and gzip shrinks them ~10x. `addresses.json` stays plain text so contract-address changes remain reviewable. Compression/decompression is handled automatically by `dumpAllStates()` / `loadChainStates()` in `deployment-runner.ts` — no manual step.
 
-To regenerate pregenerated state after contract changes:
+To regenerate pregenerated state after contract changes, first finalize `configs/genesis/zksync-os/latest.json` from the production build, then build the `anvil-interop` profile and generate the snapshots. The genesis root is part of CTM deployment data; changing it afterward invalidates the snapshot addresses.
 
 ```bash
 cd contracts/l1-contracts/test/anvil-interop

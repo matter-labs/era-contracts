@@ -11,6 +11,7 @@ import {Diamond} from "../../libraries/Diamond.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
 import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
+import {IZKsyncOSVerifier} from "../../chain-interfaces/IZKsyncOSVerifier.sol";
 import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "../../chain-interfaces/ILegacyGetters.sol";
 import {SemVer} from "../../../common/libraries/SemVer.sol";
@@ -102,6 +103,16 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     /// @inheritdoc IGetters
     function getTransactionFilterer() external view returns (address) {
         return s.transactionFilterer;
+    }
+
+    /// @inheritdoc IGetters
+    function getProofMode() external view returns (uint256) {
+        return IZKsyncOSVerifier(address(s.verifier)).getProofMode(s.disabledProofSystems);
+    }
+
+    /// @inheritdoc IGetters
+    function disabledProofSystems() external view returns (uint8) {
+        return s.disabledProofSystems;
     }
 
     /// @inheritdoc IGetters
