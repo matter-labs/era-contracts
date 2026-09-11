@@ -83,11 +83,6 @@ struct Opt {
     #[structopt(long = "zisk_vk_path", default_value = "data/ZiSK_vk.json")]
     zisk_vk_path: String,
 
-    /// ZiSK PlonkVerifier.sol input (snarkJS-generated).
-    /// Used with --variant zisk to copy and adapt the inner verifier.
-    #[structopt(long = "zisk_plonk_input_path")]
-    zisk_plonk_input_path: Option<String>,
-
     /// ZiSK verifier output path.
     #[structopt(long = "zisk_output_path", default_value = "data/ZiskVerifier.sol")]
     zisk_output_path: String,
@@ -134,11 +129,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // The ZiSK variant uses a completely different pipeline: it renders
     // ZiskVerifier from the ZiSK VK JSON, not from a scheduler key.
     if matches!(opt.variant, Variant::Zisk) {
-        return zisk::generate_zisk_verifier(
-            &opt.zisk_vk_path,
-            &opt.zisk_output_path,
-            opt.zisk_plonk_input_path.as_deref(),
-        );
+        return zisk::generate_zisk_verifier(&opt.zisk_vk_path, &opt.zisk_output_path);
     }
 
     let paths = resolve_paths(&opt);
