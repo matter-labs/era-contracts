@@ -13,6 +13,7 @@ import { getChainIdsByRole, getL2Chain, impersonateAndRun, createProvider } from
 import { getAbi } from "../../src/core/contracts";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
+  ANVIL_RECIPIENT_ADDR,
   BundleStatus,
   INTEROP_CENTER_ADDR,
   L2_ASSET_ROUTER_ADDR,
@@ -26,7 +27,14 @@ import {
   DEFAULT_TX_GAS_LIMIT,
 } from "../../src/core/const";
 import { encodeEvmAddress, encodeEvmChain } from "../../src/core/data-encoding";
-import { customError, expectRevert } from "../../src/helpers/balance-helpers";
+import {
+  customError,
+  expectRevert,
+  expectEvent,
+  captureBalance,
+  expectNativeSpend,
+  expectBalanceDelta,
+} from "../../src/helpers/balance-helpers";
 import {
   atomicBundleAttr,
   interopBundleSaltAttr,
@@ -99,9 +107,6 @@ type ChainCtx = {
   stack: AtomicStack;
 };
 
-const NTV_TOKEN_ADDRESS_ABI = ["function tokenAddress(bytes32 assetId) view returns (address)"];
-const ERC20_BALANCE_ABI = ["function balanceOf(address) view returns (uint256)"];
-
 /** assetId = keccak256(abi.encode(originChainId, L2_NATIVE_TOKEN_VAULT_ADDR, originToken)). */
 function ntvAssetId(originChainId: number, originToken: string): string {
   return ethers.utils.keccak256(
@@ -118,7 +123,9 @@ async function ensureTokenRegistered(ctx: ChainCtx): Promise<void> {
   const vault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("L2NativeTokenVault"), ctx.user);
   const registered: string = await vault.assetId(ctx.testToken.address);
   if (registered === ethers.constants.HashZero) {
-    await (await vault.registerToken(ctx.testToken.address)).wait();
+    const receipt = await (await vault.registerToken(ctx.testToken.address)).wait();
+    expect(receipt.status, "register swap token").to.equal(1);
+    expect(await vault.assetId(ctx.testToken.address)).to.equal(ntvAssetId(ctx.chainId, ctx.testToken.address));
   }
 }
 
@@ -130,7 +137,11 @@ async function ensureTokenRegistered(ctx: ChainCtx): Promise<void> {
 async function ensureNtvApproval(ctx: ChainCtx, amount: BigNumber): Promise<void> {
   const current: BigNumber = await ctx.testToken.allowance(ctx.user.address, L2_NATIVE_TOKEN_VAULT_ADDR);
   if (current.lt(amount)) {
-    await (await ctx.testToken.connect(ctx.user).approve(L2_NATIVE_TOKEN_VAULT_ADDR, amount)).wait();
+    const receipt = await (await ctx.testToken.connect(ctx.user).approve(L2_NATIVE_TOKEN_VAULT_ADDR, amount)).wait();
+    expect(receipt.status, "approve swap token").to.equal(1);
+    expect((await ctx.testToken.allowance(ctx.user.address, L2_NATIVE_TOKEN_VAULT_ADDR)).toString()).to.equal(
+      amount.toString()
+    );
   }
 }
 
@@ -174,7 +185,7 @@ async function ensureSettlementInteropRoot(
     return;
   }
   await impersonateAndRun(provider, L2_BOOTLOADER_ADDR, async (signer) => {
-    await (
+    const receipt = await (
       await storage.connect(signer).addSingleInteropRoot({
         chainId: DEFAULT_SL_CHAIN_ID,
         blockOrBatchNumber: settlementBlock,
@@ -182,6 +193,8 @@ async function ensureSettlementInteropRoot(
         sides: [ethers.utils.keccak256(ethers.utils.toUtf8Bytes(`settlement-interop-root-${settlementBlock}`))],
       })
     ).wait();
+    expect(receipt.status, "import settlement interop root").to.equal(1);
+    expect((await storage.interopRoots(DEFAULT_SL_CHAIN_ID, settlementBlock)).timestamp.toNumber()).to.equal(timestamp);
   });
 }
 
@@ -315,6 +328,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     const value = commitValue(flowId, predictedBundleHash);
     const lowNull = await lowNullifierIndexFor(source.stack.tree, value);
 
+    const senderBefore = await captureBalance(source.provider, source.testToken.address);
     const sendResult = await sendInteropBundle({
       sourceProvider: source.provider,
       destinationChainId: dest.chainId,
@@ -326,6 +340,10 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
       // Atomic sends append to the IMT (~1.1M gas insert) on top of the burn, so they need the larger cap.
       gasLimit: ATOMIC_SEND_BUNDLE_GAS_LIMIT,
     });
+
+    const senderAfter = await captureBalance(source.provider, source.testToken.address);
+    expectNativeSpend(senderBefore, senderAfter, fee, sendResult.receipt, "atomic leg sender");
+    expectBalanceDelta(senderBefore.token!, senderAfter.token!, amount.mul(-1), "atomic leg source token");
 
     // Cross-check the predicted bundleHash against the actual one the InteropCenter emitted.
     expect(sendResult.bundleHash.toLowerCase(), "predicted bundleHash matches emitted").to.equal(
@@ -434,23 +452,33 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     // are delta-based for the same reason).
     const abAssetId = ntvAssetId(chainA.chainId, chainA.testToken.address);
     const baAssetId = ntvAssetId(chainB.chainId, chainB.testToken.address);
-    const ntvOnB = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, NTV_TOKEN_ADDRESS_ABI, chainB.provider);
-    const ntvOnA = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, NTV_TOKEN_ADDRESS_ABI, chainA.provider);
+    const ntvOnB = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("L2NativeTokenVault"), chainB.provider);
+    const ntvOnA = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("L2NativeTokenVault"), chainA.provider);
     const shimAonBAddrBefore: string = await ntvOnB.tokenAddress(abAssetId);
     const shimAonBBefore: BigNumber =
       shimAonBAddrBefore === ethers.constants.AddressZero
         ? BigNumber.from(0)
-        : await new Contract(shimAonBAddrBefore, ERC20_BALANCE_ABI, chainB.provider).balanceOf(user);
+        : await new Contract(shimAonBAddrBefore, getAbi("TestnetERC20Token"), chainB.provider).balanceOf(user);
     const shimBonAAddrBefore: string = await ntvOnA.tokenAddress(baAssetId);
     const shimBonABefore: BigNumber =
       shimBonAAddrBefore === ethers.constants.AddressZero
         ? BigNumber.from(0)
-        : await new Contract(shimBonAAddrBefore, ERC20_BALANCE_ABI, chainA.provider).balanceOf(user);
+        : await new Contract(shimBonAAddrBefore, getAbi("TestnetERC20Token"), chainA.provider).balanceOf(user);
 
     const handlerB = chainB.stack.interopHandler.connect(chainB.user);
     const handlerA = chainA.stack.interopHandler.connect(chainA.user);
-    await (await handlerB.executeAtomicBundle(ab.bundleData, finality, { gasLimit: DEFAULT_TX_GAS_LIMIT })).wait();
-    await (await handlerA.executeAtomicBundle(ba.bundleData, finality, { gasLimit: DEFAULT_TX_GAS_LIMIT })).wait();
+    const receiptB = await (
+      await handlerB.executeAtomicBundle(ab.bundleData, finality, { gasLimit: DEFAULT_TX_GAS_LIMIT })
+    ).wait();
+    const receiptA = await (
+      await handlerA.executeAtomicBundle(ba.bundleData, finality, { gasLimit: DEFAULT_TX_GAS_LIMIT })
+    ).wait();
+    expect(expectEvent(receiptB, "L2InteropHandler", L2_INTEROP_HANDLER_ADDR, "BundleExecuted").bundleHash).to.equal(
+      hAB
+    );
+    expect(expectEvent(receiptA, "L2InteropHandler", L2_INTEROP_HANDLER_ADDR, "BundleExecuted").bundleHash).to.equal(
+      hBA
+    );
 
     // Destination bundles are FullyExecuted; source legs remain Committed (terminal on the happy path).
     expect(await handlerB.bundleStatus(hAB)).to.equal(BundleStatus.FullyExecuted, "AB executed on B");
@@ -462,7 +490,11 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     // B receives a bridged shim for A's token (assetId of A.testToken on chain A).
     const shimAonB = await ntvOnB.tokenAddress(abAssetId);
     expect(shimAonB).to.not.equal(ethers.constants.AddressZero, "shim for A's token deployed on B");
-    const shimAonBAfter: BigNumber = await new Contract(shimAonB, ERC20_BALANCE_ABI, chainB.provider).balanceOf(user);
+    const shimAonBAfter: BigNumber = await new Contract(
+      shimAonB,
+      getAbi("TestnetERC20Token"),
+      chainB.provider
+    ).balanceOf(user);
     expect(shimAonBAfter.sub(shimAonBBefore).toString()).to.equal(
       aAmount.toString(),
       "recipient on B received aAmount"
@@ -471,7 +503,11 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     // A receives a bridged shim for B's token.
     const shimBonA = await ntvOnA.tokenAddress(baAssetId);
     expect(shimBonA).to.not.equal(ethers.constants.AddressZero, "shim for B's token deployed on A");
-    const shimBonAAfter: BigNumber = await new Contract(shimBonA, ERC20_BALANCE_ABI, chainA.provider).balanceOf(user);
+    const shimBonAAfter: BigNumber = await new Contract(
+      shimBonA,
+      getAbi("TestnetERC20Token"),
+      chainA.provider
+    ).balanceOf(user);
     expect(shimBonAAfter.sub(shimBonABefore).toString()).to.equal(
       bAmount.toString(),
       "recipient on A received bAmount"
@@ -487,7 +523,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     // root created after the flow's deadline has been imported (the flow could already be timed out).
     const settlementInteropRootBlock = 201;
 
-    const refundRecipient = chainB.user.address; // irrelevant for refund; distinct dest recipient
+    const refundRecipient = ANVIL_RECIPIENT_ADDR;
     const aTimeoutAmount = ethers.utils.parseUnits("3", TEST_TOKEN_DECIMALS);
     const bTimeoutAmount = ethers.utils.parseUnits("5", TEST_TOKEN_DECIMALS);
 
@@ -507,6 +543,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     const flowId = computeFlowId(flowPreimage);
 
     // ── Commit only the AB leg on A. B never commits BA. ─────────────────────────────────────
+    const recipientBefore: BigNumber = await chainA.testToken.balanceOf(refundRecipient);
     const aBalanceBefore: BigNumber = await chainA.testToken.balanceOf(user);
     const ab = await sendAtomicLeg({
       source: chainA,
@@ -552,6 +589,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
         { gasLimit: DEFAULT_TX_GAS_LIMIT }
       )
     ).wait();
+    expect(refundAuth.status, "authorize refund transaction").to.equal(1);
     expect(await chainA.stack.manager.legState(flowId, hAB)).to.equal(LegState.Revertable, "AB revertable on A");
     expect(
       refundAuth.logs
@@ -562,6 +600,13 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
 
     // ── claimRefund on A -> depositor recovers the burned tokens; state Reverted. ────────────
     const claim = await (await managerA.claimRefund(flowId, ab.bundleData, { gasLimit: DEFAULT_TX_GAS_LIMIT })).wait();
+    expect(claim.status, "claim refund transaction").to.equal(1);
+    expectBalanceDelta(
+      recipientBefore,
+      await chainA.testToken.balanceOf(refundRecipient),
+      ethers.constants.Zero,
+      "refund must return to depositor, not destination recipient"
+    );
     expect(await chainA.stack.manager.legState(flowId, hAB)).to.equal(LegState.Reverted, "AB reverted on A");
 
     const aAfterRefund: BigNumber = await chainA.testToken.balanceOf(user);
@@ -604,7 +649,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     const deadline = 2_000;
     const settlementInteropRootBlock = 202;
 
-    const refundRecipient = chainB.user.address;
+    const refundRecipient = ANVIL_RECIPIENT_ADDR;
     const aTimeoutAmount = ethers.utils.parseUnits("2", TEST_TOKEN_DECIMALS);
     const bTimeoutAmount = ethers.utils.parseUnits("4", TEST_TOKEN_DECIMALS);
 
@@ -622,6 +667,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     const flowPreimage = flowPreimageOf(legHashesAsc, chainIdsAsc, deadline);
     const flowId = computeFlowId(flowPreimage);
 
+    const recipientBefore: BigNumber = await chainA.testToken.balanceOf(refundRecipient);
     const aBalanceBefore: BigNumber = await chainA.testToken.balanceOf(user);
     const ab = await sendAtomicLeg({
       source: chainA,
@@ -652,7 +698,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     const missingIdx = legHashesAsc[0] === hBA ? 0 : 1;
 
     const managerA = chainA.stack.manager.connect(chainA.user);
-    await (
+    const refundAuth = await (
       await managerA.authorizeRefund(
         atomicFlowTuple({ flowId, preimage: flowPreimage }),
         missingIdx,
@@ -660,9 +706,23 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
         { gasLimit: DEFAULT_TX_GAS_LIMIT }
       )
     ).wait();
+    expect(refundAuth.status, "authorize refund transaction").to.equal(1);
+    expect(
+      expectEvent(refundAuth, "AtomicFlowManager", L2_ATOMIC_FLOW_MANAGER_ADDR, "FlowRefundAuthorized").bundleHash
+    ).to.equal(hAB);
     expect(await chainA.stack.manager.legState(flowId, hAB)).to.equal(LegState.Revertable, "AB revertable on A");
 
-    await (await managerA.claimRefund(flowId, ab.bundleData, { gasLimit: DEFAULT_TX_GAS_LIMIT })).wait();
+    const claim = await (await managerA.claimRefund(flowId, ab.bundleData, { gasLimit: DEFAULT_TX_GAS_LIMIT })).wait();
+    expect(claim.status, "claim refund transaction").to.equal(1);
+    expect(expectEvent(claim, "AtomicFlowManager", L2_ATOMIC_FLOW_MANAGER_ADDR, "FlowRefunded").bundleHash).to.equal(
+      hAB
+    );
+    expectBalanceDelta(
+      recipientBefore,
+      await chainA.testToken.balanceOf(refundRecipient),
+      ethers.constants.Zero,
+      "refund must return to depositor, not destination recipient"
+    );
     expect(await chainA.stack.manager.legState(flowId, hAB)).to.equal(LegState.Reverted, "AB reverted on A");
     expect((await chainA.testToken.balanceOf(user)).toString()).to.equal(
       aBalanceBefore.toString(),

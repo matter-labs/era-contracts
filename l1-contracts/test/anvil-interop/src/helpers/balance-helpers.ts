@@ -75,7 +75,9 @@ export async function approveToken(
   const wallet = new Wallet(getInteropSourcePrivateKey(), provider);
   const erc20 = new Contract(tokenAddress, getAbi("TestnetERC20Token"), wallet);
   const approveTx = await erc20.approve(spender, amount);
-  await approveTx.wait();
+  const receipt = await approveTx.wait();
+  expect(receipt.status, "token approval must succeed").to.equal(1);
+  expect((await erc20.allowance(wallet.address, spender)).toString(), "approved allowance").to.equal(amount.toString());
 }
 
 /**
@@ -139,7 +141,38 @@ export function expectBalanceDelta(before: BigNumber, after: BigNumber, expected
   ).to.be.true;
 }
 
+export async function expectSuccessfulReceipt(
+  provider: providers.JsonRpcProvider,
+  txHash: string | null | undefined,
+  label: string
+): Promise<providers.TransactionReceipt> {
+  expect(txHash, `${label}: transaction must have been submitted`).to.match(/^0x[0-9a-fA-F]{64}$/);
+  const receipt = await provider.getTransactionReceipt(txHash!);
+  expect(receipt, `${label}: transaction must be mined`).to.exist;
+  expect(receipt.status, `${label}: transaction must succeed`).to.equal(1);
+  return receipt;
+}
+
+/** Assert one event from the expected emitter, then expose its decoded arguments for outcome checks. */
+export function expectEvent(
+  receipt: providers.TransactionReceipt,
+  contract: ContractName,
+  address: string,
+  eventName: string
+): ethers.utils.Result {
+  expect(receipt.status, `${eventName}: transaction must succeed`).to.equal(1);
+  const iface = new ethers.utils.Interface(getAbi(contract));
+  const topic = iface.getEventTopic(eventName);
+  const logs = receipt.logs.filter(
+    (log) => log.address.toLowerCase() === address.toLowerCase() && log.topics[0] === topic
+  );
+  expect(logs, `${eventName} from ${address}`).to.have.length(1);
+  return iface.parseLog(logs[0]).args;
+}
+
 interface EthersLikeError {
+  argument?: string;
+  value?: unknown;
   body?: string;
   data?: unknown;
   error?: unknown;
@@ -166,7 +199,10 @@ export function customError(contract: ContractName, signature: string): CustomEr
 
 function resolveExpectedReason(expectedReason: ExpectedRevert): { matchValue: string; description: string } {
   if (typeof expectedReason === "string") {
-    return { matchValue: expectedReason, description: expectedReason };
+    const encodedReason =
+      ethers.utils.id("Error(string)").slice(0, 10) +
+      ethers.utils.defaultAbiCoder.encode(["string"], [expectedReason]).slice(2);
+    return { matchValue: encodedReason, description: expectedReason };
   }
 
   const selector = new ethers.utils.Interface(getAbi(expectedReason.contract)).getSighash(expectedReason.signature);
@@ -182,6 +218,12 @@ function extractRevertData(err: unknown): string {
   const errorWithData = err as EthersLikeError;
   const nestedErrorData = extractRevertData(errorWithData.error);
   if (nestedErrorData !== "" && nestedErrorData !== "0x") return nestedErrorData;
+
+  // staticPreviewHash decodes the intentional preview revert; other custom errors surface
+  // as ethers ABI decoding errors with the original revert bytes in argument="data"/value.
+  if (errorWithData.argument === "data" && typeof errorWithData.value === "string") {
+    return errorWithData.value;
+  }
 
   const directData = errorWithData.data;
   if (typeof directData === "string" && directData !== "" && directData !== "0x") return directData;
@@ -209,7 +251,8 @@ async function extractRevertDataFromCall(provider: providers.JsonRpcProvider, er
   if (!tx?.to || !tx.data) return "";
 
   try {
-    await provider.call(
+    // ethers can return eth_call revert bytes instead of throwing; retain both forms.
+    return await provider.call(
       {
         to: tx.to,
         from: tx.from,
@@ -222,42 +265,36 @@ async function extractRevertDataFromCall(provider: providers.JsonRpcProvider, er
   } catch (callErr: unknown) {
     return extractRevertData(callErr);
   }
-
-  return "";
 }
 
 /**
  * Assert that an async call reverts (throws).
- * Optionally match the error message / revert data against a selector or ABI-derived custom error.
+ * Match revert data against an ABI-encoded Error(string) or custom error selector.
  */
 export async function expectRevert(
   fn: () => Promise<unknown>,
   label: string,
-  expectedReason?: ExpectedRevert,
+  expectedReason: ExpectedRevert,
   provider?: providers.JsonRpcProvider
 ): Promise<void> {
   try {
     await fn();
   } catch (err: unknown) {
-    if (expectedReason) {
-      const { matchValue, description } = resolveExpectedReason(expectedReason);
-      // Check both the JS error message and the on-chain revert data
-      const msg = err instanceof Error ? err.message : String(err);
-      const hasReasonInMessage = msg.includes(matchValue);
-      const errorWithData = typeof err === "object" && err !== null ? (err as EthersLikeError) : undefined;
-      let errorData = extractRevertData(err);
-      if ((errorData === "" || errorData === "0x") && provider && errorWithData) {
-        const recoveredData = await extractRevertDataFromCall(provider, errorWithData);
-        if (recoveredData) {
-          errorData = recoveredData;
-        }
+    const { matchValue, description } = resolveExpectedReason(expectedReason);
+    const msg = err instanceof Error ? err.message : String(err);
+    const errorWithData = typeof err === "object" && err !== null ? (err as EthersLikeError) : undefined;
+    let errorData = extractRevertData(err);
+    if ((errorData === "" || errorData === "0x") && provider && errorWithData) {
+      const recoveredData = await extractRevertDataFromCall(provider, errorWithData);
+      if (recoveredData) {
+        errorData = recoveredData;
       }
-      const hasReasonInData = errorData.includes(matchValue);
-      expect(
-        hasReasonInMessage || hasReasonInData,
-        `${label}: revert reason mismatch — expected ${description} in message or data.\nMessage: ${msg.slice(0, 200)}\nData: ${String(errorData).slice(0, 200)}`
-      ).to.be.true;
     }
+    const hasReasonInData = errorData.startsWith(matchValue);
+    expect(
+      hasReasonInData,
+      `${label}: revert reason mismatch — expected ${description} in revert data.\nMessage: ${msg.slice(0, 200)}\nData: ${String(errorData).slice(0, 200)}`
+    ).to.be.true;
     return; // reverted as expected
   }
   expect.fail(`${label}: expected revert but call succeeded`);
