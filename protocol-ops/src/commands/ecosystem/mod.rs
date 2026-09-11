@@ -25,7 +25,6 @@ use crate::{
 
 pub mod broadcast;
 pub mod init;
-pub mod new_gateway_prepare;
 pub mod simulator;
 pub mod stage3;
 pub mod upgrade;

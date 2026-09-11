@@ -55,12 +55,9 @@ pub struct PermanentValues {
     /// Empty/absent on envs where every current owner is already an EOA.
     #[serde(default, rename = "ownable_proxies")]
     pub ownable_proxies: Vec<OwnableProxyEntry>,
-    /// Optional new-Gateway bring-up block. When present, the v31 ecosystem
-    /// prepare flow runs `GatewayVotePreparation.s.sol` against this gateway
-    /// and folds its `governance_calls_to_execute` into the merged stage-2
-    /// hex — that single bundle whitelists the GW on L1, registers the GW
-    /// CTM, wires asset handlers, accepts ownership of the GW RollupDAManager
-    /// + ServerNotifier, and sets the initial interop settlement fee.
+    /// The Gateway the v31 ceremony brought up. Read only by `ecosystem verify-upgrade`
+    /// (the v31 PUVT) to cross-check that ceremony's stage-2 bring-up calls; the prepare
+    /// flow no longer deploys a gateway (v33 is ZKsync OS-only and has no gateway step).
     #[serde(default)]
     pub new_gateway: Option<NewGatewayConfig>,
     /// Historical gateway configuration for chains that settled on the legacy
@@ -97,12 +94,8 @@ pub struct ChainInterval {
 pub struct NewGatewayConfig {
     /// Chain ID of the gateway being brought up (e.g. 2708 for stage).
     pub chain_id: u64,
-    /// Where unused L1→L2 priority-tx gas is refunded. EOAs work as-is
-    /// (`AddressAliasHelper` is a no-op on them), so the natural default is
-    /// the deployer EOA that publishes the call on L1 — `prepare_new_gateway`
-    /// applies that default when this field is absent. Override here only
-    /// when you specifically want refunds to land somewhere else (e.g. a
-    /// chain-admin Safe).
+    /// Where unused L1→L2 priority-tx gas was refunded in the v31 ceremony. Defaulted to
+    /// the deployer EOA when absent (EOAs are not aliased across L1→L2).
     ///
     /// NOTE: setting this to a contract (e.g. governance / PUH) makes refunds
     /// land at the aliased contract address on L2, which is generally
