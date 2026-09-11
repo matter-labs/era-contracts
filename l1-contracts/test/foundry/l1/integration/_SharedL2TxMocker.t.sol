@@ -27,8 +27,7 @@ contract L2TxMocker is Test {
         mockL2SharedBridge = makeAddr("mockl2sharedbridge");
 
         mockL2Calldata = "";
-        mockFactoryDeps = new bytes[](1);
-        mockFactoryDeps[0] = "11111111111111111111111111111111";
+        mockFactoryDeps = new bytes[](0);
     }
 
     function _addL2ChainContract(uint256 _chainId, address _chainContract) internal {

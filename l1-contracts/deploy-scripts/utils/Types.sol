@@ -10,17 +10,6 @@ import {
     DAContracts
 } from "contracts/common/StateTransitionTypes.sol";
 
-/// @dev Value passed for the `eraChainId` constructor parameter that the audited legacy-bridging
-/// `L1AssetRouter` still carries. Nothing this release deploys has an Era chain, and `Bridgehub`
-/// rejects chain id 0 (`ZeroChainId`), so every Era-legacy branch keyed off it is unreachable —
-/// whereas a made-up non-zero id would unlock those branches for whichever chain happened to
-/// hold it.
-uint256 constant ERA_CHAIN_ID_UNUSED = 0;
-
-/// @dev Companion to {ERA_CHAIN_ID_UNUSED} for the `eraDiamondProxy` constructor parameter: with no
-/// Era chain there is no Era diamond, and `msg.sender` can never be `address(0)`.
-address constant ERA_DIAMOND_PROXY_UNUSED = address(0);
-
 /// @dev First protocol version whose production verifier exports the testnet-verifier flag
 /// (`isTestnetVerifier()`). Earlier production verifiers export no flag; v31/v32/v33 testnet
 /// verifiers exported it as the legacy `IS_TESTNET_VERIFIER` constant.

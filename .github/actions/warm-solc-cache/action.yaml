@@ -7,10 +7,6 @@ description: >
   of runner time per PR) and each saves to its own cache key. This shares one cross-commit cache
   between them.
 
-  zksolc output is deliberately excluded: it is not reproducible across builds, so reusing a
-  cached `zkout` changes zkBytecodeHash and fails check-hashes. Only the solc side is reused;
-  every zkout is rebuilt.
-
   On trusting a cache: this action only ever READS. The single writer is verify-merged-commit.yaml,
   which builds with the cache disabled and saves only after the hash, selector and zkstack-out
   checks pass. Nothing a `pull_request` run produces is ever offered to a later run.
@@ -54,9 +50,7 @@ runs:
     # contracts). A basename comparison keeps such a directory alive and its stale artifacts with
     # it.
     #
-    # Only the directories this action actually restores are scanned. zkout is never restored
-    # here — zksolc output is not reproducible across builds — and zksolc artifacts carry no
-    # compilationTarget to match on anyway.
+    # Only the directories this action actually restores are scanned.
     - name: Drop artifacts whose source is gone or has changed
       shell: bash
       run: |

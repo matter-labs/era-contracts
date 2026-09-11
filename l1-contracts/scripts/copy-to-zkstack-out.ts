@@ -70,7 +70,6 @@ const REQUIRED_CONTRACTS = [
   "Migrator.sol",
   "L1Nullifier.sol",
   "L1InteropHandler.sol",
-  "IBaseToken.sol",
   "BaseTokenHolder.sol",
   // L1-free atomic interop (bundle model) — used by the anvil-interop atomic spec / CLI.
   "AtomicFlowManager.sol",

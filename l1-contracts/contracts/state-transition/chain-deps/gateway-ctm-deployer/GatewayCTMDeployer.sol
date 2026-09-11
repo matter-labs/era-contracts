@@ -20,8 +20,6 @@ struct GatewayCTMDeployerConfig {
     uint256 l1ChainId;
     /// @notice Flag indicating whether to use the testnet verifier.
     bool testnetVerifier;
-    /// @notice Flag indicating whether to use ZKsync OS mode.
-    bool isZKsyncOS;
     /// @notice Array of function selectors for the Admin facet.
     bytes4[] adminSelectors;
     /// @notice Array of function selectors for the Executor facet.
@@ -120,8 +118,6 @@ struct GatewayVerifiersDeployerConfig {
     address aliasedGovernanceAddress;
     /// @notice Flag indicating whether to use the testnet verifier.
     bool testnetVerifier;
-    /// @notice Flag indicating whether to use ZKsync OS mode.
-    bool isZKsyncOS;
 }
 
 // ============ CTM Deployer ============

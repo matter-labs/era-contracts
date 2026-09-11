@@ -14,24 +14,20 @@ contract ExecutorZKsyncOSPublicInputHarness is ExecutorFacet {
         s.zksyncOSMaxTxGasLimit = _maxTxGasLimit;
     }
 
-    function getBatchProofPublicInputZKsyncOS(
+    function getBatchProofPublicInput(
         bytes32 _prevBatchStateCommitment,
         bytes32 _currentBatchStateCommitment,
         bytes32 _currentBatchCommitment
     ) external view returns (uint256) {
         return
-            _getBatchProofPublicInputZKsyncOS(
-                _prevBatchStateCommitment,
-                _currentBatchStateCommitment,
-                _currentBatchCommitment
-            );
+            _getBatchProofPublicInput(_prevBatchStateCommitment, _currentBatchStateCommitment, _currentBatchCommitment);
     }
 }
 
 /// @notice Pins the ZKsync OS batch proof public input encoding to golden vectors shared with the
 /// ZKsync OS implementation (`public_input.rs` / `chain_config.rs` in the zksync-os repository):
 /// changing the encoding on either side must update both.
-/// @dev `_getBatchProofPublicInputZKsyncOS` returns the hash UNTRUNCATED; `PUBLIC_INPUT_SHIFT` is
+/// @dev `_getBatchProofPublicInput` returns the hash UNTRUNCATED; `PUBLIC_INPUT_SHIFT` is
 /// applied once by `computeZKsyncOSHash` after the multi-batch fold.
 /// @dev The public input is `keccak256(state_before, state_after, chain_config_hash, batch_output)`,
 /// where `chain_config_hash = keccak256(chain_id, fri_proof_verification_enabled, max_tx_gas_limit,
@@ -63,11 +59,7 @@ contract ZKsyncOSPublicInputTest is Test {
     }
 
     function test_publicInput_matchesZKsyncOSGoldenVector() public view {
-        uint256 publicInput = executor.getBatchProofPublicInputZKsyncOS(
-            bytes32(0),
-            bytes32(0),
-            BATCH_OUTPUT_HASH_GOLDEN
-        );
+        uint256 publicInput = executor.getBatchProofPublicInput(bytes32(0), bytes32(0), BATCH_OUTPUT_HASH_GOLDEN);
 
         assertEq(publicInput, uint256(PUBLIC_INPUT_HASH_GOLDEN));
     }
@@ -76,31 +68,19 @@ contract ZKsyncOSPublicInputTest is Test {
         // `0` in storage (chains deployed before the field existed) must hash like the default.
         executor.util_setZKsyncOSChainConfig(GOLDEN_CHAIN_ID, 0);
 
-        uint256 publicInput = executor.getBatchProofPublicInputZKsyncOS(
-            bytes32(0),
-            bytes32(0),
-            BATCH_OUTPUT_HASH_GOLDEN
-        );
+        uint256 publicInput = executor.getBatchProofPublicInput(bytes32(0), bytes32(0), BATCH_OUTPUT_HASH_GOLDEN);
 
         assertEq(publicInput, uint256(PUBLIC_INPUT_HASH_GOLDEN));
     }
 
     function test_publicInput_commitsToChainConfig() public {
-        uint256 base = executor.getBatchProofPublicInputZKsyncOS(bytes32(0), bytes32(0), BATCH_OUTPUT_HASH_GOLDEN);
+        uint256 base = executor.getBatchProofPublicInput(bytes32(0), bytes32(0), BATCH_OUTPUT_HASH_GOLDEN);
 
         executor.util_setZKsyncOSChainConfig(GOLDEN_CHAIN_ID, ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT + 1);
-        uint256 raisedGasLimit = executor.getBatchProofPublicInputZKsyncOS(
-            bytes32(0),
-            bytes32(0),
-            BATCH_OUTPUT_HASH_GOLDEN
-        );
+        uint256 raisedGasLimit = executor.getBatchProofPublicInput(bytes32(0), bytes32(0), BATCH_OUTPUT_HASH_GOLDEN);
 
         executor.util_setZKsyncOSChainConfig(GOLDEN_CHAIN_ID + 1, ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT);
-        uint256 differentChainId = executor.getBatchProofPublicInputZKsyncOS(
-            bytes32(0),
-            bytes32(0),
-            BATCH_OUTPUT_HASH_GOLDEN
-        );
+        uint256 differentChainId = executor.getBatchProofPublicInput(bytes32(0), bytes32(0), BATCH_OUTPUT_HASH_GOLDEN);
 
         assertNotEq(base, raisedGasLimit);
         assertNotEq(base, differentChainId);
@@ -110,13 +90,9 @@ contract ZKsyncOSPublicInputTest is Test {
     /// fold coincides for N <= 2, so N == 3 is the smallest case that pins the rule.
     function test_publicInput_multiBatchFoldHashesConcatenationOnce() public view {
         uint256[] memory inputs = new uint256[](3);
-        inputs[0] = executor.getBatchProofPublicInputZKsyncOS(bytes32(0), bytes32(0), BATCH_OUTPUT_HASH_GOLDEN);
-        inputs[1] = executor.getBatchProofPublicInputZKsyncOS(
-            bytes32(0),
-            bytes32(uint256(1)),
-            BATCH_OUTPUT_HASH_GOLDEN
-        );
-        inputs[2] = executor.getBatchProofPublicInputZKsyncOS(
+        inputs[0] = executor.getBatchProofPublicInput(bytes32(0), bytes32(0), BATCH_OUTPUT_HASH_GOLDEN);
+        inputs[1] = executor.getBatchProofPublicInput(bytes32(0), bytes32(uint256(1)), BATCH_OUTPUT_HASH_GOLDEN);
+        inputs[2] = executor.getBatchProofPublicInput(
             bytes32(uint256(1)),
             bytes32(uint256(2)),
             BATCH_OUTPUT_HASH_GOLDEN
@@ -134,7 +110,7 @@ contract ZKsyncOSPublicInputTest is Test {
     /// @notice A single-batch range is the bare hash, with no keccak over it.
     function test_publicInput_singleBatchIsNotHashed() public view {
         uint256[] memory inputs = new uint256[](1);
-        inputs[0] = executor.getBatchProofPublicInputZKsyncOS(bytes32(0), bytes32(0), BATCH_OUTPUT_HASH_GOLDEN);
+        inputs[0] = executor.getBatchProofPublicInput(bytes32(0), bytes32(0), BATCH_OUTPUT_HASH_GOLDEN);
 
         assertEq(verifier.computeZKsyncOSHash(0, inputs), inputs[0] >> PUBLIC_INPUT_SHIFT);
     }

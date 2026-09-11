@@ -8,19 +8,16 @@ import {ZKsyncOSTestnetVerifier} from "../../verifiers/ZKsyncOSTestnetVerifier.s
 
 import {IVerifier} from "../../chain-interfaces/IVerifier.sol";
 
-import {WrongCTMDeployerVariant} from "../../../common/L1ContractErrors.sol";
-
 import {Verifiers} from "contracts/common/StateTransitionTypes.sol";
 import {GatewayVerifiersDeployerConfig} from "./GatewayCTMDeployer.sol";
 
-/// @title GatewayCTMDeployerVerifiersZKsyncOS
+/// @title GatewayCTMDeployerVerifiers
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Gateway CTM ZKsyncOS Verifiers deployer: deploys ZKsyncOS verifier contracts.
 /// @dev Deploys ZKsyncOSVerifierPlonk and the ZKsync OS main/testnet verifier.
-/// For Era verifiers, use GatewayCTMDeployerVerifiers instead.
 /// This contract is expected to be deployed via the built-in L2 `Create2Factory`.
-contract GatewayCTMDeployerVerifiersZKsyncOS {
+contract GatewayCTMDeployerVerifiers {
     Verifiers internal deployedResult;
 
     /// @notice Returns the deployed contracts from this deployer.
@@ -30,9 +27,6 @@ contract GatewayCTMDeployerVerifiersZKsyncOS {
     }
 
     constructor(GatewayVerifiersDeployerConfig memory _config) {
-        if (!_config.isZKsyncOS) {
-            revert WrongCTMDeployerVariant();
-        }
         bytes32 salt = _config.salt;
 
         Verifiers memory result;

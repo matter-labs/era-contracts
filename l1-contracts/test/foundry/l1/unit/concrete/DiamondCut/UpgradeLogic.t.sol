@@ -35,12 +35,11 @@ contract UpgradeLogicTest is DiamondCutTest {
     bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(1, (makeAddr("baseToken")));
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](11);
+        bytes4[] memory selectors = new bytes4[](10);
         uint256 i = 0;
         selectors[i++] = adminFacet.setPendingAdmin.selector;
         selectors[i++] = adminFacet.acceptAdmin.selector;
         selectors[i++] = adminFacet.setValidator.selector;
-        selectors[i++] = adminFacet.setPorterAvailability.selector;
         selectors[i++] = adminFacet.setPriorityTxMaxGasLimit.selector;
         selectors[i++] = adminFacet.changeFeeParams.selector;
         selectors[i++] = adminFacet.setTokenMultiplier.selector;
@@ -58,7 +57,7 @@ contract UpgradeLogicTest is DiamondCutTest {
         DummyBridgehub dummyBridgehub = new DummyBridgehub();
 
         diamondCutTestContract = new DiamondCutTestContract();
-        diamondInit = new DiamondInit(true);
+        diamondInit = new DiamondInit();
         adminFacet = new AdminFacet(block.chainid, RollupDAManager(address(0)));
         gettersFacet = new GettersFacet();
         permissionlessValidator = new PermissionlessValidator();

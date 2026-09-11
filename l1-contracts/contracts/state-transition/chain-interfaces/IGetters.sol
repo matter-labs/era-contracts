@@ -176,6 +176,6 @@ interface IGetters is IZKChainBase {
     /// @return The pubdata content (full pubdata vs logs-only).
     function getPubdataContent() external view returns (PubdataContent);
 
-    /// @return Whether the chain uses ZKsyncOS.
+    /// @return Whether the chain uses ZKsync OS.
     function getZKsyncOS() external view returns (bool);
 }

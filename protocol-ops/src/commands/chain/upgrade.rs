@@ -35,8 +35,7 @@ struct ChainUpgradeOutput {
 struct DaMove {
     /// `None` leaves the chain's DA validator pair as it is.
     pair: Option<DaPair>,
-    /// `None` leaves the chain's pubdata content as the upgrade leaves it. Always `None` on Era,
-    /// which has no such axis.
+    /// `None` leaves the chain's pubdata content as the upgrade leaves it.
     pubdata_content: Option<PubdataContent>,
 }
 
@@ -83,7 +82,7 @@ pub struct ChainUpgradeArgs {
     pub access_control_restriction: Address,
 
     /// What kind of chain this should be after the upgrade, as far as its pubdata is concerned.
-    /// The delivery scheme and the pubdata content default from it and the chain's VM, and either
+    /// The delivery scheme and the pubdata content default from it, and either
     /// can be named explicitly with the two flags below. Requires `--l1-da-validator`.
     ///
     /// For chains that settle on a gateway use `chain gateway migrate-to`: the schemes differ.
@@ -265,7 +264,7 @@ async fn run_one(
 
 /// Work out what the upgrade should do to the chain's DA setup.
 ///
-/// `--da-mode` names the target and everything else follows from it and the chain's VM, so the
+/// `--da-mode` names the target and everything else follows from it, so the
 /// pair and the content cannot end up disagreeing. Without it the upgrade leaves the DA setup
 /// alone — except for a validium-priced chain crossing into a version that requires it to publish,
 /// which is refused rather than upgraded into a state where its batches stop proving.
@@ -279,10 +278,7 @@ async fn resolve_da_move(
     let ctm = crate::common::l1_contracts::resolve_ctm_proxy(l1_rpc_url, bridgehub, chain_id)
         .await
         .context("resolving CTM from L1")?;
-    anyhow::ensure!(
-        crate::common::l1_contracts::resolve_is_zksync_os(l1_rpc_url, ctm).await?,
-        "Only ZKsync OS chains are supported"
-    );
+    crate::common::l1_contracts::ensure_supported_os_ctm(l1_rpc_url, ctm).await?;
 
     let pair = match args.da_mode {
         Some(da_mode) => Some(DaPair {

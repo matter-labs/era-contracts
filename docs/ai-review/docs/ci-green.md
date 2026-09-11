@@ -44,6 +44,8 @@ When the PR is done: dispatch **Update All Generated Artifacts** with the PR num
 commits hashes + selectors + zkstack-out, then the chain states), then mark the PR ready for review
 and merge once `pre-merge-verified` is green.
 
+Coverage compares combined Foundry and Anvil line coverage against the exact base commit. CI reuses a valid base report or generates it alongside the PR. Changes to helpers, comments, remappings, or coverage tooling do not block that comparison by themselves. Each revision uses its own test and coverage code, so review changes to measurement logic alongside the reported delta. Missing or invalid reports and coverage decreases still fail.
+
 ## TL;DR — the order to fix things
 
 CI checks form a dependency chain. Fix in this order:
@@ -66,22 +68,14 @@ Doing steps 3-5 before step 1 is the most common time-sink.
 
 This is where the bulk of regressions surface — get this green first. Three test suites in CI: **foundry** (per-project), **anvil-interop** (full L1↔L2 flow), and **v31 → v33 upgrade** (real-state replay).
 
-### Install foundry-zksync (the version CI uses)
+### Install the pinned Foundry release
 
-CI installs `foundry-zksync` via `./.github/actions/install-zksync-foundry`. To match locally:
+CI uses upstream Foundry from `.github/foundry-versions.env`. To match locally:
 
 ```bash
-mkdir ./foundry-zksync
-curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/foundry-zksync-v0.1.5/foundry_zksync_v0.1.5_linux_amd64.tar.gz
-tar zxf foundry_zksync_v0.1.5_linux_amd64.tar.gz -C ./foundry-zksync
-chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
-rm foundry_zksync_v0.1.5_linux_amd64.tar.gz
-export PATH="$PWD/foundry-zksync:$PATH"
+. .github/foundry-versions.env
+foundryup --install "$FOUNDRY_VERSION"
 ```
-
-(macOS: swap in the darwin tarball; check the install-zksync-foundry action for the exact pinned version.)
-
-Anvil-interop tests _also_ need vanilla `foundry-toolchain` (matching `foundry-rs/foundry-toolchain@v1` `version: v1.5.1`) because they run anvil directly. If both are on `PATH`, foundry-zksync's `forge`/`cast` win, which is what CI does for the upgrade tests.
 
 ### Build artifacts (in this order)
 
@@ -89,26 +83,20 @@ From the repo root:
 
 ```bash
 yarn da build:foundry   # da-contracts → da-contracts/out
-yarn l1 build:foundry   # l1-contracts → l1-contracts/out, zkout, zkstack-out
-yarn sc build:foundry   # system-contracts → system-contracts/zkout
-yarn l2 build:foundry   # l2-contracts → l2-contracts/zkout
+yarn l1 build:foundry   # l1-contracts → l1-contracts/out, zkstack-out
 ```
 
-Order matters: l1 needs da artifacts, anvil-interop needs all four, and `l1 build:foundry` regenerates `zkstack-out` (see step 4). If `yarn l1 build:foundry` fails, **stop and fix the Solidity** — every later step will fail too.
+Order matters: l1 needs da artifacts, anvil-interop needs both, and `l1 build:foundry` regenerates `zkstack-out` (see step 4). If `yarn l1 build:foundry` fails, **stop and fix the Solidity** — every later step will fail too.
 
 ### 1a. Foundry tests
 
 ```bash
 cd l1-contracts
 yarn test:foundry      # forge test --threads 1 --ffi --match-path 'test/foundry/{l1,zksync-os}/*'
-
-cd ../system-contracts
-yarn test:foundry
 ```
 
 Common foundry test failures and their root causes:
 
-- **"zkout/BeaconProxy.sol/BeaconProxy.json not found"** — you skipped `yarn l2 build:foundry` (or `sc`).
 - **"Can't acquire config lock"** — transient; rerun.
 - **`L2-context vs L1-context` assertion mismatches** — tests in `l2-tests-in-l1-context` run L2 logic in an L1 environment; some L2 system features don't behave identically. Fix the assertion or move the test, don't paper over it.
 
@@ -116,7 +104,7 @@ Common foundry test failures and their root causes:
 
 These run the full L1↔L2 interop flow against real anvil instances on ports 9545/4050-4053. They need:
 
-- All four foundry builds done above.
+- Both foundry builds done above.
 - Pre-generated chain states under `l1-contracts/test/anvil-interop/chain-states/` (committed; only regenerate when mock system contracts change — see "Regenerating chain states" below).
 
 ```bash
@@ -149,17 +137,17 @@ Commit the regenerated `chain-states/` files alongside the contract change. CI n
 
 ### 1c. Upgrade tests (v31→v33)
 
-This exercises the full upgrade flow against the captured v31 chain states. It uses protocol-ops's split flow: `ecosystem upgrade-prepare-all` to deploy core + per-CTM contracts and emit merged governance calls, `ecosystem upgrade-governance` to replay stages 0/1/2, `ecosystem stage3` to register bridged tokens and populate `bridgedOut`, then `chain upgrade` per chain. In production a chain's priority-op lower bound must also be recorded (`RecordPriorityOpLowerBound.s.sol`) well before its `chain upgrade`; the test harness models the draft-v31 backfill prerequisite instead (see `harness-shims.ts`).
+This exercises the full upgrade flow against the captured v31 chain states. It uses protocol-ops's split flow: `ecosystem upgrade-prepare-all` to deploy core + per-CTM contracts and emit merged governance calls, `ecosystem upgrade-governance` to replay stages 0/1/2, `ecosystem stage3` to populate `bridgedOut`, then `chain upgrade` per chain. In production a chain's priority-op lower bound must also be recorded (`RecordPriorityOpLowerBound.s.sol`) well before its `chain upgrade`; the test harness models the draft-v31 backfill prerequisite instead (see `harness-shims.ts`).
 
 ```bash
 cd l1-contracts/test/anvil-interop
 npx ts-node run-upgrade-test.ts
 ```
 
-Prerequisites: same as anvil-interop tests (all foundry builds done). Plus:
+Prerequisites: same as anvil-interop tests (both foundry builds done). Plus:
 
 - `protocol-ops` must build (`cd protocol-ops && cargo build`). The test runner shells out to it.
-- foundry-zksync on `PATH` (the test runner shells out to `forge --zksync` for L2 deploys).
+- The pinned upstream Foundry on `PATH`.
 
 Common failures:
 
@@ -196,20 +184,18 @@ done
 
 CI also runs `codespell` and `crate-ci/typos` as separate jobs (see `.github/workflows/lint.yaml`). They are easy to forget locally because neither is wired into `yarn lint:check`. Both must pass independently.
 
-**Important: filter out submodule paths locally.** CI's `actions/checkout@v6` runs without `submodules: true`, so it never sees the contents of `lib/`, `l1-contracts/lib/`, `system-contracts/lib/`, etc. Locally those directories are populated and produce hundreds of false-positive errors that CI doesn't see. Use `typos`'s native `--exclude` (do **not** pipe `git ls-files | xargs typos` — file paths with spaces in submodule audits will silently break the pipeline before scanning starts):
+**Important: filter out submodule paths locally.** CI's `actions/checkout@v6` runs without `submodules: true`, so it never sees the contents of `lib/`, `l1-contracts/lib/`, `da-contracts/lib/`, etc. Locally those directories are populated and produce hundreds of false-positive errors that CI doesn't see. Use `typos`'s native `--exclude` (do **not** pipe `git ls-files | xargs typos` — file paths with spaces in submodule audits will silently break the pipeline before scanning starts):
 
 ```bash
 # typos — exclude submodule paths to match CI's view
 typos . \
   --exclude 'lib/**' \
   --exclude 'l1-contracts/lib/**' \
-  --exclude 'system-contracts/lib/**' \
-  --exclude 'l2-contracts/lib/**' \
   --exclude 'da-contracts/lib/**'
 
 # codespell — `skip` already supports comma-separated paths
 codespell . \
-  --skip='_typos.toml,*.json,*.lock,*.html,*.map,target,node_modules,venv,dist,report,yarn-error.log,lib,l1-contracts/lib,system-contracts/lib,l2-contracts/lib,da-contracts/lib'
+  --skip='_typos.toml,*.json,*.lock,*.html,*.map,target,node_modules,venv,dist,report,yarn-error.log,lib,l1-contracts/lib,da-contracts/lib'
 
 # Quick "did *I* introduce a typo" check: only run on what your branch changed
 git diff --name-only -z main -- ':!lib' ':!*/lib/*' | xargs -0 typos
@@ -275,7 +261,7 @@ If you forget `yarn prettier:fix`, `check-zkstack-out` will still fail because t
 
 Bytecode hashes for genesis system contracts and force-deployed contracts are committed in `AllContractsHashes.json`. CI regenerates and diffs. **Don't fix until everything else above is green** — every contract change invalidates these, so doing it last avoids redoing work.
 
-> ⚠️ `recompute_hashes.sh` is **strictly version-pinned** to a specific foundry-zksync version (currently `v0.1.5`, commit `807f47ace`). The script refuses to run on any other version. If your local foundry is newer (e.g. `v0.1.9`), you cannot regenerate hashes locally without first downgrading via `foundryup-zksync -i 0.1.5`. For most contributors the easier path is to push your branch and run `update-hashes-on-demand.yaml` (see "When CI is failing on a PR you didn't push" below).
+> ⚠️ `recompute_hashes.sh` requires the upstream Foundry release pinned in `.github/foundry-versions.env`. Install that release before regenerating hashes locally.
 
 ```bash
 # Preferred: rebuild artifacts + recompute hashes in one shot (requires the pinned forge version).
@@ -292,7 +278,7 @@ Verify your local result matches CI's expectation:
 yarn calculate-hashes:check
 ```
 
-If `calculate-hashes:check` reports a long list of mismatches across libraries you didn't touch (e.g. `Address`, `EfficientCall`, `SafeERC20`), that's a sign the committed hashes are already stale on the branch — independent of your changes. Confirm by running `git stash && yarn calculate-hashes:check && git stash pop`. If the mismatches reproduce on stashed `HEAD`, regenerating is a separate maintenance task; don't try to fold it into your PR.
+If `calculate-hashes:check` reports a long list of mismatches across libraries you didn't touch (e.g. `Address`, `SafeERC20`), that's a sign the committed hashes are already stale on the branch — independent of your changes. Confirm by running `git stash && yarn calculate-hashes:check && git stash pop`. If the mismatches reproduce on stashed `HEAD`, regenerating is a separate maintenance task; don't try to fold it into your PR.
 
 ## Practical pre-push checklist
 
@@ -302,12 +288,9 @@ Before pushing, run from repo root:
 # 1. Build everything (catches Solidity break first)
 yarn da build:foundry
 yarn l1 build:foundry
-yarn sc build:foundry
-yarn l2 build:foundry
 
 # 2. Tests
 cd l1-contracts && yarn test:foundry && cd ..
-cd system-contracts && yarn test:foundry && cd ..
 # (Only if you touched contracts that affect interop or upgrades)
 cd l1-contracts && yarn test:hardhat:interop && cd ..
 
@@ -346,4 +329,3 @@ git status
 - **Don't add `try-catch` / `staticcall` to make a script "robust"** to a missing precondition. The CI failure points at a real ordering / initialization bug; fix the precondition.
 - **Don't `anvil_setStorageAt`** to skip a flow that's reverting. The reverting flow is the bug.
 - **Don't `--no-verify`, `--no-gpg-sign`, `--force-push`, or `--amend` published commits.** All of these turn a CI failure into something worse later. Add a new commit.
-- **Don't run a full `cargo update` in `system-contracts/bootloader/test_infra/`.** Use the selective update recipe in `AGENTS.md` — full updates pull in `crc-fast` / `zerocopy` versions that need post-1.89 nightly intrinsics and break the toolchain.

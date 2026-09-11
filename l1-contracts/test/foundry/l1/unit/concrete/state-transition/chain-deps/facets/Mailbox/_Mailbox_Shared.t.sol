@@ -119,7 +119,7 @@ contract MailboxTest is UtilsCallMockerTest {
             abi.encode(false)
         );
         mockChainTypeManagerVerifier(testnetVerifier);
-        proxy = Utils.makeZKsyncOSDiamondProxy(facetCuts, bridgehub);
+        proxy = Utils.makeDiamondProxy(facetCuts, bridgehub);
         utilsFacet = UtilsFacet(proxy);
         utilsFacet.util_setBridgehub(bridgehub);
     }

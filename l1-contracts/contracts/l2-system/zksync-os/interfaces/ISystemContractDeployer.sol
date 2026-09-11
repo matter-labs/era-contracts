@@ -2,13 +2,10 @@
 
 pragma solidity 0.8.28;
 
-/// @notice Interface for contract deployer system hook on ZKsyncOS.
-/// @dev Note, that the actual implementation of this interface is implemented in Rust
-/// as a system hook.
-interface IZKOSContractDeployer {
-    /// @notice Sets the bytecode details for a contract on ZKsyncOS.
-    /// @dev This function is used to set the bytecode details for a contract on ZKsyncOS,
-    /// it is an alternative to the `forceDeployOnAddresses` function from Era.
+/// @notice Interface for setting contract bytecode through the system-contract deployer.
+/// @dev The underlying system hook is implemented in Rust.
+interface ISystemContractDeployer {
+    /// @notice Sets the bytecode details for a contract.
     /// @param _addr The address of the contract.
     /// @param _bytecodeHash The ZKsyncOS internal bytecode hash.
     /// @param _bytecodeLength The bytecode length, used for both bytecode_length and observable_bytecode_length.

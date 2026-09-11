@@ -215,8 +215,7 @@ abstract contract NativeTokenVaultBase is
     /// @notice Mints/releases a bridged-in asset to the receiver and decreases the chain balance.
     /// @dev Unifies the native and bridged-token paths. A bridged token is minted (and deployed on first
     /// bridging if needed); a native token's escrowed funds are released via `_withdrawFunds`.
-    /// @dev `_isBridgedToken` is derived from `originChainId` rather than passed in, to keep the stack small
-    /// enough for the zksolc compiler (which is stricter than solc about stack depth).
+    /// @dev `_isBridgedToken` is derived from `originChainId` rather than passed in.
     function _bridgeMintToken(
         uint256 _chainId,
         bytes32 _assetId,
@@ -357,7 +356,7 @@ abstract contract NativeTokenVaultBase is
     /// @dev Unifies the native and bridged-token paths; they only differ in the WETH guard (native only),
     /// the metadata flag, and how the origin token is resolved.
     /// @dev `_isBridgedToken` is derived from `originChainId` rather than passed in, and the ERC20 metadata is
-    /// inlined, to keep the stack small enough for the zksolc compiler (stricter than solc about stack depth).
+    /// inlined to keep the stack shallow.
     function _bridgeBurnToken(
         uint256 _chainId,
         bytes32 _assetId,
@@ -617,8 +616,7 @@ abstract contract NativeTokenVaultBase is
     }
 
     /// @notice Deploys the beacon proxy for the bridged token.
-    /// @dev This function uses raw call to ContractDeployer to make sure that exactly `l2TokenProxyBytecodeHash` is used
-    /// for the code of the proxy.
+    /// @dev Implementations choose the chain-appropriate deterministic deployment mechanism.
     /// @param _salt The salt used for beacon proxy deployment of the bridged token (we pass the native token address).
     /// @return proxy The beacon proxy, i.e. bridged token.
     function _deployBeaconProxy(

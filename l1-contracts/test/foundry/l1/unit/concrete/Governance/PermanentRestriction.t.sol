@@ -20,7 +20,8 @@ import {
     RemovingPermanentRestriction,
     TooHighDeploymentNonce,
     UnallowedImplementation,
-    ZeroAddress
+    ZeroAddress,
+    ZeroDeploymentNonce
 } from "contracts/common/L1ContractErrors.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
@@ -31,6 +32,7 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
+import {L2AdminFactory} from "contracts/governance/L2AdminFactory.sol";
 
 import {ChainTypeManagerTest} from "test/foundry/l1/unit/concrete/state-transition/ChainTypeManager/_ChainTypeManager_Shared.t.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -364,16 +366,39 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
     }
 
     function test_validateMigrationToL2() public {
-        address expectedAddress = L2ContractHelper.computeCreateAddress(L2_FACTORY_ADDR, uint256(0));
+        address expectedAddress = L2ContractHelper.computeCreateAddress(L2_FACTORY_ADDR, uint256(1));
 
         vm.expectEmit(true, false, false, true);
         emit IPermanentRestriction.AllowL2Admin(expectedAddress);
-        permRestriction.allowL2Admin(uint256(0));
+        permRestriction.allowL2Admin(uint256(1));
 
         Call memory call = _encodeMigraationCall(true, true, true, true, true, expectedAddress);
 
         // Should not fail
         permRestriction.validateCall(call, owner);
+    }
+
+    function test_allowL2Admin_WhitelistsActualFactoryDeployment() public {
+        L2AdminFactory factory = new L2AdminFactory(new address[](0));
+        (TestPermanentRestriction factoryRestriction, ) = _deployPermRestriction(bridgehub, address(factory), owner);
+
+        uint256 deploymentNonce = vm.getNonce(address(factory));
+        assertEq(deploymentNonce, 1, "new contract must start with EVM account nonce 1");
+
+        address expectedAdmin = L2ContractHelper.computeCreateAddress(address(factory), deploymentNonce);
+        vm.expectEmit(true, false, false, true, address(factoryRestriction));
+        emit IPermanentRestriction.AllowL2Admin(expectedAdmin);
+        factoryRestriction.allowL2Admin(deploymentNonce);
+
+        vm.expectEmit(true, false, false, true, address(factory));
+        emit L2AdminFactory.AdminDeployed(expectedAdmin);
+        address deployedAdmin = factory.deployAdmin(new address[](0));
+
+        assertEq(deployedAdmin, expectedAdmin, "allowL2Admin must use the factory's EVM CREATE address");
+        assertTrue(factoryRestriction.allowedL2Admins(deployedAdmin), "deployed admin not whitelisted");
+
+        Call memory call = _encodeMigraationCall(true, true, true, true, true, deployedAdmin);
+        factoryRestriction.validateCall(call, owner);
     }
 
     function createNewChainBridgehub() internal {
@@ -463,15 +488,21 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         permRestriction.allowL2Admin(tooHighNonce);
     }
 
+    function test_allowL2Admin_ZeroDeploymentNonce() public {
+        // A contract account never deploys at nonce 0 (EIP-161), so the derived address is unreachable.
+        vm.expectRevert(ZeroDeploymentNonce.selector);
+        permRestriction.allowL2Admin(0);
+    }
+
     function test_allowL2Admin_AlreadyWhitelisted() public {
         // First, whitelist an admin
-        permRestriction.allowL2Admin(0);
+        permRestriction.allowL2Admin(1);
 
-        address expectedAddress = L2ContractHelper.computeCreateAddress(L2_FACTORY_ADDR, 0);
+        address expectedAddress = L2ContractHelper.computeCreateAddress(L2_FACTORY_ADDR, 1);
 
         // Try to whitelist the same admin again
         vm.expectRevert(abi.encodeWithSelector(AlreadyWhitelisted.selector, expectedAddress));
-        permRestriction.allowL2Admin(0);
+        permRestriction.allowL2Admin(1);
     }
 
     function test_validateRemoveRestriction_ShortData() public {

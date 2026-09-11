@@ -529,7 +529,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
             l1AssetRouter: coreAddresses.bridges.proxies.l1AssetRouter,
-            l2TokenProxyBytecodeHash: CoreOnGatewayHelper.getDeployedBytecodeHash(CoreContract.BeaconProxy),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(_governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
             bridgehubBytecodeInfo: _getBytecodeInfo(CoreContract.L2Bridgehub),

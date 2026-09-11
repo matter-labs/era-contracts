@@ -1,9 +1,9 @@
-//! Ecosystem-level v31 upgrade flow.
+//! Ecosystem-level upgrade flow.
 //!
 //! Two top-level commands:
 //!
 //!   `upgrade-prepare-all` deploys new ecosystem contracts (deployer EOA signs)
-//!                         by running `CoreUpgrade_v31` once + `CTMUpgrade_v31`
+//!                         by running `CoreUpgrade_v33` once + `CTMUpgrade_v33`
 //!                         once per `--ctm-proxy` on a single anvil fork, then
 //!                         executes operational CTM-admin calls such as
 //!                         ServerNotifier ProxyAdmin upgrades. Emits per-script
@@ -340,10 +340,9 @@ pub struct UpgradePrepareAllArgs {
     #[clap(long)]
     pub deployer_address: Option<Address>,
 
-    /// Target CTMs to upgrade. Pass once per CTM. Only ZKsyncOS CTMs can be
-    /// targeted on this release — the upgrade scripts reject EraVM CTMs. Each
-    /// must already have at least one registered chain so rollup-DA-manager
-    /// auto-resolution works.
+    /// Target CTMs to upgrade. Pass once per CTM. Only ZKsync OS CTMs can be
+    /// targeted on this release. Each must already have at least one registered
+    /// chain so rollup-DA-manager auto-resolution works.
     #[clap(long = "ctm-proxy", num_args = 1..)]
     pub ctm_proxies: Vec<Address>,
 
@@ -369,43 +368,32 @@ pub struct UpgradePrepareAllArgs {
     pub ctm_script_path: String,
 
     /// Path to a TOML file describing per-CTM inputs (proxy + optional
-    /// overrides). Mutually exclusive with the legacy single-CTM flags
-    /// (`--ctm-proxy`, `--is-zk-sync-os`, `--bytecodes-supplier-address`,
-    /// `--rollup-da-manager-address`); use this when upgrading more than one
-    /// ZKsyncOS CTM in a single fork or when the per-CTM overrides differ.
-    /// EraVM CTMs are rejected by the upgrade scripts.
+    /// overrides). Mutually exclusive with the direct CTM flags
+    /// (`--ctm-proxy`, `--bytecodes-supplier-address`,
+    /// `--rollup-da-manager-address`). Anything that is not a ZKsync OS CTM
+    /// fails the prepare.
     ///
     /// Schema:
     /// ```toml
     /// [[ctm]]
     /// proxy = "0x..."
-    /// is_zk_sync_os = true                   # optional
     /// bytecodes_supplier = "0x..."           # optional
     /// rollup_da_manager  = "0x..."           # optional
     /// ```
     #[clap(long, conflicts_with_all = [
         "ctm_proxies",
-        "is_zk_sync_os",
         "bytecodes_supplier_address",
         "rollup_da_manager_address",
     ])]
     pub ctm_config: Option<PathBuf>,
 
-    /// Override `isZKsyncOS`. Auto-resolved via `ctm.isZKsyncOS()` on v31+;
-    /// pre-v31 ecosystems (where the getter doesn't exist yet) must pass
-    /// this flag explicitly. Single-CTM legacy mode only — for multi-CTM,
-    /// use `--ctm-config`.
-    #[clap(long)]
-    pub is_zk_sync_os: Option<bool>,
-
-    /// Override the bytecodes supplier address. Auto-resolved from CTM on
-    /// v31+ ecosystems; pre-v31 callers must pass it explicitly.
+    /// Override the bytecodes supplier address. Auto-resolved from the CTM's
+    /// `L1_BYTECODES_SUPPLIER()` getter when omitted.
     #[clap(long)]
     pub bytecodes_supplier_address: Option<Address>,
 
     /// Override the rollup DA manager address. Auto-resolved from a
-    /// representative ZK chain on v31+ ecosystems; pre-v31 callers must
-    /// pass it explicitly.
+    /// representative ZK chain on the CTM when omitted.
     #[clap(long)]
     pub rollup_da_manager_address: Option<Address>,
 }
@@ -419,8 +407,6 @@ struct CtmConfigFile {
 #[derive(Debug, Deserialize)]
 struct CtmConfigEntry {
     proxy: Address,
-    #[serde(default)]
-    is_zk_sync_os: Option<bool>,
     #[serde(default)]
     bytecodes_supplier: Option<Address>,
     #[serde(default)]
@@ -490,9 +476,8 @@ pub async fn run_list_ctms(args: ListCtmsArgs) -> anyhow::Result<()> {
     out.push_str(&format!("# L1 RPC:    {}\n", args.l1_rpc_url));
     out.push_str("#\n");
     out.push_str(
-        "# `is_zk_sync_os`, `bytecodes_supplier`, `rollup_da_manager` are commented out\n\
-         # so auto-resolution kicks in on v31+ ecosystems. Uncomment + fill them on pre-v31\n\
-         # ecosystems where the on-chain getters don't exist yet.\n",
+        "# `bytecodes_supplier` and `rollup_da_manager` are commented out so the\n\
+         # prepare flow auto-resolves them from the CTM's on-chain getters.\n",
     );
     for (proxy, witness_chain) in &ctms {
         out.push_str("\n[[ctm]]\n");
@@ -500,7 +485,6 @@ pub async fn run_list_ctms(args: ListCtmsArgs) -> anyhow::Result<()> {
             "# witness chain (any chain registered on this CTM): {witness_chain}\n"
         ));
         out.push_str(&format!("proxy = \"{proxy:#x}\"\n"));
-        out.push_str("# is_zk_sync_os      = false\n");
         out.push_str("# bytecodes_supplier = \"0x...\"\n");
         out.push_str("# rollup_da_manager  = \"0x...\"\n");
     }
@@ -614,15 +598,11 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     let ctms = if let Some(cfg_path) = &args.ctm_config {
         load_ctm_config(cfg_path)?
     } else if !args.ctm_proxies.is_empty() {
-        // Legacy single-CTM mode: the global `--is-zk-sync-os` /
-        // `--bytecodes-supplier-address` / `--rollup-da-manager-address`
-        // overrides apply to every entry in `--ctm-proxy`.
         let ctms = args
             .ctm_proxies
             .iter()
             .map(|proxy| CtmInputs {
                 proxy: *proxy,
-                is_zk_sync_os: args.is_zk_sync_os,
                 bytecodes_supplier: args.bytecodes_supplier_address,
                 rollup_da_manager: args.rollup_da_manager_address,
             })
@@ -651,7 +631,6 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
             .iter()
             .map(|e| CtmInputs {
                 proxy: e.proxy,
-                is_zk_sync_os: e.is_zk_sync_os,
                 bytecodes_supplier: e.bytecodes_supplier,
                 rollup_da_manager: e.rollup_da_manager,
             })
@@ -755,11 +734,9 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         .map(|c| c.governance_kind())
         .unwrap_or_default();
     let is_puh_governed = governance_kind == crate::common::env_config::GovernanceKind::Puh;
-    let zksync_os_ctm_proxy = prepared
-        .ctm_tomls
-        .iter()
-        .find(|e| e.is_zk_sync_os)
-        .map(|e| e.proxy);
+    // Every prepared CTM is ZKsync OS (prepare rejects anything else); the first
+    // one in input order is the representative passed to the PUH redeploy.
+    let zksync_os_ctm_proxy = prepared.ctm_tomls.first().map(|e| e.proxy);
     let puh_outcome = if is_puh_governed {
         let mut puh_inputs =
             crate::commands::ecosystem::zk_governance::ZkGovernanceInputs::from_env(
@@ -988,9 +965,9 @@ fn write_merged_ecosystem_toml(
     let mut stage2: Vec<String> = vec![core_gov.stage2_calls];
     let mut zksync_os_test_calls: Option<TestUpgradeCalls> = None;
 
-    // Every CTM that reaches the merge is ZKsyncOS: `V31UpgradeInner::prepare`
-    // skips Era CTMs and bails if none remain. The merge keys per-CTM sections
-    // by the fixed `zksync_os` label, so two CTMs in one upgrade collide here.
+    // `UpgradeInner::prepare` rejects any non-ZKsync-OS CTM, so every CTM that
+    // reaches the merge is ZKsync OS. The merge keys per-CTM sections by the fixed
+    // `zksync_os` label, so two CTMs in one upgrade collide here.
     for entry in ctm_entries {
         let (body, gov, test_calls) = load_and_split(&entry.toml)?;
         let label = "zksync_os";
@@ -1019,8 +996,8 @@ fn write_merged_ecosystem_toml(
     // `[new_gateway]` block so reviewers can still audit the deployed addresses.
     //
     // When `[new_gateway]` is configured, append each GW TOML's
-    // `governance_calls_to_execute` to stage 2. Multiple GW TOMLs arise when
-    // more than one CTM is deployed on the gateway (e.g. both Era + ZKsyncOS).
+    // `governance_calls_to_execute` to stage 2. The vector form is retained so
+    // preparation outputs can be composed uniformly.
     let new_gateway_body: Option<Table> = if !new_gateway_tomls.is_empty() {
         let mut first_body: Option<Table> = None;
         for path in new_gateway_tomls {
@@ -1189,10 +1166,8 @@ pub(super) fn read_pre_governance_accept_ownership_calls(
     })
 }
 
-/// Read the multi-CTM config TOML and return per-CTM inputs + the
-/// `core_is_zk_sync_os` value to pass to the Core script. If the TOML doesn't
-/// set `core_is_zk_sync_os`, derive it from the CTM entries. This release only
-/// upgrades ZKsyncOS CTMs (Era CTMs are skipped during prepare), so any pinned
+/// Read the multi-CTM config TOML and return per-CTM inputs. This release
+/// only upgrades ZKsyncOS CTMs; prepare fails on anything else.
 fn load_ctm_config(path: &Path) -> anyhow::Result<Vec<CtmInputs>> {
     let content = fs::read_to_string(path)
         .with_context(|| format!("Failed to read CTM config TOML: {}", path.display()))?;
@@ -1211,7 +1186,6 @@ fn load_ctm_config(path: &Path) -> anyhow::Result<Vec<CtmInputs>> {
         .into_iter()
         .map(|e| CtmInputs {
             proxy: e.proxy,
-            is_zk_sync_os: e.is_zk_sync_os,
             bytecodes_supplier: e.bytecodes_supplier,
             rollup_da_manager: e.rollup_da_manager,
         })

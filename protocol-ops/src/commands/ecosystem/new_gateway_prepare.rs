@@ -137,8 +137,7 @@ pub async fn prepare_new_gateway(
     // ── Snapshot + apply gov stages 0+1 on the prepare fork ────────────
     // GatewayVotePreparation has a hard
     //   `require(ctm.protocolVersion() == latestProtocolVersion)`
-    // in `setAddressesBasedOnBridgehub`, plus several v31+ getter reads
-    // (`isZKsyncOS()`, `protocolVersionVerifier()`, `newChainCreationParamsBlock()`).
+    // in `setAddressesBasedOnBridgehub`, plus its current CTM address discovery.
     // The source CTM is still on the pre-v31 impl on the fork at this point.
     //
     // To get the script past those checks WITHOUT polluting the deployer's
@@ -149,8 +148,8 @@ pub async fn prepare_new_gateway(
     //      TOMLs as raw `eth_sendTransaction` from the impersonated
     //      governance address. Direct RPC bypasses forge entirely so
     //      these txs don't land in any broadcast log.
-    //   3. Run GatewayVotePreparation — the source CTM is now v31 on the
-    //      fork, so the require + on-chain reads succeed. Its broadcast
+    //   3. Run GatewayVotePreparation — the source CTM is now at the target version on the
+    //      fork, so the version check + on-chain reads succeed. Its broadcast
     //      log captures the GW CTM deploys for the deployer bundle.
     //   4. Capture the GW deploy txs from forge's broadcast log so we can
     //      re-apply them after the revert.

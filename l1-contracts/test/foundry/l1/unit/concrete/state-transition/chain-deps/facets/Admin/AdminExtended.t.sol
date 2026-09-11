@@ -181,21 +181,6 @@ contract AdminExtendedTest is AdminTest {
         assertFalse(utilsFacet.util_getValidator(validator));
     }
 
-    function test_SetPorterAvailability() public {
-        vm.prank(address(dummyBridgehub));
-        utilsFacet.util_setChainTypeManager(address(this));
-
-        vm.prank(address(this));
-        adminFacet.setPorterAvailability(true);
-
-        assertTrue(utilsFacet.util_getZkPorterAvailability());
-
-        vm.prank(address(this));
-        adminFacet.setPorterAvailability(false);
-
-        assertFalse(utilsFacet.util_getZkPorterAvailability());
-    }
-
     function test_SetPubdataPricingMode() public {
         address admin = utilsFacet.util_getAdmin();
 

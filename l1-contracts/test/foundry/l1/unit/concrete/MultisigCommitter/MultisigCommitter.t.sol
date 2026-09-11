@@ -9,7 +9,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {MultisigCommitter} from "contracts/state-transition/validators/MultisigCommitter.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {CommitBatchInfo, ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+import {CommitBatchInfoZKsyncOS, ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 
@@ -225,15 +225,13 @@ contract MultisigCommitterTest is Test {
         );
 
         IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();
-        CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
+        CommitBatchInfoZKsyncOS memory batchToCommit = Utils.createCommitBatchInfoZKsyncOS();
 
-        CommitBatchInfo[] memory batchesToCommit = new CommitBatchInfo[](1);
+        CommitBatchInfoZKsyncOS[] memory batchesToCommit = new CommitBatchInfoZKsyncOS[](1);
         batchesToCommit[0] = batchToCommit;
 
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            storedBatch,
-            batchesToCommit
-        );
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(storedBatch, batchesToCommit);
         return (commitBatchFrom, commitBatchTo, commitData);
     }
 

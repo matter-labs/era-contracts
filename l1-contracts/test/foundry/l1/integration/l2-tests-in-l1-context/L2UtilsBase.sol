@@ -15,7 +15,6 @@ import {
     L2_ASSET_ROUTER_ADDR,
     L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
-    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_BRIDGEHUB_ADDR,
     L2_CHAIN_ASSET_HANDLER_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,
@@ -48,7 +47,6 @@ import {InteropCenter} from "../../../../../contracts/interop/InteropCenter.sol"
 import {L2InteropHandler} from "../../../../../contracts/interop/interop-handler/L2InteropHandler.sol";
 import {DummyL2L1Messenger} from "../../../../../contracts/dev-contracts/test/DummyL2L1Messenger.sol";
 
-import {DummyBaseTokenSystemContract} from "../../../../../contracts/dev-contracts/test/DummyBaseTokenSystemContract.sol";
 import {DummyL2BaseTokenHolder} from "../../../../../contracts/dev-contracts/test/DummyL2BaseTokenHolder.sol";
 import {DummyL2InteropAccount} from "../../../../../contracts/dev-contracts/test/DummyL2InteropAccount.sol";
 
@@ -149,9 +147,6 @@ library L2UtilsBase {
         }
 
         {
-            address l2DummyBaseTokenSystemContract = address(new DummyBaseTokenSystemContract());
-            vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, l2DummyBaseTokenSystemContract.code);
-
             // Deploy DummyL2BaseTokenHolder at the reserved address
             address l2DummyBaseTokenHolder = address(new DummyL2BaseTokenHolder());
             vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, l2DummyBaseTokenHolder.code);
@@ -193,7 +188,6 @@ library L2UtilsBase {
             L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).initL2(
                 _args.l1ChainId,
                 _args.aliasedOwner,
-                _args.l2TokenProxyBytecodeHash,
                 _args.l2TokenBeacon,
                 wethToken,
                 TokenBridgingData({
@@ -202,12 +196,6 @@ library L2UtilsBase {
                     originToken: ETH_TOKEN_ADDRESS
                 }),
                 TokenMetadata({name: "Ether", symbol: "ETH", decimals: 18})
-            );
-
-            vm.store(
-                L2_NATIVE_TOKEN_VAULT_ADDR,
-                bytes32(uint256(251)),
-                bytes32(uint256(_args.l2TokenProxyBytecodeHash))
             );
             L2NativeTokenVaultDev(L2_NATIVE_TOKEN_VAULT_ADDR).deployBridgedStandardERC20(_args.aliasedOwner);
 

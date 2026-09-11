@@ -22,7 +22,6 @@ interface IMailbox is IZKChainBase {
     function bridgehubRequestL2TransactionOnGateway(bytes32 _canonicalTxHash, uint64 _expirationTimestamp) external;
 
     /// @notice Request execution of service L2 transaction from L1.
-    /// @dev Used for chain configuration. Can be called only by DiamondProxy itself.
     /// @param _contractL2 The L2 receiver address.
     /// @param _l2Calldata The input of the L2 transaction.
     function requestL2ServiceTransaction(
@@ -62,8 +61,7 @@ interface IMailbox is IZKChainBase {
     /// @param txHash keccak256 hash of encoded transaction representation.
     /// @param expirationTimestamp Deprecated, always 0.
     /// @param transaction The whole transaction structure that is requested to be executed on L2.
-    /// @param factoryDeps An array of bytecodes that were shown in the L1 public data.
-    /// Will be marked as known bytecodes in L2.
+    /// @param factoryDeps Empty for priority transactions.
     event NewPriorityRequest(
         uint256 txId,
         bytes32 txHash,
