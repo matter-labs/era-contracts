@@ -1,11 +1,17 @@
-# Permanent values for the `v30-local-fixture` environment: the frozen v30.2
-# L1-settling-only local chain committed in zksync-os-integration-tests
-# (tests/local-chains/v30.2). Identical to `local.toml` except it has no
+# Permanent values for the `zksync-os-integration-test` environment: the frozen
+# L1-settling-only local chains committed in zksync-os-integration-tests under
+# `tests/local-chains/`. Identical to `local.toml` except it has no
 # `[legacy_gateway]` section — this fixture never had a gateway chain, so the
 # stage-2 decommission calls generated from that section would revert with
-# SettlementLayersMustSettleOnL1().
+# SettlementLayersMustSettleOnL1(), and `local.toml` names as that gateway a
+# chain id the fixture uses for a chain being upgraded.
 #
-# Paired by basename with `../v0.31.0-interopB/v30-local-fixture.toml`.
+# Only the absence of `[legacy_gateway]` and `era_chain_id` are read on this
+# path; the addresses below are informational, since the integration test passes
+# the bridgehub and CTM explicitly.
+#
+# Paired by basename with the upgrade input of whichever release the fixture is
+# taken to (currently `../v0.33.0-atomic-interop/zksync-os-integration-test.toml`).
 
 era_chain_id = 6565
 is_zk_sync_os = true
