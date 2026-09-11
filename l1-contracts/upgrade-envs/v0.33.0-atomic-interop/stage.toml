@@ -23,13 +23,15 @@
 # `diamond_init_*`, `v28_protocol_version`, the priority-tx gas knobs) are gone — v33 is
 # ZKsync OS-only and nothing on this path reads them. Chain-creation params come from
 # `configs/genesis/zksync-os/latest.json`.
+#
+# Also dropped (EVM-1689): `support_l2_legacy_shared_bridge_test`. Its only readers were the
+# from-scratch deploy scripts (`DeployL1CoreUtils` / `DeployCTMUtils`), which never see this file,
+# and #2400 removed them.
 
 era_chain_id = 270
 testnet_verifier = true
 governance_upgrade_timer_initial_delay = 1200
 owner_address = "0x8f08627524aeD610192132A425D6b9C32a1727EF"
-
-support_l2_legacy_shared_bridge_test = false
 
 # v31 -> v33.
 old_protocol_version = 0x1f00000000
