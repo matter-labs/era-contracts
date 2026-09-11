@@ -178,6 +178,27 @@ pub async fn ctm_init(
             })
             .with_wallet(owner)
             .with_timing_label("ctm.accept_admin"),
+        runner
+            .script_call(AdminFunctionsAbi::governanceAcceptOwnerCall {
+                _governor: deployed.governance_addr,
+                _target: deployed.validator_timelock_addr,
+            })
+            .with_wallet(owner)
+            .with_timing_label("ctm.accept_owner_validator_timelock"),
+        runner
+            .script_call(AdminFunctionsAbi::governanceAcceptOwnerCall {
+                _governor: deployed.governance_addr,
+                _target: deployed.l1_rollup_da_manager,
+            })
+            .with_wallet(owner)
+            .with_timing_label("ctm.accept_owner_rollup_da_manager"),
+        runner
+            .script_call(AdminFunctionsAbi::chainAdminAcceptOwnerCall {
+                _chainAdmin: deployed.chain_admin,
+                _target: deployed.server_notifier_proxy_addr,
+            })
+            .with_wallet(owner)
+            .with_timing_label("ctm.accept_owner_server_notifier"),
     ];
     runner.run_scripts(accept_scripts)?;
 

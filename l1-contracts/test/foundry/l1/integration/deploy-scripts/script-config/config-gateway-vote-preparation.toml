@@ -13,3 +13,4 @@ create2_factory_salt = "0x000000000000000000000000000000000000000000000000000000
 governance_min_delay = 0
 governance_security_council_address = "0x0000000000000000000000000000000000000000"
 validator_timelock_execution_delay = 0
+max_number_of_chains = 100
