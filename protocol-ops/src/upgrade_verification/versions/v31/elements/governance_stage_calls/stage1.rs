@@ -27,8 +27,9 @@ use crate::upgrade_verification::{
 };
 
 use super::super::{
+    super::expected_old_protocol_line_label,
     super::get_expected_new_protocol_version_for_ctm_flavor,
-    super::get_expected_old_protocol_version_for_ctm_flavor,
+    super::is_expected_old_protocol_version_for_ctm_flavor,
 };
 use super::super::{
     fixed_force_deployment::FixedForceDeploymentsData,
@@ -1170,21 +1171,24 @@ async fn verify_set_new_version_upgrade_payload(
     }
 
     let decoded_old_protocol_version = ProtocolVersion::from(artifact_old_protocol_version);
-    let expected_old_protocol_version: U256 =
-        get_expected_old_protocol_version_for_ctm_flavor(ctm.flavor).into();
-    if artifact_old_protocol_version != expected_old_protocol_version {
+    if !is_expected_old_protocol_version_for_ctm_flavor(
+        decoded_old_protocol_version,
+        verifiers.env,
+        ctm.flavor,
+    ) {
         result.report_error(&format!(
-            "{} CTM old protocol version must be {}, got {}",
+            "{} CTM old protocol version must be on {}, got {}",
             ctm.flavor.label(),
-            get_expected_old_protocol_version_for_ctm_flavor(ctm.flavor),
+            expected_old_protocol_line_label(verifiers.env, ctm.flavor),
             decoded_old_protocol_version
         ));
         errors += 1;
     } else {
         result.report_ok(&format!(
-            "{} CTM old protocol version is {}",
+            "{} CTM old protocol version is {} (on {})",
             ctm.flavor.label(),
-            get_expected_old_protocol_version_for_ctm_flavor(ctm.flavor)
+            decoded_old_protocol_version,
+            expected_old_protocol_line_label(verifiers.env, ctm.flavor)
         ));
     }
 
