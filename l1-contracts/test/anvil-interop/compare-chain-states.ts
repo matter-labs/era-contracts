@@ -108,7 +108,7 @@ const BLOCK_NUMBER_STORAGE_SLOTS = new Set([
   "0x22157c206018468b45ae7922bc7a0b0cb8feed201dac3c6fb5e7876aa94e11e9",
   "0xcae482817da5739a72d01cb9874e04d330e5e8dc74bc0bece220f5b3532c14b8",
   "0xe12917faa952038297cceeb966eb4f054126fd0f1307df22b19432454cb24b37",
-  // The CTM version-keyed block slots, on the L1 ChainTypeManager and the gateway's L2 one. This
+  // The CTM version-keyed block slots, on the L1 ChainTypeManager and chain 11's L2 one. This
   // check compares committed against freshly generated state for the SAME tree, so a difference here
   // can only be run-to-run drift; `newChainCreationParamsBlock` was observed as 44 -> 53 (L1) and
   // 197 -> 222 (L2 chain 11) under the v32 key, and 43 -> 46 / 192 -> 203 under the v33 one.

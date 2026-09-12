@@ -127,7 +127,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
     /// (held here as a bridged ERC20). Small because the harness mints 100000 units of that token.
     uint256 internal constant BRIDGED_VALUE_LEG_AMOUNT = 100;
     /// @dev Destination chain whose base token differs from this chain's. Chain ids 10 (L1), 270 (era),
-    /// 271 (default destination), 300 (mint) and 506 (gateway) are taken by the shared harness.
+    /// 271 (default destination), 300 (mint) and 506 (settlement layer) are taken by the shared harness.
     uint256 internal constant DIFFERENT_BASE_DEST_CHAIN_ID = 373;
     /// @dev The invalid remote leg's real begin-branch absence proof, built once by
     /// {_authorizeRefundForInvalidRemoteLeg} and reused by the idempotency tests so the remote source

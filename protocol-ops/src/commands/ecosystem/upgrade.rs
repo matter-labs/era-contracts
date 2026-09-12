@@ -527,10 +527,8 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         //
         // Fails closed on a missing file rather than keeping the CLI default. The default is the
         // *local* input, so a silent fallback would hand a real environment local's values for the
-        // keys the input does supply — `era_chain_id`, `pre_v32_introspection`,
-        // `governance_upgrade_timer_initial_delay`, and the gateway chain id that is baked into
-        // `L1MessageRoot` as `ERA_GATEWAY_CHAIN_ID`. Losing that last one would redeploy the message
-        // root with 0. Failing here also catches a mistyped `--env`.
+        // keys the input does supply — `era_chain_id`, `pre_v32_introspection` and
+        // `governance_upgrade_timer_initial_delay`. Failing here also catches a mistyped `--env`.
         if args.upgrade_input_path == UPGRADE_V33_LOCAL_INPUT_PATH {
             let per_env_rel = format!("{UPGRADE_V33_ENV_DIR}/{}.toml", cfg.env);
             let per_env_abs = paths::contracts_root()
@@ -541,7 +539,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
                 "no upgrade input for --env {} at {}. Add it — an empty file is fine if the \
                  environment needs nothing from the input — because this command will not fall back \
                  to the local default, which would silently give this environment local's \
-                 `era_chain_id`, `governance_upgrade_timer_initial_delay` and gateway chain id.",
+                 `era_chain_id` and `governance_upgrade_timer_initial_delay`.",
                 cfg.env,
                 per_env_abs.display()
             );
@@ -710,10 +708,8 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         .as_ref()
         .map(|cfg| cfg.ownable_proxies().to_vec())
         .unwrap_or_default();
-    let new_gateway_cfg = env_cfg.as_ref().and_then(|cfg| cfg.new_gateway().cloned());
     let full = UpgradeFull::new(UpgradeInner::new(&contracts_path, bridgehub))
-        .with_ownable_proxies(proxies)
-        .with_new_gateway(new_gateway_cfg);
+        .with_ownable_proxies(proxies);
     let prepared = full.prepare(&mut runner, &deployer, &inputs).await?;
 
     // `ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps` wrote one
@@ -761,8 +757,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     };
 
     // Merge core + per-CTM governance calls + (when present) the in-memory
-    // PUH/Guardians stage-0 calls + (when present) the new-Gateway bring-up
-    // bundle into a single `<env-out>/ecosystem.toml`. The Solidity
+    // PUH/Guardians stage-0 calls into a single `<env-out>/ecosystem.toml`. The Solidity
     // scripts each emit their own toml under `script-out/` (forge
     // requirement), but downstream (PUVT + governance replay) only consumes
     // the merged file.
@@ -790,7 +785,6 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
             &prepared.ctm_tomls,
             &extra_stage0,
             puh_outcome.as_ref(),
-            &prepared.new_gateway_tomls,
             inputs.zk_token_asset_id,
             &merged_path,
         )?;
@@ -803,12 +797,6 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         logger::info(format!(
             "Wrote extra verification logs → {}",
             extra_verification_logs_path.display()
-        ));
-        let gw_verification_logs_path = canonical_dir.join("gw-verification-logs.txt");
-        runner.write_gw_verification_logs(&gw_verification_logs_path)?;
-        logger::info(format!(
-            "Wrote GW verification logs → {}",
-            gw_verification_logs_path.display()
         ));
         Some(merged_path)
     } else {
@@ -868,13 +856,11 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 
 /// Read each per-script governance TOML and write a single merged TOML
 /// containing all stage 0/1/2 calls in source-order (core first, then CTMs
-/// in the order they were prepared, then the optional new-Gateway bundle
-/// appended to stage 2). `extra_stage0` is appended to stage 0 after the
+/// in the order they were prepared). `extra_stage0` is appended to stage 0 after the
 /// file-sourced calls — used for the PUH/Guardians redeploy calls emitted
 /// in-memory by [`puh_guardians::deploy_puh_guardians`].
 /// Merge the core + per-CTM prepare TOMLs (plus optional in-memory PUH
-/// stage-0 calls and an optional `GatewayVotePreparation` bundle for the
-/// new gateway) into a single ecosystem TOML at `dst`. Shape:
+/// stage-0 calls) into a single ecosystem TOML at `dst`. Shape:
 ///
 /// ```toml
 /// [governance_calls]              # merged stage 0/1/2 hex across all sources
@@ -895,9 +881,6 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 /// ...                             # one section per ZKsyncOS CTM.
 /// ...
 ///
-/// [new_gateway]                   # only when present: GatewayVotePreparation
-/// ...                             # output minus governance_calls_to_execute.
-///
 /// [zk_governance]                 # only when the PUH governance set was redeployed
 /// new_puh_impl = "0x..."
 /// new_guardians = "0x..."
@@ -909,7 +892,6 @@ fn write_merged_ecosystem_toml(
     ctm_entries: &[crate::commands::ecosystem::upgrade_inner::CtmPrepareEntry],
     extra_stage0: &[crate::common::governance_calls::GovernanceCall],
     zk_governance: Option<&crate::commands::ecosystem::zk_governance::ZkGovernanceOutcome>,
-    new_gateway_tomls: &[PathBuf],
     _zk_token_asset_id: B256,
     dst: &Path,
 ) -> anyhow::Result<()> {
@@ -990,44 +972,6 @@ fn write_merged_ecosystem_toml(
         stage0.push(format!("0x{}", hex::encode(encode_calls(extra_stage0))));
     }
 
-    // `GatewayVotePreparation` writes a flat TOML whose `governance_calls_to_execute`
-    // field is an abi-encoded `Call[]`. Pop that into the stage-2 chunks, keep
-    // the rest (per-contract addresses + diamond cut data) under a top-level
-    // `[new_gateway]` block so reviewers can still audit the deployed addresses.
-    //
-    // When `[new_gateway]` is configured, append each GW TOML's
-    // `governance_calls_to_execute` to stage 2. The vector form is retained so
-    // preparation outputs can be composed uniformly.
-    let new_gateway_body: Option<Table> = if !new_gateway_tomls.is_empty() {
-        let mut first_body: Option<Table> = None;
-        for path in new_gateway_tomls {
-            let raw =
-                fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
-            let mut value: Table =
-                toml::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
-            let gov_hex = value
-                .remove("governance_calls_to_execute")
-                .with_context(|| {
-                    format!("missing governance_calls_to_execute in {}", path.display())
-                })?;
-            let gov_hex = match gov_hex {
-                Value::String(s) => s,
-                other => anyhow::bail!(
-                    "governance_calls_to_execute in {} is not a string (got {})",
-                    path.display(),
-                    other.type_str()
-                ),
-            };
-            stage2.push(gov_hex);
-            if first_body.is_none() {
-                first_body = Some(value);
-            }
-        }
-        first_body
-    } else {
-        None
-    };
-
     let merge = |chunks: &[String]| -> anyhow::Result<String> {
         if chunks.is_empty() {
             Ok(empty_calls_hex())
@@ -1045,7 +989,7 @@ fn write_merged_ecosystem_toml(
     governance_calls_table.insert("stage2_calls".into(), Value::String(s2));
 
     // Build the document with [governance_calls] first, then optional
-    // [test_upgrade_calls], then [core], [ctms.*], optional [new_gateway],
+    // [test_upgrade_calls], then [core], [ctms.*], optional [zk_governance],
     // and [misc] last. `toml::to_string` orders keys as inserted.
     let mut doc = Table::new();
     doc.insert(
@@ -1074,9 +1018,6 @@ fn write_merged_ecosystem_toml(
     }
     doc.insert("core".into(), Value::Table(core_body));
     doc.insert("ctms".into(), Value::Table(ctms_table));
-    if let Some(body) = new_gateway_body {
-        doc.insert("new_gateway".into(), Value::Table(body));
-    }
     if let Some(zk_governance) = zk_governance {
         let mut table = Table::new();
         table.insert(
@@ -1101,7 +1042,6 @@ fn write_merged_ecosystem_toml(
         doc.insert("misc".into(), Value::Table(body));
     }
 
-    let new_gateway_count = if new_gateway_tomls.is_empty() { 0 } else { 1 };
     let body = format!(
         "# Auto-generated by `protocol-ops ecosystem upgrade-prepare-all`.\n\
          # Merged ecosystem upgrade artifact: top-level [governance_calls] holds\n\
@@ -1111,13 +1051,10 @@ fn write_merged_ecosystem_toml(
          # core prepare output (minus its own [governance_calls]); [ctms.zksync_os]\n\
          # mirrors the ZKsyncOS CTM prepare output\n\
          # for downstream verification. [misc] carries shared metadata used\n\
-         # by verification. When [new_gateway] is present, it\n\
-         # mirrors GatewayVotePreparation's output (deployed GW CTM addresses +\n\
-         # diamond cut data) — its `governance_calls_to_execute` has already been\n\
-         # folded into stage 2 above. When [zk_governance] is present, it names\n\
+         # by verification. When [zk_governance] is present, it names\n\
          # the zk-governance contracts deployed in stage 0 and used by PUVT for\n\
          # CREATE2 provenance checks.\n\n{}",
-        1 + ctm_entries.len() + new_gateway_count,
+        1 + ctm_entries.len(),
         toml::to_string(&doc).context("serialize merged ecosystem TOML")?
     );
     fs::write(dst, body)

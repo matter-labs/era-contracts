@@ -677,7 +677,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
             _forceDeploymentData,
             _factoryDeps
         );
-        // Deposits start paused by default to allow immediate Gateway migration.
+        // Deposits start paused by default to allow an immediate settlement-layer migration.
         // Otherwise, any deposit would trigger the PAUSE_DEPOSITS_TIME_WINDOW_START delay.
         IMigrator(zkChainAddress).pauseDepositsBeforeInitiatingMigration();
     }

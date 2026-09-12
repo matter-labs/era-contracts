@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {CoreContract, L2SystemContract} from "deploy-scripts/ecosystem/CoreContract.sol";
-import {CoreOnGatewayHelper} from "deploy-scripts/ecosystem/CoreOnGatewayHelper.sol";
+import {CoreOnL2Helper} from "deploy-scripts/ecosystem/CoreOnL2Helper.sol";
 import {SystemContractsProcessing} from "deploy-scripts/upgrade/SystemContractsProcessing.s.sol";
 import {ContractsBytecodesLib} from "deploy-scripts/utils/bytecode/ContractsBytecodesLib.sol";
 import {BytecodeUtils} from "deploy-scripts/utils/bytecode/BytecodeUtils.s.sol";
@@ -37,7 +37,7 @@ contract SystemContractsProcessingTest is Test {
     function test_forceDeploymentsUpgradeComplexUpgraderAndPublishImplementation() public {
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments = SystemContractsProcessing
             .getBaseForceDeployments();
-        (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolveL2SystemContract(
+        (string memory fileName, string memory contractName) = CoreOnL2Helper.resolveL2SystemContract(
             L2SystemContract.L2ComplexUpgrader
         );
         bytes memory expectedBytecodeInfo = Utils.getZKOSProxyUpgradeBytecodeInfo(fileName, contractName);
@@ -61,7 +61,7 @@ contract SystemContractsProcessingTest is Test {
         }
         assertEq(matches, 1, "expected exactly one ComplexUpgrader deployment");
 
-        bytes[] memory factoryDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(new CoreContract[](0));
+        bytes[] memory factoryDeps = CoreOnL2Helper.getFullListOfFactoryDependencies(new CoreContract[](0));
         bytes32 implementationCodeHash = keccak256(ContractsBytecodesLib.getL2DeployedBytecode(contractName));
         assertEq(
             _countBytecode(factoryDeps, implementationCodeHash),
@@ -77,7 +77,7 @@ contract SystemContractsProcessingTest is Test {
         address _address,
         CoreContract _contract
     ) private {
-        (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(_contract);
+        (string memory fileName, string memory contractName) = CoreOnL2Helper.resolve(_contract);
         bytes memory expectedBytecodeInfo = Utils.getZKOSProxyUpgradeBytecodeInfo(fileName, contractName);
 
         uint256 matches;
@@ -127,7 +127,7 @@ contract SystemContractsProcessingTest is Test {
         }
         assertEq(matches, 1, "expected exactly one neutralization for the removed tracker");
 
-        bytes[] memory factoryDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(new CoreContract[](0));
+        bytes[] memory factoryDeps = CoreOnL2Helper.getFullListOfFactoryDependencies(new CoreContract[](0));
         bytes32 emptyContractCodeHash = keccak256(
             BytecodeUtils.readDeployedBytecodeL1("EmptyContract.sol", "EmptyContract")
         );
@@ -139,7 +139,7 @@ contract SystemContractsProcessingTest is Test {
     }
 
     function test_factoryDependenciesIncludeTheNewBuiltInImplementations() public {
-        bytes[] memory factoryDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(new CoreContract[](0));
+        bytes[] memory factoryDeps = CoreOnL2Helper.getFullListOfFactoryDependencies(new CoreContract[](0));
 
         CoreContract[2] memory builtIns = [CoreContract.L2InteropCommitmentTree, CoreContract.AtomicFlowManager];
         for (uint256 i = 0; i < builtIns.length; ++i) {
@@ -150,7 +150,7 @@ contract SystemContractsProcessingTest is Test {
 
     /// @dev Same accessor the factory-dependency builder uses: the deployed EVM bytecode.
     function _deployedBytecode(CoreContract _contract) private view returns (bytes memory) {
-        (, string memory contractName) = CoreOnGatewayHelper.resolve(_contract);
+        (, string memory contractName) = CoreOnL2Helper.resolve(_contract);
         return ContractsBytecodesLib.getL2DeployedBytecode(contractName);
     }
 

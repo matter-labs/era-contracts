@@ -38,13 +38,13 @@ test("recognises the local RPCs the harness actually starts", () => {
 });
 
 // The finding that motivated this: live mode feeds LIVE_*_RPC through the same helper via
-// setupLiveState() and getGatewayProvider().
+// setupLiveState().
 test("treats live and remote RPCs as remote, keeping ethers' conservative default", () => {
   for (const url of [
     "https://mainnet.era.zksync.io",
     "https://sepolia.infura.io/v3/deadbeef",
     "http://45.130.104.125:3050",
-    "wss://gateway.example.org/ws",
+    "wss://rpc.example.org/ws",
     "https://localhost.example.com/rpc", // not a local host despite the prefix
   ]) {
     assert.equal(isLocalRpcUrl(url), false, url);

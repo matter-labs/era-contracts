@@ -19,7 +19,7 @@ struct CTMCoreDeploymentConfig {
 }
 
 /// @notice Canonical identifier for CTM / state-transition contracts.
-///         `DeployCTML1OrGateway.resolve` maps it to the ZKsyncOS contract / artifact name.
+///         `DeployCTMContracts.resolve` maps it to the ZKsyncOS contract / artifact name.
 enum CTMContract {
     // ---- Diamond facets ----
     AdminFacet,
@@ -36,14 +36,11 @@ enum CTMContract {
     VerifierPlonk,
     DualVerifier,
     TestnetVerifier,
-    // ---- Gateway CTM deployers ----
-    GatewayCTMDeployerCTM,
-    GatewayCTMDeployerVerifiers,
     // ---- DA ----
     BlobsL1DAValidatorZKsyncOS
 }
 
-library DeployCTML1OrGateway {
+library DeployCTMContracts {
     // ======================== Name resolution ========================
 
     /// @notice Resolve a CTMContract to its (fileName, contractName).
@@ -158,12 +155,6 @@ library DeployCTML1OrGateway {
         if (_c == CTMContract.VerifierPlonk) return "ZKsyncOSVerifierPlonk";
         if (_c == CTMContract.DualVerifier) return "ZKsyncOSVerifier";
         if (_c == CTMContract.TestnetVerifier) return "ZKsyncOSTestnetVerifier";
-        if (_c == CTMContract.GatewayCTMDeployerCTM) {
-            return "GatewayCTMDeployerCTM";
-        }
-        if (_c == CTMContract.GatewayCTMDeployerVerifiers) {
-            return "GatewayCTMDeployerVerifiers";
-        }
 
         if (_c == CTMContract.AdminFacet) return "AdminFacet";
         if (_c == CTMContract.MailboxFacet) return "MailboxFacet";
@@ -174,7 +165,7 @@ library DeployCTML1OrGateway {
         if (_c == CTMContract.ValidatorTimelock) return "ValidatorTimelock";
         if (_c == CTMContract.BlobsL1DAValidatorZKsyncOS) return "BlobsL1DAValidatorZKsyncOS";
 
-        revert("DeployCTML1OrGateway: unknown CTMContract");
+        revert("DeployCTMContracts: unknown CTMContract");
     }
 
     function _compareStrings(string memory _a, string memory _b) private view returns (bool) {

@@ -57,10 +57,10 @@ export interface ChainAddresses {
 }
 
 /** Role of a chain in the test environment. */
-export type ChainRole = "l1" | "directSettled" | "gateway" | "gwSettled";
+export type ChainRole = "l1" | "directSettled";
 
 /** Settlement type: where this chain settles. */
-export type SettlementType = "l1" | "gateway";
+export type SettlementType = "l1";
 
 export interface AnvilChainConfig {
   chainId: number;

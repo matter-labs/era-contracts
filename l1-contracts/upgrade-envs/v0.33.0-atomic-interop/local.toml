@@ -8,7 +8,6 @@
 era_chain_id = 6565
 testnet_verifier = true
 governance_upgrade_timer_initial_delay = 0
-support_l2_legacy_shared_bridge_test = false
 old_protocol_version = 0x1f00000000  # v31.0.0
 
 [contracts]

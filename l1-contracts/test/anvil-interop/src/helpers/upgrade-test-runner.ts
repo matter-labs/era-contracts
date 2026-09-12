@@ -85,6 +85,10 @@ export type V31UpgradeScenario = {
   permanentValuesTemplatePath: string;
   upgradeInputTemplatePath: string;
   targetRoles: ChainRole[];
+  // Optional allow-list applied on top of `targetRoles`. Roles are read from the current
+  // anvil-config.json, so a frozen fixture whose chains had a different settlement shape when it was
+  // generated names its upgradable chains explicitly.
+  targetChainIds?: number[];
   // Protocol version the chains must report once the upgrade has been applied.
   expectedProtocolVersion: string;
   clearGenesisUpgradeTxHash?: boolean;
@@ -106,7 +110,12 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
       throw new Error(`${scenario.stateVersion} chain states not found. Generate them first.`);
     }
     const { chains, l1Addresses, ctmAddresses, chainAddresses } = await runner.loadChainStates(anvilManager, stateDir);
-    const upgradeChainAddresses = selectUpgradeChains(chainAddresses, chains.config, scenario.targetRoles);
+    const upgradeChainAddresses = selectUpgradeChains(
+      chainAddresses,
+      chains.config,
+      scenario.targetRoles,
+      scenario.targetChainIds
+    );
     if (upgradeChainAddresses.length === 0) {
       throw new Error(`No chains matched upgrade roles ${scenario.targetRoles.join(", ")} for ${scenario.label}`);
     }
@@ -450,126 +459,10 @@ export async function runEcosystemUpgradeScriptsForEnv(params: {
     "--additional-args=--memory-limit=536870912",
   ]);
 
-  // protocol-ops runs forge against its own *nested* anvil that forks
-  // `params.rpcUrl` and dies on process exit — none of the state writes it
-  // made (including the GW-prep ZK funding) survive on the test harness's
-  // anvil. The deployer's Safe bundle contains GatewayVotePreparation's
-  // L1→L2 priority txs, each of which charges the GW base token (ZK) from
-  // the bundle's impersonated sender. So before bundle replay, give that
-  // sender enough ZK on *this* anvil via the same real-flow path —
-  // impersonate the canonical NTV (the only `bridgeMint` caller) and mint.
   if (params.executeBundles) {
-    await fundDeployerZkForBundleReplay({
-      rpcUrl: params.rpcUrl,
-      envName: params.envName,
-      bridgehubAddress: params.bridgehubAddress,
-      prepareOutDir,
-    });
     await executeSafeBundles(prepareOutDir, params.rpcUrl);
   }
   return { prepareOutDir };
-}
-
-/// 1e30 wei (1B tokens for 18-decimal ZK) — matches the Rust side
-/// `ZK_FUNDING_WEI_HEX` in `new_gateway_prepare.rs`. Comfortably covers
-/// the ~580 ZK each GatewayVotePreparation priority tx charges.
-const ZK_FUNDING_WEI = ethers.BigNumber.from("0xc9f2c9cd04674edea40000000");
-
-/// Read `permanent-values/<env>.toml` and pull (a) whether a `[new_gateway]`
-/// block is present and (b) the top-level `zk_token_asset_id` hex.
-function readPermanentValuesForGwFunding(envName: string): {
-  hasNewGateway: boolean;
-  zkTokenAssetId: string | null;
-} {
-  const permPath = path.join(l1ContractsDir, "upgrade-envs", "permanent-values", `${envName}.toml`);
-  if (!fs.existsSync(permPath)) {
-    return { hasNewGateway: false, zkTokenAssetId: null };
-  }
-  const raw = fs.readFileSync(permPath, "utf8");
-  let parsed: { new_gateway?: unknown; zk_token_asset_id?: unknown };
-  try {
-    parsed = parseToml(raw) as typeof parsed;
-  } catch {
-    return { hasNewGateway: false, zkTokenAssetId: null };
-  }
-  const zk = typeof parsed.zk_token_asset_id === "string" ? parsed.zk_token_asset_id : null;
-  return { hasNewGateway: parsed.new_gateway != null, zkTokenAssetId: zk };
-}
-
-/// Read all bundle targets from `<prepareOutDir>/manifest.json` in bundle
-/// order. `executeSafeBundles` impersonates each one in turn, so any of them
-/// could be the `msg.sender` for a GW priority tx — we fund all to avoid
-/// special-casing which bundle holds the GatewayVotePreparation deploys.
-function bundleTargetsFromManifest(prepareOutDir: string): string[] {
-  const manifestPath = path.join(prepareOutDir, "manifest.json");
-  if (!fs.existsSync(manifestPath)) {
-    return [];
-  }
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as {
-    bundles?: Array<{ index?: number; target?: string }>;
-  };
-  const seen = new Set<string>();
-  return (manifest.bundles ?? [])
-    .filter((b): b is { index: number; target: string } => typeof b.index === "number" && typeof b.target === "string")
-    .sort((a, b) => a.index - b.index)
-    .map((b) => b.target.toLowerCase())
-    .filter((t) => {
-      if (seen.has(t)) return false;
-      seen.add(t);
-      return true;
-    });
-}
-
-/// Mint ZK to every bundle target on the harness anvil via real-contract-call —
-/// impersonate the NTV (only `onlyNTV` caller for `bridgeMint`) and call
-/// `BridgedStandardERC20.bridgeMint(target, ZK_FUNDING_WEI)` per target.
-/// No-ops silently when the env has no `[new_gateway]` (no GW priority txs
-/// to fund) or no `zk_token_asset_id` (older envs).
-async function fundDeployerZkForBundleReplay(params: {
-  rpcUrl: string;
-  envName: string;
-  bridgehubAddress: string;
-  prepareOutDir: string;
-}): Promise<void> {
-  const { hasNewGateway, zkTokenAssetId } = readPermanentValuesForGwFunding(params.envName);
-  if (!hasNewGateway || !zkTokenAssetId) {
-    return;
-  }
-  const targets = bundleTargetsFromManifest(params.prepareOutDir);
-  if (targets.length === 0) {
-    throw new Error(`Cannot fund bundle senders ZK: no usable bundle targets in ${params.prepareOutDir}/manifest.json`);
-  }
-
-  const provider = createProvider(params.rpcUrl);
-  const bridgehub = new ethers.Contract(params.bridgehubAddress, getAbi("L1Bridgehub"), provider);
-  const assetRouterAddr: string = await bridgehub.assetRouter();
-  const assetRouter = new ethers.Contract(assetRouterAddr, getAbi("L1AssetRouter"), provider);
-  const ntvAddr: string = await assetRouter.nativeTokenVault();
-  const ntv = new ethers.Contract(ntvAddr, getAbi("L1NativeTokenVault"), provider);
-  const zkTokenAddr: string = await ntv.tokenAddress(zkTokenAssetId);
-  if (!zkTokenAddr || zkTokenAddr === ethers.constants.AddressZero) {
-    throw new Error(`NTV.tokenAddress(${zkTokenAssetId}) returned zero on ${params.rpcUrl}`);
-  }
-
-  await provider.send("anvil_impersonateAccount", [ntvAddr]);
-  await provider.send("anvil_setBalance", [ntvAddr, "0x21e19e0c9bab2400000"]); // 10k ETH for gas
-  try {
-    const ntvSigner = provider.getSigner(ntvAddr);
-    const zkToken = new ethers.Contract(zkTokenAddr, getAbi("BridgedStandardERC20"), ntvSigner);
-    for (const target of targets) {
-      console.log(
-        `  Funding bundle sender ${target} with ${ZK_FUNDING_WEI.toString()} wei ZK ` +
-          `at ${zkTokenAddr} via NTV ${ntvAddr}.bridgeMint`
-      );
-      const tx = await zkToken.bridgeMint(target, ZK_FUNDING_WEI, { gasLimit: 1_000_000 });
-      const receipt = await tx.wait();
-      if (receipt.status !== 1) {
-        throw new Error(`bridgeMint(${target}) reverted (tx ${receipt.transactionHash})`);
-      }
-    }
-  } finally {
-    await provider.send("anvil_stopImpersonatingAccount", [ntvAddr]);
-  }
 }
 
 export async function runEcosystemUpgradeScripts(params: {
@@ -1488,12 +1381,14 @@ function buildAddressToContract(): ReadonlyMap<string, ContractName> {
 function selectUpgradeChains(
   chainAddresses: Array<{ chainId: number; diamondProxy: string }>,
   chainConfigs: Array<{ chainId: number; role: ChainRole }>,
-  targetRoles: ChainRole[]
+  targetRoles: ChainRole[],
+  targetChainIds?: number[]
 ): Array<{ chainId: number; diamondProxy: string }> {
   const roles = new Map(chainConfigs.map((c) => [c.chainId, c.role]));
   return chainAddresses.filter((chain) => {
     const role = roles.get(chain.chainId);
     if (!role) throw new Error(`Missing chain role for chain ${chain.chainId}`);
+    if (targetChainIds && !targetChainIds.includes(chain.chainId)) return false;
     return targetRoles.includes(role);
   });
 }

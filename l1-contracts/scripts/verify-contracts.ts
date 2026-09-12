@@ -18,18 +18,6 @@ import { execFileSync, execSync } from "child_process";
 import { readFileSync, existsSync } from "fs";
 import * as path from "path";
 
-// ZKsync verifier URLs
-const ZKSYNC_VERIFIER_URLS: Record<string, string> = {
-  mainnet: "https://rpc-explorer-verify.era-gateway-mainnet.zksync.dev/contract_verification",
-  stage: "https://rpc-explorer-verify.era-gateway-stage.zksync.dev/contract_verification",
-  testnet: "https://rpc-explorer-verify.era-gateway-testnet.zksync.dev/contract_verification",
-};
-
-// GW (EVM gateway) explorer API URLs — standard Etherscan-compatible
-const GW_EXPLORER_URLS: Record<string, string> = {
-  stage: "https://block-explorer-api.zksync-os-stage-gateway.zksync.dev/api",
-};
-
 // -----------------------------
 // Fallback name mappings
 // -----------------------------
@@ -143,38 +131,13 @@ function findContractAndRoot(name: string): { solPath: string; root: string; res
 // -----------------------------
 // Run a single forge verify attempt
 // -----------------------------
-function tryVerify(
-  chain: string,
-  addr: string,
-  name: string,
-  rest: string,
-  root: string,
-  isZksync: boolean,
-  gwMode: boolean
-): boolean {
-  let cmd: string;
-  if (gwMode) {
-    const url = GW_EXPLORER_URLS[chain];
-    if (!url) {
-      console.error(`❌ Unsupported chain "${chain}" for GW explorer`);
-      return false;
-    }
-    cmd = `forge verify-contract ${addr} ${name} ${rest} --verifier etherscan --verifier-url "${url}" --etherscan-api-key "dummy" --watch`;
-  } else if (isZksync) {
-    const url = ZKSYNC_VERIFIER_URLS[chain];
-    if (!url) {
-      console.error(`❌ Unsupported chain "${chain}" for zksync verifier`);
-      return false;
-    }
-    cmd = `forge verify-contract ${addr} ${name} ${rest} --verifier-url ${url} --zksync --watch`;
-  } else {
-    if (!process.env.ETHERSCAN_API_KEY) {
-      console.error("❌ ETHERSCAN_API_KEY must be set for non-zksync verifier logs");
-      process.exit(1);
-    }
-    const chainFlag = chain === "mainnet" ? "--chain mainnet" : "--chain sepolia";
-    cmd = `forge verify-contract ${addr} ${name} ${rest} --etherscan-api-key "${process.env.ETHERSCAN_API_KEY}" ${chainFlag} --watch`;
+function tryVerify(chain: string, addr: string, name: string, rest: string, root: string): boolean {
+  if (!process.env.ETHERSCAN_API_KEY) {
+    console.error("❌ ETHERSCAN_API_KEY must be set");
+    process.exit(1);
   }
+  const chainFlag = chain === "mainnet" ? "--chain mainnet" : "--chain sepolia";
+  const cmd = `forge verify-contract ${addr} ${name} ${rest} --etherscan-api-key "${process.env.ETHERSCAN_API_KEY}" ${chainFlag} --watch`;
 
   const redacted = "--etherscan-api-key [REDACTED]";
   const maskedCmd = cmd.replace(/--etherscan-api-key\s+"[^"]*"/, redacted);
@@ -196,10 +159,8 @@ async function main() {
     .description("Automates contract verification from deployment logs")
     .argument("<log_file>", "Path to deployment log containing forge verify-contract commands")
     .option("-c, --chain <chain>", "Target chain (stage|testnet|mainnet)", "stage")
-    .option("--gw", "Verify on GW (EVM gateway) explorer instead of Etherscan/ZKsync")
     .action(async (logFile, options) => {
       const chain = (options.chain || "stage").toLowerCase();
-      const gwMode = !!options.gw;
       if (!existsSync(logFile)) {
         console.error(`❌ Error: File '${logFile}' not found.`);
         process.exit(1);
@@ -224,7 +185,6 @@ async function main() {
         const addr = match[1];
         const name = match[2];
         const rest = match[3] || "";
-        const isZksync = rest.includes("--verifier zksync");
 
         if (!/^0x[0-9a-fA-F]{40}$/.test(addr)) {
           console.log(`⚠️  Parsed non-address '${addr}' — skipping`);
@@ -242,14 +202,14 @@ async function main() {
         const { solPath, root, resolvedName } = found;
         console.log(`📂 ${resolvedName} found: ${solPath} (project root: ${root})`);
 
-        let success = tryVerify(chain, addr, resolvedName, rest, root, isZksync, gwMode);
+        let success = tryVerify(chain, addr, resolvedName, rest, root);
         if (!success && resolvedName !== name) {
           console.log(`🔁 Retry with original contract name: ${name}`);
-          success = tryVerify(chain, addr, name, rest, root, isZksync, gwMode);
+          success = tryVerify(chain, addr, name, rest, root);
         }
         if (!success) {
           console.log("🔁 Final attempt with TransparentUpgradeableProxy");
-          success = tryVerify(chain, addr, "TransparentUpgradeableProxy", rest, root, isZksync, gwMode);
+          success = tryVerify(chain, addr, "TransparentUpgradeableProxy", rest, root);
         }
 
         if (success) {

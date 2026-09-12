@@ -1,5 +1,5 @@
 /**
- * End-to-end atomic-interop tests (bundle model) between two GW-settled chains: A <-> B token swap
+ * End-to-end atomic-interop tests (bundle model) between two L1-settled L2 chains: A <-> B token swap
  * via atomic sends + executeAtomicBundle, the late-batch and halted-chain timeout/refund paths, the
  * send-time flow/bundle coupling checks, and the timeout negatives. Proofs are built off-chain by
  * imt-engine-lib; on the harness the chain-batch-root leaf authentication is mocked and settlement
@@ -9,7 +9,7 @@
 import { expect } from "chai";
 import { BigNumber, Contract, Wallet, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { getChainIdsByRole, getL2Chain, impersonateAndRun, createProvider } from "../../src/core/utils";
+import { getEthBaseTokenInteropChainIds, getL2Chain, impersonateAndRun, createProvider } from "../../src/core/utils";
 import { getAbi } from "../../src/core/contracts";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
@@ -216,9 +216,9 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     if (!state.chains?.l1 || !state.chainAddresses || !state.l1Addresses || !state.testTokens) {
       throw new Error("Deployment state incomplete. Run setup first.");
     }
-    const gwSettledIds = getChainIdsByRole(state.chains.config, "gwSettled");
-    if (gwSettledIds.length < 2) throw new Error("Need >=2 gwSettled chains");
-    const [aId, bId] = gwSettledIds;
+    const interopChainIds = getEthBaseTokenInteropChainIds(state.chains.config);
+    if (interopChainIds.length < 2) throw new Error("Need >=2 ETH-base-token L1-settled chains");
+    const [aId, bId] = interopChainIds;
 
     const ctxs = await Promise.all(
       [aId, bId].map(async (chainId) => {

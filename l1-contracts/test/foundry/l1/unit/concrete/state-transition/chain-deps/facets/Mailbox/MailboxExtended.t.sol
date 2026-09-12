@@ -26,18 +26,18 @@ import {
     NotSettlementLayer
 } from "contracts/state-transition/L1StateTransitionErrors.sol";
 
-contract MailboxOnGatewayTest is UtilsCallMockerTest {
+contract MailboxOnSettlementLayerTest is UtilsCallMockerTest {
     IMailbox internal mailboxFacet;
     UtilsFacet internal utilsFacet;
     address bridgehub;
     address chainAssetHandler;
     uint256 constant eraChainId = 9;
     uint256 constant l1ChainId = 1;
-    uint256 constant gatewayChainId = 505; // Different from L1
+    uint256 constant settlementLayerChainId = 505; // Different from L1
 
     function setUp() public {
-        // Set up on a non-L1 chain (Gateway)
-        vm.chainId(gatewayChainId);
+        // Set up on a non-L1 chain (a settlement layer)
+        vm.chainId(settlementLayerChainId);
 
         bridgehub = makeAddr("bridgehub");
         chainAssetHandler = makeAddr("chainAssetHandler");
@@ -80,8 +80,8 @@ contract MailboxOnGatewayTest is UtilsCallMockerTest {
         utilsFacet.util_setChainId(eraChainId);
     }
 
-    function test_onlyL1Modifier_RevertsOnGateway() public {
-        // Any function with onlyL1 modifier should revert when called on Gateway
+    function test_onlyL1Modifier_RevertsOnSettlementLayer() public {
+        // Any function with onlyL1 modifier should revert when called on a settlement layer
         // requestL2ServiceTransaction uses onlyL1 modifier
         // Mock the chainRegistrationSender call to return the test caller
         vm.mockCall(
@@ -90,7 +90,7 @@ contract MailboxOnGatewayTest is UtilsCallMockerTest {
             abi.encode(address(this))
         );
 
-        vm.expectRevert(abi.encodeWithSelector(NotL1.selector, gatewayChainId));
+        vm.expectRevert(abi.encodeWithSelector(NotL1.selector, settlementLayerChainId));
         IMailbox(address(mailboxFacet)).requestL2ServiceTransaction(address(0x123), bytes(""));
     }
 }
@@ -103,9 +103,9 @@ contract MailboxConstructorTest is Test {
         new MailboxFacet(1, address(0x123), IEIP7702Checker(address(0)), false);
     }
 
-    function test_Constructor_RevertWhen_EIP7702CheckerIsNotZeroOnGateway() public {
-        // On Gateway, EIP7702Checker must be zero
-        vm.chainId(505); // Gateway chain ID
+    function test_Constructor_RevertWhen_EIP7702CheckerIsNotZeroOnSettlementLayer() public {
+        // On a settlement layer, EIP7702Checker must be zero
+        vm.chainId(505); // non-L1 chain ID
         IEIP7702Checker eip7702Checker = IEIP7702Checker(makeAddr("eip7702Checker"));
         vm.expectRevert(AddressNotZero.selector);
         new MailboxFacet(1, address(0x123), eip7702Checker, false);
@@ -118,8 +118,8 @@ contract MailboxConstructorTest is Test {
         assertNotEq(address(mailbox), address(0));
     }
 
-    function test_Constructor_Success_OnGatewayWithoutChecker() public {
-        vm.chainId(505); // Gateway chain ID
+    function test_Constructor_Success_OnSettlementLayerWithoutChecker() public {
+        vm.chainId(505); // non-L1 chain ID
         MailboxFacet mailbox = new MailboxFacet(1, address(0x123), IEIP7702Checker(address(0)), false);
         assertNotEq(address(mailbox), address(0));
     }

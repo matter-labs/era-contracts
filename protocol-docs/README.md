@@ -24,3 +24,10 @@ The `atomicity/` folder is split into a layered set of pages (start at its READM
 
 There are no protocol-narrative READMEs inside the contract source trees: every `.sol`/`.ts`/`.rs`
 file points here with `{protocol-docs/...}` instead of carrying its own prose.
+
+> **Gateway (deprecated).** The pages below still mention the ZK Gateway where they describe the
+> settlement-layer machinery (chain migration, message-root aggregation on a settlement layer,
+> Mailbox relaying). That machinery remains in the core contracts, but the Gateway itself is
+> deprecated: v33 onwards deploys no Gateway, and the Gateway CTM deployer contracts, the Gateway
+> deploy/migration scripts, the `chain gateway` protocol-ops commands and the Gateway test
+> harnesses were removed from this repository (EVM-1689). Treat Gateway references as historical.

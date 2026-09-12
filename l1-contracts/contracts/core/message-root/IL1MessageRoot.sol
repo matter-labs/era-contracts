@@ -8,7 +8,7 @@ pragma solidity 0.8.28;
  * @custom:security-contact security@matterlabs.dev
  */
 interface IL1MessageRoot {
-    /// @notice The chain id of the legacy Era-based Gateway chain.
+    /// @notice The chain id of the legacy settlement layer Era used to settle on (0 when none).
     /// @dev Lives only on the L1 MessageRoot; used by L1ChainAssetHandler to gate legacy GW migration intervals.
     // solhint-disable-next-line func-name-mixedcase
     function ERA_GATEWAY_CHAIN_ID() external view returns (uint256);

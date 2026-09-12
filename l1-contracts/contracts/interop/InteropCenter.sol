@@ -554,7 +554,7 @@ contract InteropCenter is
             require(_destinationChainId == L1_CHAIN_ID, NonAtomicSendUnsupported());
         }
 
-        // Deliberately no gateway-mode requirement on the send side; correctness is enforced by the
+        // Deliberately no settlement-layer requirement on the send side; correctness is enforced by the
         // receive-side proofs (see {protocol-docs/interop.md#send-flow}).
 
         // A unique (sender, salt) pair guarantees a unique bundle hash.

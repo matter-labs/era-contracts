@@ -101,7 +101,7 @@ abstract contract ChainAssetHandlerBase is
 
     /// @notice Used to track the number of times each chain has migrated.
     /// @dev It is assumed that during the release of the v31 upgrade all chains settle on L1,
-    /// so they will all start with `migrationNumber` equal to 0. Note, that ZKsync Era that used to settle on ZK Gateway
+    /// so they will all start with `migrationNumber` equal to 0. Note, that ZKsync Era that used to settle on a settlement layer
     /// will also start with migration number equal to 0.
     /// NOTE: this mapping may be deprecated in the future, don't rely on it!
     mapping(uint256 chainId => uint256 migrationNumber) public migrationNumber;

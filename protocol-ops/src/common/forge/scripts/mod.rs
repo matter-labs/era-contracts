@@ -5,9 +5,8 @@ use alloy::sol_types::SolCall;
 use serde::{Deserialize, Serialize};
 
 use crate::common::abi::{
-    AdminFunctionsAbi, DeployGatewayTransactionFiltererAbi, GatewayUtilsAbi, ICoreUpgradeV33Abi,
-    IDeployCTMAbi, IDeployL1CoreContractsAbi, IFinalizeChainInitAbi, IGatewayVotePreparationAbi,
-    IRecordPriorityOpLowerBoundAbi, IRegisterOnAllChainsAbi,
+    AdminFunctionsAbi, ICoreUpgradeV33Abi, IDeployCTMAbi, IDeployL1CoreContractsAbi,
+    IFinalizeChainInitAbi, IRecordPriorityOpLowerBoundAbi, IRegisterOnAllChainsAbi,
 };
 
 pub mod deploy_ctm;
@@ -18,7 +17,7 @@ pub const ADMIN_FUNCTIONS_SCRIPT_PATH: &str = "deploy-scripts/AdminFunctions.s.s
 pub const FINALIZE_CHAIN_INIT_SCRIPT_PATH: &str = "deploy-scripts/chain/FinalizeChainInit.s.sol";
 
 /// v33 upgrade flow. Unlike the v31 scripts these extend the `Default*` bases directly: the
-/// v30 -> v31 one-off work (stage-2 legacy-Gateway decommission, stage-3 bridged-token
+/// v30 -> v31 one-off work (stage-2 settlement-layer decommission, stage-3 bridged-token
 /// migration) has no v33 counterpart and must not be replayed. See
 /// `deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol`.
 pub const CORE_UPGRADE_V33_SCRIPT_PATH: &str = "deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol";
@@ -28,12 +27,6 @@ pub const UPGRADE_V33_LOCAL_INPUT_PATH: &str = "/upgrade-envs/v0.33.0-atomic-int
 pub const UPGRADE_V33_CORE_OUTPUT_PATH: &str = "/script-out/v33-upgrade-core.toml";
 pub const RECORD_PRIORITY_OP_LOWER_BOUND_SCRIPT_PATH: &str =
     "deploy-scripts/upgrade/v33/RecordPriorityOpLowerBound.s.sol";
-pub const GATEWAY_UTILS_SCRIPT_TARGET_PATH: &str =
-    "deploy-scripts/gateway/GatewayUtils.s.sol:GatewayUtils";
-pub const DEPLOY_GATEWAY_TRANSACTION_FILTERER_SCRIPT_TARGET_PATH: &str =
-    "deploy-scripts/gateway/DeployGatewayTransactionFilterer.s.sol:DeployGatewayTransactionFilterer";
-pub const GATEWAY_VOTE_PREPARATION_SCRIPT_PATH: &str =
-    "deploy-scripts/gateway/GatewayVotePreparation.s.sol";
 
 #[derive(Debug, Clone, Copy)]
 pub struct ForgeScriptParams {
@@ -140,23 +133,6 @@ pub static FINALIZE_CHAIN_INIT_INVOCATION: ForgeScriptParams = ForgeScriptParams
 .with_ffi()
 .with_rpc_url();
 
-pub static GATEWAY_UTILS_INVOCATION: ForgeScriptParams =
-    ForgeScriptParams::new("", "", GATEWAY_UTILS_SCRIPT_TARGET_PATH).with_rpc_url();
-
-pub static DEPLOY_GATEWAY_TRANSACTION_FILTERER_INVOCATION: ForgeScriptParams =
-    ForgeScriptParams::new(
-        "",
-        "",
-        DEPLOY_GATEWAY_TRANSACTION_FILTERER_SCRIPT_TARGET_PATH,
-    )
-    .with_ffi()
-    .with_rpc_url();
-
-pub static GATEWAY_VOTE_PREPARATION_INVOCATION: ForgeScriptParams =
-    ForgeScriptParams::new("", "", GATEWAY_VOTE_PREPARATION_SCRIPT_PATH)
-        .with_ffi()
-        .with_rpc_url();
-
 pub static REGISTER_CHAIN_INVOCATION: ForgeScriptParams = ForgeScriptParams::new(
     "script-config/register-zk-chain.toml",
     "script-out/output-register-zk-chain.toml",
@@ -207,16 +183,8 @@ macro_rules! script_calls {
 script_calls! {
     // AdminFunctions
     AdminFunctionsAbi::pauseDepositsBeforeInitiatingMigrationCall       => ADMIN_FUNCTIONS_INVOCATION,
-    AdminFunctionsAbi::notifyServerMigrationToGatewayCall               => ADMIN_FUNCTIONS_INVOCATION,
-    AdminFunctionsAbi::migrateChainToGatewayCall                        => ADMIN_FUNCTIONS_INVOCATION,
-    AdminFunctionsAbi::enableValidatorViaGatewayCall                    => ADMIN_FUNCTIONS_INVOCATION,
-    AdminFunctionsAbi::setDAValidatorPairWithGatewayCall                => ADMIN_FUNCTIONS_INVOCATION,
-    AdminFunctionsAbi::notifyServerMigrationFromGatewayCall             => ADMIN_FUNCTIONS_INVOCATION,
-    AdminFunctionsAbi::startMigrateChainFromGatewayCall                 => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::setDAValidatorPairCall                           => ADMIN_FUNCTIONS_INVOCATION,
-    AdminFunctionsAbi::grantGatewayWhitelistCall                        => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::governanceExecuteCallsCall                       => ADMIN_FUNCTIONS_INVOCATION,
-    AdminFunctionsAbi::revokeGatewayWhitelistCall                       => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::adminScheduleUpgradeCall                         => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::governanceAcceptOwnerCall                        => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::chainAdminAcceptAdminCall                        => ADMIN_FUNCTIONS_INVOCATION,
@@ -225,13 +193,7 @@ script_calls! {
     AdminFunctionsAbi::executeOwnableCallsWithWrapsCall                 => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::upgradeChainFromCTMCall                          => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::updateValidatorCall                              => ADMIN_FUNCTIONS_INVOCATION,
-    // GatewayUtils
-    GatewayUtilsAbi::finishMigrateChainFromGatewayCall                 => GATEWAY_UTILS_INVOCATION,
-    GatewayUtilsAbi::finishMigrateChainToGatewayCall                   => GATEWAY_UTILS_INVOCATION,
-    GatewayUtilsAbi::dumpForceDeploymentsCall                          => GATEWAY_UTILS_INVOCATION,
     // Other scripts
-    DeployGatewayTransactionFiltererAbi::deployAndSetOnChainCall        => DEPLOY_GATEWAY_TRANSACTION_FILTERER_INVOCATION,
-    IGatewayVotePreparationAbi::runCall                                 => GATEWAY_VOTE_PREPARATION_INVOCATION,
     IFinalizeChainInitAbi::finalizeChainInitCall                        => FINALIZE_CHAIN_INIT_INVOCATION,
     IRegisterOnAllChainsAbi::registerOnOtherChainsCall                  => REGISTER_ON_ALL_CHAINS_INVOCATION,
     IDeployL1CoreContractsAbi::runInnerCall                             => DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION,

@@ -111,7 +111,7 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
     /// @notice Shows whether a chain can currently be selected as a migration target settlement layer.
     /// @dev This does NOT represent historical settlement layers used in message proof verification.
     /// @dev Historical settlement layer assignments are tracked in ChainAssetHandler `_migrationInterval`.
-    /// @dev The Gateway will be one of the possible settlement layers. L1 is also a settlement layer.
+    /// @dev L1 is a settlement layer; whitelisted ZK chains can act as settlement layers too.
     /// @dev Sync layer chain is expected to have .. as the base token.
     mapping(uint256 chainId => bool isWhitelistedSettlementLayer) public whitelistedSettlementLayers;
 

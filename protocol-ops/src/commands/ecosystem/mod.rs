@@ -6,11 +6,6 @@
 //! additionally need [`crate::commands::chain::record_priority_op_lower_bound`] to have landed
 //! before the per-chain cuts.
 //! Each `EcosystemCommands` variant carries the per-phase doc.
-//!
-//! Pre-flight (chains migrate off legacy GW back to L1) and the new GW
-//! chain bring-up (`chain init` + `chain gateway convert`) are intentionally
-//! kept outside this module — they're per-chain operations that don't share
-//! the env-permanent shape.
 
 use clap::Subcommand;
 
@@ -25,7 +20,6 @@ use crate::{
 
 pub mod broadcast;
 pub mod init;
-pub mod new_gateway_prepare;
 pub mod simulator;
 pub mod stage3;
 pub mod upgrade;

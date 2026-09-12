@@ -14,7 +14,6 @@ below, and `protocol-ops ecosystem upgrade-prepare-all` orchestrates running the
 CoreUpgrade_v{N}    extends DefaultCoreUpgrade
 CTMUpgrade_v{N}     extends DefaultCTMUpgrade
 ChainUpgrade_v{N}   extends DefaultChainUpgrade
-GatewayUpgrade_v{N} extends DefaultGatewayUpgrade (optional)
 ```
 
 ## Steps
@@ -23,13 +22,11 @@ GatewayUpgrade_v{N} extends DefaultGatewayUpgrade (optional)
    - `l1-contracts/deploy-scripts/upgrade/default-upgrade/DefaultCoreUpgrade.s.sol`
    - `l1-contracts/deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol`
    - `l1-contracts/deploy-scripts/upgrade/default-upgrade/DefaultChainUpgrade.s.sol`
-   - `l1-contracts/deploy-scripts/upgrade/default-upgrade/DefaultGatewayUpgrade.s.sol`
 
 2. Read the most recent version upgrade (e.g., v31) as a template:
    - `l1-contracts/deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol`
    - `l1-contracts/deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol`
    - `l1-contracts/deploy-scripts/upgrade/v31/ChainUpgrade_v31.s.sol`
-   - `l1-contracts/deploy-scripts/upgrade/v31/GatewayUpgrade_v31.s.sol`
 
 3. Create new version directory: `l1-contracts/deploy-scripts/upgrade/v{N}/`
 
@@ -37,7 +34,6 @@ GatewayUpgrade_v{N} extends DefaultGatewayUpgrade (optional)
    - `CoreUpgrade_v{N}.s.sol` - Override `deployNewEcosystemContractsL1()` and stage governance calls
    - `CTMUpgrade_v{N}.s.sol` - Override `deployNewCTMContracts()` and stage governance calls
    - `ChainUpgrade_v{N}.s.sol` - Override per-chain upgrade logic
-   - `GatewayUpgrade_v{N}.s.sol` (optional) - Override Gateway-side upgrade logic
 
 5. Create the upgrade environment config directory under `l1-contracts/upgrade-envs/` (versioned name,
    e.g. `v0.31.0-interopB`)

@@ -264,8 +264,8 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         });
 
         if (L1_CHAIN_ID != block.chainid) {
-            // If we are settling on top of Gateway, we always relay the data needed to construct
-            // a proof for a new batch (and finalize it) even if the data for Gateway transactions has been fully lost.
+            // If we are settling on top of another settlement layer, we always relay the data needed to construct
+            // a proof for a new batch (and finalize it) even if the data for the settlement-layer transactions has been fully lost.
             // This data includes only `StoredBatchInfo`, which is needed to commit and prove a batch on top
             // of the previous one.
             // slither-disable-next-line unused-return

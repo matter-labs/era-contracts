@@ -28,9 +28,9 @@ test("tolerates a few failed traces among many", () => {
   );
 });
 
-// A read-only shard must not fail here. 04-gateway-setup and 01-deployment-verification assert over
-// state the pre-generated snapshots already contain, so they transact nothing — an earlier version of
-// this guard failed them on principle, and CI caught it. Whether a whole *run* saw nothing is the
+// A read-only shard must not fail here. 01-deployment-verification asserts over state the
+// pre-generated snapshots already contain, so it transacts nothing — an earlier version of this guard
+// failed it on principle, and CI caught it. Whether a whole *run* saw nothing is the
 // aggregate question, covered below.
 test("accepts a shard that only read, without transacting", () => {
   assert.doesNotThrow(() =>

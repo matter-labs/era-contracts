@@ -20,7 +20,7 @@ interface IMigrator is IZKChainBase {
     event DepositsUnpaused(uint256 chainId);
 
     /// @notice Pauses deposits before initiating migration to another settlement layer.
-    /// @dev This is required for both L1 -> Gateway and Gateway -> L1 migrations.
+    /// @dev This is required for both L1 -> settlement-layer and settlement-layer -> L1 migrations.
     function pauseDepositsBeforeInitiatingMigration() external;
 
     /// @notice Unpauses deposits, used after the chain is initialized
@@ -48,6 +48,6 @@ interface IMigrator is IZKChainBase {
     /// @notice Returns the commitment for a chain.
     function prepareChainCommitment() external view returns (ZKChainCommitment memory commitment);
 
-    /// @notice Pauses deposits on Gateway, needed as migration is only allowed with this timestamp.
+    /// @notice Pauses deposits on the settlement layer, needed as migration is only allowed with this timestamp.
     function pauseDepositsOnGateway(uint256 _timestamp) external;
 }

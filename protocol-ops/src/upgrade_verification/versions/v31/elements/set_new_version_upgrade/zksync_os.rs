@@ -338,7 +338,7 @@ fn verify_zksync_os_bytecode_info_triplet(
 }
 
 /// ZKsync OS L2 factory-dep bytecode set. Mirrors
-/// `CoreOnGatewayHelper.getFullListOfFactoryDependencies(true, [L2V32Upgrade])`.
+/// `CoreOnL2Helper.getFullListOfFactoryDependencies(true, [L2V32Upgrade])`.
 pub(super) const EXPECTED_V31_ZKSYNC_OS_BYTECODES: &[&str] = &[
     "l1-contracts/SystemContractProxy",
     "l1-contracts/SystemContractProxyAdmin",

@@ -1,5 +1,5 @@
 {
-  "stateVersion": "v0.34.0",
+  "stateVersion": "v0.35.0",
   "chains": [
     {
       "chainId": 31337,
@@ -15,26 +15,26 @@
     {
       "chainId": 11,
       "port": 4051,
-      "role": "gateway",
+      "role": "directSettled",
       "settlement": "l1"
     },
     {
       "chainId": 12,
       "port": 4052,
-      "role": "gwSettled",
-      "settlement": "gateway"
+      "role": "directSettled",
+      "settlement": "l1"
     },
     {
       "chainId": 13,
       "port": 4053,
-      "role": "gwSettled",
-      "settlement": "gateway"
+      "role": "directSettled",
+      "settlement": "l1"
     },
     {
       "chainId": 14,
       "port": 4054,
-      "role": "gwSettled",
-      "settlement": "gateway",
+      "role": "directSettled",
+      "settlement": "l1",
       "baseToken": "custom"
     }
   ]

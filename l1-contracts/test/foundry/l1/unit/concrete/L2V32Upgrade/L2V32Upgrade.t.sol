@@ -145,7 +145,7 @@ contract MockV32UpgradeBaseToken {
 contract L2V32UpgradeUnitTest is Test {
     bytes32 internal constant BASE_TOKEN_ASSET_ID = keccak256("base-token");
     uint256 internal constant L1_CHAIN_ID = 9;
-    uint256 internal constant GATEWAY_CHAIN_ID = 0;
+    uint256 internal constant SETTLEMENT_LAYER_CHAIN_ID = 0;
     uint256 internal constant MAX_NUMBER_OF_ZKCHAINS = 100;
     uint256 internal constant BASE_TOKEN_ORIGIN_CHAIN_ID = 1;
     address internal constant BASE_TOKEN_ORIGIN_ADDRESS = address(0x1234);

@@ -39,7 +39,6 @@ jobs:
           rm -rf ./l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifier.sol
           rm -rf ./l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol
           rm -rf ./l1-contracts/contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol
-          rm -rf ./l1-contracts/contracts/state-transition/chain-deps/gateway-ctm-deployer/
           rm -rf ./l1-contracts/contracts/script-interfaces/
           rm -rf ./l1-contracts/deploy-scripts/
 
