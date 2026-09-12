@@ -16,7 +16,7 @@ interface IMailbox is IZKChainBase {
         BridgehubL2TransactionRequest calldata _request
     ) external returns (bytes32 canonicalTxHash);
 
-    /// @notice The chain's mailbox receives the tx from the Bridgehub on Gateway.
+    /// @notice The chain's mailbox receives the tx from the Bridgehub on the settlement layer.
     /// @param _canonicalTxHash the canonical transaction hash.
     /// @param _expirationTimestamp Deprecated, always 0.
     function bridgehubRequestL2TransactionOnGateway(bytes32 _canonicalTxHash, uint64 _expirationTimestamp) external;
@@ -29,7 +29,7 @@ interface IMailbox is IZKChainBase {
         bytes calldata _l2Calldata
     ) external returns (bytes32 canonicalTxHash);
 
-    /// @dev On L1 we have to forward to the Gateway's mailbox which sends to the Bridgehub on the Gateway.
+    /// @dev On L1 we have to forward to the settlement layer's mailbox, which sends to its Bridgehub.
     /// @dev Note that this function is callable by any chain, including potentially malicious ones, so all inputs
     /// need to be validated (or ensured that their validation will happen on L2).
     /// @param _chainId the chainId of the chain.
@@ -78,7 +78,7 @@ interface IMailbox is IZKChainBase {
     event NewPriorityRequestId(uint256 indexed txId, bytes32 indexed txHash);
 
     /// @notice New relayed priority request event. It is emitted on a chain that is deployed
-    /// on top of the gateway when it receives a request relayed via the Bridgehub.
+    /// on top of the settlement layer when it receives a request relayed via the Bridgehub.
     /// @dev IMPORTANT: this event most likely will be removed in the future, so
     /// no one should rely on it for indexing purposes.
     /// @param txId Serial number of the priority operation.

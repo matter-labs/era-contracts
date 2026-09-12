@@ -63,8 +63,8 @@ import {BYTECODE_INFO_LENGTH, ZKSyncOSBytecodeInfo} from "../common/libraries/ZK
 /// @title L2GenesisForceDeploymentsHelper
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice A helper library for initializing and managing force-deployed contracts during either the L2 gateway upgrade or
-/// the genesis after the gateway protocol upgrade.
+/// @notice A helper library for initializing and managing force-deployed contracts during either the L2 settlement-layer
+/// upgrade or the genesis after that protocol upgrade.
 library L2GenesisForceDeploymentsHelper {
     /// @notice Emitted when a contract is deployed or upgraded during the force-deployment flow.
     event ContractUpgraded(IComplexUpgrader.ContractUpgradeType indexed upgradeType, address indexed targetAddress);

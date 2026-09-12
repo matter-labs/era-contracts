@@ -148,7 +148,7 @@ uint256 constant MAX_NATIVE_COMPUTATIONAL_ZKSYNC_OS = 1 << 35;
 /// It includes tx log, coinbase, treasury, refund recipient and asset tracker pubdata.
 uint256 constant L1_TX_INTRINSIC_PUBDATA_ZKSYNC_OS = 351;
 
-/// @dev The native per gas ratio for l1 -> l2 txs, including upgrade/service/gateway transactions in ZKsync OS.
+/// @dev The native per gas ratio for l1 -> l2 txs, including upgrade/service/relayed transactions in ZKsync OS.
 /// This value is big enough to cover computational native resources usage for any operations.
 uint256 constant L1_TX_NATIVE_PER_GAS = 100_000_000;
 
@@ -232,12 +232,12 @@ address constant SERVICE_TRANSACTION_SENDER = address(uint160(0xFFfFfFffFFfffFFf
 /// @dev The L2 data availability commitment scheme that permanent rollups are expected to use.
 L2DACommitmentScheme constant ROLLUP_L2_DA_COMMITMENT_SCHEME = L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256;
 
-/// @dev The start of the pause deposits time window. We pause when migrating to/from gateway.
-/// @dev It is set to 0 in this release, since stage1 is not yet supported for chains that settle on top of ZK Gateway.
+/// @dev The start of the pause deposits time window. We pause when migrating to/from a settlement layer.
+/// @dev It is set to 0 in this release, since stage1 is not yet supported for chains that settle on top of another settlement layer.
 uint256 constant PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET = 0;
 
 /// @dev The delay from `pausedDepositsTimestamp` from which the migration is allowed. It equals the PAUSE_DEPOSITS_TIME_WINDOW_START.
-/// @dev It is set to 0 in this release, since stage1 is not yet supported for chains that settle on top of ZK Gateway.
+/// @dev It is set to 0 in this release, since stage1 is not yet supported for chains that settle on top of another settlement layer.
 uint256 constant CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET = 0;
 
 uint256 constant PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET = 0;

@@ -124,7 +124,7 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
         _;
     }
 
-    /// @notice Used to forward a transaction on the gateway to the chains mailbox.
+    /// @notice Used to forward a transaction on the settlement layer to the chain's mailbox.
     /// @param _chainId the chainId of the chain
     /// @param _canonicalTxHash the canonical transaction hash
     /// @param _expirationTimestamp Deprecated, always 0.

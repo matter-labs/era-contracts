@@ -21,7 +21,7 @@ import {IMigrator} from "../../state-transition/chain-interfaces/IMigrator.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The ChainAssetHandler contract is used for migrating chains between settlement layers,
 /// it is the IL1AssetHandler for the chains themselves, which is used to migrate the chains
-/// between different settlement layers (for example from L1 to Gateway).
+/// between different settlement layers (for example from L1 to another settlement layer).
 /// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
 contract L2ChainAssetHandler is ChainAssetHandlerBase {
     /// @dev The assetId of the ETH.
@@ -126,7 +126,7 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
         }
     }
 
-    /// @notice Used to pause deposits on Gateway from L1 for migration back to L1.
+    /// @notice Used to pause deposits on the settlement layer from L1 for migration back to L1.
     function requestPauseDepositsForChainOnGateway(uint256 _chainId) external onlyServiceTransactionSender {
         address zkChain = _bridgehub().getZKChain(_chainId);
         require(zkChain != address(0), ChainIdNotRegistered(_chainId));
