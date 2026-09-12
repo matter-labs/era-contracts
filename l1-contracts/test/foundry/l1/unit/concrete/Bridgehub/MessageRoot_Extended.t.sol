@@ -16,6 +16,7 @@ import {
     MessageRootNotRegistered,
     OnlyChainAssetHandler,
     OnlyChain,
+    OnlyGateway,
     OnlyOnSettlementLayer,
     TotalBatchesExecutedZero
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
@@ -385,6 +386,11 @@ contract MessageRoot_Extended_Test is Test {
     function test_L1_CHAIN_ID() public view {
         uint256 chainId = messageRoot.L1_CHAIN_ID();
         assertEq(chainId, block.chainid);
+    }
+
+    function test_ERA_GATEWAY_CHAIN_ID() public view {
+        uint256 legacySettlementLayerId = messageRoot.ERA_GATEWAY_CHAIN_ID();
+        assertEq(legacySettlementLayerId, legacySettlementLayerChainId);
     }
 
     function test_BRIDGE_HUB() public view {

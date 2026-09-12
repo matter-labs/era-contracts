@@ -50,7 +50,7 @@ struct StateTransitionContracts {
 struct DAContracts {
     /// @notice Address of the RollupDAManager contract.
     address rollupDAManager;
-    /// @notice Address of the rollup SL DA validator (RollupL1DAValidator on L1).
+    /// @notice Address of the rollup SL DA validator (RollupL1DAValidator on L1, RelayedSLDAValidator on a settlement layer).
     address rollupSLDAValidator;
     /// @notice Address of the ValidiumL1DAValidator contract.
     address validiumDAValidator;

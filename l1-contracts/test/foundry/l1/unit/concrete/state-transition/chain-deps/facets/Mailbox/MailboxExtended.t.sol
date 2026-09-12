@@ -26,6 +26,75 @@ import {
     NotSettlementLayer
 } from "contracts/state-transition/L1StateTransitionErrors.sol";
 
+contract MailboxOnSettlementLayerTest is UtilsCallMockerTest {
+    IMailbox internal mailboxFacet;
+    UtilsFacet internal utilsFacet;
+    address bridgehub;
+    address chainAssetHandler;
+    uint256 constant eraChainId = 9;
+    uint256 constant l1ChainId = 1;
+    uint256 constant settlementLayerChainId = 505; // Different from L1
+
+    function setUp() public {
+        // Set up on a non-L1 chain (a settlement layer)
+        vm.chainId(settlementLayerChainId);
+
+        bridgehub = makeAddr("bridgehub");
+        chainAssetHandler = makeAddr("chainAssetHandler");
+
+        // Deploy without EIP7702Checker since we're not on L1
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
+        facetCuts[0] = Diamond.FacetCut({
+            facet: address(new MailboxFacet(l1ChainId, address(chainAssetHandler), IEIP7702Checker(address(0)), false)),
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: Utils.getMailboxSelectors()
+        });
+        facetCuts[1] = Diamond.FacetCut({
+            facet: address(new UtilsFacet()),
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: Utils.getUtilsFacetSelectors()
+        });
+
+        mockDiamondInitInteropCenterCallsWithAddress(bridgehub, address(0), bytes32(0));
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
+            abi.encode(chainAssetHandler)
+        );
+        vm.mockCall(
+            address(chainAssetHandler),
+            abi.encodeWithSelector(IChainAssetHandlerBase.migrationNumber.selector),
+            abi.encode(1)
+        );
+
+        address testnetVerifier = address(new ZKsyncOSTestnetVerifier(IVerifier(address(0))));
+        mockChainTypeManagerVerifier(testnetVerifier);
+        address diamondProxy = Utils.makeDiamondProxy(facetCuts, bridgehub);
+
+        mailboxFacet = IMailbox(diamondProxy);
+        utilsFacet = UtilsFacet(diamondProxy);
+
+        utilsFacet.util_setBridgehub(bridgehub);
+        utilsFacet.util_setChainId(eraChainId);
+    }
+
+    function test_onlyL1Modifier_RevertsOnSettlementLayer() public {
+        // Any function with onlyL1 modifier should revert when called on a settlement layer
+        // requestL2ServiceTransaction uses onlyL1 modifier
+        // Mock the chainRegistrationSender call to return the test caller
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSelector(IBridgehubBase.chainRegistrationSender.selector),
+            abi.encode(address(this))
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(NotL1.selector, settlementLayerChainId));
+        IMailbox(address(mailboxFacet)).requestL2ServiceTransaction(address(0x123), bytes(""));
+    }
+}
+
 contract MailboxConstructorTest is Test {
     function test_Constructor_RevertWhen_EIP7702CheckerIsZeroOnL1() public {
         // On L1, EIP7702Checker cannot be zero

@@ -55,6 +55,10 @@ contract L1MessageRootV31UpgradeTest is Test {
         assertEq(messageRoot.L1_CHAIN_ID(), block.chainid);
     }
 
+    function test_ERA_GATEWAY_CHAIN_ID() public view {
+        assertEq(messageRoot.ERA_GATEWAY_CHAIN_ID(), 1);
+    }
+
     function test_RevertWhen_SaveV31UpgradeChainBatchNumber_NotOnSettlementLayer() public {
         address zkChain = makeAddr("zkChain");
 

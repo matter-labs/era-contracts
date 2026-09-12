@@ -120,6 +120,68 @@ contract ServerNotifierTest is Test {
         serverNotifier.setUpgradeTimestamp(chainId, deadline);
     }
 
+    function test_migrateToGatewayEmitsEvent() public {
+        chainTypeManager.setChainAdmin(chainId, chainAdmin);
+
+        vm.startPrank(chainAdmin);
+        vm.expectEmit(true, false, false, true, address(serverNotifier));
+        // Migration number is current (0) + 1 to match what ChainAssetHandler will emit after increment
+        emit IServerNotifier.MigrateToGateway(chainId, 1);
+        serverNotifier.migrateToGateway(chainId);
+        vm.stopPrank();
+    }
+
+    function test_migrateToGatewayInvalidCallerReverts() public {
+        address alice = makeAddr("alice");
+
+        vm.startPrank(alice);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, alice));
+        serverNotifier.migrateToGateway(chainId);
+        vm.stopPrank();
+    }
+
+    function test_migrateFromGatewayEmitsEvent() public {
+        chainTypeManager.setChainAdmin(chainId, chainAdmin);
+
+        vm.startPrank(chainAdmin);
+        vm.expectEmit(true, false, false, true, address(serverNotifier));
+        // Migration number is current (0) + 1 to match what ChainAssetHandler will emit after increment
+        emit IServerNotifier.MigrateFromGateway(chainId, 1);
+        serverNotifier.migrateFromGateway(chainId);
+        vm.stopPrank();
+    }
+
+    function test_migrateToGatewayEmitsNonZeroMigrationNumber() public {
+        chainAssetHandler.setMigrationNumber(chainId, 7);
+
+        vm.startPrank(chainAdmin);
+        vm.expectEmit(true, false, false, true, address(serverNotifier));
+        // Migration number is current (7) + 1 to match what ChainAssetHandler will emit after increment
+        emit IServerNotifier.MigrateToGateway(chainId, 8);
+        serverNotifier.migrateToGateway(chainId);
+        vm.stopPrank();
+    }
+
+    function test_migrateFromGatewayEmitsNonZeroMigrationNumber() public {
+        chainAssetHandler.setMigrationNumber(chainId, 9);
+
+        vm.startPrank(chainAdmin);
+        vm.expectEmit(true, false, false, true, address(serverNotifier));
+        // Migration number is current (9) + 1 to match what ChainAssetHandler will emit after increment
+        emit IServerNotifier.MigrateFromGateway(chainId, 10);
+        serverNotifier.migrateFromGateway(chainId);
+        vm.stopPrank();
+    }
+
+    function test_migrateFromGatewayInvalidCallerReverts() public {
+        address alice = makeAddr("alice");
+
+        vm.startPrank(alice);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, alice));
+        serverNotifier.migrateFromGateway(chainId);
+        vm.stopPrank();
+    }
+
     function test_setChainTypeManagerSucceeds() public {
         DummyChainTypeManager newChainTypeManager = new DummyChainTypeManager();
 
