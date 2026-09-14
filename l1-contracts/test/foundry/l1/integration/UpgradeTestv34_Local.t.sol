@@ -46,9 +46,13 @@ import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 ///         UNMOCKED: that is what this file exists to test.
 contract CTMUpgrade_v34_Test is CTMUpgrade_v34 {
     /// @dev Same MemoryOOG avoidance: the real builder reads every L2 contract's bytecode.
-    ///      Correct length, empty rows.
+    ///      Correct length, empty rows — and no shell, since no row sits behind one.
     function getL2BytecodeInfoTable() internal override returns (bytes[] memory) {
         return new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
+    }
+
+    function getL2SystemProxyBytecodeInfo() internal override returns (bytes memory) {
+        return "";
     }
 
     /// @dev This fixture is L1-only: no L2 leg is relayed, and the real side's artifact reads (the

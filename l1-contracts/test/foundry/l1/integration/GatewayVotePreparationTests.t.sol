@@ -22,10 +22,14 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {MockCTMForDiamondInit} from "contracts/dev-contracts/test/MockCTMForDiamondInit.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
-import {GenesisManifestLib} from "contracts/upgrades/registry/libraries/GenesisManifestLib.sol";
 import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
-import {GenesisConfig, ReleaseGenesisData} from "../../../../contracts/upgrades/registry/RegistryTypes.sol";
+import {
+    GenesisFacet,
+    PinnedContract,
+    ReleaseGenesisData,
+    ReleaseManifest
+} from "../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice Test-friendly subclass of GatewayVotePreparation that exposes the
 /// initialization + calculateAddresses path without executing L1->L2 transactions.
@@ -45,7 +49,8 @@ contract GatewayVotePreparationForTest is GatewayVotePreparation {
         (contracts, , , directCalldata, ) = GatewayCTMDeployerHelper.calculateAddresses(
             bytes32(uint256(1)),
             gatewayCTMDeployerConfig,
-            getL2BytecodeInfoTable()
+            getL2BytecodeInfoTable(),
+            getL2SystemProxyBytecodeInfo()
         );
     }
 
@@ -56,9 +61,13 @@ contract GatewayVotePreparationForTest is GatewayVotePreparation {
 
     /// @dev The real builder reads every L2 contract's bytecode from artifacts, which pushes this
     ///      test over the gas limit (MemoryOOG). The table's content is irrelevant to the address
-    ///      calculation under test, so an empty enum-length table stands in.
+    ///      calculation under test, so an empty enum-length table (with no shell) stands in.
     function getL2BytecodeInfoTable() internal override returns (bytes[] memory) {
         return new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
+    }
+
+    function getL2SystemProxyBytecodeInfo() internal override returns (bytes memory) {
+        return "";
     }
 }
 
@@ -254,34 +263,54 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
 
     /// @notice Deploys a real bootstrap `CTMRelease` pinning the computed Gateway facet set — the
     /// object the Gateway deployer takes pre-deployed.
+    /// @dev Built here rather than by replaying `directCalldata.currentReleaseCalldata`: the
+    /// predicted manifest pins the verifier's SIMULATED codehash, and this fixture does not deploy
+    /// the verifier (it comes from the verifiers deployer), while `DiamondInit.initialize` validates
+    /// every pin against live code. The rows below are the Gateway deployer's facet set
+    /// (`GatewayCTMDeployerHelper._calculateDirectDeployments`) pinned to the code the create2
+    /// replay above actually produced.
     function _deployGatewayGenesisRegistry(
         DeployedContracts memory contracts,
         GatewayCTMDeployerConfig memory config
     ) internal returns (address) {
-        // The verifiers are deployed by their own deployer contract, which this fixture does not
-        // simulate (it only replays the DIRECT create2 deployments above). The release pins the
-        // verifier's codehash, so give the predicted address code before building the manifest —
-        // the verifier's own behaviour is out of scope here; only the diamond cut is under test.
+        // Give the verifier's predicted address code so its pin holds — the verifier's own
+        // behaviour is out of scope here; only the diamond cut is under test.
         vm.etch(contracts.stateTransition.verifiers.verifier, hex"600160005500");
 
+        GenesisFacet[] memory facets = new GenesisFacet[](6);
+        facets[0] = _liveFacetRow(contracts.stateTransition.facets.adminFacet, false);
+        facets[1] = _liveFacetRow(contracts.stateTransition.facets.gettersFacet, false);
+        facets[2] = _liveFacetRow(contracts.stateTransition.facets.mailboxFacet, true);
+        facets[3] = _liveFacetRow(contracts.stateTransition.facets.executorFacet, true);
+        facets[4] = _liveFacetRow(contracts.stateTransition.facets.migratorFacet, false);
+        facets[5] = _liveFacetRow(contracts.stateTransition.facets.committerFacet, true);
+
         CTMRelease release = new CTMRelease(
-            GenesisManifestLib.buildGenesisManifest(
-                GenesisConfig({
-                    facets: contracts.stateTransition.facets,
-                    verifier: contracts.stateTransition.verifiers.verifier,
-                    genesisUpgrade: contracts.stateTransition.genesisUpgrade,
-                    genesis: ReleaseGenesisData({
-                        fixedForceDeploymentsData: config.forceDeploymentsData,
-                        genesisBatchHash: config.genesisRoot,
-                        genesisBatchCommitment: config.genesisBatchCommitment,
-                        genesisIndexRepeatedStorageChanges: uint64(config.genesisRollupLeafIndex)
-                    }),
-                    // Length-checked inventory; content is irrelevant to this fixture.
-                    l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT)
-                })
-            )
+            ReleaseManifest({
+                diamondInit: _livePin(contracts.stateTransition.facets.diamondInit),
+                verifier: _livePin(contracts.stateTransition.verifiers.verifier),
+                genesisUpgrade: _livePin(contracts.stateTransition.genesisUpgrade),
+                genesisFacets: facets,
+                genesis: ReleaseGenesisData({
+                    fixedForceDeploymentsData: config.forceDeploymentsData,
+                    genesisBatchHash: config.genesisRoot,
+                    genesisBatchCommitment: config.genesisBatchCommitment,
+                    genesisIndexRepeatedStorageChanges: uint64(config.genesisRollupLeafIndex)
+                }),
+                // Length-checked inventory; content is irrelevant to this fixture.
+                l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT),
+                l2SystemProxyBytecodeInfo: ""
+            })
         );
         return address(release);
+    }
+
+    function _liveFacetRow(address _facet, bool _isFreezable) internal view returns (GenesisFacet memory) {
+        return GenesisFacet({facet: _livePin(_facet), isFreezable: _isFreezable});
+    }
+
+    function _livePin(address _addr) internal view returns (PinnedContract memory) {
+        return PinnedContract({addr: _addr, codehash: _addr.codehash});
     }
 
     /// @notice Simulates a CREATE2 deployment by calling the deterministic CREATE2 factory.

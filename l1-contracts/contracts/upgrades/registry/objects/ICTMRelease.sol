@@ -33,6 +33,10 @@ interface ICTMRelease {
     ///         `ReleaseManifest.l2BytecodeInfos`.
     function l2BytecodeInfos() external view returns (bytes[] memory);
 
+    /// @notice The shared system-proxy shell descriptor every table member sits behind — see
+    ///         `ReleaseManifest.l2SystemProxyBytecodeInfo`.
+    function l2SystemProxyBytecodeInfo() external view returns (bytes memory);
+
     function genesisParams() external view returns (address, bytes32, bytes32, uint64);
 
     /// @notice Whether `_chain`'s live diamond routing is EXACTLY this release's — same facets,

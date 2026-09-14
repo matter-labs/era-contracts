@@ -420,10 +420,15 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         return abi.encode(data);
     }
 
-    /// @dev Get bytecode info, using cached blake hashes.
+    /// @dev The `(implementation, proxy)` system-proxy descriptor of `_c` for the genesis
+    ///      force-deployments blob, from the cached bytecode infos.
     function _getBytecodeInfo(L2EcosystemContract _c) internal virtual returns (bytes memory) {
         (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(_c);
-        return _getProxyUpgradeBytecodeInfo(fileName, contractName);
+        return
+            abi.encode(
+                _cachedBytecodeInfo(fileName, contractName),
+                _cachedBytecodeInfo("SystemContractProxy.sol", "SystemContractProxy")
+            );
     }
 
     function _buildForceDeploymentsData(

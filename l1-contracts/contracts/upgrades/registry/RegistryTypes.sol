@@ -4,15 +4,13 @@ pragma solidity 0.8.28;
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
-import {Facets} from "../../common/StateTransitionTypes.sol";
 import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.sol";
 
 /// @title Registry data types.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Every struct the registry-driven upgrade objects are built from, in one place: the
-///         manifests governance audits, the rows they are made of, and the deploy-time config a
-///         bootstrap manifest is assembled from.
+///         manifests governance audits and the rows they are made of.
 /// @dev They live here rather than next to their contracts because they are the reviewable
 ///      artifact of the whole model — see {protocol-docs/README.md} and {docs/registry-driven-upgrades.md}.
 
@@ -38,9 +36,6 @@ struct GenesisFacet {
 
 /// @notice The chain state a release pins that is neither a routing row nor a codehash pin: the
 ///         force-deployment descriptor and the genesis batch.
-/// @dev Shared by {ReleaseManifest} and {GenesisConfig} so the deploy-time input and the pinned
-///      manifest cannot drift in these fields — the config carries this verbatim into the
-///      manifest it builds.
 // solhint-disable-next-line gas-struct-packing
 struct ReleaseGenesisData {
     bytes fixedForceDeploymentsData;
@@ -51,14 +46,18 @@ struct ReleaseGenesisData {
 
 /// @param l2BytecodeInfos The release's L2 contract set, indexed by {L2EcosystemContract}
 ///        (length == `L2_ECOSYSTEM_CONTRACT_COUNT` at construction, same slot semantics as the
-///        L1 inventories): per member, the VM-specific deployed-bytecode descriptor a force
-///        deployment of this release's code at the member's fixed address carries
-///        (`UniversalContractUpgradeInfo.deployedBytecodeInfo`); an empty row means the member
-///        is not part of this release's force-deployed set. Transitions DERIVE their L2 force
+///        L1 inventories): per member, the ZKsync OS bytecode info of the IMPLEMENTATION this
+///        release runs behind the member's system proxy; an empty row means the member is not
+///        part of this release's force-deployed set. Transitions DERIVE their L2 force
 ///        deployments from this table ({TransitionDerivationLib.deriveL2Deployments}) — there is
 ///        no parallel script-side composition to drift from. A release built before an enum
 ///        append keeps its shorter table, so consumers index by member, never assume the
 ///        current count.
+/// @param l2SystemProxyBytecodeInfo The ZKsync OS bytecode info of the `SystemContractProxy`
+///        shell every table member sits behind — ONE descriptor for the whole set, since the shell
+///        is the same contract at every system address. The derivation joins it to each member's
+///        implementation row to form the `(implementation, proxy)` descriptor a system-proxy
+///        upgrade executes, so the shell is never repeated per row. Empty only when the table is.
 // solhint-disable-next-line gas-struct-packing
 struct ReleaseManifest {
     PinnedContract diamondInit;
@@ -67,6 +66,7 @@ struct ReleaseManifest {
     GenesisFacet[] genesisFacets;
     ReleaseGenesisData genesis;
     bytes[] l2BytecodeInfos;
+    bytes l2SystemProxyBytecodeInfo;
 }
 
 /// @notice The complete, typed L2 side of one transition AS EXECUTED: the force-deployments,
@@ -258,20 +258,4 @@ struct BootstrapManifest {
     address ctmExecutorOwner;
     address coordinator;
     PinnedContract upgradeTimer;
-}
-
-/// @notice Everything the deploy flow feeds into a release manifest at build time.
-/// @dev A release is version-INDEPENDENT and VM-flag-free: the version schedule is a transition
-///      concern, and VM identity is single-sourced from the pinned DiamondInit immutable.
-/// @param facets The deployed diamond facet addresses (incl. DiamondInit).
-/// @param verifier The verifier a chain at this release runs.
-/// @param genesisUpgrade The L1 genesis upgrade contract run at chain creation.
-/// @param genesis The genesis payload shared verbatim with {ReleaseManifest} ({ReleaseGenesisData}).
-// solhint-disable-next-line gas-struct-packing
-struct GenesisConfig {
-    Facets facets;
-    address verifier;
-    address genesisUpgrade;
-    ReleaseGenesisData genesis;
-    bytes[] l2BytecodeInfos;
 }

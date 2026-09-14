@@ -26,10 +26,7 @@ import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
 import {CTMContract, CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "../ctm/DeployCTML1OrGateway.sol";
 
 import {Facets, Verifiers} from "contracts/common/StateTransitionTypes.sol";
-import {GenesisManifestLib} from "contracts/upgrades/registry/libraries/GenesisManifestLib.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
-
-import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 
 import {DAContracts} from "contracts/common/StateTransitionTypes.sol";
 import {
@@ -45,7 +42,6 @@ import {
     GatewayCTMFinalResult
 } from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 import {
-    GenesisConfig,
     GenesisFacet,
     ReleaseGenesisData,
     ReleaseManifest,
@@ -87,17 +83,12 @@ struct DirectDeployedAddresses {
     ///      to that manifest and cannot be produced from inside the CTM deployer.
     address currentRelease;
     bytes32 currentReleaseCodehash;
-    /// @dev Predicted LIVE codehashes (EXTCODEHASH after deployment) in genesisFacetSlots order:
-    ///      admin, getters, mailbox, executor, migrator, committer. On an EVM-equivalent Gateway
-    ///      these come from a local simulated deployment (immutables get patched into runtime
-    ///      code, so the raw artifact hash would be wrong); on EraVM from the versioned ZK
-    ///      bytecode hash (immutables live in the simulator, not the code).
-    bytes32[6] genesisFacetCodehashes;
-    /// @dev Each facet's OWN `ISelfDescribingFacet.selectors()` output (exact embedded order —
-    ///      `abi.encode` of the manifest is order-sensitive), read from a locally simulated
-    ///      deployment of the facet's EVM twin (the embedded constant is source-level, identical
-    ///      across compile targets).
-    bytes4[][6] genesisFacetSelectors;
+    /// @dev The bootstrap release's facet rows: each facet with its freezability and its predicted
+    ///      LIVE codehash (EXTCODEHASH after deployment, from a local simulated deployment —
+    ///      immutables get patched into runtime code, so the raw artifact hash would be wrong).
+    ///      Same row order as the L1 prepare (`DeployCTMUtils.deployStateTransitionDiamondFacets`):
+    ///      the manifest encoding is order-sensitive.
+    GenesisFacet[] genesisFacets;
     bytes32 diamondInitCodehash;
     bytes32 genesisUpgradeCodehash;
     /// @dev The main verifier and its predicted live codehash. Not a direct deployment (it comes
@@ -136,8 +127,8 @@ struct L1L2DeployPrepareResult {
 }
 
 library GatewayCTMDeployerHelper {
-    // Mirrors GenesisManifestLib.GENESIS_FACET_COUNT (cross-library constants cannot size arrays).
-    uint256 internal constant GENESIS_FACET_COUNT_LOCAL = 6;
+    /// @dev The facets of a Gateway chain diamond, deployed directly by `_calculateDirectDeployments`.
+    uint256 internal constant GATEWAY_FACET_COUNT = 6;
 
     /// @notice Calculates all addresses for the deployment.
     /// @dev Uses 5 deployers + direct contract deployments.
@@ -161,16 +152,25 @@ library GatewayCTMDeployerHelper {
             address
         )
     {
-        return calculateAddresses(_create2Salt, config, SystemContractsProcessing.buildL2BytecodeInfoTable());
+        return
+            calculateAddresses(
+                _create2Salt,
+                config,
+                SystemContractsProcessing.buildL2BytecodeInfoTable(),
+                SystemContractsProcessing.systemProxyBytecodeInfo()
+            );
     }
 
     /// @param _l2BytecodeInfos The release's L2 bytecode table (`ReleaseManifest.l2BytecodeInfos`),
     ///        taken as an argument so bytecode-light callers can substitute it — the default
     ///        builder reads every L2 contract's bytecode from artifacts.
+    /// @param _l2SystemProxyBytecodeInfo The table's shared proxy shell
+    ///        (`ReleaseManifest.l2SystemProxyBytecodeInfo`), substitutable for the same reason.
     function calculateAddresses(
         bytes32 _create2Salt,
         GatewayCTMDeployerConfig memory config,
-        bytes[] memory _l2BytecodeInfos
+        bytes[] memory _l2BytecodeInfos,
+        bytes memory _l2SystemProxyBytecodeInfo
     )
         internal
         returns (
@@ -186,14 +186,16 @@ library GatewayCTMDeployerHelper {
         (contracts, deployerCalldata, deployers, directCalldata) = _calculateAddressesInner(
             _create2Salt,
             config,
-            _l2BytecodeInfos
+            _l2BytecodeInfos,
+            _l2SystemProxyBytecodeInfo
         );
     }
 
     function _calculateAddressesInner(
         bytes32 _create2Salt,
         GatewayCTMDeployerConfig memory config,
-        bytes[] memory _l2BytecodeInfos
+        bytes[] memory _l2BytecodeInfos,
+        bytes memory _l2SystemProxyBytecodeInfo
     )
         internal
         returns (
@@ -231,7 +233,13 @@ library GatewayCTMDeployerHelper {
             directAddresses.currentRelease,
             directAddresses.currentReleaseCodehash,
             directCalldata.currentReleaseCalldata
-        ) = _calculateBootstrapRelease(_create2Salt, config, directAddresses, _l2BytecodeInfos);
+        ) = _calculateBootstrapRelease(
+            _create2Salt,
+            config,
+            directAddresses,
+            _l2BytecodeInfos,
+            _l2SystemProxyBytecodeInfo
+        );
 
         GatewayCTMFinalResult memory ctmResult;
         (deployers.ctmDeployer, deployerCalldata.ctmCalldata, ctmResult) = _calculateCTMDeployer(
@@ -359,6 +367,8 @@ library GatewayCTMDeployerHelper {
         GatewayCTMDeployerConfig memory config,
         DAContracts memory daResult
     ) internal returns (DirectDeployedAddresses memory addresses, DirectCreate2Calldata memory data) {
+        addresses.genesisFacets = new GenesisFacet[](GATEWAY_FACET_COUNT);
+
         // AdminFacet
         bytes memory adminFacetArgs = abi.encode(config.l1ChainId, daResult.rollupDAManager);
         (addresses.facets.adminFacet, data.adminFacetCalldata) = _calculateCreate2AddressAndCalldata(
@@ -367,10 +377,27 @@ library GatewayCTMDeployerHelper {
             "AdminFacet",
             adminFacetArgs
         );
-        (addresses.genesisFacetSelectors[0], addresses.genesisFacetCodehashes[0]) = _simulateFacetRow(
+        addresses.genesisFacets[0] = _predictedFacetRow(
+            addresses.facets.adminFacet,
             "Admin.sol",
             "AdminFacet",
-            adminFacetArgs
+            adminFacetArgs,
+            false
+        );
+
+        // GettersFacet
+        (addresses.facets.gettersFacet, data.gettersFacetCalldata) = _calculateCreate2AddressAndCalldata(
+            _create2Salt,
+            "Getters.sol",
+            "GettersFacet",
+            hex""
+        );
+        addresses.genesisFacets[1] = _predictedFacetRow(
+            addresses.facets.gettersFacet,
+            "Getters.sol",
+            "GettersFacet",
+            hex"",
+            false
         );
 
         // MailboxFacet
@@ -386,10 +413,12 @@ library GatewayCTMDeployerHelper {
             "MailboxFacet",
             mailboxFacetArgs
         );
-        (addresses.genesisFacetSelectors[2], addresses.genesisFacetCodehashes[2]) = _simulateFacetRow(
+        addresses.genesisFacets[2] = _predictedFacetRow(
+            addresses.facets.mailboxFacet,
             "Mailbox.sol",
             "MailboxFacet",
-            mailboxFacetArgs
+            mailboxFacetArgs,
+            true
         );
 
         // ExecutorFacet
@@ -399,23 +428,12 @@ library GatewayCTMDeployerHelper {
             "ExecutorFacet",
             hex""
         );
-        (addresses.genesisFacetSelectors[3], addresses.genesisFacetCodehashes[3]) = _simulateFacetRow(
+        addresses.genesisFacets[3] = _predictedFacetRow(
+            addresses.facets.executorFacet,
             "Executor.sol",
             "ExecutorFacet",
-            hex""
-        );
-
-        // GettersFacet
-        (addresses.facets.gettersFacet, data.gettersFacetCalldata) = _calculateCreate2AddressAndCalldata(
-            _create2Salt,
-            "Getters.sol",
-            "GettersFacet",
-            hex""
-        );
-        (addresses.genesisFacetSelectors[1], addresses.genesisFacetCodehashes[1]) = _simulateFacetRow(
-            "Getters.sol",
-            "GettersFacet",
-            hex""
+            hex"",
+            true
         );
 
         // MigratorFacet
@@ -426,10 +444,12 @@ library GatewayCTMDeployerHelper {
             "MigratorFacet",
             migratorFacetArgs
         );
-        (addresses.genesisFacetSelectors[4], addresses.genesisFacetCodehashes[4]) = _simulateFacetRow(
+        addresses.genesisFacets[4] = _predictedFacetRow(
+            addresses.facets.migratorFacet,
             "Migrator.sol",
             "MigratorFacet",
-            migratorFacetArgs
+            migratorFacetArgs,
+            false
         );
 
         // CommitterFacet
@@ -440,10 +460,12 @@ library GatewayCTMDeployerHelper {
             "CommitterFacet",
             committerFacetArgs
         );
-        (addresses.genesisFacetSelectors[5], addresses.genesisFacetCodehashes[5]) = _simulateFacetRow(
+        addresses.genesisFacets[5] = _predictedFacetRow(
+            addresses.facets.committerFacet,
             "Committer.sol",
             "CommitterFacet",
-            committerFacetArgs
+            committerFacetArgs,
+            true
         );
 
         // DiamondInit — `DiamondInit(bool _isZKOS)`, always ZKsync OS.
@@ -552,9 +574,12 @@ library GatewayCTMDeployerHelper {
         bytes32 _create2Salt,
         GatewayCTMDeployerConfig memory _config,
         DirectDeployedAddresses memory _direct,
-        bytes[] memory _l2BytecodeInfos
+        bytes[] memory _l2BytecodeInfos,
+        bytes memory _l2SystemProxyBytecodeInfo
     ) internal returns (address releaseAddr, bytes32 releaseCodehash, bytes memory calldataOut) {
-        bytes memory manifestArgs = abi.encode(_reconstructGenesisManifest(_direct, _config, _l2BytecodeInfos));
+        bytes memory manifestArgs = abi.encode(
+            _predictedGenesisManifest(_direct, _config, _l2BytecodeInfos, _l2SystemProxyBytecodeInfo)
+        );
         (releaseAddr, calldataOut) = _calculateCreate2AddressAndCalldata(
             _create2Salt,
             "CTMRelease.sol",
@@ -567,64 +592,53 @@ library GatewayCTMDeployerHelper {
         releaseCodehash = BytecodeUtils.getDeployedBytecodeHash("CTMRelease.sol", "CTMRelease");
     }
 
-    /// @dev Rebuilds — from build artifacts and simulated deployments, byte-identically — the
-    ///      genesis manifest the bootstrap release is constructed with
-    ///      (`GenesisManifestLib.buildGenesisManifest`). The facets do not exist at prediction
-    ///      time, so selectors come from each facet's EVM build artifact via `cast selectors`
-    ///      (the same drift-guarded source the facets' own `ISelfDescribingFacet.selectors()`
-    ///      embeds) and codehashes from `_simulatedCodehash` (see {DirectDeployedAddresses}).
-    function _reconstructGenesisManifest(
+    /// @dev The genesis manifest the bootstrap release is constructed with, from the predicted
+    ///      addresses and simulated codehashes: none of the pinned contracts exist at prediction
+    ///      time, so nothing is read from live code (see {DirectDeployedAddresses}). The release's
+    ///      CREATE2 address commits to exactly this encoding.
+    function _predictedGenesisManifest(
         DirectDeployedAddresses memory _direct,
         GatewayCTMDeployerConfig memory _baseConfig,
-        bytes[] memory _l2BytecodeInfos
+        bytes[] memory _l2BytecodeInfos,
+        bytes memory _l2SystemProxyBytecodeInfo
     ) private pure returns (ReleaseManifest memory) {
-        (
-            address[GENESIS_FACET_COUNT_LOCAL] memory addrs,
-            bool[GENESIS_FACET_COUNT_LOCAL] memory freezable
-        ) = GenesisManifestLib.genesisFacetSlots(_direct.facets);
-
-        // Slot order matches {GenesisManifestLib.genesisFacetSlots} and the simulated rows in
-        // `DirectDeployedAddresses` (selectors in the facets' own embedded order).
-        GenesisFacet[] memory rows = new GenesisFacet[](GENESIS_FACET_COUNT_LOCAL);
-        for (uint256 i = 0; i < GENESIS_FACET_COUNT_LOCAL; ++i) {
-            rows[i] = GenesisFacet({
-                facet: PinnedContract({addr: addrs[i], codehash: _direct.genesisFacetCodehashes[i]}),
-                isFreezable: freezable[i]
-            });
-        }
-
         return
-            GenesisManifestLib.buildGenesisManifestFromRows(
-                GenesisConfig({
-                    facets: _direct.facets,
-                    verifier: _direct.verifier,
-                    genesisUpgrade: _direct.genesisUpgrade,
-                    genesis: ReleaseGenesisData({
-                        fixedForceDeploymentsData: _baseConfig.forceDeploymentsData,
-                        genesisBatchHash: _baseConfig.genesisRoot,
-                        genesisBatchCommitment: _baseConfig.genesisBatchCommitment,
-                        genesisIndexRepeatedStorageChanges: uint64(_baseConfig.genesisRollupLeafIndex)
-                    }),
-                    l2BytecodeInfos: _l2BytecodeInfos
+            ReleaseManifest({
+                diamondInit: PinnedContract({addr: _direct.facets.diamondInit, codehash: _direct.diamondInitCodehash}),
+                verifier: PinnedContract({addr: _direct.verifier, codehash: _direct.verifierCodehash}),
+                genesisUpgrade: PinnedContract({
+                    addr: _direct.genesisUpgrade,
+                    codehash: _direct.genesisUpgradeCodehash
                 }),
-                rows,
-                _direct.diamondInitCodehash,
-                _direct.verifierCodehash,
-                _direct.genesisUpgradeCodehash
-            );
+                genesisFacets: _direct.genesisFacets,
+                genesis: ReleaseGenesisData({
+                    fixedForceDeploymentsData: _baseConfig.forceDeploymentsData,
+                    genesisBatchHash: _baseConfig.genesisRoot,
+                    genesisBatchCommitment: _baseConfig.genesisBatchCommitment,
+                    genesisIndexRepeatedStorageChanges: uint64(_baseConfig.genesisRollupLeafIndex)
+                }),
+                l2BytecodeInfos: _l2BytecodeInfos,
+                l2SystemProxyBytecodeInfo: _l2SystemProxyBytecodeInfo
+            });
     }
 
-    /// @dev One facet's manifest row inputs from a LOCAL simulated deployment of its EVM twin:
-    ///      `selectors()` in the facet's own embedded order (the manifest encoding is
-    ///      order-sensitive) and the flavour-appropriate codehash.
-    function _simulateFacetRow(
+    /// @dev One facet's release row: its predicted address, the codehash of a LOCAL simulated
+    ///      deployment of its EVM twin, and `_isFreezable`.
+    function _predictedFacetRow(
+        address _facet,
         string memory _fileName,
         string memory _contractName,
-        bytes memory _constructorArgs
-    ) private returns (bytes4[] memory selectors, bytes32 codehash) {
-        address simulated = _simulateDeploy(_fileName, _contractName, _constructorArgs);
-        selectors = ISelfDescribingFacet(simulated).selectors();
-        codehash = simulated.codehash;
+        bytes memory _constructorArgs,
+        bool _isFreezable
+    ) private returns (GenesisFacet memory) {
+        return
+            GenesisFacet({
+                facet: PinnedContract({
+                    addr: _facet,
+                    codehash: _simulatedCodehash(_fileName, _contractName, _constructorArgs)
+                }),
+                isFreezable: _isFreezable
+            });
     }
 
     /// @dev A stand-in Gateway chain id for local simulation: some facet constructors VALIDATE
