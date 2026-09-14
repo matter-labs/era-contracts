@@ -25,7 +25,8 @@ import {MigrationPaused, ChainTypeManagerNotRegistered, NotCTMOwner} from "contr
 ///
 /// @dev Authority is DERIVED, not stored: a caller qualifies by being the current owner of a CTM
 ///      this ecosystem registered. There is no allowlist to maintain, so replacing an executor
-///      cannot strand the ability to pause. See {docs/upgrade-stage-lifecycle.md}, section 4.3.
+///      cannot strand the ability to pause. See "Migration pause: two pauses, on two authorities"
+///      in {docs/upgrade-stage-lifecycle.md}.
 /// @dev Runs against a real `L1ChainAssetHandler` deployed directly (its constructor sets the
 ///      owner). The Bridgehub is mocked for the two lookups the pause surface makes —
 ///      `chainTypeManagerIsRegistered` and `ctmAssetIdToAddress` — because the pause logic

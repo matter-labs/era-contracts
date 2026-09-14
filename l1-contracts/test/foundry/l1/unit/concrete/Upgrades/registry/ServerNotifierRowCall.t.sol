@@ -79,7 +79,8 @@ contract NotifierImplV2 {
 contract ChainAdminStub is Ownable {}
 
 /// @notice The ServerNotifier's implementation swap is emitted as the ChainAdmin's own call
-///         (section 4.4 of {docs/upgrade-stage-lifecycle.md}). That call is RENDERED from the
+///         ("ServerNotifier: a row under a foreign admin" in {docs/upgrade-stage-lifecycle.md}).
+///         That call is RENDERED from the
 ///         `CTMContract.ServerNotifier` row the upgrade object pins — the transition on a
 ///         recurring edge, the bootstrap migration on the bootstrap edge — and is byte-identical
 ///         to the `ProxyAdmin` call `ProxyUpgradeRowLib.applyRows` makes for the same row, so the

@@ -9,6 +9,9 @@ import {Vm} from "forge-std/Vm.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 import {Test} from "forge-std/Test.sol";
+import {UpgradeSimulation} from "deploy-scripts/simulation/UpgradeSimulation.s.sol";
+import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
+import {UpgradeChainCall} from "deploy-scripts/utils/UpgradeChainCall.sol";
 import {DefaultCoreUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCoreUpgrade.s.sol";
 import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
 import {DefaultChainUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultChainUpgrade.s.sol";
@@ -110,10 +113,53 @@ abstract contract UpgradeIntegrationTestBase is Test {
         console.log("setupUpgrade: Preparing CTM admin calls");
         _cacheCTMAdminCalls(ctmUpgrade.prepareDefaultCTMAdminCalls());
         _ctmAdminCallsPrepared = true;
+        _assertSimulationProbes();
 
         console.log("setupUpgrade: Preparing chain for the upgrade");
         chainUpgrade.prepareChainWithBridgehub(chainId, params.bridgehubProxyAddress);
         console.log("setupUpgrade: Complete");
+    }
+
+    /// @dev Exercise the same independent package augmentation used by protocol-ops on real
+    ///      prepared contracts; the probes must not alter chain state or deployment output.
+    function _assertSimulationProbes() internal {
+        string memory outputPath = string.concat(vm.projectRoot(), CTM_OUTPUT);
+        string memory beforeOutput = vm.readFile(outputPath);
+        assertFalse(beforeOutput.keyExists(".test_upgrade_calls"), "production prepare emitted test calls");
+        vm.setEnv("UPGRADE_SIMULATION_CTM", vm.toString(ctmUpgrade.getCTMAddress()));
+        vm.setEnv("UPGRADE_SIMULATION_OUTPUT", outputPath);
+        UpgradeSimulation simulation = new UpgradeSimulation();
+        simulation.run();
+        string memory output = vm.readFile(outputPath);
+        assertEq(
+            output.readBytes(".chain_upgrade_diamond_cut"),
+            beforeOutput.readBytes(".chain_upgrade_diamond_cut"),
+            "simulation changed the reviewed cut"
+        );
+        Call[] memory upgrades = abi.decode(output.readBytes(".test_upgrade_calls.test_upgrade_chain"), (Call[]));
+        Call[] memory creations = abi.decode(output.readBytes(".test_upgrade_calls.test_create_chain"), (Call[]));
+        assertEq(upgrades.length, 1, "missing chain-upgrade probe");
+        assertEq(creations.length, 1, "missing chain-creation probe");
+        assertEq(IZKChain(upgrades[0].target).getChainTypeManager(), ctmUpgrade.getCTMAddress());
+        assertEq(
+            output.readAddress(".test_upgrade_calls.test_upgrade_chain_caller"),
+            IZKChain(upgrades[0].target).getAdmin()
+        );
+        assertEq(
+            upgrades[0].data,
+            UpgradeChainCall.encode(
+                upgrades[0].target,
+                ctmUpgrade.getOldProtocolVersion(),
+                abi.decode(ctmUpgrade.getChainUpgradeDiamondCutData(), (Diamond.DiamondCutData))
+            ),
+            "simulation changed chain-upgrade calldata"
+        );
+        assertEq(creations[0].target, coreUpgrade.getDiscoveredBridgehub().proxies.bridgehub);
+        assertEq(output.readAddress(".test_upgrade_calls.test_create_chain_caller"), ctmUpgrade.getBridgehubAdmin());
+        assertEq(IChainTypeManager(ctmUpgrade.getCTMAddress()).protocolVersion(), ctmUpgrade.getOldProtocolVersion());
+        vm.expectRevert("simulation calls already exist; rerun prepare first");
+        simulation.run();
+        assertEq(vm.readFile(outputPath), output, "duplicate invocation corrupted the package");
     }
 
     /// @notice The version-specific (possibly mocked) core upgrade script under test.
@@ -187,8 +233,14 @@ abstract contract UpgradeIntegrationTestBase is Test {
 
         console.log("Creating new chain");
         address admin = ctmUpgrade.getBridgehubAdmin();
+        UpgradeSimulation simulation = new UpgradeSimulation();
+        Call memory createNewChainCall = simulation.createChainCall(
+            ctmUpgrade.getCTMAddress(),
+            chainId,
+            NEW_CHAIN_ID,
+            admin
+        );
         vm.startPrank(admin);
-        Call memory createNewChainCall = ctmUpgrade.prepareCreateNewChainCall(NEW_CHAIN_ID)[0];
         (bool success, ) = payable(createNewChainCall.target).call{value: createNewChainCall.value}(
             createNewChainCall.data
         );

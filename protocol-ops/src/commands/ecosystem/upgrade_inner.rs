@@ -527,6 +527,25 @@ impl<'a> UpgradeInner<'a> {
             .run(script)
             .context("Failed to execute the CTM script's noGovernancePrepare")?;
 
+        // Simulation probes are generated independently from production prepare. Preserve the
+        // existing package fields consumed by the merger and simulator, without broadcasting
+        // either probe or coupling their construction to a version-specific prepare script.
+        let simulation = runner
+            .script_path_from_root(
+                self.contracts_path,
+                Path::new("deploy-scripts/simulation/UpgradeSimulation.s.sol"),
+            )
+            .with_env("UPGRADE_SIMULATION_CTM", format!("{ctm_proxy:#x}"))
+            .with_env(
+                "UPGRADE_SIMULATION_OUTPUT",
+                ctm_output_path.to_string_lossy().into_owned(),
+            )
+            .with_offline()
+            .with_wallet(deployer);
+        runner
+            .run(simulation)
+            .context("Failed to generate chain upgrade/creation simulator probes")?;
+
         Ok((ctm_output_path, is_zk_sync_os))
     }
 }

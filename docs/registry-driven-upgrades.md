@@ -398,8 +398,9 @@ On the chain, `DefaultUpgrade.upgradeFromTransition` applies `transition.facetCu
 runs the shared storage part (`BaseZkSyncUpgrade._upgrade`) with inputs read straight from the same
 object: the version edge and schedule from the transition, the verifier of its TARGET release (never
 the CTM's live `currentRelease()`), and the L2 protocol upgrade transaction composed from its L2
-plan. There is no intermediate proposal struct, no selector resolution and no re-diffing at
-execution time.
+plan with the executing chain’s ID and Bridgehub. The pinned delegate composer builds final
+chain-specific calldata directly; no placeholder transaction is decoded and rewritten later.
+There is no intermediate proposal struct, selector resolution or re-diffing at execution time.
 
 ## What the derivation guarantees
 

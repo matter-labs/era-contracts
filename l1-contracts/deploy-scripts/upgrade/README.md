@@ -135,6 +135,12 @@ document, "Flow: upgrading"). `chain set-upgrade-timestamp` schedules it on the 
 ({protocol-docs/upgrade-scheduling.md}); `chain set-da-validator-pair` restores the DA pair the
 upgrade resets.
 
+Server and monitoring consumers must read the final transaction through
+`transition.l2UpgradeTx(bridgehub, chainId)` or `bootstrap.l2UpgradeTx(chainId)`. These views
+use the same chain-context composition as execution. The former
+`getL2UpgradeTxData(bridgehub, chainId, zksyncOS, data)` API is removed; updating and verifying
+external consumers is required before rollout.
+
 ## Preparing the scripts for a new upgrade
 
 Start from `v35/`: inherit the `Default*Upgrade` bases, override `deployNew*Contracts` with the

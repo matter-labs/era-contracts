@@ -19,7 +19,6 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Utils} from "../../utils/Utils.sol";
 import {ChainCreationParamsConfig, ZkChainAddresses} from "../../utils/Types.sol";
-import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
@@ -55,7 +54,6 @@ import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 import {CTMUpgradeParams} from "./UpgradeParams.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
-import {UpgradeChainCall} from "deploy-scripts/utils/UpgradeChainCall.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
@@ -102,8 +100,6 @@ struct AuthoredL2Side {
 contract DefaultCTMUpgrade is Script, DeployCTMScript {
     using stdToml for string;
     using ExternalActionsLib for ExternalActionsLib.Ledger;
-
-    uint256 internal constant ZKSYNC_OS_TEST_CREATE_CHAIN_ID = 556;
 
     /// @dev Deployed on first use; see {ReleaseMemberProbe} for why it is a separate contract.
     ReleaseMemberProbe internal releaseMemberProbe;
@@ -200,10 +196,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         // Declared before the governance calls are written, so the output lists the admin action.
         prepareDefaultCTMAdminCalls();
         prepareDefaultGovernanceCalls();
-
-        // Test-only calls (`test_create_chain`, `test_upgrade_chain`) ride the CTM output TOML
-        // so protocol-ops can lift them into the merged `ecosystem.toml` for simulator checks.
-        prepareDefaultTestUpgradeCalls();
     }
 
     function initializeWithArgs(
@@ -675,24 +667,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         return coreAddresses.shared.bridgehubAdmin;
     }
 
-    /// @notice This function is meant to only be used in tests
-    function prepareCreateNewChainCall(uint256 chainId) public view virtual returns (Call[] memory result) {
-        require(coreAddresses.bridgehub.proxies.bridgehub != address(0), "bridgehubProxyAddress is zero in newConfig");
-
-        bytes32 newChainAssetId = L1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).baseTokenAssetId(
-            upToDateZkChain.chainId
-        );
-        result = new Call[](1);
-        result[0] = Call({
-            target: coreAddresses.bridgehub.proxies.bridgehub,
-            value: 0,
-            data: abi.encodeCall(
-                IL1Bridgehub.createNewChain,
-                (chainId, ctmAddresses.stateTransition.proxies.chainTypeManager, newChainAssetId, msg.sender)
-            )
-        });
-    }
-
     function setAddressesBasedOnCTM() internal virtual {
         address ctm = newConfig.ctm;
 
@@ -852,34 +826,12 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         vm.writeToml(updatedCtmAdminToml, upgradeConfig.outputPath);
     }
 
-    function prepareDefaultTestUpgradeCalls() public {
-        (Call[] memory testUpgradeChainCall, address ZKChainAdmin) = TESTONLY_prepareTestUpgradeChainCall();
-        vm.serializeAddress("test_upgrade_calls", "test_upgrade_chain_caller", ZKChainAdmin);
-        vm.serializeBytes("test_upgrade_calls", "test_upgrade_chain", abi.encode(testUpgradeChainCall));
-        (Call[] memory testCreateChainCall, address bridgehubAdmin) = TESTONLY_prepareCreateChainCall();
-        vm.serializeAddress("test_upgrade_calls", "test_create_chain_caller", bridgehubAdmin);
-
-        string memory testUpgradeCallsSerialized = vm.serializeBytes(
-            "test_upgrade_calls",
-            "test_create_chain",
-            abi.encode(testCreateChainCall)
-        );
-
-        // See the note in prepareDefaultGovernanceCalls on why keyed writeToml is not used here.
-        string memory updatedTestCallsToml = vm.serializeString(
-            "root",
-            "test_upgrade_calls",
-            testUpgradeCallsSerialized
-        );
-        vm.writeToml(updatedTestCallsToml, upgradeConfig.outputPath);
-    }
-
     /// @notice The pinned `CTMContract.ServerNotifier` row rendered as the call its own
     ///         administrator makes — the same `ProxyAdmin` call `ProxyUpgradeRowLib.applyRows`
     ///         would make were the executor to own that admin: `upgradeAndCall` with the fixed,
     ///         argument-less `initializeUpgrade()` when the row reinitializes, a plain `upgrade`
-    ///         otherwise (see {docs/upgrade-stage-lifecycle.md} section 4.4). Empty when the
-    ///         inventory leaves the notifier alone.
+    ///         otherwise (see "ServerNotifier: a row under a foreign admin" in
+    ///         {docs/upgrade-stage-lifecycle.md}). Empty when the inventory leaves the notifier alone.
     function prepareUpgradeServerNotifierCall() public view virtual returns (Call[] memory calls) {
         ProxyUpgradeRow memory row = pinnedCTMProxyInventory()[uint256(CTMContract.ServerNotifier)];
         if (row.implNew.addr == address(0)) {
@@ -917,39 +869,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
 
     function getAddresses() public view override returns (CTMDeployedAddresses memory) {
         return ctmAddresses;
-    }
-
-    /// @notice Tests that it is possible to upgrade a chain to the new version
-    function TESTONLY_prepareTestUpgradeChainCall() private view returns (Call[] memory calls, address admin) {
-        address chainDiamondProxyAddress = L1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).getZKChain(
-            upToDateZkChain.chainId
-        );
-        uint256 oldProtocolVersion = getOldProtocolVersion();
-        Diamond.DiamondCutData memory upgradeCutData = abi.decode(
-            getChainUpgradeDiamondCutData(),
-            (Diamond.DiamondCutData)
-        );
-        admin = IZKChain(chainDiamondProxyAddress).getAdmin();
-        // Each protocol generation exposes a different `upgradeChainFromVersion` on the chain
-        // diamond; calling the wrong one hits the DiamondProxy fallback and reverts with "F".
-        bytes memory upgradeCallData = UpgradeChainCall.encode(
-            chainDiamondProxyAddress,
-            oldProtocolVersion,
-            upgradeCutData
-        );
-        calls = new Call[](1);
-        calls[0] = Call({target: chainDiamondProxyAddress, data: upgradeCallData, value: 0});
-    }
-
-    /// @notice Tests that it is possible to create a new chain with the new version
-    function getDefaultTestCreateChainId() public view virtual returns (uint256) {
-        return ZKSYNC_OS_TEST_CREATE_CHAIN_ID;
-    }
-
-    function TESTONLY_prepareCreateChainCall() private returns (Call[] memory calls, address admin) {
-        admin = getBridgehubAdmin();
-        calls = new Call[](1);
-        calls[0] = prepareCreateNewChainCall(getDefaultTestCreateChainId())[0];
     }
 
     function getCreationCalldata(string memory contractName) internal view virtual override returns (bytes memory) {

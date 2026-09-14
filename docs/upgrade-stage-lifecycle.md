@@ -78,12 +78,9 @@ extra bytecode infos and a codehash-pinned `IL2DelegateCalldataComposer` (v34:
 `L2V34DelegateCalldataComposer`). `L2PlanLib` constructs the deployments, delegate address and
 factory-dependency hashes from those inputs.
 
-`CTMUpgradeComposer` asks the pinned composer for the calldata at composition time from
-authoritative inputs — the target release and the ecosystem's Bridgehub. The delegate's address is
-determined by its own force deployment, so the pieces the scripts used to relate by hand — delegate
-deployment, delegate address, delegate arguments — are one pinned deployment plus one pinned piece
-of code. Per-chain data stays the ZKsync OS engine's rewrite at execution. A composer without a
-delegate is malformed (`L2PlanLib.build`).
+`CTMUpgradeComposer` asks the pinned composer for final calldata using the target release,
+Bridgehub and chain ID. The v34 composer reads the chain-specific force-deployment data directly;
+the execution engine no longer decodes placeholders or understands the v34 delegate ABI.
 
 ## The upgrade timer
 

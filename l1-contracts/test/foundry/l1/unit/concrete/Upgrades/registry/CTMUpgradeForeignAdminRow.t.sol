@@ -42,8 +42,9 @@ contract NotifierImplOther {
 }
 
 /// @notice CTM-domain rows under a FOREIGN `ProxyAdmin` — the ServerNotifier shape of
-///         {docs/upgrade-stage-lifecycle.md} section 4.4 and "A row names its admin" in
-///         {docs/registry-driven-upgrades.md}: a per-CTM proxy administered by an admin the CTM
+///         "ServerNotifier: a row under a foreign admin" in {docs/upgrade-stage-lifecycle.md} and
+///         "A row names its admin" in {docs/registry-driven-upgrades.md}: a per-CTM proxy
+///         administered by an admin the CTM
 ///         executor may or may not own. Stage 1 applies such a row only when the executor OWNS
 ///         its admin and otherwise leaves it to that administrator (logged, not reverted); stage 2
 ///         requires it applied either way, read through the row's own admin.

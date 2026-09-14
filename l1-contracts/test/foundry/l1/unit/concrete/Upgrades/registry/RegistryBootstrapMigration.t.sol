@@ -121,7 +121,8 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     address internal implV32;
     address internal implUnknown;
     // The ServerNotifier shape: a per-CTM proxy under its OWN admin, owned by the chain admin
-    // rather than by the CTM domain's ProxyAdmin ({docs/upgrade-stage-lifecycle.md}, section 4.4).
+    // rather than by the CTM domain's ProxyAdmin ("ServerNotifier: a row under a foreign admin" in
+    // {docs/upgrade-stage-lifecycle.md}).
     address internal chainAdmin;
     ProxyAdmin internal notifierAdmin;
     TransparentUpgradeableProxy internal notifierProxy;
