@@ -25,7 +25,6 @@ import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import {ProposedUpgrade} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {
     MAX_ALLOWED_MINOR_VERSION_DELTA,
@@ -379,24 +378,6 @@ contract StorageRegistriesTest is Test {
             ),
             "the delegate is called with what the pinned composer composed"
         );
-
-        ProposedUpgrade memory proposedUpgrade = CTMUpgradeComposer.buildProposedUpgrade(
-            ICTMTransition(address(transition)),
-            bridgehub
-        );
-        assertEq(
-            keccak256(abi.encode(proposedUpgrade.l2ProtocolUpgradeTx)),
-            keccak256(abi.encode(transaction)),
-            "the proposal embeds the same composed transaction"
-        );
-        assertEq(proposedUpgrade.newProtocolVersion, NEW_VERSION);
-        assertEq(proposedUpgrade.upgradeTimestamp, 1234567);
-        assertEq(proposedUpgrade.verifier, verifier);
-        // The frozen `ProposedUpgrade` still carries the EraVM bytecode-hash words; the composer
-        // leaves them zero.
-        assertEq(proposedUpgrade.bootloaderHash, bytes32(0));
-        assertEq(proposedUpgrade.defaultAccountHash, bytes32(0));
-        assertEq(proposedUpgrade.evmEmulatorHash, bytes32(0));
     }
 
     /// @dev Regression: the MINIMAL L2 plan — the delegate's own Unsafe deployment and nothing

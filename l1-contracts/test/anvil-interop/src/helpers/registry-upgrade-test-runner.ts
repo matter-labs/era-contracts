@@ -482,8 +482,8 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     // proxy shell are placed the way the pipeline runner does before the real `L2ComplexUpgrader`
     // performs the system-proxy upgrades.
     console.log("\n── Relaying the bootstrap's composed L2 upgrade transaction ──");
-    const bootstrapProposed = await migration.proposedUpgrade();
-    const bootstrapL2Call = decodeUpgradeTxData(bootstrapProposed.l2ProtocolUpgradeTx.data);
+    const bootstrapL2Tx = await migration.l2UpgradeTx();
+    const bootstrapL2Call = decodeUpgradeTxData(bootstrapL2Tx.data);
     for (const chain of upgradeChains) {
       const l2Chain = anvilManager.getL2Chains().find((c) => c.chainId === chain.chainId);
       if (!l2Chain) {
@@ -497,7 +497,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
         true,
         "MockContractDeployer"
       );
-      await relayL2UpgradeTx(l2Provider, bootstrapProposed.l2ProtocolUpgradeTx.data, chain.chainId);
+      await relayL2UpgradeTx(l2Provider, bootstrapL2Tx.data, chain.chainId);
     }
     await clearGenesisUpgradeTxHash(l1Provider, upgradeChains);
 

@@ -9,8 +9,8 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {IServerNotifier} from "contracts/governance/IServerNotifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
-import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
+import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {
     NoCommittedUpgradeCutForVersion,
     ProtocolIdMismatch,
@@ -199,14 +199,22 @@ contract UpgradeChainFromVersionTest is AdminTest {
         uint256 oldProtocolVersion = 1;
         uint256 newProtocolVersion = SemVer.packSemVer(0, 1, 0);
 
-        // Build a real upgrade via DefaultUpgrade that bumps the protocol version
+        // A real DefaultUpgrade engine over a stand-in transition (see `Utils.mockL1OnlyTransition`):
+        // the subject here is the facet's time gate, not the registry objects the engine reads.
         DefaultUpgrade defaultUpgrade = new DefaultUpgrade();
-        ProposedUpgrade memory proposedUpgrade = ProposedUpgradeLib.emptyProposedUpgrade(newProtocolVersion);
+        address transition = makeAddr("transition");
+        Utils.mockL1OnlyTransition(
+            transition,
+            makeAddr("newRelease"),
+            oldProtocolVersion,
+            newProtocolVersion,
+            mockVerifier
+        );
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
             initAddress: address(defaultUpgrade),
-            initCalldata: abi.encodeCall(IDefaultUpgrade.upgrade, (proposedUpgrade))
+            initCalldata: abi.encodeCall(IDefaultUpgrade.upgradeFromTransition, (transition))
         });
 
         utilsFacet.util_setProtocolVersion(oldProtocolVersion);

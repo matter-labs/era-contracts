@@ -16,7 +16,8 @@ import {IChainAssetHandlerBase} from "../../../core/chain-asset-handler/IChainAs
 import {GovernanceUpgradeTimer} from "../../GovernanceUpgradeTimer.sol";
 import {BytecodesSupplier} from "../../BytecodesSupplier.sol";
 import {L2PlanValidationLib} from "../libraries/L2PlanValidationLib.sol";
-import {ProposedUpgrade} from "../../../state-transition/libraries/ProposedUpgradeLib.sol";
+import {IRegistryBootstrapMigration} from "./IRegistryBootstrapMigration.sol";
+import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
 import {
     BootstrapAlreadyExecuted,
     BootstrapAuthorityNotHeld,
@@ -34,7 +35,7 @@ import {
 import {OutdatedProtocolVersion} from "../../../state-transition/L1StateTransitionErrors.sol";
 import {BootstrapManifest, L2UpgradePlan, ProxyUpgradeRow} from "../RegistryTypes.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
-import {IDefaultUpgrade} from "../../IDefaultUpgrade.sol";
+import {IBootstrapUpgrade} from "../../IBootstrapUpgrade.sol";
 import {IDiamondInit} from "../../../state-transition/chain-interfaces/IDiamondInit.sol";
 import {IComplexUpgrader} from "../../../state-transition/l2-deps/IComplexUpgrader.sol";
 import {CTMUpgradeComposer} from "../libraries/CTMUpgradeComposer.sol";
@@ -57,7 +58,7 @@ import {MAX_NEW_FACTORY_DEPS} from "../../../common/Config.sol";
 /// @dev Authority is never parked: `migrate()` acquires nothing it does not hand onward in the same
 ///      transaction. Governance transfers ownership in, the migration executes, and ownership
 ///      leaves to the executors before the call returns.
-contract RegistryBootstrapMigration {
+contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
     using CodehashPinLib for address;
 
     /// @notice Set once `migrate` has run. The edge is one-shot: replaying it would re-check a
@@ -136,13 +137,12 @@ contract RegistryBootstrapMigration {
         return keccak256(encodedManifest);
     }
 
-    /// @notice The whole manifest, exactly as it was pinned.
+    /// @inheritdoc IRegistryBootstrapMigration
     function getManifest() public view returns (BootstrapManifest memory) {
         return abi.decode(encodedManifest, (BootstrapManifest));
     }
 
-    /// @notice The FINAL, executable L2 plan of the edge: the stored derived-plus-extra
-    ///         deployments with the authored delegate leg and factory dependencies.
+    /// @inheritdoc IRegistryBootstrapMigration
     function l2Plan() public view returns (L2UpgradePlan memory) {
         BootstrapManifest memory m = getManifest();
         return
@@ -154,28 +154,26 @@ contract RegistryBootstrapMigration {
             });
     }
 
-    /// @notice The engine init payload of the committed cut, composed from the pinned inputs by
-    ///         the same composer transitions use: the genesis release's verifier, the version edge,
-    ///         the schedule and the L2 transaction for the ecosystem the CTM belongs to.
-    function proposedUpgrade() public view returns (ProposedUpgrade memory) {
+    /// @inheritdoc IRegistryBootstrapMigration
+    function l2UpgradeTx() public view returns (L2CanonicalTransaction memory) {
         BootstrapManifest memory m = getManifest();
         return
-            CTMUpgradeComposer.buildProposedUpgradeFromPlan({
+            CTMUpgradeComposer.buildL2UpgradeTxFromPlan({
                 _plan: l2Plan(),
                 _newRelease: ICTMRelease(m.currentRelease.addr),
                 _newProtocolVersion: m.newProtocolVersion,
-                _upgradeTimestamp: m.upgradeTimestamp,
                 _bridgehub: IChainTypeManager(m.ctm).BRIDGE_HUB()
             });
     }
 
-    /// @notice The diamond cut this edge commits — no facet cuts, the pinned engine's init over
-    ///         {proposedUpgrade}. Chains crossing the edge take exactly these bytes by hand.
+    /// @inheritdoc IRegistryBootstrapMigration
+    /// @dev The engine reads the version edge, schedule and L2 plan from this object at execution,
+    ///      so the cut carries nothing but the reference back to it.
     function upgradeCut() public view returns (Diamond.DiamondCutData memory) {
         return
             CTMUpgradeComposer.buildUpgradeCutData(
                 getManifest().upgradeEngine.addr,
-                abi.encodeCall(IDefaultUpgrade.upgrade, (proposedUpgrade()))
+                abi.encodeCall(IBootstrapUpgrade.upgradeFromBootstrap, (address(this)))
             );
     }
 

@@ -216,10 +216,11 @@ struct CoreRegistryManifest {
 ///        cut's init target. The cut carries NO facet cuts and NO authored calldata: the facet
 ///        delta cannot be derived at construction (the departing version predates releases, so
 ///        there is no `fromRelease` to diff against), so the engine removes each chain's live
-///        routing and installs the genesis release's facet set AT EXECUTION; and the engine's
-///        `ProposedUpgrade` is COMPOSED on read (`upgradeCut()`) from the pinned inputs below by
-///        the same composer transitions use — the bootstrap is bootstrap-specific INPUTS, not a
-///        second composition path.
+///        routing and installs the genesis release's facet set AT EXECUTION; and the engine reads
+///        the version edge, schedule and L2 plan below from this object at execution
+///        (`upgradeFromBootstrap`), composing the L2 transaction with the same composer
+///        transitions use — the bootstrap is bootstrap-specific INPUTS, not a second composition
+///        path.
 /// @param l2Plan The authored L2 remainder, exactly as on a transition: extra deployments, the
 ///        delegate target and its pinned calldata composer, and the factory dependencies. The
 ///        table-derived deployments come from `currentRelease`'s own L2 bytecode table.

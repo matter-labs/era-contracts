@@ -37,6 +37,7 @@ const ARTIFACTS = {
   ICoreRegistry: "ICoreRegistry.sol/ICoreRegistry.json",
   DefaultUpgrade: "DefaultUpgrade.sol/DefaultUpgrade.json",
   BootstrapUpgradeDev: "BootstrapUpgradeDev.sol/BootstrapUpgradeDev.json",
+  BootstrapUpgradeZKsyncOS: "BootstrapUpgradeZKsyncOS.sol/BootstrapUpgradeZKsyncOS.json",
   DiamondInit: "DiamondInit.sol/DiamondInit.json",
   ZKsyncOSTestnetVerifier: "ZKsyncOSTestnetVerifier.sol/ZKsyncOSTestnetVerifier.json",
   ZKsyncOSVerifierPlonk: "ZKsyncOSVerifierPlonk.sol/ZKsyncOSVerifierPlonk.json",

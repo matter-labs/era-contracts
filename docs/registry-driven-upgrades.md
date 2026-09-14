@@ -131,13 +131,13 @@ is a missing line in an audited contract diff, never a wrong byte in offchain-au
 
 Supporting libraries:
 
-| Library                   | Role                                                                                  |
-| ------------------------- | ------------------------------------------------------------------------------------- |
-| `TransitionDerivationLib` | `deriveFacetCuts` / `deriveHashChanges` from a release pair                           |
-| `ReleaseFacetReader`      | `newChainInstallations(release)` — genesis cuts from a release's routing              |
-| `CTMUpgradeComposer`      | `buildUpgradeCutData`, `buildL2UpgradeTx`, `buildProposedUpgrade` from a transition   |
-| `GenesisManifestLib`      | `GenesisConfig` → genesis `ReleaseManifest`, capturing routing and pins at build time |
-| `CodehashPinLib`          | `requirePin` (reverts) / `pinHolds` (bool)                                            |
+| Library                   | Role                                                                                             |
+| ------------------------- | ------------------------------------------------------------------------------------------------ |
+| `TransitionDerivationLib` | `deriveFacetCuts` / `deriveHashChanges` from a release pair                                      |
+| `ReleaseFacetReader`      | `newChainInstallations(release)` — genesis cuts from a release's routing                         |
+| `CTMUpgradeComposer`      | `buildUpgradeCutData`; `buildL2UpgradeTx` / `buildL2UpgradeTxFromPlan` from a transition or plan |
+| `GenesisManifestLib`      | `GenesisConfig` → genesis `ReleaseManifest`, capturing routing and pins at build time            |
+| `CodehashPinLib`          | `requirePin` (reverts) / `pinHolds` (bool)                                                       |
 
 ## Contract map
 
@@ -406,7 +406,7 @@ sequenceDiagram
     E->>C: upgradeChainFromVersion(chainId, oldV)
     C->>D: upgradeChainFromVersion(oldV)
     D->>C: upgradeCutForVersion(oldV) — cut derived from upgradeTransition[oldV]
-    Note over D: apply derived facetCuts verbatim,<br/>then run composed ProposedUpgrade
+    Note over D: apply derived facetCuts verbatim,<br/>then version + target release's verifier + composed L2 tx
     G->>E: stage2(transition)
     Note over E: validateTransitionApplied +<br/>X.validateUpgradeApplied(coreRegistry)
     E->>H: unpauseMigration()
@@ -466,9 +466,13 @@ not to the chain — the chain's Admin facet takes only the departing version an
 its CTM, so no caller can substitute one. The chain diamond still treats the cut it reads as opaque
 bytes and stays unaware of transitions.
 
-On the chain, `BaseZkSyncUpgrade.upgradeFromTransition` validates the transition, applies
-`transition.facetCuts()` verbatim, and runs the `ProposedUpgrade` composed from the same object.
-There is no selector resolution and no re-diffing at execution time.
+On the chain, `DefaultUpgrade.upgradeFromTransition` applies `transition.facetCuts()` verbatim, then
+runs the shared storage part (`BaseZkSyncUpgrade._upgrade`) with inputs read straight from the same
+object: the version edge and schedule from the transition, the verifier of its TARGET release (never
+the CTM's live `currentRelease()` — a lagging chain executes the transition committed for its own
+edge after the CTM has moved on), and the L2 protocol upgrade transaction composed from its L2 plan.
+Nothing is repackaged into an intermediate struct, and there is no selector resolution and no
+re-diffing at execution time.
 
 CTM binding is commitment-based: a chain accepts only the cut whose hash its own CTM committed, and
 that commitment is written exclusively by the CTM-bound executor.
@@ -541,8 +545,8 @@ dependencies (`L2PlanValidationLib`).
 **Verifier.** Zero means "leave unchanged" on the upgrade path, which is how the genesis upgrade runs
 after `DiamondInit` has already installed it; a release itself can never pin a zero verifier. ZKsync
 OS chains have no base-system bytecodes: the EraVM bootloader/default-account/EVM-emulator hash slots
-are deprecated (EVM-1643), so releases pin none and transitions derive no hash changes — the frozen
-`ProposedUpgrade` words stay zero.
+are deprecated (EVM-1643), so releases pin none, transitions derive no hash changes, and the engines
+take no bytecode-hash inputs at all.
 
 **Row sets.** Core-registry and bootstrap rows are real, unique edges: all fields nonzero, one row
 per proxy. Duplicates would both pass the source check and the last would silently win, so the
@@ -584,11 +588,13 @@ Two properties that look like omissions but are not:
   derived at construction (the departing version predates releases, so there is no `fromRelease` to
   diff against), so it is derived AT EXECUTION instead: the cut's init target is the bootstrap engine
   (`BootstrapUpgradeZKsyncOS`), which removes each chain's live routing read from its own diamond
-  storage and installs the facet set of its immutable-pinned genesis release. The engine's
-  `ProposedUpgrade` is COMPOSED on read (`upgradeCut()`) from the manifest's pinned inputs — the
-  genesis release's table-derived L2 deployments plus the authored extras, the pinned delegate
-  composer, the release's verifier — by the same `CTMUpgradeComposer` transitions use, and the
-  plan is shape-checked at construction like a transition's (`L2PlanValidationLib`: every bytecode
+  storage and installs the facet set of its immutable-pinned genesis release. The cut's init names
+  the migration object and nothing else (`upgradeFromBootstrap(migration)`): at execution the engine
+  reads the version edge, the schedule and the L2 plan from it, takes the verifier off the genesis
+  release it pins (refusing a migration that names another release), and composes the L2
+  transaction — the genesis release's table-derived deployments plus the authored extras, the pinned
+  delegate composer's calldata — with the same `CTMUpgradeComposer` transitions use. The plan is
+  shape-checked at construction like a transition's (`L2PlanValidationLib`: every bytecode
   the L2 leg installs — each table row's implementation and proxy shell, each extra — must be among
   the factory dependencies, which `migrate()` requires published on the CTM's supplier). What
   governance reviews is the manifest; the v34 prepare asserts the on-chain composed cut equals the
