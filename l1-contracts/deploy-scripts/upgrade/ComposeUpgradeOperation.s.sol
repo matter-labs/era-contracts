@@ -107,6 +107,7 @@ contract ComposeUpgradeOperation is Script, Create2FactoryUtils {
         vm.serializeString("root", "external_actions", new string[](0));
         vm.serializeString("root", "registry", registry);
         string memory toml = vm.serializeString("root", "governance_calls", governanceCalls);
-        vm.writeToml(toml, _outputPath);
+        // Like the prepares, `_outputPath` is relative to the project root with a leading slash.
+        vm.writeToml(toml, string.concat(vm.projectRoot(), _outputPath));
     }
 }
