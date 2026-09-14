@@ -38,17 +38,19 @@ export function packSemVer(version: string): bigint {
 
 /** Parses `enum <name> { A, B, ... }` from a Solidity source into a name -> index map. */
 function parseSolidityEnum(relSourcePath: string, enumName: string): Record<string, number> {
-  const source = fs.readFileSync(path.join(l1ContractsDir, relSourcePath), "utf-8");
+  // Strip comments before locating the body: a `}` or `,` inside an explanatory comment is
+  // neither the enum's closing brace nor a member separator. Matching first and stripping the
+  // captured body afterwards truncates the enum at the first brace a comment happens to contain
+  // and silently drops every member below it, shifting the inventory length.
+  const source = fs
+    .readFileSync(path.join(l1ContractsDir, relSourcePath), "utf-8")
+    .replace(/\/\/.*$/gm, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "");
   const match = source.match(new RegExp(`enum\\s+${enumName}\\s*\\{([^}]*)\\}`));
   if (!match) {
     throw new Error(`enum ${enumName} not found in ${relSourcePath}`);
   }
   const members = match[1]
-    // Strip comments before splitting: commas inside explanatory comments are not enum
-    // separators. Filtering line-by-line after the split misclassifies the text following such
-    // a comma as an additional member and shifts every appended inventory slot.
-    .replace(/\/\/.*$/gm, "")
-    .replace(/\/\*[\s\S]*?\*\//g, "")
     .split(",")
     .map((m) => m.trim())
     .filter((m) => m.length > 0);
