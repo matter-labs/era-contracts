@@ -10,8 +10,6 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 
 import {Call} from "contracts/governance/Common.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
@@ -73,10 +71,9 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
 
     /// @notice The cut chains crossing this edge take by hand, exactly as the migration commits it.
     ///         Written to the output for tooling; the bytes come from the object.
-    function composeUpgradeCut() public virtual override {
+    function getChainUpgradeDiamondCutData() public view override returns (bytes memory) {
         require(address(bootstrapMigration) != address(0), "bootstrap migration not deployed");
-        newlyGeneratedData.upgradeCutData = abi.encode(bootstrapMigration.upgradeCut());
-        upgradeConfig.upgradeCutPrepared = true;
+        return abi.encode(bootstrapMigration.upgradeCut());
     }
 
     /// @notice The bootstrap edge authors a COMPLETE release for a pre-registry ecosystem, so
@@ -132,30 +129,21 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
         return deploySimpleContract("BootstrapUpgradeZKsyncOS");
     }
 
-    /// @notice The L2 side of the bootstrap edge: the delegate (`L2V34Upgrade`) as an unsafe force
-    ///         deployment at its bytecode-derived address (so it never overwrites live code), the
-    ///         pinned composer that defines its arguments, and every bytecode the composed
-    ///         transaction needs published — the built-ins the genesis release's table installs,
-    ///         the ZKsync OS baselines, and the delegate itself, so the sequencer holds each
-    ///         preimage when the deployments run. The table-derived deployments come from the
-    ///         pinned genesis release, on-chain.
+    /// @notice The L2 side of the bootstrap edge: the delegate's (`L2V34Upgrade`) bytecode info —
+    ///         the migration force-deploys it Unsafe at its bytecode-derived address, so it never
+    ///         overwrites live code — the pinned composer that defines its arguments, and every
+    ///         bytecode the composed transaction needs published — the built-ins the genesis
+    ///         release's table installs, the ZKsync OS baselines, and the delegate itself, so the
+    ///         sequencer holds each preimage when the deployments run. The table-derived
+    ///         deployments come from the pinned genesis release, on-chain.
     /// @dev Virtual so bytecode-light test harnesses can substitute an L1-only edge: the real side
     ///      reads the `L2V34Upgrade` artifact and every built-in's.
     function authorL2Side() internal virtual override returns (AuthoredL2Side memory side) {
         require(l2DelegateComposer != address(0), "L2 delegate composer not deployed");
-        bytes memory delegateInfo = Utils.getZKOSBytecodeInfoForContract("L2V34Upgrade.sol", "L2V34Upgrade");
-        IComplexUpgrader.UniversalContractUpgradeInfo[]
-            memory extras = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
-        extras[0] = IComplexUpgrader.UniversalContractUpgradeInfo({
-            upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
-            deployedBytecodeInfo: delegateInfo,
-            newAddress: L2GenesisForceDeploymentsHelper.generateRandomAddress(delegateInfo)
-        });
         side.plan = AuthoredL2Plan({
-            extraDeployments: extras,
-            delegateTo: extras[0].newAddress,
-            delegateComposer: _pin(l2DelegateComposer),
-            factoryDepHashes: new uint256[](0)
+            delegateBytecodeInfo: Utils.getZKOSBytecodeInfoForContract("L2V34Upgrade.sol", "L2V34Upgrade"),
+            extraBytecodeInfos: new bytes[](0),
+            delegateComposer: _pin(l2DelegateComposer)
         });
         L2EcosystemContract[] memory delegateArtifact = new L2EcosystemContract[](1);
         delegateArtifact[0] = L2EcosystemContract.L2V34Upgrade;

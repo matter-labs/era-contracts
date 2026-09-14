@@ -197,15 +197,13 @@ contract L2V34DelegateCalldataComposerTest is Test {
             });
     }
 
-    /// @dev A v33 -> v34 hop whose L2 side is the minimal well-formed plan: the delegate's own Unsafe
-    ///      deployment (its bytecode the one factory dependency) and the pinned v34 composer.
+    /// @dev A v33 -> v34 hop whose L2 side is the minimal plan: the delegate's bytecode info (the
+    ///      object constructs its Unsafe deployment and pins its bytecode as the one factory
+    ///      dependency) and the pinned v34 composer.
     function _transitionManifest(
         address _fromRelease,
         address _newRelease
     ) internal returns (TransitionManifest memory) {
-        IComplexUpgrader.UniversalContractUpgradeInfo[]
-            memory extras = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
-        extras[0] = L2PlanFixtures.unsafeDeployment(DELEGATE_CODE);
         return
             TransitionManifest({
                 oldProtocolVersion: SemVer.packSemVer(0, 33, 0),
@@ -216,12 +214,7 @@ contract L2V34DelegateCalldataComposerTest is Test {
                 proxyUpgrades: new ProxyUpgradeRow[](CTM_CONTRACT_COUNT),
                 oldProtocolVersionDeadline: type(uint256).max,
                 upgradeTimestamp: 0,
-                l2Plan: AuthoredL2Plan({
-                    extraDeployments: extras,
-                    delegateTo: extras[0].newAddress,
-                    delegateComposer: _pin(address(composer)),
-                    factoryDepHashes: L2PlanFixtures.factoryDepHashes(L2PlanFixtures.codes(DELEGATE_CODE))
-                }),
+                l2Plan: L2PlanFixtures.delegatePlan(DELEGATE_CODE, _pin(address(composer))),
                 upgradeTimer: _pin(_pinned("upgradeTimer"))
             });
     }

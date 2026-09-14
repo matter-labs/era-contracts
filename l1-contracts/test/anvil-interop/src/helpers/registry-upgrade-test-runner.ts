@@ -93,13 +93,7 @@ import {
   getDeterministicCreationBytecode,
 } from "../core/contracts";
 import { createProvider, impersonateAndRun } from "../core/utils";
-import {
-  coreInitArgs,
-  packSemVer,
-  releaseInitArgs,
-  transitionInitArgs,
-  unsafeForceDeploymentType,
-} from "./registry-manifest";
+import { coreInitArgs, packSemVer, releaseInitArgs, transitionInitArgs } from "./registry-manifest";
 import {
   assertBootstrapEndState,
   bootstrapInitArgs,
@@ -426,7 +420,8 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     );
     // Every bytecode the composed L2 leg installs must be published before the edge commits: the
     // inventory a CTM prepare publishes (the table's bytecodes and the baselines) plus the mock
-    // delegate the harness adds — the plan's factory dependencies are exactly these.
+    // delegate the harness adds — the factory dependencies the migration constructs (the table
+    // rows' bytecodes and the delegate's) are among these.
     const factoryDeps = [...l2Inventory.factoryDeps, getDeterministicBytecode("MockContractDeployer")];
     const supplier = new ethers.Contract(await ctm.L1_BYTECODES_SUPPLIER(), getAbi("BytecodesSupplier"), deployer);
     await publishFactoryDeps(l1Provider, supplier, factoryDeps);
@@ -446,8 +441,6 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
         upgradeTimer: upgradeTimer.address,
         delegateComposer: { addr: deployed.delegateComposer, codehash: await codehashOf(deployed.delegateComposer) },
         l2Delegate: upgradeDelegateInfo(),
-        unsafeDeploymentType: unsafeForceDeploymentType(),
-        factoryDepHashes: factoryDeps.map((bytecode) => ethers.utils.keccak256(bytecode)),
       })
     );
     await migration.deployed();
@@ -1143,11 +1136,11 @@ async function buildRegistryManifest(
 ): Promise<Record<string, unknown>> {
   const codehash = async (addr: string) => ethers.utils.keccak256(await l1Provider.getCode(addr));
 
-  // The L2 leg of the synthetic bump: unsafe-force-deploy the (no-op) L2 upgrade
-  // implementation at the pinned delegate address, then delegatecall it — the exact shape of a
-  // production ZKsyncOS upgrade transaction. The bytecode info describes the no-op stand-in
-  // the harness places at that address (see relayL2UpgradeTx).
-  const { deployedBytecodeInfo, address: delegateAddress } = upgradeDelegateInfo();
+  // The L2 leg of the synthetic bump: the (no-op) L2 upgrade implementation's bytecode info. The
+  // transition constructs its Unsafe deployment at the bytecode-derived address and delegatecalls
+  // it — the exact shape of a production ZKsyncOS upgrade transaction. The info describes the
+  // no-op stand-in the harness places at that address (see relayL2UpgradeTx).
+  const { deployedBytecodeInfo } = upgradeDelegateInfo();
 
   // Production freezability flags (DeployCTMUtils facet cuts).
   const freezability: Record<string, boolean> = {
@@ -1260,15 +1253,8 @@ async function buildRegistryManifest(
           // No facet swaps and no hash changes here: both are DERIVED on-chain from the
           // (fromRelease, newRelease) pair at transition initialization.
           l2Plan: {
-            deployments: [
-              {
-                upgradeType: "ZKsyncOSUnsafeForceDeployment",
-                deployedBytecodeInfo,
-                newAddress: delegateAddress,
-              },
-            ],
-            delegateTo: delegateAddress,
-            factoryDepHashes: [ethers.utils.keccak256(getDeterministicBytecode("MockContractDeployer"))],
+            delegateBytecodeInfo: deployedBytecodeInfo,
+            extraBytecodeInfos: [],
           },
         },
       },

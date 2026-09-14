@@ -15,7 +15,6 @@ import {ChainTypeManagerInitializeData, IChainTypeManager} from "./IChainTypeMan
 import {ICTMRelease} from "../upgrades/registry/objects/ICTMRelease.sol";
 import {ICTMTransition} from "../upgrades/registry/objects/ICTMTransition.sol";
 import {CTMUpgradeComposer} from "../upgrades/registry/libraries/CTMUpgradeComposer.sol";
-import {IDefaultUpgrade} from "../upgrades/IDefaultUpgrade.sol";
 import {IZKChain} from "./chain-interfaces/IZKChain.sol";
 import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
@@ -508,11 +507,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @dev The cut is a pure function of the transition: no facet cuts of its own, just the
     ///      engine-init pointing back at the transition.
     function _transitionUpgradeCut(ICTMTransition _transition) internal view returns (Diamond.DiamondCutData memory) {
-        return
-            CTMUpgradeComposer.buildUpgradeCutData(
-                _transition.upgradeEngine(),
-                abi.encodeCall(IDefaultUpgrade.upgradeFromTransition, (address(_transition)))
-            );
+        return CTMUpgradeComposer.buildUpgradeCutData(_transition);
     }
 
     /// @dev execute predefined upgrade

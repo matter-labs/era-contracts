@@ -56,7 +56,6 @@ import {CTMUpgradeParams} from "./UpgradeParams.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {UpgradeChainCall} from "deploy-scripts/utils/UpgradeChainCall.sol";
-import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
@@ -73,17 +72,17 @@ import {
 import {CTM_CONTRACT_COUNT, CTMContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {ExternalActionsLib} from "./ExternalActionsLib.sol";
 
-/// @notice The L2 side a version authors for its edge, before publication: the plan's authored
-///         fields and the deployed bytecodes its L2 transaction needs as factory dependencies.
-///         The registry objects compose the L2 payload on-chain from what they pin (see
-///         {docs/registry-driven-upgrades.md}); a prepare supplies only what a release table
-///         cannot express — and, since a hash cannot supply its own preimage, the bytecodes
-///         behind the plan, loaded from the build artifacts.
-/// @param plan The authored remainder. `factoryDepHashes` MUST be empty: publication derives it
-///        from `factoryDependencies`, so a plan can never name a hash nobody published.
+/// @notice The L2 side a version authors for its edge: the plan's authored input and the deployed
+///         bytecodes to publish. The registry objects construct the L2 payload on-chain from what
+///         they pin (see {docs/registry-driven-upgrades.md}); a prepare supplies only what a
+///         release table cannot express — and, since a hash cannot supply its own preimage, the
+///         bytecodes behind the plan, loaded from the build artifacts.
+/// @param plan The authored input ({AuthoredL2Plan}): the delegate's and any extra bytecode info,
+///        the pinned composer. The object constructs the addresses and factory dependencies.
 /// @param factoryDependencies The deployed bytecodes the composed L2 transaction installs or
-///        needs the sequencer to hold the preimage of: the extras' code, the table-derived
-///        deployments' code, and whatever the delegate deploys at execution.
+///        needs the sequencer to hold the preimage of: the delegate's and extras' code, the
+///        table-derived deployments' code, and whatever the delegate deploys at execution. The
+///        object refuses to commit until every factory dependency it constructs is published.
 struct AuthoredL2Side {
     AuthoredL2Plan plan;
     bytes[] factoryDependencies;
@@ -129,17 +128,10 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         bool usePreV32IntrospectionOverride;
     }
 
-    // solhint-disable-next-line gas-struct-packing
-    struct NewlyGeneratedData {
-        /// @dev The committed upgrade cut, READ from the upgrade object that composes it on-chain.
-        bytes upgradeCutData;
-    }
-
     /// @notice Internal state of the upgrade script
     struct EcosystemUpgradeConfig {
         bool initialized;
         bool fixedForceDeploymentsDataGenerated;
-        bool upgradeCutPrepared;
         bool l2SidePrepared;
         // TODO set it based on version of the BRIDGEHUB before upgrade
 
@@ -165,7 +157,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     }
 
     // The output of the script
-    NewlyGeneratedData internal newlyGeneratedData;
     UpgradeDeployedAddresses internal upgradeAddresses;
     EcosystemUpgradeConfig internal upgradeConfig;
 
@@ -361,7 +352,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         generateUpgradeData();
         console.log("Upgrade data generated!");
         deployUpgradeObjects();
-        composeUpgradeCut();
         saveOutput(upgradeConfig.outputPath);
     }
 
@@ -472,7 +462,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     }
 
     /// @notice The L2 side this version authors (see {AuthoredL2Side}). The default is an L1-only
-    ///         edge — no extra deployment, no delegate, no composer, nothing to publish. A version
+    ///         edge — no delegate, no extra bytecode, no composer, nothing to publish. A version
     ///         whose L2 built-ins change derives their rows from the release pair on-chain and MUST
     ///         author the delegate that initializes them and list every bytecode the resulting plan
     ///         needs published (the v34 bootstrap shows the shape).
@@ -486,19 +476,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     function authoredL2Plan() internal view returns (AuthoredL2Plan memory) {
         require(upgradeConfig.l2SidePrepared, "L2 side not prepared");
         return abi.decode(encodedAuthoredL2Plan, (AuthoredL2Plan));
-    }
-
-    /// @notice The cut chains execute for this edge, as the CTM serves it (`upgradeCutForVersion`):
-    ///         no facet cuts, the pinned engine's `upgradeFromTransition(transition)` init. Written
-    ///         to the output for tooling; nothing is hand-composed.
-    function composeUpgradeCut() public virtual {
-        require(upgradeAddresses.ctmTransition != address(0), "transition not deployed");
-        Diamond.DiamondCutData memory cut = CTMUpgradeComposer.buildUpgradeCutData(
-            ctmAddresses.stateTransition.defaultUpgrade,
-            abi.encodeCall(IDefaultUpgrade.upgradeFromTransition, (upgradeAddresses.ctmTransition))
-        );
-        newlyGeneratedData.upgradeCutData = abi.encode(cut);
-        upgradeConfig.upgradeCutPrepared = true;
     }
 
     /// @notice The `RegistryBootstrapMigration` this run deploys, or zero for every edge that is
@@ -798,29 +775,17 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
 
     /////////////////////////// Blockchain interactions ////////////////////////////
 
-    bool skipFactoryDepsCheck = false;
-
-    function setSkipFactoryDepsCheck_TestOnly(bool _skipFactoryDepsCheck) public virtual {
-        skipFactoryDepsCheck = _skipFactoryDepsCheck;
-    }
-
-    /// @notice Fixes the L2 side of this edge: takes the version's authored side, publishes exactly
-    ///         the bytecodes it lists on the CTM's `BytecodesSupplier` and pins their hashes as the
-    ///         plan's factory dependencies. An L1-only edge publishes nothing.
+    /// @notice Fixes the L2 side of this edge: takes the version's authored side and publishes
+    ///         exactly the bytecodes it lists on the CTM's `BytecodesSupplier`. An L1-only edge
+    ///         publishes nothing.
     function prepareL2Side() public virtual {
         AuthoredL2Side memory side = authorL2Side();
-        require(
-            side.plan.factoryDepHashes.length == 0,
-            "factory dependency hashes are derived from the published bytecodes, not authored"
-        );
         if (side.factoryDependencies.length != 0) {
             BytecodesSupplier supplier = BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier);
-            side.plan.factoryDepHashes = BytecodePublisher
-                .publishAndProcessFactoryDeps(
-                    supplier,
-                    SystemContractsProcessing.deduplicateBytecodes(side.factoryDependencies)
-                )
-                .factoryDepsHashes;
+            BytecodePublisher.publishAndProcessFactoryDeps(
+                supplier,
+                SystemContractsProcessing.deduplicateBytecodes(side.factoryDependencies)
+            );
         }
         encodedAuthoredL2Plan = abi.encode(side.plan);
         upgradeConfig.l2SidePrepared = true;
@@ -1154,7 +1119,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             executorKnown ? boundCTMUpgradeExecutor() : address(0)
         );
         vm.serializeString("root", "registry", registry);
-        string memory toml = vm.serializeBytes("root", "chain_upgrade_diamond_cut", newlyGeneratedData.upgradeCutData);
+        string memory toml = vm.serializeBytes("root", "chain_upgrade_diamond_cut", getChainUpgradeDiamondCutData());
 
         vm.writeToml(toml, outputPath);
     }
@@ -1163,9 +1128,10 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         return newConfig.ctm;
     }
 
-    function getChainUpgradeDiamondCutData() public view returns (bytes memory) {
-        require(upgradeConfig.upgradeCutPrepared, "upgrade cut data not prepared");
-        return newlyGeneratedData.upgradeCutData;
+    /// @notice Reads the upgrade cut from the pinned transition.
+    function getChainUpgradeDiamondCutData() public view virtual returns (bytes memory) {
+        require(upgradeAddresses.ctmTransition != address(0), "transition not deployed");
+        return abi.encode(CTMUpgradeComposer.buildUpgradeCutData(ICTMTransition(upgradeAddresses.ctmTransition)));
     }
 
     ////////////////////////////// Misc utils /////////////////////////////////

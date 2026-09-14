@@ -19,7 +19,6 @@ import {ProxyUpgradeRowLib} from "contracts/upgrades/registry/libraries/ProxyUpg
 import {IProxyUpgradeInitializable} from "contracts/upgrades/registry/IUpgradeInit.sol";
 import {MockProxyUpgradeInitImpl} from "contracts/dev-contracts/test/MockProxyUpgradeInitImpl.sol";
 import {CTMContract, CTM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
-import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {
     AuthoredL2Plan,
     BootstrapManifest,
@@ -293,10 +292,9 @@ contract ServerNotifierRowCallTest is CTMUpgradeExecutorFixture {
                     oldProtocolVersionDeadline: 1000,
                     upgradeEngine: _pin(upgradeEngineAddr),
                     l2Plan: AuthoredL2Plan({
-                        extraDeployments: new IComplexUpgrader.UniversalContractUpgradeInfo[](0),
-                        delegateTo: address(0),
-                        delegateComposer: PinnedContract({addr: address(0), codehash: bytes32(0)}),
-                        factoryDepHashes: new uint256[](0)
+                        delegateBytecodeInfo: "",
+                        extraBytecodeInfos: new bytes[](0),
+                        delegateComposer: PinnedContract({addr: address(0), codehash: bytes32(0)})
                     }),
                     upgradeTimestamp: 0,
                     ctmExecutor: _pin(address(ctmExecutor)),

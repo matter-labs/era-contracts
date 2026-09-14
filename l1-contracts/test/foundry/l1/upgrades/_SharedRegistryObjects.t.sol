@@ -121,29 +121,14 @@ abstract contract RegistryObjectsFixture is Test {
 
     /// @dev No authored L2 side: an L1-only edge.
     function _emptyPlan() internal pure returns (AuthoredL2Plan memory) {
-        return
-            AuthoredL2Plan({
-                extraDeployments: new IComplexUpgrader.UniversalContractUpgradeInfo[](0),
-                delegateTo: address(0),
-                delegateComposer: _noPin(),
-                factoryDepHashes: new uint256[](0)
-            });
+        return L2PlanFixtures.emptyPlan();
     }
 
-    /// @dev The minimal well-formed authored L2 side: the delegate's own Unsafe deployment at its
-    ///      bytecode-derived address, the pinned composer defining its calldata, the delegate's
-    ///      bytecode as the one factory dependency.
+    /// @dev The minimal authored L2 side: the delegate's bytecode info (the object constructs its
+    ///      Unsafe deployment at the bytecode-derived address and pins its bytecode as the one
+    ///      factory dependency) and the pinned composer defining its calldata.
     function _delegatePlan() internal view returns (AuthoredL2Plan memory) {
-        IComplexUpgrader.UniversalContractUpgradeInfo[]
-            memory extras = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
-        extras[0] = L2PlanFixtures.unsafeDeployment(DELEGATE_CODE);
-        return
-            AuthoredL2Plan({
-                extraDeployments: extras,
-                delegateTo: extras[0].newAddress,
-                delegateComposer: _pin(address(delegateComposer)),
-                factoryDepHashes: L2PlanFixtures.factoryDepHashes(L2PlanFixtures.codes(DELEGATE_CODE))
-            });
+        return L2PlanFixtures.delegatePlan(DELEGATE_CODE, _pin(address(delegateComposer)));
     }
 
     function _transition(

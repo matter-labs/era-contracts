@@ -160,7 +160,7 @@ library SystemContractsProcessing {
         internal
         returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments)
     {
-        return TransitionDerivationLib.deriveL2DeploymentsFromTable(buildL2BytecodeInfoTable(), true);
+        return TransitionDerivationLib.deriveL2DeploymentsFromTable(buildL2BytecodeInfoTable());
     }
 
     /// @notice Builds the release manifest's enum-indexed L2 bytecode table
@@ -172,8 +172,9 @@ library SystemContractsProcessing {
     ///        (owned by the ComplexUpgrader); re-deploying it would require an unsafe overwrite.
     ///      - L2WrappedBaseToken: upgrades must not touch the impl (since v31).
     ///      - L2V34Upgrade: the version-specific delegate is an UNSAFE deployment at a
-    ///        bytecode-derived address — pinned transition data (`AuthoredL2Plan.extraDeployments`),
-    ///        never table-derived; the PUVT guards that no other unsafe deployment is present.
+    ///        bytecode-derived address — constructed from the pinned
+    ///        `AuthoredL2Plan.delegateBytecodeInfo`, never table-derived; the PUVT guards that no
+    ///        other unsafe deployment is present.
     function buildL2BytecodeInfoTable() internal returns (bytes[] memory rows) {
         return buildL2BytecodeInfoTable(Utils.getZKOSProxyUpgradeBytecodeInfo);
     }

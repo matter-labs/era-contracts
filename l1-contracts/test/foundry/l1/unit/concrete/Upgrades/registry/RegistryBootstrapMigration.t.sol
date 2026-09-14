@@ -54,8 +54,6 @@ import {
     BootstrapNotYetExecuted,
     DeadlineNotYetPassed,
     L2BytecodeNotPublished,
-    L2DelegateNotAnExtraDeployment,
-    L2ExtraDeploymentNotBytecodeDerived,
     MalformedL2UpgradePlan,
     MigrationPaused,
     ProxyUpgradeRowMismatch,
@@ -255,29 +253,14 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     }
 
     function _emptyL2Plan() internal pure returns (AuthoredL2Plan memory) {
-        return
-            AuthoredL2Plan({
-                extraDeployments: new IComplexUpgrader.UniversalContractUpgradeInfo[](0),
-                delegateTo: address(0),
-                delegateComposer: _noPin(),
-                factoryDepHashes: new uint256[](0)
-            });
+        return L2PlanFixtures.emptyPlan();
     }
 
-    /// @dev The well-formed authored remainder: the delegate's Unsafe deployment at its
-    ///      bytecode-derived address, the pinned composer defining its calldata, and the delegate's
-    ///      bytecode as the one factory dependency.
+    /// @dev The minimal authored input with an L2 side: the delegate's bytecode info (the object
+    ///      constructs its Unsafe deployment at the bytecode-derived address and pins its bytecode
+    ///      as the one factory dependency) and the pinned composer defining its calldata.
     function _authoredPlan() internal view returns (AuthoredL2Plan memory) {
-        IComplexUpgrader.UniversalContractUpgradeInfo[]
-            memory extras = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
-        extras[0] = L2PlanFixtures.unsafeDeployment(DELEGATE_CODE);
-        return
-            AuthoredL2Plan({
-                extraDeployments: extras,
-                delegateTo: extras[0].newAddress,
-                delegateComposer: _pin(address(delegateComposer)),
-                factoryDepHashes: L2PlanFixtures.factoryDepHashes(L2PlanFixtures.codes(DELEGATE_CODE))
-            });
+        return L2PlanFixtures.delegatePlan(DELEGATE_CODE, _pin(address(delegateComposer)));
     }
 
     /// @dev Every bytecode an edge toward `_deployTableRelease()` installs: the delegate plus the
@@ -286,12 +269,9 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         return L2PlanFixtures.codes(DELEGATE_CODE, BRIDGEHUB_IMPL_CODE, SYSTEM_PROXY_CODE);
     }
 
-    /// @dev `_authoredPlan()` toward `_tableRelease`, with the table row's dependencies joining the
-    ///      delegate's and a nonzero schedule.
+    /// @dev `_authoredPlan()` toward `_tableRelease` with a nonzero schedule.
     function _tableManifest(CTMRelease _tableRelease) internal view returns (BootstrapManifest memory manifest) {
-        AuthoredL2Plan memory plan = _authoredPlan();
-        plan.factoryDepHashes = L2PlanFixtures.factoryDepHashes(_tableCodes());
-        manifest = _manifestWithL2Plan(plan);
+        manifest = _manifestWithL2Plan(_authoredPlan());
         manifest.currentRelease = PinnedContract({addr: address(_tableRelease), codehash: Utils.releaseCodehash()});
         manifest.upgradeTimestamp = PLAN_UPGRADE_TIMESTAMP;
     }
@@ -677,16 +657,21 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             plan.deployments[0].deployedBytecodeInfo,
             L2PlanFixtures.systemProxyRow(BRIDGEHUB_IMPL_CODE, SYSTEM_PROXY_CODE)
         );
-        // The authored extra follows, unchanged.
+        // The authored delegate follows, constructed from its bytecode info.
         assertEq(
             abi.encode(plan.deployments[1]),
-            abi.encode(manifest.l2Plan.extraDeployments[0]),
-            "the authored extra is appended after the derived set"
+            abi.encode(L2PlanFixtures.unsafeDeployment(DELEGATE_CODE)),
+            "the delegate's Unsafe deployment is appended after the derived set"
         );
-        assertEq(plan.delegateTo, manifest.l2Plan.delegateTo);
-        assertEq(plan.delegateTo, plan.deployments[1].newAddress, "the delegate is the authored Unsafe extra");
+        assertEq(plan.delegateTo, plan.deployments[1].newAddress, "the delegate target is its derived address");
         assertEq(plan.delegateComposer, address(delegateComposer), "the pinned composer is served");
-        assertEq(plan.factoryDepHashes, manifest.l2Plan.factoryDepHashes, "dependencies ride through");
+        assertEq(
+            plan.factoryDepHashes,
+            L2PlanFixtures.factoryDepHashes(
+                L2PlanFixtures.codes(BRIDGEHUB_IMPL_CODE, SYSTEM_PROXY_CODE, DELEGATE_CODE)
+            ),
+            "the dependencies are constructed: the row's implementation and shell, then the delegate"
+        );
     }
 
     /// @dev The fixture's default: an empty genesis table and nothing authored is an L1-only
@@ -1142,17 +1127,17 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     }
 
     // ─────────────────────────── L2 plan shape ───────────────────────────
-    // The same rules {CTMTransition} enforces, run against the COMBINED (derived + authored) plan
-    // at construction, so an edge whose L2 leg cannot execute refuses to exist. One test per rule,
-    // each on an otherwise well-formed plan so exactly that rule fires.
+    // The same rules {CTMTransition} enforces, run against the CONSTRUCTED (derived + authored)
+    // plan at construction, so an edge whose L2 leg cannot execute refuses to exist. One test per
+    // rule, each on an otherwise well-formed plan so exactly that rule fires.
 
-    function test_revertWhen_authoredDeploymentsWithoutDelegateTarget() public {
-        // Force-deployments but no delegate target: `L2ComplexUpgrader` always ends with the final
+    function test_revertWhen_authoredDeploymentsWithoutDelegate() public {
+        // Force-deployments but no delegate: `L2ComplexUpgrader` always ends with the final
         // delegatecall, so a deployments-only plan would construct here yet revert on L2 forever.
-        // (The composer is cleared so ONLY the deployments-without-target rule can fire.)
-        AuthoredL2Plan memory plan = _authoredPlan();
-        plan.delegateTo = address(0);
-        plan.delegateComposer = _noPin();
+        // (No composer either, so ONLY the deployments-without-delegate rule can fire.)
+        AuthoredL2Plan memory plan = _emptyL2Plan();
+        plan.extraBytecodeInfos = new bytes[](1);
+        plan.extraBytecodeInfos[0] = L2PlanFixtures.bytecodeInfo(DELEGATE_CODE);
 
         BootstrapManifest memory manifest = _manifestWithL2Plan(plan);
 
@@ -1164,12 +1149,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     ///      release with a row, an edge that authors NOTHING still needs its delegate.
     function test_revertWhen_derivedDeploymentsWithoutDelegateTarget() public {
         CTMRelease tableRelease = _deployTableRelease();
-        AuthoredL2Plan memory plan = _emptyL2Plan();
-        // The derived row's dependencies are present, so only the shape rule can fire.
-        plan.factoryDepHashes = L2PlanFixtures.factoryDepHashes(
-            L2PlanFixtures.codes(BRIDGEHUB_IMPL_CODE, SYSTEM_PROXY_CODE)
-        );
-        BootstrapManifest memory manifest = _manifestWithL2Plan(plan);
+        BootstrapManifest memory manifest = _manifestWithL2Plan(_emptyL2Plan());
         manifest.currentRelease = PinnedContract({addr: address(tableRelease), codehash: Utils.releaseCodehash()});
 
         vm.expectRevert(MalformedL2UpgradePlan.selector);
@@ -1187,29 +1167,15 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         new RegistryBootstrapMigration(manifest);
     }
 
-    function test_revertWhen_factoryDepsWithoutL2Side() public {
-        // Dependencies with no transaction to ride in.
-        AuthoredL2Plan memory plan = _emptyL2Plan();
-        plan.factoryDepHashes = L2PlanFixtures.factoryDepHashes(L2PlanFixtures.codes(DELEGATE_CODE));
-
-        BootstrapManifest memory manifest = _manifestWithL2Plan(plan);
-
-        vm.expectRevert(MalformedL2UpgradePlan.selector);
-        new RegistryBootstrapMigration(manifest);
-    }
-
-    /// @dev A plan carrying more factory deps than `BaseZkSyncUpgrade` accepts must be rejected at
-    ///      pin time: otherwise the edge commits and every per-chain upgrade then reverts.
+    /// @dev A plan whose CONSTRUCTED factory deps exceed what `BaseZkSyncUpgrade` accepts must be
+    ///      rejected at pin time: otherwise the edge commits and every per-chain upgrade then
+    ///      reverts. The delegate plus `MAX_NEW_FACTORY_DEPS` distinct extras is one past the cap.
     function test_revertWhen_factoryDepsExceedTheCap() public {
         AuthoredL2Plan memory plan = _authoredPlan();
-        // The delegate's real hash stays in front (so the presence rule holds); surplus dummies
-        // push the list one past the cap.
-        uint256[] memory tooManyDeps = new uint256[](MAX_NEW_FACTORY_DEPS + 1);
-        tooManyDeps[0] = plan.factoryDepHashes[0];
-        for (uint256 i = 1; i < tooManyDeps.length; ++i) {
-            tooManyDeps[i] = i;
+        plan.extraBytecodeInfos = new bytes[](MAX_NEW_FACTORY_DEPS);
+        for (uint256 i = 0; i < plan.extraBytecodeInfos.length; ++i) {
+            plan.extraBytecodeInfos[i] = L2PlanFixtures.bytecodeInfo(abi.encodePacked(bytes2(0xee00), uint8(i)));
         }
-        plan.factoryDepHashes = tooManyDeps;
 
         BootstrapManifest memory manifest = _manifestWithL2Plan(plan);
 
@@ -1217,31 +1183,14 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         new RegistryBootstrapMigration(manifest);
     }
 
-    function test_revertWhen_extraIsNotAtItsBytecodeDerivedAddress() public {
-        // An extra may only land on the address its own bytecode info derives — never on a fixed
-        // built-in or a table-derived target.
+    function test_revertWhen_delegateBytecodeInfoIsMalformed() public {
+        // Not a canonical (blake, length, keccak) tuple: no address can be derived from it.
         AuthoredL2Plan memory plan = _authoredPlan();
-        address derived = plan.extraDeployments[0].newAddress;
-        address elsewhere = makeAddr("elsewhere");
-        plan.extraDeployments[0].newAddress = elsewhere;
-        plan.delegateTo = elsewhere;
+        plan.delegateBytecodeInfo = hex"aa01";
 
         BootstrapManifest memory manifest = _manifestWithL2Plan(plan);
 
-        vm.expectRevert(abi.encodeWithSelector(L2ExtraDeploymentNotBytecodeDerived.selector, derived, elsewhere));
-        new RegistryBootstrapMigration(manifest);
-    }
-
-    function test_revertWhen_delegateIsNotAnExtraDeployment() public {
-        // The code the upgrade delegatecalls into must be pinned by a bytecode hash the manifest
-        // carries: the delegate must be one of the extras.
-        AuthoredL2Plan memory plan = _authoredPlan();
-        address stranger = makeAddr("notAnExtra");
-        plan.delegateTo = stranger;
-
-        BootstrapManifest memory manifest = _manifestWithL2Plan(plan);
-
-        vm.expectRevert(abi.encodeWithSelector(L2DelegateNotAnExtraDeployment.selector, stranger));
+        vm.expectRevert(MalformedL2UpgradePlan.selector);
         new RegistryBootstrapMigration(manifest);
     }
 

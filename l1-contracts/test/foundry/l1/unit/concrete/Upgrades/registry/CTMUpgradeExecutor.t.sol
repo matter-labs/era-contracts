@@ -31,8 +31,6 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {MAX_GAS_PER_TRANSACTION} from "contracts/common/Config.sol";
 import {
@@ -226,21 +224,16 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
         );
     }
 
-    /// @dev The default fixture manifest: the L2 side is the minimal well-formed plan (the
-    ///      delegate, force-deployed Unsafe at its bytecode-derived address, with its bytecode as
-    ///      the one factory dependency); all CTM-domain slots inert; no ecosystem leg; a fresh
-    ///      zero-delay timer bound to the coordinator.
+    /// @dev The default fixture manifest: the L2 side is the minimal plan (the delegate's bytecode
+    ///      info — the object constructs its Unsafe deployment and pins its bytecode as the one
+    ///      factory dependency); all CTM-domain slots inert; no ecosystem leg; a fresh zero-delay
+    ///      timer bound to the coordinator.
     function _transitionManifest(
         uint256 _upgradeTimestamp,
         address _fromRelease,
         uint256 _oldProtocolVersion,
         bytes memory _delegateCode
     ) internal returns (TransitionManifest memory) {
-        IComplexUpgrader.UniversalContractUpgradeInfo[]
-            memory deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
-        deployments[0] = L2PlanFixtures.unsafeDeployment(_delegateCode);
-        uint256[] memory factoryDeps = L2PlanFixtures.factoryDepHashes(L2PlanFixtures.codes(_delegateCode));
-
         return
             TransitionManifest({
                 oldProtocolVersion: _oldProtocolVersion,
@@ -253,22 +246,13 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
                 proxyUpgrades: new ProxyUpgradeRow[](CTM_CONTRACT_COUNT),
                 oldProtocolVersionDeadline: 1000,
                 upgradeTimestamp: _upgradeTimestamp,
-                l2Plan: AuthoredL2Plan({
-                    extraDeployments: deployments,
-                    delegateTo: deployments[0].newAddress,
-                    delegateComposer: _pin(address(delegateComposer)),
-                    factoryDepHashes: factoryDeps
-                }),
+                l2Plan: L2PlanFixtures.delegatePlan(_delegateCode, _pin(address(delegateComposer))),
                 upgradeTimer: _pin(address(_newTimer(0, 0)))
             });
     }
 
     function _expectedUpgradeCut(ICTMTransition _transition) internal view returns (Diamond.DiamondCutData memory) {
-        return
-            CTMUpgradeComposer.buildUpgradeCutData(
-                _transition.upgradeEngine(),
-                abi.encodeCall(IDefaultUpgrade.upgradeFromTransition, (address(_transition)))
-            );
+        return CTMUpgradeComposer.buildUpgradeCutData(_transition);
     }
 
     // ─────────────────────────── lifecycle drivers (as governance) ───────────────────────────

@@ -5,15 +5,16 @@ pragma solidity 0.8.28;
 import {ICTMRelease} from "../objects/ICTMRelease.sol";
 import {ICTMTransition} from "../objects/ICTMTransition.sol";
 import {IL2DelegateCalldataComposer} from "../objects/IL2DelegateCalldataComposer.sol";
+import {IRegistryBootstrapMigration} from "../bootstrap/IRegistryBootstrapMigration.sol";
+import {IDefaultUpgrade} from "../../IDefaultUpgrade.sol";
+import {IBootstrapUpgrade} from "../../IBootstrapUpgrade.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
 import {IComplexUpgrader} from "../../../state-transition/l2-deps/IComplexUpgrader.sol";
-import {IDiamondInit} from "../../../state-transition/chain-interfaces/IDiamondInit.sol";
 import {L2CanonicalTransactionLib} from "../../../state-transition/libraries/L2CanonicalTransactionLib.sol";
 import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
 import {
     PRIORITY_TX_MAX_GAS_LIMIT,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-    SYSTEM_UPGRADE_L2_TX_TYPE,
     ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE
 } from "../../../common/Config.sol";
 import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
@@ -29,27 +30,36 @@ import {L2UpgradePlan, TransitionManifest} from "../RegistryTypes.sol";
 ///         genesis data comes from the release the CTM pins, not from a composed
 ///         `ChainCreationParams`.
 /// @dev Everything here is CTM-scoped, including the L2 force-deployments keyed by
-///      `L2EcosystemContract`: L2 system-contract bytecodes are pinned per CTM (Era and ZKsyncOS ship
-///      different sets). Ecosystem-wide (core) L1 upgrades have no composition to do beyond
-///      proxy/impl lookups and live in `EcosystemUpgradeExecutor`.
+///      `L2EcosystemContract`: L2 system-contract bytecodes are pinned per CTM. The registry
+///      composes for ZKsync OS chains only. Ecosystem-wide (core) L1 upgrades have no composition
+///      to do beyond proxy/impl lookups and live in `EcosystemUpgradeExecutor`.
 /// @dev Because the upgrade path (existing chains) and the genesis path (new chains) both resolve
 ///      to the same pinned release, they cannot drift apart.
 library CTMUpgradeComposer {
-    /// @notice Builds the diamond cut that upgrades an existing chain: no `facetCuts` of its own.
-    ///         The committed cut names the write-once object (a transition, or the bootstrap
-    ///         migration); the engine reads the facet cuts and every other input straight from that
-    ///         same object at execution time, so nothing is carried in the cut and facet changes and
+    /// @notice Builds the diamond cut that upgrades an existing chain across `_transition`: no
+    ///         `facetCuts` of its own, the transition's pinned engine as the init target and
+    ///         `upgradeFromTransition(transition)` as its calldata. Both are determined by the
+    ///         transition, so nothing else is accepted: the engine reads the facet cuts and every
+    ///         other input straight from the same object at execution time, and facet changes and
     ///         payload composition share one source of truth.
-    function buildUpgradeCutData(
-        address _initAddress,
-        bytes memory _initCalldata
-    ) internal pure returns (Diamond.DiamondCutData memory) {
+    function buildUpgradeCutData(ICTMTransition _transition) internal view returns (Diamond.DiamondCutData memory) {
         return
-            Diamond.DiamondCutData({
-                facetCuts: new Diamond.FacetCut[](0),
-                initAddress: _initAddress,
-                initCalldata: _initCalldata
-            });
+            _cutNamingObject(
+                _transition.upgradeEngine(),
+                abi.encodeCall(IDefaultUpgrade.upgradeFromTransition, (address(_transition)))
+            );
+    }
+
+    /// @notice The bootstrap edge's cut (see {buildUpgradeCutData}): the migration's pinned engine
+    ///         as the init target and `upgradeFromBootstrap(migration)` as its calldata.
+    function buildBootstrapUpgradeCutData(
+        IRegistryBootstrapMigration _migration
+    ) internal view returns (Diamond.DiamondCutData memory) {
+        return
+            _cutNamingObject(
+                _migration.getManifest().upgradeEngine.addr,
+                abi.encodeCall(IBootstrapUpgrade.upgradeFromBootstrap, (address(_migration)))
+            );
     }
 
     /// @notice The composed transaction for a transition (see {buildL2UpgradeTxFromPlan}).
@@ -86,10 +96,8 @@ library CTMUpgradeComposer {
             // (txType == 0) makes `BaseZkSyncUpgrade` skip the L2 protocol upgrade transaction.
             return L2CanonicalTransactionLib.emptyL2CanonicalTransaction();
         }
-        // VM identity is single-sourced from the target release's pinned DiamondInit.
-        bool isZKsyncOS = IDiamondInit(_newRelease.diamondInit()).IS_ZKSYNC_OS();
         L2CanonicalTransaction memory transaction = L2CanonicalTransactionLib.emptyL2CanonicalTransaction();
-        transaction.txType = isZKsyncOS ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
+        transaction.txType = ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE;
         transaction.from = uint256(uint160(L2_FORCE_DEPLOYER_ADDR));
         transaction.to = uint256(uint160(L2_COMPLEX_UPGRADER_ADDR));
         transaction.gasLimit = PRIORITY_TX_MAX_GAS_LIMIT;
@@ -113,5 +121,19 @@ library CTMUpgradeComposer {
     ///      patch component. `BaseZkSyncUpgrade` enforces this equals the new minor version.
     function protocolUpgradeNonce(uint256 _protocolVersion) internal pure returns (uint256) {
         return _protocolVersion >> SEMVER_MINOR_OFFSET;
+    }
+
+    /// @dev The one cut shape the registry commits: no facet cuts, an engine init that names the
+    ///      write-once object the engine reads everything else from.
+    function _cutNamingObject(
+        address _engine,
+        bytes memory _initCalldata
+    ) private pure returns (Diamond.DiamondCutData memory) {
+        return
+            Diamond.DiamondCutData({
+                facetCuts: new Diamond.FacetCut[](0),
+                initAddress: _engine,
+                initCalldata: _initCalldata
+            });
     }
 }

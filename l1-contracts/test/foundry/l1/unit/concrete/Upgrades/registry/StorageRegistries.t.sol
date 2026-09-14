@@ -34,10 +34,6 @@ import {
 import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {
-    L2BytecodeNotInFactoryDeps,
-    L2DelegateNotAnExtraDeployment,
-    L2ExtraDeploymentNotBytecodeDerived,
-    L2ExtraDeploymentNotUnsafe,
     MalformedL2UpgradePlan,
     PatchCannotCarryL2Upgrade,
     PatchChangesL2GenesisState,
@@ -212,21 +208,23 @@ contract StorageRegistriesTest is Test {
         return _releaseManifest(facetNewAdmin);
     }
 
-    /// @dev The well-formed authored remainder: two Unsafe extras at their bytecode-derived
-    ///      addresses, the delegate being the first of them, both bytecodes among the factory
-    ///      dependencies, and the pinned composer defining the delegate's calldata.
+    /// @dev The authored L2 input with everything a version can author: the delegate's bytecode
+    ///      info, one extra bytecode info, and the pinned composer defining the delegate's
+    ///      calldata. The object constructs both Unsafe deployments, the delegate target and the
+    ///      factory dependencies from it.
     function _l2Plan() internal view returns (AuthoredL2Plan memory plan) {
-        IComplexUpgrader.UniversalContractUpgradeInfo[]
-            memory extraDeployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](2);
-        extraDeployments[0] = L2PlanFixtures.unsafeDeployment(DELEGATE_CODE);
-        extraDeployments[1] = L2PlanFixtures.unsafeDeployment(EXTRA_CODE);
-        return
-            AuthoredL2Plan({
-                extraDeployments: extraDeployments,
-                delegateTo: extraDeployments[0].newAddress,
-                delegateComposer: _pin(address(delegateComposer)),
-                factoryDepHashes: L2PlanFixtures.factoryDepHashes(L2PlanFixtures.codes(DELEGATE_CODE, EXTRA_CODE))
-            });
+        return L2PlanFixtures.delegatePlanWithExtra(DELEGATE_CODE, EXTRA_CODE, _pin(address(delegateComposer)));
+    }
+
+    /// @dev The deployments the object constructs for `_l2Plan()`: the delegate first, the extra after.
+    function _authoredDeployments()
+        internal
+        pure
+        returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory list)
+    {
+        list = new IComplexUpgrader.UniversalContractUpgradeInfo[](2);
+        list[0] = L2PlanFixtures.unsafeDeployment(DELEGATE_CODE);
+        list[1] = L2PlanFixtures.unsafeDeployment(EXTRA_CODE);
     }
 
     function _pin(address _addr) internal view returns (PinnedContract memory) {
@@ -243,30 +241,20 @@ contract StorageRegistriesTest is Test {
         return CTMUpgradeComposer.buildL2UpgradeTx(ICTMTransition(address(_transition)), bridgehub);
     }
 
-    /// @dev The factory dependencies a target release built by `_tableRelease()` installs: the
-    ///      implementation AND the proxy shell of each of its two system-proxy rows.
-    function _tableDeps() internal pure returns (uint256[] memory deps) {
-        deps = new uint256[](4);
-        deps[0] = L2PlanFixtures.factoryDepHash(BRIDGEHUB_IMPL_CODE);
-        deps[1] = L2PlanFixtures.factoryDepHash(SYSTEM_PROXY_CODE);
-        deps[2] = L2PlanFixtures.factoryDepHash(SYSTEM_CONTEXT_IMPL_CODE);
-        deps[3] = L2PlanFixtures.factoryDepHash(SYSTEM_PROXY_CODE);
-    }
-
-    /// @dev `_l2Plan()` extended with the table dependencies, for hops toward `_tableRelease()`.
-    function _l2PlanWithTableDeps() internal view returns (AuthoredL2Plan memory plan) {
-        plan = _l2Plan();
-        plan.factoryDepHashes = _concat(plan.factoryDepHashes, _tableDeps());
-    }
-
-    function _concat(uint256[] memory _a, uint256[] memory _b) internal pure returns (uint256[] memory joined) {
-        joined = new uint256[](_a.length + _b.length);
-        for (uint256 i = 0; i < _a.length; ++i) {
-            joined[i] = _a[i];
-        }
-        for (uint256 i = 0; i < _b.length; ++i) {
-            joined[_a.length + i] = _b[i];
-        }
+    /// @dev The factory dependencies a hop toward `_tableRelease()` with `_l2Plan()` constructs:
+    ///      the table rows' bytecodes in member order (the shared proxy shell once), then the
+    ///      authored delegate's and extra's.
+    function _tableHopDeps() internal pure returns (uint256[] memory) {
+        return
+            L2PlanFixtures.factoryDepHashes(
+                L2PlanFixtures.codes(
+                    BRIDGEHUB_IMPL_CODE,
+                    SYSTEM_PROXY_CODE,
+                    SYSTEM_CONTEXT_IMPL_CODE,
+                    DELEGATE_CODE,
+                    EXTRA_CODE
+                )
+            );
     }
 
     function _transitionManifest() internal view returns (TransitionManifest memory manifest) {
@@ -380,19 +368,18 @@ contract StorageRegistriesTest is Test {
         );
     }
 
-    /// @dev Regression: the MINIMAL L2 plan — the delegate's own Unsafe deployment and nothing
-    ///      else (the delegate must be one of the extras, so a plan can never be delegate-only)
-    ///      — must still compose a transaction; previously such committed data was silently
-    ///      discarded when no table-derived deployment rode along.
+    /// @dev Regression: the MINIMAL L2 plan — the delegate alone (its own Unsafe deployment is
+    ///      constructed, so a plan can never be delegate-only) — must still compose a transaction;
+    ///      previously such committed data was silently discarded when no table-derived
+    ///      deployment rode along.
     function test_composerBuildsMinimalDelegatePlanL2Tx() public {
         TransitionManifest memory manifest = _transitionManifest();
+        manifest.l2Plan.extraBytecodeInfos = new bytes[](0);
+        CTMTransition minimal = new CTMTransition(manifest);
+
         IComplexUpgrader.UniversalContractUpgradeInfo[]
             memory delegateOnly = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
         delegateOnly[0] = L2PlanFixtures.unsafeDeployment(DELEGATE_CODE);
-        manifest.l2Plan.extraDeployments = delegateOnly;
-        manifest.l2Plan.factoryDepHashes = L2PlanFixtures.factoryDepHashes(L2PlanFixtures.codes(DELEGATE_CODE));
-        CTMTransition minimal = new CTMTransition(manifest);
-
         L2CanonicalTransaction memory transaction = _l2Tx(minimal);
         assertEq(transaction.txType, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE, "minimal delegate plan must compose a tx");
         assertEq(
@@ -414,12 +401,7 @@ contract StorageRegistriesTest is Test {
         manifest.oldProtocolVersion = NEW_VERSION;
         manifest.newProtocolVersion = NEW_VERSION + 1;
         manifest.fromRelease = address(newRelease);
-        manifest.l2Plan = AuthoredL2Plan({
-            extraDeployments: new IComplexUpgrader.UniversalContractUpgradeInfo[](0),
-            delegateTo: address(0),
-            delegateComposer: _noPin(),
-            factoryDepHashes: new uint256[](0)
-        });
+        manifest.l2Plan = L2PlanFixtures.emptyPlan();
     }
 
     function test_patchTransitionVerifierOnlyInitializes() public {
@@ -443,16 +425,11 @@ contract StorageRegistriesTest is Test {
         new CTMTransition(manifest);
     }
 
-    function test_revertWhen_sameReleaseTransitionCarriesAuthoredExtras() public {
+    function test_revertWhen_sameReleaseTransitionCarriesAnUncomposedDelegate() public {
         TransitionManifest memory manifest = _patchManifest();
-        // The smallest payload a plan can carry: one Unsafe extra that is also the delegate, no
-        // composer. Shape-valid, so only the same-release rule can fire.
-        IComplexUpgrader.UniversalContractUpgradeInfo[]
-            memory extras = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
-        extras[0] = L2PlanFixtures.unsafeDeployment(DELEGATE_CODE);
-        manifest.l2Plan.extraDeployments = extras;
-        manifest.l2Plan.delegateTo = extras[0].newAddress;
-        manifest.l2Plan.factoryDepHashes = L2PlanFixtures.factoryDepHashes(L2PlanFixtures.codes(DELEGATE_CODE));
+        // The smallest payload a plan can carry: the delegate alone, no composer. Shape-valid, so
+        // only the same-release rule can fire.
+        manifest.l2Plan = L2PlanFixtures.delegatePlan(DELEGATE_CODE, _noPin());
 
         vm.expectRevert(SameReleaseTransitionHasPayload.selector);
         new CTMTransition(manifest);
@@ -488,13 +465,13 @@ contract StorageRegistriesTest is Test {
 
     /// @dev The DERIVED half of the same rule: a patch whose target release changes the L2
     ///      bytecode table derives force deployments, which is an L2 upgrade by another name. The
-    ///      plan here is otherwise well-formed (delegate, composer, every installed bytecode among
-    ///      the dependencies), so the patch rule is what rejects it.
+    ///      plan here is otherwise well-formed (delegate and composer), so the patch rule is what
+    ///      rejects it.
     function test_revertWhen_patchDerivesL2DeploymentsFromItsTargetRelease() public {
         TransitionManifest memory manifest = _patchManifest();
         manifest.fromRelease = address(fromRelease);
         manifest.newRelease = address(_tableRelease());
-        manifest.l2Plan = _l2PlanWithTableDeps();
+        manifest.l2Plan = _l2Plan();
 
         vm.expectRevert(PatchCannotCarryL2Upgrade.selector);
         new CTMTransition(manifest);
@@ -585,22 +562,29 @@ contract StorageRegistriesTest is Test {
         new CTMTransition(manifest);
     }
 
-    /// @dev Regression: a plan carrying more factory deps than `BaseZkSyncUpgrade` accepts must be
-    ///      rejected at pin time. Otherwise stage 1 bumps the CTM version and every per-chain
-    ///      upgrade then reverts, stranding chains on an unexecutable transition.
+    /// @dev Regression: a plan whose CONSTRUCTED factory dependencies exceed what
+    ///      `BaseZkSyncUpgrade` accepts must be rejected at pin time. Otherwise stage 1 bumps the
+    ///      CTM version and every per-chain upgrade then reverts, stranding chains on an
+    ///      unexecutable transition. The delegate plus `MAX_NEW_FACTORY_DEPS` distinct extras is
+    ///      one dependency past the cap; one extra fewer constructs.
     function test_revertWhen_transitionExceedsFactoryDepCap() public {
         TransitionManifest memory manifest = _transitionManifest();
-        // The extras' real hashes stay in front (so the presence rule holds); surplus dummies
-        // push the list one past the cap.
-        uint256[] memory tooManyDeps = new uint256[](MAX_NEW_FACTORY_DEPS + 1);
-        uint256 realDeps = manifest.l2Plan.factoryDepHashes.length;
-        for (uint256 i = 0; i < tooManyDeps.length; ++i) {
-            tooManyDeps[i] = i < realDeps ? manifest.l2Plan.factoryDepHashes[i] : i + 1;
-        }
-        manifest.l2Plan.factoryDepHashes = tooManyDeps;
+        manifest.l2Plan.extraBytecodeInfos = _distinctExtraInfos(MAX_NEW_FACTORY_DEPS);
 
         vm.expectRevert(MalformedL2UpgradePlan.selector);
         new CTMTransition(manifest);
+
+        manifest.l2Plan.extraBytecodeInfos = _distinctExtraInfos(MAX_NEW_FACTORY_DEPS - 1);
+        CTMTransition atCap = new CTMTransition(manifest);
+        assertEq(atCap.l2Plan().factoryDepHashes.length, MAX_NEW_FACTORY_DEPS, "exactly the cap constructs");
+    }
+
+    /// @dev `_count` bytecode infos of pairwise-distinct dummy codes.
+    function _distinctExtraInfos(uint256 _count) internal pure returns (bytes[] memory infos) {
+        infos = new bytes[](_count);
+        for (uint256 i = 0; i < _count; ++i) {
+            infos[i] = L2PlanFixtures.bytecodeInfo(abi.encodePacked(bytes2(0xee00), uint8(i)));
+        }
     }
 
     function test_revertWhen_deadlineBeforeUpgradeTimestamp() public {
@@ -658,37 +642,24 @@ contract StorageRegistriesTest is Test {
         assertFalse(mispinned.verifyAll(), "a mispinned timer must not verify");
     }
 
-
     // ─────────────────────────── L2 plan shape ───────────────────────────
 
-    function test_revertWhen_delegateComposerWithoutTarget() public {
+    function test_revertWhen_delegateComposerWithoutDelegate() public {
         TransitionManifest memory manifest = _transitionManifest();
-        manifest.l2Plan.extraDeployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](0);
-        manifest.l2Plan.factoryDepHashes = new uint256[](0);
-        manifest.l2Plan.delegateTo = address(0);
+        manifest.l2Plan.delegateBytecodeInfo = "";
+        manifest.l2Plan.extraBytecodeInfos = new bytes[](0);
         // The composer pin stays — code defining calldata for a delegate call that never happens.
 
         vm.expectRevert(MalformedL2UpgradePlan.selector);
         new CTMTransition(manifest);
     }
 
-    function test_revertWhen_factoryDepsWithoutL2Side() public {
-        TransitionManifest memory manifest = _transitionManifest();
-        manifest.l2Plan.extraDeployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](0);
-        manifest.l2Plan.delegateTo = address(0);
-        manifest.l2Plan.delegateComposer = _noPin();
-        // factoryDepHashes stay non-empty with no transaction to ride in.
-
-        vm.expectRevert(MalformedL2UpgradePlan.selector);
-        new CTMTransition(manifest);
-    }
-
-    function test_revertWhen_deploymentsWithoutDelegateTarget() public {
-        // Force-deployments but no delegate target: `L2ComplexUpgrader` always ends with the final
+    function test_revertWhen_extrasWithoutDelegate() public {
+        // Force-deployments but no delegate: `L2ComplexUpgrader` always ends with the final
         // delegatecall, so a deployments-only plan would initialize here yet revert on L2 forever.
-        // (The composer is cleared so ONLY the deployments-without-target rule can fire.)
+        // (The composer is cleared so ONLY the deployments-without-delegate rule can fire.)
         TransitionManifest memory manifest = _transitionManifest();
-        manifest.l2Plan.delegateTo = address(0);
+        manifest.l2Plan.delegateBytecodeInfo = "";
         manifest.l2Plan.delegateComposer = _noPin();
 
         vm.expectRevert(MalformedL2UpgradePlan.selector);
@@ -788,22 +759,18 @@ contract StorageRegistriesTest is Test {
         table[uint256(L2EcosystemContract.SystemContext)] = hex"dd02";
 
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory derived = TransitionDerivationLib
-            .deriveL2DeploymentsFromTable(table, true);
+            .deriveL2DeploymentsFromTable(table);
 
         // Only the nonempty rows become deployments, in enum order, each at its member's
-        // canonical fixed address.
+        // canonical fixed address, each a ZKsync OS system-proxy upgrade (the registry never
+        // derives an Era force deployment).
         assertEq(derived.length, 2, "empty rows must derive no deployment");
         assertTrue(derived[0].upgradeType == IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade);
         assertEq(derived[0].deployedBytecodeInfo, hex"dd01");
         assertEq(derived[0].newAddress, L2InventoryLib.fixedAddress(L2EcosystemContract.L2Bridgehub));
+        assertTrue(derived[1].upgradeType == IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade);
         assertEq(derived[1].deployedBytecodeInfo, hex"dd02");
         assertEq(derived[1].newAddress, L2InventoryLib.fixedAddress(L2EcosystemContract.SystemContext));
-
-        // The Era flavour of the same table derives force deployments instead of proxy upgrades.
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory derivedEra = TransitionDerivationLib
-            .deriveL2DeploymentsFromTable(table, false);
-        assertTrue(derivedEra[0].upgradeType == IComplexUpgrader.ContractUpgradeType.EraForceDeployment);
-        assertEq(derivedEra.length, 2);
     }
 
     function test_revertWhen_transitionDerivesRowForAddresslessMember() public {
@@ -823,47 +790,50 @@ contract StorageRegistriesTest is Test {
         new CTMTransition(manifest);
     }
 
-    function test_transitionL2PlanIsDerivedPlusExtras() public {
+    function test_transitionL2PlanIsDerivedPlusConstructedAuthored() public {
         CTMRelease tableRelease = _tableRelease();
         TransitionManifest memory manifest = _transitionManifest();
         manifest.newRelease = address(tableRelease);
-        manifest.l2Plan = _l2PlanWithTableDeps();
         CTMTransition combined = new CTMTransition(manifest);
 
-        // The FINAL plan: the target release's table-derived set first, the authored extras
-        // appended after.
+        // The FINAL plan: the target release's table-derived set first, then the authored
+        // bytecodes as Unsafe deployments — the delegate first, the extra after.
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory expectedDerived = TransitionDerivationLib
-            .deriveL2DeploymentsFromTable(tableRelease.l2BytecodeInfos(), true);
+            .deriveL2DeploymentsFromTable(tableRelease.l2BytecodeInfos());
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory expectedAuthored = _authoredDeployments();
         L2UpgradePlan memory plan = combined.l2Plan();
         assertEq(
             plan.deployments.length,
-            expectedDerived.length + manifest.l2Plan.extraDeployments.length,
-            "final plan must be derived ++ extras"
+            expectedDerived.length + expectedAuthored.length,
+            "final plan must be derived ++ authored"
         );
         for (uint256 i = 0; i < expectedDerived.length; ++i) {
             assertEq(abi.encode(plan.deployments[i]), abi.encode(expectedDerived[i]), "derived prefix mismatch");
         }
-        for (uint256 i = 0; i < manifest.l2Plan.extraDeployments.length; ++i) {
+        for (uint256 i = 0; i < expectedAuthored.length; ++i) {
             assertEq(
                 abi.encode(plan.deployments[expectedDerived.length + i]),
-                abi.encode(manifest.l2Plan.extraDeployments[i]),
-                "authored extras suffix mismatch"
+                abi.encode(expectedAuthored[i]),
+                "authored suffix mismatch"
             );
         }
-        // The authored remainder rides through unchanged.
-        assertEq(plan.delegateTo, manifest.l2Plan.delegateTo);
+        assertEq(plan.delegateTo, expectedAuthored[0].newAddress, "the delegate is the first authored deployment");
         assertEq(plan.delegateComposer, address(delegateComposer), "the pinned composer is served");
-        assertEq(plan.factoryDepHashes.length, manifest.l2Plan.factoryDepHashes.length);
+        // The factory dependencies are CONSTRUCTED from what the deployments install: each table
+        // row's implementation and the shared proxy shell (once), then the authored bytecodes.
+        assertEq(plan.factoryDepHashes, _tableHopDeps(), "constructed factory dependencies");
         // ...and the composed transaction executes the COMBINED deployments, then the delegate
-        // with the calldata the pinned composer defines.
+        // with the calldata the pinned composer defines, carrying the constructed dependencies.
+        L2CanonicalTransaction memory transaction = _l2Tx(combined);
         assertEq(
-            _l2Tx(combined).data,
+            transaction.data,
             abi.encodeCall(
                 IComplexUpgrader.forceDeployAndUpgradeUniversal,
                 (plan.deployments, plan.delegateTo, DELEGATE_CALLDATA)
             ),
-            "composed data must be derived ++ extras, delegate, composer calldata"
+            "composed data must be derived ++ authored, delegate, composer calldata"
         );
+        assertEq(transaction.factoryDeps, plan.factoryDepHashes, "the transaction carries the constructed deps");
     }
 
     /// @dev The L2 set is derived from the release PAIR: a member whose descriptor is identical in
@@ -875,12 +845,7 @@ contract StorageRegistriesTest is Test {
         TransitionManifest memory manifest = _transitionManifest();
         manifest.fromRelease = address(departing);
         manifest.newRelease = address(target);
-        manifest.l2Plan = AuthoredL2Plan({
-            extraDeployments: new IComplexUpgrader.UniversalContractUpgradeInfo[](0),
-            delegateTo: address(0),
-            delegateComposer: PinnedContract({addr: address(0), codehash: bytes32(0)}),
-            factoryDepHashes: new uint256[](0)
-        });
+        manifest.l2Plan = L2PlanFixtures.emptyPlan();
         CTMTransition l1Only = new CTMTransition(manifest);
 
         assertEq(l1Only.l2Plan().deployments.length, 0, "identical table rows derive no L2 deployment");
@@ -910,20 +875,10 @@ contract StorageRegistriesTest is Test {
         manifest.fromRelease = address(departing);
         manifest.newRelease = address(target);
         manifest.l2Plan = _l2Plan();
-        manifest.l2Plan.factoryDepHashes = _concat(
-            manifest.l2Plan.factoryDepHashes,
-            L2PlanFixtures.factoryDepHashes(
-                L2PlanFixtures.codes(CHANGED_SYSTEM_CONTEXT_IMPL_CODE, ASSET_ROUTER_IMPL_CODE, SYSTEM_PROXY_CODE)
-            )
-        );
         CTMTransition transition = new CTMTransition(manifest);
 
         L2UpgradePlan memory plan = transition.l2Plan();
-        assertEq(
-            plan.deployments.length,
-            2 + manifest.l2Plan.extraDeployments.length,
-            "only the two changed members are derived, then the authored extras"
-        );
+        assertEq(plan.deployments.length, 4, "only the two changed members are derived, then the authored two");
         // Derived rows follow the table (member) order: L2AssetRouter precedes SystemContext.
         assertEq(
             plan.deployments[0].newAddress,
@@ -939,6 +894,21 @@ contract StorageRegistriesTest is Test {
             plan.deployments[1].deployedBytecodeInfo,
             targetManifest.l2BytecodeInfos[uint256(L2EcosystemContract.SystemContext)],
             "the derived row carries the TARGET release's descriptor"
+        );
+        // Only the CHANGED rows' bytecodes are dependencies: the unchanged L2Bridgehub
+        // implementation is not installed, so it does not ride.
+        assertEq(
+            plan.factoryDepHashes,
+            L2PlanFixtures.factoryDepHashes(
+                L2PlanFixtures.codes(
+                    ASSET_ROUTER_IMPL_CODE,
+                    SYSTEM_PROXY_CODE,
+                    CHANGED_SYSTEM_CONTEXT_IMPL_CODE,
+                    DELEGATE_CODE,
+                    EXTRA_CODE
+                )
+            ),
+            "dependencies follow the derived rows (member order), then the authored bytecodes"
         );
     }
 
@@ -964,54 +934,50 @@ contract StorageRegistriesTest is Test {
         // delegate target is unexecutable on L2 even when the manifest authors NO extras.
         TransitionManifest memory manifest = _transitionManifest();
         manifest.newRelease = address(_tableRelease());
-        manifest.l2Plan.extraDeployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](0);
-        manifest.l2Plan.delegateTo = address(0);
-        manifest.l2Plan.delegateComposer = _noPin();
-        // The derived rows' dependencies are all present, so only the shape rule can fire.
-        manifest.l2Plan.factoryDepHashes = _tableDeps();
+        manifest.l2Plan = L2PlanFixtures.emptyPlan();
 
         vm.expectRevert(MalformedL2UpgradePlan.selector);
         new CTMTransition(manifest);
     }
 
-    // ─────────────────────────── authored L2 remainder shape ───────────────────────────
-    // What L1 CAN establish about the authored L2 side, mechanically (see L2PlanValidationLib):
-    // extras are Unsafe at their bytecode-derived address, the delegate is one of them, and every
-    // installed bytecode is a factory dependency. One test per rule, each on an otherwise
-    // well-formed plan so exactly that rule fires.
+    // ─────────────────────────── authored L2 plan construction ───────────────────────────
+    // The manifest names bytecodes; the object constructs everything else of the L2 side (see
+    // L2PlanLib): one Unsafe deployment per authored bytecode info at its bytecode-derived
+    // address, the delegate target, and the deduplicated factory dependencies. What cannot be
+    // constructed into an executable plan refuses to exist.
 
-    function test_wellFormedL2PlanPinsTheAuthoredRemainder() public view {
+    function test_authoredPlanIsConstructedFromItsBytecodeInfos() public view {
         L2UpgradePlan memory plan = transition.l2Plan();
         AuthoredL2Plan memory authored = _l2Plan();
 
-        // No table rows on the target release: the final plan IS the authored extras.
-        assertEq(plan.deployments.length, 2, "both extras must be pinned");
+        // No table rows on the target release: the final plan IS the constructed authored set.
+        assertEq(plan.deployments.length, 2, "the delegate and the extra");
         for (uint256 i = 0; i < plan.deployments.length; ++i) {
             assertTrue(
-                plan.deployments[i].upgradeType == IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment
+                plan.deployments[i].upgradeType == IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
+                "authored bytecodes are Unsafe deployments"
             );
             assertEq(
                 plan.deployments[i].newAddress,
                 L2GenesisForceDeploymentsHelper.generateRandomAddress(plan.deployments[i].deployedBytecodeInfo),
-                "extra must sit at its bytecode-derived address"
+                "each sits at its bytecode-derived address"
             );
         }
-        assertEq(plan.delegateTo, authored.extraDeployments[0].newAddress, "the delegate is the first extra");
-        assertEq(plan.factoryDepHashes.length, 2);
-        assertEq(plan.factoryDepHashes[0], L2PlanFixtures.factoryDepHash(DELEGATE_CODE));
-        assertEq(plan.factoryDepHashes[1], L2PlanFixtures.factoryDepHash(EXTRA_CODE));
+        assertEq(plan.deployments[0].deployedBytecodeInfo, authored.delegateBytecodeInfo, "the delegate comes first");
+        assertEq(plan.deployments[1].deployedBytecodeInfo, authored.extraBytecodeInfos[0], "the extra follows");
+        assertEq(plan.delegateTo, plan.deployments[0].newAddress, "the delegate target is its derived address");
+        assertEq(plan.delegateComposer, address(delegateComposer));
+        assertEq(
+            plan.factoryDepHashes,
+            L2PlanFixtures.factoryDepHashes(L2PlanFixtures.codes(DELEGATE_CODE, EXTRA_CODE)),
+            "the dependencies are the observable hashes of the authored bytecodes"
+        );
     }
 
-    /// @dev An L1-only hop: no extras, no delegate, no factory deps. The zero delegate is the
-    ///      one non-extra value the delegate rule admits.
+    /// @dev An L1-only hop: no delegate, no extras, no composer. The plan constructs to nothing.
     function test_l1OnlyTransitionWithoutL2PlanInitializes() public {
         TransitionManifest memory manifest = _transitionManifest();
-        manifest.l2Plan = AuthoredL2Plan({
-            extraDeployments: new IComplexUpgrader.UniversalContractUpgradeInfo[](0),
-            delegateTo: address(0),
-            delegateComposer: _noPin(),
-            factoryDepHashes: new uint256[](0)
-        });
+        manifest.l2Plan = L2PlanFixtures.emptyPlan();
 
         CTMTransition l1Only = new CTMTransition(manifest);
 
@@ -1023,93 +989,45 @@ contract StorageRegistriesTest is Test {
         assertEq(_l2Tx(l1Only).txType, 0, "an L1-only hop composes no L2 transaction");
     }
 
-    function test_revertWhen_extraDeploymentIsNotUnsafe() public {
+    function test_revertWhen_delegateBytecodeInfoIsMalformed() public {
         TransitionManifest memory manifest = _transitionManifest();
-        // A system-proxy upgrade can only be table-derived; authored, it could re-point a fixed
-        // built-in outside the release's own table.
-        manifest.l2Plan.extraDeployments[1].upgradeType = IComplexUpgrader
-            .ContractUpgradeType
-            .ZKsyncOSSystemProxyUpgrade;
+        // Not a canonical (blake, length, keccak) tuple: no address can be derived from it.
+        manifest.l2Plan.delegateBytecodeInfo = hex"aa01";
 
-        vm.expectRevert(
-            abi.encodeWithSelector(L2ExtraDeploymentNotUnsafe.selector, manifest.l2Plan.extraDeployments[1].newAddress)
-        );
+        vm.expectRevert(MalformedL2UpgradePlan.selector);
         new CTMTransition(manifest);
     }
 
-    function test_revertWhen_extraDeploymentIsNotAtItsDerivedAddress() public {
+    function test_revertWhen_extraBytecodeInfoIsMalformed() public {
         TransitionManifest memory manifest = _transitionManifest();
-        // The right bytecode aimed at a fixed built-in's address instead of its derived one.
-        address expected = manifest.l2Plan.extraDeployments[1].newAddress;
-        manifest.l2Plan.extraDeployments[1].newAddress = L2_BRIDGEHUB_ADDR;
+        manifest.l2Plan.extraBytecodeInfos[0] = hex"aa02";
 
-        vm.expectRevert(
-            abi.encodeWithSelector(L2ExtraDeploymentNotBytecodeDerived.selector, expected, L2_BRIDGEHUB_ADDR)
-        );
+        vm.expectRevert(MalformedL2UpgradePlan.selector);
         new CTMTransition(manifest);
     }
 
-    function test_revertWhen_extraDeploymentInfoHasWrongLength() public {
-        TransitionManifest memory manifest = _transitionManifest();
-        // Not a canonical (blake, length, keccak) tuple: the address derived from the junk info
-        // is reported as the expected one, the authored address as the actual.
-        bytes memory junkInfo = hex"aa02";
-        address actual = manifest.l2Plan.extraDeployments[1].newAddress;
-        manifest.l2Plan.extraDeployments[1].deployedBytecodeInfo = junkInfo;
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                L2ExtraDeploymentNotBytecodeDerived.selector,
-                L2GenesisForceDeploymentsHelper.generateRandomAddress(junkInfo),
-                actual
-            )
-        );
-        new CTMTransition(manifest);
-    }
-
-    function test_revertWhen_delegateIsNotAnExtraDeployment() public {
-        TransitionManifest memory manifest = _transitionManifest();
-        // A nonzero delegate that none of the extras deploys: the delegatecall target would not
-        // be pinned by any bytecode hash the manifest carries.
-        address stranger = address(0x10004);
-        manifest.l2Plan.delegateTo = stranger;
-
-        vm.expectRevert(abi.encodeWithSelector(L2DelegateNotAnExtraDeployment.selector, stranger));
-        new CTMTransition(manifest);
-    }
-
-    function test_revertWhen_extraBytecodeMissingFromFactoryDeps() public {
-        TransitionManifest memory manifest = _transitionManifest();
-        // Only the delegate's bytecode rides; the second extra's does not.
-        manifest.l2Plan.factoryDepHashes = L2PlanFixtures.factoryDepHashes(L2PlanFixtures.codes(DELEGATE_CODE));
-
-        vm.expectRevert(abi.encodeWithSelector(L2BytecodeNotInFactoryDeps.selector, keccak256(EXTRA_CODE)));
-        new CTMTransition(manifest);
-    }
-
-    function test_revertWhen_derivedRowImplementationMissingFromFactoryDeps() public {
+    /// @dev Factory dependencies are one entry per DISTINCT bytecode: the proxy shell shared by
+    ///      every table row rides once, and an authored bytecode identical to a table row's
+    ///      implementation adds nothing.
+    function test_constructedFactoryDepsAreDeduplicated() public {
         TransitionManifest memory manifest = _transitionManifest();
         manifest.newRelease = address(_tableRelease());
-        // `_l2Plan()` carries the extras' deps only: the first derived row's implementation
-        // (L2Bridgehub, in enum order) is the first missing hash.
+        manifest.l2Plan = L2PlanFixtures.delegatePlanWithExtra(
+            DELEGATE_CODE,
+            BRIDGEHUB_IMPL_CODE,
+            _pin(address(delegateComposer))
+        );
+        CTMTransition deduplicated = new CTMTransition(manifest);
 
-        vm.expectRevert(abi.encodeWithSelector(L2BytecodeNotInFactoryDeps.selector, keccak256(BRIDGEHUB_IMPL_CODE)));
-        new CTMTransition(manifest);
-    }
-
-    function test_revertWhen_derivedRowProxyMissingFromFactoryDeps() public {
-        TransitionManifest memory manifest = _transitionManifest();
-        manifest.newRelease = address(_tableRelease());
-        // Every implementation is present but the shared proxy shell is not.
-        uint256[] memory deps = new uint256[](4);
-        deps[0] = L2PlanFixtures.factoryDepHash(DELEGATE_CODE);
-        deps[1] = L2PlanFixtures.factoryDepHash(EXTRA_CODE);
-        deps[2] = L2PlanFixtures.factoryDepHash(BRIDGEHUB_IMPL_CODE);
-        deps[3] = L2PlanFixtures.factoryDepHash(SYSTEM_CONTEXT_IMPL_CODE);
-        manifest.l2Plan.factoryDepHashes = deps;
-
-        vm.expectRevert(abi.encodeWithSelector(L2BytecodeNotInFactoryDeps.selector, keccak256(SYSTEM_PROXY_CODE)));
-        new CTMTransition(manifest);
+        L2UpgradePlan memory plan = deduplicated.l2Plan();
+        assertEq(plan.deployments.length, 4, "two table rows, the delegate, the extra");
+        assertEq(
+            plan.factoryDepHashes,
+            L2PlanFixtures.factoryDepHashes(
+                L2PlanFixtures.codes(BRIDGEHUB_IMPL_CODE, SYSTEM_PROXY_CODE, SYSTEM_CONTEXT_IMPL_CODE, DELEGATE_CODE)
+            ),
+            "the shared shell and the duplicated implementation ride once each, first occurrence wins"
+        );
     }
 
     // ─────────────────────────── routing hygiene ───────────────────────────

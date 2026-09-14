@@ -320,10 +320,9 @@ contract RegistryIndividualUpgradeTest is ZKsyncOSChainTypeManagerSharedTest, Re
                     oldProtocolVersionDeadline: 1000,
                     upgradeTimestamp: 0,
                     l2Plan: AuthoredL2Plan({
-                        extraDeployments: new IComplexUpgrader.UniversalContractUpgradeInfo[](0),
-                        delegateTo: address(0),
-                        delegateComposer: PinnedContract({addr: address(0), codehash: bytes32(0)}),
-                        factoryDepHashes: new uint256[](0)
+                        delegateBytecodeInfo: "",
+                        extraBytecodeInfos: new bytes[](0),
+                        delegateComposer: PinnedContract({addr: address(0), codehash: bytes32(0)})
                     }),
                     upgradeTimer: PinnedContract({addr: upgradeTimer, codehash: upgradeTimer.codehash})
                 })

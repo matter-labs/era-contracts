@@ -72,9 +72,12 @@ struct ReleaseManifest {
 /// @notice The complete, typed L2 side of one transition AS EXECUTED: the force-deployments,
 ///         the delegate call the `L2ComplexUpgrader` performs after them, and the factory
 ///         dependencies the L1 -> L2 transaction carries. This is the FINAL shape a transition
-///         serves (`l2Plan()`) and the composer executes — its `deployments` are the
-///         table-derived set ({TransitionDerivationLib.deriveL2Deployments}) followed by the
-///         authored extras; only {AuthoredL2Plan} is manifest data.
+///         serves (`l2Plan()`) and the composer executes. It is CONSTRUCTED at initialization
+///         ({L2PlanLib.build}) — never authored: `deployments` is the table-derived set
+///         ({TransitionDerivationLib.deriveL2Deployments}) followed by one Unsafe deployment per
+///         authored bytecode info, `delegateTo` the delegate's bytecode-derived address, and
+///         `factoryDepHashes` the observable hash of every bytecode those deployments install.
+///         Only {AuthoredL2Plan} is manifest data.
 struct L2UpgradePlan {
     IComplexUpgrader.UniversalContractUpgradeInfo[] deployments;
     address delegateTo;
@@ -82,26 +85,31 @@ struct L2UpgradePlan {
     uint256[] factoryDepHashes;
 }
 
-/// @notice The AUTHORED part of a transition's L2 side — what the manifest pins on top of the
-///         table-derived force deployments. Shape-validated (against the combined plan) at
-///         transition initialization — a plan that commits data the composed transaction would
-///         not execute refuses to exist.
+/// @notice The AUTHORED L2 input of one transition — only what a release table cannot express
+///         and the object cannot derive: the bytecodes to force-deploy beside the table-derived
+///         set, and the code that defines the delegate's calldata. Everything else of the L2 side
+///         (addresses, the delegate target, the factory dependencies) is a function of these and
+///         is constructed at initialization, so a manifest cannot commit a plan the composed
+///         transaction would not execute.
 /// @dev This is REVIEWED-AND-PINNED data, not proven state: L1 cannot verify L2 execution
 ///      effects, so the L1-side convergence guarantee deliberately does not extend here (see
-///      the transition contract docs).
-/// @param extraDeployments Force deployments the release table cannot express — in practice the
-///        version-specific upgrade delegate, force-deployed Unsafe at a bytecode-derived
-///        address. Appended AFTER the derived set (order between deployments is free; the
-///        delegatecall always runs last).
+///      the transition contract docs). What remains review work is what the delegate DOES — its
+///      bytecode hash names an auditable artifact, not a behavior.
+/// @param delegateBytecodeInfo The canonical ZKsync OS bytecode info (see {ZKSyncOSBytecodeInfo})
+///        of the version-specific upgrade delegate the `L2ComplexUpgrader` delegatecalls after
+///        the deployments. Force-deployed Unsafe at the address its own info derives, so it can
+///        never land on a fixed built-in or a table-derived target. EMPTY means no delegate — an
+///        L1-only edge, legal only when nothing is deployed on L2 either.
+/// @param extraBytecodeInfos Further Unsafe force deployments the delegate needs beside the
+///        table-derived set, each at its bytecode-derived address. Usually empty.
 /// @param delegateComposer The codehash-pinned {IL2DelegateCalldataComposer} that DEFINES what the
 ///        delegate is called with, from the target release and the ecosystem's Bridgehub — no
 ///        authored calldata bytes ride the manifest. Zero means the delegate is called with empty
-///        calldata; nonzero requires a `delegateTo`.
+///        calldata; nonzero requires a delegate.
 struct AuthoredL2Plan {
-    IComplexUpgrader.UniversalContractUpgradeInfo[] extraDeployments;
-    address delegateTo;
+    bytes delegateBytecodeInfo;
+    bytes[] extraBytecodeInfos;
     PinnedContract delegateComposer;
-    uint256[] factoryDepHashes;
 }
 
 /// @param upgradeEngine The diamond cut's init delegatecall target implementing
@@ -221,9 +229,8 @@ struct CoreRegistryManifest {
 ///        (`upgradeFromBootstrap`), composing the L2 transaction with the same composer
 ///        transitions use — the bootstrap is bootstrap-specific INPUTS, not a second composition
 ///        path.
-/// @param l2Plan The authored L2 remainder, exactly as on a transition: extra deployments, the
-///        delegate target and its pinned calldata composer, and the factory dependencies. The
-///        table-derived deployments come from `currentRelease`'s own L2 bytecode table.
+/// @param l2Plan The authored L2 input, exactly as on a transition ({AuthoredL2Plan}); the final
+///        plan is constructed from it and `currentRelease`'s own L2 bytecode table.
 /// @param upgradeTimestamp The chain-side earliest execution time the composed proposal carries.
 /// @param ctmExecutor The pinned `CTMUpgradeExecutor` that receives BOTH CTM ownership and the
 ///        CTM-domain `ProxyAdmin` — the whole CTM domain lands under one executor. It must be

@@ -6,12 +6,14 @@ import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgra
 import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
+import {AuthoredL2Plan, PinnedContract} from "contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice Builds the L2-plan fixtures the registry suites pin. A short dummy EVM bytecode stands
-///         in for each real artifact; every descriptor (bytecode info, derived address, system-proxy
-///         row, factory dependency) is derived from it exactly the way the deploy tooling derives
-///         it from the real artifact, so the fixtures satisfy the shape `L2PlanValidationLib`
-///         enforces without duplicating literals across suites.
+///         in for each real artifact; every descriptor (bytecode info, system-proxy row, factory
+///         dependency) is derived from it exactly the way the deploy tooling derives it from the
+///         real artifact. The authored inputs name bytecodes only; `unsafeDeployment` is the
+///         deployment `L2PlanLib.build` must CONSTRUCT for one, so suites can state expectations
+///         without duplicating the derivation.
 library L2PlanFixtures {
     /// @dev Stand-in for the Blake2s hash of the bytecode: L1 only carries it, never checks it.
     bytes32 internal constant BLAKE_HASH_PLACEHOLDER = bytes32(uint256(1));
@@ -32,8 +34,43 @@ library L2PlanFixtures {
         return uint256(keccak256(_code));
     }
 
-    /// @notice One `Unsafe` extra deployment of `_code` at its bytecode-derived address — the
-    ///         only extra shape a transition accepts.
+    /// @notice The authored input of an L1-only edge: no delegate, no extras, no composer.
+    function emptyPlan() internal pure returns (AuthoredL2Plan memory) {
+        return
+            AuthoredL2Plan({
+                delegateBytecodeInfo: "",
+                extraBytecodeInfos: new bytes[](0),
+                delegateComposer: PinnedContract({addr: address(0), codehash: bytes32(0)})
+            });
+    }
+
+    /// @notice The minimal authored input with an L2 side: `_delegateCode` as the delegate and
+    ///         `_composer` defining its calldata (the zero pin for an uncomposed delegate).
+    function delegatePlan(
+        bytes memory _delegateCode,
+        PinnedContract memory _composer
+    ) internal pure returns (AuthoredL2Plan memory) {
+        return
+            AuthoredL2Plan({
+                delegateBytecodeInfo: bytecodeInfo(_delegateCode),
+                extraBytecodeInfos: new bytes[](0),
+                delegateComposer: _composer
+            });
+    }
+
+    /// @notice {delegatePlan} with one extra Unsafe deployment of `_extraCode`.
+    function delegatePlanWithExtra(
+        bytes memory _delegateCode,
+        bytes memory _extraCode,
+        PinnedContract memory _composer
+    ) internal pure returns (AuthoredL2Plan memory plan) {
+        plan = delegatePlan(_delegateCode, _composer);
+        plan.extraBytecodeInfos = new bytes[](1);
+        plan.extraBytecodeInfos[0] = bytecodeInfo(_extraCode);
+    }
+
+    /// @notice The `Unsafe` deployment of `_code` at its bytecode-derived address — what the
+    ///         object constructs for an authored bytecode info.
     function unsafeDeployment(
         bytes memory _code
     ) internal pure returns (IComplexUpgrader.UniversalContractUpgradeInfo memory) {
@@ -52,7 +89,7 @@ library L2PlanFixtures {
         return abi.encode(bytecodeInfo(_implCode), bytecodeInfo(_proxyCode));
     }
 
-    /// @notice The factory-dependency list covering every code in `_codes`.
+    /// @notice The factory-dependency list covering every code in `_codes`, in order.
     function factoryDepHashes(bytes[] memory _codes) internal pure returns (uint256[] memory hashes) {
         hashes = new uint256[](_codes.length);
         for (uint256 i = 0; i < _codes.length; ++i) {
@@ -84,5 +121,33 @@ library L2PlanFixtures {
         list[0] = _a;
         list[1] = _b;
         list[2] = _c;
+    }
+
+    function codes(
+        bytes memory _a,
+        bytes memory _b,
+        bytes memory _c,
+        bytes memory _d
+    ) internal pure returns (bytes[] memory list) {
+        list = new bytes[](4);
+        list[0] = _a;
+        list[1] = _b;
+        list[2] = _c;
+        list[3] = _d;
+    }
+
+    function codes(
+        bytes memory _a,
+        bytes memory _b,
+        bytes memory _c,
+        bytes memory _d,
+        bytes memory _e
+    ) internal pure returns (bytes[] memory list) {
+        list = new bytes[](5);
+        list[0] = _a;
+        list[1] = _b;
+        list[2] = _c;
+        list[3] = _d;
+        list[4] = _e;
     }
 }

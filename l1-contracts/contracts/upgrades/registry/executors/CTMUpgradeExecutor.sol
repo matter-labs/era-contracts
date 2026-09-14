@@ -26,7 +26,7 @@ import {
 import {OutdatedProtocolVersion} from "../../../state-transition/L1StateTransitionErrors.sol";
 import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
 import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
-import {L2PlanValidationLib} from "../libraries/L2PlanValidationLib.sol";
+import {L2PlanLib} from "../libraries/L2PlanLib.sol";
 import {BytecodesSupplier} from "../../BytecodesSupplier.sol";
 
 /// @title CTMUpgradeExecutor
@@ -347,7 +347,7 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
         (uint256 oldProtocolVersion, uint256 newProtocolVersion) = _requireEdges(_transition);
         // Every bytecode the L2 transaction depends on must already be published on the CTM's
         // supplier — otherwise the committed edge fails on every chain's L2 leg.
-        L2PlanValidationLib.requirePublished(
+        L2PlanLib.requirePublished(
             BytecodesSupplier(CHAIN_TYPE_MANAGER.L1_BYTECODES_SUPPLIER()),
             _transition.l2Plan().factoryDepHashes
         );

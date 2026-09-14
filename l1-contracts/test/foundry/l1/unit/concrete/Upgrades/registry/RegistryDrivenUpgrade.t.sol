@@ -282,28 +282,17 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
     ) internal returns (CTMTransition transition) {
         address release = address(new CTMRelease(_releaseManifest(_newAdminFacet, _verifier)));
 
-        bool hasL2Side = _newAdminFacet != address(0);
-        IComplexUpgrader.UniversalContractUpgradeInfo[]
-            memory deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](hasL2Side ? 1 : 0);
-        // A nonempty L2 plan MUST carry a delegate target: `L2ComplexUpgrader` always ends with
-        // the final delegatecall, so a deployments-only plan (no target) would revert on L2. The
-        // delegate is the one authored extra, its calldata is defined by the pinned composer, and
-        // every bytecode the hop installs (the delegate, the table row's implementation and proxy
-        // shell) is a factory dependency.
-        AuthoredL2Plan memory l2Plan;
-        l2Plan.extraDeployments = deployments;
-        l2Plan.factoryDepHashes = new uint256[](0);
-        if (hasL2Side) {
-            deployments[0] = L2PlanFixtures.unsafeDeployment(L2_DELEGATE_CODE);
-            l2Plan.delegateTo = deployments[0].newAddress;
-            l2Plan.delegateComposer = PinnedContract({
-                addr: address(delegateComposer),
-                codehash: address(delegateComposer).codehash
-            });
-            l2Plan.factoryDepHashes = L2PlanFixtures.factoryDepHashes(
-                L2PlanFixtures.codes(L2_DELEGATE_CODE, L2_BRIDGEHUB_IMPL_CODE, L2_SYSTEM_PROXY_CODE)
-            );
-        }
+        // A nonempty L2 plan MUST carry a delegate: `L2ComplexUpgrader` always ends with the final
+        // delegatecall, so a deployments-only plan would revert on L2. The delegate is the one
+        // authored bytecode, its calldata is defined by the pinned composer, and the object
+        // constructs its address and every factory dependency the hop installs (the delegate,
+        // the table row's implementation and proxy shell).
+        AuthoredL2Plan memory l2Plan = _newAdminFacet != address(0)
+            ? L2PlanFixtures.delegatePlan(
+                L2_DELEGATE_CODE,
+                PinnedContract({addr: address(delegateComposer), codehash: address(delegateComposer).codehash})
+            )
+            : L2PlanFixtures.emptyPlan();
 
         ProxyUpgradeRow[] memory noProxyUpgrades = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
         // One timer per hop, bound to the coordinator (the only address that can start it), with

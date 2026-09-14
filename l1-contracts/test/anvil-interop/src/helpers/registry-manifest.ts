@@ -55,17 +55,7 @@ function parseSolidityEnum(relSourcePath: string, enumName: string): Record<stri
   return Object.fromEntries(members.map((m, i) => [m, i]));
 }
 
-const COMPLEX_UPGRADER_SOL = "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 const CONTRACT_IDENTIFIERS_SOL = "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
-
-/** The `ContractUpgradeType.ZKsyncOSUnsafeForceDeployment` value, parsed from the Solidity source. */
-export function unsafeForceDeploymentType(): number {
-  return enumValue(
-    parseSolidityEnum(COMPLEX_UPGRADER_SOL, "ContractUpgradeType"),
-    "ZKsyncOSUnsafeForceDeployment",
-    "ContractUpgradeType"
-  );
-}
 
 function enumValue(map: Record<string, number>, name: string, enumName: string): number {
   const value = map[name];
@@ -196,17 +186,17 @@ export function transitionInitArgs(
   // Release provenance is enforced by the CTM's stored `releaseCodehash` at `setCurrentRelease`
   // time, not by the transition manifest — which is why the runner checks the freshly deployed
   // release against that same anchor.
-  const upgradeType = parseSolidityEnum(COMPLEX_UPGRADER_SOL, "ContractUpgradeType");
   const transition = ctm.transition;
 
-  // The manifest's authored list is the plan's EXTRA deployments — the table-derived set is
-  // computed on-chain at transition initialization. (Older manifest JSONs name the key
-  // `deployments`; both spellings carry the same authored list.)
-  const extraDeployments = (transition.l2Plan.extraDeployments ?? transition.l2Plan.deployments).map((d: any) => ({
-    upgradeType: enumValue(upgradeType, d.upgradeType, "ContractUpgradeType"),
-    deployedBytecodeInfo: d.deployedBytecodeInfo,
-    newAddress: d.newAddress,
-  }));
+  // The manifest authors bytecode infos only: the object constructs the Unsafe deployments, the
+  // delegate target and the factory dependencies from them (plus the table-derived set) at
+  // initialization. A manifest JSON still carrying the pre-construction `deployments` /
+  // `delegateTo` / `factoryDepHashes` keys predates that and must be re-emitted.
+  if (typeof transition.l2Plan?.delegateBytecodeInfo !== "string") {
+    throw new Error(
+      "manifest l2Plan predates plan construction (expected `delegateBytecodeInfo`); regenerate with REGEN_REGISTRIES=1"
+    );
+  }
 
   return {
     // The registry-driven hop departs from the BOOTSTRAP edge's target version (the bootstrap
@@ -223,12 +213,11 @@ export function transitionInitArgs(
     oldProtocolVersionDeadline: ethers.BigNumber.from(transition.oldProtocolVersionDeadline),
     upgradeTimestamp: transition.upgradeTimestamp,
     l2Plan: {
-      extraDeployments,
-      delegateTo: transition.l2Plan.delegateTo,
+      delegateBytecodeInfo: transition.l2Plan.delegateBytecodeInfo,
+      extraBytecodeInfos: transition.l2Plan.extraBytecodeInfos ?? [],
       // Pinned version-specific CODE defines the delegate calldata; the harness pins a fixed
       // no-op composer deployed alongside the objects (see the runner).
       delegateComposer,
-      factoryDepHashes: transition.l2Plan.factoryDepHashes.map((h: string) => ethers.BigNumber.from(h)),
     },
     // The stage-1 timer is a deploy-time object of this same run (like `newRelease`), so it
     // rides in as a pin rather than from the committed manifest. The ecosystem leg is NOT the

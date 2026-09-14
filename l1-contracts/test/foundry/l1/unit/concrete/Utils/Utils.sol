@@ -106,10 +106,9 @@ library Utils {
             oldProtocolVersionDeadline: type(uint256).max,
             upgradeTimestamp: 0,
             l2Plan: AuthoredL2Plan({
-                extraDeployments: new IComplexUpgrader.UniversalContractUpgradeInfo[](0),
-                delegateTo: address(0),
-                delegateComposer: noPin,
-                factoryDepHashes: new uint256[](0)
+                delegateBytecodeInfo: "",
+                extraBytecodeInfos: new bytes[](0),
+                delegateComposer: noPin
             }),
             upgradeTimer: noPin
         });

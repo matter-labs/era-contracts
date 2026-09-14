@@ -8,7 +8,6 @@ import {RegistryDuplicateSelector} from "../../../common/L1ContractErrors.sol";
 import {GenesisFacet} from "../RegistryTypes.sol";
 import {ISelfDescribingFacet} from "../../../state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 import {IComplexUpgrader} from "../../../state-transition/l2-deps/IComplexUpgrader.sol";
-import {IDiamondInit} from "../../../state-transition/chain-interfaces/IDiamondInit.sol";
 import {L2EcosystemContract} from "./ContractIdentifiers.sol";
 import {L2InventoryLib} from "./L2InventoryLib.sol";
 
@@ -21,9 +20,10 @@ import {L2InventoryLib} from "./L2InventoryLib.sol";
 ///         transition path (existing chains) cannot diverge from the release path (new chains)
 ///         by construction, and the chain applies the stored delta verbatim.
 ///
-/// @dev Scope: L1 diamond routing and the table-driven L2 force deployments. The rest of the L2 payload (delegate target + calldata, factory deps) is
-///      reviewed-and-pinned data — L1 cannot verify L2 execution effects, and the guarantee is
-///      deliberately not overstated.
+/// @dev Scope: L1 diamond routing and the table-driven L2 force deployments. The authored rest of
+///      the L2 side (the delegate and any extra bytecode, the composer) is constructed into the
+///      final plan by {L2PlanLib} — reviewed-and-pinned data, since L1 cannot verify L2 execution
+///      effects, and the guarantee is deliberately not overstated.
 library TransitionDerivationLib {
     /// @dev One facet row with its routing read from the facet's own self-description
     ///      (see {GenesisFacet} — routing is not stored in the manifest).
@@ -115,9 +115,7 @@ library TransitionDerivationLib {
     ///      authored, and members whose bytecode did not change are not touched — a facet-only or
     ///      verifier-only upgrade derives an empty L2 set. A same-release pair derives an empty
     ///      list by identity. The bootstrap edge has no departing release and
-    ///      installs the target table in full ({deriveL2DeploymentsFromTable}). VM identity is
-    ///      single-sourced from the target release's pinned DiamondInit, exactly like the L2
-    ///      transaction composition.
+    ///      installs the target table in full ({deriveL2DeploymentsFromTable}).
     function deriveL2Deployments(
         ICTMRelease _fromRelease,
         ICTMRelease _newRelease
@@ -125,12 +123,8 @@ library TransitionDerivationLib {
         if (address(_fromRelease) == address(_newRelease)) {
             return deployments;
         }
-        bool isZKsyncOS = IDiamondInit(_newRelease.diamondInit()).IS_ZKSYNC_OS();
         return
-            deriveL2DeploymentsFromTable(
-                changedL2Rows(_fromRelease.l2BytecodeInfos(), _newRelease.l2BytecodeInfos()),
-                isZKsyncOS
-            );
+            deriveL2DeploymentsFromTable(changedL2Rows(_fromRelease.l2BytecodeInfos(), _newRelease.l2BytecodeInfos()));
     }
 
     /// @notice The rows of `_newTable` that differ from `_fromTable` at the same member index, every
@@ -156,12 +150,12 @@ library TransitionDerivationLib {
     /// @notice The table form of {deriveL2Deployments}, shared with the deploy tooling so the
     ///         script-composed bootstrap L2 leg and the on-chain transition path derive from the
     ///         same function.
-    /// @dev Era rows embed a full `ForceDeployment` (see {IComplexUpgrader}); ZKsync OS rows are
-    ///      uniformly system-proxy upgrades — the only Unsafe deployment an upgrade carries is
-    ///      the version-specific delegate, which is pinned transition data, never table-derived.
+    /// @dev Table rows are uniformly ZKsync OS system-proxy upgrades — the registry composes for
+    ///      ZKsync OS chains only and never emits an `EraForceDeployment`. The only Unsafe
+    ///      deployments an upgrade carries are the authored delegate and extras, which
+    ///      {L2PlanLib.build} constructs from their bytecode infos, never from the table.
     function deriveL2DeploymentsFromTable(
-        bytes[] memory _l2BytecodeInfos,
-        bool _isZKsyncOS
+        bytes[] memory _l2BytecodeInfos
     ) internal pure returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments) {
         uint256 length = _l2BytecodeInfos.length;
         uint256 count = 0;
@@ -177,30 +171,11 @@ library TransitionDerivationLib {
                 continue;
             }
             deployments[cursor] = IComplexUpgrader.UniversalContractUpgradeInfo({
-                upgradeType: _isZKsyncOS
-                    ? IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade
-                    : IComplexUpgrader.ContractUpgradeType.EraForceDeployment,
+                upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
                 deployedBytecodeInfo: _l2BytecodeInfos[i],
                 newAddress: L2InventoryLib.fixedAddress(L2EcosystemContract(i))
             });
             ++cursor;
-        }
-    }
-
-    /// @notice The FINAL L2 deployment list: the table-derived set followed by the authored extras
-    ///         (order between deployments is free; the `L2ComplexUpgrader` delegatecall runs last).
-    function combineL2Deployments(
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _derived,
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _extras
-    ) internal pure returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory combined) {
-        combined = new IComplexUpgrader.UniversalContractUpgradeInfo[](_derived.length + _extras.length);
-        uint256 derivedLength = _derived.length;
-        for (uint256 i = 0; i < derivedLength; ++i) {
-            combined[i] = _derived[i];
-        }
-        uint256 extrasLength = _extras.length;
-        for (uint256 i = 0; i < extrasLength; ++i) {
-            combined[derivedLength + i] = _extras[i];
         }
     }
 

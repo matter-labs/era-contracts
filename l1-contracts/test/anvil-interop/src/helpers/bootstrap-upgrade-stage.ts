@@ -128,12 +128,8 @@ export async function bootstrapInitArgs(
     upgradeTimer: string;
     /** The pinned composer that defines the delegate calldata (the harness's fixed no-op composer). */
     delegateComposer: { addr: string; codehash: string };
-    /** The harness's no-op delegate: its bytecode info and the address that info derives. */
-    l2Delegate: { deployedBytecodeInfo: string; address: string };
-    /** `ContractUpgradeType.ZKsyncOSUnsafeForceDeployment`. */
-    unsafeDeploymentType: number;
-    /** keccak256 of every bytecode the L2 leg installs — published on the supplier beforehand. */
-    factoryDepHashes: string[];
+    /** The harness's no-op delegate's bytecode info; the migration derives its address from it. */
+    l2Delegate: { deployedBytecodeInfo: string };
   }
 ): Promise<any> {
   const codehash = async (addr: string) => ethers.utils.keccak256(await l1Provider.getCode(addr));
@@ -162,19 +158,14 @@ export async function bootstrapInitArgs(
       addr: manifest.bootstrap.upgradeEngine.address,
       codehash: manifest.bootstrap.upgradeEngine.codehash,
     },
-    // The L2 leg is COMPOSED on-chain from the genesis release's table plus these authored extras;
-    // the migration serves the resulting cut (`upgradeCut()`) — nothing is hand-built here.
+    // The L2 leg is CONSTRUCTED on-chain from the genesis release's table plus the authored
+    // delegate bytecode: its Unsafe deployment, the delegate target and the factory dependencies
+    // are the migration's, and it serves the resulting cut (`upgradeCut()`) — nothing is
+    // hand-built here.
     l2Plan: {
-      extraDeployments: [
-        {
-          upgradeType: params.unsafeDeploymentType,
-          deployedBytecodeInfo: params.l2Delegate.deployedBytecodeInfo,
-          newAddress: params.l2Delegate.address,
-        },
-      ],
-      delegateTo: params.l2Delegate.address,
+      delegateBytecodeInfo: params.l2Delegate.deployedBytecodeInfo,
+      extraBytecodeInfos: [],
       delegateComposer: params.delegateComposer,
-      factoryDepHashes: params.factoryDepHashes.map((h) => ethers.BigNumber.from(h)),
     },
     upgradeTimestamp: 0,
     // The executor and timer are deployed by this run (regular build), so their codehashes are

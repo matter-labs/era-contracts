@@ -28,19 +28,13 @@ sol! {
         address admin;
     }
 
-    #[derive(Debug)]
-    struct UniversalContractUpgradeInfo {
-        uint8 upgradeType;
-        bytes deployedBytecodeInfo;
-        address newAddress;
-    }
-
+    /// The authored L2 input only: the object constructs the deployments, the delegate
+    /// target and the factory dependencies from these at construction.
     #[derive(Debug)]
     struct AuthoredL2Plan {
-        UniversalContractUpgradeInfo[] extraDeployments;
-        address delegateTo;
+        bytes delegateBytecodeInfo;
+        bytes[] extraBytecodeInfos;
         PinnedContract delegateComposer;
-        uint256[] factoryDepHashes;
     }
 
     /// Positional mirror of `RegistryTypes.BootstrapManifest`. Every field a reviewer must

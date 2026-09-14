@@ -23,11 +23,6 @@ import {CTMUpgrade_v34} from "deploy-scripts/upgrade/v34/CTMUpgrade_v34.s.sol";
 contract CTMUpgradeForTests is CTMUpgrade_v34 {
     using stdToml for string;
 
-    function prepareCTMUpgrade() public override {
-        setSkipFactoryDepsCheck_TestOnly(true);
-        super.prepareCTMUpgrade();
-    }
-
     // solhint-disable-next-line func-named-parameters
     function initializeWithArgs(
         address _ctmProxy,
