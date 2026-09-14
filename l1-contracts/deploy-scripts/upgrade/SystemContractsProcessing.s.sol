@@ -160,13 +160,20 @@ library SystemContractsProcessing {
         internal
         returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments)
     {
-        return TransitionDerivationLib.deriveL2DeploymentsFromTable(buildL2BytecodeInfoTable());
+        return
+            TransitionDerivationLib.deriveL2DeploymentsFromTable(buildL2BytecodeInfoTable(), systemProxyBytecodeInfo());
+    }
+
+    /// @notice The release's shared system-proxy shell descriptor
+    ///         (`ReleaseManifest.l2SystemProxyBytecodeInfo`): the ZKsync OS bytecode info of
+    ///         `SystemContractProxy`, which every table member sits behind.
+    function systemProxyBytecodeInfo() internal returns (bytes memory) {
+        return Utils.getZKOSBytecodeInfoForContract("SystemContractProxy.sol", "SystemContractProxy");
     }
 
     /// @notice Builds the release manifest's enum-indexed L2 bytecode table
-    ///         (`ReleaseManifest.l2BytecodeInfos`): per force-deployed member, the
-    ///         deployed-bytecode descriptor its force deployment carries; every other slot stays
-    ///         an explicit empty.
+    ///         (`ReleaseManifest.l2BytecodeInfos`): per force-deployed member, the ZKsync OS
+    ///         bytecode info of its IMPLEMENTATION; every other slot stays an explicit empty.
     /// @dev Deliberately UNFILLED rows, and why:
     ///      - SystemContractProxyAdmin: a direct-deployed ProxyAdmin already present from genesis
     ///        (owned by the ComplexUpgrader); re-deploying it would require an unsafe overwrite.
@@ -176,19 +183,20 @@ library SystemContractsProcessing {
     ///        `AuthoredL2Plan.delegateBytecodeInfo`, never table-derived; the PUVT guards that no
     ///        other unsafe deployment is present.
     function buildL2BytecodeInfoTable() internal returns (bytes[] memory rows) {
-        return buildL2BytecodeInfoTable(Utils.getZKOSProxyUpgradeBytecodeInfo);
+        return buildL2BytecodeInfoTable(Utils.getZKOSBytecodeInfoForContract);
     }
 
     /// @dev Variant for deployers that precompute the expensive bytecode hashes and provide a
-    ///      cache-backed descriptor builder. Keeping the table assembly here prevents the genesis
-    ///      and upgrade paths from growing separate contract inventories.
+    ///      cache-backed descriptor builder (artifact file + contract name -> the implementation's
+    ///      bytecode info). Keeping the table assembly here prevents the genesis and upgrade paths
+    ///      from growing separate contract inventories.
     function buildL2BytecodeInfoTable(
         function(string memory, string memory) internal returns (bytes memory) _buildBytecodeInfo
     ) internal returns (bytes[] memory rows) {
         rows = new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
         L2EcosystemContract[] memory core = getFixedAddressCoreContracts();
         for (uint256 i = 0; i < core.length; i++) {
-            rows[uint256(core[i])] = _buildZKsyncOSEntry(core[i], _buildBytecodeInfo).deployedBytecodeInfo;
+            rows[uint256(core[i])] = _implementationBytecodeInfo(core[i], _buildBytecodeInfo);
         }
         // ZKsync-OS-only contracts: the atomic-interop built-ins and the L2 ecosystem registry.
         // Predeployed in the ZKsync OS genesis, so a from-scratch chain already has them; a chain
@@ -196,15 +204,15 @@ library SystemContractsProcessing {
         // `_initializeV32Contracts` initialize them there too.
         L2EcosystemContract[] memory zkosOnly = getZKsyncOSOnlyContracts();
         for (uint256 i = 0; i < zkosOnly.length; i++) {
-            rows[uint256(zkosOnly[i])] = _buildZKsyncOSEntry(zkosOnly[i], _buildBytecodeInfo).deployedBytecodeInfo;
+            rows[uint256(zkosOnly[i])] = _implementationBytecodeInfo(zkosOnly[i], _buildBytecodeInfo);
         }
         // Kernel built-ins with l1-contracts EVM bytecodes (system space, 0x800x).
         ZkSyncOsSystemContract[] memory sysContracts = getZKsyncOSExtraSystemContracts();
         for (uint256 i = 0; i < sysContracts.length; i++) {
-            rows[uint256(_l2MemberForSystemContract(sysContracts[i]))] = _buildZKsyncOSEntryForSystemContract({
-                _id: sysContracts[i],
-                _buildBytecodeInfo: _buildBytecodeInfo
-            }).deployedBytecodeInfo;
+            (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolveZkOsSystemContract(
+                sysContracts[i]
+            );
+            rows[uint256(_l2MemberForSystemContract(sysContracts[i]))] = _buildBytecodeInfo(fileName, contractName);
         }
         // The removed v31 GWAssetTracker's proxy keeps its neutralizing EmptyContract
         // implementation (see `getRemovedTrackerNeutralizations`).
@@ -212,6 +220,15 @@ library SystemContractsProcessing {
             "EmptyContract.sol",
             "EmptyContract"
         );
+    }
+
+    /// @dev The table row of a fixed-address `L2EcosystemContract`: its implementation's bytecode info.
+    function _implementationBytecodeInfo(
+        L2EcosystemContract _id,
+        function(string memory, string memory) internal returns (bytes memory) _buildBytecodeInfo
+    ) private returns (bytes memory) {
+        (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(_id);
+        return _buildBytecodeInfo(fileName, contractName);
     }
 
     /// @dev The appended `L2EcosystemContract` member a ZKsyncOS kernel built-in occupies in the
@@ -263,41 +280,5 @@ library SystemContractsProcessing {
         for (uint256 i = 0; i < _right.length; i++) {
             result[_left.length + i] = _right[i];
         }
-    }
-
-    /// @dev Build a single ZKsyncOS force deployment entry for a fixed-address L2EcosystemContract.
-    function _buildZKsyncOSEntry(
-        L2EcosystemContract _id,
-        function(string memory, string memory) internal returns (bytes memory) _buildBytecodeInfo
-    ) private returns (IComplexUpgrader.UniversalContractUpgradeInfo memory) {
-        (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(_id);
-
-        // Note: L2WrappedBaseToken is excluded from the ZKsyncOS force-deployment list (see
-        // getBaseZKsyncOSForceDeployments), so this builder only handles system-proxy upgrades.
-        bytes memory bytecodeInfo = _buildBytecodeInfo(fileName, contractName);
-
-        return
-            IComplexUpgrader.UniversalContractUpgradeInfo({
-                upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
-                deployedBytecodeInfo: bytecodeInfo,
-                newAddress: CoreOnGatewayHelper._resolveAddress(_id)
-            });
-    }
-
-    /// @dev Build a single ZKsyncOS force deployment entry for a ZkSyncOsSystemContract.
-    function _buildZKsyncOSEntryForSystemContract(
-        ZkSyncOsSystemContract _id,
-        function(string memory, string memory) internal returns (bytes memory) _buildBytecodeInfo
-    ) private returns (IComplexUpgrader.UniversalContractUpgradeInfo memory) {
-        address addr = CoreOnGatewayHelper._resolveZkOsSystemContractAddress(_id);
-        (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolveZkOsSystemContract(_id);
-        bytes memory bytecodeInfo = _buildBytecodeInfo(fileName, contractName);
-
-        return
-            IComplexUpgrader.UniversalContractUpgradeInfo({
-                upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
-                deployedBytecodeInfo: bytecodeInfo,
-                newAddress: addr
-            });
     }
 }

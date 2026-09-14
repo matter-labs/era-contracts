@@ -225,14 +225,16 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
     ///      Hop 1 changes only the verifier, so its target release differs from genesis in that
     ///      one field and the DERIVED facet/deployment delta is empty — an L1-only upgrade. The
     ///      v33 release (nonzero `_adminFacet`) also carries one table row, the L2Bridgehub
-    ///      system-proxy upgrade, which the v33 transition derives.
+    ///      implementation behind the shared shell, which the v33 transition derives as a
+    ///      system-proxy upgrade. A release with an empty table names no shell.
     function _releaseManifest(address _adminFacet, address _verifier) internal returns (ReleaseManifest memory) {
         bytes[] memory l2BytecodeInfos = new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
+        bytes memory l2SystemProxyBytecodeInfo;
         if (_adminFacet != address(0)) {
-            l2BytecodeInfos[uint256(L2EcosystemContract.L2Bridgehub)] = L2PlanFixtures.systemProxyRow(
-                L2_BRIDGEHUB_IMPL_CODE,
-                L2_SYSTEM_PROXY_CODE
+            l2BytecodeInfos[uint256(L2EcosystemContract.L2Bridgehub)] = L2PlanFixtures.bytecodeInfo(
+                L2_BRIDGEHUB_IMPL_CODE
             );
+            l2SystemProxyBytecodeInfo = L2PlanFixtures.bytecodeInfo(L2_SYSTEM_PROXY_CODE);
         }
         return
             ReleaseManifest({
@@ -246,7 +248,8 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
                     genesisBatchCommitment: _registryGenesisBatchCommitment(),
                     genesisIndexRepeatedStorageChanges: 54
                 }),
-                l2BytecodeInfos: l2BytecodeInfos
+                l2BytecodeInfos: l2BytecodeInfos,
+                l2SystemProxyBytecodeInfo: l2SystemProxyBytecodeInfo
             });
     }
 

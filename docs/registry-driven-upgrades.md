@@ -58,7 +58,7 @@ in `l1-contracts/contracts/upgrades/registry/RegistryTypes.sol`.
 
 | Contract                     | Holds                                                                                                                                                                                                                                                                                                      |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CTMRelease`                 | `diamondInit` + pin, `verifier` + pin, `GenesisFacet[]` (address, freezability, pin), `fixedForceDeploymentsData`, genesis params + genesis-upgrade pin, `l2BytecodeInfos` (the `L2EcosystemContract`-indexed L2 bytecode table)                                                                           |
+| `CTMRelease`                 | `diamondInit` + pin, `verifier` + pin, `GenesisFacet[]` (address, freezability, pin), `fixedForceDeploymentsData`, genesis params + genesis-upgrade pin, `l2BytecodeInfos` (the `L2EcosystemContract`-indexed implementation table), one shared `l2SystemProxyBytecodeInfo` shell                          |
 | `CTMTransition`              | version edge, `fromRelease`, `newRelease`, `upgradeEngine` + pin, `proxyUpgrades` (the `CTMContract`-indexed CTM-domain inventory, incl. the CTM itself), deadline, `upgradeTimestamp`, pinned `upgradeTimer`, `AuthoredL2Plan`; **derived and stored:** `Diamond.FacetCut[]` and the L2 force deployments |
 | `CoreRegistry`               | the `L1EcosystemContract`-indexed inventory of `(proxy, expectedOldImpl, implNew + pin)` rows for the SHARED singletons (bridges, Bridgehub, MessageRoot, …)                                                                                                                                               |
 | `EcosystemUpgradeOperation`  | `{coreRegistry, CTMLeg[] legs}` with `CTMLeg = {executor, transition}` — the participation of one upgrade. The ONLY place the core registry is named. Rejects an empty leg list and two legs on one CTM.                                                                                                   |
@@ -104,15 +104,19 @@ diff, never a wrong byte in offchain-authored data.
 
 ### Supporting libraries
 
-| Library                                 | Role                                                                                                    |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `TransitionDerivationLib`               | facet cuts and L2 deployments from a release pair                                                       |
-| `ReleaseFacetReader`                    | genesis installation from a release's self-described routing                                            |
-| `CTMUpgradeComposer`                    | the committed cut and the L2 protocol upgrade transaction, from a transition or the bootstrap migration |
-| `L2InventoryLib`, `L2PlanValidationLib` | table-derived L2 deployments; shape rules of the authored L2 plan                                       |
-| `ProxyUpgradeRowLib`                    | `toRows`, `applyRows`, `requireRowsApplied` over the enum-indexed inventories                           |
-| `GenesisManifestLib`                    | `GenesisConfig` → genesis `ReleaseManifest`, capturing routing and pins at build time                   |
-| `CodehashPinLib`                        | `requirePin` (reverts) / `pinHolds` (bool)                                                              |
+| Library                       | Role                                                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `TransitionDerivationLib`     | facet cuts and L2 deployments from a release pair                                                       |
+| `ReleaseFacetReader`          | genesis installation from a release's self-described routing                                            |
+| `CTMUpgradeComposer`          | the committed cut and the L2 protocol upgrade transaction, from a transition or the bootstrap migration |
+| `L2InventoryLib`, `L2PlanLib` | changed L2 deployments; executable plan construction from bytecode infos                                |
+| `ProxyUpgradeRowLib`          | `toRows`, `applyRows`, `requireRowsApplied` over the enum-indexed inventories                           |
+| `CodehashPinLib`              | `requirePin` (reverts) / `pinHolds` (bool)                                                              |
+
+There is no intermediate genesis-manifest type between a build and its `ReleaseManifest`:
+`DeployCTMUtils.deployCurrentRelease` (and `deployAdditionalReleaseFacets`) assembles the
+`GenesisFacet[]` directly as it deploys each facet, and the release's implementation table and its
+one shared `l2SystemProxyBytecodeInfo` shell come from `SystemContractsProcessing`.
 
 ## Contract map
 
@@ -144,8 +148,8 @@ flowchart TB
     BENG["BootstrapUpgradeZKsyncOS — upgradeFromBootstrap"]
 
     EE -. "codehash-check" .-> OP
-    EE -- "beginOperation / applyL1Upgrade /<br/>validateUpgradeApplied / endOperation" --> CO
-    EE -- "beginOperation / applyTransition /<br/>validateTransitionApplied / completeOperation / abandonOperation" --> CE
+    EE -- "beginOperation / applyL1Upgrade /<br/>completeOperation / abandonOperation" --> CO
+    EE -- "beginOperation / applyTransition /<br/>completeOperation / abandonOperation" --> CE
     EE -- "startTimer (stage 0) · checkDeadline (stage 1)" --> T
     CO -. "codehash-check + validate" .-> CR
     CO -- "upgrade / upgradeAndCall" --> PA
@@ -189,19 +193,20 @@ flowchart LR
 
 Three executors, one authority root. Governance owns all three; each domain executor holds one
 piece of protocol authority and answers to exactly one coordinator, which it names explicitly
-(`coordinator`, set by the owner). A shared owner is not authorization: the coordinator refuses a
-domain whose `coordinator()` is not itself.
+(`coordinator`, set by the owner). A shared owner is not authorization: each domain callback rejects callers other than its
+configured coordinator.
 
 | Executor                   | Bound to (immutable)                                                    | Entrypoints                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | -------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `EcosystemUpgradeExecutor` | `CORE_EXECUTOR`, the `EcosystemUpgradeOperation` codehash               | `stage0/1/2(operation)`, `abandonPendingOperation` (owner); `pendingOperation()`, `pendingStage()`                                                                                                                                                                                                                                                                                                                                 |
-| `CoreUpgradeExecutor`      | the ecosystem `ProxyAdmin`, the `CoreRegistry` codehash                 | `beginOperation`, `endOperation` (coordinator); `applyL1Upgrade` (coordinator for the reserved registry, or the owner for any — bootstrap and recovery); `validateUpgradeApplied`; `setCoordinator` (owner, refused while reserved)                                                                                                                                                                                                |
+| `CoreUpgradeExecutor`      | the ecosystem `ProxyAdmin`, the `CoreRegistry` codehash                 | `beginOperation`, `completeOperation`, `abandonOperation` (coordinator); `applyL1Upgrade` (coordinator for the reserved registry, or the owner for any — bootstrap and recovery); `validateUpgradeApplied`; `setCoordinator` (owner, refused while reserved)                                                                                                                                                                       |
 | `CTMUpgradeExecutor`       | one `ChainTypeManager` + its `ProxyAdmin`, the `CTMTransition` codehash | `beginOperation`, `applyTransition`, `completeOperation`, `abandonOperation` (coordinator); `validateTransitionApplied`; `upgradeChain`; `acceptCTMOwnership`; `setCoordinator`, `setProtocolVersionDeadline` and the routine passthroughs (`freezeChain`, `unfreezeChain`, `revertBatches`, `setValidator`, `setPriorityTxMaxGasLimit`, `setPorterAvailability`, `deactivatePriorityMode`, `setValidatorTimelockPostV29`) (owner) |
 
 The coordinator owns no proxy administration and applies nothing itself: it orders the legs,
 holds the pending operation and its stage, starts and checks the timers, and drives the domain
-callbacks. Each domain keeps one reservation (`activeOperation` plus the reserved registry or
-transition) and accepts a callback only for what it reserved. How the stages compose these calls,
+callbacks. Each domain stores only its `activeOperation`; its registry or transition is read from that
+operation rather than supplied or stored a second time. Domain callbacks enforce coordinator
+authorization and accept only the reserved operation’s leg. How the stages compose these calls,
 what each stage checks and what abandonment leaves behind is the
 [coordinator spec](../protocol-docs/ecosystem-upgrade-coordination.md).
 
@@ -271,8 +276,11 @@ and stage 2 gates on it:
   live through the row's `ProxyAdmin`.
 - `CoreUpgradeExecutor.validateUpgradeApplied(registry)` and
   `CTMUpgradeExecutor.validateTransitionApplied(transition)` — the applied form of the two apply
-  entrypoints (committed edge, version reached, rows applied). `completeOperation` re-runs the
-  CTM check itself before releasing its pause, whatever the coordinator concluded.
+  entrypoints (committed edge, version reached, rows applied). Stage 2 calls each domain’s
+  `completeOperation`, which checks its own applied state before releasing its reservation and,
+  for a CTM, its pause. A later domain’s failure rolls back all earlier completions; there is no
+  duplicate coordinator validation pass — the coordinator calls neither view in stage 2, and both
+  remain read-only surfaces for tooling and monitoring.
 - `RegistryBootstrapMigration.validateApplied()` — the whole bootstrap edge, including that the
   CTM domain landed under the bound executor and the CTM's migrations are no longer paused.
 - `CTMRelease.verifyChainRouting(chain)` — a live diamond's loupe output set-equals the release's
@@ -338,11 +346,11 @@ sequenceDiagram
     participant D as Chain diamond
 
     G->>X: stage0(operation)
-    Note over X: OPERATION_CODEHASH, every domain names X
-    X->>CO: beginOperation(operation, coreRegistry) — pin + validate
-    X->>E: beginOperation(operation, transition) — pin, validate, both edges
+    Note over X: OPERATION_CODEHASH; domain callbacks enforce onlyCoordinator
+    X->>CO: beginOperation(operation) — pin + validate
+    X->>E: beginOperation(operation) — pin, validate, both edges
     E->>H: pauseCTMMigration(ctm)
-    X->>T: startTimer() — TIMER_GOVERNANCE must be X
+    X->>T: startTimer() — once per distinct timer; TIMER_GOVERNANCE must be X
     G->>X: stage1(operation)
     X->>T: checkDeadline()
     X->>CO: applyL1Upgrade(coreRegistry) — core leg first
@@ -355,10 +363,9 @@ sequenceDiagram
     D->>C: upgradeCutForVersion(oldV) — derived from upgradeTransition[oldV]
     Note over D: apply derived facetCuts verbatim,<br/>then version + target release's verifier + composed L2 tx
     G->>X: stage2(operation)
-    X->>CO: validateUpgradeApplied(coreRegistry)
-    X->>E: validateTransitionApplied(transition)
-    X->>CO: endOperation(operation)
-    X->>E: completeOperation(operation) — re-checks applied
+    X->>CO: completeOperation(operation) — validates applied
+    X->>E: completeOperation(operation) — validates applied
+    Note over X,E: Any later failure rolls back all completions
     E->>H: unpauseCTMMigration(ctm)
 ```
 
@@ -377,9 +384,12 @@ no discretionary inputs. The named transition must be the one the CTM committed 
 version. Chain admins additionally retain their own direct path on the chain diamond.
 
 **Where the cut is composed.** The cut is a pure function of the transition — an
-`upgradeEngine.upgradeFromTransition(transition)` init over no facet cuts — and the CTM is the only
-place that composes it: hashed at commit time (`setNewVersionUpgradeFromTransition`) and re-derived
-on read (`upgradeCutForVersion`). It never travels in calldata: not in governance calls, and not to
+`upgradeEngine.upgradeFromTransition(transition)` init over no facet cuts — constructed by
+`CTMUpgradeComposer.buildUpgradeCutData(ICTMTransition)`. Prepare and the CTM use this same
+transition-only function; the bootstrap edge composes its cut the same way from its own object,
+`buildBootstrapUpgradeCutData(IRegistryBootstrapMigration)`, served as the migration's
+`upgradeCut()`. The CTM hashes it at commit time (`setNewVersionUpgradeFromTransition`)
+and re-derives it on read (`upgradeCutForVersion`). It never travels in calldata: not in governance calls, and not to
 the chain — the chain's Admin facet takes only the departing version and reads the cut from its
 CTM. The chain diamond still treats the cut it reads as opaque bytes and stays unaware of
 transitions.
@@ -398,18 +408,20 @@ an existing chain ends up with are byte-for-byte what a fresh chain at `newRelea
 upgrade path and the genesis path resolve to the same pinned release, so they cannot drift. There
 is no second mechanism for any part of installed chain state.
 
-The **L2 force deployments are derived too**: every nonempty row of the target release's
-`l2BytecodeInfos` table becomes one force deployment at its member's fixed address
-(`L2InventoryLib`) — a full reinstall of the target release's set, empty for a same-release pair or
-an unchanged table. What stays **reviewed-and-pinned** is the authored remainder
-(`AuthoredL2Plan`): the delegate leg and whatever the table cannot express. Its SHAPE is
-mechanical and `L2PlanValidationLib` enforces it at construction — an authored deployment cannot
-land on a fixed built-in or a table-derived target, the code the upgrade delegatecalls into is
-pinned by a bytecode hash the manifest carries, and every bytecode any deployment installs must be
-among the factory dependencies, which the CTM's `BytecodesSupplier` must hold published where the
-edge COMMITS (`applyTransition` and `migrate()`). The field-level rules are in the struct docs of
-`RegistryTypes.sol`. What is _not_ proven is what the delegate does on L2: its bytecode hash names
-an auditable artifact, not a behavior.
+The **L2 force deployments are derived too**: only changed, nonempty target rows of the
+`l2BytecodeInfos` table are deployed at their member’s fixed address (`L2InventoryLib`). The release
+stores each implementation descriptor and one shared system-proxy shell; derivation joins them
+into the executable descriptor. A changed shell also changes the corresponding target rows.
+Unchanged rows are not reinstalled.
+
+The reviewed input outside that table is `AuthoredL2Plan`: delegate bytecode info, extra bytecode
+infos and a pinned calldata composer. `L2PlanLib.build` constructs the delegate and extra
+`Unsafe` deployments at bytecode-derived addresses, sets the delegate target, and collects and
+deduplicates every installed bytecode’s observable hash into the factory dependencies. Those
+addresses, deployment types and dependency hashes are not separately authored or cross-checked.
+The CTM’s `BytecodesSupplier` must hold those dependencies published where the edge COMMITS
+(`applyTransition` and `migrate()`). What is not proven is what the delegate does on L2: its
+bytecode hash names an auditable artifact, not a behavior.
 
 ## Rules enforced at construction
 
@@ -428,7 +440,8 @@ L2 upgrade: `BaseZkSyncUpgrade` refuses an L2 protocol upgrade transaction on a 
 patch deliberately does NOT require an earlier L2 upgrade to be finalized first, so a pending one
 must survive it untouched. The transition therefore validates what a patch CONTAINS rather than
 which release it names: no L2 side (derived or authored), and the target release must carry over
-the departing one's L2 description — the bytecode table, the force-deployment blob, the genesis
+the departing one's L2 description — the implementation table and shared proxy shell, the
+force-deployment blob, the genesis
 batch and the VM its pinned `DiamondInit` selects. A same-release patch remains valid and is then
 schedule-only.
 
@@ -440,10 +453,10 @@ usual compatibility review of storage layout, proof handling and L2 interaction.
 **Schedule.** `oldProtocolVersionDeadline >= upgradeTimestamp`, so the old protocol is never disabled
 before chains may upgrade.
 
-**L2 plan.** Checked against the COMBINED plan (table-derived deployments plus the authored
-remainder): a nonempty plan needs its delegate, a composer needs a target, factory dependencies
-need an L2 side, and the dependency count is capped at what execution enforces
-(`L2PlanValidationLib`).
+**L2 plan.** `L2PlanLib.build` checks the remaining input constraints: canonical bytecode-info
+lengths, a delegate whenever deployments or a composer exist, and the execution limit on the
+constructed factory-dependency count. Deployment addresses, types, delegate membership and
+factory-dependency membership follow from construction rather than caller-supplied fields.
 
 **Verifier.** Zero means "leave unchanged" on the upgrade path, which is how the genesis upgrade runs
 after `DiamondInit` has already installed it; a release itself can never pin a zero verifier. ZKsync

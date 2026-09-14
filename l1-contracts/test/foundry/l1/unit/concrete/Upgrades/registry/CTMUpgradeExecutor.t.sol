@@ -182,7 +182,8 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
                     genesisIndexRepeatedStorageChanges: 54
                 }),
                 // Length-checked inventory; content is irrelevant to this fixture.
-                l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT)
+                l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT),
+                l2SystemProxyBytecodeInfo: ""
             });
     }
 
@@ -339,7 +340,7 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
         EcosystemUpgradeOperation operation = _operationFor(transition);
         vm.startPrank(governor);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
-        ctmExecutor.beginOperation(operation, ICTMTransition(address(transition)));
+        ctmExecutor.beginOperation(operation);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
         ctmExecutor.applyTransition(ICTMTransition(address(transition)));
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));

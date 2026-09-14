@@ -120,8 +120,8 @@ cargo run -p protocol_ops -- ecosystem upgrade-governance --env <env> --l1-rpc-u
 
 replays stages 0, 1 and 2 of `<env-out>/ecosystem.toml` on a fork as governance and emits the
 governance Safe bundle; `ecosystem governance-toml-to-simulator` emits the transaction-simulator
-JSON. On the real chain the stages are separate proposals: stage 0 starts every transition's
-timer, stage 1 is admissible once the timers' deadlines have passed, stage 2 after stage 1. A
+JSON. On the real chain the stages are separate proposals: stage 0 starts each distinct
+transition timer once, stage 1 is admissible once the timers' deadlines have passed, stage 2 after stage 1. A
 lifecycle that cannot complete is cleared with `EcosystemUpgradeExecutor.abandonPendingOperation`
 (see the lifecycle document for what that leaves behind).
 
@@ -140,8 +140,8 @@ upgrade resets.
 Start from `v35/`: inherit the `Default*Upgrade` bases, override `deployNew*Contracts` with the
 contracts the release changes, name every release member you replace in `changedReleaseMembers()`,
 and keep everything else derived. A release whose L2 built-ins change must also author the L2
-side (`authorL2Side`: the authored plan plus the bytecodes the prepare publishes as its factory
-dependencies — `CTMUpgrade_v34` shows the shape) because the release-pair derivation puts the
+side (`authorL2Side`: delegate/extra bytecode infos, the pinned composer and the bytecode
+artifacts needed to publish the constructed plan’s factory dependencies — `CTMUpgrade_v34` shows the shape) because the release-pair derivation puts the
 changed built-ins in the L2 leg. Any governance or admin call the version needs beyond the three
 coordinator calls is a `declareExternalAction`.
 

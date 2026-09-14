@@ -109,8 +109,6 @@ error ChainRequiresValidatorsSignaturesForCommit();
 error ChainTypeManagerNotRegistered(address chainTypeManager);
 // 0x8746f42f
 error ConstructorsNotSupported();
-// 0x78476e4c
-error CoordinatorNotBound(address domain, address boundCoordinator);
 // 0xec273439
 error CTMAlreadyRegistered();
 // 0xc630ef3c
@@ -370,6 +368,8 @@ error OnlyPriorityMode();
 error OnlySelfAllowed();
 // 0x1a21feed
 error OperationExists();
+// 0x9c6d0446
+error OperationHasNoLegForExecutor(address operation, address executor);
 // 0xeda2fbb1
 error OperationMustBePending();
 // 0xe1c1ff37

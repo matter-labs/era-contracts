@@ -338,6 +338,7 @@ async function describeReleaseDifference(
   await compare("l2BytecodeInfos", async (c) =>
     ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(["bytes[]"], [await c.l2BytecodeInfos()]))
   );
+  await compare("l2SystemProxyBytecodeInfo", (c) => c.l2SystemProxyBytecodeInfo());
   return differences.length === 0 ? "no member differs (identical manifests)" : differences.join("; ");
 }
 

@@ -15,6 +15,7 @@ import {
     EmptyBytes32,
     LegNotReserved,
     MigrationsNotPaused,
+    OperationHasNoLegForExecutor,
     OperationNotPending,
     TransitionNotCommitted,
     TransitionReleaseMismatch,
@@ -28,6 +29,7 @@ import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
 import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 import {L2PlanLib} from "../libraries/L2PlanLib.sol";
 import {BytecodesSupplier} from "../../BytecodesSupplier.sol";
+import {CTMLeg} from "../RegistryTypes.sol";
 
 /// @title CTMUpgradeExecutor
 /// @author Matter Labs
@@ -63,9 +65,6 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
 
     /// @inheritdoc ICTMUpgradeExecutor
     IEcosystemUpgradeOperation public activeOperation;
-
-    /// @inheritdoc ICTMUpgradeExecutor
-    ICTMTransition public reservedTransition;
 
     /// @notice Emitted when the owner points this executor at another coordinator.
     event CoordinatorChanged(address indexed previousCoordinator, address indexed newCoordinator);
@@ -192,28 +191,31 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
     // ---------------------------------------------------------------------------------------
 
     /// @inheritdoc ICTMUpgradeExecutor
-    /// @dev Everything that can be rejected is rejected BEFORE the reservation is recorded, so a
-    ///      wrong transition never occupies the slot. The pause is what makes the CTM's version
-    ///      commit in `applyTransition` admissible.
-    function beginOperation(
-        IEcosystemUpgradeOperation _operation,
-        ICTMTransition _transition
-    ) external onlyCoordinator {
+    /// @dev The leg is read from the operation, never passed: the operation is the one place a
+    ///      transition is bound to this executor. Everything that can be rejected is rejected
+    ///      BEFORE the reservation is recorded, so a wrong transition never occupies the slot. The
+    ///      pause is what makes the CTM's version commit in `applyTransition` admissible.
+    function beginOperation(IEcosystemUpgradeOperation _operation) external onlyCoordinator {
         if (address(activeOperation) != address(0)) {
             revert UpgradeLifecycleBusy(address(activeOperation));
         }
-        if (address(_operation) == address(0)) {
-            revert ZeroAddress();
-        }
-        _requireGenuineTransition(_transition);
-        _transition.validate();
-        _requireEdges(_transition);
+        ICTMTransition transition = _legTransition(_operation);
+        _requireGenuineTransition(transition);
+        transition.validate();
+        _requireEdges(transition);
 
         activeOperation = _operation;
-        reservedTransition = _transition;
 
         _chainAssetHandler().pauseCTMMigration(address(CHAIN_TYPE_MANAGER));
-        emit OperationReserved(address(_operation), address(_transition));
+        emit OperationReserved(address(_operation), address(transition));
+    }
+
+    /// @inheritdoc ICTMUpgradeExecutor
+    function reservedTransition() public view returns (ICTMTransition) {
+        if (address(activeOperation) == address(0)) {
+            return ICTMTransition(address(0));
+        }
+        return _legTransition(activeOperation);
     }
 
     /// @inheritdoc ICTMUpgradeExecutor
@@ -229,12 +231,12 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
     }
 
     /// @inheritdoc ICTMUpgradeExecutor
-    /// @dev The applied-state check is repeated here on purpose: this executor releases its own
-    ///      pause only for a transition it can see applied, whatever the coordinator concluded.
+    /// @dev This executor releases its own pause only for a transition it can see applied; the
+    ///      coordinator sequences completions and relies on the stage being one transaction.
     function completeOperation(IEcosystemUpgradeOperation _operation) external onlyCoordinator {
         _requireActive(_operation);
-        _requireTransitionApplied(reservedTransition);
-        _clearReservation();
+        _requireTransitionApplied(_legTransition(_operation));
+        delete activeOperation;
         _chainAssetHandler().unpauseCTMMigration(address(CHAIN_TYPE_MANAGER));
         emit OperationCompleted(address(_operation));
     }
@@ -246,7 +248,7 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
     ///      side effect of clearing a slot.
     function abandonOperation(IEcosystemUpgradeOperation _operation) external onlyCoordinator {
         _requireActive(_operation);
-        _clearReservation();
+        delete activeOperation;
         emit OperationAbandoned(address(_operation));
     }
 
@@ -310,14 +312,23 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
 
     /// @dev Also rejects a free executor: with nothing reserved, no transition matches.
     function _requireReserved(ICTMTransition _transition) private view {
-        if (address(reservedTransition) != address(_transition)) {
-            revert LegNotReserved(address(_transition), address(reservedTransition));
+        ICTMTransition reserved = reservedTransition();
+        if (address(reserved) != address(_transition)) {
+            revert LegNotReserved(address(_transition), address(reserved));
         }
     }
 
-    function _clearReservation() private {
-        delete activeOperation;
-        delete reservedTransition;
+    /// @dev The transition `_operation` binds to THIS executor. Unique when present: the operation
+    ///      refuses two legs on one CTM, and this executor's CTM is immutable.
+    function _legTransition(IEcosystemUpgradeOperation _operation) private view returns (ICTMTransition) {
+        CTMLeg[] memory legs = _operation.legs();
+        uint256 length = legs.length;
+        for (uint256 i = 0; i < length; ++i) {
+            if (legs[i].executor == address(this)) {
+                return ICTMTransition(legs[i].transition);
+            }
+        }
+        revert OperationHasNoLegForExecutor(address(_operation), address(this));
     }
 
     /// @dev Both transition edges, asserted independently:

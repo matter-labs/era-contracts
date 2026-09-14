@@ -523,11 +523,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         return coordinator;
     }
 
-    function _pin(address _addr) internal view returns (PinnedContract memory) {
-        require(_addr.code.length != 0, "pinned contract has no code");
-        return PinnedContract({addr: _addr, codehash: _addr.codehash});
-    }
-
     /// @notice The CTM domain's live EIP-7702 checker (see `CTMUpgradeParams.eip7702Checker`).
     ///         Zero leaves it to be deployed fresh.
     function setEIP7702Checker(address _eip7702Checker) public virtual {

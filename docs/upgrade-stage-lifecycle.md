@@ -73,20 +73,23 @@ executor is the long-lived owner.
 
 ## L2 delegate composition
 
-The manifest carries no delegate calldata. The authored L2 plan pins an
-`IL2DelegateCalldataComposer` by codehash (v34: `L2V34DelegateCalldataComposer`), and
-`CTMUpgradeComposer` asks it for the calldata at composition time from authoritative inputs — the
-target release and the ecosystem's Bridgehub. The delegate's address is determined by its own
-force deployment, so the pieces the scripts used to relate by hand — delegate deployment, delegate
-address, delegate arguments — are one pinned deployment plus one pinned piece of code. Per-chain
-data stays the ZKsync OS engine's rewrite at execution. A composer without a delegate target is
-malformed (`L2PlanValidationLib`).
+The manifest carries no delegate calldata. `AuthoredL2Plan` supplies the delegate bytecode info,
+extra bytecode infos and a codehash-pinned `IL2DelegateCalldataComposer` (v34:
+`L2V34DelegateCalldataComposer`). `L2PlanLib` constructs the deployments, delegate address and
+factory-dependency hashes from those inputs.
+
+`CTMUpgradeComposer` asks the pinned composer for the calldata at composition time from
+authoritative inputs — the target release and the ecosystem's Bridgehub. The delegate's address is
+determined by its own force deployment, so the pieces the scripts used to relate by hand — delegate
+deployment, delegate address, delegate arguments — are one pinned deployment plus one pinned piece
+of code. Per-chain data stays the ZKsync OS engine's rewrite at execution. A composer without a
+delegate is malformed (`L2PlanLib.build`).
 
 ## The upgrade timer
 
 Each transition pins its own `GovernanceUpgradeTimer`, deployed by the CTM prepare with
 `TIMER_GOVERNANCE` = the coordinator and `owner` = the ecosystem admin. Stage 0 checks the binding
-and starts it; stage 1 requires `checkDeadline()` for every leg. The ecosystem admin keeps the
+and starts each distinct timer once, including when several legs share it; stage 1 requires `checkDeadline()` for every leg. The ecosystem admin keeps the
 bounded extension right through the timer's own `changeDeadline`, capped at
 `deadline + MAX_ADDITIONAL_DELAY` (two weeks in the prepare). That right is separately governed
 and stays explicit. The bootstrap edge predates the coordinator, so its timer is bound to

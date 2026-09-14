@@ -99,6 +99,10 @@ contract CTMRelease is ICTMRelease {
         return getManifest().l2BytecodeInfos;
     }
 
+    function l2SystemProxyBytecodeInfo() external view returns (bytes memory) {
+        return getManifest().l2SystemProxyBytecodeInfo;
+    }
+
     function genesisParams() external view returns (address, bytes32, bytes32, uint64) {
         ReleaseManifest memory m = getManifest();
         return (

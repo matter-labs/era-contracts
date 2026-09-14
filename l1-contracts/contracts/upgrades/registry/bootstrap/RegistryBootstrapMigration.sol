@@ -96,10 +96,12 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
         // The L2 leg, exactly as a transition constructs it: the genesis release's table (the target
         // state, installed in full — there is no departing release to diff against) plus the
         // authored delegate and extras, with the same shape rules ({L2PlanLib.build}).
+        ICTMRelease release = ICTMRelease(_manifest.currentRelease.addr);
         encodedL2Plan = abi.encode(
             L2PlanLib.build(
                 TransitionDerivationLib.deriveL2DeploymentsFromTable(
-                    ICTMRelease(_manifest.currentRelease.addr).l2BytecodeInfos()
+                    release.l2BytecodeInfos(),
+                    release.l2SystemProxyBytecodeInfo()
                 ),
                 _manifest.l2Plan
             )

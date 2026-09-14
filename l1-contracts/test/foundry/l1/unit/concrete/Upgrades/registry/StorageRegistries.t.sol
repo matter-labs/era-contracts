@@ -119,6 +119,7 @@ contract StorageRegistriesTest is Test {
     // implementation and a member new to the set.
     bytes internal constant CHANGED_SYSTEM_CONTEXT_IMPL_CODE = hex"dd12";
     bytes internal constant ASSET_ROUTER_IMPL_CODE = hex"dd13";
+    bytes internal constant CHANGED_SYSTEM_PROXY_CODE = hex"dd10";
 
     function setUp() public {
         // Facets must actually self-describe their routing (the registry objects read it from
@@ -193,8 +194,10 @@ contract StorageRegistriesTest is Test {
                     genesisBatchCommitment: bytes32(uint256(1)),
                     genesisIndexRepeatedStorageChanges: 54
                 }),
-                // Length-checked inventory; content is irrelevant to this fixture.
-                l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT)
+                // Length-checked inventory; content is irrelevant to this fixture. The shell is
+                // the one `_tableRelease()` rows sit behind.
+                l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT),
+                l2SystemProxyBytecodeInfo: L2PlanFixtures.bytecodeInfo(SYSTEM_PROXY_CODE)
             });
     }
 
@@ -507,6 +510,21 @@ contract StorageRegistriesTest is Test {
         new CTMTransition(manifest);
     }
 
+    /// @dev The shell is part of the release's L2 description like the table it belongs to: a
+    ///      patch derives no L2 deployment, so a changed shell would reach no existing chain.
+    function test_revertWhen_patchTargetsAReleaseWithADifferentSystemProxyShell() public {
+        ReleaseManifest memory releaseManifest = _newReleaseManifest();
+        releaseManifest.l2SystemProxyBytecodeInfo = L2PlanFixtures.bytecodeInfo(CHANGED_SYSTEM_PROXY_CODE);
+        CTMRelease shellRelease = new CTMRelease(releaseManifest);
+
+        TransitionManifest memory manifest = _patchManifest();
+        manifest.fromRelease = address(fromRelease);
+        manifest.newRelease = address(shellRelease);
+
+        vm.expectRevert(PatchChangesL2GenesisState.selector);
+        new CTMTransition(manifest);
+    }
+
     // ─────────────────────────── schedule / version guards ───────────────────────────
 
     function test_revertWhen_transitionVersionNotIncreasing() public {
@@ -737,40 +755,57 @@ contract StorageRegistriesTest is Test {
 
     // ─────────────────────────── derived L2 deployments ───────────────────────────
 
-    /// @dev A target release whose table carries canonical system-proxy rows at two fixed-address
-    ///      members. Distinct bytecodes from the authored extras so the two sets are
-    ///      distinguishable in the combined plan; their dependencies are `_tableDeps()`.
+    /// @dev A target release whose table carries implementation rows at two fixed-address members
+    ///      (behind the fixture's shared shell). Distinct bytecodes from the authored extras so
+    ///      the two sets are distinguishable in the combined plan; their dependencies are
+    ///      `_tableDeps()`.
     function _tableRelease() internal returns (CTMRelease) {
-        ReleaseManifest memory manifest = _newReleaseManifest();
-        manifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2Bridgehub)] = L2PlanFixtures.systemProxyRow(
-            BRIDGEHUB_IMPL_CODE,
-            SYSTEM_PROXY_CODE
+        return new CTMRelease(_tableReleaseManifest());
+    }
+
+    function _tableReleaseManifest() internal view returns (ReleaseManifest memory manifest) {
+        manifest = _newReleaseManifest();
+        manifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2Bridgehub)] = L2PlanFixtures.bytecodeInfo(
+            BRIDGEHUB_IMPL_CODE
         );
-        manifest.l2BytecodeInfos[uint256(L2EcosystemContract.SystemContext)] = L2PlanFixtures.systemProxyRow(
-            SYSTEM_CONTEXT_IMPL_CODE,
-            SYSTEM_PROXY_CODE
+        manifest.l2BytecodeInfos[uint256(L2EcosystemContract.SystemContext)] = L2PlanFixtures.bytecodeInfo(
+            SYSTEM_CONTEXT_IMPL_CODE
         );
-        return new CTMRelease(manifest);
     }
 
     function test_deriveL2DeploymentsFromTableSkipsEmptyRowsAndResolvesMembers() public {
         bytes[] memory table = new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
-        table[uint256(L2EcosystemContract.L2Bridgehub)] = hex"dd01";
-        table[uint256(L2EcosystemContract.SystemContext)] = hex"dd02";
+        table[uint256(L2EcosystemContract.L2Bridgehub)] = L2PlanFixtures.bytecodeInfo(BRIDGEHUB_IMPL_CODE);
+        table[uint256(L2EcosystemContract.SystemContext)] = L2PlanFixtures.bytecodeInfo(SYSTEM_CONTEXT_IMPL_CODE);
+        bytes memory shell = L2PlanFixtures.bytecodeInfo(SYSTEM_PROXY_CODE);
 
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory derived = TransitionDerivationLib
-            .deriveL2DeploymentsFromTable(table);
+            .deriveL2DeploymentsFromTable(table, shell);
 
         // Only the nonempty rows become deployments, in enum order, each at its member's
-        // canonical fixed address, each a ZKsync OS system-proxy upgrade (the registry never
-        // derives an Era force deployment).
+        // canonical fixed address, each carrying the `(implementation, proxy)` pair the L2 side
+        // decodes — the shared shell joined to the member's own row.
         assertEq(derived.length, 2, "empty rows must derive no deployment");
         assertTrue(derived[0].upgradeType == IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade);
-        assertEq(derived[0].deployedBytecodeInfo, hex"dd01");
+        assertEq(
+            derived[0].deployedBytecodeInfo,
+            L2PlanFixtures.systemProxyRow(BRIDGEHUB_IMPL_CODE, SYSTEM_PROXY_CODE),
+            "row = (implementation, shell)"
+        );
         assertEq(derived[0].newAddress, L2InventoryLib.fixedAddress(L2EcosystemContract.L2Bridgehub));
         assertTrue(derived[1].upgradeType == IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade);
-        assertEq(derived[1].deployedBytecodeInfo, hex"dd02");
+        assertEq(
+            derived[1].deployedBytecodeInfo,
+            L2PlanFixtures.systemProxyRow(SYSTEM_CONTEXT_IMPL_CODE, SYSTEM_PROXY_CODE),
+            "every row is joined to the SAME shell"
+        );
         assertEq(derived[1].newAddress, L2InventoryLib.fixedAddress(L2EcosystemContract.SystemContext));
+    }
+
+    /// @dev The shell is stored once on the release and served beside the table.
+    function test_releaseServesTheSharedSystemProxyShell() public {
+        CTMRelease release = _tableRelease();
+        assertEq(release.l2SystemProxyBytecodeInfo(), L2PlanFixtures.bytecodeInfo(SYSTEM_PROXY_CODE));
     }
 
     function test_revertWhen_transitionDerivesRowForAddresslessMember() public {
@@ -799,7 +834,7 @@ contract StorageRegistriesTest is Test {
         // The FINAL plan: the target release's table-derived set first, then the authored
         // bytecodes as Unsafe deployments — the delegate first, the extra after.
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory expectedDerived = TransitionDerivationLib
-            .deriveL2DeploymentsFromTable(tableRelease.l2BytecodeInfos());
+            .deriveL2DeploymentsFromTable(tableRelease.l2BytecodeInfos(), tableRelease.l2SystemProxyBytecodeInfo());
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory expectedAuthored = _authoredDeployments();
         L2UpgradePlan memory plan = combined.l2Plan();
         assertEq(
@@ -858,17 +893,14 @@ contract StorageRegistriesTest is Test {
         CTMRelease departing = _tableRelease();
         ReleaseManifest memory targetManifest = _newReleaseManifest();
         // Unchanged member, changed implementation, member new to the set.
-        targetManifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2Bridgehub)] = L2PlanFixtures.systemProxyRow(
-            BRIDGEHUB_IMPL_CODE,
-            SYSTEM_PROXY_CODE
+        targetManifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2Bridgehub)] = L2PlanFixtures.bytecodeInfo(
+            BRIDGEHUB_IMPL_CODE
         );
-        targetManifest.l2BytecodeInfos[uint256(L2EcosystemContract.SystemContext)] = L2PlanFixtures.systemProxyRow(
-            CHANGED_SYSTEM_CONTEXT_IMPL_CODE,
-            SYSTEM_PROXY_CODE
+        targetManifest.l2BytecodeInfos[uint256(L2EcosystemContract.SystemContext)] = L2PlanFixtures.bytecodeInfo(
+            CHANGED_SYSTEM_CONTEXT_IMPL_CODE
         );
-        targetManifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2AssetRouter)] = L2PlanFixtures.systemProxyRow(
-            ASSET_ROUTER_IMPL_CODE,
-            SYSTEM_PROXY_CODE
+        targetManifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2AssetRouter)] = L2PlanFixtures.bytecodeInfo(
+            ASSET_ROUTER_IMPL_CODE
         );
         CTMRelease target = new CTMRelease(targetManifest);
         TransitionManifest memory manifest = _transitionManifest();
@@ -892,8 +924,8 @@ contract StorageRegistriesTest is Test {
         );
         assertEq(
             plan.deployments[1].deployedBytecodeInfo,
-            targetManifest.l2BytecodeInfos[uint256(L2EcosystemContract.SystemContext)],
-            "the derived row carries the TARGET release's descriptor"
+            L2PlanFixtures.systemProxyRow(CHANGED_SYSTEM_CONTEXT_IMPL_CODE, SYSTEM_PROXY_CODE),
+            "the derived row carries the TARGET release's implementation behind its shell"
         );
         // Only the CHANGED rows' bytecodes are dependencies: the unchanged L2Bridgehub
         // implementation is not installed, so it does not ride.
@@ -910,6 +942,23 @@ contract StorageRegistriesTest is Test {
             ),
             "dependencies follow the derived rows (member order), then the authored bytecodes"
         );
+    }
+
+    /// @dev A shell change alone is not an L2 delta: an existing member's proxy is never
+    ///      redeployed by `updateZKsyncOSContract`, so only implementation rows are compared.
+    function test_transitionDerivesNoL2RowsWhenOnlyTheShellChanges() public {
+        CTMRelease departing = _tableRelease();
+        ReleaseManifest memory targetManifest = _tableReleaseManifest();
+        targetManifest.l2SystemProxyBytecodeInfo = L2PlanFixtures.bytecodeInfo(CHANGED_SYSTEM_PROXY_CODE);
+        CTMRelease target = new CTMRelease(targetManifest);
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.fromRelease = address(departing);
+        manifest.newRelease = address(target);
+        manifest.l2Plan = L2PlanFixtures.emptyPlan();
+
+        CTMTransition shellOnly = new CTMTransition(manifest);
+
+        assertEq(shellOnly.l2Plan().deployments.length, 0, "a shell-only change derives no L2 deployment");
     }
 
     /// @dev The enum is append-only: a departing release built against a shorter enum has no row

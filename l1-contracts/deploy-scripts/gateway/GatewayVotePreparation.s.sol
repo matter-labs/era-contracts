@@ -179,7 +179,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         ) = GatewayCTMDeployerHelper.calculateAddresses(
                 gatewayCTMDeployerConfig.salt,
                 gatewayCTMDeployerConfig,
-                getL2BytecodeInfoTable()
+                getL2BytecodeInfoTable(),
+                getL2SystemProxyBytecodeInfo()
             );
 
         // Deploy all factory dependencies
@@ -468,5 +469,10 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
     ///      table: the real builder reads every L2 contract's bytecode from artifacts.
     function getL2BytecodeInfoTable() internal virtual override returns (bytes[] memory) {
         return SystemContractsProcessing.buildL2BytecodeInfoTable();
+    }
+
+    /// @dev Same as {getL2BytecodeInfoTable}, for the table's shared proxy shell.
+    function getL2SystemProxyBytecodeInfo() internal virtual override returns (bytes memory) {
+        return SystemContractsProcessing.systemProxyBytecodeInfo();
     }
 }

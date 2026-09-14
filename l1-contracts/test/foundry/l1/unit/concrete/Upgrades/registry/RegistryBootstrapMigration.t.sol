@@ -206,7 +206,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     }
 
     /// @dev A release pinning the fixture's facets, verifier and (ZKsync OS) DiamondInit over
-    ///      `_l2BytecodeInfos`.
+    ///      `_l2BytecodeInfos`, behind the fixture's system-proxy shell.
     function _deployRelease(bytes[] memory _l2BytecodeInfos) internal returns (CTMRelease result) {
         GenesisFacet[] memory genesisFacets = new GenesisFacet[](facetCuts.length);
         for (uint256 i = 0; i < facetCuts.length; ++i) {
@@ -228,20 +228,18 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                     genesisBatchCommitment: bytes32(uint256(1)),
                     genesisIndexRepeatedStorageChanges: 54
                 }),
-                l2BytecodeInfos: _l2BytecodeInfos
+                l2BytecodeInfos: _l2BytecodeInfos,
+                l2SystemProxyBytecodeInfo: L2PlanFixtures.bytecodeInfo(SYSTEM_PROXY_CODE)
             })
         );
     }
 
-    /// @dev A genesis release whose table carries one canonical system-proxy row (the L2
-    ///      Bridgehub), so the derived L2 set is nonempty. Its dependencies are the implementation
-    ///      and the proxy shell.
+    /// @dev A genesis release whose table carries one implementation row (the L2 Bridgehub), so
+    ///      the derived L2 set is nonempty. Its dependencies are the implementation and the proxy
+    ///      shell.
     function _deployTableRelease() internal returns (CTMRelease) {
         bytes[] memory table = new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
-        table[uint256(L2EcosystemContract.L2Bridgehub)] = L2PlanFixtures.systemProxyRow(
-            BRIDGEHUB_IMPL_CODE,
-            SYSTEM_PROXY_CODE
-        );
+        table[uint256(L2EcosystemContract.L2Bridgehub)] = L2PlanFixtures.bytecodeInfo(BRIDGEHUB_IMPL_CODE);
         return _deployRelease(table);
     }
 

@@ -10,7 +10,6 @@ import {CoreUpgradeExecutor} from "./CoreUpgradeExecutor.sol";
 import {UpgradeExecutorBase} from "../../../governance/UpgradeExecutorBase.sol";
 import {GovernanceUpgradeTimer} from "../../GovernanceUpgradeTimer.sol";
 import {
-    CoordinatorNotBound,
     EmptyBytes32,
     NoPendingOperation,
     OperationNotPending,
@@ -78,9 +77,9 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
         OPERATION_CODEHASH = _operationCodehash;
     }
 
-    /// @notice Stage 0 — preparation. Checks every participant answers to this coordinator and
-    ///         every timer is bound to it, records the operation, reserves the domains (which
-    ///         validate their own leg and pause their migrations) and starts the timers.
+    /// @notice Stage 0 — preparation. Records the operation, reserves every domain (each
+    ///         validates its own leg and answers only to its coordinator; the CTM executors pause
+    ///         their migrations) and starts every transition's timer once.
     /// @param _operation The write-once operation approved by governance.
     function stage0(IEcosystemUpgradeOperation _operation) external onlyOwner {
         if (address(pendingOperation) != address(0)) {
@@ -93,26 +92,29 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
         pendingStage = UpgradeStage.Prepared;
 
         if (m.coreRegistry != address(0)) {
-            _requireBound(address(CORE_EXECUTOR), CORE_EXECUTOR.coordinator());
-            CORE_EXECUTOR.beginOperation(_operation, ICoreRegistry(m.coreRegistry));
+            CORE_EXECUTOR.beginOperation(_operation);
         }
         uint256 legCount = m.legs.length;
+        address[] memory started = new address[](legCount);
+        uint256 startedCount = 0;
         for (uint256 i = 0; i < legCount; ++i) {
             CTMLeg memory leg = m.legs[i];
-            ICTMUpgradeExecutor executor = ICTMUpgradeExecutor(leg.executor);
-            _requireBound(leg.executor, executor.coordinator());
-            ICTMTransition transition = ICTMTransition(leg.transition);
             // The reservation first: it is where the transition's provenance is checked, so a
             // non-genuine object fails there rather than on an arbitrary getter below.
-            executor.beginOperation(_operation, transition);
+            ICTMUpgradeExecutor(leg.executor).beginOperation(_operation);
             // A timer nobody else can start — and one this coordinator can, which `startTimer`
-            // would only prove after the reservation is already recorded.
-            GovernanceUpgradeTimer timer = GovernanceUpgradeTimer(transition.upgradeTimer());
+            // would only prove after the reservation is already recorded. Legs may share a timer;
+            // it is started once.
+            GovernanceUpgradeTimer timer = GovernanceUpgradeTimer(ICTMTransition(leg.transition).upgradeTimer());
             address timerGovernance = timer.TIMER_GOVERNANCE();
             if (timerGovernance != address(this)) {
                 revert TimerNotBoundToExecutor(address(timer), timerGovernance);
             }
-            timer.startTimer();
+            if (!_contains(started, startedCount, address(timer))) {
+                started[startedCount] = address(timer);
+                ++startedCount;
+                timer.startTimer();
+            }
         }
         emit OperationPrepared(address(_operation));
     }
@@ -137,27 +139,22 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
         emit OperationExecuted(address(_operation));
     }
 
-    /// @notice Stage 2 — completion. Checks the core result and every CTM result, then releases
-    ///         the reservations and migration pauses and clears the lifecycle slot.
-    /// @dev Completion means the L1 edge is complete and the operational restrictions are lifted;
-    ///      it does not attest that every chain has finished its own upgrade.
+    /// @notice Stage 2 — completion. Every domain verifies its own result and releases its
+    ///         reservation (the CTM executors their migration pause); the lifecycle slot clears.
+    /// @dev One transaction: a later domain's failed verification rolls back every earlier
+    ///      release, so no pause is lifted unless every leg verified. Completion means the L1 edge
+    ///      is complete and the operational restrictions are lifted; it does not attest that every
+    ///      chain has finished its own upgrade.
     /// @param _operation The operation executed by `stage1`.
     function stage2(IEcosystemUpgradeOperation _operation) external onlyOwner {
         _requirePending(_operation, UpgradeStage.Executed);
         OperationManifest memory m = _operation.getManifest();
-        uint256 legCount = m.legs.length;
-        // Every check before any release: a later leg's failure must leave every pause held.
-        if (m.coreRegistry != address(0)) {
-            CORE_EXECUTOR.validateUpgradeApplied(ICoreRegistry(m.coreRegistry));
-        }
-        for (uint256 i = 0; i < legCount; ++i) {
-            ICTMUpgradeExecutor(m.legs[i].executor).validateTransitionApplied(ICTMTransition(m.legs[i].transition));
-        }
         delete pendingOperation;
         pendingStage = UpgradeStage.None;
         if (m.coreRegistry != address(0)) {
-            CORE_EXECUTOR.endOperation(_operation);
+            CORE_EXECUTOR.completeOperation(_operation);
         }
+        uint256 legCount = m.legs.length;
         for (uint256 i = 0; i < legCount; ++i) {
             ICTMUpgradeExecutor(m.legs[i].executor).completeOperation(_operation);
         }
@@ -177,7 +174,7 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
         delete pendingOperation;
         pendingStage = UpgradeStage.None;
         if (m.coreRegistry != address(0)) {
-            CORE_EXECUTOR.endOperation(operation);
+            CORE_EXECUTOR.abandonOperation(operation);
         }
         uint256 legCount = m.legs.length;
         for (uint256 i = 0; i < legCount; ++i) {
@@ -197,11 +194,12 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
         }
     }
 
-    /// @dev A domain that does not name this coordinator has not authorized it — a shared owner
-    ///      is not evidence of authorization.
-    function _requireBound(address _domain, address _boundCoordinator) private view {
-        if (_boundCoordinator != address(this)) {
-            revert CoordinatorNotBound(_domain, _boundCoordinator);
+    function _contains(address[] memory _list, uint256 _count, address _item) private pure returns (bool) {
+        for (uint256 i = 0; i < _count; ++i) {
+            if (_list[i] == _item) {
+                return true;
+            }
         }
+        return false;
     }
 }

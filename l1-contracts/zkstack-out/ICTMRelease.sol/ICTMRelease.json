@@ -105,6 +105,19 @@
   },
   {
     "type": "function",
+    "name": "l2SystemProxyBytecodeInfo",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "manifestHash",
     "inputs": [],
     "outputs": [

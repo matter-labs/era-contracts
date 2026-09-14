@@ -104,8 +104,8 @@ export function proxyUpgradeSlots(enumName: string, rows: Record<string, ProxyUp
 
 /**
  * Builds the release's fixed-length L2 bytecode table (`ReleaseManifest.l2BytecodeInfos`) from
- * rows keyed by `L2EcosystemContract` MEMBER NAME; every unnamed slot encodes as the explicit
- * empty row ("not part of this release's force-deployed set").
+ * implementation rows keyed by `L2EcosystemContract` MEMBER NAME; every unnamed slot encodes as
+ * the explicit empty row ("not part of this release's force-deployed set").
  */
 export function l2BytecodeInfoSlots(rows: Record<string, string>): string[] {
   const members = parseSolidityEnum(CONTRACT_IDENTIFIERS_SOL, "L2EcosystemContract");
@@ -154,12 +154,18 @@ export function releaseInitArgs(ctm: any): any {
     isFreezable: f.isFreezable,
   }));
 
+  // The one shell every table row sits behind is a manifest statement like the rows, so a
+  // manifest written before the field existed refuses to encode rather than defaulting.
+  if (typeof release.l2SystemProxyBytecodeInfo !== "string") {
+    throw new Error("release.l2SystemProxyBytecodeInfo missing from the registry manifest");
+  }
+
   return {
     diamondInit: { addr: release.diamondInit.address, codehash: release.diamondInit.codehash },
     verifier: { addr: release.verifier.address, codehash: release.verifier.codehash },
     genesisUpgrade: { addr: release.genesis.genesisUpgrade.address, codehash: release.genesis.genesisUpgrade.codehash },
     genesisFacets,
-    // `ReleaseGenesisData` — the block a release shares with the deploy-time `GenesisConfig`.
+    // `ReleaseGenesisData`.
     genesis: {
       fixedForceDeploymentsData: release.fixedForceDeploymentsData,
       genesisBatchHash: release.genesis.batchHash,
@@ -167,6 +173,7 @@ export function releaseInitArgs(ctm: any): any {
       genesisIndexRepeatedStorageChanges: release.genesis.indexRepeatedStorageChanges,
     },
     l2BytecodeInfos: l2BytecodeInfoSlots(release.l2BytecodeInfos ?? {}),
+    l2SystemProxyBytecodeInfo: release.l2SystemProxyBytecodeInfo,
   };
 }
 

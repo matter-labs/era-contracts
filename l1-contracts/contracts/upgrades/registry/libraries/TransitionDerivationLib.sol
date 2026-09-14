@@ -54,9 +54,9 @@ library TransitionDerivationLib {
         }
         FacetRouting[] memory fromFacets = _loadRouting(_fromRelease);
         FacetRouting[] memory newFacets = _loadRouting(_newRelease);
-        // Order-sensitive on purpose: the slot order is canonical ({GenesisManifestLib}), so equal
-        // routing encodes equally, and a reordered-but-equivalent pair simply falls through to the
-        // reinstall it would have got anyway.
+        // Order-sensitive on purpose: the producers keep one row order (the facets' deploy order
+        // in `DeployCTMUtils`), so equal routing encodes equally, and a reordered-but-equivalent
+        // pair simply falls through to the reinstall it would have got anyway.
         if (keccak256(abi.encode(fromFacets)) == keccak256(abi.encode(newFacets))) {
             return facetCuts;
         }
@@ -108,14 +108,19 @@ library TransitionDerivationLib {
     }
 
     /// @notice Derives the transition's L2 force deployments from the RELEASE PAIR: every row of
-    ///         the target release's L2 bytecode table whose descriptor differs from the departing
-    ///         release's (a member new to the set counts as changed) becomes one force deployment
-    ///         of that descriptor at its member's fixed address ({L2InventoryLib}).
+    ///         the target release's L2 bytecode table whose implementation differs from the
+    ///         departing release's (a member new to the set counts as changed) becomes one
+    ///         system-proxy upgrade to that implementation at its member's fixed address
+    ///         ({L2InventoryLib}), behind the target release's shared proxy shell.
     /// @dev Same philosophy as {deriveFacetCuts}: the delta is derived from the pair, never
-    ///      authored, and members whose bytecode did not change are not touched — a facet-only or
-    ///      verifier-only upgrade derives an empty L2 set. A same-release pair derives an empty
-    ///      list by identity. The bootstrap edge has no departing release and
+    ///      authored, and members whose implementation did not change are not touched — a
+    ///      facet-only or verifier-only upgrade derives an empty L2 set. A same-release pair
+    ///      derives an empty list by identity. The bootstrap edge has no departing release and
     ///      installs the target table in full ({deriveL2DeploymentsFromTable}).
+    /// @dev A shell change alone derives nothing: `updateZKsyncOSContract` deploys the shell only
+    ///      at a system address that has no code yet, so an existing member's proxy is never
+    ///      replaced — the new shell reaches exactly the members new to the set, which are derived
+    ///      anyway.
     function deriveL2Deployments(
         ICTMRelease _fromRelease,
         ICTMRelease _newRelease
@@ -124,7 +129,10 @@ library TransitionDerivationLib {
             return deployments;
         }
         return
-            deriveL2DeploymentsFromTable(changedL2Rows(_fromRelease.l2BytecodeInfos(), _newRelease.l2BytecodeInfos()));
+            deriveL2DeploymentsFromTable(
+                changedL2Rows(_fromRelease.l2BytecodeInfos(), _newRelease.l2BytecodeInfos()),
+                _newRelease.l2SystemProxyBytecodeInfo()
+            );
     }
 
     /// @notice The rows of `_newTable` that differ from `_fromTable` at the same member index, every
@@ -149,13 +157,16 @@ library TransitionDerivationLib {
 
     /// @notice The table form of {deriveL2Deployments}, shared with the deploy tooling so the
     ///         script-composed bootstrap L2 leg and the on-chain transition path derive from the
-    ///         same function.
+    ///         same function. Every nonempty row becomes one `ZKsyncOSSystemProxyUpgrade` whose
+    ///         descriptor is the `(implementation, proxy)` pair `updateZKsyncOSContract` decodes:
+    ///         the row joined to the release's one shared shell.
     /// @dev Table rows are uniformly ZKsync OS system-proxy upgrades — the registry composes for
     ///      ZKsync OS chains only and never emits an `EraForceDeployment`. The only Unsafe
     ///      deployments an upgrade carries are the authored delegate and extras, which
     ///      {L2PlanLib.build} constructs from their bytecode infos, never from the table.
     function deriveL2DeploymentsFromTable(
-        bytes[] memory _l2BytecodeInfos
+        bytes[] memory _l2BytecodeInfos,
+        bytes memory _l2SystemProxyBytecodeInfo
     ) internal pure returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments) {
         uint256 length = _l2BytecodeInfos.length;
         uint256 count = 0;
@@ -172,7 +183,7 @@ library TransitionDerivationLib {
             }
             deployments[cursor] = IComplexUpgrader.UniversalContractUpgradeInfo({
                 upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
-                deployedBytecodeInfo: _l2BytecodeInfos[i],
+                deployedBytecodeInfo: abi.encode(_l2BytecodeInfos[i], _l2SystemProxyBytecodeInfo),
                 newAddress: L2InventoryLib.fixedAddress(L2EcosystemContract(i))
             });
             ++cursor;

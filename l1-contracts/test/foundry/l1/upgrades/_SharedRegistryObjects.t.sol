@@ -102,7 +102,8 @@ abstract contract RegistryObjectsFixture is Test {
                         genesisBatchCommitment: bytes32(uint256(1)),
                         genesisIndexRepeatedStorageChanges: 54
                     }),
-                    l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT)
+                    l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT),
+                    l2SystemProxyBytecodeInfo: ""
                 })
             );
     }

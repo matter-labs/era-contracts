@@ -33,7 +33,6 @@ import {
     L1EcosystemContract
 } from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {
-    CoordinatorNotBound,
     DeadlineNotYetPassed,
     LegNotReserved,
     MigrationsNotPaused,
@@ -92,7 +91,7 @@ contract NotAnOperation {
 /// @notice The three-stage lifecycle of one operation over one CTM, driven by the coordinator
 ///         ({protocol-docs/ecosystem-upgrade-coordination.md}): ordering and authority of the
 ///         stages, the stage-0 binding and provenance conditions, the all-or-nothing stage 1, the
-///         checks-before-release stage 2, abandonment, coordinator replacement, and how the CTM's
+///         verify-then-release stage 2, abandonment, coordinator replacement, and how the CTM's
 ///         own migration pause composes with the ecosystem pause on the fixture's real
 ///         `L1ChainAssetHandler`. Several CTMs under one operation are
 ///         EcosystemUpgradeCoordination.t.sol.
@@ -210,7 +209,10 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
 
     /// @dev The lifecycle-slot, reservation and pause invariants that must hold while an
     ///      operation is pending.
-    function _assertPendingAndPaused(CTMTransition _transition, IEcosystemUpgradeExecutor.UpgradeStage _stage) internal view {
+    function _assertPendingAndPaused(
+        CTMTransition _transition,
+        IEcosystemUpgradeExecutor.UpgradeStage _stage
+    ) internal view {
         EcosystemUpgradeOperation operation = operationOf[address(_transition)];
         assertEq(address(coordinator.pendingOperation()), address(operation), "the lifecycle must stay open");
         _assertStage(_stage);
@@ -284,9 +286,10 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         assertEq(_liveImpl(ecosystemProxyAdmin, ecosystemProxy), implNew, "the ecosystem row must be applied");
         assertEq(_liveImpl(ctmProxyAdmin, ctmDomainProxy), implNew, "the CTM-domain row must be applied");
 
-        // Stage 2: the applied-state checks pass, then every reservation and pause is released.
+        // Stage 2: each domain verifies its own leg and releases its reservation (the CTM
+        // executor its pause), core first.
         vm.expectEmit(true, true, true, true, address(coreExecutor));
-        emit CoreUpgradeExecutor.OperationEnded(address(operation));
+        emit CoreUpgradeExecutor.OperationCompleted(address(operation));
         vm.expectEmit(true, true, true, true, address(chainAssetHandler));
         emit IChainAssetHandlerBase.UnpausedCTMMigration(address(chainContractAddress), address(ctmExecutor));
         vm.expectEmit(true, true, true, true, address(ctmExecutor));
@@ -512,7 +515,8 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
     }
 
     /// @dev A coordinator the domains do not name gets nothing — a shared owner and the same code
-    ///      are not authorization. With a core leg the core executor's binding is checked first.
+    ///      are not authorization. The domains enforce it themselves (`onlyCoordinator`); with a
+    ///      core leg the core executor is the first to refuse.
     function test_revertWhen_aForeignCoordinatorDrivesTheDomains() public {
         EcosystemUpgradeExecutor foreign = new EcosystemUpgradeExecutor(
             governor,
@@ -522,23 +526,19 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         CTMTransition full = _deployFullTransition();
         EcosystemUpgradeOperation operation = _operationFor(full);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(CoordinatorNotBound.selector, address(coreExecutor), address(coordinator))
-        );
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(foreign)));
         vm.prank(governor);
         foreign.stage0(operation);
 
         EcosystemUpgradeOperation ctmOnly = _operationFor(transition);
-        vm.expectRevert(
-            abi.encodeWithSelector(CoordinatorNotBound.selector, address(ctmExecutor), address(coordinator))
-        );
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(foreign)));
         vm.prank(governor);
         foreign.stage0(ctmOnly);
 
         // And the callbacks themselves refuse it outright.
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(foreign)));
         vm.prank(address(foreign));
-        ctmExecutor.beginOperation(ctmOnly, ICTMTransition(address(transition)));
+        ctmExecutor.beginOperation(ctmOnly);
         _assertLifecycleIdle();
         assertEq(address(foreign.pendingOperation()), address(0), "a refused stage 0 records nothing");
         assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)));
@@ -594,7 +594,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         coordinator.stage1(operation);
 
         vm.expectEmit(true, true, true, true, address(coreExecutor));
-        emit CoreUpgradeExecutor.OperationEnded(address(operation));
+        emit CoreUpgradeExecutor.OperationAbandoned(address(operation));
         vm.expectEmit(true, true, true, true, address(ctmExecutor));
         emit CTMUpgradeExecutor.OperationAbandoned(address(operation));
         vm.expectEmit(true, true, true, true, address(coordinator));
@@ -728,14 +728,14 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)));
     }
 
-    /// @dev Each domain's binding is read live at stage 0: a detached executor is refused, whether
-    ///      or not the operation names an ecosystem leg.
+    /// @dev Each domain enforces its binding itself, at the callback: a detached executor refuses
+    ///      the coordinator, whether or not the operation names an ecosystem leg.
     function test_revertWhen_stage0DomainDoesNotNameTheCoordinator() public {
         EcosystemUpgradeOperation operation = _operationFor(transition);
         vm.prank(governor);
         ctmExecutor.setCoordinator(address(0));
 
-        vm.expectRevert(abi.encodeWithSelector(CoordinatorNotBound.selector, address(ctmExecutor), address(0)));
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(coordinator)));
         vm.prank(governor);
         coordinator.stage0(operation);
         _assertLifecycleIdle();
@@ -752,7 +752,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         vm.prank(governor);
         coreExecutor.setCoordinator(address(0));
 
-        vm.expectRevert(abi.encodeWithSelector(CoordinatorNotBound.selector, address(coreExecutor), address(0)));
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(coordinator)));
         vm.prank(governor);
         coordinator.stage0(operation);
         _assertLifecycleIdle();
@@ -904,8 +904,10 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         _assertPendingAndPaused(full, IEcosystemUpgradeExecutor.UpgradeStage.Prepared);
     }
 
-    // ─────────────────────────── checks before release ───────────────────────────
+    // ─────────────────────────── verification before release ───────────────────────────
 
+    /// @dev Each domain verifies its own leg in `completeOperation`; the stage is one transaction,
+    ///      so the core leg's release is rolled back when the CTM leg refuses.
     function test_revertWhen_stage2CtmRowNoLongerApplied_keepsMigrationsPaused() public {
         CTMTransition full = _deployFullTransition();
         EcosystemUpgradeOperation operation = _operationFor(full);

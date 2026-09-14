@@ -299,6 +299,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       ecosystemProxyAdmin: live.ecosystemProxyAdmin,
       ctmProxyAdmin: live.ctmProxyAdmin,
       l2BytecodeInfos: l2Inventory.rows,
+      l2SystemProxyBytecodeInfo: l2Inventory.systemProxyBytecodeInfo,
     });
     // The bootstrap installs this release under the CTM's provenance anchor, like every release.
     assertEq(
@@ -903,6 +904,8 @@ async function deployUpgradeMachinery(
     ctmProxyAdmin: string;
     /** `ReleaseManifest.l2BytecodeInfos` of the bootstrap release (see emitL2BytecodeInventory). */
     l2BytecodeInfos: string[];
+    /** `ReleaseManifest.l2SystemProxyBytecodeInfo`: the one shell the table rows sit behind. */
+    l2SystemProxyBytecodeInfo: string;
   }
 ): Promise<DeployedMachinery> {
   const deployFrom = async (
@@ -1009,7 +1012,12 @@ async function deployUpgradeMachinery(
   // L2 bytecode table of the build the prepare publishes), with the live release's facets,
   // verifier, DiamondInit and genesis data — nothing about the chains changes at this edge.
   const bootstrapRelease = await deployPinned("CTMRelease", [
-    await bootstrapReleaseManifest(deployer.provider, await liveCtm.currentRelease(), params.l2BytecodeInfos),
+    await bootstrapReleaseManifest(
+      deployer.provider,
+      await liveCtm.currentRelease(),
+      params.l2BytecodeInfos,
+      params.l2SystemProxyBytecodeInfo
+    ),
   ]);
   return {
     ...machinery,
@@ -1029,15 +1037,16 @@ async function deployUpgradeMachinery(
 }
 
 /**
- * The bootstrap release's `ReleaseManifest`: the live release's pins over `l2BytecodeInfos` (see
- * deployUpgradeMachinery). Read from the live object rather than from the committed manifest:
- * the table carries the build-specific bytecode hashes of the current artifacts, which are not
- * cross-machine-stable and so never committed.
+ * The bootstrap release's `ReleaseManifest`: the live release's pins over `l2BytecodeInfos` and
+ * its shared shell (see deployUpgradeMachinery). Read from the live object rather than from the
+ * committed manifest: the table carries the build-specific bytecode hashes of the current
+ * artifacts, which are not cross-machine-stable and so never committed.
  */
 async function bootstrapReleaseManifest(
   provider: ethers.providers.Provider,
   liveRelease: string,
-  l2BytecodeInfos: string[]
+  l2BytecodeInfos: string[],
+  l2SystemProxyBytecodeInfo: string
 ): Promise<unknown> {
   const release = new ethers.Contract(liveRelease, getAbi("CTMRelease"), provider);
   const manifest = await release.getManifest();
@@ -1059,12 +1068,15 @@ async function bootstrapReleaseManifest(
       genesisIndexRepeatedStorageChanges: manifest.genesis.genesisIndexRepeatedStorageChanges,
     },
     l2BytecodeInfos,
+    l2SystemProxyBytecodeInfo,
   };
 }
 
 type L2BytecodeInventory = {
-  /** `ReleaseManifest.l2BytecodeInfos`: the enum-indexed table, empty rows as `0x`. */
+  /** `ReleaseManifest.l2BytecodeInfos`: the enum-indexed implementation table, empty rows as `0x`. */
   rows: string[];
+  /** `ReleaseManifest.l2SystemProxyBytecodeInfo`: the shell every row sits behind. */
+  systemProxyBytecodeInfo: string;
   /** Every bytecode a CTM prepare publishes on the supplier: the table's and the baselines. */
   factoryDeps: string[];
 };
@@ -1226,8 +1238,10 @@ async function buildRegistryManifest(
           // in this test, so a synthetic payload (mirroring the foundry e2e test) suffices.
           fixedForceDeploymentsData: "0xf1f2",
           // Keys are `L2EcosystemContract` member names; empty = every slot an explicit empty
-          // row (synthetic, like the payload above — no chain is created at this release here).
+          // row (synthetic, like the payload above — no chain is created at this release here),
+          // and an empty table names no shell.
           l2BytecodeInfos: {},
+          l2SystemProxyBytecodeInfo: "0x",
           genesis: {
             genesisUpgrade: { address: live.genesisUpgrade, codehash: await codehash(live.genesisUpgrade) },
             batchHash: ethers.utils.hexZeroPad("0x01", 32),
