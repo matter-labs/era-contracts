@@ -247,7 +247,11 @@ otherwise stage 1 leaves it to that administrator (`ProxyRowLeftToAdministrator`
 requires it applied. `CTMContract.ServerNotifier` is the row's slot; the v34 bootstrap manifest
 carries the notifier swap under its chainAdmin-owned admin, `migrate()` leaves it to the
 ChainAdmin's own `ctm_admin_calls` (which protocol-ops runs right after the prepares), and
-`validateApplied()` requires it. Both authority policies are therefore expressible as on-chain
+`validateApplied()` requires it. The prepare RENDERS that admin call from the pinned row rather
+than defining the swap a second time — the same `ProxyAdmin` call `applyRows` makes for the row,
+`upgradeAndCall` with the fixed `initializeUpgrade()` when the row reinitializes and a plain
+`upgrade` otherwise — so the administrator executes exactly the row governance reviewed. Both
+authority policies are therefore expressible as on-chain
 state: hand the notifier's admin to the executor and the row rides stage 1; keep it with the
 ChainAdmin and the ChainAdmin's own call must land before stage 2. `validate()` on the bootstrap
 accepts a row already at `implNew` for exactly this reason. One footgun to avoid: never transfer a

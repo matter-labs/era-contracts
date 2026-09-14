@@ -60,6 +60,8 @@ import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
+import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
+import {IProxyUpgradeInitializable} from "contracts/upgrades/registry/IUpgradeInit.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
 import {
@@ -501,6 +503,19 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         return address(0);
     }
 
+    /// @notice The CTM-domain inventory the upgrade object of this run pins, indexed by
+    ///         `CTMContract` — read back from the object (the transition, or the bootstrap
+    ///         migration on the bootstrap edge) so every admin call this prepare emits renders a
+    ///         row governance reviews rather than a second, script-side definition of the swap.
+    function pinnedCTMProxyInventory() internal view virtual returns (ProxyUpgradeRow[] memory) {
+        if (upgradeAddresses.ctmTransition != address(0)) {
+            return ICTMTransition(upgradeAddresses.ctmTransition).getManifest().proxyUpgrades;
+        }
+        address migration = bootstrapMigrationAddress();
+        require(migration != address(0), "no upgrade object deployed: the CTM-domain rows are read from it");
+        return RegistryBootstrapMigration(migration).getManifest().proxyUpgrades;
+    }
+
     /// @notice The CTM domain's bound `CTMUpgradeExecutor`: the CTM's owner once the bootstrap edge
     ///         has handed the domain over. The three governance calls of this upgrade target it and
     ///         the upgrade timer is bound to it.
@@ -826,16 +841,22 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     /// @notice The ServerNotifier's implementation swap, an ADMIN action (the notifier's ProxyAdmin
-    ///         is ChainAdmin-owned, not governance-owned) emitted only when this run deployed a new
-    ///         notifier implementation; the section is written either way so tooling reads one shape.
+    ///         is ChainAdmin-owned, not governance-owned) emitted only when the pinned inventory
+    ///         carries a notifier row; the section is written either way so tooling reads one shape.
     function prepareDefaultCTMAdminCalls() public virtual returns (Call[] memory calls) {
         address serverNotifierProxyAdmin = Utils.getProxyAdminAddress(
             ctmAddresses.stateTransition.proxies.serverNotifier
         );
         address chainAdmin = IOwnable(serverNotifierProxyAdmin).owner();
         address chainAdminOwner = IOwnable(chainAdmin).owner();
-        if (ctmAddresses.stateTransition.implementations.serverNotifier != address(0)) {
-            calls = prepareUpgradeServerNotifierCall();
+        calls = prepareUpgradeServerNotifierCall();
+        if (calls.length != 0) {
+            // The section records the live administrator's approval, so the row must name that
+            // same administrator as its authority.
+            require(
+                calls[0].target == serverNotifierProxyAdmin,
+                "the pinned ServerNotifier row names an administrator other than the live proxy's"
+            );
             declareExternalAction(
                 ExternalActionsLib.PHASE_ADMIN,
                 "ServerNotifier implementation swap (ctm_admin_calls)",
@@ -879,25 +900,29 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         vm.writeToml(updatedTestCallsToml, upgradeConfig.outputPath);
     }
 
-    function prepareUpgradeServerNotifierCall() public virtual returns (Call[] memory calls) {
-        address serverNotifierProxyAdmin = Utils.getProxyAdminAddress(
-            ctmAddresses.stateTransition.proxies.serverNotifier
-        );
+    /// @notice The pinned `CTMContract.ServerNotifier` row rendered as the call its own
+    ///         administrator makes — the same `ProxyAdmin` call `ProxyUpgradeRowLib.applyRows`
+    ///         would make were the executor to own that admin: `upgradeAndCall` with the fixed,
+    ///         argument-less `initializeUpgrade()` when the row reinitializes, a plain `upgrade`
+    ///         otherwise (see {docs/upgrade-stage-lifecycle.md} section 4.4). Empty when the
+    ///         inventory leaves the notifier alone.
+    function prepareUpgradeServerNotifierCall() public view virtual returns (Call[] memory calls) {
+        ProxyUpgradeRow memory row = pinnedCTMProxyInventory()[uint256(CTMContract.ServerNotifier)];
+        if (row.implNew.addr == address(0)) {
+            return calls;
+        }
+        require(address(row.admin) != address(0), "the pinned ServerNotifier row names no administrator");
 
-        Call memory call = Call({
-            target: serverNotifierProxyAdmin,
-            data: abi.encodeCall(
-                ProxyAdmin.upgrade,
-                (
-                    ITransparentUpgradeableProxy(payable(ctmAddresses.stateTransition.proxies.serverNotifier)),
-                    ctmAddresses.stateTransition.implementations.serverNotifier
-                )
-            ),
-            value: 0
-        });
+        ITransparentUpgradeableProxy proxy = ITransparentUpgradeableProxy(payable(row.proxy));
+        bytes memory data = row.callInitializeUpgrade
+            ? abi.encodeCall(
+                ProxyAdmin.upgradeAndCall,
+                (proxy, row.implNew.addr, abi.encodeCall(IProxyUpgradeInitializable.initializeUpgrade, ()))
+            )
+            : abi.encodeCall(ProxyAdmin.upgrade, (proxy, row.implNew.addr));
 
         calls = new Call[](1);
-        calls[0] = call;
+        calls[0] = Call({target: address(row.admin), data: data, value: 0});
     }
 
     /// @notice The governance stages of this upgrade: `CTMUpgradeExecutor.stageN(transition)` —

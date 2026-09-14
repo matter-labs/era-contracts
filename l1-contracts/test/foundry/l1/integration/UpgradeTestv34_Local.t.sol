@@ -338,6 +338,16 @@ contract UpgradeIntegrationTest_v34_Local is
             "the executor owns the CTM, which is what lets it pause that CTM's migrations"
         );
         assertFalse(IChainAssetHandlerBase(chainAssetHandler).migrationPausedFor(ctm), "no pause before stage 0");
+
+        // The ServerNotifier swap rode the ChainAdmin's own call (`ctm_admin_calls`), rendered from
+        // the row the bootstrap manifest pins under the notifier's foreign admin — the row
+        // `validateApplied()` above required applied.
+        address notifierProxy = v34.getAddresses().stateTransition.proxies.serverNotifier;
+        assertEq(
+            DeployScriptUtils.getImplementation(notifierProxy),
+            v34.getAddresses().stateTransition.implementations.serverNotifier,
+            "the notifier runs the implementation its pinned row names"
+        );
     }
 
     /// @dev Decodes an `upgrade(ProposedUpgrade)` init payload; external so the selector can be
