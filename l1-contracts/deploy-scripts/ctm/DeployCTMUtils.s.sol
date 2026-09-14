@@ -10,7 +10,6 @@ import {ChainTypeManagerInitializeData} from "contracts/state-transition/IChainT
 import {ChainCreationParams} from "contracts/state-transition/ILegacyChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
-import {GenesisManifestLib} from "contracts/upgrades/registry/libraries/GenesisManifestLib.sol";
 
 import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "../utils/Utils.sol";
@@ -68,7 +67,12 @@ import {CTMContract, CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "./Depl
 
 import {CTMDeployedAddresses} from "../utils/Types.sol";
 import {Facets} from "contracts/common/StateTransitionTypes.sol";
-import {GenesisConfig, ReleaseGenesisData, ReleaseManifest} from "../../contracts/upgrades/registry/RegistryTypes.sol";
+import {
+    GenesisFacet,
+    PinnedContract,
+    ReleaseGenesisData,
+    ReleaseManifest
+} from "../../contracts/upgrades/registry/RegistryTypes.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct Config {
@@ -112,10 +116,16 @@ abstract contract DeployCTMUtils is DeployUtils {
 
     /// @dev Cache for batched blake2s hashing (keccak256(bytecode) => blake2s(bytecode)).
     mapping(bytes32 => bytes32) private _blakeCache;
-    /// @dev Complete proxy-upgrade descriptors keyed by artifact identity.
+    /// @dev ZKsync OS bytecode infos keyed by artifact identity.
     mapping(bytes32 => bytes) private _bytecodeInfoCache;
     /// @dev Per-run scratch file for the batch blake2s FFI call.
     string internal _blakeBatchTmpFile;
+
+    /// @dev The release's facet rows, appended in the order the facets are deployed by
+    ///      {_deployReleaseFacet}. The order is part of the manifest encoding, so every prepare
+    ///      keeps it: an upgrade that reuses every facet must pin the SAME manifest as the live
+    ///      release to be recognized as such (see {deployCurrentRelease}).
+    GenesisFacet[] internal releaseFacets;
 
     /// @notice Deploys the release's L1 members and pins them in a `CTMRelease`. Each member that
     ///         the live release already runs byte-identical code for is REUSED rather than
@@ -123,17 +133,35 @@ abstract contract DeployCTMUtils is DeployUtils {
     //slither-disable-next-line reentrancy-benign
     function deployStateTransitionDiamondFacets() internal {
         Facets memory live = ctmAddresses.stateTransition.facets;
-        ctmAddresses.stateTransition.facets.executorFacet = _deployReleaseMember("ExecutorFacet", live.executorFacet);
-        ctmAddresses.stateTransition.facets.adminFacet = _deployReleaseMember("AdminFacet", live.adminFacet);
-        ctmAddresses.stateTransition.facets.mailboxFacet = _deployReleaseMember("MailboxFacet", live.mailboxFacet);
-        ctmAddresses.stateTransition.facets.gettersFacet = _deployReleaseMember("GettersFacet", live.gettersFacet);
-        ctmAddresses.stateTransition.facets.migratorFacet = _deployReleaseMember("MigratorFacet", live.migratorFacet);
-        ctmAddresses.stateTransition.facets.committerFacet = _deployReleaseMember(
-            "CommitterFacet",
-            live.committerFacet
-        );
-        ctmAddresses.stateTransition.facets.diamondInit = _deployReleaseMember("DiamondInit", live.diamondInit);
+        Facets storage facets = ctmAddresses.stateTransition.facets;
+        delete releaseFacets;
+        facets.adminFacet = _deployReleaseFacet("AdminFacet", live.adminFacet, false);
+        facets.gettersFacet = _deployReleaseFacet("GettersFacet", live.gettersFacet, false);
+        facets.mailboxFacet = _deployReleaseFacet("MailboxFacet", live.mailboxFacet, true);
+        facets.executorFacet = _deployReleaseFacet("ExecutorFacet", live.executorFacet, true);
+        facets.migratorFacet = _deployReleaseFacet("MigratorFacet", live.migratorFacet, false);
+        facets.committerFacet = _deployReleaseFacet("CommitterFacet", live.committerFacet, true);
+        deployAdditionalReleaseFacets();
+        facets.diamondInit = _deployReleaseMember("DiamondInit", live.diamondInit);
         ctmAddresses.stateTransition.currentRelease = deployCurrentRelease();
+    }
+
+    /// @notice Hook for a version that adds a facet to the diamond: deploy it here through
+    ///         {_deployReleaseFacet} and it becomes one more row of the release. Nothing by default.
+    function deployAdditionalReleaseFacets() internal virtual {}
+
+    /// @notice Deploys (or reuses, like every release member) the facet `_name` and appends its
+    ///         release row — the facet with its live codehash pin and `_isFreezable`.
+    function _deployReleaseFacet(string memory _name, address _live, bool _isFreezable) internal returns (address) {
+        address facet = _deployReleaseMember(_name, _live);
+        releaseFacets.push(GenesisFacet({facet: _pin(facet), isFreezable: _isFreezable}));
+        return facet;
+    }
+
+    /// @dev The manifest unit for a deployed contract: its address beside its live codehash.
+    function _pin(address _addr) internal view returns (PinnedContract memory) {
+        require(_addr.code.length != 0, "pinned contract has no code");
+        return PinnedContract({addr: _addr, codehash: _addr.codehash});
     }
 
     /// @notice Deploys `_name`, or keeps `_live` when it may serve as this release's member.
@@ -169,10 +197,15 @@ abstract contract DeployCTMUtils is DeployUtils {
     /// @dev Virtual so bytecode-light test harnesses can substitute the table: the real builder
     ///      reads every L2 contract's bytecode from artifacts.
     function getL2BytecodeInfoTable() internal virtual returns (bytes[] memory) {
-        return SystemContractsProcessing.buildL2BytecodeInfoTable(_getProxyUpgradeBytecodeInfo);
+        return SystemContractsProcessing.buildL2BytecodeInfoTable(_cachedBytecodeInfo);
     }
 
-    /// @dev Precompute hashes and complete descriptors for the genesis and release inventories.
+    /// @dev Virtual for the same harnesses: an empty table has no shell to name.
+    function getL2SystemProxyBytecodeInfo() internal virtual returns (bytes memory) {
+        return _cachedBytecodeInfo("SystemContractProxy.sol", "SystemContractProxy");
+    }
+
+    /// @dev Precompute hashes and bytecode infos for the genesis and release inventories.
     /// Artifact JSON is decoded once per implementation and the shared proxy, then all blake2s
     /// hashes are computed in one FFI process to keep Forge below its script-memory cap.
     function _precomputeBlakeHashes() internal {
@@ -181,13 +214,12 @@ abstract contract DeployCTMUtils is DeployUtils {
         ZkSyncOsSystemContract[] memory systemContracts = SystemContractsProcessing.getZKsyncOSExtraSystemContracts();
 
         // In addition to the release table, the legacy genesis descriptor needs the beacon
-        // deployer, and removed trackers need EmptyContract. SystemContractProxy is shared by all
-        // proxy-upgrade descriptors.
+        // deployer, removed trackers need EmptyContract, and the release names the shared
+        // SystemContractProxy shell once.
         bytes[] memory bytecodes = new bytes[](
             coreContracts.length + zkosOnlyContracts.length + systemContracts.length + 3
         );
-        // Every bytecode except the final shared proxy has a proxy-upgrade descriptor.
-        bytes32[] memory descriptorKeys = new bytes32[](bytecodes.length - 1);
+        bytes32[] memory descriptorKeys = new bytes32[](bytecodes.length);
         uint256 bytecodeIndex;
 
         for (uint256 i = 0; i < coreContracts.length; i++) {
@@ -219,6 +251,7 @@ abstract contract DeployCTMUtils is DeployUtils {
 
         descriptorKeys[bytecodeIndex] = _bytecodeInfoKey("EmptyContract.sol", "EmptyContract");
         bytecodes[bytecodeIndex++] = BytecodeUtils.readDeployedBytecodeL1("EmptyContract.sol", "EmptyContract");
+        descriptorKeys[bytecodeIndex] = _bytecodeInfoKey("SystemContractProxy.sol", "SystemContractProxy");
         bytecodes[bytecodeIndex++] = BytecodeUtils.readDeployedBytecodeL1(
             "SystemContractProxy.sol",
             "SystemContractProxy"
@@ -250,12 +283,8 @@ abstract contract DeployCTMUtils is DeployUtils {
             _blakeCache[keccak256(bytecodes[i])] = hash;
         }
 
-        bytes memory proxyBytecodeInfo = _cachedZKOSBytecodeInfo(bytecodes[bytecodes.length - 1]);
         for (uint256 i = 0; i < descriptorKeys.length; i++) {
-            _bytecodeInfoCache[descriptorKeys[i]] = abi.encode(
-                _cachedZKOSBytecodeInfo(bytecodes[i]),
-                proxyBytecodeInfo
-            );
+            _bytecodeInfoCache[descriptorKeys[i]] = _cachedZKOSBytecodeInfo(bytecodes[i]);
         }
 
         vm.removeFile(tmpFile);
@@ -272,7 +301,8 @@ abstract contract DeployCTMUtils is DeployUtils {
         return ZKSyncOSBytecodeInfo.encodeZKSyncOSBytecodeInfo(blakeHash, uint32(_bytecode.length), key);
     }
 
-    function _getProxyUpgradeBytecodeInfo(
+    /// @dev The ZKsync OS bytecode info of an artifact, from the {_precomputeBlakeHashes} cache.
+    function _cachedBytecodeInfo(
         string memory _fileName,
         string memory _contractName
     ) internal view returns (bytes memory) {
@@ -281,32 +311,32 @@ abstract contract DeployCTMUtils is DeployUtils {
         return bytecodeInfo;
     }
 
-    /// @notice Deploys the storage-backed genesis registry and pins the freshly deployed facet
-    /// set plus the base system contract hashes into it. The chain-creation params point at it
-    /// (the CTM's `currentRelease`), and `DiamondInit` reads everything chain-independent
-    /// from there — the committed genesis cut carries no facets and no init payload.
+    /// @notice Pins the release just deployed — the facet rows {deployStateTransitionDiamondFacets}
+    /// collected, DiamondInit, the verifier, the genesis upgrade, the genesis data and the L2
+    /// inventory — in a `CTMRelease`. The chain-creation params point at it (the CTM's
+    /// `currentRelease`), and `DiamondInit` reads everything chain-independent from there — the
+    /// committed genesis cut carries no facets and no init payload.
     /// @dev The manifest is a constructor argument, so the release is fully initialized the moment
     /// it exists — there is no deployed-but-uninitialized window to front-run.
     function deployCurrentRelease() internal returns (address) {
         require(generatedData.forceDeploymentsData.length != 0, "force deployments data is empty");
-        ReleaseManifest memory manifest = GenesisManifestLib.buildGenesisManifest(
-            GenesisConfig({
-                facets: ctmAddresses.stateTransition.facets,
-                verifier: ctmAddresses.stateTransition.verifiers.verifier,
-                genesisUpgrade: ctmAddresses.stateTransition.genesisUpgrade,
-                genesis: ReleaseGenesisData({
-                    // ZKsync OS has no bootloader, default-account or EVM-emulator bytecode: the
-                    // release pins zeros, the same values a fresh chain geneses with.
-                    fixedForceDeploymentsData: generatedData.forceDeploymentsData,
-                    genesisBatchHash: config.contracts.chainCreationParams.genesisRoot,
-                    genesisBatchCommitment: config.contracts.chainCreationParams.genesisBatchCommitment,
-                    genesisIndexRepeatedStorageChanges: uint64(
-                        config.contracts.chainCreationParams.genesisRollupLeafIndex
-                    )
-                }),
-                l2BytecodeInfos: getL2BytecodeInfoTable()
-            })
-        );
+        require(releaseFacets.length != 0, "release facets not deployed");
+        ReleaseManifest memory manifest = ReleaseManifest({
+            diamondInit: _pin(ctmAddresses.stateTransition.facets.diamondInit),
+            verifier: _pin(ctmAddresses.stateTransition.verifiers.verifier),
+            genesisUpgrade: _pin(ctmAddresses.stateTransition.genesisUpgrade),
+            genesisFacets: releaseFacets,
+            genesis: ReleaseGenesisData({
+                // ZKsync OS has no bootloader, default-account or EVM-emulator bytecode: the
+                // release pins zeros, the same values a fresh chain geneses with.
+                fixedForceDeploymentsData: generatedData.forceDeploymentsData,
+                genesisBatchHash: config.contracts.chainCreationParams.genesisRoot,
+                genesisBatchCommitment: config.contracts.chainCreationParams.genesisBatchCommitment,
+                genesisIndexRepeatedStorageChanges: uint64(config.contracts.chainCreationParams.genesisRollupLeafIndex)
+            }),
+            l2BytecodeInfos: getL2BytecodeInfoTable(),
+            l2SystemProxyBytecodeInfo: getL2SystemProxyBytecodeInfo()
+        });
 
         // An upgrade whose release members all reused (nothing this version changes lives in the
         // release) pins the SAME manifest, so the live release object serves it: a transition with

@@ -213,6 +213,7 @@ contract CTMTransition is ICTMTransition {
         if (
             keccak256(abi.encode(_fromRelease.l2BytecodeInfos())) !=
                 keccak256(abi.encode(_newRelease.l2BytecodeInfos())) ||
+            keccak256(_fromRelease.l2SystemProxyBytecodeInfo()) != keccak256(_newRelease.l2SystemProxyBytecodeInfo()) ||
             keccak256(_fromRelease.fixedForceDeploymentsData()) != keccak256(_newRelease.fixedForceDeploymentsData())
         ) {
             revert PatchChangesL2GenesisState();

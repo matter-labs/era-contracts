@@ -36,7 +36,6 @@ import {OutdatedProtocolVersion} from "../../../state-transition/L1StateTransiti
 import {BootstrapManifest, L2UpgradePlan, ProxyUpgradeRow} from "../RegistryTypes.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
 import {IBootstrapUpgrade} from "../../IBootstrapUpgrade.sol";
-import {IDiamondInit} from "../../../state-transition/chain-interfaces/IDiamondInit.sol";
 import {IComplexUpgrader} from "../../../state-transition/l2-deps/IComplexUpgrader.sol";
 import {CTMUpgradeComposer} from "../libraries/CTMUpgradeComposer.sol";
 import {TransitionDerivationLib} from "../libraries/TransitionDerivationLib.sol";
@@ -103,10 +102,7 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
         // authored extras, shape-validated before the object exists.
         ICTMRelease release = ICTMRelease(_manifest.currentRelease.addr);
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory derived = TransitionDerivationLib
-            .deriveL2DeploymentsFromTable(
-                release.l2BytecodeInfos(),
-                IDiamondInit(release.diamondInit()).IS_ZKSYNC_OS()
-            );
+            .deriveL2DeploymentsFromTable(release.l2BytecodeInfos(), release.l2SystemProxyBytecodeInfo());
         L2PlanValidationLib.validateAuthored(
             derived,
             _manifest.l2Plan.extraDeployments,
