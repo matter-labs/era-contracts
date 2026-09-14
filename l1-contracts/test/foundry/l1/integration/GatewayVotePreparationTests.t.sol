@@ -249,7 +249,7 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
             abi.encode(_deployGatewayGenesisRegistry(contracts, config))
         );
 
-        // Build the initCalldata exactly as ChainTypeManagerBase composes it: only
+        // Build the initCalldata exactly as ChainTypeManager composes it: only
         // (chainId, admin) — everything else is read from the mocked CTM and the registry.
         // BRIDGE_HUB is mocked to L2_BRIDGEHUB_ADDR so initialize() takes the L2 branch
         // (sets nativeTokenVault/assetTracker from L2 constants, no external calls).
@@ -341,7 +341,6 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
         assertTrue(config.l1ChainId != 0, "L1 chain ID should be set");
         assertTrue(config.genesisRoot != bytes32(0), "Genesis root should be set");
         assertTrue(config.protocolVersion != 0, "Protocol version should be set");
-        assertTrue(config.isZKsyncOS, "Config should be in ZKsyncOS mode");
     }
 
     function _writeGatewayVotePreparationConfig() internal {

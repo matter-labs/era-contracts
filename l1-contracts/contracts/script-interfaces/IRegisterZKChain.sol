@@ -23,7 +23,6 @@ struct RegisterZKChainConfig {
     address governance;
     address create2FactoryAddress;
     bytes32 create2Salt;
-    bool allowEvmEmulator;
     // optional - if not set, then equal to 0
     address l1SharedBridgeProxy;
     bytes diamondCutData;

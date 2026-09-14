@@ -8,9 +8,8 @@ import {
     L2_REMOVED_GW_ASSET_TRACKER_ADDR,
     L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import {L2EcosystemContract, ZkSyncOsSystemContract} from "../ecosystem/CoreContract.sol";
+import {L2EcosystemContract, L2SystemContract} from "../ecosystem/CoreContract.sol";
 import {L2_ECOSYSTEM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {TransitionDerivationLib} from "contracts/upgrades/registry/libraries/TransitionDerivationLib.sol";
 import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";
@@ -19,13 +18,10 @@ import {DeduplicateBytecodesCountMismatch} from "../ecosystem/DeployScriptErrors
 // solhint-disable no-console
 
 /// @dev Fixed-address L2EcosystemContract entries backed by l1-contracts bytecodes,
-///      upgraded on ZKsyncOS via universal force deployments.
-uint256 constant FIXED_ADDRESS_CORE_CONTRACTS_COUNT = 12;
-/// @dev System contracts (0x800x) with l1-contracts EVM bytecodes for ZKsyncOS proxy upgrades.
-uint256 constant ZKOS_EXTRA_SYSTEM_CONTRACTS_COUNT = 3;
-
-/// @dev Core contracts that only exist on ZKsync OS chains.
-uint256 constant ZKOS_ONLY_CONTRACTS_COUNT = 2;
+///      upgraded via universal force deployments.
+uint256 constant FIXED_ADDRESS_CORE_CONTRACTS_COUNT = 14;
+/// @dev System contracts (0x800x) with l1-contracts EVM bytecodes for proxy upgrades.
+uint256 constant SYSTEM_PROXY_UPGRADE_CONTRACTS_COUNT = 4;
 
 library SystemContractsProcessing {
     /// @notice Deduplicates the array of bytecodes.
@@ -48,7 +44,7 @@ library SystemContractsProcessing {
                 toInclude += 1;
             }
 
-            for (uint j = i + 1; j < hashes.length; j++) {
+            for (uint256 j = i + 1; j < hashes.length; j++) {
                 if (hashes[i] == hashes[j]) {
                     hashes[j] = bytes32(0);
                 }
@@ -75,9 +71,8 @@ library SystemContractsProcessing {
     }
 
     function _fillFixedAddressCoreContracts(L2EcosystemContract[] memory ids) private pure {
-        // NOTE: L2WrappedBaseToken is intentionally NOT in this list. v31 must not touch the
-        // WrappedBaseToken impl on either VM, so it is excluded from both the force-deployment list
-        // and the factory deps.
+        // L2WrappedBaseToken must retain its implementation across the upgrade, so it is
+        // intentionally NOT in this list: neither force-deployed nor published as a factory dep.
         uint256 i = 0;
         ids[i++] = L2EcosystemContract.L2Bridgehub;
         ids[i++] = L2EcosystemContract.L2AssetRouter;
@@ -92,34 +87,28 @@ library SystemContractsProcessing {
         // Stateless parser called by the InteropCenter on every send; must be co-deployed with it.
         ids[i++] = L2EcosystemContract.InteropAttributeParser;
         ids[i++] = L2EcosystemContract.L2InteropHandler;
+        // Atomic-interop built-ins, see
+        // {protocol-docs/chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins}.
+        ids[i++] = L2EcosystemContract.L2InteropCommitmentTree;
+        ids[i++] = L2EcosystemContract.AtomicFlowManager;
         // Under-filling would silently leave `L2EcosystemContract(0)` entries; over-filling
         // already reverts with an out-of-bounds access on the fixed-length array.
         require(i == FIXED_ADDRESS_CORE_CONTRACTS_COUNT, "fixed-address core contract count mismatch");
     }
 
-    /// @notice Core contracts that a ZKsync OS chain has and an Era chain does not, on top of the
-    /// fixed-address core contracts. Currently the atomic-interop built-ins, see
-    /// {protocol-docs/chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins}.
-    function getZKsyncOSOnlyContracts() internal pure returns (L2EcosystemContract[] memory ids) {
-        ids = new L2EcosystemContract[](ZKOS_ONLY_CONTRACTS_COUNT);
-        uint256 i;
-        ids[i++] = L2EcosystemContract.L2InteropCommitmentTree;
-        ids[i++] = L2EcosystemContract.AtomicFlowManager;
-        // Same guard as `getFixedAddressCoreContracts`: under-filling would leave `L2EcosystemContract(0)` entries.
-        require(i == ZKOS_ONLY_CONTRACTS_COUNT, "ZKsync-OS-only contract count mismatch");
-    }
-
-    /// @notice System contracts that have l1-contracts EVM bytecodes and need ZKsyncOS proxy upgrades.
-    /// @dev Separate from getFixedAddressCoreContracts because these are ZKsyncOS system-space contracts
-    ///      with l1-contracts EVM bytecodes.
+    /// @notice System contracts that have l1-contracts EVM bytecodes and need proxy upgrades.
+    /// @dev Kept separate from the L2EcosystemContract lists because these use a distinct enum and
+    ///      artifact source.
     ///      ContractDeployer (0x8006) is intentionally excluded: it's a sequencer hook dispatcher,
     ///      not a wrappable contract. Attempting to force-deploy a SystemContractProxy at 0x8006
     ///      and then calling forceInitAdmin on it hits the hook with an unknown selector and reverts.
-    function getZKsyncOSExtraSystemContracts() internal pure returns (ZkSyncOsSystemContract[] memory ids) {
-        ids = new ZkSyncOsSystemContract[](ZKOS_EXTRA_SYSTEM_CONTRACTS_COUNT);
-        ids[0] = ZkSyncOsSystemContract.L2BaseToken;
-        ids[1] = ZkSyncOsSystemContract.L1Messenger;
-        ids[2] = ZkSyncOsSystemContract.SystemContext;
+    function getSystemProxyUpgradeContracts() internal pure returns (L2SystemContract[] memory ids) {
+        ids = new L2SystemContract[](SYSTEM_PROXY_UPGRADE_CONTRACTS_COUNT);
+        ids[0] = L2SystemContract.L2BaseToken;
+        ids[1] = L2SystemContract.L1Messenger;
+        ids[2] = L2SystemContract.SystemContext;
+        // See {protocol-docs/chain-lifecycle.md} for the ComplexUpgrader transition.
+        ids[3] = L2SystemContract.L2ComplexUpgrader;
     }
 
     function mergeBytesArrays(bytes[] memory left, bytes[] memory right) internal pure returns (bytes[] memory result) {
@@ -134,12 +123,12 @@ library SystemContractsProcessing {
 
     function getBaseListOfDependencies() internal view returns (bytes[] memory factoryDeps) {
         // Baselines, none in the L2EcosystemContract enum:
-        //  - `SystemContractProxy`: every `updateZKsyncOSContract` call that needs
+        //  - `SystemContractProxy`: every `upgradeSystemContractProxy` call that needs
         //    to materialize a proxy at a previously-empty system address force-deploys
         //    this bytecode.
         //  - `SystemContractProxyAdmin` (at 0x1000c): a direct-deployed ProxyAdmin present from
-        //    genesis. v31 no longer force-deploys it (see getBaseZKsyncOSForceDeployments), but its
-        //    bytecode preimage is still published as a ZKsyncOS baseline.
+        //    genesis. v31 no longer force-deploys it (see getBaseForceDeployments), but its
+        //    bytecode preimage is still published as a baseline dependency.
         factoryDeps = new bytes[](3);
         factoryDeps[0] = BytecodeUtils.readDeployedBytecodeL1("SystemContractProxy.sol", "SystemContractProxy");
         factoryDeps[1] = BytecodeUtils.readDeployedBytecodeL1(
@@ -151,12 +140,12 @@ library SystemContractsProcessing {
         factoryDeps[2] = BytecodeUtils.readDeployedBytecodeL1("EmptyContract.sol", "EmptyContract");
     }
 
-    /// @notice Build the base ZKsyncOS force deployment array.
+    /// @notice Build the base force deployment array.
     /// @dev DERIVED from the release's L2 bytecode table via the SAME function the on-chain
     ///      transition derivation uses, so the script-composed bootstrap L2 leg and every
     ///      registry-driven edge after it are one code path. Which contracts participate is
     ///      encoded once, in which table rows `buildL2BytecodeInfoTable` fills.
-    function getBaseZKsyncOSForceDeployments()
+    function getBaseForceDeployments()
         internal
         returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments)
     {
@@ -198,18 +187,10 @@ library SystemContractsProcessing {
         for (uint256 i = 0; i < core.length; i++) {
             rows[uint256(core[i])] = _implementationBytecodeInfo(core[i], _buildBytecodeInfo);
         }
-        // ZKsync-OS-only contracts: the atomic-interop built-ins and the L2 ecosystem registry.
-        // Predeployed in the ZKsync OS genesis, so a from-scratch chain already has them; a chain
-        // that predates the release gets them on the upgrade path, which is what lets
-        // `_initializeV32Contracts` initialize them there too.
-        L2EcosystemContract[] memory zkosOnly = getZKsyncOSOnlyContracts();
-        for (uint256 i = 0; i < zkosOnly.length; i++) {
-            rows[uint256(zkosOnly[i])] = _implementationBytecodeInfo(zkosOnly[i], _buildBytecodeInfo);
-        }
         // Kernel built-ins with l1-contracts EVM bytecodes (system space, 0x800x).
-        ZkSyncOsSystemContract[] memory sysContracts = getZKsyncOSExtraSystemContracts();
+        L2SystemContract[] memory sysContracts = getSystemProxyUpgradeContracts();
         for (uint256 i = 0; i < sysContracts.length; i++) {
-            (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolveZkOsSystemContract(
+            (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolveL2SystemContract(
                 sysContracts[i]
             );
             rows[uint256(_l2MemberForSystemContract(sysContracts[i]))] = _buildBytecodeInfo(fileName, contractName);
@@ -233,17 +214,20 @@ library SystemContractsProcessing {
 
     /// @dev The appended `L2EcosystemContract` member a ZKsyncOS kernel built-in occupies in the
     ///      release's L2 bytecode table.
-    function _l2MemberForSystemContract(ZkSyncOsSystemContract _id) private pure returns (L2EcosystemContract) {
-        if (_id == ZkSyncOsSystemContract.L2BaseToken) {
+    function _l2MemberForSystemContract(L2SystemContract _id) private pure returns (L2EcosystemContract) {
+        if (_id == L2SystemContract.L2BaseToken) {
             return L2EcosystemContract.L2BaseToken;
         }
-        if (_id == ZkSyncOsSystemContract.L1Messenger) {
+        if (_id == L2SystemContract.L1Messenger) {
             return L2EcosystemContract.L1Messenger;
         }
-        if (_id == ZkSyncOsSystemContract.SystemContext) {
+        if (_id == L2SystemContract.SystemContext) {
             return L2EcosystemContract.SystemContext;
         }
-        revert("ZkSyncOsSystemContract has no L2EcosystemContract member");
+        if (_id == L2SystemContract.L2ComplexUpgrader) {
+            return L2EcosystemContract.L2ComplexUpgrader;
+        }
+        revert("L2SystemContract has no L2EcosystemContract member");
     }
 
     /// @notice Proxy upgrades that neutralize the removed v31 GWAssetTracker.

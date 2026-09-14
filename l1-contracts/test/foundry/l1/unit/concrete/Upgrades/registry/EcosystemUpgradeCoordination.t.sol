@@ -20,7 +20,7 @@ import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgra
 import {IEcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/IEcosystemUpgradeExecutor.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {L2PlanFixtures} from "./L2PlanFixtures.sol";
-import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {
     CTMContract,
@@ -55,7 +55,7 @@ import {
 ///      fixture's real `L1ChainAssetHandler`. Neither CTM crosses a chain here — that is
 ///      RegistryDrivenUpgrade.t.sol's business.
 contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
-    ZKsyncOSChainTypeManager internal ctm2;
+    ChainTypeManager internal ctm2;
     CTMUpgradeExecutor internal ctmExecutor2;
     ProxyAdmin internal ctmProxyAdmin2;
 
@@ -70,7 +70,7 @@ contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
         // The second CTM: same implementation and genesis shape as the fixture's, registered on
         // the Bridgehub (the ChainAssetHandler derives pause authority from registration plus
         // ownership), handed to its own executor and re-pointed at the same real release.
-        ctm2 = ZKsyncOSChainTypeManager(
+        ctm2 = ChainTypeManager(
             address(
                 new TransparentUpgradeableProxy(
                     address(chainTypeManager),

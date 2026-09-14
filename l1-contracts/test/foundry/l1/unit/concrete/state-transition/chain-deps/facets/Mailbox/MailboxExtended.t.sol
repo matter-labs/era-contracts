@@ -71,7 +71,7 @@ contract MailboxOnGatewayTest is UtilsCallMockerTest {
 
         address testnetVerifier = address(new ZKsyncOSTestnetVerifier(IVerifier(address(0))));
         mockChainTypeManagerVerifier(testnetVerifier);
-        address diamondProxy = Utils.makeZKsyncOSDiamondProxy(facetCuts, bridgehub);
+        address diamondProxy = Utils.makeDiamondProxy(facetCuts, bridgehub);
 
         mailboxFacet = IMailbox(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);

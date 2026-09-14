@@ -55,7 +55,7 @@ abstract contract RegistryObjectsFixture is Test {
     address internal facetShared; // in both releases
     address internal facetDeparting; // only in the departing release
     address internal facetArriving; // only in the target release
-    /// @dev A real DiamondInit: the composer reads VM identity off its `IS_ZKSYNC_OS` immutable.
+    /// @dev A real DiamondInit, the one every fixture release pins.
     address internal diamondInit;
     address internal genesisUpgradeStub;
     address internal upgradeTimerStub;
@@ -64,7 +64,6 @@ abstract contract RegistryObjectsFixture is Test {
     ///      version-specific composer, so plans can pin a real composer without an L2 migration.
     FixedDelegateCalldataComposer internal delegateComposer;
     bytes internal fixtureDelegateCalldata;
-    bool internal fixtureIsZKsyncOS;
 
     /// @dev The REAL v34 composer, for the per-chain composition tests. The ecosystem it reads
     ///      through the Bridgehub — the CTM deployer, the asset router and the native token vault —
@@ -100,13 +99,12 @@ abstract contract RegistryObjectsFixture is Test {
     string internal constant ERC20_SYMBOL = "LOC";
     uint256 internal constant ERC20_DECIMALS = 6;
 
-    function _setUpRegistryObjects(bool _isZKsyncOS, bytes memory _delegateCalldata) internal {
-        fixtureIsZKsyncOS = _isZKsyncOS;
+    function _setUpRegistryObjects(bytes memory _delegateCalldata) internal {
         fixtureDelegateCalldata = _delegateCalldata;
         facetShared = address(new MockSelfDescribingFacet(_selectors2(SEL_SHARED_A, SEL_SHARED_B)));
         facetDeparting = address(new MockSelfDescribingFacet(_selectors1(SEL_DEPARTING)));
         facetArriving = address(new MockSelfDescribingFacet(_selectors1(SEL_ARRIVING)));
-        diamondInit = address(new DiamondInit(_isZKsyncOS));
+        diamondInit = address(new DiamondInit());
         genesisUpgradeStub = _pinned("genesisUpgrade");
         upgradeTimerStub = _pinned("upgradeTimer");
         ctmStub = makeAddr("ctm");
@@ -320,7 +318,7 @@ abstract contract RegistryObjectsFixture is Test {
                 _newProtocolVersion,
                 abi.encodeCall(
                     IL2V34Upgrade.upgrade,
-                    (true, ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(_chainId))
+                    (ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(_chainId))
                 )
             );
     }
@@ -380,7 +378,7 @@ abstract contract RegistryObjectsFixture is Test {
 
     /// @dev The per-chain half of a composed v34 payload.
     function _perChainData(bytes memory _txData) internal view returns (ZKChainSpecificForceDeploymentsData memory) {
-        (, , , bytes memory perChainData) = this.decodeV34Upgrade(_delegateCalldata(_txData));
+        (, , bytes memory perChainData) = this.decodeV34Upgrade(_delegateCalldata(_txData));
         return abi.decode(perChainData, (ZKChainSpecificForceDeploymentsData));
     }
 
@@ -400,9 +398,9 @@ abstract contract RegistryObjectsFixture is Test {
     /// @dev Decodes an `IL2V34Upgrade.upgrade` call into its arguments.
     function decodeV34Upgrade(
         bytes calldata _data
-    ) external pure returns (bool isZKsyncOS, address ctmDeployer, bytes memory fixedData, bytes memory chainData) {
+    ) external pure returns (address ctmDeployer, bytes memory fixedData, bytes memory chainData) {
         assertEq(bytes32(bytes4(_data[:4])), bytes32(IL2V34Upgrade.upgrade.selector), "delegate selector");
-        return abi.decode(_data[4:], (bool, address, bytes, bytes));
+        return abi.decode(_data[4:], (address, bytes, bytes));
     }
 
     // ─────────────────────────────── helpers ───────────────────────────────

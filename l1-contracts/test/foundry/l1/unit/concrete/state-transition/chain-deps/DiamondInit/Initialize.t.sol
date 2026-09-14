@@ -13,6 +13,7 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {EmptyAssetId, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 contract InitializeTest is DiamondInitTest {
     /// @dev Builds the standard genesis cut. Kept separate from the deploy so revert tests can
@@ -21,7 +22,7 @@ contract InitializeTest is DiamondInitTest {
         return
             Diamond.DiamondCutData({
                 facetCuts: facetCuts,
-                initAddress: address(new DiamondInit(false)),
+                initAddress: address(new DiamondInit()),
                 initCalldata: abi.encodeCall(DiamondInit.initialize, (_chainId, _admin))
             });
     }
@@ -133,6 +134,33 @@ contract InitializeTest is DiamondInitTest {
         assertEq(vm.load(address(utilsFacet), bytes32(uint256(23))), bytes32(0)); // __DEPRECATED_l2BootloaderBytecodeHash
         assertEq(vm.load(address(utilsFacet), bytes32(uint256(24))), bytes32(0)); // __DEPRECATED_l2DefaultAccountBytecodeHash
         assertEq(vm.load(address(utilsFacet), bytes32(uint256(58))), bytes32(0)); // __DEPRECATED_l2EvmEmulatorBytecodeHash
+        assertEq(vm.load(address(utilsFacet), bytes32(uint256(25))), bytes32(0)); // __DEPRECATED_zkPorterIsAvailable
+        assertEq(vm.load(address(utilsFacet), bytes32(uint256(59))), bytes32(0)); // __DEPRECATED_precommitmentForTheLatestBatch
+        // Slot 60 packs zksyncOS (byte 0) + l2DACommitmentScheme (byte 1) +
+        // __DEPRECATED_assetTracker (bytes 2-21). Fresh OS chains set zksyncOS to true.
+        assertEq(vm.load(address(utilsFacet), bytes32(uint256(60))), bytes32(uint256(1)));
+    }
+
+    /// @dev Pins the intra-slot packing of slot 60: writing the scheme through the storage struct
+    /// must land in byte 1 exactly, preserving the live `zksyncOS` flag at byte 0 and the
+    /// `__DEPRECATED_assetTracker` tombstone at bytes 2-21. A packing shift would corrupt or
+    /// misread compatibility state on an upgraded chain.
+    function test_slot60PackingPinnedAroundDeprecatedNeighbors() public {
+        vm.mockCall(
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(ICTMRelease.verifier.selector),
+            abi.encode(testnetVerifier)
+        );
+
+        UtilsFacet utilsFacet = UtilsFacet(_deployDiamondAsCtm(_buildCut(Utils.TEST_CHAIN_ID, Utils.TEST_CHAIN_ADMIN)));
+
+        utilsFacet.util_setL2DACommitmentScheme(L2DACommitmentScheme.PUBDATA_KECCAK256);
+
+        assertEq(
+            vm.load(address(utilsFacet), bytes32(uint256(60))),
+            bytes32(uint256(1) | (uint256(uint8(L2DACommitmentScheme.PUBDATA_KECCAK256)) << 8))
+        );
+        assertTrue(utilsFacet.util_getL2DACommimentScheme() == L2DACommitmentScheme.PUBDATA_KECCAK256);
     }
 
     /// @notice The genesis registry is mandatory: a CTM that pins none must make chain creation

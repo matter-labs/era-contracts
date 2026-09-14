@@ -5,7 +5,7 @@ import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
-import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {AddressIntrospector} from "deploy-scripts/utils/AddressIntrospector.sol";
@@ -28,16 +28,16 @@ contract UpgradeSimulation is Script {
             output.readBytes(".chain_upgrade_diamond_cut"),
             (Diamond.DiamondCutData)
         );
-        ZkChainAddresses memory witness = AddressIntrospector.getUptoDateZkChainAddresses(ChainTypeManagerBase(ctm));
+        ZkChainAddresses memory witness = AddressIntrospector.getUptoDateZkChainAddresses(ChainTypeManager(ctm));
         Call[] memory upgradeCalls = new Call[](1);
         upgradeCalls[0] = Call({
             target: witness.zkChainProxy,
             value: 0,
-            data: UpgradeChainCall.encode(witness.zkChainProxy, ChainTypeManagerBase(ctm).protocolVersion(), cut)
+            data: UpgradeChainCall.encode(witness.zkChainProxy, ChainTypeManager(ctm).protocolVersion(), cut)
         });
         Call[] memory createCalls = new Call[](1);
         createCalls[0] = createChainCall(ctm, witness.chainId, ZKSYNC_OS_TEST_CREATE_CHAIN_ID, msg.sender);
-        address bridgehub = ChainTypeManagerBase(ctm).BRIDGE_HUB();
+        address bridgehub = ChainTypeManager(ctm).BRIDGE_HUB();
         // Append an independent table; keyed writeToml would replace the rest of the package.
         vm.writeLine(
             outputPath,
@@ -65,7 +65,7 @@ contract UpgradeSimulation is Script {
         uint256 _newChainId,
         address _newChainAdmin
     ) public view returns (Call memory) {
-        IL1Bridgehub bridgehub = IL1Bridgehub(ChainTypeManagerBase(_ctm).BRIDGE_HUB());
+        IL1Bridgehub bridgehub = IL1Bridgehub(ChainTypeManager(_ctm).BRIDGE_HUB());
         return
             Call({
                 target: address(bridgehub),

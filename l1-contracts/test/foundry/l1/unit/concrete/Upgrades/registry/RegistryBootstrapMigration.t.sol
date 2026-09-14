@@ -104,7 +104,7 @@ contract ImplUnknown {
 ///         registry-driven model: implementation swaps, provenance anchor + genesis release,
 ///         version edge, the on-chain composed upgrade cut, and the authority handover to the
 ///         bound executors.
-/// @dev Driven against a REAL `ZKsyncOSChainTypeManager` and a real OpenZeppelin `ProxyAdmin` — the two
+/// @dev Driven against a REAL `ChainTypeManager` and a real OpenZeppelin `ProxyAdmin` — the two
 ///      contracts whose ownership the migration actually needs — rather than mocks, because the
 ///      property under test IS the authority movement.
 contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
@@ -225,7 +225,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                 genesis: ReleaseGenesisData({
                     fixedForceDeploymentsData: hex"f1f2",
                     genesisBatchHash: bytes32(uint256(1)),
-                    // ZKsyncOSChainTypeManager requires the commitment to be exactly 1.
+                    // ChainTypeManager requires the commitment to be exactly 1.
                     genesisBatchCommitment: bytes32(uint256(1)),
                     genesisIndexRepeatedStorageChanges: 54
                 }),

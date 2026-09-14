@@ -7,11 +7,10 @@ pragma solidity ^0.8.24;
 // deploy-script importers keep working unchanged.
 import {L2EcosystemContract, ZKsyncOSUpgradeType} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
-/// @notice System contracts that have ZKsyncOS-specific implementations in l1-contracts.
-///         These use EVM bytecodes (from l1-contracts/out/) for ZKsyncOS proxy upgrades.
-enum ZkSyncOsSystemContract {
+/// @notice Fixed-address L2 system contracts upgraded through `SystemContractProxy`.
+enum L2SystemContract {
     L2BaseToken,
     L1Messenger,
     SystemContext,
-    ContractDeployer
+    L2ComplexUpgrader
 }

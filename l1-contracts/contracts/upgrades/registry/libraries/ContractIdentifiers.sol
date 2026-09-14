@@ -29,8 +29,7 @@ enum L2EcosystemContract {
     DiamondProxy,
     ProxyAdmin,
     TransparentUpgradeableProxy,
-    // Atomic-interop built-ins, part of `getZKsyncOSOnlyContracts`: the commitment tree's storage is read
-    // by the ZKsync OS bootloader, and Era chains have no atomic interop.
+    // Atomic-interop built-ins; the bootloader reads the commitment tree's storage.
     L2InteropCommitmentTree,
     AtomicFlowManager,
     // ---- Appended members (the enum is append-only) ----
@@ -42,7 +41,10 @@ enum L2EcosystemContract {
     SystemContext,
     // The retired v31 GWAssetTracker's system proxy: its table row pins the neutralizing
     // implementation (`EmptyContract`) every release re-asserts at the reserved address.
-    RemovedGWAssetTracker
+    RemovedGWAssetTracker,
+    // The ComplexUpgrader (0x800f) behind its system proxy; see the ComplexUpgrader transition in
+    // {protocol-docs/chain-lifecycle.md}.
+    L2ComplexUpgrader
 }
 
 /// @notice Canonical identifier for CTM / state-transition contracts.

@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {ZKsyncOSChainTypeManagerSharedTest} from "../../state-transition/ChainTypeManager/_ZKsyncOSChainTypeManager_Shared.t.sol";
+import {ChainTypeManagerTest} from "../../state-transition/ChainTypeManager/_ChainTypeManager_Shared.t.sol";
 import {RegistryDrivenUpgradeTestBase} from "./RegistryDrivenUpgrade.t.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
@@ -39,7 +39,7 @@ import {
 ///         the L2 side (no transaction is committed) and the release the CTM is on.
 /// @dev Departs from the state the base fixture's first hop leaves behind (0.32.0 on the v32
 ///      release), so every scenario starts from a chain whose routing a REAL release describes.
-contract RegistryIndividualUpgradeTest is ZKsyncOSChainTypeManagerSharedTest, RegistryDrivenUpgradeTestBase {
+contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUpgradeTestBase {
     // keccak256("eip1967.proxy.implementation") - 1
     bytes32 internal constant EIP1967_IMPLEMENTATION_SLOT =
         0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
@@ -54,10 +54,10 @@ contract RegistryIndividualUpgradeTest is ZKsyncOSChainTypeManagerSharedTest, Re
         address currentRelease;
     }
 
-    // ── per-VM hooks (the ZKsync OS variant of the base fixture) ──
+    // ── fixture hooks ──
 
     function _deployFixture() internal override {
-        deployZKsyncOS();
+        deploy();
     }
 
     function _isZKsyncOSVariant() internal pure override returns (bool) {

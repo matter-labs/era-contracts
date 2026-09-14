@@ -11,7 +11,6 @@ import {CTM_CONTRACT_COUNT} from "../libraries/ContractIdentifiers.sol";
 import {TransitionDerivationLib} from "../libraries/TransitionDerivationLib.sol";
 import {L2PlanLib} from "../libraries/L2PlanLib.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
-import {IDiamondInit} from "../../../state-transition/chain-interfaces/IDiamondInit.sol";
 import {SemVer} from "../../../common/libraries/SemVer.sol";
 import {MAX_ALLOWED_MINOR_VERSION_DELTA} from "../../../common/Config.sol";
 import {
@@ -199,12 +198,6 @@ contract CTMTransition is ICTMTransition {
         // slither-disable-next-line unused-return
         (, bytes32 newBatchHash, bytes32 newCommitment, uint64 newIndex) = _newRelease.genesisParams();
         if (fromBatchHash != newBatchHash || fromCommitment != newCommitment || fromIndex != newIndex) {
-            revert PatchChangesL2GenesisState();
-        }
-        if (
-            IDiamondInit(_fromRelease.diamondInit()).IS_ZKSYNC_OS() !=
-            IDiamondInit(_newRelease.diamondInit()).IS_ZKSYNC_OS()
-        ) {
             revert PatchChangesL2GenesisState();
         }
     }

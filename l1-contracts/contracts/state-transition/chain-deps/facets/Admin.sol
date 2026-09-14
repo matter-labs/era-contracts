@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {ISelfDescribingFacet} from "../../chain-interfaces/ISelfDescribingFacet.sol";
-import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {
     L2DACommitmentScheme,
@@ -26,7 +25,6 @@ import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
 import {
     L1DAValidatorAddressIsZero,
     NotL1,
-    NotZKsyncOS,
     PriorityModeAlreadyAllowed,
     ExecutedIsNotConsistentWithVerified,
     VerifiedIsNotConsistentWithCommitted,
@@ -61,8 +59,6 @@ import {
 } from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
-import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
-import {AllowedBytecodeTypes, IL2ContractDeployer} from "../../../common/interfaces/IL2ContractDeployer.sol";
 import {IServerNotifier} from "../../../governance/IServerNotifier.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -156,13 +152,6 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
     }
 
     /// @inheritdoc IAdmin
-    function setPorterAvailability(bool _zkPorterIsAvailable) external onlyChainTypeManager {
-        // Change the porter availability
-        s.zkPorterIsAvailable = _zkPorterIsAvailable;
-        emit IsPorterAvailableStatusUpdate(_zkPorterIsAvailable);
-    }
-
-    /// @inheritdoc IAdmin
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external onlyChainTypeManager onlyL1 {
         if (_newPriorityTxMaxGasLimit > MAX_GAS_PER_TRANSACTION) {
             revert TooMuchGas();
@@ -174,7 +163,7 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
     }
 
     /// @inheritdoc IAdmin
-    function setZKsyncOSMaxTxGasLimit(uint64 _newMaxTxGasLimit) external onlyAdmin onlySettlementLayer onlyZKsyncOS {
+    function setZKsyncOSMaxTxGasLimit(uint64 _newMaxTxGasLimit) external onlyAdmin onlySettlementLayer {
         // The cap may only be raised above Ethereum's EIP-7825 single-tx gas limit, never below.
         if (_newMaxTxGasLimit < ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT) {
             revert ZKsyncOSMaxTxGasLimitTooLow();
@@ -378,13 +367,6 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
             revert InvalidL2DACommitmentScheme(_l2DACommitmentScheme);
         }
 
-        // `BLOBS_ZKSYNC_OS` is only supported on ZKsync OS, where the STF interprets the scheme. It has
-        // no commitment implementation on the Era VM (`L2DAValidator.makeDACommitment` reverts for it),
-        // so reject it here to avoid configuring an unusable DA pair.
-        if (_l2DACommitmentScheme == L2DACommitmentScheme.BLOBS_ZKSYNC_OS && !s.zksyncOS) {
-            revert NotZKsyncOS();
-        }
-
         if (s.isPermanentRollup && !ROLLUP_DA_MANAGER.isPairAllowed(_l1DAValidator, _l2DACommitmentScheme)) {
             revert InvalidDAForPermanentRollup();
         }
@@ -393,7 +375,7 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
     }
 
     /// @inheritdoc IAdmin
-    function setPubdataContent(PubdataContent _pubdataContent) external onlyAdmin onlyZKsyncOS {
+    function setPubdataContent(PubdataContent _pubdataContent) external onlyAdmin {
         // A permanent rollup is locked to `FULL_PUBDATA` — its pubdata content can never be changed (in particular it
         // can never be relaxed to `LOGS_ONLY`), mirroring how the permanent-rollup flag itself is one-way.
         if (s.isPermanentRollup) {
@@ -438,7 +420,7 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
     }
 
     /// @inheritdoc IAdmin
-    function permanentlyAllowPriorityMode() external onlyAdmin onlySettlementLayer onlyL1 onlyZKsyncOS {
+    function permanentlyAllowPriorityMode() external onlyAdmin onlySettlementLayer onlyL1 {
         if (s.priorityModeInfo.canBeActivated) {
             revert PriorityModeAlreadyAllowed();
         }
@@ -501,15 +483,6 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
         // to commit, prove, and execute batches in one go.
         _revertBatches(s.totalBatchesExecuted);
         emit PriorityModeActivated();
-    }
-
-    /// @inheritdoc IAdmin
-    function allowEvmEmulation() external onlyAdmin onlyL1 notPriorityMode onlyEra returns (bytes32 canonicalTxHash) {
-        canonicalTxHash = IMailbox(address(this)).requestL2ServiceTransaction(
-            L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
-            abi.encodeCall(IL2ContractDeployer.setAllowedBytecodeTypesToDeploy, AllowedBytecodeTypes.EraVmAndEVM)
-        );
-        emit EnableEvmEmulator();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -612,7 +585,6 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
     ///      0xf9afb97e ROLLUP_DA_MANAGER()
     ///      0x0e18b681 acceptAdmin()
     ///      0x60eae0e7 activatePriorityMode()
-    ///      0x5b898748 allowEvmEmulation()
     ///      0x64bf8d66 changeFeeParams((uint8,uint32,uint32,uint32,uint32,uint64))
     ///      0x23b31192 deactivatePriorityMode()
     ///      0xa9f6d941 executeUpgrade(((address,uint8,bool,bytes4[])[],address,bytes))
@@ -623,19 +595,19 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
     ///      0x1b48b94a permanentlyAllowPriorityMode()
     ///      0x2765d079 setDAValidatorPair(address,uint8)
     ///      0x4dd18bf5 setPendingAdmin(address)
-    ///      0x1cc5d103 setPorterAvailability(bool)
     ///      0xc5f1f1f5 setPriorityModeTransactionFilterer(address)
     ///      0xbe6f11cf setPriorityTxMaxGasLimit(uint256)
+    ///      0xe51935f5 setPubdataContent(uint8)
     ///      0xe76db865 setPubdataPricingMode(uint8)
     ///      0x235d9eb5 setTokenMultiplier(uint128,uint128)
     ///      0x21f603d7 setTransactionFilterer(address)
     ///      0x4623c91d setValidator(address,bool)
-    ///      0x054e80a3 setZKsyncOSPreV31TotalSupply(uint256)
+    ///      0x2f257a5c setZKsyncOSMaxTxGasLimit(uint64)
     ///      0x17338945 unfreezeDiamond()
     ///      0x03129ad9 upgradeChainFromVersion(address,uint256)
     function selectors() public pure returns (bytes4[] memory result) {
         bytes
-            memory packed = hex"03129ad90e18b681173389451b48b94a1cc5d10321f603d7235d9eb523b311922765d07927ae4c162878fe742f257a5c4623c91d4dd18bf55b89874860eae0e764bf8d666e762e98a9f6d941b4fcb577be6f11cfc5f1f1f5e51935f5e76db865f9afb97e";
+            memory packed = hex"03129ad90e18b681173389451b48b94a21f603d7235d9eb523b311922765d07927ae4c162878fe742f257a5c4623c91d4dd18bf560eae0e764bf8d666e762e98a9f6d941b4fcb577be6f11cfc5f1f1f5e51935f5e76db865f9afb97e";
         uint256 count = packed.length / 4;
         result = new bytes4[](count);
         for (uint256 i = 0; i < count; ++i) {

@@ -33,7 +33,6 @@ contract ZKChainDeployer is L1ContractDeployer {
         address validatorSenderOperatorExecute;
         uint128 baseTokenGasPriceMultiplierNominator;
         uint128 baseTokenGasPriceMultiplierDenominator;
-        bool allowEvmEmulator;
     }
 
     ChainConfig internal eraConfig;
@@ -154,8 +153,7 @@ contract ZKChainDeployer is L1ContractDeployer {
             validatorSenderOperatorProve: address(2),
             validatorSenderOperatorExecute: address(3),
             baseTokenGasPriceMultiplierNominator: uint128(1),
-            baseTokenGasPriceMultiplierDenominator: uint128(1),
-            allowEvmEmulator: false
+            baseTokenGasPriceMultiplierDenominator: uint128(1)
         });
     }
 
@@ -189,8 +187,6 @@ contract ZKChainDeployer is L1ContractDeployer {
         );
         vm.serializeUint("chain", "governance_min_delay", 0);
         vm.serializeAddress("chain", "governance_security_council_address", address(0));
-
-        vm.serializeBool("chain", "allow_evm_emulator", description.allowEvmEmulator);
 
         string memory single_serialized = vm.serializeUint(
             "chain",
@@ -242,7 +238,7 @@ contract ZKChainDeployer is L1ContractDeployer {
             ecosystemConfig.contracts.diamondCutData,
             (Diamond.DiamondCutData)
         );
-        // Composed exactly as ChainTypeManagerBase._deployNewChain does: only (chainId, admin).
+        // Composed exactly as ChainTypeManager._deployNewChain does: only (chainId, admin).
         // DiamondInit reads everything else from the CTM — msg.sender during the proxy
         // construction, hence the prank — and from the genesis registry / bridgehub it points
         // at. The bridgehub's asset-id lookup is mocked since this helper bypasses

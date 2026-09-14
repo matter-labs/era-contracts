@@ -167,7 +167,7 @@ const DETERMINISTIC_SOURCES = [
   // Bootstrap stage: the manifest pins the fresh CTM implementation's codehash (proxy row) and
   // the bootstrap engine's (`upgradeEngine`); the legacy facet rides along for uniform
   // reproducibility of the committed addresses.
-  "contracts/state-transition/ZKsyncOSChainTypeManager.sol",
+  "contracts/state-transition/ChainTypeManager.sol",
   "contracts/dev-contracts/test/LegacyTestAdminFacet.sol",
   "contracts/upgrades/BootstrapUpgradeZKsyncOS.sol",
 ];
@@ -929,7 +929,7 @@ async function deployUpgradeMachinery(
     deployFrom(name, getDeterministicCreationBytecode(name), args);
 
   // Live CTM immutables for the bootstrap's fresh implementation.
-  const liveCtm = new ethers.Contract(params.ctm, getAbi("ZKsyncOSChainTypeManager"), deployer.provider);
+  const liveCtm = new ethers.Contract(params.ctm, getAbi("ChainTypeManager"), deployer.provider);
 
   // NOTE: the deploy ORDER below is part of the committed manifest's contract: the deployer
   // key + starting nonce are fixed by the chain states, so each contract's address is a pure
@@ -1028,7 +1028,7 @@ async function deployUpgradeMachinery(
     // the `DefaultUpgrade` storage/L2 part.
     bootstrapEngine: await deployPinned("BootstrapUpgradeZKsyncOS", [bootstrapRelease]),
     // The bootstrap's proxy row: the CTM's own implementation swap, built with live immutables.
-    ctmImplNew: await deployPinned("ZKsyncOSChainTypeManager", [
+    ctmImplNew: await deployPinned("ChainTypeManager", [
       params.bridgehub,
       await liveCtm.INTEROP_CENTER(),
       await liveCtm.L1_BYTECODES_SUPPLIER(),
@@ -1246,7 +1246,7 @@ async function buildRegistryManifest(
           genesis: {
             genesisUpgrade: { address: live.genesisUpgrade, codehash: await codehash(live.genesisUpgrade) },
             batchHash: ethers.utils.hexZeroPad("0x01", 32),
-            // ZKsyncOSChainTypeManager requires the genesis batch commitment to be exactly 1.
+            // ChainTypeManager requires the genesis batch commitment to be exactly 1.
             batchCommitment: ethers.utils.hexZeroPad("0x01", 32),
             indexRepeatedStorageChanges: 54,
           },

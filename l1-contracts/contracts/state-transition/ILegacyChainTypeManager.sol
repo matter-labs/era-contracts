@@ -9,7 +9,7 @@ import {Diamond} from "./libraries/Diamond.sol";
 ///         all of this from its genesis `CTMRegistry` instead (see `IChainTypeManager`).
 /// @dev Retained only so the legacy `deploy-scripts/upgrade/default-upgrade` pipeline can still
 ///      encode `setChainCreationParams` governance calls against pre-v32 CTM deployments. The
-///      current `ChainTypeManagerBase` does NOT implement `setChainCreationParams`.
+///      current `ChainTypeManager` does NOT implement `setChainCreationParams`.
 /// @param genesisUpgrade The address used as the diamond cut initialize address on chain creation
 /// @param genesisBatchHash Batch hash of the genesis (initial) batch
 /// @param genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for the genesis batch

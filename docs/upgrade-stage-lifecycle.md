@@ -12,7 +12,7 @@ operational policies the lifecycle relies on and neither of those documents owns
 
 The stages stop chain migrations while a CTM's version moves — a chain crossing settlement layers
 mid-edge would land with an inconsistent version, which is why
-`ChainTypeManagerBase._commitVersionEdge` refuses to run unpaused.
+`ChainTypeManager._commitVersionEdge` refuses to run unpaused.
 
 The state lives on the shared `L1ChainAssetHandler`, because that is where migrations execute
 (`bridgeBurn` / `bridgeMint`), and it is keyed on TWO axes because two authorities have a

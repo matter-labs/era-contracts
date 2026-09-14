@@ -16,6 +16,11 @@ contract ReleaseMemberReuseHarness is DefaultCTMUpgrade {
     function requireDeclaredReleaseMemberChange(string memory _name, address _live) public {
         _requireDeclaredReleaseMemberChange(_name, _live);
     }
+
+    /// @dev The L1 chain id the facets' constructor args are derived from; nothing loads a config here.
+    function setL1ChainId(uint256 _l1ChainId) public {
+        config.l1ChainId = _l1ChainId;
+    }
 }
 
 /// @dev A version that sets out to change exactly one member.
@@ -101,12 +106,14 @@ contract ReleaseMemberReuseTest is Test {
 
     /// @dev Why the predicate DEPLOYS a probe instead of comparing artifacts: a member whose code
     ///      carries immutables has those slots ZEROED in the artifact's `deployedBytecode`, so the
-    ///      artifact's codehash never equals the live one. `DiamondInit` pins its VM flag that way.
+    ///      artifact's codehash never equals the live one. `CommitterFacet` pins the L1 chain id
+    ///      that way.
     function test_reusesAnImmutableCarryingMemberTheArtifactCannotDescribe() public {
-        address live = _deployFromArtifact("DiamondInit.sol", "DiamondInit", abi.encode(true));
-        assertTrue(harness.canReuseReleaseMember("DiamondInit", live), "identical code must be reused");
+        harness.setL1ChainId(block.chainid);
+        address live = _deployFromArtifact("Committer.sol", "CommitterFacet", abi.encode(block.chainid));
+        assertTrue(harness.canReuseReleaseMember("CommitterFacet", live), "identical code must be reused");
         assertTrue(
-            live.codehash != BytecodeUtils.getDeployedBytecodeHash("DiamondInit.sol", "DiamondInit"),
+            live.codehash != BytecodeUtils.getDeployedBytecodeHash("Committer.sol", "CommitterFacet"),
             "an artifact comparison would have called this member changed"
         );
     }

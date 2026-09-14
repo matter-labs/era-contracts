@@ -77,6 +77,7 @@ interface IChainTypeManager {
     /// @notice Updated ProtocolVersion deadline
     event UpdateProtocolVersionDeadline(uint256 indexed protocolVersion, uint256 deadline);
 
+    /// @return Whether this CTM deploys ZKsync OS chains.
     function isZKsyncOS() external pure returns (bool);
 
     function BRIDGE_HUB() external view returns (address);
@@ -182,8 +183,6 @@ interface IChainTypeManager {
     function changeFeeParams(uint256 _chainId, FeeParams calldata _newFeeParams) external;
 
     function setValidator(uint256 _chainId, address _validator, bool _active) external;
-
-    function setPorterAvailability(uint256 _chainId, bool _zkPorterIsAvailable) external;
 
     function deactivatePriorityMode(uint256 _chainId) external;
 

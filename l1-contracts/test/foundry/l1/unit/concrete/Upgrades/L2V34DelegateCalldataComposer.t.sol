@@ -37,7 +37,7 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
     bytes internal constant OTHER_FIXED_FORCE_DEPLOYMENTS_DATA = hex"0a0b";
 
     function setUp() public {
-        _setUpRegistryObjects(true, "");
+        _setUpRegistryObjects("");
         bridgehub = makeAddr("bridgehub");
         _mockEcosystemForComposer(bridgehub, ctmDeployerStub);
         release = new CTMRelease(_releaseManifest(FIXED_FORCE_DEPLOYMENTS_DATA, _pinned("verifier")));
@@ -61,14 +61,11 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
             composed,
             abi.encodeCall(
                 IL2V34Upgrade.upgrade,
-                (true, ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(ETH_CHAIN_ID))
+                (ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(ETH_CHAIN_ID))
             ),
             "the v34 delegate call must be the ZKsync OS upgrade with the release's fixed data and the chain's data"
         );
-        (bool isZKsyncOS, address deployer, bytes memory fixedData, bytes memory chainData) = this.decodeV34Upgrade(
-            composed
-        );
-        assertTrue(isZKsyncOS, "the repository is ZKsync-OS-only, so the VM flag is fixed");
+        (address deployer, bytes memory fixedData, bytes memory chainData) = this.decodeV34Upgrade(composed);
         assertEq(deployer, ctmDeployerStub, "the CTM deployer is the Bridgehub's live tracker");
         assertEq(fixedData, FIXED_FORCE_DEPLOYMENTS_DATA, "the fixed data is the release's pinned payload");
         ZKChainSpecificForceDeploymentsData memory data = abi.decode(chainData, (ZKChainSpecificForceDeploymentsData));
@@ -97,10 +94,10 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
             composed,
             abi.encodeCall(
                 IL2V34Upgrade.upgrade,
-                (true, ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(ERC20_CHAIN_ID))
+                (ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(ERC20_CHAIN_ID))
             )
         );
-        (, , , bytes memory chainData) = this.decodeV34Upgrade(composed);
+        (, , bytes memory chainData) = this.decodeV34Upgrade(composed);
         ZKChainSpecificForceDeploymentsData memory data = abi.decode(chainData, (ZKChainSpecificForceDeploymentsData));
         assertEq(data.baseTokenMetadata.name, ERC20_NAME, "metadata not read from the local token");
         assertEq(data.baseTokenMetadata.symbol, ERC20_SYMBOL, "wrong symbol");
@@ -125,7 +122,7 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
             v34Composer.composeDelegateCalldata(ICTMRelease(address(otherRelease)), bridgehub, ETH_CHAIN_ID),
             abi.encodeCall(
                 IL2V34Upgrade.upgrade,
-                (true, ctmDeployerStub, OTHER_FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(ETH_CHAIN_ID))
+                (ctmDeployerStub, OTHER_FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(ETH_CHAIN_ID))
             ),
             "the fixed data follows the release"
         );
@@ -133,7 +130,7 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
             v34Composer.composeDelegateCalldata(ICTMRelease(address(release)), otherBridgehub, ETH_CHAIN_ID),
             abi.encodeCall(
                 IL2V34Upgrade.upgrade,
-                (true, otherDeployer, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(ETH_CHAIN_ID))
+                (otherDeployer, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(ETH_CHAIN_ID))
             ),
             "the CTM deployer follows the Bridgehub"
         );
@@ -154,12 +151,10 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
         );
 
         assertTrue(keccak256(forEthChain) != keccak256(forErc20Chain), "two chains must not share a call");
-        (bool ethFlag, address ethDeployer, bytes memory ethFixed, bytes memory ethChainData) = this.decodeV34Upgrade(
-            forEthChain
+        (address ethDeployer, bytes memory ethFixed, bytes memory ethChainData) = this.decodeV34Upgrade(forEthChain);
+        (address erc20Deployer, bytes memory erc20Fixed, bytes memory erc20ChainData) = this.decodeV34Upgrade(
+            forErc20Chain
         );
-        (bool erc20Flag, address erc20Deployer, bytes memory erc20Fixed, bytes memory erc20ChainData) = this
-            .decodeV34Upgrade(forErc20Chain);
-        assertEq(ethFlag, erc20Flag, "the VM flag is ecosystem-wide");
         assertEq(ethDeployer, erc20Deployer, "the CTM deployer is ecosystem-wide");
         assertEq(ethFixed, erc20Fixed, "the fixed data is ecosystem-wide");
         assertEq(ethChainData, _expectedPerChainData(ETH_CHAIN_ID), "the ETH chain's data");
@@ -222,7 +217,7 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
                     plan.delegateTo,
                     abi.encodeCall(
                         IL2V34Upgrade.upgrade,
-                        (true, ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(ETH_CHAIN_ID))
+                        (ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(ETH_CHAIN_ID))
                     )
                 )
             ),

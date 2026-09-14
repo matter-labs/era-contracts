@@ -20,8 +20,6 @@ struct GatewayCTMDeployerConfig {
     uint256 l1ChainId;
     /// @notice Flag indicating whether to use the testnet verifier.
     bool testnetVerifier;
-    /// @notice Flag indicating whether to use ZKsync OS mode.
-    bool isZKsyncOS;
     // Facet selector lists are intentionally absent: the genesis cut installs no facets directly.
     // The Gateway CTM points at a genesis release (deployed and pinned by this deployer), and
     // `DiamondInit` reads each facet's own `ISelfDescribingFacet.selectors()` at chain creation —
@@ -113,8 +111,6 @@ struct GatewayVerifiersDeployerConfig {
     address aliasedGovernanceAddress;
     /// @notice Flag indicating whether to use the testnet verifier.
     bool testnetVerifier;
-    /// @notice Flag indicating whether to use ZKsync OS mode.
-    bool isZKsyncOS;
 }
 
 // ============ CTM Deployer ============

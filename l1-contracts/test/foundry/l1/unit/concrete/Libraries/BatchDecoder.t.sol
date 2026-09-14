@@ -5,9 +5,10 @@ import {Test} from "forge-std/Test.sol";
 
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {CommitBatchInfo, PrecommitInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {InteropRoot} from "contracts/common/Messaging.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {
     EmptyData,
     IncorrectBatchBounds,
@@ -22,16 +23,16 @@ contract BatchDecoderTest is Test {
 
     function test_decodeAndCheckCommitData_basicValues() public {
         IExecutor.StoredBatchInfo memory lastBatch = _createStoredBatchInfo(10);
-        CommitBatchInfo[] memory newBatches = new CommitBatchInfo[](2);
-        newBatches[0] = _createCommitBatchInfo(11);
-        newBatches[1] = _createCommitBatchInfo(12);
+        CommitBatchInfoZKsyncOS[] memory newBatches = new CommitBatchInfoZKsyncOS[](2);
+        newBatches[0] = _createCommitBatchInfoZKsyncOS(11);
+        newBatches[1] = _createCommitBatchInfoZKsyncOS(12);
 
         bytes memory encodedData = abi.encodePacked(
-            BatchDecoder.SUPPORTED_ENCODING_VERSION,
+            BatchDecoder.SUPPORTED_ENCODING_VERSION_COMMIT,
             abi.encode(lastBatch, newBatches)
         );
 
-        (IExecutor.StoredBatchInfo memory decodedLastBatch, CommitBatchInfo[] memory decodedNewBatches) = this
+        (IExecutor.StoredBatchInfo memory decodedLastBatch, CommitBatchInfoZKsyncOS[] memory decodedNewBatches) = this
             .externalDecodeAndCheckCommitData(encodedData, 11, 12);
 
         assertEq(decodedLastBatch.batchNumber, 10);
@@ -42,15 +43,15 @@ contract BatchDecoderTest is Test {
 
     function test_decodeAndCheckCommitData_singleBatch() public {
         IExecutor.StoredBatchInfo memory lastBatch = _createStoredBatchInfo(5);
-        CommitBatchInfo[] memory newBatches = new CommitBatchInfo[](1);
-        newBatches[0] = _createCommitBatchInfo(6);
+        CommitBatchInfoZKsyncOS[] memory newBatches = new CommitBatchInfoZKsyncOS[](1);
+        newBatches[0] = _createCommitBatchInfoZKsyncOS(6);
 
         bytes memory encodedData = abi.encodePacked(
-            BatchDecoder.SUPPORTED_ENCODING_VERSION,
+            BatchDecoder.SUPPORTED_ENCODING_VERSION_COMMIT,
             abi.encode(lastBatch, newBatches)
         );
 
-        (IExecutor.StoredBatchInfo memory decodedLastBatch, CommitBatchInfo[] memory decodedNewBatches) = this
+        (IExecutor.StoredBatchInfo memory decodedLastBatch, CommitBatchInfoZKsyncOS[] memory decodedNewBatches) = this
             .externalDecodeAndCheckCommitData(encodedData, 6, 6);
 
         assertEq(decodedLastBatch.batchNumber, 5);
@@ -68,8 +69,8 @@ contract BatchDecoderTest is Test {
     function test_decodeAndCheckCommitData_revertsOnUnsupportedVersion() public {
         uint8 unsupportedVersion = 99;
         IExecutor.StoredBatchInfo memory lastBatch = _createStoredBatchInfo(10);
-        CommitBatchInfo[] memory newBatches = new CommitBatchInfo[](1);
-        newBatches[0] = _createCommitBatchInfo(11);
+        CommitBatchInfoZKsyncOS[] memory newBatches = new CommitBatchInfoZKsyncOS[](1);
+        newBatches[0] = _createCommitBatchInfoZKsyncOS(11);
 
         bytes memory encodedData = abi.encodePacked(unsupportedVersion, abi.encode(lastBatch, newBatches));
 
@@ -77,14 +78,31 @@ contract BatchDecoderTest is Test {
         this.externalDecodeAndCheckCommitData(encodedData, 11, 11);
     }
 
-    function test_decodeAndCheckCommitData_revertsOnIncorrectBounds() public {
+    /// @notice The retired EraVM commit encoding byte must stay rejected, never silently decoded.
+    function test_decodeAndCheckCommitData_revertsOnRetiredEraEncoding() public {
         IExecutor.StoredBatchInfo memory lastBatch = _createStoredBatchInfo(10);
-        CommitBatchInfo[] memory newBatches = new CommitBatchInfo[](2);
-        newBatches[0] = _createCommitBatchInfo(11);
-        newBatches[1] = _createCommitBatchInfo(12);
+        CommitBatchInfoZKsyncOS[] memory newBatches = new CommitBatchInfoZKsyncOS[](1);
+        newBatches[0] = _createCommitBatchInfoZKsyncOS(11);
 
         bytes memory encodedData = abi.encodePacked(
             BatchDecoder.SUPPORTED_ENCODING_VERSION,
+            abi.encode(lastBatch, newBatches)
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(UnsupportedCommitBatchEncoding.selector, BatchDecoder.SUPPORTED_ENCODING_VERSION)
+        );
+        this.externalDecodeAndCheckCommitData(encodedData, 11, 11);
+    }
+
+    function test_decodeAndCheckCommitData_revertsOnIncorrectBounds() public {
+        IExecutor.StoredBatchInfo memory lastBatch = _createStoredBatchInfo(10);
+        CommitBatchInfoZKsyncOS[] memory newBatches = new CommitBatchInfoZKsyncOS[](2);
+        newBatches[0] = _createCommitBatchInfoZKsyncOS(11);
+        newBatches[1] = _createCommitBatchInfoZKsyncOS(12);
+
+        bytes memory encodedData = abi.encodePacked(
+            BatchDecoder.SUPPORTED_ENCODING_VERSION_COMMIT,
             abi.encode(lastBatch, newBatches)
         );
 
@@ -95,10 +113,10 @@ contract BatchDecoderTest is Test {
 
     function test_decodeAndCheckCommitData_revertsOnEmptyNewBatches() public {
         IExecutor.StoredBatchInfo memory lastBatch = _createStoredBatchInfo(10);
-        CommitBatchInfo[] memory newBatches = new CommitBatchInfo[](0);
+        CommitBatchInfoZKsyncOS[] memory newBatches = new CommitBatchInfoZKsyncOS[](0);
 
         bytes memory encodedData = abi.encodePacked(
-            BatchDecoder.SUPPORTED_ENCODING_VERSION,
+            BatchDecoder.SUPPORTED_ENCODING_VERSION_COMMIT,
             abi.encode(lastBatch, newBatches)
         );
 
@@ -281,36 +299,13 @@ contract BatchDecoderTest is Test {
         this.externalDecodeAndCheckExecuteData(encodedData, 1, 1);
     }
 
-    // ============ decodeAndCheckPrecommitData Tests ============
-
-    function test_decodeAndCheckPrecommitData_basicValues() public {
-        PrecommitInfo memory precommitInfo = _createPrecommitInfo();
-
-        bytes memory encodedData = abi.encodePacked(BatchDecoder.SUPPORTED_ENCODING_VERSION, abi.encode(precommitInfo));
-
-        PrecommitInfo memory decodedPrecommit = this.externalDecodeAndCheckPrecommitData(encodedData);
-
-        assertEq(decodedPrecommit.packedTxsCommitments, precommitInfo.packedTxsCommitments);
-        assertEq(decodedPrecommit.untrustedLastL2BlockNumberHint, precommitInfo.untrustedLastL2BlockNumberHint);
-    }
-
-    function test_decodeAndCheckPrecommitData_revertsOnUnsupportedVersion() public {
-        uint8 unsupportedVersion = 99;
-        PrecommitInfo memory precommitInfo = _createPrecommitInfo();
-
-        bytes memory encodedData = abi.encodePacked(unsupportedVersion, abi.encode(precommitInfo));
-
-        vm.expectRevert(abi.encodeWithSelector(UnsupportedCommitBatchEncoding.selector, unsupportedVersion));
-        this.externalDecodeAndCheckPrecommitData(encodedData);
-    }
-
     // ============ External Wrappers (for calldata) ============
 
     function externalDecodeAndCheckCommitData(
         bytes calldata _commitData,
         uint256 _processBatchFrom,
         uint256 _processBatchTo
-    ) external pure returns (IExecutor.StoredBatchInfo memory, CommitBatchInfo[] memory) {
+    ) external pure returns (IExecutor.StoredBatchInfo memory, CommitBatchInfoZKsyncOS[] memory) {
         return BatchDecoder.decodeAndCheckCommitData(_commitData, _processBatchFrom, _processBatchTo);
     }
 
@@ -330,12 +325,6 @@ contract BatchDecoderTest is Test {
         return BatchDecoder.decodeAndCheckExecuteData(_executeData, _processBatchFrom, _processBatchTo);
     }
 
-    function externalDecodeAndCheckPrecommitData(
-        bytes calldata _precommitData
-    ) external pure returns (PrecommitInfo memory) {
-        return BatchDecoder.decodeAndCheckPrecommitData(_precommitData);
-    }
-
     // ============ Helper Functions ============
 
     function _createStoredBatchInfo(uint64 batchNumber) internal pure returns (IExecutor.StoredBatchInfo memory) {
@@ -353,23 +342,25 @@ contract BatchDecoderTest is Test {
             });
     }
 
-    function _createCommitBatchInfo(uint64 batchNumber) internal pure returns (CommitBatchInfo memory) {
+    function _createCommitBatchInfoZKsyncOS(uint64 batchNumber) internal pure returns (CommitBatchInfoZKsyncOS memory) {
         return
-            CommitBatchInfo({
+            CommitBatchInfoZKsyncOS({
                 batchNumber: batchNumber,
-                timestamp: uint64(batchNumber) * 100,
-                indexRepeatedStorageChanges: 0,
-                newStateRoot: bytes32(0),
+                newStateCommitment: keccak256(abi.encodePacked(batchNumber)),
                 numberOfLayer1Txs: 0,
+                numberOfLayer2Txs: 0,
                 priorityOperationsHash: bytes32(0),
-                bootloaderHeapInitialContentsHash: bytes32(0),
-                eventsQueueStateHash: bytes32(0),
-                systemLogs: "",
-                operatorDAInput: ""
+                dependencyRootsRollingHash: bytes32(0),
+                l2LogsTreeRoot: bytes32(0),
+                daCommitmentScheme: L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256,
+                daCommitment: bytes32(0),
+                firstBlockTimestamp: uint64(batchNumber) * 100,
+                firstBlockNumber: uint64(batchNumber) * 10,
+                lastBlockTimestamp: uint64(batchNumber) * 100 + 1,
+                lastBlockNumber: uint64(batchNumber) * 10 + 1,
+                chainId: 9,
+                operatorDAInput: "",
+                slChainId: 1
             });
-    }
-
-    function _createPrecommitInfo() internal pure returns (PrecommitInfo memory) {
-        return PrecommitInfo({packedTxsCommitments: bytes("test_commitments"), untrustedLastL2BlockNumberHint: 12345});
     }
 }

@@ -12,14 +12,11 @@ import {L2GenesisForceDeploymentsHelper} from "./L2GenesisForceDeploymentsHelper
 contract L2V34Upgrade is IL2V34Upgrade {
     /// @inheritdoc IL2V34Upgrade
     function upgrade(
-        bool _isZKsyncOS,
         address _ctmDeployer,
         bytes calldata _fixedForceDeploymentsData,
         bytes calldata _additionalForceDeploymentsData
     ) external {
-        // solhint-disable-next-line func-named-parameters
         L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
-            _isZKsyncOS,
             _ctmDeployer,
             _fixedForceDeploymentsData,
             _additionalForceDeploymentsData,

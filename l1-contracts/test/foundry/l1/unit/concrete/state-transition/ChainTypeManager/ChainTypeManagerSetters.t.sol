@@ -95,20 +95,6 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
         assertTrue(isActive);
     }
 
-    // setPorterAvailability
-    function test_SuccessfulSetPorterAvailability() public {
-        address chainAddress = createNewChain(getDiamondCutData(diamondInit));
-        UtilsFacet utilsFacet = UtilsFacet(chainAddress);
-
-        _mockGetZKChainFromBridgehub(chainAddress);
-
-        vm.prank(governor);
-        chainContractAddress.setPorterAvailability(chainId, true);
-
-        bool isAvailable = utilsFacet.util_getZkPorterAvailability();
-        assertTrue(isAvailable);
-    }
-
     // deactivatePriorityMode
     function test_SuccessfulDeactivatePriorityMode() public {
         address chainAddress = createNewChain(getDiamondCutData(diamondInit));

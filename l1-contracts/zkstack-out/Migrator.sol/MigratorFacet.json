@@ -455,11 +455,6 @@
   },
   {
     "type": "error",
-    "name": "NotEraChain",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "NotHistoricalRoot",
     "inputs": [
       {
@@ -530,6 +525,11 @@
   {
     "type": "error",
     "name": "RemovingPermanentRestriction",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "SettlementLayerCTMMismatch",
     "inputs": []
   },
   {

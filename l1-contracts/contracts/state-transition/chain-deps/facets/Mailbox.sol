@@ -17,11 +17,9 @@ import {
     WritePriorityOpParams
 } from "../../../common/Messaging.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
-import {L2ContractHelper} from "../../../common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {
-    MAX_NEW_FACTORY_DEPS,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     SERVICE_TRANSACTION_SENDER,
     SETTLEMENT_LAYER_RELAY_SENDER,
@@ -33,7 +31,7 @@ import {
     AddressNotZero,
     GasPerPubdataMismatch,
     MsgValueTooLow,
-    TooManyFactoryDeps,
+    FactoryDepsNotSupported,
     TransactionNotAllowed,
     ValueMismatch,
     ZeroAddress
@@ -245,10 +243,6 @@ contract MailboxFacet is ZKChainBase, IMailbox, ISelfDescribingFacet {
     function _requestL2Transaction(WritePriorityOpParams memory _params) internal returns (bytes32 canonicalTxHash) {
         BridgehubL2TransactionRequest memory request = _params.request;
 
-        // For ZKsync OS factory deps will be ignored
-        if (request.factoryDeps.length > MAX_NEW_FACTORY_DEPS) {
-            revert TooManyFactoryDeps();
-        }
         _params.txId = _nextPriorityTxId();
 
         // Checking that the user provided enough ether to pay for the transaction.
@@ -282,7 +276,6 @@ contract MailboxFacet is ZKChainBase, IMailbox, ISelfDescribingFacet {
             ? refundRecipient
             : AddressAliasHelper.applyRefundRecipientAlias(refundRecipient, is7702AccountRefundRecipient);
         // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
-        // Please note, currently ZKsync address derivation is different from Ethereum one, but it may be changed in the future.
         // solhint-disable avoid-tx-origin
         // slither-disable-next-line tx-origin
         if (request.sender != tx.origin && !is7702AccountSender) {
@@ -322,8 +315,11 @@ contract MailboxFacet is ZKChainBase, IMailbox, ISelfDescribingFacet {
 
     function _serializeL2Transaction(
         WritePriorityOpParams memory _priorityOpParams
-    ) internal view returns (L2CanonicalTransaction memory transaction) {
+    ) internal pure returns (L2CanonicalTransaction memory transaction) {
         BridgehubL2TransactionRequest memory request = _priorityOpParams.request;
+        if (request.factoryDeps.length != 0) {
+            revert FactoryDepsNotSupported();
+        }
         transaction = L2CanonicalTransaction({
             txType: _getPriorityTxType(),
             from: uint256(uint160(request.sender)),
@@ -339,7 +335,7 @@ contract MailboxFacet is ZKChainBase, IMailbox, ISelfDescribingFacet {
             reserved: [request.mintValue, uint256(uint160(request.refundRecipient)), 0, 0],
             data: request.l2Calldata,
             signature: new bytes(0),
-            factoryDeps: L2ContractHelper.hashFactoryDeps(request.factoryDeps),
+            factoryDeps: new uint256[](0),
             paymasterInput: new bytes(0),
             reservedDynamic: new bytes(0)
         });
@@ -350,13 +346,10 @@ contract MailboxFacet is ZKChainBase, IMailbox, ISelfDescribingFacet {
     ) internal view returns (L2CanonicalTransaction memory transaction, bytes32 canonicalTxHash) {
         transaction = _serializeL2Transaction(_priorityOpParams);
         bytes memory transactionEncoding = abi.encode(transaction);
-        // solhint-disable-next-line func-named-parameters
         TransactionValidator.validateL1ToL2Transaction(
             transaction,
-            transactionEncoding,
             s.priorityTxMaxGasLimit,
-            s.feeParams.priorityTxMaxPubdata,
-            s.zksyncOS
+            s.feeParams.priorityTxMaxPubdata
         );
         canonicalTxHash = keccak256(transactionEncoding);
     }
@@ -403,20 +396,8 @@ contract MailboxFacet is ZKChainBase, IMailbox, ISelfDescribingFacet {
     ///      0x12f43dab bridgehubRequestL2Transaction((address,address,uint256,uint256,bytes,uint256,uint256,bytes[],address))
     ///      0xddcc9eec bridgehubRequestL2TransactionOnGateway(bytes32,uint64)
     ///      0x60da3e83 depositsPaused()
-    ///      0x6c0960f9 finalizeEthWithdrawal(uint256,uint256,uint16,bytes,bytes32[])
     ///      0xb473318e l2TransactionBaseCost(uint256,uint256,uint256)
-    ///      0x685143b9 proveL1DepositParamsInclusion((uint256,uint256,uint256,address,uint16,bytes,bytes32[]))
-    ///      0x042901c7 proveL1ToL2TransactionStatus(bytes32,uint256,uint256,uint16,bytes32[],uint8)
-    ///      0xda24b3ee proveL1ToL2TransactionStatusShared(uint256,bytes32,uint256,uint256,uint16,bytes32[],uint8)
-    ///      0x7efda2ae proveL2LeafInclusion(uint256,uint256,bytes32,bytes32[])
-    ///      0x79cf6165 proveL2LeafInclusionShared(uint256,uint256,uint256,bytes32,bytes32[])
-    ///      0x353d7128 proveL2LeafInclusionSharedRecursive(uint256,uint256,uint256,bytes32,bytes32[],uint256)
-    ///      0x263b7f8e proveL2LogInclusion(uint256,uint256,(uint8,bool,uint16,address,bytes32,bytes32),bytes32[])
-    ///      0xe896760d proveL2LogInclusionShared(uint256,uint256,uint256,(uint8,bool,uint16,address,bytes32,bytes32),bytes32[])
-    ///      0xe4948f43 proveL2MessageInclusion(uint256,uint256,(uint16,address,bytes),bytes32[])
-    ///      0x18b7fc22 proveL2MessageInclusionShared(uint256,uint256,uint256,(uint16,address,bytes),bytes32[])
     ///      0xd07b90d1 requestL2ServiceTransaction(address,bytes)
-    ///      0xeb672419 requestL2Transaction(address,uint256,bytes,uint256,uint256,bytes[],address)
     ///      0xd0772551 requestL2TransactionToGatewayMailbox(uint256,bytes32,uint64)
     function selectors() public pure returns (bytes4[] memory result) {
         bytes memory packed = hex"12f43dab60da3e83b473318ed0772551d07b90d1ddcc9eec";

@@ -170,11 +170,6 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
         CHAIN_TYPE_MANAGER.setPriorityTxMaxGasLimit(_chainId, _maxGasLimit);
     }
 
-    /// @notice Sets a chain's zkPorter availability flag.
-    function setPorterAvailability(uint256 _chainId, bool _zkPorterIsAvailable) external onlyOwner {
-        CHAIN_TYPE_MANAGER.setPorterAvailability(_chainId, _zkPorterIsAvailable);
-    }
-
     /// @notice Deactivates priority mode on a chain.
     function deactivatePriorityMode(uint256 _chainId) external onlyOwner {
         CHAIN_TYPE_MANAGER.deactivatePriorityMode(_chainId);

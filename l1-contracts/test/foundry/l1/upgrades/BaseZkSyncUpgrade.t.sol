@@ -8,7 +8,7 @@ import {BaseZkSyncUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {
     MAX_ALLOWED_MINOR_VERSION_DELTA,
     MAX_NEW_FACTORY_DEPS,
-    SYSTEM_UPGRADE_L2_TX_TYPE
+    ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE
 } from "contracts/common/Config.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {
@@ -24,6 +24,7 @@ import {
 } from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
 import {TimeNotReached, TooManyFactoryDeps} from "contracts/common/L1ContractErrors.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
+import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
@@ -156,7 +157,7 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
 
     // L2 system upgrade tx type is wrong
     function test_revertWhen_InvalidTxType(uint256 newTxType) public {
-        vm.assume(newTxType != SYSTEM_UPGRADE_L2_TX_TYPE && newTxType > 0);
+        vm.assume(newTxType != ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE && newTxType > 0);
         l2CanonicalTransaction.txType = newTxType;
 
         vm.expectRevert(abi.encodeWithSelector(InvalidTxType.selector, newTxType));
@@ -203,12 +204,16 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         _upgrade();
     }
 
-    // Upgrade with mock factoryDepHash
-    function test_upgrade_WithMockFactoryDepHash() public {
+    // Upgrade with a factory dep hash
+    function test_upgrade_WithFactoryDepHash() public {
+        bytes memory factoryDep = hex"6001600055";
         l2CanonicalTransaction.factoryDeps = new uint256[](1);
+        l2CanonicalTransaction.factoryDeps[0] = uint256(ZKSyncOSBytecodeInfo.hashEVMBytecode(factoryDep));
+        bytes32 expectedTxHash = keccak256(abi.encode(l2CanonicalTransaction));
 
-        _upgrade();
+        bytes32 txHash = _upgrade();
 
+        assertEq(txHash, expectedTxHash);
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), protocolVersion);
     }
 

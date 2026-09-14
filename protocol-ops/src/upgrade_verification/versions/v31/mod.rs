@@ -159,14 +159,7 @@ pub(crate) async fn verify(
 
     verify_v31_artifact_state(artifact, &verifiers, create2_factory, result).await?;
 
-    verify_v31_provenance(
-        artifact,
-        &verifiers,
-        era_chain_id,
-        legacy_gateway_chain_id,
-        result,
-    )
-    .await?;
+    verify_v31_provenance(artifact, &verifiers, legacy_gateway_chain_id, result).await?;
 
     verify_per_chain_protocol_versions(artifact, &verifiers, result).await?;
 

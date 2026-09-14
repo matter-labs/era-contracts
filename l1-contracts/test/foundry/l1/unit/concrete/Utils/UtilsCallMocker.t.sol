@@ -12,7 +12,6 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
-import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {GenesisFacet} from "../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
@@ -248,9 +247,7 @@ contract UtilsCallMockerTest is Test {
             abi.encode(bytes32("mock-genesis-manifest"))
         );
         vm.mockCall(genesisRegistry, abi.encodeWithSelector(ICTMRelease.verifyAll.selector), abi.encode(true));
-        // VM identity is read from the release's DiamondInit immutable; the mocked registry's
-        // `diamondInit()` placeholder is the registry itself, so mock the flag there too.
-        vm.mockCall(genesisRegistry, abi.encodeWithSelector(IDiamondInit.IS_ZKSYNC_OS.selector), abi.encode(false));
+        // The mocked registry's `diamondInit()` placeholder is the registry itself.
         vm.mockCall(
             genesisRegistry,
             abi.encodeWithSelector(ICTMRelease.diamondInit.selector),

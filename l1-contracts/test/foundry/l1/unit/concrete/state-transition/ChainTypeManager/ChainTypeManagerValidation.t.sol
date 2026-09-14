@@ -11,9 +11,8 @@ import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
-import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -35,15 +34,15 @@ import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAss
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 
-/// @notice From v32 the ZKsyncOS CTM validates genesis params by reading them from the genesis
-///         `CTMRegistry` it is initialized with (not from an inline `ChainCreationParams`). These
-///         tests mock that registry's `genesisParams` per case and assert the CTM enforces the
-///         ZKsyncOS rules (genesis upgrade non-zero, batch hash non-zero, commitment == 1).
-contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
+/// @notice From v32 the CTM validates genesis params by reading them from the genesis release
+///         it is initialized with (not from an inline `ChainCreationParams`). These tests mock
+///         that release's `genesisParams` per case and assert the CTM enforces the rules (genesis
+///         upgrade non-zero, batch hash non-zero, commitment == 1).
+contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
     using stdStorage for StdStorage;
 
-    ZKsyncOSChainTypeManager internal chainTypeManager;
-    ZKsyncOSChainTypeManager internal chainContractAddress;
+    ChainTypeManager internal chainTypeManager;
+    ChainTypeManager internal chainContractAddress;
     L1GenesisUpgrade internal genesisUpgradeContract;
     L1Bridgehub internal bridgehub;
     L1ChainAssetHandler internal chainAssetHandler;
@@ -106,20 +105,15 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         chainAssetHandler.setAddresses();
 
         vm.startPrank(address(bridgehub));
-        chainTypeManager = new ZKsyncOSChainTypeManager(
-            address(bridgehub),
-            interopCenterAddress,
-            address(0),
-            address(0)
-        );
-        diamondInit = address(new DiamondInit(true));
+        chainTypeManager = new ChainTypeManager(address(bridgehub), interopCenterAddress, address(0), address(0));
+        diamondInit = address(new DiamondInit());
         genesisUpgradeContract = new L1GenesisUpgrade();
         vm.stopPrank();
     }
 
-    /// @dev Mocks the (single) test genesis release: its genesis params, VM-identity surface, and
-    ///      the manifest-hash + factory attestation the CTM's release-provenance check reads during
-    ///      initialization and repointing.
+    /// @dev Mocks the (single) test genesis release: its genesis params and the manifest-hash +
+    ///      factory attestation the CTM's release-provenance check reads during initialization
+    ///      and repointing.
     function _mockGenesisParams(
         address _genesisUpgrade,
         bytes32 _genesisBatchHash,
@@ -132,18 +126,6 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             abi.encode(_genesisUpgrade, _genesisBatchHash, _genesisBatchCommitment, _genesisIndexRepeatedStorageChanges)
         );
         vm.mockCall(Utils.TEST_GENESIS_REGISTRY, abi.encodeWithSelector(ICTMRelease.validate.selector), bytes(""));
-        // VM identity is single-sourced from the release's DiamondInit; the mocked registry's
-        // diamondInit placeholder is the registry itself, so mock the flag there.
-        vm.mockCall(
-            Utils.TEST_GENESIS_REGISTRY,
-            abi.encodeWithSelector(ICTMRelease.diamondInit.selector),
-            abi.encode(Utils.TEST_GENESIS_REGISTRY)
-        );
-        vm.mockCall(
-            Utils.TEST_GENESIS_REGISTRY,
-            abi.encodeWithSelector(IDiamondInit.IS_ZKSYNC_OS.selector),
-            abi.encode(true)
-        );
         // From v32 the CTM enforces release provenance via its canonical (mocked) factory during
         // initialization: the genesis release must carry the audited `CTMRelease` runtime code,
         // which is what the CTM's provenance check compares against.
@@ -155,7 +137,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         );
     }
 
-    function _deployChainTypeManager() internal returns (ZKsyncOSChainTypeManager) {
+    function _deployChainTypeManager() internal returns (ChainTypeManager) {
         vm.startPrank(address(bridgehub));
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
             owner: governor,
@@ -172,7 +154,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             abi.encodeCall(IChainTypeManager.initialize, ctmInitializeData)
         );
         vm.stopPrank();
-        return ZKsyncOSChainTypeManager(address(transparentUpgradeableProxy));
+        return ChainTypeManager(address(transparentUpgradeableProxy));
     }
 
     function _expectInitRevert(bytes4 _err) internal {
@@ -200,13 +182,9 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
     // ============================================================
 
     function test_constructor() public {
-        ZKsyncOSChainTypeManager ctm = new ZKsyncOSChainTypeManager(
-            address(bridgehub),
-            interopCenterAddress,
-            address(0),
-            address(0)
-        );
+        ChainTypeManager ctm = new ChainTypeManager(address(bridgehub), interopCenterAddress, address(0), address(0));
         assertEq(ctm.BRIDGE_HUB(), address(bridgehub));
+        assertTrue(ctm.isZKsyncOS());
     }
 
     // ============================================================

@@ -608,18 +608,6 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
         assertEq(IGetters(chainAddress).getPriorityTxMaxGasLimit(), MAX_GAS_PER_TRANSACTION);
     }
 
-    function test_setPorterAvailability_setsTheChainFlag() public {
-        UtilsFacet utilsFacet = UtilsFacet(chainAddress);
-        assertFalse(utilsFacet.util_getZkPorterAvailability());
-
-        vm.expectEmit(true, true, true, true, chainAddress);
-        emit IAdmin.IsPorterAvailableStatusUpdate(true);
-        vm.prank(governor);
-        ctmExecutor.setPorterAvailability(chainId, true);
-
-        assertTrue(utilsFacet.util_getZkPorterAvailability(), "porter availability must land on the chain");
-    }
-
     function test_deactivatePriorityMode_clearsTheChainFlag() public {
         // Entering priority mode is the chain's own flow (a permanent rollup with stale priority
         // ops), covered by the priority-mode suites; the fixture's UtilsFacet arms the flag so the
@@ -666,8 +654,6 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
         vm.expectRevert("Ownable: caller is not the owner");
         ctmExecutor.setPriorityTxMaxGasLimit(chainId, MAX_GAS_PER_TRANSACTION);
         vm.expectRevert("Ownable: caller is not the owner");
-        ctmExecutor.setPorterAvailability(chainId, true);
-        vm.expectRevert("Ownable: caller is not the owner");
         ctmExecutor.deactivatePriorityMode(chainId);
         vm.expectRevert("Ownable: caller is not the owner");
         ctmExecutor.setValidatorTimelockPostV29(newTimelock);
@@ -677,7 +663,6 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
         assertFalse(IGetters(chainAddress).isDiamondStorageFrozen());
         assertFalse(IGetters(chainAddress).isValidator(newValidator));
         assertEq(IGetters(chainAddress).getPriorityTxMaxGasLimit(), oldLimit);
-        assertFalse(UtilsFacet(chainAddress).util_getZkPorterAvailability());
         assertTrue(UtilsFacet(chainAddress).util_getPriorityModeActivated());
         assertEq(chainContractAddress.validatorTimelockPostV29(), oldTimelock);
     }

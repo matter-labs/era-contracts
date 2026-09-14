@@ -4,16 +4,10 @@ pragma solidity 0.8.28;
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "contracts/common/Config.sol";
-import {
-    RegistryReleaseCodehashAlreadySet,
-    RegistryWrongVM,
-    ZeroAddress,
-    EmptyBytes32
-} from "contracts/common/L1ContractErrors.sol";
+import {RegistryReleaseCodehashAlreadySet, ZeroAddress, EmptyBytes32} from "contracts/common/L1ContractErrors.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 
 /// @notice From v32 the CTM no longer stores chain-creation params directly; it stores a pointer
@@ -26,9 +20,9 @@ contract SetGenesisRegistryTest is ChainTypeManagerTest {
     }
 
     /// @dev Mocks a fresh release returning the given genesis params, so the CTM can be repointed
-    ///      at it: `genesisParams` (read by the `l1GenesisUpgrade`/`storedBatchZero` getters), the
-    ///      VM-identity surface, and the manifest-hash + factory attestation `setCurrentRelease`
-    ///      requires for release provenance.
+    ///      at it: `genesisParams` (read by the `l1GenesisUpgrade`/`storedBatchZero` getters) and
+    ///      the manifest-hash + factory attestation `setCurrentRelease` requires for release
+    ///      provenance.
     function _mockRegistry(
         address _registry,
         address _genesisUpgrade,
@@ -42,10 +36,6 @@ contract SetGenesisRegistryTest is ChainTypeManagerTest {
             abi.encode(_genesisUpgrade, _genesisBatchHash, _genesisBatchCommitment, _genesisIndexRepeatedStorageChanges)
         );
         vm.mockCall(_registry, abi.encodeWithSelector(ICTMRelease.validate.selector), bytes(""));
-        // VM identity is single-sourced from the release's DiamondInit; the mocked registry's
-        // diamondInit placeholder is the registry itself, so mock the flag there.
-        vm.mockCall(_registry, abi.encodeWithSelector(ICTMRelease.diamondInit.selector), abi.encode(_registry));
-        vm.mockCall(_registry, abi.encodeWithSelector(IDiamondInit.IS_ZKSYNC_OS.selector), abi.encode(true));
         // From v32 the CTM enforces release provenance by CODEHASH, so a mocked release has to
         // carry the audited `CTMRelease` runtime code to be accepted as `currentRelease`.
         vm.etch(_registry, type(CTMRelease).runtimeCode);
@@ -119,18 +109,6 @@ contract SetGenesisRegistryTest is ChainTypeManagerTest {
     // `setReleaseCodehash` is the migration path for CTMs whose storage predates the field
     // (upgraded proxies never re-run `initialize`); v32 stage calldata invokes it right before
     // the first `setCurrentRelease`.
-
-    /// @dev A ZKsync OS CTM must reject a release whose pinned DiamondInit identifies itself as
-    ///      Era VM. VM identity is read from DiamondInit rather than duplicated in the manifest.
-    function test_RevertWhen_ReleaseHasWrongVM() public {
-        address eraRelease = makeAddr("eraRelease");
-        _mockRegistry(eraRelease, makeAddr("gu"), bytes32(uint256(2)), bytes32(uint256(1)), 2);
-        vm.mockCall(eraRelease, abi.encodeWithSelector(IDiamondInit.IS_ZKSYNC_OS.selector), abi.encode(false));
-
-        vm.expectRevert(abi.encodeWithSelector(RegistryWrongVM.selector, true, false));
-        vm.prank(governor);
-        chainContractAddress.setCurrentRelease(eraRelease);
-    }
 
     /// @dev Re-setting the anchor to the value it ALREADY holds is a no-op, so one upgrade bundle
     ///      works against both a migrated CTM (anchor zero) and an already-anchored one without the

@@ -25,7 +25,7 @@ import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Commi
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
@@ -51,8 +51,8 @@ import {GenesisFacet, PinnedContract} from "../../../../../../../contracts/upgra
 contract ChainTypeManagerTest is UtilsCallMockerTest {
     using stdStorage for StdStorage;
 
-    ZKsyncOSChainTypeManager internal chainTypeManager;
-    ZKsyncOSChainTypeManager internal chainContractAddress;
+    ChainTypeManager internal chainTypeManager;
+    ChainTypeManager internal chainContractAddress;
     /// @dev The CTM's `L1_BYTECODES_SUPPLIER`: a real supplier, so the registry objects' publication
     ///      checks run against the same contract the prepare pipeline publishes factory deps to.
     BytecodesSupplier internal bytecodesSupplier;
@@ -126,13 +126,13 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         newChainAdmin = makeAddr("chainadmin");
 
         bytecodesSupplier = new BytecodesSupplier();
-        chainTypeManager = new ZKsyncOSChainTypeManager(
+        chainTypeManager = new ChainTypeManager(
             address(bridgehub),
             interopCenterAddress,
             address(bytecodesSupplier),
             address(0)
         );
-        diamondInit = address(new DiamondInit(true));
+        diamondInit = address(new DiamondInit());
         genesisUpgradeContract = new L1GenesisUpgrade();
 
         facetCuts.push(
@@ -242,7 +242,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
             admin,
             abi.encodeCall(IChainTypeManager.initialize, ctmInitializeData)
         );
-        chainContractAddress = ZKsyncOSChainTypeManager(address(transparentUpgradeableProxy));
+        chainContractAddress = ChainTypeManager(address(transparentUpgradeableProxy));
 
         // A real ecosystem always has its CTM registered on the Bridgehub, and the
         // ChainAssetHandler now relies on it: the authority to pause a CTM's migrations is

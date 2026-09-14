@@ -550,11 +550,6 @@
   },
   {
     "type": "error",
-    "name": "TxnBodyGasLimitNotEnoughGas",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "UndefinedDiamondCutAction",
     "inputs": []
   },

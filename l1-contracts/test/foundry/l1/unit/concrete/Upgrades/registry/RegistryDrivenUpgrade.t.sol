@@ -3,7 +3,6 @@
 pragma solidity 0.8.28;
 
 import {ChainTypeManagerTest} from "../../state-transition/ChainTypeManager/_ChainTypeManager_Shared.t.sol";
-import {ZKsyncOSChainTypeManagerSharedTest} from "../../state-transition/ChainTypeManager/_ZKsyncOSChainTypeManager_Shared.t.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
@@ -550,18 +549,13 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
     }
 }
 
-// NOTE(v0.34 merge): the Era variant of this suite was removed together with
-// `EraChainTypeManager` — the repo is ZKsync-OS-only, and the shared CTM fixture now deploys a
-// ZKsyncOS CTM. The registry-driven upgrade flow itself is VM-agnostic and stays covered by the
-// ZKsyncOS variant below.
-
-/// @notice The registry-driven upgrade run against a ZKsyncOS CTM and chain: the chain commits
+/// @notice The registry-driven upgrade run against the shared CTM fixture: the chain commits
 ///         a `ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE` (126) transaction with a
 ///         `ZKsyncOSSystemProxyUpgrade` deployment, and the registry's genesis params carry the
-///         `genesisBatchCommitment == 1` that `ZKsyncOSChainTypeManager` enforces.
-contract RegistryDrivenUpgradeZKsyncOSTest is ZKsyncOSChainTypeManagerSharedTest, RegistryDrivenUpgradeTestBase {
+///         `genesisBatchCommitment == 1` that `ChainTypeManager` enforces.
+contract RegistryDrivenUpgradeConcreteTest is ChainTypeManagerTest, RegistryDrivenUpgradeTestBase {
     function _deployFixture() internal override {
-        deployZKsyncOS();
+        deploy();
     }
 
     function _isZKsyncOSVariant() internal pure override returns (bool) {
@@ -577,7 +571,7 @@ contract RegistryDrivenUpgradeZKsyncOSTest is ZKsyncOSChainTypeManagerSharedTest
     }
 
     function _registryGenesisBatchCommitment() internal pure override returns (bytes32) {
-        // ZKsyncOSChainTypeManager requires the genesis batch commitment to be exactly 1.
+        // ChainTypeManager requires the genesis batch commitment to be exactly 1.
         return bytes32(uint256(1));
     }
 }

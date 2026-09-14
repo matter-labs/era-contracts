@@ -9,9 +9,7 @@ import {GenesisFacet} from "../RegistryTypes.sol";
 ///         verifier, force-deployment data and genesis params.
 /// @dev A release deliberately carries NO `protocolVersion`: the version schedule is owned by
 ///      `ICTMTransition`, and one release can serve several versions.
-/// @dev A release also carries NO VM flag: VM identity is single-sourced from the pinned
-///      `DiamondInit`'s `IS_ZKSYNC_OS` immutable, which the CTM validates against its own
-///      flavour when the release is pinned (`_setCurrentRelease`).
+/// @dev A release also carries NO VM flag: every release is a ZKsync OS release.
 interface ICTMRelease {
     /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment to every pinned value:
     ///         the single value governance reviews against the audited manifest.

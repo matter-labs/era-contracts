@@ -13,7 +13,6 @@ struct SystemContractsArgs {
     uint256 eraChainId;
     address l1AssetRouter;
     address l2TokenBeacon;
-    bytes32 l2TokenProxyBytecodeHash;
     address aliasedOwner;
     bool contractsDeployedAlready;
     address l1CtmDeployer;

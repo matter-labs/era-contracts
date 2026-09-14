@@ -59,7 +59,6 @@ import {
   L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
   NTV_WETH_TOKEN_SLOT,
   NTV_L1_CHAIN_ID_SLOT,
-  NTV_L2_TOKEN_PROXY_BYTECODE_HASH_SLOT,
   SYSTEM_CONTEXT_ADDR,
 } from "../core/const";
 import { getAbi, getBytecode, getCreationBytecode } from "../core/contracts";
@@ -1147,11 +1146,6 @@ export async function deployL2Contracts(
     toSlot(NTV_L1_CHAIN_ID_SLOT),
     ethers.utils.hexZeroPad(ethers.utils.hexlify(runtimeConfig.l1ChainId), 32),
   ]);
-  await l2Provider.send("anvil_setStorageAt", [
-    L2_NATIVE_TOKEN_VAULT_ADDR,
-    toSlot(NTV_L2_TOKEN_PROXY_BYTECODE_HASH_SLOT),
-    ethers.utils.hexZeroPad("0x01", 32),
-  ]);
 }
 
 /**
@@ -1236,7 +1230,7 @@ function buildAddressToContract(isZKsyncOS: boolean): ReadonlyMap<string, Contra
     [L2_MESSAGE_ROOT_ADDR.toLowerCase(), "L2MessageRoot"],
     [L2_BRIDGEHUB_ADDR.toLowerCase(), "L2Bridgehub"],
     [L2_ASSET_ROUTER_ADDR.toLowerCase(), "L2AssetRouter"],
-    [L2_NATIVE_TOKEN_VAULT_ADDR.toLowerCase(), isZKsyncOS ? "L2NativeTokenVaultZKOS" : "L2NativeTokenVault"],
+    [L2_NATIVE_TOKEN_VAULT_ADDR.toLowerCase(), "L2NativeTokenVault"],
     [L2_CHAIN_ASSET_HANDLER_ADDR.toLowerCase(), "L2ChainAssetHandler"],
     [L2_ASSET_TRACKER_ADDR.toLowerCase(), "L2AssetTracker"],
     [INTEROP_CENTER_ADDR.toLowerCase(), "InteropCenter"],
@@ -1248,16 +1242,17 @@ function buildAddressToContract(isZKsyncOS: boolean): ReadonlyMap<string, Contra
     [L2_INTEROP_ROOT_STORAGE_ADDR.toLowerCase(), "L2InteropRootStorage"],
   ];
   if (isZKsyncOS) {
-    // Keep this block in sync with SystemContractsProcessing's getZKsyncOSOnlyContracts /
-    // getZKsyncOSExtraSystemContracts: every appended L2EcosystemContract member with a
+    // Keep this block in sync with SystemContractsProcessing's getFixedAddressCoreContracts /
+    // getSystemProxyUpgradeContracts: every appended L2EcosystemContract member with a
     // fixed address rides the derived force-deployment list and needs a row here.
     entries.push(
       [L2_INTEROP_COMMITMENT_TREE_ADDR.toLowerCase(), "L2InteropCommitmentTree"],
       [L2_ATOMIC_FLOW_MANAGER_ADDR.toLowerCase(), "AtomicFlowManager"],
-      [L2_BASE_TOKEN_ADDR.toLowerCase(), "L2BaseTokenZKOS"],
-      [L2_TO_L1_MESSENGER_ADDR.toLowerCase(), "L1MessengerZKOS"],
+      [L2_BASE_TOKEN_ADDR.toLowerCase(), "L2BaseToken"],
+      [L2_TO_L1_MESSENGER_ADDR.toLowerCase(), "L1Messenger"],
       [SYSTEM_CONTEXT_ADDR.toLowerCase(), "SystemContext"],
-      [L2_CONTRACT_DEPLOYER_ADDR.toLowerCase(), "ZKOSContractDeployer"],
+      [L2_COMPLEX_UPGRADER_ADDR.toLowerCase(), "L2ComplexUpgrader"],
+      [L2_CONTRACT_DEPLOYER_ADDR.toLowerCase(), "ContractDeployer"],
       // The removed v31 GWAssetTracker: upgrades swap its proxy's implementation for EmptyContract.
       [L2_REMOVED_GW_ASSET_TRACKER_ADDR.toLowerCase(), "EmptyContract"]
     );
@@ -1421,7 +1416,6 @@ export function prepareUpgradeHarnessInputs(
   permanentValues = replaceTomlBareValue(permanentValues, "era_chain_id", String(primaryChainId));
   permanentValues = replaceTomlStringValue(permanentValues, "bridgehub_proxy_addr", state.l1Addresses.bridgehub);
   permanentValues = replaceTomlStringValue(permanentValues, "ctm_proxy_addr", state.ctmAddresses.chainTypeManager);
-  permanentValues = replaceTomlBareValue(permanentValues, "is_zk_sync_os", scenario.isZKsyncOS ? "true" : "false");
   fs.writeFileSync(permanentValuesPath, permanentValues);
 
   let upgradeInput = fs.readFileSync(path.join(l1ContractsDir, scenario.upgradeInputTemplatePath), "utf8");

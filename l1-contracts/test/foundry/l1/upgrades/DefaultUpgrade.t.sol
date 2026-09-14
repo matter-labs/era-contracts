@@ -53,7 +53,7 @@ contract DefaultUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         // only when it runs ZKsync OS itself.
         engine.setZKsyncOS(true);
 
-        _setUpRegistryObjects(true, DELEGATE_CALLDATA);
+        _setUpRegistryObjects(DELEGATE_CALLDATA);
         _mockEcosystemForComposer(mockBridgehub, ctmDeployerStub);
         fromVerifier = _pinned("fromVerifier");
         newVerifier = _pinned("newVerifier");
@@ -332,13 +332,10 @@ contract DefaultUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         assertEq(forEthChain.txType, forErc20Chain.txType);
         assertEq(forEthChain.nonce, forErc20Chain.nonce);
         assertEq(abi.encode(forEthChain.factoryDeps), abi.encode(forErc20Chain.factoryDeps));
-        (bool ethFlag, address ethDeployer, bytes memory ethFixed, ) = this.decodeV34Upgrade(
-            _delegateCalldata(forEthChain.data)
-        );
-        (bool erc20Flag, address erc20Deployer, bytes memory erc20Fixed, ) = this.decodeV34Upgrade(
+        (address ethDeployer, bytes memory ethFixed, ) = this.decodeV34Upgrade(_delegateCalldata(forEthChain.data));
+        (address erc20Deployer, bytes memory erc20Fixed, ) = this.decodeV34Upgrade(
             _delegateCalldata(forErc20Chain.data)
         );
-        assertEq(ethFlag, erc20Flag, "the VM flag is ecosystem-wide");
         assertEq(ethDeployer, erc20Deployer, "the CTM deployer is ecosystem-wide");
         assertEq(ethFixed, erc20Fixed, "the fixed data is ecosystem-wide");
         assertEq(_perChainData(forEthChain.data).baseTokenBridgingData.assetId, ETH_BASE_TOKEN_ASSET_ID);

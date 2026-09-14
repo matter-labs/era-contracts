@@ -13,7 +13,6 @@ import {IL2DelegateCalldataComposer} from "./registry/objects/IL2DelegateCalldat
 /// @notice The v34 delegate call: `L2V34Upgrade.upgrade` re-initializes the force-deployed system
 ///         contracts with the release's pinned `FixedForceDeploymentsData`, the ecosystem's live
 ///         CTM deployment tracker and the chain's own `ZKChainSpecificForceDeploymentsData`.
-/// @dev The repository is ZKsync-OS-only, so the VM flag is fixed.
 contract L2V34DelegateCalldataComposer is IL2DelegateCalldataComposer {
     /// @inheritdoc IL2DelegateCalldataComposer
     function composeDelegateCalldata(
@@ -25,7 +24,6 @@ contract L2V34DelegateCalldataComposer is IL2DelegateCalldataComposer {
             abi.encodeCall(
                 IL2V34Upgrade.upgrade,
                 (
-                    true,
                     address(IBridgehubBase(_bridgehub).l1CtmDeployer()),
                     _newRelease.fixedForceDeploymentsData(),
                     ZKChainSpecificForceDeploymentsLib.build(_bridgehub, _chainId)

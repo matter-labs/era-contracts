@@ -25,9 +25,8 @@ import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
 
@@ -233,6 +232,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         // Optional
         address governance
     ) public {
+        require(IChainTypeManager(permanentConfig.ctmProxy).isZKsyncOS(), "CTM is not ZKsync OS");
         // Only override the salt when explicitly provided (non-zero).
         // When zero, the script falls back to the CREATE2_FACTORY_SALT env var or built-in default.
         if (permanentConfig.create2FactorySalt != bytes32(0)) {
@@ -244,8 +244,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         // The supplier is read off the CTM's `L1_BYTECODES_SUPPLIER()` immutable during discovery, so the
         // permanent-values entry is informational for this path.
         setAddressesBasedOnCTM();
-        // Only ZKsync OS CTMs can be upgraded onto this release; the flag stays in the permanent
-        // config as a guard against pointing the script at a legacy EraVM CTM section.
         // Must be non-zero: `InteropCenter.initL2` reverts on a zero asset ID. It runs on the genesis path
         // of `performForceDeployedContractsInit` only, so this aborts the genesis of chains created from the
         // release rather than this upgrade — caught here so the misconfiguration surfaces during
@@ -284,8 +282,9 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     ) internal virtual {
         string memory toml = vm.readFile(newConfigPath);
 
-        // No `era_chain_id` read: `setAddressesBasedOnCTM` resolves it from the live asset router,
-        // which is authoritative for the ecosystems this flow upgrades.
+        // No `era_chain_id` read: the per-env input TOMLs still carry the key for the
+        // v31 tooling and the zk-governance PUH redeploy (PUH's real constructor arg),
+        // but nothing in this flow consumes an Era chain id.
 
         PermanentCTMConfig memory permanentConfig = PermanentCTMConfig({
             ctmProxy: ctmProxy,
@@ -674,7 +673,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         require(ctm.code.length > 0, "CTM contract does not exist at specified address");
 
         // CTM exists - get bridgehub and determine which introspection to use
-        address bridgehubAddr = ChainTypeManagerBase(ctm).BRIDGE_HUB();
+        address bridgehubAddr = ChainTypeManager(ctm).BRIDGE_HUB();
         bridgehub = L1Bridgehub(bridgehubAddr);
 
         bool preV32Ecosystem;
@@ -692,7 +691,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             ctmAddresses = AddressIntrospector.getCTMAddressesV31(ctm);
             coreAddresses = AddressIntrospector.getCoreDeployedAddressesV31(bridgehubAddr);
         } else {
-            ctmAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
+            ctmAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManager(ctm));
             coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubAddr);
         }
 
@@ -717,7 +716,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             console.log("No registered chain in bridgehub, using up-to-date addresses");
         }
 
-        upToDateZkChain = AddressIntrospector.getUptoDateZkChainAddresses(ChainTypeManagerBase(ctm));
+        upToDateZkChain = AddressIntrospector.getUptoDateZkChainAddresses(ChainTypeManager(ctm));
 
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
         newConfig.oldProtocolVersion = ctmProtocolVersion;

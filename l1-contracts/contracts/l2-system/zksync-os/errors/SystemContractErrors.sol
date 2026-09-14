@@ -10,5 +10,3 @@ error NotEnoughGasSupplied();
 error NotSelfCall();
 // 0x058f5efe
 error SetBytecodeOnAddressHookFailed();
-// 0x8e4a23d6
-error Unauthorized(address);

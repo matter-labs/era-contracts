@@ -16,5 +16,5 @@
   - [ai-review/](./ai-review) — review guides for the generated upgrade calldata, protocol-ops and CI.
 - The runbook for preparing, verifying and executing an upgrade is
   [`l1-contracts/deploy-scripts/upgrade/README.md`](../l1-contracts/deploy-scripts/upgrade/README.md).
-- Wider system specs live in the
+- Historical ZKsync Era contract documentation is maintained in the
   [zksync-era repository](https://github.com/matter-labs/zksync-era/blob/main/docs/src/specs/contracts).

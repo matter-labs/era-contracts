@@ -2,13 +2,15 @@
 
 [![Logo](../eraLogo.svg)](https://zksync.io/)
 
-ZKsync is a layer 2 rollup that uses zero-knowledge proofs to scale Ethereum without compromising on security or
-decentralization. Since it's EVM compatible (Solidity/Vyper), 99% of Ethereum projects can redeploy without refactoring
-or re-auditing a single line of code.
+The settlement, bridging and governance contracts for ZKsync chains running
+[ZKsync OS](https://docs.zksync.io/zksync-protocol) — zero-knowledge rollups that scale Ethereum
+without compromising on security or decentralization. Every chain deployable or upgradable from
+this repository runs ZKsync OS. Runtime compatibility retains storage tombstones and wire-format
+reservations; version-scoped upgrade tooling remains under its historical version directories. The repository
+keeps its historical `era-contracts` name.
 
 This workspace holds the ZK Stack's L1 contracts, the L2 built-in contracts of ZKsync OS chains, the Foundry deploy
-and upgrade scripts, and their tests. The repository is ZKsync OS only — EraVM chains cannot be created, upgraded or
-tested from it (see the [root README](../README.md)).
+and upgrade scripts, and their tests (see the [root README](../README.md) for the repository as a whole).
 
 ## Layout
 

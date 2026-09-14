@@ -29,7 +29,7 @@ import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol
 import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
 import {SystemContractsProcessing} from "../upgrade/SystemContractsProcessing.s.sol";
 import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";
-import {L2EcosystemContract, ZkSyncOsSystemContract} from "../ecosystem/CoreContract.sol";
+import {L2EcosystemContract, L2SystemContract} from "../ecosystem/CoreContract.sol";
 import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
@@ -44,8 +44,7 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
 import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
-import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
-import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
@@ -210,25 +209,17 @@ abstract contract DeployCTMUtils is DeployUtils {
     /// hashes are computed in one FFI process to keep Forge below its script-memory cap.
     function _precomputeBlakeHashes() internal {
         L2EcosystemContract[] memory coreContracts = SystemContractsProcessing.getFixedAddressCoreContracts();
-        L2EcosystemContract[] memory zkosOnlyContracts = SystemContractsProcessing.getZKsyncOSOnlyContracts();
-        ZkSyncOsSystemContract[] memory systemContracts = SystemContractsProcessing.getZKsyncOSExtraSystemContracts();
+        L2SystemContract[] memory systemContracts = SystemContractsProcessing.getSystemProxyUpgradeContracts();
 
         // In addition to the release table, the legacy genesis descriptor needs the beacon
         // deployer, removed trackers need EmptyContract, and the release names the shared
         // SystemContractProxy shell once.
-        bytes[] memory bytecodes = new bytes[](
-            coreContracts.length + zkosOnlyContracts.length + systemContracts.length + 3
-        );
+        bytes[] memory bytecodes = new bytes[](coreContracts.length + systemContracts.length + 3);
         bytes32[] memory descriptorKeys = new bytes32[](bytecodes.length);
         uint256 bytecodeIndex;
 
         for (uint256 i = 0; i < coreContracts.length; i++) {
             (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(coreContracts[i]);
-            descriptorKeys[bytecodeIndex] = _bytecodeInfoKey(fileName, contractName);
-            bytecodes[bytecodeIndex++] = BytecodeUtils.readDeployedBytecodeL1(fileName, contractName);
-        }
-        for (uint256 i = 0; i < zkosOnlyContracts.length; i++) {
-            (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(zkosOnlyContracts[i]);
             descriptorKeys[bytecodeIndex] = _bytecodeInfoKey(fileName, contractName);
             bytecodes[bytecodeIndex++] = BytecodeUtils.readDeployedBytecodeL1(fileName, contractName);
         }
@@ -242,7 +233,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         }
 
         for (uint256 i = 0; i < systemContracts.length; i++) {
-            (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolveZkOsSystemContract(
+            (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolveL2SystemContract(
                 systemContracts[i]
             );
             descriptorKeys[bytecodeIndex] = _bytecodeInfoKey(fileName, contractName);
@@ -534,10 +525,10 @@ abstract contract DeployCTMUtils is DeployUtils {
     }
 
     function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory) {
-        if (compareStrings(contractName, "ZKsyncOSChainTypeManager")) {
+        if (compareStrings(contractName, "ChainTypeManager")) {
             return
                 abi.encodeCall(
-                    ChainTypeManagerBase.initialize,
+                    ChainTypeManager.initialize,
                     getChainTypeManagerInitializeData(ctmAddresses.stateTransition)
                 );
         } else if (compareStrings(contractName, "ServerNotifier")) {

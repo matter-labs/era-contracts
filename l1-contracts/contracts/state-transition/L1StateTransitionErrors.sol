@@ -6,8 +6,6 @@ pragma solidity ^0.8.21;
 error AdminZero();
 // 0xca1c3cbc
 error AlreadyMigrated();
-// 0xb0bd6aca
-error AlreadySigned();
 // 0x125d99b0
 error BlobHashBlobCommitmentMismatchValue();
 // 0xafda12bf
@@ -24,8 +22,6 @@ error DepositsNotPaused();
 error DepositsPaused();
 // 0xedae13f3
 error ExecutedIsNotConsistentWithVerified(uint256 batchesExecuted, uint256 batchesVerified);
-// 0xeaeeb154
-error InitializeNotAvailable();
 // 0xfbd630b8
 error InvalidBatchesDataLength(uint256 batchesDataLength, uint256 priorityOpsDataLength);
 // 0xc06789fa
@@ -52,10 +48,6 @@ error InvalidUnprocessedIndex(uint256 treeUnprocessedIndex, uint256 commitmentUn
 error L1DAValidatorAddressIsZero();
 // 0x7fbff2dd
 error L1DAValidatorInvalidSender(address msgSender);
-// 0x7d769244
-error MemberAlreadyExists(address member);
-// 0x1599dcf8
-error MemberDoesNotExist(address member);
 // 0x9b5f85eb
 error MessageRootIsZero();
 // 0xf148c8da
@@ -68,10 +60,6 @@ error MismatchNumberOfLayer1Txs(uint256 numberOfLayer1Txs, uint256 expectedLengt
 error NotAllBatchesExecuted();
 // 0xf05c64c6
 error NotChainAdmin(address prevMsgSender, address admin);
-// 0xe246dc63
-error NotEnoughSignatures();
-// 0x8fd63d21
-error NotEraChain();
 // 0xa7050bf6
 error NotHistoricalRoot(bytes32);
 // 0x87470e36
@@ -80,12 +68,8 @@ error NotL1(uint256 blockChainId);
 error NotMigrated();
 // 0xd0266e26
 error NotSettlementLayer();
-// 0xa1b035c8
-error NotSigner();
 // 0xa43ae064
 error NotZKChain();
-// 0x1e9f6a9e
-error NotZKsyncOS();
 // 0x04e05fd1
 error OnlyOneBlobWithCalldataAllowed();
 // 0x885ae069
@@ -104,6 +88,8 @@ error PubdataInputTooSmall(uint256 pubdataInputLength, uint256 totalBlobsCommitm
 error PubdataLengthTooBig(uint256 pubdataLength, uint256 totalBlobSizeBytes);
 // 0x89935a14
 error SettlementLayerChainIdMismatch();
+// 0xaf390015
+error SettlementLayerCTMMismatch();
 // 0x97f58c80
 error TotalPriorityTxsIsZero();
 // 0x79274f04

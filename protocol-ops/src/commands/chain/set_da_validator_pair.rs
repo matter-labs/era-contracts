@@ -51,17 +51,13 @@ pub struct ChainSetDaValidatorPairArgs {
     #[clap(long)]
     pub l1_da_validator: Address,
 
-    /// What the chain does with its pubdata. The L2 DA commitment scheme follows from this and the
-    /// VM the chain runs, which is read from its CTM — a ZKsync OS rollup or logs-only validium
-    /// publishes through blobs (`blobs-zksync-os`), an Era rollup commits blobs and the pubdata hash
-    /// (`blobs-and-pubdata-keccak256`), an Era validium commits nothing (`empty-no-da`) and a
-    /// custom-DA chain commits the hash of the pubdata it hands over (`pubdata-keccak256`).
+    /// What the chain does with its pubdata. A rollup or logs-only validium defaults to blobs
+    /// (`blobs-zksync-os`); a custom-DA chain commits its pubdata hash (`pubdata-keccak256`).
     #[clap(long, value_enum, default_value_t = DAValidatorType::Rollup)]
     pub da_mode: DAValidatorType,
 
-    /// Override the L2 DA commitment scheme derived from `--da-mode` and the chain's VM. Needed
-    /// only for a gateway-settling chain, which relays its pubdata and commits it as
-    /// `blobs-and-pubdata-keccak256` whatever its VM.
+    /// Override the L2 DA commitment scheme derived from `--da-mode`. Gateway-settling chains
+    /// relay their pubdata and commit it as `blobs-and-pubdata-keccak256`.
     #[clap(long, value_enum, help_heading = "Advanced input")]
     pub l2_da_commitment_scheme: Option<L2DACommitmentScheme>,
 
@@ -79,26 +75,14 @@ pub async fn run(args: ChainSetDaValidatorPairArgs) -> anyhow::Result<()> {
             .await
             .context("resolving chain admin from L1")?;
 
-    // The commitment scheme is a function of the DA mode and the VM, and the VM is on L1 already, so
-    // the caller only has to say what the chain does with its pubdata.
-    let l2_da_commitment_scheme = match args.l2_da_commitment_scheme {
-        Some(scheme) => scheme,
-        None => {
-            let ctm_proxy = crate::common::l1_contracts::resolve_ctm_proxy(
-                &runner.rpc_url,
-                bridgehub,
-                chain_id,
-            )
+    let ctm_proxy =
+        crate::common::l1_contracts::resolve_ctm_proxy(&runner.rpc_url, bridgehub, chain_id)
             .await
             .context("resolving the chain's CTM from L1")?;
-            anyhow::ensure!(
-                crate::common::l1_contracts::resolve_is_zksync_os(&runner.rpc_url, ctm_proxy)
-                    .await?,
-                "Only ZKsync OS chains are supported"
-            );
-            L2DACommitmentScheme::from_da_type(args.da_mode)
-        }
-    };
+    crate::common::l1_contracts::ensure_supported_os_ctm(&runner.rpc_url, ctm_proxy).await?;
+    let l2_da_commitment_scheme = args
+        .l2_da_commitment_scheme
+        .unwrap_or_else(|| L2DACommitmentScheme::from_da_type(args.da_mode));
     // `AdminFunctions.setDAValidatorPair` → `Utils.adminExecuteCalls` internally
     // `vm.startBroadcast(adminOwner)` (or the AccessControlRestriction default
     // admin when `--access-control-restriction` is set), so Forge's sender must

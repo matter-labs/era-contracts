@@ -38,7 +38,7 @@ contract BootstrapUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
 
     function setUp() public {
         _prepareUpgrade();
-        _setUpRegistryObjects(true, DELEGATE_CALLDATA);
+        _setUpRegistryObjects(DELEGATE_CALLDATA);
         _mockEcosystemForComposer(mockBridgehub, ctmDeployerStub);
         // The migration reads the ecosystem's Bridgehub off its CTM; the stand-in CTM answers with
         // the chain's.

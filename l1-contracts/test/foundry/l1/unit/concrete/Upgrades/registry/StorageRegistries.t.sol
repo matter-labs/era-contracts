@@ -140,8 +140,8 @@ contract StorageRegistriesTest is Test {
         coreImplNew = _pinned("coreImplNew");
         delegateComposer = new FixedDelegateCalldataComposer(DELEGATE_CALLDATA);
         bridgehub = makeAddr("bridgehub");
-        // A real DiamondInit: VM identity is read from its IS_ZKSYNC_OS immutable.
-        diamondInit = address(new DiamondInit(true));
+        // A real DiamondInit, the one every fixture release pins.
+        diamondInit = address(new DiamondInit());
 
         coreRegistry = new CoreRegistry(_coreManifest());
         // Releases deploy through the canonical factory: transition initialization enforces

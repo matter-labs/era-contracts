@@ -18,11 +18,19 @@ import {CTMUpgradeComposer} from "../upgrades/registry/libraries/CTMUpgradeCompo
 import {IZKChain} from "./chain-interfaces/IZKChain.sol";
 import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
-import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE} from "../common/Config.sol";
+import {
+    DEFAULT_L2_LOGS_TREE_ROOT_HASH,
+    EMPTY_STRING_KECCAK,
+    GENESIS_BATCH_COMMITMENT,
+    L2_TO_L1_LOG_SERIALIZE_SIZE
+} from "../common/Config.sol";
 import {AdminZero, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
 import {ProtocolVersionTooSmall} from "../upgrades/ZkSyncUpgradeErrors.sol";
 import {
     ChainAlreadyLive,
+    GenesisBatchCommitmentIncorrect,
+    GenesisBatchHashZero,
+    GenesisUpgradeZero,
     MigrationsNotPaused,
     EmptyBytes32,
     RegistryReleaseCodehashAlreadySet,
@@ -38,11 +46,10 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {TxStatus} from "../common/Messaging.sol";
 import {CodehashPinLib} from "../upgrades/registry/libraries/CodehashPinLib.sol";
 
-/// @title Chain Type Manager Base contract
+/// @title Chain Type Manager contract
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Base contract for Chain Type Managers with common functionality
-abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ownable2StepUpgradeable {
+contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpgradeable {
     using CodehashPinLib for address;
 
     using EnumerableMap for EnumerableMap.UintToAddressMap;
@@ -198,9 +205,10 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         _;
     }
 
-    /// @return flag whether CTM is for ZKsync OS or Era VM.
-    /// @dev To be defined in derived contracts.
-    function isZKsyncOS() external pure virtual returns (bool);
+    /// @inheritdoc IChainTypeManager
+    function isZKsyncOS() external pure returns (bool) {
+        return true;
+    }
 
     /// @return The tuple of (major, minor, patch) protocol version.
     function getSemverProtocolVersion() external view returns (uint32, uint32, uint32) {
@@ -259,8 +267,32 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         _setCurrentRelease(_initializeData.currentRelease);
     }
 
-    /// @dev Overridden per VM to validate release compatibility and genesis params.
-    function _setCurrentRelease(address _release) internal virtual;
+    /// @dev Validates the release and its genesis params before storing it.
+    function _setCurrentRelease(address _release) internal {
+        if (_release == address(0)) {
+            revert ZeroAddress();
+        }
+        _requireGenuineRelease(_release);
+        ICTMRelease release = ICTMRelease(_release);
+        release.validate();
+        // No version check here: a release is version-INDEPENDENT. The release <-> protocol-version
+        // binding is established atomically by the transition (which calls `setNewVersionUpgrade`
+        // and `setCurrentRelease` from the same pinned object), not re-derived from the release.
+        // slither-disable-next-line unused-return
+        (address genesisUpgrade, bytes32 genesisBatchHash, bytes32 genesisBatchCommitment, ) = release.genesisParams();
+
+        if (genesisUpgrade == address(0)) {
+            revert GenesisUpgradeZero();
+        }
+        if (genesisBatchHash == bytes32(0)) {
+            revert GenesisBatchHashZero();
+        }
+        if (genesisBatchCommitment != GENESIS_BATCH_COMMITMENT) {
+            revert GenesisBatchCommitmentIncorrect();
+        }
+
+        _storeCurrentRelease(_release);
+    }
 
     function setCurrentRelease(address _release) external onlyOwner {
         _setCurrentRelease(_release);
@@ -555,13 +587,6 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         IZKChain(getZKChain(_chainId)).setValidator(_validator, _active);
     }
 
-    /// @dev setPorterAvailability for the specified chain
-    /// @param _chainId the chainId of the chain
-    /// @param _zkPorterIsAvailable whether the zkPorter mode is available
-    function setPorterAvailability(uint256 _chainId, bool _zkPorterIsAvailable) external onlyOwner {
-        IZKChain(getZKChain(_chainId)).setPorterAvailability(_zkPorterIsAvailable);
-    }
-
     /// @notice Deactivates Priority Mode for the specified chain.
     /// The chain will return to normal operation with whitelisted validators.
     /// @param _chainId the chainId of the chain
@@ -674,11 +699,11 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// param _depositSender the address of that sent the deposit
     /// param _ctmData the data of the migration
     function forwardedBridgeConfirmTransferResult(
-        uint256 /* _chainId */,
-        TxStatus /* _txStatus */,
-        bytes32 /* _assetInfo */,
-        address /* _depositSender */,
-        bytes calldata /* _ctmData */
+        uint256, // _chainId
+        TxStatus, // _txStatus
+        bytes32, // _assetInfo
+        address, // _depositSender
+        bytes calldata // _ctmData
     ) external onlyChainAssetHandler {
         // Function is empty due to the fact that when calling `forwardedBridgeBurn` there are no
         // state updates that occur.
