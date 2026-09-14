@@ -994,7 +994,7 @@ async function deployUpgradeMachinery(
     newMigratorFacet: await deployPinned("MigratorFacet", [params.l1ChainId, true /* _isTestnet */]),
     newCommitterFacet: await deployPinned("CommitterFacet", [params.l1ChainId]),
     newDefaultUpgrade: await deployPinned("DefaultUpgrade", []),
-    newDiamondInit: await deployPinned("DiamondInit", [true /* _isZKOS */]),
+    newDiamondInit: await deployPinned("DiamondInit", []),
     // Real verifier contract for the new version (same type the ZKsyncOS CTM uses). Since the
     // dual-verifier removal the ZKsyncOS testnet verifier takes exactly one constructor argument,
     // the plonk sub-verifier deployed just above; no proofs are verified in this harness.
