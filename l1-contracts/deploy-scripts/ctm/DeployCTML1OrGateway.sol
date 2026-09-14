@@ -27,6 +27,10 @@ struct CTMCoreDeploymentConfig {
     /// @notice Address of `AirbenderVerifier`, the Airbender lane of the multi-proof gate.
     ///         `address(0)` when Airbender support is not requested.
     address airbenderVerifier;
+    /// @notice Whether this CTM installs the multi-proof gate as its chains' verifier. Read from the
+    ///         config rather than from `airbenderVerifier`, which is still zero while `DiamondInit` is
+    ///         being deployed.
+    bool airbenderLane;
     /// @notice Address of the Boojum router (`EraDualVerifier` or `EraTestnetVerifier`), which becomes the
     ///         Boojum lane of `EraMultiProofVerifier` when Airbender support is requested.
     address boojumVerifier;
@@ -127,7 +131,7 @@ library DeployCTML1OrGateway {
         } else if (_contractName == CTMContract.CommitterFacet) {
             return abi.encode(_config.l1ChainId);
         } else if (_contractName == CTMContract.DiamondInit) {
-            return abi.encode(_isZKsyncOS, _config.airbenderVerifier);
+            return abi.encode(_isZKsyncOS, _config.airbenderLane);
         } else if (_contractName == CTMContract.DualVerifier || _contractName == CTMContract.TestnetVerifier) {
             return
                 verifierCreationArgs(_isZKsyncOS, _config.verifierFflonk, _config.verifierPlonk, _config.verifierOwner);

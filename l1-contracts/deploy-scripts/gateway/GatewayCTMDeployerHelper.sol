@@ -832,6 +832,7 @@ library GatewayCTMDeployerHelper {
                 // Gateway CTM deployment does not wire in the Airbender lane at all.
                 airbenderVerifierPlonk: address(0),
                 airbenderVerifier: address(0),
+                airbenderLane: false,
                 boojumVerifier: address(0),
                 verifierOwner: _config.aliasedGovernanceAddress,
                 permissionlessValidator: address(0)
