@@ -30,9 +30,8 @@ contract EraSettlementLayerV32Upgrade is BaseZkSyncUpgrade {
 
         super.upgrade(_proposedUpgrade);
 
-        // Shipping the Airbender lane is the point of this cut, and the chain comes out of it with
-        // `disabledProofSystems` at zero. A verifier that does not take the combined envelope would
-        // leave it unable to prove anything it commits, so the wiring is checked rather than assumed.
+        // A verifier that does not take the combined envelope would leave the chain unable to prove
+        // anything it commits, so the wiring is checked rather than assumed.
         try IEraMultiProofVerifier(address(s.verifier)).acceptedProofType() returns (uint256 proofType) {
             if (proofType != ERA_MULTI_PROOF_TYPE) {
                 revert VerifierDoesNotSupportMultiProof(address(s.verifier));

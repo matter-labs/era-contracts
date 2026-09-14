@@ -404,9 +404,7 @@ abstract contract DeployCTMUtils is DeployUtils {
                 verifierPlonk: ctmAddresses.stateTransition.verifiers.verifierPlonk,
                 airbenderVerifierPlonk: ctmAddresses.stateTransition.verifiers.airbenderVerifierPlonk,
                 airbenderVerifier: ctmAddresses.stateTransition.verifiers.airbenderVerifier,
-                // Same condition `DeployCTM` uses to pick the chain's verifier, so the gate and the
-                // chains it serves cannot disagree about the lane.
-                airbenderLane: _config.airbenderVerifier && !_config.isZKsyncOS,
+                airbenderLane: DeployCTML1OrGateway.hasAirbenderLane(_config.airbenderVerifier, _config.isZKsyncOS),
                 boojumVerifier: ctmAddresses.stateTransition.verifiers.boojumVerifier,
                 // For L1 deployment we need to use the deployer as the owner of the verifier,
                 // because we set the dual verifier later. Use getBroadcasterAddress() to get

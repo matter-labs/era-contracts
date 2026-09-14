@@ -27,9 +27,9 @@ struct CTMCoreDeploymentConfig {
     /// @notice Address of `AirbenderVerifier`, the Airbender lane of the multi-proof gate.
     ///         `address(0)` when Airbender support is not requested.
     address airbenderVerifier;
-    /// @notice Whether this CTM installs the multi-proof gate as its chains' verifier. Read from the
-    ///         config rather than from `airbenderVerifier`, which is still zero while `DiamondInit` is
-    ///         being deployed.
+    /// @notice Whether this CTM installs the multi-proof gate as its chains' verifier. A flag of its own
+    ///         because `airbenderVerifier` above is an address, and `DiamondInit` needs the decision as a
+    ///         bool. Set it with `hasAirbenderLane`.
     bool airbenderLane;
     /// @notice Address of the Boojum router (`EraDualVerifier` or `EraTestnetVerifier`), which becomes the
     ///         Boojum lane of `EraMultiProofVerifier` when Airbender support is requested.
@@ -102,6 +102,13 @@ library DeployCTML1OrGateway {
         return resolve(_isZKsyncOS, _testnet ? CTMContract.MultiProofTestnetVerifier : CTMContract.MultiProofVerifier);
     }
 
+    /// @notice Whether a CTM built from this config installs the multi-proof gate.
+    /// @dev The one place the decision is made, so the verifier a CTM deploys and the proof systems its
+    ///      chains are created requiring cannot drift apart.
+    function hasAirbenderLane(bool _airbenderRequested, bool _isZKsyncOS) internal pure returns (bool) {
+        return _airbenderRequested && !_isZKsyncOS;
+    }
+
     // ======================== Creation calldata ========================
 
     // solhint-disable-next-line code-complexity
@@ -109,7 +116,7 @@ library DeployCTML1OrGateway {
         CTMCoreDeploymentConfig memory _config,
         bool _isZKsyncOS,
         CTMContract _contractName,
-        bool /* _isZKBytecode */
+        bool _isZKBytecode
     ) internal view returns (bytes memory) {
         if (_contractName == CTMContract.AdminFacet) {
             return abi.encode(_config.l1ChainId, _config.rollupDAManager);
@@ -131,7 +138,9 @@ library DeployCTML1OrGateway {
         } else if (_contractName == CTMContract.CommitterFacet) {
             return abi.encode(_config.l1ChainId);
         } else if (_contractName == CTMContract.DiamondInit) {
-            return abi.encode(_isZKsyncOS, _config.airbenderLane);
+            // A ZK bytecode is a CTM deployed onto Gateway, and the Gateway flow wires no Airbender lane
+            // (see `GatewayCTMDeployerVerifiers`), so its chains are Boojum-only whatever the config asks.
+            return abi.encode(_isZKsyncOS, !_isZKBytecode && _config.airbenderLane);
         } else if (_contractName == CTMContract.DualVerifier || _contractName == CTMContract.TestnetVerifier) {
             return
                 verifierCreationArgs(_isZKsyncOS, _config.verifierFflonk, _config.verifierPlonk, _config.verifierOwner);

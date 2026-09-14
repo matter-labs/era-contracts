@@ -40,7 +40,6 @@ import {
     MigrationInProgress
 } from "../../L1StateTransitionErrors.sol";
 import {
-    MultiProofChainCannotMigrate,
     NotAZKChain,
     NotCompatibleWithPriorityMode,
     RemovingPermanentRestriction
@@ -164,13 +163,6 @@ contract MigratorFacet is ZKChainBase, IMigrator {
         if (_originalCaller != s.admin) {
             revert NotChainAdmin(_originalCaller, s.admin);
         }
-        // `disabledProofSystems` is not carried in `ZKChainCommitment`, and the destination
-        // initialises Era chains requiring every proof system. Migrating with one masked off would
-        // silently put it back, so require the posture the destination will come up in.
-        if (!s.zksyncOS && s.disabledProofSystems != 0) {
-            revert MultiProofChainCannotMigrate();
-        }
-
         /// We require that all the priority transactions are processed.
         require(s.priorityTree.getSize() == 0, PriorityQueueNotFullyProcessed());
 

@@ -109,8 +109,6 @@ contract EraSettlementLayerV32UpgradeTest is BaseUpgrade {
         upgradeContract.upgrade(proposedUpgrade);
     }
 
-    /// The chain comes out of the cut requiring an Airbender proof, so a verifier taking some other
-    /// envelope would leave it unable to prove anything it commits.
     function test_revertWhen_verifierTakesAnotherProofType() public {
         _mockAcceptedProofType(ERA_MULTI_PROOF_TYPE + 1);
 

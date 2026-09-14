@@ -230,7 +230,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         ctmAddresses.stateTransition.verifiers.verifierFflonk = deploySimpleContract(fflonkName, false);
         ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract(plonkName, false);
 
-        bool deployAirbenderLane = config.airbenderVerifier && !config.isZKsyncOS;
+        bool deployAirbenderLane = DeployCTML1OrGateway.hasAirbenderLane(config.airbenderVerifier, config.isZKsyncOS);
 
         // The Boojum router is deployed either way. Behind the multi-proof gate it must be the production
         // router even on testnets: the gate already provides the empty-proof skip, and a second skip inside

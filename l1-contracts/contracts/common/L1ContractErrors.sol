@@ -278,8 +278,6 @@ error MockVerifierNotSupported();
 error MsgValueMismatch(uint256 expectedMsgValue, uint256 providedMsgValue);
 // 0xb385a3da
 error MsgValueTooLow(uint256 required, uint256 provided);
-// 0x379ac44c
-error MultiProofChainCannotMigrate();
 // 0xedd74330
 error MustBeEraChain();
 // 0x8b7e144a

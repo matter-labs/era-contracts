@@ -134,9 +134,8 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.precommitmentForTheLatestBatch = DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH;
         s.zksyncOS = IS_ZKSYNC_OS;
 
-        // Without the Airbender lane the chain's verifier is the Boojum router alone, which reads a
-        // single public input. Masking the lane off at creation keeps the chain from committing
-        // Airbender data that no installed verifier can check.
+        // Keeps the chain from committing Airbender data no installed verifier can check: without the
+        // lane its verifier is the Boojum router alone, which reads a single public input.
         if (!IS_ZKSYNC_OS && !HAS_AIRBENDER_LANE) {
             s.disabledProofSystems = AIRBENDER_PROOF_SYSTEM_DISABLED;
         }
