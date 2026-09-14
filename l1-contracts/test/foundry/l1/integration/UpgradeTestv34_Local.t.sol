@@ -8,12 +8,13 @@ import {console2 as console} from "forge-std/Script.sol";
 import {CTMUpgrade_v34} from "../../../../deploy-scripts/upgrade/v34/CTMUpgrade_v34.s.sol";
 import {CoreUpgrade_v34} from "../../../../deploy-scripts/upgrade/v34/CoreUpgrade_v34.s.sol";
 import {DefaultCoreUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCoreUpgrade.s.sol";
-import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
+import {
+    AuthoredL2Side,
+    DefaultCTMUpgrade
+} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
 import {DefaultChainUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultChainUpgrade.s.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {L2_ECOSYSTEM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
-import {AuthoredL2Plan, PinnedContract} from "contracts/upgrades/registry/RegistryTypes.sol";
-import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
@@ -57,24 +58,12 @@ contract CTMUpgrade_v34_Test is CTMUpgrade_v34 {
         return new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
     }
 
-    /// @dev This fixture is L1-only: no L2 leg is relayed, and the real plan's delegate-bytecode
-    ///      read is MemoryOOG here. An empty authored remainder over the empty table above is an
-    ///      L1-only edge, for which the migration composes the all-zero L2 transaction.
-    function bootstrapAuthoredL2Plan() internal override returns (AuthoredL2Plan memory) {
-        return
-            AuthoredL2Plan({
-                extraDeployments: new IComplexUpgrader.UniversalContractUpgradeInfo[](0),
-                delegateTo: address(0),
-                delegateComposer: PinnedContract({addr: address(0), codehash: bytes32(0)}),
-                factoryDepHashes: new uint256[](0)
-            });
-    }
-
-    /// @notice Nothing to publish for an L1-only edge (reading the real factory deps' JSON
-    ///         artifacts is MemoryOOG here); the plan carries no dependencies either.
-    function publishBytecodes() public override {
-        console.log("Test mode: L1-only edge, no factory deps to publish");
-        upgradeConfig.factoryDepsPublished = true;
+    /// @dev This fixture is L1-only: no L2 leg is relayed, and the real side's artifact reads (the
+    ///      delegate's and every built-in's bytecode) are MemoryOOG here. The base's default — an
+    ///      empty plan over the empty table above and nothing to publish — is an L1-only edge, for
+    ///      which the migration composes the all-zero L2 transaction.
+    function authorL2Side() internal override returns (AuthoredL2Side memory) {
+        return DefaultCTMUpgrade.authorL2Side();
     }
 }
 

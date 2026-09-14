@@ -66,10 +66,10 @@ Per-environment inputs live in `upgrade-envs/<version>/<env>.toml` (see
 
 Start from `v35/` as the template: inherit the `Default*Upgrade` bases, override
 `deployNew*Contracts` with the contracts the release changes, and keep everything else derived.
-A release whose L2 built-ins change must also author the L2 remainder
-(`transitionAuthoredL2Plan`: the delegate's unsafe deployment, the pinned composer, the published
-factory dependencies — the v34 bootstrap shows the shape) because the release-pair derivation
-puts the changed built-ins in the L2 leg. See the Transition sections of
+A release whose L2 built-ins change must also author the L2 side
+(`authorL2Side`: the delegate's unsafe deployment, the pinned composer, and the bytecodes the
+prepare publishes as the plan's factory dependencies — the v34 bootstrap shows the shape) because
+the release-pair derivation puts the changed built-ins in the L2 leg. See the Transition sections of
 `docs/registry-driven-upgrades.md` and `docs/upgrade-stage-lifecycle.md` §4.7.
 
 ## Script retirement review
