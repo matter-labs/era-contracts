@@ -28,12 +28,12 @@ import {
     L1EcosystemContract
 } from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {
-    CoordinatorNotBound,
     DuplicateOperationLeg,
     EmptyOperation,
     L2BytecodeNotPublished,
     OperationNotPending,
     ProxyUpgradeRowMismatch,
+    Unauthorized,
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
 import {
@@ -235,8 +235,8 @@ contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
         _assertAllFree();
     }
 
-    /// @dev Stage 2 checks every leg before releasing any pause: a later CTM's foreign-admin row
-    ///      still waiting for its administrator holds the FIRST CTM's pause too.
+    /// @dev Stage 2 is one transaction: a later CTM's foreign-admin row still waiting for its
+    ///      administrator rolls back the core's and the first CTM's release too.
     function test_stage2ReleasesNothingUntilEveryLegVerified() public {
         // A per-CTM proxy of the second CTM under an admin the executor does not own.
         address chainAdmin = makeAddr("chainAdmin");
@@ -308,7 +308,7 @@ contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
         vm.prank(governor);
         ctmExecutor2.setCoordinator(other);
 
-        vm.expectRevert(abi.encodeWithSelector(CoordinatorNotBound.selector, address(ctmExecutor2), other));
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(coordinator)));
         vm.prank(governor);
         coordinator.stage0(operation);
         _assertAllFree();

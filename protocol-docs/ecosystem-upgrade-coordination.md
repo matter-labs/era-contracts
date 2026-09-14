@@ -27,33 +27,39 @@ they must not silently bypass preparation because the CTM list is empty.
 
 ## Stages
 
-Stage 0 validates all participants and their authority, reserves their transitions,
-pauses the affected migrations, and starts the pinned timers. Each domain executor
-validates its own leg when it is reserved (`beginOperation`): the core executor pins
-and validates the registry, the CTM executor pins and validates the transition and
-checks both version edges, then pauses its CTM's migrations — ChainAssetHandler
-requires the registered CTM owner for that. Timer-start authority belongs to the
+Stage 0 reserves every participant, pauses the affected migrations, and starts the
+pinned timers (each timer once — legs may share one). Each domain executor validates
+its own leg when it is reserved (`beginOperation(operation)`, reading the leg from
+the operation): the core executor pins and validates the registry, the CTM executor
+pins and validates the transition and checks both version edges, then pauses its
+CTM's migrations — ChainAssetHandler requires the registered CTM owner for that.
+Authority is the domain's to enforce: every callback is `onlyCoordinator`, and the
+coordinator performs no pre-check of its own. Timer-start authority belongs to the
 coordinator.
 
 Stage 1 checks all deadlines and pause preconditions before applying the core leg
 once, followed by the CTM legs in committed order. The entire stage is atomic.
 No CTM callback may apply the core leg independently.
 
-Stage 2 checks the core result and every CTM result before releasing any migration
-pause. Foreign-admin rows must be applied before completion. Completion concerns
-L1 execution; it does not claim that all chains have completed their L2 upgrades.
+Stage 2 completes every domain in one transaction: each verifies its own result
+(`completeOperation`) before releasing its reservation and, for a CTM, its migration
+pause. A later domain's refusal rolls back the earlier releases, so no pause is
+lifted unless every leg verified. Foreign-admin rows must be applied before
+completion. Completion concerns L1 execution; it does not claim that all chains have
+completed their L2 upgrades.
 
 Abandonment clears reservations without reversing already committed upgrades and
 leaves migrations paused. Governance explicitly decides whether to resume them.
 
 ## Authorization and recovery
 
-Each domain explicitly authorizes its coordinator. An address declaring the same
-governance owner is not evidence of authorization. Domain callbacks require that
-the coordinator is executing the exact operation and leg previously reserved.
-Replacement is forbidden while the domain has a pending operation. Existing
-governance operational entrypoints and the logged ordinary-call recovery path
-remain available.
+Each domain explicitly authorizes its coordinator (`setCoordinator`). An address
+declaring the same governance owner is not evidence of authorization. Domain
+callbacks require that the coordinator is executing the exact operation reserved;
+the leg is read from that operation, never re-supplied, so a domain cannot be
+reserved for one registry or transition and driven with another. Replacement is
+forbidden while the domain has a pending operation. Existing governance operational
+entrypoints and the logged ordinary-call recovery path remain available.
 
 ## Integration gate
 

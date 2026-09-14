@@ -355,7 +355,7 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
         EcosystemUpgradeOperation operation = _operationFor(transition);
         vm.startPrank(governor);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
-        ctmExecutor.beginOperation(operation, ICTMTransition(address(transition)));
+        ctmExecutor.beginOperation(operation);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
         ctmExecutor.applyTransition(ICTMTransition(address(transition)));
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));

@@ -44,9 +44,6 @@ contract CoreUpgradeExecutor is UpgradeExecutorBase {
     /// @notice The operation this executor is reserved for, zero when free.
     IEcosystemUpgradeOperation public activeOperation;
 
-    /// @notice The registry `beginOperation` reserved — the only one the coordinator may apply.
-    ICoreRegistry public reservedCoreRegistry;
-
     /// @notice Emitted after a registry's rows were applied through the bound admin.
     event L1UpgradeApplied(address indexed coreRegistry);
 
@@ -56,8 +53,11 @@ contract CoreUpgradeExecutor is UpgradeExecutorBase {
     /// @notice Emitted when the coordinator reserves this executor for an operation's core leg.
     event OperationReserved(address indexed operation, address indexed coreRegistry);
 
-    /// @notice Emitted when the reservation is released (completion or abandonment alike).
-    event OperationEnded(address indexed operation);
+    /// @notice Emitted by `completeOperation`: the registry is applied and the reservation released.
+    event OperationCompleted(address indexed operation);
+
+    /// @notice Emitted by `abandonOperation`: the reservation is released, nothing verified.
+    event OperationAbandoned(address indexed operation);
 
     modifier onlyCoordinator() {
         if (msg.sender != coordinator) {
@@ -93,21 +93,31 @@ contract CoreUpgradeExecutor is UpgradeExecutorBase {
     }
 
     /// @notice Reserves this executor for `_operation`'s ecosystem leg after checking the registry
-    ///         is a genuine, valid object.
+    ///         the operation names is a genuine, valid object.
+    /// @dev The registry is read from the operation, never passed: the operation is the one place
+    ///      it is named.
     /// @param _operation The operation the coordinator is preparing.
-    /// @param _coreRegistry The registry that operation's transitions name.
-    function beginOperation(IEcosystemUpgradeOperation _operation, ICoreRegistry _coreRegistry) external onlyCoordinator {
+    function beginOperation(IEcosystemUpgradeOperation _operation) external onlyCoordinator {
         if (address(activeOperation) != address(0)) {
             revert UpgradeLifecycleBusy(address(activeOperation));
         }
-        if (address(_operation) == address(0) || address(_coreRegistry) == address(0)) {
+        address coreRegistry = _operation.coreRegistry();
+        if (coreRegistry == address(0)) {
             revert ZeroAddress();
         }
-        address(_coreRegistry).requirePin(CORE_REGISTRY_CODEHASH);
-        _coreRegistry.validate();
+        coreRegistry.requirePin(CORE_REGISTRY_CODEHASH);
+        ICoreRegistry(coreRegistry).validate();
         activeOperation = _operation;
-        reservedCoreRegistry = _coreRegistry;
-        emit OperationReserved(address(_operation), address(_coreRegistry));
+        emit OperationReserved(address(_operation), coreRegistry);
+    }
+
+    /// @notice The registry of the active operation — the only one the coordinator may apply;
+    ///         zero when free. Derived from the operation, not stored.
+    function reservedCoreRegistry() public view returns (ICoreRegistry) {
+        if (address(activeOperation) == address(0)) {
+            return ICoreRegistry(address(0));
+        }
+        return ICoreRegistry(activeOperation.coreRegistry());
     }
 
     /// @notice Applies a core registry's source-checked implementation swaps through the bound
@@ -117,8 +127,9 @@ contract CoreUpgradeExecutor is UpgradeExecutorBase {
     /// @param _coreRegistry The write-once registry approved by governance.
     function applyL1Upgrade(ICoreRegistry _coreRegistry) external {
         if (msg.sender == coordinator) {
-            if (address(reservedCoreRegistry) != address(_coreRegistry)) {
-                revert LegNotReserved(address(_coreRegistry), address(reservedCoreRegistry));
+            ICoreRegistry reserved = reservedCoreRegistry();
+            if (address(reserved) != address(_coreRegistry)) {
+                revert LegNotReserved(address(_coreRegistry), address(reserved));
             }
         } else if (msg.sender != owner()) {
             revert Unauthorized(msg.sender);
@@ -130,16 +141,27 @@ contract CoreUpgradeExecutor is UpgradeExecutorBase {
         emit L1UpgradeApplied(address(_coreRegistry));
     }
 
-    /// @notice Releases the reservation held for `_operation`.
-    /// @dev The ecosystem leg has no pause of its own, so completion and abandonment are the same
-    ///      bookkeeping here; the coordinator decides which one it is.
-    function endOperation(IEcosystemUpgradeOperation _operation) external onlyCoordinator {
+    /// @notice Requires the reserved registry applied, then releases the reservation.
+    /// @dev The ecosystem leg has no pause of its own; what completion adds over abandonment is
+    ///      the verification, owned by the domain that applied the rows.
+    function completeOperation(IEcosystemUpgradeOperation _operation) external onlyCoordinator {
+        _requireActive(_operation);
+        ProxyUpgradeRowLib.requireRowsApplied(PROXY_ADMIN, reservedCoreRegistry().ecosystemRows());
+        delete activeOperation;
+        emit OperationCompleted(address(_operation));
+    }
+
+    /// @notice Releases the reservation held for `_operation` without verifying anything.
+    function abandonOperation(IEcosystemUpgradeOperation _operation) external onlyCoordinator {
+        _requireActive(_operation);
+        delete activeOperation;
+        emit OperationAbandoned(address(_operation));
+    }
+
+    function _requireActive(IEcosystemUpgradeOperation _operation) private view {
         if (address(activeOperation) != address(_operation)) {
             revert OperationNotPending(address(_operation), address(activeOperation));
         }
-        delete activeOperation;
-        delete reservedCoreRegistry;
-        emit OperationEnded(address(_operation));
     }
 
     /// @notice Reverts unless every row of `_coreRegistry` is applied: each proxy points at its
