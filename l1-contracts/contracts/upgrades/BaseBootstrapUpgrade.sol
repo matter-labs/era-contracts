@@ -16,12 +16,11 @@ import {ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice The bootstrap edge's entrypoint, shared by the production engine
-///         ({BootstrapUpgradeZKsyncOS}) and the test-only one. The committed cut carries NO facet
-///         cuts: this init derives the full facet reinstall on-chain and applies it before the
-///         storage/L2 part, the same two-step shape `upgradeFromTransition` gives every
-///         registry-driven edge after it. See the Bootstrap section of
-///         {docs/registry-driven-upgrades.md}.
+/// @notice The bootstrap edge's entrypoint ({BootstrapUpgradeZKsyncOS} is the engine). The
+///         committed cut carries NO facet cuts: this init derives the full facet reinstall on-chain
+///         and applies it before the storage/L2 part, the same two-step shape
+///         `upgradeFromTransition` gives every registry-driven edge after it. See the Bootstrap
+///         section of {docs/registry-driven-upgrades.md}.
 /// @dev The remove side is the DEPARTING diamond's own routing, read straight from its diamond
 ///      storage ({LiveRoutingReader}). The add side is the pinned genesis release's facet set: the
 ///      exact cuts a new chain geneses with (`ReleaseFacetReader`), so the bootstrap edge cannot
@@ -44,6 +43,7 @@ abstract contract BaseBootstrapUpgrade is BaseZkSyncUpgrade, IBootstrapUpgrade {
 
     /// @inheritdoc IBootstrapUpgrade
     function upgradeFromBootstrap(address _migration) external returns (bytes32) {
+        _requireAllBatchesExecuted();
         IRegistryBootstrapMigration migration = IRegistryBootstrapMigration(_migration);
         BootstrapManifest memory m = migration.getManifest();
         // The manifest pins the engine (whose code carries `GENESIS_RELEASE`) and the release it
@@ -65,7 +65,8 @@ abstract contract BaseBootstrapUpgrade is BaseZkSyncUpgrade, IBootstrapUpgrade {
                 _plan: migration.l2Plan(),
                 _newRelease: GENESIS_RELEASE,
                 _newProtocolVersion: m.newProtocolVersion,
-                _bridgehub: s.bridgehub
+                _bridgehub: s.bridgehub,
+                _chainId: s.chainId
             })
         });
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;

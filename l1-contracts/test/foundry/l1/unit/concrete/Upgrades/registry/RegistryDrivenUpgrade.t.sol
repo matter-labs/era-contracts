@@ -33,7 +33,6 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {AcceptingVerifier} from "contracts/dev-contracts/test/AcceptingVerifier.sol";
 import {FixedDelegateCalldataComposer} from "contracts/dev-contracts/FixedDelegateCalldataComposer.sol";
-import {RegistryComposerHarness} from "contracts/dev-contracts/RegistryComposerHarness.sol";
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
@@ -409,12 +408,13 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
         );
         assertEq(chainContractAddress.BRIDGE_HUB(), address(bridgehub));
 
-        // The committed L2 upgrade transaction is exactly the registry-composed one, carrying
-        // the VM's upgrade-transaction type (254 for Era, 126 for ZKsyncOS) and, as the delegate
-        // calldata, what the pinned composer composed.
+        // The committed L2 upgrade transaction is exactly the registry-composed one FOR THIS
+        // CHAIN (`s.chainId`), carrying the ZKsync OS upgrade-transaction type (126) and, as the
+        // delegate calldata, what the pinned composer composed.
         L2CanonicalTransaction memory expectedTx = CTMUpgradeComposer.buildL2UpgradeTx(
             ICTMTransition(address(transitionV33)),
-            address(bridgehub)
+            address(bridgehub),
+            chainId
         );
         assertEq(expectedTx.factoryDeps.length, 3, "the L2 transaction carries every installed bytecode");
         assertEq(expectedTx.txType, _expectedL2UpgradeTxType(), "the upgrade tx must carry the VM's upgrade tx type");
@@ -433,13 +433,21 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
             keccak256(abi.encode(expectedTx)),
             "the chain must commit the registry-composed L2 upgrade transaction"
         );
-        // The off-chain tooling's view of the same composition (the anvil runner relays exactly
-        // this) agrees with what the chain committed.
-        RegistryComposerHarness harness = new RegistryComposerHarness();
+        // The off-chain tooling's read of the same composition (the anvil runner relays exactly
+        // this): the transition forwards to the pinned engine, which serves what the chain committed.
         assertEq(
-            harness.l2UpgradeTxHash(ICTMTransition(address(transitionV33)), address(bridgehub)),
+            keccak256(abi.encode(transitionV33.l2UpgradeTx(address(bridgehub), chainId))),
             committedHash,
-            "the harness must reproduce the committed hash"
+            "the transition must serve the committed transaction"
+        );
+        assertEq(
+            keccak256(
+                abi.encode(
+                    DefaultUpgrade(defaultUpgrade).l2UpgradeTx(address(transitionV33), address(bridgehub), chainId)
+                )
+            ),
+            committedHash,
+            "the engine must serve the committed transaction"
         );
     }
 

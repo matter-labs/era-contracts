@@ -604,11 +604,10 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         return externalActions.describe();
     }
 
-    /// @notice The per-chain upgrade engine the transition pins. The repository is ZKsync-OS-only, so
-    ///         the default is the ZKsync OS engine (it performs the per-chain rewrite of an L2 leg and
-    ///         leaves an L1-only edge's all-zero L2 transaction alone).
+    /// @notice The per-chain upgrade engine the transition pins: it composes each chain's L2 leg
+    ///         from the transition's plan and leaves an L1-only edge's all-zero L2 transaction alone.
     function deployUsedUpgradeContract() internal virtual returns (address) {
-        return deploySimpleContract("DefaultUpgradeZKsyncOS");
+        return deploySimpleContract("DefaultUpgrade");
     }
 
     function deployGovernanceUpgradeTimer() internal virtual {

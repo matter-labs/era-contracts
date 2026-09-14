@@ -14,7 +14,9 @@ import {L2CanonicalTransaction} from "../common/Messaging.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The default per-chain upgrade engine: reads everything it applies from the committed
-///         `CTMTransition` and its target release. See {docs/registry-driven-upgrades.md}.
+///         `CTMTransition` and its target release, and composes the chain's L2 protocol upgrade
+///         transaction once, from that plan and the chain's own identity. See
+///         {docs/registry-driven-upgrades.md}.
 contract DefaultUpgrade is BaseZkSyncUpgrade, IDefaultUpgrade {
     /// @inheritdoc IDefaultUpgrade
     /// @dev CTM binding is commitment-based: this init only runs through the cut the chain reads
@@ -25,6 +27,7 @@ contract DefaultUpgrade is BaseZkSyncUpgrade, IDefaultUpgrade {
     ///      Pins cannot have moved since: an `EXTCODEHASH` is fixed for a non-selfdestructible
     ///      contract.
     function upgradeFromTransition(address _transition) external returns (bytes32) {
+        _requireAllBatchesExecuted();
         ICTMTransition transition = ICTMTransition(_transition);
         TransitionManifest memory m = transition.getManifest();
         // Straight from the TARGET release, never from the CTM's live `currentRelease()`: a chain
@@ -41,7 +44,8 @@ contract DefaultUpgrade is BaseZkSyncUpgrade, IDefaultUpgrade {
                 _plan: transition.l2Plan(),
                 _newRelease: newRelease,
                 _newProtocolVersion: m.newProtocolVersion,
-                _bridgehub: s.bridgehub
+                _bridgehub: s.bridgehub,
+                _chainId: s.chainId
             })
         });
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
@@ -50,8 +54,9 @@ contract DefaultUpgrade is BaseZkSyncUpgrade, IDefaultUpgrade {
     /// @inheritdoc IDefaultUpgrade
     function l2UpgradeTx(
         address _transition,
-        address _bridgehub
+        address _bridgehub,
+        uint256 _chainId
     ) external view returns (L2CanonicalTransaction memory) {
-        return CTMUpgradeComposer.buildL2UpgradeTx(ICTMTransition(_transition), _bridgehub);
+        return CTMUpgradeComposer.buildL2UpgradeTx(ICTMTransition(_transition), _bridgehub, _chainId);
     }
 }

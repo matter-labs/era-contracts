@@ -23,6 +23,7 @@ import {
     SettlementLayerUpgradeMustPrecedeChainUpgrade
 } from "./ZkSyncUpgradeErrors.sol";
 import {TimeNotReached, TooManyFactoryDeps, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {NotAllBatchesExecuted} from "../state-transition/L1StateTransitionErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
@@ -96,6 +97,17 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         }
 
         emit UpgradeComplete(_newProtocolVersion, txHash, _l2ProtocolUpgradeTx);
+    }
+
+    /// @notice Reverts unless every batch the chain has committed is also executed.
+    /// @dev The generic engines require this before {_upgrade} because they install the TARGET
+    ///      release's verifier (see {_setVerifier}), and a release ships a fresh one: batches still
+    ///      awaiting proof under the old verifier would stop being provable. Good practice rather
+    ///      than an invariant — the upgrade only sees the state of the block it lands in.
+    function _requireAllBatchesExecuted() internal view {
+        if (s.totalBatchesCommitted != s.totalBatchesExecuted) {
+            revert NotAllBatchesExecuted();
+        }
     }
 
     /// @notice Applies DERIVED, ready-to-execute diamond cuts to the diamond this contract is

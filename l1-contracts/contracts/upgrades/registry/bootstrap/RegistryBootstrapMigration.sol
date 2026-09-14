@@ -126,14 +126,15 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
     }
 
     /// @inheritdoc IRegistryBootstrapMigration
-    function l2UpgradeTx() public view returns (L2CanonicalTransaction memory) {
+    function l2UpgradeTx(uint256 _chainId) public view returns (L2CanonicalTransaction memory) {
         BootstrapManifest memory m = getManifest();
         return
             CTMUpgradeComposer.buildL2UpgradeTxFromPlan({
                 _plan: l2Plan(),
                 _newRelease: ICTMRelease(m.currentRelease.addr),
                 _newProtocolVersion: m.newProtocolVersion,
-                _bridgehub: IChainTypeManager(m.ctm).BRIDGE_HUB()
+                _bridgehub: IChainTypeManager(m.ctm).BRIDGE_HUB(),
+                _chainId: _chainId
             });
     }
 

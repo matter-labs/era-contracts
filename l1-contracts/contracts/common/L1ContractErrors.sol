@@ -518,8 +518,6 @@ error Unauthorized(address caller);
 error UndefinedDiamondCutAction();
 // 0x6aa39880
 error UnexpectedSystemLog(uint256 logKey);
-// 0x8124d8ff
-error UnexpectedUpgradeSelector();
 // 0xc352bb73
 error UnknownVerifierType();
 // 0xf3dd1b9c

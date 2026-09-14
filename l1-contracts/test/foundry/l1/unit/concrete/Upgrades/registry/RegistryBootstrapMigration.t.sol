@@ -517,10 +517,10 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             address(delegateComposer),
             abi.encodeCall(
                 IL2DelegateCalldataComposer.composeDelegateCalldata,
-                (ICTMRelease(address(tableRelease)), address(bridgehub))
+                (ICTMRelease(address(tableRelease)), address(bridgehub), chainId)
             )
         );
-        L2CanonicalTransaction memory transaction = composed.l2UpgradeTx();
+        L2CanonicalTransaction memory transaction = composed.l2UpgradeTx(chainId);
         assertEq(
             keccak256(abi.encode(transaction)),
             keccak256(abi.encode(_expectedL2Tx(plan, DELEGATE_CALLDATA))),
@@ -590,10 +590,10 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             address(delegateComposer),
             abi.encodeCall(
                 IL2DelegateCalldataComposer.composeDelegateCalldata,
-                (ICTMRelease(address(genesisRelease)), address(bridgehub))
+                (ICTMRelease(address(genesisRelease)), address(bridgehub), chainId)
             )
         );
-        L2CanonicalTransaction memory transaction = authored.l2UpgradeTx();
+        L2CanonicalTransaction memory transaction = authored.l2UpgradeTx(chainId);
 
         (
             IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments,
@@ -616,7 +616,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         L2UpgradePlan memory served = uncomposed.l2Plan();
         assertEq(served.delegateComposer, address(0), "no composer is served as zero");
 
-        L2CanonicalTransaction memory transaction = uncomposed.l2UpgradeTx();
+        L2CanonicalTransaction memory transaction = uncomposed.l2UpgradeTx(chainId);
         assertEq(transaction.txType, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE, "the plan still has an L2 side");
         assertEq(
             transaction.data,
@@ -682,7 +682,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         assertEq(plan.delegateComposer, address(0));
         assertEq(plan.factoryDepHashes.length, 0);
 
-        L2CanonicalTransaction memory transaction = migration.l2UpgradeTx();
+        L2CanonicalTransaction memory transaction = migration.l2UpgradeTx(chainId);
         assertEq(transaction.txType, 0, "no L2 side composes no L2 transaction");
         assertEq(
             keccak256(abi.encode(transaction)),
@@ -715,7 +715,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         assertEq(plan.factoryDepHashes.length, 1);
         assertEq(plan.factoryDepHashes[0], L2PlanFixtures.factoryDepHash(DELEGATE_CODE));
         assertEq(
-            authored.l2UpgradeTx().txType,
+            authored.l2UpgradeTx(chainId).txType,
             ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE,
             "an authored delegate alone gives the edge an L2 side"
         );

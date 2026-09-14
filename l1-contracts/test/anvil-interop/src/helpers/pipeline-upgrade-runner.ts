@@ -263,7 +263,7 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
       "script-out",
       `upgrade-ctm-${upgradeHarnessInputs.ctmProxyAddress.toLowerCase()}.toml`
     );
-    const { cut, migrationAddr, settlementLayerUpgradeAddr } = readCommittedCut(ctmTomlPath);
+    const { cut, migrationAddr } = readCommittedCut(ctmTomlPath);
     await runLegacyChainLegAndRelayL2({
       l1Provider,
       anvilManager,
@@ -271,8 +271,6 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
       oldVersion,
       cut,
       migrationAddr,
-      settlementLayerUpgradeAddr,
-      bridgehubAddr: l1Addresses.bridgehub,
       ctmAddr: ctmAddresses.chainTypeManager,
       isZKsyncOS: scenario.isZKsyncOS,
       l2DelegateBytecodeName: scenario.l2DelegateBytecodeName,
@@ -958,28 +956,22 @@ function readCommittedCut(ctmTomlPath: string): {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   cut: any;
   migrationAddr: string;
-  settlementLayerUpgradeAddr: string;
 } {
   if (!fs.existsSync(ctmTomlPath)) {
     throw new Error(`Missing per-CTM prepare output ${ctmTomlPath}. Did upgrade-prepare-all run?`);
   }
   const ctmOutput = parseToml(fs.readFileSync(ctmTomlPath, "utf8")) as {
     chain_upgrade_diamond_cut?: string;
-    state_transition?: { default_upgrade_addr?: string };
   };
   const cutBytes = ctmOutput.chain_upgrade_diamond_cut;
   if (typeof cutBytes !== "string" || cutBytes.length < 4) {
     throw new Error(`No chain_upgrade_diamond_cut in ${ctmTomlPath}`);
   }
-  const settlementLayerUpgradeAddr = ctmOutput.state_transition?.default_upgrade_addr;
-  if (!settlementLayerUpgradeAddr || ethers.BigNumber.from(settlementLayerUpgradeAddr).isZero()) {
-    throw new Error(`No state_transition.default_upgrade_addr in ${ctmTomlPath}`);
-  }
   const [cut] = ethers.utils.defaultAbiCoder.decode([DIAMOND_CUT_TYPE], cutBytes);
 
   const engineIface = new ethers.utils.Interface(getAbi("BootstrapUpgradeZKsyncOS"));
   const [migrationAddr] = engineIface.decodeFunctionData("upgradeFromBootstrap", cut.initCalldata);
-  return { cut, migrationAddr, settlementLayerUpgradeAddr };
+  return { cut, migrationAddr };
 }
 
 // ── Per-chain legacy crossing + L2 relay ─────────────────────────────
@@ -992,29 +984,17 @@ async function runLegacyChainLegAndRelayL2(params: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   cut: any;
   migrationAddr: string;
-  settlementLayerUpgradeAddr: string;
-  bridgehubAddr: string;
   ctmAddr: string;
   isZKsyncOS: boolean;
   l2DelegateBytecodeName: ContractName;
 }): Promise<void> {
-  // The ecosystem-wide L2 leg, as the migration object serves it (before the per-chain rewrite).
+  // The L2 leg is composed PER CHAIN by the migration object — the FINAL transaction, exactly as
+  // the engine commits it at the crossing (there is no later rewrite).
   const migration = new ethers.Contract(params.migrationAddr, getAbi("RegistryBootstrapMigration"), params.l1Provider);
-  const l2Tx = await migration.l2UpgradeTx();
-  const hasL2Leg = !ethers.BigNumber.from(l2Tx.txType).isZero();
   const l2TxParamType = migration.interface.getFunction("l2UpgradeTx").outputs?.[0];
   if (!l2TxParamType) {
     throw new Error("RegistryBootstrapMigration ABI has no l2UpgradeTx output");
   }
-
-  // The committed L2 tx carries per-chain placeholders (chainId, chain-specific force-deployment
-  // data); the per-chain upgrade contract rewrites them at upgrade time, and this leg reproduces
-  // the same rewrite through its public view.
-  const settlementLayerUpgrade = new ethers.Contract(
-    params.settlementLayerUpgradeAddr,
-    getAbi("DefaultUpgradeZKsyncOS"),
-    params.l1Provider
-  );
 
   for (const chain of params.upgradeChainAddresses) {
     console.log(`\n── Chain ${chain.chainId}: legacy handed-cut crossing ──`);
@@ -1026,31 +1006,16 @@ async function runLegacyChainLegAndRelayL2(params: {
 
     await crossBootstrapEdgeOnChains(params.l1Provider, [chain], params.oldVersion, params.cut, sendAndCheck);
 
-    if (!hasL2Leg) {
+    const l2Tx = await migration.l2UpgradeTx(chain.chainId);
+    if (ethers.BigNumber.from(l2Tx.txType).isZero()) {
       console.log(`  chain ${chain.chainId}: no L2 leg in the proposed upgrade (txType 0)`);
       continue;
     }
 
-    // Reproduce the per-chain rewrite the upgrade contract performed during the crossing.
-    const rewrittenData: string = await settlementLayerUpgrade.getL2UpgradeTxData(
-      params.bridgehubAddr,
-      chain.chainId,
-      params.isZKsyncOS,
-      l2Tx.data
-    );
-    if (rewrittenData.toLowerCase() === (l2Tx.data as string).toLowerCase()) {
-      throw new Error(
-        `Chain ${chain.chainId}: the rewritten L2 upgrade tx is identical to the committed placeholder — ` +
-          "the per-chain rewrite did nothing, so the recorded-hash check below would prove nothing."
-      );
-    }
-
     // The chain must have recorded exactly the transaction being relayed — `BaseZkSyncUpgrade`
-    // stores keccak256(abi.encode(l2ProtocolUpgradeTx)) AFTER the per-chain rewrite. Reproducing
-    // the rewrite here (rather than reading it back — the diamond only stores the hash) proves
-    // the upgrade contract performed the same rewrite during the crossing.
-    const relayedTx = { ...l2Tx, data: rewrittenData };
-    const expectedHash = ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode([l2TxParamType], [relayedTx]));
+    // stores keccak256(abi.encode(l2ProtocolUpgradeTx)) of the chain's own composition, and the
+    // diamond only stores the hash, so the object's per-chain view is what is relayed.
+    const expectedHash = ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode([l2TxParamType], [l2Tx]));
     const getters = new ethers.Contract(chain.diamondProxy, getAbi("GettersFacet"), params.l1Provider);
     const recordedHash: string = await getters.getL2SystemContractsUpgradeTxHash();
     if (recordedHash.toLowerCase() !== expectedHash.toLowerCase()) {
@@ -1069,7 +1034,7 @@ async function runLegacyChainLegAndRelayL2(params: {
 
     const l2TxHash = await prepareAndRelayL2Upgrade(
       l2Provider,
-      rewrittenData,
+      l2Tx.data,
       params.isZKsyncOS,
       params.l2DelegateBytecodeName
     );

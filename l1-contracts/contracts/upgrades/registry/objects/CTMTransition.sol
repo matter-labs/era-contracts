@@ -29,6 +29,8 @@ import {
 } from "../../../common/L1ContractErrors.sol";
 import {L2UpgradePlan, PinnedContract, ProxyUpgradeRow, TransitionManifest} from "../RegistryTypes.sol";
 import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
+import {IDefaultUpgrade} from "../../IDefaultUpgrade.sol";
+import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
 
 /// @notice Storage-backed, write-once transition between two CTM releases.
 /// @dev The facet cuts and table-derived L2 deployments are NOT part of the manifest: they are
@@ -258,6 +260,11 @@ contract CTMTransition is ICTMTransition {
     /// @notice The FINAL, executable L2 plan, exactly as constructed at initialization.
     function l2Plan() external view returns (L2UpgradePlan memory) {
         return abi.decode(encodedL2Plan, (L2UpgradePlan));
+    }
+
+    /// @inheritdoc ICTMTransition
+    function l2UpgradeTx(address _bridgehub, uint256 _chainId) external view returns (L2CanonicalTransaction memory) {
+        return IDefaultUpgrade(getManifest().upgradeEngine.addr).l2UpgradeTx(address(this), _bridgehub, _chainId);
     }
 
     function ctmProxyRows() external view returns (ProxyUpgradeRow[] memory) {
