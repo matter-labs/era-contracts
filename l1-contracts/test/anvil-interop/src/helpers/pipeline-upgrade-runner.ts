@@ -888,8 +888,6 @@ export async function runEcosystemUpgradeScripts(params: {
       params.upgradeHarnessInputs.bytecodesSupplierAddress,
       "--rollup-da-manager-address",
       params.upgradeHarnessInputs.rollupDaManagerAddress,
-      "--is-zk-sync-os",
-      String(params.upgradeHarnessInputs.isZKsyncOS),
       "--create2-factory-salt",
       params.upgradeHarnessInputs.create2FactorySalt,
       "--upgrade-input-path",
