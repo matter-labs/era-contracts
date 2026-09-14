@@ -58,9 +58,8 @@ contract CTMUpgradeForTests_v35 is CTMUpgrade_v35 {
                 ctmUpgradeExecutor: boundCTMUpgradeExecutor(),
                 ctmRelease: getAddresses().stateTransition.currentRelease,
                 upgradeTimer: upgradeAddresses.upgradeTimer,
-                // Not a bootstrap: no migration to name, and the executor is already reported.
-                bootstrapMigration: address(0),
-                boundCtmUpgradeExecutor: boundCTMUpgradeExecutor()
+                // Not a bootstrap: no migration to name.
+                bootstrapMigration: address(0)
             })
         );
     }

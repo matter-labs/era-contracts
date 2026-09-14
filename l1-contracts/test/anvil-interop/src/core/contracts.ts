@@ -26,7 +26,9 @@ const ARTIFACTS = {
   // ── Registry-driven upgrade machinery (see registry-upgrade-test-runner.ts) ──
   BytecodesSupplier: "BytecodesSupplier.sol/BytecodesSupplier.json",
   CTMUpgradeExecutor: "CTMUpgradeExecutor.sol/CTMUpgradeExecutor.json",
+  CoreUpgradeExecutor: "CoreUpgradeExecutor.sol/CoreUpgradeExecutor.json",
   EcosystemUpgradeExecutor: "EcosystemUpgradeExecutor.sol/EcosystemUpgradeExecutor.json",
+  EcosystemUpgradeOperation: "EcosystemUpgradeOperation.sol/EcosystemUpgradeOperation.json",
   RegistryComposerHarness: "RegistryComposerHarness.sol/RegistryComposerHarness.json",
   IChainTypeManager: "IChainTypeManager.sol/IChainTypeManager.json",
   ISelfDescribingFacet: "ISelfDescribingFacet.sol/ISelfDescribingFacet.json",

@@ -61,8 +61,8 @@ cargo run --release --bin protocol_ops -- ecosystem verify-bootstrap \
 ```
 
 The prepare output names every object the edge runs, including the two a bootstrap has that a
-recurring upgrade does not: `bootstrap_migration_addr` and `bound_ctm_upgrade_executor_addr`.
-`ctm_transition_addr` and `ctm_upgrade_executor_addr` stay zero for a bootstrap on purpose —
+recurring upgrade does not: `bootstrap_migration_addr`. `ctm_upgrade_executor_addr` names the
+bound executor in both cases; `ctm_transition_addr` stays zero for a bootstrap on purpose —
 the edge has no transition, and protocol-ops reads a nonzero executor there as "this prepare's
 stage calls are executor calls", which a bootstrap's are not. The verifier still derives the
 migration from the stage-1 `migrate()` call and treats the reported field as a cross-check, so

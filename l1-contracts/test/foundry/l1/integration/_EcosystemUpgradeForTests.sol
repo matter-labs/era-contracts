@@ -71,14 +71,13 @@ contract CTMUpgradeForTests is CTMUpgrade_v34 {
             getAddresses().stateTransition.defaultUpgrade,
             getAddresses().admin.eip7702Checker,
             TrimmedUpgradeOutput.Registry({
-                // A bootstrap edge has no transition, and `ctmUpgradeExecutor` must stay zero so
-                // the merger does not read this prepare's stage calls as executor calls.
+                // A bootstrap edge has no transition, so the compose step deploys no operation
+                // over this prepare; the executor it hands the domain to is still named.
                 ctmTransition: address(0),
-                ctmUpgradeExecutor: address(0),
+                ctmUpgradeExecutor: boundCTMUpgradeExecutor(),
                 ctmRelease: getAddresses().stateTransition.currentRelease,
                 upgradeTimer: upgradeAddresses.upgradeTimer,
-                bootstrapMigration: bootstrapMigrationAddress(),
-                boundCtmUpgradeExecutor: boundCTMUpgradeExecutor()
+                bootstrapMigration: bootstrapMigrationAddress()
             })
         );
     }
@@ -92,7 +91,6 @@ library TrimmedUpgradeOutput {
         address ctmRelease;
         address upgradeTimer;
         address bootstrapMigration;
-        address boundCtmUpgradeExecutor;
     }
 
     /// @param _eip7702Checker The CTM domain's EIP-7702 checker, carried forward exactly as a
@@ -120,7 +118,6 @@ library TrimmedUpgradeOutput {
         // verified from the harness is not the shape a package verified in production is.
         _vm.serializeAddress("registry", "upgrade_timer_addr", _registry.upgradeTimer);
         _vm.serializeAddress("registry", "bootstrap_migration_addr", _registry.bootstrapMigration);
-        _vm.serializeAddress("registry", "bound_ctm_upgrade_executor_addr", _registry.boundCtmUpgradeExecutor);
         string memory registry = _vm.serializeAddress(
             "registry",
             "ctm_upgrade_executor_addr",

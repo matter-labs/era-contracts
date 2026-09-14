@@ -126,7 +126,7 @@ export type PipelineUpgradeScenario = {
   /**
    * A REGISTRY-DRIVEN hop run on the same chains right after this scenario: the base prepare
    * pipeline deploys a fresh release + `CTMTransition`, governance executes exactly the three
-   * `CTMUpgradeExecutor.stageN(transition)` calls, and every chain crosses through the
+   * `EcosystemUpgradeExecutor.stageN(operation)` calls, and every chain crosses through the
    * cut-READING `upgradeChainFromVersion` (see runRecurringHop).
    */
   followUps?: RecurringUpgradeHop[];
@@ -374,10 +374,11 @@ function decodeGovernanceCalls(hex: string): Array<{ target: string; value: ethe
  *
  *   1. protocol-ops `upgrade-prepare-all` runs the (trimmed) v35 prepares: the core prepare
  *      deploys one ecosystem implementation and pins it in a `CoreRegistry`; the CTM prepare
- *      deploys the release and the `CTMTransition` naming that registry, the timer bound to the
- *      executor, and emits exactly `stage0/1/2(transition)`.
+ *      deploys the release and the `CTMTransition`, with its timer bound to the coordinator; the
+ *      compose step then deploys the `EcosystemUpgradeOperation` naming the registry and the
+ *      (executor, transition) leg and emits exactly `stage0/1/2(operation)` on the coordinator.
  *   2. The merged `ecosystem.toml` is asserted to carry ONLY those three calls (one per stage,
- *      all on the bound executor) and to list nothing but the admin action under
+ *      all on the coordinator) and to list nothing but the admin action under
  *      `external_actions` — the tooling claim, checked on the artifact.
  *   3. The governance replay executes the three stages; each chain then crosses through the
  *      cut-READING `upgradeChainFromVersion` as its own admin (no cut is handed over).
@@ -460,6 +461,7 @@ async function runRecurringHop(
           registry?: { ctm_transition_addr?: string; ctm_upgrade_executor_addr?: string; ctm_release_addr?: string };
         };
       };
+      operation?: { operation_addr?: string; coordinator_addr?: string };
     };
     const registry = merged.ctms.zksync_os.registry ?? {};
     const transitionAddr = registry.ctm_transition_addr;
@@ -467,35 +469,59 @@ async function runRecurringHop(
     if (!transitionAddr || !executorAddr || transitionAddr === ethers.constants.AddressZero) {
       throw new Error("the CTM prepare did not report its transition and bound executor");
     }
-    console.log(`  transition: ${transitionAddr}\n  executor:   ${executorAddr}`);
+    const operationAddr = merged.operation?.operation_addr;
+    const coordinatorAddr = merged.operation?.coordinator_addr;
+    if (!operationAddr || !coordinatorAddr || operationAddr === ethers.constants.AddressZero) {
+      throw new Error("the compose step did not report the operation and its coordinator");
+    }
+    console.log(
+      `  transition:  ${transitionAddr}\n  executor:    ${executorAddr}\n  operation:   ${operationAddr}\n  coordinator: ${coordinatorAddr}`
+    );
 
     // ── The tooling claim, checked on the artifact ──
-    const executorIface = new ethers.utils.Interface(getAbi("CTMUpgradeExecutor"));
+    const coordinatorIface = new ethers.utils.Interface(getAbi("EcosystemUpgradeExecutor"));
     (["stage0", "stage1", "stage2"] as const).forEach((stage, n) => {
       const key = `stage${n}_calls` as "stage0_calls" | "stage1_calls" | "stage2_calls";
       const calls = decodeGovernanceCalls(merged.governance_calls[key]);
       if (calls.length !== 1) {
-        throw new Error(`stage ${n} must be exactly one executor call, got ${calls.length}`);
+        throw new Error(`stage ${n} must be exactly one coordinator call, got ${calls.length}`);
       }
-      const expected = executorIface.encodeFunctionData(stage, [transitionAddr]);
+      const expected = coordinatorIface.encodeFunctionData(stage, [operationAddr]);
       if (
-        calls[0].target.toLowerCase() !== executorAddr.toLowerCase() ||
+        calls[0].target.toLowerCase() !== coordinatorAddr.toLowerCase() ||
         calls[0].data.toLowerCase() !== expected.toLowerCase()
       ) {
-        throw new Error(`stage ${n} is not CTMUpgradeExecutor.${stage}(transition) on the bound executor`);
+        throw new Error(`stage ${n} is not EcosystemUpgradeExecutor.${stage}(operation) on the coordinator`);
       }
     });
+    // The operation names exactly this CTM's leg on its bound executor and the core registry.
+    const operation = new ethers.Contract(operationAddr, getAbi("EcosystemUpgradeOperation"), l1Provider);
+    const legs: Array<{ executor: string; transition: string }> = await operation.legs();
+    if (
+      legs.length !== 1 ||
+      legs[0].executor.toLowerCase() !== executorAddr.toLowerCase() ||
+      legs[0].transition.toLowerCase() !== transitionAddr.toLowerCase()
+    ) {
+      throw new Error("the operation does not name exactly this CTM's (executor, transition) leg");
+    }
+    const namedRegistry: string = await operation.coreRegistry();
+    const preparedRegistry = merged.core.registry?.core_registry_addr ?? ethers.constants.AddressZero;
+    if (namedRegistry.toLowerCase() !== preparedRegistry.toLowerCase()) {
+      throw new Error(
+        `the operation names core registry ${namedRegistry}, the core prepare pinned ${preparedRegistry}`
+      );
+    }
     const externalActions = merged.external_actions ?? [];
     const nonAdmin = externalActions.filter((line) => !line.startsWith("phase admin |"));
     if (nonAdmin.length !== 0) {
       throw new Error(`a registry-driven prepare declared governance external actions:\n${nonAdmin.join("\n")}`);
     }
     console.log(
-      `  ✓ merged bundles are exactly stage0/1/2(transition); ${externalActions.length} admin-phase external action(s), no governance ones`
+      `  ✓ merged bundles are exactly stage0/1/2(operation); ${externalActions.length} admin-phase external action(s), no governance ones`
     );
 
     // ── Governance executes the three stages ──
-    console.log("\n── Replaying the three executor calls via protocol-ops ──");
+    console.log("\n── Replaying the three coordinator calls via protocol-ops ──");
     await runEcosystemGovernanceUpgrade({
       rpcUrl: ctx.rpcUrl,
       bridgehubAddress: inputs.bridgehubAddress,
@@ -560,16 +586,21 @@ async function runRecurringHop(
       }
       console.log("  ✓ identical routing on both edges derived an empty facet delta");
     }
-    const executor = new ethers.Contract(executorAddr, getAbi("CTMUpgradeExecutor"), l1Provider);
-    const pending: string = await executor.pendingTransition();
+    const coordinator = new ethers.Contract(coordinatorAddr, getAbi("EcosystemUpgradeExecutor"), l1Provider);
+    const pending: string = await coordinator.pendingOperation();
     if (pending !== ethers.constants.AddressZero) {
       throw new Error(`stage 2 did not clear the lifecycle slot (pending ${pending})`);
+    }
+    const executor = new ethers.Contract(executorAddr, getAbi("CTMUpgradeExecutor"), l1Provider);
+    const reserved: string = await executor.activeOperation();
+    if (reserved !== ethers.constants.AddressZero) {
+      throw new Error(`stage 2 did not release the CTM executor's reservation (${reserved})`);
     }
     const bridgehub = new ethers.Contract(ctx.l1Addresses.bridgehub, getAbi("IL1Bridgehub"), l1Provider);
     const chainAssetHandler: string = await bridgehub.chainAssetHandler();
     const cah = new ethers.Contract(chainAssetHandler, getAbi("L1ChainAssetHandler"), l1Provider);
-    if (await cah.migrationPaused()) {
-      throw new Error("stage 2 did not release the migration pause");
+    if (await cah.migrationPausedFor(ctx.ctmAddresses.chainTypeManager)) {
+      throw new Error("stage 2 did not release the CTM's migration pause");
     }
     if (hop.expectsFreshMessageRoot) {
       const expectedMessageRootImpl = merged.core.upgrade_addresses?.bridgehub?.message_root_implementation_addr;

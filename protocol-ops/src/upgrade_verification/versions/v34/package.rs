@@ -9,10 +9,10 @@
 //! cross-check — a disagreement means the summary and the executable calls describe different
 //! edges, which is worth a finding of its own.
 //!
-//! `ctm_transition_addr` and `ctm_upgrade_executor_addr` are both zero for a bootstrap and that
-//! is correct, not missing: the edge has no transition, and protocol-ops reads a nonzero
-//! executor there as "this prepare's stage calls are executor calls", which a bootstrap's are
-//! not. The executor is reported under `bound_ctm_upgrade_executor_addr` instead.
+//! `ctm_transition_addr` is zero for a bootstrap and that is correct, not missing: the edge has
+//! no transition, so the compose step deploys no operation and the package carries no
+//! coordinator stage calls. `ctm_upgrade_executor_addr` names the executor the edge hands the
+//! CTM domain to; the verifier reads it from the pinned manifest rather than the summary.
 
 use std::path::Path;
 
@@ -31,8 +31,11 @@ pub(crate) const VALIDATE_APPLIED_SELECTOR: [u8; 4] = [0xfe, 0x30, 0xc9, 0xfd];
 pub(crate) const PAUSE_MIGRATION_SELECTOR: [u8; 4] = [0xac, 0x70, 0x0e, 0x63];
 /// `ChainAssetHandler.unpauseMigration()`.
 pub(crate) const UNPAUSE_MIGRATION_SELECTOR: [u8; 4] = [0xf7, 0xc7, 0xeb, 0x92];
-/// `EcosystemUpgradeExecutor.applyL1Upgrade(ICoreRegistry)` — the ecosystem leg of stage 1.
+/// `CoreUpgradeExecutor.applyL1Upgrade(ICoreRegistry)` — the ecosystem leg of stage 1.
 pub(crate) const APPLY_L1_UPGRADE_SELECTOR: [u8; 4] = [0x60, 0x93, 0xa2, 0x59];
+/// `CoreUpgradeExecutor.setCoordinator(address)` — the stage-2 binding of the core executor to
+/// the lifecycle coordinator every later upgrade runs through.
+pub(crate) const SET_COORDINATOR_SELECTOR: [u8; 4] = [0x8e, 0xa9, 0x81, 0x17];
 
 #[derive(Debug)]
 pub(crate) struct BootstrapPackage {
@@ -194,6 +197,7 @@ mod tests {
             (&b"pauseMigration()"[..], PAUSE_MIGRATION_SELECTOR),
             (&b"unpauseMigration()"[..], UNPAUSE_MIGRATION_SELECTOR),
             (&b"applyL1Upgrade(address)"[..], APPLY_L1_UPGRADE_SELECTOR),
+            (&b"setCoordinator(address)"[..], SET_COORDINATOR_SELECTOR),
         ] {
             assert_eq!(
                 &alloy::primitives::keccak256(sig)[..4],

@@ -35,13 +35,15 @@ pub(crate) mod views;
 
 use package::{
     BootstrapPackage, APPLY_L1_UPGRADE_SELECTOR, MIGRATE_SELECTOR, PAUSE_MIGRATION_SELECTOR,
-    TRANSFER_OWNERSHIP_SELECTOR, UNPAUSE_MIGRATION_SELECTOR, VALIDATE_APPLIED_SELECTOR,
+    SET_COORDINATOR_SELECTOR, TRANSFER_OWNERSHIP_SELECTOR, UNPAUSE_MIGRATION_SELECTOR,
+    VALIDATE_APPLIED_SELECTOR,
 };
 use provenance::{expect_code_identity, expect_pin_holds, tolerate, CodeIdentity};
 use views::{
-    CTMUpgradeExecutorView, CoreRegistryView, CtmForBootstrapView, EcosystemUpgradeExecutorView,
-    GovernanceUpgradeTimerView, GovernanceUpgradeTimerView::GovernanceUpgradeTimerViewInstance,
-    ProxyAdminView, RegistryBootstrapMigrationView,
+    CTMUpgradeExecutorView, CoreRegistryView, CoreUpgradeExecutorView, CtmForBootstrapView,
+    EcosystemUpgradeExecutorView, GovernanceUpgradeTimerView,
+    GovernanceUpgradeTimerView::GovernanceUpgradeTimerViewInstance, ProxyAdminView,
+    RegistryBootstrapMigrationView,
 };
 
 /// Verify a v34 bootstrap package against the live L1 it targets.
@@ -223,20 +225,117 @@ pub(crate) async fn verify(
         ));
     }
 
-    let Some(ecosystem_executor) = tolerate(
-        executor.ECOSYSTEM_EXECUTOR().call().await,
+    let Some(bound_coordinator) = tolerate(
+        executor.coordinator().call().await,
         result,
-        "the executor's ecosystem executor",
+        "the executor's coordinator",
     ) else {
         return Ok(());
     };
-    if ecosystem_executor == manifest.ecosystemExecutor {
-        result.report_ok("the executor's ecosystem executor matches the manifest");
+    if bound_coordinator == manifest.coordinator {
+        result.report_ok(&format!(
+            "the executor answers to the coordinator the manifest names ({bound_coordinator})"
+        ));
     } else {
         result.report_error(&format!(
-            "the executor names ecosystem executor {ecosystem_executor} but the manifest names {}",
-            manifest.ecosystemExecutor
+            "the executor answers to coordinator {bound_coordinator} but the manifest names {}: \
+             `migrate()` would refuse, and every later upgrade would be driven from the wrong place",
+            manifest.coordinator
         ));
+    }
+    let Some(reserved) = tolerate(
+        executor.activeOperation().call().await,
+        result,
+        "the executor's activeOperation()",
+    ) else {
+        return Ok(());
+    };
+    if reserved.is_zero() {
+        result.report_ok("the executor holds no reservation");
+    } else {
+        result.report_error(&format!(
+            "the executor is already reserved for operation {reserved}: the bootstrap edge hands \
+             a domain over that is mid-lifecycle"
+        ));
+    }
+
+    // The coordinator and the core executor it drives: genuine code, the same governance owner
+    // as the CTM executor, and (pre-execution) an unbound core executor — stage 2 binds it.
+    expect_code_identity(
+        &provider,
+        &identity,
+        result,
+        "the coordinator",
+        manifest.coordinator,
+        "EcosystemUpgradeExecutor",
+    )
+    .await?;
+    let coordinator = EcosystemUpgradeExecutorView::new(manifest.coordinator, &provider);
+    let core_executor_addr = tolerate(
+        coordinator.CORE_EXECUTOR().call().await,
+        result,
+        "the coordinator's CORE_EXECUTOR",
+    );
+    if let Some(core_executor_addr) = core_executor_addr {
+        expect_code_identity(
+            &provider,
+            &identity,
+            result,
+            "the core executor",
+            core_executor_addr,
+            "CoreUpgradeExecutor",
+        )
+        .await?;
+        let core_executor = CoreUpgradeExecutorView::new(core_executor_addr, &provider);
+        for (label, owner) in [
+            (
+                "the coordinator",
+                tolerate(
+                    coordinator.owner().call().await,
+                    result,
+                    "the coordinator's owner",
+                ),
+            ),
+            (
+                "the core executor",
+                tolerate(
+                    core_executor.owner().call().await,
+                    result,
+                    "the core executor's owner",
+                ),
+            ),
+        ] {
+            match owner {
+                Some(owner) if owner == manifest.ctmExecutorOwner => result.report_ok(&format!(
+                    "{label} is owned by the same governance as the CTM executor ({owner})"
+                )),
+                Some(owner) => result.report_error(&format!(
+                    "{label} is owned by {owner}, not by the governance the manifest expects ({}): \
+                     one lifecycle would answer to two owners",
+                    manifest.ctmExecutorOwner
+                )),
+                None => {}
+            }
+        }
+        if let Some(bound) = tolerate(
+            core_executor.coordinator().call().await,
+            result,
+            "the core executor's coordinator",
+        ) {
+            if bound == manifest.coordinator {
+                result.report_ok("the core executor already answers to the coordinator");
+            } else if bound.is_zero() {
+                result.report_ok(
+                    "the core executor answers to no coordinator yet: stage 2 binds it \
+                     (`setCoordinator`, checked below)",
+                );
+            } else {
+                result.report_error(&format!(
+                    "the core executor answers to coordinator {bound}, not the manifest's {}",
+                    manifest.coordinator
+                ));
+            }
+        }
     }
 
     // The owner binding: the manifest states the owner the executor must already have, and the
@@ -380,28 +479,34 @@ pub(crate) async fn verify(
         )
         .await?;
 
-        let eco_executor = EcosystemUpgradeExecutorView::new(manifest.ecosystemExecutor, &provider);
+        let Some(core_executor_addr) = core_executor_addr else {
+            result.report_error(
+                "the core executor is unknown (the coordinator's CORE_EXECUTOR could not be read), \
+                 so the ecosystem leg cannot be checked",
+            );
+            return Ok(());
+        };
+        let core_executor = CoreUpgradeExecutorView::new(core_executor_addr, &provider);
         let pinned = tolerate(
-            eco_executor.CORE_REGISTRY_CODEHASH().call().await,
+            core_executor.CORE_REGISTRY_CODEHASH().call().await,
             result,
-            "the ecosystem executor's CORE_REGISTRY_CODEHASH",
+            "the core executor's CORE_REGISTRY_CODEHASH",
         );
         let live_code = provider.get_code_at(core_registry_addr).await?;
         let live_hash = alloy::primitives::keccak256(&live_code);
         if pinned == Some(live_hash) {
-            result
-                .report_ok("the ecosystem executor's CORE_REGISTRY_CODEHASH accepts this registry");
+            result.report_ok("the core executor's CORE_REGISTRY_CODEHASH accepts this registry");
         } else if let Some(pinned) = pinned {
             result.report_error(&format!(
-                "the ecosystem executor pins CORE_REGISTRY_CODEHASH {pinned} but the registry at \
+                "the core executor pins CORE_REGISTRY_CODEHASH {pinned} but the registry at \
                  {core_registry_addr} runs {live_hash}: `applyL1Upgrade` would be rejected"
             ));
         }
 
         let Some(eco_admin_addr) = tolerate(
-            eco_executor.PROXY_ADMIN().call().await,
+            core_executor.PROXY_ADMIN().call().await,
             result,
-            "the ecosystem executor's PROXY_ADMIN",
+            "the core executor's PROXY_ADMIN",
         ) else {
             return Ok(());
         };
@@ -503,8 +608,8 @@ pub(crate) async fn verify(
     // ── 7. The calldata governance will actually sign ──
     result.print_info("\n== Governance calldata ==");
     verify_stage0_shape(&package, result);
-    verify_stage1_shape(&package, &manifest, result);
-    verify_stage2_shape(&package, result);
+    verify_stage1_shape(&package, &manifest, core_executor_addr, result);
+    verify_stage2_shape(&package, &manifest, core_executor_addr, result);
 
     // A bootstrap edge legitimately declares external actions — the handovers and the pause
     // window are exactly the calls no object can describe yet, which is why the prepare
@@ -545,10 +650,31 @@ fn verify_stage0_shape(package: &BootstrapPackage, result: &mut VerificationResu
     }
 }
 
-/// Stage 2 closes it, and asserts the edge actually applied. `validateApplied()` is the edge's
-/// own post-condition check: a package that omits it can complete governance without ever
-/// having proved the ecosystem reached the intended state.
-fn verify_stage2_shape(package: &BootstrapPackage, result: &mut VerificationResult) {
+/// Stage 2 closes it, asserts the edge actually applied and binds the core executor to the
+/// coordinator. `validateApplied()` is the edge's own post-condition check: a package that omits
+/// it can complete governance without ever having proved the ecosystem reached the intended
+/// state. Without `setCoordinator` no later operation could reserve the ecosystem leg.
+fn verify_stage2_shape(
+    package: &BootstrapPackage,
+    manifest: &views::BootstrapManifest,
+    core_executor: Option<Address>,
+    result: &mut VerificationResult,
+) {
+    let binds_core_executor = package.stage2.iter().any(|c| {
+        Some(c.target) == core_executor
+            && c.data.get(..4) == Some(&SET_COORDINATOR_SELECTOR[..])
+            && c.data.get(4..36).map(|w| Address::from_slice(&w[12..]))
+                == Some(manifest.coordinator)
+    });
+    if binds_core_executor {
+        result.report_ok("stage 2 binds the core executor to the coordinator (`setCoordinator`)");
+    } else {
+        result.report_error(
+            "stage 2 never binds the core executor to the coordinator: no later operation could \
+             reserve the ecosystem leg",
+        );
+    }
+
     let asserts_applied = package.stage2.iter().any(|c| {
         c.target == package.migration && c.data.get(..4) == Some(&VALIDATE_APPLIED_SELECTOR[..])
     });
@@ -581,6 +707,7 @@ fn verify_stage2_shape(package: &BootstrapPackage, result: &mut VerificationResu
 fn verify_stage1_shape(
     package: &BootstrapPackage,
     manifest: &views::BootstrapManifest,
+    core_executor: Option<Address>,
     result: &mut VerificationResult,
 ) {
     let migration = package.migration;
@@ -600,14 +727,14 @@ fn verify_stage1_shape(
                 .get(4..36)
                 .map(|w| Address::from_slice(&w[12..]))
                 .unwrap_or_default();
-            if handed_to == manifest.ecosystemExecutor {
-                // The ecosystem leg: the shared ProxyAdmin goes to the ecosystem executor, not
-                // to the migration. Expected in any edge that carries a CoreRegistry.
+            if Some(handed_to) == core_executor {
+                // The ecosystem leg: the shared ProxyAdmin goes to the core executor, not to
+                // the migration. Expected in any edge that carries a CoreRegistry.
                 saw_ecosystem_admin_handover = true;
             } else if handed_to != migration {
                 unexpected.push(format!(
                     "transferOwnership on {} hands to {handed_to}, which is neither the \
-                     migration nor the ecosystem executor",
+                     migration nor the core executor",
                     call.target
                 ));
             } else if call.target == manifest.ctm {
@@ -626,11 +753,11 @@ fn verify_stage1_shape(
                 unexpected.push(format!("migrate() on an unexpected target {}", call.target));
             }
         } else if selector == APPLY_L1_UPGRADE_SELECTOR {
-            if call.target == manifest.ecosystemExecutor {
+            if Some(call.target) == core_executor {
                 saw_apply_l1 = true;
             } else {
                 unexpected.push(format!(
-                    "applyL1Upgrade on {}, which is not the manifest's ecosystem executor",
+                    "applyL1Upgrade on {}, which is not the coordinator's core executor",
                     call.target
                 ));
             }
@@ -664,8 +791,8 @@ fn verify_stage1_shape(
     }
     match (saw_ecosystem_admin_handover, saw_apply_l1) {
         (true, true) => result.report_ok(
-            "stage 1 carries the ecosystem leg: the shared ProxyAdmin goes to the ecosystem \
-             executor, which then applies the pinned inventory",
+            "stage 1 carries the ecosystem leg: the shared ProxyAdmin goes to the core executor, \
+             which then applies the pinned inventory",
         ),
         (false, false) => result.report_ok("stage 1 carries no ecosystem leg"),
         (admin, apply) => result.report_error(&format!(

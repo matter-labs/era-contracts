@@ -18,6 +18,10 @@ pub const ADMIN_FUNCTIONS_SCRIPT_PATH: &str = "deploy-scripts/AdminFunctions.s.s
 pub const FINALIZE_CHAIN_INIT_SCRIPT_PATH: &str = "deploy-scripts/chain/FinalizeChainInit.s.sol";
 pub const CORE_UPGRADE_SCRIPT_PATH: &str = "deploy-scripts/upgrade/v34/CoreUpgrade_v34.s.sol";
 pub const CTM_UPGRADE_SCRIPT_PATH: &str = "deploy-scripts/upgrade/v34/CTMUpgrade_v34.s.sol";
+/// The compose step of a registry-driven upgrade: deploys the `EcosystemUpgradeOperation` over
+/// every CTM prepare's transition and emits the coordinator's three stage calls.
+pub const COMPOSE_OPERATION_SCRIPT_PATH: &str =
+    "deploy-scripts/upgrade/ComposeUpgradeOperation.s.sol";
 pub const UPGRADE_LOCAL_INPUT_PATH: &str = "/upgrade-envs/v0.34.0-registry/local.toml";
 pub const UPGRADE_CORE_OUTPUT_PATH: &str = "/script-out/upgrade-core.toml";
 pub const GATEWAY_UTILS_SCRIPT_TARGET_PATH: &str =

@@ -8,7 +8,7 @@
  *
  *   1. Boot the pre-generated ecosystem (current branch's code) from chain-states/.
  *   2. Deploy the registry-driven machinery on the anvil L1: the two domain-specific executors
- *      (`CTMUpgradeExecutor`, `EcosystemUpgradeExecutor`), plus the new-version implementations
+ *      (`CoreUpgradeExecutor`, `CTMUpgradeExecutor`, the coordinating `EcosystemUpgradeExecutor`), plus the new-version implementations
  *      of a synthetic minor version bump (fresh `AdminFacet` as the facet change,
  *      `DefaultUpgrade` as the init contract, fresh `ZKsyncOSTestnetVerifier`, fresh
  *      `DiamondInit`, and a fresh `L1MessageRoot` implementation for the ecosystem leg). Every
@@ -42,7 +42,7 @@
  *      pre-v34 chains, and the composed L2 transaction is relayed to each L2 stand-in through
  *      the real `L2ComplexUpgrader`.
  *   5. Execute the registry-driven hop ("v34 -> v35") purely through the executors' fixed entrypoints
- *      (`stage0/stage1/stage2(transition)` on the CTM executor, per-chain
+ *      (`stage0/stage1/stage2(operation)` on the coordinator, per-chain
  *      `upgradeChain(transition, chainId)`) — no generic delegatecall modules and no
  *      stage-0/1/2 governance calldata anywhere. The schedule (upgrade timestamp, old-version
  *      deadline) lives IN the transition, not in call arguments.
@@ -381,7 +381,8 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     // registry-driven hop below runs against a bootstrap-produced ownership state.
     console.log("\n── Bootstrap stage: crossing the entry edge via RegistryBootstrapMigration ──");
     const ctmExecutor = new ethers.Contract(deployed.ctmExecutor, getAbi("CTMUpgradeExecutor"), deployer);
-    const ecoExecutor = new ethers.Contract(deployed.ecoExecutor, getAbi("EcosystemUpgradeExecutor"), deployer);
+    const coreExecutor = new ethers.Contract(deployed.coreExecutor, getAbi("CoreUpgradeExecutor"), deployer);
+    const coordinator = new ethers.Contract(deployed.coordinator, getAbi("EcosystemUpgradeExecutor"), deployer);
     const manifestJson = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
     const bootstrapPieces = {
       legacyAdminFacet: deployed.legacyAdminFacet,
@@ -438,10 +439,10 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
         releaseCodehash: ctmAddresses.releaseCodehash,
         currentRelease: deployed.bootstrapRelease,
         ctmExecutor: deployed.ctmExecutor,
-        // The harness deploys the executor owned by the deployer and bound to the ecosystem
-        // executor below; the edge refuses to hand the domain over if either has moved since.
+        // The harness deploys the executor owned by the deployer and answering to the
+        // coordinator; the edge refuses to hand the domain over if either has moved since.
         ctmExecutorOwner: deployer.address,
-        ecosystemExecutor: deployed.ecoExecutor,
+        coordinator: deployed.coordinator,
         upgradeTimer: upgradeTimer.address,
         delegateComposer: { addr: deployed.delegateComposer, codehash: await codehashOf(deployed.delegateComposer) },
         l2Delegate: upgradeDelegateInfo(),
@@ -512,54 +513,72 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
         bootstrapCut,
         ctmImplNew: deployed.ctmImplNew,
         ctmExecutor: deployed.ctmExecutor,
-        ecoExecutor: deployed.ctmExecutor,
         proxyAdminAddr: live.ctmProxyAdmin,
         chains: upgradeChains,
         deadline: ethers.constants.MaxUint256,
       }
     );
 
-    // ── 6. Execute the registry-driven upgrade through the domain executors ("v34 -> v35") ──
-    console.log("\n── Executing registry-driven upgrade via the domain executors ──");
+    // ── 6. Execute the registry-driven upgrade through the coordinator ("v34 -> v35") ──
+    console.log("\n── Executing registry-driven upgrade via the coordinator ──");
 
     // The ECOSYSTEM ProxyAdmin (MessageRoot et al.) is separate from the CTM's own ProxyAdmin
-    // the bootstrap handed over; governance hands it to its bound executor directly (1-step).
+    // the bootstrap handed over; governance hands it to the core executor directly (1-step) and
+    // binds that executor to the coordinator — the v34 core prepare's stage-1/2 actions.
     const ecosystemProxyAdmin = new ethers.Contract(live.ecosystemProxyAdmin, getAbi("ProxyAdmin"), l1Provider);
     const ecosystemProxyAdminOwner: string = await ecosystemProxyAdmin.owner();
-    if (ecosystemProxyAdminOwner.toLowerCase() !== deployed.ecoExecutor.toLowerCase()) {
+    if (ecosystemProxyAdminOwner.toLowerCase() !== deployed.coreExecutor.toLowerCase()) {
       await impersonateAndRun(l1Provider, ecosystemProxyAdminOwner, async (signer) => {
         await sendAndCheck(
           l1Provider,
-          ecosystemProxyAdmin.connect(signer).transferOwnership(deployed.ecoExecutor, { gasLimit: DEFAULT_GAS_LIMIT }),
-          "ecosystem ProxyAdmin transferOwnership(ecoExecutor)"
+          ecosystemProxyAdmin.connect(signer).transferOwnership(deployed.coreExecutor, { gasLimit: DEFAULT_GAS_LIMIT }),
+          "ecosystem ProxyAdmin transferOwnership(coreExecutor)"
         );
       });
-      console.log("  ✓ ecosystem ProxyAdmin owned by ecoExecutor");
+      console.log("  ✓ ecosystem ProxyAdmin owned by the core executor");
     }
-
-    const cah = new ethers.Contract(live.chainAssetHandler, getAbi("L1ChainAssetHandler"), l1Provider);
-    // Bootstrap JOIN (production: one explicit governance call in the v34 stage-2 bundle): the
-    // CTM executor drives the ecosystem leg of its own transitions through the ecosystem
-    // executor. Pausing its own CTM's migrations needs no join — the ChainAssetHandler derives
-    // that authority from the CTM ownership `migrate()` handed over.
     await sendAndCheck(
       l1Provider,
-      ecoExecutor.setCTMExecutorAuthorization(deployed.ctmExecutor, true, { gasLimit: DEFAULT_GAS_LIMIT }),
-      "ecoExecutor.setCTMExecutorAuthorization(ctmExecutor)"
+      coreExecutor.setCoordinator(deployed.coordinator, { gasLimit: DEFAULT_GAS_LIMIT }),
+      "coreExecutor.setCoordinator(coordinator)"
     );
+
+    const cah = new ethers.Contract(live.chainAssetHandler, getAbi("L1ChainAssetHandler"), l1Provider);
+    // The operation: the ecosystem leg and the one CTM leg governance reviews together. Deployed
+    // from the deterministic build so the coordinator's OPERATION_CODEHASH pin accepts it. The
+    // CTM executor needs no join call: it was constructed answering to the coordinator, and
+    // pausing its own CTM's migrations derives from the CTM ownership `migrate()` handed over.
+    const operationFactory = new ethers.ContractFactory(
+      getAbi("EcosystemUpgradeOperation"),
+      getDeterministicCreationBytecode("EcosystemUpgradeOperation"),
+      deployer
+    );
+    const operationContract = await operationFactory.deploy({
+      coreRegistry: objects.coreRegistry,
+      legs: [{ executor: deployed.ctmExecutor, transition: objects.transition }],
+    });
+    await operationContract.deployed();
+    const operation: string = operationContract.address;
+    assertEq(
+      ethers.utils.keccak256(await l1Provider.getCode(operation)),
+      deployed.operationCodehash,
+      "the operation runs the code the coordinator pins"
+    );
+    console.log(`  operation:      ${operation}`);
     // The three-stage lifecycle. Stage 1 applies the ecosystem leg FIRST, then the CTM leg —
     // the order the merged governance bundle always had.
     await sendAndCheck(
       l1Provider,
-      ctmExecutor.stage0(objects.transition, { gasLimit: DEFAULT_GAS_LIMIT }),
-      "ctmExecutor.stage0(transition)"
+      coordinator.stage0(operation, { gasLimit: DEFAULT_GAS_LIMIT }),
+      "coordinator.stage0(operation)"
     );
     assertTrue(await cah.migrationPausedFor(ctm.address), "stage 0 leaves THIS CTM's migrations paused");
-    console.log("  ✓ stage0 executed (pending transition recorded, migrations paused, timer started)");
+    assertEq(await ctmExecutor.reservedTransition(), objects.transition, "stage 0 reserved the CTM executor");
+    console.log("  ✓ stage0 executed (operation recorded, executors reserved, migrations paused, timer started)");
     await sendAndCheck(
       l1Provider,
-      ctmExecutor.stage1(objects.transition, { gasLimit: DEFAULT_GAS_LIMIT }),
-      "ctmExecutor.stage1(transition)"
+      coordinator.stage1(operation, { gasLimit: DEFAULT_GAS_LIMIT }),
+      "coordinator.stage1(operation)"
     );
     console.log("  ✓ stage1 executed (ecosystem rows, CTM leg, version commit, release pin)");
     for (const chain of upgradeChains) {
@@ -571,16 +590,22 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       console.log(`  ✓ chain ${chain.chainId} upgraded`);
     }
 
-    // ── 8. Stage 2: completion checks, then the executor unpauses migrations. One flag, so this
-    //       also ends the owner pause opened for the bootstrap window — no separate unpause ──
+    // ── 8. Stage 2: completion checks on every leg, then the CTM executor unpauses its CTM's
+    //       migrations and every reservation is released ──
     await sendAndCheck(
       l1Provider,
-      ctmExecutor.stage2(objects.transition, { gasLimit: DEFAULT_GAS_LIMIT }),
-      "ctmExecutor.stage2(transition)"
+      coordinator.stage2(operation, { gasLimit: DEFAULT_GAS_LIMIT }),
+      "coordinator.stage2(operation)"
     );
     assertTrue(!(await cah.migrationPausedFor(ctm.address)), "stage 2 unpaused this CTM's migrations");
-    assertEq(await ctmExecutor.pendingTransition(), ethers.constants.AddressZero, "stage 2 cleared the lifecycle slot");
-    console.log("  ✓ stage2 executed (applied-state checks, migrations unpaused)");
+    assertEq(await coordinator.pendingOperation(), ethers.constants.AddressZero, "stage 2 cleared the lifecycle slot");
+    assertEq(await ctmExecutor.activeOperation(), ethers.constants.AddressZero, "stage 2 released the CTM reservation");
+    assertEq(
+      await coreExecutor.activeOperation(),
+      ethers.constants.AddressZero,
+      "stage 2 released the core reservation"
+    );
+    console.log("  ✓ stage2 executed (applied-state checks, migrations unpaused, reservations released)");
 
     // ── 9. L1 assertions ──
     console.log("\n── Verifying L1 end state ──");
@@ -653,7 +678,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     assertEq(
       ethers.utils.getAddress("0x" + implSlot.slice(26)),
       deployed.newMessageRootImpl,
-      "MessageRoot proxy re-pointed to the fresh implementation by EcosystemUpgradeExecutor"
+      "MessageRoot proxy re-pointed to the fresh implementation by CoreUpgradeExecutor"
     );
 
     // ── 10. Relay the composed L2 upgrade tx to each target L2 chain ──
@@ -847,8 +872,11 @@ async function readLiveUpgradeInputs(
 type DeployedMachinery = {
   transitionCodehash: string;
   coreRegistryCodehash: string;
+  operationCodehash: string;
   ctmExecutor: string;
-  ecoExecutor: string;
+  coreExecutor: string;
+  /** The coordinating `EcosystemUpgradeExecutor` both domain executors answer to. */
+  coordinator: string;
   composerHarness: string;
   /** The harness's fixed no-op delegate-calldata composer, pinned by both edges' L2 plans. */
   delegateComposer: string;
@@ -911,22 +939,28 @@ async function deployUpgradeMachinery(
   // committed manifest (rerun with REGEN_REGISTRIES=1).
   const newVerifierPlonk = await deployPinned("ZKsyncOSVerifierPlonk", []);
   // Type provenance is a CODEHASH: each executor is bound at construction to the audited code
-  // every transition / core registry it accepts must run. Neither object has immutables, so the
-  // artifact's runtime bytecode IS what they carry once deployed — from the DETERMINISTIC build,
-  // the same one the objects themselves are deployed from below (and the one the chain states'
-  // release was deployed from, so all three anchors agree).
+  // every transition / core registry / operation it accepts must run. None of the objects has
+  // immutables, so the artifact's runtime bytecode IS what they carry once deployed — from the
+  // DETERMINISTIC build, the same one the objects themselves are deployed from below (and the
+  // one the chain states' release was deployed from, so all anchors agree).
   const transitionCodehash = ethers.utils.keccak256(getDeterministicBytecode("CTMTransition"));
   const coreRegistryCodehash = ethers.utils.keccak256(getDeterministicBytecode("CoreRegistry"));
-  // Deployed before the CTM executor, which is BOUND to it (the ecosystem leg of every
-  // transition runs through it).
-  const ecoExecutor = await deploy("EcosystemUpgradeExecutor", [
+  const operationCodehash = ethers.utils.keccak256(getDeterministicBytecode("EcosystemUpgradeOperation"));
+  // The ecosystem domain first: its executor owns the ecosystem ProxyAdmin, the coordinator is
+  // constructed over it, and the CTM executor is then constructed answering to the coordinator
+  // (the shape the v34 bootstrap leaves behind).
+  const coreExecutor = await deploy("CoreUpgradeExecutor", [
     deployer.address,
     params.ecosystemProxyAdmin,
     coreRegistryCodehash,
   ]);
+  const coordinator = await deploy("EcosystemUpgradeExecutor", [deployer.address, coreExecutor, operationCodehash]);
   const machinery = {
     transitionCodehash,
     coreRegistryCodehash,
+    operationCodehash,
+    coreExecutor,
+    coordinator,
     // The deployer plays the role of protocol governance; each executor is BOUND to its
     // immutable authority targets at construction. Bound to the whole CTM domain: the CTM itself
     // AND its own ProxyAdmin (a transition's `ctmProxyRows` — the CTM impl swap included — apply
@@ -935,10 +969,9 @@ async function deployUpgradeMachinery(
       deployer.address,
       params.ctm,
       params.ctmProxyAdmin,
-      ecoExecutor,
+      coordinator,
       transitionCodehash,
     ]),
-    ecoExecutor,
     composerHarness: await deploy("RegistryComposerHarness", []),
     // Pinned CODE defines the delegate calldata. The mock delegate deliberately has no fallback,
     // so the composed call names its explicit no-op method and a stale selector still fails.
@@ -1383,16 +1416,17 @@ async function deployUpgradeObjectsFromManifest(
   };
 
   const release = await deployObject("CTMRelease", releaseInitArgs(ctm), releaseCodehashAnchor);
-  // The transition PINS its ecosystem leg and its stage-1 timer, so both exist first. The timer
-  // is bound to the CTM executor (only it can start it); zero delays make the stage-1 window
-  // pass immediately in the harness, and the deployer keeps the (unused) extension right.
+  // The transition PINS its stage-1 timer, so it exists first. The timer is bound to the
+  // coordinator (only it can start it); zero delays make the stage-1 window pass immediately in
+  // the harness, and the deployer keeps the (unused) extension right. The core registry is the
+  // operation's to name, not the transition's.
   const coreRegistry = await deployObject("CoreRegistry", coreInitArgs(manifest), deployed.coreRegistryCodehash);
   const timerFactory = new ethers.ContractFactory(
     getAbi("GovernanceUpgradeTimer"),
     getCreationBytecode("GovernanceUpgradeTimer"),
     deployer
   );
-  const upgradeTimer = await timerFactory.deploy(0, 0, deployed.ctmExecutor, deployer.address);
+  const upgradeTimer = await timerFactory.deploy(0, 0, deployed.coordinator, deployer.address);
   await upgradeTimer.deployed();
   const pin = async (addr: string): Promise<{ addr: string; codehash: string }> => ({
     addr,
@@ -1402,14 +1436,7 @@ async function deployUpgradeObjectsFromManifest(
     release,
     transition: await deployObject(
       "CTMTransition",
-      transitionInitArgs(
-        manifest,
-        ctm,
-        release,
-        await pin(coreRegistry),
-        await pin(upgradeTimer.address),
-        await pin(deployed.delegateComposer)
-      ),
+      transitionInitArgs(manifest, ctm, release, await pin(upgradeTimer.address), await pin(deployed.delegateComposer)),
       deployed.transitionCodehash
     ),
     coreRegistry,

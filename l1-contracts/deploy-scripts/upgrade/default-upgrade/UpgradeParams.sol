@@ -62,3 +62,26 @@ struct CTMUpgradeParams {
     ///         a deployment it did not make.
     address ecosystemUpgradeExecutor;
 }
+
+/// @notice One CTM leg the compose step names: the transition a CTM prepare deployed and the
+///         bound executor that applies it (`[registry].ctm_transition_addr` /
+///         `ctm_upgrade_executor_addr` of that prepare's output).
+struct OperationLegInput {
+    address executor;
+    address transition;
+}
+
+/// @notice Inputs of the compose step (`ComposeUpgradeOperation.compose`), assembled by
+///         protocol-ops from the core and CTM prepare outputs.
+/// @param coordinator The `EcosystemUpgradeExecutor` every leg answers to (the core prepare's
+///        `[registry].ecosystem_upgrade_executor_addr`).
+/// @param coreRegistry The core prepare's `CoreRegistry`, zero when the upgrade has no ecosystem leg.
+/// @param legs The CTM legs, in the order stage 1 applies them.
+// solhint-disable-next-line gas-struct-packing
+struct ComposeOperationParams {
+    address coordinator;
+    address coreRegistry;
+    OperationLegInput[] legs;
+    bytes32 create2FactorySalt;
+    string outputPath;
+}

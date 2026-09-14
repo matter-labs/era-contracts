@@ -1143,21 +1143,15 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         vm.serializeAddress("registry", "upgrade_timer_addr", upgradeAddresses.upgradeTimer);
         address bootstrapMigrationAddr = bootstrapMigrationAddress();
         vm.serializeAddress("registry", "bootstrap_migration_addr", bootstrapMigrationAddr);
-        // `ctm_upgrade_executor_addr` stays gated on the transition: protocol-ops reads a nonzero
-        // value there as "this prepare's stage calls ARE executor calls", which a bootstrap's are
-        // not (they are the two handovers and `migrate()`). The executor still has to be named,
-        // so it gets its own ungated key. Only the v34 override is safe to call pre-bootstrap —
-        // the default reads the CTM's live owner, which is not yet an executor.
+        // The bound executor is named whenever it is known: after a bootstrap prepare deployed
+        // it, or once the CTM's live owner is one. The compose step reads it, with the
+        // transition, as this CTM's leg of the operation; a bootstrap edge has no transition, so
+        // nothing composes over it.
         bool executorKnown = upgradeAddresses.ctmTransition != address(0) || bootstrapMigrationAddr != address(0);
-        vm.serializeAddress(
-            "registry",
-            "bound_ctm_upgrade_executor_addr",
-            executorKnown ? boundCTMUpgradeExecutor() : address(0)
-        );
         string memory registry = vm.serializeAddress(
             "registry",
             "ctm_upgrade_executor_addr",
-            upgradeAddresses.ctmTransition == address(0) ? address(0) : boundCTMUpgradeExecutor()
+            executorKnown ? boundCTMUpgradeExecutor() : address(0)
         );
         vm.serializeString("root", "registry", registry);
         string memory toml = vm.serializeBytes("root", "chain_upgrade_diamond_cut", newlyGeneratedData.upgradeCutData);

@@ -190,7 +190,6 @@ export function transitionInitArgs(
   manifest: any,
   ctm: any,
   newRelease: string,
-  coreRegistry: { addr: string; codehash: string },
   upgradeTimer: { addr: string; codehash: string },
   delegateComposer: { addr: string; codehash: string }
 ): any {
@@ -231,9 +230,9 @@ export function transitionInitArgs(
       delegateComposer,
       factoryDepHashes: transition.l2Plan.factoryDepHashes.map((h: string) => ethers.BigNumber.from(h)),
     },
-    // The ecosystem leg and the stage-1 timer are deploy-time objects of this same run (like
-    // `newRelease`), so they ride in as pins rather than from the committed manifest.
-    coreRegistry,
+    // The stage-1 timer is a deploy-time object of this same run (like `newRelease`), so it
+    // rides in as a pin rather than from the committed manifest. The ecosystem leg is NOT the
+    // transition's to name: the operation the coordinator drives commits that association.
     upgradeTimer,
   };
 }

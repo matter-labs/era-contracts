@@ -29,7 +29,7 @@
  * After this stage the WHOLE CTM domain — the CTM and its own ProxyAdmin — is owned by
  * `CTMUpgradeExecutor`, and every later upgrade is registry-driven — which is exactly what the
  * runner's next stage exercises. (Ecosystem singletons stay under the separate ecosystem
- * ProxyAdmin / `EcosystemUpgradeExecutor`.)
+ * ProxyAdmin / `CoreUpgradeExecutor`.)
  */
 
 import { ethers } from "ethers";
@@ -123,8 +123,8 @@ export async function bootstrapInitArgs(
     ctmExecutor: string;
     /** The owner the CTM executor must ALREADY answer to (storage, so outside its codehash pin). */
     ctmExecutorOwner: string;
-    /** The ecosystem executor the CTM executor must currently point at (also storage). */
-    ecosystemExecutor: string;
+    /** The coordinator (`EcosystemUpgradeExecutor`) the CTM executor must answer to (also storage). */
+    coordinator: string;
     upgradeTimer: string;
     /** The pinned composer that defines the delegate calldata (the harness's fixed no-op composer). */
     delegateComposer: { addr: string; codehash: string };
@@ -181,7 +181,7 @@ export async function bootstrapInitArgs(
     // read live rather than committed — the manifest pins only cross-machine-stable values.
     ctmExecutor: { addr: params.ctmExecutor, codehash: await codehash(params.ctmExecutor) },
     ctmExecutorOwner: params.ctmExecutorOwner,
-    ecosystemExecutor: params.ecosystemExecutor,
+    coordinator: params.coordinator,
     upgradeTimer: { addr: params.upgradeTimer, codehash: await codehash(params.upgradeTimer) },
   };
 }
@@ -299,7 +299,6 @@ export async function assertBootstrapEndState(
     bootstrapCut: any;
     ctmImplNew: string;
     ctmExecutor: string;
-    ecoExecutor: string;
     proxyAdminAddr: string;
     chains: Array<{ chainId: number; diamondProxy: string }>;
     deadline: ethers.BigNumber;
@@ -353,7 +352,7 @@ export async function assertBootstrapEndState(
   const proxyAdmin = new ethers.Contract(params.proxyAdminAddr, getAbi("ProxyAdmin"), l1Provider);
   a.assertEq(
     await proxyAdmin.owner(),
-    params.ecoExecutor,
+    params.ctmExecutor,
     "CTM-domain ProxyAdmin owned by CTMUpgradeExecutor after the bootstrap"
   );
 

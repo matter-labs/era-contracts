@@ -60,7 +60,7 @@ sol! {
         uint256 upgradeTimestamp;
         PinnedContract ctmExecutor;
         address ctmExecutorOwner;
-        address ecosystemExecutor;
+        address coordinator;
         PinnedContract upgradeTimer;
     }
 
@@ -77,18 +77,27 @@ sol! {
         function CHAIN_TYPE_MANAGER() external view returns (address);
         function CTM_PROXY_ADMIN() external view returns (address);
         function TRANSITION_CODEHASH() external view returns (bytes32);
-        function ECOSYSTEM_EXECUTOR() external view returns (address);
+        function coordinator() external view returns (address);
+        function activeOperation() external view returns (address);
         function owner() external view returns (address);
         function pendingOwner() external view returns (address);
-        function pendingTransition() external view returns (address);
-        function pendingStage() external view returns (uint8);
     }
 
+    /// The lifecycle coordinator every later operation runs through.
     #[sol(rpc)]
     contract EcosystemUpgradeExecutorView {
+        function CORE_EXECUTOR() external view returns (address);
+        function OPERATION_CODEHASH() external view returns (bytes32);
+        function pendingOperation() external view returns (address);
+        function owner() external view returns (address);
+    }
+
+    /// The ecosystem-domain executor the shared `ProxyAdmin` lands under.
+    #[sol(rpc)]
+    contract CoreUpgradeExecutorView {
         function PROXY_ADMIN() external view returns (address);
         function CORE_REGISTRY_CODEHASH() external view returns (bytes32);
-        function isAuthorizedCTMExecutor(address ctmExecutor) external view returns (bool);
+        function coordinator() external view returns (address);
         function owner() external view returns (address);
     }
 

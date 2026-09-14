@@ -62,11 +62,6 @@
             "name": "ecosystemUpgradeExecutor",
             "type": "address",
             "internalType": "address"
-          },
-          {
-            "name": "coreRegistry",
-            "type": "address",
-            "internalType": "address"
           }
         ]
       }
