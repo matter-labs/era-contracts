@@ -40,6 +40,19 @@
   },
   {
     "type": "function",
+    "name": "MAX_EXECUTION_DELAY",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "OPTIONAL_COMMITTER_ADMIN_ROLE",
     "inputs": [],
     "outputs": [
@@ -261,6 +274,25 @@
   },
   {
     "type": "function",
+    "name": "chainExecutionDelay",
+    "inputs": [
+      {
+        "name": "_chainAddress",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "commitBatchesSharedBridge",
     "inputs": [
       {
@@ -354,6 +386,25 @@
   },
   {
     "type": "function",
+    "name": "getExecutionDelay",
+    "inputs": [
+      {
+        "name": "_chainAddress",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getName",
     "inputs": [],
     "outputs": [
@@ -393,6 +444,24 @@
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "increaseChainExecutionDelay",
+    "inputs": [
+      {
+        "name": "_chainAddress",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_newExecutionDelay",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -567,6 +636,24 @@
         "name": "_newLastBatch",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setChainExecutionDelay",
+    "inputs": [
+      {
+        "name": "_chainAddress",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_newExecutionDelay",
+        "type": "uint32",
+        "internalType": "uint32"
       }
     ],
     "outputs": [],
@@ -761,6 +848,25 @@
         "name": "currentLastVerifiedBatch",
         "type": "uint256",
         "indexed": true,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "NewChainExecutionDelay",
+    "inputs": [
+      {
+        "name": "_chainAddress",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "_newExecutionDelay",
+        "type": "uint256",
+        "indexed": false,
         "internalType": "uint256"
       }
     ],
