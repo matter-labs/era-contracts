@@ -67,21 +67,22 @@ contract CoreRegistry is ICoreRegistry {
 
     /// @inheritdoc ICoreRegistry
     function ecosystemRows() external view returns (ProxyUpgradeRow[] memory) {
-        return ProxyUpgradeRowLib.toRows(getManifest().proxyUpgrades, L1_ECOSYSTEM_CONTRACT_COUNT);
-    }
-
-    /// @inheritdoc ICoreRegistry
-    function verifyAll() external view returns (bool) {
-        return
-            ProxyUpgradeRowLib.rowPinsHold(
-                ProxyUpgradeRowLib.toRows(getManifest().proxyUpgrades, L1_ECOSYSTEM_CONTRACT_COUNT)
-            );
+        return _rows();
     }
 
     /// @inheritdoc ICoreRegistry
     function validate() external view {
-        ProxyUpgradeRowLib.requireRowPins(
-            ProxyUpgradeRowLib.toRows(getManifest().proxyUpgrades, L1_ECOSYSTEM_CONTRACT_COUNT)
-        );
+        ProxyUpgradeRowLib.requireRowPins(_rows());
+    }
+
+    /// @inheritdoc ICoreRegistry
+    function verifyAll() external view returns (bool) {
+        return ProxyUpgradeRowLib.rowPinsHold(_rows());
+    }
+
+    /// @dev THE enumeration of what this registry pins: its participating rows, each pinning its
+    ///      `implNew`. Every read and both check surfaces walk this one list.
+    function _rows() private view returns (ProxyUpgradeRow[] memory) {
+        return ProxyUpgradeRowLib.toRows(getManifest().proxyUpgrades, L1_ECOSYSTEM_CONTRACT_COUNT);
     }
 }

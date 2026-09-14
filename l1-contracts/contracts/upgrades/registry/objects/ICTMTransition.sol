@@ -55,8 +55,12 @@ interface ICTMTransition {
 
     function l2Plan() external view returns (L2UpgradePlan memory);
 
-    /// @notice Reverts unless the transition, BOTH its releases, and all codehash pins are valid.
+    /// @notice Reverts unless BOTH releases validate and every codehash this transition pins
+    ///         (engine, timer, composer, ecosystem leg, CTM-domain rows) matches the live code.
+    ///         THE enforcement surface: the paths that commit or apply a transition call it.
     function validate() external view;
 
+    /// @notice Whether {validate} would pass — the same pins, read without reverting, for
+    ///         inspection and deployment tooling. Never an enforcement surface.
     function verifyAll() external view returns (bool);
 }

@@ -393,11 +393,9 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             abi.encode(manifest),
             "CTMTransition"
         );
-        // Fail here, not in stage 0: every pin the object carries must hold against the live deployment.
-        require(
-            ICTMTransition(upgradeAddresses.ctmTransition).verifyAll(),
-            "transition does not verify against the live deployment"
-        );
+        // Fail here, not in stage 0: every pin the object carries must hold against the live
+        // deployment, and the object's own revert names the pin that does not.
+        ICTMTransition(upgradeAddresses.ctmTransition).validate();
         _requireObjectsMatchExecutorPins();
     }
 

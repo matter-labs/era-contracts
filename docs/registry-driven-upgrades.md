@@ -306,7 +306,9 @@ empty account can never satisfy one.
 **Two validation surfaces.** `validate()` reverts and runs where an object is committed or applied
 (`applyCTMUpgrade`, `applyL1Upgrade`, `migrate()`, transition construction for both release edges);
 `verifyAll()` returns `bool` and is for inspection and deployment tooling. Enforcement is never left
-to an advisory predicate. Two paths deliberately skip `validate()` and say so in code: the per-chain
+to an advisory predicate. Each object enumerates what it pins exactly once and both surfaces walk
+that one list, so a pinned field cannot be enforced by one surface and missed by the other; an object
+with no tooling reader needs only `validate()`. Two paths deliberately skip `validate()` and say so in code: the per-chain
 `upgradeChain` and the engine's `upgradeFromTransition` execute only the transition the CTM already
 committed, whose pins cannot have moved (an `EXTCODEHASH` is fixed for a non-selfdestructible
 contract), and re-checking them per chain on a permissionless path would cost ~19 code reads for no
