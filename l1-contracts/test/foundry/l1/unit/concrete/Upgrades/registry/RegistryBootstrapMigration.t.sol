@@ -23,13 +23,13 @@ import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/Ec
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
 import {ProxyUpgradeRowLib} from "contracts/upgrades/registry/libraries/ProxyUpgradeRowLib.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
-import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
+import {IBootstrapUpgrade} from "contracts/upgrades/IBootstrapUpgrade.sol";
 import {L2PlanFixtures} from "./L2PlanFixtures.sol";
 import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
+import {L2CanonicalTransactionLib} from "contracts/state-transition/libraries/L2CanonicalTransactionLib.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
@@ -327,7 +327,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         L2UpgradePlan memory _plan,
         bytes memory _delegateCalldata
     ) internal view returns (L2CanonicalTransaction memory transaction) {
-        transaction = ProposedUpgradeLib.emptyL2CanonicalTransaction();
+        transaction = L2CanonicalTransactionLib.emptyL2CanonicalTransaction();
         // VM identity comes off the release's DiamondInit, which the shared fixture builds with true.
         transaction.txType = ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE;
         transaction.from = uint256(uint160(L2_FORCE_DEPLOYER_ADDR));
@@ -343,33 +343,27 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         transaction.factoryDeps = _plan.factoryDepHashes;
     }
 
-    /// @dev The proposal the engine is handed: the release's verifier, the version edge, the
-    ///      schedule and `_transaction`; the frozen struct's EraVM bytecode-hash words stay zero.
-    function _expectedProposal(
-        L2CanonicalTransaction memory _transaction,
-        uint256 _upgradeTimestamp
-    ) internal view returns (ProposedUpgrade memory proposal) {
-        proposal = ProposedUpgradeLib.emptyProposedUpgrade(newVersion);
-        proposal.l2ProtocolUpgradeTx = _transaction;
-        proposal.verifier = address(testnetVerifier);
-        proposal.upgradeTimestamp = _upgradeTimestamp;
-    }
-
-    /// @dev No facet cuts; the pinned engine's `upgrade(proposal)` as the init.
-    function _expectedCut(ProposedUpgrade memory _proposal) internal view returns (Diamond.DiamondCutData memory) {
+    /// @dev No facet cuts; the pinned engine's `upgradeFromBootstrap(migration)` as the init — the
+    ///      engine reads the version edge, the schedule, the release and the L2 plan from the
+    ///      object itself.
+    function _expectedCut(RegistryBootstrapMigration _migration) internal view returns (Diamond.DiamondCutData memory) {
         return
             Diamond.DiamondCutData({
                 facetCuts: new Diamond.FacetCut[](0),
                 initAddress: upgradeEngine,
-                initCalldata: abi.encodeCall(IDefaultUpgrade.upgrade, (_proposal))
+                initCalldata: abi.encodeCall(IBootstrapUpgrade.upgradeFromBootstrap, (address(_migration)))
             });
     }
 
-    /// @dev Decodes an `upgrade(ProposedUpgrade)` init payload; external so the selector can be
-    ///      sliced off calldata.
-    function decodeUpgradeInit(bytes calldata _initCalldata) external pure returns (ProposedUpgrade memory) {
-        assertEq(bytes32(bytes4(_initCalldata[:4])), bytes32(IDefaultUpgrade.upgrade.selector), "init selector");
-        return abi.decode(_initCalldata[4:], (ProposedUpgrade));
+    /// @dev Decodes an `upgradeFromBootstrap(address)` init payload; external so the selector can
+    ///      be sliced off calldata.
+    function decodeUpgradeInit(bytes calldata _initCalldata) external pure returns (address) {
+        assertEq(
+            bytes32(bytes4(_initCalldata[:4])),
+            bytes32(IBootstrapUpgrade.upgradeFromBootstrap.selector),
+            "init selector"
+        );
+        return abi.decode(_initCalldata[4:], (address));
     }
 
     /// @dev Decodes a `forceDeployAndUpgradeUniversal` payload.
@@ -498,15 +492,32 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
     // ─────────────────────────────── composed payload ───────────────────────────────
 
-    /// @dev The committed cut is composed ON-CHAIN from the pinned inputs — no cut bytes ride the
-    ///      manifest. Against a genesis release whose table carries a row: the pinned engine's
-    ///      `upgrade(proposal)` init over the release's verifier, the version edge, the schedule
-    ///      and the L2 transaction built from the FINAL plan, whose delegate calldata the pinned
-    ///      composer defines from that release and the CTM's Bridgehub.
-    function test_upgradeCut_composesTheEngineInitOverTheProposalBuiltFromThePlan() public {
+    /// @dev The committed cut carries nothing but the reference back to this object: no facet cuts,
+    ///      the pinned engine's `upgradeFromBootstrap(this)` init. What the engine then reads is
+    ///      served here — the manifest's version edge and schedule, and, against a genesis release
+    ///      whose table carries a row, the L2 transaction built from the FINAL plan, whose delegate
+    ///      calldata the pinned composer defines from that release and the CTM's Bridgehub.
+    function test_upgradeCut_namesTheEngineOverThisObjectAndServesTheComposedL2Tx() public {
         CTMRelease tableRelease = _deployTableRelease();
         RegistryBootstrapMigration composed = new RegistryBootstrapMigration(_tableManifest(tableRelease));
         L2UpgradePlan memory plan = composed.l2Plan();
+
+        Diamond.DiamondCutData memory cut = composed.upgradeCut();
+        assertEq(
+            keccak256(abi.encode(cut)),
+            keccak256(abi.encode(_expectedCut(composed))),
+            "the cut must be the engine init naming this object"
+        );
+        // The same bytes, read back field by field.
+        assertEq(cut.facetCuts.length, 0, "the bootstrap cut carries no facet cuts");
+        assertEq(cut.initAddress, upgradeEngine, "the init target is the pinned engine");
+        assertEq(this.decodeUpgradeInit(cut.initCalldata), address(composed), "the init names this object");
+
+        // The inputs the engine reads at execution.
+        BootstrapManifest memory served = composed.getManifest();
+        assertEq(served.currentRelease.addr, address(tableRelease), "the release whose verifier the engine installs");
+        assertEq(served.newProtocolVersion, newVersion);
+        assertEq(served.upgradeTimestamp, PLAN_UPGRADE_TIMESTAMP, "the schedule is the manifest's");
 
         vm.expectCall(
             address(delegateComposer),
@@ -515,34 +526,13 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                 (ICTMRelease(address(tableRelease)), address(bridgehub))
             )
         );
-        Diamond.DiamondCutData memory cut = composed.upgradeCut();
-
-        ProposedUpgrade memory expected = _expectedProposal(
-            _expectedL2Tx(plan, DELEGATE_CALLDATA),
-            PLAN_UPGRADE_TIMESTAMP
-        );
+        L2CanonicalTransaction memory transaction = composed.l2UpgradeTx();
         assertEq(
-            keccak256(abi.encode(cut)),
-            keccak256(abi.encode(_expectedCut(expected))),
-            "the cut must be the engine init over the composed proposal"
+            keccak256(abi.encode(transaction)),
+            keccak256(abi.encode(_expectedL2Tx(plan, DELEGATE_CALLDATA))),
+            "the served transaction is the composition of the FINAL plan"
         );
-        assertEq(
-            keccak256(abi.encode(composed.proposedUpgrade())),
-            keccak256(abi.encode(expected)),
-            "the served proposal is the one the cut embeds"
-        );
-
-        // The same bytes, read back field by field.
-        assertEq(cut.facetCuts.length, 0, "the bootstrap cut carries no facet cuts");
-        assertEq(cut.initAddress, upgradeEngine, "the init target is the pinned engine");
-        ProposedUpgrade memory decoded = this.decodeUpgradeInit(cut.initCalldata);
-        assertEq(decoded.verifier, address(testnetVerifier), "the verifier comes off the pinned release");
-        assertEq(decoded.newProtocolVersion, newVersion);
-        assertEq(decoded.upgradeTimestamp, PLAN_UPGRADE_TIMESTAMP, "the schedule is the manifest's");
-        assertEq(decoded.bootloaderHash, bytes32(0));
-        assertEq(decoded.defaultAccountHash, bytes32(0));
-        assertEq(decoded.evmEmulatorHash, bytes32(0));
-        _assertComposedL2Tx(decoded.l2ProtocolUpgradeTx, plan, DELEGATE_CALLDATA);
+        _assertComposedL2Tx(transaction, plan, DELEGATE_CALLDATA);
     }
 
     /// @dev Field-level read of a composed L2 transaction against the plan it was built from.
@@ -577,13 +567,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         RegistryBootstrapMigration composed = _deployAndAuthorize(_tableManifest(tableRelease));
         L2PlanFixtures.publish(bytecodesSupplier, _tableCodes());
         uint256 oldVersion = chainContractAddress.protocolVersion();
-        bytes32 expectedHash = keccak256(
-            abi.encode(
-                _expectedCut(
-                    _expectedProposal(_expectedL2Tx(composed.l2Plan(), DELEGATE_CALLDATA), PLAN_UPGRADE_TIMESTAMP)
-                )
-            )
-        );
+        bytes32 expectedHash = keccak256(abi.encode(_expectedCut(composed)));
 
         vm.expectEmit(true, true, false, false, address(chainContractAddress));
         emit IChainTypeManager.NewUpgradeCutHash(oldVersion, expectedHash);
@@ -614,7 +598,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                 (ICTMRelease(address(genesisRelease)), address(bridgehub))
             )
         );
-        L2CanonicalTransaction memory transaction = authored.proposedUpgrade().l2ProtocolUpgradeTx;
+        L2CanonicalTransaction memory transaction = authored.l2UpgradeTx();
 
         (
             IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments,
@@ -637,7 +621,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         L2UpgradePlan memory served = uncomposed.l2Plan();
         assertEq(served.delegateComposer, address(0), "no composer is served as zero");
 
-        L2CanonicalTransaction memory transaction = uncomposed.proposedUpgrade().l2ProtocolUpgradeTx;
+        L2CanonicalTransaction memory transaction = uncomposed.l2UpgradeTx();
         assertEq(transaction.txType, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE, "the plan still has an L2 side");
         assertEq(
             transaction.data,
@@ -698,15 +682,17 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         assertEq(plan.delegateComposer, address(0));
         assertEq(plan.factoryDepHashes.length, 0);
 
-        ProposedUpgrade memory proposal = migration.proposedUpgrade();
-        assertEq(proposal.l2ProtocolUpgradeTx.txType, 0, "no L2 side composes no L2 transaction");
-        assertEq(proposal.verifier, address(testnetVerifier));
-        assertEq(proposal.newProtocolVersion, newVersion);
-        assertEq(proposal.upgradeTimestamp, 0);
+        L2CanonicalTransaction memory transaction = migration.l2UpgradeTx();
+        assertEq(transaction.txType, 0, "no L2 side composes no L2 transaction");
+        assertEq(
+            keccak256(abi.encode(transaction)),
+            keccak256(abi.encode(L2CanonicalTransactionLib.emptyL2CanonicalTransaction())),
+            "the all-zero transaction, exactly"
+        );
         assertEq(
             keccak256(abi.encode(migration.upgradeCut())),
-            keccak256(abi.encode(_expectedCut(_expectedProposal(ProposedUpgradeLib.emptyL2CanonicalTransaction(), 0)))),
-            "an L1-only edge is the engine init over an L2-less proposal"
+            keccak256(abi.encode(_expectedCut(migration))),
+            "an L1-only edge commits the same shape of cut: the engine init naming this object"
         );
     }
 
@@ -729,7 +715,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         assertEq(plan.factoryDepHashes.length, 1);
         assertEq(plan.factoryDepHashes[0], L2PlanFixtures.factoryDepHash(DELEGATE_CODE));
         assertEq(
-            authored.proposedUpgrade().l2ProtocolUpgradeTx.txType,
+            authored.l2UpgradeTx().txType,
             ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE,
             "an authored delegate alone gives the edge an L2 side"
         );

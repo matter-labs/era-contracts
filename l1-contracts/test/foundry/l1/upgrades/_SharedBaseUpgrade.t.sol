@@ -2,9 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {
     PRIORITY_TX_MAX_GAS_LIMIT,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
@@ -18,57 +16,29 @@ import {ISystemContext} from "contracts/common/interfaces/ISystemContext.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
+/// @notice The hand-built inputs of the shared storage part (`BaseZkSyncUpgrade._upgrade`):
+///         a well-formed L2 upgrade transaction, the version it moves to, its schedule and verifier.
 contract BaseUpgrade is Test {
     L2CanonicalTransaction l2CanonicalTransaction;
-    ProposedUpgrade proposedUpgrade;
 
+    /// @dev The version the prepared upgrade moves to.
     uint256 public protocolVersion;
+    uint256 public upgradeTimestamp;
+    address public verifier;
     uint256 public chainId;
 
-    address public bridgeHub;
-    address public stateTransitionManager;
-    address public sharedBridge;
-
-    address verifier;
-
-    function _prepareEmptyProposedUpgrade() internal {
-        protocolVersion = SemVer.packSemVer(0, 1, 0);
-
-        // Assigned field by field into the storage struct.
-        proposedUpgrade.l2ProtocolUpgradeTx = l2CanonicalTransaction;
-        proposedUpgrade.bootloaderHash = bytes32(0);
-        proposedUpgrade.defaultAccountHash = bytes32(0);
-        proposedUpgrade.evmEmulatorHash = bytes32(0);
-        proposedUpgrade.verifier = address(0);
-        proposedUpgrade.verifierParams = VerifierParams({
-            recursionNodeLevelVkHash: bytes32(0),
-            recursionLeafLevelVkHash: bytes32(0),
-            recursionCircuitsSetVksHash: bytes32(0)
-        });
-        proposedUpgrade.l1ContractsUpgradeCalldata = new bytes(0);
-        proposedUpgrade.postUpgradeCalldata = new bytes(0);
-        proposedUpgrade.upgradeTimestamp = 0;
-        proposedUpgrade.newProtocolVersion = protocolVersion;
-    }
-
-    function _prepareProposedUpgrade() internal {
+    function _prepareUpgrade() internal {
         bytes[] memory bytesEmptyArray = new bytes[](1);
         bytesEmptyArray[0] = "11111111111111111111111111111111";
         uint256[] memory uintEmptyArray = new uint256[](1);
         uintEmptyArray[0] = uint256(L2ContractHelper.hashL2Bytecode(bytesEmptyArray[0]));
 
         protocolVersion = SemVer.packSemVer(0, 1, 0);
+        upgradeTimestamp = 0;
         chainId = 1;
         bytes memory systemContextCalldata = abi.encodeCall(ISystemContext.setChainId, (chainId));
 
         verifier = makeAddr("verifier");
-        bytes32 txHash = bytes32(bytes("txHash"));
-
-        bridgeHub = makeAddr("brigheHub");
-        stateTransitionManager = makeAddr("stateTransitionManager");
-        sharedBridge = makeAddr("sharedBridge");
-
-        bytes memory postUpgradeCalldata = abi.encode(chainId, bridgeHub, stateTransitionManager, sharedBridge);
 
         l2CanonicalTransaction = L2CanonicalTransaction({
             txType: SYSTEM_UPGRADE_L2_TX_TYPE,
@@ -88,24 +58,6 @@ contract BaseUpgrade is Test {
             paymasterInput: new bytes(0),
             reservedDynamic: new bytes(0)
         });
-
-        // Assigned field by field into the storage struct.
-        proposedUpgrade.l2ProtocolUpgradeTx = l2CanonicalTransaction;
-        proposedUpgrade.bootloaderHash = bytes32(0x01000121a363b3fbec270986067c1b553bf540c30a6f186f45313133ff1a1019);
-        proposedUpgrade.defaultAccountHash = bytes32(
-            0x01000121a363b3fbec270986067c1b553bf540c30a6f186f45313133ff1a1019
-        );
-        proposedUpgrade.evmEmulatorHash = bytes32(0x01000121a363b3fbec270986067c1b553bf540c30a6f186f45313133ff1a1019);
-        proposedUpgrade.verifier = address(0);
-        proposedUpgrade.verifierParams = VerifierParams({
-            recursionNodeLevelVkHash: bytes32(0),
-            recursionLeafLevelVkHash: bytes32(0),
-            recursionCircuitsSetVksHash: bytes32(0)
-        });
-        proposedUpgrade.l1ContractsUpgradeCalldata = new bytes(0);
-        proposedUpgrade.postUpgradeCalldata = postUpgradeCalldata;
-        proposedUpgrade.upgradeTimestamp = 0;
-        proposedUpgrade.newProtocolVersion = protocolVersion;
     }
 
     // add this to be excluded from coverage report

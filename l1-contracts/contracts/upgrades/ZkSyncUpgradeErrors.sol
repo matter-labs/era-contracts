@@ -2,6 +2,8 @@
 
 pragma solidity ^0.8.21;
 
+// 0x846b2ad0
+error BootstrapEngineReleaseMismatch(address manifestRelease, address engineRelease);
 // 0xb334f781
 error GenesisUpgradeExpectedOnSettlementLayer();
 // 0x5cb29523

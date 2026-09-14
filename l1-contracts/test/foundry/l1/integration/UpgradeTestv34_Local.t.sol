@@ -34,23 +34,16 @@ import {Utils as DeployScriptUtils} from "../../../../deploy-scripts/utils/Utils
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
-import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
+import {IBootstrapUpgrade} from "contracts/upgrades/IBootstrapUpgrade.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
-import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
+import {L2CanonicalTransactionLib} from "contracts/state-transition/libraries/L2CanonicalTransactionLib.sol";
+import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 
 /// @notice Test-only v34 CTM upgrade with the same MemoryOOG mocks as the v32 local harness
 ///         (the heavy JSON/zkout reads live on the shared base). The bootstrap flow itself —
 ///         the migration deploy, the four-call stage-1 leg, the legacy cut-taking commit — runs
 ///         UNMOCKED: that is what this file exists to test.
 contract CTMUpgrade_v34_Test is CTMUpgrade_v34 {
-    /// @dev The shared local fixture is Era-flavored, but the release's real engine
-    ///      (`DefaultUpgradeZKsyncOS` + the `L2V34Upgrade` L2 leg) is ZKsyncOS-only. This
-    ///      fixture asserts the L1 side only and never relays an L2 leg, so it runs the plain
-    ///      `DefaultUpgrade`; the real engine is exercised by the anvil bootstrap pipeline.
-    function deployUsedUpgradeContract() internal override returns (address) {
-        return deploySimpleContract("DefaultUpgrade");
-    }
-
     /// @dev Same MemoryOOG avoidance: the real builder reads every L2 contract's bytecode.
     ///      Correct length, empty rows.
     function getL2BytecodeInfoTable() internal override returns (bytes[] memory) {
@@ -251,11 +244,12 @@ contract UpgradeIntegrationTest_v34_Local is
             "the bootstrap edge must not register a transition"
         );
 
-        // The cut the prepare ships is the object's composition, and this asserts the BYTES rather
-        // than re-running the composer: the committed hash comes from the CTM's own storage, and
-        // the payload is read back field by field against values derived here — the pinned engine
-        // as the init target, no facet cuts, the release's verifier, the version edge, and (this
-        // fixture is L1-only) the all-zero L2 transaction that makes the engine skip the L2 leg.
+        // The cut the prepare ships is the object's, and this asserts the BYTES rather than
+        // re-running the composition: the committed hash comes from the CTM's own storage, and the
+        // payload is read back field by field — the pinned engine as the init target, no facet
+        // cuts, and an init that names the migration and nothing else. What the engine then read
+        // from it shows on the upgraded chain: the version edge, the release's verifier, and (this
+        // fixture is L1-only) no L2 protocol upgrade transaction.
         address release = IChainTypeManager(ctm).currentRelease();
         bytes memory shippedCut = ctmUpgrade.getChainUpgradeDiamondCutData();
         assertEq(keccak256(shippedCut), _expectedUpgradeCutHash, "the shipped cut must be the committed one");
@@ -266,19 +260,30 @@ contract UpgradeIntegrationTest_v34_Local is
             v34.getAddresses().stateTransition.defaultUpgrade,
             "the init target is the pinned engine"
         );
-        ProposedUpgrade memory proposal = this.decodeUpgradeInit(cut.initCalldata);
-        assertEq(proposal.newProtocolVersion, _expectedNewVersion, "the proposal carries the version edge");
-        assertEq(proposal.verifier, ICTMRelease(release).verifier(), "the verifier comes off the pinned release");
-        assertEq(proposal.upgradeTimestamp, 0, "the bootstrap manifest schedules no timestamp");
-        assertEq(proposal.bootloaderHash, bytes32(0), "ZKsync OS has no bootloader bytecode");
-        assertEq(proposal.defaultAccountHash, bytes32(0), "ZKsync OS has no default-account bytecode");
-        assertEq(proposal.evmEmulatorHash, bytes32(0), "ZKsync OS has no EVM-emulator bytecode");
-        assertEq(proposal.postUpgradeCalldata.length, 0, "no post-upgrade calldata rides the cut");
-        assertEq(proposal.l1ContractsUpgradeCalldata.length, 0, "no L1 calldata rides the cut");
         assertEq(
-            keccak256(abi.encode(proposal.l2ProtocolUpgradeTx)),
-            keccak256(abi.encode(ProposedUpgradeLib.emptyL2CanonicalTransaction())),
+            this.decodeUpgradeInit(cut.initCalldata),
+            address(v34.bootstrapMigration()),
+            "the init names the pinned migration"
+        );
+        L2CanonicalTransaction memory l2Tx = v34.bootstrapMigration().l2UpgradeTx();
+        assertEq(
+            keccak256(abi.encode(l2Tx)),
+            keccak256(abi.encode(L2CanonicalTransactionLib.emptyL2CanonicalTransaction())),
             "an L1-only edge composes the all-zero L2 transaction"
+        );
+        assertEq(
+            address(IGetters(_eraDiamond).getVerifier()),
+            ICTMRelease(release).verifier(),
+            "the chain runs the pinned release's verifier"
+        );
+        assertEq(
+            IGetters(_eraDiamond).getL2SystemContractsUpgradeTxHash(),
+            bytes32(0),
+            "no L2 protocol upgrade transaction on an L1-only edge"
+        );
+        assertTrue(
+            ICTMRelease(release).verifyChainRouting(_eraDiamond),
+            "the bootstrap engine reinstalled exactly the release's routing"
         );
 
         // The genesis release is pinned as `currentRelease` (re-pointed to the release this
@@ -340,10 +345,13 @@ contract UpgradeIntegrationTest_v34_Local is
         assertFalse(IChainAssetHandlerBase(chainAssetHandler).migrationPausedFor(ctm), "no pause before stage 0");
     }
 
-    /// @dev Decodes an `upgrade(ProposedUpgrade)` init payload; external so the selector can be
-    ///      sliced off calldata.
-    function decodeUpgradeInit(bytes calldata _initCalldata) external pure returns (ProposedUpgrade memory) {
-        require(bytes4(_initCalldata[:4]) == IDefaultUpgrade.upgrade.selector, "unexpected init selector");
-        return abi.decode(_initCalldata[4:], (ProposedUpgrade));
+    /// @dev Decodes an `upgradeFromBootstrap(address)` init payload; external so the selector can
+    ///      be sliced off calldata.
+    function decodeUpgradeInit(bytes calldata _initCalldata) external pure returns (address) {
+        require(
+            bytes4(_initCalldata[:4]) == IBootstrapUpgrade.upgradeFromBootstrap.selector,
+            "unexpected init selector"
+        );
+        return abi.decode(_initCalldata[4:], (address));
     }
 }

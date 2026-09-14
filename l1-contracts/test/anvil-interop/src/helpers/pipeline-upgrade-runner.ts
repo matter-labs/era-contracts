@@ -254,23 +254,23 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
     }
 
     // ── Per-chain legacy crossing + L2 relay ──
-    // The cut + proposed upgrade come from the per-CTM light output the *ForTests CTM script
-    // writes (`chain_upgrade_diamond_cut`); the file name is protocol-ops' convention
-    // (`upgrade_inner.rs`).
+    // The cut comes from the per-CTM light output the *ForTests CTM script writes
+    // (`chain_upgrade_diamond_cut`); the file name is protocol-ops' convention
+    // (`upgrade_inner.rs`). The L2 leg is read from the migration object the cut names, exactly
+    // as the engine reads it at execution.
     const ctmTomlPath = path.join(
       l1ContractsDir,
       "script-out",
       `upgrade-ctm-${upgradeHarnessInputs.ctmProxyAddress.toLowerCase()}.toml`
     );
-    const { cut, proposedUpgrade, l2TxParamType, settlementLayerUpgradeAddr } = readCommittedCut(ctmTomlPath);
+    const { cut, migrationAddr, settlementLayerUpgradeAddr } = readCommittedCut(ctmTomlPath);
     await runLegacyChainLegAndRelayL2({
       l1Provider,
       anvilManager,
       upgradeChainAddresses,
       oldVersion,
       cut,
-      proposedUpgrade,
-      l2TxParamType,
+      migrationAddr,
       settlementLayerUpgradeAddr,
       bridgehubAddr: l1Addresses.bridgehub,
       ctmAddr: ctmAddresses.chainTypeManager,
@@ -911,21 +911,21 @@ export async function runEcosystemGovernanceUpgrade(params: {
   }
 }
 
-// ── Committed cut + proposed upgrade ─────────────────────────────────
+// ── Committed cut + the migration it names ───────────────────────────
 
 const DIAMOND_CUT_TYPE =
   "tuple(tuple(address facet, uint8 action, bool isFreezable, bytes4[] selectors)[] facetCuts, address initAddress, bytes initCalldata)";
 
 /**
- * Read the committed upgrade cut from the per-CTM light output and decode the ProposedUpgrade
- * out of its init calldata (the engine's `upgrade(ProposedUpgrade)` delegatecall payload).
+ * Read the committed upgrade cut from the per-CTM light output and resolve the pinned
+ * `RegistryBootstrapMigration` its init calldata names (the engine's `upgradeFromBootstrap(address)`
+ * delegatecall payload). The engine reads the edge's L2 leg from that object at execution; so does
+ * this harness.
  */
 function readCommittedCut(ctmTomlPath: string): {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   cut: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  proposedUpgrade: any;
-  l2TxParamType: ethers.utils.ParamType;
+  migrationAddr: string;
   settlementLayerUpgradeAddr: string;
 } {
   if (!fs.existsSync(ctmTomlPath)) {
@@ -945,15 +945,9 @@ function readCommittedCut(ctmTomlPath: string): {
   }
   const [cut] = ethers.utils.defaultAbiCoder.decode([DIAMOND_CUT_TYPE], cutBytes);
 
-  const engineIface = new ethers.utils.Interface(getAbi("DefaultUpgrade"));
-  const [proposedUpgrade] = engineIface.decodeFunctionData("upgrade", cut.initCalldata);
-  const l2TxParamType = engineIface
-    .getFunction("upgrade")
-    .inputs[0].components?.find((c) => c.name === "l2ProtocolUpgradeTx");
-  if (!l2TxParamType) {
-    throw new Error("ProposedUpgrade ABI has no l2ProtocolUpgradeTx component");
-  }
-  return { cut, proposedUpgrade, l2TxParamType, settlementLayerUpgradeAddr };
+  const engineIface = new ethers.utils.Interface(getAbi("BootstrapUpgradeZKsyncOS"));
+  const [migrationAddr] = engineIface.decodeFunctionData("upgradeFromBootstrap", cut.initCalldata);
+  return { cut, migrationAddr, settlementLayerUpgradeAddr };
 }
 
 // ── Per-chain legacy crossing + L2 relay ─────────────────────────────
@@ -965,17 +959,21 @@ async function runLegacyChainLegAndRelayL2(params: {
   oldVersion: ethers.BigNumber;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   cut: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  proposedUpgrade: any;
-  l2TxParamType: ethers.utils.ParamType;
+  migrationAddr: string;
   settlementLayerUpgradeAddr: string;
   bridgehubAddr: string;
   ctmAddr: string;
   isZKsyncOS: boolean;
   l2DelegateBytecodeName: ContractName;
 }): Promise<void> {
-  const l2Tx = params.proposedUpgrade.l2ProtocolUpgradeTx;
+  // The ecosystem-wide L2 leg, as the migration object serves it (before the per-chain rewrite).
+  const migration = new ethers.Contract(params.migrationAddr, getAbi("RegistryBootstrapMigration"), params.l1Provider);
+  const l2Tx = await migration.l2UpgradeTx();
   const hasL2Leg = !ethers.BigNumber.from(l2Tx.txType).isZero();
+  const l2TxParamType = migration.interface.getFunction("l2UpgradeTx").outputs?.[0];
+  if (!l2TxParamType) {
+    throw new Error("RegistryBootstrapMigration ABI has no l2UpgradeTx output");
+  }
 
   // The committed L2 tx carries per-chain placeholders (chainId, chain-specific force-deployment
   // data); the per-chain upgrade contract rewrites them at upgrade time, and this leg reproduces
@@ -1020,9 +1018,7 @@ async function runLegacyChainLegAndRelayL2(params: {
     // the rewrite here (rather than reading it back — the diamond only stores the hash) proves
     // the upgrade contract performed the same rewrite during the crossing.
     const relayedTx = { ...l2Tx, data: rewrittenData };
-    const expectedHash = ethers.utils.keccak256(
-      ethers.utils.defaultAbiCoder.encode([params.l2TxParamType], [relayedTx])
-    );
+    const expectedHash = ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode([l2TxParamType], [relayedTx]));
     const getters = new ethers.Contract(chain.diamondProxy, getAbi("GettersFacet"), params.l1Provider);
     const recordedHash: string = await getters.getL2SystemContractsUpgradeTxHash();
     if (recordedHash.toLowerCase() !== expectedHash.toLowerCase()) {

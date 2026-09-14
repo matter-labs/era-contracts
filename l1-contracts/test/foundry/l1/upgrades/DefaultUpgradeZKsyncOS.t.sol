@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DefaultUpgradeZKsyncOS} from "contracts/upgrades/DefaultUpgradeZKsyncOS.sol";
 import {IL2V34Upgrade} from "contracts/upgrades/IL2V34Upgrade.sol";
+import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
+import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
+import {ReleaseFacetReader} from "contracts/upgrades/registry/libraries/ReleaseFacetReader.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {ZKChainSpecificForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
@@ -18,40 +21,30 @@ import {NotAllBatchesExecuted} from "contracts/state-transition/L1StateTransitio
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
+import {RegistryObjectsFixture} from "./_SharedRegistryObjects.t.sol";
 
 contract DummyDefaultUpgradeZKsyncOS is DefaultUpgradeZKsyncOS, BaseUpgradeUtils {
-    function setBridgehub(address _bridgehub) public {
-        s.bridgehub = _bridgehub;
-    }
-
-    function setChainId(uint256 _chainId) public {
-        s.chainId = _chainId;
-    }
-
-    function setZKsyncOS(bool _zksyncOS) public {
-        s.zksyncOS = _zksyncOS;
-    }
-
-    function setBatchCounters(uint256 _committed, uint256 _executed) public {
-        s.totalBatchesCommitted = _committed;
-        s.totalBatchesExecuted = _executed;
-    }
-
-    function getL2SystemContractsUpgradeTxHash() public view returns (bytes32) {
-        return s.l2SystemContractsUpgradeTxHash;
+    /// @notice The shared storage part (with this engine's per-chain handling), exposed.
+    function upgrade(
+        uint256 _newProtocolVersion,
+        uint256 _upgradeTimestamp,
+        address _verifier,
+        L2CanonicalTransaction memory _l2ProtocolUpgradeTx
+    ) external returns (bytes32) {
+        return _upgrade(_newProtocolVersion, _upgradeTimestamp, _verifier, _l2ProtocolUpgradeTx);
     }
 }
 
 /// @notice Unit tests for the ZKsync OS per-chain upgrade: the outstanding-batches precondition it enforces
-///         before the generic upgrade runs, and the per-chain force-deployments-data substitution it does.
+///         before the generic upgrade runs, and the per-chain force-deployments-data substitution it does —
+///         both on the shared storage part driven directly, and once through `upgradeFromTransition` against
+///         real registry objects whose pinned composer yields the placeholder shape the rewrite expects.
 /// @dev The ecosystem contracts the substitution reads (bridgehub, asset router, native token vault) are
 ///      mocked: the behaviour under test is which values end up in the rewritten transaction, not how the
-///      vault stores them. The end-to-end composition is covered by the anvil `v31 -> v32` scenario.
-contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
+///      vault stores them. The end-to-end composition is covered by the anvil bootstrap pipeline.
+contract DefaultUpgradeZKsyncOSTest is BaseUpgrade, RegistryObjectsFixture {
     DummyDefaultUpgradeZKsyncOS internal upgradeContract;
 
-    address internal mockChainTypeManager = makeAddr("mockChainTypeManager");
-    address internal mockVerifier = makeAddr("mockVerifier");
     address internal mockBridgehub = makeAddr("mockBridgehub");
     address internal mockAssetRouter = makeAddr("mockAssetRouter");
     address internal mockNativeTokenVault = makeAddr("mockNativeTokenVault");
@@ -66,12 +59,10 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
     function setUp() public {
         upgradeContract = new DummyDefaultUpgradeZKsyncOS();
 
-        _prepareProposedUpgrade();
+        _prepareUpgrade();
 
         upgradeContract.setPriorityTxMaxGasLimit(1 ether);
         upgradeContract.setPriorityTxMaxPubdata(1000000);
-        upgradeContract.setChainTypeManager(mockChainTypeManager);
-        proposedUpgrade.verifier = mockVerifier;
         upgradeContract.setBridgehub(mockBridgehub);
         upgradeContract.setChainId(CHAIN_ID);
         upgradeContract.setZKsyncOS(true);
@@ -79,16 +70,20 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
         upgradeContract.setBatchCounters(7, 7);
         _mockEcosystemForSubstitution();
 
-        proposedUpgrade.l2ProtocolUpgradeTx.data = _placeholderUpgradeTxData();
+        l2CanonicalTransaction.data = _placeholderUpgradeTxData();
         // ZKsync OS chains use their own system-upgrade transaction type.
-        proposedUpgrade.l2ProtocolUpgradeTx.txType = ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE;
+        l2CanonicalTransaction.txType = ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE;
+    }
+
+    function _upgrade() internal returns (bytes32) {
+        return upgradeContract.upgrade(protocolVersion, upgradeTimestamp, verifier, l2CanonicalTransaction);
     }
 
     function test_upgradesWhenEveryCommittedBatchIsProcessed() public {
-        bytes32 result = upgradeContract.upgrade(proposedUpgrade);
+        _upgrade();
 
-        assertEq(result, Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
-        assertEq(upgradeContract.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
+        assertEq(upgradeContract.getProtocolVersion(), protocolVersion);
+        assertEq(upgradeContract.getVerifier(), verifier);
     }
 
     /// @dev Includes the fresh-chain boundary (0/0), where a chain has committed nothing yet.
@@ -99,24 +94,26 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
 
         if (_committed != _executed) {
             vm.expectRevert(NotAllBatchesExecuted.selector);
-            upgradeContract.upgrade(proposedUpgrade);
+            _upgrade();
         } else {
-            assertEq(upgradeContract.upgrade(proposedUpgrade), Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
+            _upgrade();
+            assertEq(upgradeContract.getProtocolVersion(), protocolVersion);
         }
     }
 
-    /// @notice `upgrade()` must record the rewritten transaction, not the placeholder it was handed. This is
-    ///         the whole point of the contract, so it is asserted through `upgrade()` rather than through a
+    /// @notice The storage part must record the rewritten transaction, not the placeholder it was handed. This
+    ///         is the whole point of the contract, so it is asserted through the upgrade rather than through a
     ///         direct `getL2UpgradeTxData` call.
     function test_upgradeRecordsTheRewrittenTransaction() public {
-        L2CanonicalTransaction memory expectedTx = proposedUpgrade.l2ProtocolUpgradeTx;
+        L2CanonicalTransaction memory expectedTx = l2CanonicalTransaction;
         bytes32 placeholderHash = keccak256(abi.encode(expectedTx));
         expectedTx.data = upgradeContract.getL2UpgradeTxData(mockBridgehub, CHAIN_ID, true, expectedTx.data);
 
-        upgradeContract.upgrade(proposedUpgrade);
+        bytes32 txHash = _upgrade();
 
         bytes32 recorded = upgradeContract.getL2SystemContractsUpgradeTxHash();
         assertEq(recorded, keccak256(abi.encode(expectedTx)), "the placeholder tx was recorded");
+        assertEq(txHash, recorded, "the returned hash is the recorded one");
         assertTrue(recorded != placeholderHash, "rewrite produced the placeholder");
     }
 
@@ -124,12 +121,12 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
     ///         there is nothing to substitute and the rewrite — which would reject the empty transaction data —
     ///         must be skipped.
     function test_upgradeWithoutAnL2TransactionSkipsTheRewrite() public {
-        delete proposedUpgrade.l2ProtocolUpgradeTx;
+        delete l2CanonicalTransaction;
 
-        assertEq(upgradeContract.upgrade(proposedUpgrade), Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
+        _upgrade();
 
-        assertEq(upgradeContract.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
-        assertEq(upgradeContract.getVerifier(), mockVerifier);
+        assertEq(upgradeContract.getProtocolVersion(), protocolVersion);
+        assertEq(upgradeContract.getVerifier(), verifier);
         assertEq(upgradeContract.getL2SystemContractsUpgradeTxHash(), bytes32(0), "an upgrade tx was recorded");
     }
 
@@ -139,7 +136,55 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
         upgradeContract.setBatchCounters(8, 7);
 
         vm.expectRevert(NotAllBatchesExecuted.selector);
-        upgradeContract.upgrade(proposedUpgrade);
+        _upgrade();
+    }
+
+    /// @notice The registry path end to end on this engine: the transition's pinned composer defines the
+    ///         delegate's placeholder calldata, the composer wraps it for the `L2ComplexUpgrader`, and the
+    ///         engine commits the PER-CHAIN rewrite of that composition — not the composition itself.
+    function test_upgradeFromTransition_composesAndRewritesThePerChainTransaction() public {
+        // The pinned composer yields the inner `IL2V34Upgrade.upgrade` placeholder; the release pins a
+        // ZKsync OS DiamondInit, so the composed transaction carries the ZKsync OS upgrade type.
+        _setUpRegistryObjects(true, _placeholderInnerCalldata());
+        address newVerifier = _pinned("newVerifier");
+        CTMRelease fromRelease = _release(_departingFacets(), _pinned("fromVerifier"));
+        CTMRelease newRelease = _release(_arrivingFacets(), newVerifier);
+        upgradeContract.applyFacetCuts(ReleaseFacetReader.newChainInstallations(ICTMRelease(address(fromRelease))));
+        CTMTransition transition = _transition(
+            fromRelease,
+            newRelease,
+            0,
+            protocolVersion,
+            0,
+            address(upgradeContract),
+            _delegatePlan()
+        );
+
+        L2CanonicalTransaction memory composed = upgradeContract.l2UpgradeTx(address(transition), mockBridgehub);
+        bytes32 composedHash = keccak256(abi.encode(composed));
+        assertEq(
+            composedHash,
+            keccak256(abi.encode(_expectedL2Tx(transition.l2Plan(), protocolVersion))),
+            "the served transaction is the composed one"
+        );
+        // The rewrite, reproduced through the engine's own view (memory structs alias: `rewritten`
+        // IS `composed` from here on, hence the hash taken above).
+        L2CanonicalTransaction memory rewritten = composed;
+        rewritten.data = upgradeContract.getL2UpgradeTxData(mockBridgehub, CHAIN_ID, true, composed.data);
+
+        upgradeContract.upgradeFromTransition(address(transition));
+
+        bytes32 recorded = upgradeContract.getL2SystemContractsUpgradeTxHash();
+        assertEq(recorded, keccak256(abi.encode(rewritten)), "the chain commits the per-chain rewrite");
+        assertTrue(recorded != composedHash, "the ecosystem-wide composition must not be committed as is");
+        assertEq(upgradeContract.getProtocolVersion(), protocolVersion);
+        assertEq(upgradeContract.getVerifier(), newVerifier, "the verifier comes off the target release");
+        assertEq(upgradeContract.facetAddress(SEL_ARRIVING), facetArriving, "the derived facet delta is applied");
+        assertEq(
+            _decodePerChainData(rewritten.data).baseTokenBridgingData.assetId,
+            BASE_TOKEN_ASSET_ID,
+            "the committed transaction carries this chain's data"
+        );
     }
 
     function test_revertWhen_theOuterSelectorIsNotForceDeployAndUpgradeUniversal() public {
@@ -307,15 +352,17 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
         return abi.decode(perChainData, (ZKChainSpecificForceDeploymentsData));
     }
 
+    /// @dev The inner `IL2V34Upgrade.upgrade` calldata with the per-chain placeholder — what a
+    ///      version-specific composer defines for the delegate.
+    function _placeholderInnerCalldata() internal view returns (bytes memory) {
+        return abi.encodeCall(IL2V34Upgrade.upgrade, (true, ctmDeployer, FIXED_FORCE_DEPLOYMENTS_DATA, hex"00"));
+    }
+
     function _placeholderUpgradeTxData() internal view returns (bytes memory) {
-        bytes memory innerCalldata = abi.encodeCall(
-            IL2V34Upgrade.upgrade,
-            (true, ctmDeployer, FIXED_FORCE_DEPLOYMENTS_DATA, hex"00")
-        );
         return
             abi.encodeCall(
                 IComplexUpgrader.forceDeployAndUpgradeUniversal,
-                (new IComplexUpgrader.UniversalContractUpgradeInfo[](0), delegateTo, innerCalldata)
+                (new IComplexUpgrader.UniversalContractUpgradeInfo[](0), delegateTo, _placeholderInnerCalldata())
             );
     }
 

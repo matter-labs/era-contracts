@@ -37,6 +37,17 @@ import {InvalidBlobCommitmentsLength, InvalidBlobHashesLength} from "test/foundr
 import {Utils as DeployUtils} from "deploy-scripts/utils/Utils.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {ContractsBytecodesLib} from "deploy-scripts/utils/bytecode/ContractsBytecodesLib.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
+import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
+import {
+    AuthoredL2Plan,
+    L2UpgradePlan,
+    PinnedContract,
+    ProxyUpgradeRow,
+    TransitionManifest
+} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {CTM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
+import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
@@ -69,6 +80,55 @@ library Utils {
 
     function transitionCodehash() internal view returns (bytes32) {
         return keccak256(vm.getDeployedCode("CTMTransition.sol:CTMTransition"));
+    }
+
+    /// @notice Stands in a `CTMTransition` at `_transition` and its target release at `_newRelease`,
+    ///         answering exactly the reads `DefaultUpgrade.upgradeFromTransition` makes for an
+    ///         L1-only edge: no facet cuts, no L2 plan, the version edge and `_verifier`.
+    /// @dev For tests whose subject is the CALLER of the engine (the Admin facet's gating, a
+    ///      migrated chain executing an upgrade) rather than the registry objects; the engine
+    ///      against real objects is covered in `test/foundry/l1/upgrades/DefaultUpgrade.t.sol`.
+    function mockL1OnlyTransition(
+        address _transition,
+        address _newRelease,
+        uint256 _oldProtocolVersion,
+        uint256 _newProtocolVersion,
+        address _verifier
+    ) internal {
+        PinnedContract memory noPin = PinnedContract({addr: address(0), codehash: bytes32(0)});
+        TransitionManifest memory manifest = TransitionManifest({
+            oldProtocolVersion: _oldProtocolVersion,
+            newProtocolVersion: _newProtocolVersion,
+            fromRelease: address(0),
+            newRelease: _newRelease,
+            upgradeEngine: noPin,
+            proxyUpgrades: new ProxyUpgradeRow[](CTM_CONTRACT_COUNT),
+            oldProtocolVersionDeadline: type(uint256).max,
+            upgradeTimestamp: 0,
+            l2Plan: AuthoredL2Plan({
+                extraDeployments: new IComplexUpgrader.UniversalContractUpgradeInfo[](0),
+                delegateTo: address(0),
+                delegateComposer: noPin,
+                factoryDepHashes: new uint256[](0)
+            }),
+            coreRegistry: noPin,
+            upgradeTimer: noPin
+        });
+        vm.mockCall(_transition, abi.encodeCall(ICTMTransition.getManifest, ()), abi.encode(manifest));
+        vm.mockCall(_transition, abi.encodeCall(ICTMTransition.facetCuts, ()), abi.encode(new Diamond.FacetCut[](0)));
+        vm.mockCall(
+            _transition,
+            abi.encodeCall(ICTMTransition.l2Plan, ()),
+            abi.encode(
+                L2UpgradePlan({
+                    deployments: new IComplexUpgrader.UniversalContractUpgradeInfo[](0),
+                    delegateTo: address(0),
+                    delegateComposer: address(0),
+                    factoryDepHashes: new uint256[](0)
+                })
+            )
+        );
+        vm.mockCall(_newRelease, abi.encodeCall(ICTMRelease.verifier, ()), abi.encode(_verifier));
     }
 
     function coreRegistryCodehash() internal view returns (bytes32) {

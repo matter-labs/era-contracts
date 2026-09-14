@@ -6,8 +6,6 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgradeGenesis} from "./BaseZkSyncUpgradeGenesis.sol";
-import {ProposedUpgrade} from "./IDefaultUpgrade.sol";
-import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {IL2GenesisUpgrade} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IL1GenesisUpgrade} from "./IL1GenesisUpgrade.sol";
@@ -26,16 +24,16 @@ import {L1FixedForceDeploymentsHelper} from "./L1FixedForceDeploymentsHelper.sol
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
+/// @notice The genesis upgrade of a new chain: composes the L2 genesis transaction and sets it
+///         through the shared storage part ({BaseZkSyncUpgrade._upgrade}) — no fabricated
+///         transition, no nested diamond cut.
 contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis, L1FixedForceDeploymentsHelper {
-    /// @notice The main function that will be called by the Admin facet.
-    /// @param _l1GenesisUpgrade the address of the l1 genesis upgrade
-    /// @param _chainId the chain id
-    /// @param _protocolVersion the current protocol version
-    /// @param _l1CtmDeployerAddress the address of the l1 ctm deployer
-    /// @param _fixedForceDeploymentsData the force deployments data
-    /// @param _factoryDeps the factory dependencies
+    /// @inheritdoc IL1GenesisUpgrade
+    /// @dev The first argument (this contract's address) is part of the interface the Admin facet
+    ///      encodes and is not needed here: the storage part runs in-place on the delegatecalling
+    ///      diamond. The verifier is left as `DiamondInit` installed it from the release.
     function genesisUpgrade(
-        address _l1GenesisUpgrade,
+        address, // _l1GenesisUpgrade
         uint256 _chainId,
         uint256 _protocolVersion,
         address _l1CtmDeployerAddress,
@@ -92,39 +90,15 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis, L1Fixe
                 reservedDynamic: new bytes(0)
             });
         }
-        ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: l2ProtocolUpgradeTx,
-            bootloaderHash: bytes32(0),
-            defaultAccountHash: bytes32(0),
-            evmEmulatorHash: bytes32(0),
-            // Verifier is fetched from CTM; keep zeroed fields for backward compatibility.
-            verifier: address(0),
-            verifierParams: VerifierParams({
-                recursionNodeLevelVkHash: bytes32(0),
-                recursionLeafLevelVkHash: bytes32(0),
-                recursionCircuitsSetVksHash: bytes32(0)
-            }),
-            l1ContractsUpgradeCalldata: new bytes(0),
-            postUpgradeCalldata: new bytes(0),
-            upgradeTimestamp: 0,
-            newProtocolVersion: _protocolVersion
-        });
 
-        Diamond.FacetCut[] memory emptyArray;
-        Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
-            facetCuts: emptyArray,
-            initAddress: _l1GenesisUpgrade,
-            initCalldata: abi.encodeCall(this.upgrade, (proposedUpgrade))
+        _upgrade({
+            _newProtocolVersion: _protocolVersion,
+            _upgradeTimestamp: 0,
+            _verifier: address(0),
+            _l2ProtocolUpgradeTx: l2ProtocolUpgradeTx
         });
-        Diamond.diamondCut(cutData);
 
         emit GenesisUpgrade(address(this), l2ProtocolUpgradeTx, _protocolVersion, _factoryDeps);
-        return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
-    }
-
-    /// @notice the upgrade function.
-    function upgrade(ProposedUpgrade memory _proposedUpgrade) public override returns (bytes32) {
-        super.upgrade(_proposedUpgrade);
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
 }

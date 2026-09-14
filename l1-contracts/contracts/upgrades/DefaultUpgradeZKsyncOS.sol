@@ -2,9 +2,10 @@
 
 pragma solidity 0.8.28;
 
+import {BaseZkSyncUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {DefaultUpgrade} from "./DefaultUpgrade.sol";
-import {ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {L2UpgradeTxLib} from "./L2UpgradeTxLib.sol";
+import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {NotAllBatchesExecuted} from "../state-transition/L1StateTransitionErrors.sol";
 
 /// @author Matter Labs
@@ -16,8 +17,13 @@ import {NotAllBatchesExecuted} from "../state-transition/L1StateTransitionErrors
 /// `IL2V34Upgrade.upgrade` calldata carries a placeholder for the chain-specific force-deployments data.
 /// Substituting the real data can only happen per chain, which is what this contract adds.
 contract DefaultUpgradeZKsyncOS is DefaultUpgrade {
-    /// @inheritdoc DefaultUpgrade
-    function upgrade(ProposedUpgrade memory _proposedUpgrade) public virtual override returns (bytes32) {
+    /// @inheritdoc BaseZkSyncUpgrade
+    function _upgrade(
+        uint256 _newProtocolVersion,
+        uint256 _upgradeTimestamp,
+        address _verifier,
+        L2CanonicalTransaction memory _l2ProtocolUpgradeTx
+    ) internal virtual override returns (bytes32) {
         // This is a generic upgrade implementation, so as good practice it requires every outstanding batch
         // to have been processed before proceeding. It is not an invariant: the upgrade sees only the state
         // of the block it lands in. It does catch the case that matters in practice — the new protocol
@@ -27,16 +33,16 @@ contract DefaultUpgradeZKsyncOS is DefaultUpgrade {
 
         // A transition whose derived delta carries no L2 upgrade transaction leaves the tx all-zero;
         // rewriting its data would turn that empty slot into a real, unintended upgrade tx.
-        if (_proposedUpgrade.l2ProtocolUpgradeTx.txType != 0) {
-            _proposedUpgrade.l2ProtocolUpgradeTx.data = getL2UpgradeTxData(
+        if (_l2ProtocolUpgradeTx.txType != 0) {
+            _l2ProtocolUpgradeTx.data = getL2UpgradeTxData(
                 s.bridgehub,
                 s.chainId,
                 s.zksyncOS,
-                _proposedUpgrade.l2ProtocolUpgradeTx.data
+                _l2ProtocolUpgradeTx.data
             );
         }
 
-        return super.upgrade(_proposedUpgrade);
+        return super._upgrade(_newProtocolVersion, _upgradeTimestamp, _verifier, _l2ProtocolUpgradeTx);
     }
 
     /// @notice Rewrite the ecosystem-wide L2 upgrade tx data for this chain.
