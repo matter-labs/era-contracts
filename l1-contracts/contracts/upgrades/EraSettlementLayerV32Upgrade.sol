@@ -5,7 +5,9 @@ pragma solidity 0.8.28;
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {MustBeEraChain} from "../common/L1ContractErrors.sol";
-import {NotAllBatchesExecuted} from "../state-transition/L1StateTransitionErrors.sol";
+import {NotAllBatchesExecuted, VerifierDoesNotSupportMultiProof} from "../state-transition/L1StateTransitionErrors.sol";
+import {IEraMultiProofVerifier} from "../state-transition/chain-interfaces/IEraMultiProofVerifier.sol";
+import {ERA_MULTI_PROOF_TYPE} from "../common/Config.sol";
 
 /// @author Matter Labs
 /// @title EraSettlementLayerV32Upgrade
@@ -27,6 +29,17 @@ contract EraSettlementLayerV32Upgrade is BaseZkSyncUpgrade {
         require(s.totalBatchesCommitted == s.totalBatchesExecuted, NotAllBatchesExecuted());
 
         super.upgrade(_proposedUpgrade);
+
+        // Shipping the Airbender lane is the point of this cut, and the chain comes out of it with
+        // `disabledProofSystems` at zero. A verifier that does not take the combined envelope would
+        // leave it unable to prove anything it commits, so the wiring is checked rather than assumed.
+        try IEraMultiProofVerifier(address(s.verifier)).acceptedProofType() returns (uint256 proofType) {
+            if (proofType != ERA_MULTI_PROOF_TYPE) {
+                revert VerifierDoesNotSupportMultiProof(address(s.verifier));
+            }
+        } catch {
+            revert VerifierDoesNotSupportMultiProof(address(s.verifier));
+        }
 
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }

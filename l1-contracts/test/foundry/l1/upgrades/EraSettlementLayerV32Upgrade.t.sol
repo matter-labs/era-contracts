@@ -4,10 +4,18 @@ pragma solidity 0.8.28;
 import {EraSettlementLayerV32Upgrade} from "contracts/upgrades/EraSettlementLayerV32Upgrade.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {MustBeEraChain} from "contracts/common/L1ContractErrors.sol";
-import {NotAllBatchesExecuted} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {
+    NotAllBatchesExecuted,
+    VerifierDoesNotSupportMultiProof
+} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {IEraMultiProofVerifier} from "contracts/state-transition/chain-interfaces/IEraMultiProofVerifier.sol";
+import {ERA_MULTI_PROOF_TYPE} from "contracts/common/Config.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
+
+/// Stands in for a pre-gate verifier: real code, but no `acceptedProofType` to answer with.
+contract NonGateVerifier {}
 
 contract DummyEraSettlementLayerV32Upgrade is EraSettlementLayerV32Upgrade, BaseUpgradeUtils {
     function setZKsyncOS(bool _zksyncOS) public {
@@ -46,6 +54,15 @@ contract EraSettlementLayerV32UpgradeTest is BaseUpgrade {
         upgradeContract.setPriorityTxMaxPubdata(1000000);
         upgradeContract.setChainTypeManager(mockChainTypeManager);
         upgradeContract.mockProtocolVersionVerifier(protocolVersion, mockVerifier);
+        _mockAcceptedProofType(ERA_MULTI_PROOF_TYPE);
+    }
+
+    function _mockAcceptedProofType(uint256 _proofType) internal {
+        vm.mockCall(
+            mockVerifier,
+            abi.encodeWithSelector(IEraMultiProofVerifier.acceptedProofType.selector),
+            abi.encode(_proofType)
+        );
     }
 
     function test_leavesBothProofSystemsRequired() public {
@@ -89,6 +106,25 @@ contract EraSettlementLayerV32UpgradeTest is BaseUpgrade {
         upgradeContract.setZKsyncOS(true);
 
         vm.expectRevert(MustBeEraChain.selector);
+        upgradeContract.upgrade(proposedUpgrade);
+    }
+
+    /// The chain comes out of the cut requiring an Airbender proof, so a verifier taking some other
+    /// envelope would leave it unable to prove anything it commits.
+    function test_revertWhen_verifierTakesAnotherProofType() public {
+        _mockAcceptedProofType(ERA_MULTI_PROOF_TYPE + 1);
+
+        vm.expectRevert(abi.encodeWithSelector(VerifierDoesNotSupportMultiProof.selector, mockVerifier));
+        upgradeContract.upgrade(proposedUpgrade);
+    }
+
+    /// A pre-gate verifier has no `acceptedProofType` at all, so the failed call is treated the same
+    /// way rather than surfacing as an opaque revert.
+    function test_revertWhen_verifierIsNotAGate() public {
+        address nonGateVerifier = address(new NonGateVerifier());
+        upgradeContract.mockProtocolVersionVerifier(protocolVersion, nonGateVerifier);
+
+        vm.expectRevert(abi.encodeWithSelector(VerifierDoesNotSupportMultiProof.selector, nonGateVerifier));
         upgradeContract.upgrade(proposedUpgrade);
     }
 }
