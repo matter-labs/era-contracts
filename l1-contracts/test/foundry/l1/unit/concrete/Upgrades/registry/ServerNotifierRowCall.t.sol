@@ -212,7 +212,11 @@ contract ServerNotifierRowCallTest is CTMUpgradeExecutorFixture {
         assertEq(harness.externalActionDescriptions().length, 0, "no declared action");
 
         string memory toml = vm.readFile(outputPath);
-        assertEq(toml.readAddress("$.ctm_admin_calls.chain_admin"), address(chainAdmin), "the section is still written");
+        assertEq(
+            toml.readAddress("$.ctm_admin_calls.chain_admin"),
+            address(chainAdmin),
+            "the section is still written"
+        );
         Call[] memory written = abi.decode(toml.readBytes("$.ctm_admin_calls.server_notifier_upgrade"), (Call[]));
         assertEq(written.length, 0, "an empty call list");
     }

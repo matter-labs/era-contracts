@@ -341,9 +341,7 @@ contract CTMTransition is ICTMTransition {
         bool hasComposer = _m.l2Plan.delegateComposer.addr != address(0);
         bool hasEcosystemLeg = _m.coreRegistry.addr != address(0);
         uint256 rowsLength = rows.length;
-        pins = new PinnedContract[](
-            FIXED_PIN_COUNT + (hasComposer ? 1 : 0) + (hasEcosystemLeg ? 1 : 0) + rowsLength
-        );
+        pins = new PinnedContract[](FIXED_PIN_COUNT + (hasComposer ? 1 : 0) + (hasEcosystemLeg ? 1 : 0) + rowsLength);
         pins[0] = _m.upgradeEngine;
         pins[1] = _m.upgradeTimer;
         uint256 next = FIXED_PIN_COUNT;
