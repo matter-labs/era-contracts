@@ -391,9 +391,9 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       sendAndCheck
     );
 
-    // One migration-pause window across both edges (`setNewVersionUpgrade` inside `migrate()`
-    // and the CTM leg of `stage1` both require it). There is a single pause flag, so stage 0
-    // re-setting it is a no-op and stage 2's unpause ends this window too.
+    // The bootstrap's stage-0 governance action: the ECOSYSTEM pause (`migrate()` requires
+    // migrations paused for the CTM). It is governance's to lift again in the bootstrap's stage 2
+    // below — the coordinator's later stages pause and unpause only the CTM's own flag.
     console.log("\n── Pausing chain migrations ──");
     await setMigrationPaused(l1Provider, live.chainAssetHandler, true);
 
@@ -493,6 +493,13 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       await relayL2UpgradeTx(l2Provider, bootstrapL2Tx.data, chain.chainId);
     }
     await clearGenesisUpgradeTxHash(l1Provider, upgradeChains);
+
+    // The bootstrap's stage-2 governance actions: lift the ecosystem pause, then let the edge
+    // assert its own completion (it refuses while the CTM's migrations are still paused).
+    console.log("\n── Bootstrap stage 2: lifting the ecosystem pause ──");
+    await setMigrationPaused(l1Provider, live.chainAssetHandler, false);
+    await migration.validateApplied();
+    console.log("  ✓ RegistryBootstrapMigration.validateApplied() holds");
 
     console.log("\n── Verifying bootstrap end state ──");
     await assertBootstrapEndState(
