@@ -48,6 +48,11 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
     /// @inheritdoc IEraMultiProofVerifier
     IVerifier public immutable AIRBENDER_VERIFIER;
 
+    /// @dev Proof type naming the Airbender lane for key discovery. Kept at the value the Boojum
+    /// router used before the Airbender route was removed from it, so existing tooling reads the
+    /// same index.
+    uint256 internal constant AIRBENDER_VERIFICATION_TYPE = 2;
+
     error BoojumVerificationFailed();
     error AirbenderVerificationFailed();
 
@@ -175,5 +180,16 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
     /// Airbender lane's key is read from `AIRBENDER_VERIFIER` directly.
     function verificationKeyHash() external view returns (bytes32) {
         return BOOJUM_VERIFIER.verificationKeyHash();
+    }
+
+    /// @inheritdoc IEraDualVerifier
+    /// @dev Both lanes' keys are readable here, so tooling that discovers keys off the chain's verifier
+    /// keeps working once the gate is installed. Discovery only: the Airbender key is reachable while an
+    /// Airbender proof still is not, since `verify` routes the Boojum segment to the Boojum router alone.
+    function verificationKeyHash(uint256 _verifierType) external view returns (bytes32) {
+        if (_verifierType == AIRBENDER_VERIFICATION_TYPE) {
+            return AIRBENDER_VERIFIER.verificationKeyHash();
+        }
+        return IEraDualVerifier(address(BOOJUM_VERIFIER)).verificationKeyHash(_verifierType);
     }
 }

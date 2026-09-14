@@ -369,6 +369,26 @@ contract EraMultiProofVerifierTest is Test {
         verifier.requiredProofSystems(mask);
     }
 
+    /// Installing the gate as a chain's verifier must not remove typed key discovery: tooling reads
+    /// both lanes' keys off `verificationKeyHash(type)` on whatever the chain points at. Discovery is
+    /// not acceptance — the Airbender key is readable while an Airbender proof is still not routable
+    /// through the Boojum segment.
+    function test_reportsBothLaneKeysByType() public {
+        EraDualVerifier boojumRouter = new EraDualVerifier(
+            IVerifierV2(address(new LaneVerifier(false, true))),
+            IVerifier(address(new LaneVerifier(false, true)))
+        );
+        LaneVerifier airbenderLane = new LaneVerifier(false, true);
+        EraMultiProofVerifier gate = new EraMultiProofVerifier(
+            IVerifier(address(boojumRouter)),
+            IVerifier(address(airbenderLane))
+        );
+
+        assertEq(gate.verificationKeyHash(0), boojumRouter.verificationKeyHash(0), "FFLONK key");
+        assertEq(gate.verificationKeyHash(1), boojumRouter.verificationKeyHash(1), "PLONK key");
+        assertEq(gate.verificationKeyHash(2), airbenderLane.verificationKeyHash(), "Airbender key");
+    }
+
     function test_reportsAcceptedProofTypeAndProductionFlag() public view {
         assertEq(verifier.acceptedProofType(), ERA_MULTI_PROOF_TYPE);
         assertFalse(verifier.isTestnetVerifier(), "the production gate must answer the flag, not omit it");

@@ -14,4 +14,11 @@ import {IEraVerifier} from "./IEraVerifier.sol";
 interface IEraDualVerifier is IEraVerifier {
     function FFLONK_VERIFIER() external view returns (IVerifierV2);
     function PLONK_VERIFIER() external view returns (IVerifier);
+
+    /// @notice The verification key hash of one sub-verifier, selected by proof type.
+    /// @dev Key discovery only. Which keys are readable here says nothing about which proofs `verify`
+    /// accepts — the multi-proof gate reports the Airbender lane's key without routing Airbender
+    /// proofs through the Boojum router.
+    /// @param _verifierType `0` FFLONK, `1` PLONK, `2` Airbender where a lane exists.
+    function verificationKeyHash(uint256 _verifierType) external view returns (bytes32);
 }

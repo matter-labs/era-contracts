@@ -32,7 +32,8 @@ library BatchDecoder {
     /// layout moved even though a ZKsync OS batch always carries a zero Airbender commitment.
     uint8 internal constant SUPPORTED_ENCODING_VERSION_COMMIT_ZKSYNC_OS = 6;
     /// @notice The currently supported encoding version for precommit data.
-    /// @dev Unchanged: `PrecommitInfo` carries no batch struct, so this layout did not move.
+    /// @dev Split from `SUPPORTED_ENCODING_VERSION` to preserve precommit encoding version 1;
+    /// `PrecommitInfo` is unaffected by the Airbender changes.
     uint8 internal constant SUPPORTED_ENCODING_VERSION_PRECOMMIT = 1;
 
     /// @notice Decodes commit data from a calldata bytes into the last committed batch data and an array of new batch data.
