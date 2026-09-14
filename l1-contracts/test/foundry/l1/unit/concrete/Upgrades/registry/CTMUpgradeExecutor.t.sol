@@ -184,7 +184,8 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
                     genesisIndexRepeatedStorageChanges: 54
                 }),
                 // Length-checked inventory; content is irrelevant to this fixture.
-                l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT)
+                l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT),
+                l2SystemProxyBytecodeInfo: ""
             });
     }
 

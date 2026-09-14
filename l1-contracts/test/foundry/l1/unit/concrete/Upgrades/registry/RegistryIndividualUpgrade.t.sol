@@ -290,7 +290,8 @@ contract RegistryIndividualUpgradeTest is ZKsyncOSChainTypeManagerSharedTest, Re
                         genesisBatchCommitment: _registryGenesisBatchCommitment(),
                         genesisIndexRepeatedStorageChanges: 54
                     }),
-                    l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT)
+                    l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT),
+                    l2SystemProxyBytecodeInfo: ""
                 })
             );
     }
