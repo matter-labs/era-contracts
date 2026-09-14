@@ -51,7 +51,6 @@ import {BytecodeUtils} from "../../utils/bytecode/BytecodeUtils.s.sol";
 import {ReleaseMemberProbe} from "./ReleaseMemberProbe.sol";
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 import {CTMUpgradeParams} from "./UpgradeParams.sol";
-import {UpgradeUtils} from "./UpgradeUtils.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
@@ -143,11 +142,10 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         ///      L2 upgrade transaction.
         bytes32 zkTokenAssetId;
         /// @dev Whether the CTM's verifier is the testnet one, which accepts unproven batches.
-        ///      Supplied by the caller alongside `isZKsyncOS`; protocol-ops reads it from
-        ///      `upgrade-envs/permanent-values/<env>.toml` (true for every env except mainnet).
-        ///      Not introspected off the deployed verifier: only the *testnet* verifiers declare
-        ///      `IS_TESTNET_VERIFIER`, so the call reverts on a production one, and probing for that
-        ///      would need the try/catch this repo forbids.
+        ///      Declared per environment in `upgrade-envs/permanent-values/<env>.toml` (true for
+        ///      every env except mainnet) and cross-checked against the env by the protocol-ops
+        ///      verifier. Not introspected off the deployed verifier: pre-v34 production verifiers
+        ///      export no flag, so probing would need the staticcall this repo forbids.
         bool testnetVerifier;
     }
 
@@ -264,9 +262,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         config.contracts.validatorTimelockExecutionDelay = IValidatorTimelock(
             ctmAddresses.stateTransition.proxies.validatorTimelock
         ).executionDelay();
-        config.testnetVerifier = UpgradeUtils.resolveTestnetVerifier(
-            IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager)
-        );
+        config.testnetVerifier = permanentConfig.testnetVerifier;
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }
 

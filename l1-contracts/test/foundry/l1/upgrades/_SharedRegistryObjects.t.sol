@@ -43,7 +43,7 @@ import {
     CTMContract,
     L2_ECOSYSTEM_CONTRACT_COUNT
 } from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
-import {L2PlanFixtures} from "foundry-test/l1/unit/concrete/upgrades/registry/L2PlanFixtures.sol";
+import {L2PlanFixtures} from "foundry-test/l1/unit/concrete/Upgrades/registry/L2PlanFixtures.sol";
 
 /// @notice Real, minimal registry objects for the upgrade-engine unit tests: two releases that
 ///         differ in one facet and their verifier, the transition between them, and a bootstrap
