@@ -378,9 +378,9 @@
   {
     "contractName": "l1-contracts/EcosystemUpgradeExecutor",
     "evmBytecodePath": "/l1-contracts/out/EcosystemUpgradeExecutor.sol/EcosystemUpgradeExecutor.json",
-    "evmBytecodeHash": "0x823528e58cc8bc96c4abc4703e139ffc8a4bd7efbe60fc5b233be414c47e2934",
-    "evmDeployedBytecodeHash": "0x099caa8426ee75b2475a409a678614522aa03b9ab60ca9acc42fb4e93dfcb24d",
-    "evmDeployedBytecodeBlakeHash": "0x00b195ee121f96961ae1ab94b35498494faa8c194089bea3f12b446ac80af0ed",
+    "evmBytecodeHash": "0x0def3adb9ad59b63821830bcfd008df6b0c9f9365892b7e817874576f548b086",
+    "evmDeployedBytecodeHash": "0x5a60e558a205ee6e71f471ee91d6f460e7fd623e27467d08ba4b27c9933dc399",
+    "evmDeployedBytecodeBlakeHash": "0xd0dfd9c46a983d9544aa69fa1ec82ff46a8528f7eefe103a839c9b3cc4498d38",
     "evmDeployedBytecodeLength": 7652
   },
   {
