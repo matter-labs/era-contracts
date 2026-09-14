@@ -75,6 +75,10 @@ library Utils {
         return keccak256(vm.getDeployedCode("CoreRegistry.sol:CoreRegistry"));
     }
 
+    function operationCodehash() internal view returns (bytes32) {
+        return keccak256(vm.getDeployedCode("EcosystemUpgradeOperation.sol:EcosystemUpgradeOperation"));
+    }
+
     /// @dev DiamondInit derives everything but (chainId, admin) from the CTM — which is simply
     ///      `msg.sender` during the diamond proxy construction. Direct-diamond fixtures prank as
     ///      this fake CTM and mock its getters (see `UtilsCallMocker`).

@@ -7,7 +7,10 @@ import {ZKsyncOSChainTypeManagerSharedTest} from "../../state-transition/ChainTy
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
+import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
+import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol";
+import {OperationFixtures} from "./OperationFixtures.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
@@ -68,15 +71,16 @@ import {
 /// @dev The registry is a storage-backed double (fixture addresses are dynamic), but everything
 ///      it pins here is real: live facet addresses/selectors, a real replacement `AdminFacet`,
 ///      the real `DefaultUpgrade`, real verifier contracts.
-/// @dev Each hop runs the executor's full three-stage lifecycle ({docs/upgrade-stage-lifecycle.md})
-///      against the fixture's REAL `L1ChainAssetHandler`: stage 0 takes the executor's migration
-///      pause hold, stage 1 commits, `upgradeChain` crosses the chain, stage 2 releases the hold.
-///      No ecosystem leg is named (the hops are CTM-only); the ecosystem executor is still bound
-///      and wired because the executor requires the join. The lifecycle's own rules are covered
-///      in CTMUpgradeLifecycle.t.sol.
-abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
+/// @dev Each hop rides a one-leg operation through the coordinator's full three-stage lifecycle
+///      ({protocol-docs/ecosystem-upgrade-coordination.md}) against the fixture's REAL
+///      `L1ChainAssetHandler`: stage 0 reserves the executor and pauses its CTM's migrations,
+///      stage 1 commits, `upgradeChain` crosses the chain, stage 2 releases the pause. No
+///      ecosystem leg is named (the hops are CTM-only). The lifecycle's own rules are covered in
+///      CTMUpgradeLifecycle.t.sol.
+abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, OperationFixtures {
     CTMUpgradeExecutor internal ctmExecutor;
-    EcosystemUpgradeExecutor internal ecosystemExecutor;
+    CoreUpgradeExecutor internal coreExecutor;
+    EcosystemUpgradeExecutor internal coordinator;
     CTMTransition internal transitionV32;
     CTMTransition internal transitionV33;
     /// @dev The v33 hop's pinned delegate-calldata composer: a test-only stand-in returning
@@ -142,20 +146,20 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         chainAddress = createNewChain(getDiamondCutData(diamondInit));
         _mockGetZKChainFromBridgehub(chainAddress);
 
-        // The ecosystem executor is bound first: the CTM executor pins it as an immutable.
-        ecosystemExecutor = new EcosystemUpgradeExecutor(governor, new ProxyAdmin(), Utils.coreRegistryCodehash());
+        // The coordinator over the ecosystem domain, and the CTM executor constructed answering
+        // to it — the shape the v34 bootstrap leaves behind. Pausing its own CTM's migrations
+        // needs no registration: the ChainAssetHandler derives that from CTM ownership.
+        coreExecutor = new CoreUpgradeExecutor(governor, new ProxyAdmin(), Utils.coreRegistryCodehash());
+        coordinator = new EcosystemUpgradeExecutor(governor, coreExecutor, Utils.operationCodehash());
+        vm.prank(governor);
+        coreExecutor.setCoordinator(address(coordinator));
         ctmExecutor = new CTMUpgradeExecutor(
             governor,
             IChainTypeManager(address(chainContractAddress)),
             new ProxyAdmin(),
-            ecosystemExecutor,
+            address(coordinator),
             Utils.transitionCodehash()
         );
-        // The one bootstrap-join authorization stage 0 requires: an authorized CTM executor on
-        // the ecosystem executor. Pausing its own CTM's migrations needs no registration — the
-        // ChainAssetHandler derives that from the CTM ownership the executor already holds.
-        vm.prank(governor);
-        ecosystemExecutor.setCTMExecutorAuthorization(address(ctmExecutor), true);
 
         // Real v33 artifacts: a fresh AdminFacet implementation (same selectors, new address)
         // and the plain DefaultUpgrade as the upgrade-init contract.
@@ -302,9 +306,9 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         }
 
         ProxyUpgradeRow[] memory noProxyUpgrades = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
-        // One timer per hop, bound to the executor (the only address that can start it), with
+        // One timer per hop, bound to the coordinator (the only address that can start it), with
         // zero delays so stage 1 is admissible in the block stage 0 ran in.
-        address upgradeTimer = address(new GovernanceUpgradeTimer(0, 0, address(ctmExecutor), governor));
+        address upgradeTimer = address(new GovernanceUpgradeTimer(0, 0, address(coordinator), governor));
         transition = new CTMTransition(
             TransitionManifest({
                 oldProtocolVersion: _oldVersion,
@@ -316,17 +320,22 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
                 oldProtocolVersionDeadline: 1000,
                 upgradeTimestamp: 0,
                 l2Plan: l2Plan,
-                coreRegistry: PinnedContract({addr: address(0), codehash: bytes32(0)}),
                 upgradeTimer: PinnedContract({addr: upgradeTimer, codehash: upgradeTimer.codehash})
             })
         );
     }
 
+    /// @dev The one-leg operation a hop rides.
+    function _operationFor(CTMTransition _transition) internal returns (EcosystemUpgradeOperation) {
+        return _operationFor(ICTMTransition(address(_transition)), address(ctmExecutor));
+    }
+
     /// @dev Stages 0 and 1: the hop is committed on the CTM and the lifecycle is still open.
     function _commitHop(CTMTransition _transition) internal {
+        EcosystemUpgradeOperation operation = _operationFor(_transition);
         vm.startPrank(governor);
-        ctmExecutor.stage0(ICTMTransition(address(_transition)));
-        ctmExecutor.stage1(ICTMTransition(address(_transition)));
+        coordinator.stage0(operation);
+        coordinator.stage1(operation);
         vm.stopPrank();
         assertTrue(
             chainAssetHandler.migrationPausedFor(address(chainContractAddress)),
@@ -334,15 +343,20 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         );
     }
 
-    /// @dev The whole hop: commit, cross the chain, complete (the hold is released again).
+    /// @dev The whole hop: commit, cross the chain, complete (the pause is released again).
     function _runHop(CTMTransition _transition) internal {
         _commitHop(_transition);
+        EcosystemUpgradeOperation operation = _operationFor(_transition);
         vm.startPrank(governor);
         ctmExecutor.upgradeChain(ICTMTransition(address(_transition)), chainId);
-        ctmExecutor.stage2(ICTMTransition(address(_transition)));
+        coordinator.stage2(operation);
         vm.stopPrank();
-        assertEq(address(ctmExecutor.pendingTransition()), address(0), "completion must free the lifecycle slot");
-        assertFalse(chainAssetHandler.migrationPaused(), "completion must release the executor's hold");
+        assertEq(address(coordinator.pendingOperation()), address(0), "completion must free the lifecycle slot");
+        assertEq(address(ctmExecutor.activeOperation()), address(0), "completion must release the reservation");
+        assertFalse(
+            chainAssetHandler.migrationPausedFor(address(chainContractAddress)),
+            "completion must release the CTM's pause"
+        );
     }
 
     function test_registryDrivenUpgrade_v32ThenV33_endToEnd() public {

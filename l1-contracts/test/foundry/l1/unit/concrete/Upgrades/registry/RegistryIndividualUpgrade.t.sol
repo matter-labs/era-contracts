@@ -307,7 +307,7 @@ contract RegistryIndividualUpgradeTest is ZKsyncOSChainTypeManagerSharedTest, Re
         address _newRelease,
         ProxyUpgradeRow[] memory _rows
     ) internal returns (CTMTransition) {
-        address upgradeTimer = address(new GovernanceUpgradeTimer(0, 0, address(ctmExecutor), governor));
+        address upgradeTimer = address(new GovernanceUpgradeTimer(0, 0, address(coordinator), governor));
         return
             new CTMTransition(
                 TransitionManifest({
@@ -325,7 +325,6 @@ contract RegistryIndividualUpgradeTest is ZKsyncOSChainTypeManagerSharedTest, Re
                         delegateComposer: PinnedContract({addr: address(0), codehash: bytes32(0)}),
                         factoryDepHashes: new uint256[](0)
                     }),
-                    coreRegistry: PinnedContract({addr: address(0), codehash: bytes32(0)}),
                     upgradeTimer: PinnedContract({addr: upgradeTimer, codehash: upgradeTimer.codehash})
                 })
             );

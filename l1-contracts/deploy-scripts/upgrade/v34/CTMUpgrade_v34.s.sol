@@ -30,7 +30,6 @@ import {
 } from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
-import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {ExternalActionsLib} from "../default-upgrade/ExternalActionsLib.sol";
 import {BytecodeUtils} from "../../utils/bytecode/BytecodeUtils.s.sol";
@@ -164,9 +163,6 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
 
     function deployNewCTMContracts() public virtual override {
         super.deployNewCTMContracts();
-        // Bootstrap-only: the stage-2 "migrations unpaused" read. Recurring upgrades check pause
-        // state on-chain in `CTMUpgradeExecutor.stage2`.
-        upgradeAddresses.upgradeStageValidator = deploySimpleContract("UpgradeStageValidator");
 
         // The new ChainTypeManager implementation (per VM) — the bootstrap manifest's one
         // participating inventory row.
@@ -209,9 +205,9 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
                         getOwnerAddress(),
                         IChainTypeManager(ctmProxy),
                         ctmProxyAdmin,
-                        // The ecosystem executor the core prepare of this upgrade deployed — the
-                        // bound route for every future transition's ecosystem leg.
-                        ecosystemUpgradeExecutor(),
+                        // The coordinator the core prepare of this upgrade deployed — the only
+                        // address that will drive this executor's lifecycle callbacks.
+                        address(ecosystemUpgradeExecutor()),
                         // The audited-object anchor for every FUTURE transition this executor
                         // accepts, taken from the artifact those transitions are DEPLOYED from
                         // (see {BytecodeUtils.getDeployedBytecodeHash}).
@@ -236,9 +232,6 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
     function getCreationCalldata(string memory contractName) internal view virtual override returns (bytes memory) {
         if (compareStrings(contractName, "L2V34DelegateCalldataComposer")) {
             return abi.encode();
-        }
-        if (compareStrings(contractName, "UpgradeStageValidator")) {
-            return abi.encode(ctmAddresses.stateTransition.proxies.chainTypeManager, getNewProtocolVersion());
         }
         return super.getCreationCalldata(contractName);
     }
@@ -297,10 +290,10 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
                 codehash: address(ctmUpgradeExecutor).codehash
             }),
             // Storage, not immutables, so outside the codehash pin above — named here so the edge
-            // refuses to hand the CTM domain to an executor whose ownership or ecosystem route
-            // moved after this prepare deployed it.
+            // refuses to hand the CTM domain to an executor whose ownership or coordinator moved
+            // after this prepare deployed it.
             ctmExecutorOwner: getOwnerAddress(),
-            ecosystemExecutor: address(ecosystemUpgradeExecutor()),
+            coordinator: address(ecosystemUpgradeExecutor()),
             upgradeTimer: PinnedContract({
                 addr: upgradeAddresses.upgradeTimer,
                 codehash: upgradeAddresses.upgradeTimer.codehash
@@ -330,15 +323,15 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
     ///         action it is: this edge predates the transition lifecycle, so governance starts the
     ///         timer, hands both CTM-domain authorities to the migration and runs it (`migrate()` is
     ///         permissionless — the handover IS the approval — but rides the bundle so the edge is
-    ///         applied atomically with it), then gates on the migration's post-state check and
-    ///         performs the two bootstrap-JOIN authorizations the recurring lifecycle needs and the
-    ///         executor cannot grant itself. The validator's timer/pause pre-checks of the legacy
-    ///         stage 1 are absorbed: `migrate()` checks the pinned timer's deadline itself, and the
-    ///         CTM's version-edge commit refuses to run while migrations are unpaused.
+    ///         applied atomically with it), then gates on the migration's post-state check. The
+    ///         legacy stage validator's checks are absorbed: `migrate()` checks the pinned timer's
+    ///         deadline itself, the CTM's version-edge commit refuses to run while migrations are
+    ///         unpaused, and `validateApplied()` refuses while they are still paused. The join to
+    ///         the recurring lifecycle needs no call: the executor is constructed answering to the
+    ///         coordinator, and the migration checks that binding.
     function _declareBootstrapActions() internal virtual {
         require(address(bootstrapMigration) != address(0), "bootstrap migration not deployed");
         require(upgradeAddresses.upgradeTimer != address(0), "upgradeTimer is zero");
-        require(upgradeAddresses.upgradeStageValidator != address(0), "upgradeStageValidator is zero");
         string memory governance = "protocol governance (CTM owner)";
         address ctmProxy = ctmAddresses.stateTransition.proxies.chainTypeManager;
         address ctmProxyAdmin = Utils.getProxyAdminAddress(ctmProxy);
@@ -388,39 +381,16 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
                 value: 0
             })
         );
-        declareExternalAction(
-            ExternalActionsLib.PHASE_STAGE_2,
-            "authorize the CTM executor on the ecosystem executor",
-            "ecosystem executor owner (governance)",
-            Call({
-                target: address(ecosystemUpgradeExecutor()),
-                data: abi.encodeCall(
-                    EcosystemUpgradeExecutor.setCTMExecutorAuthorization,
-                    (address(ctmUpgradeExecutor), true)
-                ),
-                value: 0
-            })
-        );
-        declareExternalAction(
-            ExternalActionsLib.PHASE_STAGE_2,
-            "check chain migrations are unpaused again",
-            "any (view)",
-            Call({
-                target: upgradeAddresses.upgradeStageValidator,
-                data: abi.encodeCall(UpgradeStageValidator.checkMigrationsUnpaused, ()),
-                value: 0
-            })
-        );
     }
 
-    /// @notice The `EcosystemUpgradeExecutor` the core prepare of this upgrade deployed — an input
-    ///         of this prepare (`CTMUpgradeParams.ecosystemUpgradeExecutor`, read by protocol-ops
-    ///         from the core output TOML), checked to exist so a stale or missing input fails here
-    ///         instead of in stage 2.
+    /// @notice The `EcosystemUpgradeExecutor` (lifecycle coordinator) the core prepare of this
+    ///         upgrade deployed — an input of this prepare (`CTMUpgradeParams.ecosystemUpgradeExecutor`,
+    ///         read by protocol-ops from the core output TOML), checked to exist so a stale or
+    ///         missing input fails here instead of at the bootstrap's binding check.
     function ecosystemUpgradeExecutor() public view returns (EcosystemUpgradeExecutor) {
-        address executor = upgradeAddresses.ecosystemUpgradeExecutor;
-        require(executor != address(0), "ecosystem executor not set (core prepare output)");
-        require(executor.code.length != 0, "ecosystem executor has no code");
-        return EcosystemUpgradeExecutor(payable(executor));
+        address coordinator = upgradeAddresses.ecosystemUpgradeExecutor;
+        require(coordinator != address(0), "coordinator not set (core prepare output)");
+        require(coordinator.code.length != 0, "coordinator has no code");
+        return EcosystemUpgradeExecutor(payable(coordinator));
     }
 }

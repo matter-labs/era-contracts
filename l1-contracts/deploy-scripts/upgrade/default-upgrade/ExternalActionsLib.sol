@@ -6,7 +6,7 @@ import {Strings} from "@openzeppelin/contracts-v4/utils/Strings.sol";
 import {Call} from "contracts/governance/Common.sol";
 
 /// @notice One governance (or admin) call a prepare emits that is NOT one of the three
-///         `CTMUpgradeExecutor.stage0/1/2(transition)` calls — an action the on-chain upgrade
+///         `EcosystemUpgradeExecutor.stage0/1/2(operation)` calls — an action the on-chain upgrade
 ///         objects do not describe, declared with its phase, a label and the authority that
 ///         performs it, so the output can never imply the executor calls cover it.
 /// @param phase The bundle it rides: `"0"`, `"1"`, `"2"` for the governance stages, `"admin"` for

@@ -45,7 +45,7 @@ import {L2DACommitmentScheme, PubdataContent} from "contracts/common/Config.sol"
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {UpgradeChainCall} from "./utils/UpgradeChainCall.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
-import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
+import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
 
@@ -293,20 +293,20 @@ contract AdminFunctions is Script, IAdminFunctions {
         return true;
     }
 
-    /// @dev Whether the ecosystem `ProxyAdmin` (read off the Bridgehub proxy) is owned by an
-    ///      `EcosystemUpgradeExecutor` bound to it and owned by `_governance`.
+    /// @dev Whether the ecosystem `ProxyAdmin` (read off the Bridgehub proxy) is owned by a
+    ///      `CoreUpgradeExecutor` bound to it and owned by `_governance`.
     function _isUnderBoundEcosystemExecutor(address _bridgehub, address _governance) private view returns (bool) {
         address proxyAdmin = address(uint160(uint256(vm.load(_bridgehub, Utils.ADMIN_SLOT))));
         address paOwner = IOwnableSingleStep(proxyAdmin).owner();
         if (paOwner == _governance || paOwner.code.length == 0) {
             return false;
         }
-        EcosystemUpgradeExecutor executor = EcosystemUpgradeExecutor(payable(paOwner));
+        CoreUpgradeExecutor executor = CoreUpgradeExecutor(payable(paOwner));
         require(
             address(executor.PROXY_ADMIN()) == proxyAdmin,
             "ecosystem ProxyAdmin owner is not the executor bound to it"
         );
-        require(executor.owner() == _governance, "the ecosystem executor is not owned by governance");
+        require(executor.owner() == _governance, "the core executor is not owned by governance");
         return true;
     }
 

@@ -11,6 +11,8 @@ import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 import {CTMUpgradeExecutor} from "../executors/CTMUpgradeExecutor.sol";
 import {ICTMRelease} from "../objects/ICTMRelease.sol";
 import {IChainTypeManager} from "../../../state-transition/IChainTypeManager.sol";
+import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
+import {IChainAssetHandlerBase} from "../../../core/chain-asset-handler/IChainAssetHandler.sol";
 import {GovernanceUpgradeTimer} from "../../GovernanceUpgradeTimer.sol";
 import {BytecodesSupplier} from "../../BytecodesSupplier.sol";
 import {L2PlanValidationLib} from "../libraries/L2PlanValidationLib.sol";
@@ -24,6 +26,7 @@ import {
     BootstrapNotYetExecuted,
     BootstrapReleaseNotInstalled,
     MalformedL2UpgradePlan,
+    MigrationPaused,
     ProxyUpgradeRowMismatch,
     RegistryUnknownKey,
     ZeroAddress
@@ -80,7 +83,7 @@ contract RegistryBootstrapMigration {
             _manifest.currentRelease.addr == address(0) ||
             _manifest.ctmExecutor.addr == address(0) ||
             _manifest.ctmExecutorOwner == address(0) ||
-            _manifest.ecosystemExecutor == address(0) ||
+            _manifest.coordinator == address(0) ||
             _manifest.upgradeTimer.addr == address(0) ||
             _manifest.upgradeEngine.addr == address(0)
         ) {
@@ -221,10 +224,10 @@ contract RegistryBootstrapMigration {
         if (executorPendingOwner != address(0)) {
             revert BootstrapExecutorOwnershipPending(executorPendingOwner);
         }
-        // The route every later transition's ecosystem leg takes.
-        address boundEcosystemExecutor = address(ctmExecutor.ECOSYSTEM_EXECUTOR());
-        if (boundEcosystemExecutor != m.ecosystemExecutor) {
-            revert BootstrapExecutorNotBound(m.ctmExecutor.addr, m.ecosystemExecutor, boundEcosystemExecutor);
+        // The coordinator every later operation on this CTM is driven by.
+        address boundCoordinator = ctmExecutor.coordinator();
+        if (boundCoordinator != m.coordinator) {
+            revert BootstrapExecutorNotBound(m.ctmExecutor.addr, m.coordinator, boundCoordinator);
         }
         address boundCtm = address(ctmExecutor.CHAIN_TYPE_MANAGER());
         if (boundCtm != m.ctm) {
@@ -280,9 +283,10 @@ contract RegistryBootstrapMigration {
 
     /// @notice Reverts unless the edge has been APPLIED end to end: `migrate()` ran, the CTM sits
     ///         at the new version with the pinned release and anchor installed, every proxy row
-    ///         points at its pinned `implNew`, and the whole CTM domain is owned by the bound
-    ///         executor. The stage-2 gate for the bundle whose stage 1 ran `migrate()` — deeper
-    ///         than a bare version check, and readable by any tooling afterwards.
+    ///         points at its pinned `implNew`, the whole CTM domain is owned by the bound
+    ///         executor, and the CTM's chain migrations are no longer paused. The stage-2 gate
+    ///         for the bundle whose stage 1 ran `migrate()` — deeper than a bare version check,
+    ///         and readable by any tooling afterwards.
     /// @dev The row check describes this one edge: a later transition legitimately moves the
     ///      CTM-domain proxies (and `currentRelease`) on, after which this reverts by design.
     function validateApplied() external view {
@@ -316,6 +320,14 @@ contract RegistryBootstrapMigration {
         address proxyAdminOwner = m.ctmProxyAdmin.owner();
         if (proxyAdminOwner != m.ctmExecutor.addr) {
             revert BootstrapAuthorityNotHeld(address(m.ctmProxyAdmin), proxyAdminOwner);
+        }
+        // Completion lifts the operational restrictions too: the stage-0 pause must have been
+        // released before this edge counts as done, so the bundle cannot forget it.
+        IChainAssetHandlerBase chainAssetHandler = IChainAssetHandlerBase(
+            IBridgehubBase(ctm.BRIDGE_HUB()).chainAssetHandler()
+        );
+        if (chainAssetHandler.migrationPausedFor(m.ctm)) {
+            revert MigrationPaused();
         }
     }
 

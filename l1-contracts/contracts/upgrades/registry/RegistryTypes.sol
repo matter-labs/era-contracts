@@ -116,14 +116,10 @@ struct AuthoredL2Plan {
 ///        NOT expressible here — a CTM is one of possibly many and upgrades on its own cadence;
 ///        shared contracts belong to the core registry. All slots zero when the CTM domain's
 ///        implementations do not change.
-/// @param coreRegistry The ecosystem leg of this upgrade: the `CoreRegistry` whose rows the
-///        `EcosystemUpgradeExecutor` applies in stage 1 BEFORE the CTM leg, and verifies in
-///        stage 2. A zero address means the upgrade has no ecosystem leg. Content provenance is
-///        the ecosystem executor's codehash pin; naming it here is what makes participation a
-///        reviewed, on-chain-enforced fact rather than a bundle-composition decision.
 /// @param upgradeTimer The `GovernanceUpgradeTimer` gating stage 1: stage 0 starts it, stage 1
-///        requires its deadline. Bound to the CTM executor (`TIMER_GOVERNANCE`), so nobody else
-///        can start it; its `owner` keeps the bounded extension right. Mandatory.
+///        requires its deadline. Bound to the coordinating `EcosystemUpgradeExecutor`
+///        (`TIMER_GOVERNANCE`), so nobody else can start it; its `owner` keeps the bounded
+///        extension right. Mandatory.
 // solhint-disable-next-line gas-struct-packing
 struct TransitionManifest {
     uint256 oldProtocolVersion;
@@ -135,7 +131,6 @@ struct TransitionManifest {
     uint256 oldProtocolVersionDeadline;
     uint256 upgradeTimestamp;
     AuthoredL2Plan l2Plan;
-    PinnedContract coreRegistry;
     PinnedContract upgradeTimer;
 }
 
@@ -167,6 +162,27 @@ struct ProxyUpgradeRow {
     PinnedContract implNew;
     bool callInitializeUpgrade;
     ProxyAdmin admin;
+}
+
+/// @notice One CTM leg of an ecosystem upgrade operation: a transition and the CTM-bound
+///         executor that applies it. The pair is what binds a transition to a CTM.
+struct CTMLeg {
+    address executor;
+    address transition;
+}
+
+/// @notice Everything an `EcosystemUpgradeOperation` pins, set exactly once at construction —
+///         the unit the lifecycle coordinator drives through its three stages. See
+///         {protocol-docs/ecosystem-upgrade-coordination.md}.
+/// @param coreRegistry The ecosystem leg — the `CoreRegistry` the `CoreUpgradeExecutor` applies
+///        in stage 1 BEFORE every CTM leg and verifies in stage 2 — or zero when the operation has
+///        none. Named here and only here: transitions describe their CTM's change, the operation
+///        commits the association with the ecosystem change.
+/// @param legs The CTM legs, applied in this order in stage 1. At least one; no two legs may
+///        share a CTM.
+struct OperationManifest {
+    address coreRegistry;
+    CTMLeg[] legs;
 }
 
 /// @notice Everything a core registry instance pins, set exactly once at construction.
@@ -218,10 +234,10 @@ struct CoreRegistryManifest {
 ///        receive the whole CTM domain on behalf of whoever owns it now. The edge therefore
 ///        names the expected owner and refuses to hand anything over otherwise — and refuses a
 ///        PENDING transfer too, which would let a third party claim the domain right after.
-/// @param ecosystemExecutor The `EcosystemUpgradeExecutor` the CTM executor must currently point
-///        at. Also storage rather than an immutable (governance may replace it between
-///        upgrades), so also outside the codehash pin, and it is the route every later
-///        transition's ecosystem leg takes.
+/// @param coordinator The `EcosystemUpgradeExecutor` the CTM executor must currently answer to
+///        (`coordinator()`). Also storage rather than an immutable (governance may replace it
+///        between operations), so also outside the codehash pin — and it is the only address
+///        that can drive the executor's lifecycle callbacks afterwards.
 /// @param upgradeTimer The pinned `GovernanceUpgradeTimer` whose `checkDeadline()` gates the
 ///        edge: stage 0 starts the timer, and `migrate()` refuses to run until the operational
 ///        window has passed — the stage sequencing is enforced by the object itself, not by the
@@ -239,7 +255,7 @@ struct BootstrapManifest {
     uint256 upgradeTimestamp;
     PinnedContract ctmExecutor;
     address ctmExecutorOwner;
-    address ecosystemExecutor;
+    address coordinator;
     PinnedContract upgradeTimer;
 }
 

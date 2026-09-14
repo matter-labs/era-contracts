@@ -13,7 +13,9 @@ import {CTMUpgradeExecutorFixture} from "./CTMUpgradeExecutor.t.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
-import {ICTMUpgradeExecutor} from "contracts/upgrades/registry/executors/ICTMUpgradeExecutor.sol";
+import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
+import {IEcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/IEcosystemUpgradeExecutor.sol";
+import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol";
 import {ProxyUpgradeRowLib} from "contracts/upgrades/registry/libraries/ProxyUpgradeRowLib.sol";
 import {CTMContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {ProxyUpgradeRowMismatch} from "contracts/common/L1ContractErrors.sol";
@@ -140,15 +142,24 @@ contract CTMUpgradeForeignAdminRowTest is CTMUpgradeExecutorFixture {
         }
     }
 
-    function _assertPendingAndPaused(CTMTransition _transition, ICTMUpgradeExecutor.UpgradeStage _stage) internal view {
-        assertEq(address(ctmExecutor.pendingTransition()), address(_transition), "the lifecycle must stay open");
+    function _assertPendingAndPaused(
+        CTMTransition _transition,
+        IEcosystemUpgradeExecutor.UpgradeStage _stage
+    ) internal view {
+        assertEq(
+            address(coordinator.pendingOperation()),
+            address(operationOf[address(_transition)]),
+            "the lifecycle must stay open"
+        );
+        assertEq(address(ctmExecutor.reservedTransition()), address(_transition), "the reservation must hold");
         _assertStage(_stage);
         assertTrue(chainAssetHandler.migrationPausedFor(address(chainContractAddress)), "migrations must stay paused");
     }
 
     function _assertLifecycleIdle() internal view {
-        assertEq(address(ctmExecutor.pendingTransition()), address(0), "the lifecycle slot must be cleared");
-        _assertStage(ICTMUpgradeExecutor.UpgradeStage.None);
+        assertEq(address(coordinator.pendingOperation()), address(0), "the lifecycle slot must be cleared");
+        assertEq(address(ctmExecutor.activeOperation()), address(0), "the reservation must be released");
+        _assertStage(IEcosystemUpgradeExecutor.UpgradeStage.None);
         assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)), "stage 2 unpauses migrations");
     }
 
@@ -161,13 +172,14 @@ contract CTMUpgradeForeignAdminRowTest is CTMUpgradeExecutorFixture {
     function test_stage1_leavesUnownedForeignRowToItsAdministrator_stage2WaitsForIt() public {
         CTMTransition t = _deployTransitionWithForeignRow();
         _stage0(t);
+        EcosystemUpgradeOperation operation = _operationFor(t);
 
         vm.expectEmit(true, true, true, true, address(ctmExecutor));
         emit ProxyUpgradeRowLib.ProxyImplementationUpgraded(address(ctmDomainProxy), implNew);
         vm.expectEmit(true, true, true, true, address(ctmExecutor));
         emit ProxyUpgradeRowLib.ProxyRowLeftToAdministrator(address(notifierProxy), address(notifierAdmin));
-        vm.expectEmit(true, true, true, true, address(ctmExecutor));
-        emit CTMUpgradeExecutor.UpgradeExecuted(address(t));
+        vm.expectEmit(true, true, true, true, address(coordinator));
+        emit EcosystemUpgradeExecutor.OperationExecuted(address(operation));
         _stage1(t);
 
         assertEq(_liveImpl(ctmProxyAdmin, ctmDomainProxy), implNew, "the bound-admin row must be applied");
@@ -175,18 +187,20 @@ contract CTMUpgradeForeignAdminRowTest is CTMUpgradeExecutorFixture {
         assertEq(notifierAdmin.owner(), chainAdmin, "the foreign admin stays with its owner");
         assertEq(chainContractAddress.protocolVersion(), newVersion, "the CTM leg must otherwise complete");
         assertEq(chainContractAddress.upgradeTransition(0), address(t));
-        _assertPendingAndPaused(t, ICTMUpgradeExecutor.UpgradeStage.Executed);
+        _assertPendingAndPaused(t, IEcosystemUpgradeExecutor.UpgradeStage.Executed);
 
         vm.expectRevert(
             abi.encodeWithSelector(ProxyUpgradeRowMismatch.selector, address(notifierProxy), implNew, implOld)
         );
         vm.prank(governor);
-        ctmExecutor.stage2(ICTMTransition(address(t)));
-        _assertPendingAndPaused(t, ICTMUpgradeExecutor.UpgradeStage.Executed);
+        coordinator.stage2(operation);
+        _assertPendingAndPaused(t, IEcosystemUpgradeExecutor.UpgradeStage.Executed);
 
         _chainAdminMovesNotifier(implNew);
         vm.expectEmit(true, true, true, true, address(ctmExecutor));
-        emit CTMUpgradeExecutor.UpgradeCompleted(address(t));
+        emit CTMUpgradeExecutor.OperationCompleted(address(operation));
+        vm.expectEmit(true, true, true, true, address(coordinator));
+        emit EcosystemUpgradeExecutor.OperationCompleted(address(operation));
         _stage2(t);
 
         _assertLifecycleIdle();
@@ -225,12 +239,13 @@ contract CTMUpgradeForeignAdminRowTest is CTMUpgradeExecutorFixture {
         assertEq(_liveImpl(notifierAdmin, notifierProxy), implOther, "stage 1 leaves the foreign row alone");
         assertEq(chainContractAddress.protocolVersion(), newVersion);
 
+        EcosystemUpgradeOperation operation = _operationFor(t);
         vm.expectRevert(
             abi.encodeWithSelector(ProxyUpgradeRowMismatch.selector, address(notifierProxy), implNew, implOther)
         );
         vm.prank(governor);
-        ctmExecutor.stage2(ICTMTransition(address(t)));
-        _assertPendingAndPaused(t, ICTMUpgradeExecutor.UpgradeStage.Executed);
+        coordinator.stage2(operation);
+        _assertPendingAndPaused(t, IEcosystemUpgradeExecutor.UpgradeStage.Executed);
 
         _chainAdminMovesNotifier(implNew);
         _stage2(t);
@@ -307,17 +322,18 @@ contract CTMUpgradeForeignAdminRowTest is CTMUpgradeExecutorFixture {
         _handNotifierAdminToExecutor();
         CTMTransition t = _deployTransitionWithForeignRow();
         _stage0(t);
+        EcosystemUpgradeOperation operation = _operationFor(t);
 
         vm.expectRevert(
             abi.encodeWithSelector(ProxyUpgradeRowMismatch.selector, address(notifierProxy), implOld, implOther)
         );
         vm.prank(governor);
-        ctmExecutor.stage1(ICTMTransition(address(t)));
+        coordinator.stage1(operation);
 
         assertEq(_liveImpl(ctmProxyAdmin, ctmDomainProxy), implOld, "the bound-admin row must be rolled back");
         assertEq(_liveImpl(notifierAdmin, notifierProxy), implOther, "the offending proxy is left where it was");
         assertEq(chainContractAddress.protocolVersion(), 0, "the CTM version must not move");
-        _assertPendingAndPaused(t, ICTMUpgradeExecutor.UpgradeStage.Prepared);
+        _assertPendingAndPaused(t, IEcosystemUpgradeExecutor.UpgradeStage.Prepared);
     }
 
     // ─────────────────────────── post-state reads ───────────────────────────

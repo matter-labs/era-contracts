@@ -285,7 +285,6 @@ contract StorageRegistriesTest is Test {
                 upgradeTimestamp: 1234567,
                 l2Plan: _l2Plan(),
                 // No ecosystem leg by default; the timer is mandatory.
-                coreRegistry: PinnedContract({addr: address(0), codehash: bytes32(0)}),
                 upgradeTimer: PinnedContract({addr: upgradeTimer, codehash: upgradeTimer.codehash})
             });
     }
@@ -678,33 +677,6 @@ contract StorageRegistriesTest is Test {
         assertFalse(mispinned.verifyAll(), "a mispinned timer must not verify");
     }
 
-    /// @dev The ecosystem leg is optional: zero means "no leg" and is not pin-checked; a named
-    ///      registry is pinned like every other address.
-    function test_transitionCoreRegistryIsOptionalAndPinnedWhenNamed() public {
-        assertEq(transition.coreRegistry(), address(0), "the default manifest names no ecosystem leg");
-        transition.validate();
-        assertTrue(transition.verifyAll());
-
-        TransitionManifest memory manifest = _transitionManifest();
-        manifest.coreRegistry = PinnedContract({addr: address(coreRegistry), codehash: address(coreRegistry).codehash});
-        CTMTransition withLeg = new CTMTransition(manifest);
-        assertEq(withLeg.coreRegistry(), address(coreRegistry));
-        withLeg.validate();
-        assertTrue(withLeg.verifyAll());
-
-        manifest.coreRegistry.codehash = keccak256("not the registry's code");
-        CTMTransition mispinned = new CTMTransition(manifest);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                RegistryCodehashMismatch.selector,
-                address(coreRegistry),
-                keccak256("not the registry's code"),
-                address(coreRegistry).codehash
-            )
-        );
-        mispinned.validate();
-        assertFalse(mispinned.verifyAll(), "a mispinned ecosystem leg must not verify");
-    }
 
     // ─────────────────────────── L2 plan shape ───────────────────────────
 

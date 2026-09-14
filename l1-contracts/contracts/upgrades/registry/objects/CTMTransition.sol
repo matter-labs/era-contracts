@@ -269,10 +269,6 @@ contract CTMTransition is ICTMTransition {
         return getManifest().upgradeTimestamp;
     }
 
-    function coreRegistry() external view returns (address) {
-        return getManifest().coreRegistry.addr;
-    }
-
     function upgradeTimer() external view returns (address) {
         return getManifest().upgradeTimer.addr;
     }
@@ -308,10 +304,6 @@ contract CTMTransition is ICTMTransition {
         if (m.l2Plan.delegateComposer.addr != address(0)) {
             _requirePin(m.l2Plan.delegateComposer);
         }
-        // The ecosystem leg is optional; when named it is pinned like every other address.
-        if (m.coreRegistry.addr != address(0)) {
-            _requirePin(m.coreRegistry);
-        }
         ProxyUpgradeRowLib.requireRowPins(ProxyUpgradeRowLib.toRows(m.proxyUpgrades, CTM_CONTRACT_COUNT));
     }
 
@@ -324,7 +316,6 @@ contract CTMTransition is ICTMTransition {
             CodehashPinLib.pinHolds(m.upgradeEngine) &&
             CodehashPinLib.pinHolds(m.upgradeTimer) &&
             (m.l2Plan.delegateComposer.addr == address(0) || CodehashPinLib.pinHolds(m.l2Plan.delegateComposer)) &&
-            (m.coreRegistry.addr == address(0) || CodehashPinLib.pinHolds(m.coreRegistry)) &&
             ProxyUpgradeRowLib.rowPinsHold(ProxyUpgradeRowLib.toRows(m.proxyUpgrades, CTM_CONTRACT_COUNT));
     }
 

@@ -17,7 +17,7 @@ import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
 import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol";
-import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
+import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
 import {CoreRegistryManifest, PinnedContract, ProxyUpgradeRow} from "contracts/upgrades/registry/RegistryTypes.sol";
 import {
     L1EcosystemContract,
@@ -36,9 +36,9 @@ import {ChainCreationParamsLib} from "../../ctm/ChainCreationParamsLib.sol";
 /// @notice The ecosystem (core) side of a registry-driven upgrade prepare, run before the CTM
 ///         prepare: deploys the new ecosystem implementations and pins them in a write-once
 ///         `CoreRegistry`. It emits NO governance calls of its own — the transition the CTM
-///         prepare deploys names the registry, and `CTMUpgradeExecutor.stage1` applies it through
-///         the bound ecosystem executor. Anything a version script still needs governance to do
-///         is declared as an external action and listed in the output.
+///         prepare deploys names the registry, and the coordinator's stage 1 applies it through
+///         the `CoreUpgradeExecutor`. Anything a version script still needs governance to do is
+///         declared as an external action and listed in the output.
 /// @dev Version scripts inherit and override; the v34 bootstrap edge overrides the object
 ///      deployment and declares every call of its one-time edge.
 contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
@@ -214,11 +214,20 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         return config.ownerAddress;
     }
 
-    /// @notice The ecosystem's bound `EcosystemUpgradeExecutor`: the owner of the shared ecosystem
-    ///         `ProxyAdmin` once the bootstrap edge has handed it over. The transition the CTM
-    ///         prepare deploys runs this upgrade's ecosystem leg through it. The bootstrap prepare
-    ///         overrides this with the executor it deploys.
+    /// @notice The ecosystem's lifecycle coordinator (`EcosystemUpgradeExecutor`), read from the
+    ///         core executor once the bootstrap edge has bound them: the operation naming this
+    ///         upgrade's transitions is driven through it, and every transition's timer is bound
+    ///         to it. The bootstrap prepare overrides this with the coordinator it deploys.
     function getEcosystemUpgradeExecutor() public view virtual returns (address) {
+        address coordinator = getCoreUpgradeExecutor().coordinator();
+        require(coordinator != address(0), "core executor is not bound to a coordinator: run the bootstrap edge first");
+        return coordinator;
+    }
+
+    /// @notice The ecosystem's `CoreUpgradeExecutor`: the owner of the shared ecosystem `ProxyAdmin`
+    ///         once the bootstrap edge has handed it over. The bootstrap prepare overrides this
+    ///         with the executor it deploys.
+    function getCoreUpgradeExecutor() public view virtual returns (CoreUpgradeExecutor) {
         address admin = coreAddresses.shared.transparentProxyAdmin;
         require(admin != address(0), "ecosystem ProxyAdmin not discovered");
         address executor = ProxyAdmin(admin).owner();
@@ -227,10 +236,10 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             "ecosystem ProxyAdmin owner is not a contract: run the bootstrap edge first"
         );
         require(
-            address(EcosystemUpgradeExecutor(payable(executor)).PROXY_ADMIN()) == admin,
+            address(CoreUpgradeExecutor(payable(executor)).PROXY_ADMIN()) == admin,
             "ecosystem ProxyAdmin owner is not an executor bound to it"
         );
-        return executor;
+        return CoreUpgradeExecutor(payable(executor));
     }
 
     function getNewProtocolVersion() public virtual returns (uint256) {
@@ -442,6 +451,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         vm.serializeString("root", "upgrade_addresses", deployedAddresses);
         // The objects the CTM prepare and reviewers take from this run.
         vm.serializeAddress("registry", "core_registry_addr", address(coreRegistry));
+        vm.serializeAddress("registry", "core_upgrade_executor_addr", address(getCoreUpgradeExecutor()));
         string memory registry = vm.serializeAddress(
             "registry",
             "ecosystem_upgrade_executor_addr",
@@ -461,7 +471,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         returns (Call[] memory stage0Calls, Call[] memory stage1Calls, Call[] memory stage2Calls)
     {
         // The ecosystem side emits only what a version script declared as external actions: the
-        // recurring ecosystem leg rides the CTM executor's stage calls.
+        // recurring ecosystem leg rides the coordinator's stage calls.
         stage0Calls = prepareStage0GovernanceCalls();
         vm.serializeBytes("governance_calls", "stage0_calls", abi.encode(stage0Calls));
         stage1Calls = prepareStage1GovernanceCalls();
@@ -484,8 +494,8 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     /// @notice The governance stages of the ecosystem side: nothing but the declared external
     ///         actions of each phase. The recurring ecosystem leg — the registry applied through
-    ///         the bound ecosystem executor — is `CTMUpgradeExecutor.stage1`'s job, ordered and
-    ///         enforced on-chain.
+    ///         the `CoreUpgradeExecutor` — is the coordinator's stage-1 job, ordered and enforced
+    ///         on-chain.
     function prepareStage0GovernanceCalls() public virtual returns (Call[] memory calls) {
         return externalActions.callsForPhase(ExternalActionsLib.PHASE_STAGE_0);
     }

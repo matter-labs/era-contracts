@@ -2,10 +2,11 @@
 pragma solidity 0.8.28;
 
 // TODO(EVM-1644): LEGACY UPGRADE PROCESS — remove once the registry-driven upgrade process
-// (contracts/upgrades/registry: CTMUpgradeExecutor / EcosystemUpgradeExecutor +
-// release/transition registries) has fully replaced off-chain governance-calldata generation. Kept for the
-// v34 bootstrap edge, which still ships stage0/1/2 calls (the committed cut itself is already
-// facet-less; only the call orchestration remains script-composed).
+// (contracts/upgrades/registry: EcosystemUpgradeExecutor coordinating CoreUpgradeExecutor /
+// CTMUpgradeExecutor + release/transition registries) has fully replaced off-chain
+// governance-calldata generation. Kept for the v34 bootstrap edge, which still ships stage0/1/2
+// calls (the committed cut itself is already facet-less; only the call orchestration remains
+// script-composed).
 
 // solhint-disable no-console, gas-custom-errors
 
@@ -75,10 +76,12 @@ import {ExternalActionsLib} from "./ExternalActionsLib.sol";
 /// @notice The CTM side of a registry-driven upgrade prepare, run after the core prepare: deploys
 ///         the new release (facets, DiamondInit, verifier, upgrade engine) and pins the edge in a
 ///         write-once `CTMTransition` — naming the core prepare's `CoreRegistry` as its ecosystem
-///         leg and a fresh `GovernanceUpgradeTimer` bound to the CTM executor. The governance
-///         stages it emits are exactly `CTMUpgradeExecutor.stage0/1/2(transition)`; anything a
-///         version script still needs governance (or an admin) to do is declared as an external
-///         action and listed in the output.
+///         leg and a fresh `GovernanceUpgradeTimer` bound to the ecosystem's coordinator. It emits
+///         NO lifecycle call of its own: the compose step deploys the `EcosystemUpgradeOperation`
+///         naming this transition (with every other participating CTM's) and the three governance
+///         calls are `EcosystemUpgradeExecutor.stage0/1/2(operation)`; anything a version script
+///         still needs governance (or an admin) to do is declared as an external action and listed
+///         in the output.
 /// @dev Version scripts inherit and override; the v34 bootstrap edge deploys no transition and
 ///      declares every call of its one-time edge instead.
 contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
@@ -93,12 +96,9 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     // solhint-disable-next-line gas-struct-packing
     struct UpgradeDeployedAddresses {
         address upgradeTimer;
-        /// @dev Bootstrap-only: the recurring stages check pause state on-chain.
-        address upgradeStageValidator;
+        /// @dev The lifecycle coordinator (an input, see `CTMUpgradeParams`): the timer's governance
+        ///      and, for the bootstrap edge, the executor's coordinator.
         address ecosystemUpgradeExecutor;
-        /// @dev The core prepare's `CoreRegistry` (an input, see `CTMUpgradeParams`); zero when the
-        ///      upgrade has no ecosystem leg.
-        address coreRegistry;
         /// @dev The write-once transition this prepare deploys (zero for the bootstrap edge).
         address ctmTransition;
     }
@@ -186,7 +186,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             coreAddresses.bridgehub.proxies.chainRegistrationSender = _params.chainRegistrationSender;
         }
         setEcosystemUpgradeExecutor(_params.ecosystemUpgradeExecutor);
-        setCoreRegistry(_params.coreRegistry);
         prepareCTMUpgrade();
         // Declared before the governance calls are written, so the output lists the admin action.
         prepareDefaultCTMAdminCalls();
@@ -369,10 +368,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         address engine = ctmAddresses.stateTransition.defaultUpgrade;
         require(engine != address(0), "upgrade engine not deployed");
         require(upgradeAddresses.upgradeTimer != address(0), "upgrade timer not deployed");
-        PinnedContract memory coreRegistryPin;
-        if (upgradeAddresses.coreRegistry != address(0)) {
-            coreRegistryPin = _pin(upgradeAddresses.coreRegistry);
-        }
         TransitionManifest memory manifest = TransitionManifest({
             oldProtocolVersion: getOldProtocolVersion(),
             newProtocolVersion: getNewProtocolVersion(),
@@ -383,7 +378,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             oldProtocolVersionDeadline: UpgradeHelperLib.getOldProtocolDeadline(),
             upgradeTimestamp: 0,
             l2Plan: transitionAuthoredL2Plan(),
-            coreRegistry: coreRegistryPin,
             upgradeTimer: _pin(upgradeAddresses.upgradeTimer)
         });
         // From the build ARTIFACT, which is also where the bound executor's `TRANSITION_CODEHASH`
@@ -401,25 +395,18 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         _requireObjectsMatchExecutorPins();
     }
 
-    /// @notice Checks the objects this prepare hands to the executors against the codehashes those
-    ///         executors were CONSTRUCTED with — the type-provenance gate of `stage0` and
-    ///         `applyL1Upgrade`, evaluated at prepare time.
-    /// @dev These immutables were set when the executors were deployed, possibly by an earlier
-    ///      release's prepare. Nothing keeps a later build's artifact byte-identical to that one, so
-    ///      a drifted object would otherwise only surface as a stage-0 revert with the whole upgrade
-    ///      already reviewed and scheduled.
+    /// @notice Checks the transition against the codehash the bound executor was CONSTRUCTED with —
+    ///         the type-provenance gate of its stage-0 reservation, evaluated at prepare time.
+    /// @dev That immutable was set when the executor was deployed, possibly by an earlier release's
+    ///      prepare. Nothing keeps a later build's artifact byte-identical to that one, so a drifted
+    ///      object would otherwise only surface as a stage-0 revert with the whole upgrade already
+    ///      reviewed and scheduled.
     function _requireObjectsMatchExecutorPins() internal view virtual {
         CTMUpgradeExecutor executor = CTMUpgradeExecutor(payable(boundCTMUpgradeExecutor()));
         require(
             upgradeAddresses.ctmTransition.codehash == executor.TRANSITION_CODEHASH(),
             "the deployed transition does not run the code the bound CTM executor pins"
         );
-        if (upgradeAddresses.coreRegistry != address(0)) {
-            require(
-                upgradeAddresses.coreRegistry.codehash == executor.ECOSYSTEM_EXECUTOR().CORE_REGISTRY_CODEHASH(),
-                "the core prepare's registry does not run the code the ecosystem executor pins"
-            );
-        }
     }
 
     /// @notice The enum-indexed CTM-domain inventory of this edge: a source-checked row for every
@@ -504,8 +491,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     /// @notice The CTM domain's bound `CTMUpgradeExecutor`: the CTM's owner once the bootstrap edge
-    ///         has handed the domain over. The three governance calls of this upgrade target it and
-    ///         the upgrade timer is bound to it.
+    ///         has handed the domain over. The operation naming this transition reserves it, and
+    ///         the upgrade timer is bound to its coordinator.
     function boundCTMUpgradeExecutor() public view virtual returns (address) {
         address ctm = ctmAddresses.stateTransition.proxies.chainTypeManager;
         address executor = IOwnable(ctm).owner();
@@ -517,10 +504,13 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         return executor;
     }
 
-    /// @notice Who may start this upgrade's timer: the bound executor (`stage0` starts it). The
-    ///         bootstrap edge, which predates the executor, has governance start it.
+    /// @notice Who may start this upgrade's timer: the coordinator the bound executor answers to
+    ///         (its `stage0` starts it). The bootstrap edge, which predates the coordinator, has
+    ///         governance start it.
     function timerGovernance() internal view virtual returns (address) {
-        return boundCTMUpgradeExecutor();
+        address coordinator = CTMUpgradeExecutor(payable(boundCTMUpgradeExecutor())).coordinator();
+        require(coordinator != address(0), "the bound CTM executor answers to no coordinator");
+        return coordinator;
     }
 
     function _pin(address _addr) internal view returns (PinnedContract memory) {
@@ -528,11 +518,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         return PinnedContract({addr: _addr, codehash: _addr.codehash});
     }
 
-    /// @notice The `CoreRegistry` of this upgrade (a core-prepare output). Set from the prepare params
-    ///         in production; in-forge harnesses that drive both prepares call it directly.
-    function setCoreRegistry(address _coreRegistry) public virtual {
-        upgradeAddresses.coreRegistry = _coreRegistry;
-    }
 
     /// @notice The CTM domain's live EIP-7702 checker (see `CTMUpgradeParams.eip7702Checker`).
     ///         Zero leaves it to be deployed fresh.
@@ -902,49 +887,20 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         calls[0] = call;
     }
 
-    /// @notice The governance stages of this upgrade: `CTMUpgradeExecutor.stageN(transition)` —
-    ///         the executor holds the pause, starts the timer, applies the ecosystem leg then the
-    ///         CTM leg and restores — followed by whatever a version script declared as an
-    ///         external action for the stage. A bootstrap prepare (no transition) emits only its
-    ///         declared actions.
+    /// @notice The governance stages of this prepare: only what a version script declared as an
+    ///         external action for the stage. The lifecycle calls themselves —
+    ///         `EcosystemUpgradeExecutor.stage0/1/2(operation)` — are emitted by the compose step,
+    ///         once every participating transition exists.
     function prepareStage0GovernanceCalls() public virtual returns (Call[] memory calls) {
-        return
-            _stageCalls(
-                ExternalActionsLib.PHASE_STAGE_0,
-                abi.encodeCall(CTMUpgradeExecutor.stage0, (ICTMTransition(upgradeAddresses.ctmTransition)))
-            );
+        return externalActions.callsForPhase(ExternalActionsLib.PHASE_STAGE_0);
     }
 
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-        return
-            _stageCalls(
-                ExternalActionsLib.PHASE_STAGE_1,
-                abi.encodeCall(CTMUpgradeExecutor.stage1, (ICTMTransition(upgradeAddresses.ctmTransition)))
-            );
+        return externalActions.callsForPhase(ExternalActionsLib.PHASE_STAGE_1);
     }
 
     function prepareStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
-        return
-            _stageCalls(
-                ExternalActionsLib.PHASE_STAGE_2,
-                abi.encodeCall(CTMUpgradeExecutor.stage2, (ICTMTransition(upgradeAddresses.ctmTransition)))
-            );
-    }
-
-    function _stageCalls(
-        string memory _phase,
-        bytes memory _executorCalldata
-    ) internal view returns (Call[] memory calls) {
-        Call[] memory declared = externalActions.callsForPhase(_phase);
-        if (upgradeAddresses.ctmTransition == address(0)) {
-            return declared;
-        }
-        calls = new Call[](declared.length + 1);
-        calls[0] = Call({target: boundCTMUpgradeExecutor(), data: _executorCalldata, value: 0});
-        uint256 length = declared.length;
-        for (uint256 i = 0; i < length; ++i) {
-            calls[i + 1] = declared[i];
-        }
+        return externalActions.callsForPhase(ExternalActionsLib.PHASE_STAGE_2);
     }
 
     function getAddresses() public view override returns (CTMDeployedAddresses memory) {
@@ -1096,14 +1052,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             "l1_rollup_da_manager",
             ctmAddresses.daAddresses.daContracts.rollupDAManager
         );
-        if (upgradeAddresses.upgradeStageValidator != address(0)) {
-            vm.serializeAddress(
-                "deployed_addresses",
-                "upgrade_stage_validator",
-                upgradeAddresses.upgradeStageValidator
-            );
-        }
-
         string memory deployedAddresses = vm.serializeAddress(
             "deployed_addresses",
             "l1_governance_upgrade_timer",
@@ -1140,7 +1088,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         vm.serializeAddress("registry", "ctm_transition_addr", upgradeAddresses.ctmTransition);
         vm.serializeAddress("registry", "ctm_release_addr", ctmAddresses.stateTransition.currentRelease);
         vm.serializeAddress("registry", "upgrade_timer_addr", upgradeAddresses.upgradeTimer);
-        vm.serializeAddress("registry", "core_registry_addr", upgradeAddresses.coreRegistry);
         address bootstrapMigrationAddr = bootstrapMigrationAddress();
         vm.serializeAddress("registry", "bootstrap_migration_addr", bootstrapMigrationAddr);
         // `ctm_upgrade_executor_addr` stays gated on the transition: protocol-ops reads a nonzero

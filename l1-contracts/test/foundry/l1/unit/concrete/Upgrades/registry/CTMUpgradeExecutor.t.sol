@@ -10,18 +10,21 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {Call} from "contracts/governance/Common.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
+import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol";
 import {
     CTM_CONTRACT_COUNT,
     L2_ECOSYSTEM_CONTRACT_COUNT
 } from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
+import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
-import {ICTMUpgradeExecutor} from "contracts/upgrades/registry/executors/ICTMUpgradeExecutor.sol";
+import {IEcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/IEcosystemUpgradeExecutor.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {FixedDelegateCalldataComposer} from "contracts/dev-contracts/FixedDelegateCalldataComposer.sol";
 import {L2PlanFixtures} from "./L2PlanFixtures.sol";
+import {OperationFixtures} from "./OperationFixtures.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -37,6 +40,7 @@ import {
     TransitionNotCommitted,
     RegistryCodehashMismatch,
     TransitionReleaseMismatch,
+    Unauthorized,
     UpgradeNotPermissionlessYet
 } from "contracts/common/L1ContractErrors.sol";
 import {OutdatedProtocolVersion} from "contracts/state-transition/L1StateTransitionErrors.sol";
@@ -50,23 +54,24 @@ import {
     ProxyUpgradeRow
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
-/// @notice The shared fixture of the CTM-bound executor suites (`CTMUpgradeExecutorTest`,
-///         `CTMUpgradeLifecycleTest`): a real ZKsyncOS CTM with one chain, the two domain
-///         executors (each owning its own `ProxyAdmin`), the fixture's REAL `L1ChainAssetHandler`
-///         as the migration-pause holder, and real write-once release/transition objects. The
-///         bootstrap-join authorizations the recurring lifecycle needs (upgrade pauser on the
-///         ChainAssetHandler, CTM-executor authorization on the ecosystem executor) are wired
-///         the way the v34 CTM prepare's stage 2 wires them; see {docs/upgrade-stage-lifecycle.md}.
+/// @notice The shared fixture of the registry executor suites (`CTMUpgradeExecutorTest`,
+///         `CTMUpgradeLifecycleTest`, `CTMUpgradeForeignAdminRowTest`): a real ZKsyncOS CTM with
+///         one chain, the coordinator and the two domain executors (each owning its own
+///         `ProxyAdmin`) wired the way the v34 bootstrap leaves them, the fixture's REAL
+///         `L1ChainAssetHandler` as the migration-pause holder, and real write-once
+///         release/transition objects. See {protocol-docs/ecosystem-upgrade-coordination.md}.
 /// @dev Every fixture transition departs from the fixture's current release toward `release`,
 ///      names NO ecosystem leg (`coreRegistry` zero) and pins a fresh zero-delay timer bound to
-///      the executor, so stage 1 is admissible in the same block as stage 0. Suites that need a
-///      CTM-domain row, an ecosystem leg or a delayed timer build the manifest through
-///      `_transitionManifest` and adjust it before deploying.
-abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest {
+///      the coordinator, so stage 1 is admissible in the same block as stage 0. Each transition
+///      rides a one-leg operation (`_operationFor`). Suites that need a CTM-domain row, an
+///      ecosystem leg or a delayed timer build the manifest through `_transitionManifest` and
+///      adjust it before deploying.
+abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFixtures {
     CTMUpgradeExecutor internal ctmExecutor;
     ProxyAdmin internal ctmProxyAdmin;
-    EcosystemUpgradeExecutor internal ecosystemExecutor;
+    CoreUpgradeExecutor internal coreExecutor;
     ProxyAdmin internal ecosystemProxyAdmin;
+    EcosystemUpgradeExecutor internal coordinator;
     CTMRelease internal fromRelease;
     CTMRelease internal release;
     CTMTransition internal transition;
@@ -90,34 +95,35 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest {
         chainAddress = createNewChain(getDiamondCutData(diamondInit));
         _mockGetZKChainFromBridgehub(chainAddress);
 
-        // The two authority domains, each behind its own ProxyAdmin. The ecosystem executor is
-        // bound first because the CTM executor pins it as an immutable.
+        // The ecosystem domain: its executor owns the ecosystem ProxyAdmin, and the coordinator is
+        // constructed over it. The core executor is then pointed at the coordinator (the v34
+        // bootstrap's stage-2 binding).
         ecosystemProxyAdmin = new ProxyAdmin();
-        ecosystemExecutor = new EcosystemUpgradeExecutor(governor, ecosystemProxyAdmin, Utils.coreRegistryCodehash());
-        ecosystemProxyAdmin.transferOwnership(address(ecosystemExecutor));
+        coreExecutor = new CoreUpgradeExecutor(governor, ecosystemProxyAdmin, Utils.coreRegistryCodehash());
+        ecosystemProxyAdmin.transferOwnership(address(coreExecutor));
+        coordinator = new EcosystemUpgradeExecutor(governor, coreExecutor, Utils.operationCodehash());
+        vm.prank(governor);
+        coreExecutor.setCoordinator(address(coordinator));
 
+        // The CTM domain: its executor is constructed answering to the coordinator.
         ctmProxyAdmin = new ProxyAdmin();
         ctmExecutor = new CTMUpgradeExecutor(
             governor,
             IChainTypeManager(address(chainContractAddress)),
             ctmProxyAdmin,
-            ecosystemExecutor,
+            address(coordinator),
             Utils.transitionCodehash()
         );
         ctmProxyAdmin.transferOwnership(address(ctmExecutor));
 
-        // Handover through the fixed entrypoint — no escape hatch involved.
+        // Handover through the fixed entrypoint — no escape hatch involved. Pausing its own CTM's
+        // migrations needs no registration — the ChainAssetHandler derives that from the CTM
+        // ownership the executor now holds.
         vm.prank(governor);
         chainContractAddress.transferOwnership(address(ctmExecutor));
         vm.prank(governor);
         ctmExecutor.acceptCTMOwnership();
         assertEq(chainContractAddress.owner(), address(ctmExecutor));
-
-        // The one bootstrap-join authorization stage 0 requires: an authorized CTM executor on
-        // the ecosystem executor. Pausing its own CTM's migrations needs no registration — the
-        // ChainAssetHandler derives that from the CTM ownership the executor already holds.
-        vm.prank(governor);
-        ecosystemExecutor.setCTMExecutorAuthorization(address(ctmExecutor), true);
 
         newVersion = SemVer.packSemVer(0, 1, 0);
         // The pinned genesisUpgrade / upgradeEngine stand-ins must carry real code — the
@@ -190,11 +196,11 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest {
         return PinnedContract({addr: _addr, codehash: _addr.codehash});
     }
 
-    /// @dev A transition's timer: bound to the executor (`TIMER_GOVERNANCE`, the only address
+    /// @dev A transition's timer: bound to the coordinator (`TIMER_GOVERNANCE`, the only address
     ///      that can start it), owned by governance (the bounded extension right). Zero delays
     ///      make stage 1 admissible in the block stage 0 ran in.
     function _newTimer(uint256 _initialDelay, uint256 _maxAdditionalDelay) internal returns (GovernanceUpgradeTimer) {
-        return new GovernanceUpgradeTimer(_initialDelay, _maxAdditionalDelay, address(ctmExecutor), governor);
+        return new GovernanceUpgradeTimer(_initialDelay, _maxAdditionalDelay, address(coordinator), governor);
     }
 
     function _deployTransition(uint256 _upgradeTimestamp) internal returns (CTMTransition result) {
@@ -223,7 +229,7 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest {
     /// @dev The default fixture manifest: the L2 side is the minimal well-formed plan (the
     ///      delegate, force-deployed Unsafe at its bytecode-derived address, with its bytecode as
     ///      the one factory dependency); all CTM-domain slots inert; no ecosystem leg; a fresh
-    ///      zero-delay timer bound to the executor.
+    ///      zero-delay timer bound to the coordinator.
     function _transitionManifest(
         uint256 _upgradeTimestamp,
         address _fromRelease,
@@ -253,7 +259,6 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest {
                     delegateComposer: _pin(address(delegateComposer)),
                     factoryDepHashes: factoryDeps
                 }),
-                coreRegistry: PinnedContract({addr: address(0), codehash: bytes32(0)}),
                 upgradeTimer: _pin(address(_newTimer(0, 0)))
             });
     }
@@ -268,19 +273,27 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest {
 
     // ─────────────────────────── lifecycle drivers (as governance) ───────────────────────────
 
+    /// @dev The one-leg operation over `_transition` on the fixture's executor.
+    function _operationFor(CTMTransition _transition) internal returns (EcosystemUpgradeOperation) {
+        return _operationFor(ICTMTransition(address(_transition)), address(ctmExecutor));
+    }
+
     function _stage0(CTMTransition _transition) internal {
+        EcosystemUpgradeOperation operation = _operationFor(_transition);
         vm.prank(governor);
-        ctmExecutor.stage0(ICTMTransition(address(_transition)));
+        coordinator.stage0(operation);
     }
 
     function _stage1(CTMTransition _transition) internal {
+        EcosystemUpgradeOperation operation = _operationFor(_transition);
         vm.prank(governor);
-        ctmExecutor.stage1(ICTMTransition(address(_transition)));
+        coordinator.stage1(operation);
     }
 
     function _stage2(CTMTransition _transition) internal {
+        EcosystemUpgradeOperation operation = _operationFor(_transition);
         vm.prank(governor);
-        ctmExecutor.stage2(ICTMTransition(address(_transition)));
+        coordinator.stage2(operation);
     }
 
     /// @dev Stages 0 and 1: the transition is committed on the CTM and still mid-lifecycle.
@@ -295,8 +308,8 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest {
         _stage2(_transition);
     }
 
-    function _assertStage(ICTMUpgradeExecutor.UpgradeStage _expected) internal view {
-        assertTrue(ctmExecutor.pendingStage() == _expected, "unexpected lifecycle stage");
+    function _assertStage(IEcosystemUpgradeExecutor.UpgradeStage _expected) internal view {
+        assertTrue(coordinator.pendingStage() == _expected, "unexpected lifecycle stage");
     }
 }
 
@@ -306,7 +319,8 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest {
 ///         transition data describes the one movement from the fixture's current version to that
 ///         release — its facet delta is DERIVED from the release pair (a facet-neutral hop here;
 ///         facet-changing hops are exercised end-to-end by RegistryDrivenUpgrade.t.sol). The
-///         lifecycle's own ordering, authority and pause rules are CTMUpgradeLifecycle.t.sol.
+///         coordinator's ordering, authority and pause rules are CTMUpgradeLifecycle.t.sol and
+///         EcosystemUpgradeCoordination.t.sol.
 contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
     function test_stage1_setsVersionCutAndCurrentRelease() public {
         _prepareAndExecute(transition);
@@ -328,10 +342,28 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
         assertEq(chainContractAddress.l1GenesisUpgrade(), makeAddr("genesisUpgrade"));
     }
 
-    function test_revertWhen_executorCalledByNonGovernance() public {
+    function test_revertWhen_stagesCalledByNonGovernance() public {
+        EcosystemUpgradeOperation operation = _operationFor(transition);
         vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(makeAddr("stranger"));
-        ctmExecutor.stage0(ICTMTransition(address(transition)));
+        coordinator.stage0(operation);
+    }
+
+    /// @dev The domain callbacks answer to the coordinator only — not even the owner drives them
+    ///      directly (the owner's route to the same authority is the logged escape hatch).
+    function test_revertWhen_callbacksCalledByOwner() public {
+        EcosystemUpgradeOperation operation = _operationFor(transition);
+        vm.startPrank(governor);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
+        ctmExecutor.beginOperation(operation, ICTMTransition(address(transition)));
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
+        ctmExecutor.applyTransition(ICTMTransition(address(transition)));
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
+        ctmExecutor.completeOperation(operation);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
+        ctmExecutor.abandonOperation(operation);
+        vm.stopPrank();
+        assertEq(address(ctmExecutor.activeOperation()), address(0));
     }
 
     function test_forwardExecutesForOwner() public {
@@ -415,11 +447,12 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
 
         // Replaying a completed transition trips the release edge: the CTM already moved on to the
         // transition's target release, so `fromRelease` no longer matches.
+        EcosystemUpgradeOperation replay = _operationFor(transition);
         vm.expectRevert(
             abi.encodeWithSelector(TransitionReleaseMismatch.selector, transition.fromRelease(), address(release))
         );
         vm.prank(governor);
-        ctmExecutor.stage0(ICTMTransition(address(transition)));
+        coordinator.stage0(replay);
     }
 
     function test_revertWhen_setCurrentReleaseIsNotTheAuditedCode() public {
@@ -457,9 +490,10 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
         release = _deployRelease(3);
         CTMTransition staleVersionTransition = _deployTransitionFrom(779, appliedRelease, 0);
 
+        EcosystemUpgradeOperation stale = _operationFor(staleVersionTransition);
         vm.expectRevert(abi.encodeWithSelector(OutdatedProtocolVersion.selector, newVersion, 0));
         vm.prank(governor);
-        ctmExecutor.stage0(ICTMTransition(address(staleVersionTransition)));
+        coordinator.stage0(stale);
     }
 
     /// @dev Publication is live L1 state, so it is checked where the edge COMMITS (stage 1): a
@@ -478,9 +512,10 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
         assertEq(bytecodesSupplier.evmPublishingBlock(keccak256(unpublishedDelegate)), 0, "fixture: not yet published");
         _stage0(unpublished);
 
+        EcosystemUpgradeOperation operation = _operationFor(unpublished);
         vm.expectRevert(abi.encodeWithSelector(L2BytecodeNotPublished.selector, keccak256(unpublishedDelegate)));
         vm.prank(governor);
-        ctmExecutor.stage1(ICTMTransition(address(unpublished)));
+        coordinator.stage1(operation);
         assertEq(chainContractAddress.protocolVersion(), 0, "a refused stage 1 must not move the CTM");
         assertEq(chainContractAddress.upgradeTransition(0), address(0), "a refused stage 1 must commit nothing");
         assertEq(
@@ -488,8 +523,9 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
             address(fromRelease),
             "a refused stage 1 must keep the release"
         );
-        assertEq(address(ctmExecutor.pendingTransition()), address(unpublished), "the lifecycle must stay open");
-        _assertStage(ICTMUpgradeExecutor.UpgradeStage.Prepared);
+        assertEq(address(coordinator.pendingOperation()), address(operation), "the lifecycle must stay open");
+        assertEq(address(ctmExecutor.reservedTransition()), address(unpublished), "the reservation must hold");
+        _assertStage(IEcosystemUpgradeExecutor.UpgradeStage.Prepared);
         assertTrue(
             chainAssetHandler.migrationPausedFor(address(chainContractAddress)),
             "this CTM's migrations must stay paused"
@@ -501,7 +537,8 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
         assertEq(chainContractAddress.protocolVersion(), newVersion, "the same transition executes once published");
         assertEq(chainContractAddress.upgradeTransition(0), address(unpublished));
         _stage2(unpublished);
-        assertEq(address(ctmExecutor.pendingTransition()), address(0), "the lifecycle must complete");
+        assertEq(address(coordinator.pendingOperation()), address(0), "the lifecycle must complete");
+        assertEq(address(ctmExecutor.activeOperation()), address(0), "the reservation must be released");
     }
 
     /// @dev The chain needs the transition itself, not just its cut hash, to rebuild the cut.

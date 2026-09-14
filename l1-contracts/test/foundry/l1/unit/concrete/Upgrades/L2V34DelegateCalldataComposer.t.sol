@@ -222,7 +222,6 @@ contract L2V34DelegateCalldataComposerTest is Test {
                     delegateComposer: _pin(address(composer)),
                     factoryDepHashes: L2PlanFixtures.factoryDepHashes(L2PlanFixtures.codes(DELEGATE_CODE))
                 }),
-                coreRegistry: PinnedContract({addr: address(0), codehash: bytes32(0)}),
                 upgradeTimer: _pin(_pinned("upgradeTimer"))
             });
     }

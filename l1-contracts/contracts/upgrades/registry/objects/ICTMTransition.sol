@@ -38,9 +38,6 @@ interface ICTMTransition {
 
     function upgradeTimestamp() external view returns (uint256);
 
-    /// @notice The ecosystem leg's `CoreRegistry`, zero when the upgrade has none.
-    function coreRegistry() external view returns (address);
-
     /// @notice The `GovernanceUpgradeTimer` gating stage 1 of this transition.
     function upgradeTimer() external view returns (address);
 

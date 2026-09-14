@@ -109,10 +109,10 @@ error ChainRequiresValidatorsSignaturesForCommit();
 error ChainTypeManagerNotRegistered(address chainTypeManager);
 // 0x8746f42f
 error ConstructorsNotSupported();
+// 0x78476e4c
+error CoordinatorNotBound(address domain, address boundCoordinator);
 // 0xec273439
 error CTMAlreadyRegistered();
-// 0xbfb48b0c
-error CTMExecutorNotAuthorized(address ctmExecutor);
 // 0xc630ef3c
 error CTMNotRegistered();
 // 0x13df796c
@@ -137,10 +137,8 @@ error DepositExists();
 error DiamondAlreadyFrozen();
 // 0xa7151b9a
 error DiamondNotFrozen();
-// 0x9de51419
-error EcosystemExecutorProxyAdminMismatch(address expected, address actual);
-// 0x2ad5916a
-error EcosystemLegNotNamedByTransition(address pendingTransition, address coreRegistry);
+// 0x10f5fc00
+error DuplicateOperationLeg(address ctm);
 // 0x7138356f
 error EmptyAddress();
 // 0x2d4d012f
@@ -149,6 +147,8 @@ error EmptyAssetId();
 error EmptyBytes32();
 // 0x99d8fec9
 error EmptyData();
+// 0x47fab76c
+error EmptyOperation();
 // 0x84286507
 error EmptyPrecommitData(uint256 batchNumber);
 // 0x456f8f7a
@@ -268,6 +268,8 @@ error L2ExtraDeploymentNotBytecodeDerived(address expected, address actual);
 error L2ExtraDeploymentNotUnsafe(address newAddress);
 // 0xfb5c22e6
 error L2TimestampTooBig();
+// 0xb10468c0
+error LegNotReserved(address named, address reserved);
 // 0xe37d2c02
 error LengthIsNotDivisibleBy32(uint256 length);
 // 0x1b6825bb
@@ -340,8 +342,8 @@ error NonSequentialVersion();
 error NonZeroBlobToVerifyZKsyncOS(uint256 index, bytes32 blobLinearHash, bytes32 blobOpeningCommitment);
 // 0x31967fc6
 error NonZeroCarriedHash();
-// 0x5dfa249f
-error NoPendingTransition();
+// 0x9fb2bc14
+error NoPendingOperation();
 // 0xfa5cd00f
 error NotAllowed(address addr);
 // 0x64846fe4
@@ -380,6 +382,8 @@ error OperationExists();
 error OperationMustBePending();
 // 0xe1c1ff37
 error OperationMustBeReady();
+// 0x7935eb53
+error OperationNotPending(address named, address pending);
 // 0xb926450e
 error OriginChainIdNotFound();
 // 0x720432d4
@@ -508,8 +512,6 @@ error TransactionNotAllowed();
 error TransitionDeadlineBeforeUpgrade(uint256 deadline, uint256 upgradeTimestamp);
 // 0x8d905e8b
 error TransitionNotCommitted(address named, address committed);
-// 0xd7f856c4
-error TransitionNotPending(address named, address pending);
 // 0x01a7d6aa
 error TransitionReleaseMismatch(address expected, address actual);
 // 0x4c991078

@@ -2,27 +2,47 @@
 pragma solidity 0.8.28;
 
 import {ICTMTransition} from "../objects/ICTMTransition.sol";
+import {IEcosystemUpgradeOperation} from "../objects/IEcosystemUpgradeOperation.sol";
 import {IChainTypeManager} from "../../../state-transition/IChainTypeManager.sol";
 
 /// @title ICTMUpgradeExecutor
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice The lifecycle surface of a `CTMUpgradeExecutor` other contracts read: the bound CTM
-///         and the transition currently mid-lifecycle (see {docs/upgrade-stage-lifecycle.md}).
+/// @notice The surface of a `CTMUpgradeExecutor` the coordinating `EcosystemUpgradeExecutor`
+///         drives and other readers query: the bound CTM, the coordinator it answers to, the
+///         operation it is reserved for, and the narrow domain callbacks. See
+///         {protocol-docs/ecosystem-upgrade-coordination.md}.
 interface ICTMUpgradeExecutor {
-    /// @notice Where the pending transition is in the three-stage lifecycle.
-    /// @dev `None` means no transition is pending (stage 2 clears the slot).
-    enum UpgradeStage {
-        None,
-        Prepared,
-        Executed
-    }
-
     // solhint-disable-next-line func-name-mixedcase
     function CHAIN_TYPE_MANAGER() external view returns (IChainTypeManager);
 
-    /// @notice The transition governance committed to with `stage0` and has not completed yet.
-    function pendingTransition() external view returns (ICTMTransition);
+    /// @notice `EXTCODEHASH` every transition this executor accepts must run.
+    // solhint-disable-next-line func-name-mixedcase
+    function TRANSITION_CODEHASH() external view returns (bytes32);
 
-    function pendingStage() external view returns (UpgradeStage);
+    /// @notice The only address allowed to drive the lifecycle callbacks below.
+    function coordinator() external view returns (address);
+
+    /// @notice The operation this executor is reserved for, zero when free.
+    function activeOperation() external view returns (IEcosystemUpgradeOperation);
+
+    /// @notice The transition `beginOperation` reserved — the only one `applyTransition` accepts.
+    function reservedTransition() external view returns (ICTMTransition);
+
+    /// @notice Reserves this executor for `_operation`'s leg `_transition`, checks the transition
+    ///         fits the bound CTM, and pauses the CTM's chain migrations.
+    function beginOperation(IEcosystemUpgradeOperation _operation, ICTMTransition _transition) external;
+
+    /// @notice Applies the reserved transition on the bound CTM.
+    function applyTransition(ICTMTransition _transition) external;
+
+    /// @notice Requires the reserved transition applied, unpauses the CTM's migrations and frees
+    ///         the reservation.
+    function completeOperation(IEcosystemUpgradeOperation _operation) external;
+
+    /// @notice Frees the reservation, leaving migrations paused.
+    function abandonOperation(IEcosystemUpgradeOperation _operation) external;
+
+    /// @notice Reverts unless `_transition` has been applied on the bound CTM.
+    function validateTransitionApplied(ICTMTransition _transition) external view;
 }

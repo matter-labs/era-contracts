@@ -76,7 +76,6 @@ contract CTMUpgradeForTests is CTMUpgrade_v34 {
                 ctmTransition: address(0),
                 ctmUpgradeExecutor: address(0),
                 ctmRelease: getAddresses().stateTransition.currentRelease,
-                coreRegistry: address(0),
                 upgradeTimer: upgradeAddresses.upgradeTimer,
                 bootstrapMigration: bootstrapMigrationAddress(),
                 boundCtmUpgradeExecutor: boundCTMUpgradeExecutor()
@@ -91,7 +90,6 @@ library TrimmedUpgradeOutput {
         address ctmTransition;
         address ctmUpgradeExecutor;
         address ctmRelease;
-        address coreRegistry;
         address upgradeTimer;
         address bootstrapMigration;
         address boundCtmUpgradeExecutor;
@@ -117,7 +115,6 @@ library TrimmedUpgradeOutput {
         );
         _vm.serializeAddress("registry", "ctm_transition_addr", _registry.ctmTransition);
         _vm.serializeAddress("registry", "ctm_release_addr", _registry.ctmRelease);
-        _vm.serializeAddress("registry", "core_registry_addr", _registry.coreRegistry);
         // The trimmed writer replaces the heavy `state_transition` section, NOT the registry
         // block: every object the production output names has to survive here too, or a package
         // verified from the harness is not the shape a package verified in production is.

@@ -32,8 +32,8 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IAdminV31} from "../../../../deploy-scripts/utils/UpgradeChainCall.sol";
 import {Utils as DeployScriptUtils} from "../../../../deploy-scripts/utils/Utils.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
-import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
@@ -290,26 +290,22 @@ contract UpgradeIntegrationTest_v34_Local is
         assertTrue(_newChainDiamond != address(0), "new chain not registered");
         assertEq(IGetters(_newChainDiamond).getProtocolVersion(), _expectedNewVersion, "new chain wrong version");
 
-        // The bootstrap's CTM stage 2, every call a declared external action: the migration's own
-        // post-state gate, the one bootstrap-JOIN authorization the recurring stage lifecycle
-        // needs and the executor cannot grant itself (CTM-executor authorization on the ecosystem
-        // executor — the migration pause needs no registration, being derived from the CTM
-        // ownership `migrate()` just handed over), and the unpaused read. The harness already executed the prepared stage-2 bundle green in
-        // `internalTest`; assert the emitted call list shape, that the gate still holds against
-        // the final state, and that both joins landed.
+        // The bootstrap's CTM stage 2 is one declared external action: the migration's own
+        // post-state gate, which also requires the CTM's migrations unpaused again (the legacy
+        // stage validator's read, absorbed). The join to the recurring lifecycle needs no call:
+        // the executor was constructed answering to the coordinator and `migrate()` checked that
+        // binding; the core side's stage 2 binds the core executor the same way. The harness
+        // already executed the merged stage-2 bundle green in `internalTest`; assert the emitted
+        // call list shape, that the gate still holds against the final state, and that both
+        // bindings landed.
         address bridgehub = coreUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
         address chainAssetHandler = IBridgehubBase(bridgehub).chainAssetHandler();
-        EcosystemUpgradeExecutor ecosystemExecutor = v34.ecosystemUpgradeExecutor();
+        EcosystemUpgradeExecutor coordinator = v34.ecosystemUpgradeExecutor();
         Call[] memory stage2 = v34.prepareStage2GovernanceCalls();
-        assertEq(stage2.length, 3, "v34 CTM stage 2: post-state gate, the join authorization, unpaused read");
-        assertEq(
-            stage2[2].data,
-            abi.encodeCall(UpgradeStageValidator.checkMigrationsUnpaused, ()),
-            "stage 2 must end with the unpaused read"
-        );
+        assertEq(stage2.length, 1, "v34 CTM stage 2: the post-state gate only");
         assertEq(
             v34.externalActionDescriptions().length,
-            8,
+            6,
             "the bootstrap's CTM prepare declares every one of its governance and admin calls"
         );
         assertEq(stage2[0].target, address(v34.bootstrapMigration()), "stage 2 must target the migration");
@@ -318,16 +314,21 @@ contract UpgradeIntegrationTest_v34_Local is
             abi.encodeCall(v34.bootstrapMigration().validateApplied, ()),
             "stage 2 must call validateApplied"
         );
-        assertEq(stage2[1].target, address(ecosystemExecutor), "stage 2 must target the ecosystem executor");
-        assertEq(
-            stage2[1].data,
-            abi.encodeCall(EcosystemUpgradeExecutor.setCTMExecutorAuthorization, (executor, true)),
-            "stage 2 must authorize the executor on the ecosystem executor"
-        );
         v34.bootstrapMigration().validateApplied();
-        assertTrue(
-            ecosystemExecutor.isAuthorizedCTMExecutor(executor),
-            "the executor must be authorized on the ecosystem executor after stage 2"
+        assertEq(
+            CTMUpgradeExecutor(payable(executor)).coordinator(),
+            address(coordinator),
+            "the CTM executor answers to the coordinator"
+        );
+        assertEq(
+            coreUpgrade.getCoreUpgradeExecutor().coordinator(),
+            address(coordinator),
+            "the core stage 2 must bind the core executor to the coordinator"
+        );
+        assertEq(
+            address(coordinator.CORE_EXECUTOR()),
+            address(coreUpgrade.getCoreUpgradeExecutor()),
+            "the coordinator drives the executor the ecosystem ProxyAdmin landed under"
         );
         // No pauser registration to assert: the ChainAssetHandler derives the authority from CTM
         // ownership, which `migrate()` already handed to the executor. What the join must leave is

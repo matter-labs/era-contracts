@@ -19,6 +19,7 @@ import {IL2DelegateCalldataComposer} from "contracts/upgrades/registry/objects/I
 import {FixedDelegateCalldataComposer} from "contracts/dev-contracts/FixedDelegateCalldataComposer.sol";
 import {MockProxyUpgradeInitImpl} from "contracts/dev-contracts/test/MockProxyUpgradeInitImpl.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
+import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
 import {ProxyUpgradeRowLib} from "contracts/upgrades/registry/libraries/ProxyUpgradeRowLib.sol";
@@ -56,6 +57,7 @@ import {
     L2DelegateNotAnExtraDeployment,
     L2ExtraDeploymentNotBytecodeDerived,
     MalformedL2UpgradePlan,
+    MigrationPaused,
     ProxyUpgradeRowMismatch,
     RegistryCodehashMismatch,
     RegistryDuplicateProxyRow,
@@ -110,7 +112,8 @@ contract ImplUnknown {
 contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     RegistryBootstrapMigration internal migration;
     CTMUpgradeExecutor internal ctmExecutor;
-    EcosystemUpgradeExecutor internal ecoExecutor;
+    CoreUpgradeExecutor internal coreExecutor;
+    EcosystemUpgradeExecutor internal coordinator;
     ProxyAdmin internal ecosystemProxyAdmin;
 
     CTMRelease internal genesisRelease;
@@ -167,13 +170,15 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         vm.etch(upgradeEngine, hex"600043");
         delegateComposer = new FixedDelegateCalldataComposer(DELEGATE_CALLDATA);
 
-        // The ecosystem executor is bound first: the CTM executor pins it as an immutable.
-        ecoExecutor = new EcosystemUpgradeExecutor(governor, ecosystemProxyAdmin, Utils.coreRegistryCodehash());
+        // The coordinator is deployed first: the CTM executor is constructed answering to it, and
+        // the edge checks that binding.
+        coreExecutor = new CoreUpgradeExecutor(governor, ecosystemProxyAdmin, Utils.coreRegistryCodehash());
+        coordinator = new EcosystemUpgradeExecutor(governor, coreExecutor, Utils.operationCodehash());
         ctmExecutor = new CTMUpgradeExecutor(
             governor,
             IChainTypeManager(address(chainContractAddress)),
             ecosystemProxyAdmin,
-            ecoExecutor,
+            address(coordinator),
             Utils.transitionCodehash()
         );
 
@@ -191,6 +196,16 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     }
 
     // ─────────────────────────────── fixtures ───────────────────────────────
+
+    /// @dev Stage 2's unpause, as the fixture's mocked ChainAssetHandler sees it (the fixture
+    ///      mocks the handler paused for the whole edge; see `_mockMigrationPausedFromBridgehub`).
+    function _mockMigrationsUnpaused() internal {
+        vm.mockCall(
+            makeAddr("mockChainAssetHandler"),
+            abi.encodeWithSignature("migrationPausedFor(address)"),
+            abi.encode(false)
+        );
+    }
 
     /// @dev A release pinning the fixture's facets, verifier and (ZKsync OS) DiamondInit over
     ///      `_l2BytecodeInfos`.
@@ -306,7 +321,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                 upgradeTimestamp: 0,
                 ctmExecutor: _pin(address(ctmExecutor)),
                 ctmExecutorOwner: governor,
-                ecosystemExecutor: address(ecoExecutor),
+                coordinator: address(coordinator),
                 upgradeTimer: _pin(address(upgradeTimer))
             });
     }
@@ -454,6 +469,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
         // The object's own post-state check covers the whole edge (version, release pin, rows,
         // authority landing); the granular asserts below then pin the exact expected values.
+        _mockMigrationsUnpaused();
         migration.validateApplied();
 
         // The ecosystem proxy moved to its pinned implementation.
@@ -597,6 +613,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         );
         assertEq(chainContractAddress.currentRelease(), address(tableRelease), "the table release is pinned");
         assertEq(chainContractAddress.protocolVersion(), newVersion);
+        _mockMigrationsUnpaused();
         composed.validateApplied();
     }
 
@@ -760,6 +777,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         assertTrue(gated.executed(), "the same edge applies once the bytecode is published");
         assertEq(chainContractAddress.protocolVersion(), newVersion);
         assertEq(chainContractAddress.upgradeCutHash(oldVersion), composedCutHash, "publication changes no bytes");
+        _mockMigrationsUnpaused();
         gated.validateApplied();
     }
 
@@ -769,6 +787,19 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     ///      loudly, so an incorrectly sequenced bundle cannot report success on an unapplied bootstrap.
     function test_revertWhen_validateAppliedBeforeMigrate() public {
         vm.expectRevert(BootstrapNotYetExecuted.selector);
+        migration.validateApplied();
+    }
+
+    /// @dev Completion includes the operational restrictions being lifted: the stage-0 pause the
+    ///      edge ran under must have been released, or stage 2 does not pass.
+    function test_revertWhen_validateAppliedWhileMigrationsStillPaused() public {
+        _handOverAuthority();
+        migration.migrate();
+
+        vm.expectRevert(MigrationPaused.selector);
+        migration.validateApplied();
+
+        _mockMigrationsUnpaused();
         migration.validateApplied();
     }
 
@@ -833,7 +864,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             governor,
             IChainTypeManager(foreignCtm),
             ecosystemProxyAdmin,
-            ecoExecutor,
+            address(coordinator),
             Utils.transitionCodehash()
         );
         BootstrapManifest memory manifest = _manifest();
@@ -865,7 +896,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             governor,
             IChainTypeManager(address(chainContractAddress)),
             foreignProxyAdmin,
-            ecoExecutor,
+            address(coordinator),
             Utils.transitionCodehash()
         );
         BootstrapManifest memory manifest = _manifest();
@@ -918,20 +949,20 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         migration.migrate();
     }
 
-    /// @dev The ecosystem executor the CTM executor points at is storage too (governance may
-    ///      replace it between upgrades), and it is the route every later transition's ecosystem
-    ///      leg takes.
-    function test_revertWhen_ctmExecutorPointsAtAnotherEcosystemExecutor() public {
-        EcosystemUpgradeExecutor foreignEcoExecutor = new EcosystemUpgradeExecutor(
+    /// @dev The coordinator the CTM executor answers to is storage too (governance may replace it
+    ///      between operations), and it is the only address that will drive the executor's
+    ///      lifecycle callbacks.
+    function test_revertWhen_ctmExecutorAnswersToAnotherCoordinator() public {
+        EcosystemUpgradeExecutor foreignCoordinator = new EcosystemUpgradeExecutor(
             governor,
-            ecosystemProxyAdmin,
-            Utils.coreRegistryCodehash()
+            coreExecutor,
+            Utils.operationCodehash()
         );
         CTMUpgradeExecutor redirected = new CTMUpgradeExecutor(
             governor,
             IChainTypeManager(address(chainContractAddress)),
             ecosystemProxyAdmin,
-            foreignEcoExecutor,
+            address(foreignCoordinator),
             Utils.transitionCodehash()
         );
         BootstrapManifest memory manifest = _manifest();
@@ -946,8 +977,8 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             abi.encodeWithSelector(
                 BootstrapExecutorNotBound.selector,
                 address(redirected),
-                address(ecoExecutor),
-                address(foreignEcoExecutor)
+                address(coordinator),
+                address(foreignCoordinator)
             )
         );
         mismatched.migrate();
@@ -987,6 +1018,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         ctmExecutor.acceptOwnership();
         migration.migrate();
         assertTrue(migration.executed(), "the corrected edge must run");
+        _mockMigrationsUnpaused();
         migration.validateApplied();
     }
 
@@ -1283,6 +1315,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         );
         assertEq(_liveImpl(ecosystemProxyAdmin, ecosystemProxy), implV32);
         assertEq(chainContractAddress.protocolVersion(), newVersion, "the edge must otherwise complete");
+        _mockMigrationsUnpaused();
         migration.validateApplied();
     }
 
@@ -1313,6 +1346,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         // The administrator applies its row through its own admin; the gate then passes.
         vm.prank(chainAdmin);
         notifierAdmin.upgrade(ITransparentUpgradeableProxy(address(notifierProxy)), implV32);
+        _mockMigrationsUnpaused();
         withNotifier.validateApplied();
     }
 
@@ -1342,6 +1376,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             "only the bound-admin row is applied here"
         );
         assertEq(_liveImpl(notifierAdmin, notifierProxy), implV32);
+        _mockMigrationsUnpaused();
         withNotifier.validateApplied();
     }
 
