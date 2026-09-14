@@ -164,6 +164,7 @@ const DETERMINISTIC_SOURCES = [
   "contracts/upgrades/registry/objects/CTMRelease.sol",
   "contracts/upgrades/registry/objects/CTMTransition.sol",
   "contracts/upgrades/registry/objects/CoreRegistry.sol",
+  "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol",
   // Bootstrap stage: the manifest pins the fresh CTM implementation's codehash (proxy row) and
   // the bootstrap engine's (`upgradeEngine`); the legacy facet rides along for uniform
   // reproducibility of the committed addresses.
