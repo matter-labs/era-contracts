@@ -236,7 +236,7 @@ contract ServerNotifierRowCallTest is CTMUpgradeExecutorFixture {
 
     /// @dev The section records the LIVE administrator's approval; a row naming another one would
     ///      emit a call that administrator cannot make.
-    function test_revertWhen_rowAdministratorIsNotTheLiveProxysAdmin() public {
+    function test_revertWhen_rowAdministratorIsNotTheLiveProxyAdmin() public {
         ProxyAdmin otherAdmin = new ProxyAdmin();
         harness.setCTMTransition(address(_transitionWith(_notifierRow(implNew, false, otherAdmin))));
         harness.setOutputPath(_outputPath("other-admin"));

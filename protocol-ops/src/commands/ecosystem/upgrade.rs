@@ -936,7 +936,6 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
                 &extra_stage0,
                 puh_outcome.as_ref(),
                 &prepared.new_gateway_tomls,
-                inputs.zk_token_asset_id,
                 &merged_path,
             )?;
             logger::info(format!(
@@ -1066,7 +1065,6 @@ fn write_merged_ecosystem_toml(
     extra_stage0: &[ExtraGovernanceCall],
     zk_governance: Option<&crate::commands::ecosystem::zk_governance::ZkGovernanceOutcome>,
     new_gateway_tomls: &[PathBuf],
-    _zk_token_asset_id: B256,
     dst: &Path,
 ) -> anyhow::Result<()> {
     use crate::common::governance_calls::{

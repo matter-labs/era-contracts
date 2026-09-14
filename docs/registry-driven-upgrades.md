@@ -145,7 +145,7 @@ flowchart TB
     CPA["CTM-domain ProxyAdmin"]
     DI["DiamondInit — genesis"]
     ENG["DefaultUpgrade — upgradeFromTransition"]
-    BENG["BootstrapUpgradeZKsyncOS — upgradeFromBootstrap"]
+    BOOTENG["BootstrapUpgradeZKsyncOS — upgradeFromBootstrap"]
 
     EE -. "codehash-check" .-> OP
     EE -- "beginOperation / applyL1Upgrade /<br/>completeOperation / abandonOperation" --> CO
@@ -163,7 +163,7 @@ flowchart TB
     CTM -. "currentRelease · codehash-check on setCurrentRelease" .-> REL
     DI -. "routing, verifier" .-> REL
     ENG -. "cuts, schedule, target release, L2 plan" .-> TRA
-    BENG -. "schedule, genesis release, L2 plan" .-> BOOT
+    BOOTENG -. "schedule, genesis release, L2 plan" .-> BOOT
 ```
 
 ## Authority
