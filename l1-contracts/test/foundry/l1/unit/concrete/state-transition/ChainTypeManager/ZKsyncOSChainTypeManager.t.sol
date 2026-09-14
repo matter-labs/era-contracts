@@ -135,7 +135,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             address(0),
             address(0)
         );
-        diamondInit = address(new DiamondInit(false));
+        diamondInit = address(new DiamondInit(false, true));
         genesisUpgradeContract = new L1GenesisUpgrade();
 
         facetCuts.push(

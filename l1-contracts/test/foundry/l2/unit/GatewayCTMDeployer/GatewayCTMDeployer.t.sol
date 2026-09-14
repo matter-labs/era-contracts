@@ -158,7 +158,7 @@ contract GatewayCTMDeployerTest is Test {
         new ExecutorFacet(1);
         new GettersFacet();
         new MigratorFacet(1, false);
-        new DiamondInit(false);
+        new DiamondInit(false, true);
         new L1GenesisUpgrade();
         new Multicall3();
 

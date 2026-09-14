@@ -128,7 +128,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         ctmAddresses.stateTransition.facets.gettersFacet = address(new GettersFacet());
         ctmAddresses.stateTransition.facets.migratorFacet = address(new MigratorFacet(config.l1ChainId, true));
         ctmAddresses.stateTransition.facets.committerFacet = address(new CommitterFacet(config.l1ChainId));
-        ctmAddresses.stateTransition.facets.diamondInit = address(new DiamondInit(false));
+        ctmAddresses.stateTransition.facets.diamondInit = address(new DiamondInit(false, true));
         // Deploy ChainTypeManager implementation
         if (config.isZKsyncOS) {
             ctmAddresses.stateTransition.implementations.chainTypeManager = address(

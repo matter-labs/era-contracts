@@ -11,6 +11,7 @@ import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.s
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 import {EmptyAssetId, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {AIRBENDER_PROOF_SYSTEM_DISABLED} from "contracts/common/Config.sol";
 
 contract InitializeTest is DiamondInitTest {
     function test_revertWhen_verifierIsZeroAddress() public {
@@ -23,7 +24,7 @@ contract InitializeTest is DiamondInitTest {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
+            initAddress: address(new DiamondInit(false, true)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -36,7 +37,7 @@ contract InitializeTest is DiamondInitTest {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
+            initAddress: address(new DiamondInit(false, true)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -49,7 +50,7 @@ contract InitializeTest is DiamondInitTest {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
+            initAddress: address(new DiamondInit(false, true)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -62,7 +63,7 @@ contract InitializeTest is DiamondInitTest {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
+            initAddress: address(new DiamondInit(false, true)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -75,7 +76,7 @@ contract InitializeTest is DiamondInitTest {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
+            initAddress: address(new DiamondInit(false, true)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -88,7 +89,7 @@ contract InitializeTest is DiamondInitTest {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
+            initAddress: address(new DiamondInit(false, true)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -106,7 +107,7 @@ contract InitializeTest is DiamondInitTest {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
+            initAddress: address(new DiamondInit(false, true)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -128,5 +129,44 @@ contract InitializeTest is DiamondInitTest {
         assertEq(utilsFacet.util_getL2BootloaderBytecodeHash(), initializeData.l2BootloaderBytecodeHash);
         assertEq(utilsFacet.util_getL2DefaultAccountBytecodeHash(), initializeData.l2DefaultAccountBytecodeHash);
         assertEq(utilsFacet.util_getL2EvmEmulatorBytecodeHash(), initializeData.l2EvmEmulatorBytecodeHash);
+
+        // The CTM wires the Airbender lane, so the chain is created requiring both systems.
+        assertEq(utilsFacet.util_getDisabledProofSystems(), 0);
+    }
+
+    function test_airbenderMaskedOffWhenCTMHasNoAirbenderLane() public {
+        vm.mockCall(
+            initializeData.chainTypeManager,
+            abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, initializeData.protocolVersion),
+            abi.encode(testnetVerifier)
+        );
+
+        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(new DiamondInit(false, false)),
+            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+        });
+
+        UtilsFacet utilsFacet = UtilsFacet(address(new DiamondProxy(block.chainid, diamondCutData)));
+
+        assertEq(utilsFacet.util_getDisabledProofSystems(), AIRBENDER_PROOF_SYSTEM_DISABLED);
+    }
+
+    function test_zksyncOSChainIgnoresTheAirbenderLaneFlag() public {
+        vm.mockCall(
+            initializeData.chainTypeManager,
+            abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, initializeData.protocolVersion),
+            abi.encode(testnetVerifier)
+        );
+
+        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(new DiamondInit(true, false)),
+            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+        });
+
+        UtilsFacet utilsFacet = UtilsFacet(address(new DiamondProxy(block.chainid, diamondCutData)));
+
+        assertEq(utilsFacet.util_getDisabledProofSystems(), 0);
     }
 }

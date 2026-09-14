@@ -396,7 +396,9 @@ library GatewayCTMDeployerHelper {
         );
 
         // DiamondInit
-        bytes memory diamondInitArgs = abi.encode(config.isZKsyncOS);
+        // The Gateway flow wires no Airbender lane (see `GatewayCTMDeployerVerifiers`), so chains
+        // created by this CTM are Boojum-only.
+        bytes memory diamondInitArgs = abi.encode(config.isZKsyncOS, false);
         (addresses.facets.diamondInit, data.diamondInitCalldata) = _calculateCreate2AddressAndCalldata(
             _create2Salt,
             "DiamondInit.sol",

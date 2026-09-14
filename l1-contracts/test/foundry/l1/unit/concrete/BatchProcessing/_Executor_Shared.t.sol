@@ -294,7 +294,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             abi.encodeWithSelector(IChainTypeManager.protocolVersionIsActive.selector),
             abi.encode(bool(true))
         );
-        DiamondInit diamondInit = new DiamondInit(isZKsyncOS());
+        DiamondInit diamondInit = new DiamondInit(isZKsyncOS(), true);
         EraTestnetVerifier testnetVerifier = new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)));
         // Mock the CTM to return a verifier for protocol version 0
         vm.mockCall(
