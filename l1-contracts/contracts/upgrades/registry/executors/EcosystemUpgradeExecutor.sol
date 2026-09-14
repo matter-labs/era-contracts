@@ -129,13 +129,15 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
         for (uint256 i = 0; i < legCount; ++i) {
             GovernanceUpgradeTimer(ICTMTransition(m.legs[i].transition).upgradeTimer()).checkDeadline();
         }
+        // The stage advances before the domains are driven: any leg's revert unwinds the whole
+        // stage, so nothing observes `Executed` with a leg still unapplied.
+        pendingStage = UpgradeStage.Executed;
         if (m.coreRegistry != address(0)) {
             CORE_EXECUTOR.applyL1Upgrade(ICoreRegistry(m.coreRegistry));
         }
         for (uint256 i = 0; i < legCount; ++i) {
             ICTMUpgradeExecutor(m.legs[i].executor).applyTransition(ICTMTransition(m.legs[i].transition));
         }
-        pendingStage = UpgradeStage.Executed;
         emit OperationExecuted(address(_operation));
     }
 
