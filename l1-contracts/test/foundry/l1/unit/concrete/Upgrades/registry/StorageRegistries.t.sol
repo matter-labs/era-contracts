@@ -109,6 +109,9 @@ contract StorageRegistriesTest is Test {
 
     uint256 internal constant OLD_VERSION = uint256(98) << 32;
     uint256 internal constant NEW_VERSION = uint256(99) << 32;
+    /// @dev The chain the L2 transaction is composed for; forwarded to the pinned composer like
+    ///      the Bridgehub.
+    uint256 internal constant CHAIN_ID = 271;
     bytes internal constant DELEGATE_CALLDATA = hex"beef";
 
     // Dummy EVM bytecodes standing in for the L2 artifacts a hop installs (see {L2PlanFixtures}):
@@ -238,9 +241,9 @@ contract StorageRegistriesTest is Test {
         return PinnedContract({addr: address(0), codehash: bytes32(0)});
     }
 
-    /// @dev The L2 transaction `_transition` composes against this suite's Bridgehub.
+    /// @dev The L2 transaction `_transition` composes against this suite's Bridgehub and chain.
     function _l2Tx(CTMTransition _transition) internal view returns (L2CanonicalTransaction memory) {
-        return CTMUpgradeComposer.buildL2UpgradeTx(ICTMTransition(address(_transition)), bridgehub);
+        return CTMUpgradeComposer.buildL2UpgradeTx(ICTMTransition(address(_transition)), bridgehub, CHAIN_ID);
     }
 
     /// @dev The factory dependencies a target release built by `_tableRelease()` installs: the
@@ -353,12 +356,12 @@ contract StorageRegistriesTest is Test {
 
     function test_composerBuildsL2TxAndProposalFromTransition() public {
         // The delegate calldata is DEFINED by the pinned composer, which the library asks with the
-        // TARGET release and the Bridgehub it was handed — never with authored bytes.
+        // TARGET release, the Bridgehub and the chain it was handed — never with authored bytes.
         vm.expectCall(
             address(delegateComposer),
             abi.encodeCall(
                 IL2DelegateCalldataComposer.composeDelegateCalldata,
-                (ICTMRelease(address(newRelease)), bridgehub)
+                (ICTMRelease(address(newRelease)), bridgehub, CHAIN_ID)
             )
         );
         L2CanonicalTransaction memory transaction = _l2Tx(transition);
@@ -657,7 +660,6 @@ contract StorageRegistriesTest is Test {
         mispinned.validate();
         assertFalse(mispinned.verifyAll(), "a mispinned timer must not verify");
     }
-
 
     // ─────────────────────────── L2 plan shape ───────────────────────────
 

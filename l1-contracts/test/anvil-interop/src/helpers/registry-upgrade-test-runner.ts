@@ -69,13 +69,10 @@
  *   contract deployer built-in on the anvil L2 chains is a silent no-op stub (bytecode cannot
  *   be force-deployed from within the EVM). This synthetic minor bump has no L2 init logic, so
  *   a no-op stand-in is the faithful equivalent.
- * - Bootstrap engine: `BootstrapUpgradeDev` — the production `BootstrapUpgradeZKsyncOS` facet
- *   reinstall over the plain `DefaultUpgrade` L2 handling, because the ZKsync OS engine's
- *   per-chain rewrite requires the real `L2V34Upgrade` calldata shape and this harness's delegate
- *   is the no-op stand-in above.
  *
- * Everything else — ownership handover, migration pausing, transition composition, diamond
- * cuts, `DefaultUpgrade.upgradeFromTransition` init delegatecall, L2 tx commitment,
+ * Everything else — ownership handover, migration pausing, transition composition (per chain,
+ * through the pinned composer), diamond cuts, `DefaultUpgrade.upgradeFromTransition` init
+ * delegatecall, the production `BootstrapUpgradeZKsyncOS` bootstrap engine, L2 tx commitment,
  * `L2ComplexUpgrader` execution — runs through unpatched production code paths.
  */
 
@@ -178,7 +175,7 @@ const DETERMINISTIC_SOURCES = [
   // reproducibility of the committed addresses.
   "contracts/state-transition/ZKsyncOSChainTypeManager.sol",
   "contracts/dev-contracts/test/LegacyTestAdminFacet.sol",
-  "contracts/dev-contracts/BootstrapUpgradeDev.sol",
+  "contracts/upgrades/BootstrapUpgradeZKsyncOS.sol",
 ];
 
 // Mirror L2GenesisForceDeploymentsHelper.generateRandomAddress: the delegate must be
@@ -476,15 +473,16 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
 
     await crossBootstrapEdgeOnChains(l1Provider, upgradeChains, live.oldVersion, bootstrapCut, sendAndCheck);
     // The bootstrap's L2 leg is real (composed from the bootstrap release's table plus the mock
-    // delegate): relay it to each chain like the transition's, then clear the pending hash the
+    // delegate) and PER CHAIN — the migration serves each chain the transaction that chain
+    // committed: relay it to each chain like the transition's, then clear the pending hash the
     // same way the harness does for the genesis transaction — no batches execute on these chains.
     // The anvil L2 stand-ins have no ZKsync OS deployer, so each table row's implementation and
     // proxy shell are placed the way the pipeline runner does before the real `L2ComplexUpgrader`
     // performs the system-proxy upgrades.
     console.log("\n── Relaying the bootstrap's composed L2 upgrade transaction ──");
-    const bootstrapL2Tx = await migration.l2UpgradeTx();
-    const bootstrapL2Call = decodeUpgradeTxData(bootstrapL2Tx.data);
     for (const chain of upgradeChains) {
+      const bootstrapL2Tx = await migration.l2UpgradeTx(chain.chainId);
+      const bootstrapL2Call = decodeUpgradeTxData(bootstrapL2Tx.data);
       const l2Chain = anvilManager.getL2Chains().find((c) => c.chainId === chain.chainId);
       if (!l2Chain) {
         throw new Error(`Missing running L2 chain ${chain.chainId}`);
@@ -609,12 +607,13 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
 
     // ── 9. L1 assertions ──
     console.log("\n── Verifying L1 end state ──");
-    const composerHarness = new ethers.Contract(
-      deployed.composerHarness,
-      getAbi("RegistryComposerHarness"),
-      l1Provider
-    );
-    const expectedL2TxHash: string = await composerHarness.l2UpgradeTxHash(objects.transition, l1Addresses.bridgehub);
+    // The transition is the read entry point for its per-chain L2 transaction (it forwards to the
+    // pinned engine); its hash is what `BaseZkSyncUpgrade` stores on each chain diamond.
+    const transition = new ethers.Contract(objects.transition, getAbi("ICTMTransition"), l1Provider);
+    const l2TxParamType = transition.interface.getFunction("l2UpgradeTx").outputs?.[0];
+    if (!l2TxParamType) {
+      throw new Error("ICTMTransition ABI has no l2UpgradeTx output");
+    }
 
     assertEq(
       (await ctm.protocolVersion()).toString(),
@@ -668,10 +667,14 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
         deployed.newVerifier,
         `chain ${chain.chainId}: verifier switched to the fresh instance`
       );
+      const composedTx = await transition.l2UpgradeTx(l1Addresses.bridgehub, chain.chainId);
+      const expectedL2TxHash = ethers.utils.keccak256(
+        ethers.utils.defaultAbiCoder.encode([l2TxParamType], [composedTx])
+      );
       assertEq(
         await diamond.getL2SystemContractsUpgradeTxHash(),
         expectedL2TxHash,
-        `chain ${chain.chainId}: committed L2 upgrade tx hash equals the transition-composed transaction`
+        `chain ${chain.chainId}: committed L2 upgrade tx hash equals the transaction the transition composes for it`
       );
     }
     const implSlot = await l1Provider.getStorageAt(l1Addresses.messageRoot, EIP1967_IMPL_SLOT);
@@ -681,10 +684,10 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       "MessageRoot proxy re-pointed to the fresh implementation by CoreUpgradeExecutor"
     );
 
-    // ── 10. Relay the composed L2 upgrade tx to each target L2 chain ──
+    // ── 10. Relay each chain's composed L2 upgrade tx to its L2 chain ──
     console.log("\n── Relaying the transition-composed L2 upgrade transaction ──");
-    const composedTx = await composerHarness.l2UpgradeTx(objects.transition, l1Addresses.bridgehub);
     for (const chain of upgradeChains) {
+      const composedTx = await transition.l2UpgradeTx(l1Addresses.bridgehub, chain.chainId);
       const l2Chain = anvilManager.getL2Chains().find((c) => c.chainId === chain.chainId);
       if (!l2Chain) {
         throw new Error(`Missing running L2 chain ${chain.chainId}`);
@@ -877,7 +880,6 @@ type DeployedMachinery = {
   coreExecutor: string;
   /** The coordinating `EcosystemUpgradeExecutor` both domain executors answer to. */
   coordinator: string;
-  composerHarness: string;
   /** The harness's fixed no-op delegate-calldata composer, pinned by both edges' L2 plans. */
   delegateComposer: string;
   legacyAdminFacet: string;
@@ -972,7 +974,6 @@ async function deployUpgradeMachinery(
       coordinator,
       transitionCodehash,
     ]),
-    composerHarness: await deploy("RegistryComposerHarness", []),
     // Pinned CODE defines the delegate calldata. The mock delegate deliberately has no fallback,
     // so the composed call names its explicit no-op method and a stale selector still fails.
     delegateComposer: await deploy("FixedDelegateCalldataComposer", [
@@ -1021,10 +1022,10 @@ async function deployUpgradeMachinery(
   return {
     ...machinery,
     bootstrapRelease,
-    // The bootstrap engine, pinned by the manifest's `upgradeEngine`: the production facet
+    // The production bootstrap engine, pinned by the manifest's `upgradeEngine`: the facet
     // reinstall from the release it is bound to (which removes the legacy entrypoint above) over
-    // the plain L2 handling — see BootstrapUpgradeDev for why not the ZKsync OS engine.
-    bootstrapEngine: await deployPinned("BootstrapUpgradeDev", [bootstrapRelease]),
+    // the `DefaultUpgrade` storage/L2 part.
+    bootstrapEngine: await deployPinned("BootstrapUpgradeZKsyncOS", [bootstrapRelease]),
     // The bootstrap's proxy row: the CTM's own implementation swap, built with live immutables.
     ctmImplNew: await deployPinned("ZKsyncOSChainTypeManager", [
       params.bridgehub,

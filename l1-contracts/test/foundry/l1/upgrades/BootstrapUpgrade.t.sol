@@ -3,7 +3,6 @@ pragma solidity 0.8.28;
 
 import {BaseZkSyncUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {BootstrapUpgradeZKsyncOS} from "contracts/upgrades/BootstrapUpgradeZKsyncOS.sol";
-import {BootstrapUpgradeDev} from "contracts/dev-contracts/BootstrapUpgradeDev.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
@@ -19,10 +18,6 @@ import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
 import {RegistryObjectsFixture} from "./_SharedRegistryObjects.t.sol";
 
-contract DummyBootstrapUpgradeDev is BootstrapUpgradeDev, BaseUpgradeUtils {
-    constructor(ICTMRelease _genesisRelease) BootstrapUpgradeDev(_genesisRelease) {}
-}
-
 contract DummyBootstrapUpgradeZKsyncOS is BootstrapUpgradeZKsyncOS, BaseUpgradeUtils {
     constructor(ICTMRelease _genesisRelease) BootstrapUpgradeZKsyncOS(_genesisRelease) {}
 }
@@ -34,7 +29,7 @@ contract DummyBootstrapUpgradeZKsyncOS is BootstrapUpgradeZKsyncOS, BaseUpgradeU
 ///         diamond (called directly, so its own diamond storage is the chain's); the migration's
 ///         CTM-side authorities are stand-ins the engine never touches.
 contract BootstrapUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
-    DummyBootstrapUpgradeDev internal engine;
+    DummyBootstrapUpgradeZKsyncOS internal engine;
     CTMRelease internal genesisRelease;
     address internal legacyVerifier;
     address internal mockBridgehub = makeAddr("mockBridgehub");
@@ -44,13 +39,18 @@ contract BootstrapUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
     function setUp() public {
         _prepareUpgrade();
         _setUpRegistryObjects(true, DELEGATE_CALLDATA);
+        _mockEcosystemForComposer(mockBridgehub, ctmDeployerStub);
+        // The migration reads the ecosystem's Bridgehub off its CTM; the stand-in CTM answers with
+        // the chain's.
+        vm.mockCall(ctmStub, abi.encodeCall(IChainTypeManager.BRIDGE_HUB, ()), abi.encode(mockBridgehub));
         // A release pins its verifier by codehash, so the one it installs has code.
         verifier = _pinned("releaseVerifier");
         genesisRelease = _release(_arrivingFacets(), verifier);
-        engine = new DummyBootstrapUpgradeDev(genesisRelease);
+        engine = new DummyBootstrapUpgradeZKsyncOS(genesisRelease);
         engine.setPriorityTxMaxGasLimit(1 ether);
         engine.setPriorityTxMaxPubdata(1000000);
         engine.setBridgehub(mockBridgehub);
+        engine.setChainId(ETH_CHAIN_ID);
         engine.setZKsyncOS(true);
 
         // The departing, pre-registry chain: routing no release knows, straight in diamond storage,
@@ -108,11 +108,9 @@ contract BootstrapUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         assertEq(engine.facetAddress(SEL_SHARED_A), facetShared, "the release's facets are installed");
         assertEq(engine.facetAddress(SEL_ARRIVING), facetArriving, "the release's facets are installed");
 
-        // The object's own read of the same transaction agrees (its Bridgehub comes off the CTM;
-        // the stand-in CTM answers with the chain's).
-        vm.mockCall(ctmStub, abi.encodeCall(IChainTypeManager.BRIDGE_HUB, ()), abi.encode(mockBridgehub));
+        // The object's own read of the same transaction, for this chain, agrees.
         assertEq(
-            keccak256(abi.encode(migration.l2UpgradeTx())),
+            keccak256(abi.encode(migration.l2UpgradeTx(ETH_CHAIN_ID))),
             expectedHash,
             "the migration serves what the chain committed"
         );
@@ -164,20 +162,42 @@ contract BootstrapUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         assertEq(engine.getProtocolVersion(), protocolVersion);
     }
 
-    /// @dev The production engine inherits the bootstrap entrypoint AND the ZKsync OS storage
-    ///      part: the outstanding-batches precondition must gate the bootstrap edge too.
-    function test_zksyncOSEngine_requiresEveryCommittedBatchExecuted() public {
-        DummyBootstrapUpgradeZKsyncOS osEngine = new DummyBootstrapUpgradeZKsyncOS(genesisRelease);
-        osEngine.setBatchCounters(8, 7);
-        RegistryBootstrapMigration migration = _migration(genesisRelease, 0, address(osEngine), false);
+    /// @dev The bootstrap edge installs the release's verifier like every transition after it, so
+    ///      the outstanding-batches precondition gates it too.
+    function test_revertWhen_upgradeFromBootstrap_aCommittedBatchIsNotExecuted() public {
+        engine.setBatchCounters(8, 7);
+        RegistryBootstrapMigration migration = _migration(genesisRelease, 0, address(engine), false);
 
         vm.expectRevert(NotAllBatchesExecuted.selector);
-        osEngine.upgradeFromBootstrap(address(migration));
+        engine.upgradeFromBootstrap(address(migration));
 
-        osEngine.setBatchCounters(8, 8);
-        osEngine.upgradeFromBootstrap(address(migration));
-        assertEq(osEngine.getProtocolVersion(), protocolVersion);
-        assertEq(osEngine.getVerifier(), verifier);
-        assertEq(osEngine.facetAddress(SEL_ARRIVING), facetArriving, "the reinstall runs on the production engine");
+        engine.setBatchCounters(8, 8);
+        engine.upgradeFromBootstrap(address(migration));
+        assertEq(engine.getProtocolVersion(), protocolVersion);
+        assertEq(engine.getVerifier(), verifier);
+        assertEq(engine.facetAddress(SEL_ARRIVING), facetArriving, "the reinstall runs once the batches are executed");
+    }
+
+    /// @dev The bootstrap edge composes its L2 leg the same one-pass, per-chain way transitions
+    ///      do (the REAL v34 composer over the mocked ecosystem — see the shared fixture): what the
+    ///      chain commits is what the migration serves FOR THAT CHAIN, and another chain of the
+    ///      ecosystem is served another transaction.
+    function test_upgradeFromBootstrap_commitsTheTransactionComposedForThisChain() public {
+        RegistryBootstrapMigration migration = new RegistryBootstrapMigration(
+            _bootstrapManifest(genesisRelease, 0, protocolVersion, 0, address(engine), _v34Plan())
+        );
+        L2CanonicalTransaction memory expectedTx = _expectedV34L2Tx(migration.l2Plan(), protocolVersion, ETH_CHAIN_ID);
+
+        engine.upgradeFromBootstrap(address(migration));
+
+        bytes32 recorded = engine.getL2SystemContractsUpgradeTxHash();
+        assertEq(recorded, keccak256(abi.encode(expectedTx)), "the chain commits its own composition");
+        L2CanonicalTransaction memory served = migration.l2UpgradeTx(ETH_CHAIN_ID);
+        assertEq(keccak256(abi.encode(served)), recorded, "the migration serves what this chain committed");
+        assertEq(_perChainData(served.data).baseTokenBridgingData.assetId, ETH_BASE_TOKEN_ASSET_ID);
+
+        L2CanonicalTransaction memory forOtherChain = migration.l2UpgradeTx(ERC20_CHAIN_ID);
+        assertTrue(keccak256(abi.encode(forOtherChain)) != recorded, "another chain is served its own transaction");
+        assertEq(_perChainData(forOtherChain.data).baseTokenBridgingData.assetId, ERC20_BASE_TOKEN_ASSET_ID);
     }
 }

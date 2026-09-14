@@ -9,13 +9,20 @@ import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.s
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {MockSelfDescribingFacet} from "contracts/dev-contracts/test/MockSelfDescribingFacet.sol";
 import {FixedDelegateCalldataComposer} from "contracts/dev-contracts/FixedDelegateCalldataComposer.sol";
+import {L2V34DelegateCalldataComposer} from "contracts/upgrades/L2V34DelegateCalldataComposer.sol";
+import {IL2V34Upgrade} from "contracts/upgrades/IL2V34Upgrade.sol";
+import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
+import {ZKChainSpecificForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {L2CanonicalTransactionLib} from "contracts/state-transition/libraries/L2CanonicalTransactionLib.sol";
-import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
+import {L2CanonicalTransaction, TokenBridgingData, TokenMetadata} from "contracts/common/Messaging.sol";
 import {
+    ETH_TOKEN_ADDRESS,
     PRIORITY_TX_MAX_GAS_LIMIT,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-    SYSTEM_UPGRADE_L2_TX_TYPE,
     ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE
 } from "contracts/common/Config.sol";
 import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -59,6 +66,18 @@ abstract contract RegistryObjectsFixture is Test {
     bytes internal fixtureDelegateCalldata;
     bool internal fixtureIsZKsyncOS;
 
+    /// @dev The REAL v34 composer, for the per-chain composition tests. The ecosystem it reads
+    ///      through the Bridgehub — the CTM deployer, the asset router and the native token vault —
+    ///      is mocked by {_mockEcosystemForComposer}: this fixture has no live vault, and what is
+    ///      under test is which values land in the composed transaction, not how the vault stores
+    ///      them. The ERC20 base token IS real, since its metadata is what the composer reads.
+    L2V34DelegateCalldataComposer internal v34Composer;
+    address internal mockAssetRouter = makeAddr("mockAssetRouter");
+    address internal mockNativeTokenVault = makeAddr("mockNativeTokenVault");
+    address internal ctmDeployerStub = makeAddr("ctmDeployer");
+    address internal erc20OriginToken = makeAddr("erc20OriginToken");
+    TestnetERC20Token internal erc20LocalToken;
+
     bytes4 internal constant SEL_SHARED_A = bytes4(uint32(0x11));
     bytes4 internal constant SEL_SHARED_B = bytes4(uint32(0x12));
     bytes4 internal constant SEL_DEPARTING = bytes4(uint32(0x21));
@@ -66,6 +85,20 @@ abstract contract RegistryObjectsFixture is Test {
 
     /// @dev Dummy EVM bytecode standing in for the authored L2 upgrade delegate (see {L2PlanFixtures}).
     bytes internal constant DELEGATE_CODE = hex"aa01";
+    /// @dev The fixed force-deployments blob every fixture release pins.
+    bytes internal constant FIXED_FORCE_DEPLOYMENTS_DATA = hex"f1f2";
+
+    // The two chains the mocked ecosystem knows: one ETH-based, one whose base token is an ERC20
+    // bridged from another chain (so its metadata lives on a LOCAL representation).
+    uint256 internal constant ETH_CHAIN_ID = 271;
+    uint256 internal constant ERC20_CHAIN_ID = 272;
+    uint256 internal constant ETH_ORIGIN_CHAIN_ID = 1;
+    uint256 internal constant ERC20_ORIGIN_CHAIN_ID = 300;
+    bytes32 internal constant ETH_BASE_TOKEN_ASSET_ID = keccak256("ethBaseTokenAssetId");
+    bytes32 internal constant ERC20_BASE_TOKEN_ASSET_ID = keccak256("erc20BaseTokenAssetId");
+    string internal constant ERC20_NAME = "Local Token";
+    string internal constant ERC20_SYMBOL = "LOC";
+    uint256 internal constant ERC20_DECIMALS = 6;
 
     function _setUpRegistryObjects(bool _isZKsyncOS, bytes memory _delegateCalldata) internal {
         fixtureIsZKsyncOS = _isZKsyncOS;
@@ -78,6 +111,61 @@ abstract contract RegistryObjectsFixture is Test {
         upgradeTimerStub = _pinned("upgradeTimer");
         ctmStub = makeAddr("ctm");
         delegateComposer = new FixedDelegateCalldataComposer(_delegateCalldata);
+        v34Composer = new L2V34DelegateCalldataComposer();
+        erc20LocalToken = new TestnetERC20Token(ERC20_NAME, ERC20_SYMBOL, uint8(ERC20_DECIMALS));
+    }
+
+    /// @dev Mocks the ecosystem behind `_bridgehub` for the two fixture chains (see {v34Composer}).
+    function _mockEcosystemForComposer(address _bridgehub, address _ctmDeployer) internal {
+        vm.mockCall(_bridgehub, abi.encodeCall(IBridgehubBase.l1CtmDeployer, ()), abi.encode(_ctmDeployer));
+        vm.mockCall(_bridgehub, abi.encodeCall(IBridgehubBase.assetRouter, ()), abi.encode(mockAssetRouter));
+        vm.mockCall(
+            mockAssetRouter,
+            abi.encodeCall(IL1AssetRouter.nativeTokenVault, ()),
+            abi.encode(mockNativeTokenVault)
+        );
+        _mockBaseToken(
+            _bridgehub,
+            ETH_CHAIN_ID,
+            ETH_BASE_TOKEN_ASSET_ID,
+            ETH_TOKEN_ADDRESS,
+            ETH_ORIGIN_CHAIN_ID,
+            ETH_TOKEN_ADDRESS
+        );
+        _mockBaseToken(
+            _bridgehub,
+            ERC20_CHAIN_ID,
+            ERC20_BASE_TOKEN_ASSET_ID,
+            erc20OriginToken,
+            ERC20_ORIGIN_CHAIN_ID,
+            address(erc20LocalToken)
+        );
+    }
+
+    function _mockBaseToken(
+        address _bridgehub,
+        uint256 _chainId,
+        bytes32 _assetId,
+        address _originToken,
+        uint256 _originChainId,
+        address _localToken
+    ) internal {
+        vm.mockCall(_bridgehub, abi.encodeCall(IBridgehubBase.baseTokenAssetId, (_chainId)), abi.encode(_assetId));
+        vm.mockCall(
+            mockNativeTokenVault,
+            abi.encodeCall(INativeTokenVaultBase.originToken, (_assetId)),
+            abi.encode(_originToken)
+        );
+        vm.mockCall(
+            mockNativeTokenVault,
+            abi.encodeCall(INativeTokenVaultBase.originChainId, (_assetId)),
+            abi.encode(_originChainId)
+        );
+        vm.mockCall(
+            mockNativeTokenVault,
+            abi.encodeCall(INativeTokenVaultBase.tokenAddress, (_assetId)),
+            abi.encode(_localToken)
+        );
     }
 
     // ─────────────────────────────── objects ───────────────────────────────
@@ -97,7 +185,7 @@ abstract contract RegistryObjectsFixture is Test {
                     genesisUpgrade: _pin(genesisUpgradeStub),
                     genesisFacets: rows,
                     genesis: ReleaseGenesisData({
-                        fixedForceDeploymentsData: hex"f1f2",
+                        fixedForceDeploymentsData: FIXED_FORCE_DEPLOYMENTS_DATA,
                         genesisBatchHash: bytes32(uint256(1)),
                         genesisBatchCommitment: bytes32(uint256(1)),
                         genesisIndexRepeatedStorageChanges: 54
@@ -134,6 +222,15 @@ abstract contract RegistryObjectsFixture is Test {
     ///      bytecode-derived address, the pinned composer defining its calldata, the delegate's
     ///      bytecode as the one factory dependency.
     function _delegatePlan() internal view returns (AuthoredL2Plan memory) {
+        return _planPinning(address(delegateComposer));
+    }
+
+    /// @dev {_delegatePlan} with the REAL v34 composer pinned in place of the fixed stand-in.
+    function _v34Plan() internal view returns (AuthoredL2Plan memory) {
+        return _planPinning(address(v34Composer));
+    }
+
+    function _planPinning(address _composer) internal view returns (AuthoredL2Plan memory) {
         IComplexUpgrader.UniversalContractUpgradeInfo[]
             memory extras = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
         extras[0] = L2PlanFixtures.unsafeDeployment(DELEGATE_CODE);
@@ -141,7 +238,7 @@ abstract contract RegistryObjectsFixture is Test {
             AuthoredL2Plan({
                 extraDeployments: extras,
                 delegateTo: extras[0].newAddress,
-                delegateComposer: _pin(address(delegateComposer)),
+                delegateComposer: _pin(_composer),
                 factoryDepHashes: L2PlanFixtures.factoryDepHashes(L2PlanFixtures.codes(DELEGATE_CODE))
             });
     }
@@ -213,15 +310,42 @@ abstract contract RegistryObjectsFixture is Test {
 
     // ─────────────────────────────── expectations ───────────────────────────────
 
-    /// @dev The transaction the composer builds for a FINAL plan at `_newProtocolVersion`,
-    ///      assembled from the constants it reads rather than through the library under test, so
-    ///      equality against it is a real check of the composition.
+    /// @dev The transaction the composer builds for a FINAL plan at `_newProtocolVersion` with the
+    ///      fixed stand-in composer, assembled from the constants it reads rather than through the
+    ///      library under test, so equality against it is a real check of the composition.
     function _expectedL2Tx(
         L2UpgradePlan memory _plan,
         uint256 _newProtocolVersion
-    ) internal view returns (L2CanonicalTransaction memory transaction) {
+    ) internal view returns (L2CanonicalTransaction memory) {
+        return _expectedL2TxWithDelegateCalldata(_plan, _newProtocolVersion, fixtureDelegateCalldata);
+    }
+
+    /// @dev {_expectedL2Tx} for a plan pinning the REAL v34 composer: the delegate is called with
+    ///      the release's fixed data and the per-chain data of `_chainId` read off the mocked
+    ///      ecosystem.
+    function _expectedV34L2Tx(
+        L2UpgradePlan memory _plan,
+        uint256 _newProtocolVersion,
+        uint256 _chainId
+    ) internal view returns (L2CanonicalTransaction memory) {
+        return
+            _expectedL2TxWithDelegateCalldata(
+                _plan,
+                _newProtocolVersion,
+                abi.encodeCall(
+                    IL2V34Upgrade.upgrade,
+                    (true, ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(_chainId))
+                )
+            );
+    }
+
+    function _expectedL2TxWithDelegateCalldata(
+        L2UpgradePlan memory _plan,
+        uint256 _newProtocolVersion,
+        bytes memory _delegateCalldata
+    ) internal pure returns (L2CanonicalTransaction memory transaction) {
         transaction = L2CanonicalTransactionLib.emptyL2CanonicalTransaction();
-        transaction.txType = fixtureIsZKsyncOS ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
+        transaction.txType = ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE;
         transaction.from = uint256(uint160(L2_FORCE_DEPLOYER_ADDR));
         transaction.to = uint256(uint160(L2_COMPLEX_UPGRADER_ADDR));
         transaction.gasLimit = PRIORITY_TX_MAX_GAS_LIMIT;
@@ -229,9 +353,70 @@ abstract contract RegistryObjectsFixture is Test {
         transaction.nonce = _newProtocolVersion >> SEMVER_MINOR_OFFSET;
         transaction.data = abi.encodeCall(
             IComplexUpgrader.forceDeployAndUpgradeUniversal,
-            (_plan.deployments, _plan.delegateTo, fixtureDelegateCalldata)
+            (_plan.deployments, _plan.delegateTo, _delegateCalldata)
         );
         transaction.factoryDeps = _plan.factoryDepHashes;
+    }
+
+    /// @dev The `ZKChainSpecificForceDeploymentsData` of one of the two fixture chains, as the v34
+    ///      composer must read it off the mocked ecosystem.
+    function _expectedPerChainData(uint256 _chainId) internal view returns (bytes memory) {
+        bool isEthChain = _chainId == ETH_CHAIN_ID;
+        address originToken = isEthChain ? ETH_TOKEN_ADDRESS : erc20OriginToken;
+        TokenMetadata memory metadata;
+        if (isEthChain) {
+            metadata = TokenMetadata({name: "Ether", symbol: "ETH", decimals: 18});
+        } else {
+            metadata = TokenMetadata({name: ERC20_NAME, symbol: ERC20_SYMBOL, decimals: ERC20_DECIMALS});
+        }
+        return
+            abi.encode(
+                ZKChainSpecificForceDeploymentsData({
+                    l2LegacySharedBridge: address(0),
+                    predeployedL2WethAddress: address(0),
+                    baseTokenL1Address: originToken,
+                    baseTokenMetadata: metadata,
+                    baseTokenBridgingData: TokenBridgingData({
+                        assetId: isEthChain ? ETH_BASE_TOKEN_ASSET_ID : ERC20_BASE_TOKEN_ASSET_ID,
+                        originChainId: isEthChain ? ETH_ORIGIN_CHAIN_ID : ERC20_ORIGIN_CHAIN_ID,
+                        originToken: originToken
+                    })
+                })
+            );
+    }
+
+    // ─────────────────────────────── composed-payload readers ───────────────────────────────
+
+    /// @dev The delegate calldata inside a composed `forceDeployAndUpgradeUniversal` payload.
+    function _delegateCalldata(bytes memory _txData) internal view returns (bytes memory delegateCalldata) {
+        (, , delegateCalldata) = this.decodeUniversalCall(_txData);
+    }
+
+    /// @dev The per-chain half of a composed v34 payload.
+    function _perChainData(bytes memory _txData) internal view returns (ZKChainSpecificForceDeploymentsData memory) {
+        (, , , bytes memory perChainData) = this.decodeV34Upgrade(_delegateCalldata(_txData));
+        return abi.decode(perChainData, (ZKChainSpecificForceDeploymentsData));
+    }
+
+    /// @dev Decodes a `forceDeployAndUpgradeUniversal` payload; external so the selector can be
+    ///      sliced off calldata.
+    function decodeUniversalCall(
+        bytes calldata _data
+    ) external pure returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory, address, bytes memory) {
+        assertEq(
+            bytes32(bytes4(_data[:4])),
+            bytes32(IComplexUpgrader.forceDeployAndUpgradeUniversal.selector),
+            "L2 tx selector"
+        );
+        return abi.decode(_data[4:], (IComplexUpgrader.UniversalContractUpgradeInfo[], address, bytes));
+    }
+
+    /// @dev Decodes an `IL2V34Upgrade.upgrade` call into its arguments.
+    function decodeV34Upgrade(
+        bytes calldata _data
+    ) external pure returns (bool isZKsyncOS, address ctmDeployer, bytes memory fixedData, bytes memory chainData) {
+        assertEq(bytes32(bytes4(_data[:4])), bytes32(IL2V34Upgrade.upgrade.selector), "delegate selector");
+        return abi.decode(_data[4:], (bool, address, bytes, bytes));
     }
 
     // ─────────────────────────────── helpers ───────────────────────────────

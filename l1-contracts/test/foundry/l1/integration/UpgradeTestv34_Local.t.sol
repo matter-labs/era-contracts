@@ -254,7 +254,7 @@ contract UpgradeIntegrationTest_v34_Local is
             address(v34.bootstrapMigration()),
             "the init names the pinned migration"
         );
-        L2CanonicalTransaction memory l2Tx = v34.bootstrapMigration().l2UpgradeTx();
+        L2CanonicalTransaction memory l2Tx = v34.bootstrapMigration().l2UpgradeTx(IGetters(_eraDiamond).getChainId());
         assertEq(
             keccak256(abi.encode(l2Tx)),
             keccak256(abi.encode(L2CanonicalTransactionLib.emptyL2CanonicalTransaction())),

@@ -128,7 +128,7 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
     /// @dev The repo is ZKsync-OS-only: every CTM this prepare runs against is a ZKsync OS CTM.
     function deployUsedUpgradeContract() internal virtual override returns (address) {
         // The bootstrap engine: derives the facet reinstall on-chain from the genesis release it
-        // pins as an immutable, then runs the storage/L2 part of `DefaultUpgradeZKsyncOS`.
+        // pins as an immutable, then runs the storage/L2 part of `DefaultUpgrade`.
         return deploySimpleContract("BootstrapUpgradeZKsyncOS");
     }
 

@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import {BaseZkSyncUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
+import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
@@ -10,9 +11,12 @@ import {ReleaseFacetReader} from "contracts/upgrades/registry/libraries/ReleaseF
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {L2CanonicalTransactionLib} from "contracts/state-transition/libraries/L2CanonicalTransactionLib.sol";
+import {ZKChainSpecificForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
+import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {PreviousUpgradeNotFinalized} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
+import {NotAllBatchesExecuted} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {TimeNotReached} from "contracts/common/L1ContractErrors.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
@@ -23,10 +27,11 @@ contract DummyDefaultUpgrade is DefaultUpgrade, BaseUpgradeUtils {}
 
 /// @notice `DefaultUpgrade.upgradeFromTransition` against REAL write-once objects: the engine is
 ///         handed nothing but the transition address and must read the derived facet cuts, the
-///         version edge and schedule, the TARGET release's verifier and the L2 plan from it. The
-///         engine under test plays the chain diamond (it is called directly, so its own diamond
-///         storage is the chain's). The same path through a real CTM, executor and chain proxy is
-///         covered by RegistryDrivenUpgrade.t.sol.
+///         version edge and schedule, the TARGET release's verifier and the L2 plan from it, and
+///         compose the L2 protocol upgrade transaction for THIS chain in one pass. The engine
+///         under test plays the chain diamond (it is called directly, so its own diamond storage
+///         is the chain's). The same path through a real CTM, executor and chain proxy is covered
+///         by RegistryDrivenUpgrade.t.sol.
 contract DefaultUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
     DummyDefaultUpgrade internal engine;
     CTMRelease internal fromRelease;
@@ -43,11 +48,13 @@ contract DefaultUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         engine.setPriorityTxMaxGasLimit(1 ether);
         engine.setPriorityTxMaxPubdata(1000000);
         engine.setBridgehub(mockBridgehub);
-        // The releases pin a ZKsync OS DiamondInit, so the composed transaction carries the ZKsync
-        // OS upgrade type — which the chain accepts only when it runs ZKsync OS itself.
+        engine.setChainId(ETH_CHAIN_ID);
+        // The composed transaction carries the ZKsync OS upgrade type, which the chain accepts
+        // only when it runs ZKsync OS itself.
         engine.setZKsyncOS(true);
 
         _setUpRegistryObjects(true, DELEGATE_CALLDATA);
+        _mockEcosystemForComposer(mockBridgehub, ctmDeployerStub);
         fromVerifier = _pinned("fromVerifier");
         newVerifier = _pinned("newVerifier");
         fromRelease = _release(_departingFacets(), fromVerifier);
@@ -69,6 +76,11 @@ contract DefaultUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
                 address(engine),
                 _delegatePlan()
             );
+    }
+
+    /// @dev The same hop with the REAL v34 composer pinned (see the shared fixture).
+    function _v34Transition() internal returns (CTMTransition) {
+        return _transition(fromRelease, newRelease, 0, protocolVersion, 0, address(engine), _v34Plan());
     }
 
     function test_upgradeFromTransition_appliesTheCommittedTransition() public {
@@ -193,17 +205,161 @@ contract DefaultUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         );
     }
 
-    /// @dev The off-chain read: the transaction `upgradeFromTransition` commits, before per-chain
-    ///      substitution, composed for the given Bridgehub.
+    /// @dev The off-chain read: the transaction `upgradeFromTransition` commits, composed for the
+    ///      given Bridgehub and chain.
     function test_l2UpgradeTx_isTheComposedTransaction() public {
         CTMTransition transition = _defaultTransition(0);
 
-        L2CanonicalTransaction memory served = engine.l2UpgradeTx(address(transition), mockBridgehub);
+        L2CanonicalTransaction memory served = engine.l2UpgradeTx(address(transition), mockBridgehub, ETH_CHAIN_ID);
 
         assertEq(
             keccak256(abi.encode(served)),
             keccak256(abi.encode(_expectedL2Tx(transition.l2Plan(), protocolVersion))),
             "the served transaction is the composed one"
+        );
+        engine.upgradeFromTransition(address(transition));
+        assertEq(engine.getL2SystemContractsUpgradeTxHash(), keccak256(abi.encode(served)), "and the committed one");
+    }
+
+    // ─────────────────────────── outstanding batches ───────────────────────────
+
+    /// @dev The engine installs the target release's verifier, so it refuses to run while a
+    ///      committed batch still awaits execution (see `BaseZkSyncUpgrade._requireAllBatchesExecuted`).
+    function test_revertWhen_upgradeFromTransition_aCommittedBatchIsNotExecuted() public {
+        CTMTransition transition = _defaultTransition(0);
+        engine.setBatchCounters(8, 7);
+
+        vm.expectRevert(NotAllBatchesExecuted.selector);
+        engine.upgradeFromTransition(address(transition));
+
+        engine.setBatchCounters(8, 8);
+        engine.upgradeFromTransition(address(transition));
+        assertEq(engine.getProtocolVersion(), protocolVersion);
+    }
+
+    /// @dev Includes the fresh-chain boundary (0/0), where a chain has committed nothing yet.
+    function testFuzz_upgradeFromTransition_outstandingBatchesGuard(uint256 _committed, uint256 _executed) public {
+        _committed = bound(_committed, 0, type(uint128).max);
+        _executed = bound(_executed, 0, _committed);
+        engine.setBatchCounters(_committed, _executed);
+        CTMTransition transition = _defaultTransition(0);
+
+        if (_committed != _executed) {
+            vm.expectRevert(NotAllBatchesExecuted.selector);
+            engine.upgradeFromTransition(address(transition));
+        } else {
+            engine.upgradeFromTransition(address(transition));
+            assertEq(engine.getProtocolVersion(), protocolVersion);
+        }
+    }
+
+    // ─────────────────────────── one-pass per-chain composition ───────────────────────────
+
+    /// @dev The REAL v34 composer through the engine: the transaction the chain commits carries
+    ///      THIS chain's `ZKChainSpecificForceDeploymentsData`, composed in the same pass as the
+    ///      rest of the transaction — there is no later rewrite, and the served view IS the
+    ///      committed transaction. The ecosystem the composer reads is mocked (see the shared
+    ///      fixture); the values that land in the transaction are what is under test.
+    function test_upgradeFromTransition_commitsTheTransactionComposedForThisChain() public {
+        CTMTransition transition = _v34Transition();
+        L2CanonicalTransaction memory expectedTx = _expectedV34L2Tx(transition.l2Plan(), protocolVersion, ETH_CHAIN_ID);
+        bytes32 expectedHash = keccak256(abi.encode(expectedTx));
+
+        vm.expectEmit(address(engine));
+        emit BaseZkSyncUpgrade.UpgradeComplete(protocolVersion, expectedHash, expectedTx);
+        engine.upgradeFromTransition(address(transition));
+
+        assertEq(engine.getL2SystemContractsUpgradeTxHash(), expectedHash, "the chain commits its own composition");
+        L2CanonicalTransaction memory served = engine.l2UpgradeTx(address(transition), mockBridgehub, ETH_CHAIN_ID);
+        assertEq(keccak256(abi.encode(served)), expectedHash, "the served view is the committed transaction");
+        ZKChainSpecificForceDeploymentsData memory data = _perChainData(served.data);
+        assertEq(data.baseTokenBridgingData.assetId, ETH_BASE_TOKEN_ASSET_ID, "wrong base token asset id");
+        assertEq(data.baseTokenBridgingData.originChainId, ETH_ORIGIN_CHAIN_ID, "wrong origin chain");
+        assertEq(data.baseTokenBridgingData.originToken, ETH_TOKEN_ADDRESS, "wrong origin token");
+        assertEq(data.baseTokenL1Address, ETH_TOKEN_ADDRESS, "wrong L1 base token address");
+        assertEq(data.baseTokenMetadata.name, "Ether", "wrong base token name");
+        assertEq(data.baseTokenMetadata.symbol, "ETH", "wrong base token symbol");
+        assertEq(data.baseTokenMetadata.decimals, 18, "wrong base token decimals");
+    }
+
+    /// @dev An ERC20-based chain: the metadata comes from the token's bridged representation on
+    ///      this layer (a REAL token here), not from its origin-chain address, which has no code.
+    function test_upgradeFromTransition_readsAnERC20BaseTokenFromItsLocalRepresentation() public {
+        engine.setChainId(ERC20_CHAIN_ID);
+        CTMTransition transition = _v34Transition();
+        L2CanonicalTransaction memory expectedTx = _expectedV34L2Tx(
+            transition.l2Plan(),
+            protocolVersion,
+            ERC20_CHAIN_ID
+        );
+
+        engine.upgradeFromTransition(address(transition));
+
+        assertEq(engine.getL2SystemContractsUpgradeTxHash(), keccak256(abi.encode(expectedTx)));
+        ZKChainSpecificForceDeploymentsData memory data = _perChainData(
+            engine.l2UpgradeTx(address(transition), mockBridgehub, ERC20_CHAIN_ID).data
+        );
+        assertEq(data.baseTokenMetadata.name, ERC20_NAME, "metadata not read from the local token");
+        assertEq(data.baseTokenMetadata.symbol, ERC20_SYMBOL, "wrong symbol");
+        assertEq(data.baseTokenMetadata.decimals, ERC20_DECIMALS, "wrong decimals");
+        // The bridging data still describes the token on its origin chain.
+        assertEq(data.baseTokenL1Address, erc20OriginToken, "wrong L1 base token address");
+        assertEq(data.baseTokenBridgingData.originToken, erc20OriginToken, "wrong origin token");
+        assertEq(data.baseTokenBridgingData.originChainId, ERC20_ORIGIN_CHAIN_ID, "wrong origin chain");
+        assertEq(data.baseTokenBridgingData.assetId, ERC20_BASE_TOKEN_ASSET_ID, "wrong base token asset id");
+    }
+
+    /// @dev Two chains of one ecosystem never receive the same transaction: only the per-chain
+    ///      half differs, everything ecosystem-wide is shared.
+    function test_l2UpgradeTx_isComposedPerChain() public {
+        CTMTransition transition = _v34Transition();
+
+        L2CanonicalTransaction memory forEthChain = engine.l2UpgradeTx(
+            address(transition),
+            mockBridgehub,
+            ETH_CHAIN_ID
+        );
+        L2CanonicalTransaction memory forErc20Chain = engine.l2UpgradeTx(
+            address(transition),
+            mockBridgehub,
+            ERC20_CHAIN_ID
+        );
+
+        assertTrue(
+            keccak256(abi.encode(forEthChain)) != keccak256(abi.encode(forErc20Chain)),
+            "two chains must not share a transaction"
+        );
+        assertEq(forEthChain.txType, forErc20Chain.txType);
+        assertEq(forEthChain.nonce, forErc20Chain.nonce);
+        assertEq(abi.encode(forEthChain.factoryDeps), abi.encode(forErc20Chain.factoryDeps));
+        (bool ethFlag, address ethDeployer, bytes memory ethFixed, ) = this.decodeV34Upgrade(
+            _delegateCalldata(forEthChain.data)
+        );
+        (bool erc20Flag, address erc20Deployer, bytes memory erc20Fixed, ) = this.decodeV34Upgrade(
+            _delegateCalldata(forErc20Chain.data)
+        );
+        assertEq(ethFlag, erc20Flag, "the VM flag is ecosystem-wide");
+        assertEq(ethDeployer, erc20Deployer, "the CTM deployer is ecosystem-wide");
+        assertEq(ethFixed, erc20Fixed, "the fixed data is ecosystem-wide");
+        assertEq(_perChainData(forEthChain.data).baseTokenBridgingData.assetId, ETH_BASE_TOKEN_ASSET_ID);
+        assertEq(_perChainData(forErc20Chain.data).baseTokenBridgingData.assetId, ERC20_BASE_TOKEN_ASSET_ID);
+    }
+
+    /// @dev The transition is the read entry point and the engine the composition code: the
+    ///      object forwards to the pinned engine and serves exactly what the chain commits.
+    function test_l2UpgradeTx_transitionForwardsToThePinnedEngine() public {
+        CTMTransition transition = _v34Transition();
+
+        vm.expectCall(
+            address(engine),
+            abi.encodeCall(IDefaultUpgrade.l2UpgradeTx, (address(transition), mockBridgehub, ETH_CHAIN_ID))
+        );
+        L2CanonicalTransaction memory served = transition.l2UpgradeTx(mockBridgehub, ETH_CHAIN_ID);
+
+        assertEq(
+            keccak256(abi.encode(served)),
+            keccak256(abi.encode(engine.l2UpgradeTx(address(transition), mockBridgehub, ETH_CHAIN_ID))),
+            "the transition serves the engine's composition"
         );
         engine.upgradeFromTransition(address(transition));
         assertEq(engine.getL2SystemContractsUpgradeTxHash(), keccak256(abi.encode(served)), "and the committed one");

@@ -445,8 +445,6 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "DefaultUpgradeZKsyncOS")) {
-            return abi.encode();
         } else if (compareStrings(contractName, "BootstrapUpgradeZKsyncOS")) {
             // The bootstrap engine pins the genesis release it installs as an immutable.
             require(ctmAddresses.stateTransition.currentRelease != address(0), "current release is not deployed");

@@ -17,11 +17,12 @@ interface IRegistryBootstrapMigration {
     ///         deployments with the authored delegate leg and factory dependencies.
     function l2Plan() external view returns (L2UpgradePlan memory);
 
-    /// @notice The L2 protocol upgrade transaction the edge commits on every chain BEFORE the
-    ///         engine's per-chain substitution: composed from {l2Plan}, the genesis release and the
-    ///         version edge for the ecosystem the CTM belongs to, by the same composer transitions
-    ///         use. All-zero (`txType == 0`) for an L1-only edge.
-    function l2UpgradeTx() external view returns (L2CanonicalTransaction memory);
+    /// @notice The L2 protocol upgrade transaction the edge commits on chain `_chainId` — the FINAL
+    ///         transaction, exactly as the chain stores its hash: composed from {l2Plan}, the genesis
+    ///         release and the version edge for the ecosystem the CTM belongs to, by the same
+    ///         composer transitions use. All-zero (`txType == 0`) for an L1-only edge.
+    /// @param _chainId The chain to compose for.
+    function l2UpgradeTx(uint256 _chainId) external view returns (L2CanonicalTransaction memory);
 
     /// @notice The diamond cut this edge commits — no facet cuts, the pinned engine's
     ///         `upgradeFromBootstrap(this)` init. Chains crossing the edge take exactly these bytes

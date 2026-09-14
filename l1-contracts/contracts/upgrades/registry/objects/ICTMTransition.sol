@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
+import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
 import {L2UpgradePlan, ProxyUpgradeRow, TransitionManifest} from "../RegistryTypes.sol";
 
 /// @notice Immutable description of how one CTM release becomes another.
@@ -51,6 +52,16 @@ interface ICTMTransition {
     function ctmProxyRows() external view returns (ProxyUpgradeRow[] memory);
 
     function l2Plan() external view returns (L2UpgradePlan memory);
+
+    /// @notice The L2 protocol upgrade transaction this transition's engine commits on chain
+    ///         `_chainId` of the ecosystem of `_bridgehub` — the single read entry point for tooling.
+    /// @dev Forwards to the pinned engine's `IDefaultUpgrade.l2UpgradeTx`: the composition code
+    ///      lives in the per-upgrade pinned engine, never here, because the transition's own code
+    ///      (`TRANSITION_CODEHASH`) is frozen for the executor's lifetime while the engine ships per
+    ///      release.
+    /// @param _bridgehub The Bridgehub of the ecosystem the chain belongs to.
+    /// @param _chainId The chain to compose for.
+    function l2UpgradeTx(address _bridgehub, uint256 _chainId) external view returns (L2CanonicalTransaction memory);
 
     /// @notice Reverts unless BOTH releases validate and every codehash this transition pins
     ///         (engine, timer, composer, ecosystem leg, CTM-domain rows) matches the live code.

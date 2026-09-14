@@ -7,13 +7,11 @@ import {ICTMTransition} from "../objects/ICTMTransition.sol";
 import {IL2DelegateCalldataComposer} from "../objects/IL2DelegateCalldataComposer.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
 import {IComplexUpgrader} from "../../../state-transition/l2-deps/IComplexUpgrader.sol";
-import {IDiamondInit} from "../../../state-transition/chain-interfaces/IDiamondInit.sol";
 import {L2CanonicalTransactionLib} from "../../../state-transition/libraries/L2CanonicalTransactionLib.sol";
 import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
 import {
     PRIORITY_TX_MAX_GAS_LIMIT,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-    SYSTEM_UPGRADE_L2_TX_TYPE,
     ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE
 } from "../../../common/Config.sol";
 import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
@@ -52,12 +50,13 @@ library CTMUpgradeComposer {
             });
     }
 
-    /// @notice The composed transaction for a transition (see {buildL2UpgradeTxFromPlan}).
+    /// @notice The composed transaction of a transition for one chain (see {buildL2UpgradeTxFromPlan}).
     /// @dev For callers holding only the transition address; an executing engine already holds the
     ///      manifest and enters at {buildL2UpgradeTxFromPlan} to avoid decoding it twice.
     function buildL2UpgradeTx(
         ICTMTransition _transition,
-        address _bridgehub
+        address _bridgehub,
+        uint256 _chainId
     ) internal view returns (L2CanonicalTransaction memory) {
         TransitionManifest memory m = _transition.getManifest();
         return
@@ -65,31 +64,33 @@ library CTMUpgradeComposer {
                 _plan: _transition.l2Plan(),
                 _newRelease: ICTMRelease(m.newRelease),
                 _newProtocolVersion: m.newProtocolVersion,
-                _bridgehub: _bridgehub
+                _bridgehub: _bridgehub,
+                _chainId: _chainId
             });
     }
 
-    /// @notice The L1 -> L2 protocol upgrade transaction for a FINAL L2 plan: the force
-    ///         deployments, the delegate call the `L2ComplexUpgrader` performs after them (its
-    ///         calldata defined by the plan's pinned composer from `_newRelease` and `_bridgehub`)
-    ///         and the factory dependencies. Every caller reaches this one function, so the
-    ///         transition path and the bootstrap edge compose the same transaction from the same
-    ///         inputs; the bootstrap has a plan and a release but no transition object to unpack.
+    /// @notice The FINAL L1 -> L2 protocol upgrade transaction of a chain for a FINAL L2 plan: the
+    ///         force deployments, the delegate call the `L2ComplexUpgrader` performs after them (its
+    ///         calldata defined by the plan's pinned composer from `_newRelease`, `_bridgehub` and
+    ///         `_chainId`) and the factory dependencies. Every caller reaches this one function, so
+    ///         the transition path and the bootstrap edge compose the same transaction from the
+    ///         same inputs; the bootstrap has a plan and a release but no transition object to
+    ///         unpack. The engine commits the result as is: there is no later per-chain rewrite.
     function buildL2UpgradeTxFromPlan(
         L2UpgradePlan memory _plan,
         ICTMRelease _newRelease,
         uint256 _newProtocolVersion,
-        address _bridgehub
+        address _bridgehub,
+        uint256 _chainId
     ) internal view returns (L2CanonicalTransaction memory) {
         if (_plan.deployments.length == 0 && _plan.delegateTo == address(0)) {
             // No L2 side (patch upgrades, or L1-only minor upgrades): an all-zero transaction
             // (txType == 0) makes `BaseZkSyncUpgrade` skip the L2 protocol upgrade transaction.
             return L2CanonicalTransactionLib.emptyL2CanonicalTransaction();
         }
-        // VM identity is single-sourced from the target release's pinned DiamondInit.
-        bool isZKsyncOS = IDiamondInit(_newRelease.diamondInit()).IS_ZKSYNC_OS();
         L2CanonicalTransaction memory transaction = L2CanonicalTransactionLib.emptyL2CanonicalTransaction();
-        transaction.txType = isZKsyncOS ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
+        // The repository is ZKsync-OS-only: every chain a release describes runs ZKsync OS.
+        transaction.txType = ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE;
         transaction.from = uint256(uint160(L2_FORCE_DEPLOYER_ADDR));
         transaction.to = uint256(uint160(L2_COMPLEX_UPGRADER_ADDR));
         transaction.gasLimit = PRIORITY_TX_MAX_GAS_LIMIT;
@@ -99,7 +100,11 @@ library CTMUpgradeComposer {
         // from authoritative inputs — never by authored bytes (see {IL2DelegateCalldataComposer}).
         bytes memory delegateCalldata = _plan.delegateComposer == address(0)
             ? bytes("")
-            : IL2DelegateCalldataComposer(_plan.delegateComposer).composeDelegateCalldata(_newRelease, _bridgehub);
+            : IL2DelegateCalldataComposer(_plan.delegateComposer).composeDelegateCalldata(
+                _newRelease,
+                _bridgehub,
+                _chainId
+            );
         transaction.data = abi.encodeCall(
             IComplexUpgrader.forceDeployAndUpgradeUniversal,
             (_plan.deployments, _plan.delegateTo, delegateCalldata)
