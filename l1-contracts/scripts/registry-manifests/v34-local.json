@@ -7,23 +7,23 @@
     "legacyAdminFacet": "0x413b1AfCa96a3df5A686d8BFBF93d30688a7f7D9",
     "upgradeEngine": {
       "address": "0x821f3361D454cc98b7555221A06Be563a7E2E0A6",
-      "codehash": "0x591efa34695d442db1d7d98f905ab5e587be10767335d194030310190de822af"
+      "codehash": "0x81ace9b17b47462ec81868794e7ad549e14b39733e2b04471283f784b2973b3e"
     },
     "ctmImpl": {
-      "proxy": "0x99148d74bC1ae394E04f9C7623358b95d7DCc17e",
-      "expectedOldImpl": "0x6c9F97e5A87d75D1B2685E0891d5BF3f4B78409A",
+      "proxy": "0x395D938cF6E060Ff6043956d4B2117Dd9A5bC424",
+      "expectedOldImpl": "0xB16D2666Ba84Ece3F7Fb41cF1A32f1dAC8F8Dcd3",
       "implNew": "0x1780bCf4103D3F501463AD3414c7f4b654bb7aFd",
-      "implNewCodehash": "0x89c19e20d9bc7b035348dbf8c7615425dc9b8545efdebd912d541be275e86d85"
+      "implNewCodehash": "0x1054cb0227998f9c846e426b8d676b204f2e42f2455d97de204a4515dfb178e2"
     },
     "oldProtocolVersionDeadline": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
   },
   "core": {
     "contracts": {
       "L1MessageRoot": {
-        "proxy": "0x882666DEA84BEF426a97954eF1073DD9de66Eee9",
-        "expectedOldImpl": "0x02cf78eB52729888B88A4faA49a2aA5d7761DFaE",
+        "proxy": "0x94FB3BFF7d46820A805843Ac53F6B363383d719f",
+        "expectedOldImpl": "0xa0f1804f39e8A7DDe4aa3DA795c98491314056dc",
         "implNew": "0x2b5A4e5493d4a54E717057B127cf0C000C876f9B",
-        "implNewCodehash": "0x27015448a5e1560271763972a8340fcc49f25c4b8a1a87969f8bfccc76c67355"
+        "implNewCodehash": "0x25987e152ac461db0936b03f70a2e0efd8dfab7bd9010e8535a5220a0f72cea7"
       }
     }
   },
@@ -31,11 +31,11 @@
     {
       "name": "ZKsyncOS",
       "isZKsyncOS": true,
-      "ctmProxy": "0x99148d74bC1ae394E04f9C7623358b95d7DCc17e",
+      "ctmProxy": "0x395D938cF6E060Ff6043956d4B2117Dd9A5bC424",
       "release": {
         "diamondInit": {
           "address": "0xAD523115cd35a8d4E60B3C0953E0E0ac10418309",
-          "codehash": "0xb227a1ac0aa32b4c2fbd12982e8514163a8f6336a5237b693d58fbe0cb230dd5"
+          "codehash": "0x0ae05fee65247cad061603e5380fc24ddfba327a1a98ecc59895cf86528d10ce"
         },
         "verifier": {
           "address": "0x045857BDEAE7C1c7252d611eB24eB55564198b4C",
@@ -45,7 +45,7 @@
           {
             "name": "AdminFacet",
             "address": "0x26B862f640357268Bd2d9E95bc81553a2Aa81D7E",
-            "codehash": "0x134df6f6d51965c411571e12b239bb2b961ac81283542a5e4d94f95f6150e5e9",
+            "codehash": "0xe124ab2b4a28017fffdcc3046e1c80ea8823d2fcf8426c8d49d30af598ebaacb",
             "isFreezable": false
           },
           {
@@ -57,34 +57,35 @@
           {
             "name": "ExecutorFacet",
             "address": "0x5D42EBdBBa61412295D7b0302d6F50aC449Ddb4F",
-            "codehash": "0x107689b8051e9d0bb74c4c4a5bff8907243089edd704311a3a12e6f9581410eb",
+            "codehash": "0x4a1976a0d8908b5178dc43b7f965a75fe1f58650d504e1cc69cf479e5e0058ce",
             "isFreezable": true
           },
           {
             "name": "MigratorFacet",
             "address": "0xddE78e6202518FF4936b5302cC2891ec180E8bFf",
-            "codehash": "0x08b8b05f375b0bf6cbd2cf7f277a333da2bf83d58c030270823e3b43a9b955b1",
+            "codehash": "0xad6561234dd5e7f73b16ed3e4310a0c2ca2085a49b6fdadcddc556ef02864e22",
             "isFreezable": false
           },
           {
             "name": "CommitterFacet",
             "address": "0xB06c856C8eaBd1d8321b687E188204C1018BC4E5",
-            "codehash": "0xb69473c81f0af2b483721d71d81748a3f020c0d12cadae47f2cb4b0270eda12f",
+            "codehash": "0x87144d03bcbd3a6bdd8601f97faa21b8462a8fb6e4a21fe6943f08048b7e1bfe",
             "isFreezable": true
           },
           {
             "name": "MailboxFacet",
-            "address": "0xCe25FcA30540aBCc9916bE397b4ff646b0A9Ed78",
-            "codehash": "0x6c71764f8a78e69cd89ba198886daa7c56103ef8b03fe7f8c419eeae73983b78",
+            "address": "0x42a99dbEd569991eC0db10A426E3f45Bd14167F0",
+            "codehash": "0xec1e58fed472e2e5d46f89c015717bbc788d80afa54716d875761fbddfc55800",
             "isFreezable": true
           }
         ],
         "fixedForceDeploymentsData": "0xf1f2",
         "l2BytecodeInfos": {},
+        "l2SystemProxyBytecodeInfo": "0x",
         "genesis": {
           "genesisUpgrade": {
-            "address": "0x861E19792429e90e1220aacC16d987f8074A93af",
-            "codehash": "0x5abe52f2de75e4ce47d486c733611b4757ece538030d49bd5939516e08caae7b"
+            "address": "0xceDbA01dECF9Db32E764bc85ae793d565537c181",
+            "codehash": "0xab8b8befa30a65df86d52558ca92cfbe31b9fafcb366db90e7230b91845a876c"
           },
           "batchHash": "0x0000000000000000000000000000000000000000000000000000000000000001",
           "batchCommitment": "0x0000000000000000000000000000000000000000000000000000000000000001",
@@ -92,24 +93,17 @@
         }
       },
       "transition": {
-        "releaseCodehash": "0x99bff80968505bc8f93e96d8135ccb392596f8bbecd2c9bc190a0871ab882695",
+        "releaseCodehash": "0xf346edd2f29a01eb3ab1b4a1fd3d32276b2d6814d47a74eab580ee34ed54e19f",
         "fromRelease": "0x02df3a3F960393F5B349E40A599FEda91a7cc1A7",
         "upgradeEngine": {
           "address": "0xaB7B4c595d3cE8C85e16DA86630f2fc223B05057",
-          "codehash": "0x89f3b4d122cf6bad33ca2d65e854f62146536d45054a24bf7bffdf04ee738e31"
+          "codehash": "0xdd4171bdd15db6586558aa4aece5a8662b8b18810ed8129837a7fadb21684903"
         },
         "oldProtocolVersionDeadline": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
         "upgradeTimestamp": 0,
         "l2Plan": {
-          "deployments": [
-            {
-              "upgradeType": "ZKsyncOSUnsafeForceDeployment",
-              "deployedBytecodeInfo": "0x14b0c64cce81ecc6999adbb9c99cf6dbd332adbf9a45a56756487c1331037e87000000000000000000000000000000000000000000000000000000000000009f14b0c64cce81ecc6999adbb9c99cf6dbd332adbf9a45a56756487c1331037e87",
-              "newAddress": "0xf3f4C762Bde8ed7b900EC63c0d32bD011049673A"
-            }
-          ],
-          "delegateTo": "0xf3f4C762Bde8ed7b900EC63c0d32bD011049673A",
-          "factoryDepHashes": ["0x14b0c64cce81ecc6999adbb9c99cf6dbd332adbf9a45a56756487c1331037e87"]
+          "delegateBytecodeInfo": "0x14b0c64cce81ecc6999adbb9c99cf6dbd332adbf9a45a56756487c1331037e87000000000000000000000000000000000000000000000000000000000000009f14b0c64cce81ecc6999adbb9c99cf6dbd332adbf9a45a56756487c1331037e87",
+          "extraBytecodeInfos": []
         }
       }
     }
