@@ -27,6 +27,9 @@ contract CTMRelease is ICTMRelease {
     ///      assignment, and `manifestHash` is its hash by construction.
     bytes internal encodedManifest;
 
+    /// @dev The pins of `_pins` that are not facet rows: `diamondInit`, `genesisUpgrade`, `verifier`.
+    uint256 private constant FIXED_PIN_COUNT = 3;
+
     /// @notice Pins the full manifest. There is NO state-mutating function on this contract: the
     ///         manifest is written once, at construction, so write-once is structural rather than a
     ///         runtime guard and `manifestHash` can never describe a stale object.
@@ -113,36 +116,39 @@ contract CTMRelease is ICTMRelease {
         return ReleaseFacetReader.chainMatchesFacetRows(getManifest().genesisFacets, _chain);
     }
 
+    /// @inheritdoc ICTMRelease
     function validate() external view {
-        ReleaseManifest memory m = getManifest();
-        _requirePin(m.diamondInit);
-        _requirePin(m.genesisUpgrade);
-        _requirePin(m.verifier);
-        uint256 length = m.genesisFacets.length;
+        PinnedContract[] memory pins = _pins(getManifest());
+        uint256 length = pins.length;
         for (uint256 i = 0; i < length; ++i) {
-            _requirePin(m.genesisFacets[i].facet);
+            CodehashPinLib.requirePin(pins[i]);
         }
     }
 
+    /// @inheritdoc ICTMRelease
     function verifyAll() external view returns (bool) {
-        ReleaseManifest memory m = getManifest();
-        if (!_pinHolds(m.diamondInit) || !_pinHolds(m.genesisUpgrade) || !_pinHolds(m.verifier)) {
-            return false;
-        }
-        uint256 length = m.genesisFacets.length;
+        PinnedContract[] memory pins = _pins(getManifest());
+        uint256 length = pins.length;
         for (uint256 i = 0; i < length; ++i) {
-            if (!_pinHolds(m.genesisFacets[i].facet)) {
+            if (!CodehashPinLib.pinHolds(pins[i])) {
                 return false;
             }
         }
         return true;
     }
 
-    function _requirePin(PinnedContract memory _pinned) private view {
-        CodehashPinLib.requirePin(_pinned);
-    }
-
-    function _pinHolds(PinnedContract memory _pinned) private view returns (bool) {
-        return CodehashPinLib.pinHolds(_pinned);
+    /// @dev THE enumeration of what this release pins, in check order: `diamondInit`,
+    ///      `genesisUpgrade`, `verifier`, then every genesis facet. Both `validate()` and
+    ///      `verifyAll()` walk this one list, so a pinned field added to the manifest is added
+    ///      here once and cannot be enforced by one surface and missed by the other.
+    function _pins(ReleaseManifest memory _m) private pure returns (PinnedContract[] memory pins) {
+        uint256 facetsLength = _m.genesisFacets.length;
+        pins = new PinnedContract[](FIXED_PIN_COUNT + facetsLength);
+        pins[0] = _m.diamondInit;
+        pins[1] = _m.genesisUpgrade;
+        pins[2] = _m.verifier;
+        for (uint256 i = 0; i < facetsLength; ++i) {
+            pins[FIXED_PIN_COUNT + i] = _m.genesisFacets[i].facet;
+        }
     }
 }

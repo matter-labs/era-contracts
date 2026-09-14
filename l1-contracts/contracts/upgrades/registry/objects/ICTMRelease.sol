@@ -39,9 +39,12 @@ interface ICTMRelease {
     ///         same per-facet selector sets, nothing extra.
     function verifyChainRouting(address _chain) external view returns (bool);
 
-    /// @notice Reverts unless the release is initialized and every pinned L1 codehash (facets,
-    ///         DiamondInit, genesis upgrade) matches the live code.
+    /// @notice Reverts unless every codehash this release pins (DiamondInit, genesis upgrade,
+    ///         verifier, every genesis facet) matches the live code. THE enforcement surface:
+    ///         the paths that pin or apply a release call it.
     function validate() external view;
 
+    /// @notice Whether {validate} would pass — the same pins, read without reverting, for
+    ///         inspection and deployment tooling. Never an enforcement surface.
     function verifyAll() external view returns (bool);
 }

@@ -45,7 +45,9 @@ be kept separate from documentation and reviewed with their owning batch.
 
 - The v34 prepare READS `RegistryBootstrapMigration.upgradeCut()` and writes those bytes out; the
   script-side proposal, L2 transaction and delegate-calldata composition are gone, and with them
-  `DefaultL2UpgradeStrategy` and most of `CTMUpgradeBase`.
+  `DefaultL2UpgradeStrategy` and `CTMUpgradeBase`: its three L2-input hooks collapsed into one
+  `DefaultCTMUpgrade.authorL2Side` result (the authored plan plus the bytecodes it needs), and the
+  prepare publishes exactly those bytecodes instead of a separately built broad list.
 - The equivalence evidence is field-level and independent, not two calls into one composer: the
   bootstrap unit suite builds the expected proposal and transaction from the manifest inputs
   (`RegistryBootstrapMigration.t.sol`), and the in-forge bootstrap integration test decodes the
@@ -285,8 +287,8 @@ checking the supported deployment/version inventory and upgrade deadlines.
 ### Delete or shrink
 
 The `DefaultCTMUpgrade` / `DefaultCoreUpgrade` inheritance layers, empty version subclasses,
-`CTMUpgradeBase` once its remaining hooks move, `UpgradeHelperLib` and stage-merging helpers with
-no consumers. Remove obsolete `UpgradeStageValidator` deployment when its remaining bootstrap
+`UpgradeHelperLib` and stage-merging helpers with no consumers (`CTMUpgradeBase` is already gone;
+see batch 1). Remove obsolete `UpgradeStageValidator` deployment when its remaining bootstrap
 postcondition is enforced elsewhere. Keep generic Safe serialization, signer handling and simulation.
 
 ### Gate

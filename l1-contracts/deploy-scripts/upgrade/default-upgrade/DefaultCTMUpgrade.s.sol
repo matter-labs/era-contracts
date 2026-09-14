@@ -37,10 +37,9 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 
 import {CTMDeployedAddresses} from "../../ctm/DeployCTMUtils.s.sol";
 
-import {BytecodePublisher, PublishFactoryDepsResult} from "../../utils/bytecode/BytecodePublisher.s.sol";
+import {BytecodePublisher} from "../../utils/bytecode/BytecodePublisher.s.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {L2EcosystemContract} from "../../ecosystem/CoreContract.sol";
-import {CoreOnGatewayHelper} from "../../ecosystem/CoreOnGatewayHelper.sol";
+import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
@@ -49,7 +48,7 @@ import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2G
 import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
-import {CTMUpgradeBase} from "./CTMUpgradeBase.sol";
+import {DeployCTMScript} from "../../ctm/DeployCTM.s.sol";
 import {BytecodeUtils} from "../../utils/bytecode/BytecodeUtils.s.sol";
 import {ReleaseMemberProbe} from "./ReleaseMemberProbe.sol";
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
@@ -61,6 +60,8 @@ import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
+import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
+import {IProxyUpgradeInitializable} from "contracts/upgrades/registry/IUpgradeInit.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
 import {
@@ -70,8 +71,23 @@ import {
     TransitionManifest
 } from "contracts/upgrades/registry/RegistryTypes.sol";
 import {CTM_CONTRACT_COUNT, CTMContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
-import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {ExternalActionsLib} from "./ExternalActionsLib.sol";
+
+/// @notice The L2 side a version authors for its edge, before publication: the plan's authored
+///         fields and the deployed bytecodes its L2 transaction needs as factory dependencies.
+///         The registry objects compose the L2 payload on-chain from what they pin (see
+///         {docs/registry-driven-upgrades.md}); a prepare supplies only what a release table
+///         cannot express — and, since a hash cannot supply its own preimage, the bytecodes
+///         behind the plan, loaded from the build artifacts.
+/// @param plan The authored remainder. `factoryDepHashes` MUST be empty: publication derives it
+///        from `factoryDependencies`, so a plan can never name a hash nobody published.
+/// @param factoryDependencies The deployed bytecodes the composed L2 transaction installs or
+///        needs the sequencer to hold the preimage of: the extras' code, the table-derived
+///        deployments' code, and whatever the delegate deploys at execution.
+struct AuthoredL2Side {
+    AuthoredL2Plan plan;
+    bytes[] factoryDependencies;
+}
 
 /// @notice The CTM side of a registry-driven upgrade prepare, run after the core prepare: deploys
 ///         the new release (facets, DiamondInit, verifier, upgrade engine) and pins the edge in a
@@ -84,7 +100,7 @@ import {ExternalActionsLib} from "./ExternalActionsLib.sol";
 ///         in the output.
 /// @dev Version scripts inherit and override; the v34 bootstrap edge deploys no transition and
 ///      declares every call of its one-time edge instead.
-contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
+contract DefaultCTMUpgrade is Script, DeployCTMScript {
     using stdToml for string;
     using ExternalActionsLib for ExternalActionsLib.Ledger;
 
@@ -124,7 +140,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         bool initialized;
         bool fixedForceDeploymentsDataGenerated;
         bool upgradeCutPrepared;
-        bool factoryDepsPublished;
+        bool l2SidePrepared;
         // TODO set it based on version of the BRIDGEHUB before upgrade
 
         bool ecosystemContractsDeployed;
@@ -161,7 +177,10 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     ZkChainAddresses internal upToDateZkChain;
     L1Bridgehub internal bridgehub;
 
-    PublishFactoryDepsResult internal factoryDepsResult;
+    /// @dev The authored L2 plan of this edge with its factory dependencies published and pinned,
+    ///      stored as its ABI encoding (the legacy codegen pipeline cannot copy a struct array with
+    ///      dynamic members into storage). Read through {authoredL2Plan}.
+    bytes internal encodedAuthoredL2Plan;
 
     /// @dev The governance/admin calls this prepare emits that the upgrade objects do not
     ///      describe (see {ExternalActionsLib}).
@@ -336,8 +355,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     function prepareCTMUpgrade() public virtual {
         deployNewCTMContracts();
         console.log("CTM contracts are deployed!");
-        publishBytecodes();
-        console.log("Bytecodes published!");
+        prepareL2Side();
+        console.log("L2 side prepared!");
         deployStateTransitionDiamondFacets();
         generateUpgradeData();
         console.log("Upgrade data generated!");
@@ -377,7 +396,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             proxyUpgrades: _ctmProxyUpgradeRows(),
             oldProtocolVersionDeadline: UpgradeHelperLib.getOldProtocolDeadline(),
             upgradeTimestamp: 0,
-            l2Plan: transitionAuthoredL2Plan(),
+            l2Plan: authoredL2Plan(),
             upgradeTimer: _pin(upgradeAddresses.upgradeTimer)
         });
         // From the build ARTIFACT, which is also where the bound executor's `TRANSITION_CODEHASH`
@@ -387,11 +406,9 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             abi.encode(manifest),
             "CTMTransition"
         );
-        // Fail here, not in stage 0: every pin the object carries must hold against the live deployment.
-        require(
-            ICTMTransition(upgradeAddresses.ctmTransition).verifyAll(),
-            "transition does not verify against the live deployment"
-        );
+        // Fail here, not in stage 0: every pin the object carries must hold against the live
+        // deployment, and the object's own revert names the pin that does not.
+        ICTMTransition(upgradeAddresses.ctmTransition).validate();
         _requireObjectsMatchExecutorPins();
     }
 
@@ -454,18 +471,21 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             });
     }
 
-    /// @notice The authored L2 remainder of the transition. The default is an L1-only edge — no
-    ///         extra deployment, no delegate, no composer, no factory dependency. A version whose L2
-    ///         built-ins change derives their rows from the release pair on-chain and MUST author the
-    ///         delegate that initializes them (the v34 bootstrap shows the shape).
-    function transitionAuthoredL2Plan() internal virtual returns (AuthoredL2Plan memory) {
-        return
-            AuthoredL2Plan({
-                extraDeployments: new IComplexUpgrader.UniversalContractUpgradeInfo[](0),
-                delegateTo: address(0),
-                delegateComposer: PinnedContract({addr: address(0), codehash: bytes32(0)}),
-                factoryDepHashes: new uint256[](0)
-            });
+    /// @notice The L2 side this version authors (see {AuthoredL2Side}). The default is an L1-only
+    ///         edge — no extra deployment, no delegate, no composer, nothing to publish. A version
+    ///         whose L2 built-ins change derives their rows from the release pair on-chain and MUST
+    ///         author the delegate that initializes them and list every bytecode the resulting plan
+    ///         needs published (the v34 bootstrap shows the shape).
+    function authorL2Side() internal virtual returns (AuthoredL2Side memory side) {
+        // The zero value is the L1-only side: an empty plan and nothing to publish.
+        return side;
+    }
+
+    /// @notice The authored L2 plan of this edge, factory dependencies published and pinned — what
+    ///         the upgrade object of this run carries as its `l2Plan`.
+    function authoredL2Plan() internal view returns (AuthoredL2Plan memory) {
+        require(upgradeConfig.l2SidePrepared, "L2 side not prepared");
+        return abi.decode(encodedAuthoredL2Plan, (AuthoredL2Plan));
     }
 
     /// @notice The cut chains execute for this edge, as the CTM serves it (`upgradeCutForVersion`):
@@ -488,6 +508,19 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     ///      have to decode stage-1 calldata to find the object the edge runs.
     function bootstrapMigrationAddress() public view virtual returns (address) {
         return address(0);
+    }
+
+    /// @notice The CTM-domain inventory the upgrade object of this run pins, indexed by
+    ///         `CTMContract` — read back from the object (the transition, or the bootstrap
+    ///         migration on the bootstrap edge) so every admin call this prepare emits renders a
+    ///         row governance reviews rather than a second, script-side definition of the swap.
+    function pinnedCTMProxyInventory() internal view virtual returns (ProxyUpgradeRow[] memory) {
+        if (upgradeAddresses.ctmTransition != address(0)) {
+            return ICTMTransition(upgradeAddresses.ctmTransition).getManifest().proxyUpgrades;
+        }
+        address migration = bootstrapMigrationAddress();
+        require(migration != address(0), "no upgrade object deployed: the CTM-domain rows are read from it");
+        return RegistryBootstrapMigration(migration).getManifest().proxyUpgrades;
     }
 
     /// @notice The CTM domain's bound `CTMUpgradeExecutor`: the CTM's owner once the bootstrap edge
@@ -517,7 +550,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         require(_addr.code.length != 0, "pinned contract has no code");
         return PinnedContract({addr: _addr, codehash: _addr.codehash});
     }
-
 
     /// @notice The CTM domain's live EIP-7702 checker (see `CTMUpgradeParams.eip7702Checker`).
     ///         Zero leaves it to be deployed fresh.
@@ -750,7 +782,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         );
     }
 
-    function getFixedForceDeploymentsData() internal override returns (FixedForceDeploymentsData memory data) {
+    /// @notice The force-deployments blob the release pins, built once and cached.
+    function getFixedForceDeploymentsData() internal returns (FixedForceDeploymentsData memory data) {
         if (upgradeConfig.fixedForceDeploymentsDataGenerated) {
             return abi.decode(generatedData.forceDeploymentsData, (FixedForceDeploymentsData));
         }
@@ -771,16 +804,26 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         skipFactoryDepsCheck = _skipFactoryDepsCheck;
     }
 
-    function publishBytecodes() public virtual {
-        bytes[] memory allDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(
-            getAdditionalFactoryDependencyContracts()
+    /// @notice Fixes the L2 side of this edge: takes the version's authored side, publishes exactly
+    ///         the bytecodes it lists on the CTM's `BytecodesSupplier` and pins their hashes as the
+    ///         plan's factory dependencies. An L1-only edge publishes nothing.
+    function prepareL2Side() public virtual {
+        AuthoredL2Side memory side = authorL2Side();
+        require(
+            side.plan.factoryDepHashes.length == 0,
+            "factory dependency hashes are derived from the published bytecodes, not authored"
         );
-        BytecodesSupplier supplier = BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier);
-
-        PublishFactoryDepsResult memory result = BytecodePublisher.publishAndProcessFactoryDeps(supplier, allDeps);
-
-        factoryDepsResult = result;
-        upgradeConfig.factoryDepsPublished = true;
+        if (side.factoryDependencies.length != 0) {
+            BytecodesSupplier supplier = BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier);
+            side.plan.factoryDepHashes = BytecodePublisher
+                .publishAndProcessFactoryDeps(
+                    supplier,
+                    SystemContractsProcessing.deduplicateBytecodes(side.factoryDependencies)
+                )
+                .factoryDepsHashes;
+        }
+        encodedAuthoredL2Plan = abi.encode(side.plan);
+        upgradeConfig.l2SidePrepared = true;
     }
 
     ////////////////////////////// Preparing calls /////////////////////////////////
@@ -813,16 +856,22 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     /// @notice The ServerNotifier's implementation swap, an ADMIN action (the notifier's ProxyAdmin
-    ///         is ChainAdmin-owned, not governance-owned) emitted only when this run deployed a new
-    ///         notifier implementation; the section is written either way so tooling reads one shape.
+    ///         is ChainAdmin-owned, not governance-owned) emitted only when the pinned inventory
+    ///         carries a notifier row; the section is written either way so tooling reads one shape.
     function prepareDefaultCTMAdminCalls() public virtual returns (Call[] memory calls) {
         address serverNotifierProxyAdmin = Utils.getProxyAdminAddress(
             ctmAddresses.stateTransition.proxies.serverNotifier
         );
         address chainAdmin = IOwnable(serverNotifierProxyAdmin).owner();
         address chainAdminOwner = IOwnable(chainAdmin).owner();
-        if (ctmAddresses.stateTransition.implementations.serverNotifier != address(0)) {
-            calls = prepareUpgradeServerNotifierCall();
+        calls = prepareUpgradeServerNotifierCall();
+        if (calls.length != 0) {
+            // The section records the live administrator's approval, so the row must name that
+            // same administrator as its authority.
+            require(
+                calls[0].target == serverNotifierProxyAdmin,
+                "the pinned ServerNotifier row names an administrator other than the live proxy's"
+            );
             declareExternalAction(
                 ExternalActionsLib.PHASE_ADMIN,
                 "ServerNotifier implementation swap (ctm_admin_calls)",
@@ -866,25 +915,29 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         vm.writeToml(updatedTestCallsToml, upgradeConfig.outputPath);
     }
 
-    function prepareUpgradeServerNotifierCall() public virtual returns (Call[] memory calls) {
-        address serverNotifierProxyAdmin = Utils.getProxyAdminAddress(
-            ctmAddresses.stateTransition.proxies.serverNotifier
-        );
+    /// @notice The pinned `CTMContract.ServerNotifier` row rendered as the call its own
+    ///         administrator makes — the same `ProxyAdmin` call `ProxyUpgradeRowLib.applyRows`
+    ///         would make were the executor to own that admin: `upgradeAndCall` with the fixed,
+    ///         argument-less `initializeUpgrade()` when the row reinitializes, a plain `upgrade`
+    ///         otherwise (see {docs/upgrade-stage-lifecycle.md} section 4.4). Empty when the
+    ///         inventory leaves the notifier alone.
+    function prepareUpgradeServerNotifierCall() public view virtual returns (Call[] memory calls) {
+        ProxyUpgradeRow memory row = pinnedCTMProxyInventory()[uint256(CTMContract.ServerNotifier)];
+        if (row.implNew.addr == address(0)) {
+            return calls;
+        }
+        require(address(row.admin) != address(0), "the pinned ServerNotifier row names no administrator");
 
-        Call memory call = Call({
-            target: serverNotifierProxyAdmin,
-            data: abi.encodeCall(
-                ProxyAdmin.upgrade,
-                (
-                    ITransparentUpgradeableProxy(payable(ctmAddresses.stateTransition.proxies.serverNotifier)),
-                    ctmAddresses.stateTransition.implementations.serverNotifier
-                )
-            ),
-            value: 0
-        });
+        ITransparentUpgradeableProxy proxy = ITransparentUpgradeableProxy(payable(row.proxy));
+        bytes memory data = row.callInitializeUpgrade
+            ? abi.encodeCall(
+                ProxyAdmin.upgradeAndCall,
+                (proxy, row.implNew.addr, abi.encodeCall(IProxyUpgradeInitializable.initializeUpgrade, ()))
+            )
+            : abi.encodeCall(ProxyAdmin.upgrade, (proxy, row.implNew.addr));
 
         calls = new Call[](1);
-        calls[0] = call;
+        calls[0] = Call({target: address(row.admin), data: data, value: 0});
     }
 
     /// @notice The governance stages of this prepare: only what a version script declared as an

@@ -57,6 +57,9 @@ contract CTMTransition is ICTMTransition {
     ///      codegen pipeline cannot copy a struct array with dynamic members into storage).
     bytes internal encodedL2Deployments;
 
+    /// @dev The pins of `_pins` every transition carries: `upgradeEngine` and `upgradeTimer`.
+    uint256 private constant FIXED_PIN_COUNT = 2;
+
     /// @notice Pins the manifest and DERIVES the delta. No state-mutating function exists on this
     ///         contract: everything is written once, at construction.
     constructor(TransitionManifest memory _manifest) {
@@ -294,32 +297,56 @@ contract CTMTransition is ICTMTransition {
         return ProxyUpgradeRowLib.toRows(getManifest().proxyUpgrades, CTM_CONTRACT_COUNT);
     }
 
+    /// @inheritdoc ICTMTransition
     function validate() external view {
         TransitionManifest memory m = getManifest();
         ICTMRelease(m.newRelease).validate();
         ICTMRelease(m.fromRelease).validate();
-        _requirePin(m.upgradeEngine);
-        _requirePin(m.upgradeTimer);
-        // The delegate composer is version-specific CODE the manifest pins in place of calldata.
-        if (m.l2Plan.delegateComposer.addr != address(0)) {
-            _requirePin(m.l2Plan.delegateComposer);
+        PinnedContract[] memory pins = _pins(m);
+        uint256 length = pins.length;
+        for (uint256 i = 0; i < length; ++i) {
+            CodehashPinLib.requirePin(pins[i]);
         }
-        ProxyUpgradeRowLib.requireRowPins(ProxyUpgradeRowLib.toRows(m.proxyUpgrades, CTM_CONTRACT_COUNT));
     }
 
+    /// @inheritdoc ICTMTransition
     function verifyAll() external view returns (bool) {
         TransitionManifest memory m = getManifest();
         if (!ICTMRelease(m.newRelease).verifyAll() || !ICTMRelease(m.fromRelease).verifyAll()) {
             return false;
         }
-        return
-            CodehashPinLib.pinHolds(m.upgradeEngine) &&
-            CodehashPinLib.pinHolds(m.upgradeTimer) &&
-            (m.l2Plan.delegateComposer.addr == address(0) || CodehashPinLib.pinHolds(m.l2Plan.delegateComposer)) &&
-            ProxyUpgradeRowLib.rowPinsHold(ProxyUpgradeRowLib.toRows(m.proxyUpgrades, CTM_CONTRACT_COUNT));
+        PinnedContract[] memory pins = _pins(m);
+        uint256 length = pins.length;
+        for (uint256 i = 0; i < length; ++i) {
+            if (!CodehashPinLib.pinHolds(pins[i])) {
+                return false;
+            }
+        }
+        return true;
     }
 
-    function _requirePin(PinnedContract memory _pinned) private view {
-        CodehashPinLib.requirePin(_pinned);
+    /// @dev THE enumeration of what this transition pins itself, in check order: the upgrade
+    ///      engine, the timer, the delegate composer (version-specific CODE pinned in place of
+    ///      calldata) when the plan names one, then every participating CTM-domain row's
+    ///      implementation. Both `validate()` and
+    ///      `verifyAll()` walk this one list, so a pinned field added to the manifest is added here
+    ///      once and cannot be enforced by one surface and missed by the other. The two release
+    ///      edges are objects with pin lists of their own and are checked through their surfaces.
+    function _pins(TransitionManifest memory _m) private pure returns (PinnedContract[] memory pins) {
+        ProxyUpgradeRow[] memory rows = ProxyUpgradeRowLib.toRows(_m.proxyUpgrades, CTM_CONTRACT_COUNT);
+        bool hasComposer = _m.l2Plan.delegateComposer.addr != address(0);
+        uint256 rowsLength = rows.length;
+        pins = new PinnedContract[](FIXED_PIN_COUNT + (hasComposer ? 1 : 0) + rowsLength);
+        pins[0] = _m.upgradeEngine;
+        pins[1] = _m.upgradeTimer;
+        uint256 next = FIXED_PIN_COUNT;
+        if (hasComposer) {
+            pins[next] = _m.l2Plan.delegateComposer;
+            ++next;
+        }
+        for (uint256 i = 0; i < rowsLength; ++i) {
+            pins[next] = rows[i].implNew;
+            ++next;
+        }
     }
 }

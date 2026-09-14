@@ -23,11 +23,11 @@ interface ICoreRegistry {
     ///         one call, no per-key rescans. Consumers iterate these directly.
     function ecosystemRows() external view returns (ProxyUpgradeRow[] memory);
 
-    /// @notice Walks every pinned implementation and compares its `EXTCODEHASH` against the hash
-    ///         pinned at generation time. Anyone can call this to check that deployed bytecode
-    ///         matches what was audited. Each registry (core + per-CTM) is verified independently.
+    /// @notice Whether {validate} would pass — the same pins, read without reverting, for
+    ///         inspection and deployment tooling. Never an enforcement surface.
     function verifyAll() external view returns (bool);
 
-    /// @notice The reverting counterpart of {verifyAll}, used on execution paths.
+    /// @notice Reverts unless every pinned implementation's `EXTCODEHASH` is the hash pinned at
+    ///         generation time. THE enforcement surface: the paths that apply a registry call it.
     function validate() external view;
 }
