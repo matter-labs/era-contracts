@@ -37,8 +37,8 @@ Common pitfalls: a contract added to genesis has not been added to the upgrade s
 The incoming upgrade is v34 (the bootstrap edge into the registry-driven model; only ZKsync OS
 chains are supported). Its per-chain upgrade contract is:
 
-- DefaultUpgradeZKsyncOS.sol (rewrites the per-chain placeholders in the committed L2 upgrade
-  transaction; no Era counterpart)
+- DefaultUpgrade.sol (composes the per-chain L2 upgrade transaction once, from the transition's
+  pinned delegate composer with the executing chain's ID and Bridgehub; no Era counterpart)
 
 And the corresponding L2 upgrade contract that should be used is:
 

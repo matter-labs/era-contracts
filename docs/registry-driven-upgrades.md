@@ -399,7 +399,9 @@ runs the shared storage part (`BaseZkSyncUpgrade._upgrade`) with inputs read str
 object: the version edge and schedule from the transition, the verifier of its TARGET release (never
 the CTM's live `currentRelease()`), and the L2 protocol upgrade transaction composed from its L2
 plan with the executing chain’s ID and Bridgehub. The pinned delegate composer builds final
-chain-specific calldata directly; no placeholder transaction is decoded and rewritten later.
+chain-specific calldata directly, in one pass; tooling reads that same transaction through
+`ICTMTransition.l2UpgradeTx(bridgehub, chainId)`, which forwards to the per-release engine, and
+`IRegistryBootstrapMigration.l2UpgradeTx(chainId)` for the bootstrap edge.
 There is no intermediate proposal struct, selector resolution or re-diffing at execution time.
 
 ## What the derivation guarantees
