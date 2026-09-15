@@ -31,14 +31,14 @@ use crate::common::{forge::ForgeRunner, logger};
 // ── inputs / outputs ───────────────────────────────────────────────────────
 
 /// Per-CTM inputs. One entry per `--ctm-proxy` (or per `[[ctm]]` row in a
-/// `--ctm-config` TOML). The overrides are optional: when `None`, prepare_ctm
-/// auto-resolves via the CTM's on-chain getters.
+/// `--ctm-config` TOML).
 pub struct CtmInputs {
     /// CTM proxy address.
     pub proxy: Address,
-    /// Override for the bytecodes supplier address.
-    pub bytecodes_supplier: Option<Address>,
-    /// Override for the rollup DA manager address.
+    /// Override for the rollup DA manager address; when `None`, prepare_ctm resolves it from a
+    /// chain registered on the CTM. Unlike the bytecodes supplier — which the prepare script
+    /// reads off the CTM's own `L1_BYTECODES_SUPPLIER()` immutable, so nothing transports it —
+    /// no CTM-level getter exposes the DA manager.
     pub rollup_da_manager: Option<Address>,
 }
 
@@ -359,23 +359,6 @@ impl<'a> UpgradeInner<'a> {
             "CTM proxy: {ctm_proxy:#x} (representative chain {representative_chain})"
         ));
 
-        let bytecodes_supplier = match ctm.bytecodes_supplier {
-            Some(addr) => {
-                logger::info(format!("Bytecodes supplier (override): {addr:#x}"));
-                addr
-            }
-            None => {
-                let resolved = crate::common::l1_contracts::resolve_bytecodes_supplier(
-                    &runner.rpc_url,
-                    ctm_proxy,
-                )
-                .await
-                .context("Failed to auto-resolve bytecodes supplier from CTM")?;
-                logger::info(format!("Bytecodes supplier (auto-resolved): {resolved:#x}"));
-                resolved
-            }
-        };
-
         let rollup_da_manager = match ctm.rollup_da_manager {
             Some(addr) => {
                 logger::info(format!("RollupDAManager (override): {addr:#x}"));
@@ -459,7 +442,6 @@ impl<'a> UpgradeInner<'a> {
                 ICTMUpgradeV31Abi::noGovernancePrepareCall {
                     _params: ICTMUpgradeV31Abi::CTMUpgradeParams {
                         ctmProxy: ctm_proxy,
-                        bytecodesSupplier: bytecodes_supplier,
                         rollupDAManager: rollup_da_manager,
                         create2FactorySalt: create2_salt,
                         upgradeInputPath: inputs.upgrade_input_path.clone(),

@@ -7,7 +7,6 @@ pragma solidity 0.8.28;
 struct EcosystemUpgradeParams {
     address bridgehubProxyAddress;
     address ctmProxy;
-    address bytecodesSupplier;
     address rollupDAManager;
     bytes32 create2FactorySalt;
     string upgradeInputPath;
@@ -35,7 +34,12 @@ struct CoreUpgradeParams {
 // solhint-disable-next-line gas-struct-packing
 struct CTMUpgradeParams {
     address ctmProxy;
-    address bytecodesSupplier;
+    /// @notice The CTM's rollup `DAManager`, an AdminFacet constructor argument. No CTM- or
+    ///         Bridgehub-level getter exposes it — only a live chain's diamond does, and a
+    ///         chainless ecosystem has none — so it stays an explicit input rather than something
+    ///         the prepare discovers. Contrast the `BytecodesSupplier`, which the prepare reads
+    ///         off the CTM's own `L1_BYTECODES_SUPPLIER()` immutable and therefore takes no
+    ///         parameter for.
     address rollupDAManager;
     bytes32 create2FactorySalt;
     string upgradeInputPath;

@@ -14,11 +14,6 @@
             "internalType": "address"
           },
           {
-            "name": "bytecodesSupplier",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
             "name": "rollupDAManager",
             "type": "address",
             "internalType": "address"

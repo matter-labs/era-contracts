@@ -302,7 +302,7 @@ contract UpgradeIntegrationTest_v34_Local is
         Call[] memory stage2 = v34.prepareStage2GovernanceCalls();
         assertEq(stage2.length, 1, "v34 CTM stage 2: the post-state gate only");
         assertEq(
-            v34.externalActionDescriptions().length,
+            v34.externalActionEntries().length,
             6,
             "the bootstrap's CTM prepare declares every one of its governance and admin calls"
         );

@@ -884,8 +884,6 @@ export async function runEcosystemUpgradeScripts(params: {
       ANVIL_DEFAULT_ACCOUNT_ADDR,
       "--ctm-proxy",
       params.upgradeHarnessInputs.ctmProxyAddress,
-      "--bytecodes-supplier-address",
-      params.upgradeHarnessInputs.bytecodesSupplierAddress,
       "--rollup-da-manager-address",
       params.upgradeHarnessInputs.rollupDaManagerAddress,
       "--create2-factory-salt",
@@ -1392,7 +1390,6 @@ export function prepareUpgradeHarnessInputs(
   bridgehubAddress: string;
   protocolOpsOutDir: string;
   upgradeInputArg: string;
-  bytecodesSupplierAddress: string;
   rollupDaManagerAddress: string;
   create2FactorySalt: string;
   isZKsyncOS: boolean;
@@ -1430,7 +1427,6 @@ export function prepareUpgradeHarnessInputs(
 
   const permanentValuesToml = parseToml(permanentValues) as {
     ctm_contracts?: {
-      l1_bytecodes_supplier_addr?: string;
       rollup_da_manager?: string;
     };
     permanent_contracts?: {
@@ -1448,8 +1444,6 @@ export function prepareUpgradeHarnessInputs(
     bridgehubAddress: state.l1Addresses.bridgehub,
     protocolOpsOutDir,
     upgradeInputArg: `/${path.relative(l1ContractsDir, upgradeInputPath)}`,
-    bytecodesSupplierAddress:
-      permanentValuesToml.ctm_contracts?.l1_bytecodes_supplier_addr ?? ethers.constants.AddressZero,
     rollupDaManagerAddress: permanentValuesToml.ctm_contracts?.rollup_da_manager ?? ethers.constants.AddressZero,
     create2FactorySalt: permanentValuesToml.permanent_contracts?.create2_factory_salt ?? ethers.constants.HashZero,
     isZKsyncOS: scenario.isZKsyncOS,

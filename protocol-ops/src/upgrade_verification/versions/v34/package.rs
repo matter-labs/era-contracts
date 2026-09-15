@@ -19,6 +19,7 @@ use std::path::Path;
 use alloy::primitives::Address;
 use anyhow::Context;
 
+use crate::common::external_actions::ExternalAction;
 use crate::common::governance_calls::{decode_calls, GovernanceCall};
 
 /// `RegistryBootstrapMigration.migrate()`.
@@ -56,7 +57,7 @@ pub(crate) struct BootstrapPackage {
     pub(crate) stage1: Vec<GovernanceCall>,
     pub(crate) stage2: Vec<GovernanceCall>,
     /// The prepare's declared external actions — calls the objects do NOT describe.
-    pub(crate) external_actions: Vec<String>,
+    pub(crate) external_actions: Vec<ExternalAction>,
 }
 
 fn table<'a>(root: &'a toml::Value, path: &[&str]) -> Option<&'a toml::Value> {
@@ -118,14 +119,13 @@ impl BootstrapPackage {
         )
         .filter(|a| !a.is_zero());
 
-        let external_actions = table(&root, &["external_actions"])
-            .and_then(|v| v.as_array())
-            .map(|a| {
-                a.iter()
-                    .filter_map(|v| v.as_str().map(str::to_owned))
-                    .collect()
-            })
-            .unwrap_or_default();
+        let external_actions: Vec<ExternalAction> = match table(&root, &["external_actions"]) {
+            Some(value) => value
+                .clone()
+                .try_into()
+                .context("`external_actions` does not decode as a list of declared actions")?,
+            None => Vec::new(),
+        };
 
         Ok(Self {
             core_registry,

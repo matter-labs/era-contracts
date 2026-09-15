@@ -125,7 +125,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     /// @notice Internal state of the upgrade script
     struct EcosystemUpgradeConfig {
         bool initialized;
-        bool fixedForceDeploymentsDataGenerated;
         bool l2SidePrepared;
         // TODO set it based on version of the BRIDGEHUB before upgrade
 
@@ -136,7 +135,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     struct PermanentCTMConfig {
         bytes32 create2FactorySalt;
         address ctmProxy;
-        address bytecodesSupplier;
         /// @dev ZK token asset ID, used by `InteropCenter.initL2` for fixed-fee bundles.
         ///      MUST be non-zero — `InteropCenter.initL2` reverts otherwise, which would abort the
         ///      L2 upgrade transaction.
@@ -176,7 +174,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         // solhint-disable-next-line func-named-parameters
         initializeWithArgs(
             _params.ctmProxy,
-            _params.bytecodesSupplier,
             _params.rollupDAManager,
             _params.create2FactorySalt,
             _params.upgradeInputPath,
@@ -197,7 +194,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
 
     function initializeWithArgs(
         address ctmProxy,
-        address bytecodesSupplier,
         address rollupDAManager,
         bytes32 create2FactorySalt,
         string memory newConfigPath,
@@ -210,7 +206,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         newConfigPath = string.concat(root, newConfigPath);
         initializeConfigFromArgs(
             ctmProxy,
-            bytecodesSupplier,
             rollupDAManager,
             create2FactorySalt,
             newConfigPath,
@@ -239,8 +234,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         config.l1ChainId = block.chainid;
         newConfig.ctm = permanentConfig.ctmProxy;
 
-        // The supplier is read off the CTM's `L1_BYTECODES_SUPPLIER()` immutable during discovery, so the
-        // permanent-values entry is informational for this path.
         setAddressesBasedOnCTM();
         // Must be non-zero: `InteropCenter.initL2` reverts on a zero asset ID. It runs on the genesis path
         // of `performForceDeployedContractsInit` only, so this aborts the genesis of chains created from the
@@ -268,7 +261,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
 
     function initializeConfigFromArgs(
         address ctmProxy,
-        address bytecodesSupplier,
         address rollupDAManager,
         bytes32 create2FactorySalt,
         string memory newConfigPath,
@@ -284,7 +276,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
 
         PermanentCTMConfig memory permanentConfig = PermanentCTMConfig({
             ctmProxy: ctmProxy,
-            bytecodesSupplier: bytecodesSupplier,
             create2FactorySalt: create2FactorySalt,
             zkTokenAssetId: zkTokenAssetId,
             testnetVerifier: testnetVerifier
@@ -586,9 +577,10 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         externalActions.declare(_phase, _label, _authority, _call);
     }
 
-    /// @notice One line per declared external action (see {ExternalActionsLib.describe}).
-    function externalActionDescriptions() public view returns (string[] memory) {
-        return externalActions.describe();
+    /// @notice The declared external actions as the output's `external_actions` list (see
+    ///         {ExternalActionsLib.serialize}).
+    function externalActionEntries() public returns (string[] memory) {
+        return externalActions.serialize();
     }
 
     /// @notice The per-chain upgrade engine the transition pins: it composes each chain's L2 leg
@@ -607,7 +599,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     function deployNewCTMContracts() public virtual {
         deployGovernanceUpgradeTimer();
         deployEIP7702Checker();
-        getFixedForceDeploymentsData();
+        generateFixedForceDeploymentsData();
     }
 
     /// @notice The CTM domain's governance. Once the bootstrap edge has handed the domain to the
@@ -618,11 +610,9 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         return IOwnable(boundCTMUpgradeExecutor()).owner();
     }
 
-    function deployUpgradeSpecificContractsL1() internal virtual {
-        // Empty by default.
-    }
-
-    /// @notice Generate data required for the upgrade.
+    /// @notice The step between the release deploy and the upgrade objects. Nothing on the default
+    ///         path: it is where a version script hangs a deployment that needs the release to
+    ///         already exist (the bootstrap edge's engine pins it as an immutable).
     /// @dev The chain-CREATION cut is deliberately not recomputed here: from v34 the CTM builds it
     ///      per chain creation from its pinned release, so an upgrade prepare has nothing to say
     ///      about it (see the retired `diamond_cut_data` output field).
@@ -630,10 +620,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         require(upgradeConfig.initialized, "Not initialized");
         // TODO Return the require after getting the version from bridgehub
         //        require(upgradeConfig.ecosystemContractsDeployed, "Ecosystem contracts not deployed");
-
-        // Important, this must come after the initializeExpectedL2Addresses
-        getFixedForceDeploymentsData();
-        console.log("Generated fixed force deployments data");
     }
 
     function getOwnerAddress() public virtual returns (address) {
@@ -722,18 +708,12 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         );
     }
 
-    /// @notice The force-deployments blob the release pins, built once and cached.
-    function getFixedForceDeploymentsData() internal returns (FixedForceDeploymentsData memory data) {
-        if (upgradeConfig.fixedForceDeploymentsDataGenerated) {
-            return abi.decode(generatedData.forceDeploymentsData, (FixedForceDeploymentsData));
-        }
-
+    /// @notice Builds the force-deployments blob the release pins and stores it for
+    ///         {deployCurrentRelease}, which refuses to pin an empty one.
+    function generateFixedForceDeploymentsData() internal {
         require(config.ownerAddress != address(0), "owner not set");
 
-        data = _buildForceDeploymentsData(config.ownerAddress);
-        bytes memory encodedData = abi.encode(data);
-        generatedData.forceDeploymentsData = encodedData;
-        upgradeConfig.fixedForceDeploymentsDataGenerated = true;
+        generatedData.forceDeploymentsData = abi.encode(_buildForceDeploymentsData(config.ownerAddress));
     }
 
     /////////////////////////// Blockchain interactions ////////////////////////////
@@ -778,7 +758,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         // Upstream forge's keyed `vm.writeToml(json, path, key)` silently no-ops when the key
         // does not exist in the file yet, so append sections by re-serializing into the same
         // "root" object and rewriting the whole file instead.
-        vm.serializeString("root", "external_actions", externalActionDescriptions());
+        vm.serializeString("root", "external_actions", externalActionEntries());
         string memory updatedToml = vm.serializeString("root", "governance_calls", governanceCallsSerialized);
         vm.writeToml(updatedToml, upgradeConfig.outputPath);
     }

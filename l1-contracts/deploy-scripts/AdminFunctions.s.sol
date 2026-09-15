@@ -593,13 +593,12 @@ contract AdminFunctions is Script, IAdminFunctions {
         address _chainDiamondProxy
     ) public {
         uint256 oldProtocolVersion = IZKChain(_chainDiamondProxy).getProtocolVersion();
-        Diamond.DiamondCutData memory upgradeCutData = abi.decode(_diamondCut, (Diamond.DiamondCutData));
 
         Utils.adminExecute(
             _adminAddr,
             _accessControlRestriction,
             _chainDiamondProxy,
-            UpgradeChainCall.encode(_chainDiamondProxy, oldProtocolVersion, upgradeCutData),
+            UpgradeChainCall.encodeFromEncodedCut(_chainDiamondProxy, oldProtocolVersion, _diamondCut),
             0
         );
     }
@@ -817,11 +816,14 @@ contract AdminFunctions is Script, IAdminFunctions {
 
     function _prepareUpgradeZKChainOnGatewayInner(UpgradeZKChainOnGatewayParams memory data) private {
         ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(data.bridgehub, data.chainId);
-        Diamond.DiamondCutData memory upgradeCutData = abi.decode(data.upgradeCutData, (Diamond.DiamondCutData));
 
         Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
             data.l1GasPrice,
-            UpgradeChainCall.encode(data.chainDiamondProxyOnGateway, data.oldProtocolVersion, upgradeCutData),
+            UpgradeChainCall.encodeFromEncodedCut(
+                data.chainDiamondProxyOnGateway,
+                data.oldProtocolVersion,
+                data.upgradeCutData
+            ),
             Utils.MAX_PRIORITY_TX_GAS,
             new bytes[](0),
             data.chainDiamondProxyOnGateway,

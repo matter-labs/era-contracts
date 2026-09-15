@@ -95,8 +95,10 @@ contract ComposeUpgradeOperation is Script, Create2FactoryUtils {
     }
 
     /// @dev Same sections the prepares write, so the merge reads all outputs alike: `[registry]`
-    ///      names the objects, `[governance_calls]` carries the stage bundles, and the (empty)
-    ///      `external_actions` list states that nothing here is a declared action.
+    ///      names the objects, `[governance_calls]` carries the stage bundles, and the empty
+    ///      `external_actions` list (see {ExternalActionsLib.serialize} for an entry's shape)
+    ///      states that nothing here is a declared action — the merge holds the compose step to
+    ///      that, and to emitting the three lifecycle calls and nothing else.
     function _saveOutput(string memory _outputPath, address _coordinator) internal {
         (Call[] memory stage0, Call[] memory stage1, Call[] memory stage2) = stageCalls(_coordinator);
         vm.serializeAddress("registry", "operation_addr", operation);

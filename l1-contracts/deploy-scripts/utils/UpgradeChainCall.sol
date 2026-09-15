@@ -46,6 +46,21 @@ library UpgradeChainCall {
         return abi.encodeCall(IAdmin.upgradeChainFromVersion, (_chainAddress, _protocolVersion));
     }
 
+    /// @notice The upgrade call for a caller holding the cut in its ABI-encoded form.
+    /// @dev Decodes `_encodedCutData` only on the generations that are HANDED a cut. A v34+ chain
+    ///      reads its committed cut on-chain, so the bytes are never touched and a caller that has
+    ///      none may pass empty ones — decoding first would revert on exactly the supported path.
+    function encodeFromEncodedCut(
+        address _chainAddress,
+        uint256 _protocolVersion,
+        bytes memory _encodedCutData
+    ) internal pure returns (bytes memory) {
+        if (!requiresCut(_protocolVersion)) {
+            return encodeWithoutCut(_chainAddress, _protocolVersion);
+        }
+        return encode(_chainAddress, _protocolVersion, abi.decode(_encodedCutData, (Diamond.DiamondCutData)));
+    }
+
     function encode(
         address _chainAddress,
         uint256 _protocolVersion,

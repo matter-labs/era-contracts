@@ -7,7 +7,6 @@ import {Call} from "contracts/governance/Common.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {AddressIntrospector} from "deploy-scripts/utils/AddressIntrospector.sol";
 import {ZkChainAddresses} from "deploy-scripts/utils/Types.sol";
 import {UpgradeChainCall} from "deploy-scripts/utils/UpgradeChainCall.sol";
@@ -24,16 +23,18 @@ contract UpgradeSimulation is Script {
         string memory outputPath = vm.envString("UPGRADE_SIMULATION_OUTPUT");
         string memory output = vm.readFile(outputPath);
         require(!output.keyExists(".test_upgrade_calls"), "simulation calls already exist; rerun prepare first");
-        Diamond.DiamondCutData memory cut = abi.decode(
-            output.readBytes(".chain_upgrade_diamond_cut"),
-            (Diamond.DiamondCutData)
-        );
         ZkChainAddresses memory witness = AddressIntrospector.getUptoDateZkChainAddresses(ChainTypeManager(ctm));
+        // The witness chain's generation decides the call shape, and only the legacy one is handed
+        // a cut — so the package's cut is read for that shape alone (see {UpgradeChainCall}).
+        uint256 witnessProtocolVersion = ChainTypeManager(ctm).protocolVersion();
+        bytes memory encodedCut = UpgradeChainCall.requiresCut(witnessProtocolVersion)
+            ? output.readBytes(".chain_upgrade_diamond_cut")
+            : bytes("");
         Call[] memory upgradeCalls = new Call[](1);
         upgradeCalls[0] = Call({
             target: witness.zkChainProxy,
             value: 0,
-            data: UpgradeChainCall.encode(witness.zkChainProxy, ChainTypeManager(ctm).protocolVersion(), cut)
+            data: UpgradeChainCall.encodeFromEncodedCut(witness.zkChainProxy, witnessProtocolVersion, encodedCut)
         });
         Call[] memory createCalls = new Call[](1);
         createCalls[0] = createChainCall(ctm, witness.chainId, ZKSYNC_OS_TEST_CREATE_CHAIN_ID, msg.sender);
