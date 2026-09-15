@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {AirbenderVerificationFailed, BoojumVerificationFailed} from "contracts/common/L1ContractErrors.sol";
 
 import {EraMultiProofTestnetVerifier} from "contracts/state-transition/verifiers/EraMultiProofTestnetVerifier.sol";
 import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMultiProofVerifier.sol";
@@ -13,6 +14,8 @@ import {IEraVerifier} from "contracts/state-transition/chain-interfaces/IEraVeri
 import {
     AIRBENDER_PROOF_SYSTEM_DISABLED,
     AIRBENDER_SNARK_PROOF_LENGTH,
+    BOOJUM_PROOF_SYSTEM_DISABLED,
+    DisabledProofSystems,
     ERA_MULTI_PROOF_TYPE
 } from "contracts/common/Config.sol";
 
@@ -37,10 +40,18 @@ contract RejectingVerifier is IVerifier {
 }
 
 contract ChainStub {
-    uint8 public disabledProofSystems;
+    uint8 internal mask;
 
     function setDisabledProofSystems(uint8 _mask) external {
-        disabledProofSystems = _mask;
+        mask = _mask;
+    }
+
+    function disabledProofSystems() external view returns (DisabledProofSystems memory) {
+        return
+            DisabledProofSystems({
+                boojum: mask & BOOJUM_PROOF_SYSTEM_DISABLED != 0,
+                airbender: mask & AIRBENDER_PROOF_SYSTEM_DISABLED != 0
+            });
     }
 
     function callVerify(
@@ -93,7 +104,7 @@ contract EraMultiProofTestnetVerifierTest is Test {
 
     /// Anything else goes through the real path, so a failing lane still fails.
     function test_nonEmptyProofUsesRealPath() public {
-        vm.expectRevert(EraMultiProofVerifier.AirbenderVerificationFailed.selector);
+        vm.expectRevert(AirbenderVerificationFailed.selector);
         chain.callVerify(verifier, _publicInputs(), _proof());
     }
 
@@ -116,7 +127,7 @@ contract EraMultiProofTestnetVerifierTest is Test {
         proof[0] = ERA_MULTI_PROOF_TYPE;
         proof[1] = 0;
 
-        vm.expectRevert(EraMultiProofVerifier.BoojumVerificationFailed.selector);
+        vm.expectRevert(BoojumVerificationFailed.selector);
         chain.callVerify(v, _publicInputs(), proof);
     }
 
@@ -132,7 +143,7 @@ contract EraMultiProofTestnetVerifierTest is Test {
         proof[0] = ERA_MULTI_PROOF_TYPE;
         proof[1] = 0;
 
-        vm.expectRevert(EraMultiProofVerifier.BoojumVerificationFailed.selector);
+        vm.expectRevert(BoojumVerificationFailed.selector);
         chain.callVerify(v, _publicInputs(), proof);
     }
 }

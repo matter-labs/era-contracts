@@ -10,7 +10,11 @@ import {
     POINT_EVALUATION_PRECOMPILE_RESULT
 } from "./_Executor_Shared.t.sol";
 
-import {POINT_EVALUATION_PRECOMPILE_ADDR, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER} from "contracts/common/Config.sol";
+import {
+    POINT_EVALUATION_PRECOMPILE_ADDR,
+    ProofSystem,
+    TESTNET_COMMIT_TIMESTAMP_NOT_OLDER
+} from "contracts/common/Config.sol";
 import {
     IExecutor,
     SystemLogKey,
@@ -18,6 +22,7 @@ import {
 } from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {
+    AirbenderVerificationFailed,
     BatchHashMismatch,
     CanOnlyProcessOneBatch,
     InvalidPublicInputsLength,
@@ -104,7 +109,7 @@ contract ProvingTest is ExecutorTest {
 
         // 3. Only then the capability, and only then the lane.
         vm.startPrank(owner);
-        IAdmin(address(committer)).setProofSystemStatus(AIRBENDER_PROOF_SYSTEM_DISABLED, true);
+        IAdmin(address(committer)).setProofSystemStatus(ProofSystem.Airbender, true);
         vm.stopPrank();
 
         // 4. The batch under test is the first one committed with Airbender data.
@@ -395,12 +400,12 @@ contract ProvingTest is ExecutorTest {
         proof[2] = 1;
 
         // Both required by default, and the Airbender lane rejects, so the batch must not settle.
-        vm.expectRevert(EraMultiProofVerifier.AirbenderVerificationFailed.selector);
+        vm.expectRevert(AirbenderVerificationFailed.selector);
         _proveWith(proof);
 
         // With Airbender switched off by the chain admin, the same batch settles on Boojum alone.
         vm.prank(owner);
-        IAdmin(address(executor)).setProofSystemStatus(AIRBENDER_PROOF_SYSTEM_DISABLED, false);
+        IAdmin(address(executor)).setProofSystemStatus(ProofSystem.Airbender, false);
         _proveWith(proof);
         assertEq(getters.getTotalBlocksVerified(), 2);
     }
@@ -456,8 +461,8 @@ contract ProvingTest is ExecutorTest {
 
         // Activation left both settings on, and the batch committed after it carries the second
         // commitment that the lane is proved against.
-        assertEq(getters.disabledProofSystems(), 0);
-        assertEq(getters.disabledProofSystems(), 0);
+        assertFalse(getters.disabledProofSystems().boojum);
+        assertFalse(getters.disabledProofSystems().airbender);
         assertTrue(newStoredBatchInfo.airbenderCommitment != bytes32(0));
         assertTrue(newStoredBatchInfo.airbenderCommitment != newStoredBatchInfo.commitment);
 

@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {InvalidPublicInputsLength} from "contracts/common/L1ContractErrors.sol";
+import {
+    AirbenderVerificationFailed,
+    BoojumVerificationFailed,
+    InvalidPublicInputsLength
+} from "contracts/common/L1ContractErrors.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMultiProofVerifier.sol";
@@ -12,6 +16,7 @@ import {
     AIRBENDER_PROOF_SYSTEM_DISABLED,
     AIRBENDER_SNARK_PROOF_LENGTH,
     BOOJUM_PROOF_SYSTEM_DISABLED,
+    DisabledProofSystems,
     ERA_MULTI_PROOF_TYPE
 } from "contracts/common/Config.sol";
 import {
@@ -47,10 +52,18 @@ contract LaneVerifier is IVerifier {
 
 /// @notice Chain stand-in answering the `disabledProofSystems` getter the verifier reads from its caller.
 contract ChainStub {
-    uint8 public disabledProofSystems;
+    uint8 internal mask;
 
     function setDisabledProofSystems(uint8 _mask) external {
-        disabledProofSystems = _mask;
+        mask = _mask;
+    }
+
+    function disabledProofSystems() external view returns (DisabledProofSystems memory) {
+        return
+            DisabledProofSystems({
+                boojum: mask & BOOJUM_PROOF_SYSTEM_DISABLED != 0,
+                airbender: mask & AIRBENDER_PROOF_SYSTEM_DISABLED != 0
+            });
     }
 
     function callVerify(
@@ -125,7 +138,7 @@ contract EraMultiProofVerifierTest is Test {
             IVerifier(address(new LaneVerifier(false, false))),
             IVerifier(address(airbender))
         );
-        vm.expectRevert(EraMultiProofVerifier.BoojumVerificationFailed.selector);
+        vm.expectRevert(BoojumVerificationFailed.selector);
         chain.callVerify(v, _publicInputs(), _default());
     }
 
@@ -134,7 +147,7 @@ contract EraMultiProofVerifierTest is Test {
             IVerifier(address(boojum)),
             IVerifier(address(new LaneVerifier(false, false)))
         );
-        vm.expectRevert(EraMultiProofVerifier.AirbenderVerificationFailed.selector);
+        vm.expectRevert(AirbenderVerificationFailed.selector);
         chain.callVerify(v, _publicInputs(), _default());
     }
 
@@ -227,7 +240,7 @@ contract EraMultiProofVerifierTest is Test {
             IVerifier(address(boojum)),
             IVerifier(address(new LaneVerifier(false, false)))
         );
-        vm.expectRevert(EraMultiProofVerifier.AirbenderVerificationFailed.selector);
+        vm.expectRevert(AirbenderVerificationFailed.selector);
         chain.callVerify(v, _publicInputs(), _default());
     }
 
@@ -406,7 +419,7 @@ contract EraMultiProofVerifierTest is Test {
         ChainStub airbenderMasked = new ChainStub();
         airbenderMasked.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
 
-        vm.expectRevert(EraMultiProofVerifier.AirbenderVerificationFailed.selector);
+        vm.expectRevert(AirbenderVerificationFailed.selector);
         requiresBoth.callVerify(shared, _publicInputs(), _default());
 
         assertTrue(

@@ -31,12 +31,9 @@ contract EraSettlementLayerV32Upgrade is BaseZkSyncUpgrade {
         super.upgrade(_proposedUpgrade);
 
         // A verifier that does not take the combined envelope would leave the chain unable to prove
-        // anything it commits, so the wiring is checked rather than assumed.
-        try IEraMultiProofVerifier(address(s.verifier)).acceptedProofType() returns (uint256 proofType) {
-            if (proofType != ERA_MULTI_PROOF_TYPE) {
-                revert VerifierDoesNotSupportMultiProof(address(s.verifier));
-            }
-        } catch {
+        // anything it commits, so the wiring is checked rather than assumed. A pre-gate verifier has no
+        // `acceptedProofType` at all, and the call to it reverts.
+        if (IEraMultiProofVerifier(address(s.verifier)).acceptedProofType() != ERA_MULTI_PROOF_TYPE) {
             revert VerifierDoesNotSupportMultiProof(address(s.verifier));
         }
 

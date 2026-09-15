@@ -7,7 +7,7 @@ import {IChainUpgrader} from "../chain-interfaces/IChainUpgrader.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {FeeParams, PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
-import {L2DACommitmentScheme} from "../../common/Config.sol";
+import {L2DACommitmentScheme, ProofSystem} from "../../common/Config.sol";
 
 /// @title The interface of the Admin Contract that controls access rights for contract management.
 /// @author Matter Labs
@@ -44,10 +44,9 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
 
     /// @notice Enables or disables one proof system for an Era chain. Never both: a call that would
     /// leave no system required is rejected, as is enabling one with batches still unverified.
-    /// @param _proofSystem Single proof-system bit: BOOJUM_PROOF_SYSTEM_DISABLED (1) or
-    /// AIRBENDER_PROOF_SYSTEM_DISABLED (2).
+    /// @param _proofSystem The proof system to configure.
     /// @param _enabled Whether the selected proof system is enabled.
-    function setProofSystemStatus(uint8 _proofSystem, bool _enabled) external;
+    function setProofSystemStatus(ProofSystem _proofSystem, bool _enabled) external;
 
     /// @notice Change the fee params for L1->L2 transactions
     /// @param _newFeeParams The new fee params

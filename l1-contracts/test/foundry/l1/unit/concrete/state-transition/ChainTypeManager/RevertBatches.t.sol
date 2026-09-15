@@ -11,6 +11,7 @@ import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {
     DEFAULT_L2_LOGS_TREE_ROOT_HASH,
     POINT_EVALUATION_PRECOMPILE_ADDR,
+    ProofSystem,
     TESTNET_COMMIT_TIMESTAMP_NOT_OLDER
 } from "contracts/common/Config.sol";
 import {L2_GENESIS_UPGRADE_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -132,7 +133,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
         vm.startPrank(newChainAdmin);
         adminFacet.setDAValidatorPair(address(rollupL1DAValidator), L2_DA_COMMITMENT_SCHEME);
         // This suite commits single-proof batches.
-        adminFacet.setProofSystemStatus(AIRBENDER_PROOF_SYSTEM_DISABLED, false);
+        adminFacet.setProofSystemStatus(ProofSystem.Airbender, false);
         vm.stopPrank();
     }
 

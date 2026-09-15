@@ -116,13 +116,14 @@ contract EraSettlementLayerV32UpgradeTest is BaseUpgrade {
         upgradeContract.upgrade(proposedUpgrade);
     }
 
-    /// A pre-gate verifier has no `acceptedProofType` at all, so the failed call is treated the same
-    /// way rather than surfacing as an opaque revert.
+    /// A pre-gate verifier has no `acceptedProofType` to answer with, so the call into it reverts and
+    /// takes the upgrade with it. Less diagnosable than the typed error above, but the cut still fails
+    /// rather than installing a verifier the chain cannot prove against.
     function test_revertWhen_verifierIsNotAGate() public {
         address nonGateVerifier = address(new NonGateVerifier());
         upgradeContract.mockProtocolVersionVerifier(protocolVersion, nonGateVerifier);
 
-        vm.expectRevert(abi.encodeWithSelector(VerifierDoesNotSupportMultiProof.selector, nonGateVerifier));
+        vm.expectRevert();
         upgradeContract.upgrade(proposedUpgrade);
     }
 }

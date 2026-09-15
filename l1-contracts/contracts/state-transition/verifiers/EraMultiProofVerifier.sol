@@ -9,6 +9,8 @@ import {IEraMultiProofVerifier} from "../chain-interfaces/IEraMultiProofVerifier
 import {IEraVerifier} from "../chain-interfaces/IEraVerifier.sol";
 import {IGetters} from "../chain-interfaces/IGetters.sol";
 import {
+    AirbenderVerificationFailed,
+    BoojumVerificationFailed,
     EmptyProofLength,
     InvalidDisabledProofSystemsMask,
     InvalidProofFormat,
@@ -20,6 +22,7 @@ import {
     AIRBENDER_SNARK_PROOF_LENGTH,
     ALL_PROOF_SYSTEMS_DISABLED,
     BOOJUM_PROOF_SYSTEM_DISABLED,
+    DisabledProofSystems,
     ERA_MULTI_PROOF_TYPE
 } from "../../common/Config.sol";
 
@@ -53,9 +56,6 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
     /// same index.
     uint256 internal constant AIRBENDER_VERIFICATION_TYPE = 2;
 
-    error BoojumVerificationFailed();
-    error AirbenderVerificationFailed();
-
     constructor(IVerifier _boojumVerifier, IVerifier _airbenderVerifier) {
         BOOJUM_VERIFIER = _boojumVerifier;
         AIRBENDER_VERIFIER = _airbenderVerifier;
@@ -86,7 +86,10 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
 
         // One verifier instance serves every chain of a protocol version, so the policy comes from the
         // calling chain. Resolved through the same getter callers use, so settlement and discovery agree.
-        uint8 required = requiredProofSystems(IGetters(msg.sender).disabledProofSystems());
+        DisabledProofSystems memory disabled = IGetters(msg.sender).disabledProofSystems();
+        uint8 disabledMask = (disabled.boojum ? BOOJUM_PROOF_SYSTEM_DISABLED : 0) |
+            (disabled.airbender ? AIRBENDER_PROOF_SYSTEM_DISABLED : 0);
+        uint8 required = requiredProofSystems(disabledMask);
 
         // One word per lane, since the two systems commit to different `auxiliaryOutputHash` values.
         // A single word is accepted only while the Airbender lane is masked off, which is what keeps

@@ -282,7 +282,7 @@
       {
         "name": "_proofSystem",
         "type": "uint8",
-        "internalType": "uint8"
+        "internalType": "enum ProofSystem"
       },
       {
         "name": "_enabled",

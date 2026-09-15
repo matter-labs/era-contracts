@@ -62,12 +62,26 @@ uint256 constant COMMIT_TIMESTAMP_APPROXIMATION_DELTA = 1 hours;
 /// @dev Shift to apply to verify public input before verifying.
 uint256 constant PUBLIC_INPUT_SHIFT = 32;
 
-/// @dev Bit in `ZKChainStorage.disabledProofSystems` switching the Boojum proof system off. Covers both
-/// Boojum wrappers (FFLONK and PLONK), since the wrapper choice is not a different prover.
-uint8 constant BOOJUM_PROOF_SYSTEM_DISABLED = 1;
+// Enum ordinals are storage bit positions in `ZKChainStorage.disabledProofSystems`; append new systems
+// without reordering. Boojum covers both its wrappers (FFLONK and PLONK), since the wrapper choice is not
+// a different prover.
+enum ProofSystem {
+    Boojum,
+    Airbender
+}
+
+/// @dev Which proof systems a chain does not require, as named flags rather than a mask, so a caller
+/// reviewing calldata can read the policy off it.
+struct DisabledProofSystems {
+    bool boojum;
+    bool airbender;
+}
+
+/// @dev Bit in `ZKChainStorage.disabledProofSystems` switching the Boojum proof system off.
+uint8 constant BOOJUM_PROOF_SYSTEM_DISABLED = uint8(1 << uint8(ProofSystem.Boojum));
 
 /// @dev Bit in `ZKChainStorage.disabledProofSystems` switching the Airbender proof system off.
-uint8 constant AIRBENDER_PROOF_SYSTEM_DISABLED = 2;
+uint8 constant AIRBENDER_PROOF_SYSTEM_DISABLED = uint8(1 << uint8(ProofSystem.Airbender));
 
 /// @dev Every known policy bit. A mask above this sets bits with no meaning, and a mask equal to it would
 /// leave the chain with no proof system at all; the setter rejects both.

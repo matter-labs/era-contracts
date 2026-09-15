@@ -6,12 +6,11 @@ import {AdminTest} from "./_Admin_Shared.t.sol";
 import {
     ZKsyncOSChainConfigUpdateWithUnverifiedBatches,
     InvalidDisabledProofSystemsMask,
-    InvalidProofSystem,
     MustBeEraChain,
     Unauthorized
 } from "contracts/common/L1ContractErrors.sol";
 import {NotSettlementLayer} from "contracts/state-transition/L1StateTransitionErrors.sol";
-import {AIRBENDER_PROOF_SYSTEM_DISABLED, BOOJUM_PROOF_SYSTEM_DISABLED} from "contracts/common/Config.sol";
+import {AIRBENDER_PROOF_SYSTEM_DISABLED, BOOJUM_PROOF_SYSTEM_DISABLED, ProofSystem} from "contracts/common/Config.sol";
 
 /// @notice Unit tests for `setProofSystemStatus`, which turns one of the chain's proof systems on or off.
 /// @dev Era chains settle behind two independent proof systems. Either may be switched off by the chain
@@ -38,7 +37,7 @@ contract SetProofSystemStatusTest is AdminTest {
 
         vm.startPrank(nonAdmin);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonAdmin));
-        adminFacet.setProofSystemStatus(AIRBENDER_PROOF_SYSTEM_DISABLED, false);
+        adminFacet.setProofSystemStatus(ProofSystem.Airbender, false);
     }
 
     function test_revertWhen_notEraChain() public {
@@ -46,7 +45,7 @@ contract SetProofSystemStatusTest is AdminTest {
 
         vm.startPrank(utilsFacet.util_getAdmin());
         vm.expectRevert(MustBeEraChain.selector);
-        adminFacet.setProofSystemStatus(AIRBENDER_PROOF_SYSTEM_DISABLED, false);
+        adminFacet.setProofSystemStatus(ProofSystem.Airbender, false);
     }
 
     /// Proof-system policy belongs to the layer the chain settles on. Written anywhere else it would
@@ -56,17 +55,7 @@ contract SetProofSystemStatusTest is AdminTest {
 
         vm.startPrank(utilsFacet.util_getAdmin());
         vm.expectRevert(NotSettlementLayer.selector);
-        adminFacet.setProofSystemStatus(AIRBENDER_PROOF_SYSTEM_DISABLED, false);
-    }
-
-    /// The argument names one system by its own bit. A mask, a bit index or a proof-envelope type would
-    /// each be a plausible thing to pass, and none of them names a proof system.
-    function testFuzz_revertWhen_argumentIsNotASingleKnownSystem(uint8 _proofSystem) public {
-        vm.assume(_proofSystem != BOOJUM_PROOF_SYSTEM_DISABLED && _proofSystem != AIRBENDER_PROOF_SYSTEM_DISABLED);
-
-        vm.startPrank(utilsFacet.util_getAdmin());
-        vm.expectRevert(abi.encodeWithSelector(InvalidProofSystem.selector, _proofSystem));
-        adminFacet.setProofSystemStatus(_proofSystem, false);
+        adminFacet.setProofSystemStatus(ProofSystem.Airbender, false);
     }
 
     /// The kill switch, exercised from a chain that has the lane brought up.
@@ -77,7 +66,7 @@ contract SetProofSystemStatusTest is AdminTest {
         vm.startPrank(utilsFacet.util_getAdmin());
         vm.expectEmit(true, true, true, true);
         emit NewDisabledProofSystems(0, AIRBENDER_PROOF_SYSTEM_DISABLED);
-        adminFacet.setProofSystemStatus(AIRBENDER_PROOF_SYSTEM_DISABLED, false);
+        adminFacet.setProofSystemStatus(ProofSystem.Airbender, false);
 
         assertEq(utilsFacet.util_getDisabledProofSystems(), AIRBENDER_PROOF_SYSTEM_DISABLED);
     }
@@ -87,7 +76,7 @@ contract SetProofSystemStatusTest is AdminTest {
         utilsFacet.util_setDisabledProofSystems(0);
 
         vm.startPrank(utilsFacet.util_getAdmin());
-        adminFacet.setProofSystemStatus(BOOJUM_PROOF_SYSTEM_DISABLED, false);
+        adminFacet.setProofSystemStatus(ProofSystem.Boojum, false);
 
         assertEq(utilsFacet.util_getDisabledProofSystems(), BOOJUM_PROOF_SYSTEM_DISABLED);
     }
@@ -96,7 +85,7 @@ contract SetProofSystemStatusTest is AdminTest {
         _readyForTheAirbenderLane();
 
         vm.startPrank(utilsFacet.util_getAdmin());
-        adminFacet.setProofSystemStatus(AIRBENDER_PROOF_SYSTEM_DISABLED, true);
+        adminFacet.setProofSystemStatus(ProofSystem.Airbender, true);
 
         assertEq(utilsFacet.util_getDisabledProofSystems(), 0);
     }
@@ -109,7 +98,7 @@ contract SetProofSystemStatusTest is AdminTest {
 
         vm.startPrank(utilsFacet.util_getAdmin());
         vm.expectRevert(abi.encodeWithSelector(InvalidDisabledProofSystemsMask.selector, both));
-        adminFacet.setProofSystemStatus(BOOJUM_PROOF_SYSTEM_DISABLED, false);
+        adminFacet.setProofSystemStatus(ProofSystem.Boojum, false);
     }
 
     /// A chain that has settled nothing may still require the lane: its genesis batch is an ordinary
@@ -119,7 +108,7 @@ contract SetProofSystemStatusTest is AdminTest {
         assertEq(utilsFacet.util_getTotalBatchesVerified(), 0);
 
         vm.startPrank(utilsFacet.util_getAdmin());
-        adminFacet.setProofSystemStatus(AIRBENDER_PROOF_SYSTEM_DISABLED, true);
+        adminFacet.setProofSystemStatus(ProofSystem.Airbender, true);
 
         assertEq(utilsFacet.util_getDisabledProofSystems(), 0);
     }
@@ -128,7 +117,7 @@ contract SetProofSystemStatusTest is AdminTest {
         _readyForTheAirbenderLane();
 
         vm.startPrank(utilsFacet.util_getAdmin());
-        adminFacet.setProofSystemStatus(AIRBENDER_PROOF_SYSTEM_DISABLED, true);
+        adminFacet.setProofSystemStatus(ProofSystem.Airbender, true);
 
         assertEq(utilsFacet.util_getDisabledProofSystems(), 0);
     }
@@ -143,7 +132,7 @@ contract SetProofSystemStatusTest is AdminTest {
 
         vm.startPrank(utilsFacet.util_getAdmin());
         vm.expectRevert(abi.encodeWithSelector(ZKsyncOSChainConfigUpdateWithUnverifiedBatches.selector, 1, 5));
-        adminFacet.setProofSystemStatus(AIRBENDER_PROOF_SYSTEM_DISABLED, true);
+        adminFacet.setProofSystemStatus(ProofSystem.Airbender, true);
     }
 
     /// The same guard on the other lane, so it is the enable direction being tested and not the
@@ -155,7 +144,7 @@ contract SetProofSystemStatusTest is AdminTest {
 
         vm.startPrank(utilsFacet.util_getAdmin());
         vm.expectRevert(abi.encodeWithSelector(ZKsyncOSChainConfigUpdateWithUnverifiedBatches.selector, 1, 5));
-        adminFacet.setProofSystemStatus(BOOJUM_PROOF_SYSTEM_DISABLED, true);
+        adminFacet.setProofSystemStatus(ProofSystem.Boojum, true);
     }
 
     /// Enabling a system that is already on changes nothing, so the drain it would otherwise need does
@@ -168,7 +157,7 @@ contract SetProofSystemStatusTest is AdminTest {
         vm.startPrank(utilsFacet.util_getAdmin());
         vm.expectEmit(true, true, true, true);
         emit NewDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED, AIRBENDER_PROOF_SYSTEM_DISABLED);
-        adminFacet.setProofSystemStatus(BOOJUM_PROOF_SYSTEM_DISABLED, true);
+        adminFacet.setProofSystemStatus(ProofSystem.Boojum, true);
 
         assertEq(utilsFacet.util_getDisabledProofSystems(), AIRBENDER_PROOF_SYSTEM_DISABLED);
     }
@@ -180,7 +169,7 @@ contract SetProofSystemStatusTest is AdminTest {
         utilsFacet.util_setTotalBatchesVerified(1);
 
         vm.startPrank(utilsFacet.util_getAdmin());
-        adminFacet.setProofSystemStatus(AIRBENDER_PROOF_SYSTEM_DISABLED, false);
+        adminFacet.setProofSystemStatus(ProofSystem.Airbender, false);
 
         assertEq(utilsFacet.util_getDisabledProofSystems(), AIRBENDER_PROOF_SYSTEM_DISABLED);
     }

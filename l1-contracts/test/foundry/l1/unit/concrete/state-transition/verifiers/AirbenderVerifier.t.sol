@@ -9,7 +9,7 @@ import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.s
 import {InvalidPublicInputsLength} from "contracts/common/L1ContractErrors.sol";
 import {AirbenderPlonkProofFixture} from "./fixtures/AirbenderPlonkProofFixture.sol";
 import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMultiProofVerifier.sol";
-import {AIRBENDER_SNARK_PROOF_LENGTH, ERA_MULTI_PROOF_TYPE} from "contracts/common/Config.sol";
+import {AIRBENDER_SNARK_PROOF_LENGTH, DisabledProofSystems, ERA_MULTI_PROOF_TYPE} from "contracts/common/Config.sol";
 
 /// @notice PLONK verifier stand-in that reports back the public input it was handed.
 contract RevealingPlonkVerifier is IVerifier {
@@ -179,8 +179,8 @@ contract AcceptingBoojumLane is IVerifier {
 
 /// @notice Answers the `disabledProofSystems` getter the gate reads from its caller.
 contract GateCaller {
-    function disabledProofSystems() external pure returns (uint8) {
-        return 0;
+    function disabledProofSystems() external pure returns (DisabledProofSystems memory) {
+        return DisabledProofSystems({boojum: false, airbender: false});
     }
 
     function callVerify(

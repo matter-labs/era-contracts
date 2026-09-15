@@ -17,6 +17,8 @@ error AddressMismatch(address expected, address supplied);
 error AddressNotZero();
 // 0x615e82fc
 error AirbenderCommitmentRequired();
+// 0x2271414b
+error AirbenderVerificationFailed();
 // 0xb577eb6c
 error AlreadyDangerousContract(address);
 // 0x2a5989a0
@@ -53,6 +55,8 @@ error BaseTokenPreV31TotalSupplyNotSet();
 error BaseTokenTransferFailed();
 // 0x55ad3fd3
 error BatchHashMismatch(bytes32 expected, bytes32 actual);
+// 0x5a9935ba
+error BoojumVerificationFailed();
 // 0xbd4455ff
 error BatchNumberMismatch(uint256 expectedBatchNumber, uint256 providedBatchNumber);
 // 0x41c329f7
@@ -216,8 +220,6 @@ error InvalidPublicInputsLength();
 error InvalidProofFormat();
 // 0x48c5fa28
 error InvalidProofLengthForFinalNode();
-// 0xb846fbd8
-error InvalidProofSystem(uint8 proofSystem);
 // 0x5428eae7
 error InvalidProtocolVersion();
 // 0x6f1cf752
