@@ -630,7 +630,7 @@ pub(crate) async fn verify(
     result.print_info("\n== Governance calldata ==");
     verify_stage0_shape(&package, result);
     verify_stage1_shape(&package, &manifest, core_executor_addr, result);
-    verify_stage2_shape(&package, &manifest, core_executor_addr, result);
+    verify_stage2_shape(&package, &manifest, core_executor_addr, &provider, result).await;
 
     // A bootstrap edge legitimately declares external actions — the handovers and the pause
     // window are exactly the calls no object can describe yet, which is why the prepare
@@ -672,13 +672,14 @@ fn verify_stage0_shape(package: &BootstrapPackage, result: &mut VerificationResu
 }
 
 /// Stage 2 closes it, asserts the edge actually applied and binds the core executor to the
-/// coordinator. `validateApplied()` is the edge's own post-condition check: a package that omits
-/// it can complete governance without ever having proved the ecosystem reached the intended
-/// state. Without `setCoordinator` no later operation could reserve the ecosystem leg.
-fn verify_stage2_shape(
+/// coordinator. The completion gate is the last call of a derived stage 2, so its absence is not
+/// a forgotten convention but a bundle that does not match the object it claims to come from.
+/// Without `setCoordinator` no later operation could reserve the ecosystem leg.
+async fn verify_stage2_shape<P: Provider>(
     package: &BootstrapPackage,
     manifest: &views::BootstrapManifest,
     core_executor: Option<Address>,
+    provider: &P,
     result: &mut VerificationResult,
 ) {
     let binds_core_executor = package.stage2.iter().any(|c| {
@@ -708,17 +709,7 @@ fn verify_stage2_shape(
         result.report_error("stage 2 never binds the coordinator to the reviewed CTM executor");
     }
 
-    let asserts_applied = package.stage2.iter().any(|c| {
-        c.target == package.migration && c.data.get(..4) == Some(&VALIDATE_APPLIED_SELECTOR[..])
-    });
-    if asserts_applied {
-        result.report_ok("stage 2 asserts the edge applied (`validateApplied()` on the migration)");
-    } else {
-        result.report_warn(
-            "stage 2 does not call `validateApplied()` on the migration: governance would \
-             complete without the edge proving it reached the intended state",
-        );
-    }
+    verify_completion_gate(package, provider, result).await;
 
     let unpauses = package
         .stage2
@@ -731,6 +722,80 @@ fn verify_stage2_shape(
             "stage 2 never unpauses chain migrations: the ecosystem would stay paused after the \
              edge completes",
         );
+    }
+}
+
+/// The terminal call of stage 2 is the edge's completion gate: `validateApplied()` on the
+/// `RegistryBootstrapSequence` the prepare derived the whole bundle from, which asserts BOTH
+/// domains — the migration's own post-state check and the core executor's applied-row check —
+/// in one call that cannot be half-dropped.
+///
+/// The sequence is recovered from that call rather than read from a field, for the same reason
+/// the migration is recovered from `migrate()`: the verifier checks the calldata governance will
+/// execute. Its two objects are then read live and held against the rest of the package, so a
+/// terminal call pointing at some other contract that merely answers `validateApplied()` is a
+/// finding rather than a pass.
+async fn verify_completion_gate<P: Provider>(
+    package: &BootstrapPackage,
+    provider: &P,
+    result: &mut VerificationResult,
+) {
+    let Some(last) = package.stage2.last() else {
+        result.report_error(
+            "stage 2 is empty: a derived bootstrap sequence always ends with the completion gate",
+        );
+        return;
+    };
+    if last.data != VALIDATE_APPLIED_SELECTOR || !last.value.is_zero() {
+        result.report_error(
+            "stage 2 does not end with the edge's completion gate (`validateApplied()`): \
+             governance would complete without the edge proving it reached the intended state, \
+             and the bundle is not the one the derived sequence describes",
+        );
+        return;
+    }
+
+    let sequence = views::RegistryBootstrapSequenceView::new(last.target, provider);
+    let named_migration = match sequence.MIGRATION().call().await {
+        Ok(addr) => addr,
+        Err(e) => {
+            result.report_error(&format!(
+                "the completion gate at {} does not answer `MIGRATION()` ({e}): it is not the \
+                 bootstrap sequence this package's calls were derived from",
+                last.target
+            ));
+            return;
+        }
+    };
+    if named_migration != package.migration {
+        result.report_error(&format!(
+            "the completion gate at {} describes the edge at {named_migration}, but stage 1 \
+             calls `migrate()` on {}: the gate would assert a different edge applied",
+            last.target, package.migration
+        ));
+        return;
+    }
+
+    let named_registry = match sequence.CORE_REGISTRY().call().await {
+        Ok(addr) => addr,
+        Err(e) => {
+            result.report_error(&format!(
+                "the completion gate at {} does not answer `CORE_REGISTRY()` ({e})",
+                last.target
+            ));
+            return;
+        }
+    };
+    match package.core_registry {
+        Some(reported) if reported != named_registry => result.report_error(&format!(
+            "the completion gate asserts the ecosystem inventory {named_registry}, but the \
+             package's core leg applies {reported}: the gate would pass over an unapplied \
+             ecosystem",
+        )),
+        _ => result.report_ok(
+            "stage 2 ends with the derived completion gate, asserting both domains applied \
+             (`validateApplied()` over the reviewed migration and core registry)",
+        ),
     }
 }
 

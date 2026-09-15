@@ -381,6 +381,14 @@ impl<'a> UpgradeInner<'a> {
         logger::info(format!(
             "EcosystemUpgradeExecutor (core prepare): {ecosystem_upgrade_executor:#x}"
         ));
+        // Only the bootstrap edge reads it: its call sequence covers both domains, so the object
+        // describing that sequence needs the ecosystem inventory alongside the edge.
+        let core_registry = read_core_registry(
+            &self
+                .contracts_path
+                .join(inputs.core_output_path.trim_start_matches('/')),
+        )?;
+        logger::info(format!("CoreRegistry (core prepare): {core_registry:#x}"));
         // Per-CTM CREATE2 salt. Each CTM prepare deploys a few contracts whose
         // constructor args are env-wide constants — notably
         // `GovernanceUpgradeTimer(initialDelay, 2 weeks, ownerAddress,
@@ -424,6 +432,7 @@ impl<'a> UpgradeInner<'a> {
                         zkTokenAssetId: inputs.zk_token_asset_id,
                         testnetVerifier: inputs.testnet_verifier,
                         ecosystemUpgradeExecutor: ecosystem_upgrade_executor,
+                        coreRegistry: core_registry,
                     },
                 }
                 .abi_encode(),

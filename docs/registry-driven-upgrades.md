@@ -130,6 +130,7 @@ flowchart TB
       CR["CoreRegistry<br/>ecosystem inventory"]
       OP["EcosystemUpgradeOperation<br/>coreRegistry + transition"]
       BOOT["RegistryBootstrapMigration<br/>pre-registry entry edge"]
+      SEQ["RegistryBootstrapSequence<br/>the entry edge's governance calls, derived"]
     end
 
     subgraph exe["Executors — immutable bindings + immutable object codehashes"]
@@ -164,6 +165,8 @@ flowchart TB
     DI -. "routing, verifier" .-> REL
     ENG -. "cuts, schedule, target release, L2 plan" .-> TRA
     BOOTENG -. "schedule, genesis release, L2 plan" .-> BOOT
+    SEQ -. "both domains' calls + the completion gate" .-> BOOT
+    SEQ -. "the ecosystem leg + its applied-row gate" .-> CR
 ```
 
 ## Authority
@@ -551,9 +554,40 @@ actions rather than coordinator calls: the ecosystem side hands the ecosystem `P
 freshly deployed `CoreUpgradeExecutor`, applies the `CoreRegistry` through it and binds it to the
 coordinator (`setCoordinator`); the CTM side starts the timer, hands the CTM and its `ProxyAdmin`
 to the migration and runs `migrate()`. The `CTMUpgradeExecutor` is constructed answering to the
-coordinator, and the migration checks that binding, so the CTM domain needs no join call. Which
-calls ride which stage is the runbook's business; `UpgradeTestv34_Local.t.sol` and the anvil
-pipeline drive the whole edge through the real prepares.
+coordinator, and the migration checks that binding, so the CTM domain needs no join call.
+
+### The sequence is an object too
+
+Those calls are not authored by the prepare scripts. `RegistryBootstrapSequence` is deployed over
+the two objects the edge already has — the migration and the `CoreRegistry` — and DERIVES the whole
+sequence: the coordinator (named by the manifest) names the `CoreUpgradeExecutor`, that executor
+names the ecosystem `ProxyAdmin`, the manifest names the CTM, its `ProxyAdmin`, the bound CTM
+executor and the timer, and the CTM names the chain asset handler through its Bridgehub. The only
+input the edge does not already name is the registry, and it is bound through the edge anyway: the
+core executor's `CORE_REGISTRY_CODEHASH` anchor is checked at construction, so a registry stage 1
+would refuse cannot be described here either.
+
+The prepare reads the calls off that object — label and authority included — and declares each one,
+so governance reviews a sequence derived from the objects rather than one a script and the objects
+have to agree on. It DESCRIBES, it never executes: ownership transfers run on the governance
+caller's authority, and `Governance` issues ordinary calls, so routing them through a helper would
+mean giving the contract that holds the ecosystem's authority a generic delegatecall.
+
+Because the object derives both domains and only exists once the migration does, the CTM prepare
+deploys it and declares the whole edge; the core prepare of this edge declares nothing, and the
+merge — which orders the core prepare's calls ahead of the CTM's — therefore emits exactly the
+object's sequence.
+
+Stage 2 ends with `RegistryBootstrapSequence.validateApplied()`, which requires BOTH domains: the
+migration's own `validateApplied()` and the core executor's applied-row check over the pinned
+registry. Completion is structural rather than a bundle convention, so a package whose stage 2 does
+not end in that gate is a package that does not match its object — which is why `protocol-ops`
+reports its absence as an error rather than a warning.
+
+Which calls ride which stage is the runbook's business; `UpgradeTestv34_Local.t.sol` and the anvil
+pipeline drive the whole edge through the real prepares, and
+`RegistryBootstrapSequence.t.sol` holds the derived sequence against the one the scripts authored
+before it existed.
 
 ## Deployment determinism
 

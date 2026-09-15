@@ -62,6 +62,11 @@ struct CTMUpgradeParams {
     ///         timer is bound to it, so the CTM prepare takes it as an input rather than re-deriving
     ///         a deployment it did not make.
     address ecosystemUpgradeExecutor;
+    /// @notice The core prepare's `CoreRegistry` (its output TOML,
+    ///         `[registry].core_registry_addr`), zero when the upgrade has no ecosystem leg. Only
+    ///         the bootstrap edge reads it: its derived call sequence covers both domains, so the
+    ///         object describing that sequence needs the ecosystem inventory alongside the edge.
+    address coreRegistry;
 }
 
 /// @notice Inputs of the compose step (`ComposeUpgradeOperation.compose`), assembled by

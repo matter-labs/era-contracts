@@ -103,6 +103,9 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         /// @dev The lifecycle coordinator (an input, see `CTMUpgradeParams`): the timer's governance
         ///      and, for the bootstrap edge, the executor's coordinator.
         address ecosystemUpgradeExecutor;
+        /// @dev The core prepare's ecosystem inventory (an input, see `CTMUpgradeParams`), read
+        ///      only by the bootstrap edge.
+        address coreRegistry;
         /// @dev The write-once transition this prepare deploys (zero for the bootstrap edge).
         address ctmTransition;
         /// @dev The engine this edge commits, held only until the object that pins it exists.
@@ -184,6 +187,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             coreAddresses.bridgehub.proxies.chainRegistrationSender = _params.chainRegistrationSender;
         }
         setEcosystemUpgradeExecutor(_params.ecosystemUpgradeExecutor);
+        setCoreRegistry(_params.coreRegistry);
         prepareCTMUpgrade();
         // Declared before the governance calls are written, so the output lists the admin action.
         prepareDefaultCTMAdminCalls();
@@ -639,6 +643,10 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     ///         params in production; in-forge harnesses that drive both prepares call it directly.
     function setEcosystemUpgradeExecutor(address _ecosystemUpgradeExecutor) public virtual {
         upgradeAddresses.ecosystemUpgradeExecutor = _ecosystemUpgradeExecutor;
+    }
+
+    function setCoreRegistry(address _coreRegistry) public virtual {
+        upgradeAddresses.coreRegistry = _coreRegistry;
     }
 
     function setNewProtocolVersion(uint256 _protocolVersion) public virtual {
