@@ -125,7 +125,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     /// @notice Internal state of the upgrade script
     struct EcosystemUpgradeConfig {
         bool initialized;
-        bool fixedForceDeploymentsDataGenerated;
         bool l2SidePrepared;
         // TODO set it based on version of the BRIDGEHUB before upgrade
 
@@ -608,7 +607,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     function deployNewCTMContracts() public virtual {
         deployGovernanceUpgradeTimer();
         deployEIP7702Checker();
-        getFixedForceDeploymentsData();
+        generateFixedForceDeploymentsData();
     }
 
     /// @notice The CTM domain's governance. Once the bootstrap edge has handed the domain to the
@@ -619,11 +618,9 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         return IOwnable(boundCTMUpgradeExecutor()).owner();
     }
 
-    function deployUpgradeSpecificContractsL1() internal virtual {
-        // Empty by default.
-    }
-
-    /// @notice Generate data required for the upgrade.
+    /// @notice The step between the release deploy and the upgrade objects. Nothing on the default
+    ///         path: it is where a version script hangs a deployment that needs the release to
+    ///         already exist (the bootstrap edge's engine pins it as an immutable).
     /// @dev The chain-CREATION cut is deliberately not recomputed here: from v34 the CTM builds it
     ///      per chain creation from its pinned release, so an upgrade prepare has nothing to say
     ///      about it (see the retired `diamond_cut_data` output field).
@@ -631,10 +628,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         require(upgradeConfig.initialized, "Not initialized");
         // TODO Return the require after getting the version from bridgehub
         //        require(upgradeConfig.ecosystemContractsDeployed, "Ecosystem contracts not deployed");
-
-        // Important, this must come after the initializeExpectedL2Addresses
-        getFixedForceDeploymentsData();
-        console.log("Generated fixed force deployments data");
     }
 
     function getOwnerAddress() public virtual returns (address) {
@@ -723,18 +716,12 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         );
     }
 
-    /// @notice The force-deployments blob the release pins, built once and cached.
-    function getFixedForceDeploymentsData() internal returns (FixedForceDeploymentsData memory data) {
-        if (upgradeConfig.fixedForceDeploymentsDataGenerated) {
-            return abi.decode(generatedData.forceDeploymentsData, (FixedForceDeploymentsData));
-        }
-
+    /// @notice Builds the force-deployments blob the release pins and stores it for
+    ///         {deployCurrentRelease}, which refuses to pin an empty one.
+    function generateFixedForceDeploymentsData() internal {
         require(config.ownerAddress != address(0), "owner not set");
 
-        data = _buildForceDeploymentsData(config.ownerAddress);
-        bytes memory encodedData = abi.encode(data);
-        generatedData.forceDeploymentsData = encodedData;
-        upgradeConfig.fixedForceDeploymentsDataGenerated = true;
+        generatedData.forceDeploymentsData = abi.encode(_buildForceDeploymentsData(config.ownerAddress));
     }
 
     /////////////////////////// Blockchain interactions ////////////////////////////

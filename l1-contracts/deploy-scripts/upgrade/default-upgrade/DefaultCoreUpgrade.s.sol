@@ -31,8 +31,6 @@ import {BytecodeUtils} from "../../utils/bytecode/BytecodeUtils.s.sol";
 import {ExternalActionsLib} from "./ExternalActionsLib.sol";
 import {Utils} from "../../utils/Utils.sol";
 
-import {ChainCreationParamsLib} from "../../ctm/ChainCreationParamsLib.sol";
-
 /// @notice The ecosystem (core) side of a registry-driven upgrade prepare, run before the CTM
 ///         prepare: deploys the new ecosystem implementations and pins them in a write-once
 ///         `CoreRegistry`. It emits NO governance calls of its own — the transition the CTM
@@ -60,7 +58,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     }
 
     struct AdditionalConfigParams {
-        uint256 newProtocolVersion;
         bool hasPreV32IntrospectionOverride;
         bool usePreV32IntrospectionOverride;
     }
@@ -243,21 +240,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         return CoreUpgradeExecutor(payable(executor));
     }
 
-    function getNewProtocolVersion() public virtual returns (uint256) {
-        return additionalConfig.newProtocolVersion;
-    }
-
-    function getProtocolUpgradeNonce() public virtual returns (uint256) {
-        return (getNewProtocolVersion() >> 32);
-    }
-
-    function getOldProtocolDeadline() public virtual returns (uint256) {
-        // Returns max deadline initially. After the upgrade is complete (stage2),
-        // governance should call setNewVersionUpgrade with deadline=0 to force
-        // all chains to upgrade immediately.
-        return type(uint256).max;
-    }
-
     function getDiscoveredBridgehub() public view returns (BridgehubAddresses memory) {
         return coreAddresses.bridgehub;
     }
@@ -285,9 +267,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             additionalConfig.hasPreV32IntrospectionOverride = true;
             additionalConfig.usePreV32IntrospectionOverride = upgradeToml.readBool("$.pre_v32_introspection");
         }
-
-        // Protocol version comes from genesis config
-        additionalConfig.newProtocolVersion = loadProtocolVersionFromGenesis();
 
         // Legacy Era gateway chain ID — baked into L1MessageRoot as immutable
         // ERA_GATEWAY_CHAIN_ID. Read from the upgrade input TOML ([legacy_gateway] section)
@@ -510,12 +489,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     }
 
     // add this to be excluded from coverage report
-
-    /// @notice Load protocol version from genesis config
-    function loadProtocolVersionFromGenesis() internal virtual returns (uint256) {
-        string memory genesisPath = Utils.genesisConfigPath();
-        return ChainCreationParamsLib.getChainCreationParams(genesisPath).latestProtocolVersion;
-    }
 
     function getBroadcasterAddress() internal view virtual returns (address) {
         return tx.origin;

@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// solhint-disable no-console, gas-custom-errors
-
-import {console2 as console} from "forge-std/Script.sol";
+// solhint-disable gas-custom-errors
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
@@ -190,12 +188,4 @@ contract CoreUpgrade_v34 is DefaultCoreUpgrade {
         );
     }
 
-    /// @notice Override to properly set deployerAddress in upgrade context.
-    /// @dev In Forge scripts with vm.broadcast(), msg.sender is the script address, but the
-    ///      actual deployer is the broadcast key — same fix as every upgrade script needs.
-    function initializeL1CoreUtilsConfig() internal override {
-        super.initializeL1CoreUtilsConfig();
-        config.deployerAddress = getBroadcasterAddress();
-        console.log("Overriding deployerAddress in upgrade context:", config.deployerAddress);
-    }
 }
