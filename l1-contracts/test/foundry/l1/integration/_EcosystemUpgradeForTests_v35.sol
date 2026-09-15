@@ -49,7 +49,7 @@ contract CTMUpgradeForTests_v35 is CTMUpgrade_v35 {
             vm,
             outputPath,
             getChainUpgradeDiamondCutData(),
-            getAddresses().stateTransition.defaultUpgrade,
+            committedUpgradeEngine(),
             getAddresses().admin.eip7702Checker,
             TrimmedUpgradeOutput.Registry({
                 ctmTransition: upgradeAddresses.ctmTransition,

@@ -110,6 +110,9 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         address ecosystemUpgradeExecutor;
         /// @dev The write-once transition this prepare deploys (zero for the bootstrap edge).
         address ctmTransition;
+        /// @dev The engine this edge commits, held only until the object that pins it exists.
+        ///      Read it through {committedUpgradeEngine}, never directly.
+        address upgradeEngine;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -337,7 +340,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     ///         transition pins and then the transition of this edge; the bootstrap edge deploys its
     ///         migration instead.
     function deployUpgradeObjects() public virtual {
-        ctmAddresses.stateTransition.defaultUpgrade = deployUsedUpgradeContract();
+        upgradeAddresses.upgradeEngine = deployUsedUpgradeContract();
         deployCTMTransition();
     }
 
@@ -352,8 +355,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         require(fromRelease != address(0), "CTM has no current release: the bootstrap edge must run first");
         address newRelease = ctmAddresses.stateTransition.currentRelease;
         require(newRelease != address(0), "new release not deployed");
-        address engine = ctmAddresses.stateTransition.defaultUpgrade;
-        require(engine != address(0), "upgrade engine not deployed");
+        address engine = committedUpgradeEngine();
         require(upgradeAddresses.upgradeTimer != address(0), "upgrade timer not deployed");
         TransitionManifest memory manifest = TransitionManifest({
             oldProtocolVersion: getOldProtocolVersion(),
@@ -461,6 +463,18 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     /// @dev Exists so `saveOutput` can NAME the migration: a bootstrap's stage calls target it,
     ///      but it is not reachable from any other reported address, and a reviewer should not
     ///      have to decode stage-1 calldata to find the object the edge runs.
+    /// @notice The upgrade engine this edge commits: this prepare's own deployment until the
+    ///         object that pins it exists, and that object's pin from then on. Reading it back off
+    ///         the object means the output cannot name an engine the committed edge does not pin.
+    function committedUpgradeEngine() public view virtual returns (address) {
+        address transition = upgradeAddresses.ctmTransition;
+        if (transition != address(0)) {
+            return ICTMTransition(transition).upgradeEngine();
+        }
+        require(upgradeAddresses.upgradeEngine != address(0), "upgrade engine not deployed");
+        return upgradeAddresses.upgradeEngine;
+    }
+
     function bootstrapMigrationAddress() public view virtual returns (address) {
         return address(0);
     }
@@ -933,14 +947,10 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
                 ctmAddresses.stateTransition.implementations.serverNotifier
             );
         }
-        // Introspection reports the engine as zero (nothing on-chain to read it from), so an
-        // unassigned engine surviving to serialization means the prepare never deployed one —
-        // downstream that zero silently becomes a dead upgrade cut.
-        require(ctmAddresses.stateTransition.defaultUpgrade != address(0), "default upgrade not deployed");
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "default_upgrade_addr",
-            ctmAddresses.stateTransition.defaultUpgrade
+            committedUpgradeEngine()
         );
 
         // Serialize newly deployed upgrade addresses

@@ -61,7 +61,7 @@ contract CTMUpgradeForTests is CTMUpgrade_v34 {
             vm,
             outputPath,
             getChainUpgradeDiamondCutData(),
-            getAddresses().stateTransition.defaultUpgrade,
+            committedUpgradeEngine(),
             getAddresses().admin.eip7702Checker,
             TrimmedUpgradeOutput.Registry({
                 // A bootstrap edge has no transition, so the compose step deploys no operation

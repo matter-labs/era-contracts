@@ -55,6 +55,10 @@ import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeI
 contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     using stdToml for string;
 
+    /// @dev The reusable upgrade engine this deployment publishes. Not part of the CTM's address
+    ///      set: the CTM holds no pointer to an engine, every transition pins the one it commits.
+    address internal deployedUpgradeEngine;
+
     /// @dev Nothing calls this: Rust drives `runInner`, CI `runWithBridgehub`, tests `runForTest`
     ///      and `runForAnvilTest`. It stays only because `IDeployCTM` declares it, and that
     ///      interface is compiled into `zkstack-out/` for the external `zkstack` CLI.
@@ -147,10 +151,12 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         deployVerifiers();
 
-        // The CTM keeps this implementation and reuses it for every upgrade that needs no bespoke
-        // logic — a verifier or VK swap, say — so it has to be the reusable one. A one-shot migration
-        // like `V32UpgradeZKsyncOS` would be replayed by those later upgrades.
-        (ctmAddresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade");
+        // Deployed so a fresh ecosystem ships with the reusable engine already on-chain. Nothing
+        // points at it: each transition pins the engine it commits, and a later prepare building
+        // the same code through the CREATE2 factory lands on this very address. It must therefore
+        // be the reusable implementation — a one-shot migration like `V32UpgradeZKsyncOS` would be
+        // replayed by every upgrade that reused it.
+        deployedUpgradeEngine = deploySimpleContract("DefaultUpgrade");
         (ctmAddresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade");
 
         // The single owner chainAdmin does not have a separate control restriction contract.
@@ -317,7 +323,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             "release_codehash",
             ctmAddresses.stateTransition.currentRelease.codehash
         );
-        vm.serializeAddress("state_transition", "default_upgrade_addr", ctmAddresses.stateTransition.defaultUpgrade);
+        vm.serializeAddress("state_transition", "default_upgrade_addr", deployedUpgradeEngine);
         vm.serializeAddress("state_transition", "eip7702_checker_addr", ctmAddresses.admin.eip7702Checker);
         vm.serializeAddress(
             "state_transition",

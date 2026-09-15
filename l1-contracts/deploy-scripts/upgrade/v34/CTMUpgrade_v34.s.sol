@@ -66,7 +66,7 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
     ///         READ from the migration — the object composes it on-chain from its pinned inputs, so
     ///         the prepare has nothing to compose and nothing to keep in step.
     function deployUpgradeObjects() public virtual override {
-        ctmAddresses.stateTransition.defaultUpgrade = deployUsedUpgradeContract();
+        upgradeAddresses.upgradeEngine = deployUsedUpgradeContract();
         deployRegistryBootstrap();
         _declareBootstrapActions();
     }
@@ -91,6 +91,16 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
         members[5] = "CommitterFacet";
         members[6] = "DiamondInit";
         members[7] = "EIP7702Checker";
+    }
+
+    /// @inheritdoc DefaultCTMUpgrade
+    /// @dev This edge deploys no transition, so the migration is the object that pins its engine.
+    function committedUpgradeEngine() public view override returns (address) {
+        if (address(bootstrapMigration) != address(0)) {
+            return bootstrapMigration.getManifest().upgradeEngine.addr;
+        }
+        require(upgradeAddresses.upgradeEngine != address(0), "bootstrap engine not deployed");
+        return upgradeAddresses.upgradeEngine;
     }
 
     /// @inheritdoc DefaultCTMUpgrade
@@ -254,8 +264,7 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
             admin: ProxyAdmin(Utils.getProxyAdminAddress(notifierProxy))
         });
 
-        address engine = ctmAddresses.stateTransition.defaultUpgrade;
-        require(engine != address(0), "bootstrap engine not deployed");
+        address engine = committedUpgradeEngine();
 
         manifest = BootstrapManifest({
             ctm: _ctmProxy,

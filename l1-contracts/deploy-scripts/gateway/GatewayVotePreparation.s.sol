@@ -421,11 +421,9 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             "genesis_upgrade_addr",
             output.gatewayStateTransition.genesisUpgrade
         );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "default_upgrade_addr",
-            output.gatewayStateTransition.defaultUpgrade
-        );
+        // The Gateway CTM deployer builds no upgrade engine, so this has always been zero on this
+        // path. Written anyway: the key belongs to the output schema protocol-ops reads.
+        vm.serializeAddress("gateway_state_transition", "default_upgrade_addr", address(0));
         vm.serializeAddress(
             "gateway_state_transition",
             "validator_timelock_addr",

@@ -250,7 +250,7 @@ contract UpgradeIntegrationTest_v34_Local is
         assertEq(cut.facetCuts.length, 0, "the bootstrap cut carries no facet cuts");
         assertEq(
             cut.initAddress,
-            v34.getAddresses().stateTransition.defaultUpgrade,
+            v34.committedUpgradeEngine(),
             "the init target is the pinned engine"
         );
         assertEq(
