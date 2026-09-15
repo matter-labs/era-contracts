@@ -396,7 +396,9 @@ library GatewayCTMDeployerHelper {
         );
 
         // DiamondInit
-        bytes memory diamondInitArgs = abi.encode(config.isZKsyncOS);
+        // The Gateway flow wires no Airbender lane (see `GatewayCTMDeployerVerifiers`), so chains
+        // created by this CTM are Boojum-only.
+        bytes memory diamondInitArgs = abi.encode(config.isZKsyncOS, false);
         (addresses.facets.diamondInit, data.diamondInitCalldata) = _calculateCreate2AddressAndCalldata(
             _create2Salt,
             "DiamondInit.sol",
@@ -608,13 +610,13 @@ library GatewayCTMDeployerHelper {
                 _isZKsyncOS,
                 config.testnetVerifier
             );
+            // Gateway CTM deployment does not wire in the Airbender lane, so the chain's verifier there is
+            // the Boojum router itself rather than the multi-proof gate.
             bytes memory creationArgs = DeployCTML1OrGateway.verifierCreationArgs(
                 _isZKsyncOS,
                 result.verifierFflonk,
                 result.verifierPlonk,
-                config.aliasedGovernanceAddress,
-                // Gateway CTM deployment does not wire in the Airbender verifier.
-                address(0)
+                config.aliasedGovernanceAddress
             );
             result.verifier = _deployInternalWithParams(
                 mainVerifierName,
@@ -827,8 +829,11 @@ library GatewayCTMDeployerHelper {
                 eip7702Checker: address(0),
                 verifierFflonk: _deployedContracts.stateTransition.verifiers.verifierFflonk,
                 verifierPlonk: _deployedContracts.stateTransition.verifiers.verifierPlonk,
-                // Gateway CTM deployment does not wire in the Airbender verifier.
+                // Gateway CTM deployment does not wire in the Airbender lane at all.
                 airbenderVerifierPlonk: address(0),
+                airbenderVerifier: address(0),
+                airbenderLane: false,
+                boojumVerifier: address(0),
                 verifierOwner: _config.aliasedGovernanceAddress,
                 permissionlessValidator: address(0)
             });

@@ -59,15 +59,13 @@ contract UpgradeLogicTest is DiamondCutTest {
         DummyBridgehub dummyBridgehub = new DummyBridgehub();
 
         diamondCutTestContract = new DiamondCutTestContract();
-        diamondInit = new DiamondInit(false);
+        diamondInit = new DiamondInit(false, true);
         adminFacet = new AdminFacet(block.chainid, RollupDAManager(address(0)));
         gettersFacet = new GettersFacet();
         permissionlessValidator = new PermissionlessValidator();
 
         // Mock CTM to return a verifier for protocol version 0
-        address testnetVerifier = address(
-            new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), IVerifier(address(0)))
-        );
+        address testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
         vm.mockCall(
             chainTypeManager,
             abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, uint256(0)),

@@ -163,7 +163,6 @@ contract MigratorFacet is ZKChainBase, IMigrator {
         if (_originalCaller != s.admin) {
             revert NotChainAdmin(_originalCaller, s.admin);
         }
-
         /// We require that all the priority transactions are processed.
         require(s.priorityTree.getSize() == 0, PriorityQueueNotFullyProcessed());
 

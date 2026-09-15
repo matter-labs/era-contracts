@@ -93,6 +93,28 @@ interface IExecutor is IZKChainBase {
         bytes32 l2LogsTreeRoot;
         uint256 timestamp; // For ZKsync OS not used, always set to 0
         bytes32 commitment; // For ZKsync OS batches we'll store batch output hash here
+        /// @dev The same batch commitment in Airbender shape: identical pass-through and
+        /// metaparameters, and an auxiliary output differing in the only two words Airbender does
+        /// not reproduce — the bootloader heap hash, which it computes with Blake2s, and the events
+        /// queue hash, which it pins to zero. `0` for batches committed before the lane existed and
+        /// for chains that do not run it.
+        bytes32 airbenderCommitment;
+    }
+
+    /// @notice `StoredBatchInfo` as hashed before the Airbender lane existed.
+    /// @dev Kept so batches committed under that form still authenticate after the upgrade. Such a
+    /// batch carries no Airbender commitment, so it proves on Boojum alone.
+    // solhint-disable-next-line gas-struct-packing
+    struct PreAirbenderStoredBatchInfo {
+        uint64 batchNumber;
+        bytes32 batchHash;
+        uint64 indexRepeatedStorageChanges;
+        uint256 numberOfLayer1Txs;
+        bytes32 priorityOperationsHash;
+        bytes32 dependencyRootsRollingHash;
+        bytes32 l2LogsTreeRoot;
+        uint256 timestamp;
+        bytes32 commitment;
     }
 
     /// @notice Legacy StoredBatchInfo struct

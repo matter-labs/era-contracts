@@ -501,13 +501,13 @@ library AddressIntrospector {
         return address(0);
     }
 
-    /// @notice Get fflonk, plonk and Airbender PLONK sub-verifiers from a dual verifier
+    /// @notice Get fflonk and plonk sub-verifiers from a dual verifier
     /// @param _verifier The verifier address
     /// @param _isZKsyncOS If true, uses ZKsyncOSDualVerifier interface; otherwise EraDualVerifier
     function _getSubVerifiers(
         address _verifier,
         bool _isZKsyncOS
-    ) private view returns (address fflonk, address plonk, address airbenderPlonk) {
+    ) private view returns (address fflonk, address plonk) {
         return DeployCTML1OrGateway.getSubVerifiers(_verifier, _isZKsyncOS);
     }
 
@@ -517,15 +517,20 @@ library AddressIntrospector {
     ///        added in V31, so they cannot be introspected and are reported as `address(0)`.
     /// @param _isZKsyncOS If true, uses the ZKsyncOSDualVerifier interface; otherwise EraDualVerifier.
     function _getVerifiers(address _verifier, bool _isV29, bool _isZKsyncOS) private view returns (Verifiers memory) {
-        (address verifierFflonk, address verifierPlonk, address airbenderVerifierPlonk) = _isV29
-            ? (address(0), address(0), address(0))
+        (address verifierFflonk, address verifierPlonk) = _isV29
+            ? (address(0), address(0))
             : _getSubVerifiers(_verifier, _isZKsyncOS);
+        // The gate's lanes are not probed here. Detecting them needs a fail-soft call, and reporting a
+        // miswired verifier as a zero address would hide the misconfiguration rather than surface it. The
+        // deploy scripts report them instead, under `airbender_verifier_addr` and `boojum_verifier_addr`.
         return
             Verifiers({
                 verifier: _verifier,
                 verifierFflonk: verifierFflonk,
                 verifierPlonk: verifierPlonk,
-                airbenderVerifierPlonk: airbenderVerifierPlonk
+                airbenderVerifierPlonk: address(0),
+                airbenderVerifier: address(0),
+                boojumVerifier: address(0)
             });
     }
 }

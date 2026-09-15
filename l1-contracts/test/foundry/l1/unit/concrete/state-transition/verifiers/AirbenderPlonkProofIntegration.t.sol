@@ -3,46 +3,17 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {EraDualVerifier} from "contracts/state-transition/verifiers/EraDualVerifier.sol";
 import {AirbenderVerifierPlonk} from "contracts/state-transition/verifiers/AirbenderVerifierPlonk.sol";
-import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 
 import {AirbenderPlonkProofFixture} from "./fixtures/AirbenderPlonkProofFixture.sol";
-
-/// @notice Stand-in for the FFLONK slot of `DualVerifier`. We never route to it
-/// from these tests, so it's free to fail-closed.
-contract InertFflonkVerifier is IVerifierV2 {
-    function verify(uint256[] calldata, uint256[] calldata) external pure override returns (bool) {
-        return false;
-    }
-
-    function verificationKeyHash() external pure override returns (bytes32) {
-        return bytes32(0);
-    }
-}
-
-/// @notice Stand-in for the Boojum PLONK slot of `DualVerifier`. Same rationale
-/// as `InertFflonkVerifier`.
-contract InertPlonkVerifier is IVerifier {
-    function verify(uint256[] calldata, uint256[] calldata) external pure override returns (bool) {
-        return false;
-    }
-
-    function verificationKeyHash() external pure override returns (bytes32) {
-        return bytes32(0);
-    }
-}
 
 /// @notice Verifies a real airbender PLONK SNARK proof produced by
 /// `eravm-prover-host prove-snark` against the regenerated `AirbenderVerifierPlonk`
 /// (generated from the matching `snark_vk.json` by
 /// `tools/verifier-gen/regenerate-airbender-verifier.sh`).
-/// Exercises both the standalone `AirbenderVerifierPlonk.verify` path and the
-/// airbender slot of `DualVerifier`'s router.
+/// Exercises the standalone `AirbenderVerifierPlonk.verify` path. The Airbender lane reaches this
+/// contract through `AirbenderVerifier`, which is covered by its own suite.
 contract AirbenderPlonkProofIntegrationTest is Test {
-    uint256 internal constant AIRBENDER_PLONK_VERIFICATION_TYPE = 2;
-
     /// Commitment to the eravm-airbender-verifier guest binary, as the wrapper
     /// sees it. Sourced from `recursion_chain_hash` in the FRI proof for batch 1
     /// (the guest's final registers 18..=25; also surfaced as `aux_params` of
@@ -62,15 +33,9 @@ contract AirbenderPlonkProofIntegrationTest is Test {
     ];
 
     AirbenderVerifierPlonk internal airbenderVerifier;
-    EraDualVerifier internal dual;
 
     function setUp() public {
         airbenderVerifier = new AirbenderVerifierPlonk();
-        dual = new EraDualVerifier(
-            IVerifierV2(address(new InertFflonkVerifier())),
-            IVerifier(address(new InertPlonkVerifier())),
-            IVerifier(address(airbenderVerifier))
-        );
     }
 
     /// Sanity-check: the airbender PLONK verifier accepts the real proof when
@@ -81,29 +46,6 @@ contract AirbenderPlonkProofIntegrationTest is Test {
             AirbenderPlonkProofFixture.serializedProof()
         );
         assertTrue(ok, "AirbenderVerifierPlonk should accept the airbender proof directly");
-    }
-
-    /// Routing test: `DualVerifier` should dispatch a proof prefixed with
-    /// verifier-type 2 to the airbender slot, which then accepts the proof.
-    function test_dualVerifier_routesAirbenderProof() public view {
-        uint256[] memory inner = AirbenderPlonkProofFixture.serializedProof();
-        uint256[] memory withType = new uint256[](inner.length + 1);
-        withType[0] = AIRBENDER_PLONK_VERIFICATION_TYPE;
-        for (uint256 i = 0; i < inner.length; i++) {
-            withType[i + 1] = inner[i];
-        }
-
-        bool ok = dual.verify(AirbenderPlonkProofFixture.publicInputs(), withType);
-        assertTrue(ok, "DualVerifier should accept airbender-tagged proof");
-    }
-
-    /// The airbender slot's VK hash, surfaced through `DualVerifier`, must
-    /// equal the one baked into `AirbenderVerifierPlonk` by codegen — i.e. the test
-    /// is checking the new VK, not a stale one.
-    function test_dualVerifier_airbenderVkHash_matchesUnderlyingVerifier() public view {
-        bytes32 viaDual = dual.verificationKeyHash(AIRBENDER_PLONK_VERIFICATION_TYPE);
-        bytes32 viaDirect = airbenderVerifier.verificationKeyHash();
-        assertEq(viaDual, viaDirect, "DualVerifier should surface the airbender slot's VK hash");
     }
 
     /// The VK hash baked into `AirbenderVerifierPlonk` by codegen — recorded in the

@@ -145,11 +145,7 @@ contract GatewayCTMDeployerTest is Test {
         // Verifier contracts
         new EraVerifierFflonk();
         new EraVerifierPlonk();
-        new EraTestnetVerifier(
-            EraVerifierFflonk(address(0)),
-            EraVerifierPlonk(address(0)),
-            EraVerifierPlonk(address(0))
-        );
+        new EraTestnetVerifier(EraVerifierFflonk(address(0)), EraVerifierPlonk(address(0)));
 
         // CTM contracts
         new ServerNotifier();
@@ -162,7 +158,7 @@ contract GatewayCTMDeployerTest is Test {
         new ExecutorFacet(1);
         new GettersFacet();
         new MigratorFacet(1, false);
-        new DiamondInit(false);
+        new DiamondInit(false, true);
         new L1GenesisUpgrade();
         new Multicall3();
 

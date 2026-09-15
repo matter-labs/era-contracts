@@ -246,14 +246,20 @@ contract ZKChainBase is ReentrancyGuard {
     /// @param _lastCommittedBatchData The last committed batch.
     /// @param _batchNumber The batch number to check.
     /// @param _checkLegacy Whether to check the legacy hash.
+    /// @return airbenderCommitmentBound Whether the batch matched the current hash form, which is
+    /// the only one covering `airbenderCommitment`. A batch that matched an older form carries an
+    /// `airbenderCommitment` nothing authenticated, so the caller must not use it.
     function _checkBatchHashMismatch(
         IExecutor.StoredBatchInfo memory _lastCommittedBatchData,
         uint256 _batchNumber,
         bool _checkLegacy
-    ) internal view {
+    ) internal view returns (bool airbenderCommitmentBound) {
         bytes32 cachedStoredBatchHashes = s.storedBatchHashes[_batchNumber];
+        airbenderCommitmentBound =
+            cachedStoredBatchHashes == StoredBatchHashing.hashStoredBatchInfo(_lastCommittedBatchData);
         if (
-            cachedStoredBatchHashes != StoredBatchHashing.hashStoredBatchInfo(_lastCommittedBatchData) &&
+            !airbenderCommitmentBound &&
+            cachedStoredBatchHashes != StoredBatchHashing.hashPreAirbenderStoredBatchInfo(_lastCommittedBatchData) &&
             (!_checkLegacy ||
                 cachedStoredBatchHashes != StoredBatchHashing.hashLegacyStoredBatchInfo(_lastCommittedBatchData))
         ) {

@@ -15,7 +15,9 @@ import {
     PRIORITY_EXPIRATION,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
-    ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT
+    ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT,
+    ALL_PROOF_SYSTEMS_DISABLED,
+    ProofSystem
 } from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
@@ -48,6 +50,7 @@ import {
     ProtocolIdMismatch,
     ProtocolIdNotGreater,
     TokenMultiplierChangeTooFrequent,
+    InvalidDisabledProofSystemsMask,
     TooMuchGas,
     Unauthorized,
     UpgradeTimestampNotReached,
@@ -191,9 +194,39 @@ contract AdminFacet is ZKChainBase, IAdmin {
         emit NewZKsyncOSMaxTxGasLimit(oldMaxTxGasLimit, _newMaxTxGasLimit);
     }
 
+    /// @inheritdoc IAdmin
+    function setProofSystemStatus(
+        ProofSystem _proofSystem,
+        bool _enabled
+    ) external onlyAdmin onlySettlementLayer onlyEra {
+        uint8 proofSystemMask = uint8(1 << uint8(_proofSystem));
+
+        uint8 oldDisabledProofSystems = s.disabledProofSystems;
+        uint8 newDisabledProofSystems = _enabled
+            ? oldDisabledProofSystems & ~proofSystemMask
+            : oldDisabledProofSystems | proofSystemMask;
+
+        // Switching the second one off would settle a batch behind no proof at all. Checked on the
+        // result, since one bit alone cannot say what the pair becomes.
+        if (newDisabledProofSystems >= ALL_PROOF_SYSTEMS_DISABLED) {
+            revert InvalidDisabledProofSystemsMask(newDisabledProofSystems);
+        }
+
+        // Disabling may happen with unproven batches waiting — that is the point of the switch. Enabling
+        // must not: a batch committed while Airbender was off carries a single public input that lane
+        // cannot read, and one committed while Boojum was off has that lane's two aux words zeroed, so
+        // no Boojum proof for it can ever exist. A call that leaves the system as it was needs no drain.
+        if (_enabled && (oldDisabledProofSystems & proofSystemMask) != 0) {
+            _enforceNoUnverifiedBatchesForChainConfigUpdate();
+        }
+
+        s.disabledProofSystems = newDisabledProofSystems;
+        emit NewDisabledProofSystems(oldDisabledProofSystems, newDisabledProofSystems);
+    }
+
     /// @dev The runtime chain config is read from storage when the batch proof public input is
     /// computed, so it must not change while committed-but-unverified batches exist: those batches
-    /// were executed by ZKsync OS under the old config and would become unprovable.
+    /// were committed under the old config and would become unprovable.
     function _enforceNoUnverifiedBatchesForChainConfigUpdate() internal view {
         if (s.totalBatchesCommitted != s.totalBatchesVerified) {
             revert ZKsyncOSChainConfigUpdateWithUnverifiedBatches(s.totalBatchesVerified, s.totalBatchesCommitted);
