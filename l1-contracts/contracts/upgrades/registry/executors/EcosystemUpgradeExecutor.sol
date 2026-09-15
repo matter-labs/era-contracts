@@ -13,7 +13,6 @@ import {
     EmptyBytes32,
     NoPendingOperation,
     OperationNotPending,
-    TimerNotBoundToExecutor,
     UpgradeLifecycleBusy,
     UpgradeStageOutOfOrder,
     ZeroAddress
@@ -102,14 +101,10 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
             // The reservation first: it is where the transition's provenance is checked, so a
             // non-genuine object fails there rather than on an arbitrary getter below.
             ICTMUpgradeExecutor(leg.executor).beginOperation(_operation);
-            // A timer nobody else can start — and one this coordinator can, which `startTimer`
-            // would only prove after the reservation is already recorded. Legs may share a timer;
-            // it is started once.
+            // Legs may share a timer; it is started once. No binding pre-check here: `startTimer`
+            // is `onlyTimerAdmin`, so a timer bound to anyone but this coordinator — one someone
+            // else could start early — already fails the stage.
             GovernanceUpgradeTimer timer = GovernanceUpgradeTimer(ICTMTransition(leg.transition).upgradeTimer());
-            address timerGovernance = timer.TIMER_GOVERNANCE();
-            if (timerGovernance != address(this)) {
-                revert TimerNotBoundToExecutor(address(timer), timerGovernance);
-            }
             if (!_contains(started, startedCount, address(timer))) {
                 started[startedCount] = address(timer);
                 ++startedCount;

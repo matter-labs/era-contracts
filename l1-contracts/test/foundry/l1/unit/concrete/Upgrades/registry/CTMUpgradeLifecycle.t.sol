@@ -33,6 +33,7 @@ import {
     L1EcosystemContract
 } from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {
+    CallerNotTimerAdmin,
     DeadlineNotYetPassed,
     MigrationsNotPaused,
     NoPendingOperation,
@@ -40,7 +41,6 @@ import {
     OperationNotPending,
     ProxyUpgradeRowMismatch,
     RegistryCodehashMismatch,
-    TimerNotBoundToExecutor,
     Unauthorized,
     UpgradeLifecycleBusy,
     UpgradeStageOutOfOrder
@@ -697,8 +697,9 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
     // ─────────────────────────── stage-0 conditions ───────────────────────────
 
     function test_revertWhen_stage0TimerNotBoundToCoordinator() public {
-        // A timer someone else can start (bound to governance directly) is refused: stage 0
-        // must be the only way this transition's clock starts.
+        // A timer someone else can start (bound to governance directly) is refused by the timer's
+        // own `onlyTimerAdmin`: stage 0 must be the only way this transition's clock starts. The
+        // revert unwinds the reservation and the migration pause stage 0 took before reaching it.
         TransitionManifest memory manifest = _transitionManifest(
             777,
             chainContractAddress.currentRelease(),
@@ -708,9 +709,15 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         GovernanceUpgradeTimer unbound = new GovernanceUpgradeTimer(0, 0, governor, governor);
         manifest.upgradeTimer = _pin(address(unbound));
         CTMTransition mistimed = new CTMTransition(manifest);
-        EcosystemUpgradeOperation operation = _operationFor(mistimed);
+        // An ecosystem leg too, so the rollback below covers BOTH domains' reservations — the
+        // timer is the last thing stage 0 touches.
+        EcosystemUpgradeOperation operation = _operationWithCore(
+            ICTMTransition(address(mistimed)),
+            address(ctmExecutor),
+            address(coreRegistry)
+        );
 
-        vm.expectRevert(abi.encodeWithSelector(TimerNotBoundToExecutor.selector, address(unbound), governor));
+        vm.expectRevert(CallerNotTimerAdmin.selector);
         vm.prank(governor);
         coordinator.stage0(operation);
         _assertLifecycleIdle();

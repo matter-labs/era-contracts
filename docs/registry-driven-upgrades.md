@@ -351,7 +351,7 @@ sequenceDiagram
     X->>CO: beginOperation(operation) — pin + validate
     X->>E: beginOperation(operation) — pin, validate, both edges
     E->>H: pauseCTMMigration(ctm)
-    X->>T: startTimer() — once per distinct timer; TIMER_GOVERNANCE must be X
+    X->>T: startTimer() — once per distinct timer; onlyTimerAdmin, so TIMER_GOVERNANCE must be X
     G->>X: stage1(operation)
     X->>T: checkDeadline()
     X->>CO: applyL1Upgrade(coreRegistry) — core leg first
