@@ -127,28 +127,7 @@
   {
     "type": "function",
     "name": "genesisUpgrade",
-    "inputs": [
-      {
-        "name": "_l1GenesisUpgrade",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_ctmDeployer",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_forceDeploymentData",
-        "type": "bytes",
-        "internalType": "bytes"
-      },
-      {
-        "name": "_factoryDeps",
-        "type": "bytes[]",
-        "internalType": "bytes[]"
-      }
-    ],
+    "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
   },

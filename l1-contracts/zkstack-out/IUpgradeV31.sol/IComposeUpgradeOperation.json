@@ -19,21 +19,9 @@
             "internalType": "address"
           },
           {
-            "name": "legs",
-            "type": "tuple[]",
-            "internalType": "struct OperationLegInput[]",
-            "components": [
-              {
-                "name": "executor",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "transition",
-                "type": "address",
-                "internalType": "address"
-              }
-            ]
+            "name": "transition",
+            "type": "address",
+            "internalType": "address"
           },
           {
             "name": "create2FactorySalt",

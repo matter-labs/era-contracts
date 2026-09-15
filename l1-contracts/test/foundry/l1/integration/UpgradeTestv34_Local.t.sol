@@ -248,11 +248,7 @@ contract UpgradeIntegrationTest_v34_Local is
         assertEq(keccak256(shippedCut), _expectedUpgradeCutHash, "the shipped cut must be the committed one");
         Diamond.DiamondCutData memory cut = abi.decode(shippedCut, (Diamond.DiamondCutData));
         assertEq(cut.facetCuts.length, 0, "the bootstrap cut carries no facet cuts");
-        assertEq(
-            cut.initAddress,
-            v34.committedUpgradeEngine(),
-            "the init target is the pinned engine"
-        );
+        assertEq(cut.initAddress, v34.committedUpgradeEngine(), "the init target is the pinned engine");
         assertEq(
             this.decodeUpgradeInit(cut.initCalldata),
             address(v34.bootstrapMigration()),

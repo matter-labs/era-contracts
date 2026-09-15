@@ -37,20 +37,8 @@
         "components": [
           {
             "name": "facet",
-            "type": "tuple",
-            "internalType": "struct PinnedContract",
-            "components": [
-              {
-                "name": "addr",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "codehash",
-                "type": "bytes32",
-                "internalType": "bytes32"
-              }
-            ]
+            "type": "address",
+            "internalType": "address"
           },
           {
             "name": "isFreezable",
@@ -145,19 +133,6 @@
         "name": "",
         "type": "address",
         "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "verifyAll",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
       }
     ],
     "stateMutability": "view"

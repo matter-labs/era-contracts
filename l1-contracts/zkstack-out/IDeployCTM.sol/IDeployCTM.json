@@ -148,11 +148,6 @@
                 "internalType": "address"
               },
               {
-                "name": "defaultUpgrade",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
                 "name": "chainTypeManagerProxyAdmin",
                 "type": "address",
                 "internalType": "address"
