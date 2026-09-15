@@ -13,9 +13,9 @@ import {EraDualVerifier} from "contracts/state-transition/verifiers/EraDualVerif
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {
-    AIRBENDER_PROOF_SYSTEM_DISABLED,
+    AIRBENDER_PROOF_SYSTEM_MASK,
     AIRBENDER_SNARK_PROOF_LENGTH,
-    BOOJUM_PROOF_SYSTEM_DISABLED,
+    BOOJUM_PROOF_SYSTEM_MASK,
     DisabledProofSystems,
     ERA_MULTI_PROOF_TYPE
 } from "contracts/common/Config.sol";
@@ -61,8 +61,8 @@ contract ChainStub {
     function disabledProofSystems() external view returns (DisabledProofSystems memory) {
         return
             DisabledProofSystems({
-                boojum: mask & BOOJUM_PROOF_SYSTEM_DISABLED != 0,
-                airbender: mask & AIRBENDER_PROOF_SYSTEM_DISABLED != 0
+                boojum: mask & BOOJUM_PROOF_SYSTEM_MASK != 0,
+                airbender: mask & AIRBENDER_PROOF_SYSTEM_MASK != 0
             });
     }
 
@@ -159,10 +159,10 @@ contract EraMultiProofVerifierTest is Test {
         uint256[] memory single = new uint256[](1);
         single[0] = RAW_PUBLIC_INPUT;
 
-        chain.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
+        chain.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
         assertTrue(chain.callVerify(verifier, single, _default()), "one word must settle on Boojum alone");
 
-        chain.setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_DISABLED);
+        chain.setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_MASK);
         vm.expectRevert(InvalidPublicInputsLength.selector);
         chain.callVerify(verifier, single, _default());
 
@@ -221,7 +221,7 @@ contract EraMultiProofVerifierTest is Test {
             IVerifier(address(boojum)),
             IVerifier(address(new LaneVerifier(false, false)))
         );
-        chain.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
+        chain.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
         assertTrue(chain.callVerify(v, _publicInputs(), _default()));
     }
 
@@ -230,7 +230,7 @@ contract EraMultiProofVerifierTest is Test {
             IVerifier(address(new LaneVerifier(false, false))),
             IVerifier(address(airbender))
         );
-        chain.setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_DISABLED);
+        chain.setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_MASK);
         assertTrue(chain.callVerify(v, _publicInputs(), _proof(1, 0)));
     }
 
@@ -318,11 +318,11 @@ contract EraMultiProofVerifierTest is Test {
     /// The gate must never accept a batch it verified nothing for, even if a both-disabled mask somehow
     /// reaches storage past the Admin setter's guard.
     function test_revertsWhenChainDisabledEverything() public {
-        chain.setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_DISABLED | AIRBENDER_PROOF_SYSTEM_DISABLED);
+        chain.setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_MASK | AIRBENDER_PROOF_SYSTEM_MASK);
         vm.expectRevert(
             abi.encodeWithSelector(
                 InvalidDisabledProofSystemsMask.selector,
-                BOOJUM_PROOF_SYSTEM_DISABLED | AIRBENDER_PROOF_SYSTEM_DISABLED
+                BOOJUM_PROOF_SYSTEM_MASK | AIRBENDER_PROOF_SYSTEM_MASK
             )
         );
         chain.callVerify(verifier, _publicInputs(), _default());
@@ -333,7 +333,7 @@ contract EraMultiProofVerifierTest is Test {
     // ---------------------------------------------------------------------------------------------
 
     function test_reportsBothSystemsSupported() public view {
-        assertEq(verifier.supportedProofSystems(), BOOJUM_PROOF_SYSTEM_DISABLED | AIRBENDER_PROOF_SYSTEM_DISABLED);
+        assertEq(verifier.supportedProofSystems(), BOOJUM_PROOF_SYSTEM_MASK | AIRBENDER_PROOF_SYSTEM_MASK);
     }
 
     /// A lane left unwired is missing, not merely off, so it drops out of the capability answer. This is
@@ -343,7 +343,7 @@ contract EraMultiProofVerifierTest is Test {
             IVerifier(address(boojum)),
             IVerifier(address(0))
         );
-        assertEq(noAirbender.supportedProofSystems(), BOOJUM_PROOF_SYSTEM_DISABLED);
+        assertEq(noAirbender.supportedProofSystems(), BOOJUM_PROOF_SYSTEM_MASK);
     }
 
     /// Requirement comes from the pair the gate is built to check, not from what is wired, so an unwired
@@ -353,23 +353,23 @@ contract EraMultiProofVerifierTest is Test {
             IVerifier(address(boojum)),
             IVerifier(address(0))
         );
-        assertEq(noAirbender.requiredProofSystems(0), BOOJUM_PROOF_SYSTEM_DISABLED | AIRBENDER_PROOF_SYSTEM_DISABLED);
+        assertEq(noAirbender.requiredProofSystems(0), BOOJUM_PROOF_SYSTEM_MASK | AIRBENDER_PROOF_SYSTEM_MASK);
     }
 
     function test_requiredSystemsFollowTheMask() public view {
         assertEq(
             verifier.requiredProofSystems(0),
-            BOOJUM_PROOF_SYSTEM_DISABLED | AIRBENDER_PROOF_SYSTEM_DISABLED,
+            BOOJUM_PROOF_SYSTEM_MASK | AIRBENDER_PROOF_SYSTEM_MASK,
             "an empty mask requires both"
         );
         assertEq(
-            verifier.requiredProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED),
-            BOOJUM_PROOF_SYSTEM_DISABLED,
+            verifier.requiredProofSystems(AIRBENDER_PROOF_SYSTEM_MASK),
+            BOOJUM_PROOF_SYSTEM_MASK,
             "masking Airbender leaves Boojum"
         );
         assertEq(
-            verifier.requiredProofSystems(BOOJUM_PROOF_SYSTEM_DISABLED),
-            AIRBENDER_PROOF_SYSTEM_DISABLED,
+            verifier.requiredProofSystems(BOOJUM_PROOF_SYSTEM_MASK),
+            AIRBENDER_PROOF_SYSTEM_MASK,
             "masking Boojum leaves Airbender"
         );
     }
@@ -377,7 +377,7 @@ contract EraMultiProofVerifierTest is Test {
     /// Discovery refuses the mask settlement refuses, so a caller is never told a policy the gate would
     /// not honour.
     function test_requiredSystemsRejectsTheAllDisabledMask() public {
-        uint8 mask = BOOJUM_PROOF_SYSTEM_DISABLED | AIRBENDER_PROOF_SYSTEM_DISABLED;
+        uint8 mask = BOOJUM_PROOF_SYSTEM_MASK | AIRBENDER_PROOF_SYSTEM_MASK;
         vm.expectRevert(abi.encodeWithSelector(InvalidDisabledProofSystemsMask.selector, mask));
         verifier.requiredProofSystems(mask);
     }
@@ -417,7 +417,7 @@ contract EraMultiProofVerifierTest is Test {
 
         ChainStub requiresBoth = new ChainStub();
         ChainStub airbenderMasked = new ChainStub();
-        airbenderMasked.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
+        airbenderMasked.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
 
         vm.expectRevert(AirbenderVerificationFailed.selector);
         requiresBoth.callVerify(shared, _publicInputs(), _default());

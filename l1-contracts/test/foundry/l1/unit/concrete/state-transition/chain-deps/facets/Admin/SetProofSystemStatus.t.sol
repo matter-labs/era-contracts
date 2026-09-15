@@ -10,7 +10,7 @@ import {
     Unauthorized
 } from "contracts/common/L1ContractErrors.sol";
 import {NotSettlementLayer} from "contracts/state-transition/L1StateTransitionErrors.sol";
-import {AIRBENDER_PROOF_SYSTEM_DISABLED, BOOJUM_PROOF_SYSTEM_DISABLED, ProofSystem} from "contracts/common/Config.sol";
+import {AIRBENDER_PROOF_SYSTEM_MASK, BOOJUM_PROOF_SYSTEM_MASK, ProofSystem} from "contracts/common/Config.sol";
 
 /// @notice Unit tests for `setProofSystemStatus`, which turns one of the chain's proof systems on or off.
 /// @dev Era chains settle behind two independent proof systems. Either may be switched off by the chain
@@ -65,10 +65,10 @@ contract SetProofSystemStatusTest is AdminTest {
 
         vm.startPrank(utilsFacet.util_getAdmin());
         vm.expectEmit(true, true, true, true);
-        emit NewDisabledProofSystems(0, AIRBENDER_PROOF_SYSTEM_DISABLED);
+        emit NewDisabledProofSystems(0, AIRBENDER_PROOF_SYSTEM_MASK);
         adminFacet.setProofSystemStatus(ProofSystem.Airbender, false);
 
-        assertEq(utilsFacet.util_getDisabledProofSystems(), AIRBENDER_PROOF_SYSTEM_DISABLED);
+        assertEq(utilsFacet.util_getDisabledProofSystems(), AIRBENDER_PROOF_SYSTEM_MASK);
     }
 
     function test_disablesBoojum() public {
@@ -78,7 +78,7 @@ contract SetProofSystemStatusTest is AdminTest {
         vm.startPrank(utilsFacet.util_getAdmin());
         adminFacet.setProofSystemStatus(ProofSystem.Boojum, false);
 
-        assertEq(utilsFacet.util_getDisabledProofSystems(), BOOJUM_PROOF_SYSTEM_DISABLED);
+        assertEq(utilsFacet.util_getDisabledProofSystems(), BOOJUM_PROOF_SYSTEM_MASK);
     }
 
     function test_restoresBothRequired() public {
@@ -93,8 +93,8 @@ contract SetProofSystemStatusTest is AdminTest {
     /// Switching the second one off would leave the chain settling with no proof system at all. One bit
     /// alone cannot say that, so the rule is checked on the mask the call would produce.
     function test_revertWhen_disablingTheSecondSystem() public {
-        utilsFacet.util_setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
-        uint8 both = BOOJUM_PROOF_SYSTEM_DISABLED | AIRBENDER_PROOF_SYSTEM_DISABLED;
+        utilsFacet.util_setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
+        uint8 both = BOOJUM_PROOF_SYSTEM_MASK | AIRBENDER_PROOF_SYSTEM_MASK;
 
         vm.startPrank(utilsFacet.util_getAdmin());
         vm.expectRevert(abi.encodeWithSelector(InvalidDisabledProofSystemsMask.selector, both));
@@ -104,7 +104,7 @@ contract SetProofSystemStatusTest is AdminTest {
     /// A chain that has settled nothing may still require the lane: its genesis batch is an ordinary
     /// predecessor, opened by the guest the same way the Boojum scheduler opens its own.
     function test_requiresAirbenderBeforeAnyBatchHasSettled() public {
-        utilsFacet.util_setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
+        utilsFacet.util_setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
         assertEq(utilsFacet.util_getTotalBatchesVerified(), 0);
 
         vm.startPrank(utilsFacet.util_getAdmin());
@@ -126,7 +126,7 @@ contract SetProofSystemStatusTest is AdminTest {
     /// was off carry a single public input the lane has nothing to read, so the gate refuses them and
     /// the chain stalls behind the oldest. Draining first is the only order that works.
     function test_revertWhen_requiringAirbenderWithUnverifiedBatches() public {
-        utilsFacet.util_setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
+        utilsFacet.util_setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
         utilsFacet.util_setTotalBatchesCommitted(5);
         utilsFacet.util_setTotalBatchesVerified(1);
 
@@ -138,7 +138,7 @@ contract SetProofSystemStatusTest is AdminTest {
     /// The same guard on the other lane, so it is the enable direction being tested and not the
     /// Airbender bit specifically.
     function test_revertWhen_requiringBoojumWithUnverifiedBatches() public {
-        utilsFacet.util_setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_DISABLED | AIRBENDER_PROOF_SYSTEM_DISABLED);
+        utilsFacet.util_setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_MASK | AIRBENDER_PROOF_SYSTEM_MASK);
         utilsFacet.util_setTotalBatchesCommitted(5);
         utilsFacet.util_setTotalBatchesVerified(1);
 
@@ -150,16 +150,16 @@ contract SetProofSystemStatusTest is AdminTest {
     /// Enabling a system that is already on changes nothing, so the drain it would otherwise need does
     /// not apply. Requiring one here would refuse the call that merely restates the chain's own state.
     function test_enablingAnAlreadyEnabledSystemNeedsNoDrain() public {
-        utilsFacet.util_setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
+        utilsFacet.util_setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
         utilsFacet.util_setTotalBatchesCommitted(5);
         utilsFacet.util_setTotalBatchesVerified(1);
 
         vm.startPrank(utilsFacet.util_getAdmin());
         vm.expectEmit(true, true, true, true);
-        emit NewDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED, AIRBENDER_PROOF_SYSTEM_DISABLED);
+        emit NewDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK, AIRBENDER_PROOF_SYSTEM_MASK);
         adminFacet.setProofSystemStatus(ProofSystem.Boojum, true);
 
-        assertEq(utilsFacet.util_getDisabledProofSystems(), AIRBENDER_PROOF_SYSTEM_DISABLED);
+        assertEq(utilsFacet.util_getDisabledProofSystems(), AIRBENDER_PROOF_SYSTEM_MASK);
     }
 
     /// The switch exists for the case where committed batches cannot be proved, so it has to take effect
@@ -171,6 +171,6 @@ contract SetProofSystemStatusTest is AdminTest {
         vm.startPrank(utilsFacet.util_getAdmin());
         adminFacet.setProofSystemStatus(ProofSystem.Airbender, false);
 
-        assertEq(utilsFacet.util_getDisabledProofSystems(), AIRBENDER_PROOF_SYSTEM_DISABLED);
+        assertEq(utilsFacet.util_getDisabledProofSystems(), AIRBENDER_PROOF_SYSTEM_MASK);
     }
 }

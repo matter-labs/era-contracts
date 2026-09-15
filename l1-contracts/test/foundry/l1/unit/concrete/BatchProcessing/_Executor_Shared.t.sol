@@ -16,7 +16,7 @@ import {
 import {
     ETH_TOKEN_ADDRESS,
     TESTNET_COMMIT_TIMESTAMP_NOT_OLDER,
-    AIRBENDER_PROOF_SYSTEM_DISABLED
+    AIRBENDER_PROOF_SYSTEM_MASK
 } from "contracts/common/Config.sol";
 import {DummyEraBaseTokenBridge} from "contracts/dev-contracts/test/DummyEraBaseTokenBridge.sol";
 import {IAssetRouterShared} from "contracts/bridge/asset-router/IAssetRouterShared.sol";
@@ -416,7 +416,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         // These suites commit single-proof batches, so the Airbender lane is masked off. The tests
         // that exercise the lane bring it up themselves.
         if (!isZKsyncOS()) {
-            utilsFacet.util_setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
+            utilsFacet.util_setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
         }
 
         // foundry's default value is 1 for the block's timestamp, it is expected

@@ -14,7 +14,7 @@ import {
     DEFAULT_MINIMAL_L2_GAS_PRICE,
     DEFAULT_PUBDATA_PRICING_MODE,
     DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT,
-    AIRBENDER_PROOF_SYSTEM_DISABLED
+    AIRBENDER_PROOF_SYSTEM_MASK
 } from "../../common/Config.sol";
 import {IDiamondInit, InitializeData} from "../chain-interfaces/IDiamondInit.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
@@ -137,7 +137,7 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         // Keeps the chain from committing Airbender data no installed verifier can check: without the
         // lane its verifier is the Boojum router alone, which reads a single public input.
         if (!IS_ZKSYNC_OS && !HAS_AIRBENDER_LANE) {
-            s.disabledProofSystems = AIRBENDER_PROOF_SYSTEM_DISABLED;
+            s.disabledProofSystems = AIRBENDER_PROOF_SYSTEM_MASK;
         }
 
         // All new chains (both ZKsync OS ones and not) have the totalSupply tracked for the base token of the chain.

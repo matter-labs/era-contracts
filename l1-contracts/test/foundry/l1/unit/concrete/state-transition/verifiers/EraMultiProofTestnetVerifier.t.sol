@@ -12,9 +12,9 @@ import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.s
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IEraVerifier} from "contracts/state-transition/chain-interfaces/IEraVerifier.sol";
 import {
-    AIRBENDER_PROOF_SYSTEM_DISABLED,
+    AIRBENDER_PROOF_SYSTEM_MASK,
     AIRBENDER_SNARK_PROOF_LENGTH,
-    BOOJUM_PROOF_SYSTEM_DISABLED,
+    BOOJUM_PROOF_SYSTEM_MASK,
     DisabledProofSystems,
     ERA_MULTI_PROOF_TYPE
 } from "contracts/common/Config.sol";
@@ -49,8 +49,8 @@ contract ChainStub {
     function disabledProofSystems() external view returns (DisabledProofSystems memory) {
         return
             DisabledProofSystems({
-                boojum: mask & BOOJUM_PROOF_SYSTEM_DISABLED != 0,
-                airbender: mask & AIRBENDER_PROOF_SYSTEM_DISABLED != 0
+                boojum: mask & BOOJUM_PROOF_SYSTEM_MASK != 0,
+                airbender: mask & AIRBENDER_PROOF_SYSTEM_MASK != 0
             });
     }
 
@@ -111,7 +111,7 @@ contract EraMultiProofTestnetVerifierTest is Test {
     /// Inheriting means `disabledProofSystems` is read from the chain rather than from a wrapper, so it
     /// takes effect on testnets too.
     function test_disabledSystemsAreHonouredOnTestnet() public {
-        chain.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
+        chain.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
         assertTrue(chain.callVerify(verifier, _publicInputs(), _proof()));
     }
 
@@ -137,7 +137,7 @@ contract EraMultiProofTestnetVerifierTest is Test {
             IVerifier(address(new AcceptingVerifier())),
             IVerifier(address(new AcceptingVerifier()))
         );
-        chain.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
+        chain.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
 
         uint256[] memory proof = new uint256[](2 + AIRBENDER_SNARK_PROOF_LENGTH);
         proof[0] = ERA_MULTI_PROOF_TYPE;

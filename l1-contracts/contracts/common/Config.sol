@@ -78,14 +78,14 @@ struct DisabledProofSystems {
 }
 
 /// @dev Bit in `ZKChainStorage.disabledProofSystems` switching the Boojum proof system off.
-uint8 constant BOOJUM_PROOF_SYSTEM_DISABLED = uint8(1 << uint8(ProofSystem.Boojum));
+uint8 constant BOOJUM_PROOF_SYSTEM_MASK = uint8(1 << uint8(ProofSystem.Boojum));
 
 /// @dev Bit in `ZKChainStorage.disabledProofSystems` switching the Airbender proof system off.
-uint8 constant AIRBENDER_PROOF_SYSTEM_DISABLED = uint8(1 << uint8(ProofSystem.Airbender));
+uint8 constant AIRBENDER_PROOF_SYSTEM_MASK = uint8(1 << uint8(ProofSystem.Airbender));
 
 /// @dev Every known policy bit. A mask above this sets bits with no meaning, and a mask equal to it would
 /// leave the chain with no proof system at all; the setter rejects both.
-uint8 constant ALL_PROOF_SYSTEMS_DISABLED = BOOJUM_PROOF_SYSTEM_DISABLED | AIRBENDER_PROOF_SYSTEM_DISABLED;
+uint8 constant ALL_PROOF_SYSTEMS_DISABLED = BOOJUM_PROOF_SYSTEM_MASK | AIRBENDER_PROOF_SYSTEM_MASK;
 
 /// @dev `_proof[0]` value identifying the combined Era proof carrying both a Boojum and an Airbender
 /// sub-proof. Distinct from the Boojum router's own types (0, 1) and from the ZKsync OS lane's values, so a

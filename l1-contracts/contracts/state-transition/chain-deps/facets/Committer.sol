@@ -15,8 +15,8 @@ import {
     PACKED_NUMBER_OF_L2_TRANSACTIONS_LOG_SPLIT_BITS,
     TESTNET_COMMIT_TIMESTAMP_NOT_OLDER,
     DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH,
-    AIRBENDER_PROOF_SYSTEM_DISABLED,
-    BOOJUM_PROOF_SYSTEM_DISABLED
+    AIRBENDER_PROOF_SYSTEM_MASK,
+    BOOJUM_PROOF_SYSTEM_MASK
 } from "../../../common/Config.sol";
 import {
     IExecutor,
@@ -801,7 +801,7 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         bytes32 l2ToL1LogsHash = keccak256(_batch.systemLogs);
         bytes32[] memory blobAuxOutputWords = _encodeBlobAuxiliaryOutput(_blobCommitments, _blobHashes);
 
-        bool boojumRequired = s.disabledProofSystems & BOOJUM_PROOF_SYSTEM_DISABLED == 0;
+        bool boojumRequired = s.disabledProofSystems & BOOJUM_PROOF_SYSTEM_MASK == 0;
         // solhint-disable-next-line func-named-parameters
         boojumAuxiliaryOutputHash = _auxiliaryOutputHash(
             l2ToL1LogsHash,
@@ -811,7 +811,7 @@ contract CommitterFacet is ZKChainBase, ICommitter {
             blobAuxOutputWords
         );
 
-        if (s.disabledProofSystems & AIRBENDER_PROOF_SYSTEM_DISABLED != 0) {
+        if (s.disabledProofSystems & AIRBENDER_PROOF_SYSTEM_MASK != 0) {
             return (boojumAuxiliaryOutputHash, bytes32(0));
         }
         if (_batch.airbenderBootloaderHeapHash == bytes32(0)) {

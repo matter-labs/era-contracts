@@ -11,7 +11,7 @@ import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.s
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 import {EmptyAssetId, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
-import {AIRBENDER_PROOF_SYSTEM_DISABLED} from "contracts/common/Config.sol";
+import {AIRBENDER_PROOF_SYSTEM_MASK} from "contracts/common/Config.sol";
 
 contract InitializeTest is DiamondInitTest {
     function test_revertWhen_verifierIsZeroAddress() public {
@@ -149,7 +149,7 @@ contract InitializeTest is DiamondInitTest {
 
         UtilsFacet utilsFacet = UtilsFacet(address(new DiamondProxy(block.chainid, diamondCutData)));
 
-        assertEq(utilsFacet.util_getDisabledProofSystems(), AIRBENDER_PROOF_SYSTEM_DISABLED);
+        assertEq(utilsFacet.util_getDisabledProofSystems(), AIRBENDER_PROOF_SYSTEM_MASK);
     }
 
     function test_zksyncOSChainIgnoresTheAirbenderLaneFlag() public {

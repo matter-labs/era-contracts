@@ -15,8 +15,8 @@ import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "../../chain-interfaces/ILegacyGetters.sol";
 import {SemVer} from "../../../common/libraries/SemVer.sol";
 import {
-    AIRBENDER_PROOF_SYSTEM_DISABLED,
-    BOOJUM_PROOF_SYSTEM_DISABLED,
+    AIRBENDER_PROOF_SYSTEM_MASK,
+    BOOJUM_PROOF_SYSTEM_MASK,
     DisabledProofSystems,
     L2DACommitmentScheme
 } from "../../../common/Config.sol";
@@ -229,8 +229,8 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
         uint8 mask = s.disabledProofSystems;
         return
             DisabledProofSystems({
-                boojum: mask & BOOJUM_PROOF_SYSTEM_DISABLED != 0,
-                airbender: mask & AIRBENDER_PROOF_SYSTEM_DISABLED != 0
+                boojum: mask & BOOJUM_PROOF_SYSTEM_MASK != 0,
+                airbender: mask & AIRBENDER_PROOF_SYSTEM_MASK != 0
             });
     }
 

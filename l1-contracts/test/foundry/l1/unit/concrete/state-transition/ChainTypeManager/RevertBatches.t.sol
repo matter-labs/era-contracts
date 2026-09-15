@@ -30,7 +30,7 @@ import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Commi
 import {IL2GenesisUpgrade} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {AIRBENDER_PROOF_SYSTEM_DISABLED} from "contracts/common/Config.sol";
+import {AIRBENDER_PROOF_SYSTEM_MASK} from "contracts/common/Config.sol";
 
 contract RevertBatchesTest is ChainTypeManagerTest {
     // Items for logs & commits

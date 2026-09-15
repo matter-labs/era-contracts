@@ -8,7 +8,7 @@ import {IVerifier} from "./IVerifier.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The proof-system policy a chain's installed verifier reports for itself.
-/// @dev Masks use the `*_PROOF_SYSTEM_DISABLED` bits from `Config.sol` to name a system.
+/// @dev Masks use the `*_PROOF_SYSTEM_MASK` bits from `Config.sol` to name a system.
 interface IEraMultiProofVerifier {
     /// @return The Airbender lane's verifier.
     // solhint-disable-next-line func-name-mixedcase

@@ -18,10 +18,10 @@ import {
     UnknownVerifierType
 } from "../../common/L1ContractErrors.sol";
 import {
-    AIRBENDER_PROOF_SYSTEM_DISABLED,
+    AIRBENDER_PROOF_SYSTEM_MASK,
     AIRBENDER_SNARK_PROOF_LENGTH,
     ALL_PROOF_SYSTEMS_DISABLED,
-    BOOJUM_PROOF_SYSTEM_DISABLED,
+    BOOJUM_PROOF_SYSTEM_MASK,
     DisabledProofSystems,
     ERA_MULTI_PROOF_TYPE
 } from "../../common/Config.sol";
@@ -87,8 +87,8 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
         // One verifier instance serves every chain of a protocol version, so the policy comes from the
         // calling chain. Resolved through the same getter callers use, so settlement and discovery agree.
         DisabledProofSystems memory disabled = IGetters(msg.sender).disabledProofSystems();
-        uint8 disabledMask = (disabled.boojum ? BOOJUM_PROOF_SYSTEM_DISABLED : 0) |
-            (disabled.airbender ? AIRBENDER_PROOF_SYSTEM_DISABLED : 0);
+        uint8 disabledMask = (disabled.boojum ? BOOJUM_PROOF_SYSTEM_MASK : 0) |
+            (disabled.airbender ? AIRBENDER_PROOF_SYSTEM_MASK : 0);
         uint8 required = requiredProofSystems(disabledMask);
 
         // One word per lane, since the two systems commit to different `auxiliaryOutputHash` values.
@@ -98,13 +98,11 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
         // A two-word batch stays acceptable under a masked lane, its Airbender segment riding along
         // unverified. Unlike the ZKsync OS lane, which refuses an envelope it will not fully check: here
         // the kill switch has to rescue batches already committed with Airbender data.
-        if (
-            _publicInputs.length != 2 && !(required & AIRBENDER_PROOF_SYSTEM_DISABLED == 0 && _publicInputs.length == 1)
-        ) {
+        if (_publicInputs.length != 2 && !(required & AIRBENDER_PROOF_SYSTEM_MASK == 0 && _publicInputs.length == 1)) {
             revert InvalidPublicInputsLength();
         }
 
-        if (required & BOOJUM_PROOF_SYSTEM_DISABLED != 0) {
+        if (required & BOOJUM_PROOF_SYSTEM_MASK != 0) {
             // A zero-length slice reaches a router that treats an empty proof as "skip".
             if (boojumLength == 0) {
                 revert BoojumVerificationFailed();
@@ -114,7 +112,7 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
             }
         }
 
-        if (required & AIRBENDER_PROOF_SYSTEM_DISABLED != 0) {
+        if (required & AIRBENDER_PROOF_SYSTEM_MASK != 0) {
             if (!AIRBENDER_VERIFIER.verify(_publicInputs[1:2], _proof[2 + boojumLength:])) {
                 revert AirbenderVerificationFailed();
             }
@@ -127,17 +125,17 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
     /// @dev Requirement is derived from this, not from `supportedProofSystems`: an unwired lane is
     /// missing, not exempt, so deriving it from the wiring would let `verify` skip that lane and settle
     /// a broken deployment single-proof. Kept required, the call to a zero address reverts instead.
-    uint8 internal constant GATE_PROOF_SYSTEMS = BOOJUM_PROOF_SYSTEM_DISABLED | AIRBENDER_PROOF_SYSTEM_DISABLED;
+    uint8 internal constant GATE_PROOF_SYSTEMS = BOOJUM_PROOF_SYSTEM_MASK | AIRBENDER_PROOF_SYSTEM_MASK;
 
     /// @inheritdoc IEraMultiProofVerifier
     /// @dev Reports what this deployment can check, so an unwired lane drops out of the answer.
     function supportedProofSystems() public view virtual returns (uint8) {
         uint8 supported;
         if (address(BOOJUM_VERIFIER) != address(0)) {
-            supported |= BOOJUM_PROOF_SYSTEM_DISABLED;
+            supported |= BOOJUM_PROOF_SYSTEM_MASK;
         }
         if (address(AIRBENDER_VERIFIER) != address(0)) {
-            supported |= AIRBENDER_PROOF_SYSTEM_DISABLED;
+            supported |= AIRBENDER_PROOF_SYSTEM_MASK;
         }
         return supported;
     }

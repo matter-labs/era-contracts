@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
-import {AIRBENDER_PROOF_SYSTEM_DISABLED} from "contracts/common/Config.sol";
+import {AIRBENDER_PROOF_SYSTEM_MASK} from "contracts/common/Config.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
@@ -112,7 +112,7 @@ contract ExecutorProofTest is UtilsCallMockerTest {
         utilsFacet = UtilsFacet(diamondProxy);
 
         // The fixtures here are single-proof batches.
-        utilsFacet.util_setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
+        utilsFacet.util_setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
     }
     // todo
     // This test is based on a block generated in a local system.
