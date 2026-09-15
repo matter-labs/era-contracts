@@ -19,7 +19,17 @@
             "internalType": "address"
           },
           {
+            "name": "ctmInfrastructure",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
             "name": "transition",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "timer",
             "type": "address",
             "internalType": "address"
           },

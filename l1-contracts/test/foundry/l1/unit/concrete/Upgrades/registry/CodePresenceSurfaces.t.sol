@@ -203,9 +203,7 @@ contract CodePresenceSurfacesTest is CTMUpgradeExecutorFixture {
         address[] memory fromReleaseMembers = _releaseMembers(CTMRelease(_m.fromRelease).getManifest());
         assertTrue(_m.l2Plan.delegateComposer != address(0), "the fixture transition names a composer");
 
-        members = new address[](
-            TRANSITION_FIXED_MEMBERS + 1 + newReleaseMembers.length + fromReleaseMembers.length
-        );
+        members = new address[](TRANSITION_FIXED_MEMBERS + 1 + newReleaseMembers.length + fromReleaseMembers.length);
         uint256 next = 0;
         members[next++] = _m.upgradeEngine;
         members[next++] = _m.l2Plan.delegateComposer;

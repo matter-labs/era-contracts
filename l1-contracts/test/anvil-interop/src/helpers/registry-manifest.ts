@@ -180,13 +180,7 @@ export function releaseInitArgs(ctm: any): any {
  * read from the JSON, since the release must be deployed first anyway (transition
  * initialization validates it and derives the facet/hash delta from the release pair).
  */
-export function transitionInitArgs(
-  manifest: any,
-  ctm: any,
-  newRelease: string,
-  upgradeTimer: string,
-  delegateComposer: string
-): any {
+export function transitionInitArgs(manifest: any, ctm: any, newRelease: string, delegateComposer: string): any {
   // Release provenance is enforced by the CTM's stored `releaseCodehash` at `setCurrentRelease`
   // time, not by the transition manifest — which is why the runner checks the freshly deployed
   // release against that same anchor.
@@ -210,10 +204,6 @@ export function transitionInitArgs(
     fromRelease: transition.fromRelease,
     newRelease,
     upgradeEngine: transition.upgradeEngine.address,
-    // The CTM-domain inventory (indexed by `CTMContract`); the local hop upgrades chain state
-    // only, so the manifest carries no slots and every one encodes as the explicit zero
-    // ("not upgraded") row.
-    proxyUpgrades: proxyUpgradeSlots("CTMContract", transition.proxyUpgrades ?? {}),
     oldProtocolVersionDeadline: ethers.BigNumber.from(transition.oldProtocolVersionDeadline),
     upgradeTimestamp: transition.upgradeTimestamp,
     l2Plan: {
@@ -223,9 +213,20 @@ export function transitionInitArgs(
       // composer deployed alongside the objects (see the runner).
       delegateComposer,
     },
-    // The stage-1 timer is a deploy-time object of this same run (like `newRelease`), so it is
-    // passed in rather than read from the committed manifest. The ecosystem leg is NOT the
-    // transition's to name: the operation the coordinator drives commits that association.
-    upgradeTimer,
+  };
+}
+
+/**
+ * `EcosystemUpgradeOperation.OperationManifest` initialize argument. The CTM-domain inventory
+ * (indexed by `CTMContract`) and the stage-1 timer are the OPERATION's, not the transition's; the
+ * local hop upgrades chain state only, so the manifest carries no infrastructure slots and every
+ * one encodes as the explicit zero ("not upgraded") row.
+ */
+export function operationInitArgs(ctm: any, coreRegistry: string, transition: string, timer: string): any {
+  return {
+    coreRegistry,
+    ctmInfrastructure: proxyUpgradeSlots("CTMContract", ctm.transition?.proxyUpgrades ?? {}),
+    transition,
+    timer,
   };
 }

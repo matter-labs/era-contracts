@@ -91,7 +91,7 @@ import {
   getDeterministicCreationBytecode,
 } from "../core/contracts";
 import { createProvider, impersonateAndRun } from "../core/utils";
-import { coreInitArgs, packSemVer, releaseInitArgs, transitionInitArgs } from "./registry-manifest";
+import { coreInitArgs, operationInitArgs, packSemVer, releaseInitArgs, transitionInitArgs } from "./registry-manifest";
 import {
   assertBootstrapEndState,
   bootstrapInitArgs,
@@ -561,10 +561,14 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       getDeterministicCreationBytecode("EcosystemUpgradeOperation"),
       deployer
     );
-    const operationContract = await operationFactory.deploy({
-      coreRegistry: objects.coreRegistry,
-      transition: objects.transition,
-    });
+    const operationContract = await operationFactory.deploy(
+      operationInitArgs(
+        (manifestJson.ctms || []).find((c: { name?: string }) => c.name === CTM_REGISTRY_NAME),
+        objects.coreRegistry,
+        objects.transition,
+        objects.upgradeTimer
+      )
+    );
     await operationContract.deployed();
     const operation: string = operationContract.address;
     assertEq(
@@ -978,7 +982,7 @@ async function deployUpgradeMachinery(
     coordinator,
     // The deployer plays the role of protocol governance; each executor is BOUND to its
     // immutable authority targets at construction. Bound to the whole CTM domain: the CTM itself
-    // AND its own ProxyAdmin (a transition's `ctmProxyRows` — the CTM impl swap included — apply
+    // AND its own ProxyAdmin (an operation's infrastructure rows — the CTM impl swap included — apply
     // through it).
     ctmExecutor: await deploy("CTMUpgradeExecutor", [
       deployer.address,
@@ -1422,10 +1426,9 @@ async function deployUpgradeObjectsFromManifest(
   };
 
   const release = await deployObject("CTMRelease", releaseInitArgs(ctm), releaseCodehashAnchor);
-  // The transition NAMES its stage-1 timer, so it exists first. The timer is bound to the
-  // coordinator (only it can start it); zero delays make the stage-1 window pass immediately in
-  // the harness, and the deployer keeps the (unused) extension right. The core registry is the
-  // operation's to name, not the transition's.
+  // The OPERATION names the stage-1 timer and the core registry; the transition names neither.
+  // The timer is bound to the coordinator (only it can start it); zero delays make the stage-1
+  // window pass immediately in the harness, and the deployer keeps the (unused) extension right.
   const coreRegistry = await deployObject("CoreRegistry", coreInitArgs(manifest), deployed.coreRegistryCodehash);
   const timerFactory = new ethers.ContractFactory(
     getAbi("GovernanceUpgradeTimer"),
@@ -1438,7 +1441,7 @@ async function deployUpgradeObjectsFromManifest(
     release,
     transition: await deployObject(
       "CTMTransition",
-      transitionInitArgs(manifest, ctm, release, upgradeTimer.address, deployed.delegateComposer),
+      transitionInitArgs(manifest, ctm, release, deployed.delegateComposer),
       deployed.transitionCodehash
     ),
     coreRegistry,

@@ -191,8 +191,12 @@ impl<'a> UpgradeInner<'a> {
 
         let coordinator = read_ecosystem_upgrade_executor(core_toml)?;
         let core_registry = read_core_registry(core_toml)?;
+        let ctm_infrastructure = read_ctm_infrastructure(&ctm.toml)?;
+        let timer = read_upgrade_timer(&ctm.toml)?;
         logger::info(format!(
-            "Composing the operation on coordinator {coordinator:#x}: core registry {core_registry:#x}, transition {transition:#x}"
+            "Composing the operation on coordinator {coordinator:#x}: core registry {core_registry:#x}, \
+             transition {transition:#x}, timer {timer:#x}, {} bytes of CTM infrastructure",
+            ctm_infrastructure.len()
         ));
 
         let output_path_str = "/script-out/upgrade-operation.toml".to_string();
@@ -211,7 +215,9 @@ impl<'a> UpgradeInner<'a> {
                     _params: IComposeUpgradeOperationAbi::ComposeOperationParams {
                         coordinator,
                         coreRegistry: core_registry,
+                        ctmInfrastructure: ctm_infrastructure,
                         transition,
+                        timer,
                         // The operation's init code is unique to its transition, so the core salt
                         // cannot collide with the prepares' deployments.
                         create2FactorySalt: inputs
@@ -534,6 +540,54 @@ fn read_ctm_transition(ctm_toml: &Path) -> anyhow::Result<Address> {
         .with_context(|| {
             format!(
                 "invalid registry.ctm_transition_addr in {}",
+                ctm_toml.display()
+            )
+        })
+}
+
+/// The `[registry].ctm_infrastructure` the CTM prepare wrote: its `CTMContract`-indexed inventory,
+/// ABI-encoded. The operation pins these rows, so the compose step needs them (a bootstrap edge
+/// writes nothing here — its own object carries its rows).
+fn read_ctm_infrastructure(ctm_toml: &Path) -> anyhow::Result<Bytes> {
+    let raw =
+        fs::read_to_string(ctm_toml).with_context(|| format!("read {}", ctm_toml.display()))?;
+    let top: toml::Value =
+        toml::from_str(&raw).with_context(|| format!("parse {}", ctm_toml.display()))?;
+    let Some(value) = top
+        .get("registry")
+        .and_then(|v| v.get("ctm_infrastructure"))
+        .and_then(|v| v.as_str())
+    else {
+        return Ok(Bytes::new());
+    };
+    value.parse().with_context(|| {
+        format!(
+            "registry.ctm_infrastructure in {} is not valid hex: {}",
+            ctm_toml.display(),
+            value,
+        )
+    })
+}
+
+/// The `[registry].upgrade_timer_addr` the CTM prepare deployed — the operation's execution delay.
+fn read_upgrade_timer(ctm_toml: &Path) -> anyhow::Result<Address> {
+    let raw =
+        fs::read_to_string(ctm_toml).with_context(|| format!("read {}", ctm_toml.display()))?;
+    let top: toml::Value =
+        toml::from_str(&raw).with_context(|| format!("parse {}", ctm_toml.display()))?;
+    top.get("registry")
+        .and_then(|v| v.get("upgrade_timer_addr"))
+        .and_then(|v| v.as_str())
+        .with_context(|| {
+            format!(
+                "missing registry.upgrade_timer_addr in {}",
+                ctm_toml.display()
+            )
+        })?
+        .parse()
+        .with_context(|| {
+            format!(
+                "invalid registry.upgrade_timer_addr in {}",
                 ctm_toml.display()
             )
         })

@@ -132,7 +132,12 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
     function test_validatorTimelockOnlyPatch_swapsOneProxyAndNothingElse() public {
         _runHop(transitionV32);
         UnrelatedState memory before = _snapshot();
-        (TransparentUpgradeableProxy timelock, , address implNew, ProxyUpgradeRow[] memory rows) = _timelockRowFixture();
+        (
+            TransparentUpgradeableProxy timelock,
+            ,
+            address implNew,
+            ProxyUpgradeRow[] memory rows
+        ) = _timelockRowFixture();
         address release = transitionV32.newRelease();
         CTMTransition timelockOnly = _transition(V32, V32_PATCH_1, release, release);
         _operationWithInfrastructure(ICTMTransition(address(timelockOnly)), rows);
@@ -167,15 +172,14 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
         uint256 v33DeadlineBefore = chainContractAddress.protocolVersionDeadline(V33);
         address committedForV32 = chainContractAddress.upgradeTransition(V32);
 
-        (TransparentUpgradeableProxy timelock, address implOld, address implNew, ProxyUpgradeRow[] memory rows) =
-            _timelockRowFixture();
+        (
+            TransparentUpgradeableProxy timelock,
+            address implOld,
+            address implNew,
+            ProxyUpgradeRow[] memory rows
+        ) = _timelockRowFixture();
         assertEq(_liveImpl(timelock), implOld, "fixture: the proxy starts at the old implementation");
-        EcosystemUpgradeOperation operation = _deployOperation(
-            address(0),
-            rows,
-            address(0),
-            _newOperationTimer()
-        );
+        EcosystemUpgradeOperation operation = _deployOperation(address(0), rows, address(0), _newOperationTimer());
         assertEq(operation.transition(), address(0), "an infrastructure-only operation carries no transition");
 
         vm.startPrank(governor);
@@ -223,7 +227,6 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
             "stage 2 must release the pause"
         );
     }
-
 
     /// @dev A VERIFIER replacement as a SemVer PATCH. The release is the immutable snapshot of the
     ///      intended contracts, so replacing the verifier means publishing a new release that
