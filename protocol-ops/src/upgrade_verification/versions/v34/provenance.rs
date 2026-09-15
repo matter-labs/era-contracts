@@ -119,6 +119,38 @@ impl ImmutableValue {
     }
 }
 
+/// What the reviewed commit says about a live codehash. Separated from the reporting so the
+/// classification is testable on its own: whether unknown code counts as a finding is the whole
+/// question this verifier turns on.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum CodeVerdict<'a> {
+    /// The commit produces this code for the expected contract.
+    Reviewed(&'a str),
+    /// The commit produces this code for a DIFFERENT contract, named here.
+    OtherContract(&'a str),
+    /// The commit produces this code for nothing at all: what runs there is unknown.
+    Unknown,
+}
+
+/// Classifies `live` against the reviewed commit.
+///
+/// `Unknown` is deliberately its own verdict rather than a benign default: whatever else the
+/// package claims about the address, a reviewer who cannot name the deployed code has not
+/// verified it.
+pub(crate) fn classify_code<'a>(
+    identity: &'a CodeIdentity,
+    live: &FixedBytes<32>,
+    expected_short_name: &str,
+) -> CodeVerdict<'a> {
+    match identity.name_of(live) {
+        Some(name) if name.rsplit('/').next() == Some(expected_short_name) => {
+            CodeVerdict::Reviewed(name)
+        }
+        Some(other) => CodeVerdict::OtherContract(other),
+        None => CodeVerdict::Unknown,
+    }
+}
+
 /// Reports whether the account at `address` runs the code the reviewed commit produces for
 /// `expected_short_name`.
 ///
@@ -148,18 +180,18 @@ pub(crate) async fn expect_code_identity<P: Provider>(
     }
 
     let live = alloy::primitives::keccak256(&code);
-    match identity.name_of(&live) {
-        Some(name) if name.rsplit('/').next() == Some(expected_short_name) => {
+    match classify_code(identity, &live, expected_short_name) {
+        CodeVerdict::Reviewed(name) => {
             result.report_ok(&format!("{label} at {address} runs {name}"));
             Ok(true)
         }
-        Some(other) => {
+        CodeVerdict::OtherContract(other) => {
             result.report_error(&format!(
                 "{label} at {address} runs {other}, not {expected_short_name}"
             ));
             Ok(false)
         }
-        None => {
+        CodeVerdict::Unknown => {
             // An ERROR, not a warning: the reviewer cannot say what is deployed here, and an
             // unresolved deployment must not ride along with an otherwise successful review.
             // The two benign causes name themselves in the message; both are fixed BEFORE the
@@ -205,13 +237,11 @@ pub(crate) async fn expect_immutable_bearing_identity<P: Provider>(
     }
 
     let live = alloy::primitives::keccak256(&code);
-    if let Some(other) = identity.name_of(&live) {
-        if other.rsplit('/').next() != Some(expected_short_name) {
-            result.report_error(&format!(
-                "{label} at {address} runs {other}, not {expected_short_name}"
-            ));
-            return Ok(false);
-        }
+    if let CodeVerdict::OtherContract(other) = classify_code(identity, &live, expected_short_name) {
+        result.report_error(&format!(
+            "{label} at {address} runs {other}, not {expected_short_name}"
+        ));
+        return Ok(false);
     }
 
     let mut holds = true;
@@ -363,5 +393,38 @@ mod tests {
     fn immutable_values_compare_case_insensitively() {
         assert!(ImmutableValue::new("X", "0xAbCd", "0xabcd").holds());
         assert!(!ImmutableValue::new("X", "0xAbCd", "0xabce").holds());
+    }
+
+    /// The regression this verifier exists for: a deployment the reviewed commit does not
+    /// produce is UNKNOWN and therefore a finding — whatever fingerprint a package might have
+    /// carried for it. Under the removed pin model a self-supplied hash of exactly this code
+    /// would have "matched" and reported success.
+    #[test]
+    fn unrecognized_code_is_a_verdict_of_its_own() {
+        let id = identity_from(&[("l1-contracts/CTMRelease", HASH_A)]);
+        assert_eq!(
+            classify_code(&id, &HASH_B.parse().unwrap(), "CTMRelease"),
+            CodeVerdict::Unknown
+        );
+    }
+
+    #[test]
+    fn code_the_commit_produces_for_another_contract_names_it() {
+        let id = identity_from(&[("l1-contracts/CoreRegistry", HASH_A)]);
+        assert_eq!(
+            classify_code(&id, &HASH_A.parse().unwrap(), "CTMRelease"),
+            CodeVerdict::OtherContract("l1-contracts/CoreRegistry")
+        );
+    }
+
+    /// The short name is matched against the LAST path segment, so a reviewed name and the
+    /// verifier's expectation agree without the verifier repeating the path.
+    #[test]
+    fn the_expected_contract_resolves_through_its_short_name() {
+        let id = identity_from(&[("l1-contracts/CTMRelease", HASH_A)]);
+        assert_eq!(
+            classify_code(&id, &HASH_A.parse().unwrap(), "CTMRelease"),
+            CodeVerdict::Reviewed("l1-contracts/CTMRelease")
+        );
     }
 }

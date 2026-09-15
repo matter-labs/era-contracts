@@ -37,7 +37,6 @@ import {
     MalformedL2UpgradePlan,
     PatchCannotCarryL2Upgrade,
     PatchChangesL2GenesisState,
-    RegistryCodehashMismatch,
     RegistryDuplicateProxyRow,
     RegistryDuplicateSelector,
     RegistryEmptySelectors,
