@@ -18,6 +18,8 @@ import {
 import {PRIORITY_TX_MAX_GAS_LIMIT, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../common/Config.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 
+import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
+import {ICTMRelease} from "./registry/objects/ICTMRelease.sol";
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
 
 import {L1FixedForceDeploymentsHelper} from "./L1FixedForceDeploymentsHelper.sol";
@@ -29,18 +31,14 @@ import {L1FixedForceDeploymentsHelper} from "./L1FixedForceDeploymentsHelper.sol
 ///         transition, no nested diamond cut.
 contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis, L1FixedForceDeploymentsHelper {
     /// @inheritdoc IL1GenesisUpgrade
-    /// @dev The first argument (this contract's address) is part of the interface the Admin facet
-    ///      encodes and is not needed here: the storage part runs in-place on the delegatecalling
-    ///      diamond. The verifier is left as `DiamondInit` installed it from the release.
-    function genesisUpgrade(
-        address, // _l1GenesisUpgrade
-        uint256 _chainId,
-        uint256 _protocolVersion,
-        address _l1CtmDeployerAddress,
-        bytes calldata _fixedForceDeploymentsData,
-        bytes[] calldata _factoryDeps
-    ) public override returns (bytes32) {
-        address baseTokenAddress = IL1Bridgehub(s.bridgehub).baseToken(_chainId);
+    /// @dev Genesis is deliberately NOT routed through the committed-object entry the registry
+    ///      engines share: there is no version edge to schedule, and the verifier is already
+    ///      installed by `DiamondInit` from the same release, so it is left untouched here.
+    function genesisUpgrade() public override returns (bytes32) {
+        uint256 chainId = s.chainId;
+        uint256 protocolVersion = s.protocolVersion;
+        IL1Bridgehub bridgehub = IL1Bridgehub(s.bridgehub);
+        address baseTokenAddress = bridgehub.baseToken(chainId);
 
         L2CanonicalTransaction memory l2ProtocolUpgradeTx;
 
@@ -52,9 +50,19 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis, L1Fixe
                     address(0),
                     baseTokenAddress
                 );
+                // The same release the CTM geneses every chain from, so the genesis path cannot
+                // install a force-deployment set the CTM does not currently pin.
+                bytes memory fixedForceDeploymentsData = ICTMRelease(
+                    IChainTypeManager(s.chainTypeManager).currentRelease()
+                ).fixedForceDeploymentsData();
                 bytes memory l2GenesisUpgradeCalldata = abi.encodeCall(
                     IL2GenesisUpgrade.genesisUpgrade,
-                    (_chainId, _l1CtmDeployerAddress, _fixedForceDeploymentsData, additionalForceDeploymentsData)
+                    (
+                        chainId,
+                        address(bridgehub.l1CtmDeployer()),
+                        fixedForceDeploymentsData,
+                        additionalForceDeploymentsData
+                    )
                 );
                 complexUpgraderCalldata = abi.encodeCall(
                     IComplexUpgrader.upgrade,
@@ -63,7 +71,7 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis, L1Fixe
             }
 
             // slither-disable-next-line unused-return
-            (, uint32 minorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(_protocolVersion));
+            (, uint32 minorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(protocolVersion));
             l2ProtocolUpgradeTx = L2CanonicalTransaction({
                 txType: _getUpgradeTxType(),
                 from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
@@ -86,13 +94,13 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis, L1Fixe
         }
 
         _upgrade({
-            _newProtocolVersion: _protocolVersion,
+            _newProtocolVersion: protocolVersion,
             _upgradeTimestamp: 0,
             _verifier: address(0),
             _l2ProtocolUpgradeTx: l2ProtocolUpgradeTx
         });
 
-        emit GenesisUpgrade(address(this), l2ProtocolUpgradeTx, _protocolVersion, _factoryDeps);
+        emit GenesisUpgrade(address(this), l2ProtocolUpgradeTx, protocolVersion);
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
 }

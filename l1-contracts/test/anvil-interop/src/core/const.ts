@@ -124,9 +124,9 @@ export const NTV_WETH_TOKEN_SLOT = 251;
 export const NTV_L1_CHAIN_ID_SLOT = 253;
 
 // Event signatures
-// GenesisUpgrade(address indexed, L2CanonicalTransaction, uint256 indexed, bytes[])
+// GenesisUpgrade(address indexed, L2CanonicalTransaction, uint256 indexed)
 export const GENESIS_UPGRADE_EVENT_SIG =
-  "GenesisUpgrade(address,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[4],bytes,bytes,uint256[],bytes,bytes),uint256,bytes[])";
+  "GenesisUpgrade(address,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[4],bytes,bytes,uint256[],bytes,bytes),uint256)";
 export const NEW_PRIORITY_REQUEST_EVENT_SIG =
   "NewPriorityRequest(uint256,bytes32,uint64,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[4],bytes,bytes,uint256[],bytes,bytes),bytes[])";
 export const L1_MESSAGE_SENT_EVENT_SIG = "L1MessageSent(address,bytes32,bytes)";

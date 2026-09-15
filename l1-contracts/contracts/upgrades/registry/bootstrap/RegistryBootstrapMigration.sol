@@ -9,6 +9,7 @@ import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
 import {CTM_CONTRACT_COUNT} from "../libraries/ContractIdentifiers.sol";
 import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 import {CTMUpgradeExecutor} from "../executors/CTMUpgradeExecutor.sol";
+import {ICommittedUpgrade} from "../objects/ICommittedUpgrade.sol";
 import {ICTMRelease} from "../objects/ICTMRelease.sol";
 import {IChainTypeManager} from "../../../state-transition/IChainTypeManager.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
@@ -120,7 +121,17 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
         return abi.decode(encodedManifest, (BootstrapManifest));
     }
 
-    /// @inheritdoc IRegistryBootstrapMigration
+    /// @inheritdoc ICommittedUpgrade
+    /// @dev The genesis release is the edge's target: a chain crossing this edge after the CTM has
+    ///      moved on still installs the release ITS OWN committed migration names.
+    function upgradeTarget() external view returns (uint256, uint256, address) {
+        BootstrapManifest memory m = getManifest();
+        return (m.newProtocolVersion, m.upgradeTimestamp, m.currentRelease.addr);
+    }
+
+    /// @inheritdoc ICommittedUpgrade
+    /// @dev The stored derived-plus-extra deployments with the authored delegate leg and factory
+    ///      dependencies.
     function l2Plan() public view returns (L2UpgradePlan memory) {
         return abi.decode(encodedL2Plan, (L2UpgradePlan));
     }

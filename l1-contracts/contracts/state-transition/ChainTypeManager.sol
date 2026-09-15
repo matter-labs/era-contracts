@@ -624,23 +624,17 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @notice called by Bridgehub when a chain registers
     /// @param _chainId the chain's id
     /// @param _admin the chain's admin address
-    /// @dev The bridgehub passes only the minimal chain-specific data. The base token asset id is
-    /// read by DiamondInit from the bridgehub (which registers it before this call), and the
-    /// genesis force-deployments (with their factory-dep hashes) live in the registry, so neither
-    /// is forwarded. Genesis factory-dep bytecodes are published out-of-band (via the bytecodes
-    /// supplier) and referenced by hash, so an empty `_factoryDeps` is passed to `genesisUpgrade`.
+    /// @dev The bridgehub passes only the minimal chain-specific data, and the genesis upgrade
+    /// takes none at all: the base token asset id is read by DiamondInit from the bridgehub (which
+    /// registers it before this call), and the genesis engine, the force-deployments and the CTM
+    /// deployer are read by the chain from this CTM's release and the bridgehub. Genesis
+    /// factory-dep bytecodes are published out-of-band (via the bytecodes supplier) and referenced
+    /// by hash, so the genesis transaction carries none.
     function createNewChain(uint256 _chainId, address _admin) external onlyBridgehub returns (address zkChainAddress) {
         zkChainAddress = _deployNewChain(_chainId, _admin);
 
-        // genesis upgrade, deploys some contracts, sets chainId. The force-deployments data and
-        // the genesis-upgrade address are read from the registry (single source of truth).
-        bytes memory forceDeploymentsData = ICTMRelease(currentRelease).fixedForceDeploymentsData();
-        IAdmin(zkChainAddress).genesisUpgrade(
-            l1GenesisUpgrade(),
-            address(IL1Bridgehub(BRIDGE_HUB).l1CtmDeployer()),
-            forceDeploymentsData,
-            new bytes[](0)
-        );
+        // genesis upgrade, deploys some contracts, sets chainId.
+        IAdmin(zkChainAddress).genesisUpgrade();
         // Deposits start paused by default to allow immediate Gateway migration.
         // Otherwise, any deposit would trigger the PAUSE_DEPOSITS_TIME_WINDOW_START delay.
         IMigrator(zkChainAddress).pauseDepositsBeforeInitiatingMigration();

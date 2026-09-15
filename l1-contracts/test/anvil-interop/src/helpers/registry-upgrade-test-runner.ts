@@ -72,7 +72,7 @@
  *
  * Everything else — ownership handover, migration pausing, transition composition (per chain,
  * through the pinned composer), diamond cuts, `DefaultUpgrade.upgradeFromTransition` init
- * delegatecall, the production `BootstrapUpgradeZKsyncOS` bootstrap engine, L2 tx commitment,
+ * delegatecall, the production `BootstrapUpgrade` bootstrap engine, L2 tx commitment,
  * `L2ComplexUpgrader` execution — runs through unpatched production code paths.
  */
 
@@ -170,7 +170,7 @@ const DETERMINISTIC_SOURCES = [
   // reproducibility of the committed addresses.
   "contracts/state-transition/ChainTypeManager.sol",
   "contracts/dev-contracts/test/LegacyTestAdminFacet.sol",
-  "contracts/upgrades/BootstrapUpgradeZKsyncOS.sol",
+  "contracts/upgrades/BootstrapUpgrade.sol",
 ];
 
 // Mirror L2GenesisForceDeploymentsHelper.generateRandomAddress: the delegate must be
@@ -1032,9 +1032,9 @@ async function deployUpgradeMachinery(
     ...machinery,
     bootstrapRelease,
     // The production bootstrap engine, pinned by the manifest's `upgradeEngine`: the facet
-    // reinstall from the release it is bound to (which removes the legacy entrypoint above) over
-    // the `DefaultUpgrade` storage/L2 part.
-    bootstrapEngine: await deployPinned("BootstrapUpgradeZKsyncOS", [bootstrapRelease]),
+    // reinstall from the release the migration names (which removes the legacy entrypoint above)
+    // over the `DefaultUpgrade` storage/L2 part.
+    bootstrapEngine: await deployPinned("BootstrapUpgrade", []),
     // The bootstrap's proxy row: the CTM's own implementation swap, built with live immutables.
     ctmImplNew: await deployPinned("ChainTypeManager", [
       params.bridgehub,

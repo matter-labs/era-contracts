@@ -31,6 +31,7 @@ import {Utils as DeployUtils} from "deploy-scripts/utils/Utils.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {ContractsBytecodesLib} from "deploy-scripts/utils/bytecode/ContractsBytecodesLib.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
+import {ICommittedUpgrade} from "contracts/upgrades/registry/objects/ICommittedUpgrade.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {
     AuthoredL2Plan,
@@ -104,7 +105,12 @@ library Utils {
         vm.mockCall(_transition, abi.encodeCall(ICTMTransition.facetCuts, ()), abi.encode(new Diamond.FacetCut[](0)));
         vm.mockCall(
             _transition,
-            abi.encodeCall(ICTMTransition.l2Plan, ()),
+            abi.encodeCall(ICommittedUpgrade.upgradeTarget, ()),
+            abi.encode(_newProtocolVersion, uint256(0), _newRelease)
+        );
+        vm.mockCall(
+            _transition,
+            abi.encodeCall(ICommittedUpgrade.l2Plan, ()),
             abi.encode(
                 L2UpgradePlan({
                     deployments: new IComplexUpgrader.UniversalContractUpgradeInfo[](0),
