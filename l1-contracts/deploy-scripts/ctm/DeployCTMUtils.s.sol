@@ -338,7 +338,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         } else if (
             compareStrings(contractName, "EraSettlementLayerV31Upgrade") ||
             compareStrings(contractName, "ZKsyncOSSettlementLayerV31Upgrade") ||
-            compareStrings(contractName, "EraSettlementLayerV32Upgrade")
+            compareStrings(contractName, "EraSettlementLayerV33Upgrade")
         ) {
             return abi.encode();
         } else if (compareStrings(contractName, "Governance")) {

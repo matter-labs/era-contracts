@@ -10,10 +10,10 @@ import {IEraMultiProofVerifier} from "../state-transition/chain-interfaces/IEraM
 import {ERA_MULTI_PROOF_TYPE} from "../common/Config.sol";
 
 /// @author Matter Labs
-/// @title EraSettlementLayerV32Upgrade
-/// @dev V32 upgrade for Era chains, installing the multi-proof gate.
+/// @title EraSettlementLayerV33Upgrade
+/// @dev V33 upgrade for Era chains, installing the multi-proof gate.
 /// @custom:security-contact security@matterlabs.dev
-contract EraSettlementLayerV32Upgrade is BaseZkSyncUpgrade {
+contract EraSettlementLayerV33Upgrade is BaseZkSyncUpgrade {
     /// @notice The main function that will be delegate-called by the chain.
     /// @param _proposedUpgrade The upgrade to be executed.
     function upgrade(ProposedUpgrade memory _proposedUpgrade) public override returns (bytes32) {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {EraSettlementLayerV32Upgrade} from "contracts/upgrades/EraSettlementLayerV32Upgrade.sol";
+import {EraSettlementLayerV33Upgrade} from "contracts/upgrades/EraSettlementLayerV33Upgrade.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {MustBeEraChain} from "contracts/common/L1ContractErrors.sol";
 import {
@@ -17,7 +17,7 @@ import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
 /// Stands in for a pre-gate verifier: real code, but no `acceptedProofType` to answer with.
 contract NonGateVerifier {}
 
-contract DummyEraSettlementLayerV32Upgrade is EraSettlementLayerV32Upgrade, BaseUpgradeUtils {
+contract DummyEraSettlementLayerV33Upgrade is EraSettlementLayerV33Upgrade, BaseUpgradeUtils {
     function setZKsyncOS(bool _zksyncOS) public {
         s.zksyncOS = _zksyncOS;
     }
@@ -35,18 +35,18 @@ contract DummyEraSettlementLayerV32Upgrade is EraSettlementLayerV32Upgrade, Base
     }
 }
 
-/// @notice The v32 upgrade installs the multi-proof gate, so the chain requires both systems from
+/// @notice The v33 upgrade installs the multi-proof gate, so the chain requires both systems from
 /// the cut onwards.
 /// @dev `disabledProofSystems` is new in this version and reads zero, which requires both. A batch
 /// committed before the cut carries no Airbender commitment and the gate would refuse it, so the
 /// upgrade refuses to run with any in flight — the same rule the v31 upgrade applies.
-contract EraSettlementLayerV32UpgradeTest is BaseUpgrade {
-    DummyEraSettlementLayerV32Upgrade internal upgradeContract;
+contract EraSettlementLayerV33UpgradeTest is BaseUpgrade {
+    DummyEraSettlementLayerV33Upgrade internal upgradeContract;
     address internal mockChainTypeManager = makeAddr("mockChainTypeManager");
     address internal mockVerifier = makeAddr("mockVerifier");
 
     function setUp() public {
-        upgradeContract = new DummyEraSettlementLayerV32Upgrade();
+        upgradeContract = new DummyEraSettlementLayerV33Upgrade();
 
         _prepareProposedUpgrade();
 
