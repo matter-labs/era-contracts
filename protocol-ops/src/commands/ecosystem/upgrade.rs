@@ -499,7 +499,7 @@ pub struct UpgradePrepareAllArgs {
     #[clap(long, default_value = COMPOSE_OPERATION_SCRIPT_PATH, hide = true)]
     pub compose_script_path: String,
 
-    /// Path to a TOML file describing per-CTM inputs (proxy + optional
+    /// Path to a TOML file with exactly one CTM entry (proxy + optional
     /// override). Mutually exclusive with the direct CTM flags (`--ctm-proxy`,
     /// `--rollup-da-manager-address`). Anything that is not a ZKsync OS CTM
     /// fails the prepare.

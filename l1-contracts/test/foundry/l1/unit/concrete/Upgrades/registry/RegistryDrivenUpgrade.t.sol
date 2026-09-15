@@ -159,6 +159,9 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
             Utils.transitionCodehash()
         );
 
+        vm.prank(governor);
+        coordinator.setCTMExecutor(ctmExecutor);
+
         // Real v33 artifacts: a fresh AdminFacet implementation (same selectors, new address)
         // and the plain DefaultUpgrade as the upgrade-init contract.
         newAdminFacet = address(new AdminFacet(block.chainid, RollupDAManager(address(0))));
@@ -317,7 +320,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
 
     /// @dev The one-leg operation a hop rides.
     function _operationFor(CTMTransition _transition) internal returns (EcosystemUpgradeOperation) {
-        return _operationFor(ICTMTransition(address(_transition)), address(ctmExecutor));
+        return _cachedOperationFor(ICTMTransition(address(_transition)));
     }
 
     /// @dev Stages 0 and 1: the hop is committed on the CTM and the lifecycle is still open.

@@ -543,6 +543,12 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       "coreExecutor.setCoordinator(coordinator)"
     );
 
+    await sendAndCheck(
+      l1Provider,
+      coordinator.setCTMExecutor(deployed.ctmExecutor, { gasLimit: DEFAULT_GAS_LIMIT }),
+      "coordinator.setCTMExecutor(ctmExecutor)"
+    );
+
     const cah = new ethers.Contract(live.chainAssetHandler, getAbi("L1ChainAssetHandler"), l1Provider);
     // The operation: the ecosystem leg and the one CTM leg governance reviews together. Deployed
     // from the deterministic build so the coordinator's OPERATION_CODEHASH pin accepts it. The
@@ -555,7 +561,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     );
     const operationContract = await operationFactory.deploy({
       coreRegistry: objects.coreRegistry,
-      legs: [{ executor: deployed.ctmExecutor, transition: objects.transition }],
+      transition: objects.transition,
     });
     await operationContract.deployed();
     const operation: string = operationContract.address;

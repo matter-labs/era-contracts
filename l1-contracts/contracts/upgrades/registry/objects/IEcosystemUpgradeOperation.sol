@@ -2,13 +2,13 @@
 
 pragma solidity 0.8.28;
 
-import {CTMLeg, OperationManifest} from "../RegistryTypes.sol";
+import {OperationManifest} from "../RegistryTypes.sol";
 
 /// @title IEcosystemUpgradeOperation
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Immutable description of one ecosystem upgrade: the optional ecosystem leg and the
-///         ordered CTM legs the coordinator drives together. See
+///         CTM transition the coordinator applies. See
 ///         {protocol-docs/ecosystem-upgrade-coordination.md}.
 interface IEcosystemUpgradeOperation {
     /// @notice `keccak256(abi.encode(manifest))` — the commitment governance reviews.
@@ -20,6 +20,6 @@ interface IEcosystemUpgradeOperation {
     /// @notice The ecosystem leg's `CoreRegistry`, zero when the operation has none.
     function coreRegistry() external view returns (address);
 
-    /// @notice The CTM legs in stage-1 application order.
-    function legs() external view returns (CTMLeg[] memory);
+    /// @notice The transition applied to the coordinator's bound CTM.
+    function transition() external view returns (address);
 }

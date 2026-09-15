@@ -85,10 +85,10 @@ the execution engine no longer decodes placeholders or understands the v34 deleg
 ## The upgrade timer
 
 Each transition pins its own `GovernanceUpgradeTimer`, deployed by the CTM prepare with
-`TIMER_GOVERNANCE` = the coordinator and `owner` = the ecosystem admin. Stage 0 starts each
-distinct timer once, including when several legs share it — `startTimer` is `onlyTimerAdmin`, so a
+`TIMER_GOVERNANCE` = the coordinator and `owner` = the ecosystem admin. Stage 0 starts the
+transition timer once — `startTimer` is `onlyTimerAdmin`, so a
 timer anybody else could have started early fails the stage; stage 1 requires `checkDeadline()` for
-every leg. The ecosystem admin keeps the bounded extension right through the timer's own
+the CTM transition. The ecosystem admin keeps the bounded extension right through the timer's own
 `changeDeadline`, capped at
 `deadline + MAX_ADDITIONAL_DELAY` (two weeks in the prepare). That right is separately governed
 and stays explicit. The bootstrap edge predates the coordinator, so its timer is bound to
@@ -99,7 +99,8 @@ governance and started as a declared external action.
 Each domain executor stores its coordinator explicitly (`coordinator`, `setCoordinator`); the
 coordinator's `CORE_EXECUTOR` is immutable. Replacing the coordinator therefore means deploying a
 new `EcosystemUpgradeExecutor` bound to the same `CoreUpgradeExecutor`, then, as the owner of
-each domain, pointing it at the successor. `setCoordinator` is refused while a domain is reserved,
+each domain, pointing it at the successor, then calling the successor coordinator's
+`setCTMExecutor` to bind the CTM executor back to it. `setCoordinator` is refused while a domain is reserved,
 so one operation is prepared, executed and completed by one coordinator; do it between upgrades,
 before the prepare, because every transition's timer is bound to the coordinator that will start
 it. Governance owns the domain executors, so this is a direct owner call, not `forward`.
@@ -111,7 +112,7 @@ simulated by regenerating already-deployed source state.
 ## Abandonment and recovery
 
 `abandonPendingOperation` (coordinator owner) frees every reservation and the lifecycle slot;
-what stage 1 already committed stands, and every CTM pause stays held (the semantics are in the
+what stage 1 already committed stands, and the CTM pause stays held (the semantics are in the
 coordinator spec). Recovery is then governance's explicit decision: prepare a corrected operation,
 and resume migrations — per CTM through the executor's `forward` to `unpauseCTMMigration`, or
 ecosystem-wide with `unpauseMigration`. Authority the executors hold stays reachable through

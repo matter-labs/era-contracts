@@ -181,6 +181,9 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             Utils.transitionCodehash()
         );
 
+        vm.prank(governor);
+        coordinator.setCTMExecutor(ctmExecutor);
+
         newVersion = SemVer.packSemVer(0, 1, 0);
         // The pinned timer gates `migrate()`: stage 0 starts it, the edge runs after its window.
         // Zero delays make the window pass immediately in the fixture.
@@ -771,6 +774,40 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
         _mockMigrationsUnpaused();
         migration.validateApplied();
+    }
+
+    function test_validateAppliedRequiresCoordinatorToNameTheBootstrappedExecutor() public {
+        _handOverAuthority();
+        migration.migrate();
+        _mockMigrationsUnpaused();
+        CTMUpgradeExecutor replacement = new CTMUpgradeExecutor(
+            governor,
+            IChainTypeManager(address(chainContractAddress)),
+            ecosystemProxyAdmin,
+            address(coordinator),
+            Utils.transitionCodehash()
+        );
+        vm.prank(governor);
+        coordinator.setCTMExecutor(replacement);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                BootstrapExecutorNotBound.selector,
+                address(coordinator),
+                address(ctmExecutor),
+                address(replacement)
+            )
+        );
+        migration.validateApplied();
+        assertTrue(migration.executed(), "failed completion does not undo the migration");
+        assertEq(chainContractAddress.owner(), address(ctmExecutor));
+        assertEq(ecosystemProxyAdmin.owner(), address(ctmExecutor));
+        assertEq(address(coordinator.ctmExecutor()), address(replacement));
+
+        vm.prank(governor);
+        coordinator.setCTMExecutor(ctmExecutor);
+        migration.validateApplied();
+        assertEq(address(coordinator.ctmExecutor()), address(ctmExecutor));
     }
 
     // ─────────────────────────── timer gating ───────────────────────────

@@ -300,15 +300,17 @@ contract UpgradeIntegrationTest_v34_Local is
         address chainAssetHandler = IBridgehubBase(bridgehub).chainAssetHandler();
         EcosystemUpgradeExecutor coordinator = v34.ecosystemUpgradeExecutor();
         Call[] memory stage2 = v34.prepareStage2GovernanceCalls();
-        assertEq(stage2.length, 1, "v34 CTM stage 2: the post-state gate only");
+        assertEq(stage2.length, 2, "v34 CTM stage 2: binding then post-state gate");
         assertEq(
             v34.externalActionEntries().length,
-            6,
+            7,
             "the bootstrap's CTM prepare declares every one of its governance and admin calls"
         );
-        assertEq(stage2[0].target, address(v34.bootstrapMigration()), "stage 2 must target the migration");
+        assertEq(address(coordinator.ctmExecutor()), executor, "coordinator CTM binding");
+        assertEq(stage2[0].target, address(coordinator), "bind coordinator first");
+        assertEq(stage2[1].target, address(v34.bootstrapMigration()), "stage 2 must target the migration");
         assertEq(
-            stage2[0].data,
+            stage2[1].data,
             abi.encodeCall(v34.bootstrapMigration().validateApplied, ()),
             "stage 2 must call validateApplied"
         );

@@ -12,15 +12,15 @@ import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/Ec
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
-import {CTMLeg, OperationManifest} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {OperationManifest} from "contracts/upgrades/registry/RegistryTypes.sol";
 
 import {Create2FactoryUtils} from "../utils/deploy/Create2FactoryUtils.s.sol";
 import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
-import {ComposeOperationParams, OperationLegInput} from "./default-upgrade/UpgradeParams.sol";
+import {ComposeOperationParams} from "./default-upgrade/UpgradeParams.sol";
 
 /// @notice The compose step of a registry-driven upgrade, run once every prepare has finished:
 ///         deploys the write-once `EcosystemUpgradeOperation` over the core prepare's registry and
-///         every CTM prepare's (executor, transition) leg, checks it against the live coordinator
+///         the CTM prepare's transition, checks it against the live coordinator
 ///         and executors, and emits the upgrade's three governance calls —
 ///         `EcosystemUpgradeExecutor.stage0/1/2(operation)`. Nothing here is authored: the
 ///         operation is the association of objects the prepares already deployed. See
@@ -36,7 +36,7 @@ contract ComposeUpgradeOperation is Script, Create2FactoryUtils {
         setCreate2Salt(_params.create2FactorySalt);
         EcosystemUpgradeExecutor coordinator = EcosystemUpgradeExecutor(payable(_params.coordinator));
         require(address(coordinator).code.length != 0, "coordinator has no code");
-        require(_params.legs.length != 0, "an operation needs at least one CTM leg");
+        require(_params.transition != address(0), "an operation needs a CTM transition");
 
         // Every check the coordinator's stage 0 makes, evaluated now: a drifted binding or pin
         // must fail here, not with the whole upgrade already reviewed and scheduled.
@@ -48,26 +48,22 @@ contract ComposeUpgradeOperation is Script, Create2FactoryUtils {
                 "core registry: not the code the core executor pins"
             );
         }
-        CTMLeg[] memory legs = new CTMLeg[](_params.legs.length);
-        for (uint256 i = 0; i < _params.legs.length; ++i) {
-            OperationLegInput memory leg = _params.legs[i];
-            CTMUpgradeExecutor executor = CTMUpgradeExecutor(payable(leg.executor));
-            require(executor.coordinator() == address(coordinator), "CTM executor: wrong coordinator");
-            require(
-                leg.transition.codehash == executor.TRANSITION_CODEHASH(),
-                "transition: not the code its executor pins"
-            );
-            address timerGovernance = GovernanceUpgradeTimer(ICTMTransition(leg.transition).upgradeTimer())
-                .TIMER_GOVERNANCE();
-            require(timerGovernance == address(coordinator), "transition timer: not bound to the coordinator");
-            legs[i] = CTMLeg({executor: leg.executor, transition: leg.transition});
-        }
+        CTMUpgradeExecutor executor = CTMUpgradeExecutor(payable(address(coordinator.ctmExecutor())));
+        require(address(executor) != address(0), "coordinator has no CTM executor");
+        require(executor.coordinator() == address(coordinator), "CTM executor: wrong coordinator");
+        require(
+            _params.transition.codehash == executor.TRANSITION_CODEHASH(),
+            "transition: not the code its executor pins"
+        );
+        address timerGovernance = GovernanceUpgradeTimer(ICTMTransition(_params.transition).upgradeTimer())
+            .TIMER_GOVERNANCE();
+        require(timerGovernance == address(coordinator), "transition timer: not bound to the coordinator");
 
         // From the build ARTIFACT, which is also where the coordinator's `OPERATION_CODEHASH` came
         // from — see {BytecodeUtils.getDeployedBytecodeHash}.
         operation = deployViaCreate2AndNotify(
             BytecodeUtils.readBytecodeL1("EcosystemUpgradeOperation.sol", "EcosystemUpgradeOperation"),
-            abi.encode(OperationManifest({coreRegistry: _params.coreRegistry, legs: legs})),
+            abi.encode(OperationManifest({coreRegistry: _params.coreRegistry, transition: _params.transition})),
             "EcosystemUpgradeOperation"
         );
         require(

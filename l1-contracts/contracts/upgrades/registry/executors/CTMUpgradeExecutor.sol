@@ -15,7 +15,7 @@ import {
     EmptyBytes32,
     MigrationsNotPaused,
     NoPendingOperation,
-    OperationHasNoLegForExecutor,
+    ExecutorCoordinatorMismatch,
     TransitionNotCommitted,
     TransitionReleaseMismatch,
     Unauthorized,
@@ -28,7 +28,7 @@ import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
 import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 import {L2PlanLib} from "../libraries/L2PlanLib.sol";
 import {BytecodesSupplier} from "../../BytecodesSupplier.sol";
-import {CTMLeg} from "../RegistryTypes.sol";
+import {IEcosystemUpgradeExecutor} from "./IEcosystemUpgradeExecutor.sol";
 
 /// @title CTMUpgradeExecutor
 /// @author Matter Labs
@@ -185,15 +185,16 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
     // ---------------------------------------------------------------------------------------
 
     /// @inheritdoc ICTMUpgradeExecutor
-    /// @dev The leg is read from the operation, never passed: the operation is the one place a
-    ///      transition is bound to this executor. Everything that can be rejected is rejected
-    ///      BEFORE the reservation is recorded, so a wrong transition never occupies the slot. The
-    ///      pause is what makes the CTM's version commit in `applyTransition` admissible.
+    /// @dev The coordinator binds this executor; the operation supplies its transition.
     function beginOperation(IEcosystemUpgradeOperation _operation) external onlyCoordinator {
         if (address(activeOperation) != address(0)) {
             revert UpgradeLifecycleBusy(address(activeOperation));
         }
-        ICTMTransition transition = _legTransition(_operation);
+        address boundExecutor = address(IEcosystemUpgradeExecutor(coordinator).ctmExecutor());
+        if (boundExecutor != address(this)) {
+            revert ExecutorCoordinatorMismatch(address(this), boundExecutor);
+        }
+        ICTMTransition transition = ICTMTransition(_operation.transition());
         _requireGenuineTransition(transition);
         transition.validate();
         _requireEdges(transition);
@@ -209,14 +210,14 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
         if (address(activeOperation) == address(0)) {
             return ICTMTransition(address(0));
         }
-        return _legTransition(activeOperation);
+        return ICTMTransition(activeOperation.transition());
     }
 
     /// @inheritdoc ICTMUpgradeExecutor
     /// @dev Applies CTM-domain proxy rows, the version commit and the release pin; any failure
     ///      reverts the coordinator's whole stage.
     function applyTransition() external onlyCoordinator {
-        ICTMTransition transition = _legTransition(_requireActive());
+        ICTMTransition transition = ICTMTransition(_requireActive().transition());
         // Checked here for a clear failure; the CTM's own version commit refuses to run unpaused.
         if (!_chainAssetHandler().migrationPausedFor(address(CHAIN_TYPE_MANAGER))) {
             revert MigrationsNotPaused();
@@ -229,7 +230,7 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
     ///      coordinator sequences completions and relies on the stage being one transaction.
     function completeOperation() external onlyCoordinator {
         IEcosystemUpgradeOperation operation = _requireActive();
-        _requireTransitionApplied(_legTransition(operation));
+        _requireTransitionApplied(ICTMTransition(operation.transition()));
         delete activeOperation;
         _chainAssetHandler().unpauseCTMMigration(address(CHAIN_TYPE_MANAGER));
         emit OperationCompleted(address(operation));
@@ -304,19 +305,6 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
         if (address(operation) == address(0)) {
             revert NoPendingOperation();
         }
-    }
-
-    /// @dev The transition `_operation` binds to THIS executor. Unique when present: the operation
-    ///      refuses two legs on one CTM, and this executor's CTM is immutable.
-    function _legTransition(IEcosystemUpgradeOperation _operation) private view returns (ICTMTransition) {
-        CTMLeg[] memory legs = _operation.legs();
-        uint256 length = legs.length;
-        for (uint256 i = 0; i < length; ++i) {
-            if (legs[i].executor == address(this)) {
-                return ICTMTransition(legs[i].transition);
-            }
-        }
-        revert OperationHasNoLegForExecutor(address(_operation), address(this));
     }
 
     /// @dev Both transition edges, asserted independently:

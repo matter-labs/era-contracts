@@ -17,7 +17,7 @@ review from the [root README review guide](../../../README.md#reviewing-registry
   `declareExternalAction` (`ExternalActionsLib`) and is listed in the output's `external_actions`.
   `DefaultChainUpgrade` is the legacy handed-cut per-chain leg the Foundry integration tests use.
 - `ComposeUpgradeOperation.s.sol` — the compose step: deploys the `EcosystemUpgradeOperation` over
-  the core prepare's registry and every CTM prepare's `(executor, transition)` leg and emits the
+  the core prepare's registry and the single CTM prepare's transition and emits the
   three governance calls, `EcosystemUpgradeExecutor.stage0/1/2(operation)`.
 - `v35/` — the first registry-driven release and the template for the next one: `CoreUpgrade_v35`
   deploys one fresh `L1MessageRoot`; `CTMUpgrade_v35` overrides nothing.

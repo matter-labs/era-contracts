@@ -81,6 +81,8 @@ sol! {
     #[sol(rpc)]
     contract EcosystemUpgradeExecutorView {
         function CORE_EXECUTOR() external view returns (address);
+        function ctmExecutor() external view returns (address);
+        function setCTMExecutor(address _ctmExecutor) external;
         function OPERATION_CODEHASH() external view returns (bytes32);
         function pendingOperation() external view returns (address);
         function owner() external view returns (address);

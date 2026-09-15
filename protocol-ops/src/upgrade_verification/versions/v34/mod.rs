@@ -25,6 +25,7 @@
 
 use alloy::primitives::{Address, U256};
 use alloy::providers::Provider;
+use alloy::sol_types::SolCall;
 
 use crate::common::ethereum::get_provider;
 use crate::upgrade_verification::verifiers::VerificationResult;
@@ -673,6 +674,18 @@ fn verify_stage2_shape(
             "stage 2 never binds the core executor to the coordinator: no later operation could \
              reserve the ecosystem leg",
         );
+    }
+
+    let expected_binding = EcosystemUpgradeExecutorView::setCTMExecutorCall {
+        _ctmExecutor: manifest.ctmExecutor.addr,
+    }
+    .abi_encode();
+    if package.stage2.iter().any(|call| {
+        call.target == manifest.coordinator && call.value.is_zero() && call.data == expected_binding
+    }) {
+        result.report_ok("stage 2 binds the coordinator to the reviewed CTM executor");
+    } else {
+        result.report_error("stage 2 never binds the coordinator to the reviewed CTM executor");
     }
 
     let asserts_applied = package.stage2.iter().any(|c| {

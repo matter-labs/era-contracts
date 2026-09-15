@@ -11,7 +11,6 @@ import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol
 import {ICoreRegistry} from "contracts/upgrades/registry/objects/ICoreRegistry.sol";
 import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol";
 import {IEcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/IEcosystemUpgradeOperation.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {MockProxyUpgradeInitImpl} from "contracts/dev-contracts/test/MockProxyUpgradeInitImpl.sol";
 import {
     LegNotReserved,
@@ -24,7 +23,6 @@ import {
 } from "contracts/common/L1ContractErrors.sol";
 import {
     CoreRegistryManifest,
-    CTMLeg,
     OperationManifest,
     ProxyUpgradeRow,
     PinnedContract
@@ -38,18 +36,6 @@ import {
 contract NotACoreRegistry {
     function manifestHash() external pure returns (bytes32) {
         return bytes32(uint256(1));
-    }
-}
-
-/// @dev The one CTM-executor getter an operation's constructor reads. MOCKED deliberately: this
-///      suite isolates the core executor's reservation rules, and an operation must name a CTM leg
-///      to exist at all; the CTM side of a lifecycle is CTMUpgradeLifecycle.t.sol's business.
-contract StubCTMExecutor {
-    // solhint-disable-next-line var-name-mixedcase
-    IChainTypeManager public immutable CHAIN_TYPE_MANAGER;
-
-    constructor(address _ctm) {
-        CHAIN_TYPE_MANAGER = IChainTypeManager(_ctm);
     }
 }
 
@@ -77,7 +63,7 @@ contract DummyImplB {
 /// @dev The COORDINATOR IS A PLAIN ADDRESS here, pranked: this suite isolates the executor's own
 ///      rules (who may reserve, apply and release, and for which registry) from the coordinator's
 ///      stage logic. Operations are REAL write-once `EcosystemUpgradeOperation` objects — the
-///      executor reads its leg from them — over a stub CTM leg (see `StubCTMExecutor`); the real
+///      executor reads its leg from them — with an inert transition address; the real
 ///      coordinator drives the same callbacks end to end in CTMUpgradeLifecycle.t.sol and
 ///      EcosystemUpgradeCoordination.t.sol.
 contract CoreUpgradeExecutorTest is Test {
@@ -85,7 +71,6 @@ contract CoreUpgradeExecutorTest is Test {
 
     address internal ecosystemGovernor = makeAddr("ecosystemGovernor");
     address internal coordinator = makeAddr("coordinator");
-    StubCTMExecutor internal stubCtmExecutor;
     /// @dev The default operation: the fixture registry as its ecosystem leg, one stub CTM leg.
     IEcosystemUpgradeOperation internal operation;
 
@@ -124,15 +109,15 @@ contract CoreUpgradeExecutorTest is Test {
         vm.prank(ecosystemGovernor);
         coreExecutor.setCoordinator(coordinator);
 
-        stubCtmExecutor = new StubCTMExecutor(makeAddr("ctm"));
         operation = _operationNaming(address(coreRegistry));
     }
 
     /// @dev A one-leg operation whose ecosystem leg is `_coreRegistry` (zero for none).
     function _operationNaming(address _coreRegistry) internal returns (IEcosystemUpgradeOperation) {
-        CTMLeg[] memory legs = new CTMLeg[](1);
-        legs[0] = CTMLeg({executor: address(stubCtmExecutor), transition: makeAddr("transition")});
-        return new EcosystemUpgradeOperation(OperationManifest({coreRegistry: _coreRegistry, legs: legs}));
+        return
+            new EcosystemUpgradeOperation(
+                OperationManifest({coreRegistry: _coreRegistry, transition: makeAddr("transition")})
+            );
     }
 
     function _row(

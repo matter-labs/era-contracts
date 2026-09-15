@@ -8,6 +8,7 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
 import {CTM_CONTRACT_COUNT} from "../libraries/ContractIdentifiers.sol";
 import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
+import {IEcosystemUpgradeExecutor} from "../executors/IEcosystemUpgradeExecutor.sol";
 import {CTMUpgradeExecutor} from "../executors/CTMUpgradeExecutor.sol";
 import {ICommittedUpgrade} from "../objects/ICommittedUpgrade.sol";
 import {ICTMRelease} from "../objects/ICTMRelease.sol";
@@ -297,6 +298,10 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
         address proxyAdminOwner = m.ctmProxyAdmin.owner();
         if (proxyAdminOwner != m.ctmExecutor.addr) {
             revert BootstrapAuthorityNotHeld(address(m.ctmProxyAdmin), proxyAdminOwner);
+        }
+        address boundExecutor = address(IEcosystemUpgradeExecutor(m.coordinator).ctmExecutor());
+        if (boundExecutor != m.ctmExecutor.addr) {
+            revert BootstrapExecutorNotBound(m.coordinator, m.ctmExecutor.addr, boundExecutor);
         }
         // Completion lifts the operational restrictions too: the stage-0 pause must have been
         // released before this edge counts as done, so the bundle cannot forget it.

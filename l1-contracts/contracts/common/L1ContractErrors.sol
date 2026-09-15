@@ -109,6 +109,8 @@ error ChainRequiresValidatorsSignaturesForCommit();
 error ChainTypeManagerNotRegistered(address chainTypeManager);
 // 0x8746f42f
 error ConstructorsNotSupported();
+// 0x957f207b
+error CoordinatorCTMMismatch(address expected, address actual);
 // 0xec273439
 error CTMAlreadyRegistered();
 // 0xc630ef3c
@@ -135,8 +137,6 @@ error DepositExists();
 error DiamondAlreadyFrozen();
 // 0xa7151b9a
 error DiamondNotFrozen();
-// 0x10f5fc00
-error DuplicateOperationLeg(address ctm);
 // 0x7138356f
 error EmptyAddress();
 // 0x2d4d012f
@@ -145,14 +145,14 @@ error EmptyAssetId();
 error EmptyBytes32();
 // 0x99d8fec9
 error EmptyData();
-// 0x47fab76c
-error EmptyOperation();
 // 0x456f8f7a
 error EmptyProofLength();
 // 0x05410cbc
 error EmptyPublicInputsLength();
 // 0x61733a89
 error EVMBytecodeAlreadyPublished(bytes32 bytecodeHash);
+// 0x8bd334a8
+error ExecutorCoordinatorMismatch(address expected, address actual);
 // 0xac4a3f98
 error FacetExists(bytes4 selector, address);
 // 0xba87a28b
@@ -340,8 +340,6 @@ error OnlyPriorityMode();
 error OnlySelfAllowed();
 // 0x1a21feed
 error OperationExists();
-// 0x9c6d0446
-error OperationHasNoLegForExecutor(address operation, address executor);
 // 0xeda2fbb1
 error OperationMustBePending();
 // 0xe1c1ff37

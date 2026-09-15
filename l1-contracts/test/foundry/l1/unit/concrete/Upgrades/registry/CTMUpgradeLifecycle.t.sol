@@ -34,6 +34,7 @@ import {
 } from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {
     CallerNotTimerAdmin,
+    ZeroAddress,
     DeadlineNotYetPassed,
     MigrationsNotPaused,
     NoPendingOperation,
@@ -47,7 +48,6 @@ import {
 } from "contracts/common/L1ContractErrors.sol";
 import {
     CoreRegistryManifest,
-    CTMLeg,
     PinnedContract,
     ProxyUpgradeRow,
     TransitionManifest
@@ -162,7 +162,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
     /// @dev The full transition, registered under an operation that names the ecosystem leg.
     function _deployFullTransition() internal returns (CTMTransition full) {
         full = new CTMTransition(_fullManifest());
-        _operationWithCore(ICTMTransition(address(full)), address(ctmExecutor), address(coreRegistry));
+        _operationWithCore(ICTMTransition(address(full)), address(coreRegistry));
     }
 
     function _liveImpl(ProxyAdmin _admin, TransparentUpgradeableProxy _proxy) internal view returns (address) {
@@ -309,10 +309,8 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         CTMTransition full = _deployFullTransition();
         EcosystemUpgradeOperation operation = _operationFor(full);
         assertEq(operation.coreRegistry(), address(coreRegistry));
-        CTMLeg[] memory legs = operation.legs();
-        assertEq(legs.length, 1);
-        assertEq(legs[0].executor, address(ctmExecutor));
-        assertEq(legs[0].transition, address(full));
+        assertEq(operation.transition(), address(full));
+        assertEq(address(coordinator.ctmExecutor()), address(ctmExecutor));
         assertEq(operation.manifestHash(), keccak256(abi.encode(operation.getManifest())));
     }
 
@@ -331,6 +329,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         vm.expectEmit(true, true, true, true, address(ctmExecutor));
         emit CTMUpgradeExecutor.CoordinatorChanged(address(coordinator), address(successor));
         ctmExecutor.setCoordinator(address(successor));
+        successor.setCTMExecutor(ctmExecutor);
         vm.stopPrank();
         assertEq(coreExecutor.coordinator(), address(successor));
         assertEq(ctmExecutor.coordinator(), address(successor));
@@ -530,7 +529,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         foreign.stage0(operation);
 
         EcosystemUpgradeOperation ctmOnly = _operationFor(transition);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(foreign)));
+        vm.expectRevert(ZeroAddress.selector);
         vm.prank(governor);
         foreign.stage0(ctmOnly);
 
@@ -630,7 +629,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
             implNew
         );
         CTMTransition next = new CTMTransition(corrected);
-        _operationWithCore(ICTMTransition(address(next)), address(ctmExecutor), address(coreRegistry));
+        _operationWithCore(ICTMTransition(address(next)), address(coreRegistry));
         _stage0(next);
         _assertPendingAndPaused(next, IEcosystemUpgradeExecutor.UpgradeStage.Prepared);
     }
@@ -713,7 +712,6 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         // timer is the last thing stage 0 touches.
         EcosystemUpgradeOperation operation = _operationWithCore(
             ICTMTransition(address(mistimed)),
-            address(ctmExecutor),
             address(coreRegistry)
         );
 
@@ -781,11 +779,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         // that does not run the audited `CoreRegistry` code when asked to reserve it.
         address impostor = makeAddr("notACoreRegistry");
         vm.etch(impostor, hex"600046");
-        EcosystemUpgradeOperation misnamed = _operationWithCore(
-            ICTMTransition(address(transition)),
-            address(ctmExecutor),
-            impostor
-        );
+        EcosystemUpgradeOperation misnamed = _operationWithCore(ICTMTransition(address(transition)), impostor);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -802,7 +796,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
 
     function test_revertWhen_stage0WithNonGenuineTransition() public {
         NotATransition impostor = new NotATransition();
-        EcosystemUpgradeOperation operation = _operationFor(ICTMTransition(address(impostor)), address(ctmExecutor));
+        EcosystemUpgradeOperation operation = _cachedOperationFor(ICTMTransition(address(impostor)));
 
         vm.expectRevert(
             abi.encodeWithSelector(

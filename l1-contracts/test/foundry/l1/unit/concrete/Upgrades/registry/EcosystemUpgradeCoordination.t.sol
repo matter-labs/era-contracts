@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.28;
 
+import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
+import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {
     ITransparentUpgradeableProxy,
@@ -16,6 +18,8 @@ import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.s
 import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol";
+import {ICTMUpgradeExecutor} from "contracts/upgrades/registry/executors/ICTMUpgradeExecutor.sol";
+import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {IEcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/IEcosystemUpgradeExecutor.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
@@ -28,9 +32,11 @@ import {
     L1EcosystemContract
 } from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {
-    DuplicateOperationLeg,
-    EmptyOperation,
     L2BytecodeNotPublished,
+    CoordinatorCTMMismatch,
+    ExecutorCoordinatorMismatch,
+    UpgradeLifecycleBusy,
+    RegistryPinTargetHasNoCode,
     OperationNotPending,
     ProxyUpgradeRowMismatch,
     Unauthorized,
@@ -38,22 +44,12 @@ import {
 } from "contracts/common/L1ContractErrors.sol";
 import {
     CoreRegistryManifest,
-    CTMLeg,
     ProxyUpgradeRow,
     TransitionManifest
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
-/// @notice One operation over SEVERAL CTMs sharing one ecosystem change — the case the
-///         coordinator exists for ({protocol-docs/ecosystem-upgrade-coordination.md}): the
-///         operation's shape rules, the reservation of every participant before anything is
-///         applied, the core leg applied once ahead of the CTM legs in committed order, a later
-///         leg's failure rolling back the core and the earlier legs, completion releasing no pause
-///         before every leg verified, and abandonment across all participants.
-/// @dev Builds on the one-CTM fixture by deploying a SECOND real ZKsyncOS CTM behind the same
-///      implementation (registered on the fixture's real Bridgehub, its own executor and
-///      `ProxyAdmin`, its own current release pin) so both legs run real CTM commits against the
-///      fixture's real `L1ChainAssetHandler`. Neither CTM crosses a chain here — that is
-///      RegistryDrivenUpgrade.t.sol's business.
+/// @notice One CTM coordinator: authority bindings, same-CTM succession and atomic core/CTM execution.
+/// @dev A second real CTM exists only to test rejection of a different domain during succession.
 contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
     ChainTypeManager internal ctm2;
     CTMUpgradeExecutor internal ctmExecutor2;
@@ -129,281 +125,135 @@ contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
         coreRegistry = new CoreRegistry(manifest);
     }
 
-    // ─────────────────────────────── fixtures ───────────────────────────────
-
-    function _leg(CTMUpgradeExecutor _executor, CTMTransition _transition) internal pure returns (CTMLeg memory) {
-        return CTMLeg({executor: address(_executor), transition: address(_transition)});
+    function _replacement(address _coordinator) internal returns (CTMUpgradeExecutor) {
+        return
+            new CTMUpgradeExecutor(
+                governor,
+                IChainTypeManager(address(chainContractAddress)),
+                ctmProxyAdmin,
+                _coordinator,
+                Utils.transitionCodehash()
+            );
     }
 
-    /// @dev The two-leg operation over the fixture CTM (leg 0) and the second CTM (leg 1), with
-    ///      the shared ecosystem leg.
-    function _twoLegOperation(
-        CTMTransition _first,
-        CTMTransition _second
-    ) internal returns (EcosystemUpgradeOperation) {
-        CTMLeg[] memory legs = new CTMLeg[](2);
-        legs[0] = _leg(ctmExecutor, _first);
-        legs[1] = _leg(ctmExecutor2, _second);
-        return _deployOperation(address(coreRegistry), legs);
-    }
-
-    function _liveEcosystemImpl() internal view returns (address) {
-        return ecosystemProxyAdmin.getProxyImplementation(ITransparentUpgradeableProxy(address(ecosystemProxy)));
-    }
-
-    function _assertBothPaused(bool _paused) internal view {
-        assertEq(chainAssetHandler.migrationPausedFor(address(chainContractAddress)), _paused, "CTM 1 pause");
-        assertEq(chainAssetHandler.migrationPausedFor(address(ctm2)), _paused, "CTM 2 pause");
-    }
-
-    function _assertBothUntouched() internal view {
-        assertEq(chainContractAddress.protocolVersion(), 0, "CTM 1 version must not move");
-        assertEq(ctm2.protocolVersion(), 0, "CTM 2 version must not move");
-        assertEq(_liveEcosystemImpl(), implOld, "the ecosystem leg must not be applied");
-    }
-
-    function _assertAllFree() internal view {
-        assertEq(address(coordinator.pendingOperation()), address(0), "the coordinator must be idle");
-        assertEq(address(coreExecutor.activeOperation()), address(0), "the core executor must be free");
-        assertEq(address(ctmExecutor.activeOperation()), address(0), "CTM executor 1 must be free");
-        assertEq(address(ctmExecutor2.activeOperation()), address(0), "CTM executor 2 must be free");
-    }
-
-    // ─────────────────────────────── the shared upgrade ───────────────────────────────
-
-    function test_twoCtmsShareOneCoreLeg_endToEnd() public {
-        CTMTransition first = _deployTransition(777);
-        CTMTransition second = _deployTransition(778);
-        EcosystemUpgradeOperation operation = _twoLegOperation(first, second);
-
-        vm.prank(governor);
-        coordinator.stage0(operation);
-        _assertBothPaused(true);
-        assertEq(address(coreExecutor.reservedCoreRegistry()), address(coreRegistry));
-        assertEq(address(ctmExecutor.reservedTransition()), address(first));
-        assertEq(address(ctmExecutor2.reservedTransition()), address(second));
-        assertEq(GovernanceUpgradeTimer(first.upgradeTimer()).deadline(), block.timestamp, "timer 1 started");
-        assertEq(GovernanceUpgradeTimer(second.upgradeTimer()).deadline(), block.timestamp, "timer 2 started");
-        _assertBothUntouched();
-
-        vm.prank(governor);
-        coordinator.stage1(operation);
-        assertEq(_liveEcosystemImpl(), implNew, "the ecosystem leg applies once, ahead of the CTM legs");
-        assertEq(chainContractAddress.protocolVersion(), newVersion, "CTM 1 committed");
-        assertEq(ctm2.protocolVersion(), newVersion, "CTM 2 committed");
-        assertEq(chainContractAddress.upgradeTransition(0), address(first));
-        assertEq(ctm2.upgradeTransition(0), address(second));
-        assertEq(ctm2.currentRelease(), address(release));
-        _assertBothPaused(true);
-
-        vm.prank(governor);
-        coordinator.stage2(operation);
-        _assertBothPaused(false);
-        _assertAllFree();
-        ctmExecutor.validateTransitionApplied(ICTMTransition(address(first)));
-        ctmExecutor2.validateTransitionApplied(ICTMTransition(address(second)));
-    }
-
-    /// @dev Legs may share ONE `GovernanceUpgradeTimer` — the prepare deploys one clock per
-    ///      upgrade, not one per CTM. Stage 0 must start it exactly once: a second `startTimer()`
-    ///      reverts `TimerAlreadyStarted`, so the stage completing at all is the assertion.
-    function test_legsSharingOneTimer_startItExactlyOnce() public {
-        GovernanceUpgradeTimer shared = _newTimer(0, 0);
-        CTMTransition first = _transitionWithTimer(777, shared);
-        CTMTransition second = _transitionWithTimer(778, shared);
-        assertEq(first.upgradeTimer(), second.upgradeTimer(), "both legs pin the same clock");
-        EcosystemUpgradeOperation operation = _twoLegOperation(first, second);
-
-        vm.prank(governor);
-        coordinator.stage0(operation);
-
-        assertEq(shared.deadline(), block.timestamp, "the shared clock runs");
-        _assertBothPaused(true);
-
-        // Stage 1 gates both legs on that one deadline.
-        vm.prank(governor);
-        coordinator.stage1(operation);
-        assertEq(chainContractAddress.protocolVersion(), newVersion, "CTM 1 committed");
-        assertEq(ctm2.protocolVersion(), newVersion, "CTM 2 committed");
-    }
-
-    /// @dev A fixture transition re-pinned onto `_timer` instead of its own fresh one.
-    function _transitionWithTimer(
-        uint256 _upgradeTimestamp,
-        GovernanceUpgradeTimer _timer
-    ) internal returns (CTMTransition) {
-        TransitionManifest memory manifest = _transitionManifest(
-            _upgradeTimestamp,
-            address(fromRelease),
-            0,
-            L2_DELEGATE_CODE
-        );
-        manifest.upgradeTimer = _pin(address(_timer));
-        return new CTMTransition(manifest);
-    }
-
-    /// @dev Stage 1 is one transaction: the second leg failing (its factory dependency is not
-    ///      published on the shared supplier) rolls back the core leg and the first CTM leg with
-    ///      it, and every reservation and pause stays in place for a retry.
-    function test_laterLegFailureRollsBackTheCoreAndEarlierLegs() public {
-        CTMTransition first = _deployTransition(777);
-        bytes memory unpublishedDelegate = hex"de1f";
-        CTMTransition second = _deployTransitionWithDelegate(778, address(fromRelease), 0, unpublishedDelegate);
-        EcosystemUpgradeOperation operation = _twoLegOperation(first, second);
-        vm.prank(governor);
-        coordinator.stage0(operation);
-
-        vm.expectRevert(abi.encodeWithSelector(L2BytecodeNotPublished.selector, keccak256(unpublishedDelegate)));
-        vm.prank(governor);
-        coordinator.stage1(operation);
-
-        _assertBothUntouched();
-        _assertBothPaused(true);
-        assertEq(address(coordinator.pendingOperation()), address(operation), "the operation stays prepared");
-        assertTrue(coordinator.pendingStage() == IEcosystemUpgradeExecutor.UpgradeStage.Prepared);
-
-        // Published, the same operation executes with nothing else changed.
-        L2PlanFixtures.publish(bytecodesSupplier, L2PlanFixtures.codes(unpublishedDelegate));
-        vm.startPrank(governor);
-        coordinator.stage1(operation);
-        coordinator.stage2(operation);
-        vm.stopPrank();
-        assertEq(chainContractAddress.protocolVersion(), newVersion);
-        assertEq(ctm2.protocolVersion(), newVersion);
-        _assertAllFree();
-    }
-
-    /// @dev Stage 2 is one transaction: a later CTM's foreign-admin row still waiting for its
-    ///      administrator rolls back the core's and the first CTM's release too.
-    function test_stage2ReleasesNothingUntilEveryLegVerified() public {
-        // A per-CTM proxy of the second CTM under an admin the executor does not own.
-        address chainAdmin = makeAddr("chainAdmin");
-        ProxyAdmin notifierAdmin = new ProxyAdmin();
-        notifierAdmin.transferOwnership(chainAdmin);
-        TransparentUpgradeableProxy notifierProxy = new TransparentUpgradeableProxy(
-            implOld,
-            address(notifierAdmin),
-            hex""
-        );
-        TransitionManifest memory manifest = _transitionManifest(778, address(fromRelease), 0, L2_DELEGATE_CODE);
-        manifest.proxyUpgrades[uint256(CTMContract.ServerNotifier)] = ProxyUpgradeRow({
-            proxy: address(notifierProxy),
-            expectedOldImpl: implOld,
-            implNew: _pin(implNew),
-            callInitializeUpgrade: false,
-            admin: notifierAdmin
-        });
-        CTMTransition first = _deployTransition(777);
-        CTMTransition second = new CTMTransition(manifest);
-        EcosystemUpgradeOperation operation = _twoLegOperation(first, second);
-        vm.startPrank(governor);
-        coordinator.stage0(operation);
-        coordinator.stage1(operation);
-        vm.stopPrank();
-        assertEq(ctm2.protocolVersion(), newVersion, "the leg otherwise completes");
-
+    function test_revertWhen_bindingDifferentCTM() public {
         vm.expectRevert(
-            abi.encodeWithSelector(ProxyUpgradeRowMismatch.selector, address(notifierProxy), implNew, implOld)
+            abi.encodeWithSelector(CoordinatorCTMMismatch.selector, address(chainContractAddress), address(ctm2))
         );
         vm.prank(governor);
-        coordinator.stage2(operation);
-        _assertBothPaused(true);
-        assertEq(address(ctmExecutor.activeOperation()), address(operation), "CTM 1 stays reserved");
-        assertEq(address(coreExecutor.activeOperation()), address(operation), "the core stays reserved");
-
-        vm.prank(chainAdmin);
-        notifierAdmin.upgrade(ITransparentUpgradeableProxy(address(notifierProxy)), implNew);
-        vm.prank(governor);
-        coordinator.stage2(operation);
-        _assertBothPaused(false);
-        _assertAllFree();
+        coordinator.setCTMExecutor(ctmExecutor2);
+        assertEq(address(coordinator.ctmExecutor()), address(ctmExecutor));
     }
 
-    function test_abandon_releasesEveryReservationAndLeavesEveryPause() public {
-        CTMTransition first = _deployTransition(777);
-        CTMTransition second = _deployTransition(778);
-        EcosystemUpgradeOperation operation = _twoLegOperation(first, second);
-        vm.prank(governor);
-        coordinator.stage0(operation);
-
-        vm.prank(governor);
-        coordinator.abandonPendingOperation();
-
-        _assertAllFree();
-        _assertBothPaused(true);
-        _assertBothUntouched();
-    }
-
-    // ─────────────────────────── participants and authority ───────────────────────────
-
-    /// @dev A leg whose executor does not name this coordinator refuses the whole stage 0 —
-    ///      including the legs and the core leg reserved before it.
-    function test_revertWhen_aLaterLegDoesNotNameTheCoordinator() public {
-        CTMTransition first = _deployTransition(777);
-        CTMTransition second = _deployTransition(778);
-        EcosystemUpgradeOperation operation = _twoLegOperation(first, second);
+    function test_revertWhen_executorNamesAnotherCoordinator() public {
         address other = makeAddr("otherCoordinator");
+        CTMUpgradeExecutor replacement = _replacement(other);
+        vm.expectRevert(abi.encodeWithSelector(ExecutorCoordinatorMismatch.selector, address(coordinator), other));
         vm.prank(governor);
-        ctmExecutor2.setCoordinator(other);
+        coordinator.setCTMExecutor(replacement);
+        assertEq(address(coordinator.ctmExecutor()), address(ctmExecutor));
+    }
 
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(coordinator)));
+    function test_revertWhen_bindingZeroOrCodelessExecutor() public {
+        vm.expectRevert(ZeroAddress.selector);
+        vm.prank(governor);
+        coordinator.setCTMExecutor(ICTMUpgradeExecutor(address(0)));
+        address noCode = makeAddr("noCodeExecutor");
+        vm.expectRevert(abi.encodeWithSelector(RegistryPinTargetHasNoCode.selector, noCode));
+        vm.prank(governor);
+        coordinator.setCTMExecutor(ICTMUpgradeExecutor(noCode));
+        assertEq(address(coordinator.ctmExecutor()), address(ctmExecutor));
+    }
+
+    function test_revertWhen_strangerChangesBinding() public {
+        CTMUpgradeExecutor replacement = _replacement(address(coordinator));
+        vm.expectRevert("Ownable: caller is not the owner");
+        coordinator.setCTMExecutor(replacement);
+        assertEq(address(coordinator.ctmExecutor()), address(ctmExecutor));
+    }
+
+    function test_revertWhen_rebindingPendingOperation() public {
+        EcosystemUpgradeOperation operation = _operationFor(transition);
+        _stage0(transition);
+        CTMUpgradeExecutor replacement = _replacement(address(coordinator));
+        vm.expectRevert(abi.encodeWithSelector(UpgradeLifecycleBusy.selector, address(operation)));
+        vm.prank(governor);
+        coordinator.setCTMExecutor(replacement);
+        assertEq(address(coordinator.ctmExecutor()), address(ctmExecutor));
+        assertEq(address(coordinator.pendingOperation()), address(operation));
+        assertTrue(chainAssetHandler.migrationPausedFor(address(chainContractAddress)));
+    }
+
+    function test_sameCTMExecutorReplacementCanRunAnUpgrade() public {
+        CTMUpgradeExecutor previous = ctmExecutor;
+        CTMUpgradeExecutor replacement = _replacement(address(coordinator));
+        Call[] memory calls = new Call[](2);
+        calls[0] = Call({
+            target: address(chainContractAddress),
+            value: 0,
+            data: abi.encodeCall(Ownable2Step.transferOwnership, (address(replacement)))
+        });
+        calls[1] = Call({
+            target: address(ctmProxyAdmin),
+            value: 0,
+            data: abi.encodeCall(Ownable.transferOwnership, (address(replacement)))
+        });
+        vm.prank(governor);
+        previous.forward(calls);
+        replacement.acceptCTMOwnership();
+        vm.expectEmit(true, true, false, true, address(coordinator));
+        emit EcosystemUpgradeExecutor.CTMExecutorChanged(address(previous), address(replacement));
+        vm.prank(governor);
+        coordinator.setCTMExecutor(replacement);
+        ctmExecutor = replacement;
+        assertEq(address(coordinator.ctmExecutor()), address(replacement));
+        assertEq(ctmProxyAdmin.owner(), address(replacement));
+        assertEq(chainContractAddress.owner(), address(replacement));
+        _stage0(transition);
+        _stage1(transition);
+        _stage2(transition);
+        assertEq(chainContractAddress.protocolVersion(), newVersion);
+        assertEq(address(coordinator.pendingOperation()), address(0));
+        assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)));
+    }
+
+    function test_ctmFailureRollsBackCoreUpgrade() public {
+        bytes memory unpublished = hex"de1f";
+        CTMTransition target = _deployTransitionWithDelegate(778, address(fromRelease), 0, unpublished);
+        EcosystemUpgradeOperation operation = _operationWithCore(
+            ICTMTransition(address(target)),
+            address(coreRegistry)
+        );
         vm.prank(governor);
         coordinator.stage0(operation);
-        _assertAllFree();
-        _assertBothPaused(false);
-    }
-
-    function test_revertWhen_operationDiffersBetweenStages() public {
-        CTMTransition first = _deployTransition(777);
-        CTMTransition second = _deployTransition(778);
-        EcosystemUpgradeOperation both = _twoLegOperation(first, second);
-        // The same legs under another object — the object, not its content, is what was prepared.
-        EcosystemUpgradeOperation twin = _twoLegOperation(first, second);
-        assertEq(both.manifestHash(), twin.manifestHash(), "identical manifests commit identically");
+        vm.expectRevert(abi.encodeWithSelector(L2BytecodeNotPublished.selector, keccak256(unpublished)));
         vm.prank(governor);
-        coordinator.stage0(both);
-
-        vm.expectRevert(abi.encodeWithSelector(OperationNotPending.selector, address(twin), address(both)));
-        vm.prank(governor);
-        coordinator.stage1(twin);
-        _assertBothUntouched();
-    }
-
-    function test_revertWhen_operationNamesOneCtmTwice() public {
-        CTMTransition first = _deployTransition(777);
-        CTMTransition again = _deployTransition(778);
-        CTMLeg[] memory legs = new CTMLeg[](2);
-        legs[0] = _leg(ctmExecutor, first);
-        legs[1] = _leg(ctmExecutor, again);
-        vm.expectRevert(abi.encodeWithSelector(DuplicateOperationLeg.selector, address(chainContractAddress)));
-        _deployOperation(address(coreRegistry), legs);
-
-        // Two executors bound to the same CTM are the same duplicate.
-        CTMUpgradeExecutor twinExecutor = new CTMUpgradeExecutor(
-            governor,
-            IChainTypeManager(address(chainContractAddress)),
-            new ProxyAdmin(),
-            address(coordinator),
-            Utils.transitionCodehash()
+        coordinator.stage1(operation);
+        assertEq(
+            ecosystemProxyAdmin.getProxyImplementation(ITransparentUpgradeableProxy(address(ecosystemProxy))),
+            implOld
         );
-        legs[1] = _leg(twinExecutor, again);
-        vm.expectRevert(abi.encodeWithSelector(DuplicateOperationLeg.selector, address(chainContractAddress)));
-        _deployOperation(address(coreRegistry), legs);
+        assertEq(chainContractAddress.protocolVersion(), 0);
+        assertEq(address(coreExecutor.activeOperation()), address(operation));
+        assertEq(address(ctmExecutor.activeOperation()), address(operation));
+        assertTrue(chainAssetHandler.migrationPausedFor(address(chainContractAddress)));
+        L2PlanFixtures.publish(bytecodesSupplier, L2PlanFixtures.codes(unpublished));
+        vm.startPrank(governor);
+        coordinator.stage1(operation);
+        coordinator.stage2(operation);
+        vm.stopPrank();
+        assertEq(
+            ecosystemProxyAdmin.getProxyImplementation(ITransparentUpgradeableProxy(address(ecosystemProxy))),
+            implNew
+        );
+        assertEq(chainContractAddress.protocolVersion(), newVersion);
+        assertEq(address(coreExecutor.activeOperation()), address(0));
+        assertEq(address(ctmExecutor.activeOperation()), address(0));
+        assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)));
     }
 
-    function test_revertWhen_operationHasNoLegs() public {
-        // A core-only change rides a schedule-only transition on one CTM instead.
-        vm.expectRevert(EmptyOperation.selector);
-        _deployOperation(address(coreRegistry), new CTMLeg[](0));
-    }
-
-    function test_revertWhen_legNamesZeroAddresses() public {
-        CTMLeg[] memory legs = new CTMLeg[](1);
-        legs[0] = CTMLeg({executor: address(0), transition: address(transition)});
+    function test_revertWhen_operationHasNoTransition() public {
         vm.expectRevert(ZeroAddress.selector);
-        _deployOperation(address(0), legs);
-        legs[0] = CTMLeg({executor: address(ctmExecutor), transition: address(0)});
-        vm.expectRevert(ZeroAddress.selector);
-        _deployOperation(address(0), legs);
+        _deployOperation(address(coreRegistry), address(0));
     }
 }

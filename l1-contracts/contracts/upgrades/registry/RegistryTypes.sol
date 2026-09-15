@@ -172,25 +172,11 @@ struct ProxyUpgradeRow {
     ProxyAdmin admin;
 }
 
-/// @notice One CTM leg of an ecosystem upgrade operation: a transition and the CTM-bound
-///         executor that applies it. The pair is what binds a transition to a CTM.
-struct CTMLeg {
-    address executor;
-    address transition;
-}
-
-/// @notice Everything an `EcosystemUpgradeOperation` pins, set exactly once at construction —
-///         the unit the lifecycle coordinator drives through its three stages. See
-///         {protocol-docs/ecosystem-upgrade-coordination.md}.
-/// @param coreRegistry The ecosystem leg — the `CoreRegistry` the `CoreUpgradeExecutor` applies
-///        in stage 1 BEFORE every CTM leg and verifies in stage 2 — or zero when the operation has
-///        none. Named here and only here: transitions describe their CTM's change, the operation
-///        commits the association with the ecosystem change.
-/// @param legs The CTM legs, applied in this order in stage 1. At least one; no two legs may
-///        share a CTM.
+/// @notice The optional core upgrade and the transition applied to the coordinator's bound CTM.
+// Multi-CTM extension: protocol-docs/ecosystem-upgrade-coordination.md#future-multi-ctm-extension
 struct OperationManifest {
     address coreRegistry;
-    CTMLeg[] legs;
+    address transition;
 }
 
 /// @notice Everything a core registry instance pins, set exactly once at construction.

@@ -188,6 +188,121 @@ Gate: production preparation must demonstrate bootstrap, recurring no-Gateway, i
 L1-only and mixed L1/L2 flows. Assert that every submitted call is a coordinator stage call or an
 explicitly required external action.
 
+## Proposal: remove proposal-local L1 codehash pins
+
+Status: agreed direction, not implemented. Audited against PR #2270 at `4ea1321fc`.
+This proposal covers only code added or touched by this PR. It introduces no new registry,
+hash-approval contract, or constructor-generated replacement snapshots.
+
+### Decision and security model
+
+Governance reviews the deployed contracts referenced by a release, transition, core registry or
+bootstrap migration, including their constructor arguments and privileged configuration, then
+approves that specific object. Reading a deployed address's own codehash and supplying both to
+the object does not independently verify that deployment. Packaging these fingerprints into
+one constructor instead of querying several addresses does not change the trust model.
+
+Use addresses for proposal members. Remove their supplied codehash fields and snapshot-comparison
+machinery. Retain code-existence checks before use and all authorization, source-state and
+completion checks. Do not move the same hash snapshots into object constructors.
+
+This removal assumes the referenced implementations have immutable runtime code in the supported
+execution environments. Before implementation, confirm that assumption for L1 and any supported
+Gateway deployment path. If an environment permits later replacement of the relevant runtime
+code, document and retain the narrowly necessary commitment for that case. A proxy's runtime
+hash does not freeze its implementation or storage; proxy targets and authority remain separate
+checks regardless.
+
+### Fields to change
+
+| Current field                                                    | Proposed representation                                         |
+| ---------------------------------------------------------------- | --------------------------------------------------------------- |
+| `GenesisFacet.facet`                                             | Facet address; retain `isFreezable`                             |
+| `ReleaseManifest.diamondInit`, `verifier`, `genesisUpgrade`      | Addresses                                                       |
+| `ProxyUpgradeRow.implNew`                                        | Implementation address, across core, CTM and bootstrap rows     |
+| `TransitionManifest.upgradeEngine`, `upgradeTimer`               | Addresses                                                       |
+| `AuthoredL2Plan.delegateComposer`                                | Address; retain the existing optional-zero semantics            |
+| `BootstrapManifest.upgradeEngine`, `ctmExecutor`, `upgradeTimer` | Addresses                                                       |
+| `BootstrapManifest.currentRelease`                               | Release address, with the anchor initialization below preserved |
+
+Remove `PinnedContract` when these migrations leave it unused. Remove the deploy scripts' `_pin`
+helpers and direct `addr.codehash` assignments used only to populate these fields. Remove `_pins`
+enumerations and member-hash comparisons. Retire or rename `verifyAll` surfaces whose only
+remaining purpose would be reporting code existence; do not imply they verify audited code.
+Keep `validate` responsibilities that check actual state, bindings, publication or invariants.
+
+### Hashes that remain
+
+- **Established object-type anchors:** CTM `releaseCodehash`, CTM executor `TRANSITION_CODEHASH`,
+  core executor `CORE_REGISTRY_CODEHASH`, and coordinator `OPERATION_CODEHASH`. These compare
+  subsequently supplied objects against previously established expectations. Never replace an
+  expected anchor with the hash of the candidate currently being checked.
+- **Execution and content commitments:** manifest hashes, committed diamond-cut and transaction
+  hashes, L2 bytecode descriptors and publication checks, and CREATE2 initcode hashes.
+- **Deployment reuse comparisons:** comparing a live implementation with a deployment of the
+  selected build artifact using the intended constructor arguments. This decides reuse versus
+  replacement; it is not a manifest self-pin.
+
+The bootstrap release hash currently also initializes the CTM's future release anchor. Preserve
+that operation when removing the field: after governance approves the initial release address,
+check it has code, establish its runtime hash as `releaseCodehash`, and enforce that stored anchor
+for subsequent releases. Apply the same explicit trust-establishment model to fresh and Gateway
+CTM deployment. This authenticates continuity after initialization; it does not independently
+prove that the initial code was audited. Keep governance's authority over any supported anchor
+replacement and its existing lifecycle restrictions.
+
+In `ChainTypeManager`, retain the provenance check before reading a supplied release. Remove the
+second identical check in the sole-called storage helper by consolidating the final assignment
+and event emission, without deleting the initial check.
+
+### Off-chain review and verification
+
+Read member addresses from the exact on-chain objects governance will approve. Verify their
+deployed runtime against independently reviewed artifacts, including linked libraries and
+approved constructor-set immutables. Permit explicitly approved earlier artifacts for reused
+members. Check mutable configuration independently: owners, pending owners, coordinators,
+proxy implementations/admins and other privileged bindings.
+
+The existing v34 verifier needs corresponding changes. Remove checks that merely compare live
+code with its proposal-supplied fingerprint. Unknown code must remain an unresolved verification
+failure rather than a warning that can accompany a successful review. Raw artifact runtime
+hashes alone do not handle constructor-set immutables; verify those values rather than masking
+them or downgrading mismatches. This updates the existing verifier, not the on-chain schema with
+another approval mechanism. Tie the report to the reviewed revision, build settings, chain,
+block and proposal-object addresses.
+
+### Implementation and verification order
+
+1. Confirm the supported runtime-code immutability assumption and enumerate every affected
+   Solidity field, ABI mirror, script output and external consumer. Historical deployed ABI
+   adapters remain where required; absence of an in-repository caller is not proof of retirement.
+2. Change the Solidity schemas and consumers together. Preserve optional-zero handling,
+   code-existence checks, initial anchor installation and all later anchor enforcement.
+3. Update prepare scripts, protocol-ops, manifests and simulation readers. Keep useful runtime
+   fingerprints in off-chain diagnostic reports if desired, not as required proposal fields.
+4. Update the verifier and documentation to distinguish deployed-code review, initial trust
+   establishment, object-type enforcement and mutable-state validation.
+5. Run tests and both bootstrap/recurring upgrade pipelines, then regenerate ABIs, selectors,
+   manifests, chain states and CI-produced hashes once the source is final.
+
+Required regression outcomes:
+
+- Missing required contract code is refused; legal optional empty members still work.
+- Objects with the wrong release/transition/core-registry/operation implementation are refused
+  against established anchors; initial anchor installation and subsequent enforcement work.
+- Wrong owners, pending ownership transfers, coordinator mismatches, stale source implementations
+  and wrong source versions still fail, with atomic rollback of authority and lifecycle state.
+- The verifier rejects an unrecognized deployment even when a hypothetical self-supplied hash
+  would match it. It accepts reviewed immutable-bearing contracts and approved reused artifacts,
+  and rejects incorrect immutable values.
+- Bootstrap, individual implementation changes, verifier-only patches with an earlier L2
+  transaction pending, and ordinary minor upgrades retain their execution behavior.
+
+Done means no proposal member carries a self-supplied L1 runtime hash, no equivalent snapshot has
+been relocated to a constructor, independent object-type anchors still constrain future inputs,
+and verification output no longer presents self-consistency as deployed-code provenance. Any
+environment-specific exception must identify the concrete code-change mechanism it protects.
+
 ## Delivery order and review discipline
 
 Batches 2, 3 and 4 each move a class of script-defined action into the flow that already exists,

@@ -10,6 +10,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 
 import {Call} from "contracts/governance/Common.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {ICTMUpgradeExecutor} from "contracts/upgrades/registry/executors/ICTMUpgradeExecutor.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
@@ -334,6 +335,19 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
             "run the bootstrap edge (migrate)",
             "permissionless, state-gated (both authorities held, timer passed, pins hold)",
             Call({target: address(bootstrapMigration), data: abi.encodeCall(bootstrapMigration.migrate, ()), value: 0})
+        );
+        declareExternalAction(
+            ExternalActionsLib.PHASE_STAGE_2,
+            "bind the coordinator to the CTM executor",
+            "coordinator owner (governance)",
+            Call({
+                target: address(ecosystemUpgradeExecutor()),
+                data: abi.encodeCall(
+                    EcosystemUpgradeExecutor.setCTMExecutor,
+                    (ICTMUpgradeExecutor(address(ctmUpgradeExecutor)))
+                ),
+                value: 0
+            })
         );
         declareExternalAction(
             ExternalActionsLib.PHASE_STAGE_2,

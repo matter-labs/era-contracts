@@ -21,7 +21,9 @@ use crate::common::logger;
 use crate::common::wallets::Wallet;
 
 use super::new_gateway_prepare::prepare_new_gateway;
-use super::upgrade_inner::{CtmPrepareEntry, PrepareInputs, PrepareOutput, UpgradeInner};
+use super::upgrade_inner::{
+    CtmInputs, CtmPrepareEntry, PrepareInputs, PrepareOutput, UpgradeInner,
+};
 
 pub struct UpgradeFull<'a> {
     inner: UpgradeInner<'a>,
@@ -71,8 +73,9 @@ impl<'a> UpgradeFull<'a> {
         deployer: &Wallet,
         inputs: &PrepareInputs,
     ) -> anyhow::Result<PrepareOutput> {
+        let ctm = single_ctm(&inputs.ctms)?;
         self.run_pre_steps(runner, deployer).await?;
-        let mut prepared = self.inner.prepare(runner, deployer, inputs).await?;
+        let mut prepared = self.inner.prepare(runner, deployer, inputs, ctm).await?;
         self.run_ctm_admin_steps(runner, deployer, &prepared.ctm_tomls)?;
 
         if let Some(ref new_gw) = self.new_gateway {
@@ -214,4 +217,51 @@ fn read_server_notifier_upgrade_calls(path: &Path) -> anyhow::Result<String> {
     let parsed: CtmAdminCallsToml =
         toml::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
     Ok(parsed.ctm_admin_calls.server_notifier_upgrade)
+}
+
+/// Validate before ownership/setup actions, then keep the internal prepare path scalar.
+fn single_ctm(ctms: &[CtmInputs]) -> anyhow::Result<&CtmInputs> {
+    let [ctm] = ctms else {
+        anyhow::bail!(
+            "this upgrade requires exactly one CTM; any number of chains may belong to that CTM"
+        );
+    };
+    Ok(ctm)
+}
+
+#[cfg(test)]
+mod single_ctm_tests {
+    use super::*;
+    use alloy::primitives::Address;
+
+    #[test]
+    fn selects_the_original_single_ctm_input() {
+        let ctms = [CtmInputs {
+            proxy: Address::repeat_byte(0x11),
+            rollup_da_manager: Some(Address::repeat_byte(0x22)),
+        }];
+        let selected = single_ctm(&ctms).unwrap();
+        assert!(std::ptr::eq(selected, &ctms[0]));
+        assert_eq!(selected.rollup_da_manager, ctms[0].rollup_da_manager);
+    }
+
+    #[test]
+    fn rejects_no_ctm_before_prepare() {
+        assert!(single_ctm(&[]).is_err());
+    }
+
+    #[test]
+    fn rejects_multiple_ctms_for_bootstrap_and_recurring_upgrades() {
+        let ctms = [
+            CtmInputs {
+                proxy: Address::repeat_byte(0x11),
+                rollup_da_manager: None,
+            },
+            CtmInputs {
+                proxy: Address::repeat_byte(0x22),
+                rollup_da_manager: None,
+            },
+        ];
+        assert!(single_ctm(&ctms).is_err());
+    }
 }

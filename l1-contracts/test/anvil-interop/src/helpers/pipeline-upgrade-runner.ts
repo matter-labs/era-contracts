@@ -492,15 +492,16 @@ async function runRecurringHop(
         throw new Error(`stage ${n} is not EcosystemUpgradeExecutor.${stage}(operation) on the coordinator`);
       }
     });
-    // The operation names exactly this CTM's leg on its bound executor and the core registry.
+    // The operation names the transition; the coordinator binds the CTM executor.
     const operation = new ethers.Contract(operationAddr, getAbi("EcosystemUpgradeOperation"), l1Provider);
-    const legs: Array<{ executor: string; transition: string }> = await operation.legs();
+    const coordinator = new ethers.Contract(coordinatorAddr, getAbi("EcosystemUpgradeExecutor"), l1Provider);
+    const namedTransition: string = await operation.transition();
+    const boundExecutor: string = await coordinator.ctmExecutor();
     if (
-      legs.length !== 1 ||
-      legs[0].executor.toLowerCase() !== executorAddr.toLowerCase() ||
-      legs[0].transition.toLowerCase() !== transitionAddr.toLowerCase()
+      namedTransition.toLowerCase() !== transitionAddr.toLowerCase() ||
+      boundExecutor.toLowerCase() !== executorAddr.toLowerCase()
     ) {
-      throw new Error("the operation does not name exactly this CTM's (executor, transition) leg");
+      throw new Error("the operation transition or coordinator CTM binding differs from the prepared upgrade");
     }
     const namedRegistry: string = await operation.coreRegistry();
     const preparedRegistry = merged.core.registry?.core_registry_addr ?? ethers.constants.AddressZero;
@@ -584,7 +585,6 @@ async function runRecurringHop(
       }
       console.log("  ✓ identical routing on both edges derived an empty facet delta");
     }
-    const coordinator = new ethers.Contract(coordinatorAddr, getAbi("EcosystemUpgradeExecutor"), l1Provider);
     const pending: string = await coordinator.pendingOperation();
     if (pending !== ethers.constants.AddressZero) {
       throw new Error(`stage 2 did not clear the lifecycle slot (pending ${pending})`);

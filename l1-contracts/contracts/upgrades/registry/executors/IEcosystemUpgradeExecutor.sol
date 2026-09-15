@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {ICTMUpgradeExecutor} from "./ICTMUpgradeExecutor.sol";
+
 import {IEcosystemUpgradeOperation} from "../objects/IEcosystemUpgradeOperation.sol";
 
 /// @title IEcosystemUpgradeExecutor
@@ -17,6 +19,9 @@ interface IEcosystemUpgradeExecutor {
         Prepared,
         Executed
     }
+
+    /// @notice The executor of the single CTM coordinated by this contract.
+    function ctmExecutor() external view returns (ICTMUpgradeExecutor);
 
     /// @notice The operation governance prepared with `stage0` and has not completed yet.
     function pendingOperation() external view returns (IEcosystemUpgradeOperation);

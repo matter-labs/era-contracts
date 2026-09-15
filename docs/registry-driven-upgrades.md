@@ -61,7 +61,7 @@ in `l1-contracts/contracts/upgrades/registry/RegistryTypes.sol`.
 | `CTMRelease`                 | `diamondInit` + pin, `verifier` + pin, `GenesisFacet[]` (address, freezability, pin), `fixedForceDeploymentsData`, genesis params + genesis-upgrade pin, `l2BytecodeInfos` (the `L2EcosystemContract`-indexed implementation table), one shared `l2SystemProxyBytecodeInfo` shell                          |
 | `CTMTransition`              | version edge, `fromRelease`, `newRelease`, `upgradeEngine` + pin, `proxyUpgrades` (the `CTMContract`-indexed CTM-domain inventory, incl. the CTM itself), deadline, `upgradeTimestamp`, pinned `upgradeTimer`, `AuthoredL2Plan`; **derived and stored:** `Diamond.FacetCut[]` and the L2 force deployments |
 | `CoreRegistry`               | the `L1EcosystemContract`-indexed inventory of `(proxy, expectedOldImpl, implNew + pin)` rows for the SHARED singletons (bridges, Bridgehub, MessageRoot, …)                                                                                                                                               |
-| `EcosystemUpgradeOperation`  | `{coreRegistry, CTMLeg[] legs}` with `CTMLeg = {executor, transition}` — the participation of one upgrade. The ONLY place the core registry is named. Rejects an empty leg list and two legs on one CTM.                                                                                                   |
+| `EcosystemUpgradeOperation`  | `{coreRegistry, transition}` — the optional core change and required single-CTM transition. Executors are bound on the coordinator; a zero transition is rejected.                                                                                                                                         |
 | `RegistryBootstrapMigration` | one edge from a pre-registry CTM into this model — see [Bootstrap](#bootstrap)                                                                                                                                                                                                                             |
 
 ### Enum-indexed proxy inventories
@@ -128,7 +128,7 @@ flowchart TB
       REL["CTMRelease"]
       TRA["CTMTransition<br/>version edge, engine, schedule, timer,<br/>CTM-domain rows, L2 plan + DERIVED cuts"]
       CR["CoreRegistry<br/>ecosystem inventory"]
-      OP["EcosystemUpgradeOperation<br/>coreRegistry + CTMLeg[]"]
+      OP["EcosystemUpgradeOperation<br/>coreRegistry + transition"]
       BOOT["RegistryBootstrapMigration<br/>pre-registry entry edge"]
     end
 
@@ -202,7 +202,7 @@ configured coordinator.
 | `CoreUpgradeExecutor`      | the ecosystem `ProxyAdmin`, the `CoreRegistry` codehash                 | `beginOperation`, `completeOperation`, `abandonOperation` (coordinator); `applyL1Upgrade` (coordinator for the reserved registry, or the owner for any — bootstrap and recovery); `validateUpgradeApplied`; `setCoordinator` (owner, refused while reserved)                                                                                                                                              |
 | `CTMUpgradeExecutor`       | one `ChainTypeManager` + its `ProxyAdmin`, the `CTMTransition` codehash | `beginOperation`, `applyTransition`, `completeOperation`, `abandonOperation` (coordinator); `validateTransitionApplied`; `upgradeChain`; `acceptCTMOwnership`; `setCoordinator`, `setProtocolVersionDeadline` and the routine passthroughs (`freezeChain`, `unfreezeChain`, `revertBatches`, `setValidator`, `setPriorityTxMaxGasLimit`, `deactivatePriorityMode`, `setValidatorTimelockPostV29`) (owner) |
 
-The coordinator owns no proxy administration and applies nothing itself: it orders the legs,
+The coordinator owns no proxy administration and applies nothing itself: it orders the core and CTM changes,
 holds the pending operation and its stage, starts and checks the timers, and drives the domain
 callbacks. Each domain stores only its `activeOperation`; its registry or transition is read from that
 operation rather than supplied or stored a second time. Domain callbacks enforce coordinator
@@ -373,8 +373,8 @@ sequenceDiagram
 The three `stage0/1/2(operation)` calls are ALL a registry-driven upgrade emits; every other call
 is a declared external action listed in the prepare output (see the runbook). One operation is
 mid-lifecycle at a time and each stage names it; a different operation, an out-of-order stage or a
-repeated stage is rejected. An operation with several CTM legs applies the core leg once and then
-each CTM leg in committed order, atomically. The stage-by-stage semantics are the
+repeated stage is rejected. An operation applies the optional core change and then its single CTM transition atomically.
+One CTM may still manage many chains. The stage-by-stage semantics are the
 [coordinator spec](../protocol-docs/ecosystem-upgrade-coordination.md).
 
 **`upgradeChain(transition, chainId)`** is the per-chain crossing. The executor's owner may
@@ -470,9 +470,10 @@ and the engines take no bytecode-hash inputs.
 **Row sets.** Every participating row is a real, unique edge: all fields nonzero, one row per
 proxy. A bootstrap manifest must carry at least one row.
 
-**Operation.** At least one CTM leg, no zero addresses, no two legs on one CTM (resolved through
-each executor's `CHAIN_TYPE_MANAGER`). A core-only change rides a schedule-only transition on one
-CTM, so it cannot bypass that CTM's pause and timer.
+**Operation.** One required transition and an optional core registry. The coordinator binds one
+CTM executor; a core-only change uses a schedule-only transition and retains the pause and timer.
+The [multi-CTM extension boundary](../protocol-docs/ecosystem-upgrade-coordination.md#future-multi-ctm-extension)
+identifies the schema, coordinator and tooling changes needed to expand participation later.
 
 ## Bootstrap
 

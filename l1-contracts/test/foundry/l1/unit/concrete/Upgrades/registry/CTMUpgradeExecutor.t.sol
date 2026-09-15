@@ -112,6 +112,8 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
             address(coordinator),
             Utils.transitionCodehash()
         );
+        vm.prank(governor);
+        coordinator.setCTMExecutor(ctmExecutor);
         ctmProxyAdmin.transferOwnership(address(ctmExecutor));
 
         // Handover through the fixed entrypoint — no escape hatch involved. Pausing its own CTM's
@@ -260,7 +262,7 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
 
     /// @dev The one-leg operation over `_transition` on the fixture's executor.
     function _operationFor(CTMTransition _transition) internal returns (EcosystemUpgradeOperation) {
-        return _operationFor(ICTMTransition(address(_transition)), address(ctmExecutor));
+        return _cachedOperationFor(ICTMTransition(address(_transition)));
     }
 
     function _stage0(CTMTransition _transition) internal {
