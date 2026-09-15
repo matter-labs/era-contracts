@@ -2,16 +2,17 @@
 
 pragma solidity 0.8.28;
 
+import {ICommittedUpgrade} from "./ICommittedUpgrade.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
 import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
-import {L2UpgradePlan, ProxyUpgradeRow, TransitionManifest} from "../RegistryTypes.sol";
+import {ProxyUpgradeRow, TransitionManifest} from "../RegistryTypes.sol";
 
 /// @notice Immutable description of how one CTM release becomes another.
 /// @dev The facet cuts and table-derived L2 deployments are NOT authored: they are DERIVED from
 ///      the `(fromRelease, newRelease)` pair at initialization and stored. What governance reviews
 ///      is two releases and this transition's schedule/engine/L2 plan; the delta is a
 ///      pure function of the release pair, so transition and release state cannot diverge.
-interface ICTMTransition {
+interface ICTMTransition is ICommittedUpgrade {
     /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment to every pinned value:
     ///         the single value governance reviews against the audited manifest.
     function manifestHash() external view returns (bytes32);
@@ -50,8 +51,6 @@ interface ICTMTransition {
 
     /// @notice CTM-domain implementation swaps applied by the bound executor before the commit.
     function ctmProxyRows() external view returns (ProxyUpgradeRow[] memory);
-
-    function l2Plan() external view returns (L2UpgradePlan memory);
 
     /// @notice The L2 protocol upgrade transaction this transition's engine commits on chain
     ///         `_chainId` of the ecosystem of `_bridgehub` — the single read entry point for tooling.

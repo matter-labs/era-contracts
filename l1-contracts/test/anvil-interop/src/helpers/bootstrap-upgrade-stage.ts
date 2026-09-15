@@ -78,7 +78,7 @@ export async function buildBootstrapSection(
     // The pre-v34 cut-taking entrypoint the harness installs (and the bootstrap cut removes).
     legacyAdminFacet: pieces.legacyAdminFacet,
     // The bootstrap engine the composed cut's init targets — pinned by `upgradeEngine` in the
-    // migration (the production `BootstrapUpgradeZKsyncOS`, bound to the release the edge installs).
+    // migration (the production `BootstrapUpgrade`, which installs the release the migration names).
     upgradeEngine: { address: pieces.bootstrapEngine, codehash: await codehash(pieces.bootstrapEngine) },
     // The canonical bootstrap operation: the CTM proxy's own implementation swap, as a
     // source-checked row.

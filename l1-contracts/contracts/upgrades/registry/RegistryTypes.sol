@@ -220,12 +220,13 @@ struct CoreRegistryManifest {
 ///        every release this CTM ever pins must run exactly that code.
 /// @param newProtocolVersion The version the CTM moves to.
 /// @param oldProtocolVersionDeadline Until when the departing version stays usable.
-/// @param upgradeEngine The pinned bootstrap engine (`BootstrapUpgradeZKsyncOS`), the committed
+/// @param upgradeEngine The pinned bootstrap engine (`BootstrapUpgrade`), the committed
 ///        cut's init target. The cut carries NO facet cuts and NO authored calldata: the facet
 ///        delta cannot be derived at construction (the departing version predates releases, so
 ///        there is no `fromRelease` to diff against), so the engine removes each chain's live
-///        routing and installs the genesis release's facet set AT EXECUTION; and the engine reads
-///        the version edge, schedule and L2 plan below from this object at execution
+///        routing and installs the genesis release's facet set AT EXECUTION. The engine is
+///        version-independent and holds nothing of its own: `currentRelease`, the version edge,
+///        the schedule and the L2 plan below are all read from this object at execution
 ///        (`upgradeFromBootstrap`), composing the L2 transaction with the same composer
 ///        transitions use — the bootstrap is bootstrap-specific INPUTS, not a second composition
 ///        path.

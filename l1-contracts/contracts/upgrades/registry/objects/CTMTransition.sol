@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
+import {ICommittedUpgrade} from "./ICommittedUpgrade.sol";
 import {ICTMRelease} from "./ICTMRelease.sol";
 import {ICTMTransition} from "./ICTMTransition.sol";
 import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
@@ -246,11 +247,18 @@ contract CTMTransition is ICTMTransition {
         return getManifest().upgradeTimer.addr;
     }
 
+    /// @inheritdoc ICommittedUpgrade
+    function upgradeTarget() external view returns (uint256, uint256, address) {
+        TransitionManifest memory m = getManifest();
+        return (m.newProtocolVersion, m.upgradeTimestamp, m.newRelease);
+    }
+
     function facetCuts() external view returns (Diamond.FacetCut[] memory) {
         return derivedFacetCuts;
     }
 
-    /// @notice The FINAL, executable L2 plan, exactly as constructed at initialization.
+    /// @inheritdoc ICommittedUpgrade
+    /// @dev Exactly as constructed at initialization.
     function l2Plan() external view returns (L2UpgradePlan memory) {
         return abi.decode(encodedL2Plan, (L2UpgradePlan));
     }

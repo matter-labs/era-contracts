@@ -2,20 +2,17 @@
 
 pragma solidity 0.8.28;
 
+import {ICommittedUpgrade} from "../objects/ICommittedUpgrade.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
 import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
-import {BootstrapManifest, L2UpgradePlan} from "../RegistryTypes.sol";
+import {BootstrapManifest} from "../RegistryTypes.sol";
 
 /// @notice The read surface of `RegistryBootstrapMigration`: what the bootstrap engine reads at
 ///         execution ({IBootstrapUpgrade.upgradeFromBootstrap}) and what tooling reads to relay
 ///         the edge's L2 leg.
-interface IRegistryBootstrapMigration {
+interface IRegistryBootstrapMigration is ICommittedUpgrade {
     /// @notice The whole manifest, exactly as it was pinned.
     function getManifest() external view returns (BootstrapManifest memory);
-
-    /// @notice The FINAL, executable L2 plan of the edge: the stored derived-plus-extra
-    ///         deployments with the authored delegate leg and factory dependencies.
-    function l2Plan() external view returns (L2UpgradePlan memory);
 
     /// @notice The L2 protocol upgrade transaction the edge commits on chain `_chainId` — the FINAL
     ///         transaction, exactly as the chain stores its hash: composed from {l2Plan}, the genesis

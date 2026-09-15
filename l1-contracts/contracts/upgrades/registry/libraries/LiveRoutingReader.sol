@@ -5,7 +5,7 @@ import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
 
 /// @notice The departing routing of the diamond the caller is delegatecalled into, as the cuts
 ///         that remove it — the remove side of a bootstrap engine's full facet reinstall (see
-///         {BootstrapUpgradeZKsyncOS}). Pre-v34 facets do not self-describe, so the routing is read
+///         {BootstrapUpgrade}). Pre-v34 facets do not self-describe, so the routing is read
 ///         straight from diamond storage.
 library LiveRoutingReader {
     /// @notice One `Remove` cut per live facet, covering its complete current routing.

@@ -30,9 +30,11 @@ import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The storage part shared by every per-chain upgrade engine: the version change, the
-///         verifier installation and the L2 protocol upgrade transaction. Each entrypoint
-///         (`DefaultUpgrade.upgradeFromTransition`, the bootstrap edge, the genesis upgrade) reads
-///         its inputs from its own pinned object and hands them to {_upgrade}.
+///         verifier installation and the L2 protocol upgrade transaction. The registry-driven
+///         engines reach {_upgrade} through the one entry that resolves their committed object
+///         ({DefaultUpgrade._upgradeFromCommittedObject}); the genesis upgrade calls it directly,
+///         because genesis has rules of its own (no schedule, and the verifier is already
+///         installed by `DiamondInit`).
 abstract contract BaseZkSyncUpgrade is ZKChainBase {
     /// @notice Changes the protocol version
     event NewProtocolVersion(uint256 indexed previousProtocolVersion, uint256 indexed newProtocolVersion);

@@ -39,7 +39,7 @@ import {Utils} from "../../utils/Utils.sol";
 /// @notice The v34 CTM upgrade: the ONE-TIME edge into the registry-driven model (see the
 ///         Bootstrap section of {docs/registry-driven-upgrades.md}). Chains crossing this edge
 ///         run pre-v34 facets and take the committed cut by hand, but the cut itself already
-///         has the registry shape: NO facet cuts, just the `BootstrapUpgradeZKsyncOS` init,
+///         has the registry shape: NO facet cuts, just the `BootstrapUpgrade` init,
 ///         which derives the facet reinstall on-chain from the pinned genesis release. The
 ///         stage-1 CTM call soup is GONE too: everything the CTM must do (its own
 ///         implementation swap, the version commit, the provenance anchors, the authority
@@ -60,11 +60,12 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
     ///         defines what `L2V34Upgrade` is called with.
     address public l2DelegateComposer;
 
-    /// @notice The bootstrap edge deploys no transition: its objects are the bound executor and the
-    ///         write-once migration. The committed cut is READ from the migration — the object
-    ///         composes it on-chain from its pinned inputs, so the prepare has nothing to compose
-    ///         and nothing to keep in step.
+    /// @notice The bootstrap edge deploys no transition: after the engine every edge pins, its
+    ///         objects are the bound executor and the write-once migration. The committed cut is
+    ///         READ from the migration — the object composes it on-chain from its pinned inputs, so
+    ///         the prepare has nothing to compose and nothing to keep in step.
     function deployUpgradeObjects() public virtual override {
+        ctmAddresses.stateTransition.defaultUpgrade = deployUsedUpgradeContract();
         deployRegistryBootstrap();
         _declareBootstrapActions();
     }
@@ -113,20 +114,11 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
         return ctmAddresses.admin.governance;
     }
 
-    /// @notice The upgrade engine — the composed cut's init delegatecall target, pinned by the
-    ///         bootstrap manifest through `upgradeCutInitCodehash`. Deployed HERE, not in
-    ///         `deployNewCTMContracts`: the engine pins the genesis release as an immutable, and
-    ///         the release only exists once `deployStateTransitionDiamondFacets` has run.
-    function generateUpgradeData() public virtual override {
-        ctmAddresses.stateTransition.defaultUpgrade = deployUsedUpgradeContract();
-        super.generateUpgradeData();
-    }
-
     /// @dev The repo is ZKsync-OS-only: every CTM this prepare runs against is a ZKsync OS CTM.
     function deployUsedUpgradeContract() internal virtual override returns (address) {
-        // The bootstrap engine: derives the facet reinstall on-chain from the genesis release it
-        // pins as an immutable, then runs the storage/L2 part of `DefaultUpgrade`.
-        return deploySimpleContract("BootstrapUpgradeZKsyncOS");
+        // The bootstrap engine: derives the facet reinstall on-chain from the genesis release the
+        // migration it is handed names, then runs the storage/L2 part of `DefaultUpgrade`.
+        return deploySimpleContract("BootstrapUpgrade");
     }
 
     /// @notice The L2 side of the bootstrap edge: the delegate's (`L2V34Upgrade`) bytecode info —

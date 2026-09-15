@@ -5,10 +5,10 @@ pragma solidity 0.8.28;
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {IDefaultUpgrade} from "./IDefaultUpgrade.sol";
+import {ICommittedUpgrade} from "./registry/objects/ICommittedUpgrade.sol";
 import {ICTMRelease} from "./registry/objects/ICTMRelease.sol";
 import {ICTMTransition} from "./registry/objects/ICTMTransition.sol";
 import {CTMUpgradeComposer} from "./registry/libraries/CTMUpgradeComposer.sol";
-import {TransitionManifest} from "./registry/RegistryTypes.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 
 /// @author Matter Labs
@@ -29,25 +29,8 @@ contract DefaultUpgrade is BaseZkSyncUpgrade, IDefaultUpgrade {
     function upgradeFromTransition(address _transition) external returns (bytes32) {
         _requireAllBatchesExecuted();
         ICTMTransition transition = ICTMTransition(_transition);
-        TransitionManifest memory m = transition.getManifest();
-        // Straight from the TARGET release, never from the CTM's live `currentRelease()`: a chain
-        // several versions behind executes the transition that names its own next release, and the
-        // CTM may already have moved past it.
-        ICTMRelease newRelease = ICTMRelease(m.newRelease);
-
         _applyDerivedFacetCuts(transition.facetCuts());
-        _upgrade({
-            _newProtocolVersion: m.newProtocolVersion,
-            _upgradeTimestamp: m.upgradeTimestamp,
-            _verifier: newRelease.verifier(),
-            _l2ProtocolUpgradeTx: CTMUpgradeComposer.buildL2UpgradeTxFromPlan({
-                _plan: transition.l2Plan(),
-                _newRelease: newRelease,
-                _newProtocolVersion: m.newProtocolVersion,
-                _bridgehub: s.bridgehub,
-                _chainId: s.chainId
-            })
-        });
+        _upgradeFromCommittedObject(transition);
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
 
@@ -58,5 +41,32 @@ contract DefaultUpgrade is BaseZkSyncUpgrade, IDefaultUpgrade {
         uint256 _chainId
     ) external view returns (L2CanonicalTransaction memory) {
         return CTMUpgradeComposer.buildL2UpgradeTx(ICTMTransition(_transition), _bridgehub, _chainId);
+    }
+
+    /// @notice Applies the storage/L2 part of a registry-driven edge from the object the committed
+    ///         cut names: the version edge and its schedule, the verifier of the TARGET release,
+    ///         and the L2 protocol upgrade transaction composed from the object's plan and the
+    ///         executing chain's own identity.
+    /// @param _object The `CTMTransition` or `RegistryBootstrapMigration` this cut points at.
+    /// @dev The engine takes the whole edge from ONE object rather than from separately supplied
+    ///      values, so a version, a schedule, a verifier and an L2 transaction belonging to
+    ///      different upgrades cannot be assembled on the way in.
+    /// @dev The release comes off the object, never off the CTM's live `currentRelease()`: a chain
+    ///      several versions behind executes the object that names its own next release, and the
+    ///      CTM may already have moved past it.
+    function _upgradeFromCommittedObject(ICommittedUpgrade _object) internal {
+        (uint256 newProtocolVersion, uint256 upgradeTimestamp, address newRelease) = _object.upgradeTarget();
+        _upgrade({
+            _newProtocolVersion: newProtocolVersion,
+            _upgradeTimestamp: upgradeTimestamp,
+            _verifier: ICTMRelease(newRelease).verifier(),
+            _l2ProtocolUpgradeTx: CTMUpgradeComposer.buildL2UpgradeTxFromPlan({
+                _plan: _object.l2Plan(),
+                _newRelease: ICTMRelease(newRelease),
+                _newProtocolVersion: newProtocolVersion,
+                _bridgehub: s.bridgehub,
+                _chainId: s.chainId
+            })
+        });
     }
 }

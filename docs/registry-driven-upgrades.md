@@ -145,7 +145,7 @@ flowchart TB
     CPA["CTM-domain ProxyAdmin"]
     DI["DiamondInit — genesis"]
     ENG["DefaultUpgrade — upgradeFromTransition"]
-    BOOTENG["BootstrapUpgradeZKsyncOS — upgradeFromBootstrap"]
+    BOOTENG["BootstrapUpgrade — upgradeFromBootstrap"]
 
     EE -. "codehash-check" .-> OP
     EE -- "beginOperation / applyL1Upgrade /<br/>completeOperation / abandonOperation" --> CO
@@ -511,11 +511,13 @@ Two properties that look like omissions but are not:
   migrations are unpaused, which is the ecosystem pause governance holds across the edge.
 - The committed cut carries **no facet cuts and no authored calldata**. The facet delta cannot be
   derived at construction (the departing version predates releases), so the cut's init target is
-  the bootstrap engine (`BootstrapUpgradeZKsyncOS`), which removes each chain's live routing read
-  from its own diamond storage and installs the facet set of the genesis release it pins as an
-  immutable. The init names the migration and nothing else (`upgradeFromBootstrap(migration)`);
-  at execution the engine reads the version edge, the schedule and the L2 plan from it and
-  composes the L2 transaction with the same `CTMUpgradeComposer` transitions use. Chains crossing
+  the bootstrap engine (`BootstrapUpgrade`), which removes each chain's live routing read from its
+  own diamond storage and installs the facet set of the genesis release the migration names. The
+  init names the migration and nothing else (`upgradeFromBootstrap(migration)`); at execution the
+  engine reads the version edge, the schedule, the target release and the L2 plan from it and
+  composes the L2 transaction with the same `CTMUpgradeComposer` transitions use. The engine
+  itself is version-independent and holds no release: a chain that crosses the edge after the CTM
+  has moved on still lands on the release its own committed migration names. Chains crossing
   the edge run pre-v34 facets and take these bytes by hand (`upgradeCut()`), through the legacy
   cut-taking chain entrypoint; `upgradeTransition` stays zero for the departing version.
 

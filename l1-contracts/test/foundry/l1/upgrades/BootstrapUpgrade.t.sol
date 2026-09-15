@@ -2,15 +2,13 @@
 pragma solidity 0.8.28;
 
 import {BaseZkSyncUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
-import {BootstrapUpgradeZKsyncOS} from "contracts/upgrades/BootstrapUpgradeZKsyncOS.sol";
+import {BootstrapUpgrade} from "contracts/upgrades/BootstrapUpgrade.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
-import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {L2CanonicalTransactionLib} from "contracts/state-transition/libraries/L2CanonicalTransactionLib.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {BootstrapEngineReleaseMismatch} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
 import {NotAllBatchesExecuted} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {TimeNotReached} from "contracts/common/L1ContractErrors.sol";
 
@@ -18,18 +16,16 @@ import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
 import {RegistryObjectsFixture} from "./_SharedRegistryObjects.t.sol";
 
-contract DummyBootstrapUpgradeZKsyncOS is BootstrapUpgradeZKsyncOS, BaseUpgradeUtils {
-    constructor(ICTMRelease _genesisRelease) BootstrapUpgradeZKsyncOS(_genesisRelease) {}
-}
+contract DummyBootstrapUpgrade is BootstrapUpgrade, BaseUpgradeUtils {}
 
 /// @notice The bootstrap edge on the chain side (`upgradeFromBootstrap`) against a REAL
 ///         `RegistryBootstrapMigration`: the engine is handed nothing but the migration address and
-///         must reinstall the routing from the release it pins, then read the version edge, the
-///         schedule and the L2 plan from the migration. The engine under test plays the chain
+///         must read everything off it — the release whose routing and verifier it reinstalls, the
+///         version edge, the schedule and the L2 plan. The engine under test plays the chain
 ///         diamond (called directly, so its own diamond storage is the chain's); the migration's
 ///         CTM-side authorities are stand-ins the engine never touches.
 contract BootstrapUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
-    DummyBootstrapUpgradeZKsyncOS internal engine;
+    DummyBootstrapUpgrade internal engine;
     CTMRelease internal genesisRelease;
     address internal legacyVerifier;
     address internal mockBridgehub = makeAddr("mockBridgehub");
@@ -46,7 +42,7 @@ contract BootstrapUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         // A release pins its verifier by codehash, so the one it installs has code.
         verifier = _pinned("releaseVerifier");
         genesisRelease = _release(_arrivingFacets(), verifier);
-        engine = new DummyBootstrapUpgradeZKsyncOS(genesisRelease);
+        engine = new DummyBootstrapUpgrade();
         engine.setPriorityTxMaxGasLimit(1 ether);
         engine.setPriorityTxMaxPubdata(1000000);
         engine.setBridgehub(mockBridgehub);
@@ -133,21 +129,19 @@ contract BootstrapUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         assertEq(engine.facetAddress(SEL_ARRIVING), facetArriving, "the reinstall happens on an L1-only edge too");
     }
 
-    /// @dev The manifest pins the engine and the release as two rows; an engine whose immutable
-    ///      names another release refuses the pair rather than installing one release's facets and
-    ///      verifier on chains the CTM records as running another.
-    function test_revertWhen_upgradeFromBootstrap_migrationPinsAnotherRelease() public {
-        CTMRelease otherRelease = _release(_arrivingFacets(), _pinned("otherVerifier"));
+    /// @dev The engine holds no release of its own: the one it installs is the one the migration
+    ///      it is handed names. That is what lets a lagging chain cross the edge on its OWN
+    ///      committed migration after the CTM has moved on — the same engine deployment serves both.
+    function test_upgradeFromBootstrap_installsTheReleaseTheMigrationNames() public {
+        address otherVerifier = _pinned("otherVerifier");
+        CTMRelease otherRelease = _release(_arrivingFacets(), otherVerifier);
         RegistryBootstrapMigration migration = _migration(otherRelease, 0, address(engine), false);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                BootstrapEngineReleaseMismatch.selector,
-                address(otherRelease),
-                address(genesisRelease)
-            )
-        );
         engine.upgradeFromBootstrap(address(migration));
+
+        assertEq(engine.getVerifier(), otherVerifier, "the verifier comes off the release the migration names");
+        assertTrue(otherVerifier != verifier, "the two releases really do install different verifiers");
+        assertEq(engine.facetAddress(SEL_ARRIVING), facetArriving, "that release's routing is installed");
     }
 
     function test_revertWhen_upgradeFromBootstrap_beforeTheSchedule() public {

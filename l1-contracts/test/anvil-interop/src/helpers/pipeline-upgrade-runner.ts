@@ -966,7 +966,7 @@ function readCommittedCut(ctmTomlPath: string): {
   }
   const [cut] = ethers.utils.defaultAbiCoder.decode([DIAMOND_CUT_TYPE], cutBytes);
 
-  const engineIface = new ethers.utils.Interface(getAbi("BootstrapUpgradeZKsyncOS"));
+  const engineIface = new ethers.utils.Interface(getAbi("BootstrapUpgrade"));
   const [migrationAddr] = engineIface.decodeFunctionData("upgradeFromBootstrap", cut.initCalldata);
   return { cut, migrationAddr };
 }
