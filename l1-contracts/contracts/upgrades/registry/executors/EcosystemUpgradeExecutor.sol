@@ -2,7 +2,6 @@
 pragma solidity 0.8.28;
 
 import {ICoreRegistry} from "../objects/ICoreRegistry.sol";
-import {ICTMTransition} from "../objects/ICTMTransition.sol";
 import {IEcosystemUpgradeOperation} from "../objects/IEcosystemUpgradeOperation.sol";
 import {ICTMUpgradeExecutor} from "./ICTMUpgradeExecutor.sol";
 import {IEcosystemUpgradeExecutor} from "./IEcosystemUpgradeExecutor.sol";
@@ -56,10 +55,10 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
     UpgradeStage public pendingStage;
 
     /// @notice Emitted by `stage0`: every participant is reserved, migrations are paused and the
-    ///         transition's timer is running.
+    ///         operation's timer is running.
     event OperationPrepared(address indexed operation);
 
-    /// @notice Emitted by `stage1` after the core leg and the CTM transition were applied.
+    /// @notice Emitted by `stage1` after the core leg and the operation's CTM leg were applied.
     event OperationExecuted(address indexed operation);
 
     /// @notice Emitted by `stage2` after every leg verified and the migration pause was released.
@@ -112,13 +111,14 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
 
     /// @notice Stage 0 — preparation. Records the operation, reserves every domain (each
     ///         validates its own leg and answers only to its coordinator; the CTM executor pauses
-    ///         migrations) and starts the transition's timer.
+    ///         migrations) and starts the operation's timer.
     /// @param _operation The write-once operation approved by governance.
     function stage0(IEcosystemUpgradeOperation _operation) external onlyOwner {
         if (address(pendingOperation) != address(0)) {
             revert UpgradeLifecycleBusy(address(pendingOperation));
         }
         address(_operation).requireObjectType(OPERATION_CODEHASH);
+        _operation.validate();
         OperationManifest memory m = _operation.getManifest();
 
         pendingOperation = _operation;
@@ -130,25 +130,27 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
         if (address(ctmExecutor) == address(0)) {
             revert ZeroAddress();
         }
+        // The CTM domain is reserved for EVERY operation, transition or not: an infrastructure
+        // change swaps implementations under chains that may be migrating.
         ctmExecutor.beginOperation(_operation);
-        GovernanceUpgradeTimer(ICTMTransition(m.transition).upgradeTimer()).startTimer();
+        GovernanceUpgradeTimer(m.timer).startTimer();
         emit OperationPrepared(address(_operation));
     }
 
     /// @notice Stage 1 — execution. Requires the timer's deadline, then applies the core leg
-    ///         once and the CTM transition. Any failure reverts the whole stage.
+    ///         once and the CTM leg. Any failure reverts the whole stage.
     /// @param _operation The operation prepared by `stage0`.
     function stage1(IEcosystemUpgradeOperation _operation) external onlyOwner {
         _requirePending(_operation, UpgradeStage.Prepared);
         OperationManifest memory m = _operation.getManifest();
-        GovernanceUpgradeTimer(ICTMTransition(m.transition).upgradeTimer()).checkDeadline();
+        GovernanceUpgradeTimer(m.timer).checkDeadline();
         // The stage advances before the domains are driven: any leg's revert unwinds the whole
         // stage, so nothing observes `Executed` with a leg still unapplied.
         pendingStage = UpgradeStage.Executed;
         if (m.coreRegistry != address(0)) {
             CORE_EXECUTOR.applyL1Upgrade(ICoreRegistry(m.coreRegistry));
         }
-        ctmExecutor.applyTransition();
+        ctmExecutor.applyOperation();
         emit OperationExecuted(address(_operation));
     }
 

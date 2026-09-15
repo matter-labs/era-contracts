@@ -47,8 +47,8 @@ Consequences:
 
 The notifier is a per-CTM proxy but sits under its OWN `ProxyAdmin`, owned by the CTM's
 `ChainAdmin` — not under the CTM-domain `ProxyAdmin` the executor owns. Its implementation swap
-is therefore the one inventory row whose `admin` field is set (the row format is described with
-the objects in the architecture document). Two operating modes follow, both expressible as
+is therefore the one operation-inventory row whose `admin` field is set (the row format is
+described with the objects in the architecture document). Two operating modes follow, both expressible as
 on-chain state:
 
 - **Hand the notifier's `ProxyAdmin` to the `CTMUpgradeExecutor`.** The row rides stage 1 like
@@ -84,11 +84,11 @@ the execution engine no longer decodes placeholders or understands the v34 deleg
 
 ## The upgrade timer
 
-Each transition pins its own `GovernanceUpgradeTimer`, deployed by the CTM prepare with
-`TIMER_GOVERNANCE` = the coordinator and `owner` = the ecosystem admin. Stage 0 starts the
-transition timer once — `startTimer` is `onlyTimerAdmin`, so a
-timer anybody else could have started early fails the stage; stage 1 requires `checkDeadline()` for
-the CTM transition. The ecosystem admin keeps the bounded extension right through the timer's own
+Each operation pins its own `GovernanceUpgradeTimer`, deployed by the CTM prepare with
+`TIMER_GOVERNANCE` = the coordinator and `owner` = the ecosystem admin. Stage 0 starts it once —
+`startTimer` is `onlyTimerAdmin`, so a timer anybody else could have started early fails the stage;
+stage 1 requires `checkDeadline()`. It is the delay before GOVERNANCE may execute, and is
+independent of the transition's chain-side `upgradeTimestamp` (see the coordinator spec). The ecosystem admin keeps the bounded extension right through the timer's own
 `changeDeadline`, capped at
 `deadline + MAX_ADDITIONAL_DELAY` (two weeks in the prepare). That right is separately governed
 and stays explicit. The bootstrap edge predates the coordinator, so its timer is bound to
@@ -102,7 +102,7 @@ new `EcosystemUpgradeExecutor` bound to the same `CoreUpgradeExecutor`, then, as
 each domain, pointing it at the successor, then calling the successor coordinator's
 `setCTMExecutor` to bind the CTM executor back to it. `setCoordinator` is refused while a domain is reserved,
 so one operation is prepared, executed and completed by one coordinator; do it between upgrades,
-before the prepare, because every transition's timer is bound to the coordinator that will start
+before the prepare, because every operation's timer is bound to the coordinator that will start
 it. Governance owns the domain executors, so this is a direct owner call, not `forward`.
 
 This changes neither an executor's bound CTM / `ProxyAdmin` nor its object codehash anchors.

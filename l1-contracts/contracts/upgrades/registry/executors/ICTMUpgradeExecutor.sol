@@ -26,24 +26,33 @@ interface ICTMUpgradeExecutor {
     /// @notice The operation this executor is reserved for, zero when free.
     function activeOperation() external view returns (IEcosystemUpgradeOperation);
 
-    /// @notice The transition of the active operation's leg on this executor — the one
-    ///         `applyTransition` applies; zero when free. Derived from the operation, not stored.
+    /// @notice The transition of the active operation's leg on this executor; zero when the
+    ///         executor is free OR the reserved operation changes infrastructure only. Derived
+    ///         from the operation, not stored.
     function reservedTransition() external view returns (ICTMTransition);
 
-    /// @notice Reserves this executor for its leg of `_operation`, checks that leg's transition
-    ///         fits the bound CTM, and pauses the CTM's chain migrations.
+    /// @notice Reserves this executor for its leg of `_operation`, checks that leg (the
+    ///         infrastructure rows, and the transition against the bound CTM when it carries one),
+    ///         and pauses the CTM's chain migrations.
     function beginOperation(IEcosystemUpgradeOperation _operation) external;
 
-    /// @notice Applies the reserved transition on the bound CTM.
-    function applyTransition() external;
+    /// @notice Applies the reserved operation's CTM leg: its infrastructure rows, then its
+    ///         transition when it carries one.
+    function applyOperation() external;
 
-    /// @notice Requires the reserved transition applied, unpauses the CTM's migrations and frees
-    ///         the reservation.
+    /// @notice Requires the reserved leg applied, unpauses the CTM's migrations and frees the
+    ///         reservation.
     function completeOperation() external;
 
     /// @notice Frees the reservation, leaving migrations paused.
     function abandonOperation() external;
 
-    /// @notice Reverts unless `_transition` has been applied on the bound CTM.
+    /// @notice Reverts unless `_transition` has been committed on the bound CTM.
     function validateTransitionApplied(ICTMTransition _transition) external view;
+
+    /// @notice Reverts unless `_operation`'s whole CTM leg has been applied: every infrastructure
+    ///         row is live (each read through the admin it names) and its transition, if any, is
+    ///         committed. The post-state counterpart of `applyOperation`, and the check stage 2
+    ///         makes before it lifts the migration pause.
+    function validateOperationApplied(IEcosystemUpgradeOperation _operation) external view;
 }

@@ -8,7 +8,6 @@ import {ICommittedUpgrade} from "./ICommittedUpgrade.sol";
 import {ICTMRelease} from "./ICTMRelease.sol";
 import {ICTMTransition} from "./ICTMTransition.sol";
 import {ObjectAnchorLib} from "../libraries/ObjectAnchorLib.sol";
-import {CTM_CONTRACT_COUNT} from "../libraries/ContractIdentifiers.sol";
 import {TransitionDerivationLib} from "../libraries/TransitionDerivationLib.sol";
 import {L2PlanLib} from "../libraries/L2PlanLib.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
@@ -27,8 +26,7 @@ import {
     TransitionDeadlineBeforeUpgrade,
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
-import {L2UpgradePlan, ProxyUpgradeRow, TransitionManifest} from "../RegistryTypes.sol";
-import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
+import {L2UpgradePlan, TransitionManifest} from "../RegistryTypes.sol";
 import {IDefaultUpgrade} from "../../IDefaultUpgrade.sol";
 import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
 
@@ -67,15 +65,10 @@ contract CTMTransition is ICTMTransition {
         if (
             _manifest.fromRelease == address(0) ||
             _manifest.newRelease == address(0) ||
-            _manifest.upgradeEngine == address(0) ||
-            _manifest.upgradeTimer == address(0)
+            _manifest.upgradeEngine == address(0)
         ) {
             revert ZeroAddress();
         }
-        // CTM-domain implementation swaps ride on the transition (see {TransitionManifest});
-        // an all-inert inventory is the common case — most upgrades change chain state, not the
-        // CTM itself.
-        ProxyUpgradeRowLib.validateRows(ProxyUpgradeRowLib.toRows(_manifest.proxyUpgrades, CTM_CONTRACT_COUNT));
         // A transition only ever moves the version forward — the same rule chains enforce at
         // execution and the CTM enforces in `setNewVersionUpgrade`.
         if (_manifest.newProtocolVersion <= _manifest.oldProtocolVersion) {
@@ -87,8 +80,8 @@ contract CTMTransition is ICTMTransition {
             revert TransitionDeadlineBeforeUpgrade(_manifest.oldProtocolVersionDeadline, _manifest.upgradeTimestamp);
         }
 
-        // The engine's and timer's code existence is checked by `validate()` on the execution
-        // paths, not here — see {CoreRegistry}. Both release EDGES are validated, though: the
+        // The engine's code existence is checked by `validate()` on the execution paths, not
+        // here — see {CoreRegistry}. Both release EDGES are validated, though: the
         // delta below is derived from their manifests, so a malformed edge would silently
         // produce a malformed cut.
         // RELEASE PROVENANCE is still deliberately NOT checked here: the
@@ -241,10 +234,6 @@ contract CTMTransition is ICTMTransition {
         return getManifest().upgradeTimestamp;
     }
 
-    function upgradeTimer() external view returns (address) {
-        return getManifest().upgradeTimer;
-    }
-
     /// @inheritdoc ICommittedUpgrade
     function upgradeTarget() external view returns (uint256, uint256, address) {
         TransitionManifest memory m = getManifest();
@@ -266,24 +255,17 @@ contract CTMTransition is ICTMTransition {
         return IDefaultUpgrade(getManifest().upgradeEngine).l2UpgradeTx(address(this), _bridgehub, _chainId);
     }
 
-    function ctmProxyRows() external view returns (ProxyUpgradeRow[] memory) {
-        return ProxyUpgradeRowLib.toRows(getManifest().proxyUpgrades, CTM_CONTRACT_COUNT);
-    }
-
     /// @inheritdoc ICTMTransition
-    /// @dev THE enumeration of what this transition names itself: the upgrade engine, the timer,
-    ///      the delegate composer (version-specific CODE in place of authored calldata) when the
-    ///      plan names one, and every participating CTM-domain row's implementation. The two
-    ///      release edges are objects with check surfaces of their own.
+    /// @dev THE enumeration of what this transition names itself: the upgrade engine and the
+    ///      delegate composer (version-specific CODE in place of authored calldata) when the plan
+    ///      names one. The two release edges are objects with check surfaces of their own.
     function validate() external view {
         TransitionManifest memory m = getManifest();
         ICTMRelease(m.newRelease).validate();
         ICTMRelease(m.fromRelease).validate();
         ObjectAnchorLib.requireCode(m.upgradeEngine);
-        ObjectAnchorLib.requireCode(m.upgradeTimer);
         if (m.l2Plan.delegateComposer != address(0)) {
             ObjectAnchorLib.requireCode(m.l2Plan.delegateComposer);
         }
-        ProxyUpgradeRowLib.requireRowCode(ProxyUpgradeRowLib.toRows(m.proxyUpgrades, CTM_CONTRACT_COUNT));
     }
 }

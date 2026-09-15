@@ -32,10 +32,12 @@ import {
     L1_ECOSYSTEM_CONTRACT_COUNT,
     L1EcosystemContract
 } from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
+import {L2PlanFixtures} from "./L2PlanFixtures.sol";
 import {
     CallerNotTimerAdmin,
     ZeroAddress,
     DeadlineNotYetPassed,
+    L2BytecodeNotPublished,
     MigrationsNotPaused,
     NoPendingOperation,
     NotCTMOwner,
@@ -148,20 +150,31 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         return new CoreRegistry(manifest);
     }
 
-    /// @dev The fixture's default manifest plus a CTM-domain row.
-    function _fullManifest() internal returns (TransitionManifest memory manifest) {
-        manifest = _transitionManifest(777, chainContractAddress.currentRelease(), 0, L2_DELEGATE_CODE);
-        manifest.proxyUpgrades[uint256(CTMContract.ValidatorTimelock)] = _row(
-            address(ctmDomainProxy),
-            implOld,
-            implNew
-        );
+    /// @dev The CTM-domain inventory the "full" operation carries: one row over a proxy under
+    ///      the executor's own `ProxyAdmin`, departing from `_expectedOldImpl`.
+    function _fullInventory(address _expectedOldImpl) internal view returns (ProxyUpgradeRow[] memory inventory) {
+        inventory = _emptyInventory();
+        inventory[uint256(CTMContract.ValidatorTimelock)] = _row(address(ctmDomainProxy), _expectedOldImpl, implNew);
     }
 
-    /// @dev The full transition, registered under an operation that names the ecosystem leg.
+    /// @dev The fixture's default transition under an operation that names all three changes: the
+    ///      ecosystem leg, one CTM-domain infrastructure row, and the transition itself.
     function _deployFullTransition() internal returns (CTMTransition full) {
-        full = new CTMTransition(_fullManifest());
-        _operationWithCore(ICTMTransition(address(full)), address(coreRegistry));
+        full = _deployTransition(777);
+        _deployFullOperation(full, implOld);
+    }
+
+    function _deployFullOperation(
+        CTMTransition _transition,
+        address _expectedOldImpl
+    ) internal returns (EcosystemUpgradeOperation operation) {
+        operation = _deployOperation(
+            address(coreRegistry),
+            _fullInventory(_expectedOldImpl),
+            address(_transition),
+            _newOperationTimer()
+        );
+        operationOf[address(_transition)] = operation;
     }
 
     function _liveImpl(ProxyAdmin _admin, TransparentUpgradeableProxy _proxy) internal view returns (address) {
@@ -232,7 +245,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
     function test_lifecycle_eventsAndEndState() public {
         CTMTransition full = _deployFullTransition();
         EcosystemUpgradeOperation operation = _operationFor(full);
-        GovernanceUpgradeTimer timer = GovernanceUpgradeTimer(full.upgradeTimer());
+        GovernanceUpgradeTimer timer = GovernanceUpgradeTimer(operation.timer());
         uint256 oldVersion = chainContractAddress.protocolVersion();
         assertFalse(
             chainAssetHandler.migrationPausedFor(address(chainContractAddress)),
@@ -299,7 +312,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         _assertLifecycleIdle();
         assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)), "stage 2 unpauses migrations");
         // The post-state checks keep holding on their own after completion.
-        ctmExecutor.validateTransitionApplied(ICTMTransition(address(full)));
+        ctmExecutor.validateOperationApplied(operation);
         coreExecutor.validateUpgradeApplied(ICoreRegistry(address(coreRegistry)));
     }
 
@@ -551,7 +564,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         _stage0(transition);
 
         vm.prank(governor);
-        coordinator.forward(_singleCall(address(ctmExecutor), abi.encodeCall(CTMUpgradeExecutor.applyTransition, ())));
+        coordinator.forward(_singleCall(address(ctmExecutor), abi.encodeCall(CTMUpgradeExecutor.applyOperation, ())));
 
         assertEq(chainContractAddress.upgradeTransition(0), address(transition), "the reserved leg is the one applied");
         assertTrue(chainContractAddress.upgradeTransition(0) != address(other), "never the unreserved one");
@@ -563,7 +576,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
     function test_revertWhen_coordinatorDrivesCallbacksWithNothingReserved() public {
         vm.startPrank(governor);
         vm.expectRevert(NoPendingOperation.selector);
-        coordinator.forward(_singleCall(address(ctmExecutor), abi.encodeCall(CTMUpgradeExecutor.applyTransition, ())));
+        coordinator.forward(_singleCall(address(ctmExecutor), abi.encodeCall(CTMUpgradeExecutor.applyOperation, ())));
         vm.expectRevert(NoPendingOperation.selector);
         coordinator.forward(
             _singleCall(address(ctmExecutor), abi.encodeCall(CTMUpgradeExecutor.completeOperation, ()))
@@ -620,15 +633,9 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         );
         _assertCtmUntouched();
         assertEq(_liveImpl(ecosystemProxyAdmin, ecosystemProxy), implOld, "the ecosystem leg never ran");
-        // The corrected transition (the row now departs from where the proxy actually is).
-        TransitionManifest memory corrected = _fullManifest();
-        corrected.proxyUpgrades[uint256(CTMContract.ValidatorTimelock)] = _row(
-            address(ctmDomainProxy),
-            implOther,
-            implNew
-        );
-        CTMTransition next = new CTMTransition(corrected);
-        _operationWithCore(ICTMTransition(address(next)), address(coreRegistry));
+        // The corrected operation (the row now departs from where the proxy actually is).
+        CTMTransition next = _deployTransition(778);
+        _deployFullOperation(next, implOther);
         _stage0(next);
         _assertPendingAndPaused(next, IEcosystemUpgradeExecutor.UpgradeStage.Prepared);
     }
@@ -696,22 +703,17 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
 
     function test_revertWhen_stage0TimerNotBoundToCoordinator() public {
         // A timer someone else can start (bound to governance directly) is refused by the timer's
-        // own `onlyTimerAdmin`: stage 0 must be the only way this transition's clock starts. The
+        // own `onlyTimerAdmin`: stage 0 must be the only way this operation's clock starts. The
         // revert unwinds the reservation and the migration pause stage 0 took before reaching it.
-        TransitionManifest memory manifest = _transitionManifest(
-            777,
-            chainContractAddress.currentRelease(),
-            0,
-            L2_DELEGATE_CODE
-        );
         GovernanceUpgradeTimer unbound = new GovernanceUpgradeTimer(0, 0, governor, governor);
-        manifest.upgradeTimer = address(unbound);
-        CTMTransition mistimed = new CTMTransition(manifest);
+        CTMTransition mistimed = _deployTransition(777);
         // An ecosystem leg too, so the rollback below covers BOTH domains' reservations — the
         // timer is the last thing stage 0 touches.
-        EcosystemUpgradeOperation operation = _operationWithCore(
-            ICTMTransition(address(mistimed)),
-            address(coreRegistry)
+        EcosystemUpgradeOperation operation = _deployOperation(
+            address(coreRegistry),
+            _emptyInventory(),
+            address(mistimed),
+            address(unbound)
         );
 
         vm.expectRevert(CallerNotTimerAdmin.selector);
@@ -831,16 +833,15 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
     /// @dev The timer is the operational window between preparation and execution; its owner
     ///      (governance) keeps the bounded extension right through the timer itself.
     function test_stage1_waitsForTheTimerDeadline() public {
-        TransitionManifest memory manifest = _transitionManifest(
-            777,
-            chainContractAddress.currentRelease(),
-            0,
-            L2_DELEGATE_CODE
-        );
         GovernanceUpgradeTimer timer = _newTimer(100, 50);
-        manifest.upgradeTimer = address(timer);
-        CTMTransition delayed = new CTMTransition(manifest);
-        EcosystemUpgradeOperation operation = _operationFor(delayed);
+        CTMTransition delayed = _deployTransition(777);
+        EcosystemUpgradeOperation operation = _deployOperation(
+            address(0),
+            _emptyInventory(),
+            address(delayed),
+            address(timer)
+        );
+        operationOf[address(delayed)] = operation;
         uint256 preparedAt = block.timestamp;
         _stage0(delayed);
         assertEq(timer.deadline(), preparedAt + 100);
@@ -888,6 +889,51 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
     }
 
     // ─────────────────────────── all-or-nothing stage 1 ───────────────────────────
+
+    /// @dev Stage 1 applies infrastructure rows BEFORE the version commit (the commit may need a
+    ///      setter only the implementation this very operation installs has), so the case that
+    ///      proves atomicity for a MIXED operation is the reverse one: rows that already applied
+    ///      must be rolled back when the transition leg then fails. Here the transition's L2
+    ///      delegate was never published on the CTM's supplier — a check `_applyCTMUpgrade` makes
+    ///      after the rows are live, and one stage 0 deliberately does not make.
+    function test_revertWhen_stage1TransitionFailsAfterRows_everyRowIsRolledBack() public {
+        bytes memory unpublishedDelegate = hex"de2f";
+        CTMTransition unpublished = _deployTransitionWithDelegate(
+            777,
+            chainContractAddress.currentRelease(),
+            0,
+            unpublishedDelegate
+        );
+        assertEq(bytecodesSupplier.evmPublishingBlock(keccak256(unpublishedDelegate)), 0, "fixture: not yet published");
+        // A mixed operation: an ecosystem leg, an infrastructure row and the transition.
+        EcosystemUpgradeOperation operation = _deployFullOperation(unpublished, implOld);
+        _stage0(unpublished);
+
+        vm.expectRevert(abi.encodeWithSelector(L2BytecodeNotPublished.selector, keccak256(unpublishedDelegate)));
+        vm.prank(governor);
+        coordinator.stage1(operation);
+
+        assertEq(
+            _liveImpl(ctmProxyAdmin, ctmDomainProxy),
+            implOld,
+            "the infrastructure row applied earlier in the stage must be rolled back"
+        );
+        assertEq(
+            _liveImpl(ecosystemProxyAdmin, ecosystemProxy),
+            implOld,
+            "the ecosystem leg applied earlier in the stage must be rolled back too"
+        );
+        _assertCtmUntouched();
+        _assertPendingAndPaused(unpublished, IEcosystemUpgradeExecutor.UpgradeStage.Prepared);
+
+        // Publishing the missing dependency makes the very same operation executable, rows and all.
+        L2PlanFixtures.publish(bytecodesSupplier, L2PlanFixtures.codes(unpublishedDelegate));
+        _stage1(unpublished);
+        assertEq(_liveImpl(ctmProxyAdmin, ctmDomainProxy), implNew, "the row applies once the stage can complete");
+        assertEq(chainContractAddress.protocolVersion(), newVersion, "and so does the version commit");
+        _stage2(unpublished);
+        _assertLifecycleIdle();
+    }
 
     /// @dev A CTM-domain row whose proxy sits at an implementation the row does not know fails
     ///      the source check. The ecosystem leg ran FIRST inside the same stage, so "no partial

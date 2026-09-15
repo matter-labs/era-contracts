@@ -338,6 +338,8 @@ error OnlyNormalMode();
 error OnlyPriorityMode();
 // 0x6c167909
 error OnlySelfAllowed();
+// 0xcfc11a41
+error OperationChangesNothing();
 // 0x1a21feed
 error OperationExists();
 // 0xeda2fbb1

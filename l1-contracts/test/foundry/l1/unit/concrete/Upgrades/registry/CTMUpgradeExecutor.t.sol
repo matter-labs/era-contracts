@@ -57,12 +57,11 @@ import {
 ///         `ProxyAdmin`) wired the way the v34 bootstrap leaves them, the fixture's REAL
 ///         `L1ChainAssetHandler` as the migration-pause holder, and real write-once
 ///         release/transition objects. See {protocol-docs/ecosystem-upgrade-coordination.md}.
-/// @dev Every fixture transition departs from the fixture's current release toward `release`,
-///      names NO ecosystem leg (`coreRegistry` zero) and pins a fresh zero-delay timer bound to
-///      the coordinator, so stage 1 is admissible in the same block as stage 0. Each transition
-///      rides a one-leg operation (`_operationFor`). Suites that need a CTM-domain row, an
-///      ecosystem leg or a delayed timer build the manifest through `_transitionManifest` and
-///      adjust it before deploying.
+/// @dev Every fixture transition departs from the fixture's current release toward `release`.
+///      Each rides a one-leg operation (`_operationFor`) that names NO ecosystem leg
+///      (`coreRegistry` zero), NO infrastructure rows and a fresh zero-delay timer, so stage 1 is
+///      admissible in the same block as stage 0. Suites that need a CTM-domain row, an ecosystem
+///      leg or a delayed timer build the operation through {OperationFixtures._deployOperation}.
 abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFixtures {
     CTMUpgradeExecutor internal ctmExecutor;
     ProxyAdmin internal ctmProxyAdmin;
@@ -196,6 +195,11 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
         return new GovernanceUpgradeTimer(_initialDelay, _maxAdditionalDelay, address(coordinator), governor);
     }
 
+    /// @inheritdoc OperationFixtures
+    function _newOperationTimer() internal override returns (address) {
+        return address(_newTimer(0, 0));
+    }
+
     function _deployTransition(uint256 _upgradeTimestamp) internal returns (CTMTransition result) {
         return _deployTransitionFrom(_upgradeTimestamp, chainContractAddress.currentRelease(), 0);
     }
@@ -221,14 +225,14 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
 
     /// @dev The default fixture manifest: the L2 side is the minimal plan (the delegate's bytecode
     ///      info — the object constructs its Unsafe deployment and pins its bytecode as the one
-    ///      factory dependency); all CTM-domain slots inert; no ecosystem leg; a fresh zero-delay
-    ///      timer bound to the coordinator.
+    ///      factory dependency). Infrastructure rows and the timer are the OPERATION's, not the
+    ///      transition's.
     function _transitionManifest(
         uint256 _upgradeTimestamp,
         address _fromRelease,
         uint256 _oldProtocolVersion,
         bytes memory _delegateCode
-    ) internal returns (TransitionManifest memory) {
+    ) internal view returns (TransitionManifest memory) {
         return
             TransitionManifest({
                 oldProtocolVersion: _oldProtocolVersion,
@@ -238,11 +242,9 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
                 fromRelease: _fromRelease,
                 newRelease: address(release),
                 upgradeEngine: upgradeEngineAddr,
-                proxyUpgrades: new ProxyUpgradeRow[](CTM_CONTRACT_COUNT),
                 oldProtocolVersionDeadline: 1000,
                 upgradeTimestamp: _upgradeTimestamp,
-                l2Plan: L2PlanFixtures.delegatePlan(_delegateCode, address(delegateComposer)),
-                upgradeTimer: address(_newTimer(0, 0))
+                l2Plan: L2PlanFixtures.delegatePlan(_delegateCode, address(delegateComposer))
             });
     }
 
@@ -336,7 +338,7 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
         ctmExecutor.beginOperation(operation);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
-        ctmExecutor.applyTransition();
+        ctmExecutor.applyOperation();
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
         ctmExecutor.completeOperation();
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));

@@ -5,9 +5,11 @@ pragma solidity 0.8.28;
 import {ICommittedUpgrade} from "./ICommittedUpgrade.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
 import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
-import {ProxyUpgradeRow, TransitionManifest} from "../RegistryTypes.sol";
+import {TransitionManifest} from "../RegistryTypes.sol";
 
-/// @notice Immutable description of how one CTM release becomes another.
+/// @notice Immutable description of how one CTM release becomes another: what chains upgrade
+///         from and to, and by when. Infrastructure changes and the execution delay belong to the
+///         OPERATION that carries this transition, not here.
 /// @dev The facet cuts and table-derived L2 deployments are NOT authored: they are DERIVED from
 ///      the `(fromRelease, newRelease)` pair at initialization and stored. What governance reviews
 ///      is two releases and this transition's schedule/engine/L2 plan; the delta is a
@@ -40,17 +42,11 @@ interface ICTMTransition is ICommittedUpgrade {
 
     function upgradeTimestamp() external view returns (uint256);
 
-    /// @notice The `GovernanceUpgradeTimer` gating stage 1 of this transition.
-    function upgradeTimer() external view returns (address);
-
     /// @notice The DERIVED facet swaps realizing `fromRelease -> newRelease` routing.
     /// @notice The final, ready-to-execute diamond cuts — DERIVED from the release pair at
     ///         initialization (all `Remove` cuts first, then `Add`), applied verbatim by the
     ///         chain with no re-diffing.
     function facetCuts() external view returns (Diamond.FacetCut[] memory);
-
-    /// @notice CTM-domain implementation swaps applied by the bound executor before the commit.
-    function ctmProxyRows() external view returns (ProxyUpgradeRow[] memory);
 
     /// @notice The L2 protocol upgrade transaction this transition's engine commits on chain
     ///         `_chainId` of the ecosystem of `_bridgehub` — the single read entry point for tooling.
@@ -63,8 +59,8 @@ interface ICTMTransition is ICommittedUpgrade {
     function l2UpgradeTx(address _bridgehub, uint256 _chainId) external view returns (L2CanonicalTransaction memory);
 
     /// @notice Reverts unless BOTH releases validate and every contract this transition names
-    ///         (engine, timer, composer, CTM-domain rows) is deployed code. THE enforcement
-    ///         surface: the paths that commit or apply a transition call it.
+    ///         (engine, composer) is deployed code. THE enforcement surface: the paths that commit
+    ///         or apply a transition call it.
     /// @dev It does NOT attest that the code is the reviewed code — that is governance's
     ///      approval of this object's member ADDRESSES, established off-chain before approval
     ///      (see {docs/registry-driven-upgrades.md}).

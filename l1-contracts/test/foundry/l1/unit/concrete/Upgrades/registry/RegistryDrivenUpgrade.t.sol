@@ -291,10 +291,6 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
             ? L2PlanFixtures.delegatePlan(L2_DELEGATE_CODE, address(delegateComposer))
             : L2PlanFixtures.emptyPlan();
 
-        ProxyUpgradeRow[] memory noProxyUpgrades = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
-        // One timer per hop, bound to the coordinator (the only address that can start it), with
-        // zero delays so stage 1 is admissible in the block stage 0 ran in.
-        address upgradeTimer = address(new GovernanceUpgradeTimer(0, 0, address(coordinator), governor));
         transition = new CTMTransition(
             TransitionManifest({
                 oldProtocolVersion: _oldVersion,
@@ -302,13 +298,17 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
                 fromRelease: _fromRelease,
                 newRelease: release,
                 upgradeEngine: defaultUpgrade,
-                proxyUpgrades: noProxyUpgrades,
                 oldProtocolVersionDeadline: 1000,
                 upgradeTimestamp: 0,
-                l2Plan: l2Plan,
-                upgradeTimer: upgradeTimer
+                l2Plan: l2Plan
             })
         );
+    }
+
+    /// @inheritdoc OperationFixtures
+    /// @dev One timer per hop: a timer starts exactly once, and each hop runs its own lifecycle.
+    function _newOperationTimer() internal override returns (address) {
+        return address(new GovernanceUpgradeTimer(0, 0, address(coordinator), governor));
     }
 
     /// @dev The one-leg operation a hop rides.
