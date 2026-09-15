@@ -15,27 +15,15 @@ interface IL1GenesisUpgrade {
     /// @param _zkChain the address of the zk chain
     /// @param _l2Transaction the l2 genesis upgrade transaction
     /// @param _protocolVersion the current protocol version
-    /// @param _factoryDeps the factory dependencies needed for the upgrade
     event GenesisUpgrade(
         address indexed _zkChain,
         L2CanonicalTransaction _l2Transaction,
-        uint256 indexed _protocolVersion,
-        bytes[] _factoryDeps
+        uint256 indexed _protocolVersion
     );
 
     /// @notice The main function that will be called by the Admin facet at genesis.
-    /// @param _l1GenesisUpgrade the address of the l1 genesis upgrade
-    /// @param _chainId the chain id
-    /// @param _protocolVersion the current protocol version
-    /// @param _l1CtmDeployerAddress the address of the l1 ctm deployer
-    /// @param _forceDeployments the force deployments
-    /// @param _factoryDeps the factory dependencies
-    function genesisUpgrade(
-        address _l1GenesisUpgrade,
-        uint256 _chainId,
-        uint256 _protocolVersion,
-        address _l1CtmDeployerAddress,
-        bytes calldata _forceDeployments,
-        bytes[] calldata _factoryDeps
-    ) external returns (bytes32);
+    /// @dev Takes no arguments: it is delegatecalled into the freshly initialized chain diamond,
+    /// so the chain identity and protocol version come from that diamond's own storage, the force
+    /// deployments from the release its CTM pins, and the CTM deployer from the Bridgehub.
+    function genesisUpgrade() external returns (bytes32);
 }

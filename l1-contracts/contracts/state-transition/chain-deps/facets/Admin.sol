@@ -528,21 +528,15 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
         _executeDiamondCut(_diamondCut);
     }
 
+    /// @inheritdoc IAdmin
     /// @dev we have to set the chainId at genesis, as blockhashzero is the same for all chains with the same chainId
-    function genesisUpgrade(
-        address _l1GenesisUpgrade,
-        address _ctmDeployer,
-        bytes calldata _forceDeploymentData,
-        bytes[] calldata _factoryDeps
-    ) external onlyChainTypeManager {
+    function genesisUpgrade() external onlyChainTypeManager {
+        address l1GenesisUpgrade = IChainTypeManager(s.chainTypeManager).l1GenesisUpgrade();
         Diamond.FacetCut[] memory emptyArray;
         Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
             facetCuts: emptyArray,
-            initAddress: _l1GenesisUpgrade,
-            initCalldata: abi.encodeCall(
-                IL1GenesisUpgrade.genesisUpgrade,
-                (_l1GenesisUpgrade, s.chainId, s.protocolVersion, _ctmDeployer, _forceDeploymentData, _factoryDeps)
-            )
+            initAddress: l1GenesisUpgrade,
+            initCalldata: abi.encodeCall(IL1GenesisUpgrade.genesisUpgrade, ())
         });
 
         _executeDiamondCut(cutData);
@@ -589,7 +583,7 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
     ///      0x23b31192 deactivatePriorityMode()
     ///      0xa9f6d941 executeUpgrade(((address,uint8,bool,bytes4[])[],address,bytes))
     ///      0x27ae4c16 freezeDiamond()
-    ///      0x2878fe74 genesisUpgrade(address,address,bytes,bytes[])
+    ///      0xd241f618 genesisUpgrade()
     ///      0xb4fcb577 getRollupDAManager()
     ///      0x6e762e98 makePermanentRollup()
     ///      0x1b48b94a permanentlyAllowPriorityMode()
@@ -607,7 +601,7 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
     ///      0x03129ad9 upgradeChainFromVersion(address,uint256)
     function selectors() public pure returns (bytes4[] memory result) {
         bytes
-            memory packed = hex"03129ad90e18b681173389451b48b94a21f603d7235d9eb523b311922765d07927ae4c162878fe742f257a5c4623c91d4dd18bf560eae0e764bf8d666e762e98a9f6d941b4fcb577be6f11cfc5f1f1f5e51935f5e76db865f9afb97e";
+            memory packed = hex"03129ad90e18b681173389451b48b94a21f603d7235d9eb523b311922765d07927ae4c162f257a5c4623c91d4dd18bf560eae0e764bf8d666e762e98a9f6d941b4fcb577be6f11cfc5f1f1f5d241f618e51935f5e76db865f9afb97e";
         uint256 count = packed.length / 4;
         result = new bytes4[](count);
         for (uint256 i = 0; i < count; ++i) {

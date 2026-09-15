@@ -88,12 +88,10 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// @dev Only the CTM can unfreeze Diamond Proxy
     function unfreezeDiamond() external;
 
-    function genesisUpgrade(
-        address _l1GenesisUpgrade,
-        address _ctmDeployer,
-        bytes calldata _forceDeploymentData,
-        bytes[] calldata _factoryDeps
-    ) external;
+    /// @notice Runs the genesis upgrade of a freshly created chain.
+    /// @dev Takes no arguments: the genesis engine comes from the CTM's pinned release and
+    /// everything the engine needs from this chain's own storage and the Bridgehub.
+    function genesisUpgrade() external;
 
     /// @notice Returns address of the RollupDAManager of the ZK Chain.
     function getRollupDAManager() external view returns (address);
