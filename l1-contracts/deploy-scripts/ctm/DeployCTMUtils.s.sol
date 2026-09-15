@@ -66,11 +66,7 @@ import {CTMContract, CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "./Depl
 
 import {CTMDeployedAddresses} from "../utils/Types.sol";
 import {Facets} from "contracts/common/StateTransitionTypes.sol";
-import {
-    GenesisFacet,
-    ReleaseGenesisData,
-    ReleaseManifest
-} from "../../contracts/upgrades/registry/RegistryTypes.sol";
+import {GenesisFacet, ReleaseGenesisData, ReleaseManifest} from "../../contracts/upgrades/registry/RegistryTypes.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct Config {

@@ -165,10 +165,7 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
     function _releaseManifest(uint256 _manifestNonce) internal view returns (ReleaseManifest memory) {
         GenesisFacet[] memory genesisFacets = new GenesisFacet[](facetCuts.length);
         for (uint256 i = 0; i < facetCuts.length; ++i) {
-            genesisFacets[i] = GenesisFacet({
-                facet: facetCuts[i].facet,
-                isFreezable: facetCuts[i].isFreezable
-            });
+            genesisFacets[i] = GenesisFacet({facet: facetCuts[i].facet, isFreezable: facetCuts[i].isFreezable});
         }
         return
             ReleaseManifest({

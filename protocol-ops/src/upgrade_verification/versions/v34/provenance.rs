@@ -2,9 +2,21 @@
 //!
 //! Under the registry model this replaces v31's CREATE2-transaction archaeology. There, a
 //! reviewer had to reconstruct each deployment from an append-only transaction log to learn
-//! what had been deployed. Here every object's identity is a runtime codehash that the
-//! executors and the CTM enforce on-chain, so provenance is a comparison between live
-//! `EXTCODEHASH` and `AllContractsHashes.json` — no transaction history required.
+//! what had been deployed. Here the answer comes from the REVIEWED COMMIT's own artifacts:
+//! live `EXTCODEHASH` against `AllContractsHashes.json`. Nothing the package supplies takes
+//! part in that comparison — a fingerprint the package carried would only prove the package
+//! is self-consistent.
+//!
+//! # Constructor-set immutables
+//!
+//! `AllContractsHashes.json` records the ARTIFACT's deployed bytecode, whose immutable slots
+//! are zero. A contract that sets immutables in its constructor therefore never hashes to its
+//! own artifact once deployed, and a hash lookup for it misses by construction. Such a contract
+//! is not waved through: [`expect_immutable_bearing_identity`] requires every immutable the
+//! reviewer depends on to be read back from the deployment and to equal the reviewed value, and
+//! a mismatch is an error like any other. Objects WITHOUT immutables go through
+//! [`expect_code_identity`], where code the commit does not produce is an error — never a
+//! warning that could accompany a successful review.
 
 use std::collections::HashMap;
 
@@ -34,15 +46,18 @@ pub(crate) fn tolerate<T>(
     }
 }
 
-/// Reverse map from a contract's deployed-bytecode hash to its `AllContractsHashes.json` name.
+/// The reviewed commit's contracts, indexed both ways: by deployed-bytecode hash (what is this
+/// code?) and by short contract name (what should this contract's code hash to?).
 pub(crate) struct CodeIdentity {
     by_codehash: HashMap<FixedBytes<32>, String>,
+    by_short_name: HashMap<String, FixedBytes<32>>,
 }
 
 impl CodeIdentity {
     pub(crate) fn from_local_hashes() -> anyhow::Result<Self> {
         let hashes = ContractHashes::init_from_local()?;
         let mut by_codehash = HashMap::new();
+        let mut by_short_name = HashMap::new();
         for contract in hashes.hashes {
             if let Some(hash) = contract.evm_deployed_bytecode_hash.as_deref() {
                 if let Ok(parsed) = hash.parse::<FixedBytes<32>>() {
@@ -51,15 +66,56 @@ impl CodeIdentity {
                     by_codehash
                         .entry(parsed)
                         .or_insert_with(|| contract.contract_name.clone());
+                    if let Some(short) = contract.contract_name.rsplit('/').next() {
+                        by_short_name.entry(short.to_string()).or_insert(parsed);
+                    }
                 }
             }
         }
-        Ok(Self { by_codehash })
+        Ok(Self {
+            by_codehash,
+            by_short_name,
+        })
     }
 
     /// The reviewed-commit name for `codehash`, if the commit produces that code at all.
     pub(crate) fn name_of(&self, codehash: &FixedBytes<32>) -> Option<&str> {
         self.by_codehash.get(codehash).map(String::as_str)
+    }
+
+    /// The deployed-bytecode hash the reviewed commit produces for `short_name`.
+    ///
+    /// Meaningful only for contracts with no constructor-set immutables — which is exactly what
+    /// the object-type anchors cover (`CTMTransition`, `CoreRegistry`,
+    /// `EcosystemUpgradeOperation`), so an executor's anchor immutable can be checked against
+    /// the commit rather than against whatever the package says it should be.
+    pub(crate) fn codehash_of(&self, short_name: &str) -> Option<FixedBytes<32>> {
+        self.by_short_name.get(short_name).copied()
+    }
+}
+
+/// One constructor-set immutable, as read back from the deployment and as the review expects it.
+pub(crate) struct ImmutableValue {
+    pub(crate) name: &'static str,
+    pub(crate) actual: String,
+    pub(crate) expected: String,
+}
+
+impl ImmutableValue {
+    pub(crate) fn new(
+        name: &'static str,
+        actual: impl std::fmt::Display,
+        expected: impl std::fmt::Display,
+    ) -> Self {
+        Self {
+            name,
+            actual: actual.to_string(),
+            expected: expected.to_string(),
+        }
+    }
+
+    fn holds(&self) -> bool {
+        self.actual.eq_ignore_ascii_case(&self.expected)
     }
 }
 
@@ -104,54 +160,109 @@ pub(crate) async fn expect_code_identity<P: Provider>(
             Ok(false)
         }
         None => {
-            // Reported as a WARNING, not an error: the overwhelmingly common cause is an
-            // AllContractsHashes.json that has not been regenerated for the reviewed commit,
-            // which makes every lookup miss at once. A genuinely foreign contract shows up as
-            // the `Some(other)` arm above, which IS an error. `unresolved_codehashes` lets the
-            // caller escalate when only SOME objects miss.
-            result.report_warn(&format!(
+            // An ERROR, not a warning: the reviewer cannot say what is deployed here, and an
+            // unresolved deployment must not ride along with an otherwise successful review.
+            // The two benign causes name themselves in the message; both are fixed BEFORE the
+            // review concludes, not annotated in it.
+            result.report_error(&format!(
                 "{label} at {address} runs code ({live}) that AllContractsHashes.json does not \
-                 attribute to any contract — regenerate it for the reviewed commit, or confirm \
-                 the object was built with the deterministic (metadata-free) profile"
+                 attribute to any contract: what is deployed there is unknown. Regenerate \
+                 AllContractsHashes.json for the reviewed commit, or confirm the object was \
+                 built with the deterministic (metadata-free) profile"
             ));
             Ok(false)
         }
     }
 }
 
-/// Reports whether a manifest's inline `PinnedContract` pin holds against live code.
+/// Reports whether the account at `address` is the reviewed `expected_short_name` deployment,
+/// for a contract that sets IMMUTABLES in its constructor.
 ///
-/// A pin that does not hold is not a review nit: the executors and the CTM reject an object
-/// whose code disagrees with its pin, so a package shipping a stale pin cannot execute.
-pub(crate) async fn expect_pin_holds<P: Provider>(
+/// Such a deployment cannot hash to its own artifact (the artifact's immutable slots are zero),
+/// so identity is established from the immutable VALUES the reviewer depends on: each is read
+/// back from the deployment and compared with the reviewed value, and any mismatch is an error.
+/// A live hash that resolves to a DIFFERENT reviewed contract is still an error — that is a
+/// definitive answer, whatever the immutables say.
+pub(crate) async fn expect_immutable_bearing_identity<P: Provider>(
     provider: &P,
+    identity: &CodeIdentity,
     result: &mut VerificationResult,
     label: &str,
     address: Address,
-    pinned_codehash: FixedBytes<32>,
+    expected_short_name: &str,
+    immutables: &[ImmutableValue],
 ) -> anyhow::Result<bool> {
     if address.is_zero() {
-        result.report_error(&format!("{label} pins the zero address"));
+        result.report_error(&format!("{label} is the zero address"));
         return Ok(false);
     }
     let code = provider.get_code_at(address).await?;
     if code.is_empty() {
         result.report_error(&format!(
-            "{label} pins {address}, which has no code: the pin can never hold"
+            "{label} at {address} has NO code: nothing is deployed there"
         ));
         return Ok(false);
     }
+
     let live = alloy::primitives::keccak256(&code);
-    if live == pinned_codehash {
-        result.report_ok(&format!("{label} pin holds against the code at {address}"));
-        Ok(true)
-    } else {
-        result.report_error(&format!(
-            "{label} pins codehash {pinned_codehash} but {address} runs {live}: execution will \
-             be rejected on-chain"
-        ));
-        Ok(false)
+    if let Some(other) = identity.name_of(&live) {
+        if other.rsplit('/').next() != Some(expected_short_name) {
+            result.report_error(&format!(
+                "{label} at {address} runs {other}, not {expected_short_name}"
+            ));
+            return Ok(false);
+        }
     }
+
+    let mut holds = true;
+    for immutable in immutables {
+        if immutable.holds() {
+            result.report_ok(&format!(
+                "{label}: immutable {} is {}",
+                immutable.name, immutable.actual
+            ));
+        } else {
+            holds = false;
+            result.report_error(&format!(
+                "{label}: immutable {} is {} but the review expects {}",
+                immutable.name, immutable.actual, immutable.expected
+            ));
+        }
+    }
+    if !holds {
+        return Ok(false);
+    }
+    result.report_ok(&format!(
+        "{label} at {address} is a {expected_short_name} whose {} constructor-set immutable(s) \
+         match the review; its runtime code differs from the artifact only where those values \
+         are patched in",
+        immutables.len()
+    ));
+    Ok(true)
+}
+
+/// Reports whether an address is a deployed contract at all — the precondition every object
+/// this package names has to meet, and the one the objects' own `validate()` enforces on-chain.
+pub(crate) async fn expect_code_present<P: Provider>(
+    provider: &P,
+    result: &mut VerificationResult,
+    label: &str,
+    address: Address,
+) -> anyhow::Result<bool> {
+    if address.is_zero() {
+        result.report_error(&format!("{label} is the zero address"));
+        return Ok(false);
+    }
+    let code = provider.get_code_at(address).await?;
+    if code.is_empty() {
+        result.report_error(&format!(
+            "{label} at {address} has NO code: the object names an address nothing is deployed \
+             to, and `validate()` refuses it on-chain"
+        ));
+        return Ok(false);
+    }
+    result.report_ok(&format!("{label} at {address} is deployed code"));
+    Ok(true)
 }
 
 #[cfg(test)]
@@ -161,10 +272,16 @@ mod tests {
 
     fn identity_from(pairs: &[(&str, &str)]) -> CodeIdentity {
         let mut by_codehash = HashMap::new();
+        let mut by_short_name = HashMap::new();
         for (name, hash) in pairs {
-            by_codehash.insert(hash.parse().unwrap(), (*name).to_string());
+            let parsed: FixedBytes<32> = hash.parse().unwrap();
+            by_codehash.insert(parsed, (*name).to_string());
+            by_short_name.insert(name.rsplit('/').next().unwrap().to_string(), parsed);
         }
-        CodeIdentity { by_codehash }
+        CodeIdentity {
+            by_codehash,
+            by_short_name,
+        }
     }
 
     const HASH_A: &str = "0x1111111111111111111111111111111111111111111111111111111111111111";
@@ -217,10 +334,34 @@ mod tests {
                     .or_insert_with(|| contract.contract_name.clone());
             }
         }
-        let id = CodeIdentity { by_codehash };
+        let id = CodeIdentity {
+            by_codehash,
+            by_short_name: HashMap::new(),
+        };
         assert_eq!(
             id.name_of(&HASH_A.parse().unwrap()),
             Some("l1-contracts/First")
         );
+    }
+
+    /// The anchor checks resolve a SHORT name to the reviewed commit's codehash, so an
+    /// executor's `TRANSITION_CODEHASH` can be held against the commit instead of against a
+    /// value the package supplied.
+    #[test]
+    fn resolves_a_short_name_to_its_codehash() {
+        let id = identity_from(&[("l1-contracts/CTMTransition", HASH_A)]);
+        assert_eq!(
+            id.codehash_of("CTMTransition"),
+            Some(HASH_A.parse().unwrap())
+        );
+        assert_eq!(id.codehash_of("CoreRegistry"), None);
+    }
+
+    /// An immutable is compared case-insensitively, because the two sides are rendered from
+    /// different alloy types (a checksummed `Address` against a lowercase hash string).
+    #[test]
+    fn immutable_values_compare_case_insensitively() {
+        assert!(ImmutableValue::new("X", "0xAbCd", "0xabcd").holds());
+        assert!(!ImmutableValue::new("X", "0xAbCd", "0xabce").holds());
     }
 }

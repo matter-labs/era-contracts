@@ -6,14 +6,12 @@
   "bootstrap": {
     "legacyAdminFacet": "0x413b1AfCa96a3df5A686d8BFBF93d30688a7f7D9",
     "upgradeEngine": {
-      "address": "0x821f3361D454cc98b7555221A06Be563a7E2E0A6",
-      "codehash": "0x81ace9b17b47462ec81868794e7ad549e14b39733e2b04471283f784b2973b3e"
+      "address": "0x821f3361D454cc98b7555221A06Be563a7E2E0A6"
     },
     "ctmImpl": {
       "proxy": "0x395D938cF6E060Ff6043956d4B2117Dd9A5bC424",
       "expectedOldImpl": "0xB16D2666Ba84Ece3F7Fb41cF1A32f1dAC8F8Dcd3",
-      "implNew": "0x1780bCf4103D3F501463AD3414c7f4b654bb7aFd",
-      "implNewCodehash": "0x1054cb0227998f9c846e426b8d676b204f2e42f2455d97de204a4515dfb178e2"
+      "implNew": "0x1780bCf4103D3F501463AD3414c7f4b654bb7aFd"
     },
     "oldProtocolVersionDeadline": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
   },
@@ -22,8 +20,7 @@
       "L1MessageRoot": {
         "proxy": "0x94FB3BFF7d46820A805843Ac53F6B363383d719f",
         "expectedOldImpl": "0xa0f1804f39e8A7DDe4aa3DA795c98491314056dc",
-        "implNew": "0x2b5A4e5493d4a54E717057B127cf0C000C876f9B",
-        "implNewCodehash": "0x25987e152ac461db0936b03f70a2e0efd8dfab7bd9010e8535a5220a0f72cea7"
+        "implNew": "0x2b5A4e5493d4a54E717057B127cf0C000C876f9B"
       }
     }
   },
@@ -34,48 +31,40 @@
       "ctmProxy": "0x395D938cF6E060Ff6043956d4B2117Dd9A5bC424",
       "release": {
         "diamondInit": {
-          "address": "0xAD523115cd35a8d4E60B3C0953E0E0ac10418309",
-          "codehash": "0x0ae05fee65247cad061603e5380fc24ddfba327a1a98ecc59895cf86528d10ce"
+          "address": "0xAD523115cd35a8d4E60B3C0953E0E0ac10418309"
         },
         "verifier": {
-          "address": "0x045857BDEAE7C1c7252d611eB24eB55564198b4C",
-          "codehash": "0xf5f2e8d798248e784214d926073c2fdb122546e618093e4ba4ff2cb07a0adb86"
+          "address": "0x045857BDEAE7C1c7252d611eB24eB55564198b4C"
         },
         "genesisFacets": [
           {
             "name": "AdminFacet",
             "address": "0x26B862f640357268Bd2d9E95bc81553a2Aa81D7E",
-            "codehash": "0xe124ab2b4a28017fffdcc3046e1c80ea8823d2fcf8426c8d49d30af598ebaacb",
             "isFreezable": false
           },
           {
             "name": "GettersFacet",
             "address": "0xA56F946D6398Dd7d9D4D9B337Cf9E0F68982ca5B",
-            "codehash": "0xbed57914784dd09cf9a858edeea19cedd025371dcd52980afeae232cd7a4ca0a",
             "isFreezable": false
           },
           {
             "name": "ExecutorFacet",
             "address": "0x5D42EBdBBa61412295D7b0302d6F50aC449Ddb4F",
-            "codehash": "0x4a1976a0d8908b5178dc43b7f965a75fe1f58650d504e1cc69cf479e5e0058ce",
             "isFreezable": true
           },
           {
             "name": "MigratorFacet",
             "address": "0xddE78e6202518FF4936b5302cC2891ec180E8bFf",
-            "codehash": "0xad6561234dd5e7f73b16ed3e4310a0c2ca2085a49b6fdadcddc556ef02864e22",
             "isFreezable": false
           },
           {
             "name": "CommitterFacet",
             "address": "0xB06c856C8eaBd1d8321b687E188204C1018BC4E5",
-            "codehash": "0x87144d03bcbd3a6bdd8601f97faa21b8462a8fb6e4a21fe6943f08048b7e1bfe",
             "isFreezable": true
           },
           {
             "name": "MailboxFacet",
             "address": "0x42a99dbEd569991eC0db10A426E3f45Bd14167F0",
-            "codehash": "0xec1e58fed472e2e5d46f89c015717bbc788d80afa54716d875761fbddfc55800",
             "isFreezable": true
           }
         ],
@@ -84,8 +73,7 @@
         "l2SystemProxyBytecodeInfo": "0x",
         "genesis": {
           "genesisUpgrade": {
-            "address": "0xceDbA01dECF9Db32E764bc85ae793d565537c181",
-            "codehash": "0xab8b8befa30a65df86d52558ca92cfbe31b9fafcb366db90e7230b91845a876c"
+            "address": "0xceDbA01dECF9Db32E764bc85ae793d565537c181"
           },
           "batchHash": "0x0000000000000000000000000000000000000000000000000000000000000001",
           "batchCommitment": "0x0000000000000000000000000000000000000000000000000000000000000001",
@@ -96,8 +84,7 @@
         "releaseCodehash": "0xf346edd2f29a01eb3ab1b4a1fd3d32276b2d6814d47a74eab580ee34ed54e19f",
         "fromRelease": "0x02df3a3F960393F5B349E40A599FEda91a7cc1A7",
         "upgradeEngine": {
-          "address": "0xaB7B4c595d3cE8C85e16DA86630f2fc223B05057",
-          "codehash": "0xdd4171bdd15db6586558aa4aece5a8662b8b18810ed8129837a7fadb21684903"
+          "address": "0xaB7B4c595d3cE8C85e16DA86630f2fc223B05057"
         },
         "oldProtocolVersionDeadline": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
         "upgradeTimestamp": 0,

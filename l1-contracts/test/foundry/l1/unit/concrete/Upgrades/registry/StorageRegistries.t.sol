@@ -172,18 +172,9 @@ contract StorageRegistriesTest is Test {
 
     function _releaseManifest(address _adminFacet) internal view returns (ReleaseManifest memory manifest) {
         GenesisFacet[] memory facets = new GenesisFacet[](3);
-        facets[0] = GenesisFacet({
-            facet: _adminFacet,
-            isFreezable: false
-        });
-        facets[1] = GenesisFacet({
-            facet: facetShared,
-            isFreezable: false
-        });
-        facets[2] = GenesisFacet({
-            facet: facetFrozen,
-            isFreezable: true
-        });
+        facets[0] = GenesisFacet({facet: _adminFacet, isFreezable: false});
+        facets[1] = GenesisFacet({facet: facetShared, isFreezable: false});
+        facets[2] = GenesisFacet({facet: facetFrozen, isFreezable: true});
         return
             ReleaseManifest({
                 diamondInit: diamondInit,

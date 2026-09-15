@@ -46,10 +46,7 @@ library L2PlanFixtures {
 
     /// @notice The minimal authored input with an L2 side: `_delegateCode` as the delegate and
     ///         `_composer` defining its calldata (zero for an uncomposed delegate).
-    function delegatePlan(
-        bytes memory _delegateCode,
-        address _composer
-    ) internal pure returns (AuthoredL2Plan memory) {
+    function delegatePlan(bytes memory _delegateCode, address _composer) internal pure returns (AuthoredL2Plan memory) {
         return
             AuthoredL2Plan({
                 delegateBytecodeInfo: bytecodeInfo(_delegateCode),

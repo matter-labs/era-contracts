@@ -13,7 +13,7 @@ import {RegistryCodehashMismatch, RegistryTargetHasNoCode} from "../../../common
 ///      established EARLIER (the CTM's `releaseCodehash`, an executor's `TRANSITION_CODEHASH` /
 ///      `CORE_REGISTRY_CODEHASH` / `OPERATION_CODEHASH`), so it constrains what a later,
 ///      arbitrary input may be. A hash that arrived WITH the candidate would prove nothing —
-///      see the codehash-pin section of {docs/registry-driven-upgrades.md}.
+///      see "Provenance and validation" in {docs/registry-driven-upgrades.md}.
 library ObjectAnchorLib {
     /// @notice Reverts unless `_target` is a deployed contract.
     function requireCode(address _target) internal view {

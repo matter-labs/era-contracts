@@ -330,10 +330,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
     function _mockGenesisRegistryFacets(Diamond.FacetCut[] memory _facetCuts) internal {
         GenesisFacet[] memory facets = new GenesisFacet[](_facetCuts.length);
         for (uint256 i = 0; i < _facetCuts.length; ++i) {
-            facets[i] = GenesisFacet({
-                facet: _facetCuts[i].facet,
-                isFreezable: _facetCuts[i].isFreezable
-            });
+            facets[i] = GenesisFacet({facet: _facetCuts[i].facet, isFreezable: _facetCuts[i].isFreezable});
         }
         _mockFacetSelfDescriptions(_facetCuts);
         vm.mockCall(

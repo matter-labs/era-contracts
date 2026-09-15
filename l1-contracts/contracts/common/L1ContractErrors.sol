@@ -398,7 +398,7 @@ error RegistryInventoryLengthMismatch(uint256 expected, uint256 actual);
 error RegistryMemberHasNoFixedAddress(uint256 member);
 // 0x0d122829
 error RegistryReleaseCodehashAlreadySet(bytes32 current);
-// 0xa0c88a92
+// 0xe89c554c
 error RegistryTargetHasNoCode(address target);
 // 0x1f20dafa
 error RegistryUnknownKey();

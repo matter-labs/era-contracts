@@ -120,10 +120,7 @@ contract PrepareL2SideTest is Test {
     function _authoredSide() internal returns (AuthoredL2Side memory side) {
         address composer = makeAddr("composer");
         vm.etch(composer, hex"6000fe");
-        side.plan = L2PlanFixtures.delegatePlan(
-            DELEGATE_CODE,
-            composer
-        );
+        side.plan = L2PlanFixtures.delegatePlan(DELEGATE_CODE, composer);
         side.factoryDependencies = new bytes[](3);
         side.factoryDependencies[0] = DELEGATE_CODE;
         side.factoryDependencies[1] = BUILT_IN_CODE;

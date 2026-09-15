@@ -56,7 +56,6 @@ import {TransitionDerivationLib} from "../libraries/TransitionDerivationLib.sol"
 ///      transaction. Governance transfers ownership in, the migration executes, and ownership
 ///      leaves to the executors before the call returns.
 contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
-
     /// @notice Set once `migrate` has run. The edge is one-shot: replaying it would re-check a
     ///         starting state that no longer exists anyway, but failing loudly is clearer.
     bool public executed;

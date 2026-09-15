@@ -8,7 +8,7 @@
 #   zkstack-out     -> copied ABIs/bytecode; the anvil harness PREFERS these over out/, so a
 #                      stale copy here makes the chain-state step run against the old interface
 #   chain states    -> genesis deploys, so they move whenever contract bytecode moves
-#   registry manifest -> pins addresses/codehashes taken from those chain states
+#   registry manifest -> records addresses taken from those chain states
 #   selectors       -> derived from the built ABIs
 #
 # AllContractsHashes is deliberately NOT regenerated here: zksolc output diverges off Linux, so

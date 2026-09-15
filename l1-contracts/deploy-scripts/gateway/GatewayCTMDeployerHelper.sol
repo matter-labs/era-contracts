@@ -40,11 +40,7 @@ import {
     GatewayCTMFinalConfig,
     GatewayCTMFinalResult
 } from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
-import {
-    GenesisFacet,
-    ReleaseGenesisData,
-    ReleaseManifest
-} from "../../contracts/upgrades/registry/RegistryTypes.sol";
+import {GenesisFacet, ReleaseGenesisData, ReleaseManifest} from "../../contracts/upgrades/registry/RegistryTypes.sol";
 
 // solhint-disable gas-custom-errors
 

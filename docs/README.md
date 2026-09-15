@@ -6,8 +6,8 @@
   [ecosystem-upgrade-coordination.md](../protocol-docs/ecosystem-upgrade-coordination.md).
 - This folder holds design documents for the repository's own machinery:
   - [registry-driven-upgrades.md](./registry-driven-upgrades.md) — the canonical upgrade architecture: write-once
-    release / transition / registry / operation objects, the coordinator and domain executors, provenance and pinning,
-    the bootstrap edge.
+    release / transition / registry / operation objects, the coordinator and domain executors, provenance and
+    validation, the bootstrap edge.
   - [upgrade-stage-lifecycle.md](./upgrade-stage-lifecycle.md) — operational policies of the on-chain lifecycle:
     pause composition, the ServerNotifier row, the upgrade timer, coordinator succession, recovery.
   - [upgrade-script-retirement.md](./upgrade-script-retirement.md) — the temporary plan for moving what the prepare

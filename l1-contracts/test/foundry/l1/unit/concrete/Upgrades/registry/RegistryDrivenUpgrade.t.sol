@@ -261,10 +261,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
         for (uint256 i = 0; i < facetCuts.length; ++i) {
             bool replaced = _adminFacet != address(0) && facetCuts[i].facet == facetCuts[1].facet;
             address facet = replaced ? _adminFacet : facetCuts[i].facet;
-            genesisFacets[i] = GenesisFacet({
-                facet: facet,
-                isFreezable: facetCuts[i].isFreezable
-            });
+            genesisFacets[i] = GenesisFacet({facet: facet, isFreezable: facetCuts[i].isFreezable});
         }
     }
 
@@ -291,10 +288,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
         // constructs its address and every factory dependency the hop installs (the delegate,
         // the table row's implementation and proxy shell).
         AuthoredL2Plan memory l2Plan = _newAdminFacet != address(0)
-            ? L2PlanFixtures.delegatePlan(
-                L2_DELEGATE_CODE,
-                address(delegateComposer)
-            )
+            ? L2PlanFixtures.delegatePlan(L2_DELEGATE_CODE, address(delegateComposer))
             : L2PlanFixtures.emptyPlan();
 
         ProxyUpgradeRow[] memory noProxyUpgrades = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);

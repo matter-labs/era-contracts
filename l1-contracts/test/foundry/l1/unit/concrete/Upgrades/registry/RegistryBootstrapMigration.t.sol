@@ -213,10 +213,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     function _deployRelease(bytes[] memory _l2BytecodeInfos) internal returns (CTMRelease result) {
         GenesisFacet[] memory genesisFacets = new GenesisFacet[](facetCuts.length);
         for (uint256 i = 0; i < facetCuts.length; ++i) {
-            genesisFacets[i] = GenesisFacet({
-                facet: facetCuts[i].facet,
-                isFreezable: facetCuts[i].isFreezable
-            });
+            genesisFacets[i] = GenesisFacet({facet: facetCuts[i].facet, isFreezable: facetCuts[i].isFreezable});
         }
         result = new CTMRelease(
             ReleaseManifest({

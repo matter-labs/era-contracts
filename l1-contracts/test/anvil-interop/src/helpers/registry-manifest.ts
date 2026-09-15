@@ -7,17 +7,16 @@
  * manifest JSON (scripts/registry-manifests/*.json — the reviewable per-upgrade artifact) into
  * the `initialize()` argument objects ethers encodes against the contract ABIs:
  *
- *   - `CTMRelease.ReleaseManifest` — what a chain at the target release IS: facet rows with
- *     INLINE MANDATORY codehash pins beside every address (routing is read from each pinned
- *     facet's own self-description). Version- and VM-flag-independent (VM identity lives in
- *     the pinned DiamondInit immutable).
+ *   - `CTMRelease.ReleaseManifest` — what a chain at the target release IS: facet rows naming
+ *     each facet by address (routing is read from the facet's own self-description).
+ *     Version- and VM-flag-independent (VM identity lives in the DiamondInit's immutable).
  *   - `CTMTransition.TransitionManifest` — how the current release becomes the target release.
  *     Carries NO facet swaps and NO hash changes: the delta is DERIVED on-chain from the
  *     `(fromRelease, newRelease)` pair at initialization. What is authored: version edge,
- *     pinned verifier + upgrade engine, schedule, and the typed `L2UpgradePlan`.
+ *     upgrade engine, schedule, and the typed `L2UpgradePlan`.
  *   - `CoreRegistry.CoreRegistryManifest` — the ecosystem inventory: a fixed-length row array
- *     indexed by `L1EcosystemContract`, source-checked rows with inline pins in the
- *     participating slots, zero `implNew` in the explicitly-not-upgraded ones.
+ *     indexed by `L1EcosystemContract`, source-checked rows in the participating slots, zero
+ *     `implNew` in the explicitly-not-upgraded ones.
  *
  * Enum identifiers and inventory slot names in the manifest are NAMES; enum values are parsed
  * from the canonical Solidity sources at runtime (never hardcoded), so upstream reordering or
@@ -71,7 +70,7 @@ function enumValue(map: Record<string, number>, name: string, enumName: string):
 interface ProxyUpgradeRowArg {
   proxy: string;
   expectedOldImpl: string;
-  implNew: { addr: string; codehash: string };
+  implNew: string;
   callInitializeUpgrade: boolean;
   /** The row's own ProxyAdmin; the zero address means the applying executor's bound admin. */
   admin: string;
@@ -82,7 +81,7 @@ function zeroProxyUpgradeRow(): ProxyUpgradeRowArg {
   return {
     proxy: ethers.constants.AddressZero,
     expectedOldImpl: ethers.constants.AddressZero,
-    implNew: { addr: ethers.constants.AddressZero, codehash: ethers.constants.HashZero },
+    implNew: ethers.constants.AddressZero,
     callInitializeUpgrade: false,
     admin: ethers.constants.AddressZero,
   };
@@ -132,10 +131,7 @@ export function coreInitArgs(manifest: any): any {
       {
         proxy: e.proxy,
         expectedOldImpl: e.expectedOldImpl ?? ethers.constants.AddressZero,
-        implNew: {
-          addr: e.implNew ?? ethers.constants.AddressZero,
-          codehash: e.implNewCodehash ?? ethers.constants.HashZero,
-        },
+        implNew: e.implNew ?? ethers.constants.AddressZero,
         callInitializeUpgrade: e.callInitializeUpgrade ?? false,
         admin: e.admin ?? ethers.constants.AddressZero,
       },
@@ -149,10 +145,9 @@ export function coreInitArgs(manifest: any): any {
 export function releaseInitArgs(ctm: any): any {
   const release = ctm.release;
 
-  // Inline mandatory pin per facet row; routing is read from each pinned facet's own
-  // self-description, never stored.
+  // Routing is read from each facet's own self-description, never stored.
   const genesisFacets = release.genesisFacets.map((f: any) => ({
-    facet: { addr: f.address, codehash: f.codehash },
+    facet: f.address,
     isFreezable: f.isFreezable,
   }));
 
@@ -163,9 +158,9 @@ export function releaseInitArgs(ctm: any): any {
   }
 
   return {
-    diamondInit: { addr: release.diamondInit.address, codehash: release.diamondInit.codehash },
-    verifier: { addr: release.verifier.address, codehash: release.verifier.codehash },
-    genesisUpgrade: { addr: release.genesis.genesisUpgrade.address, codehash: release.genesis.genesisUpgrade.codehash },
+    diamondInit: release.diamondInit.address,
+    verifier: release.verifier.address,
+    genesisUpgrade: release.genesis.genesisUpgrade.address,
     genesisFacets,
     // `ReleaseGenesisData`.
     genesis: {
@@ -189,8 +184,8 @@ export function transitionInitArgs(
   manifest: any,
   ctm: any,
   newRelease: string,
-  upgradeTimer: { addr: string; codehash: string },
-  delegateComposer: { addr: string; codehash: string }
+  upgradeTimer: string,
+  delegateComposer: string
 ): any {
   // Release provenance is enforced by the CTM's stored `releaseCodehash` at `setCurrentRelease`
   // time, not by the transition manifest — which is why the runner checks the freshly deployed
@@ -214,7 +209,7 @@ export function transitionInitArgs(
     newProtocolVersion: packSemVer(manifest.newVersion),
     fromRelease: transition.fromRelease,
     newRelease,
-    upgradeEngine: { addr: transition.upgradeEngine.address, codehash: transition.upgradeEngine.codehash },
+    upgradeEngine: transition.upgradeEngine.address,
     // The CTM-domain inventory (indexed by `CTMContract`); the local hop upgrades chain state
     // only, so the manifest carries no slots and every one encodes as the explicit zero
     // ("not upgraded") row.
@@ -224,12 +219,12 @@ export function transitionInitArgs(
     l2Plan: {
       delegateBytecodeInfo: transition.l2Plan.delegateBytecodeInfo,
       extraBytecodeInfos: transition.l2Plan.extraBytecodeInfos ?? [],
-      // Pinned version-specific CODE defines the delegate calldata; the harness pins a fixed
-      // no-op composer deployed alongside the objects (see the runner).
+      // Version-specific CODE defines the delegate calldata; the harness names a fixed no-op
+      // composer deployed alongside the objects (see the runner).
       delegateComposer,
     },
-    // The stage-1 timer is a deploy-time object of this same run (like `newRelease`), so it
-    // rides in as a pin rather than from the committed manifest. The ecosystem leg is NOT the
+    // The stage-1 timer is a deploy-time object of this same run (like `newRelease`), so it is
+    // passed in rather than read from the committed manifest. The ecosystem leg is NOT the
     // transition's to name: the operation the coordinator drives commits that association.
     upgradeTimer,
   };
