@@ -9,8 +9,8 @@ import {ISelfDescribingFacet} from "../../../state-transition/chain-interfaces/I
 import {IGetters} from "../../../state-transition/chain-interfaces/IGetters.sol";
 
 /// @notice Turns a release's facet routing into the genesis diamond cut.
-/// @dev Routing comes from each pinned facet's own self-description (see {GenesisFacet}), so
-///      genesis installs exactly the routing the pinned code carries.
+/// @dev Routing comes from each facet's own self-description (see {GenesisFacet}), so
+///      genesis installs exactly the routing the deployed code carries.
 library ReleaseFacetReader {
     function newChainInstallations(ICTMRelease _release) internal view returns (Diamond.FacetCut[] memory facetCuts) {
         GenesisFacet[] memory facets = _release.genesisFacets();
@@ -18,17 +18,17 @@ library ReleaseFacetReader {
         facetCuts = new Diamond.FacetCut[](length);
         for (uint256 i = 0; i < length; ++i) {
             facetCuts[i] = Diamond.FacetCut({
-                facet: facets[i].facet.addr,
+                facet: facets[i].facet,
                 action: Diamond.Action.Add,
                 isFreezable: facets[i].isFreezable,
-                selectors: ISelfDescribingFacet(facets[i].facet.addr).selectors()
+                selectors: ISelfDescribingFacet(facets[i].facet).selectors()
             });
         }
     }
 
     /// @notice Whether a live chain diamond's routing is EXACTLY the release's: the same facet
     ///         addresses (no extras, no omissions) and, per facet, the same selector set as the
-    ///         pinned facet's self-description AND the same freezability. Order-insensitive on
+    ///         facet's own self-description AND the same freezability. Order-insensitive on
     ///         both levels.
     /// @dev Post-upgrade / monitoring read: after a chain crosses an edge its loupe output must
     ///      match the target release byte-for-byte in routing terms — the on-chain form of the
@@ -50,14 +50,14 @@ library ReleaseFacetReader {
         uint256 expectedLength = expected.length;
         uint256 liveLength = live.length;
         for (uint256 i = 0; i < expectedLength; ++i) {
-            bytes4[] memory selectors = ISelfDescribingFacet(expected[i].facet.addr).selectors();
+            bytes4[] memory selectors = ISelfDescribingFacet(expected[i].facet).selectors();
             if (selectors.length == 0) {
                 continue;
             }
             ++expectedRouted;
             bool found = false;
             for (uint256 j = 0; j < liveLength; ++j) {
-                if (live[j].addr != expected[i].facet.addr) {
+                if (live[j].addr != expected[i].facet) {
                     continue;
                 }
                 // Freezability is part of the release row, not of the loupe's `facets()` view.

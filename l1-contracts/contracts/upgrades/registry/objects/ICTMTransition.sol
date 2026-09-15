@@ -13,7 +13,7 @@ import {ProxyUpgradeRow, TransitionManifest} from "../RegistryTypes.sol";
 ///      is two releases and this transition's schedule/engine/L2 plan; the delta is a
 ///      pure function of the release pair, so transition and release state cannot diverge.
 interface ICTMTransition is ICommittedUpgrade {
-    /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment to every pinned value:
+    /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment to every manifest value:
     ///         the single value governance reviews against the audited manifest.
     function manifestHash() external view returns (bytes32);
 
@@ -32,8 +32,8 @@ interface ICTMTransition is ICommittedUpgrade {
 
     function newRelease() external view returns (address);
 
-    /// @notice The codehash-pinned upgrade-execution contract the committed cut delegatecalls
-    ///         (`upgradeFromTransition`). Transition-scoped machinery — explicit and pinned.
+    /// @notice The upgrade-execution contract the committed cut delegatecalls
+    ///         (`upgradeFromTransition`). Transition-scoped machinery — named explicitly.
     function upgradeEngine() external view returns (address);
 
     function oldProtocolVersionDeadline() external view returns (uint256);
@@ -54,20 +54,19 @@ interface ICTMTransition is ICommittedUpgrade {
 
     /// @notice The L2 protocol upgrade transaction this transition's engine commits on chain
     ///         `_chainId` of the ecosystem of `_bridgehub` — the single read entry point for tooling.
-    /// @dev Forwards to the pinned engine's `IDefaultUpgrade.l2UpgradeTx`: the composition code
-    ///      lives in the per-upgrade pinned engine, never here, because the transition's own code
+    /// @dev Forwards to the engine's `IDefaultUpgrade.l2UpgradeTx`: the composition code lives in
+    ///      the per-upgrade engine, never here, because the transition's own code
     ///      (`TRANSITION_CODEHASH`) is frozen for the executor's lifetime while the engine ships per
     ///      release.
     /// @param _bridgehub The Bridgehub of the ecosystem the chain belongs to.
     /// @param _chainId The chain to compose for.
     function l2UpgradeTx(address _bridgehub, uint256 _chainId) external view returns (L2CanonicalTransaction memory);
 
-    /// @notice Reverts unless BOTH releases validate and every codehash this transition pins
-    ///         (engine, timer, composer, ecosystem leg, CTM-domain rows) matches the live code.
-    ///         THE enforcement surface: the paths that commit or apply a transition call it.
+    /// @notice Reverts unless BOTH releases validate and every contract this transition names
+    ///         (engine, timer, composer, CTM-domain rows) is deployed code. THE enforcement
+    ///         surface: the paths that commit or apply a transition call it.
+    /// @dev It does NOT attest that the code is the reviewed code — that is governance's
+    ///      approval of this object's member ADDRESSES, established off-chain before approval
+    ///      (see {docs/registry-driven-upgrades.md}).
     function validate() external view;
-
-    /// @notice Whether {validate} would pass — the same pins, read without reverting, for
-    ///         inspection and deployment tooling. Never an enforcement surface.
-    function verifyAll() external view returns (bool);
 }

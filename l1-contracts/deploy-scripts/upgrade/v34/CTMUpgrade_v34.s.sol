@@ -16,12 +16,7 @@ import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/Ec
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
-import {
-    AuthoredL2Plan,
-    BootstrapManifest,
-    PinnedContract,
-    ProxyUpgradeRow
-} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {AuthoredL2Plan, BootstrapManifest, ProxyUpgradeRow} from "contracts/upgrades/registry/RegistryTypes.sol";
 import {
     CTM_CONTRACT_COUNT,
     CTMContract,
@@ -97,7 +92,7 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
     /// @dev This edge deploys no transition, so the migration is the object that pins its engine.
     function committedUpgradeEngine() public view override returns (address) {
         if (address(bootstrapMigration) != address(0)) {
-            return bootstrapMigration.getManifest().upgradeEngine.addr;
+            return bootstrapMigration.getManifest().upgradeEngine;
         }
         require(upgradeAddresses.upgradeEngine != address(0), "bootstrap engine not deployed");
         return upgradeAddresses.upgradeEngine;
@@ -138,7 +133,7 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
     ///         bytecode the composed transaction needs published — the built-ins the genesis
     ///         release's table installs, the ZKsync OS baselines, and the delegate itself, so the
     ///         sequencer holds each preimage when the deployments run. The table-derived
-    ///         deployments come from the pinned genesis release, on-chain.
+    ///         deployments come from the genesis release the manifest names, on-chain.
     /// @dev Virtual so bytecode-light test harnesses can substitute an L1-only edge: the real side
     ///      reads the `L2V34Upgrade` artifact and every built-in's.
     function authorL2Side() internal virtual override returns (AuthoredL2Side memory side) {
@@ -146,7 +141,7 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
         side.plan = AuthoredL2Plan({
             delegateBytecodeInfo: Utils.getZKOSBytecodeInfoForContract("L2V34Upgrade.sol", "L2V34Upgrade"),
             extraBytecodeInfos: new bytes[](0),
-            delegateComposer: _pin(l2DelegateComposer)
+            delegateComposer: l2DelegateComposer
         });
         L2EcosystemContract[] memory delegateArtifact = new L2EcosystemContract[](1);
         delegateArtifact[0] = L2EcosystemContract.L2V34Upgrade;
@@ -156,7 +151,7 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
     function deployNewCTMContracts() public virtual override {
         super.deployNewCTMContracts();
 
-        // The composer the L2 side pins (see `authorL2Side`), deployed before that side is prepared.
+        // The composer the L2 side names (see `authorL2Side`), deployed before that side is prepared.
         l2DelegateComposer = deploySimpleContract("L2V34DelegateCalldataComposer");
 
         // The new ChainTypeManager implementation (per VM) — the bootstrap manifest's one
@@ -245,7 +240,7 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
         proxyUpgrades[uint256(CTMContract.ChainTypeManager)] = ProxyUpgradeRow({
             proxy: _ctmProxy,
             expectedOldImpl: Utils.getImplementation(_ctmProxy),
-            implNew: PinnedContract({addr: implNew, codehash: implNew.codehash}),
+            implNew: implNew,
             callInitializeUpgrade: false,
             admin: ProxyAdmin(address(0))
         });
@@ -259,7 +254,7 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
         proxyUpgrades[uint256(CTMContract.ServerNotifier)] = ProxyUpgradeRow({
             proxy: notifierProxy,
             expectedOldImpl: Utils.getImplementation(notifierProxy),
-            implNew: PinnedContract({addr: notifierImplNew, codehash: notifierImplNew.codehash}),
+            implNew: notifierImplNew,
             callInitializeUpgrade: false,
             admin: ProxyAdmin(Utils.getProxyAdminAddress(notifierProxy))
         });
@@ -271,25 +266,19 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
             expectedProtocolVersion: getOldProtocolVersion(),
             ctmProxyAdmin: _ctmProxyAdmin,
             proxyUpgrades: proxyUpgrades,
-            currentRelease: PinnedContract({addr: release, codehash: release.codehash}),
+            currentRelease: release,
             newProtocolVersion: getNewProtocolVersion(),
             oldProtocolVersionDeadline: UpgradeHelperLib.getOldProtocolDeadline(),
-            upgradeEngine: PinnedContract({addr: engine, codehash: engine.codehash}),
+            upgradeEngine: engine,
             l2Plan: authoredL2Plan(),
             upgradeTimestamp: 0,
-            ctmExecutor: PinnedContract({
-                addr: address(ctmUpgradeExecutor),
-                codehash: address(ctmUpgradeExecutor).codehash
-            }),
-            // Storage, not immutables, so outside the codehash pin above — named here so the edge
-            // refuses to hand the CTM domain to an executor whose ownership or coordinator moved
-            // after this prepare deployed it.
+            ctmExecutor: address(ctmUpgradeExecutor),
+            // The executor's ownership and coordinator are storage, so the edge names them here
+            // and refuses to hand the CTM domain over if either moved after this prepare deployed
+            // it.
             ctmExecutorOwner: getOwnerAddress(),
             coordinator: address(ecosystemUpgradeExecutor()),
-            upgradeTimer: PinnedContract({
-                addr: upgradeAddresses.upgradeTimer,
-                codehash: upgradeAddresses.upgradeTimer.codehash
-            })
+            upgradeTimer: upgradeAddresses.upgradeTimer
         });
     }
 

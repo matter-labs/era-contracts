@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {CodehashPinLib} from "./CodehashPinLib.sol";
+import {ObjectAnchorLib} from "./ObjectAnchorLib.sol";
 import {IProxyUpgradeInitializable} from "../IUpgradeInit.sol";
 import {ProxyUpgradeRow} from "../RegistryTypes.sol";
 import {
@@ -28,7 +28,7 @@ import {
 ///      enum per domain for deployment and upgrades alike), with the array length checked
 ///      against the enum's member count. `toRows` is the single point where those become the
 ///      row arrays everything below consumes, dropping the slots explicitly marked "not
-///      upgraded" (zero `implNew.addr`). Appliers therefore never see the inventory shape and
+///      upgraded" (zero `implNew`). Appliers therefore never see the inventory shape and
 ///      survive it growing.
 library ProxyUpgradeRowLib {
     /// @notice Emitted (from the applying contract) for every proxy pointed at its new
@@ -62,16 +62,16 @@ library ProxyUpgradeRowLib {
     }
 
     /// @notice Shape discipline shared by every row-carrying manifest: every row is a REAL,
-    ///         unique edge — known source, pinned target, one row per proxy. Placeholder rows
+    ///         unique edge — known source, named target, one row per proxy. Placeholder rows
     ///         (zero fields) are refused: a contract not participating in the upgrade is an
-    ///         inventory slot `toRows` already dropped, never a row. Codehash pins are NOT
-    ///         checked here (the manifest supplies both halves of each pair); `requireRowPins`
-    ///         holds them against live code on the execution paths.
+    ///         inventory slot `toRows` already dropped, never a row. Code existence is NOT
+    ///         checked here (an object may be constructed alongside the implementations it
+    ///         names); `requireRowCode` holds that on the execution paths.
     function validateRows(ProxyUpgradeRow[] memory _rows) internal pure {
         uint256 length = _rows.length;
         for (uint256 i = 0; i < length; ++i) {
             ProxyUpgradeRow memory row = _rows[i];
-            if (row.proxy == address(0) || row.expectedOldImpl == address(0) || row.implNew.addr == address(0)) {
+            if (row.proxy == address(0) || row.expectedOldImpl == address(0) || row.implNew == address(0)) {
                 revert ZeroAddress();
             }
             for (uint256 j = 0; j < i; ++j) {
@@ -82,18 +82,18 @@ library ProxyUpgradeRowLib {
         }
     }
 
-    /// @notice Reverts unless every row's `implNew` pin holds against live code.
-    function requireRowPins(ProxyUpgradeRow[] memory _rows) internal view {
+    /// @notice Reverts unless every row's `implNew` is deployed code.
+    function requireRowCode(ProxyUpgradeRow[] memory _rows) internal view {
         uint256 length = _rows.length;
         for (uint256 i = 0; i < length; ++i) {
-            CodehashPinLib.requirePin(_rows[i].implNew);
+            ObjectAnchorLib.requireCode(_rows[i].implNew);
         }
     }
 
-    /// @notice Reverts unless every row has been APPLIED: the proxy's live implementation (read
-    ///         through `_admin`, the same authority that applied it) is `implNew` and the pin
-    ///         still holds. The post-state counterpart of `applyRows`' source check — a stage-2
-    ///         gate calls this so a bundle cannot conclude with a swap silently missing.
+    /// @notice Reverts unless every row has been APPLIED: the proxy's live implementation, read
+    ///         through `_admin` (the same authority that applied it), is `implNew`. The
+    ///         post-state counterpart of `applyRows`' source check — a stage-2 gate calls this so
+    ///         a bundle cannot conclude with a swap silently missing.
     /// @dev Meaningful right after the upgrade that carries the rows: a LATER upgrade legitimately
     ///      moves proxies past `implNew`, after which this reverts by design (the rows describe
     ///      one edge, not a standing invariant).
@@ -103,22 +103,10 @@ library ProxyUpgradeRowLib {
             address liveImpl = adminOf(_admin, _rows[i]).getProxyImplementation(
                 ITransparentUpgradeableProxy(_rows[i].proxy)
             );
-            if (liveImpl != _rows[i].implNew.addr) {
-                revert ProxyUpgradeRowMismatch(_rows[i].proxy, _rows[i].implNew.addr, liveImpl);
-            }
-            CodehashPinLib.requirePin(_rows[i].implNew);
-        }
-    }
-
-    /// @notice Non-reverting variant for `verifyAll()` tooling reads.
-    function rowPinsHold(ProxyUpgradeRow[] memory _rows) internal view returns (bool) {
-        uint256 length = _rows.length;
-        for (uint256 i = 0; i < length; ++i) {
-            if (!CodehashPinLib.pinHolds(_rows[i].implNew)) {
-                return false;
+            if (liveImpl != _rows[i].implNew) {
+                revert ProxyUpgradeRowMismatch(_rows[i].proxy, _rows[i].implNew, liveImpl);
             }
         }
-        return true;
     }
 
     /// @notice Applies every row with the source-checked semantics above, each through the admin
@@ -135,7 +123,7 @@ library ProxyUpgradeRowLib {
                 emit ProxyRowLeftToAdministrator(address(proxy), address(admin));
                 continue;
             }
-            address newImpl = _rows[i].implNew.addr;
+            address newImpl = _rows[i].implNew;
             address liveImpl = admin.getProxyImplementation(proxy);
             if (liveImpl == newImpl) {
                 continue;
@@ -153,20 +141,20 @@ library ProxyUpgradeRowLib {
         }
     }
 
-    /// @dev A slot participates iff `implNew.addr` is set; anything half-filled that survives
+    /// @dev A slot participates iff `implNew` is set; anything half-filled that survives
     ///      (e.g. an impl without a proxy) is left for `validateRows` to refuse loudly.
     function _dropInertSlots(ProxyUpgradeRow[] memory _slots) private pure returns (ProxyUpgradeRow[] memory rows) {
         uint256 slotsLength = _slots.length;
         uint256 count = 0;
         for (uint256 i = 0; i < slotsLength; ++i) {
-            if (_slots[i].implNew.addr != address(0)) {
+            if (_slots[i].implNew != address(0)) {
                 ++count;
             }
         }
         rows = new ProxyUpgradeRow[](count);
         uint256 next = 0;
         for (uint256 i = 0; i < slotsLength; ++i) {
-            if (_slots[i].implNew.addr != address(0)) {
+            if (_slots[i].implNew != address(0)) {
                 rows[next] = _slots[i];
                 ++next;
             }

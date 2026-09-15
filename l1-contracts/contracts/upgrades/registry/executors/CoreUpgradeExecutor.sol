@@ -14,7 +14,7 @@ import {
     UpgradeLifecycleBusy,
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
-import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
+import {ObjectAnchorLib} from "../libraries/ObjectAnchorLib.sol";
 import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 
 /// @title CoreUpgradeExecutor
@@ -27,7 +27,7 @@ import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 /// @dev Fixed logic, no generic delegatecall. The owner may also apply a registry directly — the
 ///      bootstrap edge and recovery run that way, outside any operation.
 contract CoreUpgradeExecutor is UpgradeExecutorBase {
-    using CodehashPinLib for address;
+    using ObjectAnchorLib for address;
 
     /// @notice The ecosystem `ProxyAdmin` — admin of every shared singleton proxy. Owned by this
     ///         executor, so registry rows apply through the same authority that validates them.
@@ -105,7 +105,7 @@ contract CoreUpgradeExecutor is UpgradeExecutorBase {
         if (coreRegistry == address(0)) {
             revert ZeroAddress();
         }
-        coreRegistry.requirePin(CORE_REGISTRY_CODEHASH);
+        coreRegistry.requireObjectType(CORE_REGISTRY_CODEHASH);
         ICoreRegistry(coreRegistry).validate();
         activeOperation = _operation;
         emit OperationReserved(address(_operation), coreRegistry);
@@ -134,7 +134,7 @@ contract CoreUpgradeExecutor is UpgradeExecutorBase {
         } else if (msg.sender != owner()) {
             revert Unauthorized(msg.sender);
         }
-        address(_coreRegistry).requirePin(CORE_REGISTRY_CODEHASH);
+        address(_coreRegistry).requireObjectType(CORE_REGISTRY_CODEHASH);
         _coreRegistry.validate();
         // One call returns complete typed rows; no per-key rescans of the registry.
         ProxyUpgradeRowLib.applyRows(PROXY_ADMIN, _coreRegistry.ecosystemRows());
@@ -167,11 +167,11 @@ contract CoreUpgradeExecutor is UpgradeExecutorBase {
     }
 
     /// @notice Reverts unless every row of `_coreRegistry` is applied: each proxy points at its
-    ///         pinned `implNew`, read live through the bound `ProxyAdmin`.
+    ///         `implNew`, read live through the bound `ProxyAdmin`.
     /// @dev The row check describes one edge, not a standing invariant: a later upgrade moves
     ///      proxies past these rows and this then reverts by design.
     function validateUpgradeApplied(ICoreRegistry _coreRegistry) external view {
-        address(_coreRegistry).requirePin(CORE_REGISTRY_CODEHASH);
+        address(_coreRegistry).requireObjectType(CORE_REGISTRY_CODEHASH);
         ProxyUpgradeRowLib.requireRowsApplied(PROXY_ADMIN, _coreRegistry.ecosystemRows());
     }
 }

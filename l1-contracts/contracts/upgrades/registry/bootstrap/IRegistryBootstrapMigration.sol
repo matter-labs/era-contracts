@@ -21,7 +21,7 @@ interface IRegistryBootstrapMigration is ICommittedUpgrade {
     /// @param _chainId The chain to compose for.
     function l2UpgradeTx(uint256 _chainId) external view returns (L2CanonicalTransaction memory);
 
-    /// @notice The diamond cut this edge commits — no facet cuts, the pinned engine's
+    /// @notice The diamond cut this edge commits — no facet cuts, the engine's
     ///         `upgradeFromBootstrap(this)` init. Chains crossing the edge take exactly these bytes
     ///         by hand.
     function upgradeCut() external view returns (Diamond.DiamondCutData memory);

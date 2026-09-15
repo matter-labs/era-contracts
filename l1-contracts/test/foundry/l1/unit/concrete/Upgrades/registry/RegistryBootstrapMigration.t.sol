@@ -57,7 +57,7 @@ import {
     MalformedL2UpgradePlan,
     MigrationPaused,
     ProxyUpgradeRowMismatch,
-    RegistryCodehashMismatch,
+    RegistryTargetHasNoCode,
     RegistryDuplicateProxyRow,
     TimerNotStarted,
     ZeroAddress
@@ -70,8 +70,7 @@ import {
     ProxyUpgradeRow,
     GenesisFacet,
     ReleaseGenesisData,
-    ReleaseManifest,
-    PinnedContract
+    ReleaseManifest
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 import {
     CTM_CONTRACT_COUNT,
@@ -215,15 +214,15 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         GenesisFacet[] memory genesisFacets = new GenesisFacet[](facetCuts.length);
         for (uint256 i = 0; i < facetCuts.length; ++i) {
             genesisFacets[i] = GenesisFacet({
-                facet: PinnedContract({addr: facetCuts[i].facet, codehash: facetCuts[i].facet.codehash}),
+                facet: facetCuts[i].facet,
                 isFreezable: facetCuts[i].isFreezable
             });
         }
         result = new CTMRelease(
             ReleaseManifest({
-                diamondInit: PinnedContract({addr: diamondInit, codehash: diamondInit.codehash}),
-                verifier: PinnedContract({addr: address(testnetVerifier), codehash: address(testnetVerifier).codehash}),
-                genesisUpgrade: PinnedContract({addr: genesisUpgradeAddr, codehash: genesisUpgradeAddr.codehash}),
+                diamondInit: diamondInit,
+                verifier: address(testnetVerifier),
+                genesisUpgrade: genesisUpgradeAddr,
                 genesisFacets: genesisFacets,
                 genesis: ReleaseGenesisData({
                     fixedForceDeploymentsData: hex"f1f2",
@@ -262,7 +261,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     ///      constructs its Unsafe deployment at the bytecode-derived address and pins its bytecode
     ///      as the one factory dependency) and the pinned composer defining its calldata.
     function _authoredPlan() internal view returns (AuthoredL2Plan memory) {
-        return L2PlanFixtures.delegatePlan(DELEGATE_CODE, _pin(address(delegateComposer)));
+        return L2PlanFixtures.delegatePlan(DELEGATE_CODE, address(delegateComposer));
     }
 
     /// @dev Every bytecode an edge toward `_deployTableRelease()` installs: the delegate plus the
@@ -274,7 +273,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     /// @dev `_authoredPlan()` toward `_tableRelease` with a nonzero schedule.
     function _tableManifest(CTMRelease _tableRelease) internal view returns (BootstrapManifest memory manifest) {
         manifest = _manifestWithL2Plan(_authoredPlan());
-        manifest.currentRelease = PinnedContract({addr: address(_tableRelease), codehash: Utils.releaseCodehash()});
+        manifest.currentRelease = address(_tableRelease);
         manifest.upgradeTimestamp = PLAN_UPGRADE_TIMESTAMP;
     }
 
@@ -285,7 +284,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         upgrades[uint256(CTMContract.ChainTypeManager)] = ProxyUpgradeRow({
             proxy: address(ecosystemProxy),
             expectedOldImpl: implV31,
-            implNew: PinnedContract({addr: implV32, codehash: implV32.codehash}),
+            implNew: implV32,
             callInitializeUpgrade: false,
             admin: ProxyAdmin(address(0))
         });
@@ -295,28 +294,20 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                 expectedProtocolVersion: chainContractAddress.protocolVersion(),
                 ctmProxyAdmin: ecosystemProxyAdmin,
                 proxyUpgrades: upgrades,
-                currentRelease: PinnedContract({addr: address(genesisRelease), codehash: Utils.releaseCodehash()}),
+                currentRelease: address(genesisRelease),
                 newProtocolVersion: newVersion,
                 oldProtocolVersionDeadline: type(uint256).max,
-                upgradeEngine: _pin(upgradeEngine),
+                upgradeEngine: upgradeEngine,
                 l2Plan: _l2Plan,
                 upgradeTimestamp: 0,
-                ctmExecutor: _pin(address(ctmExecutor)),
+                ctmExecutor: address(ctmExecutor),
                 ctmExecutorOwner: governor,
                 coordinator: address(coordinator),
-                upgradeTimer: _pin(address(upgradeTimer))
+                upgradeTimer: address(upgradeTimer)
             });
     }
 
-    function _pin(address _addr) internal view returns (PinnedContract memory) {
-        return PinnedContract({addr: _addr, codehash: _addr.codehash});
-    }
-
     /// @dev The zero pin: no composer (the delegate is called with empty calldata).
-    function _noPin() internal pure returns (PinnedContract memory) {
-        return PinnedContract({addr: address(0), codehash: bytes32(0)});
-    }
-
     /// @dev The L2 transaction the edge's FINAL plan composes, assembled here from the constants
     ///      the composer reads rather than through the library under test, so the equality below
     ///      is a real check of the composition.
@@ -390,7 +381,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         manifest.proxyUpgrades[uint256(CTMContract.ServerNotifier)] = ProxyUpgradeRow({
             proxy: address(notifierProxy),
             expectedOldImpl: implV31,
-            implNew: PinnedContract({addr: implV32, codehash: implV32.codehash}),
+            implNew: implV32,
             callInitializeUpgrade: false,
             admin: notifierAdmin
         });
@@ -448,16 +439,22 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         _mockMigrationsUnpaused();
         migration.validateApplied();
 
-        // The ecosystem proxy moved to its pinned implementation.
+        // The ecosystem proxy moved to the implementation the row names.
         assertEq(
             ecosystemProxyAdmin.getProxyImplementation(ITransparentUpgradeableProxy(address(ecosystemProxy))),
             implV32,
-            "proxy must point at the pinned implementation"
+            "proxy must point at the row's implementation"
         );
-        // The registry anchors are installed and the version edge committed with the cut the
-        // object composes on-chain.
+        // The provenance anchor is ESTABLISHED from the code actually deployed at the approved
+        // release address, and the version edge committed with the cut the object composes
+        // on-chain.
         assertEq(chainContractAddress.releaseCodehash(), Utils.releaseCodehash(), "anchor must be installed");
-        assertEq(chainContractAddress.currentRelease(), address(genesisRelease), "release must be pinned");
+        assertEq(
+            chainContractAddress.releaseCodehash(),
+            address(genesisRelease).codehash,
+            "the anchor must be the live runtime hash of the approved release"
+        );
+        assertEq(chainContractAddress.currentRelease(), address(genesisRelease), "release must be installed");
         assertEq(chainContractAddress.protocolVersion(), newVersion, "version must be bumped");
         assertEq(
             chainContractAddress.upgradeCutHash(oldVersion),
@@ -513,7 +510,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
         // The inputs the engine reads at execution.
         BootstrapManifest memory served = composed.getManifest();
-        assertEq(served.currentRelease.addr, address(tableRelease), "the release whose verifier the engine installs");
+        assertEq(served.currentRelease, address(tableRelease), "the release whose verifier the engine installs");
         assertEq(served.newProtocolVersion, newVersion);
         assertEq(served.upgradeTimestamp, PLAN_UPGRADE_TIMESTAMP, "the schedule is the manifest's");
 
@@ -615,7 +612,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     ///      EMPTY calldata, there is no composer pin to hold, and the edge commits.
     function test_composedL2Tx_withoutComposerCallsTheDelegateWithEmptyCalldata() public {
         AuthoredL2Plan memory plan = _authoredPlan();
-        plan.delegateComposer = _noPin();
+        plan.delegateComposer = address(0);
         RegistryBootstrapMigration uncomposed = _deployAndAuthorize(_manifestWithL2Plan(plan));
         L2UpgradePlan memory served = uncomposed.l2Plan();
         assertEq(served.delegateComposer, address(0), "no composer is served as zero");
@@ -812,12 +809,12 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
     // ─────────────────────────── timer gating ───────────────────────────
 
-    /// @dev The pinned timer proves stage 0 ran: an edge whose timer was never started must not
+    /// @dev The timer proves stage 0 ran: an edge whose timer was never started must not
     ///      execute, regardless of authority.
     function test_revertWhen_timerNeverStarted() public {
         GovernanceUpgradeTimer unstarted = new GovernanceUpgradeTimer(0, 0, governor, governor);
         BootstrapManifest memory manifest = _manifest();
-        manifest.upgradeTimer = PinnedContract({addr: address(unstarted), codehash: address(unstarted).codehash});
+        manifest.upgradeTimer = address(unstarted);
         RegistryBootstrapMigration gated = new RegistryBootstrapMigration(manifest);
 
         vm.prank(governor);
@@ -833,7 +830,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         vm.prank(governor);
         pending.startTimer();
         BootstrapManifest memory manifest = _manifest();
-        manifest.upgradeTimer = PinnedContract({addr: address(pending), codehash: address(pending).codehash});
+        manifest.upgradeTimer = address(pending);
         RegistryBootstrapMigration gated = new RegistryBootstrapMigration(manifest);
 
         vm.prank(governor);
@@ -875,10 +872,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             Utils.transitionCodehash()
         );
         BootstrapManifest memory manifest = _manifest();
-        manifest.ctmExecutor = PinnedContract({
-            addr: address(foreignExecutor),
-            codehash: address(foreignExecutor).codehash
-        });
+        manifest.ctmExecutor = address(foreignExecutor);
 
         RegistryBootstrapMigration mismatched = new RegistryBootstrapMigration(manifest);
         vm.prank(governor);
@@ -907,10 +901,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             Utils.transitionCodehash()
         );
         BootstrapManifest memory manifest = _manifest();
-        manifest.ctmExecutor = PinnedContract({
-            addr: address(foreignExecutor),
-            codehash: address(foreignExecutor).codehash
-        });
+        manifest.ctmExecutor = address(foreignExecutor);
 
         RegistryBootstrapMigration mismatched = new RegistryBootstrapMigration(manifest);
         vm.prank(governor);
@@ -928,9 +919,10 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         mismatched.migrate();
     }
 
-    /// @dev The executor's OWNERSHIP is storage, so the codehash pin does not cover it. An
-    ///      executor whose ownership moved after this manifest was reviewed would otherwise pass
-    ///      every other check and then receive the whole CTM domain on behalf of its new owner.
+    /// @dev The executor's OWNERSHIP is storage, so the reviewed deployment does not settle it.
+    ///      An executor whose ownership moved after this manifest was reviewed would otherwise
+    ///      pass every other check and then receive the whole CTM domain on behalf of its new
+    ///      owner.
     function test_revertWhen_ctmExecutorIsOwnedBySomeoneElse() public {
         address stranger = makeAddr("stranger");
         vm.prank(governor);
@@ -973,7 +965,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             Utils.transitionCodehash()
         );
         BootstrapManifest memory manifest = _manifest();
-        manifest.ctmExecutor = PinnedContract({addr: address(redirected), codehash: address(redirected).codehash});
+        manifest.ctmExecutor = address(redirected);
 
         RegistryBootstrapMigration mismatched = new RegistryBootstrapMigration(manifest);
         vm.prank(governor);
@@ -1029,76 +1021,52 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         migration.validateApplied();
     }
 
-    function test_revertWhen_executorCodehashDrifted() public {
-        bytes32 pinnedCodehash = address(ctmExecutor).codehash;
-        vm.etch(address(ctmExecutor), hex"6001600155");
+    function test_revertWhen_executorHasNoCode() public {
+        vm.etch(address(ctmExecutor), "");
         _handOverAuthority();
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                RegistryCodehashMismatch.selector,
-                address(ctmExecutor),
-                pinnedCodehash,
-                address(ctmExecutor).codehash
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, address(ctmExecutor)));
         migration.migrate();
     }
 
-    // ─────────────────────────── engine and composer pins ───────────────────────────
+    // ─────────────────────────── engine and composer code ───────────────────────────
 
-    /// @dev The engine is the code the committed cut delegatecalls into on every chain, so it is
-    ///      held against live code like every other pin. A manifest whose pin disagrees still
-    ///      constructs (pins are checked on the execution path) but refuses to migrate.
-    function test_revertWhen_upgradeEnginePinMismatch() public {
-        BootstrapManifest memory manifest = _manifest();
-        manifest.upgradeEngine.codehash = keccak256("not the engine's code");
-        RegistryBootstrapMigration mispinned = _deployAndAuthorize(manifest);
+    /// @dev The engine is the code the committed cut delegatecalls into on every chain: a codeless
+    ///      one would make every chain's upgrade a no-op delegatecall that silently "succeeds".
+    ///      Held on the execution path, so the object still constructs and serves the address.
+    function test_revertWhen_upgradeEngineHasNoCode() public {
+        RegistryBootstrapMigration authorized = _deployAndAuthorize(_manifest());
         uint256 oldVersion = chainContractAddress.protocolVersion();
-        assertEq(mispinned.upgradeCut().initAddress, upgradeEngine, "the engine is served like any pinned address");
+        assertEq(authorized.upgradeCut().initAddress, upgradeEngine, "the engine is served like any other member");
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                RegistryCodehashMismatch.selector,
-                upgradeEngine,
-                keccak256("not the engine's code"),
-                upgradeEngine.codehash
-            )
-        );
-        mispinned.migrate();
-        assertFalse(mispinned.executed(), "a refused edge must stay unspent");
+        vm.etch(upgradeEngine, "");
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, upgradeEngine));
+        authorized.migrate();
+        assertFalse(authorized.executed(), "a refused edge must stay unspent");
         assertEq(chainContractAddress.upgradeCutHash(oldVersion), bytes32(0), "a refused edge commits no cut");
     }
 
-    /// @dev The composer is version-specific CODE pinned in place of calldata, so when the plan
-    ///      names one it is held exactly like the engine.
-    function test_revertWhen_delegateComposerPinMismatch() public {
-        AuthoredL2Plan memory plan = _authoredPlan();
-        plan.delegateComposer.codehash = keccak256("not the composer's code");
-        RegistryBootstrapMigration mispinned = _deployAndAuthorize(_manifestWithL2Plan(plan));
+    /// @dev The composer is version-specific CODE in place of authored calldata, so when the plan
+    ///      names one it is required to exist exactly like the engine.
+    function test_revertWhen_delegateComposerHasNoCode() public {
+        RegistryBootstrapMigration authorized = _deployAndAuthorize(_manifestWithL2Plan(_authoredPlan()));
         assertEq(
-            mispinned.l2Plan().delegateComposer,
+            authorized.l2Plan().delegateComposer,
             address(delegateComposer),
-            "the composer is served like every other pinned address"
+            "the composer is served like every other member"
         );
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                RegistryCodehashMismatch.selector,
-                address(delegateComposer),
-                keccak256("not the composer's code"),
-                address(delegateComposer).codehash
-            )
-        );
-        mispinned.migrate();
-        assertFalse(mispinned.executed(), "a refused edge must stay unspent");
+        vm.etch(address(delegateComposer), "");
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, address(delegateComposer)));
+        authorized.migrate();
+        assertFalse(authorized.executed(), "a refused edge must stay unspent");
     }
 
     // ─────────────────────────── manifest shape ───────────────────────────
 
     function test_revertWhen_upgradeEngineIsZero() public {
         BootstrapManifest memory manifest = _manifest();
-        manifest.upgradeEngine = _noPin();
+        manifest.upgradeEngine = address(0);
 
         vm.expectRevert(ZeroAddress.selector);
         new RegistryBootstrapMigration(manifest);
@@ -1121,7 +1089,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         manifest.proxyUpgrades[uint256(CTMContract.ValidatorTimelock)] = ProxyUpgradeRow({
             proxy: address(vtProxy),
             expectedOldImpl: implV31,
-            implNew: PinnedContract({addr: address(initImpl), codehash: address(initImpl).codehash}),
+            implNew: address(initImpl),
             callInitializeUpgrade: true,
             admin: ProxyAdmin(address(0))
         });
@@ -1145,7 +1113,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         manifest.proxyUpgrades[uint256(CTMContract.ValidatorTimelock)] = ProxyUpgradeRow({
             proxy: address(ecosystemProxy),
             expectedOldImpl: implV31,
-            implNew: PinnedContract({addr: implV31, codehash: implV31.codehash}),
+            implNew: implV31,
             callInitializeUpgrade: false,
             admin: ProxyAdmin(address(0))
         });
@@ -1186,7 +1154,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     function test_revertWhen_derivedDeploymentsWithoutDelegateTarget() public {
         CTMRelease tableRelease = _deployTableRelease();
         BootstrapManifest memory manifest = _manifestWithL2Plan(_emptyL2Plan());
-        manifest.currentRelease = PinnedContract({addr: address(tableRelease), codehash: Utils.releaseCodehash()});
+        manifest.currentRelease = address(tableRelease);
 
         vm.expectRevert(MalformedL2UpgradePlan.selector);
         new RegistryBootstrapMigration(manifest);
@@ -1195,7 +1163,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     function test_revertWhen_delegateComposerWithoutTarget() public {
         // Code defining calldata for a delegate call that never happens.
         AuthoredL2Plan memory plan = _emptyL2Plan();
-        plan.delegateComposer = _pin(address(delegateComposer));
+        plan.delegateComposer = address(delegateComposer);
 
         BootstrapManifest memory manifest = _manifestWithL2Plan(plan);
 
@@ -1366,37 +1334,28 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         assertEq(chainContractAddress.protocolVersion(), 0, "a refused edge must not move the CTM");
     }
 
-    function test_revertWhen_pinnedImplementationCodehashDrifted() public {
-        // The pin protects the address: replacing the code at `implNew` must be rejected.
-        bytes32 pinnedCodehash = implV32.codehash;
-        vm.etch(implV32, hex"6001600155");
+    function test_revertWhen_rowImplementationHasNoCode() public {
+        // A row pointing a proxy at an address with no code would brick it; `ProxyAdmin` refuses
+        // it too, but the edge has to say so before it spends itself.
+        vm.etch(implV32, "");
         _handOverAuthority();
 
-        vm.expectRevert(
-            abi.encodeWithSelector(RegistryCodehashMismatch.selector, implV32, pinnedCodehash, implV32.codehash)
-        );
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, implV32));
         migration.migrate();
     }
 
-    function test_revertWhen_releaseDoesNotRunTheAnchoredCode() public {
-        // The anchor this edge installs and the release it vouches for cannot be mismatched:
-        // replacing the release's code makes the migration refuse before spending itself.
-        bytes32 anchoredCodehash = address(genesisRelease).codehash;
-        vm.etch(address(genesisRelease), hex"600045");
+    function test_revertWhen_releaseHasNoCode() public {
+        // The anchor this edge installs is READ from the release's live code, so a codeless
+        // release would anchor the empty-code hash and accept nothing afterwards. Refused before
+        // the migration spends itself.
+        vm.etch(address(genesisRelease), "");
         _handOverAuthority();
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                RegistryCodehashMismatch.selector,
-                address(genesisRelease),
-                anchoredCodehash,
-                address(genesisRelease).codehash
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, address(genesisRelease)));
         migration.migrate();
     }
 
-    function test_manifestHashCommitsToThePinnedEdge() public view {
+    function test_manifestHashCommitsToTheWholeEdge() public view {
         assertEq(migration.manifestHash(), keccak256(abi.encode(_manifest())));
     }
 

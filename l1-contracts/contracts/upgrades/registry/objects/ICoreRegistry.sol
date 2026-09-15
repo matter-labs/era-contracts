@@ -10,24 +10,21 @@ import {ProxyUpgradeRow} from "../RegistryTypes.sol";
 /// @notice The lookup surface of a storage-backed, write-once registry that pins every
 ///         ecosystem-wide L1 contract row for one protocol upgrade, as a `fromState -> toState`
 ///         edge (see {ProxyUpgradeRow}).
-/// @dev The registry is initialized once from an audited manifest; `manifestHash` commits to the
-///      pinned values and each `implNew` carries an inline `EXTCODEHASH` pin verified by
-///      `validate()` / `verifyAll()`. Version-schedule identity is owned by {ICTMTransition},
-///      not pinned here.
+/// @dev The registry is initialized once from an audited manifest and `manifestHash` commits to
+///      every value in it. Version-schedule identity is owned by {ICTMTransition}, not here.
 interface ICoreRegistry {
-    /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment to every pinned value:
-    ///         the single value governance reviews against the audited manifest.
+    /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment to every manifest
+    ///         value: the single value governance reviews against the audited manifest.
     function manifestHash() external view returns (bytes32);
 
     /// @notice Every ecosystem contract participating in this upgrade, as complete typed rows —
     ///         one call, no per-key rescans. Consumers iterate these directly.
     function ecosystemRows() external view returns (ProxyUpgradeRow[] memory);
 
-    /// @notice Whether {validate} would pass — the same pins, read without reverting, for
-    ///         inspection and deployment tooling. Never an enforcement surface.
-    function verifyAll() external view returns (bool);
-
-    /// @notice Reverts unless every pinned implementation's `EXTCODEHASH` is the hash pinned at
-    ///         generation time. THE enforcement surface: the paths that apply a registry call it.
+    /// @notice Reverts unless every row's `implNew` is deployed code. THE enforcement surface:
+    ///         the paths that apply a registry call it.
+    /// @dev It does NOT attest that the code is the reviewed code — that is governance's
+    ///      approval of this object's row ADDRESSES, established off-chain before approval (see
+    ///      {docs/registry-driven-upgrades.md}).
     function validate() external view;
 }

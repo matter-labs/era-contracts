@@ -43,7 +43,7 @@ import {
     RegistryEmptySelectors,
     RegistryInventoryLengthMismatch,
     RegistryMemberHasNoFixedAddress,
-    RegistryPinTargetHasNoCode,
+    RegistryTargetHasNoCode,
     RegistryUnknownKey,
     SameReleaseTransitionHasPayload,
     TransitionDeadlineBeforeUpgrade,
@@ -62,8 +62,7 @@ import {
     L2UpgradePlan,
     ReleaseGenesisData,
     ReleaseManifest,
-    TransitionManifest,
-    PinnedContract
+    TransitionManifest
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 import {
     CTM_CONTRACT_COUNT,
@@ -131,13 +130,13 @@ contract StorageRegistriesTest is Test {
         facetNewAdmin = address(new MockSelfDescribingFacet(_selectors2(bytes4(uint32(2)), bytes4(uint32(3)))));
         facetShared = address(new MockSelfDescribingFacet(_selectors2(bytes4(uint32(0x10)), bytes4(uint32(0x11)))));
         facetFrozen = address(new MockSelfDescribingFacet(_selectors1(bytes4(uint32(0x20)))));
-        genesisUpgrade = _pinned("genesisUpgrade");
-        verifier = _pinned("verifier");
-        upgradeEngine = _pinned("upgradeEngine");
+        genesisUpgrade = _deployedStub("genesisUpgrade");
+        verifier = _deployedStub("verifier");
+        upgradeEngine = _deployedStub("upgradeEngine");
         // The transition only pins the timer (the executor checks its binding), so a stand-in
         // with real code is all this suite needs.
-        upgradeTimer = _pinned("upgradeTimer");
-        coreImplNew = _pinned("coreImplNew");
+        upgradeTimer = _deployedStub("upgradeTimer");
+        coreImplNew = _deployedStub("coreImplNew");
         delegateComposer = new FixedDelegateCalldataComposer(DELEGATE_CALLDATA);
         bridgehub = makeAddr("bridgehub");
         // A real DiamondInit, the one every fixture release pins.
@@ -153,7 +152,7 @@ contract StorageRegistriesTest is Test {
 
     /// @dev Deploys a distinct-bytecode stand-in at a labelled address so EXTCODEHASH pins are
     ///      real (an empty address would pin the zero hash).
-    function _pinned(string memory _name) internal returns (address addr) {
+    function _deployedStub(string memory _name) internal returns (address addr) {
         addr = makeAddr(_name);
         vm.etch(addr, bytes.concat(hex"00", bytes(_name)));
     }
@@ -165,7 +164,7 @@ contract StorageRegistriesTest is Test {
         manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)] = ProxyUpgradeRow({
             proxy: address(0xB001),
             expectedOldImpl: address(0xB101),
-            implNew: PinnedContract({addr: coreImplNew, codehash: coreImplNew.codehash}),
+            implNew: coreImplNew,
             callInitializeUpgrade: false,
             admin: ProxyAdmin(address(0))
         });
@@ -174,22 +173,22 @@ contract StorageRegistriesTest is Test {
     function _releaseManifest(address _adminFacet) internal view returns (ReleaseManifest memory manifest) {
         GenesisFacet[] memory facets = new GenesisFacet[](3);
         facets[0] = GenesisFacet({
-            facet: PinnedContract({addr: _adminFacet, codehash: _adminFacet.codehash}),
+            facet: _adminFacet,
             isFreezable: false
         });
         facets[1] = GenesisFacet({
-            facet: PinnedContract({addr: facetShared, codehash: facetShared.codehash}),
+            facet: facetShared,
             isFreezable: false
         });
         facets[2] = GenesisFacet({
-            facet: PinnedContract({addr: facetFrozen, codehash: facetFrozen.codehash}),
+            facet: facetFrozen,
             isFreezable: true
         });
         return
             ReleaseManifest({
-                diamondInit: PinnedContract({addr: diamondInit, codehash: diamondInit.codehash}),
-                verifier: PinnedContract({addr: verifier, codehash: verifier.codehash}),
-                genesisUpgrade: PinnedContract({addr: genesisUpgrade, codehash: genesisUpgrade.codehash}),
+                diamondInit: diamondInit,
+                verifier: verifier,
+                genesisUpgrade: genesisUpgrade,
                 genesisFacets: facets,
                 genesis: ReleaseGenesisData({
                     fixedForceDeploymentsData: hex"f1f2",
@@ -219,7 +218,7 @@ contract StorageRegistriesTest is Test {
     ///      calldata. The object constructs both Unsafe deployments, the delegate target and the
     ///      factory dependencies from it.
     function _l2Plan() internal view returns (AuthoredL2Plan memory plan) {
-        return L2PlanFixtures.delegatePlanWithExtra(DELEGATE_CODE, EXTRA_CODE, _pin(address(delegateComposer)));
+        return L2PlanFixtures.delegatePlanWithExtra(DELEGATE_CODE, EXTRA_CODE, address(delegateComposer));
     }
 
     /// @dev The deployments the object constructs for `_l2Plan()`: the delegate first, the extra after.
@@ -233,15 +232,7 @@ contract StorageRegistriesTest is Test {
         list[1] = L2PlanFixtures.unsafeDeployment(EXTRA_CODE);
     }
 
-    function _pin(address _addr) internal view returns (PinnedContract memory) {
-        return PinnedContract({addr: _addr, codehash: _addr.codehash});
-    }
-
     /// @dev The zero pin: no composer (the delegate is called with empty calldata), no ecosystem leg.
-    function _noPin() internal pure returns (PinnedContract memory) {
-        return PinnedContract({addr: address(0), codehash: bytes32(0)});
-    }
-
     /// @dev The L2 transaction `_transition` composes against this suite's Bridgehub and chain.
     function _l2Tx(CTMTransition _transition) internal view returns (L2CanonicalTransaction memory) {
         return CTMUpgradeComposer.buildL2UpgradeTx(ICTMTransition(address(_transition)), bridgehub, CHAIN_ID);
@@ -272,13 +263,13 @@ contract StorageRegistriesTest is Test {
                 newProtocolVersion: NEW_VERSION,
                 fromRelease: address(fromRelease),
                 newRelease: address(newRelease),
-                upgradeEngine: PinnedContract({addr: upgradeEngine, codehash: upgradeEngine.codehash}),
+                upgradeEngine: upgradeEngine,
                 proxyUpgrades: noProxyUpgrades,
                 oldProtocolVersionDeadline: type(uint256).max,
                 upgradeTimestamp: 1234567,
                 l2Plan: _l2Plan(),
                 // No ecosystem leg by default; the timer is mandatory.
-                upgradeTimer: PinnedContract({addr: upgradeTimer, codehash: upgradeTimer.codehash})
+                upgradeTimer: upgradeTimer
             });
     }
 
@@ -419,7 +410,6 @@ contract StorageRegistriesTest is Test {
         assertEq(patchTransition.l2Plan().deployments.length, 0, "same-release pair must derive no deployments");
         // Both edges are live releases, so runtime validation holds.
         patchTransition.validate();
-        assertTrue(patchTransition.verifyAll());
     }
 
     function test_revertWhen_sameReleaseTransitionCarriesL2Payload() public {
@@ -435,7 +425,7 @@ contract StorageRegistriesTest is Test {
         TransitionManifest memory manifest = _patchManifest();
         // The smallest payload a plan can carry: the delegate alone, no composer. Shape-valid, so
         // only the same-release rule can fire.
-        manifest.l2Plan = L2PlanFixtures.delegatePlan(DELEGATE_CODE, _noPin());
+        manifest.l2Plan = L2PlanFixtures.delegatePlan(DELEGATE_CODE, address(0));
 
         vm.expectRevert(SameReleaseTransitionHasPayload.selector);
         new CTMTransition(manifest);
@@ -545,7 +535,7 @@ contract StorageRegistriesTest is Test {
     function test_revertWhen_transitionDerivesTowardSplitRowRelease() public {
         ReleaseManifest memory manifest = _newReleaseManifest();
         // Same facet address in two rows: its selectors appear twice in the release's routing.
-        manifest.genesisFacets[2].facet = PinnedContract({addr: facetShared, codehash: facetShared.codehash});
+        manifest.genesisFacets[2].facet = facetShared;
         CTMRelease splitRowRelease = new CTMRelease(manifest);
 
         TransitionManifest memory transitionManifest = _transitionManifest();
@@ -639,28 +629,22 @@ contract StorageRegistriesTest is Test {
     function test_revertWhen_upgradeTimerZero() public {
         // Stage 1 is gated on the timer's deadline, so a transition without one cannot exist.
         TransitionManifest memory manifest = _transitionManifest();
-        manifest.upgradeTimer = PinnedContract({addr: address(0), codehash: bytes32(0)});
+        manifest.upgradeTimer = address(0);
 
         vm.expectRevert(ZeroAddress.selector);
         new CTMTransition(manifest);
     }
 
-    function test_revertWhen_transitionTimerPinMismatch() public {
+    function test_revertWhen_transitionTimerHasNoCode() public {
+        // Stage 1 calls `checkDeadline()` on the timer, so a manifest naming an address that is
+        // not a deployed contract has to be refused before the transition is committed.
         TransitionManifest memory manifest = _transitionManifest();
-        manifest.upgradeTimer.codehash = keccak256("not the timer's code");
-        CTMTransition mispinned = new CTMTransition(manifest);
-        assertEq(mispinned.upgradeTimer(), upgradeTimer, "the timer is served like every other pinned address");
+        CTMTransition committed = new CTMTransition(manifest);
+        assertEq(committed.upgradeTimer(), upgradeTimer, "the timer is served like every other member");
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                RegistryCodehashMismatch.selector,
-                upgradeTimer,
-                keccak256("not the timer's code"),
-                upgradeTimer.codehash
-            )
-        );
-        mispinned.validate();
-        assertFalse(mispinned.verifyAll(), "a mispinned timer must not verify");
+        vm.etch(upgradeTimer, "");
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, upgradeTimer));
+        committed.validate();
     }
 
     // ─────────────────────────── L2 plan shape ───────────────────────────
@@ -669,7 +653,7 @@ contract StorageRegistriesTest is Test {
         TransitionManifest memory manifest = _transitionManifest();
         manifest.l2Plan.delegateBytecodeInfo = "";
         manifest.l2Plan.extraBytecodeInfos = new bytes[](0);
-        // The composer pin stays — code defining calldata for a delegate call that never happens.
+        // The composer stays — code defining calldata for a delegate call that never happens.
 
         vm.expectRevert(MalformedL2UpgradePlan.selector);
         new CTMTransition(manifest);
@@ -681,7 +665,7 @@ contract StorageRegistriesTest is Test {
         // (The composer is cleared so ONLY the deployments-without-delegate rule can fire.)
         TransitionManifest memory manifest = _transitionManifest();
         manifest.l2Plan.delegateBytecodeInfo = "";
-        manifest.l2Plan.delegateComposer = _noPin();
+        manifest.l2Plan.delegateComposer = address(0);
 
         vm.expectRevert(MalformedL2UpgradePlan.selector);
         new CTMTransition(manifest);
@@ -689,62 +673,31 @@ contract StorageRegistriesTest is Test {
 
     // ─────────────────────────── delegate composer ───────────────────────────
 
-    /// @dev The composer is version-specific CODE pinned in place of calldata, so it is held
-    ///      against live code exactly like every other pin: a manifest whose pin disagrees with the
-    ///      composer's code still constructs (pins are checked on the execution paths, see
-    ///      {CTMRelease}) but fails `validate()` and does not verify.
-    function test_revertWhen_transitionDelegateComposerPinMismatch() public {
+    /// @dev The composer is version-specific CODE in place of authored calldata, so the plan is
+    ///      unexecutable if nothing is deployed at the address the manifest names — held on the
+    ///      execution paths by `validate()`, not at construction (see {CTMRelease}).
+    function test_revertWhen_transitionDelegateComposerHasNoCode() public {
         TransitionManifest memory manifest = _transitionManifest();
-        manifest.l2Plan.delegateComposer.codehash = keccak256("not the composer's code");
-        CTMTransition mispinned = new CTMTransition(manifest);
+        CTMTransition committed = new CTMTransition(manifest);
         assertEq(
-            mispinned.l2Plan().delegateComposer,
+            committed.l2Plan().delegateComposer,
             address(delegateComposer),
-            "the composer is served like every other pinned address"
+            "the composer is served like every other member"
         );
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                RegistryCodehashMismatch.selector,
-                address(delegateComposer),
-                keccak256("not the composer's code"),
-                address(delegateComposer).codehash
-            )
-        );
-        mispinned.validate();
-        assertFalse(mispinned.verifyAll(), "a mispinned composer must not verify");
-    }
-
-    /// @dev The live side of the same pin: a correctly pinned composer whose code later differs
-    ///      from the pin (modelled by re-etching it) stops the transition from validating.
-    function test_revertWhen_delegateComposerCodeDrifts() public {
-        transition.validate();
-        assertTrue(transition.verifyAll());
-        bytes32 pinned = address(delegateComposer).codehash;
-
-        vm.etch(address(delegateComposer), hex"600042");
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                RegistryCodehashMismatch.selector,
-                address(delegateComposer),
-                pinned,
-                address(delegateComposer).codehash
-            )
-        );
-        transition.validate();
-        assertFalse(transition.verifyAll(), "a drifted composer must not verify");
+        vm.etch(address(delegateComposer), "");
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, address(delegateComposer)));
+        committed.validate();
     }
 
     /// @dev A zero composer is a legal plan with a delegate target: the delegate is called with
-    ///      EMPTY calldata, and there is no pin to hold.
+    ///      EMPTY calldata, and there is no composer to require code at.
     function test_zeroDelegateComposerComposesEmptyDelegateCalldata() public {
         TransitionManifest memory manifest = _transitionManifest();
-        manifest.l2Plan.delegateComposer = _noPin();
+        manifest.l2Plan.delegateComposer = address(0);
         CTMTransition uncomposed = new CTMTransition(manifest);
         assertEq(uncomposed.l2Plan().delegateComposer, address(0), "no composer is served as zero");
         uncomposed.validate();
-        assertTrue(uncomposed.verifyAll());
 
         L2CanonicalTransaction memory transaction = _l2Tx(uncomposed);
         L2UpgradePlan memory plan = uncomposed.l2Plan();
@@ -1067,7 +1020,7 @@ contract StorageRegistriesTest is Test {
         manifest.l2Plan = L2PlanFixtures.delegatePlanWithExtra(
             DELEGATE_CODE,
             BRIDGEHUB_IMPL_CODE,
-            _pin(address(delegateComposer))
+            address(delegateComposer)
         );
         CTMTransition deduplicated = new CTMTransition(manifest);
 
@@ -1090,7 +1043,7 @@ contract StorageRegistriesTest is Test {
         // when a chain is actually created from it.
         address emptyFacet = address(new MockSelfDescribingFacet(new bytes4[](0)));
         ReleaseManifest memory manifest = _newReleaseManifest();
-        manifest.genesisFacets[1].facet = PinnedContract({addr: emptyFacet, codehash: emptyFacet.codehash});
+        manifest.genesisFacets[1].facet = emptyFacet;
 
         CTMRelease release = new CTMRelease(manifest);
         assertEq(release.manifestHash(), keccak256(abi.encode(manifest)), "unvalidated routing still pins");
@@ -1106,21 +1059,20 @@ contract StorageRegistriesTest is Test {
         CTMRelease empty = new CTMRelease(manifest);
     }
 
-    function test_revertWhen_releasePinsCodelessFacet() public {
-        // A codehash pin must be over ACTUAL code: an address with no code is not a real
-        // implementation (its EXTCODEHASH is zero / the empty-code hash), so pinning it is refused
-        // by `validate()`, which holds the pins against live code on every execution path. The
-        // facet self-describes normally at construction; its code is stripped afterwards to model
-        // a pinned target that no longer carries code at validation time.
+    function test_revertWhen_releaseNamesCodelessFacet() public {
+        // A facet must be ACTUAL code: the release reads its routing out of it, and a codeless
+        // address answers that read with an empty revert. Refused by `validate()`, which holds the
+        // requirement on every execution path. The facet self-describes normally at construction;
+        // its code is stripped afterwards to model a member that no longer carries code at
+        // validation time.
         address codeless = address(new MockSelfDescribingFacet(_selectors1(bytes4(uint32(0x99)))));
         ReleaseManifest memory manifest = _newReleaseManifest();
-        manifest.genesisFacets[0].facet = PinnedContract({addr: codeless, codehash: codeless.codehash});
+        manifest.genesisFacets[0].facet = codeless;
         CTMRelease codelessRelease = new CTMRelease(manifest);
         vm.etch(codeless, "");
 
-        vm.expectRevert(abi.encodeWithSelector(RegistryPinTargetHasNoCode.selector, codeless));
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, codeless));
         codelessRelease.validate();
-        assertFalse(codelessRelease.verifyAll(), "a codeless pin must not verify");
     }
 
     function test_revertWhen_transitionDerivesTowardSelectorCollision() public {
@@ -1130,7 +1082,7 @@ contract StorageRegistriesTest is Test {
         // The colliding facet self-describes a selector facetFrozen also carries (0x20).
         address collidingFacet = address(new MockSelfDescribingFacet(_selectors1(bytes4(uint32(0x20)))));
         ReleaseManifest memory manifest = _newReleaseManifest();
-        manifest.genesisFacets[1].facet = PinnedContract({addr: collidingFacet, codehash: collidingFacet.codehash});
+        manifest.genesisFacets[1].facet = collidingFacet;
         CTMRelease collidingRelease = new CTMRelease(manifest);
 
         TransitionManifest memory transitionManifest = _transitionManifest();
@@ -1144,10 +1096,10 @@ contract StorageRegistriesTest is Test {
 
     function test_transitionDefersReleaseProvenanceToCtm() public {
         // Release PROVENANCE is deliberately NOT a transition concern: a permissionless manifest
-        // could name any "factory", so the transition only validates each edge's routing/pins and
-        // leaves attestation to the CTM's canonical `releaseFactory` (enforced when the release
-        // becomes `currentRelease` — see the CTM-level provenance test). So a hand-deployed but
-        // VALID release is accepted here and derives a normal delta.
+        // could name any object, so the transition only validates each edge's routing and members
+        // and leaves attestation to the CTM's canonical `releaseCodehash` (enforced when the
+        // release becomes `currentRelease` — see the CTM-level provenance test). So a
+        // hand-deployed but VALID release is accepted here and derives a normal delta.
         CTMRelease handDeployed = new CTMRelease(_newReleaseManifest());
 
         TransitionManifest memory manifest = _transitionManifest();
@@ -1157,65 +1109,44 @@ contract StorageRegistriesTest is Test {
         assertEq(deferred.newRelease(), address(handDeployed), "transition accepts a valid hand-deployed release");
     }
 
-    // ─────────────────────────── pins ───────────────────────────
+    // ─────────────────────────── named members must be deployed ───────────────────────────
 
-    function test_revertWhen_transitionPinMismatch() public {
-        TransitionManifest memory manifest = _transitionManifest();
-        manifest.upgradeEngine.codehash = keccak256("not the engine's code");
-        CTMTransition mispinned = new CTMTransition(manifest);
+    function test_revertWhen_transitionEngineHasNoCode() public {
+        // The engine is the committed cut's init delegatecall target: a codeless one would make
+        // every chain's upgrade a no-op delegatecall that silently "succeeds".
+        CTMTransition committed = new CTMTransition(_transitionManifest());
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                RegistryCodehashMismatch.selector,
-                upgradeEngine,
-                keccak256("not the engine's code"),
-                upgradeEngine.codehash
-            )
-        );
-        mispinned.validate();
-        assertFalse(mispinned.verifyAll(), "a mispinned engine must not verify");
+        vm.etch(upgradeEngine, "");
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, upgradeEngine));
+        committed.validate();
     }
 
-    /// @dev The verifier pin moved to the release along with the verifier itself.
-    function test_revertWhen_releaseVerifierPinMismatch() public {
-        ReleaseManifest memory manifest = _newReleaseManifest();
-        manifest.verifier.codehash = keccak256("not the verifier's code");
-        CTMRelease mispinned = new CTMRelease(manifest);
+    /// @dev The verifier belongs to the release along with the rest of the installed chain state.
+    function test_revertWhen_releaseVerifierHasNoCode() public {
+        CTMRelease committed = new CTMRelease(_newReleaseManifest());
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                RegistryCodehashMismatch.selector,
-                verifier,
-                keccak256("not the verifier's code"),
-                verifier.codehash
-            )
-        );
-        mispinned.validate();
-        assertFalse(mispinned.verifyAll(), "a mispinned verifier must not verify");
+        vm.etch(verifier, "");
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, verifier));
+        committed.validate();
     }
 
-    function test_validateRejectsCodehashDrift() public {
+    function test_validateRejectsAMemberThatLostItsCode() public {
         coreRegistry.validate();
-        assertTrue(coreRegistry.verifyAll());
         newRelease.validate();
         transition.validate();
-        assertTrue(transition.verifyAll());
 
-        // Drift one pinned facet of the FROM release: release, and transitively the transition
-        // (which validates both edges), must stop verifying.
-        vm.etch(facetOldAdmin, hex"600042");
-        vm.expectPartialRevert(RegistryCodehashMismatch.selector);
+        // Empty one facet of the FROM release: the release, and transitively the transition
+        // (which validates both edges), must stop validating.
+        vm.etch(facetOldAdmin, "");
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, facetOldAdmin));
         fromRelease.validate();
-        assertFalse(fromRelease.verifyAll());
-        vm.expectPartialRevert(RegistryCodehashMismatch.selector);
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, facetOldAdmin));
         transition.validate();
-        assertFalse(transition.verifyAll());
 
-        // Same for the core registry's pinned implementation.
-        vm.etch(coreImplNew, hex"600042");
-        vm.expectPartialRevert(RegistryCodehashMismatch.selector);
+        // Same for the core registry's named implementation.
+        vm.etch(coreImplNew, "");
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, coreImplNew));
         coreRegistry.validate();
-        assertFalse(coreRegistry.verifyAll());
     }
 
     // ─────────────────────────── core registry inventory ───────────────────────────
@@ -1263,10 +1194,7 @@ contract StorageRegistriesTest is Test {
     function test_revertWhen_everyInventorySlotIsInert() public {
         // A registry whose whole inventory is "not upgraded" upgrades nothing — refused.
         CoreRegistryManifest memory manifest = _coreManifest();
-        manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)].implNew = PinnedContract({
-            addr: address(0),
-            codehash: bytes32(0)
-        });
+        manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)].implNew = address(0);
 
         vm.expectRevert(RegistryUnknownKey.selector);
         new CoreRegistry(manifest);
@@ -1310,21 +1238,21 @@ contract StorageRegistriesTest is Test {
     ///      under the applying executor's bound admin, the named admin otherwise — and it is part
     ///      of the committed manifest hash.
     function test_transitionRowsCarryTheirNamedAdmin() public {
-        address ctmImplNew = _pinned("ctmImplNew");
-        address notifierImplNew = _pinned("notifierImplNew");
+        address ctmImplNew = _deployedStub("ctmImplNew");
+        address notifierImplNew = _deployedStub("notifierImplNew");
         ProxyAdmin notifierAdmin = ProxyAdmin(makeAddr("notifierAdmin"));
         TransitionManifest memory manifest = _transitionManifest();
         manifest.proxyUpgrades[uint256(CTMContract.ChainTypeManager)] = ProxyUpgradeRow({
             proxy: address(0xC001),
             expectedOldImpl: address(0xC101),
-            implNew: PinnedContract({addr: ctmImplNew, codehash: ctmImplNew.codehash}),
+            implNew: ctmImplNew,
             callInitializeUpgrade: false,
             admin: ProxyAdmin(address(0))
         });
         manifest.proxyUpgrades[uint256(CTMContract.ServerNotifier)] = ProxyUpgradeRow({
             proxy: address(0xC002),
             expectedOldImpl: address(0xC102),
-            implNew: PinnedContract({addr: notifierImplNew, codehash: notifierImplNew.codehash}),
+            implNew: notifierImplNew,
             callInitializeUpgrade: false,
             admin: notifierAdmin
         });

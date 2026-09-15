@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
+import {ObjectAnchorLib} from "../libraries/ObjectAnchorLib.sol";
 import {CTM_CONTRACT_COUNT} from "../libraries/ContractIdentifiers.sol";
 import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 import {IEcosystemUpgradeExecutor} from "../executors/IEcosystemUpgradeExecutor.sol";
@@ -43,12 +43,12 @@ import {TransitionDerivationLib} from "../libraries/TransitionDerivationLib.sol"
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The single, source-checked edge from a pre-registry ecosystem to the registry-driven
-///         one: it swaps the pinned implementations, installs the provenance anchor and the genesis
+///         one: it swaps the named implementations, installs the provenance anchor and the genesis
 ///         release, commits the version edge, and hands CTM + ProxyAdmin authority to the bound
 ///         executors — after which every later upgrade is a `CTMTransition`, and this object is
 ///         inert. See the Bootstrap section of {docs/registry-driven-upgrades.md}.
 /// @dev Deliberately NOT a general-purpose executor: there is no arbitrary-call surface. The
-///      manifest pins every address it touches, and `migrate()` refuses to run unless the live
+///      manifest names every address it touches, and `migrate()` refuses to run unless the live
 ///      ecosystem is EXACTLY the starting state the manifest names — so the reviewable question is
 ///      "is this the edge we intend?" rather than "are these calls right against a state I must
 ///      verify separately".
@@ -56,7 +56,6 @@ import {TransitionDerivationLib} from "../libraries/TransitionDerivationLib.sol"
 ///      transaction. Governance transfers ownership in, the migration executes, and ownership
 ///      leaves to the executors before the call returns.
 contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
-    using CodehashPinLib for address;
 
     /// @notice Set once `migrate` has run. The edge is one-shot: replaying it would re-check a
     ///         starting state that no longer exists anyway, but failing loudly is clearer.
@@ -73,17 +72,17 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
     /// @notice Emitted once the ecosystem has crossed into the registry-driven model.
     event EcosystemBootstrapped(address indexed ctm, address indexed currentRelease, uint256 newProtocolVersion);
 
-    /// @notice Pins the audited manifest at construction; the manifest is immutable afterwards.
+    /// @notice Stores the audited manifest at construction; it is immutable afterwards.
     constructor(BootstrapManifest memory _manifest) {
         if (
             _manifest.ctm == address(0) ||
             address(_manifest.ctmProxyAdmin) == address(0) ||
-            _manifest.currentRelease.addr == address(0) ||
-            _manifest.ctmExecutor.addr == address(0) ||
+            _manifest.currentRelease == address(0) ||
+            _manifest.ctmExecutor == address(0) ||
             _manifest.ctmExecutorOwner == address(0) ||
             _manifest.coordinator == address(0) ||
-            _manifest.upgradeTimer.addr == address(0) ||
-            _manifest.upgradeEngine.addr == address(0)
+            _manifest.upgradeTimer == address(0) ||
+            _manifest.upgradeEngine == address(0)
         ) {
             revert ZeroAddress();
         }
@@ -98,7 +97,7 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
         // The L2 leg, exactly as a transition constructs it: the genesis release's table (the target
         // state, installed in full — there is no departing release to diff against) plus the
         // authored delegate and extras, with the same shape rules ({L2PlanLib.build}).
-        ICTMRelease release = ICTMRelease(_manifest.currentRelease.addr);
+        ICTMRelease release = ICTMRelease(_manifest.currentRelease);
         encodedL2Plan = abi.encode(
             L2PlanLib.build(
                 TransitionDerivationLib.deriveL2DeploymentsFromTable(
@@ -111,7 +110,7 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
         encodedManifest = abi.encode(_manifest);
     }
 
-    /// @notice Commitment to the pinned manifest — the 32 bytes governance approves. Computed
+    /// @notice Commitment to the whole manifest — the 32 bytes governance approves. Computed
     ///         from the stored encoding; no contract reads it.
     function manifestHash() external view returns (bytes32) {
         return keccak256(encodedManifest);
@@ -127,7 +126,7 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
     ///      moved on still installs the release ITS OWN committed migration names.
     function upgradeTarget() external view returns (uint256, uint256, address) {
         BootstrapManifest memory m = getManifest();
-        return (m.newProtocolVersion, m.upgradeTimestamp, m.currentRelease.addr);
+        return (m.newProtocolVersion, m.upgradeTimestamp, m.currentRelease);
     }
 
     /// @inheritdoc ICommittedUpgrade
@@ -143,7 +142,7 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
         return
             CTMUpgradeComposer.buildL2UpgradeTxFromPlan({
                 _plan: l2Plan(),
-                _newRelease: ICTMRelease(m.currentRelease.addr),
+                _newRelease: ICTMRelease(m.currentRelease),
                 _newProtocolVersion: m.newProtocolVersion,
                 _bridgehub: IChainTypeManager(m.ctm).BRIDGE_HUB(),
                 _chainId: _chainId
@@ -158,7 +157,7 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
     }
 
     /// @notice Reverts unless the live ecosystem is exactly the starting state the manifest names
-    ///         AND the edge is executable now: the pinned timer's operational window has passed
+    ///         AND the edge is executable now: the named timer's operational window has passed
     ///         (which also proves stage 0 started it — `checkDeadline` rejects an unstarted timer).
     /// @dev Runs on the execution path, so a drifted ecosystem cannot be migrated by accident and
     ///      the stage sequencing is enforced by the object itself, not by call order in a bundle.
@@ -168,8 +167,8 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
     function validate() public view {
         BootstrapManifest memory m = getManifest();
 
-        CodehashPinLib.requirePin(m.upgradeTimer);
-        GovernanceUpgradeTimer(m.upgradeTimer.addr).checkDeadline();
+        ObjectAnchorLib.requireCode(m.upgradeTimer);
+        GovernanceUpgradeTimer(m.upgradeTimer).checkDeadline();
 
         // Authority must already rest here, or `migrate` could not perform any of the work.
         address ctmOwner = Ownable2Step(m.ctm).owner();
@@ -181,17 +180,17 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
             revert BootstrapAuthorityNotHeld(address(m.ctmProxyAdmin), proxyAdminOwner);
         }
 
-        // The executors are where ALL of this authority ends up, so they are checked exactly as
-        // hard as everything else the manifest names: pinned, and BOUND to the very contracts they
-        // receive. An executor bound elsewhere would take ownership its fixed entrypoints cannot
-        // drive — and since the edge is one-shot, recovering from that would mean falling back to
-        // break-glass, the one authority this design exists to avoid depending on.
-        CodehashPinLib.requirePin(m.ctmExecutor);
-        CTMUpgradeExecutor ctmExecutor = CTMUpgradeExecutor(payable(m.ctmExecutor.addr));
-        // The codehash pin covers the executor's CODE and its immutables; ownership and the
-        // ecosystem pointer are storage, so they are checked by value. Without this, an executor
-        // whose ownership moved after deployment would still pass every other check and then
-        // receive the whole CTM domain on behalf of whoever owns it now.
+        // The executors are where ALL of this authority ends up, so every binding they carry is
+        // checked BY VALUE against the very contracts they receive. An executor bound elsewhere
+        // would take ownership its fixed entrypoints cannot drive — and since the edge is
+        // one-shot, recovering from that would mean falling back to break-glass, the one
+        // authority this design exists to avoid depending on.
+        ObjectAnchorLib.requireCode(m.ctmExecutor);
+        CTMUpgradeExecutor ctmExecutor = CTMUpgradeExecutor(payable(m.ctmExecutor));
+        // Ownership is storage, so it is checked here rather than assumed from the reviewed
+        // deployment: an executor whose ownership moved after deployment would otherwise pass
+        // every other check and then receive the whole CTM domain on behalf of whoever owns it
+        // now.
         address executorOwner = ctmExecutor.owner();
         if (executorOwner != m.ctmExecutorOwner) {
             revert BootstrapExecutorOwnerMismatch(m.ctmExecutorOwner, executorOwner);
@@ -205,18 +204,18 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
         // The coordinator every later operation on this CTM is driven by.
         address boundCoordinator = ctmExecutor.coordinator();
         if (boundCoordinator != m.coordinator) {
-            revert BootstrapExecutorNotBound(m.ctmExecutor.addr, m.coordinator, boundCoordinator);
+            revert BootstrapExecutorNotBound(m.ctmExecutor, m.coordinator, boundCoordinator);
         }
         address boundCtm = address(ctmExecutor.CHAIN_TYPE_MANAGER());
         if (boundCtm != m.ctm) {
-            revert BootstrapExecutorNotBound(m.ctmExecutor.addr, m.ctm, boundCtm);
+            revert BootstrapExecutorNotBound(m.ctmExecutor, m.ctm, boundCtm);
         }
         // The WHOLE CTM domain lands under the one CTM-bound executor: the CTM proxy and its
         // per-CTM proxies share `ctmProxyAdmin`, and later transitions apply their
         // `ctmProxyRows` through it. Nothing CTM-scoped goes under ecosystem authority.
         address boundProxyAdmin = address(ctmExecutor.CTM_PROXY_ADMIN());
         if (boundProxyAdmin != address(m.ctmProxyAdmin)) {
-            revert BootstrapExecutorNotBound(m.ctmExecutor.addr, address(m.ctmProxyAdmin), boundProxyAdmin);
+            revert BootstrapExecutorNotBound(m.ctmExecutor, address(m.ctmProxyAdmin), boundProxyAdmin);
         }
 
         // The departing version fixes which ecosystem this edge is valid for.
@@ -236,15 +235,15 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
             address liveImpl = ProxyUpgradeRowLib.adminOf(m.ctmProxyAdmin, row).getProxyImplementation(
                 ITransparentUpgradeableProxy(row.proxy)
             );
-            if (liveImpl != row.expectedOldImpl && liveImpl != row.implNew.addr) {
+            if (liveImpl != row.expectedOldImpl && liveImpl != row.implNew) {
                 revert ProxyUpgradeRowMismatch(row.proxy, row.expectedOldImpl, liveImpl);
             }
-            CodehashPinLib.requirePin(row.implNew);
+            ObjectAnchorLib.requireCode(row.implNew);
         }
 
-        CodehashPinLib.requirePin(m.upgradeEngine);
-        if (m.l2Plan.delegateComposer.addr != address(0)) {
-            CodehashPinLib.requirePin(m.l2Plan.delegateComposer);
+        ObjectAnchorLib.requireCode(m.upgradeEngine);
+        if (m.l2Plan.delegateComposer != address(0)) {
+            ObjectAnchorLib.requireCode(m.l2Plan.delegateComposer);
         }
         // The composed L2 transaction must find every bytecode it depends on already published
         // on the CTM's supplier, or the edge fails on every chain's L2 leg.
@@ -253,15 +252,16 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
             l2Plan().factoryDepHashes
         );
 
-        // The release must run the very code this migration installs as the anchor, so the anchor
-        // and the release it vouches for cannot be mismatched at the moment of installation.
-        ICTMRelease(m.currentRelease.addr).validate();
-        CodehashPinLib.requirePin(m.currentRelease);
+        // The release is where the CTM's provenance anchor comes FROM (`migrate()` reads its
+        // live runtime hash), so it must be deployed code before the edge runs: an anchor taken
+        // from a codeless account would accept nothing afterwards.
+        ObjectAnchorLib.requireCode(m.currentRelease);
+        ICTMRelease(m.currentRelease).validate();
     }
 
     /// @notice Reverts unless the edge has been APPLIED end to end: `migrate()` ran, the CTM sits
-    ///         at the new version with the pinned release and anchor installed, every proxy row
-    ///         points at its pinned `implNew`, the whole CTM domain is owned by the bound
+    ///         at the new version with the named release and anchor installed, every proxy row
+    ///         points at its `implNew`, the whole CTM domain is owned by the bound
     ///         executor, and the CTM's chain migrations are no longer paused. The stage-2 gate
     ///         for the bundle whose stage 1 ran `migrate()` — deeper than a bare version check,
     ///         and readable by any tooling afterwards.
@@ -279,10 +279,9 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
             revert OutdatedProtocolVersion(liveVersion, m.newProtocolVersion);
         }
         address liveRelease = ctm.currentRelease();
-        if (liveRelease != m.currentRelease.addr) {
-            revert BootstrapReleaseNotInstalled(m.currentRelease.addr, liveRelease);
+        if (liveRelease != m.currentRelease) {
+            revert BootstrapReleaseNotInstalled(m.currentRelease, liveRelease);
         }
-        CodehashPinLib.requirePin(m.currentRelease);
 
         ProxyUpgradeRowLib.requireRowsApplied(
             m.ctmProxyAdmin,
@@ -292,16 +291,16 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
         // The whole CTM domain must have LANDED under the bound executor — the accept inside
         // `migrate()` completed, nothing is parked on this spent object.
         address ctmOwner = Ownable2Step(m.ctm).owner();
-        if (ctmOwner != m.ctmExecutor.addr) {
+        if (ctmOwner != m.ctmExecutor) {
             revert BootstrapAuthorityNotHeld(m.ctm, ctmOwner);
         }
         address proxyAdminOwner = m.ctmProxyAdmin.owner();
-        if (proxyAdminOwner != m.ctmExecutor.addr) {
+        if (proxyAdminOwner != m.ctmExecutor) {
             revert BootstrapAuthorityNotHeld(address(m.ctmProxyAdmin), proxyAdminOwner);
         }
         address boundExecutor = address(IEcosystemUpgradeExecutor(m.coordinator).ctmExecutor());
-        if (boundExecutor != m.ctmExecutor.addr) {
-            revert BootstrapExecutorNotBound(m.coordinator, m.ctmExecutor.addr, boundExecutor);
+        if (boundExecutor != m.ctmExecutor) {
+            revert BootstrapExecutorNotBound(m.coordinator, m.ctmExecutor, boundExecutor);
         }
         // Completion lifts the operational restrictions too: the stage-0 pause must have been
         // released before this edge counts as done, so the bundle cannot forget it.
@@ -348,19 +347,22 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
             _oldProtocolVersionDeadline: m.oldProtocolVersionDeadline,
             _newProtocolVersion: m.newProtocolVersion
         });
-        // The anchor first: `setCurrentRelease` checks the release against it.
+        // Trust is ESTABLISHED here, not verified: governance approved this release ADDRESS, so
+        // the edge reads the code actually deployed there (`validate()` has already required that
+        // there is some) and installs its runtime hash as the anchor every LATER release is held
+        // against. The anchor goes first — `setCurrentRelease` checks the release against it.
         ctm.setReleaseCodehash(m.currentRelease.codehash);
-        ctm.setCurrentRelease(m.currentRelease.addr);
+        ctm.setCurrentRelease(m.currentRelease);
 
         // Authority leaves in the same transaction it arrived. The ProxyAdmin is plain `Ownable`,
         // so its transfer lands immediately. The CTM is `Ownable2Step`: nominate the executor and
         // complete the handover through its `acceptCTMOwnership()` in the SAME transaction — the
         // accept is permissionless-safe (see its docs), so the CTM never sits owned by this
         // spent one-shot object waiting for a separate governance call.
-        Ownable2Step(m.ctm).transferOwnership(m.ctmExecutor.addr);
-        m.ctmProxyAdmin.transferOwnership(m.ctmExecutor.addr);
-        CTMUpgradeExecutor(payable(m.ctmExecutor.addr)).acceptCTMOwnership();
+        Ownable2Step(m.ctm).transferOwnership(m.ctmExecutor);
+        m.ctmProxyAdmin.transferOwnership(m.ctmExecutor);
+        CTMUpgradeExecutor(payable(m.ctmExecutor)).acceptCTMOwnership();
 
-        emit EcosystemBootstrapped(m.ctm, m.currentRelease.addr, m.newProtocolVersion);
+        emit EcosystemBootstrapped(m.ctm, m.currentRelease, m.newProtocolVersion);
     }
 }

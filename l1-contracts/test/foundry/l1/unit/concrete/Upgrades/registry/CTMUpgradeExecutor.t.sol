@@ -48,7 +48,6 @@ import {
     ReleaseGenesisData,
     ReleaseManifest,
     TransitionManifest,
-    PinnedContract,
     ProxyUpgradeRow
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
@@ -167,15 +166,15 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
         GenesisFacet[] memory genesisFacets = new GenesisFacet[](facetCuts.length);
         for (uint256 i = 0; i < facetCuts.length; ++i) {
             genesisFacets[i] = GenesisFacet({
-                facet: PinnedContract({addr: facetCuts[i].facet, codehash: facetCuts[i].facet.codehash}),
+                facet: facetCuts[i].facet,
                 isFreezable: facetCuts[i].isFreezable
             });
         }
         return
             ReleaseManifest({
-                diamondInit: PinnedContract({addr: diamondInit, codehash: diamondInit.codehash}),
-                verifier: PinnedContract({addr: address(testnetVerifier), codehash: address(testnetVerifier).codehash}),
-                genesisUpgrade: PinnedContract({addr: genesisUpgradeAddr, codehash: genesisUpgradeAddr.codehash}),
+                diamondInit: diamondInit,
+                verifier: address(testnetVerifier),
+                genesisUpgrade: genesisUpgradeAddr,
                 genesisFacets: genesisFacets,
                 genesis: ReleaseGenesisData({
                     fixedForceDeploymentsData: hex"f1f2",
@@ -191,10 +190,6 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
 
     function _deployRelease(uint256 _manifestNonce) internal returns (CTMRelease result) {
         result = new CTMRelease(_releaseManifest(_manifestNonce));
-    }
-
-    function _pin(address _addr) internal view returns (PinnedContract memory) {
-        return PinnedContract({addr: _addr, codehash: _addr.codehash});
     }
 
     /// @dev A transition's timer: bound to the coordinator (`TIMER_GOVERNANCE`, the only address
@@ -245,12 +240,12 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
                 // genesis'd with (its current release), as the executor's release-edge pin requires.
                 fromRelease: _fromRelease,
                 newRelease: address(release),
-                upgradeEngine: _pin(upgradeEngineAddr),
+                upgradeEngine: upgradeEngineAddr,
                 proxyUpgrades: new ProxyUpgradeRow[](CTM_CONTRACT_COUNT),
                 oldProtocolVersionDeadline: 1000,
                 upgradeTimestamp: _upgradeTimestamp,
-                l2Plan: L2PlanFixtures.delegatePlan(_delegateCode, _pin(address(delegateComposer))),
-                upgradeTimer: _pin(address(_newTimer(0, 0)))
+                l2Plan: L2PlanFixtures.delegatePlan(_delegateCode, address(delegateComposer)),
+                upgradeTimer: address(_newTimer(0, 0))
             });
     }
 

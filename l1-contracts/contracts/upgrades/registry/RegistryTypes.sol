@@ -14,28 +14,18 @@ import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.
 /// @dev They live here rather than next to their contracts because they are the reviewable
 ///      artifact of the whole model — see {protocol-docs/README.md} and {docs/registry-driven-upgrades.md}.
 
-/// @notice An address together with the MANDATORY `EXTCODEHASH` pin of the code it must run —
-///         the unit every manifest names contracts in. Pins sit beside the address they protect
-///         (there is no detached, optional pin list) and are held against live code by
-///         `validate()` / `verifyAll()`.
-struct PinnedContract {
-    address addr;
-    bytes32 codehash;
-}
-
 /// @notice One facet installed on every chain created from a CTM release.
 /// @dev The facet's selector routing is NOT stored: every facet is self-describing
-///      (`ISelfDescribingFacet.selectors()`), and the `codehash` pin freezes that
-///      self-description together with the code — a stored copy would only be a second,
+///      (`ISelfDescribingFacet.selectors()`), and a stored copy would only be a second,
 ///      unverified source that could disagree with it. Consumers (genesis installation,
-///      transition delta derivation) read the routing from the pinned facet.
+///      transition delta derivation) read the routing from the facet itself.
 struct GenesisFacet {
-    PinnedContract facet;
+    address facet;
     bool isFreezable;
 }
 
-/// @notice The chain state a release pins that is neither a routing row nor a codehash pin: the
-///         force-deployment descriptor and the genesis batch.
+/// @notice The chain state a release names that is not a routing row: the force-deployment
+///         descriptor and the genesis batch.
 // solhint-disable-next-line gas-struct-packing
 struct ReleaseGenesisData {
     bytes fixedForceDeploymentsData;
@@ -60,9 +50,9 @@ struct ReleaseGenesisData {
 ///        upgrade executes, so the shell is never repeated per row. Empty only when the table is.
 // solhint-disable-next-line gas-struct-packing
 struct ReleaseManifest {
-    PinnedContract diamondInit;
-    PinnedContract verifier;
-    PinnedContract genesisUpgrade;
+    address diamondInit;
+    address verifier;
+    address genesisUpgrade;
     GenesisFacet[] genesisFacets;
     ReleaseGenesisData genesis;
     bytes[] l2BytecodeInfos;
@@ -91,10 +81,10 @@ struct L2UpgradePlan {
 ///         (addresses, the delegate target, the factory dependencies) is a function of these and
 ///         is constructed at initialization, so a manifest cannot commit a plan the composed
 ///         transaction would not execute.
-/// @dev This is REVIEWED-AND-PINNED data, not proven state: L1 cannot verify L2 execution
-///      effects, so the L1-side convergence guarantee deliberately does not extend here (see
-///      the transition contract docs). What remains review work is what the delegate DOES — its
-///      bytecode hash names an auditable artifact, not a behavior.
+/// @dev This is REVIEWED data, not proven state: L1 cannot verify L2 execution effects, so the
+///      L1-side convergence guarantee deliberately does not extend here (see the transition
+///      contract docs). What remains review work is what the delegate DOES — its bytecode hash
+///      names an auditable artifact, not a behavior.
 /// @param delegateBytecodeInfo The canonical ZKsync OS bytecode info (see {ZKSyncOSBytecodeInfo})
 ///        of the version-specific upgrade delegate the `L2ComplexUpgrader` delegatecalls after
 ///        the deployments. Force-deployed Unsafe at the address its own info derives, so it can
@@ -102,14 +92,14 @@ struct L2UpgradePlan {
 ///        L1-only edge, legal only when nothing is deployed on L2 either.
 /// @param extraBytecodeInfos Further Unsafe force deployments the delegate needs beside the
 ///        table-derived set, each at its bytecode-derived address. Usually empty.
-/// @param delegateComposer The codehash-pinned {IL2DelegateCalldataComposer} that DEFINES what the
-///        delegate is called with, from the target release and the ecosystem's Bridgehub — no
-///        authored calldata bytes ride the manifest. Zero means the delegate is called with empty
+/// @param delegateComposer The {IL2DelegateCalldataComposer} that DEFINES what the delegate is
+///        called with, from the target release and the ecosystem's Bridgehub — no authored
+///        calldata bytes ride the manifest. Zero means the delegate is called with empty
 ///        calldata; nonzero requires a delegate.
 struct AuthoredL2Plan {
     bytes delegateBytecodeInfo;
     bytes[] extraBytecodeInfos;
-    PinnedContract delegateComposer;
+    address delegateComposer;
 }
 
 /// @param upgradeEngine The diamond cut's init delegatecall target implementing
@@ -134,12 +124,12 @@ struct TransitionManifest {
     uint256 newProtocolVersion;
     address fromRelease;
     address newRelease;
-    PinnedContract upgradeEngine;
+    address upgradeEngine;
     ProxyUpgradeRow[] proxyUpgrades;
     uint256 oldProtocolVersionDeadline;
     uint256 upgradeTimestamp;
     AuthoredL2Plan l2Plan;
-    PinnedContract upgradeTimer;
+    address upgradeTimer;
 }
 
 /// @notice One proxy's upgrade row: a SOURCE-CHECKED edge, not just a target.
@@ -147,15 +137,15 @@ struct TransitionManifest {
 /// @param expectedOldImpl The implementation the proxy must currently point at for this row to
 ///        apply. This is the replay guard: after a later upgrade moves the proxy on, replaying
 ///        this row cannot silently downgrade it — the source no longer matches.
-/// @param implNew The pinned implementation the proxy points at afterwards. A ZERO address marks
-///        an inventory slot as EXPLICITLY not upgraded; such a slot never becomes a row.
+/// @param implNew The implementation the proxy points at afterwards. A ZERO address marks an
+///        inventory slot as EXPLICITLY not upgraded; such a slot never becomes a row.
 /// @param callInitializeUpgrade Whether the swap reinitializes. There is NO calldata and NO
 ///        data anywhere on the row: `true` executes `upgradeAndCall` with the FIXED,
 ///        argument-less `IProxyUpgradeInitializable.initializeUpgrade()` selector (`false` is a
 ///        plain `ProxyAdmin.upgrade`). Whatever the reinitializer needs lives in the audited
-///        implementation itself — constants, or immutables on L1, both pinned by the row's
-///        codehash (see {IUpgradeInit.sol}). A manifest can therefore never route the init call
-///        to an arbitrary function or smuggle arguments into it.
+///        implementation itself — constants, or immutables on L1 (see {IUpgradeInit.sol}). A
+///        manifest can therefore never route the init call to an arbitrary function or smuggle
+///        arguments into it.
 /// @param admin The `ProxyAdmin` administering `proxy`. ZERO means the applying executor's own
 ///        bound admin — the common case. A nonzero admin names a proxy administered elsewhere (the
 ///        `ServerNotifier` under its chainAdmin-owned admin): reads go through it, because a
@@ -167,7 +157,7 @@ struct TransitionManifest {
 struct ProxyUpgradeRow {
     address proxy;
     address expectedOldImpl;
-    PinnedContract implNew;
+    address implNew;
     bool callInitializeUpgrade;
     ProxyAdmin admin;
 }
@@ -196,18 +186,18 @@ struct CoreRegistryManifest {
 /// @param ctmProxyAdmin The ProxyAdmin owning every proxy in `proxyUpgrades` (and the CTM proxy).
 /// @param proxyUpgrades The CTM-domain inventory, indexed by {CTMContract} (same slot semantics
 ///        as {CoreRegistryManifest}): each participating slot applies only if the proxy
-///        currently points at `expectedOldImpl`, and each `implNew` carries an inline pin. The
-///        CTM's own implementation swap is one of these slots. A row under a FOREIGN admin (the
+///        currently points at `expectedOldImpl`. The CTM's own implementation swap is one of
+///        these slots. A row under a FOREIGN admin (the
 ///        ServerNotifier's) is left to that administrator: `migrate()` hands onward only
 ///        `ctmProxyAdmin`, so a foreign admin must never be transferred to this one-shot object —
 ///        hand it to the executor, or keep it and apply the row yourself before stage 2.
-/// @param currentRelease The pinned genesis release installed as `currentRelease`. Its
-///        `codehash` doubles as the CTM's canonical provenance anchor (`releaseCodehash`):
-///        every release this CTM ever pins must run exactly that code.
+/// @param currentRelease The genesis release installed as `currentRelease`. `migrate()` reads
+///        its LIVE runtime hash and establishes that as the CTM's provenance anchor
+///        (`releaseCodehash`), which every later release is then held against.
 /// @param newProtocolVersion The version the CTM moves to.
 /// @param oldProtocolVersionDeadline Until when the departing version stays usable.
-/// @param upgradeEngine The pinned bootstrap engine (`BootstrapUpgrade`), the committed
-///        cut's init target. The cut carries NO facet cuts and NO authored calldata: the facet
+/// @param upgradeEngine The bootstrap engine (`BootstrapUpgrade`), the committed cut's init
+///        target. The cut carries NO facet cuts and NO authored calldata: the facet
 ///        delta cannot be derived at construction (the departing version predates releases, so
 ///        there is no `fromRelease` to diff against), so the engine removes each chain's live
 ///        routing and installs the genesis release's facet set AT EXECUTION. The engine is
@@ -219,21 +209,20 @@ struct CoreRegistryManifest {
 /// @param l2Plan The authored L2 input, exactly as on a transition ({AuthoredL2Plan}); the final
 ///        plan is constructed from it and `currentRelease`'s own L2 bytecode table.
 /// @param upgradeTimestamp The chain-side earliest execution time the composed proposal carries.
-/// @param ctmExecutor The pinned `CTMUpgradeExecutor` that receives BOTH CTM ownership and the
+/// @param ctmExecutor The `CTMUpgradeExecutor` that receives BOTH CTM ownership and the
 ///        CTM-domain `ProxyAdmin` — the whole CTM domain lands under one executor. It must be
 ///        BOUND to `ctm` AND to `ctmProxyAdmin`, otherwise its fixed entrypoints could never
 ///        drive what it is handed.
-/// @param ctmExecutorOwner The governance the executor must ALREADY answer to. Its codehash pin
-///        covers the executor's code and immutables but NOT its storage, and ownership is
-///        storage: an executor whose ownership moved between deployment and `migrate()` would
-///        receive the whole CTM domain on behalf of whoever owns it now. The edge therefore
-///        names the expected owner and refuses to hand anything over otherwise — and refuses a
-///        PENDING transfer too, which would let a third party claim the domain right after.
+/// @param ctmExecutorOwner The governance the executor must ALREADY answer to: an executor
+///        whose ownership moved between deployment and `migrate()` would receive the whole CTM
+///        domain on behalf of whoever owns it now. The edge therefore names the expected owner
+///        and refuses to hand anything over otherwise — and refuses a PENDING transfer too,
+///        which would let a third party claim the domain right after.
 /// @param coordinator The `EcosystemUpgradeExecutor` the CTM executor must currently answer to
-///        (`coordinator()`). Also storage rather than an immutable (governance may replace it
-///        between operations), so also outside the codehash pin — and it is the only address
-///        that can drive the executor's lifecycle callbacks afterwards.
-/// @param upgradeTimer The pinned `GovernanceUpgradeTimer` whose `checkDeadline()` gates the
+///        (`coordinator()`) — the only address that can drive the executor's lifecycle
+///        callbacks afterwards. Storage rather than an immutable, since governance may replace
+///        it between operations, so the edge checks it by value.
+/// @param upgradeTimer The `GovernanceUpgradeTimer` whose `checkDeadline()` gates the
 ///        edge: stage 0 starts the timer, and `migrate()` refuses to run until the operational
 ///        window has passed — the stage sequencing is enforced by the object itself, not by the
 ///        order of calls in a reviewed bundle.
@@ -242,14 +231,14 @@ struct BootstrapManifest {
     uint256 expectedProtocolVersion;
     ProxyAdmin ctmProxyAdmin;
     ProxyUpgradeRow[] proxyUpgrades;
-    PinnedContract currentRelease;
+    address currentRelease;
     uint256 newProtocolVersion;
     uint256 oldProtocolVersionDeadline;
-    PinnedContract upgradeEngine;
+    address upgradeEngine;
     AuthoredL2Plan l2Plan;
     uint256 upgradeTimestamp;
-    PinnedContract ctmExecutor;
+    address ctmExecutor;
     address ctmExecutorOwner;
     address coordinator;
-    PinnedContract upgradeTimer;
+    address upgradeTimer;
 }

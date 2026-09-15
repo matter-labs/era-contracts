@@ -24,7 +24,7 @@ import {
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
 import {OutdatedProtocolVersion} from "../../../state-transition/L1StateTransitionErrors.sol";
-import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
+import {ObjectAnchorLib} from "../libraries/ObjectAnchorLib.sol";
 import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 import {L2PlanLib} from "../libraries/L2PlanLib.sol";
 import {BytecodesSupplier} from "../../BytecodesSupplier.sol";
@@ -37,15 +37,15 @@ import {IEcosystemUpgradeExecutor} from "./IEcosystemUpgradeExecutor.sol";
 ///         `ProxyAdmin`, and applies pinned, write-once `CTMTransition`s to it on the coordinating
 ///         `EcosystemUpgradeExecutor`'s instructions — reserve, apply, complete — plus the
 ///         per-chain `upgradeChain`. See {protocol-docs/ecosystem-upgrade-coordination.md}.
-/// @dev Fixed logic, no generic delegatecall. The transition each callback takes is a *pinned
-///      implementation address* — the exact generated contract governance approved — never a
+/// @dev Fixed logic, no generic delegatecall. The transition each callback takes is an
+///      *implementation address* — the exact generated contract governance approved — never a
 ///      proxy. The CTM's routine and recovery owner operations that have NO chain-side alternative
 ///      (the chain gates them `onlyChainTypeManager`) are exposed as fixed passthroughs below.
 ///      Deliberately NOT passed through: the legacy cut-taking commits and `executeUpgrade` (an
 ///      arbitrary cut — the very bypass the object-driven path exists to remove) and the
 ///      release-provenance setters (driven by `applyTransition` and the bootstrap only).
 contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
-    using CodehashPinLib for address;
+    using ObjectAnchorLib for address;
 
     /// @notice The one ChainTypeManager this executor governs. Transitions carry no CTM pointer;
     ///         the binding is this immutable, so a transition cannot be aimed at a foreign CTM.
@@ -214,7 +214,7 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
     }
 
     /// @inheritdoc ICTMUpgradeExecutor
-    /// @dev Applies CTM-domain proxy rows, the version commit and the release pin; any failure
+    /// @dev Applies CTM-domain proxy rows, the version commit and the release pointer; any failure
     ///      reverts the coordinator's whole stage.
     function applyTransition() external onlyCoordinator {
         ICTMTransition transition = ICTMTransition(_requireActive().transition());
@@ -282,10 +282,10 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
         if (committed != address(_transition)) {
             revert TransitionNotCommitted(address(_transition), committed);
         }
-        // Deliberately NOT re-validated here — do not "restore" this: `validate()` re-reads pins
-        // that cannot have moved (an `EXTCODEHASH` is fixed for a non-selfdestructible contract),
-        // and costs ~19 EXTCODEHASH reads across both releases PER CHAIN on a function that is
-        // permissionless once the deadline passes.
+        // Deliberately NOT re-validated here — do not "restore" this: `validate()` re-reads code
+        // existence that cannot have changed since the commit, and costs ~19 EXTCODESIZE reads
+        // across both releases PER CHAIN on a function that is permissionless once the deadline
+        // passes.
         CHAIN_TYPE_MANAGER.upgradeChainFromVersion(_chainId, oldProtocolVersion);
         emit ChainUpgradeApplied(_chainId, _transition.newProtocolVersion());
     }
@@ -296,7 +296,7 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
 
     /// @dev Type provenance: the object at `_transition` must run the audited `CTMTransition` code.
     function _requireGenuineTransition(ICTMTransition _transition) private view {
-        address(_transition).requirePin(TRANSITION_CODEHASH);
+        address(_transition).requireObjectType(TRANSITION_CODEHASH);
     }
 
     /// @dev The reservation every callback after `beginOperation` acts on.

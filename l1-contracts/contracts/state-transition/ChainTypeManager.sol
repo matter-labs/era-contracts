@@ -44,13 +44,13 @@ import {IChainAssetHandlerBase} from "../core/chain-asset-handler/IChainAssetHan
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {TxStatus} from "../common/Messaging.sol";
-import {CodehashPinLib} from "../upgrades/registry/libraries/CodehashPinLib.sol";
+import {ObjectAnchorLib} from "../upgrades/registry/libraries/ObjectAnchorLib.sol";
 
 /// @title Chain Type Manager contract
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpgradeable {
-    using CodehashPinLib for address;
+    using ObjectAnchorLib for address;
 
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
@@ -147,7 +147,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     address public currentRelease;
 
     /// @notice `EXTCODEHASH` of the audited `CTMRelease`. Every release this CTM pins must run
-    ///         exactly that code (see `_storeCurrentRelease`). Set once at initialization.
+    ///         exactly that code (see `_requireGenuineRelease`). Set once at initialization.
     bytes32 public releaseCodehash;
 
     /// @notice The transition committed for chains departing from a given protocol version. The
@@ -267,7 +267,8 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         _setCurrentRelease(_initializeData.currentRelease);
     }
 
-    /// @dev Validates the release and its genesis params before storing it.
+    /// @dev THE single point every release passes through (initialization and every later
+    ///      transition alike): provenance against the stored anchor, then the genesis params.
     function _setCurrentRelease(address _release) internal {
         if (_release == address(0)) {
             revert ZeroAddress();
@@ -291,7 +292,8 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
             revert GenesisBatchCommitmentIncorrect();
         }
 
-        _storeCurrentRelease(_release);
+        currentRelease = _release;
+        emit NewCurrentRelease(protocolVersion, _release);
     }
 
     function setCurrentRelease(address _release) external onlyOwner {
@@ -330,19 +332,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     ///      `ICTMRelease` implementation. Callers check this BEFORE reading anything out of the
     ///      candidate: a non-release answers those reads with an empty revert.
     function _requireGenuineRelease(address _release) internal view {
-        _release.requirePin(releaseCodehash);
-    }
-
-    function _storeCurrentRelease(address _release) internal {
-        if (_release == address(0)) {
-            revert ZeroAddress();
-        }
-        // The single authoritative point every release passes through (bootstrap initialize and
-        // every later transition alike), so provenance holds even for a path that skipped the
-        // fail-fast check in `_setCurrentRelease`.
-        _requireGenuineRelease(_release);
-        currentRelease = _release;
-        emit NewCurrentRelease(protocolVersion, _release);
+        _release.requireObjectType(releaseCodehash);
     }
 
     /// @notice The L1 genesis upgrade contract new chains run at creation, read from the genesis

@@ -9,12 +9,14 @@ from an audited manifest. There is no per-version generated `.sol` file and no `
 
 - **Manifest (source of truth):** `scripts/registry-manifests/v32-local.json` — the audited
   values (facets, DiamondInit, base-system hashes, force-deployments, genesis params for the
-  release; version, verifier, facet transitions, L2 deployments for the transition; codehash
-  pins). Auditors verify a deployed registry by re-deriving its `manifestHash` from this file.
+  release; version, verifier, facet transitions, L2 deployments for the transition). Auditors
+  verify a deployed registry by re-deriving its `manifestHash` from this file.
 - **On-chain shape:** a `CTMRelease` describes the version-independent post-upgrade chain state;
-  a `CTMTransition` pins `fromRelease -> newRelease` and `oldProtocolVersion -> newProtocolVersion`
-  plus the verifier and facet swaps. Both expose `validate()` (reverts on any codehash-pin drift,
-  called on every execution path) and `verifyAll()` (returns `bool`, for off-chain tooling).
+  a `CTMTransition` commits `fromRelease -> newRelease` and
+  `oldProtocolVersion -> newProtocolVersion` plus the verifier and facet swaps. Both expose
+  `validate()`, which reverts unless every contract the manifest names is deployed code and is
+  called on every execution path. What that code IS is governance's review of the member
+  addresses, not something the object can attest to.
 
 ## How they are consumed
 
@@ -22,9 +24,11 @@ The anvil registry-driven upgrade test
 (`test/anvil-interop/run-registry-driven-upgrade-test.ts`) deploys the registries from the
 manifest against the deterministic local ecosystem
 (`test/anvil-interop/chain-states/v0.32.0`) and drives the upgrade through the on-chain
-executor/module path, asserting `validate()` succeeds against the live deployment. Pinned
-codehashes come from the `registry-deterministic` foundry profile (CBOR-metadata-free, so
-byte-identical across macOS and CI).
+executor/module path, asserting `validate()` succeeds against the live deployment. The objects
+themselves are built with the `registry-deterministic` foundry profile (CBOR-metadata-free, so
+byte-identical across macOS and CI) — which is what makes the object-type anchors
+(`releaseCodehash`, `TRANSITION_CODEHASH`, `CORE_REGISTRY_CODEHASH`, `OPERATION_CODEHASH`)
+reproducible.
 
 ## Regenerating the manifest
 

@@ -59,12 +59,7 @@ import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/
 import {IProxyUpgradeInitializable} from "contracts/upgrades/registry/IUpgradeInit.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
-import {
-    AuthoredL2Plan,
-    PinnedContract,
-    ProxyUpgradeRow,
-    TransitionManifest
-} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {AuthoredL2Plan, ProxyUpgradeRow, TransitionManifest} from "contracts/upgrades/registry/RegistryTypes.sol";
 import {CTM_CONTRACT_COUNT, CTMContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {ExternalActionsLib} from "./ExternalActionsLib.sol";
 
@@ -362,12 +357,12 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             newProtocolVersion: getNewProtocolVersion(),
             fromRelease: fromRelease,
             newRelease: newRelease,
-            upgradeEngine: _pin(engine),
+            upgradeEngine: engine,
             proxyUpgrades: _ctmProxyUpgradeRows(),
             oldProtocolVersionDeadline: UpgradeHelperLib.getOldProtocolDeadline(),
             upgradeTimestamp: 0,
             l2Plan: authoredL2Plan(),
-            upgradeTimer: _pin(upgradeAddresses.upgradeTimer)
+            upgradeTimer: upgradeAddresses.upgradeTimer
         });
         // From the build ARTIFACT, which is also where the bound executor's `TRANSITION_CODEHASH`
         // came from — see {BytecodeUtils.getDeployedBytecodeHash}.
@@ -376,10 +371,10 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             abi.encode(manifest),
             "CTMTransition"
         );
-        // Fail here, not in stage 0: every pin the object carries must hold against the live
-        // deployment, and the object's own revert names the pin that does not.
+        // Fail here, not in stage 0: every contract the object names must already be deployed,
+        // and the object's own revert names the one that is not.
         ICTMTransition(upgradeAddresses.ctmTransition).validate();
-        _requireObjectsMatchExecutorPins();
+        _requireObjectsMatchExecutorAnchors();
     }
 
     /// @notice Checks the transition against the codehash the bound executor was CONSTRUCTED with —
@@ -388,11 +383,11 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     ///      prepare. Nothing keeps a later build's artifact byte-identical to that one, so a drifted
     ///      object would otherwise only surface as a stage-0 revert with the whole upgrade already
     ///      reviewed and scheduled.
-    function _requireObjectsMatchExecutorPins() internal view virtual {
+    function _requireObjectsMatchExecutorAnchors() internal view virtual {
         CTMUpgradeExecutor executor = CTMUpgradeExecutor(payable(boundCTMUpgradeExecutor()));
         require(
             upgradeAddresses.ctmTransition.codehash == executor.TRANSITION_CODEHASH(),
-            "the deployed transition does not run the code the bound CTM executor pins"
+            "the deployed transition does not run the code the bound CTM executor anchors"
         );
     }
 
@@ -435,7 +430,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             ProxyUpgradeRow({
                 proxy: _proxy,
                 expectedOldImpl: Utils.getImplementation(_proxy),
-                implNew: PinnedContract({addr: _implNew, codehash: _implNew.codehash}),
+                implNew: _implNew,
                 callInitializeUpgrade: false,
                 admin: _admin
             });
@@ -823,7 +818,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     ///         {docs/upgrade-stage-lifecycle.md}). Empty when the inventory leaves the notifier alone.
     function prepareUpgradeServerNotifierCall() public view virtual returns (Call[] memory calls) {
         ProxyUpgradeRow memory row = pinnedCTMProxyInventory()[uint256(CTMContract.ServerNotifier)];
-        if (row.implNew.addr == address(0)) {
+        if (row.implNew == address(0)) {
             return calls;
         }
         require(address(row.admin) != address(0), "the pinned ServerNotifier row names no administrator");
@@ -832,9 +827,9 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         bytes memory data = row.callInitializeUpgrade
             ? abi.encodeCall(
                 ProxyAdmin.upgradeAndCall,
-                (proxy, row.implNew.addr, abi.encodeCall(IProxyUpgradeInitializable.initializeUpgrade, ()))
+                (proxy, row.implNew, abi.encodeCall(IProxyUpgradeInitializable.initializeUpgrade, ()))
             )
-            : abi.encodeCall(ProxyAdmin.upgrade, (proxy, row.implNew.addr));
+            : abi.encodeCall(ProxyAdmin.upgrade, (proxy, row.implNew));
 
         calls = new Call[](1);
         calls[0] = Call({target: address(row.admin), data: data, value: 0});

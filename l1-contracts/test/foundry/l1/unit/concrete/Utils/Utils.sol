@@ -36,7 +36,6 @@ import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition
 import {
     AuthoredL2Plan,
     L2UpgradePlan,
-    PinnedContract,
     ProxyUpgradeRow,
     TransitionManifest
 } from "contracts/upgrades/registry/RegistryTypes.sol";
@@ -84,22 +83,21 @@ library Utils {
         uint256 _newProtocolVersion,
         address _verifier
     ) internal {
-        PinnedContract memory noPin = PinnedContract({addr: address(0), codehash: bytes32(0)});
         TransitionManifest memory manifest = TransitionManifest({
             oldProtocolVersion: _oldProtocolVersion,
             newProtocolVersion: _newProtocolVersion,
             fromRelease: address(0),
             newRelease: _newRelease,
-            upgradeEngine: noPin,
+            upgradeEngine: address(0),
             proxyUpgrades: new ProxyUpgradeRow[](CTM_CONTRACT_COUNT),
             oldProtocolVersionDeadline: type(uint256).max,
             upgradeTimestamp: 0,
             l2Plan: AuthoredL2Plan({
                 delegateBytecodeInfo: "",
                 extraBytecodeInfos: new bytes[](0),
-                delegateComposer: noPin
+                delegateComposer: address(0)
             }),
-            upgradeTimer: noPin
+            upgradeTimer: address(0)
         });
         vm.mockCall(_transition, abi.encodeCall(ICTMTransition.getManifest, ()), abi.encode(manifest));
         vm.mockCall(_transition, abi.encodeCall(ICTMTransition.facetCuts, ()), abi.encode(new Diamond.FacetCut[](0)));

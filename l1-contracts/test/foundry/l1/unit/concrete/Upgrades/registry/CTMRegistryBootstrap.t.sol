@@ -14,7 +14,6 @@ import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 import {
     GenesisFacet,
-    PinnedContract,
     ReleaseGenesisData,
     ReleaseManifest
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
@@ -59,13 +58,13 @@ contract CTMRegistryBootstrapTest is Test {
     function _genesisManifest() internal view returns (ReleaseManifest memory) {
         GenesisFacet[] memory rows = new GenesisFacet[](FACET_COUNT);
         for (uint256 i = 0; i < FACET_COUNT; ++i) {
-            rows[i] = GenesisFacet({facet: _livePin(facetAddrs[i]), isFreezable: facetFreezable[i]});
+            rows[i] = GenesisFacet({facet: (facetAddrs[i]), isFreezable: facetFreezable[i]});
         }
         return
             ReleaseManifest({
-                diamondInit: _livePin(DIAMOND_INIT),
-                verifier: _livePin(VERIFIER),
-                genesisUpgrade: _livePin(GENESIS_UPGRADE),
+                diamondInit: (DIAMOND_INIT),
+                verifier: (VERIFIER),
+                genesisUpgrade: (GENESIS_UPGRADE),
                 genesisFacets: rows,
                 genesis: ReleaseGenesisData({
                     fixedForceDeploymentsData: bytes(""),
@@ -77,10 +76,6 @@ contract CTMRegistryBootstrapTest is Test {
                 l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT),
                 l2SystemProxyBytecodeInfo: ""
             });
-    }
-
-    function _livePin(address _addr) internal view returns (PinnedContract memory) {
-        return PinnedContract({addr: _addr, codehash: _addr.codehash});
     }
 
     // ---- Happy path ----
@@ -95,21 +90,20 @@ contract CTMRegistryBootstrapTest is Test {
         GenesisFacet[] memory list = release.genesisFacets();
         assertEq(list.length, FACET_COUNT, "list length");
         for (uint256 i = 0; i < FACET_COUNT; ++i) {
-            assertEq(list[i].facet.addr, facetAddrs[i], "facet addr");
+            assertEq(list[i].facet, facetAddrs[i], "facet addr");
             assertEq(list[i].facet.codehash, facetAddrs[i].codehash, "facet codehash");
             assertEq(list[i].isFreezable, facetFreezable[i], "facet freezability");
         }
 
-        // Routing is not stored in the manifest: it is read from the pinned facet's own
+        // Routing is not stored in the manifest: it is read from the facet's own
         // self-description on demand.
-        bytes4[] memory firstSelectors = ISelfDescribingFacet(list[0].facet.addr).selectors();
+        bytes4[] memory firstSelectors = ISelfDescribingFacet(list[0].facet).selectors();
         assertEq(firstSelectors.length, 1, "self-described selectors");
         assertEq(firstSelectors[0], bytes4(uint32(0x100)), "first selector");
 
-        // Inline pins captured from live code (the etched synthetic facets carry real, nonempty
-        // code) verify against the same live state.
+        // Every named member is deployed code (the etched synthetic facets carry real, nonempty
+        // code), so the enforcement surface passes.
         release.validate();
-        assertTrue(release.verifyAll(), "verifyAll");
     }
 
     // ---- Unhappy path ----
@@ -117,7 +111,7 @@ contract CTMRegistryBootstrapTest is Test {
     function test_constructorRevertsOnZeroGenesisUpgrade() public {
         // Version validation moved to the transition; a release still rejects a zero genesisUpgrade.
         ReleaseManifest memory manifest = _genesisManifest();
-        manifest.genesisUpgrade.addr = address(0);
+        manifest.genesisUpgrade = address(0);
 
         vm.expectRevert();
         new CTMRelease(manifest);

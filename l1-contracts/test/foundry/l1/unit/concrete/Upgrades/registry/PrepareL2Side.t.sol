@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {AuthoredL2Side, DefaultCTMUpgrade} from "deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
-import {AuthoredL2Plan, PinnedContract} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {AuthoredL2Plan} from "contracts/upgrades/registry/RegistryTypes.sol";
 import {L2PlanFixtures} from "./L2PlanFixtures.sol";
 
 /// @dev Substitutes the authored side and exposes the prepared plan. Nothing else of the prepare
@@ -70,7 +70,7 @@ contract PrepareL2SideTest is Test {
         AuthoredL2Plan memory plan = harness.preparedPlan();
         assertEq(plan.delegateBytecodeInfo.length, 0, "no delegate");
         assertEq(plan.extraBytecodeInfos.length, 0, "no extras");
-        assertEq(plan.delegateComposer.addr, address(0), "no composer");
+        assertEq(plan.delegateComposer, address(0), "no composer");
     }
 
     /// @dev The authored list names the delegate twice: publication deduplicates, so each listed
@@ -89,7 +89,7 @@ contract PrepareL2SideTest is Test {
         AuthoredL2Plan memory plan = harness.preparedPlan();
         assertEq(plan.delegateBytecodeInfo, side.plan.delegateBytecodeInfo, "delegate bytecode info");
         assertEq(plan.extraBytecodeInfos.length, 0, "no extras");
-        assertEq(plan.delegateComposer.addr, side.plan.delegateComposer.addr, "composer");
+        assertEq(plan.delegateComposer, side.plan.delegateComposer, "composer");
         assertEq(plan.delegateComposer.codehash, side.plan.delegateComposer.codehash, "composer pin");
     }
 
@@ -122,7 +122,7 @@ contract PrepareL2SideTest is Test {
         vm.etch(composer, hex"6000fe");
         side.plan = L2PlanFixtures.delegatePlan(
             DELEGATE_CODE,
-            PinnedContract({addr: composer, codehash: composer.codehash})
+            composer
         );
         side.factoryDependencies = new bytes[](3);
         side.factoryDependencies[0] = DELEGATE_CODE;

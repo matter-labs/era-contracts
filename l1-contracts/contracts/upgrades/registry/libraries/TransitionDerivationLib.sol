@@ -22,7 +22,7 @@ import {L2InventoryLib} from "./L2InventoryLib.sol";
 ///
 /// @dev Scope: L1 diamond routing and the table-driven L2 force deployments. The authored rest of
 ///      the L2 side (the delegate and any extra bytecode, the composer) is constructed into the
-///      final plan by {L2PlanLib} — reviewed-and-pinned data, since L1 cannot verify L2 execution
+///      final plan by {L2PlanLib} — REVIEWED data, since L1 cannot verify L2 execution
 ///      effects, and the guarantee is deliberately not overstated.
 library TransitionDerivationLib {
     /// @dev One facet row with its routing read from the facet's own self-description
@@ -197,9 +197,9 @@ library TransitionDerivationLib {
         rows = new FacetRouting[](length);
         for (uint256 i = 0; i < length; ++i) {
             rows[i] = FacetRouting({
-                facet: facets[i].facet.addr,
+                facet: facets[i].facet,
                 isFreezable: facets[i].isFreezable,
-                selectors: ISelfDescribingFacet(facets[i].facet.addr).selectors()
+                selectors: ISelfDescribingFacet(facets[i].facet).selectors()
             });
         }
     }

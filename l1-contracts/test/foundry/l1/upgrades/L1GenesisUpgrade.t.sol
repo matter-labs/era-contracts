@@ -58,7 +58,7 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
 
         _setUpRegistryObjects("");
         _mockEcosystemForComposer(mockBridgehub, ctmDeployerStub);
-        releaseVerifier = _pinned("genesisVerifier");
+        releaseVerifier = _deployedStub("genesisVerifier");
         release = _release(_arrivingFacets(), releaseVerifier);
         vm.mockCall(mockCtm, abi.encodeCall(IChainTypeManager.currentRelease, ()), abi.encode(address(release)));
 
@@ -196,7 +196,7 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
     function test_genesisAndUpgradePathsShareTheEnvelope() public {
         DummyDefaultUpgradeForGenesis upgradeEngine = new DummyDefaultUpgradeForGenesis();
         CTMTransition transition = _transition(
-            _release(_departingFacets(), _pinned("fromVerifier")),
+            _release(_departingFacets(), _deployedStub("fromVerifier")),
             release,
             0,
             protocolVersion,
@@ -240,7 +240,7 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
     function test_creatingAtAReleaseInstallsWhatUpgradingToItInstalls() public {
         DummyDefaultUpgradeForGenesis upgradeEngine = new DummyDefaultUpgradeForGenesis();
         CTMTransition transition = _transition(
-            _release(_departingFacets(), _pinned("fromVerifierForEquivalence")),
+            _release(_departingFacets(), _deployedStub("fromVerifierForEquivalence")),
             release,
             0,
             protocolVersion,

@@ -59,7 +59,7 @@ library L2PlanLib {
             plan.deployments[cursor] = _unsafeDeployment(_authored.extraBytecodeInfos[i]);
             ++cursor;
         }
-        plan.delegateComposer = _authored.delegateComposer.addr;
+        plan.delegateComposer = _authored.delegateComposer;
         plan.factoryDepHashes = _factoryDepHashes(plan.deployments);
 
         if (!hasDelegate && (plan.deployments.length != 0 || plan.delegateComposer != address(0))) {

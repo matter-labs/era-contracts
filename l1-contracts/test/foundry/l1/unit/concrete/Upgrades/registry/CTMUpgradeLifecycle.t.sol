@@ -48,7 +48,6 @@ import {
 } from "contracts/common/L1ContractErrors.sol";
 import {
     CoreRegistryManifest,
-    PinnedContract,
     ProxyUpgradeRow,
     TransitionManifest
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
@@ -134,7 +133,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
             ProxyUpgradeRow({
                 proxy: _proxy,
                 expectedOldImpl: _expectedOldImpl,
-                implNew: _pin(_implNew),
+                implNew: _implNew,
                 callInitializeUpgrade: false,
                 admin: ProxyAdmin(address(0))
             });
@@ -706,7 +705,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
             L2_DELEGATE_CODE
         );
         GovernanceUpgradeTimer unbound = new GovernanceUpgradeTimer(0, 0, governor, governor);
-        manifest.upgradeTimer = _pin(address(unbound));
+        manifest.upgradeTimer = address(unbound);
         CTMTransition mistimed = new CTMTransition(manifest);
         // An ecosystem leg too, so the rollback below covers BOTH domains' reservations — the
         // timer is the last thing stage 0 touches.
@@ -839,7 +838,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
             L2_DELEGATE_CODE
         );
         GovernanceUpgradeTimer timer = _newTimer(100, 50);
-        manifest.upgradeTimer = _pin(address(timer));
+        manifest.upgradeTimer = address(timer);
         CTMTransition delayed = new CTMTransition(manifest);
         EcosystemUpgradeOperation operation = _operationFor(delayed);
         uint256 preparedAt = block.timestamp;
