@@ -43,7 +43,7 @@ import {IEcosystemUpgradeExecutor} from "./IEcosystemUpgradeExecutor.sol";
 ///      (the chain gates them `onlyChainTypeManager`) are exposed as fixed passthroughs below.
 ///      Deliberately NOT passed through: the legacy cut-taking commits and `executeUpgrade` (an
 ///      arbitrary cut — the very bypass the object-driven path exists to remove) and the
-///      release-provenance setters (driven by `applyTransition` and the bootstrap only).
+///      release-provenance setters (driven by `applyOperation` and the bootstrap only).
 contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
     using ObjectAnchorLib for address;
 
@@ -52,8 +52,9 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
     IChainTypeManager public immutable CHAIN_TYPE_MANAGER;
 
     /// @notice The CTM DOMAIN's `ProxyAdmin` — the admin of the CTM proxy itself and of the
-    ///         per-CTM proxies under the CTM's own administration. Owned by this executor, so a
-    ///         transition's `ctmProxyRows` apply through the same authority that commits it.
+    ///         per-CTM proxies under the CTM's own administration. Owned by this executor, so an
+    ///         operation's infrastructure rows apply through the same authority that commits its
+    ///         transition.
     ProxyAdmin public immutable CTM_PROXY_ADMIN;
 
     /// @inheritdoc ICTMUpgradeExecutor
@@ -68,8 +69,8 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
     /// @notice Emitted when the owner points this executor at another coordinator.
     event CoordinatorChanged(address indexed previousCoordinator, address indexed newCoordinator);
 
-    /// @notice Emitted by `beginOperation`: the transition is reserved and the CTM's chain
-    ///         migrations are paused.
+    /// @notice Emitted by `beginOperation`: the operation's CTM leg is reserved and the CTM's
+    ///         chain migrations are paused. `transition` is zero for an infrastructure-only leg.
     event OperationReserved(address indexed operation, address indexed transition);
 
     /// @notice Emitted after the bound CTM was moved to the transition's new protocol version.
@@ -185,7 +186,9 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
     // ---------------------------------------------------------------------------------------
 
     /// @inheritdoc ICTMUpgradeExecutor
-    /// @dev The coordinator binds this executor; the operation supplies its transition.
+    /// @dev The coordinator binds this executor; the operation supplies both halves of the leg.
+    ///      Migrations are paused for an infrastructure-only leg too — see "Pause policy" in
+    ///      {protocol-docs/ecosystem-upgrade-coordination.md}.
     function beginOperation(IEcosystemUpgradeOperation _operation) external onlyCoordinator {
         if (address(activeOperation) != address(0)) {
             revert UpgradeLifecycleBusy(address(activeOperation));
@@ -194,10 +197,13 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
         if (boundExecutor != address(this)) {
             revert ExecutorCoordinatorMismatch(address(this), boundExecutor);
         }
+        ProxyUpgradeRowLib.requireRowCode(_operation.ctmInfrastructureRows());
         ICTMTransition transition = ICTMTransition(_operation.transition());
-        _requireGenuineTransition(transition);
-        transition.validate();
-        _requireEdges(transition);
+        if (address(transition) != address(0)) {
+            _requireGenuineTransition(transition);
+            transition.validate();
+            _requireEdges(transition);
+        }
 
         activeOperation = _operation;
 
@@ -214,30 +220,42 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
     }
 
     /// @inheritdoc ICTMUpgradeExecutor
-    /// @dev Applies CTM-domain proxy rows, the version commit and the release pointer; any failure
-    ///      reverts the coordinator's whole stage.
-    function applyTransition() external onlyCoordinator {
-        ICTMTransition transition = ICTMTransition(_requireActive().transition());
+    /// @dev Applies the operation's CTM-domain proxy rows and then, when it carries one, the
+    ///      transition's version commit and release pointer. The rows go FIRST — the commit may
+    ///      need setters that only exist on the implementation this very operation installs — and
+    ///      any failure reverts the coordinator's whole stage, so a failed row leg cannot leave a
+    ///      version commit standing.
+    function applyOperation() external onlyCoordinator {
+        IEcosystemUpgradeOperation operation = _requireActive();
         // Checked here for a clear failure; the CTM's own version commit refuses to run unpaused.
         if (!_chainAssetHandler().migrationPausedFor(address(CHAIN_TYPE_MANAGER))) {
             revert MigrationsNotPaused();
         }
-        _applyCTMUpgrade(transition);
+        ProxyUpgradeRowLib.applyRows(CTM_PROXY_ADMIN, operation.ctmInfrastructureRows());
+        ICTMTransition transition = ICTMTransition(operation.transition());
+        if (address(transition) != address(0)) {
+            _applyCTMUpgrade(transition);
+        }
     }
 
     /// @inheritdoc ICTMUpgradeExecutor
-    /// @dev This executor releases its own pause only for a transition it can see applied; the
-    ///      coordinator sequences completions and relies on the stage being one transaction.
+    /// @dev This executor releases its own pause only for a leg it can see applied — every
+    ///      infrastructure row, and the transition when the operation carries one; the coordinator
+    ///      sequences completions and relies on the stage being one transaction.
     function completeOperation() external onlyCoordinator {
         IEcosystemUpgradeOperation operation = _requireActive();
-        _requireTransitionApplied(ICTMTransition(operation.transition()));
+        ProxyUpgradeRowLib.requireRowsApplied(CTM_PROXY_ADMIN, operation.ctmInfrastructureRows());
+        ICTMTransition transition = ICTMTransition(operation.transition());
+        if (address(transition) != address(0)) {
+            _requireTransitionApplied(transition);
+        }
         delete activeOperation;
         _chainAssetHandler().unpauseCTMMigration(address(CHAIN_TYPE_MANAGER));
         emit OperationCompleted(address(operation));
     }
 
     /// @inheritdoc ICTMUpgradeExecutor
-    /// @dev Whatever `applyTransition` already committed stands — abandoning is bookkeeping, not a
+    /// @dev Whatever `applyOperation` already committed stands — abandoning is bookkeeping, not a
     ///      rollback. Migrations stay paused: whether it is safe to resume them is governance's
     ///      call (`ChainAssetHandler.unpauseCTMMigration` through the fixed CTM authority), not a
     ///      side effect of clearing a slot.
@@ -248,15 +266,25 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
     }
 
     /// @inheritdoc ICTMUpgradeExecutor
-    /// @dev The row check describes one edge, not a standing invariant: a later upgrade moves
-    ///      proxies past these rows and this then reverts by design.
     function validateTransitionApplied(ICTMTransition _transition) external view {
         _requireGenuineTransition(_transition);
         _requireTransitionApplied(_transition);
     }
 
+    /// @inheritdoc ICTMUpgradeExecutor
+    /// @dev The row check describes one edge, not a standing invariant: a later upgrade moves
+    ///      proxies past these rows and this then reverts by design.
+    function validateOperationApplied(IEcosystemUpgradeOperation _operation) external view {
+        ProxyUpgradeRowLib.requireRowsApplied(CTM_PROXY_ADMIN, _operation.ctmInfrastructureRows());
+        ICTMTransition transition = ICTMTransition(_operation.transition());
+        if (address(transition) != address(0)) {
+            _requireGenuineTransition(transition);
+            _requireTransitionApplied(transition);
+        }
+    }
+
     /// @notice Upgrades a single chain diamond to the transition's new protocol version with the
-    ///         same composed cut that `applyTransition` committed to.
+    ///         same composed cut that `applyOperation` committed to.
     /// @dev Execution policy, in order of precedence:
     ///      - the OWNER may upgrade any chain at any time;
     ///      - a CHAIN'S OWN ADMIN may upgrade that chain at any time — upgrading is the chain's
@@ -266,7 +294,7 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
     ///      - ANYONE ELSE only once the old-version deadline has passed, at which point the
     ///        upgrade is operationally mandatory and execution carries no discretionary inputs.
     ///      The chain-side `upgradeTimestamp` gate applies to non-admin callers regardless.
-    /// @param _transition The same transition committed by `applyTransition`.
+    /// @param _transition The same transition committed by `applyOperation`.
     /// @param _chainId The chain to upgrade.
     function upgradeChain(ICTMTransition _transition, uint256 _chainId) external {
         uint256 oldProtocolVersion = _transition.oldProtocolVersion();
@@ -338,9 +366,6 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
             BytecodesSupplier(CHAIN_TYPE_MANAGER.L1_BYTECODES_SUPPLIER()),
             _transition.l2Plan().factoryDepHashes
         );
-        // CTM-domain implementation swaps FIRST — the commit below may need setters that only
-        // exist on the implementation this very transition installs.
-        ProxyUpgradeRowLib.applyRows(CTM_PROXY_ADMIN, _transition.ctmProxyRows());
         // One argument, not four plus a cut: the CTM reads the version edge, the schedule and the
         // cut from the same pinned object, so they cannot be passed inconsistently.
         CHAIN_TYPE_MANAGER.setNewVersionUpgradeFromTransition(_transition);
@@ -359,7 +384,6 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
         if (currentProtocolVersion < newProtocolVersion) {
             revert OutdatedProtocolVersion(currentProtocolVersion, newProtocolVersion);
         }
-        ProxyUpgradeRowLib.requireRowsApplied(CTM_PROXY_ADMIN, _transition.ctmProxyRows());
     }
 
     /// @dev The shared ChainAssetHandler, read from the bound CTM's Bridgehub.

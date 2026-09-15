@@ -276,11 +276,9 @@ abstract contract RegistryObjectsFixture is Test {
                     fromRelease: address(_fromRelease),
                     newRelease: address(_newRelease),
                     upgradeEngine: _upgradeEngine,
-                    proxyUpgrades: new ProxyUpgradeRow[](CTM_CONTRACT_COUNT),
                     oldProtocolVersionDeadline: type(uint256).max,
                     upgradeTimestamp: _upgradeTimestamp,
-                    l2Plan: _plan,
-                    upgradeTimer: upgradeTimerStub
+                    l2Plan: _plan
                 })
             );
     }

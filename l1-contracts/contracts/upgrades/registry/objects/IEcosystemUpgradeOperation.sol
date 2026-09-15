@@ -2,13 +2,13 @@
 
 pragma solidity 0.8.28;
 
-import {OperationManifest} from "../RegistryTypes.sol";
+import {OperationManifest, ProxyUpgradeRow} from "../RegistryTypes.sol";
 
 /// @title IEcosystemUpgradeOperation
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Immutable description of one ecosystem upgrade: the optional ecosystem leg and the
-///         CTM transition the coordinator applies. See
+/// @notice Immutable description of one ecosystem upgrade: its three optional changes and the
+///         delay before governance may execute them. See
 ///         {protocol-docs/ecosystem-upgrade-coordination.md}.
 interface IEcosystemUpgradeOperation {
     /// @notice `keccak256(abi.encode(manifest))` — the commitment governance reviews.
@@ -20,6 +20,22 @@ interface IEcosystemUpgradeOperation {
     /// @notice The ecosystem leg's `CoreRegistry`, zero when the operation has none.
     function coreRegistry() external view returns (address);
 
-    /// @notice The transition applied to the coordinator's bound CTM.
+    /// @notice The PARTICIPATING CTM-domain rows, flattened from the enum-indexed inventory (the
+    ///         slots explicitly marked "not upgraded" are dropped). Empty when the operation
+    ///         changes no CTM-domain implementation.
+    function ctmInfrastructureRows() external view returns (ProxyUpgradeRow[] memory);
+
+    /// @notice The transition applied to the coordinator's bound CTM, zero when the operation
+    ///         moves no chain version.
     function transition() external view returns (address);
+
+    /// @notice The `GovernanceUpgradeTimer` gating stage 1. Never zero.
+    function timer() external view returns (address);
+
+    /// @notice Reverts unless the timer and every participating infrastructure row's
+    ///         implementation is deployed code.
+    /// @dev It does NOT attest that the code is the reviewed code — that is governance's approval
+    ///      of this object's member ADDRESSES, established off-chain before approval (see
+    ///      {docs/registry-driven-upgrades.md}).
+    function validate() external view;
 }

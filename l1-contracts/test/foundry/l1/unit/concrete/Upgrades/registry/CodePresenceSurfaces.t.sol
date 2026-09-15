@@ -9,6 +9,8 @@ import {CTMUpgradeExecutorFixture} from "./CTMUpgradeExecutor.t.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
 import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol";
+import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol";
+import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {
     CTMContract,
     L1EcosystemContract,
@@ -23,7 +25,7 @@ import {
 } from "contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @dev The check surface every write-once registry object exposes, so one helper can drive a
-///      release, a transition and a core registry alike.
+///      release, a transition, a core registry and an operation alike.
 interface IValidatable {
     function validate() external view;
 }
@@ -44,22 +46,23 @@ contract ValidateTargetNew {
 /// @notice `validate()` is the enforcement surface every write-once registry object exposes: it
 ///         refuses a manifest naming a member that is not deployed code (see "Validation" in
 ///         {docs/registry-driven-upgrades.md}). These tests enumerate every contract a release, a
-///         transition and a core registry name — the MANIFEST is the spec, not the objects' code —
-///         and check that emptying any ONE of them is refused with that member's own diagnostic,
-///         so no named member can be left unchecked.
-/// @dev The transition under test names every optional member (a delegate composer, a
-///      participating CTM-domain row) so the full list is exercised.
+///         transition, a core registry and an operation name — the MANIFEST is the spec, not the
+///         objects' code — and check that emptying any ONE of them is refused with that member's
+///         own diagnostic, so no named member can be left unchecked.
+/// @dev The transition under test names its optional delegate composer and the operation carries a
+///      participating CTM-domain row, so the full list is exercised.
 contract CodePresenceSurfacesTest is CTMUpgradeExecutorFixture {
     /// @dev `diamondInit`, `genesisUpgrade`, `verifier` — the release members that are not facets.
     uint256 internal constant RELEASE_FIXED_MEMBERS = 3;
-    /// @dev `upgradeEngine`, `upgradeTimer` — the transition members every manifest carries.
-    uint256 internal constant TRANSITION_FIXED_MEMBERS = 2;
+    /// @dev `upgradeEngine` — the only fixed transition member every manifest carries.
+    uint256 internal constant TRANSITION_FIXED_MEMBERS = 1;
 
     address internal implOld;
     address internal implNew;
     CoreRegistry internal coreRegistry;
-    /// @dev The fixture's default transition plus one CTM-domain row.
+    /// @dev The fixture's default transition, under an operation carrying one CTM-domain row.
     CTMTransition internal fullTransition;
+    EcosystemUpgradeOperation internal operation;
 
     function setUp() public override {
         super.setUp();
@@ -75,19 +78,15 @@ contract CodePresenceSurfacesTest is CTMUpgradeExecutorFixture {
         ecosystemInventory[uint256(L1EcosystemContract.L1Bridgehub)] = _row(address(ecosystemProxy));
         coreRegistry = new CoreRegistry(CoreRegistryManifest({proxyUpgrades: ecosystemInventory}));
 
-        TransitionManifest memory manifest = _transitionManifest(
-            777,
-            chainContractAddress.currentRelease(),
-            0,
-            L2_DELEGATE_CODE
-        );
+        fullTransition = _deployTransition(777);
         TransparentUpgradeableProxy ctmDomainProxy = new TransparentUpgradeableProxy(
             implOld,
             address(ctmProxyAdmin),
             hex""
         );
-        manifest.proxyUpgrades[uint256(CTMContract.ValidatorTimelock)] = _row(address(ctmDomainProxy));
-        fullTransition = new CTMTransition(manifest);
+        ProxyUpgradeRow[] memory ctmInventory = _emptyInventory();
+        ctmInventory[uint256(CTMContract.ValidatorTimelock)] = _row(address(ctmDomainProxy));
+        operation = _operationWithInfrastructure(ICTMTransition(address(fullTransition)), ctmInventory);
     }
 
     // ─────────────────────────────── happy path ───────────────────────────────
@@ -96,6 +95,7 @@ contract CodePresenceSurfacesTest is CTMUpgradeExecutorFixture {
         IValidatable(address(release)).validate();
         IValidatable(address(fullTransition)).validate();
         IValidatable(address(coreRegistry)).validate();
+        IValidatable(address(operation)).validate();
     }
 
     /// @dev The optional-zero member stays legal: a transition with no composer still validates,
@@ -110,6 +110,18 @@ contract CodePresenceSurfacesTest is CTMUpgradeExecutorFixture {
         manifest.l2Plan.delegateComposer = address(0);
         CTMTransition uncomposed = new CTMTransition(manifest);
         uncomposed.validate();
+    }
+
+    /// @dev Same for the operation: an all-inert infrastructure inventory leaves only the timer to
+    ///      check, and that operation still validates.
+    function test_operationWithoutInfrastructureValidates() public {
+        EcosystemUpgradeOperation bare = _deployOperation(
+            address(coreRegistry),
+            _emptyInventory(),
+            address(0),
+            _newOperationTimer()
+        );
+        bare.validate();
     }
 
     // ─────────────────────────────── every named member ───────────────────────────────
@@ -143,6 +155,22 @@ contract CodePresenceSurfacesTest is CTMUpgradeExecutorFixture {
         }
     }
 
+    /// @dev What an operation names ITSELF: the timer and every participating infrastructure row's
+    ///      implementation. The core registry and the transition are objects with their own check
+    ///      surfaces, so the operation deliberately does not walk into them.
+    function test_everyOperationMemberIsRequiredToHaveCode() public {
+        ProxyUpgradeRow[] memory rows = operation.ctmInfrastructureRows();
+        assertEq(rows.length, 1, "one participating infrastructure row");
+        address[] memory members = new address[](1 + rows.length);
+        members[0] = operation.timer();
+        for (uint256 i = 0; i < rows.length; ++i) {
+            members[1 + i] = rows[i].implNew;
+        }
+        for (uint256 i = 0; i < members.length; ++i) {
+            _assertCodelessMemberIsRefused(IValidatable(address(operation)), members[i]);
+        }
+    }
+
     // ─────────────────────────────── helpers ───────────────────────────────
 
     function _row(address _proxy) internal view returns (ProxyUpgradeRow memory) {
@@ -168,25 +196,19 @@ contract CodePresenceSurfacesTest is CTMUpgradeExecutorFixture {
         }
     }
 
-    /// @dev What a transition names, read off its manifest: engine, timer, composer, every
-    ///      participating row's implementation, and both release edges' own lists.
+    /// @dev What a transition names, read off its manifest: engine, composer, and both release
+    ///      edges' own lists.
     function _transitionMembers(TransitionManifest memory _m) internal view returns (address[] memory members) {
-        ProxyUpgradeRow[] memory rows = fullTransition.ctmProxyRows();
         address[] memory newReleaseMembers = _releaseMembers(CTMRelease(_m.newRelease).getManifest());
         address[] memory fromReleaseMembers = _releaseMembers(CTMRelease(_m.fromRelease).getManifest());
         assertTrue(_m.l2Plan.delegateComposer != address(0), "the fixture transition names a composer");
-        assertEq(rows.length, 1, "one participating CTM-domain row");
 
         members = new address[](
-            TRANSITION_FIXED_MEMBERS + 1 + rows.length + newReleaseMembers.length + fromReleaseMembers.length
+            TRANSITION_FIXED_MEMBERS + 1 + newReleaseMembers.length + fromReleaseMembers.length
         );
         uint256 next = 0;
         members[next++] = _m.upgradeEngine;
-        members[next++] = _m.upgradeTimer;
         members[next++] = _m.l2Plan.delegateComposer;
-        for (uint256 i = 0; i < rows.length; ++i) {
-            members[next++] = rows[i].implNew;
-        }
         for (uint256 i = 0; i < newReleaseMembers.length; ++i) {
             members[next++] = newReleaseMembers[i];
         }

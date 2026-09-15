@@ -69,12 +69,20 @@ struct CTMUpgradeParams {
 /// @param coordinator The `EcosystemUpgradeExecutor` the CTM executor answers to (the core prepare's
 ///        `[registry].ecosystem_upgrade_executor_addr`).
 /// @param coreRegistry The core prepare's `CoreRegistry`, zero when the upgrade has no ecosystem leg.
-/// @param transition The single CTM transition this operation applies.
+/// @param ctmInfrastructure The CTM prepare's `CTMContract`-indexed inventory, ABI-encoded
+///        (`[registry].ctm_infrastructure`); empty bytes when the upgrade changes no CTM-domain
+///        implementation.
+/// @param transition The single CTM transition this operation applies, zero when the upgrade moves
+///        no chain version.
+/// @param timer The `GovernanceUpgradeTimer` gating the operation's execution (the CTM prepare's
+///        `[registry].upgrade_timer_addr`).
 // solhint-disable-next-line gas-struct-packing
 struct ComposeOperationParams {
     address coordinator;
     address coreRegistry;
+    bytes ctmInfrastructure;
     address transition;
+    address timer;
     bytes32 create2FactorySalt;
     string outputPath;
 }

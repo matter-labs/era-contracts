@@ -27,6 +27,7 @@ import {
     ProxyUpgradeRow
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 import {
+    CTM_CONTRACT_COUNT,
     L1_ECOSYSTEM_CONTRACT_COUNT,
     L1EcosystemContract
 } from "../../../../../../../contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
@@ -111,11 +112,18 @@ contract CoreUpgradeExecutorTest is Test {
         operation = _operationNaming(address(coreRegistry));
     }
 
-    /// @dev A one-leg operation whose ecosystem leg is `_coreRegistry` (zero for none).
+    /// @dev A one-leg operation whose ecosystem leg is `_coreRegistry` (zero for none). The
+    ///      transition is a labelled stand-in — this suite drives the core executor directly and
+    ///      never reaches a coordinator stage, so nothing reads it.
     function _operationNaming(address _coreRegistry) internal returns (IEcosystemUpgradeOperation) {
         return
             new EcosystemUpgradeOperation(
-                OperationManifest({coreRegistry: _coreRegistry, transition: makeAddr("transition")})
+                OperationManifest({
+                    coreRegistry: _coreRegistry,
+                    ctmInfrastructure: new ProxyUpgradeRow[](CTM_CONTRACT_COUNT),
+                    transition: makeAddr("transition"),
+                    timer: makeAddr("timer")
+                })
             );
     }
 

@@ -358,11 +358,9 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             fromRelease: fromRelease,
             newRelease: newRelease,
             upgradeEngine: engine,
-            proxyUpgrades: _ctmProxyUpgradeRows(),
             oldProtocolVersionDeadline: UpgradeHelperLib.getOldProtocolDeadline(),
             upgradeTimestamp: 0,
-            l2Plan: authoredL2Plan(),
-            upgradeTimer: upgradeAddresses.upgradeTimer
+            l2Plan: authoredL2Plan()
         });
         // From the build ARTIFACT, which is also where the bound executor's `TRANSITION_CODEHASH`
         // came from — see {BytecodeUtils.getDeployedBytecodeHash}.
@@ -474,17 +472,23 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         return address(0);
     }
 
-    /// @notice The CTM-domain inventory the upgrade object of this run pins, indexed by
-    ///         `CTMContract` — read back from the object (the transition, or the bootstrap
-    ///         migration on the bootstrap edge) so every admin call this prepare emits renders a
-    ///         row governance reviews rather than a second, script-side definition of the swap.
-    function pinnedCTMProxyInventory() internal view virtual returns (ProxyUpgradeRow[] memory) {
-        if (upgradeAddresses.ctmTransition != address(0)) {
-            return ICTMTransition(upgradeAddresses.ctmTransition).getManifest().proxyUpgrades;
-        }
+    /// @notice The CTM-domain inventory of this edge, indexed by `CTMContract` — ONE definition,
+    ///         which both the admin calls this prepare emits and the compose step's operation are
+    ///         rendered from.
+    /// @dev The bootstrap edge reads it back off its own pinned object; a recurring edge cannot,
+    ///      because the object that pins the rows (the `EcosystemUpgradeOperation`) is deployed by
+    ///      the compose step AFTER this prepare — the prepare's `[registry].ctm_infrastructure`
+    ///      output is that step's input.
+    function ctmProxyInventory() internal view virtual returns (ProxyUpgradeRow[] memory) {
         address migration = bootstrapMigrationAddress();
-        require(migration != address(0), "no upgrade object deployed: the CTM-domain rows are read from it");
-        return RegistryBootstrapMigration(migration).getManifest().proxyUpgrades;
+        if (migration != address(0)) {
+            return RegistryBootstrapMigration(migration).getManifest().proxyUpgrades;
+        }
+        require(
+            upgradeAddresses.ctmTransition != address(0),
+            "no upgrade object deployed: the CTM-domain rows are read from it"
+        );
+        return _ctmProxyUpgradeRows();
     }
 
     /// @notice The CTM domain's bound `CTMUpgradeExecutor`: the CTM's owner once the bootstrap edge
@@ -817,7 +821,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     ///         otherwise (see "ServerNotifier: a row under a foreign admin" in
     ///         {docs/upgrade-stage-lifecycle.md}). Empty when the inventory leaves the notifier alone.
     function prepareUpgradeServerNotifierCall() public view virtual returns (Call[] memory calls) {
-        ProxyUpgradeRow memory row = pinnedCTMProxyInventory()[uint256(CTMContract.ServerNotifier)];
+        ProxyUpgradeRow memory row = ctmProxyInventory()[uint256(CTMContract.ServerNotifier)];
         if (row.implNew == address(0)) {
             return calls;
         }
@@ -999,6 +1003,13 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         vm.serializeAddress("registry", "ctm_transition_addr", upgradeAddresses.ctmTransition);
         vm.serializeAddress("registry", "ctm_release_addr", ctmAddresses.stateTransition.currentRelease);
         vm.serializeAddress("registry", "upgrade_timer_addr", upgradeAddresses.upgradeTimer);
+        // The CTM-domain rows of this edge, for the compose step to pin on the operation. A
+        // bootstrap edge composes nothing — its own object already carries them.
+        vm.serializeBytes(
+            "registry",
+            "ctm_infrastructure",
+            upgradeAddresses.ctmTransition != address(0) ? abi.encode(_ctmProxyUpgradeRows()) : bytes("")
+        );
         address bootstrapMigrationAddr = bootstrapMigrationAddress();
         vm.serializeAddress("registry", "bootstrap_migration_addr", bootstrapMigrationAddr);
         // The bound executor is named whenever it is known: after a bootstrap prepare deployed

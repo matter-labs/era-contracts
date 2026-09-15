@@ -19,7 +19,7 @@ import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/Eco
 import {ProxyUpgradeRowLib} from "contracts/upgrades/registry/libraries/ProxyUpgradeRowLib.sol";
 import {CTMContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {ProxyUpgradeRowMismatch} from "contracts/common/L1ContractErrors.sol";
-import {ProxyUpgradeRow, TransitionManifest} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
+import {ProxyUpgradeRow} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @dev Three distinct implementations so a proxy row is a real `expectedOldImpl -> implNew`
 ///      edge and a proxy can also sit at an implementation the row does not know.
@@ -48,7 +48,7 @@ contract NotifierImplOther {
 ///         executor may or may not own. Stage 1 applies such a row only when the executor OWNS
 ///         its admin and otherwise leaves it to that administrator (logged, not reverted); stage 2
 ///         requires it applied either way, read through the row's own admin.
-/// @dev Every transition here carries one row under the executor's bound admin (the
+/// @dev Every operation here carries one row under the executor's bound admin (the
 ///      `ValidatorTimelock` slot) next to the foreign row (the `ServerNotifier` slot), so the two
 ///      apply policies are observed side by side within one stage. Rows apply in inventory order,
 ///      so the bound-admin row's event always precedes the foreign row's.
@@ -92,27 +92,19 @@ contract CTMUpgradeForeignAdminRowTest is CTMUpgradeExecutorFixture {
             });
     }
 
-    /// @dev The fixture's default manifest plus the bound-admin row and the foreign-admin row.
-    function _deployTransitionWithForeignRow() internal returns (CTMTransition) {
-        TransitionManifest memory manifest = _transitionManifest(
-            777,
-            chainContractAddress.currentRelease(),
-            0,
-            L2_DELEGATE_CODE
-        );
-        manifest.proxyUpgrades[uint256(CTMContract.ValidatorTimelock)] = _row(
+    /// @dev The fixture's default transition under an operation carrying the bound-admin row and
+    ///      the foreign-admin row.
+    function _deployTransitionWithForeignRow() internal returns (CTMTransition transitionWithRows) {
+        transitionWithRows = _deployTransition(777);
+        ProxyUpgradeRow[] memory inventory = _emptyInventory();
+        inventory[uint256(CTMContract.ValidatorTimelock)] = _row(
             address(ctmDomainProxy),
             implOld,
             implNew,
             ProxyAdmin(address(0))
         );
-        manifest.proxyUpgrades[uint256(CTMContract.ServerNotifier)] = _row(
-            address(notifierProxy),
-            implOld,
-            implNew,
-            notifierAdmin
-        );
-        return new CTMTransition(manifest);
+        inventory[uint256(CTMContract.ServerNotifier)] = _row(address(notifierProxy), implOld, implNew, notifierAdmin);
+        _operationWithInfrastructure(ICTMTransition(address(transitionWithRows)), inventory);
     }
 
     function _liveImpl(ProxyAdmin _admin, TransparentUpgradeableProxy _proxy) internal view returns (address) {
@@ -206,7 +198,7 @@ contract CTMUpgradeForeignAdminRowTest is CTMUpgradeExecutorFixture {
 
         _assertLifecycleIdle();
         assertEq(_liveImpl(notifierAdmin, notifierProxy), implNew);
-        ctmExecutor.validateTransitionApplied(ICTMTransition(address(t)));
+        ctmExecutor.validateOperationApplied(operation);
     }
 
     /// @dev The production ordering: the administrator's call lands BEFORE the bundle, so stage 1
@@ -225,7 +217,7 @@ contract CTMUpgradeForeignAdminRowTest is CTMUpgradeExecutorFixture {
 
         _stage2(t);
         _assertLifecycleIdle();
-        ctmExecutor.validateTransitionApplied(ICTMTransition(address(t)));
+        ctmExecutor.validateOperationApplied(_operationFor(t));
     }
 
     /// @dev Not owned, the row is not source-checked by stage 1 — it is the administrator's. An
@@ -285,7 +277,7 @@ contract CTMUpgradeForeignAdminRowTest is CTMUpgradeExecutorFixture {
 
         _stage2(t);
         _assertLifecycleIdle();
-        ctmExecutor.validateTransitionApplied(ICTMTransition(address(t)));
+        ctmExecutor.validateOperationApplied(_operationFor(t));
     }
 
     /// @dev Owned and already at `implNew`: the same idempotence as a bound-admin row — skipped
@@ -342,9 +334,10 @@ contract CTMUpgradeForeignAdminRowTest is CTMUpgradeExecutorFixture {
     /// @dev A transparent proxy answers `implementation()` only to its own admin, so the bound
     ///      admin cannot even inspect the notifier; the post-state check reads the row through the
     ///      admin it names and therefore works for foreign rows.
-    function test_validateTransitionApplied_readsForeignRowThroughItsOwnAdmin() public {
+    function test_validateOperationApplied_readsForeignRowThroughItsOwnAdmin() public {
         CTMTransition t = _deployTransitionWithForeignRow();
         _prepareAndExecute(t);
+        EcosystemUpgradeOperation operation = _operationFor(t);
 
         vm.expectRevert();
         ctmProxyAdmin.getProxyImplementation(ITransparentUpgradeableProxy(address(notifierProxy)));
@@ -352,11 +345,11 @@ contract CTMUpgradeForeignAdminRowTest is CTMUpgradeExecutorFixture {
         vm.expectRevert(
             abi.encodeWithSelector(ProxyUpgradeRowMismatch.selector, address(notifierProxy), implNew, implOld)
         );
-        ctmExecutor.validateTransitionApplied(ICTMTransition(address(t)));
+        ctmExecutor.validateOperationApplied(operation);
 
         _chainAdminMovesNotifier(implNew);
         // A view over live state — anyone may run the post-state check.
         vm.prank(makeAddr("stranger"));
-        ctmExecutor.validateTransitionApplied(ICTMTransition(address(t)));
+        ctmExecutor.validateOperationApplied(operation);
     }
 }

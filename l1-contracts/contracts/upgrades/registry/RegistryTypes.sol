@@ -102,22 +102,14 @@ struct AuthoredL2Plan {
     address delegateComposer;
 }
 
+/// @notice What chains upgrade FROM and TO, and by when — nothing else. Infrastructure changes
+///         and the operation's execution delay live on {OperationManifest}; see
+///         {protocol-docs/ecosystem-upgrade-coordination.md}.
 /// @param upgradeEngine The diamond cut's init delegatecall target implementing
 ///        `upgradeFromTransition` — the registry-model name for what deploy tooling calls the
 ///        per-version "default upgrade" contract (`DefaultUpgrade` and its versioned subclasses).
-/// @param proxyUpgrades The CTM-DOMAIN inventory, indexed by {CTMContract} (same slot semantics
-///        and construction-time length check — `CTM_CONTRACT_COUNT` — as
-///        {CoreRegistryManifest}): implementation swaps for the CTM proxy itself and the
-///        per-CTM proxies under its own ProxyAdmin. Applied by the CTM-bound executor BEFORE
-///        the version commit, so a transition whose commit needs the new CTM implementation
-///        carries that swap itself. Ecosystem singletons (bridges, Bridgehub, MessageRoot) are
-///        NOT expressible here — a CTM is one of possibly many and upgrades on its own cadence;
-///        shared contracts belong to the core registry. All slots zero when the CTM domain's
-///        implementations do not change.
-/// @param upgradeTimer The `GovernanceUpgradeTimer` gating stage 1: stage 0 starts it, stage 1
-///        requires its deadline. Bound to the coordinating `EcosystemUpgradeExecutor`
-///        (`TIMER_GOVERNANCE`), so nobody else can start it; its `owner` keeps the bounded
-///        extension right. Mandatory.
+/// @param oldProtocolVersionDeadline When the departing version stops being usable.
+/// @param upgradeTimestamp The earliest a chain may execute its own diamond upgrade.
 // solhint-disable-next-line gas-struct-packing
 struct TransitionManifest {
     uint256 oldProtocolVersion;
@@ -125,11 +117,9 @@ struct TransitionManifest {
     address fromRelease;
     address newRelease;
     address upgradeEngine;
-    ProxyUpgradeRow[] proxyUpgrades;
     uint256 oldProtocolVersionDeadline;
     uint256 upgradeTimestamp;
     AuthoredL2Plan l2Plan;
-    address upgradeTimer;
 }
 
 /// @notice One proxy's upgrade row: a SOURCE-CHECKED edge, not just a target.
@@ -162,11 +152,32 @@ struct ProxyUpgradeRow {
     ProxyAdmin admin;
 }
 
-/// @notice The optional core upgrade and the transition applied to the coordinator's bound CTM.
+/// @notice One ecosystem upgrade: what changes, and when governance may execute it. Each of the
+///         three changes is OPTIONAL, but an operation that changes nothing is refused at
+///         construction — see {protocol-docs/ecosystem-upgrade-coordination.md}.
+/// @param coreRegistry The ecosystem leg's `CoreRegistry`; zero when no shared singleton changes.
+/// @param ctmInfrastructure The CTM-DOMAIN inventory, indexed by {CTMContract} (same slot
+///        semantics and construction-time length check — `CTM_CONTRACT_COUNT` — as
+///        {CoreRegistryManifest}): implementation swaps for the CTM proxy itself and the per-CTM
+///        proxies under its own ProxyAdmin. Applied by the CTM-bound executor BEFORE the version
+///        commit, so an operation whose commit needs the new CTM implementation carries that swap
+///        beside it. Ecosystem singletons (bridges, Bridgehub, MessageRoot) are NOT expressible
+///        here — a CTM is one of possibly many and upgrades on its own cadence; shared contracts
+///        belong to the core registry. All slots zero when the CTM domain's implementations do
+///        not change.
+/// @param transition The `CTMTransition` applied to the coordinator's bound CTM; zero when the
+///        operation moves no chain version.
+/// @param timer The `GovernanceUpgradeTimer` gating stage 1: stage 0 starts it, stage 1 requires
+///        its deadline. Bound to the coordinating `EcosystemUpgradeExecutor`
+///        (`TIMER_GOVERNANCE`), so nobody else can start it; its `owner` keeps the bounded
+///        extension right. Mandatory — every operation has an execution delay.
 // Multi-CTM extension: protocol-docs/ecosystem-upgrade-coordination.md#future-multi-ctm-extension
+// solhint-disable-next-line gas-struct-packing
 struct OperationManifest {
     address coreRegistry;
+    ProxyUpgradeRow[] ctmInfrastructure;
     address transition;
+    address timer;
 }
 
 /// @notice Everything a core registry instance pins, set exactly once at construction.

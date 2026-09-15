@@ -12,7 +12,8 @@ import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/Ec
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
-import {OperationManifest} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {OperationManifest, ProxyUpgradeRow} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {CTM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 import {Create2FactoryUtils} from "../utils/deploy/Create2FactoryUtils.s.sol";
 import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
@@ -20,7 +21,8 @@ import {ComposeOperationParams} from "./default-upgrade/UpgradeParams.sol";
 
 /// @notice The compose step of a registry-driven upgrade, run once every prepare has finished:
 ///         deploys the write-once `EcosystemUpgradeOperation` over the core prepare's registry and
-///         the CTM prepare's transition, checks it against the live coordinator
+///         the CTM prepare's infrastructure rows, transition and timer, checks it against the live
+///         coordinator
 ///         and executors, and emits the upgrade's three governance calls —
 ///         `EcosystemUpgradeExecutor.stage0/1/2(operation)`. Nothing here is authored: the
 ///         operation is the association of objects the prepares already deployed. See
@@ -36,7 +38,10 @@ contract ComposeUpgradeOperation is Script, Create2FactoryUtils {
         setCreate2Salt(_params.create2FactorySalt);
         EcosystemUpgradeExecutor coordinator = EcosystemUpgradeExecutor(payable(_params.coordinator));
         require(address(coordinator).code.length != 0, "coordinator has no code");
-        require(_params.transition != address(0), "an operation needs a CTM transition");
+        ProxyUpgradeRow[] memory ctmInfrastructure = _params.ctmInfrastructure.length == 0
+            ? new ProxyUpgradeRow[](CTM_CONTRACT_COUNT)
+            : abi.decode(_params.ctmInfrastructure, (ProxyUpgradeRow[]));
+        require(ctmInfrastructure.length == CTM_CONTRACT_COUNT, "the CTM inventory is not the enum's length");
 
         // Every check the coordinator's stage 0 makes, evaluated now: a drifted binding or pin
         // must fail here, not with the whole upgrade already reviewed and scheduled.
@@ -51,19 +56,30 @@ contract ComposeUpgradeOperation is Script, Create2FactoryUtils {
         CTMUpgradeExecutor executor = CTMUpgradeExecutor(payable(address(coordinator.ctmExecutor())));
         require(address(executor) != address(0), "coordinator has no CTM executor");
         require(executor.coordinator() == address(coordinator), "CTM executor: wrong coordinator");
+        if (_params.transition != address(0)) {
+            require(
+                _params.transition.codehash == executor.TRANSITION_CODEHASH(),
+                "transition: not the code its executor pins"
+            );
+            ICTMTransition(_params.transition).validate();
+        }
         require(
-            _params.transition.codehash == executor.TRANSITION_CODEHASH(),
-            "transition: not the code its executor pins"
+            GovernanceUpgradeTimer(_params.timer).TIMER_GOVERNANCE() == address(coordinator),
+            "operation timer: not bound to the coordinator"
         );
-        address timerGovernance = GovernanceUpgradeTimer(ICTMTransition(_params.transition).upgradeTimer())
-            .TIMER_GOVERNANCE();
-        require(timerGovernance == address(coordinator), "transition timer: not bound to the coordinator");
 
         // From the build ARTIFACT, which is also where the coordinator's `OPERATION_CODEHASH` came
         // from — see {BytecodeUtils.getDeployedBytecodeHash}.
         operation = deployViaCreate2AndNotify(
             BytecodeUtils.readBytecodeL1("EcosystemUpgradeOperation.sol", "EcosystemUpgradeOperation"),
-            abi.encode(OperationManifest({coreRegistry: _params.coreRegistry, transition: _params.transition})),
+            abi.encode(
+                OperationManifest({
+                    coreRegistry: _params.coreRegistry,
+                    ctmInfrastructure: ctmInfrastructure,
+                    transition: _params.transition,
+                    timer: _params.timer
+                })
+            ),
             "EcosystemUpgradeOperation"
         );
         require(

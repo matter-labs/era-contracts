@@ -31,9 +31,24 @@ import {
 ///      object and the live notifier proxy.
 contract ServerNotifierRowCallHarness is DefaultCTMUpgrade {
     address internal migration;
+    /// @dev Stands in for what a version prepare builds from its own deployments: the rows the
+    ///      compose step will pin on the operation over this edge's transition. Held ABI-encoded —
+    ///      the legacy codegen pipeline cannot copy a struct array into storage.
+    bytes internal encodedInventory;
 
     function setCTMTransition(address _transition) external {
         upgradeAddresses.ctmTransition = _transition;
+    }
+
+    function setInventory(ProxyUpgradeRow[] memory _inventory) external {
+        encodedInventory = abi.encode(_inventory);
+    }
+
+    function _ctmProxyUpgradeRows() internal view override returns (ProxyUpgradeRow[] memory) {
+        if (encodedInventory.length == 0) {
+            return new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
+        }
+        return abi.decode(encodedInventory, (ProxyUpgradeRow[]));
     }
 
     function setBootstrapMigration(address _migration) external {
@@ -111,7 +126,7 @@ contract ServerNotifierRowCallTest is CTMUpgradeExecutorFixture {
 
     function test_plainRowRendersTheApplyRowsUpgradeCall() public {
         ProxyUpgradeRow memory row = _notifierRow(implNew, false, notifierAdmin);
-        harness.setCTMTransition(address(_transitionWith(row)));
+        _recurringEdgeWith(row);
 
         Call[] memory calls = harness.prepareUpgradeServerNotifierCall();
         assertEq(calls.length, 1, "one admin call");
@@ -131,7 +146,7 @@ contract ServerNotifierRowCallTest is CTMUpgradeExecutorFixture {
     function test_reinitializingRowRendersUpgradeAndCall() public {
         address reinitImpl = address(new MockProxyUpgradeInitImpl());
         ProxyUpgradeRow memory row = _notifierRow(reinitImpl, true, notifierAdmin);
-        harness.setCTMTransition(address(_transitionWith(row)));
+        _recurringEdgeWith(row);
 
         Call[] memory calls = harness.prepareUpgradeServerNotifierCall();
         assertEq(calls.length, 1, "one admin call");
@@ -184,7 +199,7 @@ contract ServerNotifierRowCallTest is CTMUpgradeExecutorFixture {
 
     function test_adminCallsSectionRecordsTheRowAndItsAdministrator() public {
         ProxyUpgradeRow memory row = _notifierRow(implNew, false, notifierAdmin);
-        harness.setCTMTransition(address(_transitionWith(row)));
+        _recurringEdgeWith(row);
         string memory outputPath = _outputPath("with-row");
         harness.setOutputPath(outputPath);
 
@@ -236,7 +251,7 @@ contract ServerNotifierRowCallTest is CTMUpgradeExecutorFixture {
     }
 
     function test_revertWhen_rowNamesNoAdministrator() public {
-        harness.setCTMTransition(address(_transitionWith(_notifierRow(implNew, false, ProxyAdmin(address(0))))));
+        _recurringEdgeWith(_notifierRow(implNew, false, ProxyAdmin(address(0))));
         vm.expectRevert(bytes("the pinned ServerNotifier row names no administrator"));
         harness.prepareUpgradeServerNotifierCall();
     }
@@ -245,7 +260,7 @@ contract ServerNotifierRowCallTest is CTMUpgradeExecutorFixture {
     ///      emit a call that administrator cannot make.
     function test_revertWhen_rowAdministratorIsNotTheLiveProxyAdmin() public {
         ProxyAdmin otherAdmin = new ProxyAdmin();
-        harness.setCTMTransition(address(_transitionWith(_notifierRow(implNew, false, otherAdmin))));
+        _recurringEdgeWith(_notifierRow(implNew, false, otherAdmin));
         harness.setOutputPath(_outputPath("other-admin"));
 
         vm.expectRevert(bytes("the pinned ServerNotifier row names an administrator other than the live proxy's"));
@@ -274,15 +289,12 @@ contract ServerNotifierRowCallTest is CTMUpgradeExecutorFixture {
         inventory[uint256(CTMContract.ServerNotifier)] = _row;
     }
 
-    function _transitionWith(ProxyUpgradeRow memory _row) internal returns (CTMTransition) {
-        TransitionManifest memory manifest = _transitionManifest(
-            777,
-            chainContractAddress.currentRelease(),
-            0,
-            L2_DELEGATE_CODE
-        );
-        manifest.proxyUpgrades = _inventoryWith(_row);
-        return new CTMTransition(manifest);
+    /// @dev The recurring-edge setup: this edge's transition, plus the inventory the compose step
+    ///      would pin on the operation over it — the prepare renders the admin call from that one
+    ///      definition.
+    function _recurringEdgeWith(ProxyUpgradeRow memory _row) internal {
+        harness.setCTMTransition(address(transition));
+        harness.setInventory(_inventoryWith(_row));
     }
 
     /// @dev An L1-only bootstrap edge over the fixture's objects; the notifier row is its one

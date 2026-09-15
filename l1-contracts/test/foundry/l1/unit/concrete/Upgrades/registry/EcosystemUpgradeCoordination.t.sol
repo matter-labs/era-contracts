@@ -37,6 +37,7 @@ import {
     ExecutorCoordinatorMismatch,
     UpgradeLifecycleBusy,
     RegistryTargetHasNoCode,
+    OperationChangesNothing,
     OperationNotPending,
     ProxyUpgradeRowMismatch,
     Unauthorized,
@@ -252,8 +253,39 @@ contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
         assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)));
     }
 
-    function test_revertWhen_operationHasNoTransition() public {
-        vm.expectRevert(ZeroAddress.selector);
-        _deployOperation(address(coreRegistry), address(0));
+    /// @dev A core-only operation needs no chain-version edge, and the CTM domain is STILL
+    ///      reserved and its migrations paused for it — the conservative pause policy of
+    ///      {protocol-docs/ecosystem-upgrade-coordination.md}: whether a CTM change rides along is
+    ///      not something the coordinator infers a safe migration window from.
+    function test_coreOnlyOperation_stillReservesTheCTMAndPausesMigrations() public {
+        EcosystemUpgradeOperation operation = _deployOperation(address(coreRegistry), address(0));
+        uint256 ctmVersionBefore = chainContractAddress.protocolVersion();
+
+        vm.prank(governor);
+        coordinator.stage0(operation);
+        assertEq(address(ctmExecutor.activeOperation()), address(operation), "the CTM domain is reserved");
+        assertEq(address(ctmExecutor.reservedTransition()), address(0), "with no transition of its own");
+        assertTrue(chainAssetHandler.migrationPausedFor(address(chainContractAddress)), "migrations are paused");
+
+        vm.prank(governor);
+        coordinator.stage1(operation);
+        assertEq(
+            ecosystemProxyAdmin.getProxyImplementation(ITransparentUpgradeableProxy(address(ecosystemProxy))),
+            implNew,
+            "the ecosystem leg applied"
+        );
+        assertEq(chainContractAddress.protocolVersion(), ctmVersionBefore, "no chain-version edge was bought");
+
+        vm.prank(governor);
+        coordinator.stage2(operation);
+        assertEq(address(ctmExecutor.activeOperation()), address(0), "the reservation is released");
+        assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)), "migrations resume");
+    }
+
+    function test_revertWhen_operationChangesNothing() public {
+        // The timer is deployed first: `expectRevert` applies to the very next call.
+        address timer = _newOperationTimer();
+        vm.expectRevert(OperationChangesNothing.selector);
+        _deployOperation(address(0), _emptyInventory(), address(0), timer);
     }
 }

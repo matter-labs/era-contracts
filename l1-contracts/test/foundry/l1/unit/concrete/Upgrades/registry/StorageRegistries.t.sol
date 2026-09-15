@@ -6,6 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol";
+import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol";
 import {MockSelfDescribingFacet} from "contracts/dev-contracts/test/MockSelfDescribingFacet.sol";
 import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 
@@ -43,6 +44,7 @@ import {
     RegistryInventoryLengthMismatch,
     RegistryMemberHasNoFixedAddress,
     RegistryTargetHasNoCode,
+    OperationChangesNothing,
     RegistryUnknownKey,
     SameReleaseTransitionHasPayload,
     TransitionDeadlineBeforeUpgrade,
@@ -56,6 +58,7 @@ import {
 import {
     AuthoredL2Plan,
     CoreRegistryManifest,
+    OperationManifest,
     ProxyUpgradeRow,
     GenesisFacet,
     L2UpgradePlan,
@@ -245,8 +248,6 @@ contract StorageRegistriesTest is Test {
     }
 
     function _transitionManifest() internal view returns (TransitionManifest memory manifest) {
-        // All CTM-domain inventory slots inert: this hop changes chain state, not the CTM itself.
-        ProxyUpgradeRow[] memory noProxyUpgrades = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
         return
             TransitionManifest({
                 oldProtocolVersion: OLD_VERSION,
@@ -254,12 +255,9 @@ contract StorageRegistriesTest is Test {
                 fromRelease: address(fromRelease),
                 newRelease: address(newRelease),
                 upgradeEngine: upgradeEngine,
-                proxyUpgrades: noProxyUpgrades,
                 oldProtocolVersionDeadline: type(uint256).max,
                 upgradeTimestamp: 1234567,
-                l2Plan: _l2Plan(),
-                // No ecosystem leg by default; the timer is mandatory.
-                upgradeTimer: upgradeTimer
+                l2Plan: _l2Plan()
             });
     }
 
@@ -614,27 +612,78 @@ contract StorageRegistriesTest is Test {
         new CTMTransition(manifest);
     }
 
-    // ─────────────────────────── lifecycle inputs (timer, ecosystem leg) ───────────────────────────
+    // ─────────────────────────── operation shape ───────────────────────────
 
-    function test_revertWhen_upgradeTimerZero() public {
-        // Stage 1 is gated on the timer's deadline, so a transition without one cannot exist.
-        TransitionManifest memory manifest = _transitionManifest();
-        manifest.upgradeTimer = address(0);
+    function test_revertWhen_operationTimerZero() public {
+        // Stage 1 is gated on the timer's deadline, so an operation without one cannot exist.
+        OperationManifest memory manifest = _operationManifest();
+        manifest.timer = address(0);
 
         vm.expectRevert(ZeroAddress.selector);
-        new CTMTransition(manifest);
+        new EcosystemUpgradeOperation(manifest);
     }
 
-    function test_revertWhen_transitionTimerHasNoCode() public {
-        // Stage 1 calls `checkDeadline()` on the timer, so a manifest naming an address that is
-        // not a deployed contract has to be refused before the transition is committed.
-        TransitionManifest memory manifest = _transitionManifest();
-        CTMTransition committed = new CTMTransition(manifest);
-        assertEq(committed.upgradeTimer(), upgradeTimer, "the timer is served like every other member");
+    function test_revertWhen_operationTimerHasNoCode() public {
+        // Stage 1 calls `checkDeadline()` on the timer, and a call to a codeless address returning
+        // nothing would SUCCEED silently — so the operation's check surface refuses it.
+        EcosystemUpgradeOperation committed = new EcosystemUpgradeOperation(_operationManifest());
+        assertEq(committed.timer(), upgradeTimer, "the timer is served like every other member");
 
         vm.etch(upgradeTimer, "");
         vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, upgradeTimer));
         committed.validate();
+    }
+
+    /// @dev An operation that changes nothing is a mistake, not an upgrade — and the mere presence
+    ///      of an all-inert inventory must not make it look like one that changes something.
+    function test_revertWhen_operationChangesNothing() public {
+        OperationManifest memory manifest = _operationManifest();
+        manifest.transition = address(0);
+
+        vm.expectRevert(OperationChangesNothing.selector);
+        new EcosystemUpgradeOperation(manifest);
+    }
+
+    /// @dev Each change on its own is a complete operation.
+    function test_operationWithOnlyACoreChange() public {
+        OperationManifest memory manifest = _operationManifest();
+        manifest.transition = address(0);
+        manifest.coreRegistry = address(coreRegistry);
+
+        EcosystemUpgradeOperation operation = new EcosystemUpgradeOperation(manifest);
+        assertEq(operation.coreRegistry(), address(coreRegistry));
+        assertEq(operation.transition(), address(0));
+        assertEq(operation.ctmInfrastructureRows().length, 0, "no infrastructure row");
+        assertEq(operation.manifestHash(), keccak256(abi.encode(manifest)));
+    }
+
+    function test_operationWithOnlyInfrastructure() public {
+        OperationManifest memory manifest = _operationManifest();
+        manifest.transition = address(0);
+        manifest.ctmInfrastructure = _ctmInventoryWithTwoRows();
+
+        EcosystemUpgradeOperation operation = new EcosystemUpgradeOperation(manifest);
+        assertEq(operation.coreRegistry(), address(0));
+        assertEq(operation.transition(), address(0), "no chain-version edge is bought for an infrastructure change");
+        assertEq(operation.ctmInfrastructureRows().length, 2, "both participating slots become rows");
+        operation.validate();
+    }
+
+    function test_operationWithOnlyATransition() public {
+        EcosystemUpgradeOperation operation = new EcosystemUpgradeOperation(_operationManifest());
+        assertEq(operation.coreRegistry(), address(0));
+        assertEq(operation.transition(), address(transition));
+        assertEq(operation.ctmInfrastructureRows().length, 0, "no infrastructure row");
+    }
+
+    function test_revertWhen_operationInventoryLengthMismatch() public {
+        OperationManifest memory manifest = _operationManifest();
+        manifest.ctmInfrastructure = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT - 1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(RegistryInventoryLengthMismatch.selector, CTM_CONTRACT_COUNT, CTM_CONTRACT_COUNT - 1)
+        );
+        new EcosystemUpgradeOperation(manifest);
     }
 
     // ─────────────────────────── L2 plan shape ───────────────────────────
@@ -1227,33 +1276,50 @@ contract StorageRegistriesTest is Test {
     /// @dev A row's `admin` rides the manifest into the flattened rows unchanged: zero for rows
     ///      under the applying executor's bound admin, the named admin otherwise — and it is part
     ///      of the committed manifest hash.
-    function test_transitionRowsCarryTheirNamedAdmin() public {
-        address ctmImplNew = _deployedStub("ctmImplNew");
-        address notifierImplNew = _deployedStub("notifierImplNew");
-        ProxyAdmin notifierAdmin = ProxyAdmin(makeAddr("notifierAdmin"));
-        TransitionManifest memory manifest = _transitionManifest();
-        manifest.proxyUpgrades[uint256(CTMContract.ChainTypeManager)] = ProxyUpgradeRow({
-            proxy: address(0xC001),
-            expectedOldImpl: address(0xC101),
-            implNew: ctmImplNew,
-            callInitializeUpgrade: false,
-            admin: ProxyAdmin(address(0))
-        });
-        manifest.proxyUpgrades[uint256(CTMContract.ServerNotifier)] = ProxyUpgradeRow({
-            proxy: address(0xC002),
-            expectedOldImpl: address(0xC102),
-            implNew: notifierImplNew,
-            callInitializeUpgrade: false,
-            admin: notifierAdmin
-        });
+    function test_operationRowsCarryTheirNamedAdmin() public {
+        OperationManifest memory manifest = _operationManifest();
+        manifest.ctmInfrastructure = _ctmInventoryWithTwoRows();
 
-        CTMTransition withRows = new CTMTransition(manifest);
-        ProxyUpgradeRow[] memory rows = withRows.ctmProxyRows();
+        EcosystemUpgradeOperation withRows = new EcosystemUpgradeOperation(manifest);
+        ProxyUpgradeRow[] memory rows = withRows.ctmInfrastructureRows();
         assertEq(rows.length, 2, "both participating slots become rows, in inventory order");
         assertEq(rows[0].proxy, address(0xC001));
         assertEq(address(rows[0].admin), address(0), "a bound-admin row names no admin");
         assertEq(rows[1].proxy, address(0xC002));
-        assertEq(address(rows[1].admin), address(notifierAdmin), "the notifier row names its own admin");
+        assertEq(address(rows[1].admin), makeAddr("notifierAdmin"), "the notifier row names its own admin");
         assertEq(withRows.manifestHash(), keccak256(abi.encode(manifest)), "the admin is part of the commitment");
+    }
+
+    // ─────────────────────────── operation fixtures ───────────────────────────
+
+    /// @dev The default operation: the fixture transition, no ecosystem leg, no infrastructure.
+    function _operationManifest() internal view returns (OperationManifest memory) {
+        return
+            OperationManifest({
+                coreRegistry: address(0),
+                ctmInfrastructure: new ProxyUpgradeRow[](CTM_CONTRACT_COUNT),
+                transition: address(transition),
+                timer: upgradeTimer
+            });
+    }
+
+    /// @dev Two participating CTM-domain slots: the CTM itself under the executor's bound admin,
+    ///      and the ServerNotifier under its own.
+    function _ctmInventoryWithTwoRows() internal returns (ProxyUpgradeRow[] memory inventory) {
+        inventory = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
+        inventory[uint256(CTMContract.ChainTypeManager)] = ProxyUpgradeRow({
+            proxy: address(0xC001),
+            expectedOldImpl: address(0xC101),
+            implNew: _deployedStub("ctmImplNew"),
+            callInitializeUpgrade: false,
+            admin: ProxyAdmin(address(0))
+        });
+        inventory[uint256(CTMContract.ServerNotifier)] = ProxyUpgradeRow({
+            proxy: address(0xC002),
+            expectedOldImpl: address(0xC102),
+            implNew: _deployedStub("notifierImplNew"),
+            callInitializeUpgrade: false,
+            admin: ProxyAdmin(makeAddr("notifierAdmin"))
+        });
     }
 }

@@ -8,7 +8,8 @@ import {ChainTypeManagerTest} from "../../state-transition/ChainTypeManager/_Cha
 import {RegistryDrivenUpgradeTestBase} from "./RegistryDrivenUpgrade.t.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
-import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
+import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
+import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
@@ -86,7 +87,7 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
         UnrelatedState memory before = _snapshot();
         address adminV33 = address(new AdminFacet(block.chainid, RollupDAManager(address(0))));
         CTMRelease target = _release(adminV33, before.verifier);
-        CTMTransition facetOnly = _transition(V32, V33, transitionV32.newRelease(), address(target), _noRows());
+        CTMTransition facetOnly = _transition(V32, V33, transitionV32.newRelease(), address(target));
         assertEq(facetOnly.l2Plan().deployments.length, 0, "an unchanged L2 table derives no L2 deployment");
 
         _runHop(facetOnly);
@@ -111,7 +112,7 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
         UnrelatedState memory before = _snapshot();
         address verifierNext = address(new AcceptingVerifier());
         CTMRelease target = _release(address(0), verifierNext);
-        CTMTransition verifierOnly = _transition(V32, V33, transitionV32.newRelease(), address(target), _noRows());
+        CTMTransition verifierOnly = _transition(V32, V33, transitionV32.newRelease(), address(target));
         assertEq(verifierOnly.l2Plan().deployments.length, 0, "an unchanged L2 table derives no L2 deployment");
 
         _runHop(verifierOnly);
@@ -131,32 +132,15 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
     function test_validatorTimelockOnlyPatch_swapsOneProxyAndNothingElse() public {
         _runHop(transitionV32);
         UnrelatedState memory before = _snapshot();
-        // The timelock proxy lives under the executor's bound CTM-domain ProxyAdmin, which the
-        // executor must own to apply the row (the bootstrap edge hands that admin over).
-        ProxyAdmin ctmProxyAdmin = ctmExecutor.CTM_PROXY_ADMIN();
-        address implOld = address(new ValidatorTimelock(address(bridgehub)));
-        address implNew = address(new ValidatorTimelock(address(bridgehub)));
-        TransparentUpgradeableProxy timelock = new TransparentUpgradeableProxy(implOld, address(ctmProxyAdmin), hex"");
-        ctmProxyAdmin.transferOwnership(address(ctmExecutor));
-        ProxyUpgradeRow[] memory rows = _noRows();
-        rows[uint256(CTMContract.ValidatorTimelock)] = ProxyUpgradeRow({
-            proxy: address(timelock),
-            expectedOldImpl: implOld,
-            implNew: implNew,
-            callInitializeUpgrade: false,
-            admin: ProxyAdmin(address(0))
-        });
+        (TransparentUpgradeableProxy timelock, , address implNew, ProxyUpgradeRow[] memory rows) = _timelockRowFixture();
         address release = transitionV32.newRelease();
-        CTMTransition timelockOnly = _transition(V32, V32_PATCH_1, release, release, rows);
+        CTMTransition timelockOnly = _transition(V32, V32_PATCH_1, release, release);
+        _operationWithInfrastructure(ICTMTransition(address(timelockOnly)), rows);
         assertEq(timelockOnly.l2Plan().deployments.length, 0, "a same-release patch has no L2 side");
 
         _runHop(timelockOnly);
 
-        assertEq(
-            address(uint160(uint256(vm.load(address(timelock), EIP1967_IMPLEMENTATION_SLOT)))),
-            implNew,
-            "the timelock proxy points at the new implementation"
-        );
+        assertEq(_liveImpl(timelock), implNew, "the timelock proxy points at the new implementation");
         assertEq(IGetters(chainAddress).getProtocolVersion(), V32_PATCH_1, "the chain crossed the patch edge");
         assertEq(chainContractAddress.protocolVersion(), V32_PATCH_1, "the CTM committed the patch edge");
         _assertFacetsUnchanged(before);
@@ -165,6 +149,81 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
         assertEq(chainContractAddress.currentRelease(), before.currentRelease, "a patch keeps the release");
         assertEq(IGetters(chainAddress).getL2SystemContractsUpgradeTxHash(), bytes32(0), "no L2 transaction");
     }
+
+    /// @notice THE decoupling test: replacing an ecosystem singleton behind a CTM-domain proxy is
+    ///         an operation with NO transition at all, so it costs no chain-version edge. Nothing
+    ///         about what any chain runs moves — see "Infrastructure-only operations" in
+    ///         {protocol-docs/ecosystem-upgrade-coordination.md}.
+    function test_validatorTimelockOnlyOperation_movesNoProtocolVersion() public {
+        // Two hops first, so there is a real committed transition, a real pending L2 upgrade and a
+        // real old-version deadline for the infrastructure-only operation to leave alone.
+        _runHop(transitionV32);
+        _runHop(transitionV33);
+        UnrelatedState memory before = _snapshot();
+        uint256 ctmVersionBefore = chainContractAddress.protocolVersion();
+        uint256 chainVersionBefore = IGetters(chainAddress).getProtocolVersion();
+        bytes32 pendingL2TxBefore = IGetters(chainAddress).getL2SystemContractsUpgradeTxHash();
+        uint256 v32DeadlineBefore = chainContractAddress.protocolVersionDeadline(V32);
+        uint256 v33DeadlineBefore = chainContractAddress.protocolVersionDeadline(V33);
+        address committedForV32 = chainContractAddress.upgradeTransition(V32);
+
+        (TransparentUpgradeableProxy timelock, address implOld, address implNew, ProxyUpgradeRow[] memory rows) =
+            _timelockRowFixture();
+        assertEq(_liveImpl(timelock), implOld, "fixture: the proxy starts at the old implementation");
+        EcosystemUpgradeOperation operation = _deployOperation(
+            address(0),
+            rows,
+            address(0),
+            _newOperationTimer()
+        );
+        assertEq(operation.transition(), address(0), "an infrastructure-only operation carries no transition");
+
+        vm.startPrank(governor);
+        coordinator.stage0(operation);
+        // Migrations are paused for an infrastructure-only operation too (the conservative
+        // policy): implementations move under chains that could otherwise be migrating.
+        assertTrue(
+            chainAssetHandler.migrationPausedFor(address(chainContractAddress)),
+            "stage 0 must pause migrations even without a transition"
+        );
+        coordinator.stage1(operation);
+        coordinator.stage2(operation);
+        vm.stopPrank();
+
+        // The one thing that changed.
+        assertEq(_liveImpl(timelock), implNew, "the timelock proxy points at the new implementation");
+        ctmExecutor.validateOperationApplied(operation);
+
+        // Everything a chain-version edge would have moved, unmoved.
+        assertEq(chainContractAddress.protocolVersion(), ctmVersionBefore, "the CTM version must not move");
+        assertEq(chainContractAddress.currentRelease(), before.currentRelease, "currentRelease must not move");
+        assertEq(IGetters(chainAddress).getProtocolVersion(), chainVersionBefore, "no chain version may move");
+        assertEq(chainContractAddress.protocolVersionDeadline(V32), v32DeadlineBefore, "v32's deadline must not move");
+        assertEq(chainContractAddress.protocolVersionDeadline(V33), v33DeadlineBefore, "v33's deadline must not move");
+        assertEq(chainContractAddress.upgradeTransition(V32), committedForV32, "no commit may change");
+        assertEq(
+            chainContractAddress.upgradeTransition(ctmVersionBefore),
+            address(0),
+            "no transition may be committed for the current version"
+        );
+        assertEq(
+            IGetters(chainAddress).getL2SystemContractsUpgradeTxHash(),
+            pendingL2TxBefore,
+            "a pending L2 upgrade must survive untouched"
+        );
+        _assertFacetsUnchanged(before);
+        assertEq(address(IGetters(chainAddress).getVerifier()), before.verifier, "the verifier is untouched");
+        assertEq(vm.load(address(chainContractAddress), EIP1967_IMPLEMENTATION_SLOT), before.ctmImplementationSlot);
+
+        // The lifecycle ended cleanly: nothing reserved, migrations resumed.
+        assertEq(address(coordinator.pendingOperation()), address(0), "the lifecycle slot must be free");
+        assertEq(address(ctmExecutor.activeOperation()), address(0), "the reservation must be released");
+        assertFalse(
+            chainAssetHandler.migrationPausedFor(address(chainContractAddress)),
+            "stage 2 must release the pause"
+        );
+    }
+
 
     /// @dev A VERIFIER replacement as a SemVer PATCH. The release is the immutable snapshot of the
     ///      intended contracts, so replacing the verifier means publishing a new release that
@@ -177,13 +236,7 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
         address verifierNext = address(new AcceptingVerifier());
         assertTrue(before.verifier != verifierNext, "the fixture must actually replace the verifier");
         CTMRelease target = _release(address(0), verifierNext);
-        CTMTransition verifierPatch = _transition(
-            V32,
-            V32_PATCH_1,
-            transitionV32.newRelease(),
-            address(target),
-            _noRows()
-        );
+        CTMTransition verifierPatch = _transition(V32, V32_PATCH_1, transitionV32.newRelease(), address(target));
         assertEq(verifierPatch.facetCuts().length, 0, "identical routing must derive no facet cut");
         assertEq(verifierPatch.l2Plan().deployments.length, 0, "a verifier patch has no L2 side");
 
@@ -220,7 +273,7 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
         // A copy of the DEPARTING snapshot with the verifier replaced and nothing else — the
         // v33 release's facet routing and its L2 bytecode table carried over verbatim.
         CTMRelease target = new CTMRelease(_releaseManifest(newAdminFacet, verifierNext));
-        CTMTransition verifierPatch = _transition(V33, V33 + 1, transitionV33.newRelease(), address(target), _noRows());
+        CTMTransition verifierPatch = _transition(V33, V33 + 1, transitionV33.newRelease(), address(target));
         assertEq(verifierPatch.facetCuts().length, 0, "identical routing must derive no facet cut");
 
         _runHop(verifierPatch);
@@ -299,15 +352,13 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
         return new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
     }
 
-    /// @dev An L1-only transition (no authored L2 remainder) over `_rows`, with its own timer.
+    /// @dev An L1-only transition (no authored L2 remainder).
     function _transition(
         uint256 _oldVersion,
         uint256 _newVersion,
         address _fromRelease,
-        address _newRelease,
-        ProxyUpgradeRow[] memory _rows
+        address _newRelease
     ) internal returns (CTMTransition) {
-        address upgradeTimer = address(new GovernanceUpgradeTimer(0, 0, address(coordinator), governor));
         return
             new CTMTransition(
                 TransitionManifest({
@@ -316,16 +367,40 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
                     fromRelease: _fromRelease,
                     newRelease: _newRelease,
                     upgradeEngine: defaultUpgrade,
-                    proxyUpgrades: _rows,
                     oldProtocolVersionDeadline: 1000,
                     upgradeTimestamp: 0,
                     l2Plan: AuthoredL2Plan({
                         delegateBytecodeInfo: "",
                         extraBytecodeInfos: new bytes[](0),
                         delegateComposer: address(0)
-                    }),
-                    upgradeTimer: upgradeTimer
+                    })
                 })
             );
+    }
+
+    /// @dev A `ValidatorTimelock` proxy under the executor's bound CTM-domain `ProxyAdmin` (which
+    ///      the executor must own to apply a row — the bootstrap edge hands that admin over), and
+    ///      the inventory holding its `implOld -> implNew` row.
+    function _timelockRowFixture()
+        internal
+        returns (TransparentUpgradeableProxy timelock, address implOld, address implNew, ProxyUpgradeRow[] memory rows)
+    {
+        ProxyAdmin ctmProxyAdmin = ctmExecutor.CTM_PROXY_ADMIN();
+        implOld = address(new ValidatorTimelock(address(bridgehub)));
+        implNew = address(new ValidatorTimelock(address(bridgehub)));
+        timelock = new TransparentUpgradeableProxy(implOld, address(ctmProxyAdmin), hex"");
+        ctmProxyAdmin.transferOwnership(address(ctmExecutor));
+        rows = _noRows();
+        rows[uint256(CTMContract.ValidatorTimelock)] = ProxyUpgradeRow({
+            proxy: address(timelock),
+            expectedOldImpl: implOld,
+            implNew: implNew,
+            callInitializeUpgrade: false,
+            admin: ProxyAdmin(address(0))
+        });
+    }
+
+    function _liveImpl(TransparentUpgradeableProxy _proxy) internal view returns (address) {
+        return address(uint160(uint256(vm.load(address(_proxy), EIP1967_IMPLEMENTATION_SLOT))));
     }
 }

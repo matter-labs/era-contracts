@@ -33,13 +33,7 @@ import {ContractsBytecodesLib} from "deploy-scripts/utils/bytecode/ContractsByte
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ICommittedUpgrade} from "contracts/upgrades/registry/objects/ICommittedUpgrade.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
-import {
-    AuthoredL2Plan,
-    L2UpgradePlan,
-    ProxyUpgradeRow,
-    TransitionManifest
-} from "contracts/upgrades/registry/RegistryTypes.sol";
-import {CTM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
+import {AuthoredL2Plan, L2UpgradePlan, TransitionManifest} from "contracts/upgrades/registry/RegistryTypes.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
@@ -89,15 +83,13 @@ library Utils {
             fromRelease: address(0),
             newRelease: _newRelease,
             upgradeEngine: address(0),
-            proxyUpgrades: new ProxyUpgradeRow[](CTM_CONTRACT_COUNT),
             oldProtocolVersionDeadline: type(uint256).max,
             upgradeTimestamp: 0,
             l2Plan: AuthoredL2Plan({
                 delegateBytecodeInfo: "",
                 extraBytecodeInfos: new bytes[](0),
                 delegateComposer: address(0)
-            }),
-            upgradeTimer: address(0)
+            })
         });
         vm.mockCall(_transition, abi.encodeCall(ICTMTransition.getManifest, ()), abi.encode(manifest));
         vm.mockCall(_transition, abi.encodeCall(ICTMTransition.facetCuts, ()), abi.encode(new Diamond.FacetCut[](0)));
