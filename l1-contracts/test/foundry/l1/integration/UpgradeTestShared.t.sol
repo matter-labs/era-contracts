@@ -83,7 +83,6 @@ abstract contract UpgradeIntegrationTestBase is Test {
         console.log("setupUpgrade: Initializing CTM upgrade");
         ctmUpgrade.initializeWithArgs(
             params.ctmProxy,
-            params.bytecodesSupplier,
             params.rollupDAManager,
             params.create2FactorySalt,
             params.upgradeInputPath,
@@ -403,9 +402,6 @@ abstract contract UpgradeIntegrationTestBase is Test {
         address ctmProxy = outputDeployCTMToml.readAddress(
             "$.deployed_addresses.state_transition.state_transition_proxy_addr"
         );
-        address bytecodesSupplier = outputDeployCTMToml.readAddress(
-            "$.deployed_addresses.state_transition.bytecodes_supplier_addr"
-        );
         address rollupDAManager = outputDeployCTMToml.readAddress(
             "$.deployed_addresses.blobs_zksync_os_l1_da_validator_addr"
         );
@@ -415,7 +411,6 @@ abstract contract UpgradeIntegrationTestBase is Test {
             EcosystemUpgradeParams({
                 bridgehubProxyAddress: bridgehubProxy,
                 ctmProxy: ctmProxy,
-                bytecodesSupplier: bytecodesSupplier,
                 rollupDAManager: rollupDAManager,
                 create2FactorySalt: bytes32(0),
                 upgradeInputPath: ECOSYSTEM_UPGRADE_INPUT,

@@ -19,7 +19,6 @@ contract CTMUpgradeForTests_v35 is CTMUpgrade_v35 {
     // solhint-disable-next-line func-named-parameters
     function initializeWithArgs(
         address _ctmProxy,
-        address _bytecodesSupplier,
         address _rollupDAManager,
         bytes32 _create2FactorySalt,
         string memory _newConfigPath,
@@ -31,7 +30,6 @@ contract CTMUpgradeForTests_v35 is CTMUpgrade_v35 {
         // solhint-disable-next-line func-named-parameters
         super.initializeWithArgs(
             _ctmProxy,
-            _bytecodesSupplier,
             _rollupDAManager,
             _create2FactorySalt,
             _newConfigPath,

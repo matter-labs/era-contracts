@@ -190,8 +190,10 @@ pub struct CtmContracts {
 #[derive(Debug, Deserialize, Clone)]
 pub struct CtmEntry {
     pub proxy: Address,
-    #[serde(default)]
-    pub bytecodes_supplier: Option<Address>,
+    /// Optional override; the prepare flow otherwise resolves it from a chain registered on the
+    /// CTM. The bytecodes supplier has no counterpart here: the prepare script reads it off the
+    /// CTM's own `L1_BYTECODES_SUPPLIER()` immutable, so a permanent-values entry for it would
+    /// name a value nothing consumes.
     #[serde(default)]
     pub rollup_da_manager: Option<Address>,
 }

@@ -500,8 +500,7 @@ pub struct UpgradePrepareAllArgs {
     pub compose_script_path: String,
 
     /// Path to a TOML file describing per-CTM inputs (proxy + optional
-    /// overrides). Mutually exclusive with the direct CTM flags
-    /// (`--ctm-proxy`, `--bytecodes-supplier-address`,
+    /// override). Mutually exclusive with the direct CTM flags (`--ctm-proxy`,
     /// `--rollup-da-manager-address`). Anything that is not a ZKsync OS CTM
     /// fails the prepare.
     ///
@@ -509,23 +508,18 @@ pub struct UpgradePrepareAllArgs {
     /// ```toml
     /// [[ctm]]
     /// proxy = "0x..."
-    /// bytecodes_supplier = "0x..."           # optional
     /// rollup_da_manager  = "0x..."           # optional
     /// ```
     #[clap(long, conflicts_with_all = [
         "ctm_proxies",
-        "bytecodes_supplier_address",
         "rollup_da_manager_address",
     ])]
     pub ctm_config: Option<PathBuf>,
 
-    /// Override the bytecodes supplier address. Auto-resolved from the CTM's
-    /// `L1_BYTECODES_SUPPLIER()` getter when omitted.
-    #[clap(long)]
-    pub bytecodes_supplier_address: Option<Address>,
-
     /// Override the rollup DA manager address. Auto-resolved from a
-    /// representative ZK chain on the CTM when omitted.
+    /// representative ZK chain on the CTM when omitted. There is no bytecodes-supplier
+    /// counterpart: the prepare script reads that off the CTM's own
+    /// `L1_BYTECODES_SUPPLIER()` immutable.
     #[clap(long)]
     pub rollup_da_manager_address: Option<Address>,
 }
@@ -539,8 +533,6 @@ struct CtmConfigFile {
 #[derive(Debug, Deserialize)]
 struct CtmConfigEntry {
     proxy: Address,
-    #[serde(default)]
-    bytecodes_supplier: Option<Address>,
     #[serde(default)]
     rollup_da_manager: Option<Address>,
 }
@@ -608,8 +600,8 @@ pub async fn run_list_ctms(args: ListCtmsArgs) -> anyhow::Result<()> {
     out.push_str(&format!("# L1 RPC:    {}\n", args.l1_rpc_url));
     out.push_str("#\n");
     out.push_str(
-        "# `bytecodes_supplier` and `rollup_da_manager` are commented out so the\n\
-         # prepare flow auto-resolves them from the CTM's on-chain getters.\n",
+        "# `rollup_da_manager` is commented out so the prepare flow auto-resolves it\n\
+         # from a chain registered on the CTM.\n",
     );
     for (proxy, witness_chain) in &ctms {
         out.push_str("\n[[ctm]]\n");
@@ -617,7 +609,6 @@ pub async fn run_list_ctms(args: ListCtmsArgs) -> anyhow::Result<()> {
             "# witness chain (any chain registered on this CTM): {witness_chain}\n"
         ));
         out.push_str(&format!("proxy = \"{proxy:#x}\"\n"));
-        out.push_str("# bytecodes_supplier = \"0x...\"\n");
         out.push_str("# rollup_da_manager  = \"0x...\"\n");
     }
 
@@ -734,7 +725,6 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
             .iter()
             .map(|proxy| CtmInputs {
                 proxy: *proxy,
-                bytecodes_supplier: args.bytecodes_supplier_address,
                 rollup_da_manager: args.rollup_da_manager_address,
             })
             .collect::<Vec<_>>();
@@ -747,22 +737,10 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
                 cfg.env
             );
         }
-        let zero = Address::ZERO;
-        for (i, e) in entries.iter().enumerate() {
-            if e.bytecodes_supplier == Some(zero) {
-                anyhow::bail!(
-                    "permanent-values/{}.toml [[ctm_contracts.ctms]][{}] proxy={:#x}: bytecodes_supplier still 0x0 (TODO marker) — fill it in",
-                    cfg.env,
-                    i,
-                    e.proxy
-                );
-            }
-        }
         let ctms = entries
             .iter()
             .map(|e| CtmInputs {
                 proxy: e.proxy,
-                bytecodes_supplier: e.bytecodes_supplier,
                 rollup_da_manager: e.rollup_da_manager,
             })
             .collect::<Vec<_>>();
@@ -1453,7 +1431,6 @@ fn load_ctm_config(path: &Path) -> anyhow::Result<Vec<CtmInputs>> {
         .into_iter()
         .map(|e| CtmInputs {
             proxy: e.proxy,
-            bytecodes_supplier: e.bytecodes_supplier,
             rollup_da_manager: e.rollup_da_manager,
         })
         .collect();

@@ -135,7 +135,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     struct PermanentCTMConfig {
         bytes32 create2FactorySalt;
         address ctmProxy;
-        address bytecodesSupplier;
         /// @dev ZK token asset ID, used by `InteropCenter.initL2` for fixed-fee bundles.
         ///      MUST be non-zero — `InteropCenter.initL2` reverts otherwise, which would abort the
         ///      L2 upgrade transaction.
@@ -175,7 +174,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         // solhint-disable-next-line func-named-parameters
         initializeWithArgs(
             _params.ctmProxy,
-            _params.bytecodesSupplier,
             _params.rollupDAManager,
             _params.create2FactorySalt,
             _params.upgradeInputPath,
@@ -196,7 +194,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
 
     function initializeWithArgs(
         address ctmProxy,
-        address bytecodesSupplier,
         address rollupDAManager,
         bytes32 create2FactorySalt,
         string memory newConfigPath,
@@ -209,7 +206,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         newConfigPath = string.concat(root, newConfigPath);
         initializeConfigFromArgs(
             ctmProxy,
-            bytecodesSupplier,
             rollupDAManager,
             create2FactorySalt,
             newConfigPath,
@@ -238,8 +234,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         config.l1ChainId = block.chainid;
         newConfig.ctm = permanentConfig.ctmProxy;
 
-        // The supplier is read off the CTM's `L1_BYTECODES_SUPPLIER()` immutable during discovery, so the
-        // permanent-values entry is informational for this path.
         setAddressesBasedOnCTM();
         // Must be non-zero: `InteropCenter.initL2` reverts on a zero asset ID. It runs on the genesis path
         // of `performForceDeployedContractsInit` only, so this aborts the genesis of chains created from the
@@ -267,7 +261,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
 
     function initializeConfigFromArgs(
         address ctmProxy,
-        address bytecodesSupplier,
         address rollupDAManager,
         bytes32 create2FactorySalt,
         string memory newConfigPath,
@@ -283,7 +276,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
 
         PermanentCTMConfig memory permanentConfig = PermanentCTMConfig({
             ctmProxy: ctmProxy,
-            bytecodesSupplier: bytecodesSupplier,
             create2FactorySalt: create2FactorySalt,
             zkTokenAssetId: zkTokenAssetId,
             testnetVerifier: testnetVerifier
