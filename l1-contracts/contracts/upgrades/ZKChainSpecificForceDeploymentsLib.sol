@@ -105,7 +105,6 @@ library ZKChainSpecificForceDeploymentsLib {
     function _safeCallTokenMetadataBytes(address _token, bytes memory _data) private view returns (bytes memory, bool) {
         // We are not afraid if token returns large calldata, since it affects
         // only the deployment of the chain that uses such a malicious token.
-        // slither-disable-next-line low-level-calls
         (bool callSuccess, bytes memory returnData) = _token.staticcall(_data);
 
         // The failed call most likely means that this method is not supported.
@@ -121,7 +120,10 @@ library ZKChainSpecificForceDeploymentsLib {
         return (returnData, true);
     }
 
-    function _safeCallTokenMetadataString(address _token, bytes memory _data) private view returns (string memory, bool) {
+    function _safeCallTokenMetadataString(
+        address _token,
+        bytes memory _data
+    ) private view returns (string memory, bool) {
         (bytes memory returnData, bool success) = _safeCallTokenMetadataBytes(_token, _data);
         if (!success) {
             return ("", false);

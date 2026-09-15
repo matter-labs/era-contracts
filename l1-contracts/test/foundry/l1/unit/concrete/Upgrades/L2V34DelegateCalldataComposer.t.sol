@@ -109,6 +109,29 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
         assertEq(data.baseTokenBridgingData.assetId, ERC20_BASE_TOKEN_ASSET_ID, "wrong base token asset id");
     }
 
+    /// @dev A chain whose base token serves no usable metadata — none at all, or Maker-style
+    ///      `bytes32` — is still composable here. Genesis deliberately permits such a base token,
+    ///      and the upgrade path probes it the same tolerant way, so the chain does not become
+    ///      unupgradeable the moment its metadata has to be recomposed.
+    function test_composesForBaseTokensWithoutUsableMetadata() public {
+        assertEq(
+            v34Composer.composeDelegateCalldata(ICTMRelease(address(release)), bridgehub, NO_METADATA_CHAIN_ID),
+            abi.encodeCall(
+                IL2V34Upgrade.upgrade,
+                (ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(NO_METADATA_CHAIN_ID))
+            ),
+            "a token without metadata must compose the defaults"
+        );
+        assertEq(
+            v34Composer.composeDelegateCalldata(ICTMRelease(address(release)), bridgehub, BYTES32_METADATA_CHAIN_ID),
+            abi.encodeCall(
+                IL2V34Upgrade.upgrade,
+                (ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(BYTES32_METADATA_CHAIN_ID))
+            ),
+            "a bytes32-returning token must compose the defaults too"
+        );
+    }
+
     /// @dev Nothing is cached in the composer: a different release or a Bridgehub naming another
     ///      tracker composes different arguments from the same code.
     function test_composesFromLiveInputs() public {
