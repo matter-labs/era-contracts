@@ -2,10 +2,11 @@
 
 pragma solidity 0.8.28;
 
+import {InvalidMockProof, MockProofTooShort, NonZeroCarriedHash} from "../../common/L1ContractErrors.sol";
+
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {MultiProofVerifier} from "./MultiProofVerifier.sol";
 import {IZKsyncOSVerifier} from "../chain-interfaces/IZKsyncOSVerifier.sol";
-import {NonZeroCarriedHash} from "../../common/L1ContractErrors.sol";
 import {PUBLIC_INPUT_SHIFT} from "../../common/Config.sol";
 
 /// @title Multi-proof Testnet Verifier
@@ -20,9 +21,6 @@ contract MultiProofTestnetVerifier is IVerifier, IZKsyncOSVerifier {
     uint256 internal constant MOCK_PROOF_TYPE = 3;
 
     IVerifier public immutable INNER_VERIFIER;
-
-    error InvalidMockProof();
-    error MockProofTooShort();
 
     constructor(IVerifier _innerVerifier) {
         assert(block.chainid != 1);

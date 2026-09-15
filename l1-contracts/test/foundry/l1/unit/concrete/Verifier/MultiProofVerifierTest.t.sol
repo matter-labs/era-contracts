@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {ProofSystem, DisabledProofSystems} from "contracts/common/Config.sol";
+
 import "forge-std/Test.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
@@ -8,8 +10,17 @@ import {MultiProofTestnetVerifier} from "contracts/state-transition/verifiers/Mu
 import {ZiskTestnetVerifier} from "contracts/state-transition/verifiers/ZiskTestnetVerifier.sol";
 import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
 import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
-import {InvalidDisabledProofSystemsMask, NonZeroCarriedHash} from "contracts/common/L1ContractErrors.sol";
-import {AIRBENDER_PROOF_SYSTEM_DISABLED, ZISK_PROOF_SYSTEM_DISABLED} from "contracts/common/Config.sol";
+import {
+    InvalidDisabledProofSystemsMask,
+    NonZeroCarriedHash,
+    ProofTooShort,
+    InvalidMockProof,
+    InvalidProofFormat,
+    UnknownProofType,
+    AirbenderVerificationFailed,
+    ZiskVerificationFailed
+} from "contracts/common/L1ContractErrors.sol";
+
 import {DeployCTML1OrGateway} from "deploy-scripts/ctm/DeployCTML1OrGateway.sol";
 
 /// @dev Mock verifier that always returns true.
@@ -102,8 +113,13 @@ contract MultiProofVerifierTest is Test {
     ///      directly, so it stands in for that chain.
     uint8 internal disabledProofSystemsMask;
 
-    function disabledProofSystems() external view returns (uint8) {
-        return disabledProofSystemsMask;
+    function disabledProofSystems() external view returns (DisabledProofSystems memory) {
+        return
+            DisabledProofSystems({
+                boojum: disabledProofSystemsMask & uint8(1 << uint8(ProofSystem.Boojum)) != 0,
+                airbender: disabledProofSystemsMask & uint8(1 << uint8(ProofSystem.Airbender)) != 0,
+                zisk: disabledProofSystemsMask & uint8(1 << uint8(ProofSystem.Zisk)) != 0
+            });
     }
 
     function setUp() public {
@@ -186,7 +202,7 @@ contract MultiProofVerifierTest is Test {
         proof[2] = 13;
         proof[3] = 42;
 
-        vm.expectRevert(abi.encodeWithSelector(MultiProofVerifier.UnknownProofType.selector, 3));
+        vm.expectRevert(abi.encodeWithSelector(UnknownProofType.selector, 3));
         verifier.verify(publicInputs, proof);
     }
 
@@ -195,7 +211,7 @@ contract MultiProofVerifierTest is Test {
         uint256[] memory proof = new uint256[](30);
         proof[0] = 2;
 
-        vm.expectRevert(abi.encodeWithSelector(MultiProofVerifier.UnknownProofType.selector, 2));
+        vm.expectRevert(abi.encodeWithSelector(UnknownProofType.selector, 2));
         verifier.verify(publicInputs, proof);
     }
 
@@ -206,7 +222,7 @@ contract MultiProofVerifierTest is Test {
         uint256[] memory proof = _type5Proof(0, 2);
         proof[0] = (1 << 8) | 5;
 
-        vm.expectRevert(MultiProofVerifier.InvalidProofFormat.selector);
+        vm.expectRevert(InvalidProofFormat.selector);
         verifier.verify(_singlePublicInputs(), proof);
     }
 
@@ -217,7 +233,7 @@ contract MultiProofVerifierTest is Test {
         proof[0] = 5;
         proof[2] = 2;
 
-        vm.expectRevert(MultiProofVerifier.ProofTooShort.selector);
+        vm.expectRevert(ProofTooShort.selector);
         verifier.verify(publicInputs, proof);
     }
 
@@ -234,7 +250,7 @@ contract MultiProofVerifierTest is Test {
             IVerifier(address(passVerifier))
         );
 
-        vm.expectRevert(MultiProofVerifier.AirbenderVerificationFailed.selector);
+        vm.expectRevert(AirbenderVerificationFailed.selector);
         failing.verify(_singlePublicInputs(), _type5Proof(0, 2));
     }
 
@@ -244,7 +260,7 @@ contract MultiProofVerifierTest is Test {
             IVerifier(address(failVerifier))
         );
 
-        vm.expectRevert(MultiProofVerifier.ZiskVerificationFailed.selector);
+        vm.expectRevert(ZiskVerificationFailed.selector);
         failing.verify(_singlePublicInputs(), _type5Proof(0, 2));
     }
 
@@ -256,34 +272,34 @@ contract MultiProofVerifierTest is Test {
             IVerifier(address(failVerifier))
         );
 
-        vm.expectRevert(MultiProofVerifier.ZiskVerificationFailed.selector);
+        vm.expectRevert(ZiskVerificationFailed.selector);
         lane.verify(_rangePublicInputs(), _type5Proof(0, 2));
 
-        disabledProofSystemsMask = ZISK_PROOF_SYSTEM_DISABLED;
+        disabledProofSystemsMask = uint8(1 << uint8(ProofSystem.Zisk));
         uint256[] memory proof = new uint256[](2);
         proof[0] = 2;
         assertTrue(lane.verify(_rangePublicInputs(), proof));
-        vm.expectRevert(abi.encodeWithSelector(MultiProofVerifier.UnknownProofType.selector, 5));
+        vm.expectRevert(abi.encodeWithSelector(UnknownProofType.selector, 5));
         lane.verify(_rangePublicInputs(), _type5Proof(0, 2));
     }
 
     /// @dev The verifier does not trust the stored mask: a value the setter could never write, such as
     ///      one clearing the Airbender lane, is refused rather than acted on.
-    function test_disabledProofSystems_rejectsMaskTheSetterCannotWrite() public {
+    function testFuzz_disabledProofSystems_rejectsUnsupportedFlags(bool _boojum, bool _zisk) public {
         MultiProofVerifier lane = new MultiProofVerifier(
             IVerifier(address(passVerifier)),
             IVerifier(address(passVerifier))
         );
 
-        disabledProofSystemsMask = AIRBENDER_PROOF_SYSTEM_DISABLED;
-        vm.expectRevert(
-            abi.encodeWithSelector(InvalidDisabledProofSystemsMask.selector, AIRBENDER_PROOF_SYSTEM_DISABLED)
-        );
+        disabledProofSystemsMask =
+            (_boojum ? uint8(1 << uint8(ProofSystem.Boojum)) : uint8(1 << uint8(ProofSystem.Airbender))) |
+            (_zisk ? uint8(1 << uint8(ProofSystem.Zisk)) : 0);
+        vm.expectRevert(abi.encodeWithSelector(InvalidDisabledProofSystemsMask.selector, disabledProofSystemsMask));
         lane.verify(_rangePublicInputs(), _type5Proof(0, 2));
     }
 
     function test_disabled_type2_forwardsRawInputsAndProof() public {
-        disabledProofSystemsMask = ZISK_PROOF_SYSTEM_DISABLED;
+        disabledProofSystemsMask = uint8(1 << uint8(ProofSystem.Zisk));
         uint256[] memory inputs = _rangePublicInputs();
         uint256[] memory proof = new uint256[](3);
         proof[0] = 2;
@@ -293,25 +309,25 @@ contract MultiProofVerifierTest is Test {
     }
 
     function test_disabled_type2_reservedHeaderBits_rejected() public {
-        disabledProofSystemsMask = ZISK_PROOF_SYSTEM_DISABLED;
+        disabledProofSystemsMask = uint8(1 << uint8(ProofSystem.Zisk));
         uint256[] memory proof = new uint256[](2);
         proof[0] = (1 << 8) | 2;
-        vm.expectRevert(MultiProofVerifier.InvalidProofFormat.selector);
+        vm.expectRevert(InvalidProofFormat.selector);
         verifier.verify(_singlePublicInputs(), proof);
     }
 
     function test_testnet_realProofMode_followsChainSwitch() public {
         uint256[] memory proof = new uint256[](2);
         proof[0] = 2;
-        disabledProofSystemsMask = ZISK_PROOF_SYSTEM_DISABLED;
+        disabledProofSystemsMask = uint8(1 << uint8(ProofSystem.Zisk));
         assertEq(testnetVerifier.getProofMode(disabledProofSystemsMask), 2);
         assertTrue(testnetVerifier.verify(_singlePublicInputs(), proof));
-        vm.expectRevert(abi.encodeWithSelector(MultiProofVerifier.UnknownProofType.selector, 5));
+        vm.expectRevert(abi.encodeWithSelector(UnknownProofType.selector, 5));
         testnetVerifier.verify(_singlePublicInputs(), _type5Proof(0, 2));
 
         disabledProofSystemsMask = 0;
         assertEq(testnetVerifier.getProofMode(disabledProofSystemsMask), 5);
-        vm.expectRevert(abi.encodeWithSelector(MultiProofVerifier.UnknownProofType.selector, 2));
+        vm.expectRevert(abi.encodeWithSelector(UnknownProofType.selector, 2));
         testnetVerifier.verify(_singlePublicInputs(), proof);
         assertTrue(testnetVerifier.verify(_singlePublicInputs(), _type5Proof(0, 2)));
     }
@@ -438,7 +454,7 @@ contract MultiProofVerifierTest is Test {
         uint256[] memory proof = new uint256[](30);
         proof[0] = 2;
 
-        vm.expectRevert(abi.encodeWithSelector(MultiProofVerifier.UnknownProofType.selector, 2));
+        vm.expectRevert(abi.encodeWithSelector(UnknownProofType.selector, 2));
         testnetVerifier.verify(_singlePublicInputs(), proof);
     }
 
@@ -514,7 +530,7 @@ contract ZiskTestnetVerifierTest is Test {
     function test_fakeProof_rejectsMismatchedPublicInput() public {
         ZiskTestnetVerifier verifier = new ZiskTestnetVerifier(IVerifier(address(failVerifier)));
 
-        vm.expectRevert(ZiskTestnetVerifier.InvalidMockProof.selector);
+        vm.expectRevert(InvalidMockProof.selector);
         verifier.verify(_publicInputs(), _fakeProof(1));
     }
 
@@ -525,7 +541,7 @@ contract ZiskTestnetVerifierTest is Test {
         uint256[] memory proof = _fakeProof(folded);
         proof[23] = 1;
 
-        vm.expectRevert(ZiskTestnetVerifier.InvalidMockProof.selector);
+        vm.expectRevert(InvalidMockProof.selector);
         verifier.verify(inputs, proof);
     }
 

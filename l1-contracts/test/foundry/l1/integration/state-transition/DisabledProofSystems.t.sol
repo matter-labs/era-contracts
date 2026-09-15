@@ -26,14 +26,21 @@ import {ZiskVerifier} from "contracts/state-transition/verifiers/ZiskVerifier.so
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {
+    ProofSystem,
+    DisabledProofSystems,
     TESTNET_COMMIT_TIMESTAMP_NOT_OLDER,
     ZISK_SNARK_PROOF_LENGTH,
-    ZISK_PROOF_SYSTEM_DISABLED,
     ZKSYNC_OS_PROOF_METADATA_LENGTH,
     ZKSYNC_OS_PLONK_VERIFICATION_TYPE,
     L2DACommitmentScheme
 } from "contracts/common/Config.sol";
-import {InvalidProofSystem, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {
+    InvalidProofSystem,
+    Unauthorized,
+    UnknownProofType,
+    AirbenderVerificationFailed,
+    ZiskVerificationFailed
+} from "contracts/common/L1ContractErrors.sol";
 
 /// @notice Exercises the per-chain switch through production facets and verifier wrappers.
 /// @dev Only the SNARK backends and unrelated initialization dependencies are mocked.
@@ -60,8 +67,14 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
         chain = _deployChain(10);
     }
 
+    function test_proofSystemEnum_preservesStorageBits() public pure {
+        assertEq(uint8(1 << uint8(ProofSystem.Boojum)), 1);
+        assertEq(uint8(1 << uint8(ProofSystem.Airbender)), 2);
+        assertEq(uint8(1 << uint8(ProofSystem.Zisk)), 4);
+    }
+
     function test_default_requiresBothProofs() public {
-        assertEq(IGetters(chain).disabledProofSystems(), 0);
+        _assertDisabledProofSystems(chain, 0);
         assertEq(IGetters(chain).getProofMode(), 5);
         IExecutor.StoredBatchInfo memory batch = _commit(chain, genesis);
         _prove(chain, genesis, batch);
@@ -71,8 +84,8 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
     function test_nonAdmin_cannotDisable() public {
         vm.prank(validator);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, validator));
-        IAdmin(chain).setProofSystemStatus(ZISK_PROOF_SYSTEM_DISABLED, false);
-        assertEq(IGetters(chain).disabledProofSystems(), 0);
+        IAdmin(chain).setProofSystemStatus(ProofSystem.Zisk, false);
+        _assertDisabledProofSystems(chain, 0);
     }
 
     function testFuzz_invalidProofSystem_preservesState(
@@ -80,17 +93,35 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
         bool _enabled,
         bool _initiallyDisabled
     ) public {
-        vm.assume(_proofSystem != ZISK_PROOF_SYSTEM_DISABLED);
-        uint8 initialMask = _initiallyDisabled ? ZISK_PROOF_SYSTEM_DISABLED : 0;
+        _proofSystem = uint8(bound(_proofSystem, 0, uint8(ProofSystem.Airbender)));
+        uint8 initialMask = _initiallyDisabled ? uint8(1 << uint8(ProofSystem.Zisk)) : 0;
         _setMask(chain, initialMask);
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(InvalidProofSystem.selector, _proofSystem));
-        IAdmin(chain).setProofSystemStatus(_proofSystem, _enabled);
-        assertEq(IGetters(chain).disabledProofSystems(), initialMask);
+        IAdmin(chain).setProofSystemStatus(ProofSystem(_proofSystem), _enabled);
+        _assertDisabledProofSystems(chain, initialMask);
+    }
+
+    function testFuzz_invalidEnumEncoding_preservesState(uint8 _value, bool _initiallyDisabled) public {
+        _value = uint8(bound(_value, uint8(ProofSystem.Zisk) + 1, type(uint8).max));
+        _assertInvalidEnumEncoding(_value, _initiallyDisabled);
+    }
+
+    function test_oldZiskMask_isNotAcceptedAsEnum() public {
+        _assertInvalidEnumEncoding(4, true);
+    }
+
+    function _assertInvalidEnumEncoding(uint8 _value, bool _initiallyDisabled) internal {
+        uint8 initialMask = _initiallyDisabled ? uint8(1 << uint8(ProofSystem.Zisk)) : 0;
+        _setMask(chain, initialMask);
+        vm.prank(owner);
+        (bool success, ) = chain.call(abi.encodeWithSelector(IAdmin.setProofSystemStatus.selector, _value, true));
+        assertFalse(success, "out-of-range enum must be rejected by ABI decoding");
+        _assertDisabledProofSystems(chain, initialMask);
     }
 
     function testFuzz_setProofSystemStatus_reportsRepeatedStatus(bool _enabled) public {
-        uint8 mask = _enabled ? 0 : ZISK_PROOF_SYSTEM_DISABLED;
+        uint8 mask = _enabled ? 0 : uint8(1 << uint8(ProofSystem.Zisk));
         _setMask(chain, mask);
         _setMask(chain, mask);
     }
@@ -100,7 +131,7 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
         _setProofResults(true, false);
         _expectZiskFailure(chain, genesis, first);
 
-        _setMask(chain, ZISK_PROOF_SYSTEM_DISABLED);
+        _setMask(chain, uint8(1 << uint8(ProofSystem.Zisk)));
         assertEq(IGetters(chain).getProofMode(), 2);
         _expectWrongProofType(chain, genesis, first, 5);
         assertEq(IGetters(chain).getTotalBatchesCommitted(), 1);
@@ -124,11 +155,11 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
 
     function test_disabled_stillRequiresAirbender() public {
         IExecutor.StoredBatchInfo memory batch = _commit(chain, genesis);
-        _setMask(chain, ZISK_PROOF_SYSTEM_DISABLED);
+        _setMask(chain, uint8(1 << uint8(ProofSystem.Zisk)));
         _setProofResults(false, true);
         bytes memory data = _proofData(genesis, batch, IGetters(chain).getProofMode());
         vm.prank(validator);
-        vm.expectRevert(MultiProofVerifier.AirbenderVerificationFailed.selector);
+        vm.expectRevert(AirbenderVerificationFailed.selector);
         IExecutor(chain).proveBatchesSharedBridge(chain, batch.batchNumber, batch.batchNumber, data);
         assertEq(IGetters(chain).getTotalBatchesVerified(), 0);
     }
@@ -139,25 +170,25 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
         assertEq(address(IGetters(secondChain).getVerifier()), address(verifier));
         IExecutor.StoredBatchInfo memory first = _commit(chain, genesis);
         IExecutor.StoredBatchInfo memory second = _commit(secondChain, genesis);
-        _setMask(chain, ZISK_PROOF_SYSTEM_DISABLED);
+        _setMask(chain, uint8(1 << uint8(ProofSystem.Zisk)));
         _setProofResults(true, false);
         _prove(chain, genesis, first);
         _expectZiskFailure(secondChain, genesis, second);
-        assertEq(IGetters(secondChain).disabledProofSystems(), 0);
+        _assertDisabledProofSystems(secondChain, 0);
         assertEq(IGetters(secondChain).getTotalBatchesVerified(), 0);
     }
 
     function test_disabled_rejectsValidMultiproof() public {
         IExecutor.StoredBatchInfo memory batch = _commit(chain, genesis);
-        _setMask(chain, ZISK_PROOF_SYSTEM_DISABLED);
+        _setMask(chain, uint8(1 << uint8(ProofSystem.Zisk)));
         _expectWrongProofType(chain, genesis, batch, 5);
         _prove(chain, genesis, batch);
     }
 
     function test_getProofMode_distinguishesDeploymentsWithZeroMask() public {
         address singleChain = _deployChain(11, address(new ZKsyncOSVerifier(IVerifier(airbenderPlonk))));
-        assertEq(IGetters(chain).disabledProofSystems(), 0);
-        assertEq(IGetters(singleChain).disabledProofSystems(), 0);
+        _assertDisabledProofSystems(chain, 0);
+        _assertDisabledProofSystems(singleChain, 0);
         assertEq(IGetters(chain).getProofMode(), 5);
         assertEq(IGetters(singleChain).getProofMode(), 2);
         IExecutor.StoredBatchInfo memory batch = _commit(singleChain, genesis);
@@ -171,7 +202,7 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
         assertEq(IGetters(firstChain).getProofMode(), 5);
         IExecutor.StoredBatchInfo memory first = _commit(firstChain, genesis);
         IExecutor.StoredBatchInfo memory second = _commit(secondChain, genesis);
-        _setMask(firstChain, ZISK_PROOF_SYSTEM_DISABLED);
+        _setMask(firstChain, uint8(1 << uint8(ProofSystem.Zisk)));
         assertEq(IGetters(firstChain).getProofMode(), 2);
         assertEq(IGetters(secondChain).getProofMode(), 5);
         _expectWrongProofType(firstChain, genesis, first, 5);
@@ -188,7 +219,7 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
     ) internal {
         bytes memory data = _proofData(_previous, _batch, _type);
         vm.prank(validator);
-        vm.expectRevert(abi.encodeWithSelector(MultiProofVerifier.UnknownProofType.selector, _type));
+        vm.expectRevert(abi.encodeWithSelector(UnknownProofType.selector, _type));
         IExecutor(_chain).proveBatchesSharedBridge(_chain, _batch.batchNumber, _batch.batchNumber, data);
         assertEq(IGetters(_chain).getTotalBatchesVerified(), _previous.batchNumber);
     }
@@ -198,13 +229,20 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
         vm.mockCall(ziskPlonk, abi.encodeWithSelector(IZiskSnarkPlonkVerifier.verifyProof.selector), abi.encode(_zisk));
     }
 
+    function _assertDisabledProofSystems(address _chain, uint8 _mask) internal view {
+        DisabledProofSystems memory disabled = IGetters(_chain).disabledProofSystems();
+        assertFalse(disabled.boojum, "Boojum disable bit stays unset on OS");
+        assertFalse(disabled.airbender, "Airbender stays mandatory");
+        assertEq(disabled.zisk, _mask == uint8(1 << uint8(ProofSystem.Zisk)), "ZiSK disable flag");
+    }
+
     function _setMask(address _chain, uint8 _mask) internal {
-        uint8 oldMask = IGetters(_chain).disabledProofSystems();
+        uint8 oldMask = IGetters(_chain).disabledProofSystems().zisk ? uint8(1 << uint8(ProofSystem.Zisk)) : 0;
         vm.expectEmit(true, true, false, true, _chain);
         emit IAdmin.NewDisabledProofSystems(oldMask, _mask);
         vm.prank(owner);
-        IAdmin(_chain).setProofSystemStatus(ZISK_PROOF_SYSTEM_DISABLED, _mask == 0);
-        assertEq(IGetters(_chain).disabledProofSystems(), _mask);
+        IAdmin(_chain).setProofSystemStatus(ProofSystem.Zisk, _mask == 0);
+        _assertDisabledProofSystems(_chain, _mask);
     }
 
     function _deployChain(uint256 _chainId) internal returns (address) {
@@ -335,7 +373,7 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
     ) internal {
         bytes memory data = _proofData(_previous, _batch, IGetters(_chain).getProofMode());
         vm.prank(validator);
-        vm.expectRevert(MultiProofVerifier.ZiskVerificationFailed.selector);
+        vm.expectRevert(ZiskVerificationFailed.selector);
         IExecutor(_chain).proveBatchesSharedBridge(_chain, _batch.batchNumber, _batch.batchNumber, data);
         assertEq(IGetters(_chain).getTotalBatchesVerified(), _previous.batchNumber);
     }

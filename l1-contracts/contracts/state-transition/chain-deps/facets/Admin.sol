@@ -5,6 +5,7 @@ pragma solidity 0.8.28;
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {
+    ProofSystem,
     L2DACommitmentScheme,
     PubdataContent,
     MAX_GAS_PER_TRANSACTION,
@@ -14,7 +15,6 @@ import {
     PRICE_UPDATE_INTERVAL,
     PRIORITY_EXPIRATION,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-    ZISK_PROOF_SYSTEM_DISABLED,
     ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
     ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT
 } from "../../../common/Config.sol";
@@ -389,15 +389,16 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setProofSystemStatus(uint8 _proofSystem, bool _enabled) external onlyAdmin {
-        if (_proofSystem != ZISK_PROOF_SYSTEM_DISABLED) {
-            revert InvalidProofSystem(_proofSystem);
+    function setProofSystemStatus(ProofSystem _proofSystem, bool _enabled) external onlyAdmin {
+        if (_proofSystem != ProofSystem.Zisk) {
+            revert InvalidProofSystem(uint8(_proofSystem));
         }
         // The emergency switch must also work while committed batches wait for a proof.
+        uint8 proofSystemMask = uint8(1 << uint8(_proofSystem));
         uint8 oldDisabledProofSystems = s.disabledProofSystems;
         uint8 newDisabledProofSystems = _enabled
-            ? oldDisabledProofSystems & ~_proofSystem
-            : oldDisabledProofSystems | _proofSystem;
+            ? oldDisabledProofSystems & ~proofSystemMask
+            : oldDisabledProofSystems | proofSystemMask;
         s.disabledProofSystems = newDisabledProofSystems;
         emit NewDisabledProofSystems(oldDisabledProofSystems, newDisabledProofSystems);
     }

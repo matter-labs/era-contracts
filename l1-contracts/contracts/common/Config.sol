@@ -115,14 +115,18 @@ uint256 constant ZKSYNC_OS_MOCK_PROOF_MAGIC = 13;
 /// @dev Number of words in the ZiSK BN254 PLONK proof and its padded testnet mock component.
 uint256 constant ZISK_SNARK_PROOF_LENGTH = 24;
 
-/// @dev Bit in `ZKChainStorage.disabledProofSystems` switching the Airbender proof system off. A ZKsync OS
-/// chain may never set it, because Airbender is the lane its settlement rests on; it is defined here so the
-/// bit is reserved across every lane and one value can not mean two proof systems.
-uint8 constant AIRBENDER_PROOF_SYSTEM_DISABLED = 2;
+// Enum ordinals are storage bit positions; append new systems without reordering.
+enum ProofSystem {
+    Boojum,
+    Airbender,
+    Zisk
+}
 
-/// @dev Bit in `ZKChainStorage.disabledProofSystems` switching the ZiSK proof system off. The only bit a
-/// ZKsync OS chain accepts (see `Admin.setProofSystemStatus`).
-uint8 constant ZISK_PROOF_SYSTEM_DISABLED = 4;
+struct DisabledProofSystems {
+    bool boojum;
+    bool airbender;
+    bool zisk;
+}
 
 /// @dev Padding value for empty/unused leaves in an {IndexedMerkleTree}. Deliberately NOT a valid
 /// `hashLeaf(IMTLeaf)` output, so an unused padded index can't be presented as a `{0,0,0}` low leaf to forge
