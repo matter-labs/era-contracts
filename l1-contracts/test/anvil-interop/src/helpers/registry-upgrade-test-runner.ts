@@ -493,10 +493,18 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     }
     await clearGenesisUpgradeTxHash(l1Provider, upgradeChains);
 
-    // The bootstrap's stage-2 governance actions: lift the ecosystem pause, then let the edge
-    // assert its own completion (it refuses while the CTM's migrations are still paused).
-    console.log("\n── Bootstrap stage 2: lifting the ecosystem pause ──");
+    // The bootstrap's stage-2 governance actions, in the order the prepare declares them
+    // (`CTMUpgrade_v34._declareBootstrapActions`): lift the ecosystem pause, bind the coordinator
+    // to the CTM executor the edge just handed the whole CTM domain to, then let the edge assert
+    // its own completion — `validateApplied()` gates on BOTH, so neither may be deferred to the
+    // recurring hop below.
+    console.log("\n── Bootstrap stage 2: lifting the ecosystem pause, binding the coordinator ──");
     await setMigrationPaused(l1Provider, live.chainAssetHandler, false);
+    await sendAndCheck(
+      l1Provider,
+      coordinator.setCTMExecutor(deployed.ctmExecutor, { gasLimit: DEFAULT_GAS_LIMIT }),
+      "coordinator.setCTMExecutor(ctmExecutor)"
+    );
     await migration.validateApplied();
     console.log("  ✓ RegistryBootstrapMigration.validateApplied() holds");
 
@@ -542,17 +550,12 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       "coreExecutor.setCoordinator(coordinator)"
     );
 
-    await sendAndCheck(
-      l1Provider,
-      coordinator.setCTMExecutor(deployed.ctmExecutor, { gasLimit: DEFAULT_GAS_LIMIT }),
-      "coordinator.setCTMExecutor(ctmExecutor)"
-    );
-
     const cah = new ethers.Contract(live.chainAssetHandler, getAbi("L1ChainAssetHandler"), l1Provider);
     // The operation: the ecosystem leg and the one CTM leg governance reviews together. Deployed
     // from the deterministic build so the coordinator's OPERATION_CODEHASH anchor accepts it. The
-    // CTM executor needs no join call: it was constructed answering to the coordinator, and
-    // pausing its own CTM's migrations derives from the CTM ownership `migrate()` handed over.
+    // CTM side needs nothing further here: the executor was constructed answering to the
+    // coordinator, the coordinator was bound to it in the bootstrap's stage 2, and pausing its own
+    // CTM's migrations derives from the CTM ownership `migrate()` handed over.
     const operationFactory = new ethers.ContractFactory(
       getAbi("EcosystemUpgradeOperation"),
       getDeterministicCreationBytecode("EcosystemUpgradeOperation"),

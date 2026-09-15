@@ -290,8 +290,9 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
     ///         legacy stage validator's checks are absorbed: `migrate()` checks the pinned timer's
     ///         deadline itself, the CTM's version-edge commit refuses to run while migrations are
     ///         unpaused, and `validateApplied()` refuses while they are still paused. The join to
-    ///         the recurring lifecycle needs no call: the executor is constructed answering to the
-    ///         coordinator, and the migration checks that binding.
+    ///         the recurring lifecycle is one call in the other direction: the executor is
+    ///         constructed answering to the coordinator, and stage 2 binds the coordinator back to
+    ///         it before `validateApplied()`, which gates on that binding.
     function _declareBootstrapActions() internal virtual {
         require(address(bootstrapMigration) != address(0), "bootstrap migration not deployed");
         require(upgradeAddresses.upgradeTimer != address(0), "upgradeTimer is zero");
