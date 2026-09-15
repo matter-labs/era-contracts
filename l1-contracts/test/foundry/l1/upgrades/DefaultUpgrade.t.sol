@@ -301,9 +301,10 @@ contract DefaultUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         );
         assertEq(data.baseTokenMetadata.name, ERC20_NAME, "metadata not read from the local token");
         assertEq(data.baseTokenMetadata.symbol, ERC20_SYMBOL, "wrong symbol");
-        assertEq(data.baseTokenMetadata.decimals, ERC20_DECIMALS, "wrong decimals");
-        // The bridging data still describes the token on its origin chain.
-        assertEq(data.baseTokenL1Address, erc20OriginToken, "wrong L1 base token address");
+        assertEq(data.baseTokenMetadata.decimals, COMPOSED_DECIMALS, "wrong decimals");
+        // The recorded address is the same local token the metadata came from; the bridging data
+        // still describes the token on its origin chain.
+        assertEq(data.baseTokenL1Address, address(erc20LocalToken), "wrong L1 base token address");
         assertEq(data.baseTokenBridgingData.originToken, erc20OriginToken, "wrong origin token");
         assertEq(data.baseTokenBridgingData.originChainId, ERC20_ORIGIN_CHAIN_ID, "wrong origin chain");
         assertEq(data.baseTokenBridgingData.assetId, ERC20_BASE_TOKEN_ASSET_ID, "wrong base token asset id");

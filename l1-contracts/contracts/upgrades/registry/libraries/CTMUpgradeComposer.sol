@@ -12,13 +12,6 @@ import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
 import {IComplexUpgrader} from "../../../state-transition/l2-deps/IComplexUpgrader.sol";
 import {L2CanonicalTransactionLib} from "../../../state-transition/libraries/L2CanonicalTransactionLib.sol";
 import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
-import {
-    PRIORITY_TX_MAX_GAS_LIMIT,
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-    ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE
-} from "../../../common/Config.sol";
-import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
-import {SEMVER_MINOR_OFFSET} from "../../../common/libraries/SemVer.sol";
 import {L2UpgradePlan, TransitionManifest} from "../RegistryTypes.sol";
 
 /// @author Matter Labs
@@ -100,13 +93,6 @@ library CTMUpgradeComposer {
             // (txType == 0) makes `BaseZkSyncUpgrade` skip the L2 protocol upgrade transaction.
             return L2CanonicalTransactionLib.emptyL2CanonicalTransaction();
         }
-        L2CanonicalTransaction memory transaction = L2CanonicalTransactionLib.emptyL2CanonicalTransaction();
-        transaction.txType = ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE;
-        transaction.from = uint256(uint160(L2_FORCE_DEPLOYER_ADDR));
-        transaction.to = uint256(uint160(L2_COMPLEX_UPGRADER_ADDR));
-        transaction.gasLimit = PRIORITY_TX_MAX_GAS_LIMIT;
-        transaction.gasPerPubdataByteLimit = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
-        transaction.nonce = protocolUpgradeNonce(_newProtocolVersion);
         // What the delegate is called WITH is defined by the pinned version-specific composer
         // from authoritative inputs — never by authored bytes (see {IL2DelegateCalldataComposer}).
         bytes memory delegateCalldata = _plan.delegateComposer == address(0)
@@ -116,19 +102,15 @@ library CTMUpgradeComposer {
                 _bridgehub,
                 _chainId
             );
-        transaction.data = abi.encodeCall(
-            IComplexUpgrader.forceDeployAndUpgradeUniversal,
-            (_plan.deployments, _plan.delegateTo, delegateCalldata)
+        L2CanonicalTransaction memory transaction = L2CanonicalTransactionLib.upgradeTransaction(
+            _newProtocolVersion,
+            abi.encodeCall(
+                IComplexUpgrader.forceDeployAndUpgradeUniversal,
+                (_plan.deployments, _plan.delegateTo, delegateCalldata)
+            )
         );
         transaction.factoryDeps = _plan.factoryDepHashes;
         return transaction;
-    }
-
-    /// @notice The nonce of the L2 protocol upgrade transaction for a packed SemVer version.
-    /// @dev Mirrors `UpgradeHelperLib.getProtocolUpgradeNonce`: the packed version without its
-    ///      patch component. `BaseZkSyncUpgrade` enforces this equals the new minor version.
-    function protocolUpgradeNonce(uint256 _protocolVersion) internal pure returns (uint256) {
-        return _protocolVersion >> SEMVER_MINOR_OFFSET;
     }
 
     /// @dev The one cut shape the registry commits: no facet cuts, an engine init that names the

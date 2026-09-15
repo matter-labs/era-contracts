@@ -98,6 +98,10 @@ abstract contract RegistryObjectsFixture is Test {
     string internal constant ERC20_NAME = "Local Token";
     string internal constant ERC20_SYMBOL = "LOC";
     uint256 internal constant ERC20_DECIMALS = 6;
+    /// @dev What the composition actually records for any token: the tolerant metadata probe
+    ///      filters a conforming 32-byte `decimals()` answer, so the ERC20 default stands — see
+    ///      `ZKChainSpecificForceDeploymentsLib._baseTokenMetadata`.
+    uint256 internal constant COMPOSED_DECIMALS = 18;
 
     function _setUpRegistryObjects(bytes memory _delegateCalldata) internal {
         fixtureDelegateCalldata = _delegateCalldata;
@@ -149,6 +153,9 @@ abstract contract RegistryObjectsFixture is Test {
         address _localToken
     ) internal {
         vm.mockCall(_bridgehub, abi.encodeCall(IBridgehubBase.baseTokenAssetId, (_chainId)), abi.encode(_assetId));
+        // What a real Bridgehub resolves through the asset handler: the token's representation on
+        // THIS layer, which is what the composition records and reads the metadata from.
+        vm.mockCall(_bridgehub, abi.encodeCall(IBridgehubBase.baseToken, (_chainId)), abi.encode(_localToken));
         vm.mockCall(
             mockNativeTokenVault,
             abi.encodeCall(INativeTokenVaultBase.originToken, (_assetId)),
@@ -158,11 +165,6 @@ abstract contract RegistryObjectsFixture is Test {
             mockNativeTokenVault,
             abi.encodeCall(INativeTokenVaultBase.originChainId, (_assetId)),
             abi.encode(_originChainId)
-        );
-        vm.mockCall(
-            mockNativeTokenVault,
-            abi.encodeCall(INativeTokenVaultBase.tokenAddress, (_assetId)),
-            abi.encode(_localToken)
         );
     }
 
@@ -347,18 +349,21 @@ abstract contract RegistryObjectsFixture is Test {
     function _expectedPerChainData(uint256 _chainId) internal view returns (bytes memory) {
         bool isEthChain = _chainId == ETH_CHAIN_ID;
         address originToken = isEthChain ? ETH_TOKEN_ADDRESS : erc20OriginToken;
+        // The recorded address is the token's representation on THIS layer, which for the ERC20
+        // chain is a different contract from its origin token.
+        address localToken = isEthChain ? ETH_TOKEN_ADDRESS : address(erc20LocalToken);
         TokenMetadata memory metadata;
         if (isEthChain) {
             metadata = TokenMetadata({name: "Ether", symbol: "ETH", decimals: 18});
         } else {
-            metadata = TokenMetadata({name: ERC20_NAME, symbol: ERC20_SYMBOL, decimals: ERC20_DECIMALS});
+            metadata = TokenMetadata({name: ERC20_NAME, symbol: ERC20_SYMBOL, decimals: COMPOSED_DECIMALS});
         }
         return
             abi.encode(
                 ZKChainSpecificForceDeploymentsData({
                     l2LegacySharedBridge: address(0),
                     predeployedL2WethAddress: address(0),
-                    baseTokenL1Address: originToken,
+                    baseTokenL1Address: localToken,
                     baseTokenMetadata: metadata,
                     baseTokenBridgingData: TokenBridgingData({
                         assetId: isEthChain ? ETH_BASE_TOKEN_ASSET_ID : ERC20_BASE_TOKEN_ASSET_ID,
