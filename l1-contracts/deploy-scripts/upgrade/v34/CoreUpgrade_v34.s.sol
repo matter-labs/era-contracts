@@ -187,5 +187,4 @@ contract CoreUpgrade_v34 is DefaultCoreUpgrade {
             })
         );
     }
-
 }
