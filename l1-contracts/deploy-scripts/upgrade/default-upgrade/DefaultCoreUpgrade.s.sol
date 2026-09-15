@@ -8,9 +8,6 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
-import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
@@ -19,21 +16,40 @@ import {Call} from "contracts/governance/Common.sol";
 import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
-import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol";
+import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
+import {CoreRegistryManifest, ProxyUpgradeRow} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {
+    L1EcosystemContract,
+    L1_ECOSYSTEM_CONTRACT_COUNT
+} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {BridgehubAddresses, CoreDeployedAddresses} from "../../utils/Types.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
-import {UpgradeUtils} from "./UpgradeUtils.sol";
+import {CoreUpgradeParams} from "./UpgradeParams.sol";
+import {BytecodeUtils} from "../../utils/bytecode/BytecodeUtils.s.sol";
+import {ExternalActionsLib} from "./ExternalActionsLib.sol";
 import {Utils} from "../../utils/Utils.sol";
 
-import {ChainCreationParamsLib} from "../../ctm/ChainCreationParamsLib.sol";
-import {CoreUpgradeParams} from "./UpgradeParams.sol";
-import {ICoreUpgrade} from "contracts/script-interfaces/ICoreUpgrade.sol";
-
-/// @notice Script used for default ecosystem upgrade flow should be run as a first for the upgrade.
-/// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
-contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
+/// @notice The ecosystem (core) side of a registry-driven upgrade prepare, run before the CTM
+///         prepare: deploys the new ecosystem implementations and pins them in a write-once
+///         `CoreRegistry`. It emits NO governance calls of its own — the transition the CTM
+///         prepare deploys names the registry, and the coordinator's stage 1 applies it through
+///         the `CoreUpgradeExecutor`. Anything a version script still needs governance to do is
+///         declared as an external action and listed in the output.
+/// @dev Version scripts inherit and override; the v34 bootstrap edge overrides the object
+///      deployment and declares every call of its one-time edge.
+contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     using stdToml for string;
+    using ExternalActionsLib for ExternalActionsLib.Ledger;
+
+    /// @notice The write-once inventory of this upgrade's ecosystem implementation swaps; zero
+    ///         when the run deployed no ecosystem implementation.
+    CoreRegistry public coreRegistry;
+
+    /// @dev The governance/admin calls this prepare emits that the upgrade objects do not
+    ///      describe (see {ExternalActionsLib}).
+    ExternalActionsLib.Ledger internal externalActions;
 
     /// @notice Internal state of the upgrade script
     struct EcosystemUpgradeConfig {
@@ -42,13 +58,25 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
     }
 
     struct AdditionalConfigParams {
-        uint256 newProtocolVersion;
         bool hasPreV32IntrospectionOverride;
         bool usePreV32IntrospectionOverride;
     }
     AdditionalConfigParams internal additionalConfig;
 
     EcosystemUpgradeConfig internal upgradeConfig;
+
+    /// @notice Single-call entry point invoked by the protocol-ops CLI's `upgrade-prepare-all`
+    ///         (`ICoreUpgradeV31` in `contracts/script-interfaces/IUpgradeV31.sol`).
+    function noGovernancePrepare(CoreUpgradeParams memory _params) public virtual {
+        initializeWithArgs(
+            _params.bridgehubProxyAddress,
+            _params.create2FactorySalt,
+            _params.upgradeInputPath,
+            _params.outputPath
+        );
+        prepareEcosystemUpgrade();
+        prepareDefaultGovernanceCalls();
+    }
 
     function initializeWithArgs(
         address bridgehubProxyAddress,
@@ -69,80 +97,151 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
     function prepareEcosystemUpgrade() public virtual {
         deployNewEcosystemContractsL1();
         console.log("Ecosystem contracts are deployed!");
+        deployEcosystemUpgradeObjects();
         saveOutput(upgradeConfig.outputPath);
         console.log("Core upgrade output saved!");
     }
 
-    /// @notice Single-call entry point invoked by the protocol-ops CLI's `ecosystem
-    ///         upgrade-prepare-all`. Runs the ecosystem-wide core deploys; CTM deploys are handled
-    ///         by the matching CTM upgrade script.
-    function noGovernancePrepare(CoreUpgradeParams memory _params) public virtual {
-        initializeWithArgs(
-            _params.bridgehubProxyAddress,
-            _params.create2FactorySalt,
-            _params.upgradeInputPath,
-            _params.outputPath
-        );
-        prepareEcosystemUpgrade();
-        prepareDefaultGovernanceCalls();
+    /// @notice The upgrade objects of the ecosystem side. The default deploys the registry over the
+    ///         implementations this run deployed; the bootstrap edge also deploys the executor.
+    function deployEcosystemUpgradeObjects() public virtual {
+        deployCoreRegistry();
     }
 
-    /// @notice Deploy the L1 core implementations behind the proxies {prepareUpgradeProxiesCalls}
-    ///         upgrades. Every release refreshes all of them, so this lives here rather than being
-    ///         restated per version; a release adds only what is new to it (a new proxy, say) by
-    ///         overriding {deployVersionSpecificEcosystemContractsL1}.
-    /// @dev Includes the interop handler's implementation even though its *proxy* first appears in
-    ///      v33: the implementation is refreshed like any other core contract from then on, and the
-    ///      release that introduces the proxy reuses this deploy rather than repeating it.
-    function deployNewEcosystemContractsL1() public virtual {
-        coreAddresses.bridgehub.implementations.bridgehub = deploySimpleContract("L1Bridgehub");
-        coreAddresses.bridgehub.implementations.messageRoot = deploySimpleContract("L1MessageRoot");
-        coreAddresses.bridges.implementations.l1Nullifier = deploySimpleContract("L1Nullifier");
-        coreAddresses.bridges.implementations.l1AssetRouter = deploySimpleContract("L1AssetRouter");
-        coreAddresses.bridges.implementations.l1NativeTokenVault = deploySimpleContract("L1NativeTokenVault");
-        coreAddresses.bridgehub.implementations.ctmDeploymentTracker = deploySimpleContract("CTMDeploymentTracker");
-        coreAddresses.bridgehub.implementations.chainAssetHandler = deploySimpleContract("L1ChainAssetHandler");
-        coreAddresses.bridgehub.implementations.chainRegistrationSender = deploySimpleContract(
-            "ChainRegistrationSender"
+    /// @notice Deploys the write-once inventory of this upgrade's swaps — one source-checked row
+    ///         per proxy this run deployed a new implementation for. Nothing is deployed when the
+    ///         run deployed none (a CTM-only upgrade has no ecosystem leg).
+    /// @dev Rides the CREATE2 factory like every prepare deployment: the Safe bundle replays factory
+    ///      transactions only.
+    function deployCoreRegistry() public virtual {
+        ProxyUpgradeRow[] memory rows = _coreProxyUpgradeRows();
+        uint256 participating = 0;
+        uint256 length = rows.length;
+        for (uint256 i = 0; i < length; ++i) {
+            if (rows[i].implNew != address(0)) {
+                ++participating;
+            }
+        }
+        if (participating == 0) {
+            console.log("No ecosystem implementation deployed: this upgrade has no CoreRegistry");
+            return;
+        }
+        // From the build ARTIFACT, which is also where the ecosystem executor's
+        // `CORE_REGISTRY_CODEHASH` came from — see {BytecodeUtils.getDeployedBytecodeHash}.
+        coreRegistry = CoreRegistry(
+            deployViaCreate2AndNotify(
+                BytecodeUtils.readBytecodeL1("CoreRegistry.sol", "CoreRegistry"),
+                abi.encode(CoreRegistryManifest({proxyUpgrades: rows})),
+                "CoreRegistry"
+            )
         );
-        coreAddresses.bridges.implementations.l1InteropHandler = deploySimpleContract("L1InteropHandler");
-
-        deployVersionSpecificEcosystemContractsL1();
     }
 
-    /// @notice Hook for deploys that only one release needs — typically a proxy that did not exist
-    ///         before it. Implementation refreshes belong in {deployNewEcosystemContractsL1}.
-    function deployVersionSpecificEcosystemContractsL1() public virtual {}
+    /// @notice The enum-indexed ecosystem inventory: one slot per `L1EcosystemContract` member, a
+    ///         source-checked row (live implementation read from the EIP-1967 slot) for every proxy
+    ///         this run deployed a new implementation for, every other slot an explicit inert zero.
+    function _coreProxyUpgradeRows() internal view virtual returns (ProxyUpgradeRow[] memory rows) {
+        rows = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
+        rows[uint256(L1EcosystemContract.L1Bridgehub)] = _row(
+            coreAddresses.bridgehub.proxies.bridgehub,
+            coreAddresses.bridgehub.implementations.bridgehub
+        );
+        rows[uint256(L1EcosystemContract.L1Nullifier)] = _row(
+            coreAddresses.bridges.proxies.l1Nullifier,
+            coreAddresses.bridges.implementations.l1Nullifier
+        );
+        rows[uint256(L1EcosystemContract.L1AssetRouter)] = _row(
+            coreAddresses.bridges.proxies.l1AssetRouter,
+            coreAddresses.bridges.implementations.l1AssetRouter
+        );
+        rows[uint256(L1EcosystemContract.L1NativeTokenVault)] = _row(
+            coreAddresses.bridges.proxies.l1NativeTokenVault,
+            coreAddresses.bridges.implementations.l1NativeTokenVault
+        );
+        rows[uint256(L1EcosystemContract.L1MessageRoot)] = _row(
+            coreAddresses.bridgehub.proxies.messageRoot,
+            coreAddresses.bridgehub.implementations.messageRoot
+        );
+        rows[uint256(L1EcosystemContract.CTMDeploymentTracker)] = _row(
+            coreAddresses.bridgehub.proxies.ctmDeploymentTracker,
+            coreAddresses.bridgehub.implementations.ctmDeploymentTracker
+        );
+        rows[uint256(L1EcosystemContract.L1ChainAssetHandler)] = _row(
+            coreAddresses.bridgehub.proxies.chainAssetHandler,
+            coreAddresses.bridgehub.implementations.chainAssetHandler
+        );
+    }
+
+    /// @dev The inert (all-zero) row when this run deployed no implementation for the proxy.
+    function _row(address _proxy, address _implNew) internal view returns (ProxyUpgradeRow memory row) {
+        if (_implNew == address(0)) {
+            return row;
+        }
+        return
+            ProxyUpgradeRow({
+                proxy: _proxy,
+                expectedOldImpl: Utils.getImplementation(_proxy),
+                implNew: _implNew,
+                callInitializeUpgrade: false,
+                admin: ProxyAdmin(address(0))
+            });
+    }
+
+    /// @notice Declares one governance/admin call this prepare emits that the upgrade objects do
+    ///         not describe. Everything a version script adds to a stage goes through here, so
+    ///         the output lists it (see {ExternalActionsLib}).
+    function declareExternalAction(
+        string memory _phase,
+        string memory _label,
+        string memory _authority,
+        Call memory _call
+    ) internal {
+        externalActions.declare(_phase, _label, _authority, _call);
+    }
+
+    /// @notice The declared external actions as the output's `external_actions` list (see
+    ///         {ExternalActionsLib.serialize}).
+    function externalActionEntries() public returns (string[] memory) {
+        return externalActions.serialize();
+    }
+
+    /// @notice Deploy everything that should be deployed
+    function deployNewEcosystemContractsL1() public virtual {}
 
     function getOwnerAddress() public virtual returns (address) {
         return config.ownerAddress;
     }
 
-    function setOwners(address owner) public virtual {
-        config.ownerAddress = owner;
+    /// @notice The ecosystem's lifecycle coordinator (`EcosystemUpgradeExecutor`), read from the
+    ///         core executor once the bootstrap edge has bound them: the operation naming this
+    ///         upgrade's transitions is driven through it, and every transition's timer is bound
+    ///         to it. The bootstrap prepare overrides this with the coordinator it deploys.
+    function getEcosystemUpgradeExecutor() public view virtual returns (address) {
+        address coordinator = getCoreUpgradeExecutor().coordinator();
+        require(coordinator != address(0), "core executor is not bound to a coordinator: run the bootstrap edge first");
+        return coordinator;
     }
 
-    function getNewProtocolVersion() public virtual returns (uint256) {
-        return additionalConfig.newProtocolVersion;
-    }
-
-    function getProtocolUpgradeNonce() public virtual returns (uint256) {
-        return (getNewProtocolVersion() >> 32);
-    }
-
-    function getOldProtocolDeadline() public virtual returns (uint256) {
-        // Returns max deadline initially. After the upgrade is complete (stage2),
-        // governance should call setNewVersionUpgrade with deadline=0 to force
-        // all chains to upgrade immediately.
-        return type(uint256).max;
+    /// @notice The ecosystem's `CoreUpgradeExecutor`: the owner of the shared ecosystem `ProxyAdmin`
+    ///         once the bootstrap edge has handed it over. The bootstrap prepare overrides this
+    ///         with the executor it deploys.
+    function getCoreUpgradeExecutor() public view virtual returns (CoreUpgradeExecutor) {
+        address admin = coreAddresses.shared.transparentProxyAdmin;
+        require(admin != address(0), "ecosystem ProxyAdmin not discovered");
+        address executor = ProxyAdmin(admin).owner();
+        require(
+            executor.code.length != 0,
+            "ecosystem ProxyAdmin owner is not a contract: run the bootstrap edge first"
+        );
+        require(
+            address(CoreUpgradeExecutor(payable(executor)).PROXY_ADMIN()) == admin,
+            "ecosystem ProxyAdmin owner is not an executor bound to it"
+        );
+        return CoreUpgradeExecutor(payable(executor));
     }
 
     function getDiscoveredBridgehub() public view returns (BridgehubAddresses memory) {
         return coreAddresses.bridgehub;
-    }
-
-    function getCoreAddresses() public view returns (CoreDeployedAddresses memory) {
-        return coreAddresses;
     }
 
     function initializeConfigWithArgs(
@@ -168,9 +267,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
             additionalConfig.hasPreV32IntrospectionOverride = true;
             additionalConfig.usePreV32IntrospectionOverride = upgradeToml.readBool("$.pre_v32_introspection");
         }
-
-        // Protocol version comes from genesis config
-        additionalConfig.newProtocolVersion = loadProtocolVersionFromGenesis();
 
         // Legacy Era gateway chain ID — baked into L1MessageRoot as immutable
         // ERA_GATEWAY_CHAIN_ID. Read from the upgrade input TOML ([legacy_gateway] section)
@@ -252,20 +348,19 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
             coreAddresses.bridgehub.proxies.chainAssetHandler
         );
         if (coreAddresses.bridgehub.proxies.chainRegistrationSender != address(0)) {
-            require(
-                coreAddresses.bridgehub.implementations.chainRegistrationSender != address(0),
-                "chainRegistrationSenderImpl is zero"
-            );
-            vm.serializeAddress(
-                "bridgehub",
-                "chain_registration_sender_implementation_addr",
-                coreAddresses.bridgehub.implementations.chainRegistrationSender
-            );
             vm.serializeAddress(
                 "bridgehub",
                 "chain_registration_sender_proxy_addr",
                 coreAddresses.bridgehub.proxies.chainRegistrationSender
             );
+            // A registry-driven prepare redeploys only what its release changes.
+            if (coreAddresses.bridgehub.implementations.chainRegistrationSender != address(0)) {
+                vm.serializeAddress(
+                    "bridgehub",
+                    "chain_registration_sender_implementation_addr",
+                    coreAddresses.bridgehub.implementations.chainRegistrationSender
+                );
+            }
         }
         vm.serializeAddress("bridgehub", "message_root_proxy_addr", coreAddresses.bridgehub.proxies.messageRoot);
         string memory bridgehubSerialized = vm.serializeAddress(
@@ -334,14 +429,19 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
 
         string memory misc = vm.serializeAddress("misc", "deployer_addr", config.deployerAddress);
         vm.serializeString("root", "upgrade_addresses", deployedAddresses);
+        // The objects the CTM prepare and reviewers take from this run.
+        vm.serializeAddress("registry", "core_registry_addr", address(coreRegistry));
+        vm.serializeAddress("registry", "core_upgrade_executor_addr", address(getCoreUpgradeExecutor()));
+        string memory registry = vm.serializeAddress(
+            "registry",
+            "ecosystem_upgrade_executor_addr",
+            getEcosystemUpgradeExecutor()
+        );
+        vm.serializeString("root", "registry", registry);
         string memory toml = vm.serializeString("root", "misc", misc);
 
         vm.writeToml(toml, outputPath);
-
-        saveOutputVersionSpecific();
     }
-
-    function saveOutputVersionSpecific() public virtual {}
 
     ////////////////////////////// Preparing calls /////////////////////////////////
 
@@ -350,10 +450,8 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
         virtual
         returns (Call[] memory stage0Calls, Call[] memory stage1Calls, Call[] memory stage2Calls)
     {
-        // Default upgrade is done it 3 stages:
-        // 0. Pause migration to/from Gateway
-        // 1. Perform upgrade
-        // 2. Unpause migration to/from Gateway
+        // The ecosystem side emits only what a version script declared as external actions: the
+        // recurring ecosystem leg rides the coordinator's stage calls.
         stage0Calls = prepareStage0GovernanceCalls();
         vm.serializeBytes("governance_calls", "stage0_calls", abi.encode(stage0Calls));
         stage1Calls = prepareStage1GovernanceCalls();
@@ -369,177 +467,28 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
         // Upstream forge's keyed `vm.writeToml(json, path, key)` silently no-ops when the key
         // does not exist in the file yet, so append sections by re-serializing into the same
         // "root" object and rewriting the whole file instead.
+        vm.serializeString("root", "external_actions", externalActionEntries());
         string memory updatedToml = vm.serializeString("root", "governance_calls", governanceCallsSerialized);
         vm.writeToml(updatedToml, upgradeConfig.outputPath);
     }
 
-    function prepareDefaultEcosystemAdminCalls() public virtual returns (Call[] memory calls) {
-        // Empty by default.
-        return calls;
-    }
-
-    function prepareUnpauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
-        require(coreAddresses.bridgehub.proxies.bridgehub != address(0), "bridgehubProxyAddress is zero in newConfig");
-
-        result = new Call[](1);
-        result[0] = Call({
-            target: coreAddresses.bridgehub.proxies.chainAssetHandler,
-            value: 0,
-            data: abi.encodeCall(IChainAssetHandlerBase.unpauseMigration, ())
-        });
-    }
-
-    /// @notice The zeroth step of upgrade. By default it just stops gateway migrations
+    /// @notice The governance stages of the ecosystem side: nothing but the declared external
+    ///         actions of each phase. The recurring ecosystem leg — the registry applied through
+    ///         the `CoreUpgradeExecutor` — is the coordinator's stage-1 job, ordered and enforced
+    ///         on-chain.
     function prepareStage0GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](3);
-
-        allCalls[0] = preparePauseGatewayMigrationsCall();
-        allCalls[1] = prepareVersionSpecificStage0GovernanceCallsL1();
-        allCalls[2] = prepareDefaultEcosystemAdminCalls();
-
-        calls = UpgradeUtils.mergeCallsArray(allCalls);
+        return externalActions.callsForPhase(ExternalActionsLib.PHASE_STAGE_0);
     }
 
-    /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](4);
-
-        // Re-assert the migration pause as the first stage-1 call. When this upgrade is executed via the
-        // EmergencyUpgradeBoard, PUH.executeEmergencyUpgrade runs a built-in unfreeze/unpause pre-step that
-        // calls ChainAssetHandler.unpauseMigration(), clearing the pause set in stage 0; stage 1's
-        // checkMigrationsPaused() would then revert with MigrationsNotPaused(). Harmless on the normal
-        // governance path (the pause from stage 0 is simply re-asserted).
-        allCalls[0] = preparePauseGatewayMigrationsCall();
-        console.log("prepareStage1GovernanceCalls: prepareUpgradeProxiesCalls");
-        allCalls[1] = prepareUpgradeProxiesCalls();
-        allCalls[2] = provideSetNewVersionUpgradeCall();
-        console.log("prepareStage1GovernanceCalls: prepareGatewaySpecificStage1GovernanceCalls");
-        allCalls[3] = prepareVersionSpecificStage1GovernanceCallsL1();
-
-        calls = UpgradeUtils.mergeCallsArray(allCalls);
+        return externalActions.callsForPhase(ExternalActionsLib.PHASE_STAGE_1);
     }
 
-    /// @notice The second step of upgrade. By default it unpauses migrations.
     function prepareStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](2);
-
-        allCalls[0] = prepareVersionSpecificStage2GovernanceCallsL1();
-        allCalls[1] = prepareUnpauseGatewayMigrationsCall();
-
-        calls = UpgradeUtils.mergeCallsArray(allCalls);
-    }
-
-    function prepareVersionSpecificStage0GovernanceCallsL1() public virtual returns (Call[] memory calls) {
-        // Empty by default.
-        return calls;
-    }
-
-    function prepareVersionSpecificStage1GovernanceCallsL1() public virtual returns (Call[] memory calls) {
-        // Empty by default.
-        return calls;
-    }
-
-    function prepareVersionSpecificStage2GovernanceCallsL1() public virtual returns (Call[] memory calls) {
-        // Empty by default.
-        return calls;
-    }
-
-    // TODO looks like we have to set it for bridgehub too
-    function provideSetNewVersionUpgradeCall() public virtual returns (Call[] memory calls) {}
-
-    function preparePauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
-        require(coreAddresses.bridgehub.proxies.chainAssetHandler != address(0), "chainAssetHandlerProxy is zero");
-
-        result = new Call[](1);
-        result[0] = Call({
-            target: coreAddresses.bridgehub.proxies.chainAssetHandler,
-            value: 0,
-            data: abi.encodeCall(IChainAssetHandlerBase.pauseMigration, ())
-        });
-    }
-
-    /// @notice Update implementations in proxies
-    function prepareUpgradeProxiesCalls() public virtual returns (Call[] memory calls) {
-        calls = new Call[](8);
-
-        calls[0] = _buildCallProxyUpgrade(
-            coreAddresses.bridgehub.proxies.bridgehub,
-            coreAddresses.bridgehub.implementations.bridgehub
-        );
-
-        // Note, that we do not need to run the initializer
-        calls[1] = _buildCallProxyUpgrade(
-            coreAddresses.bridges.proxies.l1Nullifier,
-            coreAddresses.bridges.implementations.l1Nullifier
-        );
-
-        calls[2] = _buildCallProxyUpgrade(
-            coreAddresses.bridges.proxies.l1AssetRouter,
-            coreAddresses.bridges.implementations.l1AssetRouter
-        );
-
-        calls[3] = _buildCallProxyUpgrade(
-            coreAddresses.bridges.proxies.l1NativeTokenVault,
-            coreAddresses.bridges.implementations.l1NativeTokenVault
-        );
-
-        // L1MessageRoot is a plain upgrade like the rest: v31's `initializeL1V31Upgrade` reinitializer was
-        // removed in this release, and every ecosystem it can upgrade had already consumed that version.
-        calls[4] = _buildCallProxyUpgrade(
-            coreAddresses.bridgehub.proxies.messageRoot,
-            coreAddresses.bridgehub.implementations.messageRoot
-        );
-
-        calls[5] = _buildCallProxyUpgrade(
-            coreAddresses.bridgehub.proxies.ctmDeploymentTracker,
-            coreAddresses.bridgehub.implementations.ctmDeploymentTracker
-        );
-
-        calls[6] = _buildCallProxyUpgrade(
-            coreAddresses.bridgehub.proxies.chainAssetHandler,
-            coreAddresses.bridgehub.implementations.chainAssetHandler
-        );
-
-        calls[7] = _buildCallProxyUpgrade(
-            coreAddresses.bridgehub.proxies.chainRegistrationSender,
-            coreAddresses.bridgehub.implementations.chainRegistrationSender
-        );
-    }
-
-    function _buildCallProxyUpgrade(
-        address proxyAddress,
-        address newImplementationAddress
-    ) internal virtual returns (Call memory call) {
-        require(coreAddresses.shared.transparentProxyAdmin != address(0), "transparentProxyAdmin not newConfigured");
-
-        call = Call({
-            target: coreAddresses.shared.transparentProxyAdmin,
-            data: abi.encodeCall(
-                ProxyAdmin.upgrade,
-                (ITransparentUpgradeableProxy(payable(proxyAddress)), newImplementationAddress)
-            ),
-            value: 0
-        });
-    }
-
-    function _buildCallBeaconProxyUpgrade(
-        address proxyAddress,
-        address newImplementationAddress
-    ) internal virtual returns (Call memory call) {
-        call = Call({
-            target: proxyAddress,
-            data: abi.encodeCall(UpgradeableBeacon.upgradeTo, (newImplementationAddress)),
-            value: 0
-        });
+        return externalActions.callsForPhase(ExternalActionsLib.PHASE_STAGE_2);
     }
 
     // add this to be excluded from coverage report
-
-    /// @notice Load protocol version from genesis config
-    function loadProtocolVersionFromGenesis() internal virtual returns (uint256) {
-        string memory genesisPath = Utils.genesisConfigPath();
-        return ChainCreationParamsLib.getChainCreationParams(genesisPath).latestProtocolVersion;
-    }
 
     function getBroadcasterAddress() internal view virtual returns (address) {
         return tx.origin;

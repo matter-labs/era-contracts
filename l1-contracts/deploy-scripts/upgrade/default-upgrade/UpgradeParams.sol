@@ -7,7 +7,6 @@ pragma solidity 0.8.28;
 struct EcosystemUpgradeParams {
     address bridgehubProxyAddress;
     address ctmProxy;
-    address bytecodesSupplier;
     address rollupDAManager;
     bytes32 create2FactorySalt;
     string upgradeInputPath;
@@ -29,12 +28,18 @@ struct CoreUpgradeParams {
     string outputPath;
 }
 
-/// @notice Parameters for the standalone CTM upgrade entry point.
-///         Used by `CTMUpgrade_v31.noGovernancePrepare` when running once per target CTM.
+/// @notice Parameters for the standalone CTM upgrade entry point
+///         (`DefaultCTMUpgrade.noGovernancePrepare`) when running once per target CTM in a
+///         multi-CTM ecosystem.
 // solhint-disable-next-line gas-struct-packing
 struct CTMUpgradeParams {
     address ctmProxy;
-    address bytecodesSupplier;
+    /// @notice The CTM's rollup `DAManager`, an AdminFacet constructor argument. No CTM- or
+    ///         Bridgehub-level getter exposes it — only a live chain's diamond does, and a
+    ///         chainless ecosystem has none — so it stays an explicit input rather than something
+    ///         the prepare discovers. Contrast the `BytecodesSupplier`, which the prepare reads
+    ///         off the CTM's own `L1_BYTECODES_SUPPLIER()` immutable and therefore takes no
+    ///         parameter for.
     address rollupDAManager;
     bytes32 create2FactorySalt;
     string upgradeInputPath;
@@ -51,4 +56,25 @@ struct CTMUpgradeParams {
     ///         `performForceDeployedContractsInit`, so a zero value breaks the genesis of chains created
     ///         from this release.
     bytes32 zkTokenAssetId;
+    /// @notice The `EcosystemUpgradeExecutor` — the lifecycle coordinator — the core prepare of this
+    ///         upgrade deployed or discovered (its output TOML, `[registry].ecosystem_upgrade_executor_addr`).
+    ///         The bootstrap's CTM executor is constructed answering to it and every transition's
+    ///         timer is bound to it, so the CTM prepare takes it as an input rather than re-deriving
+    ///         a deployment it did not make.
+    address ecosystemUpgradeExecutor;
+}
+
+/// @notice Inputs of the compose step (`ComposeUpgradeOperation.compose`), assembled by
+///         protocol-ops from the core and CTM prepare outputs.
+/// @param coordinator The `EcosystemUpgradeExecutor` the CTM executor answers to (the core prepare's
+///        `[registry].ecosystem_upgrade_executor_addr`).
+/// @param coreRegistry The core prepare's `CoreRegistry`, zero when the upgrade has no ecosystem leg.
+/// @param transition The single CTM transition this operation applies.
+// solhint-disable-next-line gas-struct-packing
+struct ComposeOperationParams {
+    address coordinator;
+    address coreRegistry;
+    address transition;
+    bytes32 create2FactorySalt;
+    string outputPath;
 }

@@ -3,7 +3,7 @@ import { promisify } from "util";
 import * as path from "path";
 import type { CoreDeployedAddresses, CTMDeployedAddresses } from "../core/types";
 import { ensureDirectoryExists, parseForgeScriptOutput, saveTomlConfig } from "../core/utils";
-import { ANVIL_DEFAULT_ACCOUNT_ADDR } from "../core/const";
+import { ANVIL_DEFAULT_ACCOUNT_ADDR, CTM_DEPLOYMENT_FORGE_MEMORY_LIMIT_BYTES } from "../core/const";
 import { runForgeScript } from "../core/forge";
 import {
   ANVIL_INTEROP_CTM_DEPLOYMENT_CONFIG_RELATIVE,
@@ -114,6 +114,7 @@ export class ForgeDeployer {
       projectRoot: this.projectRoot,
       sig,
       args,
+      extraForgeArgs: ["--memory-limit", CTM_DEPLOYMENT_FORGE_MEMORY_LIMIT_BYTES.toString()],
     });
 
     const fullOutputPath = path.join(this.projectRoot, ANVIL_INTEROP_CTM_OUTPUT_RELATIVE);
@@ -127,6 +128,7 @@ export class ForgeDeployer {
 
     return {
       chainTypeManager: stateTransition.state_transition_proxy_addr as string,
+      releaseCodehash: stateTransition.release_codehash as string,
       chainAdmin: (deployedAddresses.chain_admin || output.chain_admin_addr) as string,
       diamondProxy: (output.diamond_proxy_addr || output.diamond_proxy) as string,
       adminFacet: (stateTransition.admin_facet_addr || output.admin_facet) as string,

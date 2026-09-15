@@ -188,11 +188,17 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         IChainAssetHandlerBase(address(l2ChainAssetHandler)).bridgeBurn(eraZKChainId, 0, 0, address(0), "");
     }
 
-    function test_bridgeBurn_revertWhen_migrationPaused() public {
+    /// @dev The release-level ban is checked before the pause, so on a production handler an
+    ///      ecosystem pause is masked by `ChainMigrationsDisabled` — migrations being disabled
+    ///      outright is the dominant fact. The pause gate itself (including the per-CTM pause) is
+    ///      covered against the Dev handler, where migrations are enabled and it is reachable:
+    ///      see `L1ChainAssetHandlerMigrationPause.t.sol`.
+    function test_bridgeBurn_releaseBanDominatesTheEcosystemPause() public {
         vm.prank(_owner());
         IChainAssetHandlerBase(address(l2ChainAssetHandler)).pauseMigration();
+        assertTrue(IChainAssetHandlerBase(address(l2ChainAssetHandler)).migrationPaused());
 
-        vm.expectRevert(abi.encodeWithSelector(MigrationPaused.selector));
+        vm.expectRevert(abi.encodeWithSelector(ChainMigrationsDisabled.selector));
         vm.prank(L2_ASSET_ROUTER_ADDR);
         IChainAssetHandlerBase(address(l2ChainAssetHandler)).bridgeBurn(eraZKChainId, 0, 0, address(0), "");
     }

@@ -1,0 +1,26 @@
+# Upgrade input for the same-minor PATCH hop: a verifier replacement published as a new release
+# that copies the departing one except that member. A patch may change the release but may not
+# carry an L2 upgrade, and it deliberately does not require an earlier L2 upgrade to be finalized
+# first — the hop runs with one still pending. Substituted by the harness like
+# bootstrap-upgrade.toml; only `contracts.new_protocol_version` is consumed.
+
+old_protocol_version = 0x2200000000
+bridgehub_proxy_address = "0x0000000000000000000000000000000000000000"
+owner_address = "0x0000000000000000000000000000000000000000"
+
+[chain]
+chain_id = 10
+
+[contracts]
+
+genesis_root = "0x0000000000000000000000000000000000000000000000000000000000000000"
+genesis_rollup_leaf_index = 0
+genesis_batch_commitment = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_node_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_leaf_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_circuits_set_vks_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+bootloader_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+default_aa_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+evm_emulator_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+latest_protocol_version = 0x2200000001
+new_protocol_version = 0x2200000001

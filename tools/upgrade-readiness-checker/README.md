@@ -23,8 +23,11 @@ The upgrade can be safely finalized on L1 once:
    `Bridgehub.chainTypeManager(chainId)` on the settlement layer (L1 for direct
    chains, gateway L2 for gateway-settling chains).
 2. Scans for `NewUpgradeCutData(targetProtocolVersion, ...)` on the CTM and
-   decodes the embedded `L2CanonicalTransaction` from the diamond cut init
-   calldata.
+   resolves the committed `L2CanonicalTransaction` from the diamond cut init
+   calldata: a registry-driven cut (`upgradeFromTransition(transition)` /
+   `upgradeFromBootstrap(migration)`) names the object the engine reads at
+   execution, so the transaction is read back through `l2UpgradeTx` on the
+   engine / migration; a legacy pre-v34 cut embeds it in `ProposedUpgrade`.
 3. Computes the canonical tx hash: `keccak256(tx.abi_encode())`.
 4. Polls the chain's L2 RPC:
    - `eth_getTransactionReceipt(hash)` — once present, we have block **N**.

@@ -1045,3 +1045,44 @@ fn append_test_upgrade_calls(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::common::governance_calls::{encode_calls, GovernanceCall};
+    use alloy::primitives::U256;
+
+    #[test]
+    fn separately_generated_probes_preserve_simulation_actions() {
+        let admin = Address::repeat_byte(0x11);
+        let target = Address::repeat_byte(0x22);
+        let data = vec![0xde, 0xad, 0xbe, 0xef];
+        let encoded = format!(
+            "0x{}",
+            hex::encode(encode_calls(&[GovernanceCall {
+                target,
+                value: U256::ZERO,
+                data: data.clone(),
+            }]))
+        );
+        let mut probes = BTreeMap::new();
+        for tag in ["test_create_chain_zkos", "test_upgrade_chain_zkos"] {
+            probes.insert(tag.to_owned(), encoded.clone());
+            probes.insert(format!("{tag}_caller"), format!("{admin:#x}"));
+        }
+        let mut txs = Vec::new();
+        append_test_upgrade_calls(&mut txs, &probes, "l1", &SimDescriptionRegistry::default())
+            .unwrap();
+        assert_eq!(txs.len(), 2);
+        for tx in &txs {
+            assert_eq!(tx.from, format!("{admin:#x}"));
+            assert_eq!(tx.to, format!("{target:#x}"));
+            assert_eq!(tx.data, format!("0x{}", hex::encode(&data)));
+            assert_eq!(tx.value, "0");
+        }
+        assert_eq!(txs[0].tag, "test_create_chain_zkos");
+        assert_eq!(txs[0].emulate_all_batches_executed, None);
+        assert_eq!(txs[1].tag, "test_upgrade_chain_zkos");
+        assert_eq!(txs[1].emulate_all_batches_executed, Some(true));
+    }
+}

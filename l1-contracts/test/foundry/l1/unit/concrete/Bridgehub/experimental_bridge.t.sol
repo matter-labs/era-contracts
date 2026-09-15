@@ -13,7 +13,6 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {IInteropCenter, InteropCenter} from "contracts/interop/InteropCenter.sol";
-import {ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
 import {
     L2TransactionRequestDirect,
     L2TransactionRequestTwoBridgesInner,
@@ -598,10 +597,7 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
 
         vm.prank(bridgeOwner);
@@ -613,10 +609,7 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
     }
 
@@ -642,10 +635,7 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
     }
 
@@ -671,10 +661,7 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
 
         chainId = 0;
@@ -684,10 +671,7 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
     }
 
@@ -709,10 +693,7 @@ contract ExperimentalBridgeTest is Test {
             _chainId: HARD_CODED_CHAIN_ID,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
     }
 
@@ -734,10 +715,7 @@ contract ExperimentalBridgeTest is Test {
             _chainId: HARD_CODED_CHAIN_ID,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
     }
 
@@ -766,10 +744,7 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
     }
 
@@ -798,10 +773,7 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
     }
 
@@ -826,10 +798,7 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
     }
 
@@ -861,10 +830,7 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: factoryDeps
+            _admin: admin
         });
 
         vm.prank(mockCTM.owner());
@@ -877,14 +843,7 @@ contract ExperimentalBridgeTest is Test {
         vm.mockCall(
             address(mockCTM),
             // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(
-                mockCTM.createNewChain.selector,
-                chainId,
-                tokenAssetId,
-                admin,
-                mockInitCalldata,
-                factoryDeps
-            ),
+            abi.encodeWithSelector(mockCTM.createNewChain.selector, chainId, admin),
             abi.encode(newChainAddress)
         );
         // The Bridgehub seeds the fresh chain's genesis root right after registration by pulling
@@ -903,10 +862,7 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: uint256(chainId * 2),
-            _admin: admin,
-            _initData: mockInitCalldata,
-            _factoryDeps: factoryDeps
+            _admin: admin
         });
 
         vm.stopPrank();
@@ -1351,18 +1307,10 @@ contract ExperimentalBridgeTest is Test {
         diamondCutData.initAddress = address(0);
         diamondCutData.initCalldata = "";
 
-        ChainCreationParams memory params = ChainCreationParams({
-            diamondCut: diamondCutData,
-            // Just some dummy values:
-            genesisUpgrade: address(0x01),
-            genesisBatchHash: bytes32(uint256(0x01)),
-            genesisIndexRepeatedStorageChanges: uint64(0x01),
-            genesisBatchCommitment: bytes32(uint256(0x01)),
-            forceDeploymentsData: bytes("")
-        });
-
-        mockCTM.setChainCreationParams(params);
-
+        // From v32 the CTM derives all genesis data from its pinned registry, so there is nothing
+        // to register on the CTM here: the returned blob is only the opaque `_initData` the
+        // bridgehub forwards (and the CTM ignores). These tests either mock `createNewChain` or
+        // revert (on pause) before it runs, so no genesis registry needs to exist on the CTM.
         return abi.encode(abi.encode(diamondCutData), bytes(""));
     }
 

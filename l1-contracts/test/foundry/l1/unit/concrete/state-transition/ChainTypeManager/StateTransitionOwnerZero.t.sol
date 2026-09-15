@@ -2,14 +2,12 @@
 pragma solidity 0.8.28;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 
-import {
-    IChainTypeManager,
-    ChainCreationParams,
-    ChainTypeManagerInitializeData
-} from "contracts/state-transition/IChainTypeManager.sol";
+import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 
 contract initializingCTMOwnerZeroTest is ChainTypeManagerTest {
     function setUp() public {
@@ -17,21 +15,12 @@ contract initializingCTMOwnerZeroTest is ChainTypeManagerTest {
     }
 
     function test_InitializingCTMWithGovernorZeroShouldRevert() public {
-        ChainCreationParams memory chainCreationParams = ChainCreationParams({
-            genesisUpgrade: address(genesisUpgradeContract),
-            genesisBatchHash: bytes32(uint256(0x01)),
-            genesisIndexRepeatedStorageChanges: 1,
-            genesisBatchCommitment: bytes32(uint256(0x01)),
-            diamondCut: getDiamondCutData(address(diamondInit)),
-            forceDeploymentsData: bytes("")
-        });
-
         ChainTypeManagerInitializeData memory ctmInitializeDataNoOwner = ChainTypeManagerInitializeData({
             owner: address(0),
             validatorTimelock: validator,
-            chainCreationParams: chainCreationParams,
+            releaseCodehash: Utils.releaseCodehash(),
+            currentRelease: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
-            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 

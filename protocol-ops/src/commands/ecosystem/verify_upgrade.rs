@@ -59,7 +59,7 @@ pub struct VerifyUpgradeArgs {
     /// Stale entries (from older regens whose bytecode is no longer in
     /// AllContractsHashes) are silently skipped.
     ///
-    /// Defaults to `<l1-contracts>/upgrade-envs/v0.33.0-atomic-interop/output/<env>/transactions.txt`
+    /// Defaults to `<l1-contracts>/upgrade-envs/v0.34.0-registry/output/<env>/transactions.txt`
     #[clap(long)]
     pub transactions_log: Option<PathBuf>,
 
@@ -102,7 +102,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     let era_chain_id = env_cfg.era_chain_id().ok_or_else(|| {
         anyhow::anyhow!(
             "{} is missing top-level `era_chain_id`",
-            env_cfg.upgrade_input_path.display()
+            env_cfg.upgrade_input_toml_path.display()
         )
     })?;
     let legacy_gateway_chain_id = env_cfg.legacy_gateway_chain_id().ok_or_else(|| {
@@ -144,10 +144,10 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     // `[create2_factory_salts]`. PUVT hard-errors per deploy whose salt isn't
     // in this set.
     let mut expected_salts: Vec<FixedBytes<32>> = Vec::new();
-    if let Some(core_salt) = env_cfg.create2_factory_salt_for_upgrade()? {
+    if let Some(core_salt) = env_cfg.upgrade_create2_factory_salt()? {
         expected_salts.push(core_salt);
     }
-    for salt in env_cfg.create2_factory_salt_for_upgrade_per_ctm()?.values() {
+    for salt in env_cfg.upgrade_create2_factory_salt_per_ctm()?.values() {
         expected_salts.push(*salt);
     }
     if env_cfg.governance_kind() == GovernanceKind::Puh {
@@ -171,7 +171,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     ));
     logger::info(format!(
         "V31 input: {}",
-        env_cfg.upgrade_input_path.display()
+        env_cfg.upgrade_input_toml_path.display()
     ));
     logger::info(format!("Ecosystem TOML: {}", args.ecosystem_toml.display()));
     logger::info(format!(

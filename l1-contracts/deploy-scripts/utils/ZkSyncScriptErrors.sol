@@ -7,10 +7,6 @@ error AddressHasNoCode(address);
 error ArgumentsLengthNotIdentical();
 // 0x07637bd8
 error MintFailed();
-// 0xbd13da86
-error ProxyAdminIncorrect(address expectedProxyAdmin, address proxyAdmin);
-// 0x565fae63
-error ProxyAdminIncorrectOwner(address proxyAdmin, address governance);
 
 enum ZksyncContract {
     Create2Factory,

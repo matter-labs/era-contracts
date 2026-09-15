@@ -33,9 +33,10 @@ use serde::{Deserialize, Serialize};
 use crate::commands::ecosystem::upgrade_full::UpgradeFull;
 use crate::commands::ecosystem::upgrade_inner::{CtmInputs, PrepareInputs, UpgradeInner};
 use crate::common::abi::AdminFunctionsAbi;
+use crate::common::external_actions::ExternalAction;
 use crate::common::forge::scripts::{
-    ADMIN_FUNCTIONS_INVOCATION, CORE_UPGRADE_V33_SCRIPT_PATH, CTM_UPGRADE_V33_SCRIPT_PATH,
-    UPGRADE_V33_CORE_OUTPUT_PATH, UPGRADE_V33_ENV_DIR, UPGRADE_V33_LOCAL_INPUT_PATH,
+    ADMIN_FUNCTIONS_INVOCATION, COMPOSE_OPERATION_SCRIPT_PATH, CORE_UPGRADE_SCRIPT_PATH,
+    CTM_UPGRADE_SCRIPT_PATH, UPGRADE_CORE_OUTPUT_PATH, UPGRADE_LOCAL_INPUT_PATH,
 };
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
@@ -202,6 +203,134 @@ struct EcosystemUpgradeOutput {
     governance_calls: GovernanceCalls,
 }
 
+/// A governance call the merger appends that no prepare script emitted (the PUH/Guardians
+/// wiring, the CTM `acceptOwnership()` normalization, the new-Gateway bring-up). Declared in the
+/// merged TOML's `external_actions` exactly like the scripts' own, so the merged bundles never
+/// carry a call the artifact does not name.
+#[derive(Debug, Clone)]
+pub(super) struct ExtraGovernanceCall {
+    pub label: &'static str,
+    pub authority: &'static str,
+    pub call: crate::common::governance_calls::GovernanceCall,
+}
+
+alloy::sol! {
+    /// The three recurring stage entrypoints of the coordinating `EcosystemUpgradeExecutor` —
+    /// the only lifecycle calls a registry-driven package carries, emitted by the compose step.
+    interface IEcosystemUpgradeExecutorStages {
+        function stage0(address _operation);
+        function stage1(address _operation);
+        function stage2(address _operation);
+    }
+}
+
+/// The provenance invariant of one prepare output: every call of every stage bundle IS one of the
+/// `external_actions` the script declared for that phase — same target, same value, same calldata
+/// — and every declared action for that phase appears in it. A script that composes a call it
+/// never declared fails the merge instead of shipping it; so does one that declares an action it
+/// then omits. The lifecycle calls themselves come from the compose step, whose bundle
+/// `check_operation_bundle` pins exactly.
+fn check_bundle_provenance(
+    source: &str,
+    gov: &GovernanceCalls,
+    declared: &[ExternalAction],
+) -> anyhow::Result<()> {
+    use crate::common::governance_calls::decode_calls;
+    let stages = [
+        ("0", &gov.stage0_calls),
+        ("1", &gov.stage1_calls),
+        ("2", &gov.stage2_calls),
+    ];
+    for (phase, hex_calls) in stages {
+        let calls = decode_calls(hex_calls)
+            .with_context(|| format!("{source}: decode stage {phase} calls"))?;
+        let for_phase: Vec<&ExternalAction> =
+            declared.iter().filter(|a| a.phase == phase).collect();
+        // Matched one-for-one rather than by set membership, so a bundle cannot carry a declared
+        // call twice over while a second declaration goes unemitted.
+        let mut claimed = vec![false; for_phase.len()];
+        for call in &calls {
+            let matched = for_phase
+                .iter()
+                .enumerate()
+                .position(|(i, action)| !claimed[i] && action.is_call(call));
+            match matched {
+                Some(i) => claimed[i] = true,
+                None => anyhow::bail!(
+                    "{source}: stage {phase} carries a call no declared external action accounts \
+                     for — target {:#x}, value {}, selector 0x{}. Every emitted call must be a \
+                     declared action (see ExternalActionsLib); the lifecycle calls come from the \
+                     compose step",
+                    call.target,
+                    call.value,
+                    hex::encode(&call.data[..call.data.len().min(4)])
+                ),
+            }
+        }
+        if let Some(i) = claimed.iter().position(|c| !c) {
+            anyhow::bail!(
+                "{source}: stage {phase} declares an external action it never emits — {}",
+                for_phase[i].describe()
+            );
+        }
+    }
+    Ok(())
+}
+
+/// The compose step's bundle is exactly `stage0/1/2(operation)` on the coordinator — one call
+/// per stage, nothing else — and the operation it names is the one the step reported.
+fn check_operation_bundle(
+    gov: &GovernanceCalls,
+    coordinator: Address,
+    operation: Address,
+) -> anyhow::Result<()> {
+    use crate::common::governance_calls::decode_calls;
+    use alloy::sol_types::SolCall;
+    let expected = [
+        (
+            "0",
+            &gov.stage0_calls,
+            IEcosystemUpgradeExecutorStages::stage0Call {
+                _operation: operation,
+            }
+            .abi_encode(),
+        ),
+        (
+            "1",
+            &gov.stage1_calls,
+            IEcosystemUpgradeExecutorStages::stage1Call {
+                _operation: operation,
+            }
+            .abi_encode(),
+        ),
+        (
+            "2",
+            &gov.stage2_calls,
+            IEcosystemUpgradeExecutorStages::stage2Call {
+                _operation: operation,
+            }
+            .abi_encode(),
+        ),
+    ];
+    for (phase, hex_calls, data) in expected {
+        let calls = decode_calls(hex_calls)
+            .with_context(|| format!("compose step: decode stage {phase} calls"))?;
+        let [call] = calls.as_slice() else {
+            anyhow::bail!(
+                "compose step: stage {phase} carries {} call(s); exactly one coordinator stage call is expected",
+                calls.len()
+            );
+        };
+        if call.target != coordinator || call.data.as_slice() != data.as_slice() {
+            anyhow::bail!(
+                "compose step: stage {phase} is not `EcosystemUpgradeExecutor.stage{phase}({operation:#x})` on \
+                 the coordinator {coordinator:#x}"
+            );
+        }
+    }
+    Ok(())
+}
+
 /// Replay stage 0/1/2 governance calls from one or more prepared TOMLs.
 ///
 /// All stage-0 calls (across the TOMLs in the order given) execute first,
@@ -314,8 +443,8 @@ async fn stage_governance_execute(
 
 // ── upgrade-prepare-all (split-flow orchestrator) ──────────────────────────
 
-/// Unified split-flow prepare. Runs the core script's `noGovernancePrepare` once
-/// and the CTM script's `noGovernancePrepare` once per `--ctm-proxy`, all on a
+/// Unified split-flow prepare. Runs `the core script's noGovernancePrepare` once
+/// and `the CTM script's noGovernancePrepare` once per `--ctm-proxy`, all on a
 /// single anvil fork so deployer and operational admin broadcasts emit as one
 /// prepare bundle set. The downstream `upgrade-governance` consumes the
 /// per-step TOMLs (passed as `--governance-toml` once each).
@@ -351,25 +480,27 @@ pub struct UpgradePrepareAllArgs {
 
     #[clap(
         long,
-        default_value = UPGRADE_V33_LOCAL_INPUT_PATH,
+        default_value = UPGRADE_LOCAL_INPUT_PATH,
         hide = true
     )]
     pub upgrade_input_path: String,
 
     /// Override the core-prepare output TOML path (relative to l1-contracts
-    /// root). Defaults to the canonical `script-out/v33-upgrade-core.toml`.
-    #[clap(long, default_value = UPGRADE_V33_CORE_OUTPUT_PATH, hide = true)]
+    /// root). Defaults to the canonical `script-out/upgrade-core.toml`.
+    #[clap(long, default_value = UPGRADE_CORE_OUTPUT_PATH, hide = true)]
     pub core_output_path: String,
 
-    #[clap(long, default_value = CORE_UPGRADE_V33_SCRIPT_PATH, hide = true)]
+    #[clap(long, default_value = CORE_UPGRADE_SCRIPT_PATH, hide = true)]
     pub core_script_path: String,
 
-    #[clap(long, default_value = CTM_UPGRADE_V33_SCRIPT_PATH, hide = true)]
+    #[clap(long, default_value = CTM_UPGRADE_SCRIPT_PATH, hide = true)]
     pub ctm_script_path: String,
 
-    /// Path to a TOML file describing per-CTM inputs (proxy + optional
-    /// overrides). Mutually exclusive with the direct CTM flags
-    /// (`--ctm-proxy`, `--bytecodes-supplier-address`,
+    #[clap(long, default_value = COMPOSE_OPERATION_SCRIPT_PATH, hide = true)]
+    pub compose_script_path: String,
+
+    /// Path to a TOML file with exactly one CTM entry (proxy + optional
+    /// override). Mutually exclusive with the direct CTM flags (`--ctm-proxy`,
     /// `--rollup-da-manager-address`). Anything that is not a ZKsync OS CTM
     /// fails the prepare.
     ///
@@ -377,23 +508,18 @@ pub struct UpgradePrepareAllArgs {
     /// ```toml
     /// [[ctm]]
     /// proxy = "0x..."
-    /// bytecodes_supplier = "0x..."           # optional
     /// rollup_da_manager  = "0x..."           # optional
     /// ```
     #[clap(long, conflicts_with_all = [
         "ctm_proxies",
-        "bytecodes_supplier_address",
         "rollup_da_manager_address",
     ])]
     pub ctm_config: Option<PathBuf>,
 
-    /// Override the bytecodes supplier address. Auto-resolved from the CTM's
-    /// `L1_BYTECODES_SUPPLIER()` getter when omitted.
-    #[clap(long)]
-    pub bytecodes_supplier_address: Option<Address>,
-
     /// Override the rollup DA manager address. Auto-resolved from a
-    /// representative ZK chain on the CTM when omitted.
+    /// representative ZK chain on the CTM when omitted. There is no bytecodes-supplier
+    /// counterpart: the prepare script reads that off the CTM's own
+    /// `L1_BYTECODES_SUPPLIER()` immutable.
     #[clap(long)]
     pub rollup_da_manager_address: Option<Address>,
 }
@@ -407,8 +533,6 @@ struct CtmConfigFile {
 #[derive(Debug, Deserialize)]
 struct CtmConfigEntry {
     proxy: Address,
-    #[serde(default)]
-    bytecodes_supplier: Option<Address>,
     #[serde(default)]
     rollup_da_manager: Option<Address>,
 }
@@ -476,8 +600,8 @@ pub async fn run_list_ctms(args: ListCtmsArgs) -> anyhow::Result<()> {
     out.push_str(&format!("# L1 RPC:    {}\n", args.l1_rpc_url));
     out.push_str("#\n");
     out.push_str(
-        "# `bytecodes_supplier` and `rollup_da_manager` are commented out so the\n\
-         # prepare flow auto-resolves them from the CTM's on-chain getters.\n",
+        "# `rollup_da_manager` is commented out so the prepare flow auto-resolves it\n\
+         # from a chain registered on the CTM.\n",
     );
     for (proxy, witness_chain) in &ctms {
         out.push_str("\n[[ctm]]\n");
@@ -485,7 +609,6 @@ pub async fn run_list_ctms(args: ListCtmsArgs) -> anyhow::Result<()> {
             "# witness chain (any chain registered on this CTM): {witness_chain}\n"
         ));
         out.push_str(&format!("proxy = \"{proxy:#x}\"\n"));
-        out.push_str("# bytecodes_supplier = \"0x...\"\n");
         out.push_str("# rollup_da_manager  = \"0x...\"\n");
     }
 
@@ -507,7 +630,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     // ── env preset auto-fills ────────────────────────────────────────
     let env_cfg = args.topology.env_config()?;
     if let Some(ref cfg) = env_cfg {
-        // Default --out to upgrade-envs/v0.33.0-atomic-interop/output/<env>/protocol-ops/prepare/
+        // Default --out to upgrade-envs/v0.34.0-registry/output/<env>/protocol-ops/prepare/
         if args.shared.out.is_none() {
             args.shared.out = Some(
                 crate::common::env_config::default_protocol_ops_out_dir(&cfg.env)?.join("prepare"),
@@ -521,8 +644,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         // works on a fork via `anvil_impersonateAccount`; on a real chain
         // nobody can sign as that contract. The caller must pass
         // `--deployer-address <real-EOA>` (or derive it from the broadcast
-        // signer's private key — see `regen-and-verify-stage.sh` for an
-        // example using `cast wallet address`).
+        // signer's private key with `cast wallet address`).
         // Resolve --upgrade-input-path from --env, unless the caller passed one explicitly.
         //
         // Fails closed on a missing file rather than keeping the CLI default. The default is the
@@ -531,8 +653,8 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         // `governance_upgrade_timer_initial_delay`, and the gateway chain id that is baked into
         // `L1MessageRoot` as `ERA_GATEWAY_CHAIN_ID`. Losing that last one would redeploy the message
         // root with 0. Failing here also catches a mistyped `--env`.
-        if args.upgrade_input_path == UPGRADE_V33_LOCAL_INPUT_PATH {
-            let per_env_rel = format!("{UPGRADE_V33_ENV_DIR}/{}.toml", cfg.env);
+        if args.upgrade_input_path == UPGRADE_LOCAL_INPUT_PATH {
+            let per_env_rel = format!("/upgrade-envs/v0.34.0-registry/{}.toml", cfg.env);
             let per_env_abs = paths::contracts_root()
                 .join("l1-contracts")
                 .join(per_env_rel.trim_start_matches('/'));
@@ -550,7 +672,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         }
     }
     // Auto-fill the CREATE2 salt from the per-version upgrade input
-    // (`upgrade-envs/v0.33.0-atomic-interop/<env>.toml [contracts]
+    // (`upgrade-envs/v0.34.0-registry/<env>.toml [contracts]
     // create2_factory_salt`). Recording the salt in version control makes
     // re-prepares reproducible (same addresses every run regardless of who
     // runs it), so deployer-bundle broadcasts can land at addresses that
@@ -558,10 +680,10 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     // with explicit `--create2-factory-salt`.
     if args.create2_factory_salt.is_none() {
         if let Some(cfg) = env_cfg.as_ref() {
-            if let Some(salt) = cfg.create2_factory_salt_for_upgrade()? {
+            if let Some(salt) = cfg.upgrade_create2_factory_salt()? {
                 logger::info(format!(
                     "Using create2_factory_salt from {}: {salt:#x}",
-                    cfg.upgrade_input_path.display(),
+                    cfg.upgrade_input_toml_path.display(),
                 ));
                 args.create2_factory_salt = Some(salt);
             }
@@ -576,10 +698,10 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     // `contracts/.claude/skills/regenerate-v31-stage-calldata/SKILL.md`
     // ("Core principle") for why a per-regen salt is required.
     if let Some(cfg) = env_cfg.as_ref() {
-        if let Some(salt) = cfg.v31_legacy_gov_salt()? {
+        if let Some(salt) = cfg.upgrade_legacy_gov_salt()? {
             logger::info(format!(
                 "Using legacy_gov_salt from {}: {salt:#x}",
-                cfg.upgrade_input_path.display(),
+                cfg.upgrade_input_toml_path.display(),
             ));
             std::env::set_var("LEGACY_GOV_SALT", format!("{salt:#x}"));
         }
@@ -603,7 +725,6 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
             .iter()
             .map(|proxy| CtmInputs {
                 proxy: *proxy,
-                bytecodes_supplier: args.bytecodes_supplier_address,
                 rollup_da_manager: args.rollup_da_manager_address,
             })
             .collect::<Vec<_>>();
@@ -616,22 +737,10 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
                 cfg.env
             );
         }
-        let zero = Address::ZERO;
-        for (i, e) in entries.iter().enumerate() {
-            if e.bytecodes_supplier == Some(zero) {
-                anyhow::bail!(
-                    "permanent-values/{}.toml [[ctm_contracts.ctms]][{}] proxy={:#x}: bytecodes_supplier still 0x0 (TODO marker) — fill it in",
-                    cfg.env,
-                    i,
-                    e.proxy
-                );
-            }
-        }
         let ctms = entries
             .iter()
             .map(|e| CtmInputs {
                 proxy: e.proxy,
-                bytecodes_supplier: e.bytecodes_supplier,
                 rollup_da_manager: e.rollup_da_manager,
             })
             .collect::<Vec<_>>();
@@ -680,14 +789,14 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 
     let create2_factory_salt_per_ctm = match env_cfg.as_ref() {
         Some(cfg) => {
-            let map = cfg.create2_factory_salt_for_upgrade_per_ctm()?;
+            let map = cfg.upgrade_create2_factory_salt_per_ctm()?;
             if map.is_empty() {
                 None
             } else {
                 logger::info(format!(
                     "Using {} per-CTM create2 salts from {}",
                     map.len(),
-                    cfg.upgrade_input_path.display()
+                    cfg.upgrade_input_toml_path.display()
                 ));
                 Some(map)
             }
@@ -703,6 +812,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         core_output_path: args.core_output_path.clone(),
         core_script_path: args.core_script_path.clone(),
         ctm_script_path: args.ctm_script_path.clone(),
+        compose_script_path: args.compose_script_path.clone(),
         zk_token_asset_id,
         testnet_verifier,
     };
@@ -772,48 +882,65 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     // reads from. The `prepare/` subtree under `--out` keeps the per-bundle
     // intermediates (safe.json + manifest.json + executed.json) which stay
     // untracked.
-    let merged_ecosystem = if let Some(out_dir) = args.shared.out.clone() {
-        let canonical_dir = out_dir.parent().ok_or_else(|| {
-            anyhow::anyhow!(
+    let merged_ecosystem =
+        if let Some(out_dir) = args.shared.out.clone() {
+            let canonical_dir = out_dir.parent().ok_or_else(|| {
+                anyhow::anyhow!(
                 "--out ({}) has no parent directory; cannot derive canonical ecosystem.toml path",
                 out_dir.display()
             )
-        })?;
-        let merged_path = canonical_dir.join("ecosystem.toml");
-        let mut extra_stage0: Vec<crate::common::governance_calls::GovernanceCall> = puh_outcome
-            .as_ref()
-            .map(|o| o.stage0_calls.clone())
-            .unwrap_or_default();
-        extra_stage0.extend(pre_gov_accept_calls.iter().cloned());
-        write_merged_ecosystem_toml(
-            &prepared.core_toml,
-            &prepared.ctm_tomls,
-            &extra_stage0,
-            puh_outcome.as_ref(),
-            &prepared.new_gateway_tomls,
-            inputs.zk_token_asset_id,
-            &merged_path,
-        )?;
-        logger::info(format!(
-            "Wrote merged ecosystem.toml → {}",
-            merged_path.display()
-        ));
-        let extra_verification_logs_path = canonical_dir.join("extra-verification-logs.txt");
-        runner.write_extra_verification_logs(&extra_verification_logs_path)?;
-        logger::info(format!(
-            "Wrote extra verification logs → {}",
-            extra_verification_logs_path.display()
-        ));
-        let gw_verification_logs_path = canonical_dir.join("gw-verification-logs.txt");
-        runner.write_gw_verification_logs(&gw_verification_logs_path)?;
-        logger::info(format!(
-            "Wrote GW verification logs → {}",
-            gw_verification_logs_path.display()
-        ));
-        Some(merged_path)
-    } else {
-        None
-    };
+            })?;
+            let merged_path = canonical_dir.join("ecosystem.toml");
+            let mut extra_stage0: Vec<ExtraGovernanceCall> = puh_outcome
+                .as_ref()
+                .map(|o| {
+                    o.stage0_calls
+                        .iter()
+                        .cloned()
+                        .map(|call| ExtraGovernanceCall {
+                            label: "PUH/Guardians redeploy wiring (zk_governance)",
+                            authority: "protocol governance (PUH self-upgrade)",
+                            call,
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            extra_stage0.extend(pre_gov_accept_calls.iter().cloned().map(|call| {
+                ExtraGovernanceCall {
+                    label: "acceptOwnership() on a CTM whose pending owner is governance",
+                    authority: "protocol governance",
+                    call,
+                }
+            }));
+            write_merged_ecosystem_toml(
+                &prepared.core_toml,
+                &prepared.ctm_tomls,
+                prepared.operation_toml.as_deref(),
+                &extra_stage0,
+                puh_outcome.as_ref(),
+                &prepared.new_gateway_tomls,
+                &merged_path,
+            )?;
+            logger::info(format!(
+                "Wrote merged ecosystem.toml → {}",
+                merged_path.display()
+            ));
+            let extra_verification_logs_path = canonical_dir.join("extra-verification-logs.txt");
+            runner.write_extra_verification_logs(&extra_verification_logs_path)?;
+            logger::info(format!(
+                "Wrote extra verification logs → {}",
+                extra_verification_logs_path.display()
+            ));
+            let gw_verification_logs_path = canonical_dir.join("gw-verification-logs.txt");
+            runner.write_gw_verification_logs(&gw_verification_logs_path)?;
+            logger::info(format!(
+                "Wrote GW verification logs → {}",
+                gw_verification_logs_path.display()
+            ));
+            Some(merged_path)
+        } else {
+            None
+        };
 
     let ctm_governance_tomls: Vec<CtmGovernanceTomlEntry> = prepared
         .ctm_tomls
@@ -866,21 +993,35 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     Ok(())
 }
 
-/// Read each per-script governance TOML and write a single merged TOML
-/// containing all stage 0/1/2 calls in source-order (core first, then CTMs
-/// in the order they were prepared, then the optional new-Gateway bundle
-/// appended to stage 2). `extra_stage0` is appended to stage 0 after the
-/// file-sourced calls — used for the PUH/Guardians redeploy calls emitted
-/// in-memory by [`puh_guardians::deploy_puh_guardians`].
-/// Merge the core + per-CTM prepare TOMLs (plus optional in-memory PUH
-/// stage-0 calls and an optional `GatewayVotePreparation` bundle for the
-/// new gateway) into a single ecosystem TOML at `dst`. Shape:
+/// Merge the core + per-CTM prepare TOMLs and the compose step's operation TOML (plus the
+/// merger's own appends: the in-memory PUH stage-0 calls, the CTM `acceptOwnership()`
+/// normalization, and an optional `GatewayVotePreparation` bundle for the new gateway) into a
+/// single ecosystem TOML at `dst`.
+///
+/// The merger COMPOSES nothing: each stage bundle is the prepare scripts' bundles copied in
+/// source order (core, then the CTM), followed by the appends. Every call is accounted for —
+/// a registry-driven prepare emits exactly `CTMUpgradeExecutor.stageN(transition)`, and anything
+/// else (a script's declared external action, or one of the appends) is declared in
+/// `external_actions`; a bundle carrying a call the artifact does not name fails the merge
+/// (`check_bundle_provenance`). Shape:
 ///
 /// ```toml
-/// [governance_calls]              # merged stage 0/1/2 hex across all sources
-/// stage0_calls = "0x..."
-/// stage1_calls = "0x..."
+/// [[external_actions]]            # every governance/admin call that is NOT a coordinator stage
+/// phase = "0"                     # call, carrying the call itself (see `common::external_actions`)
+/// label = "…"
+/// authority = "…"
+/// target = "0x…"
+/// value = "0"
+/// data = "0x…"
+///
+/// [governance_calls]              # merged stage 0/1/2 hex: core actions, then the coordinator's
+/// stage0_calls = "0x..."         # stageN(operation) (registry-driven upgrades only), then each
+/// stage1_calls = "0x..."         # CTM's actions, in source order
 /// stage2_calls = "0x..."
+///
+/// [operation]                     # registry-driven upgrades only: the compose step's output
+/// operation_addr = "0x..."        # minus its [governance_calls]
+/// coordinator_addr = "0x..."
 ///
 /// [test_upgrade_calls]            # optional: copied from CTM prepare output
 /// test_create_chain_zkos = "0x..."
@@ -907,13 +1048,15 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 fn write_merged_ecosystem_toml(
     core_toml: &Path,
     ctm_entries: &[crate::commands::ecosystem::upgrade_inner::CtmPrepareEntry],
-    extra_stage0: &[crate::common::governance_calls::GovernanceCall],
+    operation_toml: Option<&Path>,
+    extra_stage0: &[ExtraGovernanceCall],
     zk_governance: Option<&crate::commands::ecosystem::zk_governance::ZkGovernanceOutcome>,
     new_gateway_tomls: &[PathBuf],
-    _zk_token_asset_id: B256,
     dst: &Path,
 ) -> anyhow::Result<()> {
-    use crate::common::governance_calls::{empty_calls_hex, encode_calls, merge_call_array_hex};
+    use crate::common::governance_calls::{
+        decode_calls, empty_calls_hex, encode_calls, merge_call_array_hex,
+    };
     use toml::value::{Table, Value};
 
     if let Some(parent) = dst.parent() {
@@ -921,12 +1064,17 @@ fn write_merged_ecosystem_toml(
     }
 
     // Read each source as a generic TOML table; pop [governance_calls] (always
-    // present) and optional [test_upgrade_calls] out so governance can be
-    // merged at top level and test calls can be lifted to top-level
-    // `ecosystem.toml`.
-    fn load_and_split(
-        path: &Path,
-    ) -> anyhow::Result<(Table, GovernanceCalls, Option<TestUpgradeCalls>)> {
+    // present), the optional [test_upgrade_calls] and the script's `external_actions`
+    // out so governance can be merged at top level and test calls can be lifted to
+    // top-level `ecosystem.toml`.
+    struct PrepareOutput {
+        body: Table,
+        gov: GovernanceCalls,
+        test_calls: Option<TestUpgradeCalls>,
+        /// The script's declared `external_actions` (see `ExternalActionsLib.serialize`).
+        external_actions: Vec<ExternalAction>,
+    }
+    fn load_and_split(path: &Path) -> anyhow::Result<PrepareOutput> {
         let raw = fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
         let mut value: Table =
             toml::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
@@ -937,18 +1085,47 @@ fn write_merged_ecosystem_toml(
             .try_into()
             .with_context(|| format!("invalid [governance_calls] in {}", path.display()))?;
 
-        let test = value
+        let test_calls = value
             .remove("test_upgrade_calls")
             .map(|v| {
                 v.try_into()
                     .with_context(|| format!("invalid [test_upgrade_calls] in {}", path.display()))
             })
             .transpose()?;
+        let external_actions: Vec<ExternalAction> = value
+            .remove("external_actions")
+            .map(|v| {
+                v.try_into()
+                    .with_context(|| format!("invalid external_actions in {}", path.display()))
+            })
+            .transpose()?
+            .unwrap_or_default();
 
-        Ok((value, gov, test))
+        Ok(PrepareOutput {
+            body: value,
+            gov,
+            test_calls,
+            external_actions,
+        })
     }
 
-    let (mut core_body, core_gov, _core_test_calls) = load_and_split(core_toml)?;
+    /// One `[registry]` address of a prepare output, by key.
+    fn registry_address(body: &Table, key: &str, path: &Path) -> anyhow::Result<Address> {
+        body.get("registry")
+            .and_then(|r| r.get(key))
+            .and_then(|v| v.as_str())
+            .with_context(|| format!("missing registry.{key} in {}", path.display()))?
+            .parse::<Address>()
+            .with_context(|| format!("registry.{key} in {} is not an address", path.display()))
+    }
+
+    let PrepareOutput {
+        body: mut core_body,
+        gov: core_gov,
+        mut external_actions,
+        ..
+    } = load_and_split(core_toml)?;
+    check_bundle_provenance("core prepare", &core_gov, &external_actions)?;
     let misc_body = match core_body.remove("misc") {
         Some(Value::Table(table)) => Some(table),
         Some(other) => anyhow::bail!(
@@ -965,17 +1142,55 @@ fn write_merged_ecosystem_toml(
     let mut stage2: Vec<String> = vec![core_gov.stage2_calls];
     let mut zksync_os_test_calls: Option<TestUpgradeCalls> = None;
 
+    // The lifecycle calls: the coordinator's three stage calls over the composed operation,
+    // ordered after the core prepare's declared actions and before every CTM's — the position
+    // the CTM executors' own stage calls used to take.
+    let operation_body: Option<Table> = match operation_toml {
+        Some(path) => {
+            let PrepareOutput {
+                body,
+                gov,
+                external_actions: operation_external_actions,
+                ..
+            } = load_and_split(path)?;
+            anyhow::ensure!(
+                operation_external_actions.is_empty(),
+                "compose step: declared {} external action(s); the compose step emits lifecycle calls only",
+                operation_external_actions.len()
+            );
+            let coordinator = registry_address(&body, "coordinator_addr", path)?;
+            let operation = registry_address(&body, "operation_addr", path)?;
+            check_operation_bundle(&gov, coordinator, operation)?;
+            stage0.push(gov.stage0_calls);
+            stage1.push(gov.stage1_calls);
+            stage2.push(gov.stage2_calls);
+            body.get("registry").and_then(|r| r.as_table()).cloned()
+        }
+        None => None,
+    };
+
     // `UpgradeInner::prepare` rejects any non-ZKsync-OS CTM, so every CTM that
     // reaches the merge is ZKsync OS. The merge keys per-CTM sections by the fixed
     // `zksync_os` label, so two CTMs in one upgrade collide here.
     for entry in ctm_entries {
-        let (body, gov, test_calls) = load_and_split(&entry.toml)?;
+        let PrepareOutput {
+            body,
+            gov,
+            test_calls,
+            external_actions: ctm_external_actions,
+        } = load_and_split(&entry.toml)?;
         let label = "zksync_os";
         if ctms_table.contains_key(label) {
             anyhow::bail!(
                 "duplicate CTM section `{label}`: a single upgrade merges at most one ZKsyncOS CTM"
             );
         }
+        check_bundle_provenance(
+            &format!("CTM prepare {:#x}", entry.proxy),
+            &gov,
+            &ctm_external_actions,
+        )?;
+        external_actions.extend(ctm_external_actions);
         ctms_table.insert(label.to_string(), Value::Table(body));
         stage0.push(gov.stage0_calls);
         stage1.push(gov.stage1_calls);
@@ -987,7 +1202,13 @@ fn write_merged_ecosystem_toml(
     }
 
     if !extra_stage0.is_empty() {
-        stage0.push(format!("0x{}", hex::encode(encode_calls(extra_stage0))));
+        let calls: Vec<_> = extra_stage0.iter().map(|e| e.call.clone()).collect();
+        stage0.push(format!("0x{}", hex::encode(encode_calls(&calls))));
+        external_actions.extend(
+            extra_stage0
+                .iter()
+                .map(|e| ExternalAction::for_stage(0, e.label, e.authority, &e.call)),
+        );
     }
 
     // `GatewayVotePreparation` writes a flat TOML whose `governance_calls_to_execute`
@@ -1018,6 +1239,21 @@ fn write_merged_ecosystem_toml(
                     other.type_str()
                 ),
             };
+            external_actions.extend(
+                decode_calls(&gov_hex)
+                    .with_context(|| {
+                        format!("decode governance_calls_to_execute in {}", path.display())
+                    })?
+                    .iter()
+                    .map(|call| {
+                        ExternalAction::for_stage(
+                            2,
+                            "new-Gateway bring-up (GatewayVotePreparation)",
+                            "protocol governance",
+                            call,
+                        )
+                    }),
+            );
             stage2.push(gov_hex);
             if first_body.is_none() {
                 first_body = Some(value);
@@ -1049,6 +1285,10 @@ fn write_merged_ecosystem_toml(
     // and [misc] last. `toml::to_string` orders keys as inserted.
     let mut doc = Table::new();
     doc.insert(
+        "external_actions".into(),
+        Value::try_from(&external_actions).context("serialize the merged external actions")?,
+    );
+    doc.insert(
         "governance_calls".into(),
         Value::Table(governance_calls_table),
     );
@@ -1074,6 +1314,9 @@ fn write_merged_ecosystem_toml(
     }
     doc.insert("core".into(), Value::Table(core_body));
     doc.insert("ctms".into(), Value::Table(ctms_table));
+    if let Some(body) = operation_body {
+        doc.insert("operation".into(), Value::Table(body));
+    }
     if let Some(body) = new_gateway_body {
         doc.insert("new_gateway".into(), Value::Table(body));
     }
@@ -1105,7 +1348,9 @@ fn write_merged_ecosystem_toml(
     let body = format!(
         "# Auto-generated by `protocol-ops ecosystem upgrade-prepare-all`.\n\
          # Merged ecosystem upgrade artifact: top-level [governance_calls] holds\n\
-         # the combined stage 0/1/2 hex from {} prepare TOML(s). Optional\n\
+         # the stage 0/1/2 hex of {} prepare TOML(s) plus the compose step's, copied\n\
+         # in source order and never composed here; `external_actions` names every\n\
+         # call in them that is not an `EcosystemUpgradeExecutor.stageN(operation)` call. Optional\n\
          # [test_upgrade_calls] is copied from the per-CTM prepare output under\n\
          # `*_zkos` keys. [core] mirrors the\n\
          # core prepare output (minus its own [governance_calls]); [ctms.zksync_os]\n\
@@ -1186,10 +1431,84 @@ fn load_ctm_config(path: &Path) -> anyhow::Result<Vec<CtmInputs>> {
         .into_iter()
         .map(|e| CtmInputs {
             proxy: e.proxy,
-            bytecodes_supplier: e.bytecodes_supplier,
             rollup_da_manager: e.rollup_da_manager,
         })
         .collect();
 
     Ok(ctms)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::common::governance_calls::{encode_calls, GovernanceCall};
+    use alloy::primitives::U256;
+
+    fn call(target: u8, data: &[u8]) -> GovernanceCall {
+        GovernanceCall {
+            target: Address::repeat_byte(target),
+            value: U256::ZERO,
+            data: data.to_vec(),
+        }
+    }
+
+    fn stage_hex(calls: &[GovernanceCall]) -> String {
+        format!("0x{}", hex::encode(encode_calls(calls)))
+    }
+
+    fn gov(stage0: &[GovernanceCall]) -> GovernanceCalls {
+        GovernanceCalls {
+            stage0_calls: stage_hex(stage0),
+            stage1_calls: stage_hex(&[]),
+            stage2_calls: stage_hex(&[]),
+        }
+    }
+
+    #[test]
+    fn a_bundle_of_exactly_the_declared_actions_passes() {
+        let emitted = [call(0x11, &[0xaa]), call(0x22, &[0xbb])];
+        let declared: Vec<ExternalAction> = emitted
+            .iter()
+            .map(|c| ExternalAction::for_stage(0, "l", "a", c))
+            .collect();
+        check_bundle_provenance("t", &gov(&emitted), &declared).expect("identical bundle");
+    }
+
+    /// The defect a headcount cannot see: the script declares one action and emits a different
+    /// call, in equal numbers.
+    #[test]
+    fn a_substituted_call_fails_even_at_the_declared_count() {
+        let declared = vec![ExternalAction::for_stage(0, "l", "a", &call(0x11, &[0xaa]))];
+        let err = check_bundle_provenance("t", &gov(&[call(0x11, &[0xbb])]), &declared)
+            .expect_err("substituted calldata must fail");
+        assert!(
+            err.to_string().contains("no declared external action"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn a_declared_action_that_is_never_emitted_fails() {
+        let declared = vec![ExternalAction::for_stage(0, "l", "a", &call(0x11, &[0xaa]))];
+        let err = check_bundle_provenance("t", &gov(&[]), &declared)
+            .expect_err("an unemitted declaration must fail");
+        assert!(
+            err.to_string().contains("never emits"),
+            "unexpected error: {err}"
+        );
+    }
+
+    /// Actions of another phase do not account for a stage's calls — an `admin` action least of
+    /// all, since it rides no governance bundle.
+    #[test]
+    fn another_phases_action_does_not_account_for_a_stage_call() {
+        let emitted = [call(0x11, &[0xaa])];
+        let mut declared = ExternalAction::for_stage(0, "l", "a", &emitted[0]);
+        declared.phase = "admin".to_string();
+        check_bundle_provenance("t", &gov(&emitted), std::slice::from_ref(&declared))
+            .expect_err("an admin declaration cannot cover a stage-0 call");
+        declared.phase = "1".to_string();
+        check_bundle_provenance("t", &gov(&emitted), &[declared])
+            .expect_err("a stage-1 declaration cannot cover a stage-0 call");
+    }
 }

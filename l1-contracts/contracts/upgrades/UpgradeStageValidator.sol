@@ -37,14 +37,14 @@ contract UpgradeStageValidator {
 
     /// @notice Check if migrations are paused
     function checkMigrationsPaused() external view {
-        if (!IChainAssetHandlerBase(BRIDGEHUB.chainAssetHandler()).migrationPaused()) {
+        if (!IChainAssetHandlerBase(BRIDGEHUB.chainAssetHandler()).migrationPausedFor(address(CHAIN_TYPE_MANAGER))) {
             revert MigrationsNotPaused();
         }
     }
 
     /// @notice Check if migrations are unpaused
     function checkMigrationsUnpaused() external view {
-        if (IChainAssetHandlerBase(BRIDGEHUB.chainAssetHandler()).migrationPaused()) {
+        if (IChainAssetHandlerBase(BRIDGEHUB.chainAssetHandler()).migrationPausedFor(address(CHAIN_TYPE_MANAGER))) {
             revert MigrationPaused();
         }
     }

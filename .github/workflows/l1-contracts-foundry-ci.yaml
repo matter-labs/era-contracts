@@ -217,6 +217,3 @@ jobs:
 #        run: |
 #          cat ./script-out/output-deploy-l1.toml >> ./script-config/register-zk-chain.toml
 #          forge script ./deploy-scripts/ctm/RegisterZKChain.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
-#      - name: Run InitializeL2WethToken script
-#        working-directory: ./l1-contracts-foundry
-#        run: forge script ./deploy-scripts/chain/InitializeL2WethToken.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY

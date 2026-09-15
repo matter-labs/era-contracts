@@ -63,6 +63,25 @@
   },
   {
     "type": "function",
+    "name": "ctmMigrationPaused",
+    "inputs": [
+      {
+        "name": "_ctm",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "migrationNumber",
     "inputs": [
       {
@@ -95,6 +114,25 @@
   },
   {
     "type": "function",
+    "name": "migrationPausedFor",
+    "inputs": [
+      {
+        "name": "_ctm",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "migrationsEnabled",
     "inputs": [],
     "outputs": [
@@ -108,8 +146,34 @@
   },
   {
     "type": "function",
+    "name": "pauseCTMMigration",
+    "inputs": [
+      {
+        "name": "_ctm",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "pauseMigration",
     "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "unpauseCTMMigration",
+    "inputs": [
+      {
+        "name": "_ctm",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
@@ -252,8 +316,46 @@
   },
   {
     "type": "event",
+    "name": "PausedCTMMigration",
+    "inputs": [
+      {
+        "name": "ctm",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "pauser",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "PausedMigration",
     "inputs": [
+      {
+        "name": "pauser",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "UnpausedCTMMigration",
+    "inputs": [
+      {
+        "name": "ctm",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
       {
         "name": "pauser",
         "type": "address",

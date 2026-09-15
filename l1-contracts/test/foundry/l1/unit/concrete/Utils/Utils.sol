@@ -21,7 +21,7 @@ import {
     VerifierParams
 } from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
-import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {Vm} from "forge-std/Vm.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {InteropRoot, L2CanonicalTransaction} from "contracts/common/Messaging.sol";
@@ -30,6 +30,17 @@ import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/Priorit
 import {Utils as DeployUtils} from "deploy-scripts/utils/Utils.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {ContractsBytecodesLib} from "deploy-scripts/utils/bytecode/ContractsBytecodesLib.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
+import {ICommittedUpgrade} from "contracts/upgrades/registry/objects/ICommittedUpgrade.sol";
+import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
+import {
+    AuthoredL2Plan,
+    L2UpgradePlan,
+    ProxyUpgradeRow,
+    TransitionManifest
+} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {CTM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
+import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_BOOTLOADER_ADDRESS = 0x0000000000000000000000000000000000008001;
@@ -39,6 +50,94 @@ L2DACommitmentScheme constant L2_DA_COMMITMENT_SCHEME = L2DACommitmentScheme.PUB
 address constant TEST_ROLLUP_DA_MANAGER_OWNER = address(0x1234567890DEADBEEF);
 
 library Utils {
+    Vm internal constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
+
+    /// @dev The genesis-registry address the mocked CTM fixtures return; the registry itself is
+    ///      mocked too (see `UtilsCallMocker`), pinning no facets.
+    address internal constant TEST_GENESIS_REGISTRY = address(0x9E8E5157A9);
+    /// @dev The audited `CTMRelease` / `CTMTransition` codehashes: THE provenance anchors a CTM
+    ///      and a `CTMUpgradeExecutor` pin. `TEST_GENESIS_REGISTRY` is etched with the release
+    ///      runtime code (see `UtilsCallMocker`) so the mocked genesis release passes the same
+    ///      check a real one does.
+    /// @dev Read from the artifacts (`vm.getDeployedCode`) instead of `type(T).runtimeCode`:
+    ///      this file is in the zksync test compile closure and zksolc rejects `runtimeCode`.
+    ///      The objects carry no immutables, so the artifact bytes equal the deployed bytes.
+    function releaseCodehash() internal view returns (bytes32) {
+        return keccak256(vm.getDeployedCode("CTMRelease.sol:CTMRelease"));
+    }
+
+    function transitionCodehash() internal view returns (bytes32) {
+        return keccak256(vm.getDeployedCode("CTMTransition.sol:CTMTransition"));
+    }
+
+    /// @notice Stands in a `CTMTransition` at `_transition` and its target release at `_newRelease`,
+    ///         answering exactly the reads `DefaultUpgrade.upgradeFromTransition` makes for an
+    ///         L1-only edge: no facet cuts, no L2 plan, the version edge and `_verifier`.
+    /// @dev For tests whose subject is the CALLER of the engine (the Admin facet's gating, a
+    ///      migrated chain executing an upgrade) rather than the registry objects; the engine
+    ///      against real objects is covered in `test/foundry/l1/upgrades/DefaultUpgrade.t.sol`.
+    function mockL1OnlyTransition(
+        address _transition,
+        address _newRelease,
+        uint256 _oldProtocolVersion,
+        uint256 _newProtocolVersion,
+        address _verifier
+    ) internal {
+        TransitionManifest memory manifest = TransitionManifest({
+            oldProtocolVersion: _oldProtocolVersion,
+            newProtocolVersion: _newProtocolVersion,
+            fromRelease: address(0),
+            newRelease: _newRelease,
+            upgradeEngine: address(0),
+            proxyUpgrades: new ProxyUpgradeRow[](CTM_CONTRACT_COUNT),
+            oldProtocolVersionDeadline: type(uint256).max,
+            upgradeTimestamp: 0,
+            l2Plan: AuthoredL2Plan({
+                delegateBytecodeInfo: "",
+                extraBytecodeInfos: new bytes[](0),
+                delegateComposer: address(0)
+            }),
+            upgradeTimer: address(0)
+        });
+        vm.mockCall(_transition, abi.encodeCall(ICTMTransition.getManifest, ()), abi.encode(manifest));
+        vm.mockCall(_transition, abi.encodeCall(ICTMTransition.facetCuts, ()), abi.encode(new Diamond.FacetCut[](0)));
+        vm.mockCall(
+            _transition,
+            abi.encodeCall(ICommittedUpgrade.upgradeTarget, ()),
+            abi.encode(_newProtocolVersion, uint256(0), _newRelease)
+        );
+        vm.mockCall(
+            _transition,
+            abi.encodeCall(ICommittedUpgrade.l2Plan, ()),
+            abi.encode(
+                L2UpgradePlan({
+                    deployments: new IComplexUpgrader.UniversalContractUpgradeInfo[](0),
+                    delegateTo: address(0),
+                    delegateComposer: address(0),
+                    factoryDepHashes: new uint256[](0)
+                })
+            )
+        );
+        vm.mockCall(_newRelease, abi.encodeCall(ICTMRelease.verifier, ()), abi.encode(_verifier));
+    }
+
+    function coreRegistryCodehash() internal view returns (bytes32) {
+        return keccak256(vm.getDeployedCode("CoreRegistry.sol:CoreRegistry"));
+    }
+
+    function operationCodehash() internal view returns (bytes32) {
+        return keccak256(vm.getDeployedCode("EcosystemUpgradeOperation.sol:EcosystemUpgradeOperation"));
+    }
+
+    /// @dev DiamondInit derives everything but (chainId, admin) from the CTM — which is simply
+    ///      `msg.sender` during the diamond proxy construction. Direct-diamond fixtures prank as
+    ///      this fake CTM and mock its getters (see `UtilsCallMocker`).
+    address internal constant TEST_CHAIN_TYPE_MANAGER = address(0x1234567890876543567890);
+    uint256 internal constant TEST_CHAIN_ID = 1;
+    address internal constant TEST_CHAIN_ADMIN = address(0x32149872498357874258787);
+    address internal constant TEST_VALIDATOR_TIMELOCK = address(0x85430237648403822345345);
+    bytes32 internal constant TEST_BASE_TOKEN_ASSET_ID = bytes32(uint256(0x923645439232223445));
+
     function randomBytes32(bytes memory seed) public view returns (bytes32) {
         return keccak256(abi.encodePacked(block.timestamp, seed));
     }
@@ -318,27 +417,9 @@ library Utils {
         return IVerifier(testnetVerifier);
     }
 
-    function makeInitializeData(address bridgehub) public pure returns (InitializeData memory) {
-        return
-            InitializeData({
-                chainId: 1,
-                bridgehub: bridgehub,
-                chainTypeManager: address(0x1234567890876543567890),
-                interopCenter: address(0x1234567890876543567890),
-                protocolVersion: 0,
-                admin: address(0x32149872498357874258787),
-                validatorTimelock: address(0x85430237648403822345345),
-                baseTokenAssetId: bytes32(uint256(0x923645439232223445)),
-                storedBatchZero: bytes32(0)
-            });
-    }
-
-    function makeDiamondProxy(Diamond.FacetCut[] memory facetCuts, address bridgehub) public returns (address) {
+    function makeDiamondProxy(Diamond.FacetCut[] memory facetCuts, address) public returns (address) {
         DiamondInit diamondInit = new DiamondInit();
-        bytes memory diamondInitData = abi.encodeWithSelector(
-            diamondInit.initialize.selector,
-            makeInitializeData(bridgehub)
-        );
+        bytes memory diamondInitData = abi.encodeCall(diamondInit.initialize, (TEST_CHAIN_ID, TEST_CHAIN_ADMIN));
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -347,6 +428,9 @@ library Utils {
         });
 
         uint256 chainId = block.chainid;
+        // DiamondInit treats the proxy deployer as the CTM; callers must have mocked the fake
+        // CTM's getters beforehand (UtilsCallMocker).
+        vm.prank(TEST_CHAIN_TYPE_MANAGER);
         DiamondProxy diamondProxy = new DiamondProxy(chainId, diamondCutData);
         return address(diamondProxy);
     }

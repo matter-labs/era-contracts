@@ -1,7 +1,7 @@
 //! Canonical prepare-phase orchestration.
 //!
-//! `UpgradeInner::prepare` fires the core script's `noGovernancePrepare`
-//! once and the CTM script's `noGovernancePrepare` once per target CTM, all on
+//! `UpgradeInner::prepare` fires `the core script's noGovernancePrepare`
+//! once and `the CTM script's noGovernancePrepare` once per target CTM, all on
 //! the supplied `ForgeRunner` so deployer broadcasts merge into one Safe
 //! bundle.
 //!
@@ -21,27 +21,30 @@ use alloy::primitives::{Address, Bytes, B256};
 use alloy::sol_types::SolCall;
 use anyhow::Context;
 
-use crate::common::abi::{ICTMUpgradeAbi, ICoreUpgradeAbi};
+// Every script generation exposes the same entry points (`noGovernancePrepare(CoreUpgradeParams)` /
+// `(CTMUpgradeParams)`), so this one driver serves them all; which one actually runs is decided by
+// the `--core-script-path` / `--ctm-script-path` inputs.
+use crate::common::abi::{ICTMUpgradeV31Abi, IComposeUpgradeOperationAbi, ICoreUpgradeV31Abi};
 use crate::common::wallets::Wallet;
 use crate::common::{forge::ForgeRunner, logger};
 
 // ── inputs / outputs ───────────────────────────────────────────────────────
 
 /// Per-CTM inputs. One entry per `--ctm-proxy` (or per `[[ctm]]` row in a
-/// `--ctm-config` TOML). The overrides are optional: when `None`, prepare_ctm
-/// auto-resolves via the CTM's on-chain getters.
+/// `--ctm-config` TOML).
 pub struct CtmInputs {
     /// CTM proxy address.
     pub proxy: Address,
-    /// Override for the bytecodes supplier address.
-    pub bytecodes_supplier: Option<Address>,
-    /// Override for the rollup DA manager address.
+    /// Override for the rollup DA manager address; when `None`, prepare_ctm resolves it from a
+    /// chain registered on the CTM. Unlike the bytecodes supplier — which the prepare script
+    /// reads off the CTM's own `L1_BYTECODES_SUPPLIER()` immutable, so nothing transports it —
+    /// no CTM-level getter exposes the DA manager.
     pub rollup_da_manager: Option<Address>,
 }
 
 /// Inputs to the prepare phase. The CLI handler builds this from clap args.
 pub struct PrepareInputs {
-    /// Target CTMs. One forge invocation per entry.
+    /// CLI-compatible collection; the prepare boundary requires exactly one CTM.
     pub ctms: Vec<CtmInputs>,
     /// Optional CREATE2 salt for the Core prepare; random if `None`.
     pub create2_factory_salt: Option<B256>,
@@ -62,6 +65,10 @@ pub struct PrepareInputs {
     pub core_script_path: String,
     /// CTM upgrade script path (relative to `l1-contracts/`).
     pub ctm_script_path: String,
+    /// Compose script path (relative to `l1-contracts/`): deploys the operation over every CTM
+    /// prepare's transition and emits the coordinator's stage calls. Skipped for a bootstrap
+    /// edge, whose prepares emit no transition.
+    pub compose_script_path: String,
     /// ZK token asset ID used by CTM prepare. For named envs this comes from
     /// `upgrade-envs/permanent-values/<env>.toml`; otherwise it is explicitly
     /// supplied or falls back only for networks with a canonical value.
@@ -79,6 +86,9 @@ pub struct PrepareInputs {
 pub struct PrepareOutput {
     pub core_toml: PathBuf,
     pub ctm_tomls: Vec<CtmPrepareEntry>,
+    /// The compose step's output — the `EcosystemUpgradeOperation` and the coordinator's three
+    /// stage calls — or `None` for a bootstrap edge (no transition to compose over).
+    pub operation_toml: Option<PathBuf>,
     /// Empty when the env's `[new_gateway]` block isn't set. When present,
     /// each entry points at one `GatewayVotePreparation` output TOML (one
     /// per CTM deployed on the gateway); the merge logic in
@@ -114,8 +124,8 @@ impl<'a> UpgradeInner<'a> {
         self.bridgehub
     }
 
-    /// Run the core script's `noGovernancePrepare` then
-    /// the CTM script's `noGovernancePrepare` once per CTM, all on the
+    /// Run `the core script's noGovernancePrepare` then
+    /// `the CTM script's noGovernancePrepare` for the selected CTM, all on the
     /// supplied runner. Returns the per-step output TOML paths.
     ///
     /// `pub(super)` so production callers must go through
@@ -127,39 +137,103 @@ impl<'a> UpgradeInner<'a> {
         runner: &mut ForgeRunner,
         deployer: &Wallet,
         inputs: &PrepareInputs,
+        ctm: &CtmInputs,
     ) -> anyhow::Result<PrepareOutput> {
-        if inputs.ctms.is_empty() {
-            anyhow::bail!("UpgradeInner::prepare requires at least one CTM");
-        }
-
-        for ctm in &inputs.ctms {
-            crate::common::l1_contracts::ensure_supported_os_ctm(&runner.rpc_url, ctm.proxy)
-                .await
-                .with_context(|| format!("Unsupported upgrade target ({:#x})", ctm.proxy))?;
-        }
+        crate::common::l1_contracts::ensure_supported_os_ctm(&runner.rpc_url, ctm.proxy)
+            .await
+            .with_context(|| format!("Unsupported upgrade target ({:#x})", ctm.proxy))?;
 
         let core_toml = self
             .prepare_core(runner, deployer, inputs)
             .await
             .context("core prepare")?;
 
-        let mut ctm_tomls = Vec::with_capacity(inputs.ctms.len());
-        for ctm in &inputs.ctms {
-            let path = self
-                .prepare_ctm(runner, deployer, inputs, ctm)
-                .await
-                .with_context(|| format!("ctm prepare ({:#x})", ctm.proxy))?;
-            ctm_tomls.push(CtmPrepareEntry {
-                proxy: ctm.proxy,
-                toml: path,
-            });
-        }
+        let path = self
+            .prepare_ctm(runner, deployer, inputs, ctm)
+            .await
+            .with_context(|| format!("ctm prepare ({:#x})", ctm.proxy))?;
+        let ctm_entry = CtmPrepareEntry {
+            proxy: ctm.proxy,
+            toml: path,
+        };
+
+        let operation_toml = self
+            .compose_operation(runner, deployer, inputs, &core_toml, &ctm_entry)
+            .await
+            .context("compose operation")?;
 
         Ok(PrepareOutput {
             core_toml,
-            ctm_tomls,
+            ctm_tomls: vec![ctm_entry],
+            operation_toml,
             new_gateway_tomls: Vec::new(),
         })
+    }
+
+    /// Compose the one CTM transition and optional core change into an operation.
+    /// Bootstrap prepares emit no transition and retain their explicit handover flow.
+    async fn compose_operation(
+        &self,
+        runner: &mut ForgeRunner,
+        deployer: &Wallet,
+        inputs: &PrepareInputs,
+        core_toml: &Path,
+        ctm: &CtmPrepareEntry,
+    ) -> anyhow::Result<Option<PathBuf>> {
+        let transition = read_ctm_transition(&ctm.toml)?;
+        if transition.is_zero() {
+            logger::info(
+                "no transition to compose over (bootstrap edge): skipping the compose step",
+            );
+            return Ok(None);
+        }
+        ensure_script_exists(self.contracts_path, &inputs.compose_script_path)?;
+
+        let coordinator = read_ecosystem_upgrade_executor(core_toml)?;
+        let core_registry = read_core_registry(core_toml)?;
+        logger::info(format!(
+            "Composing the operation on coordinator {coordinator:#x}: core registry {core_registry:#x}, transition {transition:#x}"
+        ));
+
+        let output_path_str = "/script-out/upgrade-operation.toml".to_string();
+        let output_path = self
+            .contracts_path
+            .join(output_path_str.trim_start_matches('/'));
+        let _ = fs::remove_file(&output_path);
+
+        let script = runner
+            .script_path_from_root(
+                self.contracts_path,
+                Path::new(inputs.compose_script_path.trim_start_matches('/')),
+            )
+            .with_calldata(&Bytes::from(
+                IComposeUpgradeOperationAbi::composeCall {
+                    _params: IComposeUpgradeOperationAbi::ComposeOperationParams {
+                        coordinator,
+                        coreRegistry: core_registry,
+                        transition,
+                        // The operation's init code is unique to its transition, so the core salt
+                        // cannot collide with the prepares' deployments.
+                        create2FactorySalt: inputs
+                            .create2_factory_salt
+                            .unwrap_or_else(|| B256::from(rand::random::<[u8; 32]>())),
+                        outputPath: output_path_str,
+                    },
+                }
+                .abi_encode(),
+            ))
+            .with_broadcast()
+            .with_ffi()
+            .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
+            .with_offline()
+            .with_wallet(deployer);
+
+        logger::step("Running the compose step");
+        runner
+            .run(script)
+            .context("Failed to execute the compose script")?;
+
+        Ok(Some(output_path))
     }
 
     async fn prepare_core(
@@ -192,8 +266,8 @@ impl<'a> UpgradeInner<'a> {
                 Path::new(inputs.core_script_path.trim_start_matches('/')),
             )
             .with_calldata(&Bytes::from(
-                ICoreUpgradeAbi::noGovernancePrepareCall {
-                    _params: ICoreUpgradeAbi::CoreUpgradeParams {
+                ICoreUpgradeV31Abi::noGovernancePrepareCall {
+                    _params: ICoreUpgradeV31Abi::CoreUpgradeParams {
                         bridgehubProxyAddress: self.bridgehub,
                         create2FactorySalt: create2_salt,
                         upgradeInputPath: inputs.upgrade_input_path.clone(),
@@ -211,7 +285,7 @@ impl<'a> UpgradeInner<'a> {
         logger::step("Running core prepare");
         runner
             .run(script)
-            .context("Failed to execute the core upgrade script's noGovernancePrepare")?;
+            .context("Failed to execute the core script's noGovernancePrepare")?;
 
         Ok(core_output_path)
     }
@@ -258,23 +332,6 @@ impl<'a> UpgradeInner<'a> {
             "CTM proxy: {ctm_proxy:#x} (representative chain {representative_chain})"
         ));
 
-        let bytecodes_supplier = match ctm.bytecodes_supplier {
-            Some(addr) => {
-                logger::info(format!("Bytecodes supplier (override): {addr:#x}"));
-                addr
-            }
-            None => {
-                let resolved = crate::common::l1_contracts::resolve_bytecodes_supplier(
-                    &runner.rpc_url,
-                    ctm_proxy,
-                )
-                .await
-                .context("Failed to auto-resolve bytecodes supplier from CTM")?;
-                logger::info(format!("Bytecodes supplier (auto-resolved): {resolved:#x}"));
-                resolved
-            }
-        };
-
         let rollup_da_manager = match ctm.rollup_da_manager {
             Some(addr) => {
                 logger::info(format!("RollupDAManager (override): {addr:#x}"));
@@ -316,10 +373,23 @@ impl<'a> UpgradeInner<'a> {
         logger::info(format!(
             "ChainRegistrationSender (core prepare): {chain_registration_sender:#x}"
         ));
-
-        // Named environments keep CREATE2 salts keyed by registered CTM so the
-        // selected target gets its ceremony-specific salt. Legacy local
-        // fixtures fall back to a fresh random salt.
+        let ecosystem_upgrade_executor = read_ecosystem_upgrade_executor(
+            &self
+                .contracts_path
+                .join(inputs.core_output_path.trim_start_matches('/')),
+        )?;
+        logger::info(format!(
+            "EcosystemUpgradeExecutor (core prepare): {ecosystem_upgrade_executor:#x}"
+        ));
+        // Per-CTM CREATE2 salt. Each CTM prepare deploys a few contracts whose
+        // constructor args are env-wide constants — notably
+        // `GovernanceUpgradeTimer(initialDelay, 2 weeks, ownerAddress,
+        // ecosystemAdminAddress)` — so two CTMs prepared in one ecosystem would
+        // land them at the same address without per-CTM differentiation, and the
+        // downstream gov-replay's second `startTimer()` on that contract would
+        // revert. Named environments keep CREATE2 salts keyed by registered CTM
+        // (`upgrade-envs/v0.34.0-registry/<env>.toml [create2_salts.per_ctm]`);
+        // legacy local fixtures fall back to a fresh random salt.
         let create2_salt = inputs
             .create2_factory_salt_per_ctm
             .as_ref()
@@ -330,7 +400,7 @@ impl<'a> UpgradeInner<'a> {
         ));
 
         // Per-CTM output path so back-to-back prepares don't clobber each other.
-        let output_path_str = format!("/script-out/v33-upgrade-ctm-{ctm_proxy:#x}.toml");
+        let output_path_str = format!("/script-out/upgrade-ctm-{ctm_proxy:#x}.toml");
         let ctm_output_path = self
             .contracts_path
             .join(output_path_str.trim_start_matches('/'));
@@ -342,10 +412,9 @@ impl<'a> UpgradeInner<'a> {
                 Path::new(inputs.ctm_script_path.trim_start_matches('/')),
             )
             .with_calldata(&Bytes::from(
-                ICTMUpgradeAbi::noGovernancePrepareCall {
-                    _params: ICTMUpgradeAbi::CTMUpgradeParams {
+                ICTMUpgradeV31Abi::noGovernancePrepareCall {
+                    _params: ICTMUpgradeV31Abi::CTMUpgradeParams {
                         ctmProxy: ctm_proxy,
-                        bytecodesSupplier: bytecodes_supplier,
                         rollupDAManager: rollup_da_manager,
                         create2FactorySalt: create2_salt,
                         upgradeInputPath: inputs.upgrade_input_path.clone(),
@@ -354,6 +423,7 @@ impl<'a> UpgradeInner<'a> {
                         chainRegistrationSender: chain_registration_sender,
                         zkTokenAssetId: inputs.zk_token_asset_id,
                         testnetVerifier: inputs.testnet_verifier,
+                        ecosystemUpgradeExecutor: ecosystem_upgrade_executor,
                     },
                 }
                 .abi_encode(),
@@ -367,7 +437,26 @@ impl<'a> UpgradeInner<'a> {
         logger::step(format!("Running CTM prepare for {ctm_proxy:#x}"));
         runner
             .run(script)
-            .context("Failed to execute the CTM upgrade script's noGovernancePrepare")?;
+            .context("Failed to execute the CTM script's noGovernancePrepare")?;
+
+        // Simulation probes are generated independently from production prepare. Preserve the
+        // existing package fields consumed by the merger and simulator, without broadcasting
+        // either probe or coupling their construction to a version-specific prepare script.
+        let simulation = runner
+            .script_path_from_root(
+                self.contracts_path,
+                Path::new("deploy-scripts/simulation/UpgradeSimulation.s.sol"),
+            )
+            .with_env("UPGRADE_SIMULATION_CTM", format!("{ctm_proxy:#x}"))
+            .with_env(
+                "UPGRADE_SIMULATION_OUTPUT",
+                ctm_output_path.to_string_lossy().into_owned(),
+            )
+            .with_offline()
+            .with_wallet(deployer);
+        runner
+            .run(simulation)
+            .context("Failed to generate chain upgrade/creation simulator probes")?;
 
         Ok(ctm_output_path)
     }
@@ -393,6 +482,85 @@ fn read_chain_registration_sender_proxy(core_toml: &Path) -> anyhow::Result<Addr
     value.parse().with_context(|| {
         format!(
             "chain_registration_sender_proxy_addr in {} is not a valid address: {}",
+            core_toml.display(),
+            value,
+        )
+    })
+}
+
+/// The `[registry].core_registry_addr` the core prepare wrote — the ecosystem leg the operation
+/// names. Zero when the core prepare deployed no ecosystem implementation (the upgrade then has
+/// no ecosystem leg).
+fn read_core_registry(core_toml: &Path) -> anyhow::Result<Address> {
+    let raw =
+        fs::read_to_string(core_toml).with_context(|| format!("read {}", core_toml.display()))?;
+    let top: toml::Value =
+        toml::from_str(&raw).with_context(|| format!("parse {}", core_toml.display()))?;
+    let value = top
+        .get("registry")
+        .and_then(|v| v.get("core_registry_addr"))
+        .and_then(|v| v.as_str())
+        .with_context(|| {
+            format!(
+                "missing registry.core_registry_addr in {}",
+                core_toml.display()
+            )
+        })?;
+    value.parse().with_context(|| {
+        format!(
+            "core_registry_addr in {} is not a valid address: {}",
+            core_toml.display(),
+            value,
+        )
+    })
+}
+
+/// Read the transition of a CTM prepare. The coordinator already binds its executor on-chain.
+fn read_ctm_transition(ctm_toml: &Path) -> anyhow::Result<Address> {
+    let raw =
+        fs::read_to_string(ctm_toml).with_context(|| format!("read {}", ctm_toml.display()))?;
+    let top: toml::Value =
+        toml::from_str(&raw).with_context(|| format!("parse {}", ctm_toml.display()))?;
+    top.get("registry")
+        .and_then(|v| v.get("ctm_transition_addr"))
+        .and_then(|v| v.as_str())
+        .with_context(|| {
+            format!(
+                "missing registry.ctm_transition_addr in {}",
+                ctm_toml.display()
+            )
+        })?
+        .parse()
+        .with_context(|| {
+            format!(
+                "invalid registry.ctm_transition_addr in {}",
+                ctm_toml.display()
+            )
+        })
+}
+
+/// The `[registry].ecosystem_upgrade_executor_addr` the core prepare wrote — the coordinator
+/// (`EcosystemUpgradeExecutor`) the CTM prepare's executor and timers answer to, and the target
+/// of the compose step's stage calls.
+fn read_ecosystem_upgrade_executor(core_toml: &Path) -> anyhow::Result<Address> {
+    let raw =
+        fs::read_to_string(core_toml).with_context(|| format!("read {}", core_toml.display()))?;
+    let top: toml::Value =
+        toml::from_str(&raw).with_context(|| format!("parse {}", core_toml.display()))?;
+    let value = top
+        .get("registry")
+        .and_then(|v| v.get("ecosystem_upgrade_executor_addr"))
+        .and_then(|v| v.as_str())
+        .with_context(|| {
+            format!(
+                "missing registry.ecosystem_upgrade_executor_addr in {}",
+                core_toml.display()
+            )
+        })?;
+
+    value.parse().with_context(|| {
+        format!(
+            "ecosystem_upgrade_executor_addr in {} is not a valid address: {}",
             core_toml.display(),
             value,
         )
