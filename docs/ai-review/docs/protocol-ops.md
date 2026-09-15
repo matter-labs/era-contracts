@@ -29,22 +29,32 @@ append-only `transactions.txt` to establish provenance.
 `ecosystem verify-bootstrap` (`upgrade_verification/versions/v34/`) verifies a **registry
 bootstrap** package, and is much smaller because the registry model moved the reviewable content
 off the calldata and onto write-once objects. It needs only the merged prepare TOML and an L1
-RPC — no gateway RPC, no zk-governance commit, and no transaction log, since provenance is a
-runtime codehash the executors and the CTM enforce on-chain rather than a CREATE2 history to
+RPC — no gateway RPC, no zk-governance commit, and no transaction log, since the objects are
+identified against the reviewed commit's own artifacts rather than a CREATE2 history to
 reconstruct. What it checks:
 
-- **Object provenance** — the code at each address, looked up in `AllContractsHashes.json`.
-  Code attributable to no contract is a WARNING (the usual cause is an un-regenerated hash file,
-  which makes every lookup miss at once); code attributable to a _different_ contract is an ERROR.
-- **The manifest's inline pins** against live code. A pin that does not hold cannot execute:
-  the executors reject an object whose code disagrees with its pin.
+- **Object provenance** — the code at each address, looked up in `AllContractsHashes.json`. Code
+  attributable to a _different_ contract is an ERROR, and so is code attributable to NO contract:
+  the reviewer cannot say what is deployed there, and an unresolved deployment must not ride along
+  with an otherwise successful review. (The usual cause is an un-regenerated hash file, which makes
+  every lookup miss at once — fixed before the review concludes, not annotated in it.)
+- **Constructor-set immutables.** `AllContractsHashes.json` records the ARTIFACT's deployed
+  bytecode, whose immutable slots are zero, so a contract that sets immutables never hashes to its
+  own artifact once deployed. Those are identified from their immutable VALUES instead — read back
+  from the deployment, each held against the reviewed value, each mismatch an error. The CTM
+  executor's `CHAIN_TYPE_MANAGER` / `CTM_PROXY_ADMIN` go against the manifest; its
+  `TRANSITION_CODEHASH`, the core executor's `CORE_REGISTRY_CODEHASH` and the coordinator's
+  `OPERATION_CODEHASH` go against the reviewed commit's own `CTMTransition` / `CoreRegistry` /
+  `EcosystemUpgradeOperation` bytecode — never against a value the package supplied.
+- **Named members exist.** Every contract the manifest names by address must be deployed code,
+  which is what the objects' own `validate()` refuses on-chain.
 - **Bound authority** — the CTM executor's CTM, its ProxyAdmin, its coordinator
   (`coordinator()`), its owner, and that no nomination is outstanding. The owner check is the
   consequential one, so pass `--expected-governance-owner` for anything that will actually be
   signed: after `migrate()` the CTM domain belongs to that owner permanently.
 - **Departing state** — the CTM's live version against the manifest's expectation, and every
   proxy row's `expectedOldImpl` against the implementation actually live behind that proxy.
-- **Calldata shape** — stage 0 pauses and starts the pinned timer; stage 1 re-asserts the pause,
+- **Calldata shape** — stage 0 pauses and starts the timer; stage 1 re-asserts the pause,
   hands the ecosystem ProxyAdmin to the `CoreUpgradeExecutor` and applies the `CoreRegistry`
   through it (when the edge has an ecosystem leg), then hands the CTM and its ProxyAdmin to the
   migration and runs `migrate()`; stage 2 asserts `validateUpgradeApplied()` /

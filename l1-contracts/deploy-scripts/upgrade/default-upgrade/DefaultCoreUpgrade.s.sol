@@ -18,7 +18,7 @@ import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol";
 import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
-import {CoreRegistryManifest, PinnedContract, ProxyUpgradeRow} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {CoreRegistryManifest, ProxyUpgradeRow} from "contracts/upgrades/registry/RegistryTypes.sol";
 import {
     L1EcosystemContract,
     L1_ECOSYSTEM_CONTRACT_COUNT
@@ -118,7 +118,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         uint256 participating = 0;
         uint256 length = rows.length;
         for (uint256 i = 0; i < length; ++i) {
-            if (rows[i].implNew.addr != address(0)) {
+            if (rows[i].implNew != address(0)) {
                 ++participating;
             }
         }
@@ -181,7 +181,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             ProxyUpgradeRow({
                 proxy: _proxy,
                 expectedOldImpl: Utils.getImplementation(_proxy),
-                implNew: PinnedContract({addr: _implNew, codehash: _implNew.codehash}),
+                implNew: _implNew,
                 callInitializeUpgrade: false,
                 admin: ProxyAdmin(address(0))
             });

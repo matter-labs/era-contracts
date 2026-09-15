@@ -55,8 +55,8 @@ contract DefaultUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
 
         _setUpRegistryObjects(DELEGATE_CALLDATA);
         _mockEcosystemForComposer(mockBridgehub, ctmDeployerStub);
-        fromVerifier = _pinned("fromVerifier");
-        newVerifier = _pinned("newVerifier");
+        fromVerifier = _deployedStub("fromVerifier");
+        newVerifier = _deployedStub("newVerifier");
         fromRelease = _release(_departingFacets(), fromVerifier);
         newRelease = _release(_arrivingFacets(), newVerifier);
 
@@ -113,7 +113,7 @@ contract DefaultUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
     function test_upgradeFromTransition_readsTheTargetReleaseNotTheCTMsLiveOne() public {
         address ctm = makeAddr("chainTypeManager");
         engine.setChainTypeManager(ctm);
-        address laterVerifier = _pinned("laterVerifier");
+        address laterVerifier = _deployedStub("laterVerifier");
         CTMRelease laterRelease = _release(_arrivingFacets(), laterVerifier);
         vm.mockCall(ctm, abi.encodeCall(IChainTypeManager.currentRelease, ()), abi.encode(address(laterRelease)));
 

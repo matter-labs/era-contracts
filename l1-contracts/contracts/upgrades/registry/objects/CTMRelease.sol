@@ -3,22 +3,21 @@
 pragma solidity 0.8.28;
 
 import {ICTMRelease} from "./ICTMRelease.sol";
-import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
+import {ObjectAnchorLib} from "../libraries/ObjectAnchorLib.sol";
 import {ReleaseFacetReader} from "../libraries/ReleaseFacetReader.sol";
 import {
     RegistryEmptySelectors,
     RegistryInventoryLengthMismatch,
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
-import {GenesisFacet, PinnedContract, ReleaseManifest} from "../RegistryTypes.sol";
+import {GenesisFacet, ReleaseManifest} from "../RegistryTypes.sol";
 import {L2_ECOSYSTEM_CONTRACT_COUNT} from "../libraries/ContractIdentifiers.sol";
 
 /// @notice Storage-backed, write-once description of one CTM release.
-/// @dev Every pinned address carries its expected `EXTCODEHASH` INLINE and MANDATORILY — the
-///      facets in their `GenesisFacet` rows, `DiamondInit` and the genesis upgrade beside their
-///      addresses. Initialization refuses a manifest whose pins do not match the live code, and
-///      `validate()` / `verifyAll()` re-check the same pins afterwards. There is no optional,
-///      detached pin list: what the release names, the release pins.
+/// @dev A release names its members by ADDRESS. What those addresses run is what governance
+///      reviewed before approving this object; the contract's own job is to refuse a member
+///      that is not a deployed contract at all, which `validate()` does on every path that
+///      installs or applies the release.
 contract CTMRelease is ICTMRelease {
     /// @dev THE manifest, stored as its own ABI encoding. Structured storage would need the
     ///      constructor to transcribe the struct field by field — the legacy codegen pipeline
@@ -27,25 +26,22 @@ contract CTMRelease is ICTMRelease {
     ///      assignment, and `manifestHash` is its hash by construction.
     bytes internal encodedManifest;
 
-    /// @dev The pins of `_pins` that are not facet rows: `diamondInit`, `genesisUpgrade`, `verifier`.
-    uint256 private constant FIXED_PIN_COUNT = 3;
-
     /// @notice Pins the full manifest. There is NO state-mutating function on this contract: the
     ///         manifest is written once, at construction, so write-once is structural rather than a
     ///         runtime guard and `manifestHash` can never describe a stale object.
     constructor(ReleaseManifest memory _manifest) {
         if (
-            _manifest.diamondInit.addr == address(0) ||
-            _manifest.genesisUpgrade.addr == address(0) ||
-            _manifest.verifier.addr == address(0)
+            _manifest.diamondInit == address(0) ||
+            _manifest.genesisUpgrade == address(0) ||
+            _manifest.verifier == address(0)
         ) {
             revert ZeroAddress();
         }
 
-        // The pins are deliberately NOT checked here: the manifest author supplies both halves of
-        // every (address, codehash) pair, so a construction-time check proves only that the pair is
-        // self-consistent. `validate()` re-checks all of them against live code on every execution
-        // path, which is where the property is actually needed.
+        // Code existence is deliberately NOT checked here: a release may legitimately be
+        // constructed in the same transaction that deploys its members, and `validate()` holds
+        // the requirement on every path that installs or applies the release, which is where it
+        // is actually needed.
         // The one facet-set check kept: an empty set would describe an unusable chain and derive
         // a remove-everything delta in any transition departing toward it.
         if (_manifest.genesisFacets.length == 0) {
@@ -59,7 +55,7 @@ contract CTMRelease is ICTMRelease {
             revert RegistryInventoryLengthMismatch(L2_ECOSYSTEM_CONTRACT_COUNT, _manifest.l2BytecodeInfos.length);
         }
         // NO routing validation here — the release does not own the routing concept at all. It
-        // pins facet rows; the selectors live in the facets' own self-description, and routing
+        // names facet rows; the selectors live in the facets' own self-description, and routing
         // well-formedness is enforced where routing actually executes: `Diamond.diamondCut`
         // rejects duplicate or empty routing when a chain is created, and `TransitionDerivationLib`
         // re-walks both releases' routing when a transition derives its delta — both before
@@ -80,11 +76,11 @@ contract CTMRelease is ICTMRelease {
     }
 
     function diamondInit() external view returns (address) {
-        return getManifest().diamondInit.addr;
+        return getManifest().diamondInit;
     }
 
     function verifier() external view returns (address) {
-        return getManifest().verifier.addr;
+        return getManifest().verifier;
     }
 
     function genesisFacets() external view returns (GenesisFacet[] memory) {
@@ -106,7 +102,7 @@ contract CTMRelease is ICTMRelease {
     function genesisParams() external view returns (address, bytes32, bytes32, uint64) {
         ReleaseManifest memory m = getManifest();
         return (
-            m.genesisUpgrade.addr,
+            m.genesisUpgrade,
             m.genesis.genesisBatchHash,
             m.genesis.genesisBatchCommitment,
             m.genesis.genesisIndexRepeatedStorageChanges
@@ -122,37 +118,16 @@ contract CTMRelease is ICTMRelease {
 
     /// @inheritdoc ICTMRelease
     function validate() external view {
-        PinnedContract[] memory pins = _pins(getManifest());
-        uint256 length = pins.length;
-        for (uint256 i = 0; i < length; ++i) {
-            CodehashPinLib.requirePin(pins[i]);
-        }
-    }
-
-    /// @inheritdoc ICTMRelease
-    function verifyAll() external view returns (bool) {
-        PinnedContract[] memory pins = _pins(getManifest());
-        uint256 length = pins.length;
-        for (uint256 i = 0; i < length; ++i) {
-            if (!CodehashPinLib.pinHolds(pins[i])) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /// @dev THE enumeration of what this release pins, in check order: `diamondInit`,
-    ///      `genesisUpgrade`, `verifier`, then every genesis facet. Both `validate()` and
-    ///      `verifyAll()` walk this one list, so a pinned field added to the manifest is added
-    ///      here once and cannot be enforced by one surface and missed by the other.
-    function _pins(ReleaseManifest memory _m) private pure returns (PinnedContract[] memory pins) {
-        uint256 facetsLength = _m.genesisFacets.length;
-        pins = new PinnedContract[](FIXED_PIN_COUNT + facetsLength);
-        pins[0] = _m.diamondInit;
-        pins[1] = _m.genesisUpgrade;
-        pins[2] = _m.verifier;
+        ReleaseManifest memory m = getManifest();
+        ObjectAnchorLib.requireCode(m.diamondInit);
+        ObjectAnchorLib.requireCode(m.genesisUpgrade);
+        ObjectAnchorLib.requireCode(m.verifier);
+        uint256 facetsLength = m.genesisFacets.length;
         for (uint256 i = 0; i < facetsLength; ++i) {
-            pins[FIXED_PIN_COUNT + i] = _m.genesisFacets[i].facet;
+            // Not merely defensive: the facets are the one member set this contract READS
+            // through (`ISelfDescribingFacet.selectors()`), and a codeless target answers that
+            // read with an empty revert instead of a usable failure.
+            ObjectAnchorLib.requireCode(m.genesisFacets[i].facet);
         }
     }
 }

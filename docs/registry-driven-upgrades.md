@@ -1,8 +1,8 @@
 # Registry-Driven Protocol Upgrades
 
 A protocol upgrade is a set of **write-once contracts** deployed ahead of time. Governance approves
-the object addresses and their pinned contents; the contracts validate them and the executors apply
-them. What governance signs is three fixed-signature calls on one coordinator plus whatever the
+the object addresses and the contents they commit to; the contracts validate them and the executors
+apply them. What governance signs is three fixed-signature calls on one coordinator plus whatever the
 prepare declared as an external action.
 
 **Scope:** L1 + L2 era-contracts, upgrade tooling, governance proposal shape.
@@ -21,20 +21,20 @@ belong to neither: pause composition, the ServerNotifier row, the timer, coordin
 Read in this order: [objects](#objects), [authority](#authority), [upgrading](#flow-upgrading),
 [bootstrap](#bootstrap). The central security question is whether the reviewed objects and the
 declared external actions account for every executable change: review source/target edges,
-target identities, code pins, initializers, engine and composer code and ownership changes
-together, and include governance's `forward`, abandonment and coordinator-replacement powers.
+target identities, the deployed code at every named address, initializers, engine and composer
+code and ownership changes together, and include governance's `forward`, abandonment and coordinator-replacement powers.
 Stage 2 verifies the applied L1 state, not completion on every L2 chain.
 
 ## Model
 
 Two objects, deliberately separate:
 
-|          | **Release**                                                                                                             | **Transition**                                                                |
-| -------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| Answers  | what a chain **is**                                                                                                     | how release A **becomes** release B                                           |
-| Contains | pinned facet set (routing self-described by the facets), `DiamondInit`, verifier, genesis params, force-deployment data | version edge, upgrade engine, CTM-domain proxy rows, schedule, L2 plan, timer |
-| Version  | none — version-independent, reusable                                                                                    | owns the `old -> new` version edge                                            |
-| VM flag  | none — every release is a ZKsync OS release                                                                             | —                                                                             |
+|          | **Release**                                                                                                               | **Transition**                                                                |
+| -------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Answers  | what a chain **is**                                                                                                       | how release A **becomes** release B                                           |
+| Contains | complete facet set (routing self-described by the facets), `DiamondInit`, verifier, genesis params, force-deployment data | version edge, upgrade engine, CTM-domain proxy rows, schedule, L2 plan, timer |
+| Version  | none — version-independent, reusable                                                                                      | owns the `old -> new` version edge                                            |
+| VM flag  | none — every release is a ZKsync OS release                                                                               | —                                                                             |
 
 A release is reusable chain state: everything a chain _runs_ belongs to it, including the verifier
 (the chain stores it as `s.verifier`). What a release does **not** carry is anything about _when_ —
@@ -56,13 +56,13 @@ All are storage-backed, built once from a manifest they take in the constructor,
 `manifestHash = keccak256(abi.encode(manifest))`. The struct definitions and their field docs are
 in `l1-contracts/contracts/upgrades/registry/RegistryTypes.sol`.
 
-| Contract                     | Holds                                                                                                                                                                                                                                                                                                      |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CTMRelease`                 | `diamondInit` + pin, `verifier` + pin, `GenesisFacet[]` (address, freezability, pin), `fixedForceDeploymentsData`, genesis params + genesis-upgrade pin, `l2BytecodeInfos` (the `L2EcosystemContract`-indexed implementation table), one shared `l2SystemProxyBytecodeInfo` shell                          |
-| `CTMTransition`              | version edge, `fromRelease`, `newRelease`, `upgradeEngine` + pin, `proxyUpgrades` (the `CTMContract`-indexed CTM-domain inventory, incl. the CTM itself), deadline, `upgradeTimestamp`, pinned `upgradeTimer`, `AuthoredL2Plan`; **derived and stored:** `Diamond.FacetCut[]` and the L2 force deployments |
-| `CoreRegistry`               | the `L1EcosystemContract`-indexed inventory of `(proxy, expectedOldImpl, implNew + pin)` rows for the SHARED singletons (bridges, Bridgehub, MessageRoot, …)                                                                                                                                               |
-| `EcosystemUpgradeOperation`  | `{coreRegistry, transition}` — the optional core change and required single-CTM transition. Executors are bound on the coordinator; a zero transition is rejected.                                                                                                                                         |
-| `RegistryBootstrapMigration` | one edge from a pre-registry CTM into this model — see [Bootstrap](#bootstrap)                                                                                                                                                                                                                             |
+| Contract                     | Holds                                                                                                                                                                                                                                                                                         |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CTMRelease`                 | `diamondInit`, `verifier`, `GenesisFacet[]` (address + freezability), `fixedForceDeploymentsData`, genesis params incl. the genesis upgrade, `l2BytecodeInfos` (the `L2EcosystemContract`-indexed implementation table), one shared `l2SystemProxyBytecodeInfo` shell                         |
+| `CTMTransition`              | version edge, `fromRelease`, `newRelease`, `upgradeEngine`, `proxyUpgrades` (the `CTMContract`-indexed CTM-domain inventory, incl. the CTM itself), deadline, `upgradeTimestamp`, `upgradeTimer`, `AuthoredL2Plan`; **derived and stored:** `Diamond.FacetCut[]` and the L2 force deployments |
+| `CoreRegistry`               | the `L1EcosystemContract`-indexed inventory of `(proxy, expectedOldImpl, implNew)` rows for the SHARED singletons (bridges, Bridgehub, MessageRoot, …)                                                                                                                                        |
+| `EcosystemUpgradeOperation`  | `{coreRegistry, transition}` — the optional core change and required single-CTM transition. Executors are bound on the coordinator; a zero transition is rejected.                                                                                                                            |
+| `RegistryBootstrapMigration` | one edge from a pre-registry CTM into this model — see [Bootstrap](#bootstrap)                                                                                                                                                                                                                |
 
 ### Enum-indexed proxy inventories
 
@@ -97,8 +97,8 @@ its operating modes are in [the lifecycle document](upgrade-stage-lifecycle.md#s
 A row never carries calldata. Its `callInitializeUpgrade` BOOLEAN is the entire reinitialization
 surface: when set, the apply performs `upgradeAndCall` with the FIXED, argument-less
 `IProxyUpgradeInitializable.initializeUpgrade()` selector. Everything the reinitializer needs
-lives in the new implementation's own audited code — constants, or immutables on L1, both pinned
-by the row's `implNew` codehash. A manifest cannot route the init call to an arbitrary function or
+lives in the new implementation's own audited code — constants, or immutables on L1, both settled
+by the deployment governance reviewed. A manifest cannot route the init call to an arbitrary function or
 smuggle arguments into it; a wrong reinitialization value is a missing line in an audited contract
 diff, never a wrong byte in offchain-authored data.
 
@@ -111,7 +111,7 @@ diff, never a wrong byte in offchain-authored data.
 | `CTMUpgradeComposer`          | the committed cut and the L2 protocol upgrade transaction, from a transition or the bootstrap migration |
 | `L2InventoryLib`, `L2PlanLib` | changed L2 deployments; executable plan construction from bytecode infos                                |
 | `ProxyUpgradeRowLib`          | `toRows`, `applyRows`, `requireRowsApplied` over the enum-indexed inventories                           |
-| `CodehashPinLib`              | `requirePin` (reverts) / `pinHolds` (bool)                                                              |
+| `ObjectAnchorLib`             | `requireCode` (a named member is deployed) / `requireObjectType` (an anchor admits a candidate)         |
 
 There is no intermediate genesis-manifest type between a build and its `ReleaseManifest`:
 `DeployCTMUtils.deployCurrentRelease` (and `deployAdditionalReleaseFacets`) assembles the
@@ -238,43 +238,47 @@ Who can do what once the CTM domain is owned by `CTMUpgradeExecutor`. "Chain sid
 | `setReleaseCodehash`                                                                                                                | `forward` only — one-shot, installed by the bootstrap                                           | —                                       |
 | CTM / ProxyAdmin `transferOwnership` (executor succession)                                                                          | `forward` only                                                                                  | —                                       |
 
-## Provenance and pinning
+## Provenance and validation
 
 Three mechanisms, applied everywhere:
 
-**Type provenance by codehash.** Each object takes its whole manifest as a constructor argument, so
-it has no initializer and no state-mutating function at all — write-once is structural, not a runtime
-guard. Consumers establish provenance by checking the object's `EXTCODEHASH` against the audited
-one: the executors hold `TRANSITION_CODEHASH` / `CORE_REGISTRY_CODEHASH` / `OPERATION_CODEHASH`
-as immutables, and the CTM holds `releaseCodehash` as state, checked in `setCurrentRelease`.
+**Object-type anchors.** Each object takes its whole manifest as a constructor argument, so it has
+no initializer and no state-mutating function at all — write-once is structural, not a runtime
+guard. Consumers establish that a candidate IS one of these objects by checking its `EXTCODEHASH`
+against an expectation established EARLIER: the executors hold `TRANSITION_CODEHASH` /
+`CORE_REGISTRY_CODEHASH` / `OPERATION_CODEHASH` as construction-time immutables, and the CTM holds
+`releaseCodehash` as state, checked in `setCurrentRelease`. That direction is what makes the check
+worth anything — the expectation predates every input it is applied to, so an arbitrary contract
+cannot impersonate an object whose behavior the executor then trusts. A hash arriving WITH the
+candidate would prove nothing.
 
-What this proves is that the address runs the audited, write-once code — not _which_ manifest it
-holds. Governance approving the address is what gates content. Because the manifest lives in the
+What an anchor proves is that the address runs the audited, write-once code — not _which_ manifest
+it holds. Governance approving the address is what gates content. Because the manifest lives in the
 initcode, a CREATE2 address also commits to it. For this to hold, manifest data must live in
 **storage**, never in immutables: immutables are patched into runtime code, which would give every
 instance a different codehash.
 
-**Inline codehash pins.** Every executable address an object names carries its expected
-`EXTCODEHASH` beside it — facets, `DiamondInit`, the verifier, the genesis upgrade, the upgrade
-engine, the timer, the composer, each `implNew`. Pins are deliberately NOT checked in the
-constructor — the manifest author supplies both halves of every pair, so that would prove only
-self-consistency — and are held against live code by `validate()` on the paths that commit or
-apply an object. A pin holds only against an account that **has code**.
+**Members are named by address.** Everything executable an object names — facets, `DiamondInit`,
+the verifier, the genesis upgrade, the upgrade engine, the timer, the composer, each `implNew` — is
+an ADDRESS, and what it runs is what governance reviewed before approving the object. The object
+carries no fingerprint of that code: the manifest author would supply both halves of such a pair,
+so it could only ever agree with itself, and hashing whatever the deployment script produced never
+made that choice independently reviewed.
 
-**Two validation surfaces.** `validate()` reverts and runs where an object is committed or applied
-(`beginOperation` on both domain executors, `applyL1Upgrade`, `applyTransition`, `migrate()`,
-transition construction for both release edges); `verifyAll()` returns `bool` and is for
-inspection and deployment tooling. Each object enumerates what it pins exactly once and both
-surfaces walk that one list, so a pinned field cannot be enforced by one surface and missed by the
-other. Two paths deliberately skip `validate()` and say so in code: the per-chain `upgradeChain`
-and the engine's `upgradeFromTransition` execute only the transition the CTM already committed,
-whose pins cannot have moved (an `EXTCODEHASH` is fixed for a non-selfdestructible contract).
+**Validation.** `validate()` reverts unless every contract an object names is deployed code, and
+runs where an object is committed or applied (`beginOperation` on both domain executors,
+`applyL1Upgrade`, `applyTransition`, `migrate()`, transition construction for both release edges).
+It is a real precondition rather than a formality: a codeless facet answers the routing read with
+an empty revert, and a codeless engine turns a chain's upgrade into a delegatecall that silently
+succeeds. It does NOT attest that the code is the reviewed code — that is governance's approval of
+the addresses, established off-chain. Two paths deliberately skip `validate()` and say so in code:
+the per-chain `upgradeChain` and the engine's `upgradeFromTransition` execute only the transition
+the CTM already committed, whose members cannot have lost their code since.
 
-**Post-state verification.** Pins prove the objects; a second layer proves the upgrade LANDED,
-and stage 2 gates on it:
+**Post-state verification.** A second layer proves the upgrade LANDED, and stage 2 gates on it:
 
-- `ProxyUpgradeRowLib.requireRowsApplied` — every row's proxy points at its pinned `implNew`, read
-  live through the row's `ProxyAdmin`.
+- `ProxyUpgradeRowLib.requireRowsApplied` — every row's proxy points at its `implNew`, read live
+  through the row's `ProxyAdmin`.
 - `CoreUpgradeExecutor.validateUpgradeApplied(registry)` and
   `CTMUpgradeExecutor.validateTransitionApplied(transition)` — the applied form of the two apply
   entrypoints (committed edge, version reached, rows applied). Stage 2 calls each domain’s
@@ -296,7 +300,10 @@ The CTM stores one release pointer and derives genesis data from it:
 
 - `currentRelease` — the release every new chain is created at. `storedBatchZero()` and
   `l1GenesisUpgrade()` are views over `ICTMRelease(currentRelease).genesisParams()`.
-- `releaseCodehash` — the provenance anchor every pinned release is checked against.
+- `releaseCodehash` — the provenance anchor every release this CTM installs is checked against.
+  Established once (in `initialize` for a fresh CTM, by `setReleaseCodehash` for a migrated one,
+  from the live runtime code of the release governance approved) and enforced for every release
+  afterwards. It is deliberately not a rotation mechanism.
 - `upgradeTransition[oldProtocolVersion]` — the transition committed for chains departing from that
   version, and the ONLY commitment for registry-driven edges: `upgradeCutForVersion` derives the cut
   from it on read (a chain is never handed cut bytes), and `protocolVersionDeadline` resolves the
@@ -313,7 +320,7 @@ chain several versions behind resolves its verifier from the release its own tra
 (`transition.newRelease()`), so a lagging chain is never affected by where `currentRelease` has
 moved since.
 
-When a release is pinned, the CTM validates its genesis params: a non-zero genesis upgrade and
+When a release is installed, the CTM validates its genesis params: a non-zero genesis upgrade and
 batch hash, and `genesisBatchCommitment == 1`.
 
 ## Flow: creating a chain
@@ -325,9 +332,9 @@ batch hash, and `genesisBatchCommitment == 1`.
 3. `DiamondInit.initialize(chainId, admin)` is delegatecalled from the proxy constructor, so
    `msg.sender` is the CTM. It reads `currentRelease`, installs that release's self-described routing via
    `ReleaseFacetReader`, and takes the verifier from the release.
-4. The CTM runs `IAdmin.genesisUpgrade`, which delegatecalls the release's pinned genesis engine.
+4. The CTM runs `IAdmin.genesisUpgrade`, which delegatecalls the release's genesis engine.
    The engine takes no arguments: it reads the chain context out of the storage `DiamondInit` just
-   wrote and the force deployments out of the release its CTM pins, and composes the L2 genesis
+   wrote and the force deployments out of the release its CTM points at, and composes the L2 genesis
    transaction from those. That transaction is the release's initialization edge — the same
    envelope a registry-driven upgrade commits, differing only in the call the `L2ComplexUpgrader`
    performs (`upgrade` into the L2 genesis upgrade, rather than an upgrade's deployment plan), and
@@ -355,8 +362,8 @@ sequenceDiagram
 
     G->>X: stage0(operation)
     Note over X: OPERATION_CODEHASH; domain callbacks enforce onlyCoordinator
-    X->>CO: beginOperation(operation) — pin + validate
-    X->>E: beginOperation(operation) — pin, validate, both edges
+    X->>CO: beginOperation(operation) — anchor + validate
+    X->>E: beginOperation(operation) — anchor, validate, both edges
     E->>H: pauseCTMMigration(ctm)
     X->>T: startTimer() — once per distinct timer; onlyTimerAdmin, so TIMER_GOVERNANCE must be X
     G->>X: stage1(operation)
@@ -406,7 +413,7 @@ On the chain, `DefaultUpgrade.upgradeFromTransition` applies `transition.facetCu
 runs the shared storage part (`BaseZkSyncUpgrade._upgrade`) with inputs read straight from the same
 object: the version edge and schedule from the transition, the verifier of its TARGET release (never
 the CTM's live `currentRelease()`), and the L2 protocol upgrade transaction composed from its L2
-plan with the executing chain’s ID and Bridgehub. The pinned delegate composer builds final
+plan with the executing chain’s ID and Bridgehub. The delegate composer builds final
 chain-specific calldata directly, in one pass; tooling reads that same transaction through
 `ICTMTransition.l2UpgradeTx(bridgehub, chainId)`, which forwards to the per-release engine, and
 `IRegistryBootstrapMigration.l2UpgradeTx(chainId)` for the bootstrap edge.
@@ -416,7 +423,7 @@ There is no intermediate proposal struct, selector resolution or re-diffing at e
 
 For any representable release pair, the L1-side guarantee is that **the facet routing and verifier
 an existing chain ends up with are byte-for-byte what a fresh chain at `newRelease` gets**. The
-upgrade path and the genesis path resolve to the same pinned release, so they cannot drift. There
+upgrade path and the genesis path resolve to the same release, so they cannot drift. There
 is no second mechanism for any part of installed chain state.
 
 The **L2 force deployments are derived too**: only changed, nonempty target rows of the
@@ -426,7 +433,7 @@ into the executable descriptor. A changed shell also changes the corresponding t
 Unchanged rows are not reinstalled.
 
 The reviewed input outside that table is `AuthoredL2Plan`: delegate bytecode info, extra bytecode
-infos and a pinned calldata composer. `L2PlanLib.build` constructs the delegate and extra
+infos and a calldata composer. `L2PlanLib.build` constructs the delegate and extra
 `Unsafe` deployments at bytecode-derived addresses, sets the delegate target, and collects and
 deduplicates every installed bytecode’s observable hash into the factory dependencies. Those
 addresses, deployment types and dependency hashes are not separately authored or cross-checked.
@@ -442,7 +449,7 @@ most one row.
 
 **Version edge.** `newProtocolVersion > oldProtocolVersion`; both majors zero; the minor delta is
 within `MAX_ALLOWED_MINOR_VERSION_DELTA`. These mirror the rules chains apply at execution, so a
-transition cannot pin successfully and then strand every chain.
+transition cannot construct successfully and then strand every chain.
 
 **Patches.** A patch may name a NEW release. A release is the immutable snapshot of the intended
 contracts, so replacing one of its L1 members — the verifier, a facet — is not by itself a change
@@ -453,7 +460,7 @@ must survive it untouched. The transition therefore validates what a patch CONTA
 which release it names: no L2 side (derived or authored), and the target release must carry over
 the departing one's L2 description — the implementation table and shared proxy shell, the
 force-deployment blob, the genesis
-batch and the VM its pinned `DiamondInit` selects. A same-release patch remains valid and is then
+batch and the VM its `DiamondInit` selects. A same-release patch remains valid and is then
 schedule-only.
 
 A verifier rotation is therefore: deploy the verifier, publish release B copying release A except
@@ -470,8 +477,8 @@ constructed factory-dependency count. Deployment addresses, types, delegate memb
 factory-dependency membership follow from construction rather than caller-supplied fields.
 
 **Verifier.** Zero means "leave unchanged" on the upgrade path, which is how the genesis upgrade runs
-after `DiamondInit` has already installed it; a release itself can never pin a zero verifier. ZKsync
-OS chains have no base-system bytecodes, so releases pin none, transitions derive no hash changes,
+after `DiamondInit` has already installed it; a release itself can never name a zero verifier. ZKsync
+OS chains have no base-system bytecodes, so releases carry none, transitions derive no hash changes,
 and the engines take no bytecode-hash inputs.
 
 **Row sets.** Every participating row is a real, unique edge: all fields nonzero, one row per
@@ -486,15 +493,20 @@ identifies the schema, coordinator and tooling changes needed to expand particip
 
 A pre-registry CTM has neither `currentRelease` nor `releaseCodehash`, and transitions never accept a
 zero `fromRelease`. It must therefore cross into the model once, through one-time migration code —
-never through an accommodation inside the transition model. Fresh CTMs pin both at genesis and need
+never through an accommodation inside the transition model. Fresh CTMs set both at genesis and need
 no bootstrap.
 
-`RegistryBootstrapMigration` expresses that crossing as a single pinned object. Its manifest names
+`RegistryBootstrapMigration` expresses that crossing as a single write-once object. Its manifest names
 the CTM and its departing version, the CTM-domain `ProxyAdmin`, the source-checked implementation
-swaps (the CTM's own among them), the genesis `currentRelease` whose codehash doubles as the
-`releaseCodehash` anchor, the version edge and deadline, the pinned bootstrap engine and authored
-L2 plan, the pinned timer, and the `CTMUpgradeExecutor` that receives the domain together with
-the owner and the `coordinator` it must already answer to. Every address carries an inline pin.
+swaps (the CTM's own among them), the genesis `currentRelease`, the version edge and deadline, the
+bootstrap engine and authored L2 plan, the timer, and the `CTMUpgradeExecutor` that receives the
+domain together with the owner and the `coordinator` it must already answer to.
+
+This is also where the CTM's provenance anchor is ESTABLISHED. After governance has approved the
+release ADDRESS, `migrate()` checks there is code at it and installs that live runtime hash as
+`releaseCodehash`; every release the CTM accepts afterwards is held against it. The step
+authenticates continuity from the approved release onward — it does not, and cannot, prove on-chain
+that the initial code was the audited code.
 
 Governance nominates the migration as CTM owner and transfers the CTM-domain `ProxyAdmin` to it;
 `migrate()` accepts the CTM, performs the whole edge and hands both to the bound executor in the
@@ -503,20 +515,21 @@ permissionless-safe: it accepts only the bound CTM and only after a nomination).
 never parked.
 
 `validate()` runs on the execution path and requires that the migration holds both ownerships,
-that the pinned timer's deadline has passed (so `migrate()` cannot run before stage 0 started it),
-that the CTM sits at the departing version, that every proxy row is at its `expectedOldImpl` (or
-already at `implNew` — how a row a foreign administrator applied first passes), that every pin
-holds and every factory dependency is published, and that the executor is **bound to what it is
-about to receive**: its `CHAIN_TYPE_MANAGER`, its `CTM_PROXY_ADMIN`, its `coordinator()`, its
-`owner()` (with no pending owner). Ownership and the coordinator are storage, outside the
-executor's codehash pin, so they are checked by value: the edge is one-shot, and an executor whose
-ownership moved after deployment would receive the whole domain on behalf of whoever owns it now.
+that the timer's deadline has passed (so `migrate()` cannot run before stage 0 started it), that
+the CTM sits at the departing version, that every proxy row is at its `expectedOldImpl` (or already
+at `implNew` — how a row a foreign administrator applied first passes), that every contract the
+manifest names is deployed code and every factory dependency is published, and that the executor is
+**bound to what it is about to receive**: its `CHAIN_TYPE_MANAGER`, its `CTM_PROXY_ADMIN`, its
+`coordinator()`, its `owner()` (with no pending owner). Ownership and the coordinator are storage
+rather than settled by the reviewed deployment, so they are checked by value: the edge is one-shot,
+and an executor whose ownership moved after deployment would receive the whole domain on behalf of
+whoever owns it now.
 
 Two properties that look like omissions but are not:
 
 - `migrate()` is **permissionless**. The gate is the state, not the caller: nothing runs until
   governance has handed over both ownerships, which is the approval, and every value written
-  afterwards is pinned. The CTM's own version-edge commit additionally refuses to run while chain
+  afterwards comes from the approved manifest. The CTM's own version-edge commit additionally refuses to run while chain
   migrations are unpaused, which is the ecosystem pause governance holds across the edge.
 - The committed cut carries **no facet cuts and no authored calldata**. The facet delta cannot be
   derived at construction (the departing version predates releases), so the cut's init target is
@@ -549,11 +562,11 @@ CREATE2 address commits to it. There is no separate salt to reproduce and no win
 deployed-but-uninitialized instance exists. Every prepare deployment rides the CREATE2 factory,
 because the deployer Safe bundle replays factory transactions only.
 
-The object codehashes the executors pin are taken from the same build artifact the objects are
-deployed from (`BytecodeUtils.getDeployedBytecodeHash` / `readBytecodeL1`); a pin read from one
-artifact and an object deployed from another can differ in CBOR metadata. Pinned implementations
-are built with a CBOR-metadata-free profile (`registry-deterministic`) so hashes are byte-identical
-across platforms.
+The object-type anchors the executors are constructed with are taken from the same build artifact
+the objects are deployed from (`BytecodeUtils.getDeployedBytecodeHash` / `readBytecodeL1`); an
+anchor read from one artifact and an object deployed from another can differ in CBOR metadata. The
+anchored contracts are built with a CBOR-metadata-free profile (`registry-deterministic`) so their
+hashes are byte-identical across platforms.
 
 **Gateway.** EraVM has no constructors, so these objects cannot be constructed there. A Gateway CTM
 therefore cannot deploy its own `CTMRelease` in-flow and the registry model cannot bump it yet; the

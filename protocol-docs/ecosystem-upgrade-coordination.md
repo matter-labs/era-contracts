@@ -5,7 +5,7 @@
 
 ## Execution domains
 
-`CoreUpgradeExecutor` owns the ecosystem ProxyAdmin and applies one pinned core
+`CoreUpgradeExecutor` owns the ecosystem ProxyAdmin and applies one write-once core
 upgrade. `CTMUpgradeExecutor` retains ownership of one CTM and its ProxyAdmin.
 `EcosystemUpgradeExecutor` coordinates the lifecycle across those domains; it does
 not acquire their proxy administration directly.

@@ -36,7 +36,7 @@ import {
     CoordinatorCTMMismatch,
     ExecutorCoordinatorMismatch,
     UpgradeLifecycleBusy,
-    RegistryPinTargetHasNoCode,
+    RegistryTargetHasNoCode,
     OperationNotPending,
     ProxyUpgradeRowMismatch,
     Unauthorized,
@@ -118,7 +118,7 @@ contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
         manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)] = ProxyUpgradeRow({
             proxy: address(ecosystemProxy),
             expectedOldImpl: implOld,
-            implNew: _pin(implNew),
+            implNew: implNew,
             callInitializeUpgrade: false,
             admin: ProxyAdmin(address(0))
         });
@@ -159,7 +159,7 @@ contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
         vm.prank(governor);
         coordinator.setCTMExecutor(ICTMUpgradeExecutor(address(0)));
         address noCode = makeAddr("noCodeExecutor");
-        vm.expectRevert(abi.encodeWithSelector(RegistryPinTargetHasNoCode.selector, noCode));
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, noCode));
         vm.prank(governor);
         coordinator.setCTMExecutor(ICTMUpgradeExecutor(noCode));
         assertEq(address(coordinator.ctmExecutor()), address(ctmExecutor));

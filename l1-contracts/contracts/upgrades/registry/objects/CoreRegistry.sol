@@ -15,8 +15,9 @@ import {CoreRegistryManifest, ProxyUpgradeRow} from "../RegistryTypes.sol";
 ///         the full manifest exactly once, there is no other state-mutating function, and the
 ///         implementation is a fixed, audited-once contract, so a per-instance review is a pure
 ///         DATA check (read the getters or compare {manifestHash} against the audited manifest).
-/// @dev Rows are source-checked edges (`expectedOldImpl -> implNew`) with MANDATORY inline
-///      codehash pins on every new implementation — no detached, optional pin list.
+/// @dev Rows are source-checked edges (`expectedOldImpl -> implNew`). What each `implNew`
+///      RUNS is what governance reviewed before approving this object; the registry's own job
+///      is to refuse a target that is not a deployed contract at all.
 contract CoreRegistry is ICoreRegistry {
     /*//////////////////////////////////////////////////////////////
                               STORAGE
@@ -72,16 +73,11 @@ contract CoreRegistry is ICoreRegistry {
 
     /// @inheritdoc ICoreRegistry
     function validate() external view {
-        ProxyUpgradeRowLib.requireRowPins(_rows());
+        ProxyUpgradeRowLib.requireRowCode(_rows());
     }
 
-    /// @inheritdoc ICoreRegistry
-    function verifyAll() external view returns (bool) {
-        return ProxyUpgradeRowLib.rowPinsHold(_rows());
-    }
-
-    /// @dev THE enumeration of what this registry pins: its participating rows, each pinning its
-    ///      `implNew`. Every read and both check surfaces walk this one list.
+    /// @dev THE enumeration of what this registry names: its participating rows. Every read and
+    ///      the check surface walk this one list.
     function _rows() private view returns (ProxyUpgradeRow[] memory) {
         return ProxyUpgradeRowLib.toRows(getManifest().proxyUpgrades, L1_ECOSYSTEM_CONTRACT_COUNT);
     }

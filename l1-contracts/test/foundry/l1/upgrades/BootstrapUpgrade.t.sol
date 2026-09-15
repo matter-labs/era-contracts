@@ -40,7 +40,7 @@ contract BootstrapUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         // the chain's.
         vm.mockCall(ctmStub, abi.encodeCall(IChainTypeManager.BRIDGE_HUB, ()), abi.encode(mockBridgehub));
         // A release pins its verifier by codehash, so the one it installs has code.
-        verifier = _pinned("releaseVerifier");
+        verifier = _deployedStub("releaseVerifier");
         genesisRelease = _release(_arrivingFacets(), verifier);
         engine = new DummyBootstrapUpgrade();
         engine.setPriorityTxMaxGasLimit(1 ether);
@@ -59,7 +59,7 @@ contract BootstrapUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
             selectors: _selectors1(SEL_DEPARTING)
         });
         engine.applyFacetCuts(legacy);
-        legacyVerifier = _pinned("legacyVerifier");
+        legacyVerifier = _deployedStub("legacyVerifier");
         engine.setVerifier(legacyVerifier);
     }
 
@@ -133,7 +133,7 @@ contract BootstrapUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
     ///      it is handed names. That is what lets a lagging chain cross the edge on its OWN
     ///      committed migration after the CTM has moved on — the same engine deployment serves both.
     function test_upgradeFromBootstrap_installsTheReleaseTheMigrationNames() public {
-        address otherVerifier = _pinned("otherVerifier");
+        address otherVerifier = _deployedStub("otherVerifier");
         CTMRelease otherRelease = _release(_arrivingFacets(), otherVerifier);
         RegistryBootstrapMigration migration = _migration(otherRelease, 0, address(engine), false);
 

@@ -13,14 +13,13 @@ import {
     EmptyBytes32,
     ExecutorCoordinatorMismatch,
     CoordinatorCTMMismatch,
-    RegistryPinTargetHasNoCode,
     NoPendingOperation,
     OperationNotPending,
     UpgradeLifecycleBusy,
     UpgradeStageOutOfOrder,
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
-import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
+import {ObjectAnchorLib} from "../libraries/ObjectAnchorLib.sol";
 import {OperationManifest} from "../RegistryTypes.sol";
 
 /// @title EcosystemUpgradeExecutor
@@ -35,7 +34,7 @@ import {OperationManifest} from "../RegistryTypes.sol";
 ///      `EcosystemUpgradeOperation` governance approved; no caller-supplied calldata enters a
 ///      stage.
 contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecutor {
-    using CodehashPinLib for address;
+    using ObjectAnchorLib for address;
 
     /// @notice The executor of the ecosystem leg. Immutable: replacing it means replacing the
     ///         coordinator, which each domain does explicitly through its `setCoordinator`.
@@ -92,9 +91,7 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
         if (address(_executor) == address(0)) {
             revert ZeroAddress();
         }
-        if (address(_executor).code.length == 0) {
-            revert RegistryPinTargetHasNoCode(address(_executor));
-        }
+        ObjectAnchorLib.requireCode(address(_executor));
         address boundCoordinator = _executor.coordinator();
         if (boundCoordinator != address(this)) {
             revert ExecutorCoordinatorMismatch(address(this), boundCoordinator);
@@ -121,7 +118,7 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
         if (address(pendingOperation) != address(0)) {
             revert UpgradeLifecycleBusy(address(pendingOperation));
         }
-        address(_operation).requirePin(OPERATION_CODEHASH);
+        address(_operation).requireObjectType(OPERATION_CODEHASH);
         OperationManifest memory m = _operation.getManifest();
 
         pendingOperation = _operation;

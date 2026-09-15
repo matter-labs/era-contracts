@@ -6,9 +6,9 @@ import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgra
 import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
-import {AuthoredL2Plan, PinnedContract} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {AuthoredL2Plan} from "contracts/upgrades/registry/RegistryTypes.sol";
 
-/// @notice Builds the L2-plan fixtures the registry suites pin. A short dummy EVM bytecode stands
+/// @notice Builds the L2-plan fixtures the registry suites use. A short dummy EVM bytecode stands
 ///         in for each real artifact; every descriptor (bytecode info, system-proxy row, factory
 ///         dependency) is derived from it exactly the way the deploy tooling derives it from the
 ///         real artifact. The authored inputs name bytecodes only; `unsafeDeployment` is the
@@ -40,16 +40,13 @@ library L2PlanFixtures {
             AuthoredL2Plan({
                 delegateBytecodeInfo: "",
                 extraBytecodeInfos: new bytes[](0),
-                delegateComposer: PinnedContract({addr: address(0), codehash: bytes32(0)})
+                delegateComposer: address(0)
             });
     }
 
     /// @notice The minimal authored input with an L2 side: `_delegateCode` as the delegate and
-    ///         `_composer` defining its calldata (the zero pin for an uncomposed delegate).
-    function delegatePlan(
-        bytes memory _delegateCode,
-        PinnedContract memory _composer
-    ) internal pure returns (AuthoredL2Plan memory) {
+    ///         `_composer` defining its calldata (zero for an uncomposed delegate).
+    function delegatePlan(bytes memory _delegateCode, address _composer) internal pure returns (AuthoredL2Plan memory) {
         return
             AuthoredL2Plan({
                 delegateBytecodeInfo: bytecodeInfo(_delegateCode),
@@ -62,7 +59,7 @@ library L2PlanFixtures {
     function delegatePlanWithExtra(
         bytes memory _delegateCode,
         bytes memory _extraCode,
-        PinnedContract memory _composer
+        address _composer
     ) internal pure returns (AuthoredL2Plan memory plan) {
         plan = delegatePlan(_delegateCode, _composer);
         plan.extraBytecodeInfos = new bytes[](1);

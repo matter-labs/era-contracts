@@ -9,10 +9,16 @@
 //! different question — not "is this calldata what the scripts would produce?" but:
 //!
 //!   1. Does every object run the code the reviewed commit produces? (`provenance`)
-//!   2. Do the manifest's inline pins hold against live code?
+//!   2. Does every contract the manifest names exist, and does each object-type ANCHOR hold
+//!      the reviewed commit's codehash for the object type it admits?
 //!   3. Is authority bound as the manifest claims, and to the expected governance owner?
 //!   4. Does every proxy row depart from the implementation that is actually live?
 //!   5. Is the edge un-executed, and does the calldata contain only the expected calls?
+//!
+//! Question 2 is deliberately NOT "does the manifest's own fingerprint of a member match that
+//! member's code": the manifest author supplies both halves of such a pair, so it can only ever
+//! agree with itself. Every comparison here is against the reviewed commit or against live
+//! state the package does not control.
 //!
 //! # What it deliberately does not do
 //!
@@ -39,7 +45,10 @@ use package::{
     SET_COORDINATOR_SELECTOR, TRANSFER_OWNERSHIP_SELECTOR, UNPAUSE_MIGRATION_SELECTOR,
     VALIDATE_APPLIED_SELECTOR,
 };
-use provenance::{expect_code_identity, expect_pin_holds, tolerate, CodeIdentity};
+use provenance::{
+    expect_code_identity, expect_code_present, expect_immutable_bearing_identity, tolerate,
+    CodeIdentity, ImmutableValue,
+};
 use views::{
     CTMUpgradeExecutorView, CoreRegistryView, CoreUpgradeExecutorView, CtmForBootstrapView,
     EcosystemUpgradeExecutorView, GovernanceUpgradeTimerView,
@@ -82,7 +91,7 @@ pub(crate) async fn verify(
         ),
     }
 
-    // ── 1. The migration itself, and its pinned manifest ──
+    // ── 1. The migration itself, and its committed manifest ──
     result.print_info("\n== Object provenance ==");
     expect_code_identity(
         &provider,
@@ -126,105 +135,85 @@ pub(crate) async fn verify(
         &provider,
         &identity,
         result,
-        "the pinned release",
-        manifest.currentRelease.addr,
+        "the release the edge installs",
+        manifest.currentRelease,
         "CTMRelease",
     )
     .await?;
-    expect_code_identity(
+
+    // ── 2. Every contract the manifest names is deployed ──
+    //
+    // The manifest names members by ADDRESS; what those addresses RUN is what governance
+    // reviewed before approving this object. What the object itself refuses — and what a
+    // reviewer can check here, before the edge runs — is a member nothing is deployed to.
+    result.print_info("\n== Named members ==");
+    expect_code_present(
+        &provider,
+        result,
+        "manifest.upgradeEngine",
+        manifest.upgradeEngine,
+    )
+    .await?;
+    if !manifest.l2Plan.delegateComposer.is_zero() {
+        expect_code_present(
+            &provider,
+            result,
+            "manifest.l2Plan.delegateComposer",
+            manifest.l2Plan.delegateComposer,
+        )
+        .await?;
+    }
+
+    // ── 3. Authority: the binding, and the owner it lands on ──
+    result.print_info("\n== Bound authority ==");
+    let executor = CTMUpgradeExecutorView::new(manifest.ctmExecutor, &provider);
+    // The executor sets its bindings as constructor immutables, so its runtime code cannot hash
+    // to the reviewed artifact (whose immutable slots are zero). Identity therefore rests on
+    // those VALUES — read back here and held against the manifest, and, for the transition
+    // anchor, against the reviewed commit's own `CTMTransition` bytecode rather than against
+    // anything the package supplied.
+    let bound_ctm = tolerate(
+        executor.CHAIN_TYPE_MANAGER().call().await,
+        result,
+        "the executor's bound CTM",
+    );
+    let bound_admin = tolerate(
+        executor.CTM_PROXY_ADMIN().call().await,
+        result,
+        "the executor's bound ProxyAdmin",
+    );
+    let transition_anchor = tolerate(
+        executor.TRANSITION_CODEHASH().call().await,
+        result,
+        "the executor's TRANSITION_CODEHASH",
+    );
+    let executor_immutables = [
+        ImmutableValue::new(
+            "CHAIN_TYPE_MANAGER",
+            optional_display(bound_ctm),
+            manifest.ctm,
+        ),
+        ImmutableValue::new(
+            "CTM_PROXY_ADMIN",
+            optional_display(bound_admin),
+            manifest.ctmProxyAdmin,
+        ),
+        ImmutableValue::new(
+            "TRANSITION_CODEHASH",
+            optional_display(transition_anchor),
+            optional_display(identity.codehash_of("CTMTransition")),
+        ),
+    ];
+    expect_immutable_bearing_identity(
         &provider,
         &identity,
         result,
         "the bound CTM upgrade executor",
-        manifest.ctmExecutor.addr,
+        manifest.ctmExecutor,
         "CTMUpgradeExecutor",
+        &executor_immutables,
     )
     .await?;
-    expect_code_identity(
-        &provider,
-        &identity,
-        result,
-        "the pinned upgrade timer",
-        manifest.upgradeTimer.addr,
-        "GovernanceUpgradeTimer",
-    )
-    .await?;
-
-    // ── 2. Every inline pin holds against live code ──
-    result.print_info("\n== Manifest pins ==");
-    expect_pin_holds(
-        &provider,
-        result,
-        "manifest.currentRelease",
-        manifest.currentRelease.addr,
-        manifest.currentRelease.codehash,
-    )
-    .await?;
-    expect_pin_holds(
-        &provider,
-        result,
-        "manifest.upgradeEngine",
-        manifest.upgradeEngine.addr,
-        manifest.upgradeEngine.codehash,
-    )
-    .await?;
-    expect_pin_holds(
-        &provider,
-        result,
-        "manifest.ctmExecutor",
-        manifest.ctmExecutor.addr,
-        manifest.ctmExecutor.codehash,
-    )
-    .await?;
-    expect_pin_holds(
-        &provider,
-        result,
-        "manifest.upgradeTimer",
-        manifest.upgradeTimer.addr,
-        manifest.upgradeTimer.codehash,
-    )
-    .await?;
-
-    // ── 3. Authority: the binding, and the owner it lands on ──
-    result.print_info("\n== Bound authority ==");
-    let executor = CTMUpgradeExecutorView::new(manifest.ctmExecutor.addr, &provider);
-
-    let Some(bound_ctm) = tolerate(
-        executor.CHAIN_TYPE_MANAGER().call().await,
-        result,
-        "the executor's bound CTM",
-    ) else {
-        return Ok(());
-    };
-    if bound_ctm == manifest.ctm {
-        result.report_ok(&format!(
-            "the executor is bound to the manifest's CTM {bound_ctm}"
-        ));
-    } else {
-        result.report_error(&format!(
-            "the executor is bound to CTM {bound_ctm} but the manifest names {}: the edge would \
-             hand authority over a different CTM",
-            manifest.ctm
-        ));
-    }
-
-    let Some(bound_admin) = tolerate(
-        executor.CTM_PROXY_ADMIN().call().await,
-        result,
-        "the executor's bound ProxyAdmin",
-    ) else {
-        return Ok(());
-    };
-    if bound_admin == manifest.ctmProxyAdmin {
-        result.report_ok(&format!(
-            "the executor is bound to CTM ProxyAdmin {bound_admin}"
-        ));
-    } else {
-        result.report_error(&format!(
-            "the executor is bound to ProxyAdmin {bound_admin} but the manifest hands over {}",
-            manifest.ctmProxyAdmin
-        ));
-    }
 
     let Some(bound_coordinator) = tolerate(
         executor.coordinator().call().await,
@@ -288,6 +277,33 @@ pub(crate) async fn verify(
         )
         .await?;
         let core_executor = CoreUpgradeExecutorView::new(core_executor_addr, &provider);
+        // The two remaining object-type anchors, each held against the reviewed commit's own
+        // bytecode for the object type it admits. Neither object has immutables, so the
+        // artifact's deployed-bytecode hash IS what a genuine one carries once deployed.
+        let core_registry_anchor = tolerate(
+            core_executor.CORE_REGISTRY_CODEHASH().call().await,
+            result,
+            "the core executor's CORE_REGISTRY_CODEHASH",
+        );
+        expect_anchor_matches_commit(
+            &identity,
+            result,
+            "the core executor's CORE_REGISTRY_CODEHASH",
+            core_registry_anchor,
+            "CoreRegistry",
+        );
+        let operation_anchor = tolerate(
+            coordinator.OPERATION_CODEHASH().call().await,
+            result,
+            "the coordinator's OPERATION_CODEHASH",
+        );
+        expect_anchor_matches_commit(
+            &identity,
+            result,
+            "the coordinator's OPERATION_CODEHASH",
+            operation_anchor,
+            "EcosystemUpgradeOperation",
+        );
         for (label, owner) in [
             (
                 "the coordinator",
@@ -438,7 +454,7 @@ pub(crate) async fn verify(
     // the prepare saw: a row at an unexpected implementation reverts stage 1 wholesale.
     let ctm_admin = ProxyAdminView::new(manifest.ctmProxyAdmin, &provider);
     for (i, row) in manifest.proxyUpgrades.iter().enumerate() {
-        if row.implNew.addr.is_zero() {
+        if row.implNew.is_zero() {
             continue; // an inert row: this edge deliberately does not upgrade that proxy
         }
         let label = format!("CTM-domain row {i} ({})", row.proxy);
@@ -457,14 +473,7 @@ pub(crate) async fn verify(
                 row.expectedOldImpl
             ));
         }
-        expect_pin_holds(
-            &provider,
-            result,
-            &format!("{label} implNew"),
-            row.implNew.addr,
-            row.implNew.codehash,
-        )
-        .await?;
+        expect_code_present(&provider, result, &format!("{label} implNew"), row.implNew).await?;
     }
 
     // ── 5. The ecosystem leg ──
@@ -488,18 +497,18 @@ pub(crate) async fn verify(
             return Ok(());
         };
         let core_executor = CoreUpgradeExecutorView::new(core_executor_addr, &provider);
-        let pinned = tolerate(
+        let anchor = tolerate(
             core_executor.CORE_REGISTRY_CODEHASH().call().await,
             result,
             "the core executor's CORE_REGISTRY_CODEHASH",
         );
         let live_code = provider.get_code_at(core_registry_addr).await?;
         let live_hash = alloy::primitives::keccak256(&live_code);
-        if pinned == Some(live_hash) {
+        if anchor == Some(live_hash) {
             result.report_ok("the core executor's CORE_REGISTRY_CODEHASH accepts this registry");
-        } else if let Some(pinned) = pinned {
+        } else if let Some(anchor) = anchor {
             result.report_error(&format!(
-                "the core executor pins CORE_REGISTRY_CODEHASH {pinned} but the registry at \
+                "the core executor anchors CORE_REGISTRY_CODEHASH {anchor} but the registry at \
                  {core_registry_addr} runs {live_hash}: `applyL1Upgrade` would be rejected"
             ));
         }
@@ -521,7 +530,7 @@ pub(crate) async fn verify(
             return Ok(());
         };
         for (i, row) in rows.iter().enumerate() {
-            if row.implNew.addr.is_zero() {
+            if row.implNew.is_zero() {
                 continue;
             }
             let label = format!("ecosystem row {i} ({})", row.proxy);
@@ -540,14 +549,8 @@ pub(crate) async fn verify(
                     row.expectedOldImpl
                 ));
             }
-            expect_pin_holds(
-                &provider,
-                result,
-                &format!("{label} implNew"),
-                row.implNew.addr,
-                row.implNew.codehash,
-            )
-            .await?;
+            expect_code_present(&provider, result, &format!("{label} implNew"), row.implNew)
+                .await?;
         }
     } else {
         result.print_info("\n== Ecosystem leg ==");
@@ -557,7 +560,7 @@ pub(crate) async fn verify(
     // ── 6. The timer that gates the edge ──
     result.print_info("\n== Stage sequencing ==");
     let timer: GovernanceUpgradeTimerViewInstance<_> =
-        GovernanceUpgradeTimerView::new(manifest.upgradeTimer.addr, &provider);
+        GovernanceUpgradeTimerView::new(manifest.upgradeTimer, &provider);
     let Some(timer_governance) = tolerate(
         timer.TIMER_GOVERNANCE().call().await,
         result,
@@ -568,38 +571,55 @@ pub(crate) async fn verify(
     // GOVERNANCE starts the bootstrap's timer, not the executor: at stage 0 the executor does
     // not hold the CTM domain yet (`CTMUpgrade_v34.timerGovernance`). Only every LATER upgrade
     // binds its timer to the executor, which `CTMUpgradeExecutor.stage0` then enforces.
+    //
+    // `TIMER_GOVERNANCE` is also a constructor-set immutable, so the timer's runtime code cannot
+    // hash to its artifact — which is why this value IS the timer's identity check.
+    expect_immutable_bearing_identity(
+        &provider,
+        &identity,
+        result,
+        "the upgrade timer",
+        manifest.upgradeTimer,
+        "GovernanceUpgradeTimer",
+        &[ImmutableValue::new(
+            "TIMER_GOVERNANCE",
+            timer_governance,
+            manifest.ctmExecutorOwner,
+        )],
+    )
+    .await?;
     if timer_governance == manifest.ctmExecutorOwner {
         result.report_ok(
-            "the pinned timer is governed by the same address that owns the executor, so \
-             governance can start it at stage 0",
+            "the timer is governed by the same address that owns the executor, so governance \
+             can start it at stage 0",
         );
-    } else if timer_governance == manifest.ctmExecutor.addr {
+    } else if timer_governance == manifest.ctmExecutor {
         result.report_error(
-            "the pinned timer is governed by the bound executor: correct for a recurring \
-             upgrade, but at bootstrap stage 0 the executor does not hold the domain yet, so \
-             nobody can start this timer",
+            "the timer is governed by the bound executor: correct for a recurring upgrade, but \
+             at bootstrap stage 0 the executor does not hold the domain yet, so nobody can \
+             start this timer",
         );
     } else {
         result.report_error(&format!(
-            "the pinned timer is governed by {timer_governance}, which neither owns the executor \
-             ({}) nor is the executor itself: stage 0 could not start it",
+            "the timer is governed by {timer_governance}, which neither owns the executor ({}) \
+             nor is the executor itself: stage 0 could not start it",
             manifest.ctmExecutorOwner
         ));
     }
 
-    if package.release != manifest.currentRelease.addr {
+    if package.release != manifest.currentRelease {
         result.report_warn(&format!(
-            "the package reports ctm_release_addr {} but the manifest pins {}: the prepare's \
+            "the package reports ctm_release_addr {} but the manifest names {}: the prepare's \
              summary disagrees with the object governance will execute",
-            package.release, manifest.currentRelease.addr
+            package.release, manifest.currentRelease
         ));
     }
     match package.upgrade_timer {
-        Some(reported) if reported != manifest.upgradeTimer.addr => result.report_warn(&format!(
-            "the package reports upgrade_timer_addr {reported} but the manifest pins {}",
-            manifest.upgradeTimer.addr
+        Some(reported) if reported != manifest.upgradeTimer => result.report_warn(&format!(
+            "the package reports upgrade_timer_addr {reported} but the manifest names {}",
+            manifest.upgradeTimer
         )),
-        Some(_) => result.report_ok("the package's reported timer matches the manifest's pin"),
+        Some(_) => result.report_ok("the package's reported timer matches the manifest"),
         None => result.report_warn(
             "the package does not report upgrade_timer_addr, so the timer is taken from the \
              manifest alone — a package produced before the prepare output named it",
@@ -677,7 +697,7 @@ fn verify_stage2_shape(
     }
 
     let expected_binding = EcosystemUpgradeExecutorView::setCTMExecutorCall {
-        _ctmExecutor: manifest.ctmExecutor.addr,
+        _ctmExecutor: manifest.ctmExecutor,
     }
     .abi_encode();
     if package.stage2.iter().any(|call| {
@@ -818,6 +838,45 @@ fn verify_stage1_shape(
     for line in unexpected {
         result.report_warn(&format!("stage 1: {line}"));
     }
+}
+
+/// Holds one object-type ANCHOR against the reviewed commit's bytecode for the object type it
+/// admits.
+///
+/// The anchor is an executor immutable: an expectation established when the executor was
+/// deployed, which every later, arbitrary input is held against. So the question is whether it
+/// admits the REVIEWED object type — never whether it agrees with a value this package carries.
+fn expect_anchor_matches_commit(
+    identity: &CodeIdentity,
+    result: &mut VerificationResult,
+    label: &str,
+    anchor: Option<alloy::primitives::FixedBytes<32>>,
+    expected_short_name: &str,
+) {
+    let Some(anchor) = anchor else {
+        return;
+    };
+    match identity.codehash_of(expected_short_name) {
+        Some(reviewed) if reviewed == anchor => {
+            result.report_ok(&format!(
+                "{label} admits the reviewed {expected_short_name}"
+            ));
+        }
+        Some(reviewed) => result.report_error(&format!(
+            "{label} is {anchor}, but the reviewed commit builds {expected_short_name} to \
+             {reviewed}: an object built from the reviewed sources would be rejected"
+        )),
+        None => result.report_error(&format!(
+            "{label} cannot be checked: AllContractsHashes.json has no \
+             {expected_short_name} entry for the reviewed commit"
+        )),
+    }
+}
+
+/// Renders an optional read for an [`ImmutableValue`], so a getter that reverted compares
+/// unequal instead of silently dropping the check.
+fn optional_display<T: std::fmt::Display>(value: Option<T>) -> String {
+    value.map_or_else(|| "<unreadable>".to_string(), |v| v.to_string())
 }
 
 /// Renders a packed SemVer protocol version the way the upgrade envs and release notes write it.

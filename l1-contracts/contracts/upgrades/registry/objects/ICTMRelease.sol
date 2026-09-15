@@ -11,7 +11,7 @@ import {GenesisFacet} from "../RegistryTypes.sol";
 ///      `ICTMTransition`, and one release can serve several versions.
 /// @dev A release also carries NO VM flag: every release is a ZKsync OS release.
 interface ICTMRelease {
-    /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment to every pinned value:
+    /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment to every manifest value:
     ///         the single value governance reviews against the audited manifest.
     function manifestHash() external view returns (bytes32);
 
@@ -41,12 +41,11 @@ interface ICTMRelease {
     ///         same per-facet selector sets, nothing extra.
     function verifyChainRouting(address _chain) external view returns (bool);
 
-    /// @notice Reverts unless every codehash this release pins (DiamondInit, genesis upgrade,
-    ///         verifier, every genesis facet) matches the live code. THE enforcement surface:
-    ///         the paths that pin or apply a release call it.
+    /// @notice Reverts unless every contract this release names (DiamondInit, genesis upgrade,
+    ///         verifier, every genesis facet) is deployed code. THE enforcement surface: the
+    ///         paths that install or apply a release call it.
+    /// @dev It does NOT attest that the code is the reviewed code — that is governance's
+    ///      approval of this object's member ADDRESSES, established off-chain before approval
+    ///      (see {docs/registry-driven-upgrades.md}).
     function validate() external view;
-
-    /// @notice Whether {validate} would pass — the same pins, read without reverting, for
-    ///         inspection and deployment tooling. Never an enforcement surface.
-    function verifyAll() external view returns (bool);
 }

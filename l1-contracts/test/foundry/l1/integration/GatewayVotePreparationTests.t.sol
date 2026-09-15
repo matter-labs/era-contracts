@@ -26,7 +26,6 @@ import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-hel
 import {Utils} from "deploy-scripts/utils/Utils.sol";
 import {
     GenesisFacet,
-    PinnedContract,
     ReleaseGenesisData,
     ReleaseManifest
 } from "../../../../contracts/upgrades/registry/RegistryTypes.sol";
@@ -287,9 +286,9 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
 
         CTMRelease release = new CTMRelease(
             ReleaseManifest({
-                diamondInit: _livePin(contracts.stateTransition.facets.diamondInit),
-                verifier: _livePin(contracts.stateTransition.verifiers.verifier),
-                genesisUpgrade: _livePin(contracts.stateTransition.genesisUpgrade),
+                diamondInit: (contracts.stateTransition.facets.diamondInit),
+                verifier: (contracts.stateTransition.verifiers.verifier),
+                genesisUpgrade: (contracts.stateTransition.genesisUpgrade),
                 genesisFacets: facets,
                 genesis: ReleaseGenesisData({
                     fixedForceDeploymentsData: config.forceDeploymentsData,
@@ -306,11 +305,7 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
     }
 
     function _liveFacetRow(address _facet, bool _isFreezable) internal view returns (GenesisFacet memory) {
-        return GenesisFacet({facet: _livePin(_facet), isFreezable: _isFreezable});
-    }
-
-    function _livePin(address _addr) internal view returns (PinnedContract memory) {
-        return PinnedContract({addr: _addr, codehash: _addr.codehash});
+        return GenesisFacet({facet: (_facet), isFreezable: _isFreezable});
     }
 
     /// @notice Simulates a CREATE2 deployment by calling the deterministic CREATE2 factory.

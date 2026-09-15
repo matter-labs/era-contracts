@@ -32,7 +32,6 @@ import {
     BootstrapManifest,
     GenesisFacet,
     L2UpgradePlan,
-    PinnedContract,
     ProxyUpgradeRow,
     ReleaseGenesisData,
     ReleaseManifest,
@@ -56,13 +55,13 @@ abstract contract RegistryObjectsFixture is Test {
     address internal facetShared; // in both releases
     address internal facetDeparting; // only in the departing release
     address internal facetArriving; // only in the target release
-    /// @dev A real DiamondInit, the one every fixture release pins.
+    /// @dev A real DiamondInit, the one every fixture release names.
     address internal diamondInit;
     address internal genesisUpgradeStub;
     address internal upgradeTimerStub;
     address internal ctmStub;
     /// @dev Returns `fixtureDelegateCalldata` regardless of its inputs — the stand-in for a
-    ///      version-specific composer, so plans can pin a real composer without an L2 migration.
+    ///      version-specific composer, so plans can name a real composer without an L2 migration.
     FixedDelegateCalldataComposer internal delegateComposer;
     bytes internal fixtureDelegateCalldata;
 
@@ -122,8 +121,8 @@ abstract contract RegistryObjectsFixture is Test {
         facetDeparting = address(new MockSelfDescribingFacet(_selectors1(SEL_DEPARTING)));
         facetArriving = address(new MockSelfDescribingFacet(_selectors1(SEL_ARRIVING)));
         diamondInit = address(new DiamondInit());
-        genesisUpgradeStub = _pinned("genesisUpgrade");
-        upgradeTimerStub = _pinned("upgradeTimer");
+        genesisUpgradeStub = _deployedStub("genesisUpgrade");
+        upgradeTimerStub = _deployedStub("upgradeTimer");
         ctmStub = makeAddr("ctm");
         delegateComposer = new FixedDelegateCalldataComposer(_delegateCalldata);
         v34Composer = new L2V34DelegateCalldataComposer();
@@ -201,19 +200,19 @@ abstract contract RegistryObjectsFixture is Test {
 
     // ─────────────────────────────── objects ───────────────────────────────
 
-    /// @dev A release pinning `_facets` (all non-freezable), `_verifier`, the fixture's DiamondInit
+    /// @dev A release naming `_facets` (all non-freezable), `_verifier`, the fixture's DiamondInit
     ///      and an empty L2 table.
     function _release(address[] memory _facets, address _verifier) internal returns (CTMRelease) {
         GenesisFacet[] memory rows = new GenesisFacet[](_facets.length);
         for (uint256 i = 0; i < _facets.length; ++i) {
-            rows[i] = GenesisFacet({facet: _pin(_facets[i]), isFreezable: false});
+            rows[i] = GenesisFacet({facet: _facets[i], isFreezable: false});
         }
         return
             new CTMRelease(
                 ReleaseManifest({
-                    diamondInit: _pin(diamondInit),
-                    verifier: _pin(_verifier),
-                    genesisUpgrade: _pin(genesisUpgradeStub),
+                    diamondInit: diamondInit,
+                    verifier: _verifier,
+                    genesisUpgrade: genesisUpgradeStub,
                     genesisFacets: rows,
                     genesis: ReleaseGenesisData({
                         fixedForceDeploymentsData: FIXED_FORCE_DEPLOYMENTS_DATA,
@@ -245,19 +244,19 @@ abstract contract RegistryObjectsFixture is Test {
     }
 
     /// @dev The minimal authored L2 side: the delegate's bytecode info (the object constructs its
-    ///      Unsafe deployment at the bytecode-derived address and pins its bytecode as the one
-    ///      factory dependency) and the pinned composer defining its calldata.
+    ///      Unsafe deployment at the bytecode-derived address and commits its bytecode as the one
+    ///      factory dependency) and the composer defining its calldata.
     function _delegatePlan() internal view returns (AuthoredL2Plan memory) {
-        return _planPinning(address(delegateComposer));
+        return _planWithComposer(address(delegateComposer));
     }
 
-    /// @dev {_delegatePlan} with the REAL v34 composer pinned in place of the fixed stand-in.
+    /// @dev {_delegatePlan} with the REAL v34 composer in place of the fixed stand-in.
     function _v34Plan() internal view returns (AuthoredL2Plan memory) {
-        return _planPinning(address(v34Composer));
+        return _planWithComposer(address(v34Composer));
     }
 
-    function _planPinning(address _composer) internal view returns (AuthoredL2Plan memory) {
-        return L2PlanFixtures.delegatePlan(DELEGATE_CODE, _pin(_composer));
+    function _planWithComposer(address _composer) internal pure returns (AuthoredL2Plan memory) {
+        return L2PlanFixtures.delegatePlan(DELEGATE_CODE, _composer);
     }
 
     function _transition(
@@ -276,12 +275,12 @@ abstract contract RegistryObjectsFixture is Test {
                     newProtocolVersion: _newProtocolVersion,
                     fromRelease: address(_fromRelease),
                     newRelease: address(_newRelease),
-                    upgradeEngine: _pin(_upgradeEngine),
+                    upgradeEngine: _upgradeEngine,
                     proxyUpgrades: new ProxyUpgradeRow[](CTM_CONTRACT_COUNT),
                     oldProtocolVersionDeadline: type(uint256).max,
                     upgradeTimestamp: _upgradeTimestamp,
                     l2Plan: _plan,
-                    upgradeTimer: _pin(upgradeTimerStub)
+                    upgradeTimer: upgradeTimerStub
                 })
             );
     }
@@ -302,7 +301,7 @@ abstract contract RegistryObjectsFixture is Test {
         rows[uint256(CTMContract.ChainTypeManager)] = ProxyUpgradeRow({
             proxy: makeAddr("ctmProxy"),
             expectedOldImpl: makeAddr("ctmImplOld"),
-            implNew: _pin(_pinned("ctmImplNew")),
+            implNew: _deployedStub("ctmImplNew"),
             callInitializeUpgrade: false,
             admin: ProxyAdmin(address(0))
         });
@@ -312,16 +311,16 @@ abstract contract RegistryObjectsFixture is Test {
                 expectedProtocolVersion: _oldProtocolVersion,
                 ctmProxyAdmin: ProxyAdmin(makeAddr("ctmProxyAdmin")),
                 proxyUpgrades: rows,
-                currentRelease: _pin(address(_release)),
+                currentRelease: address(_release),
                 newProtocolVersion: _newProtocolVersion,
                 oldProtocolVersionDeadline: type(uint256).max,
-                upgradeEngine: _pin(_upgradeEngine),
+                upgradeEngine: _upgradeEngine,
                 l2Plan: _plan,
                 upgradeTimestamp: _upgradeTimestamp,
-                ctmExecutor: _pin(_pinned("ctmExecutor")),
+                ctmExecutor: _deployedStub("ctmExecutor"),
                 ctmExecutorOwner: makeAddr("governor"),
                 coordinator: makeAddr("coordinator"),
-                upgradeTimer: _pin(upgradeTimerStub)
+                upgradeTimer: upgradeTimerStub
             });
     }
 
@@ -476,19 +475,11 @@ abstract contract RegistryObjectsFixture is Test {
 
     // ─────────────────────────────── helpers ───────────────────────────────
 
-    /// @dev Deploys a distinct-bytecode stand-in at a labelled address so EXTCODEHASH pins are
-    ///      real (an empty address would pin the zero hash).
-    function _pinned(string memory _name) internal returns (address addr) {
+    /// @dev Deploys a distinct-bytecode stand-in at a labelled address, so the objects' own
+    ///      code-existence checks see a real contract there.
+    function _deployedStub(string memory _name) internal returns (address addr) {
         addr = makeAddr(_name);
         vm.etch(addr, bytes.concat(hex"00", bytes(_name)));
-    }
-
-    function _pin(address _addr) internal view returns (PinnedContract memory) {
-        return PinnedContract({addr: _addr, codehash: _addr.codehash});
-    }
-
-    function _noPin() internal pure returns (PinnedContract memory) {
-        return PinnedContract({addr: address(0), codehash: bytes32(0)});
     }
 
     function _selectors1(bytes4 _a) internal pure returns (bytes4[] memory selectors) {

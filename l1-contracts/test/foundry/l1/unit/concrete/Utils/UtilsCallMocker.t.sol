@@ -246,7 +246,6 @@ contract UtilsCallMockerTest is Test {
             abi.encodeWithSelector(ICTMRelease.manifestHash.selector),
             abi.encode(bytes32("mock-genesis-manifest"))
         );
-        vm.mockCall(genesisRegistry, abi.encodeWithSelector(ICTMRelease.verifyAll.selector), abi.encode(true));
         // The mocked registry's `diamondInit()` placeholder is the registry itself.
         vm.mockCall(
             genesisRegistry,

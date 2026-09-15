@@ -24,8 +24,7 @@ import {
 import {
     CoreRegistryManifest,
     OperationManifest,
-    ProxyUpgradeRow,
-    PinnedContract
+    ProxyUpgradeRow
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 import {
     L1_ECOSYSTEM_CONTRACT_COUNT,
@@ -129,7 +128,7 @@ contract CoreUpgradeExecutorTest is Test {
             ProxyUpgradeRow({
                 proxy: _proxy,
                 expectedOldImpl: _expectedOldImpl,
-                implNew: PinnedContract({addr: _implNew, codehash: _implNew.codehash}),
+                implNew: _implNew,
                 callInitializeUpgrade: false,
                 admin: ProxyAdmin(address(0))
             });
@@ -196,7 +195,7 @@ contract CoreUpgradeExecutorTest is Test {
         rows[0] = ProxyUpgradeRow({
             proxy: address(bridgehubProxy),
             expectedOldImpl: address(implOld),
-            implNew: PinnedContract({addr: address(initImpl), codehash: address(initImpl).codehash}),
+            implNew: address(initImpl),
             callInitializeUpgrade: true,
             admin: ProxyAdmin(address(0))
         });

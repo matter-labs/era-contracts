@@ -7,7 +7,7 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {ICommittedUpgrade} from "./ICommittedUpgrade.sol";
 import {ICTMRelease} from "./ICTMRelease.sol";
 import {ICTMTransition} from "./ICTMTransition.sol";
-import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
+import {ObjectAnchorLib} from "../libraries/ObjectAnchorLib.sol";
 import {CTM_CONTRACT_COUNT} from "../libraries/ContractIdentifiers.sol";
 import {TransitionDerivationLib} from "../libraries/TransitionDerivationLib.sol";
 import {L2PlanLib} from "../libraries/L2PlanLib.sol";
@@ -27,7 +27,7 @@ import {
     TransitionDeadlineBeforeUpgrade,
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
-import {L2UpgradePlan, PinnedContract, ProxyUpgradeRow, TransitionManifest} from "../RegistryTypes.sol";
+import {L2UpgradePlan, ProxyUpgradeRow, TransitionManifest} from "../RegistryTypes.sol";
 import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 import {IDefaultUpgrade} from "../../IDefaultUpgrade.sol";
 import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
@@ -38,12 +38,12 @@ import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
 ///      {TransitionDerivationLib}) and stored. Transition and release state cannot diverge because
 ///      the delta is a pure function of the two pinned releases.
 /// @dev What IS authored: the version edge, upgrade engine, schedule and the L2 plan's authored
-///      input (the delegate's and any extra bytecode, the composer) — each either derived-checked
-///      or codehash-pinned inline. The verifier is NOT authored here: it is part of the installed
+///      input (the delegate's and any extra bytecode, the composer). The verifier is NOT
+///      authored here: it is part of the installed
 ///      chain state and therefore lives on the release, so it converges by the same mechanism as
 ///      facet routing. The final L2 plan is CONSTRUCTED from the target release's bytecode table
-///      and the authored input ({L2PlanLib.build}); the authored input is reviewed-and-pinned
-///      data (L1 cannot verify L2 execution effects), so the on-chain convergence guarantee
+///      and the authored input ({L2PlanLib.build}); the authored input is REVIEWED data
+///      (L1 cannot verify L2 execution effects), so the on-chain convergence guarantee
 ///      covers L1 state only.
 contract CTMTransition is ICTMTransition {
     /// @dev THE manifest, stored as its own ABI encoding — see {CTMRelease} for why the struct is
@@ -58,9 +58,6 @@ contract CTMTransition is ICTMTransition {
     ///      with dynamic members into storage).
     bytes internal encodedL2Plan;
 
-    /// @dev The pins of `_pins` every transition carries: `upgradeEngine` and `upgradeTimer`.
-    uint256 private constant FIXED_PIN_COUNT = 2;
-
     /// @notice Pins the manifest and DERIVES the delta. No state-mutating function exists on this
     ///         contract: everything is written once, at construction.
     constructor(TransitionManifest memory _manifest) {
@@ -70,8 +67,8 @@ contract CTMTransition is ICTMTransition {
         if (
             _manifest.fromRelease == address(0) ||
             _manifest.newRelease == address(0) ||
-            _manifest.upgradeEngine.addr == address(0) ||
-            _manifest.upgradeTimer.addr == address(0)
+            _manifest.upgradeEngine == address(0) ||
+            _manifest.upgradeTimer == address(0)
         ) {
             revert ZeroAddress();
         }
@@ -90,12 +87,13 @@ contract CTMTransition is ICTMTransition {
             revert TransitionDeadlineBeforeUpgrade(_manifest.oldProtocolVersionDeadline, _manifest.upgradeTimestamp);
         }
 
-        // The upgrade engine's pin is checked by `validate()` against live code, not here — see
-        // {CoreRegistry}. Both release EDGES are validated, though: the delta below is derived
-        // from their manifests, so a malformed edge would silently produce a malformed cut.
+        // The engine's and timer's code existence is checked by `validate()` on the execution
+        // paths, not here — see {CoreRegistry}. Both release EDGES are validated, though: the
+        // delta below is derived from their manifests, so a malformed edge would silently
+        // produce a malformed cut.
         // RELEASE PROVENANCE is still deliberately NOT checked here: the
         // attestation that both edges are genuine write-once CTMRelease instances comes from the
-        // CTM itself — its canonical `releaseCodehash` is enforced in `_storeCurrentRelease`, which
+        // CTM itself — its canonical `releaseCodehash` is enforced in `_setCurrentRelease`, which
         // every pinned release (bootstrap and every transition target) passes through, and the
         // executor's release edge check ties `fromRelease` to that same pinned `currentRelease`.
         ICTMRelease(_manifest.newRelease).validate();
@@ -232,7 +230,7 @@ contract CTMTransition is ICTMTransition {
     }
 
     function upgradeEngine() external view returns (address) {
-        return getManifest().upgradeEngine.addr;
+        return getManifest().upgradeEngine;
     }
 
     function oldProtocolVersionDeadline() external view returns (uint256) {
@@ -244,7 +242,7 @@ contract CTMTransition is ICTMTransition {
     }
 
     function upgradeTimer() external view returns (address) {
-        return getManifest().upgradeTimer.addr;
+        return getManifest().upgradeTimer;
     }
 
     /// @inheritdoc ICommittedUpgrade
@@ -265,7 +263,7 @@ contract CTMTransition is ICTMTransition {
 
     /// @inheritdoc ICTMTransition
     function l2UpgradeTx(address _bridgehub, uint256 _chainId) external view returns (L2CanonicalTransaction memory) {
-        return IDefaultUpgrade(getManifest().upgradeEngine.addr).l2UpgradeTx(address(this), _bridgehub, _chainId);
+        return IDefaultUpgrade(getManifest().upgradeEngine).l2UpgradeTx(address(this), _bridgehub, _chainId);
     }
 
     function ctmProxyRows() external view returns (ProxyUpgradeRow[] memory) {
@@ -273,55 +271,19 @@ contract CTMTransition is ICTMTransition {
     }
 
     /// @inheritdoc ICTMTransition
+    /// @dev THE enumeration of what this transition names itself: the upgrade engine, the timer,
+    ///      the delegate composer (version-specific CODE in place of authored calldata) when the
+    ///      plan names one, and every participating CTM-domain row's implementation. The two
+    ///      release edges are objects with check surfaces of their own.
     function validate() external view {
         TransitionManifest memory m = getManifest();
         ICTMRelease(m.newRelease).validate();
         ICTMRelease(m.fromRelease).validate();
-        PinnedContract[] memory pins = _pins(m);
-        uint256 length = pins.length;
-        for (uint256 i = 0; i < length; ++i) {
-            CodehashPinLib.requirePin(pins[i]);
+        ObjectAnchorLib.requireCode(m.upgradeEngine);
+        ObjectAnchorLib.requireCode(m.upgradeTimer);
+        if (m.l2Plan.delegateComposer != address(0)) {
+            ObjectAnchorLib.requireCode(m.l2Plan.delegateComposer);
         }
-    }
-
-    /// @inheritdoc ICTMTransition
-    function verifyAll() external view returns (bool) {
-        TransitionManifest memory m = getManifest();
-        if (!ICTMRelease(m.newRelease).verifyAll() || !ICTMRelease(m.fromRelease).verifyAll()) {
-            return false;
-        }
-        PinnedContract[] memory pins = _pins(m);
-        uint256 length = pins.length;
-        for (uint256 i = 0; i < length; ++i) {
-            if (!CodehashPinLib.pinHolds(pins[i])) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /// @dev THE enumeration of what this transition pins itself, in check order: the upgrade
-    ///      engine, the timer, the delegate composer (version-specific CODE pinned in place of
-    ///      calldata) when the plan names one, then every participating CTM-domain row's
-    ///      implementation. Both `validate()` and
-    ///      `verifyAll()` walk this one list, so a pinned field added to the manifest is added here
-    ///      once and cannot be enforced by one surface and missed by the other. The two release
-    ///      edges are objects with pin lists of their own and are checked through their surfaces.
-    function _pins(TransitionManifest memory _m) private pure returns (PinnedContract[] memory pins) {
-        ProxyUpgradeRow[] memory rows = ProxyUpgradeRowLib.toRows(_m.proxyUpgrades, CTM_CONTRACT_COUNT);
-        bool hasComposer = _m.l2Plan.delegateComposer.addr != address(0);
-        uint256 rowsLength = rows.length;
-        pins = new PinnedContract[](FIXED_PIN_COUNT + (hasComposer ? 1 : 0) + rowsLength);
-        pins[0] = _m.upgradeEngine;
-        pins[1] = _m.upgradeTimer;
-        uint256 next = FIXED_PIN_COUNT;
-        if (hasComposer) {
-            pins[next] = _m.l2Plan.delegateComposer;
-            ++next;
-        }
-        for (uint256 i = 0; i < rowsLength; ++i) {
-            pins[next] = rows[i].implNew;
-            ++next;
-        }
+        ProxyUpgradeRowLib.requireRowCode(ProxyUpgradeRowLib.toRows(m.proxyUpgrades, CTM_CONTRACT_COUNT));
     }
 }

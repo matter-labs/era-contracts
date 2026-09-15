@@ -66,27 +66,24 @@ export function legacyUpgradeSelector(): string {
 }
 
 /** The manifest's `bootstrap` section (emit mode). */
-export async function buildBootstrapSection(
-  l1Provider: ethers.providers.JsonRpcProvider,
+export function buildBootstrapSection(
   pieces: BootstrapPieces,
   ctmProxy: string,
   ctmImplOld: string,
   oldVersionDeadline: string
-): Promise<Record<string, unknown>> {
-  const codehash = async (addr: string) => ethers.utils.keccak256(await l1Provider.getCode(addr));
+): Record<string, unknown> {
   return {
     // The pre-v34 cut-taking entrypoint the harness installs (and the bootstrap cut removes).
     legacyAdminFacet: pieces.legacyAdminFacet,
-    // The bootstrap engine the composed cut's init targets — pinned by `upgradeEngine` in the
-    // migration (the production `BootstrapUpgrade`, which installs the release the migration names).
-    upgradeEngine: { address: pieces.bootstrapEngine, codehash: await codehash(pieces.bootstrapEngine) },
+    // The bootstrap engine the composed cut's init targets — the migration's `upgradeEngine`
+    // (the production `BootstrapUpgrade`, which installs the release the migration names).
+    upgradeEngine: { address: pieces.bootstrapEngine },
     // The canonical bootstrap operation: the CTM proxy's own implementation swap, as a
     // source-checked row.
     ctmImpl: {
       proxy: ctmProxy,
       expectedOldImpl: ctmImplOld,
       implNew: pieces.ctmImplNew,
-      implNewCodehash: await codehash(pieces.ctmImplNew),
     },
     oldProtocolVersionDeadline: oldVersionDeadline,
   };
@@ -110,29 +107,26 @@ export function bootstrapManifestChecks(
 }
 
 /** `RegistryBootstrapMigration.BootstrapManifest` constructor argument. */
-export async function bootstrapInitArgs(
-  l1Provider: ethers.providers.JsonRpcProvider,
+export function bootstrapInitArgs(
   manifest: any,
   packSemVer: (v: string) => bigint,
   params: {
     ctmProxy: string;
     proxyAdmin: string;
-    releaseCodehash: string;
     /** The release the edge installs as the CTM's `currentRelease` (its L2 table is the derived L2 set). */
     currentRelease: string;
     ctmExecutor: string;
-    /** The owner the CTM executor must ALREADY answer to (storage, so outside its codehash pin). */
+    /** The owner the CTM executor must ALREADY answer to (storage, so checked by value). */
     ctmExecutorOwner: string;
     /** The coordinator (`EcosystemUpgradeExecutor`) the CTM executor must answer to (also storage). */
     coordinator: string;
     upgradeTimer: string;
-    /** The pinned composer that defines the delegate calldata (the harness's fixed no-op composer). */
-    delegateComposer: { addr: string; codehash: string };
+    /** The composer that defines the delegate calldata (the harness's fixed no-op composer). */
+    delegateComposer: string;
     /** The harness's no-op delegate's bytecode info; the migration derives its address from it. */
     l2Delegate: { deployedBytecodeInfo: string };
   }
-): Promise<any> {
-  const codehash = async (addr: string) => ethers.utils.keccak256(await l1Provider.getCode(addr));
+): any {
   return {
     ctm: params.ctmProxy,
     expectedProtocolVersion: packSemVer(manifest.oldVersion),
@@ -143,21 +137,17 @@ export async function bootstrapInitArgs(
       ChainTypeManager: {
         proxy: manifest.bootstrap.ctmImpl.proxy,
         expectedOldImpl: manifest.bootstrap.ctmImpl.expectedOldImpl,
-        implNew: {
-          addr: manifest.bootstrap.ctmImpl.implNew,
-          codehash: manifest.bootstrap.ctmImpl.implNewCodehash,
-        },
+        implNew: manifest.bootstrap.ctmImpl.implNew,
         callInitializeUpgrade: false,
         admin: ethers.constants.AddressZero,
       },
     }),
-    currentRelease: { addr: params.currentRelease, codehash: params.releaseCodehash },
+    // `migrate()` reads this release's LIVE runtime hash and installs it as the CTM's
+    // `releaseCodehash` anchor, so no hash rides the manifest.
+    currentRelease: params.currentRelease,
     newProtocolVersion: packSemVer(manifest.bootstrapVersion),
     oldProtocolVersionDeadline: ethers.BigNumber.from(manifest.bootstrap.oldProtocolVersionDeadline),
-    upgradeEngine: {
-      addr: manifest.bootstrap.upgradeEngine.address,
-      codehash: manifest.bootstrap.upgradeEngine.codehash,
-    },
+    upgradeEngine: manifest.bootstrap.upgradeEngine.address,
     // The L2 leg is CONSTRUCTED on-chain from the genesis release's table plus the authored
     // delegate bytecode: its Unsafe deployment, the delegate target and the factory dependencies
     // are the migration's, and it serves the resulting cut (`upgradeCut()`) — nothing is
@@ -168,12 +158,12 @@ export async function bootstrapInitArgs(
       delegateComposer: params.delegateComposer,
     },
     upgradeTimestamp: 0,
-    // The executor and timer are deployed by this run (regular build), so their codehashes are
-    // read live rather than committed — the manifest pins only cross-machine-stable values.
-    ctmExecutor: { addr: params.ctmExecutor, codehash: await codehash(params.ctmExecutor) },
+    // The executor and timer are deployed by this run, so their addresses come from the run
+    // rather than from the committed manifest, which carries only cross-machine-stable values.
+    ctmExecutor: params.ctmExecutor,
     ctmExecutorOwner: params.ctmExecutorOwner,
     coordinator: params.coordinator,
-    upgradeTimer: { addr: params.upgradeTimer, codehash: await codehash(params.upgradeTimer) },
+    upgradeTimer: params.upgradeTimer,
   };
 }
 

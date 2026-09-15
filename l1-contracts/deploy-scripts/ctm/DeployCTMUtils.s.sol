@@ -66,12 +66,7 @@ import {CTMContract, CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "./Depl
 
 import {CTMDeployedAddresses} from "../utils/Types.sol";
 import {Facets} from "contracts/common/StateTransitionTypes.sol";
-import {
-    GenesisFacet,
-    PinnedContract,
-    ReleaseGenesisData,
-    ReleaseManifest
-} from "../../contracts/upgrades/registry/RegistryTypes.sol";
+import {GenesisFacet, ReleaseGenesisData, ReleaseManifest} from "../../contracts/upgrades/registry/RegistryTypes.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct Config {
@@ -150,17 +145,11 @@ abstract contract DeployCTMUtils is DeployUtils {
     function deployAdditionalReleaseFacets() internal virtual {}
 
     /// @notice Deploys (or reuses, like every release member) the facet `_name` and appends its
-    ///         release row — the facet with its live codehash pin and `_isFreezable`.
+    ///         release row — the facet address with `_isFreezable`.
     function _deployReleaseFacet(string memory _name, address _live, bool _isFreezable) internal returns (address) {
         address facet = _deployReleaseMember(_name, _live);
-        releaseFacets.push(GenesisFacet({facet: _pin(facet), isFreezable: _isFreezable}));
+        releaseFacets.push(GenesisFacet({facet: facet, isFreezable: _isFreezable}));
         return facet;
-    }
-
-    /// @dev The manifest unit for a deployed contract: its address beside its live codehash.
-    function _pin(address _addr) internal view returns (PinnedContract memory) {
-        require(_addr.code.length != 0, "pinned contract has no code");
-        return PinnedContract({addr: _addr, codehash: _addr.codehash});
     }
 
     /// @notice Deploys `_name`, or keeps `_live` when it may serve as this release's member.
@@ -302,9 +291,9 @@ abstract contract DeployCTMUtils is DeployUtils {
         return bytecodeInfo;
     }
 
-    /// @notice Pins the release just deployed — the facet rows {deployStateTransitionDiamondFacets}
-    /// collected, DiamondInit, the verifier, the genesis upgrade, the genesis data and the L2
-    /// inventory — in a `CTMRelease`. The chain-creation params point at it (the CTM's
+    /// @notice Commits the release just deployed — the facet rows
+    /// {deployStateTransitionDiamondFacets} collected, DiamondInit, the verifier, the genesis
+    /// upgrade, the genesis data and the L2 inventory — in a `CTMRelease`. The chain-creation params point at it (the CTM's
     /// `currentRelease`), and `DiamondInit` reads everything chain-independent from there — the
     /// committed genesis cut carries no facets and no init payload.
     /// @dev The manifest is a constructor argument, so the release is fully initialized the moment
@@ -313,13 +302,13 @@ abstract contract DeployCTMUtils is DeployUtils {
         require(generatedData.forceDeploymentsData.length != 0, "force deployments data is empty");
         require(releaseFacets.length != 0, "release facets not deployed");
         ReleaseManifest memory manifest = ReleaseManifest({
-            diamondInit: _pin(ctmAddresses.stateTransition.facets.diamondInit),
-            verifier: _pin(ctmAddresses.stateTransition.verifiers.verifier),
-            genesisUpgrade: _pin(ctmAddresses.stateTransition.genesisUpgrade),
+            diamondInit: ctmAddresses.stateTransition.facets.diamondInit,
+            verifier: ctmAddresses.stateTransition.verifiers.verifier,
+            genesisUpgrade: ctmAddresses.stateTransition.genesisUpgrade,
             genesisFacets: releaseFacets,
             genesis: ReleaseGenesisData({
                 // ZKsync OS has no bootloader, default-account or EVM-emulator bytecode: the
-                // release pins zeros, the same values a fresh chain geneses with.
+                // release commits zeros, the same values a fresh chain geneses with.
                 fixedForceDeploymentsData: generatedData.forceDeploymentsData,
                 genesisBatchHash: config.contracts.chainCreationParams.genesisRoot,
                 genesisBatchCommitment: config.contracts.chainCreationParams.genesisBatchCommitment,
@@ -432,6 +421,9 @@ abstract contract DeployCTMUtils is DeployUtils {
             ChainTypeManagerInitializeData({
                 owner: getBroadcasterAddress(),
                 validatorTimelock: stateTransition.proxies.validatorTimelock,
+                // The provenance anchor is ESTABLISHED here, from the code actually deployed at
+                // the release this run just produced — the same trust-establishment step
+                // `RegistryBootstrapMigration` performs for a migrated CTM.
                 releaseCodehash: stateTransition.currentRelease.codehash,
                 currentRelease: stateTransition.currentRelease,
                 protocolVersion: config.contracts.chainCreationParams.latestProtocolVersion,

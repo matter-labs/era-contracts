@@ -9,7 +9,7 @@ pragma solidity ^0.8.21;
 ///         `callInitializeUpgrade` is set, `applyRows` invokes exactly `initializeUpgrade()` —
 ///         fixed selector, no arguments — on the freshly-upgraded proxy, and everything the
 ///         reinitializer needs lives in the new implementation's own audited code (constants,
-///         or immutables on L1 — both pinned by the row's `implNew` codehash). There is no
+///         or immutables on L1 — both settled by the reviewed deployment). There is no
 ///         runtime data channel at all: nothing offchain-authored can steer the call, and there
 ///         is nothing to fetch.
 interface IProxyUpgradeInitializable {

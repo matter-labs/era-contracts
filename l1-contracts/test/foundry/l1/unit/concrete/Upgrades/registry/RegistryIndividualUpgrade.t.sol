@@ -24,7 +24,6 @@ import {
 import {ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 import {
     AuthoredL2Plan,
-    PinnedContract,
     ProxyUpgradeRow,
     ReleaseGenesisData,
     ReleaseManifest,
@@ -143,7 +142,7 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
         rows[uint256(CTMContract.ValidatorTimelock)] = ProxyUpgradeRow({
             proxy: address(timelock),
             expectedOldImpl: implOld,
-            implNew: PinnedContract({addr: implNew, codehash: implNew.codehash}),
+            implNew: implNew,
             callInitializeUpgrade: false,
             admin: ProxyAdmin(address(0))
         });
@@ -280,9 +279,9 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
         return
             new CTMRelease(
                 ReleaseManifest({
-                    diamondInit: PinnedContract({addr: diamondInit, codehash: diamondInit.codehash}),
-                    verifier: PinnedContract({addr: _verifier, codehash: _verifier.codehash}),
-                    genesisUpgrade: PinnedContract({addr: genesisUpgradeAddr, codehash: genesisUpgradeAddr.codehash}),
+                    diamondInit: diamondInit,
+                    verifier: _verifier,
+                    genesisUpgrade: genesisUpgradeAddr,
                     genesisFacets: _releaseFacets(_adminFacet),
                     genesis: ReleaseGenesisData({
                         fixedForceDeploymentsData: hex"f1f2",
@@ -316,16 +315,16 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
                     newProtocolVersion: _newVersion,
                     fromRelease: _fromRelease,
                     newRelease: _newRelease,
-                    upgradeEngine: PinnedContract({addr: defaultUpgrade, codehash: defaultUpgrade.codehash}),
+                    upgradeEngine: defaultUpgrade,
                     proxyUpgrades: _rows,
                     oldProtocolVersionDeadline: 1000,
                     upgradeTimestamp: 0,
                     l2Plan: AuthoredL2Plan({
                         delegateBytecodeInfo: "",
                         extraBytecodeInfos: new bytes[](0),
-                        delegateComposer: PinnedContract({addr: address(0), codehash: bytes32(0)})
+                        delegateComposer: address(0)
                     }),
-                    upgradeTimer: PinnedContract({addr: upgradeTimer, codehash: upgradeTimer.codehash})
+                    upgradeTimer: upgradeTimer
                 })
             );
     }

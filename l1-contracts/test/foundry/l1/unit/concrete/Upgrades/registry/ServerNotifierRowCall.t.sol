@@ -22,7 +22,6 @@ import {CTMContract, CTM_CONTRACT_COUNT} from "contracts/upgrades/registry/libra
 import {
     AuthoredL2Plan,
     BootstrapManifest,
-    PinnedContract,
     ProxyUpgradeRow,
     TransitionManifest
 } from "contracts/upgrades/registry/RegistryTypes.sol";
@@ -264,7 +263,7 @@ contract ServerNotifierRowCallTest is CTMUpgradeExecutorFixture {
             ProxyUpgradeRow({
                 proxy: address(notifierProxy),
                 expectedOldImpl: implOld,
-                implNew: _pin(_implNew),
+                implNew: _implNew,
                 callInitializeUpgrade: _callInitializeUpgrade,
                 admin: _admin
             });
@@ -296,20 +295,20 @@ contract ServerNotifierRowCallTest is CTMUpgradeExecutorFixture {
                     expectedProtocolVersion: 0,
                     ctmProxyAdmin: ctmProxyAdmin,
                     proxyUpgrades: _inventoryWith(_row),
-                    currentRelease: _pin(address(release)),
+                    currentRelease: address(release),
                     newProtocolVersion: newVersion,
                     oldProtocolVersionDeadline: 1000,
-                    upgradeEngine: _pin(upgradeEngineAddr),
+                    upgradeEngine: upgradeEngineAddr,
                     l2Plan: AuthoredL2Plan({
                         delegateBytecodeInfo: "",
                         extraBytecodeInfos: new bytes[](0),
-                        delegateComposer: PinnedContract({addr: address(0), codehash: bytes32(0)})
+                        delegateComposer: address(0)
                     }),
                     upgradeTimestamp: 0,
-                    ctmExecutor: _pin(address(ctmExecutor)),
+                    ctmExecutor: address(ctmExecutor),
                     ctmExecutorOwner: governor,
                     coordinator: address(coordinator),
-                    upgradeTimer: _pin(address(_newTimer(0, 0)))
+                    upgradeTimer: address(_newTimer(0, 0))
                 })
             );
     }
@@ -343,7 +342,7 @@ contract ServerNotifierRowCallTest is CTMUpgradeExecutorFixture {
         rows[0] = _row;
         vm.expectCall(_rendered.target, _rendered.value, _rendered.data);
         applier.applyRows(ctmProxyAdmin, rows);
-        assertEq(_liveImpl(), _row.implNew.addr, "applyRows moved the proxy through the same call");
+        assertEq(_liveImpl(), _row.implNew, "applyRows moved the proxy through the same call");
         assertTrue(vm.revertToState(snapshot), "restore the pre-apply state");
     }
 }

@@ -11,19 +11,13 @@
 use alloy::sol;
 
 sol! {
-    /// The bootstrap manifest, as pinned in `RegistryBootstrapMigration`'s constructor.
+    /// The bootstrap manifest, as stored in `RegistryBootstrapMigration`'s constructor.
     /// Field order and types mirror `RegistryTypes.sol` exactly — the decode is positional.
-    #[derive(Debug)]
-    struct PinnedContract {
-        address addr;
-        bytes32 codehash;
-    }
-
     #[derive(Debug)]
     struct ProxyUpgradeRow {
         address proxy;
         address expectedOldImpl;
-        PinnedContract implNew;
+        address implNew;
         bool callInitializeUpgrade;
         address admin;
     }
@@ -34,11 +28,11 @@ sol! {
     struct AuthoredL2Plan {
         bytes delegateBytecodeInfo;
         bytes[] extraBytecodeInfos;
-        PinnedContract delegateComposer;
+        address delegateComposer;
     }
 
     /// Positional mirror of `RegistryTypes.BootstrapManifest`. Every field a reviewer must
-    /// agree to is here, so the verifier reads the pinned manifest itself rather than the
+    /// agree to is here, so the verifier reads the committed manifest itself rather than the
     /// prepare's summary of it.
     #[derive(Debug)]
     struct BootstrapManifest {
@@ -46,16 +40,16 @@ sol! {
         uint256 expectedProtocolVersion;
         address ctmProxyAdmin;
         ProxyUpgradeRow[] proxyUpgrades;
-        PinnedContract currentRelease;
+        address currentRelease;
         uint256 newProtocolVersion;
         uint256 oldProtocolVersionDeadline;
-        PinnedContract upgradeEngine;
+        address upgradeEngine;
         AuthoredL2Plan l2Plan;
         uint256 upgradeTimestamp;
-        PinnedContract ctmExecutor;
+        address ctmExecutor;
         address ctmExecutorOwner;
         address coordinator;
-        PinnedContract upgradeTimer;
+        address upgradeTimer;
     }
 
     #[sol(rpc)]
@@ -101,7 +95,6 @@ sol! {
     contract CoreRegistryView {
         function manifestHash() external view returns (bytes32);
         function ecosystemRows() external view returns (ProxyUpgradeRow[] memory);
-        function verifyAll() external view returns (bool);
         function validate() external view;
     }
 

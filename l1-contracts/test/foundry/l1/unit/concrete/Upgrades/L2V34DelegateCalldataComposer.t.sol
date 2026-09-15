@@ -40,7 +40,7 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
         _setUpRegistryObjects("");
         bridgehub = makeAddr("bridgehub");
         _mockEcosystemForComposer(bridgehub, ctmDeployerStub);
-        release = new CTMRelease(_releaseManifest(FIXED_FORCE_DEPLOYMENTS_DATA, _pinned("verifier")));
+        release = new CTMRelease(_releaseManifest(FIXED_FORCE_DEPLOYMENTS_DATA, _deployedStub("verifier")));
     }
 
     // ─────────────────────────── the composed call ───────────────────────────
@@ -136,7 +136,7 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
     ///      tracker composes different arguments from the same code.
     function test_composesFromLiveInputs() public {
         CTMRelease otherRelease = new CTMRelease(
-            _releaseManifest(OTHER_FIXED_FORCE_DEPLOYMENTS_DATA, _pinned("otherVerifier"))
+            _releaseManifest(OTHER_FIXED_FORCE_DEPLOYMENTS_DATA, _deployedStub("otherVerifier"))
         );
         address otherBridgehub = makeAddr("otherBridgehub");
         address otherDeployer = makeAddr("otherCtmDeployer");
@@ -205,25 +205,26 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
         v34Composer.composeDelegateCalldata(ICTMRelease(address(release)), bridgehub, unknownChainId);
     }
 
-    // ─────────────────────────── through a pinned transition ───────────────────────────
+    // ─────────────────────────── through a transition ───────────────────────────
 
-    /// @dev The production path: a transition pins the composer by codehash and
-    ///      `CTMUpgradeComposer` asks it for the delegate calldata with the TARGET release, the
-    ///      Bridgehub and the chain it is handed. The composed L2 transaction therefore carries the
-    ///      v34 call with that chain's data.
-    function test_transitionPinningTheComposerComposesTheV34Call() public {
-        CTMRelease fromRelease = new CTMRelease(_releaseManifest(FIXED_FORCE_DEPLOYMENTS_DATA, _pinned("verifierV33")));
+    /// @dev The production path: a transition names the composer and `CTMUpgradeComposer` asks it
+    ///      for the delegate calldata with the TARGET release, the Bridgehub and the chain it is
+    ///      handed. The composed L2 transaction therefore carries the v34 call with that chain's
+    ///      data.
+    function test_transitionNamingTheComposerComposesTheV34Call() public {
+        CTMRelease fromRelease = new CTMRelease(
+            _releaseManifest(FIXED_FORCE_DEPLOYMENTS_DATA, _deployedStub("verifierV33"))
+        );
         CTMTransition transition = _transition(
             fromRelease,
             release,
             SemVer.packSemVer(0, 33, 0),
             SemVer.packSemVer(0, 34, 0),
             0,
-            _pinned("upgradeEngine"),
+            _deployedStub("upgradeEngine"),
             _v34Plan()
         );
         transition.validate();
-        assertTrue(transition.verifyAll(), "the pinned composer must verify against its live code");
 
         L2UpgradePlan memory plan = transition.l2Plan();
         assertEq(plan.delegateComposer, address(v34Composer));
@@ -258,12 +259,12 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
         address _verifier
     ) internal view returns (ReleaseManifest memory) {
         GenesisFacet[] memory facets = new GenesisFacet[](1);
-        facets[0] = GenesisFacet({facet: _pin(facetShared), isFreezable: false});
+        facets[0] = GenesisFacet({facet: facetShared, isFreezable: false});
         return
             ReleaseManifest({
-                diamondInit: _pin(diamondInit),
-                verifier: _pin(_verifier),
-                genesisUpgrade: _pin(genesisUpgradeStub),
+                diamondInit: diamondInit,
+                verifier: _verifier,
+                genesisUpgrade: genesisUpgradeStub,
                 genesisFacets: facets,
                 genesis: ReleaseGenesisData({
                     fixedForceDeploymentsData: _fixedForceDeploymentsData,

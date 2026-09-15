@@ -30,7 +30,7 @@ import {L2UpgradePlan, TransitionManifest} from "../RegistryTypes.sol";
 ///      to the same pinned release, they cannot drift apart.
 library CTMUpgradeComposer {
     /// @notice Builds the diamond cut that upgrades an existing chain across `_transition`: no
-    ///         `facetCuts` of its own, the transition's pinned engine as the init target and
+    ///         `facetCuts` of its own, the transition's engine as the init target and
     ///         `upgradeFromTransition(transition)` as its calldata. Both are determined by the
     ///         transition, so nothing else is accepted: the engine reads the facet cuts and every
     ///         other input straight from the same object at execution time, and facet changes and
@@ -43,14 +43,14 @@ library CTMUpgradeComposer {
             );
     }
 
-    /// @notice The bootstrap edge's cut (see {buildUpgradeCutData}): the migration's pinned engine
+    /// @notice The bootstrap edge's cut (see {buildUpgradeCutData}): the migration's engine
     ///         as the init target and `upgradeFromBootstrap(migration)` as its calldata.
     function buildBootstrapUpgradeCutData(
         IRegistryBootstrapMigration _migration
     ) internal view returns (Diamond.DiamondCutData memory) {
         return
             _cutNamingObject(
-                _migration.getManifest().upgradeEngine.addr,
+                _migration.getManifest().upgradeEngine,
                 abi.encodeCall(IBootstrapUpgrade.upgradeFromBootstrap, (address(_migration)))
             );
     }
@@ -76,7 +76,7 @@ library CTMUpgradeComposer {
 
     /// @notice The FINAL L1 -> L2 protocol upgrade transaction of a chain for a FINAL L2 plan: the
     ///         force deployments, the delegate call the `L2ComplexUpgrader` performs after them (its
-    ///         calldata defined by the plan's pinned composer from `_newRelease`, `_bridgehub` and
+    ///         calldata defined by the plan's composer from `_newRelease`, `_bridgehub` and
     ///         `_chainId`) and the factory dependencies. Every caller reaches this one function, so
     ///         the transition path and the bootstrap edge compose the same transaction from the
     ///         same inputs; the bootstrap has a plan and a release but no transition object to
@@ -93,7 +93,7 @@ library CTMUpgradeComposer {
             // (txType == 0) makes `BaseZkSyncUpgrade` skip the L2 protocol upgrade transaction.
             return L2CanonicalTransactionLib.emptyL2CanonicalTransaction();
         }
-        // What the delegate is called WITH is defined by the pinned version-specific composer
+        // What the delegate is called WITH is defined by the version-specific composer
         // from authoritative inputs — never by authored bytes (see {IL2DelegateCalldataComposer}).
         bytes memory delegateCalldata = _plan.delegateComposer == address(0)
             ? bytes("")

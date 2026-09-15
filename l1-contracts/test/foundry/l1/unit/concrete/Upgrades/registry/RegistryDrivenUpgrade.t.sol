@@ -46,7 +46,6 @@ import {
     ReleaseGenesisData,
     ReleaseManifest,
     TransitionManifest,
-    PinnedContract,
     ProxyUpgradeRow
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
@@ -239,9 +238,9 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
         }
         return
             ReleaseManifest({
-                diamondInit: PinnedContract({addr: diamondInit, codehash: diamondInit.codehash}),
-                verifier: PinnedContract({addr: _verifier, codehash: _verifier.codehash}),
-                genesisUpgrade: PinnedContract({addr: genesisUpgradeAddr, codehash: genesisUpgradeAddr.codehash}),
+                diamondInit: diamondInit,
+                verifier: _verifier,
+                genesisUpgrade: genesisUpgradeAddr,
                 genesisFacets: _releaseFacets(_adminFacet),
                 genesis: ReleaseGenesisData({
                     fixedForceDeploymentsData: hex"f1f2",
@@ -262,10 +261,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
         for (uint256 i = 0; i < facetCuts.length; ++i) {
             bool replaced = _adminFacet != address(0) && facetCuts[i].facet == facetCuts[1].facet;
             address facet = replaced ? _adminFacet : facetCuts[i].facet;
-            genesisFacets[i] = GenesisFacet({
-                facet: PinnedContract({addr: facet, codehash: facet.codehash}),
-                isFreezable: facetCuts[i].isFreezable
-            });
+            genesisFacets[i] = GenesisFacet({facet: facet, isFreezable: facetCuts[i].isFreezable});
         }
     }
 
@@ -292,10 +288,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
         // constructs its address and every factory dependency the hop installs (the delegate,
         // the table row's implementation and proxy shell).
         AuthoredL2Plan memory l2Plan = _newAdminFacet != address(0)
-            ? L2PlanFixtures.delegatePlan(
-                L2_DELEGATE_CODE,
-                PinnedContract({addr: address(delegateComposer), codehash: address(delegateComposer).codehash})
-            )
+            ? L2PlanFixtures.delegatePlan(L2_DELEGATE_CODE, address(delegateComposer))
             : L2PlanFixtures.emptyPlan();
 
         ProxyUpgradeRow[] memory noProxyUpgrades = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
@@ -308,12 +301,12 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
                 newProtocolVersion: _newVersion,
                 fromRelease: _fromRelease,
                 newRelease: release,
-                upgradeEngine: PinnedContract({addr: defaultUpgrade, codehash: defaultUpgrade.codehash}),
+                upgradeEngine: defaultUpgrade,
                 proxyUpgrades: noProxyUpgrades,
                 oldProtocolVersionDeadline: 1000,
                 upgradeTimestamp: 0,
                 l2Plan: l2Plan,
-                upgradeTimer: PinnedContract({addr: upgradeTimer, codehash: upgradeTimer.codehash})
+                upgradeTimer: upgradeTimer
             })
         );
     }
@@ -513,7 +506,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
             // Addresses and selectors still match; only this row's freezability disagrees with
             // what the diamond installed.
             assertEq(
-                IGetters(chainAddress).isFacetFreezable(manifest.genesisFacets[i].facet.addr),
+                IGetters(chainAddress).isFacetFreezable(manifest.genesisFacets[i].facet),
                 manifest.genesisFacets[i].isFreezable,
                 "the live diamond must carry the original freezability"
             );

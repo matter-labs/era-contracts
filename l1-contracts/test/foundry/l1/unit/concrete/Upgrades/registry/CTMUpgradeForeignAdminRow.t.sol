@@ -86,7 +86,7 @@ contract CTMUpgradeForeignAdminRowTest is CTMUpgradeExecutorFixture {
             ProxyUpgradeRow({
                 proxy: _proxy,
                 expectedOldImpl: _expectedOldImpl,
-                implNew: _pin(_implNew),
+                implNew: _implNew,
                 callInitializeUpgrade: false,
                 admin: _admin
             });
