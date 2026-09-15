@@ -15,7 +15,7 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {MockProxyUpgradeInitImpl} from "contracts/dev-contracts/test/MockProxyUpgradeInitImpl.sol";
 import {
     LegNotReserved,
-    OperationNotPending,
+    NoPendingOperation,
     ProxyUpgradeRowMismatch,
     RegistryCodehashMismatch,
     Unauthorized,
@@ -430,7 +430,7 @@ contract CoreUpgradeExecutorTest is Test {
             )
         );
         vm.prank(coordinator);
-        coreExecutor.completeOperation(operation);
+        coreExecutor.completeOperation();
         assertEq(address(coreExecutor.activeOperation()), address(operation), "a refused completion keeps the slot");
 
         vm.prank(coordinator);
@@ -438,7 +438,7 @@ contract CoreUpgradeExecutorTest is Test {
         vm.expectEmit(true, true, true, true, address(coreExecutor));
         emit CoreUpgradeExecutor.OperationCompleted(address(operation));
         vm.prank(coordinator);
-        coreExecutor.completeOperation(operation);
+        coreExecutor.completeOperation();
 
         assertEq(address(coreExecutor.activeOperation()), address(0), "the operation must be cleared");
         assertEq(address(coreExecutor.reservedCoreRegistry()), address(0), "nothing stays reserved");
@@ -455,31 +455,32 @@ contract CoreUpgradeExecutorTest is Test {
         vm.expectEmit(true, true, true, true, address(coreExecutor));
         emit CoreUpgradeExecutor.OperationAbandoned(address(operation));
         vm.prank(coordinator);
-        coreExecutor.abandonOperation(operation);
+        coreExecutor.abandonOperation();
 
         assertEq(address(coreExecutor.activeOperation()), address(0), "the operation must be cleared");
         assertEq(_liveImpl(bridgehubProxy), address(implOld), "abandoning applies nothing");
     }
 
-    function test_revertWhen_completeOrAbandonNamesAnotherOperation() public {
-        _reserve(operation);
-        IEcosystemUpgradeOperation other = _operationNaming(address(coreRegistry));
+    /// @dev The callbacks act on the executor's own reservation; a free executor has none, which
+    ///      is the state the removed operation argument used to be checked against.
+    function test_revertWhen_completeOrAbandonWithNothingReserved() public {
         vm.startPrank(coordinator);
-        vm.expectRevert(abi.encodeWithSelector(OperationNotPending.selector, address(other), address(operation)));
-        coreExecutor.completeOperation(other);
-        vm.expectRevert(abi.encodeWithSelector(OperationNotPending.selector, address(other), address(operation)));
-        coreExecutor.abandonOperation(other);
+        vm.expectRevert(NoPendingOperation.selector);
+        coreExecutor.completeOperation();
+        vm.expectRevert(NoPendingOperation.selector);
+        coreExecutor.abandonOperation();
         vm.stopPrank();
-        assertEq(address(coreExecutor.activeOperation()), address(operation), "the reservation stands");
+        assertEq(address(coreExecutor.activeOperation()), address(0), "nothing may become reserved");
+        assertEq(_liveImpl(bridgehubProxy), address(implOld), "and nothing may be applied");
     }
 
     function test_revertWhen_completeOrAbandonByNonCoordinator() public {
         _reserve(operation);
         vm.startPrank(ecosystemGovernor);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, ecosystemGovernor));
-        coreExecutor.completeOperation(operation);
+        coreExecutor.completeOperation();
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, ecosystemGovernor));
-        coreExecutor.abandonOperation(operation);
+        coreExecutor.abandonOperation();
         vm.stopPrank();
         assertEq(address(coreExecutor.activeOperation()), address(operation));
     }

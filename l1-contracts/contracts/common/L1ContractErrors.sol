@@ -444,8 +444,6 @@ error SystemContractProxyInitialized();
 error TimeNotReached(uint256 expectedTimestamp, uint256 actualTimestamp);
 // 0x7a4902ad
 error TimerAlreadyStarted();
-// 0xafd69dcd
-error TimerNotBoundToExecutor(address timer, address timerGovernance);
 // 0xf511412f
 error TimerNotStarted();
 // 0xb1e96bbd

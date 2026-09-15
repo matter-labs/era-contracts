@@ -85,9 +85,11 @@ the execution engine no longer decodes placeholders or understands the v34 deleg
 ## The upgrade timer
 
 Each transition pins its own `GovernanceUpgradeTimer`, deployed by the CTM prepare with
-`TIMER_GOVERNANCE` = the coordinator and `owner` = the ecosystem admin. Stage 0 checks the binding
-and starts each distinct timer once, including when several legs share it; stage 1 requires `checkDeadline()` for every leg. The ecosystem admin keeps the
-bounded extension right through the timer's own `changeDeadline`, capped at
+`TIMER_GOVERNANCE` = the coordinator and `owner` = the ecosystem admin. Stage 0 starts each
+distinct timer once, including when several legs share it — `startTimer` is `onlyTimerAdmin`, so a
+timer anybody else could have started early fails the stage; stage 1 requires `checkDeadline()` for
+every leg. The ecosystem admin keeps the bounded extension right through the timer's own
+`changeDeadline`, capped at
 `deadline + MAX_ADDITIONAL_DELAY` (two weeks in the prepare). That right is separately governed
 and stays explicit. The bootstrap edge predates the coordinator, so its timer is bound to
 governance and started as a declared external action.

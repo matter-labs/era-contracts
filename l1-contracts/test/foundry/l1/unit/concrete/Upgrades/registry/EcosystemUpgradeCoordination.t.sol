@@ -204,6 +204,44 @@ contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
         ctmExecutor2.validateTransitionApplied(ICTMTransition(address(second)));
     }
 
+    /// @dev Legs may share ONE `GovernanceUpgradeTimer` — the prepare deploys one clock per
+    ///      upgrade, not one per CTM. Stage 0 must start it exactly once: a second `startTimer()`
+    ///      reverts `TimerAlreadyStarted`, so the stage completing at all is the assertion.
+    function test_legsSharingOneTimer_startItExactlyOnce() public {
+        GovernanceUpgradeTimer shared = _newTimer(0, 0);
+        CTMTransition first = _transitionWithTimer(777, shared);
+        CTMTransition second = _transitionWithTimer(778, shared);
+        assertEq(first.upgradeTimer(), second.upgradeTimer(), "both legs pin the same clock");
+        EcosystemUpgradeOperation operation = _twoLegOperation(first, second);
+
+        vm.prank(governor);
+        coordinator.stage0(operation);
+
+        assertEq(shared.deadline(), block.timestamp, "the shared clock runs");
+        _assertBothPaused(true);
+
+        // Stage 1 gates both legs on that one deadline.
+        vm.prank(governor);
+        coordinator.stage1(operation);
+        assertEq(chainContractAddress.protocolVersion(), newVersion, "CTM 1 committed");
+        assertEq(ctm2.protocolVersion(), newVersion, "CTM 2 committed");
+    }
+
+    /// @dev A fixture transition re-pinned onto `_timer` instead of its own fresh one.
+    function _transitionWithTimer(
+        uint256 _upgradeTimestamp,
+        GovernanceUpgradeTimer _timer
+    ) internal returns (CTMTransition) {
+        TransitionManifest memory manifest = _transitionManifest(
+            _upgradeTimestamp,
+            address(fromRelease),
+            0,
+            L2_DELEGATE_CODE
+        );
+        manifest.upgradeTimer = _pin(address(_timer));
+        return new CTMTransition(manifest);
+    }
+
     /// @dev Stage 1 is one transaction: the second leg failing (its factory dependency is not
     ///      published on the shared supplier) rolls back the core leg and the first CTM leg with
     ///      it, and every reservation and pause stays in place for a retry.

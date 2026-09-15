@@ -342,11 +342,11 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
         ctmExecutor.beginOperation(operation);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
-        ctmExecutor.applyTransition(ICTMTransition(address(transition)));
+        ctmExecutor.applyTransition();
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
-        ctmExecutor.completeOperation(operation);
+        ctmExecutor.completeOperation();
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
-        ctmExecutor.abandonOperation(operation);
+        ctmExecutor.abandonOperation();
         vm.stopPrank();
         assertEq(address(ctmExecutor.activeOperation()), address(0));
     }

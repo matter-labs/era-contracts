@@ -9,7 +9,7 @@ import {UpgradeExecutorBase} from "../../../governance/UpgradeExecutorBase.sol";
 import {
     EmptyBytes32,
     LegNotReserved,
-    OperationNotPending,
+    NoPendingOperation,
     Unauthorized,
     UpgradeLifecycleBusy,
     ZeroAddress
@@ -144,23 +144,25 @@ contract CoreUpgradeExecutor is UpgradeExecutorBase {
     /// @notice Requires the reserved registry applied, then releases the reservation.
     /// @dev The ecosystem leg has no pause of its own; what completion adds over abandonment is
     ///      the verification, owned by the domain that applied the rows.
-    function completeOperation(IEcosystemUpgradeOperation _operation) external onlyCoordinator {
-        _requireActive(_operation);
+    function completeOperation() external onlyCoordinator {
+        IEcosystemUpgradeOperation operation = _requireActive();
         ProxyUpgradeRowLib.requireRowsApplied(PROXY_ADMIN, reservedCoreRegistry().ecosystemRows());
         delete activeOperation;
-        emit OperationCompleted(address(_operation));
+        emit OperationCompleted(address(operation));
     }
 
-    /// @notice Releases the reservation held for `_operation` without verifying anything.
-    function abandonOperation(IEcosystemUpgradeOperation _operation) external onlyCoordinator {
-        _requireActive(_operation);
+    /// @notice Releases the reservation this executor holds without verifying anything.
+    function abandonOperation() external onlyCoordinator {
+        IEcosystemUpgradeOperation operation = _requireActive();
         delete activeOperation;
-        emit OperationAbandoned(address(_operation));
+        emit OperationAbandoned(address(operation));
     }
 
-    function _requireActive(IEcosystemUpgradeOperation _operation) private view {
-        if (address(activeOperation) != address(_operation)) {
-            revert OperationNotPending(address(_operation), address(activeOperation));
+    /// @dev The reservation every callback after `beginOperation` acts on.
+    function _requireActive() private view returns (IEcosystemUpgradeOperation operation) {
+        operation = activeOperation;
+        if (address(operation) == address(0)) {
+            revert NoPendingOperation();
         }
     }
 
