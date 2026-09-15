@@ -10,7 +10,7 @@
 //! edges, which is worth a finding of its own.
 //!
 //! `ctm_transition_addr` is zero for a bootstrap and that is correct, not missing: the edge has
-//! no transition, so the compose step deploys no operation and the package carries no
+//! no transition, so the prepare deploys no operation and the package carries no
 //! coordinator stage calls. `ctm_upgrade_executor_addr` names the executor the edge hands the
 //! CTM domain to; the verifier reads it from the pinned manifest rather than the summary.
 

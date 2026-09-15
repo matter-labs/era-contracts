@@ -35,8 +35,8 @@ use crate::commands::ecosystem::upgrade_inner::{CtmInputs, PrepareInputs, Upgrad
 use crate::common::abi::AdminFunctionsAbi;
 use crate::common::external_actions::ExternalAction;
 use crate::common::forge::scripts::{
-    ADMIN_FUNCTIONS_INVOCATION, COMPOSE_OPERATION_SCRIPT_PATH, CORE_UPGRADE_SCRIPT_PATH,
-    CTM_UPGRADE_SCRIPT_PATH, UPGRADE_CORE_OUTPUT_PATH, UPGRADE_LOCAL_INPUT_PATH,
+    ADMIN_FUNCTIONS_INVOCATION, CORE_UPGRADE_SCRIPT_PATH, CTM_UPGRADE_SCRIPT_PATH,
+    UPGRADE_CORE_OUTPUT_PATH, UPGRADE_LOCAL_INPUT_PATH,
 };
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
@@ -216,7 +216,9 @@ pub(super) struct ExtraGovernanceCall {
 
 alloy::sol! {
     /// The three recurring stage entrypoints of the coordinating `EcosystemUpgradeExecutor` —
-    /// the only lifecycle calls a registry-driven package carries, emitted by the compose step.
+    /// the only lifecycle calls a registry-driven package carries. They are a function of the
+    /// operation's address alone, so the merge DERIVES them rather than reading them from a
+    /// prepare bundle.
     interface IEcosystemUpgradeExecutorStages {
         function stage0(address _operation);
         function stage1(address _operation);
@@ -228,8 +230,8 @@ alloy::sol! {
 /// `external_actions` the script declared for that phase — same target, same value, same calldata
 /// — and every declared action for that phase appears in it. A script that composes a call it
 /// never declared fails the merge instead of shipping it; so does one that declares an action it
-/// then omits. The lifecycle calls themselves come from the compose step, whose bundle
-/// `check_operation_bundle` pins exactly.
+/// then omits. The lifecycle calls themselves are not in any prepare's bundle: the merge derives
+/// them from the operation the CTM prepare deployed.
 fn check_bundle_provenance(
     source: &str,
     gov: &GovernanceCalls,
@@ -259,8 +261,8 @@ fn check_bundle_provenance(
                 None => anyhow::bail!(
                     "{source}: stage {phase} carries a call no declared external action accounts \
                      for — target {:#x}, value {}, selector 0x{}. Every emitted call must be a \
-                     declared action (see ExternalActionsLib); the lifecycle calls come from the \
-                     compose step",
+                     declared action (see ExternalActionsLib); the lifecycle calls are derived by \
+                     the merge from the operation",
                     call.target,
                     call.value,
                     hex::encode(&call.data[..call.data.len().min(4)])
@@ -277,58 +279,83 @@ fn check_bundle_provenance(
     Ok(())
 }
 
-/// The compose step's bundle is exactly `stage0/1/2(operation)` on the coordinator — one call
-/// per stage, nothing else — and the operation it names is the one the step reported.
-fn check_operation_bundle(
-    gov: &GovernanceCalls,
+/// The upgrade's three lifecycle calls: `EcosystemUpgradeExecutor.stage0/1/2(operation)` on the
+/// coordinator, one per stage. Nothing about them is authored — they are a pure function of the
+/// operation's address, which is why they are computed here instead of being carried through a
+/// prepare bundle and re-checked against this same encoding.
+fn coordinator_stage_calls(
     coordinator: Address,
     operation: Address,
-) -> anyhow::Result<()> {
-    use crate::common::governance_calls::decode_calls;
+) -> [crate::common::governance_calls::GovernanceCall; 3] {
     use alloy::sol_types::SolCall;
-    let expected = [
-        (
-            "0",
-            &gov.stage0_calls,
+    let call = |data: Vec<u8>| crate::common::governance_calls::GovernanceCall {
+        target: coordinator,
+        value: alloy::primitives::U256::ZERO,
+        data,
+    };
+    [
+        call(
             IEcosystemUpgradeExecutorStages::stage0Call {
                 _operation: operation,
             }
             .abi_encode(),
         ),
-        (
-            "1",
-            &gov.stage1_calls,
+        call(
             IEcosystemUpgradeExecutorStages::stage1Call {
                 _operation: operation,
             }
             .abi_encode(),
         ),
-        (
-            "2",
-            &gov.stage2_calls,
+        call(
             IEcosystemUpgradeExecutorStages::stage2Call {
                 _operation: operation,
             }
             .abi_encode(),
         ),
-    ];
-    for (phase, hex_calls, data) in expected {
-        let calls = decode_calls(hex_calls)
-            .with_context(|| format!("compose step: decode stage {phase} calls"))?;
-        let [call] = calls.as_slice() else {
-            anyhow::bail!(
-                "compose step: stage {phase} carries {} call(s); exactly one coordinator stage call is expected",
-                calls.len()
-            );
+    ]
+}
+
+/// The `(coordinator, operation)` pair the CTM prepare reported, or `None` when it deployed no
+/// operation — a bootstrap edge, which has no transition to associate and drives its own declared
+/// sequence instead.
+///
+/// One operation names one transition, so a package with several CTM prepares would carry several;
+/// the prepare boundary already admits exactly one ZKsync OS CTM, and this refuses the rest rather
+/// than silently emitting one upgrade's stage calls for another's.
+fn sole_operation(
+    ctm_entries: &[crate::commands::ecosystem::upgrade_inner::CtmPrepareEntry],
+) -> anyhow::Result<Option<(Address, Address)>> {
+    let mut found: Option<(Address, Address)> = None;
+    for entry in ctm_entries {
+        let raw = fs::read_to_string(&entry.toml)
+            .with_context(|| format!("read {}", entry.toml.display()))?;
+        let top: toml::Value =
+            toml::from_str(&raw).with_context(|| format!("parse {}", entry.toml.display()))?;
+        let read = |key: &str| -> Option<Address> {
+            top.get("registry")
+                .and_then(|r| r.get(key))
+                .and_then(|v| v.as_str())
+                .and_then(|v| v.parse::<Address>().ok())
+                .filter(|a| !a.is_zero())
         };
-        if call.target != coordinator || call.data.as_slice() != data.as_slice() {
+        let Some(operation) = read("operation_addr") else {
+            continue;
+        };
+        let coordinator = read("coordinator_addr").with_context(|| {
+            format!(
+                "{} names operation_addr {operation:#x} but no coordinator_addr to drive it",
+                entry.toml.display()
+            )
+        })?;
+        if let Some((_, previous)) = found {
             anyhow::bail!(
-                "compose step: stage {phase} is not `EcosystemUpgradeExecutor.stage{phase}({operation:#x})` on \
-                 the coordinator {coordinator:#x}"
+                "two CTM prepares reported an operation ({previous:#x} and {operation:#x}); \
+                 one upgrade carries exactly one"
             );
         }
+        found = Some((coordinator, operation));
     }
-    Ok(())
+    Ok(found)
 }
 
 /// Replay stage 0/1/2 governance calls from one or more prepared TOMLs.
@@ -495,9 +522,6 @@ pub struct UpgradePrepareAllArgs {
 
     #[clap(long, default_value = CTM_UPGRADE_SCRIPT_PATH, hide = true)]
     pub ctm_script_path: String,
-
-    #[clap(long, default_value = COMPOSE_OPERATION_SCRIPT_PATH, hide = true)]
-    pub compose_script_path: String,
 
     /// Path to a TOML file with exactly one CTM entry (proxy + optional
     /// override). Mutually exclusive with the direct CTM flags (`--ctm-proxy`,
@@ -812,7 +836,6 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         core_output_path: args.core_output_path.clone(),
         core_script_path: args.core_script_path.clone(),
         ctm_script_path: args.ctm_script_path.clone(),
-        compose_script_path: args.compose_script_path.clone(),
         zk_token_asset_id,
         testnet_verifier,
     };
@@ -915,7 +938,6 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
             write_merged_ecosystem_toml(
                 &prepared.core_toml,
                 &prepared.ctm_tomls,
-                prepared.operation_toml.as_deref(),
                 &extra_stage0,
                 puh_outcome.as_ref(),
                 &prepared.new_gateway_tomls,
@@ -993,7 +1015,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     Ok(())
 }
 
-/// Merge the core + per-CTM prepare TOMLs and the compose step's operation TOML (plus the
+/// Merge the core + per-CTM prepare TOMLs and the derived coordinator stage calls (plus the
 /// merger's own appends: the in-memory PUH stage-0 calls, the CTM `acceptOwnership()`
 /// normalization, and an optional `GatewayVotePreparation` bundle for the new gateway) into a
 /// single ecosystem TOML at `dst`.
@@ -1014,13 +1036,14 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 /// value = "0"
 /// data = "0x…"
 ///
-/// [governance_calls]              # merged stage 0/1/2 hex: core actions, then the coordinator's
+/// [governance_calls]              # merged stage 0/1/2 hex: core actions, then the DERIVED
 /// stage0_calls = "0x..."         # stageN(operation) (registry-driven upgrades only), then each
 /// stage1_calls = "0x..."         # CTM's actions, in source order
 /// stage2_calls = "0x..."
 ///
-/// [operation]                     # registry-driven upgrades only: the compose step's output
-/// operation_addr = "0x..."        # minus its [governance_calls]
+/// [operation]                     # registry-driven upgrades only: the operation the CTM
+/// operation_addr = "0x..."        # prepare deployed, with the coordinator its stage calls
+/// coordinator_addr = "0x..."      # are derived on
 /// coordinator_addr = "0x..."
 ///
 /// [test_upgrade_calls]            # optional: copied from CTM prepare output
@@ -1048,7 +1071,6 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 fn write_merged_ecosystem_toml(
     core_toml: &Path,
     ctm_entries: &[crate::commands::ecosystem::upgrade_inner::CtmPrepareEntry],
-    operation_toml: Option<&Path>,
     extra_stage0: &[ExtraGovernanceCall],
     zk_governance: Option<&crate::commands::ecosystem::zk_governance::ZkGovernanceOutcome>,
     new_gateway_tomls: &[PathBuf],
@@ -1109,16 +1131,6 @@ fn write_merged_ecosystem_toml(
         })
     }
 
-    /// One `[registry]` address of a prepare output, by key.
-    fn registry_address(body: &Table, key: &str, path: &Path) -> anyhow::Result<Address> {
-        body.get("registry")
-            .and_then(|r| r.get(key))
-            .and_then(|v| v.as_str())
-            .with_context(|| format!("missing registry.{key} in {}", path.display()))?
-            .parse::<Address>()
-            .with_context(|| format!("registry.{key} in {} is not an address", path.display()))
-    }
-
     let PrepareOutput {
         body: mut core_body,
         gov: core_gov,
@@ -1142,29 +1154,26 @@ fn write_merged_ecosystem_toml(
     let mut stage2: Vec<String> = vec![core_gov.stage2_calls];
     let mut zksync_os_test_calls: Option<TestUpgradeCalls> = None;
 
-    // The lifecycle calls: the coordinator's three stage calls over the composed operation,
-    // ordered after the core prepare's declared actions and before every CTM's — the position
-    // the CTM executors' own stage calls used to take.
-    let operation_body: Option<Table> = match operation_toml {
-        Some(path) => {
-            let PrepareOutput {
-                body,
-                gov,
-                external_actions: operation_external_actions,
-                ..
-            } = load_and_split(path)?;
-            anyhow::ensure!(
-                operation_external_actions.is_empty(),
-                "compose step: declared {} external action(s); the compose step emits lifecycle calls only",
-                operation_external_actions.len()
+    // The lifecycle calls: the coordinator's three stage calls over the operation the CTM prepare
+    // deployed, DERIVED from its address and ordered after the core prepare's declared actions and
+    // before every CTM's — the position the CTM executors' own stage calls used to take. A
+    // bootstrap edge deploys no operation (it has no transition) and names none.
+    let operation_body: Option<Table> = match sole_operation(ctm_entries)? {
+        Some((coordinator, operation)) => {
+            let [s0, s1, s2] = coordinator_stage_calls(coordinator, operation);
+            stage0.push(format!("0x{}", hex::encode(encode_calls(&[s0]))));
+            stage1.push(format!("0x{}", hex::encode(encode_calls(&[s1]))));
+            stage2.push(format!("0x{}", hex::encode(encode_calls(&[s2]))));
+            let mut table = Table::new();
+            table.insert(
+                "operation_addr".into(),
+                Value::String(format!("{operation:#x}")),
             );
-            let coordinator = registry_address(&body, "coordinator_addr", path)?;
-            let operation = registry_address(&body, "operation_addr", path)?;
-            check_operation_bundle(&gov, coordinator, operation)?;
-            stage0.push(gov.stage0_calls);
-            stage1.push(gov.stage1_calls);
-            stage2.push(gov.stage2_calls);
-            body.get("registry").and_then(|r| r.as_table()).cloned()
+            table.insert(
+                "coordinator_addr".into(),
+                Value::String(format!("{coordinator:#x}")),
+            );
+            Some(table)
         }
         None => None,
     };
@@ -1348,7 +1357,7 @@ fn write_merged_ecosystem_toml(
     let body = format!(
         "# Auto-generated by `protocol-ops ecosystem upgrade-prepare-all`.\n\
          # Merged ecosystem upgrade artifact: top-level [governance_calls] holds\n\
-         # the stage 0/1/2 hex of {} prepare TOML(s) plus the compose step's, copied\n\
+         # the stage 0/1/2 hex of {} prepare TOML(s) plus the derived stage calls\n\
          # in source order and never composed here; `external_actions` names every\n\
          # call in them that is not an `EcosystemUpgradeExecutor.stageN(operation)` call. Optional\n\
          # [test_upgrade_calls] is copied from the per-CTM prepare output under\n\
@@ -1442,12 +1451,11 @@ fn load_ctm_config(path: &Path) -> anyhow::Result<Vec<CtmInputs>> {
 mod tests {
     use super::*;
     use crate::common::governance_calls::{encode_calls, GovernanceCall};
-    use alloy::primitives::U256;
 
     fn call(target: u8, data: &[u8]) -> GovernanceCall {
         GovernanceCall {
             target: Address::repeat_byte(target),
-            value: U256::ZERO,
+            value: alloy::primitives::U256::ZERO,
             data: data.to_vec(),
         }
     }
@@ -1496,6 +1504,31 @@ mod tests {
             err.to_string().contains("never emits"),
             "unexpected error: {err}"
         );
+    }
+
+    /// The three lifecycle calls are what the retired compose step hand-encoded: the coordinator
+    /// as target, no value, and `stageN(address)` over the operation. The selectors are
+    /// transcribed rather than re-derived from the same `sol!` block the code under test uses, so
+    /// this is a real check of the encoding and not of itself.
+    #[test]
+    fn the_derived_stage_calls_are_the_ones_the_compose_step_encoded() {
+        let coordinator = Address::repeat_byte(0xc0);
+        let operation = Address::repeat_byte(0x0b);
+        let selectors: [[u8; 4]; 3] = [
+            [0xdc, 0xcd, 0x77, 0x7d],
+            [0x4a, 0x0d, 0x05, 0x33],
+            [0xb3, 0xd8, 0x7b, 0x1a],
+        ];
+
+        let derived = coordinator_stage_calls(coordinator, operation);
+        for (stage, (call, selector)) in derived.iter().zip(selectors).enumerate() {
+            let mut expected = selector.to_vec();
+            expected.extend_from_slice(&[0u8; 12]);
+            expected.extend_from_slice(operation.as_slice());
+            assert_eq!(call.target, coordinator, "stage {stage} target");
+            assert!(call.value.is_zero(), "stage {stage} value");
+            assert_eq!(call.data, expected, "stage {stage} calldata");
+        }
     }
 
     /// Actions of another phase do not account for a stage's calls — an `admin` action least of

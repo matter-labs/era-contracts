@@ -32,7 +32,7 @@ Finished, and described where it now lives:
 - **The stage machine is on-chain.** The scripted stage-0/1/2 bundles became
   `EcosystemUpgradeExecutor.stage0/1/2(operation)` over a write-once
   `EcosystemUpgradeOperation`; the domain executors (`CoreUpgradeExecutor`, `CTMUpgradeExecutor`)
-  only answer the coordinator's callbacks. The compose step emits the three calls; the Rust merger
+  only answer the coordinator's callbacks. The three calls are derived from the operation; the Rust merger
   copies bundles and composes nothing. Spec: `protocol-docs/ecosystem-upgrade-coordination.md`.
 - **`UpgradeStageValidator` is retired from the v34 path.** Its checks are absorbed: `migrate()`
   checks the timer's deadline, the CTM's version-edge commit refuses to run unpaused, and

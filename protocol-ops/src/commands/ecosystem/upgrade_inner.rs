@@ -24,7 +24,7 @@ use anyhow::Context;
 // Every script generation exposes the same entry points (`noGovernancePrepare(CoreUpgradeParams)` /
 // `(CTMUpgradeParams)`), so this one driver serves them all; which one actually runs is decided by
 // the `--core-script-path` / `--ctm-script-path` inputs.
-use crate::common::abi::{ICTMUpgradeV31Abi, IComposeUpgradeOperationAbi, ICoreUpgradeV31Abi};
+use crate::common::abi::{ICTMUpgradeV31Abi, ICoreUpgradeV31Abi};
 use crate::common::wallets::Wallet;
 use crate::common::{forge::ForgeRunner, logger};
 
@@ -65,10 +65,6 @@ pub struct PrepareInputs {
     pub core_script_path: String,
     /// CTM upgrade script path (relative to `l1-contracts/`).
     pub ctm_script_path: String,
-    /// Compose script path (relative to `l1-contracts/`): deploys the operation over every CTM
-    /// prepare's transition and emits the coordinator's stage calls. Skipped for a bootstrap
-    /// edge, whose prepares emit no transition.
-    pub compose_script_path: String,
     /// ZK token asset ID used by CTM prepare. For named envs this comes from
     /// `upgrade-envs/permanent-values/<env>.toml`; otherwise it is explicitly
     /// supplied or falls back only for networks with a canonical value.
@@ -86,9 +82,6 @@ pub struct PrepareInputs {
 pub struct PrepareOutput {
     pub core_toml: PathBuf,
     pub ctm_tomls: Vec<CtmPrepareEntry>,
-    /// The compose step's output — the `EcosystemUpgradeOperation` and the coordinator's three
-    /// stage calls — or `None` for a bootstrap edge (no transition to compose over).
-    pub operation_toml: Option<PathBuf>,
     /// Empty when the env's `[new_gateway]` block isn't set. When present,
     /// each entry points at one `GatewayVotePreparation` output TOML (one
     /// per CTM deployed on the gateway); the merge logic in
@@ -157,83 +150,11 @@ impl<'a> UpgradeInner<'a> {
             toml: path,
         };
 
-        let operation_toml = self
-            .compose_operation(runner, deployer, inputs, &core_toml, &ctm_entry)
-            .await
-            .context("compose operation")?;
-
         Ok(PrepareOutput {
             core_toml,
             ctm_tomls: vec![ctm_entry],
-            operation_toml,
             new_gateway_tomls: Vec::new(),
         })
-    }
-
-    /// Compose the one CTM transition and optional core change into an operation.
-    /// Bootstrap prepares emit no transition and retain their explicit handover flow.
-    async fn compose_operation(
-        &self,
-        runner: &mut ForgeRunner,
-        deployer: &Wallet,
-        inputs: &PrepareInputs,
-        core_toml: &Path,
-        ctm: &CtmPrepareEntry,
-    ) -> anyhow::Result<Option<PathBuf>> {
-        let transition = read_ctm_transition(&ctm.toml)?;
-        if transition.is_zero() {
-            logger::info(
-                "no transition to compose over (bootstrap edge): skipping the compose step",
-            );
-            return Ok(None);
-        }
-        ensure_script_exists(self.contracts_path, &inputs.compose_script_path)?;
-
-        let coordinator = read_ecosystem_upgrade_executor(core_toml)?;
-        let core_registry = read_core_registry(core_toml)?;
-        logger::info(format!(
-            "Composing the operation on coordinator {coordinator:#x}: core registry {core_registry:#x}, transition {transition:#x}"
-        ));
-
-        let output_path_str = "/script-out/upgrade-operation.toml".to_string();
-        let output_path = self
-            .contracts_path
-            .join(output_path_str.trim_start_matches('/'));
-        let _ = fs::remove_file(&output_path);
-
-        let script = runner
-            .script_path_from_root(
-                self.contracts_path,
-                Path::new(inputs.compose_script_path.trim_start_matches('/')),
-            )
-            .with_calldata(&Bytes::from(
-                IComposeUpgradeOperationAbi::composeCall {
-                    _params: IComposeUpgradeOperationAbi::ComposeOperationParams {
-                        coordinator,
-                        coreRegistry: core_registry,
-                        transition,
-                        // The operation's init code is unique to its transition, so the core salt
-                        // cannot collide with the prepares' deployments.
-                        create2FactorySalt: inputs
-                            .create2_factory_salt
-                            .unwrap_or_else(|| B256::from(rand::random::<[u8; 32]>())),
-                        outputPath: output_path_str,
-                    },
-                }
-                .abi_encode(),
-            ))
-            .with_broadcast()
-            .with_ffi()
-            .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
-            .with_offline()
-            .with_wallet(deployer);
-
-        logger::step("Running the compose step");
-        runner
-            .run(script)
-            .context("Failed to execute the compose script")?;
-
-        Ok(Some(output_path))
     }
 
     async fn prepare_core(
@@ -524,33 +445,9 @@ fn read_core_registry(core_toml: &Path) -> anyhow::Result<Address> {
     })
 }
 
-/// Read the transition of a CTM prepare. The coordinator already binds its executor on-chain.
-fn read_ctm_transition(ctm_toml: &Path) -> anyhow::Result<Address> {
-    let raw =
-        fs::read_to_string(ctm_toml).with_context(|| format!("read {}", ctm_toml.display()))?;
-    let top: toml::Value =
-        toml::from_str(&raw).with_context(|| format!("parse {}", ctm_toml.display()))?;
-    top.get("registry")
-        .and_then(|v| v.get("ctm_transition_addr"))
-        .and_then(|v| v.as_str())
-        .with_context(|| {
-            format!(
-                "missing registry.ctm_transition_addr in {}",
-                ctm_toml.display()
-            )
-        })?
-        .parse()
-        .with_context(|| {
-            format!(
-                "invalid registry.ctm_transition_addr in {}",
-                ctm_toml.display()
-            )
-        })
-}
-
 /// The `[registry].ecosystem_upgrade_executor_addr` the core prepare wrote — the coordinator
 /// (`EcosystemUpgradeExecutor`) the CTM prepare's executor and timers answer to, and the target
-/// of the compose step's stage calls.
+/// of the derived coordinator stage calls.
 fn read_ecosystem_upgrade_executor(core_toml: &Path) -> anyhow::Result<Address> {
     let raw =
         fs::read_to_string(core_toml).with_context(|| format!("read {}", core_toml.display()))?;

@@ -63,23 +63,9 @@ struct CTMUpgradeParams {
     ///         a deployment it did not make.
     address ecosystemUpgradeExecutor;
     /// @notice The core prepare's `CoreRegistry` (its output TOML,
-    ///         `[registry].core_registry_addr`), zero when the upgrade has no ecosystem leg. Only
-    ///         the bootstrap edge reads it: its derived call sequence covers both domains, so the
-    ///         object describing that sequence needs the ecosystem inventory alongside the edge.
+    ///         `[registry].core_registry_addr`), zero when the upgrade has no ecosystem leg. It is
+    ///         the ecosystem leg of the `EcosystemUpgradeOperation` this prepare deploys, and the
+    ///         bootstrap edge's second object — the one its derived call sequence covers the
+    ///         ecosystem domain from.
     address coreRegistry;
-}
-
-/// @notice Inputs of the compose step (`ComposeUpgradeOperation.compose`), assembled by
-///         protocol-ops from the core and CTM prepare outputs.
-/// @param coordinator The `EcosystemUpgradeExecutor` the CTM executor answers to (the core prepare's
-///        `[registry].ecosystem_upgrade_executor_addr`).
-/// @param coreRegistry The core prepare's `CoreRegistry`, zero when the upgrade has no ecosystem leg.
-/// @param transition The single CTM transition this operation applies.
-// solhint-disable-next-line gas-struct-packing
-struct ComposeOperationParams {
-    address coordinator;
-    address coreRegistry;
-    address transition;
-    bytes32 create2FactorySalt;
-    string outputPath;
 }

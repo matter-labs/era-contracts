@@ -15,7 +15,7 @@
 - `protocol-ops/src/common/forge/scripts/mod.rs` — `ForgeScriptParams` invocation specs for each forge script the CLI invokes, and the `ScriptCall` table binding each typed call to its script.
 - `l1-contracts/deploy-scripts/AdminFunctions.s.sol` — Solidity helpers invoked by protocol-ops (e.g. `governanceExecuteCalls`, `ensureCtmsAndProxyAdminsOwnedByGovernance`). Auto-imported via the `IAdminFunctions` interface.
 - `l1-contracts/deploy-scripts/upgrade/v34/{CoreUpgrade_v34,CTMUpgrade_v34}.s.sol` — the bootstrap edge's prepares; `v35/` the first registry-driven release's.
-- `l1-contracts/deploy-scripts/upgrade/ComposeUpgradeOperation.s.sol` — the compose step: deploys the `EcosystemUpgradeOperation` and emits the coordinator's three stage calls. The runbook is `l1-contracts/deploy-scripts/upgrade/README.md`.
+- The `EcosystemUpgradeOperation` is deployed by the CTM prepare, and the coordinator's three stage calls are derived from its address by the merge — there is no compose step. The runbook is `l1-contracts/deploy-scripts/upgrade/README.md`.
 
 ## Verifying a package before it is signed
 
@@ -79,16 +79,16 @@ cargo run --release --bin protocol_ops -- ecosystem verify-bootstrap \
 The prepare output names every object the edge runs, including the one a bootstrap has that a
 recurring upgrade does not: `bootstrap_migration_addr`. `ctm_upgrade_executor_addr` names the
 bound executor in both cases; `ctm_transition_addr` stays zero for a bootstrap on purpose —
-the edge has no transition, so protocol-ops skips the compose step and the package carries no
+the edge has no transition, so the prepare deploys no operation and the package carries no
 `[operation]` section and no coordinator stage calls. The verifier still derives the migration
 from the stage-1 `migrate()` call and treats the reported field as a cross-check, so it checks
 the calldata governance will execute rather than the prepare's summary of it.
 
 A recurring registry-driven package — `EcosystemUpgradeExecutor.stage0/1/2(operation)` over
-transitions — has no verifier yet. Until it does, the compose step's live checks (every domain
-names the coordinator, every object runs the code its executor pins, every timer is bound to the
-coordinator) and the merge's provenance invariant (every bundled call is the compose step's stage
-call or a declared external action) are what gate it.
+transitions — has no verifier yet. Until it does, what gates it is the prepare's own object checks
+(each object against the codehash its executor pins), the coordinator's stage-0 enforcement of the
+bindings at execution, and the merge's provenance invariant: every bundled call is either a derived
+coordinator stage call or a declared external action.
 
 ## What protocol-ops is
 
@@ -119,7 +119,7 @@ Sharp edge: the merged file is `<env-out>/ecosystem.toml` (the parent of the `--
 
 For non-trivial flows (the ecosystem upgrade in particular) we keep a small library-style struct hierarchy distinct from the CLI shells:
 
-- **`UpgradeInner`** — canonical prepare orchestration. `prepare(runner, deployer, inputs)` fires the version's core script `noGovernancePrepare` once, its CTM script `noGovernancePrepare` once per ZKsync OS CTM, then `ComposeUpgradeOperation.compose` over the outputs (skipped when no transition was emitted — a bootstrap edge), all on a single shared `ForgeRunner`. Returns the per-step output TOML paths.
+- **`UpgradeInner`** — canonical prepare orchestration. `prepare(runner, deployer, inputs)` fires the version's core script `noGovernancePrepare` once and its CTM script `noGovernancePrepare` once per ZKsync OS CTM, on a single shared `ForgeRunner`. The CTM prepare also deploys the `EcosystemUpgradeOperation` (none on a bootstrap edge, which has no transition). Returns the per-step output TOML paths.
 - **`UpgradeFull`** — wraps Inner with the real-world precondition `ensureCtmsAndProxyAdminsOwnedByGovernance` before and the ServerNotifier admin call after. Has only a `prepare` method — the governance phase is plumbing, not orchestration.
 - **Free `replay_governance_stages` helper** in `upgrade.rs` — reads each prepared TOML's hex-encoded `stage{N}_calls`, dispatches `governanceExecuteCalls` for legacy Governance or `governanceExecuteCallsDirect` for PUH-governed environments. No struct because there's no state.
 
@@ -190,4 +190,4 @@ When reviewing a protocol-ops PR:
 4. **Does the new flow produce one Safe bundle per signer per phase?** If a single phase emits multiple bundles for the same signer, that's a sign the orchestration logic should be on one shared `ForgeRunner`.
 5. **Does the prepare phase rely on data only present in-memory across forge invocations?** If yes, either pass it via TOML written by the previous forge call or use CREATE2 determinism — don't fold separate phases back into one forge process to dodge the question.
 6. **Are addresses in the orchestration code resolved via `l1_contracts.rs` or via `script_params` consts?** Hardcoded addresses anywhere in protocol-ops are almost always wrong.
-7. **Does the new code reintroduce a monolithic prepare, or compose stage calldata in Rust?** Push back. Current work targets the `Default*Upgrade` version scripts (`v34/`, `v35/`) plus the compose step via `upgrade-prepare-all`; the merger copies bundles and composes nothing, and anything that is not a coordinator stage call must be a declared external action.
+7. **Does the new code reintroduce a monolithic prepare, or author stage calldata in Rust?** Push back. Current work targets the `Default*Upgrade` version scripts (`v34/`, `v35/`) via `upgrade-prepare-all`; the merger copies bundles and authors nothing — the only calldata it produces is `stageN(operation)`, a pure function of the operation address — and anything that is not a coordinator stage call must be a declared external action.

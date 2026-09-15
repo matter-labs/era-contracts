@@ -12,19 +12,19 @@ review from the [root README review guide](../../../README.md#reviewing-registry
 - `default-upgrade/` — the version-independent prepare pipeline. `DefaultCoreUpgrade` (ecosystem
   side) deploys the new ecosystem implementations and pins them in a `CoreRegistry`.
   `DefaultCTMUpgrade` (per-CTM side) deploys the release members the version changes, a
-  `GovernanceUpgradeTimer` bound to the coordinator and the `CTMTransition`. Neither emits a
-  lifecycle call; anything else a version needs governance (or an admin) to do goes through
+  `GovernanceUpgradeTimer` bound to the coordinator, the `CTMTransition`, and the
+  `EcosystemUpgradeOperation` associating that transition with the core prepare's registry. Neither
+  emits a lifecycle call — the three governance calls,
+  `EcosystemUpgradeExecutor.stage0/1/2(operation)`, are a function of the operation's address and
+  the merge derives them; anything else a version needs governance (or an admin) to do goes through
   `declareExternalAction` (`ExternalActionsLib`) and is listed in the output's `external_actions`.
   `DefaultChainUpgrade` is the legacy handed-cut per-chain leg the Foundry integration tests use.
-- `ComposeUpgradeOperation.s.sol` — the compose step: deploys the `EcosystemUpgradeOperation` over
-  the core prepare's registry and the single CTM prepare's transition and emits the
-  three governance calls, `EcosystemUpgradeExecutor.stage0/1/2(operation)`.
 - `v35/` — the first registry-driven release and the template for the next one: `CoreUpgrade_v35`
   deploys one fresh `L1MessageRoot`; `CTMUpgrade_v35` overrides nothing.
 - `v34/` — the bootstrap edge: `CoreUpgrade_v34` also deploys the `CoreUpgradeExecutor` and the
   coordinator; `CTMUpgrade_v34` deploys the `CTMUpgradeExecutor` (constructed answering to that
-  coordinator) and the `RegistryBootstrapMigration`, and both declare every call of the one-time
-  edge as external actions.
+  coordinator), the `RegistryBootstrapMigration` and the `RegistryBootstrapSequence` over both
+  objects, and declares every call of the one-time edge by reading it off that sequence.
 - `SystemContractsProcessing.s.sol` — the L2 force-deployment set shared by genesis and upgrades.
 
 One-off scripts of shipped upgrades live on their release branches, not here.
@@ -58,24 +58,22 @@ On one anvil fork of L1, in this order:
    itself. Then the timer, the transition (validated, and checked against the bound executor's
    `TRANSITION_CODEHASH`), and the ServerNotifier admin call rendered from the pinned row. Output
    `[registry]`: `ctm_transition_addr`, `ctm_release_addr`, `upgrade_timer_addr`,
-   `ctm_upgrade_executor_addr`, `bootstrap_migration_addr` (zero unless a bootstrap).
+   `ctm_upgrade_executor_addr`, `bootstrap_migration_addr` (zero unless a bootstrap),
+   `operation_addr` and `coordinator_addr` (both zero on a bootstrap edge, which has no transition
+   to compose over).
 4. The ServerNotifier admin call, executed on the fork as the ChainAdmin
    (`UpgradeFull::run_ctm_admin_steps`; see the
    [lifecycle document](../../../docs/upgrade-stage-lifecycle.md#servernotifier-a-row-under-a-foreign-admin)).
-5. The compose step (`upgrade_inner.rs::compose_operation`): skipped when no CTM prepare emitted a
-   transition (a bootstrap edge); a mix of transition-bearing and transition-less CTM outputs is
-   refused. It re-checks every stage-0 binding (each domain's `coordinator()`, each object against
-   the codehash its executor pins, each timer's `TIMER_GOVERNANCE`) so a drift fails here, not
-   with the upgrade already reviewed. Output `[registry]`: `operation_addr`, `coordinator_addr`.
-6. On PUH-governed environments, the PUH/Guardians redeploy (`zk_governance.rs`); when
+5. On PUH-governed environments, the PUH/Guardians redeploy (`zk_governance.rs`); when
    `[new_gateway]` is configured, `GatewayVotePreparation`.
-7. The merge (`upgrade.rs::write_merged_ecosystem_toml`) writes `<env-out>/ecosystem.toml`: each
-   stage bundle is core actions → the coordinator's `stageN(operation)` → CTM actions, in source
-   order, followed by the merger's own appends (PUH wiring and CTM `acceptOwnership` normalization
-   in stage 0, the new-Gateway bundle in stage 2). The layout is documented on that function.
-   The merge composes nothing and refuses a bundle whose calls are not all either the compose
-   step's stage call or a declared external action — matched by identity, target, value and
-   calldata alike, not by headcount (`check_bundle_provenance`, `check_operation_bundle`).
+6. The merge (`upgrade.rs::write_merged_ecosystem_toml`) writes `<env-out>/ecosystem.toml`: each
+   stage bundle is core actions → the coordinator's `stageN(operation)`, derived from the
+   `operation_addr`/`coordinator_addr` the CTM prepare reported → CTM actions, in source order,
+   followed by the merger's own appends (PUH wiring and CTM `acceptOwnership` normalization in
+   stage 0, the new-Gateway bundle in stage 2). The layout is documented on that function. The
+   merge authors nothing and refuses a bundle whose calls are not all declared external actions —
+   matched by identity, target, value and calldata alike, not by headcount
+   (`check_bundle_provenance`).
 
 Every prepare deployment rides the CREATE2 factory; the deployer's Safe bundles and `manifest.json`
 land under `--out` (default `upgrade-envs/<version>/output/<env>/protocol-ops/prepare/`).
@@ -101,8 +99,8 @@ cargo run --release --bin protocol_ops -- ecosystem verify-bootstrap \
 against live L1 — object provenance, the manifest's pins, the bound authority and the owner it
 lands on, every row's departing implementation, and the stage calldata shape. What it checks and
 deliberately does not is in [`docs/ai-review/docs/protocol-ops.md`](../../../docs/ai-review/docs/protocol-ops.md).
-A recurring registry-driven package (an operation over transitions) has no verifier yet; the
-compose step's checks and `protocol-ops`' provenance invariant are what gate it today.
+A recurring registry-driven package (an operation over transitions) has no verifier yet; the CTM
+prepare's own object checks and `protocol-ops`' provenance invariant are what gate it today.
 `ecosystem verify-upgrade` is the pre-registry (v31) calldata verifier and does not apply.
 
 ## 5. Deployer broadcast
