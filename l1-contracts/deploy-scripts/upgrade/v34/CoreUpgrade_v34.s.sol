@@ -4,27 +4,21 @@ pragma solidity 0.8.28;
 // solhint-disable gas-custom-errors
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
-import {Call} from "contracts/governance/Common.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
-import {ICoreRegistry} from "contracts/upgrades/registry/objects/ICoreRegistry.sol";
 
 import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
-import {ExternalActionsLib} from "../default-upgrade/ExternalActionsLib.sol";
 import {BytecodeUtils} from "../../utils/bytecode/BytecodeUtils.s.sol";
 
 /// @notice Core (ecosystem) side of the v34 upgrade: deploys the new shared-singleton
 ///         implementation set, pins it in a write-once `CoreRegistry` (the enum-indexed
-///         inventory — one slot per `L1EcosystemContract` member, inert slots explicit), hands
-///         the ecosystem `ProxyAdmin` to the bound `CoreUpgradeExecutor` and binds that executor
-///         to the lifecycle coordinator every later upgrade runs through. Stage 1 carries TWO
-///         ecosystem calls — the ProxyAdmin handover and `applyL1Upgrade(registry)` — instead of
-///         one raw `ProxyAdmin.upgrade` per proxy; the rows are source-checked edges, so a replay
-///         can never downgrade a proxy a later upgrade has moved on.
+///         inventory — one slot per `L1EcosystemContract` member, inert slots explicit), and
+///         deploys the bound `CoreUpgradeExecutor` the ecosystem `ProxyAdmin` lands under
+///         together with the lifecycle coordinator every later upgrade runs through. The
+///         governance calls that put those to work are derived from `RegistryBootstrapSequence`
+///         over this registry, not authored here.
 contract CoreUpgrade_v34 is DefaultCoreUpgrade {
     /// @notice The bound executor the ecosystem `ProxyAdmin` lands under. Deployed by this
     ///         prepare run.
@@ -70,7 +64,9 @@ contract CoreUpgrade_v34 is DefaultCoreUpgrade {
 
     /// @notice The bootstrap edge deploys the registry, the bound executor that will apply it and
     ///         the coordinator every later operation runs through (a recurring prepare finds both
-    ///         live), then declares every governance call of its one-time ecosystem leg.
+    ///         live). It declares no governance call of its own: the whole edge — both domains —
+    ///         is derived from `RegistryBootstrapSequence`, which the CTM prepare deploys once the
+    ///         migration exists and reads every call off (see {CTMUpgrade_v34}).
     /// @dev All ride the CREATE2 factory: the Safe bundle replays factory transactions only, so
     ///      a plain CREATE would leave the stage-1 calls pointing at codeless addresses.
     function deployEcosystemUpgradeObjects() public virtual override {
@@ -108,83 +104,6 @@ contract CoreUpgrade_v34 is DefaultCoreUpgrade {
                     "EcosystemUpgradeExecutor"
                 )
             )
-        );
-        _declareBootstrapActions();
-    }
-
-    /// @notice Every governance call of the bootstrap edge's ecosystem leg, declared as the
-    ///         external action it is: this edge predates the transition lifecycle, so governance
-    ///         itself pauses, hands the ecosystem `ProxyAdmin` to the bound executor, applies the
-    ///         pinned inventory through it, gates on the executor's post-state check, binds the
-    ///         executor to the coordinator and unpauses. Every later upgrade gets all of this from
-    ///         `EcosystemUpgradeExecutor.stage0/1/2(operation)`.
-    function _declareBootstrapActions() internal virtual {
-        address chainAssetHandler = coreAddresses.bridgehub.proxies.chainAssetHandler;
-        require(chainAssetHandler != address(0), "chainAssetHandlerProxy is zero");
-        string memory cahOwner = "ChainAssetHandler owner (governance)";
-        Call memory pause = Call({
-            target: chainAssetHandler,
-            value: 0,
-            data: abi.encodeCall(IChainAssetHandlerBase.pauseMigration, ())
-        });
-        declareExternalAction(
-            ExternalActionsLib.PHASE_STAGE_0,
-            "pause chain migrations for the upgrade",
-            cahOwner,
-            pause
-        );
-        // Re-asserted first in stage 1: the emergency-upgrade path's built-in pre-step unpauses,
-        // and the CTM's version commit refuses to run while migrations are unpaused.
-        declareExternalAction(ExternalActionsLib.PHASE_STAGE_1, "re-assert the migration pause", cahOwner, pause);
-        declareExternalAction(
-            ExternalActionsLib.PHASE_STAGE_1,
-            "hand the ecosystem ProxyAdmin to the bound core executor",
-            "ecosystem ProxyAdmin owner (governance)",
-            Call({
-                target: coreAddresses.shared.transparentProxyAdmin,
-                value: 0,
-                data: abi.encodeCall(Ownable.transferOwnership, (address(coreUpgradeExecutor)))
-            })
-        );
-        declareExternalAction(
-            ExternalActionsLib.PHASE_STAGE_1,
-            "apply the pinned ecosystem inventory (applyL1Upgrade)",
-            "core executor owner (governance)",
-            Call({
-                target: address(coreUpgradeExecutor),
-                value: 0,
-                data: abi.encodeCall(CoreUpgradeExecutor.applyL1Upgrade, (ICoreRegistry(address(coreRegistry))))
-            })
-        );
-        declareExternalAction(
-            ExternalActionsLib.PHASE_STAGE_2,
-            "ecosystem post-state gate (validateUpgradeApplied)",
-            "any (view)",
-            Call({
-                target: address(coreUpgradeExecutor),
-                value: 0,
-                data: abi.encodeCall(CoreUpgradeExecutor.validateUpgradeApplied, (ICoreRegistry(address(coreRegistry))))
-            })
-        );
-        declareExternalAction(
-            ExternalActionsLib.PHASE_STAGE_2,
-            "bind the core executor to the lifecycle coordinator",
-            "core executor owner (governance)",
-            Call({
-                target: address(coreUpgradeExecutor),
-                value: 0,
-                data: abi.encodeCall(CoreUpgradeExecutor.setCoordinator, (address(ecosystemUpgradeExecutor)))
-            })
-        );
-        declareExternalAction(
-            ExternalActionsLib.PHASE_STAGE_2,
-            "unpause chain migrations",
-            cahOwner,
-            Call({
-                target: chainAssetHandler,
-                value: 0,
-                data: abi.encodeCall(IChainAssetHandlerBase.unpauseMigration, ())
-            })
         );
     }
 }

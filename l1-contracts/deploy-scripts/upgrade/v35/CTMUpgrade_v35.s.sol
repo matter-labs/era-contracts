@@ -7,7 +7,7 @@ import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 ///         entirely by the base pipeline: a fresh release (facets, DiamondInit, upgrade engine)
 ///         pinned by a write-once `CTMTransition` that names the core prepare's registry, and
 ///         exactly three governance calls — `EcosystemUpgradeExecutor.stage0/1/2(operation)`,
-///         emitted by the compose step over the one-leg operation naming it. No L2
+///         derived from the one-leg operation the base pipeline deploys over it. No L2
 ///         leg: the release's L2 bytecode table is unchanged, so the release-pair derivation
 ///         yields no L2 deployment and the edge composes the all-zero L2 transaction.
 /// @dev Nothing to override: this is what a facet/verifier-level upgrade costs in script code.

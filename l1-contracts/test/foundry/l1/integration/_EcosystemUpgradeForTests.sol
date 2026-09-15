@@ -64,13 +64,17 @@ contract CTMUpgradeForTests is CTMUpgrade_v34 {
             committedUpgradeEngine(),
             getAddresses().admin.eip7702Checker,
             TrimmedUpgradeOutput.Registry({
-                // A bootstrap edge has no transition, so the compose step deploys no operation
-                // over this prepare; the executor it hands the domain to is still named.
+                // A bootstrap edge has no transition, so this prepare deploys no operation;
+                // the executor it hands the domain to is still named.
                 ctmTransition: address(0),
                 ctmUpgradeExecutor: boundCTMUpgradeExecutor(),
                 ctmRelease: getAddresses().stateTransition.currentRelease,
                 upgradeTimer: upgradeAddresses.upgradeTimer,
-                bootstrapMigration: bootstrapMigrationAddress()
+                bootstrapMigration: bootstrapMigrationAddress(),
+                // A bootstrap edge composes no operation: it has no transition, and its own
+                // sequence object carries every call.
+                operation: address(0),
+                coordinator: address(0)
             })
         );
     }
@@ -84,6 +88,8 @@ library TrimmedUpgradeOutput {
         address ctmRelease;
         address upgradeTimer;
         address bootstrapMigration;
+        address operation;
+        address coordinator;
     }
 
     /// @param _eip7702Checker The CTM domain's EIP-7702 checker, carried forward exactly as a
@@ -111,11 +117,11 @@ library TrimmedUpgradeOutput {
         // verified from the harness is not the shape a package verified in production is.
         _vm.serializeAddress("registry", "upgrade_timer_addr", _registry.upgradeTimer);
         _vm.serializeAddress("registry", "bootstrap_migration_addr", _registry.bootstrapMigration);
-        string memory registry = _vm.serializeAddress(
-            "registry",
-            "ctm_upgrade_executor_addr",
-            _registry.ctmUpgradeExecutor
-        );
+        _vm.serializeAddress("registry", "ctm_upgrade_executor_addr", _registry.ctmUpgradeExecutor);
+        // The merge derives this upgrade's three lifecycle calls from exactly these two addresses,
+        // so a trimmed output that omitted them would produce a package with no stage calls at all.
+        _vm.serializeAddress("registry", "coordinator_addr", _registry.coordinator);
+        string memory registry = _vm.serializeAddress("registry", "operation_addr", _registry.operation);
         _vm.serializeBytes("root", "chain_upgrade_diamond_cut", _upgradeCutData);
         _vm.serializeString("root", "registry", registry);
         string memory toml = _vm.serializeString("root", "state_transition", stateTransition);

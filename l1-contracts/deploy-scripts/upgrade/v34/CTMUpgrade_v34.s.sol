@@ -5,17 +5,15 @@ pragma solidity 0.8.28;
 
 import {console2 as console} from "forge-std/Script.sol";
 
-import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
-import {Call} from "contracts/governance/Common.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {ICTMUpgradeExecutor} from "contracts/upgrades/registry/executors/ICTMUpgradeExecutor.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
-import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {ICoreRegistry} from "contracts/upgrades/registry/objects/ICoreRegistry.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
+import {BootstrapAction} from "contracts/upgrades/registry/bootstrap/IRegistryBootstrapSequence.sol";
+import {RegistryBootstrapSequence} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapSequence.sol";
 import {AuthoredL2Plan, BootstrapManifest, ProxyUpgradeRow} from "contracts/upgrades/registry/RegistryTypes.sol";
 import {
     CTM_CONTRACT_COUNT,
@@ -23,7 +21,6 @@ import {
     L2EcosystemContract
 } from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
-import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {AuthoredL2Side, DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {ExternalActionsLib} from "../default-upgrade/ExternalActionsLib.sol";
 import {CoreOnGatewayHelper} from "../../ecosystem/CoreOnGatewayHelper.sol";
@@ -51,6 +48,11 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
     /// @notice The write-once edge object. Its manifest pins everything the stage-1 calls used
     ///         to spell out.
     RegistryBootstrapMigration public bootstrapMigration;
+
+    /// @notice The object the edge's whole governance call sequence is READ from. Deployed over
+    ///         the migration and the core prepare's inventory; nothing about the sequence is
+    ///         authored here.
+    RegistryBootstrapSequence public bootstrapSequence;
 
     /// @notice The v34 delegate-calldata composer the bootstrap manifest pins: the CODE that
     ///         defines what `L2V34Upgrade` is called with.
@@ -215,6 +217,16 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
                 "RegistryBootstrapMigration"
             )
         );
+
+        address coreRegistry = upgradeAddresses.coreRegistry;
+        require(coreRegistry != address(0), "coreRegistry not set (core prepare output)");
+        bootstrapSequence = RegistryBootstrapSequence(
+            deployViaCreate2AndNotify(
+                type(RegistryBootstrapSequence).creationCode,
+                abi.encode(bootstrapMigration, ICoreRegistry(coreRegistry)),
+                "RegistryBootstrapSequence"
+            )
+        );
     }
 
     function getCreationCalldata(string memory contractName) internal view virtual override returns (bytes memory) {
@@ -282,82 +294,33 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
         });
     }
 
-    /// @notice Every governance call of the bootstrap edge's CTM leg, declared as the external
-    ///         action it is: this edge predates the transition lifecycle, so governance starts the
-    ///         timer, hands both CTM-domain authorities to the migration and runs it (`migrate()` is
-    ///         permissionless — the handover IS the approval — but rides the bundle so the edge is
-    ///         applied atomically with it), then gates on the migration's post-state check. The
-    ///         legacy stage validator's checks are absorbed: `migrate()` checks the pinned timer's
-    ///         deadline itself, the CTM's version-edge commit refuses to run while migrations are
-    ///         unpaused, and `validateApplied()` refuses while they are still paused. The join to
-    ///         the recurring lifecycle is one call in the other direction: the executor is
-    ///         constructed answering to the coordinator, and stage 2 binds the coordinator back to
-    ///         it before `validateApplied()`, which gates on that binding.
+    /// @notice Declares every governance call of the bootstrap edge — BOTH domains — by reading
+    ///         them off the sequence object this prepare deployed. Nothing here is authored: the
+    ///         phase, order, target and calldata all come from the object, and the label and
+    ///         authority ride along with each call.
+    /// @dev The whole edge is declared from the CTM prepare rather than split across the two
+    ///      prepares, because the object derives both legs and only exists once the migration
+    ///      does — which is after the core prepare has run. The merged bundles are unchanged:
+    ///      the merge concatenates the core prepare's calls ahead of this one's, and the core
+    ///      prepare of this edge now contributes none.
+    /// @dev One ordering the object encodes is worth knowing at the call site, because it is the
+    ///      edge's join to the recurring lifecycle: the CTM executor is constructed answering to
+    ///      the coordinator, and stage 2 binds the coordinator back to it BEFORE the terminal
+    ///      post-state gate, which refuses until that binding holds.
     function _declareBootstrapActions() internal virtual {
-        require(address(bootstrapMigration) != address(0), "bootstrap migration not deployed");
-        require(upgradeAddresses.upgradeTimer != address(0), "upgradeTimer is zero");
-        string memory governance = "protocol governance (CTM owner)";
-        address ctmProxy = ctmAddresses.stateTransition.proxies.chainTypeManager;
-        address ctmProxyAdmin = Utils.getProxyAdminAddress(ctmProxy);
-        declareExternalAction(
-            ExternalActionsLib.PHASE_STAGE_0,
-            "start the pinned upgrade timer",
-            governance,
-            Call({
-                target: upgradeAddresses.upgradeTimer,
-                data: abi.encodeCall(GovernanceUpgradeTimer.startTimer, ()),
-                value: 0
-            })
-        );
-        declareExternalAction(
-            ExternalActionsLib.PHASE_STAGE_1,
-            "nominate the bootstrap migration as CTM owner",
-            governance,
-            Call({
-                target: ctmProxy,
-                data: abi.encodeCall(Ownable2Step.transferOwnership, (address(bootstrapMigration))),
-                value: 0
-            })
-        );
-        declareExternalAction(
-            ExternalActionsLib.PHASE_STAGE_1,
-            "hand the CTM-domain ProxyAdmin to the bootstrap migration",
-            "CTM-domain ProxyAdmin owner (governance)",
-            Call({
-                target: ctmProxyAdmin,
-                data: abi.encodeCall(Ownable2Step.transferOwnership, (address(bootstrapMigration))),
-                value: 0
-            })
-        );
-        declareExternalAction(
-            ExternalActionsLib.PHASE_STAGE_1,
-            "run the bootstrap edge (migrate)",
-            "permissionless, state-gated (both authorities held, timer passed, pins hold)",
-            Call({target: address(bootstrapMigration), data: abi.encodeCall(bootstrapMigration.migrate, ()), value: 0})
-        );
-        declareExternalAction(
-            ExternalActionsLib.PHASE_STAGE_2,
-            "bind the coordinator to the CTM executor",
-            "coordinator owner (governance)",
-            Call({
-                target: address(ecosystemUpgradeExecutor()),
-                data: abi.encodeCall(
-                    EcosystemUpgradeExecutor.setCTMExecutor,
-                    (ICTMUpgradeExecutor(address(ctmUpgradeExecutor)))
-                ),
-                value: 0
-            })
-        );
-        declareExternalAction(
-            ExternalActionsLib.PHASE_STAGE_2,
-            "bootstrap post-state gate (validateApplied)",
-            "any (view)",
-            Call({
-                target: address(bootstrapMigration),
-                data: abi.encodeCall(bootstrapMigration.validateApplied, ()),
-                value: 0
-            })
-        );
+        require(address(bootstrapSequence) != address(0), "bootstrap sequence not deployed");
+        _declarePhase(ExternalActionsLib.PHASE_STAGE_0, bootstrapSequence.stage0Actions());
+        _declarePhase(ExternalActionsLib.PHASE_STAGE_1, bootstrapSequence.stage1Actions());
+        _declarePhase(ExternalActionsLib.PHASE_STAGE_2, bootstrapSequence.stage2Actions());
+    }
+
+    /// @param _phase The bundle these actions ride.
+    /// @param _actions The derived actions of that phase, in execution order.
+    function _declarePhase(string memory _phase, BootstrapAction[] memory _actions) private {
+        uint256 length = _actions.length;
+        for (uint256 i = 0; i < length; ++i) {
+            declareExternalAction(_phase, _actions[i].label, _actions[i].authority, _actions[i].call);
+        }
     }
 
     /// @notice The `EcosystemUpgradeExecutor` (lifecycle coordinator) the core prepare of this

@@ -60,6 +60,16 @@ sol! {
         function validate() external view;
     }
 
+    /// The object the edge's whole governance call sequence is derived from. The verifier reads
+    /// the two objects it was built over, so the completion gate terminating stage 2 can be held
+    /// against the edge the rest of the package describes.
+    #[sol(rpc)]
+    contract RegistryBootstrapSequenceView {
+        function MIGRATION() external view returns (address);
+        function CORE_REGISTRY() external view returns (address);
+        function validateApplied() external view;
+    }
+
     #[sol(rpc)]
     contract CTMUpgradeExecutorView {
         function CHAIN_TYPE_MANAGER() external view returns (address);

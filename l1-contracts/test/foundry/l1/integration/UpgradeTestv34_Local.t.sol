@@ -37,6 +37,8 @@ import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgra
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {IBootstrapUpgrade} from "contracts/upgrades/IBootstrapUpgrade.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
+import {RegistryBootstrapSequence} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapSequence.sol";
+import {IRegistryBootstrapSequence} from "contracts/upgrades/registry/bootstrap/IRegistryBootstrapSequence.sol";
 import {L2CanonicalTransactionLib} from "contracts/state-transition/libraries/L2CanonicalTransactionLib.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 
@@ -284,33 +286,35 @@ contract UpgradeIntegrationTest_v34_Local is
         assertTrue(_newChainDiamond != address(0), "new chain not registered");
         assertEq(IGetters(_newChainDiamond).getProtocolVersion(), _expectedNewVersion, "new chain wrong version");
 
-        // The bootstrap's CTM stage 2 is one declared external action: the migration's own
-        // post-state gate, which also requires the CTM's migrations unpaused again (the legacy
-        // stage validator's read, absorbed). The join to the recurring lifecycle needs no call:
-        // the executor was constructed answering to the coordinator and `migrate()` checked that
-        // binding; the core side's stage 2 binds the core executor the same way. The harness
-        // already executed the merged stage-2 bundle green in `internalTest`; assert the emitted
-        // call list shape, that the gate still holds against the final state, and that both
-        // bindings landed.
+        // The whole bootstrap edge — both domains — is DERIVED from `RegistryBootstrapSequence`
+        // and declared by the CTM prepare; the core prepare of this edge declares nothing, so the
+        // merged bundles are exactly the object's. The harness already executed the merged stage-2
+        // bundle green in `internalTest`; assert the emitted call list shape, that the completion
+        // gate still holds against the final state, and that both bindings landed.
         address bridgehub = coreUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
         address chainAssetHandler = IBridgehubBase(bridgehub).chainAssetHandler();
         EcosystemUpgradeExecutor coordinator = v34.ecosystemUpgradeExecutor();
+        RegistryBootstrapSequence sequence = v34.bootstrapSequence();
         Call[] memory stage2 = v34.prepareStage2GovernanceCalls();
-        assertEq(stage2.length, 2, "v34 CTM stage 2: binding then post-state gate");
+        assertEq(stage2.length, 4, "v34 stage 2: two bindings, the unpause and the completion gate");
         assertEq(
             v34.externalActionEntries().length,
-            7,
-            "the bootstrap's CTM prepare declares every one of its governance and admin calls"
+            13,
+            "the bootstrap's CTM prepare declares every derived governance call plus its admin call"
         );
+        assertEq(coreUpgrade.externalActionEntries().length, 0, "the core prepare of a derived edge authors nothing");
         assertEq(address(coordinator.ctmExecutor()), executor, "coordinator CTM binding");
-        assertEq(stage2[0].target, address(coordinator), "bind coordinator first");
-        assertEq(stage2[1].target, address(v34.bootstrapMigration()), "stage 2 must target the migration");
+        assertEq(stage2[2].target, address(coordinator), "the coordinator binding rides stage 2");
+        assertEq(stage2[3].target, address(sequence), "stage 2 ends with the derived completion gate");
         assertEq(
-            stage2[1].data,
-            abi.encodeCall(v34.bootstrapMigration().validateApplied, ()),
-            "stage 2 must call validateApplied"
+            stage2[3].data,
+            abi.encodeCall(IRegistryBootstrapSequence.validateApplied, ()),
+            "the completion gate is `validateApplied()`"
         );
-        v34.bootstrapMigration().validateApplied();
+        // The gate asserts BOTH domains, so this one call covers the migration's post-state check
+        // and the core executor's applied-row check.
+        sequence.validateApplied();
+        assertEq(sequence.MIGRATION(), address(v34.bootstrapMigration()), "the gate names this edge");
         assertEq(
             CTMUpgradeExecutor(payable(executor)).coordinator(),
             address(coordinator),

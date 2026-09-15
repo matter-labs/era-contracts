@@ -59,7 +59,13 @@ import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/
 import {IProxyUpgradeInitializable} from "contracts/upgrades/registry/IUpgradeInit.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
-import {AuthoredL2Plan, ProxyUpgradeRow, TransitionManifest} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
+import {
+    AuthoredL2Plan,
+    OperationManifest,
+    ProxyUpgradeRow,
+    TransitionManifest
+} from "contracts/upgrades/registry/RegistryTypes.sol";
 import {CTM_CONTRACT_COUNT, CTMContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {ExternalActionsLib} from "./ExternalActionsLib.sol";
 
@@ -81,13 +87,12 @@ struct AuthoredL2Side {
 
 /// @notice The CTM side of a registry-driven upgrade prepare, run after the core prepare: deploys
 ///         the new release (facets, DiamondInit, verifier, upgrade engine) and pins the edge in a
-///         write-once `CTMTransition` — naming the core prepare's `CoreRegistry` as its ecosystem
-///         leg and a fresh `GovernanceUpgradeTimer` bound to the ecosystem's coordinator. It emits
-///         NO lifecycle call of its own: the compose step deploys the `EcosystemUpgradeOperation`
-///         naming this transition (with every other participating CTM's) and the three governance
-///         calls are `EcosystemUpgradeExecutor.stage0/1/2(operation)`; anything a version script
-///         still needs governance (or an admin) to do is declared as an external action and listed
-///         in the output.
+///         write-once `CTMTransition`, then the `EcosystemUpgradeOperation` associating that
+///         transition with the core prepare's `CoreRegistry`, over a fresh `GovernanceUpgradeTimer`
+///         bound to the ecosystem's coordinator. It emits NO lifecycle call of its own: the three
+///         governance calls are `EcosystemUpgradeExecutor.stage0/1/2(operation)`, derived by the
+///         merge from the operation's address; anything a version script still needs governance (or
+///         an admin) to do is declared as an external action and listed in the output.
 /// @dev Version scripts inherit and override; the v34 bootstrap edge deploys no transition and
 ///      declares every call of its one-time edge instead.
 contract DefaultCTMUpgrade is Script, DeployCTMScript {
@@ -103,8 +108,15 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         /// @dev The lifecycle coordinator (an input, see `CTMUpgradeParams`): the timer's governance
         ///      and, for the bootstrap edge, the executor's coordinator.
         address ecosystemUpgradeExecutor;
+        /// @dev The core prepare's ecosystem inventory (an input, see `CTMUpgradeParams`): the
+        ///      operation's ecosystem leg, and the bootstrap edge's second object.
+        address coreRegistry;
         /// @dev The write-once transition this prepare deploys (zero for the bootstrap edge).
         address ctmTransition;
+        /// @dev The write-once operation over `{coreRegistry, ctmTransition}` this prepare
+        ///      deploys — what the coordinator's three stage calls name (zero for the bootstrap
+        ///      edge, which has no transition to compose over).
+        address ecosystemUpgradeOperation;
         /// @dev The engine this edge commits, held only until the object that pins it exists.
         ///      Read it through {committedUpgradeEngine}, never directly.
         address upgradeEngine;
@@ -184,6 +196,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             coreAddresses.bridgehub.proxies.chainRegistrationSender = _params.chainRegistrationSender;
         }
         setEcosystemUpgradeExecutor(_params.ecosystemUpgradeExecutor);
+        setCoreRegistry(_params.coreRegistry);
         prepareCTMUpgrade();
         // Declared before the governance calls are written, so the output lists the admin action.
         prepareDefaultCTMAdminCalls();
@@ -332,11 +345,13 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     }
 
     /// @notice The upgrade objects of the CTM side. The default deploys the upgrade engine the
-    ///         transition pins and then the transition of this edge; the bootstrap edge deploys its
-    ///         migration instead.
+    ///         transition pins, the transition of this edge, and the operation the coordinator's
+    ///         stage calls name; the bootstrap edge deploys its migration and its call sequence
+    ///         instead.
     function deployUpgradeObjects() public virtual {
         upgradeAddresses.upgradeEngine = deployUsedUpgradeContract();
         deployCTMTransition();
+        deployEcosystemUpgradeOperation();
     }
 
     /// @notice Deploys the write-once `CTMTransition` of this upgrade — what governance reviews and
@@ -375,6 +390,39 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         // and the object's own revert names the one that is not.
         ICTMTransition(upgradeAddresses.ctmTransition).validate();
         _requireObjectsMatchExecutorAnchors();
+    }
+
+    /// @notice Deploys the write-once `EcosystemUpgradeOperation` this upgrade's three coordinator
+    ///         calls name: the association of the core prepare's `CoreRegistry` with this
+    ///         prepare's transition. Nothing is authored — the operation IS that association, and
+    ///         the stage calls are `stage0/1/2(operation)`, derivable from its address alone.
+    /// @dev Rides the CREATE2 factory like every prepare deployment: the Safe bundle replays
+    ///      factory transactions only, so a plain CREATE would leave the stage calls pointing at a
+    ///      codeless address on the real chain.
+    function deployEcosystemUpgradeOperation() public virtual {
+        require(upgradeAddresses.ctmTransition != address(0), "transition not deployed");
+        address coordinator = upgradeAddresses.ecosystemUpgradeExecutor;
+        // A call to a codeless address is a silent success, so a coordinator that is not deployed
+        // would turn all three stage calls into no-ops the governance bundle reports as executed.
+        // Nothing on-chain catches that, which is why it is checked here.
+        require(coordinator.code.length != 0, "coordinator has no code (core prepare output)");
+        // From the build ARTIFACT, which is also where the coordinator's `OPERATION_CODEHASH`
+        // came from — see {BytecodeUtils.getDeployedBytecodeHash}.
+        upgradeAddresses.ecosystemUpgradeOperation = deployViaCreate2AndNotify(
+            BytecodeUtils.readBytecodeL1("EcosystemUpgradeOperation.sol", "EcosystemUpgradeOperation"),
+            abi.encode(
+                OperationManifest({
+                    coreRegistry: upgradeAddresses.coreRegistry,
+                    transition: upgradeAddresses.ctmTransition
+                })
+            ),
+            "EcosystemUpgradeOperation"
+        );
+        require(
+            upgradeAddresses.ecosystemUpgradeOperation.codehash ==
+                EcosystemUpgradeExecutor(payable(coordinator)).OPERATION_CODEHASH(),
+            "the deployed operation does not run the code the coordinator anchors"
+        );
     }
 
     /// @notice Checks the transition against the codehash the bound executor was CONSTRUCTED with —
@@ -641,6 +689,10 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         upgradeAddresses.ecosystemUpgradeExecutor = _ecosystemUpgradeExecutor;
     }
 
+    function setCoreRegistry(address _coreRegistry) public virtual {
+        upgradeAddresses.coreRegistry = _coreRegistry;
+    }
+
     function setNewProtocolVersion(uint256 _protocolVersion) public virtual {
         config.contracts.chainCreationParams.latestProtocolVersion = _protocolVersion;
     }
@@ -837,8 +889,8 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
 
     /// @notice The governance stages of this prepare: only what a version script declared as an
     ///         external action for the stage. The lifecycle calls themselves —
-    ///         `EcosystemUpgradeExecutor.stage0/1/2(operation)` — are emitted by the compose step,
-    ///         once every participating transition exists.
+    ///         `EcosystemUpgradeExecutor.stage0/1/2(operation)` — are authored nowhere: they are a
+    ///         function of the operation's address, and the merge derives them from it.
     function prepareStage0GovernanceCalls() public virtual returns (Call[] memory calls) {
         return externalActions.callsForPhase(ExternalActionsLib.PHASE_STAGE_0);
     }
@@ -1002,14 +1054,22 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         address bootstrapMigrationAddr = bootstrapMigrationAddress();
         vm.serializeAddress("registry", "bootstrap_migration_addr", bootstrapMigrationAddr);
         // The bound executor is named whenever it is known: after a bootstrap prepare deployed
-        // it, or once the CTM's live owner is one. The compose step reads it, with the
+        // it, or once the CTM's live owner is one. Tooling reads it, with the
         // transition, as this CTM's leg of the operation; a bootstrap edge has no transition, so
         // nothing composes over it.
         bool executorKnown = upgradeAddresses.ctmTransition != address(0) || bootstrapMigrationAddr != address(0);
-        string memory registry = vm.serializeAddress(
+        vm.serializeAddress(
             "registry",
             "ctm_upgrade_executor_addr",
             executorKnown ? boundCTMUpgradeExecutor() : address(0)
+        );
+        // The operation and the coordinator it is driven through: the merge derives this upgrade's
+        // three governance calls — `stage0/1/2(operation)` — from exactly these two addresses.
+        vm.serializeAddress("registry", "coordinator_addr", upgradeAddresses.ecosystemUpgradeExecutor);
+        string memory registry = vm.serializeAddress(
+            "registry",
+            "operation_addr",
+            upgradeAddresses.ecosystemUpgradeOperation
         );
         vm.serializeString("root", "registry", registry);
         string memory toml = vm.serializeBytes("root", "chain_upgrade_diamond_cut", getChainUpgradeDiamondCutData());
