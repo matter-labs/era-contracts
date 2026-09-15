@@ -97,6 +97,9 @@ uint256 constant PUBLIC_INPUT_SHIFT = 32;
 /// @dev Proof type used by the ZKsync OS PLONK verifier.
 uint256 constant ZKSYNC_OS_PLONK_VERIFICATION_TYPE = 2;
 
+/// @dev Proof type containing both Airbender and ZiSK proofs.
+uint256 constant ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE = 5;
+
 /// @dev Proof type used by the proof-skipping ZKsync OS testnet verifier.
 uint256 constant ZKSYNC_OS_MOCK_VERIFICATION_TYPE = 3;
 
@@ -108,6 +111,22 @@ uint256 constant ZKSYNC_OS_MOCK_PROOF_LENGTH = 2;
 
 /// @dev Marker expected as the first word in a proof-skipping ZKsync OS testnet proof.
 uint256 constant ZKSYNC_OS_MOCK_PROOF_MAGIC = 13;
+
+/// @dev Number of words in the ZiSK BN254 PLONK proof and its padded testnet mock component.
+uint256 constant ZISK_SNARK_PROOF_LENGTH = 24;
+
+// Enum ordinals are storage bit positions; append new systems without reordering.
+enum ProofSystem {
+    Boojum,
+    Airbender,
+    Zisk
+}
+
+struct DisabledProofSystems {
+    bool boojum;
+    bool airbender;
+    bool zisk;
+}
 
 /// @dev Padding value for empty/unused leaves in an {IndexedMerkleTree}. Deliberately NOT a valid
 /// `hashLeaf(IMTLeaf)` output, so an unused padded index can't be presented as a `{0,0,0}` low leaf to forge
