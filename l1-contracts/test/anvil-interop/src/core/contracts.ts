@@ -144,17 +144,3 @@ export function getDeterministicBytecode(name: ContractName): string {
 export function getDeterministicCreationBytecode(name: ContractName): string {
   return loadDeterministicCreationBytecodeFromOut(ARTIFACTS[name]);
 }
-
-// ── Legacy ABIs ─────────────────────────────────────────────────
-// ABIs for older contract versions that no longer exist as artifacts.
-// Kept here (not inline) so every consumer imports from a single source of truth.
-
-/**
- * Legacy AdminFacet ABI: upgradeChainFromVersion(uint256, DiamondCutData) with 2 params. The current
- * AdminFacet has upgradeChainFromVersion(address, uint256, DiamondCutData) with 3 params. Only reachable
- * from fork runs against an ecosystem that predates the third parameter; the state-dump scenarios all
- * start at v31, which already has it.
- */
-export const LEGACY_ADMIN_ABI: string[] = [
-  "function upgradeChainFromVersion(uint256, tuple(tuple(address,uint8,bool,bytes4[])[],address,bytes))",
-];

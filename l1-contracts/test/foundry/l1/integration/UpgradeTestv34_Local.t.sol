@@ -30,7 +30,7 @@ import {LegacyTestAdminFacet} from "contracts/dev-contracts/test/LegacyTestAdmin
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {IAdminV31} from "../../../../deploy-scripts/utils/UpgradeChainCall.sol";
+import {IAdminWithCut} from "../../../../deploy-scripts/utils/UpgradeChainCall.sol";
 import {Utils as DeployScriptUtils} from "../../../../deploy-scripts/utils/Utils.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
@@ -76,7 +76,7 @@ contract CoreUpgrade_v34_Test is CoreUpgrade_v34 {}
 contract ChainUpgrade_v34_Test is DefaultChainUpgrade {
     function upgradeChain(Diamond.DiamondCutData memory diamondCutData) public override {
         bytes memory callData = abi.encodeCall(
-            IAdminV31.upgradeChainFromVersion,
+            IAdminWithCut.upgradeChainFromVersion,
             (config.chainDiamondProxyAddress, config.oldProtocolVersion, diamondCutData)
         );
         DeployScriptUtils.adminExecute(

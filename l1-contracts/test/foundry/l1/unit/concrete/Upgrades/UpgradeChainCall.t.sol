@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {IAdminPreV31, IAdminV31, UpgradeChainCall} from "deploy-scripts/utils/UpgradeChainCall.sol";
+import {IAdminWithCut, UpgradeChainCall} from "deploy-scripts/utils/UpgradeChainCall.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 
@@ -25,29 +25,20 @@ contract UpgradeChainCallTest is Test {
             });
     }
 
-    function test_preV31TakesTheTwoArgumentLegacyShape() public pure {
-        assertEq(
-            UpgradeChainCall.encode(CHAIN, _version(30), _cut()),
-            abi.encodeCall(IAdminPreV31.upgradeChainFromVersion, (_version(30), _cut())),
-            "a pre-v31 chain is called without its own address"
-        );
-    }
-
     function test_v31TakesTheChainAddressedCutShape() public pure {
         assertEq(
             UpgradeChainCall.encode(CHAIN, _version(31), _cut()),
-            abi.encodeCall(IAdminV31.upgradeChainFromVersion, (CHAIN, _version(31), _cut())),
-            "v31 added the leading chain address"
+            abi.encodeCall(IAdminWithCut.upgradeChainFromVersion, (CHAIN, _version(31), _cut())),
+            "a cut-taking chain is called with its own address"
         );
     }
 
-    /// @dev The three shapes must be mutually distinct — the whole reason the encoder selects by
-    ///      the chain's current version rather than encoding one shape for everyone.
-    function test_theThreeShapesAreDistinct() public pure {
-        bytes4 preV31 = bytes4(UpgradeChainCall.encode(CHAIN, _version(30), _cut()));
-        bytes4 v31 = bytes4(UpgradeChainCall.encode(CHAIN, _version(31), _cut()));
-        bytes4 v34 = bytes4(UpgradeChainCall.encode(CHAIN, _version(34), _cut()));
-        assertTrue(preV31 != v31 && v31 != v34 && preV31 != v34, "shapes must not collide");
+    /// @dev The two shapes must be distinct — the whole reason the encoder selects by the chain's
+    ///      current version rather than encoding one shape for everyone.
+    function test_theTwoShapesAreDistinct() public pure {
+        bytes4 withCut = bytes4(UpgradeChainCall.encode(CHAIN, _version(31), _cut()));
+        bytes4 readsCut = bytes4(UpgradeChainCall.encode(CHAIN, _version(34), _cut()));
+        assertTrue(withCut != readsCut, "shapes must not collide");
     }
 
     /// @dev v32 and v33 still ship the cut-taking facet, so the boundary is v34 and not the version
