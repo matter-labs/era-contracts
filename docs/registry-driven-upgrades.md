@@ -206,8 +206,9 @@ The coordinator owns no proxy administration and applies nothing itself: it orde
 holds the pending operation and its stage, starts and checks the timers, and drives the domain
 callbacks. Each domain stores only its `activeOperation`; its registry or transition is read from that
 operation rather than supplied or stored a second time. Domain callbacks enforce coordinator
-authorization and accept only the reserved operation’s leg. How the stages compose these calls,
-what each stage checks and what abandonment leaves behind is the
+authorization; only `beginOperation` names an operation, and every callback after it acts on the
+reservation the executor already holds. How the stages compose these calls, what each stage checks
+and what abandonment leaves behind is the
 [coordinator spec](../protocol-docs/ecosystem-upgrade-coordination.md).
 
 `UpgradeExecutorBase` gives every executor ONE role. `owner` (`Ownable2Step`) drives the fixed
@@ -354,7 +355,7 @@ sequenceDiagram
     G->>X: stage1(operation)
     X->>T: checkDeadline()
     X->>CO: applyL1Upgrade(coreRegistry) — core leg first
-    X->>E: applyTransition(transition)
+    X->>E: applyTransition() — the reserved leg
     E->>C: setNewVersionUpgradeFromTransition(transition)
     E->>C: setCurrentRelease(newRelease)
     G->>E: upgradeChain(transition, chainId)
@@ -363,8 +364,8 @@ sequenceDiagram
     D->>C: upgradeCutForVersion(oldV) — derived from upgradeTransition[oldV]
     Note over D: apply derived facetCuts verbatim,<br/>then version + target release's verifier + composed L2 tx
     G->>X: stage2(operation)
-    X->>CO: completeOperation(operation) — validates applied
-    X->>E: completeOperation(operation) — validates applied
+    X->>CO: completeOperation() — validates applied
+    X->>E: completeOperation() — validates applied
     Note over X,E: Any later failure rolls back all completions
     E->>H: unpauseCTMMigration(ctm)
 ```

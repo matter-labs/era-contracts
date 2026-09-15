@@ -54,12 +54,13 @@ leaves migrations paused. Governance explicitly decides whether to resume them.
 ## Authorization and recovery
 
 Each domain explicitly authorizes its coordinator (`setCoordinator`). An address
-declaring the same governance owner is not evidence of authorization. Domain
-callbacks require that the coordinator is executing the exact operation reserved;
-the leg is read from that operation, never re-supplied, so a domain cannot be
-reserved for one registry or transition and driven with another. Replacement is
-forbidden while the domain has a pending operation. Existing governance operational
-entrypoints and the logged ordinary-call recovery path remain available.
+declaring the same governance owner is not evidence of authorization. Only
+`beginOperation` names an operation; every callback after it acts on the reservation
+the domain already holds and takes no argument, and the leg is read from that
+reservation, so a domain cannot be reserved for one registry or transition and
+driven with another. Replacement is forbidden while the domain has a pending
+operation. Existing governance operational entrypoints and the logged ordinary-call
+recovery path remain available.
 
 ## Integration gate
 

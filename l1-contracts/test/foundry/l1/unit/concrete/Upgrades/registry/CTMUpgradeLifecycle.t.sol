@@ -34,7 +34,6 @@ import {
 } from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {
     DeadlineNotYetPassed,
-    LegNotReserved,
     MigrationsNotPaused,
     NoPendingOperation,
     NotCTMOwner,
@@ -544,35 +543,46 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)));
     }
 
-    /// @dev The coordinator may apply exactly the leg it reserved: driven through its escape hatch
-    ///      (the executor sees the coordinator as the caller), a different transition or operation
-    ///      is refused.
-    function test_revertWhen_coordinatorNamesAnUnreservedLeg() public {
+    /// @dev The callbacks after `beginOperation` carry no leg to name, so the coordinator can only
+    ///      drive the executor's OWN reservation — here through its escape hatch, which is the
+    ///      only way to reach a callback out of stage order (the executor sees the coordinator as
+    ///      the caller). `other` is an equally genuine transition that was never reserved: there is
+    ///      no argument that could aim a callback at it.
+    function test_coordinatorCallbacksActOnTheReservedLegOnly() public {
         CTMTransition other = _deployTransition(778);
-        EcosystemUpgradeOperation otherOperation = _operationFor(other);
-        EcosystemUpgradeOperation operation = _operationFor(transition);
         _stage0(transition);
 
-        vm.expectRevert(abi.encodeWithSelector(LegNotReserved.selector, address(other), address(transition)));
         vm.prank(governor);
-        coordinator.forward(
-            _singleCall(
-                address(ctmExecutor),
-                abi.encodeCall(CTMUpgradeExecutor.applyTransition, (ICTMTransition(address(other))))
-            )
-        );
-        vm.expectRevert(
-            abi.encodeWithSelector(OperationNotPending.selector, address(otherOperation), address(operation))
-        );
-        vm.prank(governor);
-        coordinator.forward(
-            _singleCall(
-                address(ctmExecutor),
-                abi.encodeCall(CTMUpgradeExecutor.completeOperation, (IEcosystemUpgradeOperation(otherOperation)))
-            )
-        );
-        _assertCtmUntouched();
+        coordinator.forward(_singleCall(address(ctmExecutor), abi.encodeCall(CTMUpgradeExecutor.applyTransition, ())));
+
+        assertEq(chainContractAddress.upgradeTransition(0), address(transition), "the reserved leg is the one applied");
+        assertTrue(chainContractAddress.upgradeTransition(0) != address(other), "never the unreserved one");
         _assertPendingAndPaused(transition, IEcosystemUpgradeExecutor.UpgradeStage.Prepared);
+    }
+
+    /// @dev A free executor has no reservation for a callback to act on — the state the removed
+    ///      leg argument used to be checked against.
+    function test_revertWhen_coordinatorDrivesCallbacksWithNothingReserved() public {
+        vm.startPrank(governor);
+        vm.expectRevert(NoPendingOperation.selector);
+        coordinator.forward(_singleCall(address(ctmExecutor), abi.encodeCall(CTMUpgradeExecutor.applyTransition, ())));
+        vm.expectRevert(NoPendingOperation.selector);
+        coordinator.forward(
+            _singleCall(address(ctmExecutor), abi.encodeCall(CTMUpgradeExecutor.completeOperation, ()))
+        );
+        vm.expectRevert(NoPendingOperation.selector);
+        coordinator.forward(_singleCall(address(ctmExecutor), abi.encodeCall(CTMUpgradeExecutor.abandonOperation, ())));
+        vm.expectRevert(NoPendingOperation.selector);
+        coordinator.forward(
+            _singleCall(address(coreExecutor), abi.encodeCall(CoreUpgradeExecutor.completeOperation, ()))
+        );
+        vm.expectRevert(NoPendingOperation.selector);
+        coordinator.forward(
+            _singleCall(address(coreExecutor), abi.encodeCall(CoreUpgradeExecutor.abandonOperation, ()))
+        );
+        vm.stopPrank();
+        _assertCtmUntouched();
+        _assertLifecycleIdle();
     }
 
     // ─────────────────────────── abandoning a stuck lifecycle ───────────────

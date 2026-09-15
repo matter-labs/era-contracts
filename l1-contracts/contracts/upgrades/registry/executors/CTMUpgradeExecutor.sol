@@ -13,10 +13,9 @@ import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
 import {IChainAssetHandlerBase} from "../../../core/chain-asset-handler/IChainAssetHandler.sol";
 import {
     EmptyBytes32,
-    LegNotReserved,
     MigrationsNotPaused,
+    NoPendingOperation,
     OperationHasNoLegForExecutor,
-    OperationNotPending,
     TransitionNotCommitted,
     TransitionReleaseMismatch,
     Unauthorized,
@@ -181,8 +180,8 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
     }
 
     // ---------------------------------------------------------------------------------------
-    // The coordinator's callbacks. One operation at a time; every callback names the operation
-    // or transition previously reserved and is rejected for any other.
+    // The coordinator's callbacks. One operation at a time: `beginOperation` names the operation
+    // to reserve, and every callback after it acts on that reservation alone.
     // ---------------------------------------------------------------------------------------
 
     /// @inheritdoc ICTMUpgradeExecutor
@@ -216,24 +215,24 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
     /// @inheritdoc ICTMUpgradeExecutor
     /// @dev Applies CTM-domain proxy rows, the version commit and the release pin; any failure
     ///      reverts the coordinator's whole stage.
-    function applyTransition(ICTMTransition _transition) external onlyCoordinator {
-        _requireReserved(_transition);
+    function applyTransition() external onlyCoordinator {
+        ICTMTransition transition = _legTransition(_requireActive());
         // Checked here for a clear failure; the CTM's own version commit refuses to run unpaused.
         if (!_chainAssetHandler().migrationPausedFor(address(CHAIN_TYPE_MANAGER))) {
             revert MigrationsNotPaused();
         }
-        _applyCTMUpgrade(_transition);
+        _applyCTMUpgrade(transition);
     }
 
     /// @inheritdoc ICTMUpgradeExecutor
     /// @dev This executor releases its own pause only for a transition it can see applied; the
     ///      coordinator sequences completions and relies on the stage being one transaction.
-    function completeOperation(IEcosystemUpgradeOperation _operation) external onlyCoordinator {
-        _requireActive(_operation);
-        _requireTransitionApplied(_legTransition(_operation));
+    function completeOperation() external onlyCoordinator {
+        IEcosystemUpgradeOperation operation = _requireActive();
+        _requireTransitionApplied(_legTransition(operation));
         delete activeOperation;
         _chainAssetHandler().unpauseCTMMigration(address(CHAIN_TYPE_MANAGER));
-        emit OperationCompleted(address(_operation));
+        emit OperationCompleted(address(operation));
     }
 
     /// @inheritdoc ICTMUpgradeExecutor
@@ -241,10 +240,10 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
     ///      rollback. Migrations stay paused: whether it is safe to resume them is governance's
     ///      call (`ChainAssetHandler.unpauseCTMMigration` through the fixed CTM authority), not a
     ///      side effect of clearing a slot.
-    function abandonOperation(IEcosystemUpgradeOperation _operation) external onlyCoordinator {
-        _requireActive(_operation);
+    function abandonOperation() external onlyCoordinator {
+        IEcosystemUpgradeOperation operation = _requireActive();
         delete activeOperation;
-        emit OperationAbandoned(address(_operation));
+        emit OperationAbandoned(address(operation));
     }
 
     /// @inheritdoc ICTMUpgradeExecutor
@@ -299,17 +298,11 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
         address(_transition).requirePin(TRANSITION_CODEHASH);
     }
 
-    function _requireActive(IEcosystemUpgradeOperation _operation) private view {
-        if (address(activeOperation) != address(_operation)) {
-            revert OperationNotPending(address(_operation), address(activeOperation));
-        }
-    }
-
-    /// @dev Also rejects a free executor: with nothing reserved, no transition matches.
-    function _requireReserved(ICTMTransition _transition) private view {
-        ICTMTransition reserved = reservedTransition();
-        if (address(reserved) != address(_transition)) {
-            revert LegNotReserved(address(_transition), address(reserved));
+    /// @dev The reservation every callback after `beginOperation` acts on.
+    function _requireActive() private view returns (IEcosystemUpgradeOperation operation) {
+        operation = activeOperation;
+        if (address(operation) == address(0)) {
+            revert NoPendingOperation();
         }
     }
 

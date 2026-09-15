@@ -26,8 +26,8 @@ interface ICTMUpgradeExecutor {
     /// @notice The operation this executor is reserved for, zero when free.
     function activeOperation() external view returns (IEcosystemUpgradeOperation);
 
-    /// @notice The transition of the active operation's leg on this executor — the only one
-    ///         `applyTransition` accepts; zero when free. Derived from the operation, not stored.
+    /// @notice The transition of the active operation's leg on this executor — the one
+    ///         `applyTransition` applies; zero when free. Derived from the operation, not stored.
     function reservedTransition() external view returns (ICTMTransition);
 
     /// @notice Reserves this executor for its leg of `_operation`, checks that leg's transition
@@ -35,14 +35,14 @@ interface ICTMUpgradeExecutor {
     function beginOperation(IEcosystemUpgradeOperation _operation) external;
 
     /// @notice Applies the reserved transition on the bound CTM.
-    function applyTransition(ICTMTransition _transition) external;
+    function applyTransition() external;
 
     /// @notice Requires the reserved transition applied, unpauses the CTM's migrations and frees
     ///         the reservation.
-    function completeOperation(IEcosystemUpgradeOperation _operation) external;
+    function completeOperation() external;
 
     /// @notice Frees the reservation, leaving migrations paused.
-    function abandonOperation(IEcosystemUpgradeOperation _operation) external;
+    function abandonOperation() external;
 
     /// @notice Reverts unless `_transition` has been applied on the bound CTM.
     function validateTransitionApplied(ICTMTransition _transition) external view;

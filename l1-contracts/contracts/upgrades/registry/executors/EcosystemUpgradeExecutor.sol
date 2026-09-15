@@ -136,7 +136,7 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
             CORE_EXECUTOR.applyL1Upgrade(ICoreRegistry(m.coreRegistry));
         }
         for (uint256 i = 0; i < legCount; ++i) {
-            ICTMUpgradeExecutor(m.legs[i].executor).applyTransition(ICTMTransition(m.legs[i].transition));
+            ICTMUpgradeExecutor(m.legs[i].executor).applyTransition();
         }
         emit OperationExecuted(address(_operation));
     }
@@ -154,11 +154,11 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
         delete pendingOperation;
         pendingStage = UpgradeStage.None;
         if (m.coreRegistry != address(0)) {
-            CORE_EXECUTOR.completeOperation(_operation);
+            CORE_EXECUTOR.completeOperation();
         }
         uint256 legCount = m.legs.length;
         for (uint256 i = 0; i < legCount; ++i) {
-            ICTMUpgradeExecutor(m.legs[i].executor).completeOperation(_operation);
+            ICTMUpgradeExecutor(m.legs[i].executor).completeOperation();
         }
         emit OperationCompleted(address(_operation));
     }
@@ -176,11 +176,11 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
         delete pendingOperation;
         pendingStage = UpgradeStage.None;
         if (m.coreRegistry != address(0)) {
-            CORE_EXECUTOR.abandonOperation(operation);
+            CORE_EXECUTOR.abandonOperation();
         }
         uint256 legCount = m.legs.length;
         for (uint256 i = 0; i < legCount; ++i) {
-            ICTMUpgradeExecutor(m.legs[i].executor).abandonOperation(operation);
+            ICTMUpgradeExecutor(m.legs[i].executor).abandonOperation();
         }
         emit OperationAbandoned(address(operation), stage);
     }
