@@ -5,7 +5,7 @@ pragma solidity ^0.8.21;
 import {VerifierParams} from "../chain-interfaces/IVerifier.sol";
 import {PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
 import {IZKChainBase} from "./IZKChainBase.sol";
-import {L2DACommitmentScheme, PubdataContent} from "../../common/Config.sol";
+import {DisabledProofSystems, L2DACommitmentScheme, PubdataContent} from "../../common/Config.sol";
 
 /// @title The interface of the Getters Contract that implements functions for getting contract state from outside the blockchain.
 /// @author Matter Labs
@@ -61,8 +61,8 @@ interface IGetters is IZKChainBase {
     /// @return The accepted real proof type: 2 for Airbender or 5 for multiprover.
     function getProofMode() external view returns (uint256);
 
-    /// @return Bit mask of the proof systems disabled on this chain.
-    function disabledProofSystems() external view returns (uint8);
+    /// @return Named disable flags for each proof system; these do not indicate verifier support.
+    function disabledProofSystems() external view returns (DisabledProofSystems memory);
 
     /// @return The total number of priority operations that were added to the priority queue, including all processed ones
     function getTotalPriorityTxs() external view returns (uint256);

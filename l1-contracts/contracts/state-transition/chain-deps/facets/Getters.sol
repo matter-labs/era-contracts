@@ -15,7 +15,7 @@ import {IZKsyncOSVerifier} from "../../chain-interfaces/IZKsyncOSVerifier.sol";
 import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "../../chain-interfaces/ILegacyGetters.sol";
 import {SemVer} from "../../../common/libraries/SemVer.sol";
-import {L2DACommitmentScheme, PubdataContent} from "../../../common/Config.sol";
+import {ProofSystem, DisabledProofSystems, L2DACommitmentScheme, PubdataContent} from "../../../common/Config.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -111,8 +111,14 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
-    function disabledProofSystems() external view returns (uint8) {
-        return s.disabledProofSystems;
+    function disabledProofSystems() external view returns (DisabledProofSystems memory) {
+        uint8 mask = s.disabledProofSystems;
+        return
+            DisabledProofSystems({
+                boojum: mask & uint8(1 << uint8(ProofSystem.Boojum)) != 0,
+                airbender: mask & uint8(1 << uint8(ProofSystem.Airbender)) != 0,
+                zisk: mask & uint8(1 << uint8(ProofSystem.Zisk)) != 0
+            });
     }
 
     /// @inheritdoc IGetters

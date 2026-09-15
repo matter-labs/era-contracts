@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.28;
 
+import {ProofTooShort} from "../../common/L1ContractErrors.sol";
+
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {IZiskVerifier} from "../chain-interfaces/IZiskVerifier.sol";
 import {IZiskSnarkPlonkVerifier} from "../chain-interfaces/IZiskSnarkPlonkVerifier.sol";
@@ -40,8 +42,6 @@ contract ZiskVerifier is IZiskVerifier {
     ///         while its final circuit/setup VK remains unchanged; see
     ///         `verifiers/README.md` for generation and deployment.
     IZiskSnarkPlonkVerifier public immutable PLONK_VERIFIER;
-
-    error ProofTooShort();
 
     constructor(IZiskSnarkPlonkVerifier _plonkVerifier) {
         PLONK_VERIFIER = _plonkVerifier;

@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {ProofSystem, DisabledProofSystems, PUBLIC_INPUT_SHIFT} from "contracts/common/Config.sol";
+
 import "forge-std/Test.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IZiskSnarkPlonkVerifier} from "contracts/state-transition/chain-interfaces/IZiskSnarkPlonkVerifier.sol";
 import {ZiskVerifier} from "contracts/state-transition/verifiers/ZiskVerifier.sol";
 import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
-import {NonZeroCarriedHash} from "contracts/common/L1ContractErrors.sol";
-import {PUBLIC_INPUT_SHIFT} from "contracts/common/Config.sol";
+import {NonZeroCarriedHash, ZiskVerificationFailed} from "contracts/common/L1ContractErrors.sol";
 
 /// @dev Mock verifier that always returns true (Airbender side; exercised with
 ///      real-proof fixtures elsewhere).
@@ -86,8 +87,13 @@ contract MultiProofRangeVectorTest is Test {
     ///      directly, so it stands in for that chain.
     uint8 internal disabledProofSystemsMask;
 
-    function disabledProofSystems() external view returns (uint8) {
-        return disabledProofSystemsMask;
+    function disabledProofSystems() external view returns (DisabledProofSystems memory) {
+        return
+            DisabledProofSystems({
+                boojum: disabledProofSystemsMask & uint8(1 << uint8(ProofSystem.Boojum)) != 0,
+                airbender: disabledProofSystemsMask & uint8(1 << uint8(ProofSystem.Airbender)) != 0,
+                zisk: disabledProofSystemsMask & uint8(1 << uint8(ProofSystem.Zisk)) != 0
+            });
     }
 
     function setUp() public {
@@ -213,7 +219,7 @@ contract MultiProofRangeVectorTest is Test {
         uint256[] memory pis = _publicInputs();
         pis[2] ^= 1;
 
-        vm.expectRevert(MultiProofVerifier.ZiskVerificationFailed.selector);
+        vm.expectRevert(ZiskVerificationFailed.selector);
         verifier.verify(pis, _rangeProof(0));
     }
 

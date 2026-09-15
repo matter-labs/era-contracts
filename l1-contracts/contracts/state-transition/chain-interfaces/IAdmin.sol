@@ -7,7 +7,7 @@ import {IChainUpgrader} from "../chain-interfaces/IChainUpgrader.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {FeeParams, PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
-import {L2DACommitmentScheme, PubdataContent} from "../../common/Config.sol";
+import {ProofSystem, L2DACommitmentScheme, PubdataContent} from "../../common/Config.sol";
 
 /// @title The interface of the Admin Contract that controls access rights for contract management.
 /// @author Matter Labs
@@ -118,9 +118,9 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     function setPubdataContent(PubdataContent _pubdataContent) external;
 
     /// @notice Enables or disables one proof system for a ZKsync OS chain.
-    /// @param _proofSystem Single proof-system bit; only ZISK_PROOF_SYSTEM_DISABLED (4) is supported.
+    /// @param _proofSystem Proof system to configure; only ProofSystem.Zisk is supported on ZKsync OS.
     /// @param _enabled Whether the selected proof system is enabled.
-    function setProofSystemStatus(uint8 _proofSystem, bool _enabled) external;
+    function setProofSystemStatus(ProofSystem _proofSystem, bool _enabled) external;
 
     /// @notice Makes the chain as permanent rollup.
     /// @dev This is a security feature needed for chains that should be

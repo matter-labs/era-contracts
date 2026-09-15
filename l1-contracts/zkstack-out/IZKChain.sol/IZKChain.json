@@ -236,8 +236,25 @@
     "outputs": [
       {
         "name": "",
-        "type": "uint8",
-        "internalType": "uint8"
+        "type": "tuple",
+        "internalType": "struct DisabledProofSystems",
+        "components": [
+          {
+            "name": "boojum",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "airbender",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "zisk",
+            "type": "bool",
+            "internalType": "bool"
+          }
+        ]
       }
     ],
     "stateMutability": "view"
@@ -1395,7 +1412,7 @@
       {
         "name": "_proofSystem",
         "type": "uint8",
-        "internalType": "uint8"
+        "internalType": "enum ProofSystem"
       },
       {
         "name": "_enabled",

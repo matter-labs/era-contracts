@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.28;
 
+import {InvalidMockProof} from "../../common/L1ContractErrors.sol";
+
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {
     MAINNET_CHAIN_ID,
@@ -19,8 +21,6 @@ import {
 ///      identifies the fake path together; every other proof is delegated unchanged.
 contract ZiskTestnetVerifier is IVerifier {
     IVerifier public immutable INNER_VERIFIER;
-
-    error InvalidMockProof();
 
     constructor(IVerifier _innerVerifier) {
         assert(block.chainid != MAINNET_CHAIN_ID);

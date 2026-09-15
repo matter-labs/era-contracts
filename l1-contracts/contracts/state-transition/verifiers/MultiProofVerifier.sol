@@ -2,12 +2,23 @@
 
 pragma solidity 0.8.28;
 
+import {
+    EmptyProof,
+    InvalidProofFormat,
+    UnknownProofType,
+    ProofTooShort,
+    AirbenderVerificationFailed,
+    ZiskVerificationFailed,
+    InvalidDisabledProofSystemsMask,
+    NonZeroCarriedHash
+} from "../../common/L1ContractErrors.sol";
+
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {IZKsyncOSVerifier} from "../chain-interfaces/IZKsyncOSVerifier.sol";
 import {IGetters} from "../chain-interfaces/IGetters.sol";
-import {InvalidDisabledProofSystemsMask, NonZeroCarriedHash} from "../../common/L1ContractErrors.sol";
 import {
-    ZISK_PROOF_SYSTEM_DISABLED,
+    ProofSystem,
+    DisabledProofSystems,
     ZKSYNC_OS_PLONK_VERIFICATION_TYPE,
     ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE,
     ZISK_SNARK_PROOF_LENGTH
@@ -32,13 +43,6 @@ contract MultiProofVerifier is IVerifier, IZKsyncOSVerifier {
     ///         ZiSK public values from its own pinned VKs and checks the SNARK
     ///         for every range size, single batch or many.
     IVerifier public immutable ZISK_RANGE_VERIFIER;
-
-    error EmptyProof();
-    error InvalidProofFormat();
-    error UnknownProofType(uint256 proofType);
-    error ProofTooShort();
-    error AirbenderVerificationFailed();
-    error ZiskVerificationFailed();
 
     constructor(IVerifier _airbenderVerifier, IVerifier _ziskRangeVerifier) {
         AIRBENDER_VERIFIER = _airbenderVerifier;
@@ -71,7 +75,11 @@ contract MultiProofVerifier is IVerifier, IZKsyncOSVerifier {
             revert InvalidProofFormat();
         }
         uint256 proofType = _proof[0];
-        uint256 requiredType = getProofMode(IGetters(_chain).disabledProofSystems());
+        DisabledProofSystems memory disabled = IGetters(_chain).disabledProofSystems();
+        uint8 disabledMask = (disabled.boojum ? uint8(1 << uint8(ProofSystem.Boojum)) : 0) |
+            (disabled.airbender ? uint8(1 << uint8(ProofSystem.Airbender)) : 0) |
+            (disabled.zisk ? uint8(1 << uint8(ProofSystem.Zisk)) : 0);
+        uint256 requiredType = getProofMode(disabledMask);
         if (proofType != requiredType) {
             revert UnknownProofType(proofType);
         }
@@ -91,11 +99,11 @@ contract MultiProofVerifier is IVerifier, IZKsyncOSVerifier {
 
     /// @inheritdoc IZKsyncOSVerifier
     function getProofMode(uint8 _disabledProofSystems) public pure returns (uint256) {
-        if (_disabledProofSystems & ~ZISK_PROOF_SYSTEM_DISABLED != 0) {
+        if (_disabledProofSystems & ~uint8(1 << uint8(ProofSystem.Zisk)) != 0) {
             revert InvalidDisabledProofSystemsMask(_disabledProofSystems);
         }
         return
-            _disabledProofSystems & ZISK_PROOF_SYSTEM_DISABLED == 0
+            _disabledProofSystems & uint8(1 << uint8(ProofSystem.Zisk)) == 0
                 ? ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE
                 : ZKSYNC_OS_PLONK_VERIFICATION_TYPE;
     }
