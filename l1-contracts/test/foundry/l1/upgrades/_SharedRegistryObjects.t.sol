@@ -44,6 +44,7 @@ import {
     L2_ECOSYSTEM_CONTRACT_COUNT
 } from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {L2PlanFixtures} from "foundry-test/l1/unit/concrete/Upgrades/registry/L2PlanFixtures.sol";
+import {Bytes32MetadataToken, NoMetadataToken} from "./_NonStandardBaseTokens.sol";
 
 /// @notice Real, minimal registry objects for the upgrade-engine unit tests: two releases that
 ///         differ in one facet and their verifier, the transition between them, and a bootstrap
@@ -76,6 +77,10 @@ abstract contract RegistryObjectsFixture is Test {
     address internal ctmDeployerStub = makeAddr("ctmDeployer");
     address internal erc20OriginToken = makeAddr("erc20OriginToken");
     TestnetERC20Token internal erc20LocalToken;
+    /// @dev Base tokens the metadata probe must tolerate rather than revert on — a chain may be
+    ///      created on either, and every later upgrade recomposes the same data for it.
+    NoMetadataToken internal noMetadataToken;
+    Bytes32MetadataToken internal bytes32MetadataToken;
 
     bytes4 internal constant SEL_SHARED_A = bytes4(uint32(0x11));
     bytes4 internal constant SEL_SHARED_B = bytes4(uint32(0x12));
@@ -91,13 +96,25 @@ abstract contract RegistryObjectsFixture is Test {
     // bridged from another chain (so its metadata lives on a LOCAL representation).
     uint256 internal constant ETH_CHAIN_ID = 271;
     uint256 internal constant ERC20_CHAIN_ID = 272;
+    // Two more chains, based on tokens that serve no usable metadata (see {noMetadataToken}).
+    uint256 internal constant NO_METADATA_CHAIN_ID = 273;
+    uint256 internal constant BYTES32_METADATA_CHAIN_ID = 274;
     uint256 internal constant ETH_ORIGIN_CHAIN_ID = 1;
     uint256 internal constant ERC20_ORIGIN_CHAIN_ID = 300;
     bytes32 internal constant ETH_BASE_TOKEN_ASSET_ID = keccak256("ethBaseTokenAssetId");
     bytes32 internal constant ERC20_BASE_TOKEN_ASSET_ID = keccak256("erc20BaseTokenAssetId");
+    bytes32 internal constant NO_METADATA_BASE_TOKEN_ASSET_ID = keccak256("noMetadataBaseTokenAssetId");
+    bytes32 internal constant BYTES32_METADATA_BASE_TOKEN_ASSET_ID = keccak256("bytes32MetadataBaseTokenAssetId");
+    /// @dev What the probe substitutes for a token it cannot read a string out of.
+    string internal constant DEFAULT_BASE_TOKEN_NAME = "Base Token";
+    string internal constant DEFAULT_BASE_TOKEN_SYMBOL = "BT";
     string internal constant ERC20_NAME = "Local Token";
     string internal constant ERC20_SYMBOL = "LOC";
     uint256 internal constant ERC20_DECIMALS = 6;
+    /// @dev What the composition actually records for any token: the tolerant metadata probe
+    ///      filters a conforming 32-byte `decimals()` answer, so the ERC20 default stands — see
+    ///      `ZKChainSpecificForceDeploymentsLib._baseTokenMetadata`.
+    uint256 internal constant COMPOSED_DECIMALS = 18;
 
     function _setUpRegistryObjects(bytes memory _delegateCalldata) internal {
         fixtureDelegateCalldata = _delegateCalldata;
@@ -111,6 +128,8 @@ abstract contract RegistryObjectsFixture is Test {
         delegateComposer = new FixedDelegateCalldataComposer(_delegateCalldata);
         v34Composer = new L2V34DelegateCalldataComposer();
         erc20LocalToken = new TestnetERC20Token(ERC20_NAME, ERC20_SYMBOL, uint8(ERC20_DECIMALS));
+        noMetadataToken = new NoMetadataToken();
+        bytes32MetadataToken = new Bytes32MetadataToken(bytes32("Maker"), bytes32("MKR"), uint8(ERC20_DECIMALS));
     }
 
     /// @dev Mocks the ecosystem behind `_bridgehub` for the two fixture chains (see {v34Composer}).
@@ -138,6 +157,22 @@ abstract contract RegistryObjectsFixture is Test {
             ERC20_ORIGIN_CHAIN_ID,
             address(erc20LocalToken)
         );
+        _mockBaseToken(
+            _bridgehub,
+            NO_METADATA_CHAIN_ID,
+            NO_METADATA_BASE_TOKEN_ASSET_ID,
+            address(noMetadataToken),
+            block.chainid,
+            address(noMetadataToken)
+        );
+        _mockBaseToken(
+            _bridgehub,
+            BYTES32_METADATA_CHAIN_ID,
+            BYTES32_METADATA_BASE_TOKEN_ASSET_ID,
+            address(bytes32MetadataToken),
+            block.chainid,
+            address(bytes32MetadataToken)
+        );
     }
 
     function _mockBaseToken(
@@ -149,6 +184,9 @@ abstract contract RegistryObjectsFixture is Test {
         address _localToken
     ) internal {
         vm.mockCall(_bridgehub, abi.encodeCall(IBridgehubBase.baseTokenAssetId, (_chainId)), abi.encode(_assetId));
+        // What a real Bridgehub resolves through the asset handler: the token's representation on
+        // THIS layer, which is what the composition records and reads the metadata from.
+        vm.mockCall(_bridgehub, abi.encodeCall(IBridgehubBase.baseToken, (_chainId)), abi.encode(_localToken));
         vm.mockCall(
             mockNativeTokenVault,
             abi.encodeCall(INativeTokenVaultBase.originToken, (_assetId)),
@@ -158,11 +196,6 @@ abstract contract RegistryObjectsFixture is Test {
             mockNativeTokenVault,
             abi.encodeCall(INativeTokenVaultBase.originChainId, (_assetId)),
             abi.encode(_originChainId)
-        );
-        vm.mockCall(
-            mockNativeTokenVault,
-            abi.encodeCall(INativeTokenVaultBase.tokenAddress, (_assetId)),
-            abi.encode(_localToken)
         );
     }
 
@@ -345,24 +378,62 @@ abstract contract RegistryObjectsFixture is Test {
     /// @dev The `ZKChainSpecificForceDeploymentsData` of one of the two fixture chains, as the v34
     ///      composer must read it off the mocked ecosystem.
     function _expectedPerChainData(uint256 _chainId) internal view returns (bytes memory) {
-        bool isEthChain = _chainId == ETH_CHAIN_ID;
-        address originToken = isEthChain ? ETH_TOKEN_ADDRESS : erc20OriginToken;
+        // The recorded address is always the token's representation on THIS layer, which for the
+        // ERC20 chain is a different contract from its origin token.
+        address localToken;
+        address originToken;
+        uint256 originChainId = block.chainid;
+        bytes32 assetId;
         TokenMetadata memory metadata;
-        if (isEthChain) {
+        if (_chainId == ETH_CHAIN_ID) {
+            (localToken, originToken, originChainId, assetId) = (
+                ETH_TOKEN_ADDRESS,
+                ETH_TOKEN_ADDRESS,
+                ETH_ORIGIN_CHAIN_ID,
+                ETH_BASE_TOKEN_ASSET_ID
+            );
             metadata = TokenMetadata({name: "Ether", symbol: "ETH", decimals: 18});
+        } else if (_chainId == ERC20_CHAIN_ID) {
+            (localToken, originToken, originChainId, assetId) = (
+                address(erc20LocalToken),
+                erc20OriginToken,
+                ERC20_ORIGIN_CHAIN_ID,
+                ERC20_BASE_TOKEN_ASSET_ID
+            );
+            metadata = TokenMetadata({name: ERC20_NAME, symbol: ERC20_SYMBOL, decimals: COMPOSED_DECIMALS});
+        } else if (_chainId == NO_METADATA_CHAIN_ID) {
+            (localToken, originToken, assetId) = (
+                address(noMetadataToken),
+                address(noMetadataToken),
+                NO_METADATA_BASE_TOKEN_ASSET_ID
+            );
+            metadata = TokenMetadata({
+                name: DEFAULT_BASE_TOKEN_NAME,
+                symbol: DEFAULT_BASE_TOKEN_SYMBOL,
+                decimals: COMPOSED_DECIMALS
+            });
         } else {
-            metadata = TokenMetadata({name: ERC20_NAME, symbol: ERC20_SYMBOL, decimals: ERC20_DECIMALS});
+            (localToken, originToken, assetId) = (
+                address(bytes32MetadataToken),
+                address(bytes32MetadataToken),
+                BYTES32_METADATA_BASE_TOKEN_ASSET_ID
+            );
+            metadata = TokenMetadata({
+                name: DEFAULT_BASE_TOKEN_NAME,
+                symbol: DEFAULT_BASE_TOKEN_SYMBOL,
+                decimals: COMPOSED_DECIMALS
+            });
         }
         return
             abi.encode(
                 ZKChainSpecificForceDeploymentsData({
                     l2LegacySharedBridge: address(0),
                     predeployedL2WethAddress: address(0),
-                    baseTokenL1Address: originToken,
+                    baseTokenL1Address: localToken,
                     baseTokenMetadata: metadata,
                     baseTokenBridgingData: TokenBridgingData({
-                        assetId: isEthChain ? ETH_BASE_TOKEN_ASSET_ID : ERC20_BASE_TOKEN_ASSET_ID,
-                        originChainId: isEthChain ? ETH_ORIGIN_CHAIN_ID : ERC20_ORIGIN_CHAIN_ID,
+                        assetId: assetId,
+                        originChainId: originChainId,
                         originToken: originToken
                     })
                 })

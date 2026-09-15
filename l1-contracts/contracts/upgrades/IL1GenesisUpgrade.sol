@@ -26,4 +26,20 @@ interface IL1GenesisUpgrade {
     /// so the chain identity and protocol version come from that diamond's own storage, the force
     /// deployments from the release its CTM pins, and the CTM deployer from the Bridgehub.
     function genesisUpgrade() external returns (bytes32);
+
+    /// @notice The L2 genesis transaction `genesisUpgrade` commits for a chain created at
+    ///         `_release` — the FINAL transaction, exactly as the chain stores its hash.
+    /// @dev THE composition view, the genesis counterpart of `IDefaultUpgrade.l2UpgradeTx`: free
+    /// of diamond-storage reads, so it is called directly on this contract rather than through a
+    /// chain, and it runs the same construction the execution path runs.
+    /// @param _release The `CTMRelease` the chain is created at.
+    /// @param _bridgehub The Bridgehub of the ecosystem the chain belongs to.
+    /// @param _chainId The chain to compose for.
+    /// @param _protocolVersion The packed version the chain starts at.
+    function genesisUpgradeTx(
+        address _release,
+        address _bridgehub,
+        uint256 _chainId,
+        uint256 _protocolVersion
+    ) external view returns (L2CanonicalTransaction memory);
 }

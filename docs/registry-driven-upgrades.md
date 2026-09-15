@@ -325,8 +325,15 @@ batch hash, and `genesisBatchCommitment == 1`.
 3. `DiamondInit.initialize(chainId, admin)` is delegatecalled from the proxy constructor, so
    `msg.sender` is the CTM. It reads `currentRelease`, installs that release's self-described routing via
    `ReleaseFacetReader`, and takes the verifier from the release.
-4. The CTM runs `IAdmin.genesisUpgrade` with the release's `fixedForceDeploymentsData` and genesis
-   upgrade address.
+4. The CTM runs `IAdmin.genesisUpgrade`, which delegatecalls the release's pinned genesis engine.
+   The engine takes no arguments: it reads the chain context out of the storage `DiamondInit` just
+   wrote and the force deployments out of the release its CTM pins, and composes the L2 genesis
+   transaction from those. That transaction is the release's initialization edge — the same
+   envelope a registry-driven upgrade commits, differing only in the call the `L2ComplexUpgrader`
+   performs (`upgrade` into the L2 genesis upgrade, rather than an upgrade's deployment plan), and
+   carrying the same per-chain `ZKChainSpecificForceDeploymentsData` an upgrade composes for that
+   chain. `IL1GenesisUpgrade.genesisUpgradeTx` serves that composition for inspection, the way
+   `IDefaultUpgrade.l2UpgradeTx` does for a transition.
 
 `chainId` and `admin` are the only per-chain inputs; everything else comes from the CTM and the
 release it points at. When a chain migrates between settlement layers, `forwardedBridgeBurn`

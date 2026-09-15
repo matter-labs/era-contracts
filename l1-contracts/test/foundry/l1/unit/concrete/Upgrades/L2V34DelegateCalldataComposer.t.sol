@@ -81,8 +81,9 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
     }
 
     /// @dev For a chain whose base token is not ETH the metadata comes from the token's local
-    ///      bridged representation (`tokenAddress`), not from `originToken`, which may have no
-    ///      code on this layer; the bridging data still describes the token on its origin chain.
+    ///      bridged representation (what the Bridgehub's `baseToken` resolves to), not from
+    ///      `originToken`, which may have no code on this layer; the bridging data still describes
+    ///      the token on its origin chain.
     function test_readsAnERC20BaseTokenFromItsLocalRepresentation() public {
         bytes memory composed = v34Composer.composeDelegateCalldata(
             ICTMRelease(address(release)),
@@ -101,11 +102,34 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
         ZKChainSpecificForceDeploymentsData memory data = abi.decode(chainData, (ZKChainSpecificForceDeploymentsData));
         assertEq(data.baseTokenMetadata.name, ERC20_NAME, "metadata not read from the local token");
         assertEq(data.baseTokenMetadata.symbol, ERC20_SYMBOL, "wrong symbol");
-        assertEq(data.baseTokenMetadata.decimals, ERC20_DECIMALS, "wrong decimals");
-        assertEq(data.baseTokenL1Address, erc20OriginToken, "wrong L1 base token address");
+        assertEq(data.baseTokenMetadata.decimals, COMPOSED_DECIMALS, "wrong decimals");
+        assertEq(data.baseTokenL1Address, address(erc20LocalToken), "wrong L1 base token address");
         assertEq(data.baseTokenBridgingData.originToken, erc20OriginToken, "wrong origin token");
         assertEq(data.baseTokenBridgingData.originChainId, ERC20_ORIGIN_CHAIN_ID, "wrong origin chain");
         assertEq(data.baseTokenBridgingData.assetId, ERC20_BASE_TOKEN_ASSET_ID, "wrong base token asset id");
+    }
+
+    /// @dev A chain whose base token serves no usable metadata — none at all, or Maker-style
+    ///      `bytes32` — is still composable here. Genesis deliberately permits such a base token,
+    ///      and the upgrade path probes it the same tolerant way, so the chain does not become
+    ///      unupgradeable the moment its metadata has to be recomposed.
+    function test_composesForBaseTokensWithoutUsableMetadata() public {
+        assertEq(
+            v34Composer.composeDelegateCalldata(ICTMRelease(address(release)), bridgehub, NO_METADATA_CHAIN_ID),
+            abi.encodeCall(
+                IL2V34Upgrade.upgrade,
+                (ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(NO_METADATA_CHAIN_ID))
+            ),
+            "a token without metadata must compose the defaults"
+        );
+        assertEq(
+            v34Composer.composeDelegateCalldata(ICTMRelease(address(release)), bridgehub, BYTES32_METADATA_CHAIN_ID),
+            abi.encodeCall(
+                IL2V34Upgrade.upgrade,
+                (ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(BYTES32_METADATA_CHAIN_ID))
+            ),
+            "a bytes32-returning token must compose the defaults too"
+        );
     }
 
     /// @dev Nothing is cached in the composer: a different release or a Bridgehub naming another
