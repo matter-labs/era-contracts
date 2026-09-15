@@ -625,8 +625,8 @@ pub(crate) async fn verify(
             "  {} declared external action(s) — the calls no object describes, for review:",
             package.external_actions.len()
         ));
-        for line in &package.external_actions {
-            result.print_info(&format!("    · {line}"));
+        for action in &package.external_actions {
+            result.print_info(&format!("    · {}", action.describe()));
         }
     }
 

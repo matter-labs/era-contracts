@@ -74,8 +74,8 @@ On one anvil fork of L1, in this order:
    order, followed by the merger's own appends (PUH wiring and CTM `acceptOwnership` normalization
    in stage 0, the new-Gateway bundle in stage 2). The layout is documented on that function.
    The merge composes nothing and refuses a bundle whose calls are not all either the compose
-   step's stage call or a declared external action (`check_bundle_provenance`,
-   `check_operation_bundle`).
+   step's stage call or a declared external action — matched by identity, target, value and
+   calldata alike, not by headcount (`check_bundle_provenance`, `check_operation_bundle`).
 
 Every prepare deployment rides the CREATE2 factory; the deployer's Safe bundles and `manifest.json`
 land under `--out` (default `upgrade-envs/<version>/output/<env>/protocol-ops/prepare/`).
@@ -85,9 +85,10 @@ land under `--out` (default `upgrade-envs/<version>/output/<env>/protocol-ops/pr
 The reviewable content is the objects, not the calldata. For each object in `[registry]`, read the
 manifest (`getManifest()`) and compare `manifestHash()` with the audited manifest; the executors
 enforce type provenance (codehash) and the objects enforce their pins at execution. Then read
-`external_actions`: every line is a call the objects do not describe, with its phase, label,
-target, selector and the authority that performs it. A registry-driven upgrade has none beyond
-the merger's appends; the bootstrap edge declares its whole one-time edge this way.
+`external_actions`: one `[[external_actions]]` entry per call the objects do not describe,
+carrying the call itself (`target`, `value`, `data`) beside its `phase`, `label` and the
+`authority` that performs it. A registry-driven upgrade has none beyond the merger's appends; the
+bootstrap edge declares its whole one-time edge this way.
 
 ## 4. Verify
 

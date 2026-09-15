@@ -191,7 +191,15 @@ contract ServerNotifierRowCallTest is CTMUpgradeExecutorFixture {
 
         Call[] memory calls = harness.prepareDefaultCTMAdminCalls();
         assertEq(calls.length, 1, "the section carries the rendered call");
-        assertEq(harness.externalActionDescriptions().length, 1, "the swap is declared as an external action");
+
+        // The declared action carries the call itself, not a rendering of it: that identity is
+        // what the merge holds an emitted bundle to.
+        string[] memory declared = harness.externalActionEntries();
+        assertEq(declared.length, 1, "the swap is declared as an external action");
+        assertEq(vm.parseJsonString(declared[0], "$.phase"), "admin", "declared as an admin action");
+        assertEq(vm.parseJsonAddress(declared[0], "$.target"), calls[0].target, "declared target");
+        assertEq(vm.parseJsonBytes(declared[0], "$.data"), calls[0].data, "declared calldata");
+        assertEq(vm.parseJsonString(declared[0], "$.value"), "0", "declared value");
 
         string memory toml = vm.readFile(outputPath);
         assertEq(toml.readAddress("$.ctm_admin_calls.chain_admin"), address(chainAdmin), "the row's administrator");
@@ -209,7 +217,7 @@ contract ServerNotifierRowCallTest is CTMUpgradeExecutorFixture {
 
         Call[] memory calls = harness.prepareDefaultCTMAdminCalls();
         assertEq(calls.length, 0, "no call");
-        assertEq(harness.externalActionDescriptions().length, 0, "no declared action");
+        assertEq(harness.externalActionEntries().length, 0, "no declared action");
 
         string memory toml = vm.readFile(outputPath);
         assertEq(

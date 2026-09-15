@@ -33,6 +33,7 @@ use serde::{Deserialize, Serialize};
 use crate::commands::ecosystem::upgrade_full::UpgradeFull;
 use crate::commands::ecosystem::upgrade_inner::{CtmInputs, PrepareInputs, UpgradeInner};
 use crate::common::abi::AdminFunctionsAbi;
+use crate::common::external_actions::ExternalAction;
 use crate::common::forge::scripts::{
     ADMIN_FUNCTIONS_INVOCATION, COMPOSE_OPERATION_SCRIPT_PATH, CORE_UPGRADE_SCRIPT_PATH,
     CTM_UPGRADE_SCRIPT_PATH, UPGRADE_CORE_OUTPUT_PATH, UPGRADE_LOCAL_INPUT_PATH,
@@ -203,9 +204,9 @@ struct EcosystemUpgradeOutput {
 }
 
 /// A governance call the merger appends that no prepare script emitted (the PUH/Guardians
-/// wiring, the CTM `acceptOwnership()` normalization, the new-Gateway bring-up). Listed in the
-/// merged TOML's `external_actions` exactly like the scripts' own declarations, so the merged
-/// bundles never carry a call the artifact does not name.
+/// wiring, the CTM `acceptOwnership()` normalization, the new-Gateway bring-up). Declared in the
+/// merged TOML's `external_actions` exactly like the scripts' own, so the merged bundles never
+/// carry a call the artifact does not name.
 #[derive(Debug, Clone)]
 pub(super) struct ExtraGovernanceCall {
     pub label: &'static str,
@@ -223,31 +224,16 @@ alloy::sol! {
     }
 }
 
-/// `phase N | label | target 0x… | selector 0x… | authority: …` — the line format
-/// `ExternalActionsLib.describe` emits on the Solidity side.
-fn describe_external_action(
-    phase: &str,
-    label: &str,
-    authority: &str,
-    call: &crate::common::governance_calls::GovernanceCall,
-) -> String {
-    let selector_len = call.data.len().min(4);
-    format!(
-        "phase {phase} | {label} | target {:#x} | selector 0x{} | authority: {authority}",
-        call.target,
-        hex::encode(&call.data[..selector_len])
-    )
-}
-
-/// Whether `call` is one of the three `CTMUpgradeExecutor.stageN(transition)` calls on `executor`.
-/// The provenance invariant of one prepare output: every call of every stage bundle is one of
-/// the `external_actions` the script declared for that phase. A script that composes a call
-/// without declaring it fails the merge instead of shipping it. The lifecycle calls themselves
-/// come from the compose step, checked by `check_operation_bundle`.
+/// The provenance invariant of one prepare output: every call of every stage bundle IS one of the
+/// `external_actions` the script declared for that phase — same target, same value, same calldata
+/// — and every declared action for that phase appears in it. A script that composes a call it
+/// never declared fails the merge instead of shipping it; so does one that declares an action it
+/// then omits. The lifecycle calls themselves come from the compose step, whose bundle
+/// `check_operation_bundle` pins exactly.
 fn check_bundle_provenance(
     source: &str,
     gov: &GovernanceCalls,
-    declared: &[String],
+    declared: &[ExternalAction],
 ) -> anyhow::Result<()> {
     use crate::common::governance_calls::decode_calls;
     let stages = [
@@ -258,14 +244,33 @@ fn check_bundle_provenance(
     for (phase, hex_calls) in stages {
         let calls = decode_calls(hex_calls)
             .with_context(|| format!("{source}: decode stage {phase} calls"))?;
-        let prefix = format!("phase {phase} |");
-        let declared_calls = declared.iter().filter(|l| l.starts_with(&prefix)).count();
-        if calls.len() != declared_calls {
+        let for_phase: Vec<&ExternalAction> =
+            declared.iter().filter(|a| a.phase == phase).collect();
+        // Matched one-for-one rather than by set membership, so a bundle cannot carry a declared
+        // call twice over while a second declaration goes unemitted.
+        let mut claimed = vec![false; for_phase.len()];
+        for call in &calls {
+            let matched = for_phase
+                .iter()
+                .enumerate()
+                .position(|(i, action)| !claimed[i] && action.is_call(call));
+            match matched {
+                Some(i) => claimed[i] = true,
+                None => anyhow::bail!(
+                    "{source}: stage {phase} carries a call no declared external action accounts \
+                     for — target {:#x}, value {}, selector 0x{}. Every emitted call must be a \
+                     declared action (see ExternalActionsLib); the lifecycle calls come from the \
+                     compose step",
+                    call.target,
+                    call.value,
+                    hex::encode(&call.data[..call.data.len().min(4)])
+                ),
+            }
+        }
+        if let Some(i) = claimed.iter().position(|c| !c) {
             anyhow::bail!(
-                "{source}: stage {phase} carries {} call(s) but only {declared_calls} declared external \
-                 action(s) account for them — every emitted call must be a declared action (see \
-                 ExternalActionsLib); the lifecycle calls come from the compose step",
-                calls.len()
+                "{source}: stage {phase} declares an external action it never emits — {}",
+                for_phase[i].describe()
             );
         }
     }
@@ -1018,14 +1023,18 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 /// The merger COMPOSES nothing: each stage bundle is the prepare scripts' bundles copied in
 /// source order (core, then the CTM), followed by the appends. Every call is accounted for —
 /// a registry-driven prepare emits exactly `CTMUpgradeExecutor.stageN(transition)`, and anything
-/// else (a script's declared external action, or one of the appends) is listed in
+/// else (a script's declared external action, or one of the appends) is declared in
 /// `external_actions`; a bundle carrying a call the artifact does not name fails the merge
 /// (`check_bundle_provenance`). Shape:
 ///
 /// ```toml
-/// external_actions = [            # every governance/admin call that is NOT a coordinator stage call
-///   "phase 0 | <label> | target 0x… | selector 0x… | authority: …",
-/// ]
+/// [[external_actions]]            # every governance/admin call that is NOT a coordinator stage
+/// phase = "0"                     # call, carrying the call itself (see `common::external_actions`)
+/// label = "…"
+/// authority = "…"
+/// target = "0x…"
+/// value = "0"
+/// data = "0x…"
 ///
 /// [governance_calls]              # merged stage 0/1/2 hex: core actions, then the coordinator's
 /// stage0_calls = "0x..."         # stageN(operation) (registry-driven upgrades only), then each
@@ -1084,8 +1093,8 @@ fn write_merged_ecosystem_toml(
         body: Table,
         gov: GovernanceCalls,
         test_calls: Option<TestUpgradeCalls>,
-        /// The script's `external_actions` lines (see `ExternalActionsLib.describe`).
-        external_actions: Vec<String>,
+        /// The script's declared `external_actions` (see `ExternalActionsLib.serialize`).
+        external_actions: Vec<ExternalAction>,
     }
     fn load_and_split(path: &Path) -> anyhow::Result<PrepareOutput> {
         let raw = fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
@@ -1105,7 +1114,7 @@ fn write_merged_ecosystem_toml(
                     .with_context(|| format!("invalid [test_upgrade_calls] in {}", path.display()))
             })
             .transpose()?;
-        let external_actions: Vec<String> = value
+        let external_actions: Vec<ExternalAction> = value
             .remove("external_actions")
             .map(|v| {
                 v.try_into()
@@ -1220,7 +1229,7 @@ fn write_merged_ecosystem_toml(
         external_actions.extend(
             extra_stage0
                 .iter()
-                .map(|e| describe_external_action("0", e.label, e.authority, &e.call)),
+                .map(|e| ExternalAction::for_stage(0, e.label, e.authority, &e.call)),
         );
     }
 
@@ -1259,8 +1268,8 @@ fn write_merged_ecosystem_toml(
                     })?
                     .iter()
                     .map(|call| {
-                        describe_external_action(
-                            "2",
+                        ExternalAction::for_stage(
+                            2,
                             "new-Gateway bring-up (GatewayVotePreparation)",
                             "protocol governance",
                             call,
@@ -1299,7 +1308,7 @@ fn write_merged_ecosystem_toml(
     let mut doc = Table::new();
     doc.insert(
         "external_actions".into(),
-        Value::Array(external_actions.into_iter().map(Value::String).collect()),
+        Value::try_from(&external_actions).context("serialize the merged external actions")?,
     );
     doc.insert(
         "governance_calls".into(),
@@ -1450,4 +1459,79 @@ fn load_ctm_config(path: &Path) -> anyhow::Result<Vec<CtmInputs>> {
         .collect();
 
     Ok(ctms)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::common::governance_calls::{encode_calls, GovernanceCall};
+    use alloy::primitives::U256;
+
+    fn call(target: u8, data: &[u8]) -> GovernanceCall {
+        GovernanceCall {
+            target: Address::repeat_byte(target),
+            value: U256::ZERO,
+            data: data.to_vec(),
+        }
+    }
+
+    fn stage_hex(calls: &[GovernanceCall]) -> String {
+        format!("0x{}", hex::encode(encode_calls(calls)))
+    }
+
+    fn gov(stage0: &[GovernanceCall]) -> GovernanceCalls {
+        GovernanceCalls {
+            stage0_calls: stage_hex(stage0),
+            stage1_calls: stage_hex(&[]),
+            stage2_calls: stage_hex(&[]),
+        }
+    }
+
+    #[test]
+    fn a_bundle_of_exactly_the_declared_actions_passes() {
+        let emitted = [call(0x11, &[0xaa]), call(0x22, &[0xbb])];
+        let declared: Vec<ExternalAction> = emitted
+            .iter()
+            .map(|c| ExternalAction::for_stage(0, "l", "a", c))
+            .collect();
+        check_bundle_provenance("t", &gov(&emitted), &declared).expect("identical bundle");
+    }
+
+    /// The defect a headcount cannot see: the script declares one action and emits a different
+    /// call, in equal numbers.
+    #[test]
+    fn a_substituted_call_fails_even_at_the_declared_count() {
+        let declared = vec![ExternalAction::for_stage(0, "l", "a", &call(0x11, &[0xaa]))];
+        let err = check_bundle_provenance("t", &gov(&[call(0x11, &[0xbb])]), &declared)
+            .expect_err("substituted calldata must fail");
+        assert!(
+            err.to_string().contains("no declared external action"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn a_declared_action_that_is_never_emitted_fails() {
+        let declared = vec![ExternalAction::for_stage(0, "l", "a", &call(0x11, &[0xaa]))];
+        let err = check_bundle_provenance("t", &gov(&[]), &declared)
+            .expect_err("an unemitted declaration must fail");
+        assert!(
+            err.to_string().contains("never emits"),
+            "unexpected error: {err}"
+        );
+    }
+
+    /// Actions of another phase do not account for a stage's calls — an `admin` action least of
+    /// all, since it rides no governance bundle.
+    #[test]
+    fn another_phases_action_does_not_account_for_a_stage_call() {
+        let emitted = [call(0x11, &[0xaa])];
+        let mut declared = ExternalAction::for_stage(0, "l", "a", &emitted[0]);
+        declared.phase = "admin".to_string();
+        check_bundle_provenance("t", &gov(&emitted), std::slice::from_ref(&declared))
+            .expect_err("an admin declaration cannot cover a stage-0 call");
+        declared.phase = "1".to_string();
+        check_bundle_provenance("t", &gov(&emitted), &[declared])
+            .expect_err("a stage-1 declaration cannot cover a stage-0 call");
+    }
 }

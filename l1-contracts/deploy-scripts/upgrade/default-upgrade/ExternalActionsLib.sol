@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Strings} from "@openzeppelin/contracts-v4/utils/Strings.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 
@@ -22,6 +22,9 @@ struct ExternalAction {
 ///         pipelines emit exactly the executor calls; everything else a version script adds goes
 ///         through {declare}, which is what makes the emitted bundles auditable call by call.
 library ExternalActionsLib {
+    address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
+    Vm internal constant vm = Vm(VM_ADDRESS);
+
     string internal constant PHASE_STAGE_0 = "0";
     string internal constant PHASE_STAGE_1 = "1";
     string internal constant PHASE_STAGE_2 = "2";
@@ -60,25 +63,31 @@ library ExternalActionsLib {
         }
     }
 
-    /// @notice One human-readable line per declared action, for the prepare output's
-    ///         `external_actions` list: `phase | label | target | selector | authority`.
-    function describe(Ledger storage _ledger) internal view returns (string[] memory lines) {
+    /// @notice The ledger as the prepare output's `external_actions` list: one TOML table per
+    ///         declared action carrying the call itself — `target`, `value`, `data` — beside its
+    ///         `phase`, `label` and `authority`.
+    /// @dev Emitted from the same ledger {callsForPhase} builds the stage bundles from, which is
+    ///      what lets `protocol-ops` hold a prepare output to an identity rather than a headcount:
+    ///      every call of stage N must BE one of phase N's declared actions, target, value and
+    ///      calldata alike (`check_bundle_provenance`). A prepare that composes a call it never
+    ///      declared therefore fails the merge instead of shipping. Reviewer-facing one-line
+    ///      renderings are produced where the list is displayed, from these same fields.
+    /// @return entries One JSON object per action, in declaration order, for
+    ///         `vm.serializeString(..., string[])` to nest as an array of tables.
+    function serialize(Ledger storage _ledger) internal returns (string[] memory entries) {
         uint256 total = _ledger.actions.length;
-        lines = new string[](total);
+        entries = new string[](total);
         for (uint256 i = 0; i < total; ++i) {
             ExternalAction storage action = _ledger.actions[i];
-            lines[i] = string.concat(
-                "phase ",
-                action.phase,
-                " | ",
-                action.label,
-                " | target ",
-                Strings.toHexString(action.call.target),
-                " | selector ",
-                Strings.toHexString(uint256(uint32(bytes4(action.call.data))), 4),
-                " | authority: ",
-                action.authority
-            );
+            string memory key = string.concat("external_action_", vm.toString(i));
+            vm.serializeString(key, "phase", action.phase);
+            vm.serializeString(key, "label", action.label);
+            vm.serializeString(key, "authority", action.authority);
+            vm.serializeAddress(key, "target", action.call.target);
+            // Decimal string rather than a TOML integer: the field is a uint256 and a TOML
+            // integer is signed 64-bit.
+            vm.serializeString(key, "value", vm.toString(action.call.value));
+            entries[i] = vm.serializeBytes(key, "data", action.call.data);
         }
     }
 
