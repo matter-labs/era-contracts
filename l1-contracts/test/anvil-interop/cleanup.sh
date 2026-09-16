@@ -16,7 +16,6 @@ echo "🧹 Cleaning up Anvil interop environment..."
 # Read chain ports from anvil-config.json (single source of truth)
 PORT_OFFSET="${ANVIL_INTEROP_PORT_OFFSET:-0}"
 RUN_SUFFIX="${ANVIL_INTEROP_RUN_SUFFIX:-}"
-PID_FILE="outputs/anvil-pids${RUN_SUFFIX}.json"
 STATE_DIR="outputs/state${RUN_SUFFIX}"
 BASE_PORTS=$(node -e "const c=require('./config/anvil-config.json');console.log(c.chains.map(ch=>ch.port).join(' '))" 2>/dev/null || echo "9545 4050 4051 4052 4053 4054")
 ANVIL_PORTS=""
@@ -27,7 +26,7 @@ done
 # Stop all Anvil instances - try graceful shutdown first using PIDs
 echo "Stopping Anvil instances..."
 
-# Use current listeners; PID files can outlive their processes and contain recycled PIDs.
+# Use current listeners so cleanup targets only the configured ports.
 for PORT in $ANVIL_PORTS; do
     PID=$(lsof -ti :$PORT -sTCP:LISTEN 2>/dev/null || true)
     if [ -n "$PID" ]; then
@@ -36,7 +35,6 @@ for PORT in $ANVIL_PORTS; do
     fi
 done
 sleep 2
-rm -f "$PID_FILE"
 
 # Fallback: Kill processes LISTENING on known Anvil ports only (not system-wide)
 # -sTCP:LISTEN ensures we only kill Anvil server processes, not Node.js clients

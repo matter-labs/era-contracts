@@ -59,7 +59,7 @@ interface StorageAccountPolicies {
 }
 
 // Resolve deployment-specific MessageRoot and chain-diamond addresses by role. Only MessageRoot is
-// skipped wholesale; diamonds use the deterministic projection in isComparableDiamondSlot().
+// skipped wholesale; diamonds ignore only the explicitly derived volatile slots below.
 function collectStorageAccountPolicies(versionDir: string): StorageAccountPolicies {
   const skip = new Set(BLOCK_INDEXED_STORAGE_ACCOUNTS);
   const diamonds = new Set<string>();
@@ -77,46 +77,57 @@ function collectStorageAccountPolicies(versionDir: string): StorageAccountPolici
   return { skip, diamonds };
 }
 
-const ZK_CHAIN_FIXED_SLOT_COUNT = 69n;
+const PRIORITY_TREE_START_INDEX_SLOT = 51n;
+const PRIORITY_TREE_NEXT_LEAF_INDEX_SLOT = 54n;
+const PRIORITY_TREE_SIDES_LENGTH_SLOT = 55n;
+const PRIORITY_OPS_REQUEST_TIMESTAMP_MAPPING_SLOT = 65n;
 const LAST_TOKEN_MULTIPLIER_UPDATE_TIMESTAMP_SLOT = 67n;
-const GENESIS_STORED_BATCH_HASH_SLOT = "0xe710864318d4a32f37d6ce54cb3fadbef648dd12d8dbdf53973564d56b7f881c";
-const DIAMOND_STORAGE_POSITION = BigInt("0xc8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b");
-const DIAMOND_FACETS_LENGTH_SLOT = DIAMOND_STORAGE_POSITION + 2n;
-const DIAMOND_FROZEN_SLOT = DIAMOND_STORAGE_POSITION + 3n;
-const DIAMOND_FACETS_ARRAY_START = BigInt("0xc0d727610ea16241eff4447d08bb1b4595f7d2ec4515282437a13b7d0df4b922");
+
+function slotKey(slot: bigint): string {
+  return `0x${slot.toString(16).padStart(64, "0")}`;
+}
 
 function storageWord(storage: Record<string, string>, slot: bigint): bigint {
   const key = `0x${slot.toString(16).padStart(64, "0")}`;
   return BigInt(storage[key] ?? "0x0");
 }
 
-// Priority-operation timestamps, historical roots and Merkle-tree sides depend on interval-mining
-// progress and gas-sensitive priority transactions. The fixed layout still covers protocol/config
-// state and the tree's indices, sizes and array lengths. Facet membership and the genesis batch hash
-// are deterministic and are compared as well.
-function isComparableDiamondSlot(
-  slot: string,
+// Priority-operation timestamps and Merkle-tree sides depend on interval-mining progress and
+// gas-sensitive priority transactions. Derive only those storage locations from the fixed-layout
+// tree metadata; every other diamond slot is compared by default.
+function ignoredDiamondSlots(
   committedStorage: Record<string, string>,
   generatedStorage: Record<string, string>
-): boolean {
-  let slotNumber: bigint;
-  try {
-    slotNumber = BigInt(slot);
-  } catch {
-    return true;
-  }
+): Set<string> {
+  const ignored = new Set([slotKey(LAST_TOKEN_MULTIPLIER_UPDATE_TIMESTAMP_SLOT)]);
 
-  if (slotNumber < ZK_CHAIN_FIXED_SLOT_COUNT) {
-    return slotNumber !== LAST_TOKEN_MULTIPLIER_UPDATE_TIMESTAMP_SLOT;
-  }
-  if (slot === GENESIS_STORED_BATCH_HASH_SLOT) return true;
-  if (slotNumber === DIAMOND_FACETS_LENGTH_SLOT || slotNumber === DIAMOND_FROZEN_SLOT) return true;
-
-  const facetCount = [
-    storageWord(committedStorage, DIAMOND_FACETS_LENGTH_SLOT),
-    storageWord(generatedStorage, DIAMOND_FACETS_LENGTH_SLOT),
+  const sidesLength = [
+    storageWord(committedStorage, PRIORITY_TREE_SIDES_LENGTH_SLOT),
+    storageWord(generatedStorage, PRIORITY_TREE_SIDES_LENGTH_SLOT),
   ].reduce((max, value) => (value > max ? value : max), 0n);
-  return slotNumber >= DIAMOND_FACETS_ARRAY_START && slotNumber < DIAMOND_FACETS_ARRAY_START + facetCount;
+  const sidesStart = BigInt(
+    utils.keccak256(utils.defaultAbiCoder.encode(["uint256"], [PRIORITY_TREE_SIDES_LENGTH_SLOT]))
+  );
+  for (let index = 0n; index < sidesLength; index++) {
+    ignored.add(slotKey(sidesStart + index));
+  }
+
+  for (const storage of [committedStorage, generatedStorage]) {
+    const startIndex = storageWord(storage, PRIORITY_TREE_START_INDEX_SLOT);
+    const nextLeafIndex = storageWord(storage, PRIORITY_TREE_NEXT_LEAF_INDEX_SLOT);
+    for (let index = startIndex; index < startIndex + nextLeafIndex; index++) {
+      ignored.add(
+        utils.keccak256(
+          utils.defaultAbiCoder.encode(
+            ["uint256", "uint256"],
+            [index.toString(), PRIORITY_OPS_REQUEST_TIMESTAMP_MAPPING_SLOT]
+          )
+        )
+      );
+    }
+  }
+
+  return ignored;
 }
 
 // `ChainTypeManager.upgradeCutDataBlock` and `.newChainCreationParamsBlock` (storage indices 166
@@ -255,12 +266,15 @@ function compareChainState(
       const s2 = a2.storage || {};
       if (JSON.stringify(s1) !== JSON.stringify(s2)) {
         const allSlots = [...new Set([...Object.keys(s1), ...Object.keys(s2)])].sort();
+        const ignoredSlots = storagePolicies.diamonds.has(addr.toLowerCase())
+          ? ignoredDiamondSlots(s1, s2)
+          : new Set<string>();
         // Drop the explicitly-listed block-number slots (see above) and tolerate
         // gas-scale drift on the known gas-dependent value slots; everything else
         // must match exactly.
         const diffSlots = allSlots.filter((s) => {
           if (s1[s] === s2[s]) return false;
-          if (storagePolicies.diamonds.has(addr.toLowerCase()) && !isComparableDiamondSlot(s, s1, s2)) return false;
+          if (ignoredSlots.has(s)) return false;
           if (BLOCK_NUMBER_STORAGE_SLOTS.has(s)) return false;
           if (GAS_DEPENDENT_VALUE_SLOTS.has(s) && withinBalanceTolerance(s1[s], s2[s])) return false;
           return true;

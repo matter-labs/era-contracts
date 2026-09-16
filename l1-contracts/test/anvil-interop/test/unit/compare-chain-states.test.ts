@@ -2,6 +2,7 @@ import * as assert from "assert/strict";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
+import { utils } from "ethers";
 import { compareStateDirectories } from "../../compare-chain-states";
 import { createSuite } from "./harness";
 
@@ -60,14 +61,21 @@ test("compares fixed diamond state, including explicit zero writes", () => {
   assert.match(diffs, new RegExp(`slot ${word(58)}`));
 });
 
-test("ignores only the diamond's volatile timestamp and dynamic priority-tree state", () => {
-  const dynamicSlot = word(10_000);
-  const fixedShape = { [word(54)]: word(3), [word(55)]: word(3), [word(56)]: word(3) };
+test("ignores only the diamond's explicitly derived volatile slots", () => {
+  const priorityTimestampSlot = utils.keccak256(utils.defaultAbiCoder.encode(["uint256", "uint256"], [2, 65]));
+  const sidesStart = BigInt(utils.keccak256(utils.defaultAbiCoder.encode(["uint256"], [55])));
+  const fixedShape = { [word(51)]: word(2), [word(54)]: word(1), [word(55)]: word(1) };
   const [committed, generated] = fixturePair(
-    { ...fixedShape, [word(67)]: word(76), [dynamicSlot]: word(1) },
-    { ...fixedShape, [word(67)]: word(88), [dynamicSlot]: word(2) }
+    { ...fixedShape, [word(67)]: word(76), [priorityTimestampSlot]: word(77), [word(sidesStart)]: word(1) },
+    { ...fixedShape, [word(67)]: word(88), [priorityTimestampSlot]: word(89), [word(sidesStart)]: word(2) }
   );
   assert.deepEqual(compareStateDirectories(committed, generated), []);
+});
+
+test("compares unrecognized diamond storage", () => {
+  const unknownSlot = word(10_000);
+  const [committed, generated] = fixturePair({ [unknownSlot]: word(1) }, { [unknownSlot]: word(2) });
+  assert.match(compareStateDirectories(committed, generated).join("\n"), new RegExp(unknownSlot));
 });
 
 test("compares diamond tree shape and facet membership", () => {
