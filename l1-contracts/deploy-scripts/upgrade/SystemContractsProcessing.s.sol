@@ -169,9 +169,13 @@ library SystemContractsProcessing {
     ///      - L2WrappedBaseToken: upgrades must not touch the impl (since v31).
     ///      - L2V34Upgrade: the version-specific delegate is an UNSAFE deployment at a
     ///        bytecode-derived address — constructed from the pinned
-    ///        `AuthoredL2Plan.delegateBytecodeInfo`, never table-derived. That no OTHER unsafe
-    ///        deployment rides along is established by reviewing this table: the pre-registry
-    ///        verifier that used to assert it has been retired.
+    ///        `AuthoredL2Plan.delegateBytecodeInfo`, never table-derived. No OTHER unsafe
+    ///        deployment can ride along, by construction rather than by review: this table's
+    ///        rows are emitted as `ZKsyncOSSystemProxyUpgrade`, and the only producer of an
+    ///        `ZKsyncOSUnsafeForceDeployment` is `L2PlanLib._unsafeDeployment`, reached solely
+    ///        from `AuthoredL2Plan.delegateBytecodeInfo` and `extraBytecodeInfos` — both pinned
+    ///        manifest fields. The plan is built, not authored, so there is no path by which an
+    ///        unsafe deployment appears without being an explicit, reviewed manifest entry.
     function buildL2BytecodeInfoTable() internal returns (bytes[] memory rows) {
         return buildL2BytecodeInfoTable(Utils.getZKOSBytecodeInfoForContract);
     }
