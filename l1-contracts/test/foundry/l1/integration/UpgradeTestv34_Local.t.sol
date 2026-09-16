@@ -278,9 +278,8 @@ contract UpgradeIntegrationTest_v34_Local is
         );
 
         // The genesis release is pinned as `currentRelease` (re-pointed to the release this
-        // prepare run deployed) with the codehash anchor intact.
+        // prepare run deployed).
         assertEq(release, v34.getAddresses().stateTransition.currentRelease, "release must be the pipeline's");
-        assertEq(IChainTypeManager(ctm).releaseCodehash(), release.codehash, "anchor must cover the pinned release");
 
         // New chain created AFTER the edge geneses from the pinned release at the new version.
         assertTrue(_newChainDiamond != address(0), "new chain not registered");

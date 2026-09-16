@@ -39,7 +39,7 @@ contract BootstrapUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         // The migration reads the ecosystem's Bridgehub off its CTM; the stand-in CTM answers with
         // the chain's.
         vm.mockCall(ctmStub, abi.encodeCall(IChainTypeManager.BRIDGE_HUB, ()), abi.encode(mockBridgehub));
-        // A release pins its verifier by codehash, so the one it installs has code.
+        // A release's `validate()` rejects a codeless verifier, so the one it installs has code.
         verifier = _deployedStub("releaseVerifier");
         genesisRelease = _release(_arrivingFacets(), verifier);
         engine = new DummyBootstrapUpgrade();

@@ -117,17 +117,10 @@ contract ReleaseFacetRowsTest is Test {
         rows[1] = GenesisFacet({facet: facetA, isFreezable: false});
 
         address counterfeit = address(
-            new CounterfeitRelease(
-                vm.getDeployedCode("CTMRelease.sol:CTMRelease"),
-                abi.encode(_manifest(rows))
-            )
+            new CounterfeitRelease(vm.getDeployedCode("CTMRelease.sol:CTMRelease"), abi.encode(_manifest(rows)))
         );
         // It is a `CTMRelease` in every way a chain can observe...
-        assertEq(
-            ICTMRelease(counterfeit).genesisFacets().length,
-            2,
-            "the counterfeit must serve the duplicate rows"
-        );
+        assertEq(ICTMRelease(counterfeit).genesisFacets().length, 2, "the counterfeit must serve the duplicate rows");
         // ...and `validate()` still refuses it.
         vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateFacetRow.selector, facetA));
         ICTMRelease(counterfeit).validate();
@@ -155,20 +148,23 @@ contract ReleaseFacetRowsTest is Test {
         vm.mockCall(chain, abi.encodeCall(IGetters.facets, ()), abi.encode(_live));
         uint256 length = _live.length;
         for (uint256 i = 0; i < length; ++i) {
-            vm.mockCall(
-                chain,
-                abi.encodeCall(IGetters.isFacetFreezable, (_live[i].addr)),
-                abi.encode(false)
-            );
+            vm.mockCall(chain, abi.encodeCall(IGetters.isFacetFreezable, (_live[i].addr)), abi.encode(false));
         }
+    }
+
+    /// @dev `validate()` checks member code BEFORE the row check, so a manifest exercising the
+    ///      row check must name members that are deployed.
+    function _stub(string memory _name) internal returns (address addr) {
+        addr = makeAddr(_name);
+        vm.etch(addr, bytes.concat(hex"00", bytes(_name)));
     }
 
     function _manifest(GenesisFacet[] memory _rows) internal returns (ReleaseManifest memory) {
         return
             ReleaseManifest({
-                diamondInit: makeAddr("diamondInit"),
-                verifier: makeAddr("verifier"),
-                genesisUpgrade: makeAddr("genesisUpgrade"),
+                diamondInit: _stub("diamondInit"),
+                verifier: _stub("verifier"),
+                genesisUpgrade: _stub("genesisUpgrade"),
                 genesisFacets: _rows,
                 genesis: ReleaseGenesisData({
                     fixedForceDeploymentsData: hex"f1",

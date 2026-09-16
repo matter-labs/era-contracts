@@ -25,7 +25,7 @@ contract CTMRelease is ICTMRelease {
     ///      cannot copy a struct ARRAY from memory to storage — which is exactly the second,
     ///      drift-prone copy of the shape this object is supposed to BE. One blob, one
     ///      assignment, and `manifestHash` is its hash by construction.
-    bytes public encodedManifest;
+    bytes internal encodedManifest;
 
     /// @notice Pins the full manifest. There is NO state-mutating function on this contract: the
     ///         manifest is written once, at construction, so write-once is structural rather than a

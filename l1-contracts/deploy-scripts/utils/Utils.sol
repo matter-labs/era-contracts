@@ -344,8 +344,7 @@ library Utils {
         bytes memory _creationCode,
         bytes memory _constructorArgs
     ) internal view returns (address) {
-        return
-            getL2AddressViaDeterministicCreate2(_salt, abi.encodePacked(_creationCode, _constructorArgs));
+        return getL2AddressViaDeterministicCreate2(_salt, abi.encodePacked(_creationCode, _constructorArgs));
     }
 
     /// @notice Deploys an L2 contract from L1 through the deterministic CREATE2 factory.

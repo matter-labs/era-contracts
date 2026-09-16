@@ -3,7 +3,6 @@
 pragma solidity 0.8.28;
 
 import {ChainTypeManagerTest} from "../../state-transition/ChainTypeManager/_ChainTypeManager_Shared.t.sol";
-import {Utils} from "../../Utils/Utils.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";

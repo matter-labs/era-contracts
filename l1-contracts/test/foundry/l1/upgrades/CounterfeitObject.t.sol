@@ -82,14 +82,14 @@ contract CounterfeitObjectTest is RegistryObjectsFixture {
         _setUpRegistryObjects(hex"");
         _ensureDeterministicFactory();
 
-        departingRelease = _release(_departingFacets(), makeAddr("departingVerifier"));
-        arrivingRelease = _release(_arrivingFacets(), makeAddr("arrivingVerifier"));
+        departingRelease = _release(_departingFacets(), _deployedStub("departingVerifier"));
+        arrivingRelease = _release(_arrivingFacets(), _deployedStub("arrivingVerifier"));
         approvedManifest = TransitionManifest({
             oldProtocolVersion: OLD_VERSION,
             newProtocolVersion: NEW_VERSION,
             fromRelease: address(departingRelease),
             newRelease: address(arrivingRelease),
-            upgradeEngine: makeAddr("upgradeEngine"),
+            upgradeEngine: _deployedStub("upgradeEngine"),
             oldProtocolVersionDeadline: type(uint256).max,
             upgradeTimestamp: 0,
             l2Plan: _emptyPlan()
@@ -204,7 +204,7 @@ contract CounterfeitObjectTest is RegistryObjectsFixture {
     }
 
     function _attackerFacet() internal returns (address) {
-        return makeAddr("attackerFacet");
+        return _deployedStub("attackerFacet");
     }
 
     /// @dev The counterfeit's own CREATE2 deployment — through the same factory, under the same

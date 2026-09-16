@@ -217,10 +217,7 @@ library GatewayCTMDeployerHelper {
         (directAddresses, directCalldata) = _calculateDirectDeployments(_create2Salt, config, im.daResult);
         directAddresses.verifier = im.verifiersResult.verifier;
         // Last, because the manifest it commits to names every facet AND the verifier.
-        (
-            directAddresses.currentRelease,
-            directCalldata.currentReleaseCalldata
-        ) = _calculateBootstrapRelease(
+        (directAddresses.currentRelease, directCalldata.currentReleaseCalldata) = _calculateBootstrapRelease(
             _create2Salt,
             config,
             directAddresses,

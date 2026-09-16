@@ -62,10 +62,7 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
     /// @notice Emitted when governance abandons the pending operation.
     event OperationAbandoned(address indexed operation, UpgradeStage stage);
 
-    constructor(
-        address _initialOwner,
-        CoreUpgradeExecutor _coreExecutor
-    ) UpgradeExecutorBase(_initialOwner) {
+    constructor(address _initialOwner, CoreUpgradeExecutor _coreExecutor) UpgradeExecutorBase(_initialOwner) {
         if (address(_coreExecutor) == address(0)) {
             revert ZeroAddress();
         }

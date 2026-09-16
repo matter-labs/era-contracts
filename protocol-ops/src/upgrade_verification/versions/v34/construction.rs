@@ -99,6 +99,23 @@ impl ReviewedBuild {
         Self { loaded }
     }
 
+    /// A build holding exactly the given creation code, for tests that drive the reporting path
+    /// without a compiled repository on disk.
+    #[cfg(test)]
+    pub(crate) fn from_parts(entries: &[(&'static str, &'static str, Vec<u8>)]) -> Self {
+        let mut loaded = HashMap::new();
+        for (file, short_name, code) in entries {
+            loaded.insert(
+                *short_name,
+                Ok(ReviewedCreationCode {
+                    artifact_file: file,
+                    code: Bytes::from(code.clone()),
+                }),
+            );
+        }
+        Self { loaded }
+    }
+
     /// The reviewed creation code for `short_name`, or the reason it is unavailable.
     pub(crate) fn get(&self, short_name: &str) -> Result<&ReviewedCreationCode, &str> {
         match self.loaded.get(short_name) {
@@ -367,5 +384,80 @@ mod tests {
             classify_construction(address, &creation_code(), &args(), &[]),
             ConstructionVerdict::NoSalt
         );
+    }
+
+    fn reviewed_build() -> ReviewedBuild {
+        ReviewedBuild::from_parts(&[("CTMTransition.sol", "CTMTransition", creation_code())])
+    }
+
+    /// The verdicts above decide nothing on their own — what fails a verification run is the
+    /// REPORTING path. These drive it end to end, so a classifier that said "not canonical"
+    /// while the run still passed would be caught.
+    #[test]
+    fn the_reporting_path_fails_the_run_for_a_counterfeit() {
+        let counterfeit =
+            canonical_create2_address(SALT_A, b"initcode of the attacker's choosing", &args());
+        let mut result = VerificationResult::default();
+        let verified = expect_canonical_construction(
+            &reviewed_build(),
+            &mut result,
+            "the transition",
+            counterfeit,
+            "CTMTransition",
+            &args(),
+            &[SALT_A],
+        );
+        assert!(!verified);
+        assert_eq!(result.errors, 1, "a counterfeit must fail the run");
+        assert!(result.ensure_success().is_err());
+    }
+
+    #[test]
+    fn the_reporting_path_passes_a_genuine_object() {
+        let genuine = canonical_create2_address(SALT_A, &creation_code(), &args());
+        let mut result = VerificationResult::default();
+        assert!(expect_canonical_construction(
+            &reviewed_build(),
+            &mut result,
+            "the transition",
+            genuine,
+            "CTMTransition",
+            &args(),
+            &[SALT_A],
+        ));
+        assert_eq!(result.errors, 0);
+    }
+
+    /// "Could not be checked" must fail the run too, or a reviewer who never ran the check would
+    /// read the same clean report as one who ran it and passed.
+    #[test]
+    fn an_unloadable_object_type_fails_the_run() {
+        let mut result = VerificationResult::default();
+        assert!(!expect_canonical_construction(
+            &reviewed_build(),
+            &mut result,
+            "the core registry",
+            Address::repeat_byte(0x99),
+            "CoreRegistry",
+            &args(),
+            &[SALT_A],
+        ));
+        assert_eq!(result.errors, 1);
+    }
+
+    #[test]
+    fn a_missing_salt_fails_the_run() {
+        let genuine = canonical_create2_address(SALT_A, &creation_code(), &args());
+        let mut result = VerificationResult::default();
+        assert!(!expect_canonical_construction(
+            &reviewed_build(),
+            &mut result,
+            "the transition",
+            genuine,
+            "CTMTransition",
+            &args(),
+            &[],
+        ));
+        assert_eq!(result.errors, 1);
     }
 }

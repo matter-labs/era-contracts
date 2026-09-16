@@ -38,6 +38,7 @@ import {
     MalformedL2UpgradePlan,
     PatchCannotCarryL2Upgrade,
     PatchChangesL2GenesisState,
+    RegistryDuplicateFacetRow,
     RegistryDuplicateProxyRow,
     RegistryDuplicateSelector,
     RegistryEmptySelectors,
@@ -86,7 +87,7 @@ contract StorageRegistriesTest is Test {
 
     address internal diamondInit;
 
-    // Pinned synthetic contracts (etched with distinct bytecode so codehash pins are real).
+    // Pinned synthetic contracts (etched with distinct bytecode so each is a real deployed member).
     address internal facetOldAdmin; // replaced by the hop
     address internal facetNewAdmin; // its replacement (different selectors)
     address internal facetShared; // carried over unchanged
@@ -516,21 +517,20 @@ contract StorageRegistriesTest is Test {
         new CTMTransition(manifest);
     }
 
-    /// @dev The release does NOT own the routing concept: a split-row (same facet twice) release
-    ///      constructs — routing well-formedness is enforced where routing executes. Here: the
-    ///      transition deriving toward it rejects the duplicated selectors (`TransitionDerivationLib`),
-    ///      BEFORE anything is committed. (Genesis would equally revert in `Diamond.diamondCut`.)
-    function test_revertWhen_transitionDerivesTowardSplitRowRelease() public {
+    /// @dev A split-row release (the same facet address in two rows) is now refused by the release
+    ///      itself, at construction — so no transition can ever be derived toward one. Retargeted
+    ///      from the derivation-time `RegistryDuplicateSelector` this used to trip: the check moved
+    ///      earlier, it did not go away. `ReleaseFacetRows.t.sol` carries the rest of it (the same
+    ///      refusal from `validate()`, on an object whose constructor never ran the check); the
+    ///      derivation-time selector check is still exercised by the collision test below, which
+    ///      uses a DISTINCT facet carrying an already-routed selector.
+    function test_revertWhen_releaseSplitsOneFacetAcrossTwoRows() public {
         ReleaseManifest memory manifest = _newReleaseManifest();
-        // Same facet address in two rows: its selectors appear twice in the release's routing.
+        // Same facet address in two rows: its selectors would appear twice in the routing.
         manifest.genesisFacets[2].facet = facetShared;
-        CTMRelease splitRowRelease = new CTMRelease(manifest);
 
-        TransitionManifest memory transitionManifest = _transitionManifest();
-        transitionManifest.newRelease = address(splitRowRelease);
-
-        vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateSelector.selector, bytes4(uint32(0x10))));
-        new CTMTransition(transitionManifest);
+        vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateFacetRow.selector, facetShared));
+        new CTMRelease(manifest);
     }
 
     /// @dev Regression: the transition must enforce the SAME version shape chains enforce at
@@ -1131,14 +1131,14 @@ contract StorageRegistriesTest is Test {
         new CTMTransition(transitionManifest);
     }
 
-    // ─────────────────────────── factory provenance ───────────────────────────
+    // ─────────────────────────── release provenance ───────────────────────────
 
     function test_transitionDefersReleaseProvenanceToCtm() public {
-        // Release PROVENANCE is deliberately NOT a transition concern: a permissionless manifest
-        // could name any object, so the transition only validates each edge's routing and members
-        // and leaves attestation to the CTM's canonical `releaseCodehash` (enforced when the
-        // release becomes `currentRelease` — see the CTM-level provenance test). So a
-        // hand-deployed but VALID release is accepted here and derives a normal delta.
+        // Which release object is genuine is deliberately NOT a transition concern: a
+        // permissionless manifest could name any object, so the transition validates only each
+        // edge's routing and members, and leaves WHICH object is trusted to governance reviewing
+        // the deployed release the CTM is pointed at. So a hand-deployed but VALID release is
+        // accepted here and derives a normal delta.
         CTMRelease handDeployed = new CTMRelease(_newReleaseManifest());
 
         TransitionManifest memory manifest = _transitionManifest();

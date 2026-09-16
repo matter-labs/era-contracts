@@ -21,7 +21,7 @@
  *      bound executors. The cut itself is COMPOSED by the migration from those inputs.
  *   3. `migrate()` runs the whole edge in one transaction: impl swap, legacy
  *      `setNewVersionUpgrade` commit (writing the deprecated `upgradeCutHash` — the ONLY writer
- *      left), release install + anchor, and the authority handover to the executors.
+ *      left), release install, and the authority handover to the executors.
  *   4. Each chain's admin crosses the edge through the legacy 3-arg `upgradeChainFromVersion`,
  *      handing the committed cut — verified against `upgradeCutHash` exactly like production
  *      pre-v34 chains do.

@@ -936,12 +936,7 @@ async function deployUpgradeMachinery(
     // immutable authority targets at construction. Bound to the whole CTM domain: the CTM itself
     // AND its own ProxyAdmin (an operation's infrastructure rows — the CTM impl swap included — apply
     // through it).
-    ctmExecutor: await deploy("CTMUpgradeExecutor", [
-      deployer.address,
-      params.ctm,
-      params.ctmProxyAdmin,
-      coordinator,
-    ]),
+    ctmExecutor: await deploy("CTMUpgradeExecutor", [deployer.address, params.ctm, params.ctmProxyAdmin, coordinator]),
     // Pinned CODE defines the delegate calldata. The mock delegate deliberately has no fallback,
     // so the composed call names its explicit no-op method and a stale selector still fails.
     delegateComposer: await deploy("FixedDelegateCalldataComposer", [

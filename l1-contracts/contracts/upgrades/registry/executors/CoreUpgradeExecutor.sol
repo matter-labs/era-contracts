@@ -61,10 +61,7 @@ contract CoreUpgradeExecutor is UpgradeExecutorBase {
         _;
     }
 
-    constructor(
-        address _initialOwner,
-        ProxyAdmin _proxyAdmin
-    ) UpgradeExecutorBase(_initialOwner) {
+    constructor(address _initialOwner, ProxyAdmin _proxyAdmin) UpgradeExecutorBase(_initialOwner) {
         if (address(_proxyAdmin) == address(0)) {
             revert ZeroAddress();
         }

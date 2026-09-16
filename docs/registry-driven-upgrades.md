@@ -114,7 +114,7 @@ diff, never a wrong byte in offchain-authored data.
 | `CTMUpgradeComposer`          | the committed cut and the L2 protocol upgrade transaction, from a transition or the bootstrap migration |
 | `L2InventoryLib`, `L2PlanLib` | changed L2 deployments; executable plan construction from bytecode infos                                |
 | `ProxyUpgradeRowLib`          | `toRows`, `applyRows`, `requireRowsApplied` over the enum-indexed inventories                           |
-| `ObjectAnchorLib`             | `requireCode` — a named object or member is deployed at all                                            |
+| `ObjectAnchorLib`             | `requireCode` — a named object or member is deployed at all                                             |
 
 There is no intermediate genesis-manifest type between a build and its `ReleaseManifest`:
 `DeployCTMUtils.deployCurrentRelease` (and `deployAdditionalReleaseFacets`) assembles the

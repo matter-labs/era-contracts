@@ -32,7 +32,6 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {AcceptingVerifier} from "contracts/dev-contracts/test/AcceptingVerifier.sol";
 import {FixedDelegateCalldataComposer} from "contracts/dev-contracts/FixedDelegateCalldataComposer.sol";
-import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {PRIORITY_TX_MAX_GAS_LIMIT, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
@@ -146,16 +145,15 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
         // The coordinator over the ecosystem domain, and the CTM executor constructed answering
         // to it — the shape the v34 bootstrap leaves behind. Pausing its own CTM's migrations
         // needs no registration: the ChainAssetHandler derives that from CTM ownership.
-        coreExecutor = new CoreUpgradeExecutor(governor, new ProxyAdmin(), Utils.coreRegistryCodehash());
-        coordinator = new EcosystemUpgradeExecutor(governor, coreExecutor, Utils.operationCodehash());
+        coreExecutor = new CoreUpgradeExecutor(governor, new ProxyAdmin());
+        coordinator = new EcosystemUpgradeExecutor(governor, coreExecutor);
         vm.prank(governor);
         coreExecutor.setCoordinator(address(coordinator));
         ctmExecutor = new CTMUpgradeExecutor(
             governor,
             IChainTypeManager(address(chainContractAddress)),
             new ProxyAdmin(),
-            address(coordinator),
-            Utils.transitionCodehash()
+            address(coordinator)
         );
 
         vm.prank(governor);
@@ -168,8 +166,8 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
         verifierV32 = address(new AcceptingVerifier());
         verifierV33 = address(new AcceptingVerifier());
         delegateComposer = new FixedDelegateCalldataComposer(DELEGATE_CALLDATA);
-        // The pinned genesisUpgrade must carry real code — the registry's codehash pin rejects a
-        // codeless target — so etch a stand-in and pin its actual codehash below.
+        // The pinned genesisUpgrade must carry real code — a release's `validate()` rejects a
+        // codeless member — so etch a stand-in.
         genesisUpgradeAddr = makeAddr("genesisUpgrade");
         vm.etch(genesisUpgradeAddr, hex"600042");
 
