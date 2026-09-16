@@ -48,7 +48,7 @@ use alloy::providers::Provider;
 use alloy::sol_types::SolValue;
 
 use crate::common::ethereum::get_provider;
-use crate::upgrade_verification::verifiers::VerificationResult;
+use crate::upgrade_verification::report::VerificationResult;
 
 pub(crate) mod construction;
 pub(crate) mod operation;

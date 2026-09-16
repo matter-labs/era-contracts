@@ -31,7 +31,7 @@ use alloy::providers::Provider;
 use alloy::sol_types::{SolCall, SolValue};
 
 use crate::common::governance_calls::GovernanceCall;
-use crate::upgrade_verification::verifiers::VerificationResult;
+use crate::upgrade_verification::report::VerificationResult;
 
 use super::construction::{expect_canonical_construction, ReviewedBuild};
 use super::package::OperationPackage;

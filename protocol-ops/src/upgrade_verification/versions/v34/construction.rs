@@ -41,7 +41,7 @@ use alloy::primitives::{keccak256, Address, Bytes, B256};
 
 use crate::upgrade_verification::constants::ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR;
 use crate::upgrade_verification::paths::repo_relative_path;
-use crate::upgrade_verification::verifiers::VerificationResult;
+use crate::upgrade_verification::report::VerificationResult;
 
 use super::provenance::CodeIdentity;
 

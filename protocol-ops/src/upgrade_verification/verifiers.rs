@@ -4,9 +4,7 @@ use alloy::{
     sol,
     sol_types::SolCall,
 };
-use console::style;
 use serde::Deserialize;
-use std::fmt::{self, Display};
 use std::fs;
 use std::panic::Location;
 
@@ -243,44 +241,15 @@ impl GenesisConfig {
     }
 }
 
-#[derive(Default)]
-pub(crate) struct VerificationResult {
-    pub(crate) result: String,
-    pub(crate) warnings: u64,
-    pub(crate) errors: u64,
-}
+/// Re-exported so the v31 call sites below (and the v31 tree's own `use` statements) keep
+/// naming it here, while the type itself lives in the module the registry verifier depends on.
+pub(crate) use crate::upgrade_verification::report::VerificationResult;
 
+/// The v31 expectations: every one of them takes the [`Verifiers`] context above — the address
+/// book, the bytecode fetcher and the network verifier — so they belong with it and not with the
+/// reporting core. An inherent impl may live in any module of the defining crate, so this needs
+/// no trait and no import at the call sites.
 impl VerificationResult {
-    pub(crate) fn print_info(&self, info: &str) {
-        println!("{}", info);
-    }
-
-    pub(crate) fn report_ok(&self, info: &str) {
-        println!("{} {}", style("[OK]: ").green(), info);
-    }
-
-    pub(crate) fn report_warn(&mut self, warn: &str) {
-        self.warnings += 1;
-        println!("{} {}", style("[WARN]:").yellow(), warn);
-    }
-
-    pub(crate) fn report_error(&mut self, error: &str) {
-        self.errors += 1;
-        println!("{} {}", style("[ERROR]:").red(), error);
-    }
-
-    pub(crate) fn ensure_success(&self) -> anyhow::Result<()> {
-        if self.errors > 0 {
-            anyhow::bail!(
-                "verify-upgrade failed with {} error(s) and {} warning(s)",
-                self.errors,
-                self.warnings
-            );
-        }
-
-        Ok(())
-    }
-
     #[track_caller]
     pub(crate) fn expect_address(
         &mut self,
@@ -486,30 +455,5 @@ impl VerificationResult {
             expected_impl_constructor_params,
             expected_file,
         );
-    }
-}
-
-impl Display for VerificationResult {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.errors > 0 {
-            write!(
-                f,
-                "{} errors: {}, warnings: {} - result: {}",
-                style("ERROR").red(),
-                self.errors,
-                self.warnings,
-                self.result
-            )
-        } else if self.warnings > 0 {
-            write!(
-                f,
-                "{} warnings: {} - result: {}",
-                style("WARN").yellow(),
-                self.warnings,
-                self.result
-            )
-        } else {
-            write!(f, "{} - result: {}", style("OK").green(), self.result)
-        }
     }
 }

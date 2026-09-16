@@ -4,5 +4,6 @@ pub mod constants;
 pub mod contract_hashes;
 pub(crate) mod hex;
 pub mod paths;
+pub(crate) mod report;
 pub(crate) mod verifiers;
 pub mod versions;

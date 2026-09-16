@@ -23,7 +23,7 @@ use std::collections::HashMap;
 use alloy::primitives::{Address, FixedBytes};
 use alloy::providers::Provider;
 
-use crate::upgrade_verification::{contract_hashes::ContractHashes, verifiers::VerificationResult};
+use crate::upgrade_verification::{contract_hashes::ContractHashes, report::VerificationResult};
 
 /// Resolves an eth_call that may revert into a reported error rather than an abort.
 ///

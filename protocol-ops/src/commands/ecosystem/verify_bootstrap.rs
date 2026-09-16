@@ -19,7 +19,7 @@ use clap::Parser;
 
 use crate::{
     common::logger,
-    upgrade_verification::{verifiers::VerificationResult, versions::v34},
+    upgrade_verification::{report::VerificationResult, versions::v34},
 };
 
 #[derive(Debug, Clone, Parser)]
