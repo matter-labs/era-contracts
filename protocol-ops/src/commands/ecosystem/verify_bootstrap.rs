@@ -3,12 +3,13 @@
 //!
 //! Deliberately narrower than `verify-upgrade`: a bootstrap package's reviewable content is
 //! the write-once objects and the authority they land on, so the tool needs the merged prepare
-//! TOML and an L1 RPC — no gateway RPC, no zk-governance commit, and no transaction log, since
-//! provenance is a codehash rather than a CREATE2 history to reconstruct.
+//! TOML and an L1 RPC — no gateway RPC, no zk-governance commit, and no transaction log: an
+//! object's provenance is re-derived from the reviewed creation code and its own manifest
+//! rather than reconstructed from a deployment history.
 
 use std::path::PathBuf;
 
-use alloy::primitives::Address;
+use alloy::primitives::{Address, B256};
 use clap::Parser;
 
 use crate::{
@@ -31,6 +32,15 @@ pub struct VerifyBootstrapArgs {
     /// for any package that will actually be signed.
     #[clap(long)]
     pub expected_governance_owner: Option<Address>,
+
+    /// A reviewed CREATE2 salt, repeatable. Objects are re-derived from the reviewed creation
+    /// code and their own manifests under these salts, which is what proves the audited
+    /// CONSTRUCTOR produced them rather than merely that they run audited runtime code. Take
+    /// them from the upgrade env's `[contracts] create2_factory_salt` and its
+    /// `[create2_factory_salts]` per-CTM entries; packages that record their own are picked up
+    /// automatically and these add to them.
+    #[clap(long = "create2-salt")]
+    pub create2_salts: Vec<B256>,
 }
 
 pub async fn run(args: VerifyBootstrapArgs) -> anyhow::Result<()> {
@@ -41,6 +51,7 @@ pub async fn run(args: VerifyBootstrapArgs) -> anyhow::Result<()> {
         &args.ecosystem_toml,
         &args.l1_rpc_url,
         args.expected_governance_owner,
+        &args.create2_salts,
         &mut result,
     )
     .await?;

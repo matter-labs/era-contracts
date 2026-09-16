@@ -51,6 +51,7 @@ pub(crate) fn tolerate<T>(
 pub(crate) struct CodeIdentity {
     by_codehash: HashMap<FixedBytes<32>, String>,
     by_short_name: HashMap<String, FixedBytes<32>>,
+    creation_code_by_short_name: HashMap<String, FixedBytes<32>>,
 }
 
 impl CodeIdentity {
@@ -58,7 +59,18 @@ impl CodeIdentity {
         let hashes = ContractHashes::init_from_local()?;
         let mut by_codehash = HashMap::new();
         let mut by_short_name = HashMap::new();
+        let mut creation_code_by_short_name = HashMap::new();
         for contract in hashes.hashes {
+            if let Some(hash) = contract.evm_bytecode_hash.as_deref() {
+                if let (Ok(parsed), Some(short)) = (
+                    hash.parse::<FixedBytes<32>>(),
+                    contract.contract_name.rsplit('/').next(),
+                ) {
+                    creation_code_by_short_name
+                        .entry(short.to_string())
+                        .or_insert(parsed);
+                }
+            }
             if let Some(hash) = contract.evm_deployed_bytecode_hash.as_deref() {
                 if let Ok(parsed) = hash.parse::<FixedBytes<32>>() {
                     // First writer wins: a duplicate hash means two names share bytecode
@@ -75,6 +87,7 @@ impl CodeIdentity {
         Ok(Self {
             by_codehash,
             by_short_name,
+            creation_code_by_short_name,
         })
     }
 
@@ -91,6 +104,15 @@ impl CodeIdentity {
     /// the commit rather than against whatever the package says it should be.
     pub(crate) fn codehash_of(&self, short_name: &str) -> Option<FixedBytes<32>> {
         self.by_short_name.get(short_name).copied()
+    }
+
+    /// The CREATION-code hash the reviewed commit produces for `short_name`.
+    ///
+    /// What a locally built artifact is held against before its bytes are used to derive an
+    /// object's address: the bytes come from an uncommitted build directory, the hash from the
+    /// committed record.
+    pub(crate) fn creation_code_hash_of(&self, short_name: &str) -> Option<FixedBytes<32>> {
+        self.creation_code_by_short_name.get(short_name).copied()
     }
 }
 
@@ -311,6 +333,7 @@ mod tests {
         CodeIdentity {
             by_codehash,
             by_short_name,
+            creation_code_by_short_name: HashMap::new(),
         }
     }
 
@@ -367,6 +390,7 @@ mod tests {
         let id = CodeIdentity {
             by_codehash,
             by_short_name: HashMap::new(),
+            creation_code_by_short_name: HashMap::new(),
         };
         assert_eq!(
             id.name_of(&HASH_A.parse().unwrap()),
