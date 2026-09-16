@@ -181,9 +181,9 @@ export function releaseInitArgs(ctm: any): any {
  * initialization validates it and derives the facet/hash delta from the release pair).
  */
 export function transitionInitArgs(manifest: any, ctm: any, newRelease: string, delegateComposer: string): any {
-  // Release provenance is enforced by the CTM's stored `releaseCodehash` at `setCurrentRelease`
-  // time, not by the transition manifest — which is why the runner checks the freshly deployed
-  // release against that same anchor.
+  // Release provenance is not a manifest field: `setCurrentRelease` runs the release's own
+  // `validate()` and genesis-parameter checks, and the reviewed object's address is re-derived
+  // off-chain from its creation code by `protocol-ops ecosystem verify-bootstrap`.
   const transition = ctm.transition;
 
   // The manifest authors bytecode infos only: the object constructs the Unsafe deployments, the

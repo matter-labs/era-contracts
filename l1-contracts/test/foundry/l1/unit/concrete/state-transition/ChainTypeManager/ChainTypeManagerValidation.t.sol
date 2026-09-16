@@ -111,9 +111,8 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
         vm.stopPrank();
     }
 
-    /// @dev Mocks the (single) test genesis release: its genesis params and the manifest-hash +
-    ///      factory attestation the CTM's release-provenance check reads during initialization
-    ///      and repointing.
+    /// @dev Mocks the (single) test genesis release: its genesis params plus the `validate()` and
+    ///      manifest-hash reads the CTM makes during initialization and repointing.
     function _mockGenesisParams(
         address _genesisUpgrade,
         bytes32 _genesisBatchHash,
@@ -126,9 +125,8 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
             abi.encode(_genesisUpgrade, _genesisBatchHash, _genesisBatchCommitment, _genesisIndexRepeatedStorageChanges)
         );
         vm.mockCall(Utils.TEST_GENESIS_REGISTRY, abi.encodeWithSelector(ICTMRelease.validate.selector), bytes(""));
-        // From v32 the CTM enforces release provenance via its canonical (mocked) factory during
-        // initialization: the genesis release must carry the audited `CTMRelease` runtime code,
-        // which is what the CTM's provenance check compares against.
+        // The CTM CALLS its genesis release while initializing, so the mocked one has to be a
+        // deployed contract at all; the audited `CTMRelease` runtime code is what gets etched.
         vm.etch(Utils.TEST_GENESIS_REGISTRY, type(CTMRelease).runtimeCode);
         vm.mockCall(
             Utils.TEST_GENESIS_REGISTRY,
@@ -142,7 +140,6 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
             owner: governor,
             validatorTimelock: validator,
-            releaseCodehash: Utils.releaseCodehash(),
             currentRelease: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
             serverNotifier: serverNotifier
@@ -162,7 +159,6 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
             owner: governor,
             validatorTimelock: validator,
-            releaseCodehash: Utils.releaseCodehash(),
             currentRelease: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
             serverNotifier: serverNotifier

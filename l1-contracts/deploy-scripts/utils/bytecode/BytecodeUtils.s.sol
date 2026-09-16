@@ -68,13 +68,11 @@ library BytecodeUtils {
     }
 
     /// @notice Read and hash deployed bytecode (keccak256) in one call.
-    /// @dev This is the `EXTCODEHASH` an object-type ANCHOR holds — the registry executors'
-    ///      `TRANSITION_CODEHASH` / `CORE_REGISTRY_CODEHASH` / `OPERATION_CODEHASH` and the CTM's
-    ///      `releaseCodehash`. Deploy an anchored object from {readBytecodeL1} on the SAME
-    ///      artifact: an anchor taken here while the object is deployed from a script's own
-    ///      compiled copy diverges whenever the two compilations do (the CBOR metadata records the
-    ///      compilation's remappings, which is enough), and an executor anchored to code its
-    ///      objects do not run is bricked for good.
+    /// @dev Deploy registry objects from {readBytecodeL1} on the SAME artifact this reads. A hash
+    ///      taken here while the object is deployed from a script's own compiled copy diverges
+    ///      whenever the two compilations do (the CBOR metadata records the compilation's
+    ///      remappings, which is enough), and a review that cannot reproduce an object's creation
+    ///      code cannot re-derive its address.
     function getDeployedBytecodeHash(
         string memory _fileName,
         string memory _contractName

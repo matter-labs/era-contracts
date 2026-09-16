@@ -283,7 +283,6 @@ export class DeploymentRunner {
       }),
       ctmAddresses: {
         chainTypeManager: ZERO_ADDRESS,
-        releaseCodehash: ethers.constants.HashZero,
         chainAdmin: ZERO_ADDRESS,
         diamondProxy: ZERO_ADDRESS,
         adminFacet: ZERO_ADDRESS,

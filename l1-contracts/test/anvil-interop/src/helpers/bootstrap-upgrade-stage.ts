@@ -142,8 +142,9 @@ export function bootstrapInitArgs(
         admin: ethers.constants.AddressZero,
       },
     }),
-    // `migrate()` reads this release's LIVE runtime hash and installs it as the CTM's
-    // `releaseCodehash` anchor, so no hash rides the manifest.
+    // The release `migrate()` installs as the CTM's `currentRelease`, named by address: no hash
+    // rides the manifest, since a runtime codehash cannot establish that the audited constructor
+    // produced the object it is applied to.
     currentRelease: params.currentRelease,
     newProtocolVersion: packSemVer(manifest.bootstrapVersion),
     oldProtocolVersionDeadline: ethers.BigNumber.from(manifest.bootstrap.oldProtocolVersionDeadline),

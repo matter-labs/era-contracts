@@ -7,7 +7,7 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "contracts/common/Config.sol";
-import {RegistryReleaseCodehashAlreadySet, ZeroAddress, EmptyBytes32} from "contracts/common/L1ContractErrors.sol";
+import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 
 /// @notice From v32 the CTM no longer stores chain-creation params directly; it stores a pointer
@@ -20,9 +20,8 @@ contract SetGenesisRegistryTest is ChainTypeManagerTest {
     }
 
     /// @dev Mocks a fresh release returning the given genesis params, so the CTM can be repointed
-    ///      at it: `genesisParams` (read by the `l1GenesisUpgrade`/`storedBatchZero` getters) and
-    ///      the manifest-hash + factory attestation `setCurrentRelease` requires for release
-    ///      provenance.
+    ///      at it: `genesisParams` (read by the `l1GenesisUpgrade`/`storedBatchZero` getters) plus
+    ///      the `validate()` and manifest-hash reads `setCurrentRelease` makes.
     function _mockRegistry(
         address _registry,
         address _genesisUpgrade,
@@ -36,8 +35,8 @@ contract SetGenesisRegistryTest is ChainTypeManagerTest {
             abi.encode(_genesisUpgrade, _genesisBatchHash, _genesisBatchCommitment, _genesisIndexRepeatedStorageChanges)
         );
         vm.mockCall(_registry, abi.encodeWithSelector(ICTMRelease.validate.selector), bytes(""));
-        // From v32 the CTM enforces release provenance by CODEHASH, so a mocked release has to
-        // carry the audited `CTMRelease` runtime code to be accepted as `currentRelease`.
+        // The release is CALLED by `setCurrentRelease`, so the mocked one has to be a deployed
+        // contract at all; the audited `CTMRelease` runtime code is what gets etched.
         vm.etch(_registry, type(CTMRelease).runtimeCode);
         vm.mockCall(
             _registry,
@@ -104,48 +103,5 @@ contract SetGenesisRegistryTest is ChainTypeManagerTest {
         vm.expectRevert();
         vm.prank(makeAddr("notOwner"));
         chainContractAddress.setCurrentRelease(newRegistry);
-    }
-
-    // `setReleaseCodehash` is the migration path for CTMs whose storage predates the field
-    // (upgraded proxies never re-run `initialize`); v32 stage calldata invokes it right before
-    // the first `setCurrentRelease`.
-
-    /// @dev Re-setting the anchor to the value it ALREADY holds is a no-op, so one upgrade bundle
-    ///      works against both a migrated CTM (anchor zero) and an already-anchored one without the
-    ///      calldata predicting which it is.
-    function test_SettingReleaseCodehashToSameValueIsNoop() public {
-        bytes32 configured = chainContractAddress.releaseCodehash();
-        assertTrue(configured != bytes32(0), "fixture CTM should already be anchored");
-
-        vm.prank(governor);
-        chainContractAddress.setReleaseCodehash(configured);
-
-        assertEq(chainContractAddress.releaseCodehash(), configured, "anchor must be unchanged");
-    }
-
-    /// @dev But the anchor can never be RE-POINTED: every pinned release is checked against it, so
-    ///      changing it would retroactively change which code counts as a genuine release. The
-    ///      migration path itself (anchor still zero) is exercised by the v32 integration test.
-    function test_RevertWhen_ReplacingConfiguredReleaseCodehash() public {
-        bytes32 configured = chainContractAddress.releaseCodehash();
-        assertTrue(configured != bytes32(0), "fixture CTM should already be anchored");
-
-        vm.expectRevert(abi.encodeWithSelector(RegistryReleaseCodehashAlreadySet.selector, configured));
-        vm.prank(governor);
-        chainContractAddress.setReleaseCodehash(keccak256("otherRelease"));
-
-        assertEq(chainContractAddress.releaseCodehash(), configured, "anchor must be unchanged");
-    }
-
-    function test_RevertWhen_SettingZeroReleaseCodehash() public {
-        vm.expectRevert(EmptyBytes32.selector);
-        vm.prank(governor);
-        chainContractAddress.setReleaseCodehash(bytes32(0));
-    }
-
-    function test_RevertWhen_SettingReleaseCodehashNotOwner() public {
-        vm.expectRevert();
-        vm.prank(makeAddr("notOwner"));
-        chainContractAddress.setReleaseCodehash(keccak256("otherRelease"));
     }
 }

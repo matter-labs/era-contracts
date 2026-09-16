@@ -126,8 +126,8 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             console.log("No ecosystem implementation deployed: this upgrade has no CoreRegistry");
             return;
         }
-        // From the build ARTIFACT, which is also where the ecosystem executor's
-        // `CORE_REGISTRY_CODEHASH` came from — see {BytecodeUtils.getDeployedBytecodeHash}.
+        // From the build ARTIFACT, so a reviewer's own build of the same commit reproduces the
+        // creation code this object's address is re-derived from.
         coreRegistry = CoreRegistry(
             deployViaCreate2AndNotify(
                 BytecodeUtils.readBytecodeL1("CoreRegistry.sol", "CoreRegistry"),

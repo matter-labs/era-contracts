@@ -79,12 +79,11 @@ Finished, and described where it now lives:
 - `DiamondInit` comes from the CTM's current RELEASE. It is the genesis cut's init target rather
   than a routed facet, so introspection reported zero and every upgrade deployed a fresh one —
   found by the pipeline's reuse assertion.
-- Two production-bricking findings fixed here: an object-type anchor taken from a build artifact
-  while the object is deployed from the script's own compiled copy can differ (CBOR metadata
-  records the remappings), so anchored objects are deployed from the same artifact the anchor is
-  read from (`BytecodeUtils.readBytecodeL1` / `getDeployedBytecodeHash`) and the prepare re-checks
-  every object against the live executors' immutables; and reading artifacts inside the pipeline's
-  own call frame charges memory quadratically, so the member probe runs in its own frame.
+- Two findings fixed here: a hash taken from a build artifact while the object is deployed from
+  the script's own compiled copy can differ (CBOR metadata records the remappings), so registry
+  objects are deployed from the same artifact a reviewer reproduces
+  (`BytecodeUtils.readBytecodeL1`); and reading artifacts inside the pipeline's own call frame
+  charges memory quadratically, so the member probe runs in its own frame.
 
 ## Batch 2: move the remaining script-defined actions into the existing flow — partial
 

@@ -55,8 +55,8 @@ On one anvil fork of L1, in this order:
 3. Each ZKsync OS CTM prepare, in input order (Era CTMs are skipped): every release member is
    reused when it already runs the code the current sources produce and redeployed only when the
    version names it in `changedReleaseMembers()`; a release whose members all reused is reused
-   itself. Then the timer, the transition (validated, and checked against the bound executor's
-   `TRANSITION_CODEHASH`), and the ServerNotifier admin call rendered from the pinned row. Output
+   itself. Then the timer, the transition (validated), and the ServerNotifier admin call rendered
+   from the pinned row. Output
    `[registry]`: `ctm_transition_addr`, `ctm_release_addr`, `upgrade_timer_addr`,
    `ctm_upgrade_executor_addr`, `bootstrap_migration_addr` (zero unless a bootstrap),
    `operation_addr` and `coordinator_addr` (both zero on a bootstrap edge, which has no transition

@@ -377,8 +377,8 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             upgradeTimestamp: 0,
             l2Plan: authoredL2Plan()
         });
-        // From the build ARTIFACT, which is also where the bound executor's `TRANSITION_CODEHASH`
-        // came from — see {BytecodeUtils.getDeployedBytecodeHash}.
+        // From the build ARTIFACT, so a reviewer's own build of the same commit reproduces the
+        // creation code this object's address is re-derived from.
         upgradeAddresses.ctmTransition = deployViaCreate2AndNotify(
             BytecodeUtils.readBytecodeL1("CTMTransition.sol", "CTMTransition"),
             abi.encode(manifest),
@@ -403,8 +403,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         // would turn all three stage calls into no-ops the governance bundle reports as executed.
         // Nothing on-chain catches that, which is why it is checked here.
         require(coordinator.code.length != 0, "coordinator has no code (core prepare output)");
-        // From the build ARTIFACT, which is also where the coordinator's `OPERATION_CODEHASH`
-        // came from — see {BytecodeUtils.getDeployedBytecodeHash}.
+        // From the build ARTIFACT, for the same reason as the transition above.
         upgradeAddresses.ecosystemUpgradeOperation = deployViaCreate2AndNotify(
             BytecodeUtils.readBytecodeL1("EcosystemUpgradeOperation.sol", "EcosystemUpgradeOperation"),
             abi.encode(

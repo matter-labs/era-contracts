@@ -280,6 +280,7 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
     await verifyCtmEndState(l1Provider, ctmAddresses.chainTypeManager, l1Addresses.governance, {
       oldVersion,
       expectedProtocolVersion: scenario.expectedProtocolVersion,
+      migrationAddr,
     });
     console.log("✅ Pipeline upgrade scenario verified successfully!\n");
 
@@ -1292,14 +1293,14 @@ export async function verifyProtocolVersions(
 /**
  * Post-upgrade CTM-side assertions for the bootstrap edge: the version bumped, the whole CTM
  * domain (CTM + its ProxyAdmin) landed under ONE new authority that is not governance (the
- * bound `CTMUpgradeExecutor`), the genesis release is pinned with its anchor, and the commit
+ * bound `CTMUpgradeExecutor`), the genesis release the migration names is pinned, and the commit
  * has the legacy cut-taking shape (hash written, no transition registered).
  */
 async function verifyCtmEndState(
   provider: ethers.providers.JsonRpcProvider,
   ctmAddr: string,
   governance: string,
-  params: { oldVersion: ethers.BigNumber; expectedProtocolVersion: string }
+  params: { oldVersion: ethers.BigNumber; expectedProtocolVersion: string; migrationAddr: string }
 ): Promise<void> {
   const ctm = new ethers.Contract(ctmAddr, getAbi("IChainTypeManager"), provider);
   const ownable = new ethers.Contract(ctmAddr, getAbi("Ownable2Step"), provider);
@@ -1324,14 +1325,21 @@ async function verifyCtmEndState(
     );
   }
 
+  // The CTM's `releaseCodehash` anchor was removed: a runtime codehash cannot prove the release's
+  // audited constructor ran. What stays checkable is that the CTM points at the very release the
+  // pipeline pinned — read off the migration OBJECT, the way the engine reads it — and that the
+  // pointer names code rather than an empty address.
   const release: string = await ctm.currentRelease();
   if (release === ethers.constants.AddressZero) {
     throw new Error("currentRelease not pinned after the bootstrap edge");
   }
-  const anchor: string = await ctm.releaseCodehash();
-  const releaseCodehash = ethers.utils.keccak256(await provider.getCode(release));
-  if (anchor.toLowerCase() !== releaseCodehash.toLowerCase()) {
-    throw new Error(`releaseCodehash anchor ${anchor} does not cover the pinned release (${releaseCodehash})`);
+  const migration = new ethers.Contract(params.migrationAddr, getAbi("RegistryBootstrapMigration"), provider);
+  const pinnedRelease: string = (await migration.getManifest()).currentRelease;
+  if (release.toLowerCase() !== pinnedRelease.toLowerCase()) {
+    throw new Error(`CTM currentRelease ${release} is not the release the migration pins (${pinnedRelease})`);
+  }
+  if (ethers.utils.hexDataLength(await provider.getCode(release)) === 0) {
+    throw new Error(`CTM currentRelease ${release} has no code`);
   }
 
   const cutHash: string = await ctm.upgradeCutHash(params.oldVersion);

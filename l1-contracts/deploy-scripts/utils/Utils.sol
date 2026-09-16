@@ -328,6 +328,26 @@ library Utils {
         return vm.computeCreate2Address(salt, keccak256(initCode), DETERMINISTIC_CREATE2_ADDRESS);
     }
 
+    /// @notice The address the deterministic factory produces for `_creationCode` run on
+    ///         `_constructorArgs` under `_salt`.
+    /// @dev The Solidity twin of `protocol-ops`'s construction check
+    ///      (`upgrade_verification::versions::v34::construction`), which is what establishes that
+    ///      a registry object was produced by the AUDITED constructor rather than merely running
+    ///      audited runtime code. Kept in step with it by
+    ///      `test/foundry/l1/upgrades/CounterfeitObject.t.sol`, which builds a counterfeit and
+    ///      asserts this derivation rejects it.
+    /// @param _salt The run's CREATE2 salt.
+    /// @param _creationCode The object type's creation code, from the build artifact.
+    /// @param _constructorArgs The ABI-encoded manifest.
+    function canonicalCreate2Address(
+        bytes32 _salt,
+        bytes memory _creationCode,
+        bytes memory _constructorArgs
+    ) internal view returns (address) {
+        return
+            getL2AddressViaDeterministicCreate2(_salt, abi.encodePacked(_creationCode, _constructorArgs));
+    }
+
     /// @notice Deploys an L2 contract from L1 through the deterministic CREATE2 factory.
     /// @dev The init code travels in the calldata (`salt ++ initCode`) rather than as a factory dep,
     /// and the address uses standard EVM CREATE2 derivation. Contracts deployed this way run their constructors normally — only the

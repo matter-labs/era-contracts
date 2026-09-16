@@ -26,8 +26,8 @@ manifest against the deterministic local ecosystem
 (`test/anvil-interop/chain-states/v0.32.0`) and drives the upgrade through the on-chain
 executor/module path, asserting `validate()` succeeds against the live deployment. The objects
 themselves are built with the `registry-deterministic` foundry profile (CBOR-metadata-free, so
-byte-identical across macOS and CI) — which is what makes the object-type anchors
-(`releaseCodehash`, `TRANSITION_CODEHASH`, `CORE_REGISTRY_CODEHASH`, `OPERATION_CODEHASH`)
+byte-identical across macOS and CI) — which is what lets a reviewer's own build reproduce the
+creation code a package's objects were deployed from, so their addresses can be re-derived
 reproducible.
 
 ## Regenerating the manifest

@@ -16,7 +16,7 @@ import {
     LegNotReserved,
     NoPendingOperation,
     ProxyUpgradeRowMismatch,
-    RegistryCodehashMismatch,
+    RegistryTargetHasNoCode,
     Unauthorized,
     UpgradeLifecycleBusy,
     ZeroAddress
@@ -31,13 +31,6 @@ import {
     L1_ECOSYSTEM_CONTRACT_COUNT,
     L1EcosystemContract
 } from "../../../../../../../contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
-
-/// @dev Not a `CoreRegistry`: exercises the executor's codehash provenance check.
-contract NotACoreRegistry {
-    function manifestHash() external pure returns (bytes32) {
-        return bytes32(uint256(1));
-    }
-}
 
 /// @dev Minimal implementation contracts for proxy-upgrade tests.
 contract DummyImplA {
@@ -76,7 +69,6 @@ contract CoreUpgradeExecutorTest is Test {
 
     CoreUpgradeExecutor internal coreExecutor;
     ICoreRegistry internal coreRegistry;
-    bytes32 internal coreRegistryCodehash;
     ProxyAdmin internal proxyAdmin;
 
     DummyImplA internal implOld;
@@ -99,12 +91,11 @@ contract CoreUpgradeExecutorTest is Test {
         rows[0] = _row(address(bridgehubProxy), address(implOld), address(implNew));
         rows[1] = _row(address(messageRootProxy), address(implOld), address(implOld));
         coreRegistry = _deployRegistry(rows);
-        coreRegistryCodehash = address(coreRegistry).codehash;
 
-        // The executor is BOUND to (and owns) one immutable ecosystem ProxyAdmin and pins the
-        // audited `CoreRegistry` codehash, mirroring the production ownership chain; the owner
-        // then points it at the coordinator (the v34 bootstrap's stage-2 binding).
-        coreExecutor = new CoreUpgradeExecutor(ecosystemGovernor, proxyAdmin, coreRegistryCodehash);
+        // The executor is BOUND to (and owns) one immutable ecosystem ProxyAdmin, mirroring the
+        // production ownership chain; the owner then points it at the coordinator (the v34
+        // bootstrap's stage-2 binding).
+        coreExecutor = new CoreUpgradeExecutor(ecosystemGovernor, proxyAdmin);
         proxyAdmin.transferOwnership(address(coreExecutor));
         vm.prank(ecosystemGovernor);
         coreExecutor.setCoordinator(coordinator);
@@ -207,8 +198,6 @@ contract CoreUpgradeExecutorTest is Test {
             callInitializeUpgrade: true,
             admin: ProxyAdmin(address(0))
         });
-        // Same audited bytecode as the fixture registry (no immutables), so the executor's
-        // codehash pin covers this instance too.
         ICoreRegistry initRegistry = _deployRegistry(rows);
 
         vm.prank(ecosystemGovernor);
@@ -232,21 +221,16 @@ contract CoreUpgradeExecutorTest is Test {
         assertEq(_liveImpl(bridgehubProxy), address(implOld));
     }
 
-    function test_revertWhen_registryIsNotTheAuditedCode() public {
-        // Type provenance is a codehash check: an object that does not run the audited
-        // `CoreRegistry` code is rejected before any row is read, whatever it claims to be.
-        NotACoreRegistry impostor = new NotACoreRegistry();
+    /// @dev Retargeted from the removed codehash anchor to the check that still guards this
+    ///      entrypoint: the registry must be DEPLOYED. A call into a codeless address succeeds
+    ///      silently, so without it an undeployed registry turns the apply into a reported no-op.
+    function test_revertWhen_registryIsNotDeployed() public {
+        address codeless = makeAddr("codelessRegistry");
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                RegistryCodehashMismatch.selector,
-                address(impostor),
-                coreRegistryCodehash,
-                address(impostor).codehash
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, codeless));
         vm.prank(ecosystemGovernor);
-        coreExecutor.applyL1Upgrade(ICoreRegistry(address(impostor)));
+        coreExecutor.applyL1Upgrade(ICoreRegistry(codeless));
+        assertEq(_liveImpl(bridgehubProxy), address(implOld), "a refused registry applies nothing");
     }
 
     function test_revertWhen_replayingStaleRegistryWouldDowngrade() public {
