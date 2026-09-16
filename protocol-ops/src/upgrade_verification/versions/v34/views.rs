@@ -1,5 +1,5 @@
-//! Read-only views of the registry objects and the live contracts a v34 bootstrap
-//! package touches.
+//! Read-only views of the registry objects and the live contracts a v34 package touches —
+//! a bootstrap edge or an ordinary recurring operation.
 //!
 //! Declared inline rather than bound from `zkstack-out/` because the verifier needs a
 //! handful of getters per object, not the objects' full ABIs, and because a package is
@@ -60,13 +60,34 @@ sol! {
         function validate() external view;
     }
 
+    /// One governance call of a bootstrap edge, as `RegistryBootstrapSequence` derives it.
+    #[derive(Debug)]
+    struct BootstrapAction {
+        string label;
+        string authority;
+        BootstrapCall call;
+    }
+
+    /// Positional mirror of `governance/Common.sol`'s `Call`, under a distinct name so it cannot
+    /// collide with the tool's own decoded governance call type.
+    #[derive(Debug)]
+    struct BootstrapCall {
+        address target;
+        uint256 value;
+        bytes data;
+    }
+
     /// The object the edge's whole governance call sequence is derived from. The verifier reads
     /// the two objects it was built over, so the completion gate terminating stage 2 can be held
-    /// against the edge the rest of the package describes.
+    /// against the edge the rest of the package describes, and the three stage lists, so the
+    /// submitted bundle can be compared against the list the contract itself derives.
     #[sol(rpc)]
     contract RegistryBootstrapSequenceView {
         function MIGRATION() external view returns (address);
         function CORE_REGISTRY() external view returns (address);
+        function stage0Actions() external view returns (BootstrapAction[] memory);
+        function stage1Actions() external view returns (BootstrapAction[] memory);
+        function stage2Actions() external view returns (BootstrapAction[] memory);
         function validateApplied() external view;
     }
 
@@ -81,13 +102,77 @@ sol! {
     }
 
     /// The lifecycle coordinator every later operation runs through.
+    ///
+    /// `stage0`/`stage1`/`stage2` are declared so the verifier can ENCODE the three calls a
+    /// recurring upgrade's governance transaction must contain and compare them byte for byte —
+    /// the whole of "does the signed transaction invoke the reviewed upgrade at the intended
+    /// address?" for an ordinary operation.
     #[sol(rpc)]
     contract EcosystemUpgradeExecutorView {
         function CORE_EXECUTOR() external view returns (address);
         function ctmExecutor() external view returns (address);
         function setCTMExecutor(address _ctmExecutor) external;
         function pendingOperation() external view returns (address);
+        function pendingStage() external view returns (uint8);
         function owner() external view returns (address);
+        function stage0(address _operation) external;
+        function stage1(address _operation) external;
+        function stage2(address _operation) external;
+    }
+
+    /// Positional mirror of `RegistryTypes.OperationManifest` — the whole constructor argument of
+    /// an `EcosystemUpgradeOperation`, and therefore what its address commits to.
+    #[derive(Debug)]
+    struct OperationManifest {
+        address coreRegistry;
+        ProxyUpgradeRow[] ctmInfrastructure;
+        address transition;
+        address timer;
+    }
+
+    /// The operation object a recurring upgrade's three governance calls name.
+    #[sol(rpc)]
+    contract EcosystemUpgradeOperationView {
+        function manifestHash() external view returns (bytes32);
+        function getManifest() external view returns (OperationManifest memory);
+        function ctmInfrastructureRows() external view returns (ProxyUpgradeRow[] memory);
+        function validate() external view;
+    }
+
+    /// Positional mirror of `RegistryTypes.TransitionManifest` — the whole constructor argument of
+    /// a `CTMTransition`.
+    #[derive(Debug)]
+    struct TransitionManifest {
+        uint256 oldProtocolVersion;
+        uint256 newProtocolVersion;
+        address fromRelease;
+        address newRelease;
+        address upgradeEngine;
+        uint256 oldProtocolVersionDeadline;
+        uint256 upgradeTimestamp;
+        AuthoredL2Plan l2Plan;
+    }
+
+    /// Positional mirror of `Diamond.FacetCut`, with `Action` as its underlying `uint8`.
+    #[derive(Debug)]
+    struct FacetCut {
+        address facet;
+        uint8 action;
+        bool isFreezable;
+        bytes4[] selectors;
+    }
+
+    /// The chain-version edge an operation may carry.
+    ///
+    /// `facetCuts()` is DERIVED at construction from the release pair — the state a counterfeit
+    /// exists to replace, and what every chain applies verbatim through delegatecall — so it is
+    /// rendered for the reviewer rather than only counted.
+    #[sol(rpc)]
+    contract CTMTransitionView {
+        function manifestHash() external view returns (bytes32);
+        function getManifest() external view returns (TransitionManifest memory);
+        function facetCuts() external view returns (FacetCut[] memory);
+        function validate() external view;
     }
 
     /// The ecosystem-domain executor the shared `ProxyAdmin` lands under.
@@ -95,6 +180,7 @@ sol! {
     contract CoreUpgradeExecutorView {
         function PROXY_ADMIN() external view returns (address);
         function coordinator() external view returns (address);
+        function activeOperation() external view returns (address);
         function owner() external view returns (address);
     }
 
@@ -189,19 +275,22 @@ sol! {
         function getProxyImplementation(address proxy) external view returns (address);
     }
 
+    /// The CTM's bytecode supplier. `evmPublishingBlock` is the exact read
+    /// `L2PlanLib.requirePublished` performs when the CTM leg applies, so a zero here is the
+    /// readiness failure that would revert stage 1.
     #[sol(rpc)]
     contract BytecodesSupplierView {
-        function publishingBlock(bytes32 bytecodeHash) external view returns (uint256);
+        function evmPublishingBlock(bytes32 bytecodeHash) external view returns (uint256);
     }
 
     /// Only the hop from the CTM to its ChainAssetHandler, which the pause calls target.
     #[sol(rpc)]
-    contract BridgehubForBootstrapView {
+    contract BridgehubView {
         function chainAssetHandler() external view returns (address);
     }
 
     #[sol(rpc)]
-    contract CtmForBootstrapView {
+    contract CtmView {
         function protocolVersion() external view returns (uint256);
         function owner() external view returns (address);
         function pendingOwner() external view returns (address);

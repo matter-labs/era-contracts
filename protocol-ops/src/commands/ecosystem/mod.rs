@@ -54,10 +54,12 @@ pub enum EcosystemCommands {
     /// Verify ecosystem upgrade artifacts produced by upgrade-prepare.
     #[command(name = "verify-upgrade")]
     VerifyUpgrade(VerifyUpgradeArgs),
-    /// Verify a v34 registry-BOOTSTRAP package: object provenance, the manifest's inline pins
-    /// against live code, the authority binding and the owner it lands on, every proxy row's
-    /// departing implementation, and the stage-1 calldata shape. Read-only.
-    #[command(name = "verify-bootstrap")]
+    /// Verify a v34 registry-driven upgrade package — a recurring operation or the one-time
+    /// bootstrap edge, decided from the package itself. Checks object provenance and
+    /// construction, the authority binding and the owner it lands on, every proxy row's
+    /// departing implementation, readiness, and that the governance calldata invokes the
+    /// reviewed upgrade. Read-only.
+    #[command(name = "verify-bootstrap", visible_alias = "verify-package")]
     VerifyBootstrap(VerifyBootstrapArgs),
     /// Broadcast the bundles produced by `upgrade-prepare-all` to a real (or
     /// fork) RPC under the supplied EOA keys. Multi-bundle dispatcher around

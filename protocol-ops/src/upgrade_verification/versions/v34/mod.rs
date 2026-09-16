@@ -1,4 +1,4 @@
-//! Verification of a v34 registry-bootstrap package.
+//! Verification of a v34 registry-driven upgrade package.
 //!
 //! # What this replaces
 //!
@@ -15,13 +15,22 @@
 //!   3. Does every contract the manifest names exist?
 //!   4. Is authority bound as the manifest claims, and to the expected governance owner?
 //!   5. Does every proxy row depart from the implementation that is actually live?
-//!   6. Is the edge un-executed, does the calldata contain only the expected calls, and does
-//!      every one of those calls target an address this review accounted for?
+//!   6. Does the transaction governance signs invoke the reviewed upgrade, at the reviewed
+//!      address?
 //!
 //! None of it is "does the manifest's own fingerprint of a member match that member's code": the
 //! manifest author supplies both halves of such a pair, so it can only ever agree with itself.
 //! Every comparison here is against the reviewed commit or against live state the package does
 //! not control.
+//!
+//! # Two kinds of package
+//!
+//! The ordinary case is a RECURRING upgrade, verified by [`operation`]: one
+//! `EcosystemUpgradeOperation`, and three governance calls that are a pure function of its
+//! address. This module handles the other kind — the one-time BOOTSTRAP edge that installs the
+//! registry model on a CTM that predates it. A bootstrap has no operation and no coordinator, so
+//! governance executes a list of ordinary calls instead; see [`verify_derived_sequence`] for why
+//! that list has to be compared at all, and why nothing else should be built on that comparison.
 //!
 //! # What it deliberately does not do
 //!
@@ -36,38 +45,41 @@ use std::collections::BTreeMap;
 
 use alloy::primitives::{Address, B256, U256};
 use alloy::providers::Provider;
-use alloy::sol_types::{SolCall, SolValue};
+use alloy::sol_types::SolValue;
 
 use crate::common::ethereum::get_provider;
 use crate::upgrade_verification::verifiers::VerificationResult;
 
 pub(crate) mod construction;
+pub(crate) mod operation;
 pub(crate) mod package;
 pub(crate) mod provenance;
 pub(crate) mod views;
 
 use construction::{expect_canonical_construction, ReviewedBuild};
 use package::{
-    BootstrapPackage, APPLY_L1_UPGRADE_SELECTOR, MIGRATE_SELECTOR, PAUSE_MIGRATION_SELECTOR,
-    SET_COORDINATOR_SELECTOR, TRANSFER_OWNERSHIP_SELECTOR, UNPAUSE_MIGRATION_SELECTOR,
-    VALIDATE_APPLIED_SELECTOR,
+    BootstrapPackage, RegistryPackage, TRANSFER_OWNERSHIP_SELECTOR, VALIDATE_APPLIED_SELECTOR,
 };
 use provenance::{
     expect_code_identity, expect_code_present, expect_immutable_bearing_identity, tolerate,
     CodeIdentity, ImmutableValue,
 };
 use views::{
-    BridgehubForBootstrapView, CTMReleaseView, CTMUpgradeExecutorView, CommittedUpgradeView,
-    CoreRegistryView, CoreUpgradeExecutorView, CtmForBootstrapView, EcosystemUpgradeExecutorView,
+    BridgehubView, CTMReleaseView, CTMUpgradeExecutorView, CommittedUpgradeView,
+    CoreRegistryView, CoreUpgradeExecutorView, CtmView, EcosystemUpgradeExecutorView,
     GovernanceUpgradeTimerView, GovernanceUpgradeTimerView::GovernanceUpgradeTimerViewInstance,
     ProxyAdminView, RegistryBootstrapMigrationView,
 };
 
-/// Verify a v34 bootstrap package against the live L1 it targets.
+/// Verify a v34 registry-driven upgrade package against the live L1 it targets.
 ///
-/// `expected_governance_owner` is the reviewed value the CTM executor must end up owned by —
-/// the single most consequential field in the manifest, because an executor bound to the wrong
-/// owner hands the CTM domain to that owner permanently.
+/// The package's own content decides which verifier runs — a recurring operation or a bootstrap
+/// edge (see [`RegistryPackage::load`]); a package that is neither is refused rather than
+/// verified as the nearest match.
+///
+/// `expected_governance_owner` is the reviewed address the upgrade must be driven by. For a
+/// bootstrap that is the owner the CTM domain lands on permanently; for a recurring upgrade it is
+/// the owner of the whole lifecycle.
 pub(crate) async fn verify(
     ecosystem_toml: &std::path::Path,
     l1_rpc_url: &str,
@@ -75,11 +87,51 @@ pub(crate) async fn verify(
     extra_create2_salts: &[B256],
     result: &mut VerificationResult,
 ) -> anyhow::Result<()> {
-    let package = BootstrapPackage::load(ecosystem_toml)?;
     let provider = get_provider(l1_rpc_url)?;
     let identity = CodeIdentity::from_local_hashes()?;
     let build = ReviewedBuild::load(&identity);
-    let salts = merge_salts(&package.create2_salts, extra_create2_salts);
+
+    match RegistryPackage::load(ecosystem_toml)? {
+        RegistryPackage::Operation(package) => {
+            let salts = merge_salts(&package.create2_salts, extra_create2_salts);
+            operation::verify(
+                &provider,
+                &identity,
+                &build,
+                &package,
+                expected_governance_owner,
+                &salts,
+                result,
+            )
+            .await
+        }
+        RegistryPackage::Bootstrap(package) => {
+            let salts = merge_salts(&package.create2_salts, extra_create2_salts);
+            verify_bootstrap(
+                &provider,
+                &identity,
+                &build,
+                &package,
+                expected_governance_owner,
+                &salts,
+                result,
+            )
+            .await
+        }
+    }
+}
+
+/// Verify the one-time bootstrap edge onto the registry model.
+#[allow(clippy::too_many_arguments)]
+async fn verify_bootstrap<P: Provider>(
+    provider: &P,
+    identity: &CodeIdentity,
+    build: &ReviewedBuild,
+    package: &BootstrapPackage,
+    expected_governance_owner: Option<Address>,
+    salts: &[B256],
+    result: &mut VerificationResult,
+) -> anyhow::Result<()> {
     // The set of addresses this run establishes as reviewed. Every governance call must land on
     // one of them (or on a live contract the manifest itself names), which is the last of the
     // three things a reviewer has to be able to say: the calls execute the objects that were
@@ -109,8 +161,8 @@ pub(crate) async fn verify(
     // ── 1. The migration itself, and its committed manifest ──
     result.print_info("\n== Object provenance ==");
     expect_code_identity(
-        &provider,
-        &identity,
+        provider,
+        identity,
         result,
         "the bootstrap migration",
         package.migration,
@@ -118,7 +170,7 @@ pub(crate) async fn verify(
     )
     .await?;
 
-    let migration = RegistryBootstrapMigrationView::new(package.migration, &provider);
+    let migration = RegistryBootstrapMigrationView::new(package.migration, provider);
     let manifest = match migration.getManifest().call().await {
         Ok(m) => m,
         Err(e) => {
@@ -137,37 +189,37 @@ pub(crate) async fn verify(
     //    bytecode over storage of its own choosing); an address can.
     result.print_info("\n== Object construction ==");
     if expect_canonical_construction(
-        &build,
+        build,
         result,
         "the bootstrap migration",
         package.migration,
         "RegistryBootstrapMigration",
         &manifest.abi_encode(),
-        &salts,
+        salts,
     ) {
         reviewed.insert(package.migration, "the bootstrap migration".to_string());
     }
     verify_release_construction(
-        &provider,
-        &build,
+        provider,
+        build,
         result,
         manifest.currentRelease,
-        &salts,
+        salts,
         &mut reviewed,
     )
     .await;
     if let Some(core_registry_addr) = package.core_registry {
         verify_core_registry_construction(
-            &provider,
-            &build,
+            provider,
+            build,
             result,
             core_registry_addr,
-            &salts,
+            salts,
             &mut reviewed,
         )
         .await;
     }
-    render_derived_payloads(&provider, result, package.migration).await;
+    render_derived_payloads(provider, result, package.migration).await;
 
     result.print_info("\n== Edge state ==");
     let executed = tolerate(
@@ -185,8 +237,8 @@ pub(crate) async fn verify(
     }
 
     expect_code_identity(
-        &provider,
-        &identity,
+        provider,
+        identity,
         result,
         "the release the edge installs",
         manifest.currentRelease,
@@ -201,7 +253,7 @@ pub(crate) async fn verify(
     // reviewer can check here, before the edge runs — is a member nothing is deployed to.
     result.print_info("\n== Named members ==");
     expect_code_present(
-        &provider,
+        provider,
         result,
         "manifest.upgradeEngine",
         manifest.upgradeEngine,
@@ -209,7 +261,7 @@ pub(crate) async fn verify(
     .await?;
     if !manifest.l2Plan.delegateComposer.is_zero() {
         expect_code_present(
-            &provider,
+            provider,
             result,
             "manifest.l2Plan.delegateComposer",
             manifest.l2Plan.delegateComposer,
@@ -219,7 +271,7 @@ pub(crate) async fn verify(
 
     // ── 3. Authority: the binding, and the owner it lands on ──
     result.print_info("\n== Bound authority ==");
-    let executor = CTMUpgradeExecutorView::new(manifest.ctmExecutor, &provider);
+    let executor = CTMUpgradeExecutorView::new(manifest.ctmExecutor, provider);
     // The executor sets its bindings as constructor immutables, so its runtime code cannot hash
     // to the reviewed artifact (whose immutable slots are zero). Identity therefore rests on
     // those VALUES — read back here and held against the manifest, and, for the transition
@@ -248,8 +300,8 @@ pub(crate) async fn verify(
         ),
     ];
     expect_immutable_bearing_identity(
-        &provider,
-        &identity,
+        provider,
+        identity,
         result,
         "the bound CTM upgrade executor",
         manifest.ctmExecutor,
@@ -295,15 +347,15 @@ pub(crate) async fn verify(
     // The coordinator and the core executor it drives: genuine code, the same governance owner
     // as the CTM executor, and (pre-execution) an unbound core executor — stage 2 binds it.
     expect_code_identity(
-        &provider,
-        &identity,
+        provider,
+        identity,
         result,
         "the coordinator",
         manifest.coordinator,
         "EcosystemUpgradeExecutor",
     )
     .await?;
-    let coordinator = EcosystemUpgradeExecutorView::new(manifest.coordinator, &provider);
+    let coordinator = EcosystemUpgradeExecutorView::new(manifest.coordinator, provider);
     let core_executor_addr = tolerate(
         coordinator.CORE_EXECUTOR().call().await,
         result,
@@ -311,15 +363,15 @@ pub(crate) async fn verify(
     );
     if let Some(core_executor_addr) = core_executor_addr {
         expect_code_identity(
-            &provider,
-            &identity,
+            provider,
+            identity,
             result,
             "the core executor",
             core_executor_addr,
             "CoreUpgradeExecutor",
         )
         .await?;
-        let core_executor = CoreUpgradeExecutorView::new(core_executor_addr, &provider);
+        let core_executor = CoreUpgradeExecutorView::new(core_executor_addr, provider);
         for (label, owner) in [
             (
                 "the coordinator",
@@ -432,7 +484,7 @@ pub(crate) async fn verify(
 
     // ── 4. The departing state the manifest asserts ──
     result.print_info("\n== Departing state ==");
-    let ctm = CtmForBootstrapView::new(manifest.ctm, &provider);
+    let ctm = CtmView::new(manifest.ctm, provider);
     let Some(live_version) = tolerate(
         ctm.protocolVersion().call().await,
         result,
@@ -468,7 +520,7 @@ pub(crate) async fn verify(
 
     // Each CTM-domain row must depart from the implementation that is LIVE, not from whatever
     // the prepare saw: a row at an unexpected implementation reverts stage 1 wholesale.
-    let ctm_admin = ProxyAdminView::new(manifest.ctmProxyAdmin, &provider);
+    let ctm_admin = ProxyAdminView::new(manifest.ctmProxyAdmin, provider);
     for (i, row) in manifest.proxyUpgrades.iter().enumerate() {
         if row.implNew.is_zero() {
             continue; // an inert row: this edge deliberately does not upgrade that proxy
@@ -489,15 +541,15 @@ pub(crate) async fn verify(
                 row.expectedOldImpl
             ));
         }
-        expect_code_present(&provider, result, &format!("{label} implNew"), row.implNew).await?;
+        expect_code_present(provider, result, &format!("{label} implNew"), row.implNew).await?;
     }
 
     // ── 5. The ecosystem leg ──
     if let Some(core_registry_addr) = package.core_registry {
         result.print_info("\n== Ecosystem leg ==");
         expect_code_identity(
-            &provider,
-            &identity,
+            provider,
+            identity,
             result,
             "the core registry",
             core_registry_addr,
@@ -512,7 +564,7 @@ pub(crate) async fn verify(
             );
             return Ok(());
         };
-        let core_executor = CoreUpgradeExecutorView::new(core_executor_addr, &provider);
+        let core_executor = CoreUpgradeExecutorView::new(core_executor_addr, provider);
         let Some(eco_admin_addr) = tolerate(
             core_executor.PROXY_ADMIN().call().await,
             result,
@@ -520,8 +572,8 @@ pub(crate) async fn verify(
         ) else {
             return Ok(());
         };
-        let registry = CoreRegistryView::new(core_registry_addr, &provider);
-        let eco_admin = ProxyAdminView::new(eco_admin_addr, &provider);
+        let registry = CoreRegistryView::new(core_registry_addr, provider);
+        let eco_admin = ProxyAdminView::new(eco_admin_addr, provider);
         let Some(rows) = tolerate(
             registry.ecosystemRows().call().await,
             result,
@@ -549,7 +601,7 @@ pub(crate) async fn verify(
                     row.expectedOldImpl
                 ));
             }
-            expect_code_present(&provider, result, &format!("{label} implNew"), row.implNew)
+            expect_code_present(provider, result, &format!("{label} implNew"), row.implNew)
                 .await?;
         }
     } else {
@@ -560,7 +612,7 @@ pub(crate) async fn verify(
     // ── 6. The timer that gates the edge ──
     result.print_info("\n== Stage sequencing ==");
     let timer: GovernanceUpgradeTimerViewInstance<_> =
-        GovernanceUpgradeTimerView::new(manifest.upgradeTimer, &provider);
+        GovernanceUpgradeTimerView::new(manifest.upgradeTimer, provider);
     let Some(timer_governance) = tolerate(
         timer.TIMER_GOVERNANCE().call().await,
         result,
@@ -575,8 +627,8 @@ pub(crate) async fn verify(
     // `TIMER_GOVERNANCE` is also a constructor-set immutable, so the timer's runtime code cannot
     // hash to its artifact — which is why this value IS the timer's identity check.
     expect_immutable_bearing_identity(
-        &provider,
-        &identity,
+        provider,
+        identity,
         result,
         "the upgrade timer",
         manifest.upgradeTimer,
@@ -631,9 +683,7 @@ pub(crate) async fn verify(
 
     // ── 7. The calldata governance will actually sign ──
     result.print_info("\n== Governance calldata ==");
-    verify_stage0_shape(&package, result);
-    verify_stage1_shape(&package, &manifest, core_executor_addr, result);
-    verify_stage2_shape(&package, &manifest, core_executor_addr, &provider, result).await;
+    verify_derived_sequence(package, provider, result).await;
 
     // The pause/unpause calls land on the CTM's own ChainAssetHandler, which no manifest names;
     // it is derived from the CTM's Bridgehub so a call to it is accounted for as that contract
@@ -642,7 +692,7 @@ pub(crate) async fn verify(
     // `verify_call_targets` then reports the pause call's target as an address this review does
     // not explain — which is the honest outcome.
     let chain_asset_handler = match ctm.BRIDGE_HUB().call().await {
-        Ok(bridgehub) => BridgehubForBootstrapView::new(bridgehub, &provider)
+        Ok(bridgehub) => BridgehubView::new(bridgehub, provider)
             .chainAssetHandler()
             .call()
             .await
@@ -920,88 +970,27 @@ fn verify_call_targets(
     }
 }
 
-/// Stage 0 opens the operational window: migrations must be paused before the CTM's own
-/// version commit will run, so a package whose stage 0 does not pause cannot reach stage 1.
-fn verify_stage0_shape(package: &BootstrapPackage, result: &mut VerificationResult) {
-    let pauses = package
-        .stage0
-        .iter()
-        .any(|c| c.data.get(..4) == Some(&PAUSE_MIGRATION_SELECTOR[..]));
-    if pauses {
-        result.report_ok("stage 0 pauses chain migrations");
-    } else {
-        result.report_error(
-            "stage 0 never pauses chain migrations: the CTM's version commit refuses to run \
-             unpaused, so stage 1 could not complete",
-        );
-    }
-}
-
-/// Stage 2 closes it, asserts the edge actually applied and binds the core executor to the
-/// coordinator. The completion gate is the last call of a derived stage 2, so its absence is not
-/// a forgotten convention but a bundle that does not match the object it claims to come from.
-/// Without `setCoordinator` no later operation could reserve the ecosystem leg.
-async fn verify_stage2_shape<P: Provider>(
-    package: &BootstrapPackage,
-    manifest: &views::BootstrapManifest,
-    core_executor: Option<Address>,
-    provider: &P,
-    result: &mut VerificationResult,
-) {
-    let binds_core_executor = package.stage2.iter().any(|c| {
-        Some(c.target) == core_executor
-            && c.data.get(..4) == Some(&SET_COORDINATOR_SELECTOR[..])
-            && c.data.get(4..36).map(|w| Address::from_slice(&w[12..]))
-                == Some(manifest.coordinator)
-    });
-    if binds_core_executor {
-        result.report_ok("stage 2 binds the core executor to the coordinator (`setCoordinator`)");
-    } else {
-        result.report_error(
-            "stage 2 never binds the core executor to the coordinator: no later operation could \
-             reserve the ecosystem leg",
-        );
-    }
-
-    let expected_binding = EcosystemUpgradeExecutorView::setCTMExecutorCall {
-        _ctmExecutor: manifest.ctmExecutor,
-    }
-    .abi_encode();
-    if package.stage2.iter().any(|call| {
-        call.target == manifest.coordinator && call.value.is_zero() && call.data == expected_binding
-    }) {
-        result.report_ok("stage 2 binds the coordinator to the reviewed CTM executor");
-    } else {
-        result.report_error("stage 2 never binds the coordinator to the reviewed CTM executor");
-    }
-
-    verify_completion_gate(package, provider, result).await;
-
-    let unpauses = package
-        .stage2
-        .iter()
-        .any(|c| c.data.get(..4) == Some(&UNPAUSE_MIGRATION_SELECTOR[..]));
-    if unpauses {
-        result.report_ok("stage 2 unpauses chain migrations");
-    } else {
-        result.report_warn(
-            "stage 2 never unpauses chain migrations: the ecosystem would stay paused after the \
-             edge completes",
-        );
-    }
-}
-
-/// The terminal call of stage 2 is the edge's completion gate: `validateApplied()` on the
-/// `RegistryBootstrapSequence` the prepare derived the whole bundle from, which asserts BOTH
-/// domains — the migration's own post-state check and the core executor's applied-row check —
-/// in one call that cannot be half-dropped.
+/// Compares each stage of the bundle against the list `RegistryBootstrapSequence` derives.
 ///
-/// The sequence is recovered from that call rather than read from a field, for the same reason
-/// the migration is recovered from `migrate()`: the verifier checks the calldata governance will
-/// execute. Its two objects are then read live and held against the rest of the package, so a
-/// terminal call pointing at some other contract that merely answers `validateApplied()` is a
-/// finding rather than a pass.
-async fn verify_completion_gate<P: Provider>(
+/// # This comparison is TRANSITIONAL SCAFFOLDING, and must not be generalised
+///
+/// It exists for one reason: a bootstrap edge has no executor to invoke, so GOVERNANCE EXECUTES
+/// THE LIST rather than invoking the sequence to execute it. Reviewing the sequence contract
+/// therefore does not establish that the calls governance will sign are the calls it derives —
+/// only comparing them does.
+///
+/// Every LATER upgrade is a recurring operation, where governance signs
+/// `coordinator.stageN(operation)` and the executors derive everything else on chain. That path
+/// needs no list comparison and must not grow one: see
+/// [`operation::verify_stage_calls`](super::operation). Do not build new machinery on top of this
+/// function — when the bootstrap edge is behind us, it goes.
+///
+/// The sequence is recovered from the terminal `validateApplied()` call rather than read from a
+/// field, for the same reason the migration is recovered from `migrate()`: the verifier checks
+/// the calldata governance will execute. Its two objects are then held against the rest of the
+/// package, so a terminal call pointing at some other contract that merely answers
+/// `validateApplied()` is a finding rather than a pass.
+async fn verify_derived_sequence<P: Provider>(
     package: &BootstrapPackage,
     provider: &P,
     result: &mut VerificationResult,
@@ -1041,9 +1030,22 @@ async fn verify_completion_gate<P: Provider>(
         ));
         return;
     }
-
-    let named_registry = match sequence.CORE_REGISTRY().call().await {
-        Ok(addr) => addr,
+    match sequence.CORE_REGISTRY().call().await {
+        Ok(named_registry) => match package.core_registry {
+            Some(reported) if reported != named_registry => {
+                result.report_error(&format!(
+                    "the completion gate asserts the ecosystem inventory {named_registry}, but \
+                     the package's core leg applies {reported}: the gate would pass over an \
+                     unapplied ecosystem"
+                ));
+                return;
+            }
+            _ => result.report_ok(&format!(
+                "stage 2 ends with the completion gate of the sequence at {} (`validateApplied()` \
+                 over the reviewed migration and core registry)",
+                last.target
+            )),
+        },
         Err(e) => {
             result.report_error(&format!(
                 "the completion gate at {} does not answer `CORE_REGISTRY()` ({e})",
@@ -1051,123 +1053,69 @@ async fn verify_completion_gate<P: Provider>(
             ));
             return;
         }
-    };
-    match package.core_registry {
-        Some(reported) if reported != named_registry => result.report_error(&format!(
-            "the completion gate asserts the ecosystem inventory {named_registry}, but the \
-             package's core leg applies {reported}: the gate would pass over an unapplied \
-             ecosystem",
-        )),
-        _ => result.report_ok(
-            "stage 2 ends with the derived completion gate, asserting both domains applied \
-             (`validateApplied()` over the reviewed migration and core registry)",
-        ),
     }
-}
 
-/// Stage 1 of a bootstrap edge is a fixed, small shape: hand the CTM to the migration, hand its
-/// ProxyAdmin to the migration, then `migrate()`. Anything else in that stage is a call a
-/// reviewer has to justify, so it is reported rather than assumed benign.
-fn verify_stage1_shape(
-    package: &BootstrapPackage,
-    manifest: &views::BootstrapManifest,
-    core_executor: Option<Address>,
-    result: &mut VerificationResult,
-) {
-    let migration = package.migration;
-    let mut saw_ctm_handover = false;
-    let mut saw_admin_handover = false;
-    let mut saw_ecosystem_admin_handover = false;
-    let mut saw_apply_l1 = false;
-    let mut saw_pause_reassert = false;
-    let mut unexpected: Vec<String> = Vec::new();
+    for (stage, submitted) in [
+        (0usize, &package.stage0),
+        (1, &package.stage1),
+        (2, &package.stage2),
+    ] {
+        let derived = match stage {
+            0 => sequence.stage0Actions().call().await,
+            1 => sequence.stage1Actions().call().await,
+            _ => sequence.stage2Actions().call().await,
+        };
+        let derived = match derived {
+            Ok(actions) => actions,
+            Err(e) => {
+                result.report_error(&format!(
+                    "the sequence at {} does not answer `stage{stage}Actions()` ({e}): the \
+                     submitted stage-{stage} calls cannot be held against the list it derives",
+                    last.target
+                ));
+                continue;
+            }
+        };
 
-    for call in &package.stage1 {
-        let selector = call.data.get(..4).unwrap_or_default();
-        if selector == TRANSFER_OWNERSHIP_SELECTOR {
-            // The argument is the sole 32-byte word after the selector.
-            let handed_to = call
-                .data
-                .get(4..36)
-                .map(|w| Address::from_slice(&w[12..]))
-                .unwrap_or_default();
-            if Some(handed_to) == core_executor {
-                // The ecosystem leg: the shared ProxyAdmin goes to the core executor, not to
-                // the migration. Expected in any edge that carries a CoreRegistry.
-                saw_ecosystem_admin_handover = true;
-            } else if handed_to != migration {
-                unexpected.push(format!(
-                    "transferOwnership on {} hands to {handed_to}, which is neither the \
-                     migration nor the core executor",
-                    call.target
+        // In ORDER and one-for-one: the derived calls are a contiguous run inside the stage, and
+        // whatever else the merge appended sits around them. An out-of-order run is a finding —
+        // the edge's own steps depend on each other (the pause before the version commit, the
+        // handovers before `migrate()`).
+        let position = submitted
+            .windows(derived.len().max(1))
+            .position(|window| {
+                derived.len() == window.len()
+                    && derived.iter().zip(window).all(|(action, call)| {
+                        action.call.target == call.target
+                            && action.call.value == call.value
+                            && action.call.data[..] == call.data[..]
+                    })
+            })
+            .filter(|_| !derived.is_empty());
+        match position {
+            Some(at) => {
+                result.report_ok(&format!(
+                    "stage {stage} carries the {} call(s) the sequence derives, in order (at \
+                     offset {at} of {} submitted)",
+                    derived.len(),
+                    submitted.len()
                 ));
-            } else if call.target == manifest.ctm {
-                saw_ctm_handover = true;
-            } else if call.target == manifest.ctmProxyAdmin {
-                saw_admin_handover = true;
-            } else {
-                unexpected.push(format!(
-                    "transferOwnership hands {} to the migration, which is neither the CTM nor \
-                     its ProxyAdmin",
-                    call.target
-                ));
+                for action in derived.iter() {
+                    result.print_info(&format!(
+                        "    · {} — {} (authority: {})",
+                        action.label, action.call.target, action.authority
+                    ));
+                }
             }
-        } else if selector == MIGRATE_SELECTOR {
-            if call.target != migration {
-                unexpected.push(format!("migrate() on an unexpected target {}", call.target));
-            }
-        } else if selector == APPLY_L1_UPGRADE_SELECTOR {
-            if Some(call.target) == core_executor {
-                saw_apply_l1 = true;
-            } else {
-                unexpected.push(format!(
-                    "applyL1Upgrade on {}, which is not the coordinator's core executor",
-                    call.target
-                ));
-            }
-        } else if selector == PAUSE_MIGRATION_SELECTOR {
-            // Re-asserted in stage 1 because the EUB path's built-in pre-step unpauses.
-            saw_pause_reassert = true;
-        } else {
-            unexpected.push(format!(
-                "unrecognised stage-1 call to {} (selector 0x{})",
-                call.target,
-                alloy::hex::encode(selector)
-            ));
+            None => result.report_error(&format!(
+                "stage {stage}'s {} submitted call(s) do not contain the {} call(s) the sequence \
+                 at {} derives, in order: governance would sign a bundle the reviewed edge does \
+                 not describe",
+                submitted.len(),
+                derived.len(),
+                last.target
+            )),
         }
-    }
-
-    if saw_ctm_handover {
-        result.report_ok("stage 1 nominates the migration as the CTM's owner");
-    } else {
-        result
-            .report_error("stage 1 never hands the CTM to the migration: `migrate()` would refuse");
-    }
-    if saw_admin_handover {
-        result.report_ok("stage 1 hands the CTM ProxyAdmin to the migration");
-    } else {
-        result.report_error(
-            "stage 1 never hands the CTM ProxyAdmin to the migration: `migrate()` would refuse",
-        );
-    }
-    if saw_pause_reassert {
-        result.report_ok("stage 1 re-asserts the migration pause");
-    }
-    match (saw_ecosystem_admin_handover, saw_apply_l1) {
-        (true, true) => result.report_ok(
-            "stage 1 carries the ecosystem leg: the shared ProxyAdmin goes to the core executor, \
-             which then applies the pinned inventory",
-        ),
-        (false, false) => result.report_ok("stage 1 carries no ecosystem leg"),
-        (admin, apply) => result.report_error(&format!(
-            "stage 1's ecosystem leg is incomplete: ProxyAdmin handover {}, applyL1Upgrade {} \
-             — the executor cannot apply an inventory over an admin it does not own",
-            if admin { "present" } else { "MISSING" },
-            if apply { "present" } else { "MISSING" }
-        )),
-    }
-    for line in unexpected {
-        result.report_warn(&format!("stage 1: {line}"));
     }
 }
 
