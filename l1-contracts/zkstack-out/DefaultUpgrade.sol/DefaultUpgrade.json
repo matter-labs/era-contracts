@@ -1,163 +1,123 @@
 [
   {
     "type": "function",
-    "name": "upgrade",
+    "name": "l2UpgradeTx",
     "inputs": [
       {
-        "name": "_proposedUpgrade",
+        "name": "_transition",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
         "type": "tuple",
-        "internalType": "struct ProposedUpgrade",
+        "internalType": "struct L2CanonicalTransaction",
         "components": [
           {
-            "name": "l2ProtocolUpgradeTx",
-            "type": "tuple",
-            "internalType": "struct L2CanonicalTransaction",
-            "components": [
-              {
-                "name": "txType",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "from",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "to",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "gasLimit",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "gasPerPubdataByteLimit",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "maxFeePerGas",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "maxPriorityFeePerGas",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "paymaster",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "nonce",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "value",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "reserved",
-                "type": "uint256[4]",
-                "internalType": "uint256[4]"
-              },
-              {
-                "name": "data",
-                "type": "bytes",
-                "internalType": "bytes"
-              },
-              {
-                "name": "signature",
-                "type": "bytes",
-                "internalType": "bytes"
-              },
-              {
-                "name": "factoryDeps",
-                "type": "uint256[]",
-                "internalType": "uint256[]"
-              },
-              {
-                "name": "paymasterInput",
-                "type": "bytes",
-                "internalType": "bytes"
-              },
-              {
-                "name": "reservedDynamic",
-                "type": "bytes",
-                "internalType": "bytes"
-              }
-            ]
-          },
-          {
-            "name": "bootloaderHash",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "defaultAccountHash",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "evmEmulatorHash",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "verifier",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "verifierParams",
-            "type": "tuple",
-            "internalType": "struct VerifierParams",
-            "components": [
-              {
-                "name": "recursionNodeLevelVkHash",
-                "type": "bytes32",
-                "internalType": "bytes32"
-              },
-              {
-                "name": "recursionLeafLevelVkHash",
-                "type": "bytes32",
-                "internalType": "bytes32"
-              },
-              {
-                "name": "recursionCircuitsSetVksHash",
-                "type": "bytes32",
-                "internalType": "bytes32"
-              }
-            ]
-          },
-          {
-            "name": "l1ContractsUpgradeCalldata",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "postUpgradeCalldata",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "upgradeTimestamp",
+            "name": "txType",
             "type": "uint256",
             "internalType": "uint256"
           },
           {
-            "name": "newProtocolVersion",
+            "name": "from",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "to",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "gasLimit",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "gasPerPubdataByteLimit",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxFeePerGas",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxPriorityFeePerGas",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "paymaster",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "nonce",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "value",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "reserved",
+            "type": "uint256[4]",
+            "internalType": "uint256[4]"
+          },
+          {
+            "name": "data",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "signature",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "factoryDeps",
+            "type": "uint256[]",
+            "internalType": "uint256[]"
+          },
+          {
+            "name": "paymasterInput",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "reservedDynamic",
+            "type": "bytes",
+            "internalType": "bytes"
           }
         ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "upgradeFromTransition",
+    "inputs": [
+      {
+        "name": "_transition",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [
@@ -170,23 +130,51 @@
     "stateMutability": "nonpayable"
   },
   {
-    "type": "function",
-    "name": "upgradeVerifierOnly",
+    "type": "event",
+    "name": "DiamondCut",
     "inputs": [
       {
-        "name": "_newProtocolVersion",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
+        "name": "facetCuts",
+        "type": "tuple[]",
+        "indexed": false,
+        "internalType": "struct Diamond.FacetCut[]",
+        "components": [
+          {
+            "name": "facet",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "action",
+            "type": "uint8",
+            "internalType": "enum Diamond.Action"
+          },
+          {
+            "name": "isFreezable",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "selectors",
+            "type": "bytes4[]",
+            "internalType": "bytes4[]"
+          }
+        ]
+      },
       {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
+        "name": "initAddress",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "initCalldata",
+        "type": "bytes",
+        "indexed": false,
+        "internalType": "bytes"
       }
     ],
-    "stateMutability": "nonpayable"
+    "anonymous": false
   },
   {
     "type": "event",
@@ -243,164 +231,133 @@
         "internalType": "bytes32"
       },
       {
-        "name": "upgrade",
+        "name": "l2ProtocolUpgradeTx",
         "type": "tuple",
         "indexed": false,
-        "internalType": "struct ProposedUpgrade",
+        "internalType": "struct L2CanonicalTransaction",
         "components": [
           {
-            "name": "l2ProtocolUpgradeTx",
-            "type": "tuple",
-            "internalType": "struct L2CanonicalTransaction",
-            "components": [
-              {
-                "name": "txType",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "from",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "to",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "gasLimit",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "gasPerPubdataByteLimit",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "maxFeePerGas",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "maxPriorityFeePerGas",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "paymaster",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "nonce",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "value",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "reserved",
-                "type": "uint256[4]",
-                "internalType": "uint256[4]"
-              },
-              {
-                "name": "data",
-                "type": "bytes",
-                "internalType": "bytes"
-              },
-              {
-                "name": "signature",
-                "type": "bytes",
-                "internalType": "bytes"
-              },
-              {
-                "name": "factoryDeps",
-                "type": "uint256[]",
-                "internalType": "uint256[]"
-              },
-              {
-                "name": "paymasterInput",
-                "type": "bytes",
-                "internalType": "bytes"
-              },
-              {
-                "name": "reservedDynamic",
-                "type": "bytes",
-                "internalType": "bytes"
-              }
-            ]
-          },
-          {
-            "name": "bootloaderHash",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "defaultAccountHash",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "evmEmulatorHash",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "verifier",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "verifierParams",
-            "type": "tuple",
-            "internalType": "struct VerifierParams",
-            "components": [
-              {
-                "name": "recursionNodeLevelVkHash",
-                "type": "bytes32",
-                "internalType": "bytes32"
-              },
-              {
-                "name": "recursionLeafLevelVkHash",
-                "type": "bytes32",
-                "internalType": "bytes32"
-              },
-              {
-                "name": "recursionCircuitsSetVksHash",
-                "type": "bytes32",
-                "internalType": "bytes32"
-              }
-            ]
-          },
-          {
-            "name": "l1ContractsUpgradeCalldata",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "postUpgradeCalldata",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "upgradeTimestamp",
+            "name": "txType",
             "type": "uint256",
             "internalType": "uint256"
           },
           {
-            "name": "newProtocolVersion",
+            "name": "from",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "to",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "gasLimit",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "gasPerPubdataByteLimit",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxFeePerGas",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxPriorityFeePerGas",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "paymaster",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "nonce",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "value",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "reserved",
+            "type": "uint256[4]",
+            "internalType": "uint256[4]"
+          },
+          {
+            "name": "data",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "signature",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "factoryDeps",
+            "type": "uint256[]",
+            "internalType": "uint256[]"
+          },
+          {
+            "name": "paymasterInput",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "reservedDynamic",
+            "type": "bytes",
+            "internalType": "bytes"
           }
         ]
       }
     ],
     "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "AddressHasNoCode",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "DelegateCallFailed",
+    "inputs": [
+      {
+        "name": "returnData",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "FacetExists",
+    "inputs": [
+      {
+        "name": "selector",
+        "type": "bytes4",
+        "internalType": "bytes4"
+      },
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
   },
   {
     "type": "error",
@@ -443,6 +400,21 @@
   {
     "type": "error",
     "name": "NewProtocolMajorVersionNotZero",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NoFunctionsForDiamondCut",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NonEmptyCalldata",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotAllBatchesExecuted",
     "inputs": []
   },
   {
@@ -521,6 +493,32 @@
   },
   {
     "type": "error",
+    "name": "RemoveFunctionFacetAddressNotZero",
+    "inputs": [
+      {
+        "name": "facet",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "RemoveFunctionFacetAddressZero",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ReplaceFunctionFacetAddressZero",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "SelectorsMustAllHaveSameFreezability",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "SettlementLayerUpgradeMustPrecedeChainUpgrade",
     "inputs": []
   },
@@ -548,6 +546,11 @@
   {
     "type": "error",
     "name": "TooMuchGas",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "UndefinedDiamondCutAction",
     "inputs": []
   },
   {

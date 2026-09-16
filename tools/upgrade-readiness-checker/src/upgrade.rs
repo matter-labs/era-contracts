@@ -4,12 +4,13 @@
 use alloy::primitives::{keccak256, Address, Bytes, B256, U256};
 use alloy::providers::{DynProvider, Provider};
 use alloy::rpc::types::Filter;
-use alloy::sol_types::{SolEvent, SolValue};
+use alloy::sol_types::{SolCall, SolEvent, SolValue};
 use anyhow::{anyhow, Context};
 use tracing::{debug, info};
 
 use crate::abi::{
-    IBridgehub::IBridgehubInstance, IChainTypeManager::NewUpgradeCutData,
+    IBootstrapUpgrade, IBridgehub::IBridgehubInstance, IChainTypeManager::NewUpgradeCutData,
+    IDefaultUpgrade, IRegistryBootstrapMigration,
     ISettlementLayerUpgrade::ISettlementLayerUpgradeInstance, L2CanonicalTransaction,
 };
 
@@ -40,15 +41,17 @@ pub async fn resolve_ctm(
 }
 
 /// Scan the settlement layer for the `NewUpgradeCutData` event matching
-/// `protocol_version` and compute the canonical tx hash of the embedded
-/// L2 upgrade transaction.
+/// `protocol_version` and compute the canonical tx hash of the L2 upgrade
+/// transaction the committed cut resolves to for `chain_id`.
 ///
-/// For v31+ upgrades, `SettlementLayerV31UpgradeBase.upgrade()` mutates
-/// `l2ProtocolUpgradeTx.data` per-chain before hashing (to splice in
-/// `ZKChainSpecificForceDeploymentsData` queried from the bridgehub/NTV). We
-/// replicate that by calling the upgrade contract's `getL2UpgradeTxData` view
-/// directly — single source of truth. Pre-v31 upgrade contracts don't expose
-/// that selector; the eth_call reverts and we fall back to the unmutated data.
+/// Registry-driven cuts (v34+) serve the FINAL per-chain transaction through
+/// the pinned engine / migration object. For legacy cut-taking commits,
+/// `SettlementLayerV31UpgradeBase.upgrade()` mutates `l2ProtocolUpgradeTx.data`
+/// per-chain before hashing (to splice in `ZKChainSpecificForceDeploymentsData`
+/// queried from the bridgehub/NTV); we replicate that by calling the upgrade
+/// contract's `getL2UpgradeTxData` view directly — single source of truth.
+/// Pre-v31 upgrade contracts don't expose that selector; the eth_call reverts
+/// and we fall back to the unmutated data.
 ///
 /// `lookback_blocks` caps how far back we scan; scans are performed newest-first
 /// so recent upgrades are found quickly.
@@ -107,10 +110,18 @@ pub async fn find_upgrade_tx_hash(
     ))
 }
 
-/// Decode `ProposedUpgrade` from the DiamondCutData init calldata (the first 4 bytes
-/// are the upgrade selector, the rest is `ProposedUpgrade` ABI-encoded), apply the
-/// per-chain `.data` mutation performed by v31+ upgrade contracts, and compute
-/// `keccak256(L2CanonicalTransaction.abi_encode())`.
+/// Resolve the L2 protocol upgrade transaction the DiamondCutData init commits on `chain_id`
+/// and compute `keccak256(L2CanonicalTransaction.abi_encode())`.
+///
+/// The init calldata takes one of three shapes, told apart by its selector:
+/// - `upgradeFromTransition(transition)` — a registry-driven transition (v34+): the engine at
+///   `initAddress` serves the FINAL per-chain transaction via
+///   `l2UpgradeTx(transition, bridgehub, chainId)`;
+/// - `upgradeFromBootstrap(migration)` — the v34 bootstrap edge: the migration object serves it
+///   via `l2UpgradeTx(chainId)`;
+/// - anything else is the legacy `upgrade(ProposedUpgrade)` (pre-v34 cut-taking commits), with
+///   the transaction embedded in the struct after the selector and its `.data` mutated per
+///   chain by the upgrade contract at execution — replayed here.
 async fn tx_hash_from_init_calldata(
     provider: &DynProvider,
     init_address: Address,
@@ -124,28 +135,53 @@ async fn tx_hash_from_init_calldata(
             init_calldata.len()
         );
     }
-    // Skip the 4-byte selector and decode the ProposedUpgrade struct.
-    let proposed = <crate::abi::IChainTypeManager::ProposedUpgrade as SolValue>::abi_decode(
-        &init_calldata[4..],
-    )
-    .context("ProposedUpgrade decode from initCalldata")?;
+    let selector: [u8; 4] = init_calldata[..4].try_into().expect("length checked above");
 
-    let mut tx = proposed.l2ProtocolUpgradeTx;
-    tx.data = rebuild_tx_data_if_v31plus(
-        provider,
-        init_address,
-        bridgehub_address,
-        chain_id,
-        tx.data.clone(),
-    )
-    .await;
+    let tx = if selector == IDefaultUpgrade::upgradeFromTransitionCall::SELECTOR {
+        let call = IDefaultUpgrade::upgradeFromTransitionCall::abi_decode(init_calldata)
+            .context("upgradeFromTransition(address) decode from initCalldata")?;
+        info!(%init_address, transition = %call._transition, "registry-driven cut: reading the chain's composed L2 tx from the engine");
+        IDefaultUpgrade::IDefaultUpgradeInstance::new(init_address, provider.clone())
+            .l2UpgradeTx(call._transition, bridgehub_address, U256::from(chain_id))
+            .call()
+            .await
+            .context("DefaultUpgrade.l2UpgradeTx call failed")?
+    } else if selector == IBootstrapUpgrade::upgradeFromBootstrapCall::SELECTOR {
+        let call = IBootstrapUpgrade::upgradeFromBootstrapCall::abi_decode(init_calldata)
+            .context("upgradeFromBootstrap(address) decode from initCalldata")?;
+        info!(migration = %call._migration, "bootstrap cut: reading the chain's composed L2 tx from the migration");
+        IRegistryBootstrapMigration::IRegistryBootstrapMigrationInstance::new(
+            call._migration,
+            provider.clone(),
+        )
+        .l2UpgradeTx(U256::from(chain_id))
+        .call()
+        .await
+        .context("RegistryBootstrapMigration.l2UpgradeTx call failed")?
+    } else {
+        // Legacy cut-taking commit: skip the 4-byte selector and decode the ProposedUpgrade struct.
+        let proposed = <crate::abi::IChainTypeManager::ProposedUpgrade as SolValue>::abi_decode(
+            &init_calldata[4..],
+        )
+        .context("ProposedUpgrade decode from initCalldata")?;
+        let mut tx = proposed.l2ProtocolUpgradeTx;
+        tx.data = rebuild_tx_data_if_v31plus(
+            provider,
+            init_address,
+            bridgehub_address,
+            chain_id,
+            tx.data.clone(),
+        )
+        .await;
+        tx
+    };
 
     Ok(canonical_tx_hash(&tx))
 }
 
-/// For v31+ upgrade contracts, call `initAddress.getL2UpgradeTxData(bridgehub, chainId,
-/// originalData)` and return the rebuilt data. For pre-v31 contracts (or any other failure),
-/// fall back to `original_data` — the older hashing path didn't mutate per-chain.
+/// For legacy v31–v33 upgrade contracts, call `initAddress.getL2UpgradeTxData(bridgehub,
+/// chainId, zksyncOS, originalData)` and return the rebuilt data. For pre-v31 contracts (or any
+/// other failure), fall back to `original_data` — the older hashing path didn't mutate per-chain.
 async fn rebuild_tx_data_if_v31plus(
     provider: &DynProvider,
     init_address: Address,

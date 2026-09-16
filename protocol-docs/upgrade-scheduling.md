@@ -22,3 +22,8 @@ or removes it.
 The per-version registry lets future releases add prerequisites without embedding release logic
 in the notifier. This change does not register a checker for any existing upgrade; release-specific
 implementation, deployment and end-to-end validation belong to the release that adopts it.
+
+Scheduling is a per-chain operational decision and not part of upgrade composition. The
+notifier's own implementation swap in an upgrade is the foreign-admin inventory row described in
+`docs/upgrade-stage-lifecycle.md`; the chain crossing it schedules is
+`CTMUpgradeExecutor.upgradeChain` (`docs/registry-driven-upgrades.md`).

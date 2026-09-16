@@ -2,123 +2,102 @@
 
 pragma solidity 0.8.28;
 
-import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
-
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgradeGenesis} from "./BaseZkSyncUpgradeGenesis.sol";
-import {ProposedUpgrade} from "./IDefaultUpgrade.sol";
-import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {IL2GenesisUpgrade} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IL1GenesisUpgrade} from "./IL1GenesisUpgrade.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
-import {
-    L2_COMPLEX_UPGRADER_ADDR,
-    L2_FORCE_DEPLOYER_ADDR,
-    L2_GENESIS_UPGRADE_ADDR
-} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {PRIORITY_TX_MAX_GAS_LIMIT, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../common/Config.sol";
-import {SemVer} from "../common/libraries/SemVer.sol";
+import {L2_GENESIS_UPGRADE_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2CanonicalTransactionLib} from "../state-transition/libraries/L2CanonicalTransactionLib.sol";
 
-import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
+import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
+import {ICTMRelease} from "./registry/objects/ICTMRelease.sol";
+import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 
-import {L1FixedForceDeploymentsHelper} from "./L1FixedForceDeploymentsHelper.sol";
+import {ZKChainSpecificForceDeploymentsLib} from "./ZKChainSpecificForceDeploymentsLib.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis, L1FixedForceDeploymentsHelper {
-    /// @notice The main function that will be called by the Admin facet.
-    /// @param _l1GenesisUpgrade the address of the l1 genesis upgrade
-    /// @param _chainId the chain id
-    /// @param _protocolVersion the current protocol version
-    /// @param _l1CtmDeployerAddress the address of the l1 ctm deployer
-    /// @param _fixedForceDeploymentsData the force deployments data
-    /// @param _factoryDeps the factory dependencies
-    function genesisUpgrade(
-        address _l1GenesisUpgrade,
-        uint256 _chainId,
-        uint256 _protocolVersion,
-        address _l1CtmDeployerAddress,
-        bytes calldata _fixedForceDeploymentsData,
-        bytes[] calldata _factoryDeps
-    ) public override returns (bytes32) {
-        address baseTokenAddress = IL1Bridgehub(s.bridgehub).baseToken(_chainId);
-
-        L2CanonicalTransaction memory l2ProtocolUpgradeTx;
-
-        {
-            bytes memory complexUpgraderCalldata;
-            {
-                bytes memory additionalForceDeploymentsData = getZKChainSpecificForceDeploymentsData(
-                    s,
-                    address(0),
-                    baseTokenAddress
-                );
-                bytes memory l2GenesisUpgradeCalldata = abi.encodeCall(
-                    IL2GenesisUpgrade.genesisUpgrade,
-                    (_chainId, _l1CtmDeployerAddress, _fixedForceDeploymentsData, additionalForceDeploymentsData)
-                );
-                complexUpgraderCalldata = abi.encodeCall(
-                    IComplexUpgrader.upgrade,
-                    (L2_GENESIS_UPGRADE_ADDR, l2GenesisUpgradeCalldata)
-                );
-            }
-
-            // slither-disable-next-line unused-return
-            (, uint32 minorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(_protocolVersion));
-            l2ProtocolUpgradeTx = L2CanonicalTransaction({
-                txType: _getUpgradeTxType(),
-                from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
-                to: uint256(uint160(L2_COMPLEX_UPGRADER_ADDR)),
-                gasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
-                gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-                maxFeePerGas: uint256(0),
-                maxPriorityFeePerGas: uint256(0),
-                paymaster: uint256(0),
-                // Note, that the protocol version is used as "nonce" for system upgrade transactions
-                nonce: minorVersion,
-                value: 0,
-                reserved: [uint256(0), 0, 0, 0],
-                data: complexUpgraderCalldata,
-                signature: new bytes(0),
-                factoryDeps: new uint256[](0),
-                paymasterInput: new bytes(0),
-                reservedDynamic: new bytes(0)
-            });
-        }
-        ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: l2ProtocolUpgradeTx,
-            bootloaderHash: bytes32(0),
-            defaultAccountHash: bytes32(0),
-            evmEmulatorHash: bytes32(0),
-            // Verifier is fetched from CTM; keep zeroed fields for backward compatibility.
-            verifier: address(0),
-            verifierParams: VerifierParams({
-                recursionNodeLevelVkHash: bytes32(0),
-                recursionLeafLevelVkHash: bytes32(0),
-                recursionCircuitsSetVksHash: bytes32(0)
-            }),
-            l1ContractsUpgradeCalldata: new bytes(0),
-            postUpgradeCalldata: new bytes(0),
-            upgradeTimestamp: 0,
-            newProtocolVersion: _protocolVersion
+/// @notice The genesis upgrade of a new chain: the initialization path of the release its CTM
+///         pins. It composes the L2 genesis transaction from that release plus the chain context
+///         `DiamondInit` has just installed, and sets it through the shared storage part
+///         ({BaseZkSyncUpgrade._upgrade}) — no fabricated transition, no nested diamond cut.
+contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
+    /// @inheritdoc IL1GenesisUpgrade
+    /// @dev Genesis is deliberately NOT routed through the committed-object entry the registry
+    ///      engines share: there is no version edge to schedule, and the verifier is already
+    ///      installed by `DiamondInit` from the same release, so it is left untouched here.
+    function genesisUpgrade() public override returns (bytes32) {
+        uint256 protocolVersion = s.protocolVersion;
+        // The chain context is the one `DiamondInit` just installed from this same CTM, so the
+        // Bridgehub answers `baseTokenAssetId(s.chainId)` with the value sitting in `s`.
+        L2CanonicalTransaction memory l2ProtocolUpgradeTx = _genesisUpgradeTx({
+            _release: ICTMRelease(IChainTypeManager(s.chainTypeManager).currentRelease()),
+            _bridgehub: s.bridgehub,
+            _chainId: s.chainId,
+            _protocolVersion: protocolVersion
         });
 
-        Diamond.FacetCut[] memory emptyArray;
-        Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
-            facetCuts: emptyArray,
-            initAddress: _l1GenesisUpgrade,
-            initCalldata: abi.encodeCall(this.upgrade, (proposedUpgrade))
+        _upgrade({
+            _newProtocolVersion: protocolVersion,
+            _upgradeTimestamp: 0,
+            _verifier: address(0),
+            _l2ProtocolUpgradeTx: l2ProtocolUpgradeTx
         });
-        Diamond.diamondCut(cutData);
 
-        emit GenesisUpgrade(address(this), l2ProtocolUpgradeTx, _protocolVersion, _factoryDeps);
+        emit GenesisUpgrade(address(this), l2ProtocolUpgradeTx, protocolVersion);
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
 
-    /// @notice the upgrade function.
-    function upgrade(ProposedUpgrade memory _proposedUpgrade) public override returns (bytes32) {
-        super.upgrade(_proposedUpgrade);
-        return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
+    /// @inheritdoc IL1GenesisUpgrade
+    function genesisUpgradeTx(
+        address _release,
+        address _bridgehub,
+        uint256 _chainId,
+        uint256 _protocolVersion
+    ) external view returns (L2CanonicalTransaction memory) {
+        return
+            _genesisUpgradeTx({
+                _release: ICTMRelease(_release),
+                _bridgehub: _bridgehub,
+                _chainId: _chainId,
+                _protocolVersion: _protocolVersion
+            });
+    }
+
+    /// @notice THE genesis composition, reached by both {genesisUpgrade} (with the executing
+    ///         chain's own context) and {genesisUpgradeTx} (with explicit context).
+    /// @param _release The release the chain is created at — the CTM's `currentRelease`.
+    /// @param _bridgehub The Bridgehub of the ecosystem the chain belongs to.
+    /// @param _chainId The chain the transaction is composed for.
+    /// @param _protocolVersion The packed version the chain starts at.
+    function _genesisUpgradeTx(
+        ICTMRelease _release,
+        address _bridgehub,
+        uint256 _chainId,
+        uint256 _protocolVersion
+    ) internal view returns (L2CanonicalTransaction memory) {
+        bytes memory l2GenesisUpgradeCalldata = abi.encodeCall(
+            IL2GenesisUpgrade.genesisUpgrade,
+            (
+                _chainId,
+                address(IBridgehubBase(_bridgehub).l1CtmDeployer()),
+                _release.fixedForceDeploymentsData(),
+                ZKChainSpecificForceDeploymentsLib.build(_bridgehub, _chainId)
+            )
+        );
+        // Genesis installs its L2 contract set through a plain `upgrade` delegate call rather than
+        // through an upgrade path's deployment plan: a new chain has nothing force-deployed yet,
+        // and routing it through a plan would add deployments the genesis engine does not perform.
+        //
+        // The envelope's nonce is `protocolUpgradeNonce` — `major << 32 | minor` — which is the
+        // bare minor version here, because `BaseZkSyncUpgradeGenesis._setNewProtocolVersion`
+        // refuses a non-zero major version on both sides of the edge.
+        return
+            L2CanonicalTransactionLib.upgradeTransaction(
+                _protocolVersion,
+                abi.encodeCall(IComplexUpgrader.upgrade, (L2_GENESIS_UPGRADE_ADDR, l2GenesisUpgradeCalldata))
+            );
     }
 }

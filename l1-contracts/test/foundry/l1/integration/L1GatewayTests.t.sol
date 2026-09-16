@@ -49,8 +49,7 @@ import {GatewayUtils} from "deploy-scripts/gateway/GatewayUtils.s.sol";
 import {Utils} from "../unit/concrete/Utils/Utils.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
-import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
-import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
@@ -454,7 +453,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
         bytes memory bridgehubMintData = abi.encode(data);
         // The CTM asset withdrawal from the gateway arrives as a single-call interop bundle emitted by
-        // the gateway's InteropCenter (see `GatewayPreparation.startMigrateChainFromGateway`).
+        // the gateway's InteropCenter (see `AdminFunctions.startMigrateChainFromGateway`).
         bytes memory message = _encodeWithdrawalBundleMessage(gatewayChainId, assetId, bridgehubMintData);
 
         GatewayUtils userUtils = new GatewayUtils();
@@ -500,38 +499,29 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         (uint32 major, uint32 minor, uint32 patch) = SemVer.unpackSemVer(uint96(currentProtocolVersion));
         uint256 newProtocolVersion = SemVer.packSemVer(major, minor + 1, patch);
 
-        ProposedUpgrade memory upgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: Utils.makeEmptyL2CanonicalTransaction(),
-            bootloaderHash: bytes32(0),
-            defaultAccountHash: bytes32(0),
-            evmEmulatorHash: bytes32(0),
-            verifier: address(0),
-            verifierParams: VerifierParams({
-                recursionNodeLevelVkHash: bytes32(0),
-                recursionLeafLevelVkHash: bytes32(0),
-                recursionCircuitsSetVksHash: bytes32(0)
-            }),
-            l1ContractsUpgradeCalldata: hex"",
-            postUpgradeCalldata: hex"",
-            upgradeTimestamp: 0,
-            newProtocolVersion: newProtocolVersion
-        });
+        // The engine reads the edge from the committed transition; the subject here is the migrated
+        // chain executing an upgrade, so the transition and its target release are stand-ins (see
+        // `Utils.mockL1OnlyTransition`).
+        address transition = makeAddr("transition");
+        Utils.mockL1OnlyTransition(
+            transition,
+            makeAddr("newRelease"),
+            currentProtocolVersion,
+            newProtocolVersion,
+            makeAddr("newVerifier")
+        );
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
             initAddress: address(upgradeImpl),
-            initCalldata: abi.encodeCall(DefaultUpgrade.upgrade, (upgrade))
+            initCalldata: abi.encodeCall(IDefaultUpgrade.upgradeFromTransition, (transition))
         });
 
         address ctm = migratingChain.getChainTypeManager();
+        // The chain reads the committed cut from its CTM rather than being handed one.
         vm.mockCall(
             ctm,
-            abi.encodeCall(IChainTypeManager.upgradeCutHash, (currentProtocolVersion)),
-            abi.encode(keccak256(abi.encode(diamondCut)))
-        );
-        vm.mockCall(
-            ctm,
-            abi.encodeCall(IChainTypeManager.protocolVersionVerifier, (newProtocolVersion)),
-            abi.encode(address(0x1))
+            abi.encodeCall(IChainTypeManager.upgradeCutForVersion, (currentProtocolVersion)),
+            abi.encode(diamondCut)
         );
         vm.mockCall(
             address(gatewayChain),
@@ -540,7 +530,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         );
 
         vm.startBroadcast(migratingChain.getAdmin());
-        migratingChain.upgradeChainFromVersion(address(migratingChain), currentProtocolVersion, diamondCut);
+        migratingChain.upgradeChainFromVersion(address(migratingChain), currentProtocolVersion);
         vm.stopBroadcast();
 
         // Verify protocol version was updated

@@ -22,6 +22,15 @@ given ecosystem (for example bridgehub address).
 
 We should aim at keeping the inputs as small as possible - as many things should be auto-detected from the network (which makes it less error prone).
 
+### `[contracts] eip7702_checker`
+
+Carry the CTM domain's live EIP-7702 checker forward from the previous prepare's output
+(`[state_transition] eip7702_checker_addr`). It is a permanent, argument-less singleton the
+`MailboxFacet` pins as an immutable, and nothing on-chain exposes it, so it cannot be
+auto-detected. Omitting it makes the prepare deploy a fresh one, which changes the Mailbox's
+immutable and therefore replaces the Mailbox facet — and cuts it on every chain — even for an
+upgrade that changes neither. Omit it only for a CTM that has no checker yet.
+
 ## Generating outputs
 
 Outputs usually consist of 4 files:

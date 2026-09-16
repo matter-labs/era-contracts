@@ -1,9 +1,11 @@
 l1_chain_id = 11155111
 
-# TODO(testnet): no L1NativeTokenVault asset ID is registered yet. Populate this
-# once the token is live; PUVT and `ecosystem upgrade-prepare-all --env testnet`
-# will bail without it.
-# zk_token_asset_id = "0x..." # TODO
+# L1 ZK token (0xf41D4478F1D6b8A096c0369B05C0b24ae00CC2dF, the v31 sim-descriptions
+# `l1_zk_token`) is now live and registered on the testnet L1NativeTokenVault
+# (0xF8d4A5195737043f45F998539D5C62Eee02E3426). Asset id derived via
+# DataEncoding.encodeNTVAssetId(l1ChainId=11155111, zkTokenL1Address) and verified
+# against the live NTV (`tokenAddress(assetId)` round-trips to the token).
+zk_token_asset_id = "0xc479e9440a8b7ce560ba8bf25e74bdd07198bf9478156a228de961132d1f479d"
 
 # Whether this environment's CTM verifier is the testnet one. Env-wide, not per-CTM.
 # Non-mainnet envs run `ZKsyncOSTestnetVerifier`, which accepts unproven batches.
@@ -22,7 +24,10 @@ bridgehub_proxy_addr = "0xc4fd2580c3487bba18d63f50301020132342fdbd"
 # TODO(EVM-1200): Retained for consumers of the legacy single-CTM shape; points to Atlas.
 [ctm_contracts]
 ctm_proxy_addr = "0x54D55e74De9c6003E7a68a1fE70E633f05761eb5"
-l1_bytecodes_supplier_addr = "0x3ad11E8BAAa24708086EEdaEE28722B8c1489e3b"
+# Atlas CTM's live BytecodesSupplier (CTM.L1_BYTECODES_SUPPLIER()). The previous
+# 0x3ad11E8B… is stale (a pre-v31 supplier lacking `evmPublishingBlock`); testnet's
+# v31 upgrade re-pointed the CTMs at new suppliers.
+l1_bytecodes_supplier_addr = "0x4332c61541c4aD8ffFB158c51d9C915e8114E845"
 rollup_da_manager = "0xC90E4E4897421E9380d734b72221f5485C3fd116"
 
 # Multi-CTM list for `protocol-ops ecosystem upgrade-prepare-all`. Only
@@ -34,7 +39,8 @@ rollup_da_manager = "0xC90E4E4897421E9380d734b72221f5485C3fd116"
 # CTM and still points at the old RollupDAManager `0x2732eA4D...`; the v31
 # upgrade flow targets the current v30 state, so we pin the v30 value.
 proxy = "0x54D55e74De9c6003E7a68a1fE70E633f05761eb5"
-bytecodes_supplier = "0x3ad11E8BAAa24708086EEdaEE28722B8c1489e3b"
+# CTM.L1_BYTECODES_SUPPLIER() on-chain (v31 re-pointed it; old 0x3ad11E8B… is stale).
+bytecodes_supplier = "0x4332c61541c4aD8ffFB158c51d9C915e8114E845"
 rollup_da_manager = "0xC90E4E4897421E9380d734b72221f5485C3fd116"
 
 # Legacy Gateway configuration for settlement layer validation

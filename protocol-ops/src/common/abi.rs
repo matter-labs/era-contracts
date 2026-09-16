@@ -36,6 +36,15 @@ pub mod i_chain_type_manager {
 }
 pub use i_chain_type_manager::IChainTypeManagerAbi;
 
+pub mod i_ctm_release {
+    alloy::sol!(
+        #[sol(rpc)]
+        ICTMReleaseAbi,
+        "../l1-contracts/zkstack-out/ICTMRelease.sol/ICTMRelease.json"
+    );
+}
+pub use i_ctm_release::ICTMReleaseAbi;
+
 pub mod zk_chain {
     alloy::sol!(
         #[sol(rpc)]
@@ -190,15 +199,6 @@ pub mod i_register_on_all_chains {
 }
 pub use i_register_on_all_chains::IRegisterOnAllChainsAbi;
 
-pub mod i_finalize_upgrade {
-    alloy::sol!(
-        #[sol(rpc)]
-        IFinalizeUpgradeAbi,
-        "../l1-contracts/zkstack-out/IFinalizeUpgrade.sol/IFinalizeUpgrade.json"
-    );
-}
-pub use i_finalize_upgrade::IFinalizeUpgradeAbi;
-
 pub mod il1_native_token_vault {
     alloy::sol!(
         #[sol(rpc)]
@@ -267,41 +267,23 @@ pub mod access_control_default_admin_rules {
 }
 pub use access_control_default_admin_rules::AccessControlDefaultAdminRulesAbi;
 
-pub mod i_core_upgrade {
+pub mod i_core_upgrade_v31 {
     alloy::sol!(
         #[sol(rpc)]
-        ICoreUpgradeAbi,
-        "../l1-contracts/zkstack-out/ICoreUpgrade.sol/ICoreUpgrade.json"
+        ICoreUpgradeV31Abi,
+        "../l1-contracts/zkstack-out/IUpgradeV31.sol/ICoreUpgradeV31.json"
     );
 }
-pub use i_core_upgrade::ICoreUpgradeAbi;
+pub use i_core_upgrade_v31::ICoreUpgradeV31Abi;
 
-pub mod i_core_upgrade_v33 {
+pub mod i_ctm_upgrade_v31 {
     alloy::sol!(
         #[sol(rpc)]
-        ICoreUpgradeV33Abi,
-        "../l1-contracts/zkstack-out/ICoreUpgradeV33.sol/ICoreUpgradeV33.json"
+        ICTMUpgradeV31Abi,
+        "../l1-contracts/zkstack-out/IUpgradeV31.sol/ICTMUpgradeV31.json"
     );
 }
-pub use i_core_upgrade_v33::ICoreUpgradeV33Abi;
-
-pub mod i_ctm_upgrade {
-    alloy::sol!(
-        #[sol(rpc)]
-        ICTMUpgradeAbi,
-        "../l1-contracts/zkstack-out/ICTMUpgrade.sol/ICTMUpgrade.json"
-    );
-}
-pub use i_ctm_upgrade::ICTMUpgradeAbi;
-
-pub mod i_record_priority_op_lower_bound {
-    alloy::sol!(
-        #[sol(rpc)]
-        IRecordPriorityOpLowerBoundAbi,
-        "../l1-contracts/zkstack-out/IRecordPriorityOpLowerBound.sol/IRecordPriorityOpLowerBound.json"
-    );
-}
-pub use i_record_priority_op_lower_bound::IRecordPriorityOpLowerBoundAbi;
+pub use i_ctm_upgrade_v31::ICTMUpgradeV31Abi;
 
 pub mod i_finalize_chain_init {
     // Hand-declared: the artifact JSON's `enum L2DACommitmentScheme`

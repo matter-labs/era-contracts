@@ -8,6 +8,7 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
 import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
+import {IOwnable} from "../../common/interfaces/IOwnable.sol";
 import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
 import {TokenBridgingData} from "../../common/Messaging.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
@@ -42,6 +43,8 @@ import {
     ChainIdNotRegistered,
     ChainMigrationsDisabled,
     MigrationPaused,
+    NotCTMOwner,
+    ChainTypeManagerNotRegistered,
     NotAssetRouter
 } from "../../common/L1ContractErrors.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
@@ -76,8 +79,10 @@ abstract contract ChainAssetHandlerBase is
 
     function _assetRouter() internal view virtual returns (IAssetRouterBase);
 
-    /// @notice Used to pause the migrations of chains. Used for upgrades.
-    bool public migrationPaused;
+    /// @dev The ECOSYSTEM-wide migration pause, owner-only: incident control that stops every
+    ///      chain's migration regardless of which CTM it belongs to. A CTM's own upgrade uses
+    ///      {ctmMigrationPaused} instead. Same slot as the former public `migrationPaused`.
+    bool internal ecosystemMigrationPaused;
 
     /// @dev The assetId of the ETH.
     /// @dev Kept here for storage layout compatibility with previous versions.
@@ -106,12 +111,20 @@ abstract contract ChainAssetHandlerBase is
     /// NOTE: this mapping may be deprecated in the future, don't rely on it!
     mapping(uint256 chainId => uint256 migrationNumber) public migrationNumber;
 
+    /// @notice Per-CTM migration pause, written by that CTM's OWNER — during an upgrade, its
+    ///         bound `CTMUpgradeExecutor`.
+    /// @dev Keyed by the CTM because that is the domain the pause is about: a chain may only
+    ///      migrate between settlement layers under its own CTM (`SLHasDifferentCTM`), so one
+    ///      CTM's upgrade never needs to stop another's chains. Authority is DERIVED from CTM
+    ///      ownership rather than stored, so replacing an executor cannot strand it.
+    mapping(address ctm => bool paused) public ctmMigrationPaused;
+
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[43] private __gap;
+    uint256[42] private __gap;
 
     /// @notice Only the asset router can call.
     modifier onlyAssetRouter() {
@@ -121,10 +134,15 @@ abstract contract ChainAssetHandlerBase is
         _;
     }
 
-    /// @notice Only when migrations are not paused.
-    modifier whenMigrationsNotPaused() {
-        if (migrationPaused) {
-            revert MigrationPaused();
+    /// @notice Only the current owner of `_ctm`, and only for a CTM this ecosystem registered.
+    /// @dev Registration is checked too: without it any contract could claim to be a CTM and
+    ///      write a pause row, and rows for unregistered addresses would be unreadable noise.
+    modifier onlyRegisteredCTMOwner(address _ctm) {
+        if (!IBridgehubBase(_bridgehub()).chainTypeManagerIsRegistered(_ctm)) {
+            revert ChainTypeManagerNotRegistered(_ctm);
+        }
+        if (_msgSender() != IOwnable(_ctm).owner()) {
+            revert NotCTMOwner(_msgSender(), _ctm);
         }
         _;
     }
@@ -195,10 +213,10 @@ abstract contract ChainAssetHandlerBase is
         requireZeroValue(_l2MsgValue + msg.value)
         onlyAssetRouter
         whenNotPaused
-        whenMigrationsNotPaused
         whenMigrationsEnabled
         returns (bytes memory bridgehubMintData)
     {
+        _requireMigrationsNotPausedFor(_assetId);
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
         uint256 chainId = bridgehubBurnData.chainId;
         require(
@@ -359,16 +377,8 @@ abstract contract ChainAssetHandlerBase is
         uint256, // unused originChainId: chain assets are identified by _assetId.
         bytes32 _assetId,
         bytes calldata _bridgehubMintData
-    )
-        external
-        payable
-        override
-        requireZeroValue(msg.value)
-        onlyAssetRouter
-        whenNotPaused
-        whenMigrationsNotPaused
-        whenMigrationsEnabled
-    {
+    ) external payable override requireZeroValue(msg.value) onlyAssetRouter whenNotPaused whenMigrationsEnabled {
+        _requireMigrationsNotPausedFor(_assetId);
         BridgehubMintCTMAssetData memory bridgehubMintData = abi.decode(
             _bridgehubMintData,
             (BridgehubMintCTMAssetData)
@@ -428,16 +438,55 @@ abstract contract ChainAssetHandlerBase is
                             PAUSE
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Pauses migration functions.
+    /// @inheritdoc IChainAssetHandlerBase
+    function migrationPaused() public view returns (bool) {
+        return ecosystemMigrationPaused;
+    }
+
+    /// @inheritdoc IChainAssetHandlerBase
+    function migrationPausedFor(address _ctm) public view returns (bool) {
+        return ecosystemMigrationPaused || ctmMigrationPaused[_ctm];
+    }
+
+    /// @inheritdoc IChainAssetHandlerBase
     function pauseMigration() external onlyOwner {
-        migrationPaused = true;
+        ecosystemMigrationPaused = true;
         emit PausedMigration(_msgSender());
     }
 
-    /// @notice Unpauses migration functions.
+    /// @inheritdoc IChainAssetHandlerBase
     function unpauseMigration() external onlyOwner {
-        migrationPaused = false;
+        ecosystemMigrationPaused = false;
         emit UnpausedMigration(_msgSender());
+    }
+
+    /// @inheritdoc IChainAssetHandlerBase
+    function pauseCTMMigration(address _ctm) external onlyRegisteredCTMOwner(_ctm) {
+        ctmMigrationPaused[_ctm] = true;
+        emit PausedCTMMigration(_ctm, _msgSender());
+    }
+
+    /// @inheritdoc IChainAssetHandlerBase
+    function unpauseCTMMigration(address _ctm) external onlyRegisteredCTMOwner(_ctm) {
+        ctmMigrationPaused[_ctm] = false;
+        emit UnpausedCTMMigration(_ctm, _msgSender());
+    }
+
+    /// @dev Refuses unless migrations are open for the CTM this chain asset belongs to — neither
+    ///      paused ecosystem-wide nor by that CTM's own owner.
+    /// @dev Called as the first BODY statement, so it runs after `whenMigrationsEnabled`: the
+    ///      release-level ban is the dominant fact when it applies, and a caller learns migrations
+    ///      are disabled outright rather than that one is paused. It cannot be a modifier —
+    ///      `bridgeBurn` has no stack room for a retained modifier parameter (see its two
+    ///      "to avoid stack too deep" blocks).
+    /// @dev A private function rather than a modifier: `bridgeBurn` is stack-tight (see its two
+    ///      "to avoid stack too deep" blocks), and a modifier's locals would live for the whole
+    ///      body, while this frame is released at once.
+    function _requireMigrationsNotPausedFor(bytes32 _assetId) private view {
+        address ctm = IBridgehubBase(_bridgehub()).ctmAssetIdToAddress(_assetId);
+        if (migrationPausedFor(ctm)) {
+            revert MigrationPaused();
+        }
     }
 
     /// @notice Pauses all functions marked with the `whenNotPaused` modifier.

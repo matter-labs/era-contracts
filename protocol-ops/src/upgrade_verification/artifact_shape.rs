@@ -10,6 +10,8 @@ use crate::upgrade_verification::{
 
 const ARTIFACT_NAME: &str = "ecosystem";
 const OPTIONAL_HEX_FIELDS: &[&[&str]] = &[
+    // `diamond_cut_data` is retired from the registry-driven prepare output; shipped v31-v33
+    // artifacts still carry it, so the shape check stays optional rather than being removed.
     &["contracts_config", "diamond_cut_data"],
     &["contracts_config", "force_deployments_data"],
 ];

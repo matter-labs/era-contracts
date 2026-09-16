@@ -6,9 +6,8 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {ZKChainBase} from "../state-transition/chain-deps/facets/ZKChainBase.sol";
 import {IVerifier} from "../state-transition/chain-interfaces/IVerifier.sol";
-import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {TransactionValidator} from "../state-transition/libraries/TransactionValidator.sol";
-import {ProposedUpgrade} from "../state-transition/libraries/ProposedUpgradeLib.sol";
+import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {MAX_ALLOWED_MINOR_VERSION_DELTA, MAX_NEW_FACTORY_DEPS} from "../common/Config.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {
@@ -24,12 +23,18 @@ import {
     SettlementLayerUpgradeMustPrecedeChainUpgrade
 } from "./ZkSyncUpgradeErrors.sol";
 import {TimeNotReached, TooManyFactoryDeps, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {NotAllBatchesExecuted} from "../state-transition/L1StateTransitionErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Interface to which all the upgrade implementations should adhere
+/// @notice The storage part shared by every per-chain upgrade engine: the version change, the
+///         verifier installation and the L2 protocol upgrade transaction. The registry-driven
+///         engines reach {_upgrade} through the one entry that resolves their committed object
+///         ({DefaultUpgrade._upgradeFromCommittedObject}); the genesis upgrade calls it directly,
+///         because genesis has rules of its own (no schedule, and the verifier is already
+///         installed by `DiamondInit`).
 abstract contract BaseZkSyncUpgrade is ZKChainBase {
     /// @notice Changes the protocol version
     event NewProtocolVersion(uint256 indexed previousProtocolVersion, uint256 indexed newProtocolVersion);
@@ -37,57 +42,84 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
     /// @notice Verifier address changed
     event NewVerifier(address indexed oldVerifier, address indexed newVerifier);
 
-    /// @notice Notifies about complete upgrade
-    event UpgradeComplete(uint256 indexed newProtocolVersion, bytes32 indexed l2UpgradeTxHash, ProposedUpgrade upgrade);
+    /// @notice Notifies about complete upgrade. `l2ProtocolUpgradeTx` is the transaction as this
+    ///         chain committed it (after any per-chain substitution); all-zero when none was set.
+    event UpgradeComplete(
+        uint256 indexed newProtocolVersion,
+        bytes32 indexed l2UpgradeTxHash,
+        L2CanonicalTransaction l2ProtocolUpgradeTx
+    );
 
-    /// @notice The main function that will be delegate-called by the chain.
-    /// @dev This is a virtual function and should be overridden by custom upgrade implementations.
-    /// @param _proposedUpgrade The upgrade to be executed.
-    /// @return txHash The hash of the L2 system contract upgrade transaction.
+    /// @notice Applies the storage part of an upgrade to the diamond this contract is delegatecalled into.
+    /// @param _newProtocolVersion The version the chain moves to.
+    /// @param _upgradeTimestamp The earliest time the upgrade may execute; zero means no gate.
+    /// @param _verifier The verifier to install. Zero means "leave unchanged": the genesis upgrade
+    /// runs after `DiamondInit` has already installed the verifier from the release.
+    /// @param _l2ProtocolUpgradeTx The L2 protocol upgrade transaction; an all-zero transaction
+    /// (`txType == 0`) sets none.
+    /// @return txHash The hash of the L2 system contract upgrade transaction set, zero when none was set.
     /// @dev Note, that the logic of the upgrade differs depending on whether the upgrade happens on the settlement layer
     /// or not. If the upgrade happens on the instance of the diamond proxy that is not on the settlement layer, we
     /// do not validate any variants about the upgrade transaction or generally don't do anything related to the upgrade transaction.
     /// Updates on diamond proxy located not on settlement layer are needed to ensure that the logic of the contracts remains compatible with
     /// the diamond proxy on the settlement layer and so are still needed to update facets, verifiers and so on.
-    function upgrade(ProposedUpgrade memory _proposedUpgrade) public virtual returns (bytes32 txHash) {
+    function _upgrade(
+        uint256 _newProtocolVersion,
+        uint256 _upgradeTimestamp,
+        address _verifier,
+        L2CanonicalTransaction memory _l2ProtocolUpgradeTx
+    ) internal virtual returns (bytes32 txHash) {
         // Note that due to commitment delay, the timestamp of the L2 upgrade batch may be earlier than the timestamp
         // of the L1 block at which the upgrade occurred. This means that using timestamp as a signifier of "upgraded"
         // on the L2 side would be inaccurate. The effects of this "back-dating" of L2 upgrade batches will be reduced
         // as the permitted delay window is reduced in the future.
-        if (block.timestamp < _proposedUpgrade.upgradeTimestamp) {
-            revert TimeNotReached(_proposedUpgrade.upgradeTimestamp, block.timestamp);
+        if (block.timestamp < _upgradeTimestamp) {
+            revert TimeNotReached(_upgradeTimestamp, block.timestamp);
         }
+
         // If settlement layer is 0, it means that this diamond proxy is located on the settlement layer.
         bool isOnSettlementLayer = s.settlementLayer == address(0);
 
         if (!isOnSettlementLayer) {
             require(
-                _proposedUpgrade.newProtocolVersion <= IZKChain(s.settlementLayer).getProtocolVersion(),
+                _newProtocolVersion <= IZKChain(s.settlementLayer).getProtocolVersion(),
                 SettlementLayerUpgradeMustPrecedeChainUpgrade()
             );
         }
 
-        (uint32 newMinorVersion, bool isPatchOnly) = _setNewProtocolVersion(
-            _proposedUpgrade.newProtocolVersion,
-            isOnSettlementLayer
-        );
-        _upgradeL1Contract(_proposedUpgrade.l1ContractsUpgradeCalldata);
-        // Fetch verifier from CTM based on new protocol version.
-        // It must be set for every protocol version.
-        address ctmVerifier = IChainTypeManager(s.chainTypeManager).protocolVersionVerifier(
-            _proposedUpgrade.newProtocolVersion
-        );
-        _setVerifier(IVerifier(ctmVerifier));
+        (uint32 newMinorVersion, bool isPatchOnly) = _setNewProtocolVersion(_newProtocolVersion, isOnSettlementLayer);
+        if (_verifier != address(0)) {
+            _setVerifier(IVerifier(_verifier));
+        }
 
         // The upgrades that happen not on settlement layers are to update the logic of the facets
         // only and do not include the upgrade transaction.
         if (isOnSettlementLayer) {
-            txHash = _setL2SystemContractUpgrade(_proposedUpgrade.l2ProtocolUpgradeTx, newMinorVersion, isPatchOnly);
+            txHash = _setL2SystemContractUpgrade(_l2ProtocolUpgradeTx, newMinorVersion, isPatchOnly);
         }
 
-        _postUpgrade(_proposedUpgrade.postUpgradeCalldata);
+        emit UpgradeComplete(_newProtocolVersion, txHash, _l2ProtocolUpgradeTx);
+    }
 
-        emit UpgradeComplete(_proposedUpgrade.newProtocolVersion, txHash, _proposedUpgrade);
+    /// @notice Reverts unless every batch the chain has committed is also executed.
+    /// @dev The generic engines require this before {_upgrade} because they install the TARGET
+    ///      release's verifier (see {_setVerifier}), and a release ships a fresh one: batches still
+    ///      awaiting proof under the old verifier would stop being provable. Good practice rather
+    ///      than an invariant — the upgrade only sees the state of the block it lands in.
+    function _requireAllBatchesExecuted() internal view {
+        if (s.totalBatchesCommitted != s.totalBatchesExecuted) {
+            revert NotAllBatchesExecuted();
+        }
+    }
+
+    /// @notice Applies DERIVED, ready-to-execute diamond cuts to the diamond this contract is
+    ///         delegatecalled into, verbatim — there is nothing to resolve or re-diff at execution
+    ///         time. An empty list is a no-op.
+    function _applyDerivedFacetCuts(Diamond.FacetCut[] memory _facetCuts) internal {
+        if (_facetCuts.length == 0) {
+            return;
+        }
+        Diamond.diamondCut(Diamond.DiamondCutData({facetCuts: _facetCuts, initAddress: address(0), initCalldata: ""}));
     }
 
     /// @notice Change the address of the verifier smart contract
@@ -224,16 +256,4 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         s.protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
     }
-
-    /// @notice Placeholder function for custom logic for upgrading L1 contract.
-    /// Typically this function will never be used.
-    /// @param _customCallDataForUpgrade Custom data for an upgrade, which may be interpreted differently for each
-    /// upgrade.
-    function _upgradeL1Contract(bytes memory _customCallDataForUpgrade) internal virtual {}
-
-    /// @notice placeholder function for custom logic for post-upgrade logic.
-    /// Typically this function will never be used.
-    /// @param _customCallDataForUpgrade Custom data for an upgrade, which may be interpreted differently for each
-    /// upgrade.
-    function _postUpgrade(bytes memory _customCallDataForUpgrade) internal virtual {}
 }

@@ -7,7 +7,6 @@ import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 
-import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
@@ -30,7 +29,6 @@ contract DiamondProxyTest is UtilsCallMockerTest {
     Diamond.FacetCut[] internal facetCuts;
     address internal testnetVerifier = address(new ZKsyncOSTestnetVerifier(IVerifier(address(0))));
     DummyBridgehub internal dummyBridgehub;
-    InitializeData internal initializeData;
 
     function getTestFacetSelectors() public pure returns (bytes4[] memory selectors) {
         selectors = new bytes4[](1);
@@ -55,9 +53,14 @@ contract DiamondProxyTest is UtilsCallMockerTest {
             })
         );
         dummyBridgehub = new DummyBridgehub();
-        initializeData = Utils.makeInitializeData(address(dummyBridgehub));
-
-        mockDiamondInitInteropCenterCallsWithAddress(initializeData.bridgehub, address(0), bytes32(0));
+        // DiamondInit derives everything but (chainId, admin) from the CTM — msg.sender during
+        // the proxy construction — so these tests prank as Utils.TEST_CHAIN_TYPE_MANAGER and
+        // mock its getters here.
+        mockDiamondInitInteropCenterCallsWithAddress(
+            address(dummyBridgehub),
+            address(0),
+            Utils.TEST_BASE_TOKEN_ASSET_ID
+        );
         mockChainTypeManagerVerifier(testnetVerifier);
     }
 
@@ -65,10 +68,11 @@ contract DiamondProxyTest is UtilsCallMockerTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit()),
-            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+            initCalldata: abi.encodeCall(DiamondInit.initialize, (Utils.TEST_CHAIN_ID, Utils.TEST_CHAIN_ADMIN))
         });
 
         vm.expectRevert(bytes("pr"));
+        vm.prank(Utils.TEST_CHAIN_TYPE_MANAGER);
         new DiamondProxy(block.chainid + 1, diamondCutData);
     }
 
@@ -76,8 +80,10 @@ contract DiamondProxyTest is UtilsCallMockerTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit()),
-            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+            initCalldata: abi.encodeCall(DiamondInit.initialize, (Utils.TEST_CHAIN_ID, Utils.TEST_CHAIN_ADMIN))
         });
+
+        vm.prank(Utils.TEST_CHAIN_TYPE_MANAGER);
 
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
 
@@ -91,8 +97,10 @@ contract DiamondProxyTest is UtilsCallMockerTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit()),
-            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+            initCalldata: abi.encodeCall(DiamondInit.initialize, (Utils.TEST_CHAIN_ID, Utils.TEST_CHAIN_ADMIN))
         });
+
+        vm.prank(Utils.TEST_CHAIN_TYPE_MANAGER);
 
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
 
@@ -106,8 +114,10 @@ contract DiamondProxyTest is UtilsCallMockerTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit()),
-            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+            initCalldata: abi.encodeCall(DiamondInit.initialize, (Utils.TEST_CHAIN_ID, Utils.TEST_CHAIN_ADMIN))
         });
+
+        vm.prank(Utils.TEST_CHAIN_TYPE_MANAGER);
 
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
 
@@ -126,8 +136,10 @@ contract DiamondProxyTest is UtilsCallMockerTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
             initAddress: address(new DiamondInit()),
-            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+            initCalldata: abi.encodeCall(DiamondInit.initialize, (Utils.TEST_CHAIN_ID, Utils.TEST_CHAIN_ADMIN))
         });
+
+        vm.prank(Utils.TEST_CHAIN_TYPE_MANAGER);
 
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
         TestFacet testFacet = TestFacet(address(diamondProxy));
@@ -140,8 +152,10 @@ contract DiamondProxyTest is UtilsCallMockerTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit()),
-            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+            initCalldata: abi.encodeCall(DiamondInit.initialize, (Utils.TEST_CHAIN_ID, Utils.TEST_CHAIN_ADMIN))
         });
+
+        vm.prank(Utils.TEST_CHAIN_TYPE_MANAGER);
 
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
         TestFacet testFacet = TestFacet(address(diamondProxy));
@@ -157,8 +171,10 @@ contract DiamondProxyTest is UtilsCallMockerTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit()),
-            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+            initCalldata: abi.encodeCall(DiamondInit.initialize, (Utils.TEST_CHAIN_ID, Utils.TEST_CHAIN_ADMIN))
         });
+
+        vm.prank(Utils.TEST_CHAIN_TYPE_MANAGER);
 
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
         TestFacet testFacet = TestFacet(address(diamondProxy));
@@ -180,8 +196,10 @@ contract DiamondProxyTest is UtilsCallMockerTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: cuts,
             initAddress: address(new DiamondInit()),
-            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+            initCalldata: abi.encodeCall(DiamondInit.initialize, (Utils.TEST_CHAIN_ID, Utils.TEST_CHAIN_ADMIN))
         });
+
+        vm.prank(Utils.TEST_CHAIN_TYPE_MANAGER);
 
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
         TestFacet testFacet = TestFacet(address(diamondProxy));

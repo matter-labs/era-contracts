@@ -1,7 +1,7 @@
 use std::{
     fs::{self, File},
     io::Write,
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 use alloy::{
@@ -9,32 +9,13 @@ use alloy::{
     primitives::{keccak256, Address, Bytes, FixedBytes, Keccak256, U160},
 };
 
+pub use crate::upgrade_verification::paths::repo_relative_path;
+
 pub mod address_verifier;
 pub mod bytecode_verifier;
 pub mod facet_cut_set;
 pub mod network_verifier;
 pub mod transactions_log;
-
-pub fn repo_relative_path(relative_path: impl AsRef<Path>) -> PathBuf {
-    let relative_path = relative_path.as_ref();
-    if relative_path.is_absolute() {
-        return relative_path.to_path_buf();
-    }
-
-    if let Ok(current_dir) = std::env::current_dir() {
-        for ancestor in current_dir.ancestors() {
-            let candidate = ancestor.join(relative_path);
-            if candidate.exists() {
-                return candidate;
-            }
-        }
-    }
-
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("protocol-ops must be a direct child of the repository root")
-        .join(relative_path)
-}
 
 pub async fn get_contents_from_github(commit: &str, repo: &str, file_path: &str) -> String {
     let url = format!(

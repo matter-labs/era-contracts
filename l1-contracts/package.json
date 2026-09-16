@@ -38,7 +38,7 @@
     "test:foundry": "forge test --threads 1 --ffi --gas-limit 20000000000 --match-path 'test/foundry/{l1,zksync-os}/*' --no-match-test 'test_DefaultUpgrade_MainnetFork' --no-match-contract 'ChainRegistrarTest'",
     "test:mainnet-upgrade-fork": "forge test --match-test test_DefaultUpgrade_MainnetFork --ffi --rpc-url $INFURA_MAINNET --gas-limit 2000000000",
     "test:invariant:l1-context": "WHERE=L1 scripts/run-invariant-tests",
-    "coverage:foundry": "forge coverage --threads 1 --ffi --match-path 'test/foundry/{l1,zksync-os}/*' --no-match-coverage 'contracts/(bridge/.*L2.*\\.sol|governance/L2AdminFactory\\.sol|state-transition/verifiers/ZKsyncOSVerifierPlonk\\.sol)' --no-match-test 'test_StageProofsForkScriptBased|test_StageProofsForkFileBased|test_DefaultUpgrade' --no-match-contract 'ChainRegistrarTest'",
+    "coverage:foundry": "forge coverage --threads 1 --ffi --match-path 'test/foundry/{l1,zksync-os}/*' --no-match-coverage 'contracts/(bridge/.*L2.*\\.sol|governance/L2AdminFactory\\.sol|state-transition/verifiers/ZKsyncOSVerifierPlonk\\.sol)' --no-match-test 'test_StageProofsForkScriptBased|test_StageProofsForkFileBased|test_DefaultUpgrade|test_v34BootstrapUpgrade_Local' --no-match-contract 'ChainRegistrarTest'",
     "coverage-report": "forge coverage --report lcov -r ./lcov.info --ffi --match-path 'test/foundry/{l1,zksync-os}/*' --no-match-coverage 'contracts/(governance/L2AdminFactory\\.sol|state-transition/verifiers/ZKsyncOSVerifierPlonk\\.sol)' --no-match-test 'test_StageProofsForkScriptBased|test_StageProofsForkFileBased|test_DefaultUpgrade' --no-match-contract 'ChainRegistrarTest' && genhtml -o report lcov.info --branch-coverage  --ignore-errors category lcov.info --ignore-errors inconsistent",
     "coverage-untested": "yarn coverage-report && ts-node scripts/generate-untested-lines-report.ts ./lcov.info ./UNTESTED_LINES_REPORT.md",
     "coverage-untested-quick": "ts-node scripts/generate-untested-lines-report.ts ./lcov.info ./UNTESTED_LINES_REPORT.md",
@@ -52,7 +52,8 @@
     "selectors": "ts-node ../scripts/selectors.ts",
     "write-factory-deps-zksync-os": "ts-node scripts/write-factory-deps-zksync-os.ts",
     "fmt": "prettier --write \"**/*.json\" --cache",
-    "copy-to-zkstack-out": "ts-node scripts/copy-to-zkstack-out.ts && yarn fmt"
+    "copy-to-zkstack-out": "ts-node scripts/copy-to-zkstack-out.ts && yarn fmt",
+    "regen": "bash scripts/regen-generated-artifacts.sh"
   },
   "dependencies": {
     "dotenv": "^16.0.3",

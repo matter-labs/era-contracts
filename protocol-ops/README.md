@@ -57,7 +57,51 @@ the duration of the command and stops when it exits.
 To apply the generated Safe bundles to a real chain, use `dev execute-manifest` (or any
 Safe-bundle-aware executor) with the keys from `wallets.yaml`.
 
+## Verifying a registry-driven upgrade before it is signed
+
+`ecosystem verify-bootstrap` (alias `verify-package`) is the verifier for current packages. It
+reads the merged `ecosystem.toml`, decides from the package itself whether it drives a recurring
+upgrade or the one-time bootstrap edge, and refuses a package that is neither. It is read-only and
+needs nothing but that file and an L1 RPC.
+
+```bash
+cargo run --release --bin protocol_ops -- ecosystem verify-bootstrap \
+  --ecosystem-toml <path-to>/ecosystem.toml \
+  --l1-rpc-url <l1-rpc-url> \
+  --expected-governance-owner 0x... \
+  --create2-salt 0x...
+```
+
+It answers two questions and keeps them apart.
+
+**What does this upgrade do?** is answered by reviewing the objects the package names — the
+operation, the transition it may carry, the release pair, the core registry. Each is read live,
+identified against `AllContractsHashes.json`, and held against its own construction: the reviewed
+creation code, run on the manifest that object itself serves, must land at the object's address.
+That is what establishes the audited CONSTRUCTOR produced it, which a runtime codehash cannot —
+so it needs the reviewed commit built locally (`cd l1-contracts && forge build`) for the creation
+code BYTES, and the reviewed CREATE2 salts, which packages that record their own supply
+automatically.
+
+**Does the signed transaction invoke it?** is answered, for a recurring upgrade, by re-encoding
+`EcosystemUpgradeExecutor.stage0/1/2(operation)` on the reviewed coordinator and comparing byte
+for byte. The operation's internal calls are deliberately not re-derived — the executors derive
+them on chain from the same pinned object. Any call that is neither a lifecycle call nor a
+declared external action fails the run.
+
+Around those it checks what the objects cannot answer for themselves: authority bound where the
+review says (governance, coordinator, both domain executors, the CTM and both ProxyAdmins), the
+live state the upgrade departs from, and readiness — the L2 factory dependencies published on the
+CTM's supplier, the timer startable, no lifecycle already in flight. Readiness is reported apart
+from anything about value.
+
+Anything a reviewer could not establish is an ERROR, never a warning: warnings do not fail a run,
+so an unverifiable input reported as one reads, afterwards, exactly like a check that passed.
+
 ## Running the Protocol Upgrade Verification Tool (PUVT)
+
+> **Historical.** `ecosystem verify-upgrade` is the pre-registry (v31) calldata verifier. It is
+> kept to re-review v31-era packages; current packages go through `verify-bootstrap` above.
 
 `ecosystem verify-upgrade` re-derives and cross-checks the calldata produced by
 `ecosystem upgrade-prepare-all` for the **v31 → v32 ZKsync OS upgrade**. It is
