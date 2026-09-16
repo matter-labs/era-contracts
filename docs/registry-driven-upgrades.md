@@ -80,11 +80,21 @@ enum's member count (`L1_ECOSYSTEM_CONTRACT_COUNT` / `CTM_CONTRACT_COUNT`):
   (ChainTypeManager, ValidatorTimelock, BytecodesSupplier, PermissionlessValidator) through the
   executor's bound admin, and the `ServerNotifier` through the row's own named admin.
 
-Slot `uint256(member)` IS that contract's row; a slot whose `implNew` is zero is the **explicit
-"not upgraded" statement**. The length check means a manifest cannot omit a slot, and the enum —
-being the same one deployment uses — is the single naming scheme end to end.
-`ProxyUpgradeRowLib.toRows` flattens the array into the `ProxyUpgradeRow[]` the executors apply,
-dropping the inert slots, so the executors never recompile when the inventory grows.
+Slot `uint256(member)` IS that contract's row; a slot whose `implNew` is zero is the **"not
+upgraded" statement**. The length check means every contract of the domain HAS a slot and none can
+be smuggled in, and the enum — being the same one deployment uses — is the single naming scheme end
+to end. `ProxyUpgradeRowLib.toRows` flattens the array into the `ProxyUpgradeRow[]` the executors
+apply, dropping the inert slots, so the executors never recompile when the inventory grows.
+
+**What the length check does not give you.** It guarantees the SLOTS exist, not that preparation
+populated every intended change: an inert slot is the same bytes whether the upgrade deliberately
+leaves the contract alone or whether nobody wrote its row builder. Nothing on-chain can tell those
+apart — only the run that produced the deployments can. That is why preparation refuses an
+implementation it deployed that no row installs and no version script named as deliberately
+uninstalled (`_requireDeployedImplementationsInstalled` on both `DefaultCoreUpgrade` and
+`DefaultCTMUpgrade`; `uninstalledCoreDeployments` / `uninstalledCTMDeployments` are the
+declarations). A reviewer reading a manifest is reading recorded decisions, and still has to check
+them against the release.
 
 **A row names its admin.** `ProxyUpgradeRow.admin` is zero for the common case — the applying
 executor's bound `ProxyAdmin` — and set for a proxy administered elsewhere. A transparent proxy

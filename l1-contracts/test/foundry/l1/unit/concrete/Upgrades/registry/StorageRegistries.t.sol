@@ -1219,8 +1219,9 @@ contract StorageRegistriesTest is Test {
     // ─────────────────────────── core registry inventory ───────────────────────────
 
     function test_revertWhen_inventoryLengthDoesNotMatchTheEnum() public {
-        // The dynamic inventory must be COMPLETE: exactly one slot per enum member, so a
-        // manifest can neither omit a slot nor smuggle an extra one.
+        // The dynamic inventory must be exactly one slot per enum member, so every contract of
+        // the domain HAS a slot and none can be smuggled in. Whether the slot says what the
+        // upgrade meant is preparation's job, not this length check's.
         CoreRegistryManifest memory manifest = _coreManifest();
         ProxyUpgradeRow[] memory tooShort = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT - 1);
         tooShort[uint256(L1EcosystemContract.L1Bridgehub)] = manifest.proxyUpgrades[

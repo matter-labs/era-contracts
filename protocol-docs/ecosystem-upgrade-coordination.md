@@ -46,6 +46,14 @@ moves no version: not the CTM's `protocolVersion`, not its `currentRelease`, no 
 version deadline and no pending L2 upgrade. It goes through the same three stages, the same
 reservations and the same migration pause as any other operation.
 
+Preparation emits one because the version script **declares** it does
+(`DefaultCTMUpgrade.upgradeKind`), never because the version numbers happen to match. Two releases
+sharing a version number is a consequence of an infrastructure-only edge, not a statement that one
+is intended; deriving the kind from it would let a mistyped version silently change what is being
+prepared. The declaration comes first and the version relationship is checked against it in both
+directions: an infrastructure-only edge whose input names another version is refused, and so is a
+chain-release edge whose input forgot to move it.
+
 ### The delay and the schedule are independent
 
 The operation's `timer` is the delay before GOVERNANCE may execute stage 1 on L1. The transition's

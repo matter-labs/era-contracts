@@ -23,13 +23,12 @@ import {
 ///         (idempotence); a proxy at `expectedOldImpl` is upgraded; a proxy at anything else
 ///         reverts, so replaying a stale object can never downgrade a proxy that a later upgrade
 ///         has already moved on.
-/// @dev Manifests carry rows as COMPLETE inventories indexed by the canonical contract enums
+/// @dev Manifests carry rows as inventories indexed by the canonical contract enums
 ///      (`L1EcosystemContract` for the ecosystem domain, `CTMContract` for the CTM domain — one
 ///      enum per domain for deployment and upgrades alike), with the array length checked
 ///      against the enum's member count. `toRows` is the single point where those become the
-///      row arrays everything below consumes, dropping the slots explicitly marked "not
-///      upgraded" (zero `implNew`). Appliers therefore never see the inventory shape and
-///      survive it growing.
+///      row arrays everything below consumes, dropping the slots marked "not upgraded" (zero
+///      `implNew`). Appliers therefore never see the inventory shape and survive it growing.
 library ProxyUpgradeRowLib {
     /// @notice Emitted (from the applying contract) for every proxy pointed at its new
     ///         implementation. The proxy ADDRESS is the row identity (human labels live in the
@@ -47,10 +46,14 @@ library ProxyUpgradeRowLib {
         return address(_row.admin) == address(0) ? _defaultAdmin : _row.admin;
     }
 
-    /// @notice Flattens an enum-indexed inventory into rows. The inventory is COMPLETE by
-    ///         construction: its length must be exactly the domain enum's member count
-    ///         (`L1_ECOSYSTEM_CONTRACT_COUNT` / `CTM_CONTRACT_COUNT` — the caller passes its
-    ///         domain's), so a manifest can neither omit a slot nor smuggle an extra one.
+    /// @notice Flattens an enum-indexed inventory into rows. Its length must be exactly the domain
+    ///         enum's member count (`L1_ECOSYSTEM_CONTRACT_COUNT` / `CTM_CONTRACT_COUNT` — the
+    ///         caller passes its domain's), so every member of the domain HAS a slot and none can
+    ///         be smuggled in.
+    /// @dev What that does NOT establish is that the slot says what the upgrade meant it to say: an
+    ///      inert slot reads the same whether the upgrade leaves the contract alone or whether
+    ///      preparation never built its row. Only preparation can tell those apart, and it does —
+    ///      see `DefaultCoreUpgrade._requireDeployedImplementationsInstalled`.
     function toRows(
         ProxyUpgradeRow[] memory _slots,
         uint256 _inventoryLength

@@ -34,11 +34,13 @@ contract CoreRegistry is ICoreRegistry {
     /// @notice Pins the full manifest. This contract has NO state-mutating function at all — the
     ///         manifest is written once, at construction, so write-once is structural rather than
     ///         a runtime guard, and `manifestHash` can never describe a stale object.
-    /// @param _manifest The manifest to pin. Its inventory is the COMPLETE slot array indexed
-    ///        by `L1EcosystemContract` (length checked against the enum's member count in
-    ///        `toRows`) — every ecosystem contract has a slot, and a zero `implNew` is the
-    ///        explicit "not upgraded" statement, so the audited calldata shows what the upgrade
-    ///        leaves alone as clearly as what it changes.
+    /// @param _manifest The manifest to pin. Its inventory is the slot array indexed by
+    ///        `L1EcosystemContract` (length checked against the enum's member count in `toRows`) —
+    ///        every ecosystem contract has a slot, and a zero `implNew` is the "not upgraded"
+    ///        statement, so the audited calldata shows what the upgrade leaves alone beside what it
+    ///        changes. A reviewer still has to check those statements against the release: the
+    ///        length check cannot tell an intended "leave alone" from a row preparation never
+    ///        built (see {ProxyUpgradeRowLib.toRows}).
     constructor(CoreRegistryManifest memory _manifest) {
         ProxyUpgradeRow[] memory rows = ProxyUpgradeRowLib.toRows(_manifest.proxyUpgrades, L1_ECOSYSTEM_CONTRACT_COUNT);
         // Sentinel against pinning an empty manifest: a registry that upgrades nothing is not a

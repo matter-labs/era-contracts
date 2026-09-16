@@ -104,9 +104,11 @@ enum ZKsyncOSUpgradeType {
 ///         the ecosystem domain. ONE enum for both deployment identity and upgrades: member
 ///         names are the deploy artifact names, and a `CoreRegistryManifest` carries its
 ///         upgrades as a `ProxyUpgradeRow[L1_ECOSYSTEM_CONTRACT_COUNT]` fixed array indexed by
-///         this enum — slot `uint256(member)` IS that contract's row, a zero `implNew` in it is
-///         the explicit "not upgraded" statement, and the fixed length makes completeness
-///         structural: a manifest cannot omit a slot.
+///         this enum — slot `uint256(member)` IS that contract's row, and a zero `implNew` in it
+///         is the "not upgraded" statement. The fixed length guarantees every member HAS a slot;
+///         it does not guarantee that preparation wrote every intended change into one, since an
+///         inert slot and a row that was never built are the same bytes (see
+///         {ProxyUpgradeRowLib.toRows}).
 /// @dev APPEND-ONLY: numeric values are stable identifiers — never reorder or remove members.
 ///      Appending one grows the manifest array, which the next release's objects pick up.
 enum L1EcosystemContract {

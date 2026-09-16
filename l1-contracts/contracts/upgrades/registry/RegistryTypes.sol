@@ -183,10 +183,11 @@ struct OperationManifest {
 /// @dev Carries NO protocol version (version-schedule identity is owned by {CTMTransition})
 ///      and NO proxy admin (the `EcosystemUpgradeExecutor` is bound to its immutable
 ///      `ProxyAdmin`). A core registry pins ONLY the ecosystem inventory.
-/// @param proxyUpgrades The COMPLETE ecosystem inventory, indexed by {L1EcosystemContract}:
-///        slot `uint256(member)` is that contract's row and a zero `implNew` is the explicit
-///        "not upgraded" statement. The length MUST be exactly `L1_ECOSYSTEM_CONTRACT_COUNT`
-///        (enforced at construction), so a manifest cannot omit a slot.
+/// @param proxyUpgrades The ecosystem inventory, indexed by {L1EcosystemContract}: slot
+///        `uint256(member)` is that contract's row and a zero `implNew` is the "not upgraded"
+///        statement. The length MUST be exactly `L1_ECOSYSTEM_CONTRACT_COUNT` (enforced at
+///        construction), so every ecosystem contract HAS a slot — which is not the same as every
+///        intended change having been written into one (see {ProxyUpgradeRowLib.toRows}).
 struct CoreRegistryManifest {
     ProxyUpgradeRow[] proxyUpgrades;
 }

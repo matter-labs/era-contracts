@@ -144,7 +144,26 @@ external consumers is required before rollout.
 
 Start from `v35/`: inherit the `Default*Upgrade` bases, override `deployNew*Contracts` with the
 contracts the release changes, name every release member you replace in `changedReleaseMembers()`,
-and keep everything else derived. A release whose L2 built-ins change must also author the L2
+and keep everything else derived.
+
+**Declare what the upgrade is.** `DefaultCTMUpgrade.upgradeKind()` returns `ChainRelease` by
+default — the edge deploys the upgrade engine and a `CTMTransition`, and the protocol version
+moves. An upgrade that only replaces ecosystem or CTM-domain singletons behind their proxies
+overrides it with `InfrastructureOnly`: no transition, no engine, no cut, and the operation carries
+its rows and timer alone, so a `ValidatorTimelock` swap costs no fleet-wide version adoption. The
+declaration is a version-script hook rather than an input key for the same reason
+`changedReleaseMembers()` is one — what an upgrade sets out to change is a property of the release,
+identical on every environment — and the version numbers are checked AGAINST it: an
+infrastructure-only edge whose input names another version is refused, and so is a chain-release
+edge whose input forgot to move it.
+
+**Every implementation the run deploys must be installed.** Preparation refuses an implementation
+it deployed that no inventory row installs, unless the version names its slot in
+`uninstalledCoreDeployments()` / `uninstalledCTMDeployments()` — a deployment nothing references is
+either a swap that will silently not ship or a row builder nobody wrote, and both look like a
+successful prepare from the output alone.
+
+A release whose L2 built-ins change must also author the L2
 side (`authorL2Side`: delegate/extra bytecode infos, the pinned composer and the bytecode
 artifacts needed to publish the constructed plan’s factory dependencies — `CTMUpgrade_v34` shows the shape) because the release-pair derivation puts the
 changed built-ins in the L2 leg. Any governance or admin call the version needs beyond the three
@@ -154,6 +173,10 @@ coordinator calls is a `declareExternalAction`.
 
 - `test/foundry/l1/integration/UpgradeTestv34_Local.t.sol` — the bootstrap edge through the real
   prepare pipeline, in-forge, including the chain crossing via the legacy cut-taking leg.
+- `test/foundry/l1/integration/UpgradeTestRecurring_Local.t.sol` — RECURRING prepares on the
+  ecosystem that fixture leaves behind: the infrastructure-only, chain-release and mixed shapes
+  preparation can emit, and the four it must refuse (an empty operation, either version/kind
+  contradiction, an orphaned deployment on either domain).
 - `test/anvil-interop/run-v33-to-v34-upgrade-test.ts` — the bootstrap driven end to end by
   protocol-ops against the frozen departing-version chain states, then two registry-driven hops
   on the same chains: a same-minor verifier patch (run with the bootstrap's L2 transaction still
