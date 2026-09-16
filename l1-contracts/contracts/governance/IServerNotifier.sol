@@ -22,6 +22,11 @@ interface IServerNotifier {
     /// @param upgradeTimestamp UNIX timestamp when the upgrade is expected.
     event UpgradeTimestampUpdated(uint256 indexed chainId, uint256 indexed protocolVersion, uint256 upgradeTimestamp);
 
+    /// @notice Emitted to notify the server before the chain admin changes which proof systems the chain requires.
+    /// @param chainId The ID of the chain.
+    /// @param disabledProofSystems The mask the chain admin is going to set with `setProofSystemStatus`.
+    event ProofSystemStatusNotified(uint256 indexed chainId, uint8 disabledProofSystems);
+
     /// @notice Returns the upgrade timestamp for a specific chain ID and protocol version.
     /// @param _chainId The ID of the chain to query.
     /// @param _oldProtocolVersion The protocol version to query.
@@ -38,4 +43,6 @@ interface IServerNotifier {
     function migrateFromGateway(uint256 _chainId) external;
 
     function setUpgradeTimestamp(uint256 _chainId, uint256 _upgradeTimestamp) external;
+
+    function notifyProofSystemStatus(uint256 _chainId, uint8 _disabledProofSystems) external;
 }

@@ -160,6 +160,23 @@ contract ServerNotifierTest is Test {
         vm.stopPrank();
     }
 
+    function test_notifyProofSystemStatusEmitsEvent() public {
+        vm.startPrank(chainAdmin);
+        vm.expectEmit(true, false, false, true, address(serverNotifier));
+        emit IServerNotifier.ProofSystemStatusNotified(chainId, 2);
+        serverNotifier.notifyProofSystemStatus(chainId, 2);
+        vm.stopPrank();
+    }
+
+    function test_notifyProofSystemStatusInvalidCallerReverts() public {
+        address alice = makeAddr("alice");
+
+        vm.startPrank(alice);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, alice));
+        serverNotifier.notifyProofSystemStatus(chainId, 2);
+        vm.stopPrank();
+    }
+
     function test_setChainTypeManagerSucceeds() public {
         DummyChainTypeManager newChainTypeManager = new DummyChainTypeManager();
 
