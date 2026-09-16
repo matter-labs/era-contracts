@@ -59,9 +59,8 @@ pub struct UpgradeBroadcastArgs {
     pub unlocked: bool,
 
     /// Optional path to accumulate executed-tx logs across every bundle in the
-    /// manifest. Same shape `dev execute-safe --out` produces. Consumed by
-    /// `ecosystem verify-upgrade --executed-bundles <path>` so the verifier
-    /// can reconstruct CREATE2 / TUPP deployments from a fork rehearsal.
+    /// manifest. Same shape `dev execute-safe --out` produces. An operational
+    /// record of what a fork rehearsal broadcast; no verifier reads it.
     #[clap(long)]
     pub out: Option<PathBuf>,
 }

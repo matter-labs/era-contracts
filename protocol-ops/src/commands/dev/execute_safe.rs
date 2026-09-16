@@ -124,9 +124,8 @@ pub struct DevExecuteSafeArgs {
     /// Optional path to append the replayed transactions to as JSON. Use the
     /// same path across multiple bundles (the file is read on entry and
     /// rewritten on exit, so successful replays of multiple bundles
-    /// accumulate in execution order). Consumed later by
-    /// `ecosystem verify-upgrade --executed-bundles <path>` so the verifier
-    /// can reconstruct CREATE2 / TUPP deployments from the prepare output.
+    /// accumulate in execution order). An operational record of what a replay
+    /// broadcast; no verifier reads it.
     #[clap(long)]
     pub out: Option<PathBuf>,
 }

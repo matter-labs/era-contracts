@@ -562,8 +562,8 @@ struct UpgradePrepareAllOutput {
     /// 0/1/2 hex), `[core]` (the CTM-agnostic core prepare output), and one
     /// `[ctms.zksync_os]` table per CTM carrying the per-CTM diamond cut +
     /// contracts config (this release only upgrades ZKsyncOS CTMs). Downstream
-    /// `upgrade-governance --env <env>` and `verify-upgrade` both consume this
-    /// single file.
+    /// `upgrade-governance --env <env>` and `verify-bootstrap` both consume
+    /// this single file.
     #[serde(skip_serializing_if = "Option::is_none")]
     merged_ecosystem_toml: Option<String>,
     puh_proxy: String,

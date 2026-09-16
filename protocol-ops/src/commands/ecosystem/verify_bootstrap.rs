@@ -6,11 +6,10 @@
 //! name kept its original spelling because the docs and runbooks that reference it predate the
 //! recurring path.
 //!
-//! Deliberately narrower than `verify-upgrade`: a registry package's reviewable content is the
-//! write-once objects and the authority they land on, so the tool needs the merged prepare TOML
-//! and an L1 RPC — no gateway RPC, no zk-governance commit, and no transaction log: an object's
-//! provenance is re-derived from the reviewed creation code and its own manifest rather than
-//! reconstructed from a deployment history.
+//! A registry package's reviewable content is the write-once objects and the authority they land
+//! on, so the tool needs only the merged prepare TOML and an L1 RPC: an object's provenance is
+//! re-derived from the reviewed creation code and its own manifest rather than reconstructed from
+//! a deployment history.
 
 use std::path::PathBuf;
 
