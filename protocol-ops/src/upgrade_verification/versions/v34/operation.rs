@@ -247,6 +247,36 @@ pub(crate) async fn verify<P: Provider>(
     result.report_ok(&format!(
         "the upgrade lands on CTM {ctm_addr}, under ProxyAdmin {ctm_admin_addr}"
     ));
+    // The executor sets both bindings as constructor immutables, so its runtime code cannot hash
+    // to the reviewed artifact (whose immutable slots are zero) and identity rests on those
+    // VALUES. They are held against the package's own record of which CTM this prepare ran
+    // against — NOT against themselves: a read compared with itself always agrees and would
+    // report a passing check that established nothing.
+    let mut executor_immutables = Vec::new();
+    match package.reported_ctm {
+        Some(reported) => executor_immutables.push(ImmutableValue::new(
+            "CHAIN_TYPE_MANAGER",
+            ctm_addr,
+            reported,
+        )),
+        None => result.report_error(&format!(
+            "the package does not name `chain_type_manager_proxy`, so the executor's bound CTM \
+             ({ctm_addr}) cannot be held against anything the review fixes: which CTM this \
+             upgrade lands on is unverified"
+        )),
+    }
+    match package.reported_ctm_proxy_admin {
+        Some(reported) => executor_immutables.push(ImmutableValue::new(
+            "CTM_PROXY_ADMIN",
+            ctm_admin_addr,
+            reported,
+        )),
+        None => result.report_error(&format!(
+            "the package does not name `transparent_proxy_admin`, so the executor's bound \
+             ProxyAdmin ({ctm_admin_addr}) — the authority every infrastructure row applies \
+             through — is unverified"
+        )),
+    }
     expect_immutable_bearing_identity(
         provider,
         identity,
@@ -254,10 +284,7 @@ pub(crate) async fn verify<P: Provider>(
         "the bound CTM upgrade executor",
         ctm_executor_addr,
         "CTMUpgradeExecutor",
-        &[
-            ImmutableValue::new("CHAIN_TYPE_MANAGER", ctm_addr, ctm_addr),
-            ImmutableValue::new("CTM_PROXY_ADMIN", ctm_admin_addr, ctm_admin_addr),
-        ],
+        &executor_immutables,
     )
     .await?;
     expect_code_identity(
@@ -1187,6 +1214,8 @@ mod tests {
             reported_core_registry: None,
             reported_ctm_executor: None,
             reported_timer: None,
+            reported_ctm: None,
+            reported_ctm_proxy_admin: None,
             stage0,
             stage1,
             stage2,

@@ -91,6 +91,16 @@ pub(crate) struct OperationPackage {
     pub(crate) reported_ctm_executor: Option<Address>,
     /// `[ctms.*.registry] upgrade_timer_addr`, a cross-check on the timer the operation pins.
     pub(crate) reported_timer: Option<Address>,
+    /// `[ctms.*.state_transition] chain_type_manager_proxy` — the CTM this package upgrades.
+    ///
+    /// An operation names no CTM (the binding is the CTM executor's immutable), so this is the
+    /// only value in the package the executor's `CHAIN_TYPE_MANAGER` can be held against. Without
+    /// it, that binding is derived and unverified, which the verifier reports as an error rather
+    /// than comparing the read value with itself.
+    pub(crate) reported_ctm: Option<Address>,
+    /// `[ctms.*.deployed_addresses] transparent_proxy_admin` — likewise for the executor's
+    /// `CTM_PROXY_ADMIN`.
+    pub(crate) reported_ctm_proxy_admin: Option<Address>,
     pub(crate) stage0: Vec<GovernanceCall>,
     pub(crate) stage1: Vec<GovernanceCall>,
     pub(crate) stage2: Vec<GovernanceCall>,
@@ -129,6 +139,18 @@ impl OperationPackage {
                 .filter(|a| !a.is_zero()),
             reported_ctm_executor: registry_address(root, &ctm_key, "ctm_upgrade_executor_addr"),
             reported_timer: registry_address(root, &ctm_key, "upgrade_timer_addr"),
+            reported_ctm: ctm_address(
+                root,
+                &ctm_key,
+                "state_transition",
+                "chain_type_manager_proxy",
+            ),
+            reported_ctm_proxy_admin: ctm_address(
+                root,
+                &ctm_key,
+                "deployed_addresses",
+                "transparent_proxy_admin",
+            ),
             stage0: calls_at(root, "stage0_calls")?,
             stage1: calls_at(root, "stage1_calls")?,
             stage2: calls_at(root, "stage2_calls")?,
@@ -222,8 +244,12 @@ fn external_actions_in(root: &toml::Value) -> anyhow::Result<Vec<ExternalAction>
     }
 }
 
+fn ctm_address(root: &toml::Value, ctm_key: &str, section: &str, key: &str) -> Option<Address> {
+    address_at(root, &["ctms", ctm_key, section, key]).filter(|a| !a.is_zero())
+}
+
 fn registry_address(root: &toml::Value, ctm_key: &str, key: &str) -> Option<Address> {
-    address_at(root, &["ctms", ctm_key, "registry", key]).filter(|a| !a.is_zero())
+    ctm_address(root, ctm_key, "registry", key)
 }
 
 /// The single `[ctms.*]` section a package may carry.
