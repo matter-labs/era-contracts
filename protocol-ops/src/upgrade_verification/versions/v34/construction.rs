@@ -460,4 +460,178 @@ mod tests {
         ));
         assert_eq!(result.errors, 1);
     }
+
+    // ───────────────────────── the deployed counterfeit ─────────────────────────
+    //
+    // The tests above establish the predicate over byte strings of this module's choosing. The
+    // counterfeit that matters is the one `l1-contracts/test/foundry/l1/upgrades/CounterfeitObject.t.sol`
+    // actually DEPLOYS: real initcode, through the real deterministic factory, returning the
+    // audited `CTMTransition` runtime bytecode over storage of its own choosing, serving the
+    // approved manifest. That test proves, in a real EVM, that
+    // `DeployUtils.canonicalCreate2Address` rejects it and accepts the genuine object.
+    //
+    // Driving that exact deployment through the Rust reporting path is NOT possible in this test
+    // suite, and the reason is worth stating rather than papering over with another synthetic
+    // case. `cargo test` runs on a bare checkout (`.github/workflows/lint.yaml`, job
+    // `protocol-ops-test`): no `forge build`, so no `l1-contracts/out` to read creation code from,
+    // and no EVM. The counterfeit's ADDRESS is a function of that Foundry fixture's in-EVM state
+    // (the approved manifest names stubs the fixture deploys), so it cannot be recomputed here;
+    // and `l1-contracts/foundry.toml`'s `fs_permissions` grants no writable path under
+    // `protocol-ops/`, so the Solidity side cannot hand it over either.
+    //
+    // What CAN be established here is the link that makes the Foundry finding a statement about
+    // THIS code: that the derivation the Solidity control evaluates is the derivation this module
+    // decides on. Without it, `Utils.sol` could drift to a different factory or a different init-
+    // code layout, the Foundry test would keep passing, and it would be proving something about a
+    // function the tool does not use.
+
+    const UTILS_SOL: &str =
+        include_str!("../../../../../l1-contracts/deploy-scripts/utils/Utils.sol");
+    const COUNTERFEIT_SOL: &str = include_str!(
+        "../../../../../l1-contracts/test/foundry/l1/upgrades/CounterfeitObject.t.sol"
+    );
+
+    /// The body of the Solidity function named `name`, from `{` to the matching top-level `}`.
+    fn solidity_fn_body<'a>(source: &'a str, name: &str) -> &'a str {
+        let after_signature = source
+            .split_once(&format!("function {name}("))
+            .unwrap_or_else(|| panic!("`{name}` must exist in the Solidity source"))
+            .1;
+        let open = after_signature
+            .find('{')
+            .expect("a function body must be opened");
+        let body = &after_signature[open + 1..];
+        let close = body.find("\n    }").expect("a function body must be closed");
+        &body[..close]
+    }
+
+    /// The factory both sides derive against must be the same account, or the Foundry control and
+    /// this module would be asking about different addresses.
+    #[test]
+    fn the_solidity_derivation_uses_the_same_factory() {
+        let declared = UTILS_SOL
+            .split_once("address internal constant DETERMINISTIC_CREATE2_ADDRESS =")
+            .expect("Utils.sol must declare the deterministic factory")
+            .1
+            .split_once(';')
+            .expect("the declaration must be terminated")
+            .0
+            .trim();
+        assert_eq!(
+            declared.to_lowercase(),
+            DETERMINISTIC_CREATE2_FACTORY.to_string().to_lowercase(),
+            "the Solidity control derives against a different factory from this module"
+        );
+    }
+
+    /// The init code must be `creationCode ++ constructorArgs`, hashed, in that order. A swapped
+    /// concatenation derives a different address for every object, so the two sides would disagree
+    /// on every package while each looked internally consistent.
+    #[test]
+    fn the_solidity_derivation_is_the_same_eip_1014_preimage() {
+        let canonical = solidity_fn_body(UTILS_SOL, "canonicalCreate2Address");
+        assert!(
+            canonical.contains(
+                "getL2AddressViaDeterministicCreate2(_salt, abi.encodePacked(_creationCode, _constructorArgs))"
+            ),
+            "the Solidity control must hash `creationCode ++ constructorArgs`, in that order; it \
+             reads: {canonical}"
+        );
+        let via_factory = solidity_fn_body(UTILS_SOL, "getL2AddressViaDeterministicCreate2");
+        assert!(
+            via_factory.contains(
+                "vm.computeCreate2Address(salt, keccak256(initCode), DETERMINISTIC_CREATE2_ADDRESS)"
+            ),
+            "the Solidity control must be plain EIP-1014 over the init-code hash under the \
+             deterministic factory; it reads: {via_factory}"
+        );
+    }
+
+    /// The counterfeit must be deployed through that same factory — nothing about HOW it was
+    /// deployed may distinguish it from a genuine object, or the Foundry test would be catching
+    /// the deployment route rather than the init code.
+    #[test]
+    fn the_deployed_counterfeit_rides_the_same_factory() {
+        let declared = COUNTERFEIT_SOL
+            .split_once("address internal constant DETERMINISTIC_CREATE2_FACTORY =")
+            .expect("the counterfeit test must name the factory it deploys through")
+            .1
+            .split_once(';')
+            .expect("the declaration must be terminated")
+            .0
+            .trim();
+        assert_eq!(
+            declared.to_lowercase(),
+            DETERMINISTIC_CREATE2_FACTORY.to_string().to_lowercase()
+        );
+    }
+
+    /// And the Foundry control must BE this predicate, applied to the deployed counterfeit and to
+    /// the genuine object — rejecting one and accepting the other. A test that only asserted the
+    /// rejection would be satisfied by a predicate that refuses everything.
+    #[test]
+    fn the_deployed_counterfeit_is_judged_by_this_predicate() {
+        let rejects = solidity_fn_body(COUNTERFEIT_SOL, "test_theConstructionCheckRejectsTheCounterfeit");
+        assert!(
+            rejects.contains("DeployUtils.canonicalCreate2Address(")
+                && rejects.contains("_transitionCreationCode()")
+                && rejects.contains("_approvedArgs()")
+                && rejects.contains("canonical != counterfeit"),
+            "the counterfeit control must derive the reviewed creation code against the APPROVED \
+             manifest and assert the deployed counterfeit is not there; it reads: {rejects}"
+        );
+        let accepts =
+            solidity_fn_body(COUNTERFEIT_SOL, "test_theConstructionCheckAcceptsTheGenuineObject");
+        assert!(
+            accepts.contains("DeployUtils.canonicalCreate2Address(")
+                && accepts.contains("address(genuine)"),
+            "the same predicate must accept a prepare-deployed object, or it discriminates \
+             nothing; it reads: {accepts}"
+        );
+    }
+
+    /// The property the whole control turns on, restated over the counterfeit's own defining
+    /// trait: it runs the audited RUNTIME code, so nothing a chain can read tells it apart. This
+    /// module's classifier is asked both questions about one pair of addresses, and must answer
+    /// "same code" and "different construction".
+    #[test]
+    fn identical_runtime_code_does_not_make_construction_identical() {
+        let audited_runtime = b"the audited CTMTransition runtime bytecode".to_vec();
+        // Two different initcodes that both return `audited_runtime`: the genuine constructor and
+        // a counterfeit one that writes storage of its own choosing first.
+        let genuine_initcode = creation_code();
+        let counterfeit_initcode = b"initcode that writes chosen storage, then returns it".to_vec();
+        let genuine = canonical_create2_address(SALT_A, &genuine_initcode, &args());
+        let counterfeit = canonical_create2_address(SALT_A, &counterfeit_initcode, &args());
+
+        assert_ne!(
+            genuine, counterfeit,
+            "the one thing creation code cannot choose is the address it lands at"
+        );
+        // A runtime-codehash pin cannot separate them: by construction they return the same code.
+        assert_eq!(keccak256(&audited_runtime), keccak256(&audited_runtime));
+        // The construction check can, and the reporting path fails the run for it.
+        let mut result = VerificationResult::default();
+        assert!(expect_canonical_construction(
+            &reviewed_build(),
+            &mut result,
+            "the transition",
+            genuine,
+            "CTMTransition",
+            &args(),
+            &[SALT_A],
+        ));
+        assert_eq!(result.errors, 0);
+        assert!(!expect_canonical_construction(
+            &reviewed_build(),
+            &mut result,
+            "the transition",
+            counterfeit,
+            "CTMTransition",
+            &args(),
+            &[SALT_A],
+        ));
+        assert_eq!(result.errors, 1);
+        assert!(result.ensure_success().is_err());
+    }
 }
