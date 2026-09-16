@@ -43,10 +43,10 @@ import {TransitionDerivationLib} from "../libraries/TransitionDerivationLib.sol"
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The single, source-checked edge from a pre-registry ecosystem to the registry-driven
-///         one: it swaps the named implementations, installs the provenance anchor and the genesis
-///         release, commits the version edge, and hands CTM + ProxyAdmin authority to the bound
-///         executors — after which every later upgrade is a `CTMTransition`, and this object is
-///         inert. See the Bootstrap section of {docs/registry-driven-upgrades.md}.
+///         one: it swaps the named implementations, installs the genesis release, commits the
+///         version edge, and hands CTM + ProxyAdmin authority to the bound executors — after
+///         which every later upgrade is a `CTMTransition`, and this object is inert. See the
+///         Bootstrap section of {docs/registry-driven-upgrades.md}.
 /// @dev Deliberately NOT a general-purpose executor: there is no arbitrary-call surface. The
 ///      manifest names every address it touches, and `migrate()` refuses to run unless the live
 ///      ecosystem is EXACTLY the starting state the manifest names — so the reviewable question is
@@ -251,9 +251,6 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
             l2Plan().factoryDepHashes
         );
 
-        // The release is where the CTM's provenance anchor comes FROM (`migrate()` reads its
-        // live runtime hash), so it must be deployed code before the edge runs: an anchor taken
-        // from a codeless account would accept nothing afterwards.
         ObjectAnchorLib.requireCode(m.currentRelease);
         ICTMRelease(m.currentRelease).validate();
     }
@@ -346,11 +343,6 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
             _oldProtocolVersionDeadline: m.oldProtocolVersionDeadline,
             _newProtocolVersion: m.newProtocolVersion
         });
-        // Trust is ESTABLISHED here, not verified: governance approved this release ADDRESS, so
-        // the edge reads the code actually deployed there (`validate()` has already required that
-        // there is some) and installs its runtime hash as the anchor every LATER release is held
-        // against. The anchor goes first — `setCurrentRelease` checks the release against it.
-        ctm.setReleaseCodehash(m.currentRelease.codehash);
         ctm.setCurrentRelease(m.currentRelease);
 
         // Authority leaves in the same transaction it arrived. The ProxyAdmin is plain `Ownable`,

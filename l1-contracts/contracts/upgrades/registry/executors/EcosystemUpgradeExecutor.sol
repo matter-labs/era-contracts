@@ -9,7 +9,6 @@ import {CoreUpgradeExecutor} from "./CoreUpgradeExecutor.sol";
 import {UpgradeExecutorBase} from "../../../governance/UpgradeExecutorBase.sol";
 import {GovernanceUpgradeTimer} from "../../GovernanceUpgradeTimer.sol";
 import {
-    EmptyBytes32,
     ExecutorCoordinatorMismatch,
     CoordinatorCTMMismatch,
     NoPendingOperation,
@@ -39,10 +38,6 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
     ///         coordinator, which each domain does explicitly through its `setCoordinator`.
     CoreUpgradeExecutor public immutable CORE_EXECUTOR;
 
-    /// @notice `EXTCODEHASH` of the audited `EcosystemUpgradeOperation`. Every operation the
-    ///         stages accept must run exactly that code, so its contents cannot change between stages.
-    bytes32 public immutable OPERATION_CODEHASH;
-
     /// @inheritdoc IEcosystemUpgradeExecutor
     ICTMUpgradeExecutor public ctmExecutor;
 
@@ -69,17 +64,12 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
 
     constructor(
         address _initialOwner,
-        CoreUpgradeExecutor _coreExecutor,
-        bytes32 _operationCodehash
+        CoreUpgradeExecutor _coreExecutor
     ) UpgradeExecutorBase(_initialOwner) {
         if (address(_coreExecutor) == address(0)) {
             revert ZeroAddress();
         }
-        if (_operationCodehash == bytes32(0)) {
-            revert EmptyBytes32();
-        }
         CORE_EXECUTOR = _coreExecutor;
-        OPERATION_CODEHASH = _operationCodehash;
     }
 
     /// @notice Binds the CTM executor, or replaces it with a successor governing the same CTM.
@@ -117,7 +107,7 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
         if (address(pendingOperation) != address(0)) {
             revert UpgradeLifecycleBusy(address(pendingOperation));
         }
-        address(_operation).requireObjectType(OPERATION_CODEHASH);
+        address(_operation).requireCode();
         _operation.validate();
         OperationManifest memory m = _operation.getManifest();
 

@@ -76,7 +76,6 @@ struct DirectDeployedAddresses {
     ///      release takes its manifest as a CONSTRUCTOR argument, so its address is a commitment
     ///      to that manifest and cannot be produced from inside the CTM deployer.
     address currentRelease;
-    bytes32 currentReleaseCodehash;
     /// @dev The bootstrap release's facet rows: each predicted facet address with its
     ///      freezability. Same row order as the L1 prepare
     ///      (`DeployCTMUtils.deployStateTransitionDiamondFacets`): the manifest encoding is
@@ -220,7 +219,6 @@ library GatewayCTMDeployerHelper {
         // Last, because the manifest it commits to names every facet AND the verifier.
         (
             directAddresses.currentRelease,
-            directAddresses.currentReleaseCodehash,
             directCalldata.currentReleaseCalldata
         ) = _calculateBootstrapRelease(
             _create2Salt,
@@ -490,12 +488,7 @@ library GatewayCTMDeployerHelper {
             CTMContract.GatewayCTMDeployerCTM,
             abi.encode(ctmConfig)
         );
-        result = _calculateCTMDeployerAddresses(
-            deployer,
-            ctmConfig,
-            directAddresses.currentRelease,
-            directAddresses.currentReleaseCodehash
-        );
+        result = _calculateCTMDeployerAddresses(deployer, ctmConfig, directAddresses.currentRelease);
     }
 
     function _buildCTMFinalConfig(
@@ -526,7 +519,7 @@ library GatewayCTMDeployerHelper {
         DirectDeployedAddresses memory _direct,
         bytes[] memory _l2BytecodeInfos,
         bytes memory _l2SystemProxyBytecodeInfo
-    ) internal returns (address releaseAddr, bytes32 releaseCodehash, bytes memory calldataOut) {
+    ) internal returns (address releaseAddr, bytes memory calldataOut) {
         bytes memory manifestArgs = abi.encode(
             _predictedGenesisManifest(_direct, _config, _l2BytecodeInfos, _l2SystemProxyBytecodeInfo)
         );
@@ -536,10 +529,6 @@ library GatewayCTMDeployerHelper {
             "CTMRelease",
             manifestArgs
         );
-        // The anchor the fresh CTM will be initialized with. A release has no immutables, so
-        // its runtime code is exactly the artifact's — which is what the CREATE2 deployment above
-        // will put at `releaseAddr`.
-        releaseCodehash = BytecodeUtils.getDeployedBytecodeHash("CTMRelease.sol", "CTMRelease");
     }
 
     /// @dev The genesis manifest the bootstrap release is constructed with, from the predicted
@@ -647,8 +636,7 @@ library GatewayCTMDeployerHelper {
     function _calculateCTMDeployerAddresses(
         address deployerAddr,
         GatewayCTMFinalConfig memory config,
-        address predictedRelease,
-        bytes32 predictedReleaseCodehash
+        address predictedRelease
     ) internal returns (GatewayCTMFinalResult memory result) {
         GatewayCTMDeployerConfig memory baseConfig = config.baseConfig;
         InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: baseConfig.salt});
@@ -686,8 +674,7 @@ library GatewayCTMDeployerHelper {
                 baseConfig,
                 result.chainTypeManagerImplementation,
                 result.serverNotifierProxy,
-                predictedRelease,
-                predictedReleaseCodehash
+                predictedRelease
             );
             result.diamondCutData = _buildDiamondCutDataEncoded(config.facets, baseConfig);
             result.chainTypeManagerProxy = _deployInternalWithParams(
@@ -722,13 +709,11 @@ library GatewayCTMDeployerHelper {
         GatewayCTMDeployerConfig memory baseConfig,
         address ctmImplementation,
         address serverNotifierProxy,
-        address currentRelease,
-        bytes32 currentReleaseCodehash
+        address currentRelease
     ) private pure returns (bytes memory) {
         ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({
             owner: baseConfig.aliasedGovernanceAddress,
             validatorTimelock: config.validatorTimelockProxy,
-            releaseCodehash: currentReleaseCodehash,
             currentRelease: currentRelease,
             protocolVersion: baseConfig.protocolVersion,
             serverNotifier: serverNotifierProxy

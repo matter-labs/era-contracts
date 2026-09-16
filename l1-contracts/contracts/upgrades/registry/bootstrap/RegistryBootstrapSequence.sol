@@ -56,14 +56,11 @@ contract RegistryBootstrapSequence is IRegistryBootstrapSequence {
         address(_migration).requireCode();
         MIGRATION = address(_migration);
         CORE_REGISTRY = address(_coreRegistry);
-        // The registry is the one input the edge does not name, so it is bound through the edge
-        // instead: the manifest names the coordinator, the coordinator names the core executor,
-        // and that executor pins the code every registry it will accept. A registry outside that
-        // anchor would be refused in stage 1, with the whole bundle already reviewed and
-        // scheduled.
-        address(_coreRegistry).requireObjectType(
-            _coreExecutor(_migration.getManifest().coordinator).CORE_REGISTRY_CODEHASH()
-        );
+        // The registry is the one input the edge does not name, so the sequence pins it here:
+        // stage 1 applies exactly this address, and a reviewer reads it off the derived calls.
+        // Which registry that is remains governance's decision, established by review — see
+        // "Provenance and validation" in {docs/registry-driven-upgrades.md}.
+        address(_coreRegistry).requireCode();
     }
 
     /// @inheritdoc IRegistryBootstrapSequence

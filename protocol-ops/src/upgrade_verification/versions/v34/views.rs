@@ -74,7 +74,6 @@ sol! {
     contract CTMUpgradeExecutorView {
         function CHAIN_TYPE_MANAGER() external view returns (address);
         function CTM_PROXY_ADMIN() external view returns (address);
-        function TRANSITION_CODEHASH() external view returns (bytes32);
         function coordinator() external view returns (address);
         function activeOperation() external view returns (address);
         function owner() external view returns (address);
@@ -87,7 +86,6 @@ sol! {
         function CORE_EXECUTOR() external view returns (address);
         function ctmExecutor() external view returns (address);
         function setCTMExecutor(address _ctmExecutor) external;
-        function OPERATION_CODEHASH() external view returns (bytes32);
         function pendingOperation() external view returns (address);
         function owner() external view returns (address);
     }
@@ -96,7 +94,6 @@ sol! {
     #[sol(rpc)]
     contract CoreUpgradeExecutorView {
         function PROXY_ADMIN() external view returns (address);
-        function CORE_REGISTRY_CODEHASH() external view returns (bytes32);
         function coordinator() external view returns (address);
         function owner() external view returns (address);
     }
@@ -209,7 +206,6 @@ sol! {
         function owner() external view returns (address);
         function pendingOwner() external view returns (address);
         function currentRelease() external view returns (address);
-        function releaseCodehash() external view returns (bytes32);
         function L1_BYTECODES_SUPPLIER() external view returns (address);
         function BRIDGE_HUB() external view returns (address);
     }

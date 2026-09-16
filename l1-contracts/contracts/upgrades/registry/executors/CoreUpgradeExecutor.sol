@@ -7,7 +7,6 @@ import {ICoreRegistry} from "../objects/ICoreRegistry.sol";
 import {IEcosystemUpgradeOperation} from "../objects/IEcosystemUpgradeOperation.sol";
 import {UpgradeExecutorBase} from "../../../governance/UpgradeExecutorBase.sol";
 import {
-    EmptyBytes32,
     LegNotReserved,
     NoPendingOperation,
     Unauthorized,
@@ -32,10 +31,6 @@ contract CoreUpgradeExecutor is UpgradeExecutorBase {
     /// @notice The ecosystem `ProxyAdmin` — admin of every shared singleton proxy. Owned by this
     ///         executor, so registry rows apply through the same authority that validates them.
     ProxyAdmin public immutable PROXY_ADMIN;
-
-    /// @notice `EXTCODEHASH` of the audited `CoreRegistry`. Every registry this executor accepts
-    ///         must run exactly that code (see `CTMUpgradeExecutor.TRANSITION_CODEHASH`).
-    bytes32 public immutable CORE_REGISTRY_CODEHASH;
 
     /// @notice The coordinating `EcosystemUpgradeExecutor` allowed to reserve this executor and
     ///         drive its callbacks. Explicit owner wiring, never inferred from ownership shape.
@@ -68,17 +63,12 @@ contract CoreUpgradeExecutor is UpgradeExecutorBase {
 
     constructor(
         address _initialOwner,
-        ProxyAdmin _proxyAdmin,
-        bytes32 _coreRegistryCodehash
+        ProxyAdmin _proxyAdmin
     ) UpgradeExecutorBase(_initialOwner) {
         if (address(_proxyAdmin) == address(0)) {
             revert ZeroAddress();
         }
-        if (_coreRegistryCodehash == bytes32(0)) {
-            revert EmptyBytes32();
-        }
         PROXY_ADMIN = _proxyAdmin;
-        CORE_REGISTRY_CODEHASH = _coreRegistryCodehash;
     }
 
     /// @notice Points this executor at a coordinator (zero detaches it).
@@ -105,7 +95,7 @@ contract CoreUpgradeExecutor is UpgradeExecutorBase {
         if (coreRegistry == address(0)) {
             revert ZeroAddress();
         }
-        coreRegistry.requireObjectType(CORE_REGISTRY_CODEHASH);
+        coreRegistry.requireCode();
         ICoreRegistry(coreRegistry).validate();
         activeOperation = _operation;
         emit OperationReserved(address(_operation), coreRegistry);
@@ -134,7 +124,7 @@ contract CoreUpgradeExecutor is UpgradeExecutorBase {
         } else if (msg.sender != owner()) {
             revert Unauthorized(msg.sender);
         }
-        address(_coreRegistry).requireObjectType(CORE_REGISTRY_CODEHASH);
+        address(_coreRegistry).requireCode();
         _coreRegistry.validate();
         // One call returns complete typed rows; no per-key rescans of the registry.
         ProxyUpgradeRowLib.applyRows(PROXY_ADMIN, _coreRegistry.ecosystemRows());
@@ -171,7 +161,7 @@ contract CoreUpgradeExecutor is UpgradeExecutorBase {
     /// @dev The row check describes one edge, not a standing invariant: a later upgrade moves
     ///      proxies past these rows and this then reverts by design.
     function validateUpgradeApplied(ICoreRegistry _coreRegistry) external view {
-        address(_coreRegistry).requireObjectType(CORE_REGISTRY_CODEHASH);
+        address(_coreRegistry).requireCode();
         ProxyUpgradeRowLib.requireRowsApplied(PROXY_ADMIN, _coreRegistry.ecosystemRows());
     }
 }

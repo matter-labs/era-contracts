@@ -9,16 +9,19 @@
 //! different question — not "is this calldata what the scripts would produce?" but:
 //!
 //!   1. Does every object run the code the reviewed commit produces? (`provenance`)
-//!   2. Does every contract the manifest names exist, and does each object-type ANCHOR hold
-//!      the reviewed commit's codehash for the object type it admits?
-//!   3. Is authority bound as the manifest claims, and to the expected governance owner?
-//!   4. Does every proxy row depart from the implementation that is actually live?
-//!   5. Is the edge un-executed, and does the calldata contain only the expected calls?
+//!   2. Was every object PRODUCED by that code's constructor from the manifest it serves?
+//!      (`construction`) — the question a runtime codehash cannot answer, and the reason the
+//!      chain no longer pretends to answer it.
+//!   3. Does every contract the manifest names exist?
+//!   4. Is authority bound as the manifest claims, and to the expected governance owner?
+//!   5. Does every proxy row depart from the implementation that is actually live?
+//!   6. Is the edge un-executed, does the calldata contain only the expected calls, and does
+//!      every one of those calls target an address this review accounted for?
 //!
-//! Question 2 is deliberately NOT "does the manifest's own fingerprint of a member match that
-//! member's code": the manifest author supplies both halves of such a pair, so it can only ever
-//! agree with itself. Every comparison here is against the reviewed commit or against live
-//! state the package does not control.
+//! None of it is "does the manifest's own fingerprint of a member match that member's code": the
+//! manifest author supplies both halves of such a pair, so it can only ever agree with itself.
+//! Every comparison here is against the reviewed commit or against live state the package does
+//! not control.
 //!
 //! # What it deliberately does not do
 //!
@@ -233,11 +236,6 @@ pub(crate) async fn verify(
         result,
         "the executor's bound ProxyAdmin",
     );
-    let transition_anchor = tolerate(
-        executor.TRANSITION_CODEHASH().call().await,
-        result,
-        "the executor's TRANSITION_CODEHASH",
-    );
     let executor_immutables = [
         ImmutableValue::new(
             "CHAIN_TYPE_MANAGER",
@@ -248,11 +246,6 @@ pub(crate) async fn verify(
             "CTM_PROXY_ADMIN",
             optional_display(bound_admin),
             manifest.ctmProxyAdmin,
-        ),
-        ImmutableValue::new(
-            "TRANSITION_CODEHASH",
-            optional_display(transition_anchor),
-            optional_display(identity.codehash_of("CTMTransition")),
         ),
     ];
     expect_immutable_bearing_identity(
@@ -328,33 +321,6 @@ pub(crate) async fn verify(
         )
         .await?;
         let core_executor = CoreUpgradeExecutorView::new(core_executor_addr, &provider);
-        // The two remaining object-type anchors, each held against the reviewed commit's own
-        // bytecode for the object type it admits. Neither object has immutables, so the
-        // artifact's deployed-bytecode hash IS what a genuine one carries once deployed.
-        let core_registry_anchor = tolerate(
-            core_executor.CORE_REGISTRY_CODEHASH().call().await,
-            result,
-            "the core executor's CORE_REGISTRY_CODEHASH",
-        );
-        expect_anchor_matches_commit(
-            &identity,
-            result,
-            "the core executor's CORE_REGISTRY_CODEHASH",
-            core_registry_anchor,
-            "CoreRegistry",
-        );
-        let operation_anchor = tolerate(
-            coordinator.OPERATION_CODEHASH().call().await,
-            result,
-            "the coordinator's OPERATION_CODEHASH",
-        );
-        expect_anchor_matches_commit(
-            &identity,
-            result,
-            "the coordinator's OPERATION_CODEHASH",
-            operation_anchor,
-            "EcosystemUpgradeOperation",
-        );
         for (label, owner) in [
             (
                 "the coordinator",
@@ -548,22 +514,6 @@ pub(crate) async fn verify(
             return Ok(());
         };
         let core_executor = CoreUpgradeExecutorView::new(core_executor_addr, &provider);
-        let anchor = tolerate(
-            core_executor.CORE_REGISTRY_CODEHASH().call().await,
-            result,
-            "the core executor's CORE_REGISTRY_CODEHASH",
-        );
-        let live_code = provider.get_code_at(core_registry_addr).await?;
-        let live_hash = alloy::primitives::keccak256(&live_code);
-        if anchor == Some(live_hash) {
-            result.report_ok("the core executor's CORE_REGISTRY_CODEHASH accepts this registry");
-        } else if let Some(anchor) = anchor {
-            result.report_error(&format!(
-                "the core executor anchors CORE_REGISTRY_CODEHASH {anchor} but the registry at \
-                 {core_registry_addr} runs {live_hash}: `applyL1Upgrade` would be rejected"
-            ));
-        }
-
         let Some(eco_admin_addr) = tolerate(
             core_executor.PROXY_ADMIN().call().await,
             result,
@@ -1216,39 +1166,6 @@ fn verify_stage1_shape(
     }
     for line in unexpected {
         result.report_warn(&format!("stage 1: {line}"));
-    }
-}
-
-/// Holds one object-type ANCHOR against the reviewed commit's bytecode for the object type it
-/// admits.
-///
-/// The anchor is an executor immutable: an expectation established when the executor was
-/// deployed, which every later, arbitrary input is held against. So the question is whether it
-/// admits the REVIEWED object type — never whether it agrees with a value this package carries.
-fn expect_anchor_matches_commit(
-    identity: &CodeIdentity,
-    result: &mut VerificationResult,
-    label: &str,
-    anchor: Option<alloy::primitives::FixedBytes<32>>,
-    expected_short_name: &str,
-) {
-    let Some(anchor) = anchor else {
-        return;
-    };
-    match identity.codehash_of(expected_short_name) {
-        Some(reviewed) if reviewed == anchor => {
-            result.report_ok(&format!(
-                "{label} admits the reviewed {expected_short_name}"
-            ));
-        }
-        Some(reviewed) => result.report_error(&format!(
-            "{label} is {anchor}, but the reviewed commit builds {expected_short_name} to \
-             {reviewed}: an object built from the reviewed sources would be rejected"
-        )),
-        None => result.report_error(&format!(
-            "{label} cannot be checked: AllContractsHashes.json has no \
-             {expected_short_name} entry for the reviewed commit"
-        )),
     }
 }
 

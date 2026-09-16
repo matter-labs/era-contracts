@@ -46,33 +46,42 @@ library ReleaseFacetReader {
 
         // Facets whose self-description is empty contribute no routing (genesis installs no cut
         // for them), so only routed facets are expected in the loupe output.
-        uint256 expectedRouted = 0;
+        uint256 matchedLive = 0;
         uint256 expectedLength = expected.length;
         uint256 liveLength = live.length;
+        // Each live row may satisfy at most ONE expected row. Without consuming the match, two
+        // expected rows naming the same facet would both match the single live row that carries
+        // it, and the count below would then report a second, UNEXAMINED live facet as accounted
+        // for. This surface is reached with rows read off an object whose construction the caller
+        // may not be able to trust, so uniqueness cannot be assumed here even though the
+        // construction paths enforce it.
+        bool[] memory consumed = new bool[](liveLength);
         for (uint256 i = 0; i < expectedLength; ++i) {
             bytes4[] memory selectors = ISelfDescribingFacet(expected[i].facet).selectors();
             if (selectors.length == 0) {
                 continue;
             }
-            ++expectedRouted;
             bool found = false;
             for (uint256 j = 0; j < liveLength; ++j) {
-                if (live[j].addr != expected[i].facet) {
+                if (consumed[j] || live[j].addr != expected[i].facet) {
                     continue;
                 }
                 // Freezability is part of the release row, not of the loupe's `facets()` view.
                 found =
                     _selectorSetsEqual(selectors, live[j].selectors) &&
                     IGetters(_chain).isFacetFreezable(live[j].addr) == expected[i].isFreezable;
+                if (found) {
+                    consumed[j] = true;
+                    ++matchedLive;
+                }
                 break;
             }
             if (!found) {
                 return false;
             }
         }
-        // No extra facets: every live facet was matched above iff the counts agree (release rows
-        // are unique per address — enforced at transition derivation and by `Diamond.diamondCut`).
-        return liveLength == expectedRouted;
+        // No extra facets: every live row was consumed by an expected row of its own.
+        return liveLength == matchedLive;
     }
 
     /// @dev Order-insensitive set equality; both lists are duplicate-free (the diamond routes a

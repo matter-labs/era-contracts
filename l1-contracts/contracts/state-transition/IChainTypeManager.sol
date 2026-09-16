@@ -18,9 +18,6 @@ import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 struct ChainTypeManagerInitializeData {
     address owner;
     address validatorTimelock;
-    /// @dev `EXTCODEHASH` of the audited `CTMRelease`: every release this CTM ever pins (bootstrap
-    ///      included) must run exactly that code — provenance is enforced by the CTM itself.
-    bytes32 releaseCodehash;
     address currentRelease;
     uint256 protocolVersion;
     address serverNotifier;
@@ -58,9 +55,6 @@ interface IChainTypeManager {
 
     /// @notice The release used for new-chain genesis changed.
     event NewCurrentRelease(uint256 indexed protocolVersion, address indexed release);
-
-    /// @notice The canonical release factory was set.
-    event NewReleaseCodehash(bytes32 indexed releaseCodehash);
 
     /// @notice New UpgradeCutHash
     event NewUpgradeCutHash(uint256 indexed protocolVersion, bytes32 indexed upgradeCutHash);
@@ -137,13 +131,6 @@ interface IChainTypeManager {
     function setValidatorTimelockPostV29(address _validatorTimelockPostV29) external;
 
     function setCurrentRelease(address _release) external;
-
-    /// @notice Sets the canonical release factory (migration path for CTMs whose storage
-    ///         predates the field; fresh CTMs receive it in `initialize`).
-    function setReleaseCodehash(bytes32 _releaseCodehash) external;
-
-    /// @notice The canonical release factory whose attestation every pinned release must carry.
-    function releaseCodehash() external view returns (bytes32);
 
     function getChainAdmin(uint256 _chainId) external view returns (address);
 

@@ -387,7 +387,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         // Fail here, not in stage 0: every contract the object names must already be deployed,
         // and the object's own revert names the one that is not.
         ICTMTransition(upgradeAddresses.ctmTransition).validate();
-        _requireObjectsMatchExecutorAnchors();
     }
 
     /// @notice Deploys the write-once `EcosystemUpgradeOperation` this upgrade's three coordinator
@@ -419,25 +418,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
                 })
             ),
             "EcosystemUpgradeOperation"
-        );
-        require(
-            upgradeAddresses.ecosystemUpgradeOperation.codehash ==
-                EcosystemUpgradeExecutor(payable(coordinator)).OPERATION_CODEHASH(),
-            "the deployed operation does not run the code the coordinator anchors"
-        );
-    }
-
-    /// @notice Checks the transition against the codehash the bound executor was CONSTRUCTED with —
-    ///         the type-provenance gate of its stage-0 reservation, evaluated at prepare time.
-    /// @dev That immutable was set when the executor was deployed, possibly by an earlier release's
-    ///      prepare. Nothing keeps a later build's artifact byte-identical to that one, so a drifted
-    ///      object would otherwise only surface as a stage-0 revert with the whole upgrade already
-    ///      reviewed and scheduled.
-    function _requireObjectsMatchExecutorAnchors() internal view virtual {
-        CTMUpgradeExecutor executor = CTMUpgradeExecutor(payable(boundCTMUpgradeExecutor()));
-        require(
-            upgradeAddresses.ctmTransition.codehash == executor.TRANSITION_CODEHASH(),
-            "the deployed transition does not run the code the bound CTM executor anchors"
         );
     }
 

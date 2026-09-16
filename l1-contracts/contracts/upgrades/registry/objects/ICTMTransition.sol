@@ -52,7 +52,7 @@ interface ICTMTransition is ICommittedUpgrade {
     ///         `_chainId` of the ecosystem of `_bridgehub` — the single read entry point for tooling.
     /// @dev Forwards to the engine's `IDefaultUpgrade.l2UpgradeTx`: the composition code lives in
     ///      the per-upgrade engine, never here, because the transition's own code
-    ///      (`TRANSITION_CODEHASH`) is frozen for the executor's lifetime while the engine ships per
+    ///      is frozen for the executor's lifetime while the engine ships per
     ///      release.
     /// @param _bridgehub The Bridgehub of the ecosystem the chain belongs to.
     /// @param _chainId The chain to compose for.

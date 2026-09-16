@@ -421,10 +421,6 @@ abstract contract DeployCTMUtils is DeployUtils {
             ChainTypeManagerInitializeData({
                 owner: getBroadcasterAddress(),
                 validatorTimelock: stateTransition.proxies.validatorTimelock,
-                // The provenance anchor is ESTABLISHED here, from the code actually deployed at
-                // the release this run just produced — the same trust-establishment step
-                // `RegistryBootstrapMigration` performs for a migrated CTM.
-                releaseCodehash: stateTransition.currentRelease.codehash,
                 currentRelease: stateTransition.currentRelease,
                 protocolVersion: config.contracts.chainCreationParams.latestProtocolVersion,
                 serverNotifier: stateTransition.proxies.serverNotifier
