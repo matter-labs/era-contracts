@@ -89,6 +89,8 @@ pub(crate) struct OperationPackage {
     /// `[ctms.*.registry] ctm_upgrade_executor_addr`, a cross-check on the executor the
     /// coordinator is actually bound to.
     pub(crate) reported_ctm_executor: Option<Address>,
+    /// `[ctms.*.registry] upgrade_timer_addr`, a cross-check on the timer the operation pins.
+    pub(crate) reported_timer: Option<Address>,
     pub(crate) stage0: Vec<GovernanceCall>,
     pub(crate) stage1: Vec<GovernanceCall>,
     pub(crate) stage2: Vec<GovernanceCall>,
@@ -126,6 +128,7 @@ impl OperationPackage {
             reported_core_registry: address_at(root, &["core", "registry", "core_registry_addr"])
                 .filter(|a| !a.is_zero()),
             reported_ctm_executor: registry_address(root, &ctm_key, "ctm_upgrade_executor_addr"),
+            reported_timer: registry_address(root, &ctm_key, "upgrade_timer_addr"),
             stage0: calls_at(root, "stage0_calls")?,
             stage1: calls_at(root, "stage1_calls")?,
             stage2: calls_at(root, "stage2_calls")?,
@@ -418,15 +421,27 @@ mod tests {
         assert_eq!(package.ctm_key, "zksync_os");
         assert_eq!(
             package.reported_transition,
-            Some("0x00000000000000000000000000000000000000cc".parse().unwrap())
+            Some(
+                "0x00000000000000000000000000000000000000cc"
+                    .parse()
+                    .unwrap()
+            )
         );
         assert_eq!(
             package.reported_ctm_executor,
-            Some("0x00000000000000000000000000000000000000dd".parse().unwrap())
+            Some(
+                "0x00000000000000000000000000000000000000dd"
+                    .parse()
+                    .unwrap()
+            )
         );
         assert_eq!(
             package.reported_core_registry,
-            Some("0x00000000000000000000000000000000000000ee".parse().unwrap())
+            Some(
+                "0x00000000000000000000000000000000000000ee"
+                    .parse()
+                    .unwrap()
+            )
         );
     }
 
@@ -434,8 +449,7 @@ mod tests {
     /// coordinator left unknown: the three stage calls have no target without it.
     #[test]
     fn an_operation_without_a_coordinator_is_refused() {
-        let body =
-            recurring_toml(&format!("[operation]\noperation_addr = \"{OPERATION}\"\n").as_str());
+        let body = recurring_toml(&format!("[operation]\noperation_addr = \"{OPERATION}\"\n"));
         let err = load_str(&body).unwrap_err().to_string();
         assert!(err.contains("coordinator_addr"), "{err}");
     }

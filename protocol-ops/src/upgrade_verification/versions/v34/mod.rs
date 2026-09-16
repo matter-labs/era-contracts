@@ -65,10 +65,10 @@ use provenance::{
     CodeIdentity, ImmutableValue,
 };
 use views::{
-    BridgehubView, CTMReleaseView, CTMUpgradeExecutorView, CommittedUpgradeView,
-    CoreRegistryView, CoreUpgradeExecutorView, CtmView, EcosystemUpgradeExecutorView,
-    GovernanceUpgradeTimerView, GovernanceUpgradeTimerView::GovernanceUpgradeTimerViewInstance,
-    ProxyAdminView, RegistryBootstrapMigrationView,
+    BridgehubView, CTMReleaseView, CTMUpgradeExecutorView, CommittedUpgradeView, CoreRegistryView,
+    CoreUpgradeExecutorView, CtmView, EcosystemUpgradeExecutorView, GovernanceUpgradeTimerView,
+    GovernanceUpgradeTimerView::GovernanceUpgradeTimerViewInstance, ProxyAdminView,
+    RegistryBootstrapMigrationView,
 };
 
 /// Verify a v34 registry-driven upgrade package against the live L1 it targets.
@@ -601,8 +601,7 @@ async fn verify_bootstrap<P: Provider>(
                     row.expectedOldImpl
                 ));
             }
-            expect_code_present(provider, result, &format!("{label} implNew"), row.implNew)
-                .await?;
+            expect_code_present(provider, result, &format!("{label} implNew"), row.implNew).await?;
         }
     } else {
         result.print_info("\n== Ecosystem leg ==");
@@ -700,7 +699,7 @@ async fn verify_bootstrap<P: Provider>(
         Err(_) => None,
     };
     verify_call_targets(
-        &package,
+        package,
         &manifest,
         core_executor_addr,
         chain_asset_handler,

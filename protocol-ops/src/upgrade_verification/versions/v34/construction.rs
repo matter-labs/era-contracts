@@ -501,7 +501,9 @@ mod tests {
             .find('{')
             .expect("a function body must be opened");
         let body = &after_signature[open + 1..];
-        let close = body.find("\n    }").expect("a function body must be closed");
+        let close = body
+            .find("\n    }")
+            .expect("a function body must be closed");
         &body[..close]
     }
 
@@ -571,7 +573,10 @@ mod tests {
     /// rejection would be satisfied by a predicate that refuses everything.
     #[test]
     fn the_deployed_counterfeit_is_judged_by_this_predicate() {
-        let rejects = solidity_fn_body(COUNTERFEIT_SOL, "test_theConstructionCheckRejectsTheCounterfeit");
+        let rejects = solidity_fn_body(
+            COUNTERFEIT_SOL,
+            "test_theConstructionCheckRejectsTheCounterfeit",
+        );
         assert!(
             rejects.contains("DeployUtils.canonicalCreate2Address(")
                 && rejects.contains("_transitionCreationCode()")
@@ -580,8 +585,10 @@ mod tests {
             "the counterfeit control must derive the reviewed creation code against the APPROVED \
              manifest and assert the deployed counterfeit is not there; it reads: {rejects}"
         );
-        let accepts =
-            solidity_fn_body(COUNTERFEIT_SOL, "test_theConstructionCheckAcceptsTheGenuineObject");
+        let accepts = solidity_fn_body(
+            COUNTERFEIT_SOL,
+            "test_theConstructionCheckAcceptsTheGenuineObject",
+        );
         assert!(
             accepts.contains("DeployUtils.canonicalCreate2Address(")
                 && accepts.contains("address(genuine)"),

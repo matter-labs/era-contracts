@@ -115,8 +115,16 @@ pub(crate) async fn verify<P: Provider>(
     );
     let transition_manifest = match transition {
         Some(address) => {
-            verify_transition(provider, identity, build, result, address, salts, &mut reviewed)
-                .await?
+            verify_transition(
+                provider,
+                identity,
+                build,
+                result,
+                address,
+                salts,
+                &mut reviewed,
+            )
+            .await?
         }
         None => {
             result.report_ok(
@@ -137,11 +145,21 @@ pub(crate) async fn verify<P: Provider>(
     );
     let core_rows = match core_registry {
         Some(address) => {
-            verify_core_registry(provider, identity, build, result, address, salts, &mut reviewed)
-                .await?
+            verify_core_registry(
+                provider,
+                identity,
+                build,
+                result,
+                address,
+                salts,
+                &mut reviewed,
+            )
+            .await?
         }
         None => {
-            result.report_ok("the operation carries no core registry: it upgrades no shared singletons");
+            result.report_ok(
+                "the operation carries no core registry: it upgrades no shared singletons",
+            );
             Vec::new()
         }
     };
@@ -445,11 +463,32 @@ pub(crate) async fn verify<P: Provider>(
         ctm_admin_addr,
     )
     .await?;
-    verify_rows(provider, result, "ecosystem row", &core_rows, core_admin_addr).await?;
+    verify_rows(
+        provider,
+        result,
+        "ecosystem row",
+        &core_rows,
+        core_admin_addr,
+    )
+    .await?;
 
     // ── 4. Readiness: the things stage 0 and stage 1 require that no object can assert ──
     result.print_info("\n== Readiness ==");
-    verify_timer(provider, identity, result, manifest.timer, package.coordinator).await?;
+    cross_check(
+        result,
+        "upgrade_timer_addr",
+        package.reported_timer,
+        Some(manifest.timer),
+        "the timer",
+    );
+    verify_timer(
+        provider,
+        identity,
+        result,
+        manifest.timer,
+        package.coordinator,
+    )
+    .await?;
     if let Some(transition_addr) = transition {
         verify_bytecodes_published(provider, result, &ctm, transition_addr).await?;
     }
@@ -768,7 +807,10 @@ async fn verify_rows<P: Provider>(
                 .call()
                 .await,
             result,
-            &format!("{label}: the live implementation of {} under {admin}", row.proxy),
+            &format!(
+                "{label}: the live implementation of {} under {admin}",
+                row.proxy
+            ),
         ) else {
             continue;
         };
@@ -1012,6 +1054,8 @@ async fn expect_owned_by<P: Provider>(
     expected: Address,
     expected_label: &str,
 ) {
+    // `ProxyAdminView` is used for its `owner()` getter alone; the subject is an Ownable, not
+    // necessarily a ProxyAdmin.
     let Some(owner) = tolerate(
         ProxyAdminView::new(subject, provider).owner().call().await,
         result,
@@ -1020,7 +1064,9 @@ async fn expect_owned_by<P: Provider>(
         return;
     };
     if owner == expected {
-        result.report_ok(&format!("{label} is owned by {expected_label} ({expected})"));
+        result.report_ok(&format!(
+            "{label} is owned by {expected_label} ({expected})"
+        ));
     } else {
         result.report_error(&format!(
             "{label} is owned by {owner}, not by {expected_label} ({expected}): this upgrade \
@@ -1073,9 +1119,9 @@ fn cross_check(
     what: &str,
 ) {
     match (reported, actual) {
-        (Some(reported), Some(actual)) if reported == actual => {
-            result.report_ok(&format!("the package's reported {field} is {what} that executes"))
-        }
+        (Some(reported), Some(actual)) if reported == actual => result.report_ok(&format!(
+            "the package's reported {field} is {what} that executes"
+        )),
         (Some(reported), Some(actual)) => result.report_error(&format!(
             "the package reports {field} {reported} but the operation pins {actual} as {what}: \
              the summary a reviewer reads describes a different object from the executing one"
@@ -1140,6 +1186,7 @@ mod tests {
             reported_transition: None,
             reported_core_registry: None,
             reported_ctm_executor: None,
+            reported_timer: None,
             stage0,
             stage1,
             stage2,
@@ -1267,8 +1314,12 @@ mod tests {
         };
         let mut pkg = well_formed();
         pkg.stage1.push(extra.clone());
-        pkg.external_actions
-            .push(ExternalAction::for_stage(1, "an admin hop", "governance", &extra));
+        pkg.external_actions.push(ExternalAction::for_stage(
+            1,
+            "an admin hop",
+            "governance",
+            &extra,
+        ));
         let mut result = VerificationResult::default();
         verify_stage_calls(&pkg, &mut result);
         assert_eq!(result.errors, 0);
@@ -1285,8 +1336,12 @@ mod tests {
         };
         let mut pkg = well_formed();
         pkg.stage1.push(extra.clone());
-        pkg.external_actions
-            .push(ExternalAction::for_stage(2, "an admin hop", "governance", &extra));
+        pkg.external_actions.push(ExternalAction::for_stage(
+            2,
+            "an admin hop",
+            "governance",
+            &extra,
+        ));
         let mut result = VerificationResult::default();
         verify_stage_calls(&pkg, &mut result);
         assert_eq!(result.errors, 1);
