@@ -24,7 +24,7 @@ use anyhow::Context;
 // Every script generation exposes the same entry points (`noGovernancePrepare(CoreUpgradeParams)` /
 // `(CTMUpgradeParams)`), so this one driver serves them all; which one actually runs is decided by
 // the `--core-script-path` / `--ctm-script-path` inputs.
-use crate::common::abi::{ICTMUpgradeV31Abi, ICoreUpgradeV31Abi};
+use crate::common::abi::{ICTMUpgradePrepareAbi, ICoreUpgradePrepareAbi};
 use crate::common::wallets::Wallet;
 use crate::common::{forge::ForgeRunner, logger};
 
@@ -187,8 +187,8 @@ impl<'a> UpgradeInner<'a> {
                 Path::new(inputs.core_script_path.trim_start_matches('/')),
             )
             .with_calldata(&Bytes::from(
-                ICoreUpgradeV31Abi::noGovernancePrepareCall {
-                    _params: ICoreUpgradeV31Abi::CoreUpgradeParams {
+                ICoreUpgradePrepareAbi::noGovernancePrepareCall {
+                    _params: ICoreUpgradePrepareAbi::CoreUpgradeParams {
                         bridgehubProxyAddress: self.bridgehub,
                         create2FactorySalt: create2_salt,
                         upgradeInputPath: inputs.upgrade_input_path.clone(),
@@ -341,8 +341,8 @@ impl<'a> UpgradeInner<'a> {
                 Path::new(inputs.ctm_script_path.trim_start_matches('/')),
             )
             .with_calldata(&Bytes::from(
-                ICTMUpgradeV31Abi::noGovernancePrepareCall {
-                    _params: ICTMUpgradeV31Abi::CTMUpgradeParams {
+                ICTMUpgradePrepareAbi::noGovernancePrepareCall {
+                    _params: ICTMUpgradePrepareAbi::CTMUpgradeParams {
                         ctmProxy: ctm_proxy,
                         rollupDAManager: rollup_da_manager,
                         create2FactorySalt: create2_salt,

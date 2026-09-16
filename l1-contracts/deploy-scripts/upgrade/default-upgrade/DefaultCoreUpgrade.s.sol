@@ -66,7 +66,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     EcosystemUpgradeConfig internal upgradeConfig;
 
     /// @notice Single-call entry point invoked by the protocol-ops CLI's `upgrade-prepare-all`
-    ///         (`ICoreUpgradeV31` in `contracts/script-interfaces/IUpgradeV31.sol`).
+    ///         (`ICoreUpgradePrepare` in `contracts/script-interfaces/IUpgradePrepare.sol`).
     function noGovernancePrepare(CoreUpgradeParams memory _params) public virtual {
         initializeWithArgs(
             _params.bridgehubProxyAddress,

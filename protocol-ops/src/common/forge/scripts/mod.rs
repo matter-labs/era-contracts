@@ -212,7 +212,6 @@ script_calls! {
     IDeployL1CoreContractsAbi::runInnerCall                             => DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION,
     // DeployCTM
     IDeployCTMAbi::runInnerCall                                         => DEPLOY_CTM_INVOCATION,
-    // v31 upgrade scripts
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

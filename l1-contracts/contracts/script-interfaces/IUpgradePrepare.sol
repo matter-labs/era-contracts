@@ -7,15 +7,17 @@ import {CoreUpgradeParams, CTMUpgradeParams} from "deploy-scripts/upgrade/defaul
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Standalone core ecosystem upgrade entry point.
-///         Pairs with `ICTMUpgradeV31`. The legacy single-shot ecosystem
+///         Pairs with `ICTMUpgradePrepare`. The legacy single-shot ecosystem
 ///         orchestrator was removed; protocol-ops now drives Core + per-CTM
 ///         forge invocations directly via `upgrade-prepare-all`.
-interface ICoreUpgradeV31 {
+/// @dev Deliberately not named after a release: every script generation subclasses the same
+///      `DefaultCoreUpgrade`/`DefaultCTMUpgrade` bases and inherits these entry points unchanged.
+interface ICoreUpgradePrepare {
     function noGovernancePrepare(CoreUpgradeParams memory _params) external;
 }
 
 /// @notice Standalone CTM upgrade entry point. Invoked once per CTM proxy when the
 ///         ecosystem hosts multiple CTMs (e.g. ZKsyncOS + EraVM).
-interface ICTMUpgradeV31 {
+interface ICTMUpgradePrepare {
     function noGovernancePrepare(CTMUpgradeParams memory _params) external;
 }

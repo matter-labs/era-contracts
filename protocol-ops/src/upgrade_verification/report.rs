@@ -1,14 +1,6 @@
 //! The reporting surface every verifier writes to, and the rule that decides whether a run
 //! passed.
 //!
-//! Split out of [`verifiers`](super::verifiers) — which is otherwise entirely v31 machinery (the
-//! address book, the bytecode fetcher, the network verifier and the `expect_*` helpers built on
-//! them) — so that the registry-driven verifier does not depend on the v31 tree for its one
-//! shared piece. When the v31 tree is retired, `verifiers.rs` goes with it and this module stays.
-//!
-//! The v31 `expect_*` helpers remain inherent methods on [`VerificationResult`], declared in
-//! `verifiers.rs` alongside the `Verifiers` context they all take.
-//!
 //! # Errors versus warnings
 //!
 //! Only errors fail a run ([`VerificationResult::ensure_success`]). So anything a reviewer could

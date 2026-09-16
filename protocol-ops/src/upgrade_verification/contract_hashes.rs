@@ -2,8 +2,7 @@
 //! compiled bytecode hashes to.
 //!
 //! Version-independent on purpose: it is how any verifier answers "is the code at this
-//! address the code the reviewed commit produces?". The v31 verifier adds GitHub-fetching
-//! and filtering constructors to `ContractHashes` in its own module.
+//! address the code the reviewed commit produces?".
 
 use std::fs;
 

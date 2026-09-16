@@ -92,7 +92,7 @@ Landed, each verified by naming the surviving owner of the responsibility:
 - `deploy-scripts/gateway/GatewayPreparation.sol` (690 lines, 18 entrypoints) is deleted; the
   gateway flow runs through `_GatewayPreparationForTests.sol` → `GatewayGovernanceUtils`, and
   every function it declared has a live equivalent in `AdminFunctions.s.sol` or `GatewayUtils.s.sol`.
-- `ICoreUpgradeV31.stage3` and `protocol-ops ecosystem stage3` are deleted: the script behind
+- `ICoreUpgradePrepare.stage3` and `protocol-ops ecosystem stage3` are deleted: the script behind
   them no longer existed, and {protocol-docs/bridging.md} records that every ecosystem the current
   release can upgrade is already populated. The four `*-bridged-tokens.toml` fixtures go with it.
 - `deploy-scripts/provider/` (a Solidity JSON-RPC client plus eight FFI bash scripts) is deleted;

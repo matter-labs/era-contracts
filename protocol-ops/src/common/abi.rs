@@ -267,23 +267,26 @@ pub mod access_control_default_admin_rules {
 }
 pub use access_control_default_admin_rules::AccessControlDefaultAdminRulesAbi;
 
-pub mod i_core_upgrade_v31 {
+// The artifact paths still spell the interfaces' former `V31` names: `zkstack-out/` is a
+// committed build product, so it only picks up the rename on the next regeneration (which also
+// has to drop the stale `IUpgradeV31.sol/` directory — `copy-to-zkstack-out` only adds).
+pub mod i_core_upgrade_prepare {
     alloy::sol!(
         #[sol(rpc)]
-        ICoreUpgradeV31Abi,
+        ICoreUpgradePrepareAbi,
         "../l1-contracts/zkstack-out/IUpgradeV31.sol/ICoreUpgradeV31.json"
     );
 }
-pub use i_core_upgrade_v31::ICoreUpgradeV31Abi;
+pub use i_core_upgrade_prepare::ICoreUpgradePrepareAbi;
 
-pub mod i_ctm_upgrade_v31 {
+pub mod i_ctm_upgrade_prepare {
     alloy::sol!(
         #[sol(rpc)]
-        ICTMUpgradeV31Abi,
+        ICTMUpgradePrepareAbi,
         "../l1-contracts/zkstack-out/IUpgradeV31.sol/ICTMUpgradeV31.json"
     );
 }
-pub use i_ctm_upgrade_v31::ICTMUpgradeV31Abi;
+pub use i_ctm_upgrade_prepare::ICTMUpgradePrepareAbi;
 
 pub mod i_finalize_chain_init {
     // Hand-declared: the artifact JSON's `enum L2DACommitmentScheme`

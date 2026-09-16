@@ -109,10 +109,10 @@ pub const ECADD_SYSTEM_CONTRACT: Address = literal_addr(0x06);
 pub const ECMUL_SYSTEM_CONTRACT: Address = literal_addr(0x07);
 pub const ECPAIRING_SYSTEM_CONTRACT: Address = literal_addr(0x08);
 
-/// v31 L2 protocol upgrade transaction parameters.
+/// L2 protocol upgrade transaction parameters.
 /// ZKsync OS upgrade txs use txType 126 (Era VM's 254 is gone with the Era
-/// CTM); gas + pubdata limits are fixed by v31 deploy scripts and travel
-/// with the artifact.
+/// CTM); gas + pubdata limits are fixed by the upgrade deploy scripts and
+/// travel with the artifact.
 pub const ZKSYNC_OS_SYSTEM_UPGRADE_TX_TYPE: u64 = 126;
 pub const L2_UPGRADE_GAS_LIMIT: u64 = 72_000_000;
 pub const L2_UPGRADE_GAS_PER_PUBDATA_BYTE_LIMIT: u64 = 800;

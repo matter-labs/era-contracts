@@ -179,7 +179,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     ExternalActionsLib.Ledger internal externalActions;
 
     /// @notice Single-call entry point invoked by the protocol-ops CLI's `upgrade-prepare-all`,
-    ///         once per CTM proxy (`ICTMUpgradeV31` in `contracts/script-interfaces/IUpgradeV31.sol`).
+    ///         once per CTM proxy (`ICTMUpgradePrepare` in `contracts/script-interfaces/IUpgradePrepare.sol`).
     function noGovernancePrepare(CTMUpgradeParams memory _params) public virtual {
         // solhint-disable-next-line func-named-parameters
         initializeWithArgs(
