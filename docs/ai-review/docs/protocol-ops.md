@@ -42,10 +42,20 @@ reconstruct. What it checks:
   bytecode, whose immutable slots are zero, so a contract that sets immutables never hashes to its
   own artifact once deployed. Those are identified from their immutable VALUES instead — read back
   from the deployment, each held against the reviewed value, each mismatch an error. The CTM
-  executor's `CHAIN_TYPE_MANAGER` / `CTM_PROXY_ADMIN` go against the manifest; its
-  `TRANSITION_CODEHASH`, the core executor's `CORE_REGISTRY_CODEHASH` and the coordinator's
-  `OPERATION_CODEHASH` go against the reviewed commit's own `CTMTransition` / `CoreRegistry` /
-  `EcosystemUpgradeOperation` bytecode — never against a value the package supplied.
+  executor's `CHAIN_TYPE_MANAGER` / `CTM_PROXY_ADMIN` go against the manifest — never against a
+  value the package supplied.
+- **Construction.** The check that carries object trust, because a runtime codehash cannot give
+  it: creation code can write any storage it likes and then return the canonical runtime
+  bytecode. Every object is deployed through the deterministic CREATE2 factory, so its address is
+  re-derived from the reviewed creation code and the manifest the object serves, and compared
+  with the address the package uses. A match proves the audited constructor ran on that manifest,
+  which covers the object's whole state. The creation-code bytes come from the local build
+  (`l1-contracts/out`, so the reviewed commit must be built), held against the committed
+  `evmBytecodeHash`. The salt comes from the package when it records one and from
+  `--create2-salt` otherwise; with no salt the check cannot run, and that is an ERROR rather than
+  a silent pass.
+- **Call targets.** Every governance call must target a reviewed object or a live contract the
+  manifest names. An address no part of the review accounts for is an error.
 - **Named members exist.** Every contract the manifest names by address must be deployed code,
   which is what the objects' own `validate()` refuses on-chain.
 - **Bound authority** — the CTM executor's CTM, its ProxyAdmin, its coordinator

@@ -235,10 +235,10 @@ contract UtilsCallMockerTest is Test {
     ///      only serves the verifier and genesis params DiamondInit / the CTM read at genesis.
     function mockGenesisRegistryContract() public {
         address genesisRegistry = Utils.TEST_GENESIS_REGISTRY;
-        // Release provenance is a codehash check, so the mocked release must actually CARRY the
-        // audited `CTMRelease` runtime code; its behaviour is then mocked on top. The code is
-        // read from the artifacts (zksolc rejects `type(T).runtimeCode`), matching
-        // `Utils.releaseCodehash()`.
+        // The mocked release must carry CODE — a release is called, not just recorded, and a
+        // call into a codeless address is rejected before the mock ever answers. The audited
+        // `CTMRelease` runtime code is what gets etched (read from the artifacts, since zksolc
+        // rejects `type(T).runtimeCode`); its behaviour is then mocked on top.
         vm.etch(genesisRegistry, vm.getDeployedCode("CTMRelease.sol:CTMRelease"));
         vm.mockCall(genesisRegistry, abi.encodeWithSelector(ICTMRelease.validate.selector), bytes(""));
         vm.mockCall(

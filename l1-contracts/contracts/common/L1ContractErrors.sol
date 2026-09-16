@@ -141,8 +141,6 @@ error DiamondNotFrozen();
 error EmptyAddress();
 // 0x2d4d012f
 error EmptyAssetId();
-// 0x1c25715b
-error EmptyBytes32();
 // 0x99d8fec9
 error EmptyData();
 // 0x456f8f7a
@@ -386,8 +384,8 @@ error QueueIsEmpty();
 error RecoverToL1NotSupported();
 // 0xab143c06
 error Reentrancy();
-// 0xfc83be31
-error RegistryCodehashMismatch(address target, bytes32 expected, bytes32 actual);
+// 0xcb530847
+error RegistryDuplicateFacetRow(address facet);
 // 0x3e28bae4
 error RegistryDuplicateProxyRow(address proxy);
 // 0x22345d26
@@ -398,8 +396,6 @@ error RegistryEmptySelectors(address facet);
 error RegistryInventoryLengthMismatch(uint256 expected, uint256 actual);
 // 0xb40929f4
 error RegistryMemberHasNoFixedAddress(uint256 member);
-// 0x0d122829
-error RegistryReleaseCodehashAlreadySet(bytes32 current);
 // 0xe89c554c
 error RegistryTargetHasNoCode(address target);
 // 0x1f20dafa

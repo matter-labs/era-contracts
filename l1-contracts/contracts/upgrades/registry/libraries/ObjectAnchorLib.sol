@@ -2,36 +2,30 @@
 
 pragma solidity 0.8.28;
 
-import {RegistryCodehashMismatch, RegistryTargetHasNoCode} from "../../../common/L1ContractErrors.sol";
+import {RegistryTargetHasNoCode} from "../../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice The two code checks the registry model runs against live addresses: "there is a
-///         contract here at all", and "this candidate runs the audited code of the object type
-///         the caller already committed to".
-/// @dev The second is an ANCHOR check, not a self-check: `_expectedCodehash` is state the caller
-///      established EARLIER (the CTM's `releaseCodehash`, an executor's `TRANSITION_CODEHASH` /
-///      `CORE_REGISTRY_CODEHASH` / `OPERATION_CODEHASH`), so it constrains what a later,
-///      arbitrary input may be. A hash that arrived WITH the candidate would prove nothing —
-///      see "Provenance and validation" in {docs/registry-driven-upgrades.md}.
+/// @notice The one code check the registry model runs against live addresses: "there is a
+///         contract here at all".
+/// @dev There used to be a second — a runtime-`EXTCODEHASH` comparison against a pinned
+///      expectation, one per object type. It was removed because it answers a strictly weaker
+///      question than it appeared to: creation code can write arbitrary storage and then return
+///      the canonical runtime bytecode, so an object that PASSES such a check can still serve
+///      state the audited constructor would never have produced. Object trust is established by
+///      governance reviewing the exact deployed objects, with `protocol-ops ecosystem
+///      verify-bootstrap` re-deriving each object's address from the reviewed creation code and
+///      the manifest it serves — see "Provenance and validation" in
+///      {docs/registry-driven-upgrades.md}.
 library ObjectAnchorLib {
     /// @notice Reverts unless `_target` is a deployed contract.
+    /// @dev Not defensive bookkeeping: a call to a codeless address SUCCEEDS silently, and a
+    ///      codeless delegatecall target turns a chain's upgrade into a no-op that reports
+    ///      success. This is an execution precondition, and it stays on every path that commits
+    ///      or applies an object.
     function requireCode(address _target) internal view {
         if (_target.code.length == 0) {
             revert RegistryTargetHasNoCode(_target);
-        }
-    }
-
-    /// @notice Reverts unless `_candidate` is deployed code whose `EXTCODEHASH` is the anchored
-    ///         `_expectedCodehash`.
-    /// @dev The code-length check is not redundant with the comparison: an anchor can never be
-    ///      zero, but reporting "nothing is deployed here" separately from "the wrong contract is
-    ///      deployed here" is what makes a misconfigured package diagnosable.
-    function requireObjectType(address _candidate, bytes32 _expectedCodehash) internal view {
-        requireCode(_candidate);
-        bytes32 actualCodehash = _candidate.codehash;
-        if (actualCodehash != _expectedCodehash) {
-            revert RegistryCodehashMismatch(_candidate, _expectedCodehash, actualCodehash);
         }
     }
 }

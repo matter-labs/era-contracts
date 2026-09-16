@@ -16,7 +16,7 @@ import {
     LegNotReserved,
     NoPendingOperation,
     ProxyUpgradeRowMismatch,
-    RegistryCodehashMismatch,
+    RegistryTargetHasNoCode,
     Unauthorized,
     UpgradeLifecycleBusy,
     ZeroAddress
@@ -31,13 +31,6 @@ import {
     L1_ECOSYSTEM_CONTRACT_COUNT,
     L1EcosystemContract
 } from "../../../../../../../contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
-
-/// @dev Not a `CoreRegistry`: exercises the executor's codehash provenance check.
-contract NotACoreRegistry {
-    function manifestHash() external pure returns (bytes32) {
-        return bytes32(uint256(1));
-    }
-}
 
 /// @dev Minimal implementation contracts for proxy-upgrade tests.
 contract DummyImplA {
@@ -57,9 +50,8 @@ contract DummyImplB {
 ///         coordinator drives it through. Deliberately owned by a DIFFERENT governance address
 ///         than the CTM-scoped executor in CTMUpgradeExecutor.t.sol: the two authority domains
 ///         are separable.
-/// @dev Registries are REAL, factory-deployed `CoreRegistry` instances: the executor enforces
-///      factory provenance, so a mutable test double is rejected by design — which this suite
-///      also asserts.
+/// @dev Registries are REAL, write-once `CoreRegistry` instances rather than mutable test
+///      doubles: the rows the executor applies are the rows a governance-reviewed object serves.
 /// @dev The COORDINATOR IS A PLAIN ADDRESS here, pranked: this suite isolates the executor's own
 ///      rules (who may reserve, apply and release, and for which registry) from the coordinator's
 ///      stage logic. Operations are REAL write-once `EcosystemUpgradeOperation` objects — the
@@ -76,7 +68,6 @@ contract CoreUpgradeExecutorTest is Test {
 
     CoreUpgradeExecutor internal coreExecutor;
     ICoreRegistry internal coreRegistry;
-    bytes32 internal coreRegistryCodehash;
     ProxyAdmin internal proxyAdmin;
 
     DummyImplA internal implOld;
@@ -99,12 +90,11 @@ contract CoreUpgradeExecutorTest is Test {
         rows[0] = _row(address(bridgehubProxy), address(implOld), address(implNew));
         rows[1] = _row(address(messageRootProxy), address(implOld), address(implOld));
         coreRegistry = _deployRegistry(rows);
-        coreRegistryCodehash = address(coreRegistry).codehash;
 
-        // The executor is BOUND to (and owns) one immutable ecosystem ProxyAdmin and pins the
-        // audited `CoreRegistry` codehash, mirroring the production ownership chain; the owner
-        // then points it at the coordinator (the v34 bootstrap's stage-2 binding).
-        coreExecutor = new CoreUpgradeExecutor(ecosystemGovernor, proxyAdmin, coreRegistryCodehash);
+        // The executor is BOUND to (and owns) one immutable ecosystem ProxyAdmin, mirroring the
+        // production ownership chain; the owner then points it at the coordinator (the v34
+        // bootstrap's stage-2 binding).
+        coreExecutor = new CoreUpgradeExecutor(ecosystemGovernor, proxyAdmin);
         proxyAdmin.transferOwnership(address(coreExecutor));
         vm.prank(ecosystemGovernor);
         coreExecutor.setCoordinator(coordinator);
@@ -207,8 +197,6 @@ contract CoreUpgradeExecutorTest is Test {
             callInitializeUpgrade: true,
             admin: ProxyAdmin(address(0))
         });
-        // Same audited bytecode as the fixture registry (no immutables), so the executor's
-        // codehash pin covers this instance too.
         ICoreRegistry initRegistry = _deployRegistry(rows);
 
         vm.prank(ecosystemGovernor);
@@ -232,21 +220,16 @@ contract CoreUpgradeExecutorTest is Test {
         assertEq(_liveImpl(bridgehubProxy), address(implOld));
     }
 
-    function test_revertWhen_registryIsNotTheAuditedCode() public {
-        // Type provenance is a codehash check: an object that does not run the audited
-        // `CoreRegistry` code is rejected before any row is read, whatever it claims to be.
-        NotACoreRegistry impostor = new NotACoreRegistry();
+    /// @dev Retargeted from the removed codehash anchor to the check that still guards this
+    ///      entrypoint: the registry must be DEPLOYED. A call into a codeless address succeeds
+    ///      silently, so without it an undeployed registry turns the apply into a reported no-op.
+    function test_revertWhen_registryIsNotDeployed() public {
+        address codeless = makeAddr("codelessRegistry");
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                RegistryCodehashMismatch.selector,
-                address(impostor),
-                coreRegistryCodehash,
-                address(impostor).codehash
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, codeless));
         vm.prank(ecosystemGovernor);
-        coreExecutor.applyL1Upgrade(ICoreRegistry(address(impostor)));
+        coreExecutor.applyL1Upgrade(ICoreRegistry(codeless));
+        assertEq(_liveImpl(bridgehubProxy), address(implOld), "a refused registry applies nothing");
     }
 
     function test_revertWhen_replayingStaleRegistryWouldDowngrade() public {
@@ -339,19 +322,14 @@ contract CoreUpgradeExecutorTest is Test {
         assertEq(address(coreExecutor.activeOperation()), address(operation), "the first reservation stands");
     }
 
-    function test_revertWhen_beginOperationWithNonGenuineRegistry() public {
-        // The operation names whatever address it is given; the reservation is where the leg's
-        // provenance is checked — before anything is paused or applied anywhere.
-        NotACoreRegistry impostor = new NotACoreRegistry();
-        IEcosystemUpgradeOperation misnamed = _operationNaming(address(impostor));
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                RegistryCodehashMismatch.selector,
-                address(impostor),
-                coreRegistryCodehash,
-                address(impostor).codehash
-            )
-        );
+    /// @dev Retargeted from the removed codehash anchor: the reservation is still where the named
+    ///      leg is checked — before anything is paused or applied anywhere — and what it checks is
+    ///      that the address the operation names is deployed at all.
+    function test_revertWhen_beginOperationWithAnUndeployedRegistry() public {
+        // The operation names whatever address it is given.
+        address codeless = makeAddr("codelessRegistry");
+        IEcosystemUpgradeOperation misnamed = _operationNaming(codeless);
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, codeless));
         vm.prank(coordinator);
         coreExecutor.beginOperation(misnamed);
         assertEq(address(coreExecutor.activeOperation()), address(0), "a refused leg occupies nothing");
@@ -498,25 +476,19 @@ contract CoreUpgradeExecutorTest is Test {
         coreExecutor.validateUpgradeApplied(coreRegistry);
     }
 
-    function test_revertWhen_validateUpgradeAppliedAgainstNonGenuineRegistry() public {
-        // The check reads rows from the registry, so it enforces the same code provenance as the
-        // apply path — an impostor is rejected before any row is trusted.
+    /// @dev Retargeted from the removed codehash anchor: the post-state check reads its rows from
+    ///      the registry, so it enforces the same code-presence precondition as the apply path —
+    ///      without it an undeployed registry would report "applied" over an empty row list.
+    function test_revertWhen_validateUpgradeAppliedAgainstAnUndeployedRegistry() public {
         _applyL1Upgrade();
-        NotACoreRegistry impostor = new NotACoreRegistry();
+        address codeless = makeAddr("codelessRegistry");
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                RegistryCodehashMismatch.selector,
-                address(impostor),
-                coreRegistryCodehash,
-                address(impostor).codehash
-            )
-        );
-        coreExecutor.validateUpgradeApplied(ICoreRegistry(address(impostor)));
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, codeless));
+        coreExecutor.validateUpgradeApplied(ICoreRegistry(codeless));
     }
 
     function test_manifestHashCommitsToTheRows() public {
-        // Provenance pins the CODE; the manifest hash is what distinguishes two instances of it.
+        // The manifest hash is what distinguishes two instances of the same audited code.
         ProxyUpgradeRow[] memory rows = new ProxyUpgradeRow[](1);
         rows[0] = _row(address(bridgehubProxy), address(implOld), address(implNew));
         ICoreRegistry first = _deployRegistry(rows);

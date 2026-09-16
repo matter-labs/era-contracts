@@ -16,7 +16,7 @@
 
 use std::path::Path;
 
-use alloy::primitives::Address;
+use alloy::primitives::{Address, B256};
 use anyhow::Context;
 
 use crate::common::external_actions::ExternalAction;
@@ -58,6 +58,12 @@ pub(crate) struct BootstrapPackage {
     pub(crate) stage2: Vec<GovernanceCall>,
     /// The prepare's declared external actions — calls the objects do NOT describe.
     pub(crate) external_actions: Vec<ExternalAction>,
+    /// Every CREATE2 salt the package records, in the order they were found. A prepare deploys
+    /// the core leg under the ecosystem salt and each CTM leg under that CTM's, so an object's
+    /// address is re-derivable under one of them — which one is reported rather than assumed.
+    /// Empty for a package produced before the prepare recorded them, in which case the reviewer
+    /// supplies the reviewed salts on the command line.
+    pub(crate) create2_salts: Vec<B256>,
 }
 
 fn table<'a>(root: &'a toml::Value, path: &[&str]) -> Option<&'a toml::Value> {
@@ -70,6 +76,32 @@ fn table<'a>(root: &'a toml::Value, path: &[&str]) -> Option<&'a toml::Value> {
 
 fn address_at(root: &toml::Value, path: &[&str]) -> Option<Address> {
     table(root, path)?.as_str()?.parse().ok()
+}
+
+/// Collects the CREATE2 salts a merged prepare output records, de-duplicated and order-stable.
+///
+/// Salt-bearing keys are looked up rather than required: the verifier must keep working against
+/// packages produced before the prepare wrote them, where the reviewer supplies the salts
+/// instead (and the construction check ERRORS when neither source has any).
+fn create2_salts_in(root: &toml::Value, ctm_key: &str) -> Vec<B256> {
+    let candidates = [
+        vec!["misc", "create2_factory_salt"],
+        vec!["core", "create2_factory_salt"],
+        vec!["ctms", ctm_key, "create2_factory_salt"],
+    ];
+    let mut salts: Vec<B256> = Vec::new();
+    for path in &candidates {
+        let Some(parsed) = table(root, path)
+            .and_then(|v| v.as_str())
+            .and_then(|s| s.parse::<B256>().ok())
+        else {
+            continue;
+        };
+        if !salts.contains(&parsed) {
+            salts.push(parsed);
+        }
+    }
+    salts
 }
 
 fn calls_at(root: &toml::Value, key: &str) -> anyhow::Result<Vec<GovernanceCall>> {
@@ -119,6 +151,8 @@ impl BootstrapPackage {
         )
         .filter(|a| !a.is_zero());
 
+        let create2_salts = create2_salts_in(&root, &ctm_key);
+
         let external_actions: Vec<ExternalAction> = match table(&root, &["external_actions"]) {
             Some(value) => value
                 .clone()
@@ -138,6 +172,7 @@ impl BootstrapPackage {
             stage1,
             stage2,
             external_actions,
+            create2_salts,
         })
     }
 }

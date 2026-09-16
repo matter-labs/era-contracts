@@ -84,11 +84,9 @@ contract CTMTransition is ICTMTransition {
         // here — see {CoreRegistry}. Both release EDGES are validated, though: the
         // delta below is derived from their manifests, so a malformed edge would silently
         // produce a malformed cut.
-        // RELEASE PROVENANCE is still deliberately NOT checked here: the
-        // attestation that both edges are genuine write-once CTMRelease instances comes from the
-        // CTM itself — its canonical `releaseCodehash` is enforced in `_setCurrentRelease`, which
-        // every pinned release (bootstrap and every transition target) passes through, and the
-        // executor's release edge check ties `fromRelease` to that same pinned `currentRelease`.
+        // WHICH releases these are is governance's decision, established by review: the
+        // executor's release-edge check ties `fromRelease` to the CTM's live `currentRelease`,
+        // and `newRelease` is what the same operation then installs.
         ICTMRelease(_manifest.newRelease).validate();
         ICTMRelease(_manifest.fromRelease).validate();
 

@@ -49,20 +49,6 @@ library Utils {
     /// @dev The genesis-registry address the mocked CTM fixtures return; the registry itself is
     ///      mocked too (see `UtilsCallMocker`), pinning no facets.
     address internal constant TEST_GENESIS_REGISTRY = address(0x9E8E5157A9);
-    /// @dev The audited `CTMRelease` / `CTMTransition` codehashes: THE provenance anchors a CTM
-    ///      and a `CTMUpgradeExecutor` pin. `TEST_GENESIS_REGISTRY` is etched with the release
-    ///      runtime code (see `UtilsCallMocker`) so the mocked genesis release passes the same
-    ///      check a real one does.
-    /// @dev Read from the artifacts (`vm.getDeployedCode`) instead of `type(T).runtimeCode`:
-    ///      this file is in the zksync test compile closure and zksolc rejects `runtimeCode`.
-    ///      The objects carry no immutables, so the artifact bytes equal the deployed bytes.
-    function releaseCodehash() internal view returns (bytes32) {
-        return keccak256(vm.getDeployedCode("CTMRelease.sol:CTMRelease"));
-    }
-
-    function transitionCodehash() internal view returns (bytes32) {
-        return keccak256(vm.getDeployedCode("CTMTransition.sol:CTMTransition"));
-    }
 
     /// @notice Stands in a `CTMTransition` at `_transition` and its target release at `_newRelease`,
     ///         answering exactly the reads `DefaultUpgrade.upgradeFromTransition` makes for an
@@ -111,14 +97,6 @@ library Utils {
             )
         );
         vm.mockCall(_newRelease, abi.encodeCall(ICTMRelease.verifier, ()), abi.encode(_verifier));
-    }
-
-    function coreRegistryCodehash() internal view returns (bytes32) {
-        return keccak256(vm.getDeployedCode("CoreRegistry.sol:CoreRegistry"));
-    }
-
-    function operationCodehash() internal view returns (bytes32) {
-        return keccak256(vm.getDeployedCode("EcosystemUpgradeOperation.sol:EcosystemUpgradeOperation"));
     }
 
     /// @dev DiamondInit derives everything but (chainId, admin) from the CTM — which is simply

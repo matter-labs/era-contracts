@@ -7,7 +7,6 @@ import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 
 import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
-import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 
 contract initializingCTMOwnerZeroTest is ChainTypeManagerTest {
     function setUp() public {
@@ -18,7 +17,6 @@ contract initializingCTMOwnerZeroTest is ChainTypeManagerTest {
         ChainTypeManagerInitializeData memory ctmInitializeDataNoOwner = ChainTypeManagerInitializeData({
             owner: address(0),
             validatorTimelock: validator,
-            releaseCodehash: Utils.releaseCodehash(),
             currentRelease: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
             serverNotifier: serverNotifier

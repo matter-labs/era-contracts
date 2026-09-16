@@ -6,6 +6,7 @@ import {ICTMRelease} from "./ICTMRelease.sol";
 import {ObjectAnchorLib} from "../libraries/ObjectAnchorLib.sol";
 import {ReleaseFacetReader} from "../libraries/ReleaseFacetReader.sol";
 import {
+    RegistryDuplicateFacetRow,
     RegistryEmptySelectors,
     RegistryInventoryLengthMismatch,
     ZeroAddress
@@ -47,6 +48,7 @@ contract CTMRelease is ICTMRelease {
         if (_manifest.genesisFacets.length == 0) {
             revert RegistryEmptySelectors(address(0));
         }
+        _requireUniqueFacetRows(_manifest.genesisFacets);
         // The L2 table is an enum-indexed inventory: the length check makes every slot an
         // explicit statement (content is governance-reviewed data, like the rest of the
         // manifest). Checked against the count at THIS release's construction — later enum
@@ -122,12 +124,34 @@ contract CTMRelease is ICTMRelease {
         ObjectAnchorLib.requireCode(m.diamondInit);
         ObjectAnchorLib.requireCode(m.genesisUpgrade);
         ObjectAnchorLib.requireCode(m.verifier);
+        _requireUniqueFacetRows(m.genesisFacets);
         uint256 facetsLength = m.genesisFacets.length;
         for (uint256 i = 0; i < facetsLength; ++i) {
             // Not merely defensive: the facets are the one member set this contract READS
             // through (`ISelfDescribingFacet.selectors()`), and a codeless target answers that
             // read with an empty revert instead of a usable failure.
             ObjectAnchorLib.requireCode(m.genesisFacets[i].facet);
+        }
+    }
+
+    /// @dev One row per facet address. A repeated address describes a routing no diamond can hold
+    ///      (`Diamond.diamondCut` would re-add selectors already routed) and makes the release's
+    ///      row count disagree with the facet count any live diamond can show — which is what
+    ///      {ReleaseFacetReader.chainMatchesFacetRows} counts. Checked at construction AND on
+    ///      every `validate()`, because the two answer to different threats: a mistake in an
+    ///      authored manifest, and rows read off an object some caller could not attest.
+    function _requireUniqueFacetRows(GenesisFacet[] memory _facets) private pure {
+        uint256 length = _facets.length;
+        for (uint256 i = 0; i < length; ++i) {
+            address facet = _facets[i].facet;
+            if (facet == address(0)) {
+                continue;
+            }
+            for (uint256 j = 0; j < i; ++j) {
+                if (_facets[j].facet == facet) {
+                    revert RegistryDuplicateFacetRow(facet);
+                }
+            }
         }
     }
 }

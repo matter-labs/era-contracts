@@ -12,7 +12,6 @@ import {IChainTypeManager} from "../../../state-transition/IChainTypeManager.sol
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
 import {IChainAssetHandlerBase} from "../../../core/chain-asset-handler/IChainAssetHandler.sol";
 import {
-    EmptyBytes32,
     MigrationsNotPaused,
     NoPendingOperation,
     ExecutorCoordinatorMismatch,
@@ -58,9 +57,6 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
     ProxyAdmin public immutable CTM_PROXY_ADMIN;
 
     /// @inheritdoc ICTMUpgradeExecutor
-    bytes32 public immutable TRANSITION_CODEHASH;
-
-    /// @inheritdoc ICTMUpgradeExecutor
     address public coordinator;
 
     /// @inheritdoc ICTMUpgradeExecutor
@@ -96,19 +92,14 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
         address _initialOwner,
         IChainTypeManager _ctm,
         ProxyAdmin _ctmProxyAdmin,
-        address _coordinator,
-        bytes32 _transitionCodehash
+        address _coordinator
     ) UpgradeExecutorBase(_initialOwner) {
         if (address(_ctm) == address(0) || address(_ctmProxyAdmin) == address(0) || _coordinator == address(0)) {
             revert ZeroAddress();
         }
-        if (_transitionCodehash == bytes32(0)) {
-            revert EmptyBytes32();
-        }
         CHAIN_TYPE_MANAGER = _ctm;
         CTM_PROXY_ADMIN = _ctmProxyAdmin;
         coordinator = _coordinator;
-        TRANSITION_CODEHASH = _transitionCodehash;
     }
 
     /// @notice Points this executor at a coordinator (zero detaches it).
@@ -200,7 +191,7 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
         ProxyUpgradeRowLib.requireRowCode(_operation.ctmInfrastructureRows());
         ICTMTransition transition = ICTMTransition(_operation.transition());
         if (address(transition) != address(0)) {
-            _requireGenuineTransition(transition);
+            _requireTransitionDeployed(transition);
             transition.validate();
             _requireEdges(transition);
         }
@@ -267,7 +258,7 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
 
     /// @inheritdoc ICTMUpgradeExecutor
     function validateTransitionApplied(ICTMTransition _transition) external view {
-        _requireGenuineTransition(_transition);
+        _requireTransitionDeployed(_transition);
         _requireTransitionApplied(_transition);
     }
 
@@ -278,7 +269,7 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
         ProxyUpgradeRowLib.requireRowsApplied(CTM_PROXY_ADMIN, _operation.ctmInfrastructureRows());
         ICTMTransition transition = ICTMTransition(_operation.transition());
         if (address(transition) != address(0)) {
-            _requireGenuineTransition(transition);
+            _requireTransitionDeployed(transition);
             _requireTransitionApplied(transition);
         }
     }
@@ -322,9 +313,15 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
     // Internals
     // ---------------------------------------------------------------------------------------
 
-    /// @dev Type provenance: the object at `_transition` must run the audited `CTMTransition` code.
-    function _requireGenuineTransition(ICTMTransition _transition) private view {
-        address(_transition).requireObjectType(TRANSITION_CODEHASH);
+    /// @dev The execution precondition every transition-taking entrypoint shares. It is
+    ///      deliberately NOT an identity check: a runtime codehash cannot establish that the
+    ///      audited constructor produced this object, so the model does not pretend it can — the
+    ///      transition reaching here is the one governance reviewed and named, re-derived from the
+    ///      reviewed creation code before signing (`protocol-ops ecosystem verify-bootstrap`).
+    ///      What a chain CAN check is that something is deployed here at all, and it must: a call
+    ///      to a codeless address succeeds silently.
+    function _requireTransitionDeployed(ICTMTransition _transition) private view {
+        address(_transition).requireCode();
     }
 
     /// @dev The reservation every callback after `beginOperation` acts on.

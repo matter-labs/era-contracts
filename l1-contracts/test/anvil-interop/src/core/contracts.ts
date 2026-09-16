@@ -134,7 +134,7 @@ export function getCreationBytecode(name: ContractName): string {
 /**
  * Deployed (runtime) bytecode from the deterministic (CBOR-metadata-free) build — see
  * `[profile.registry-deterministic]` in l1-contracts/foundry.toml. Used for every contract an
- * object-type anchor covers, and for the addresses the committed registry manifest names.
+ * bytecode-DERIVED value the committed registry manifest pins, and for the addresses it names.
  */
 export function getDeterministicBytecode(name: ContractName): string {
   return loadDeterministicBytecodeFromOut(ARTIFACTS[name]);

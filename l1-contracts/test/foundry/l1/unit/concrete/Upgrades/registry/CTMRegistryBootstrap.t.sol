@@ -36,7 +36,7 @@ contract CTMRegistryBootstrapTest is Test {
     function setUp() public {
         // Consumers read each facet's routing from its own self-description; mock it on the
         // synthetic facet addresses. Every pinned target must also carry real code — the
-        // release's codehash pin rejects a codeless target — so etch a distinct nonempty
+        // release's `validate()` rejects a codeless member — so etch a distinct nonempty
         // stand-in wherever a pin is captured.
         for (uint256 i = 0; i < FACET_COUNT; ++i) {
             bytes4[] memory selectors = new bytes4[](1);

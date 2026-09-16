@@ -202,9 +202,7 @@ struct CoreRegistryManifest {
 ///        ServerNotifier's) is left to that administrator: `migrate()` hands onward only
 ///        `ctmProxyAdmin`, so a foreign admin must never be transferred to this one-shot object —
 ///        hand it to the executor, or keep it and apply the row yourself before stage 2.
-/// @param currentRelease The genesis release installed as `currentRelease`. `migrate()` reads
-///        its LIVE runtime hash and establishes that as the CTM's provenance anchor
-///        (`releaseCodehash`), which every later release is then held against.
+/// @param currentRelease The genesis release the edge installs as the CTM's `currentRelease`.
 /// @param newProtocolVersion The version the CTM moves to.
 /// @param oldProtocolVersionDeadline Until when the departing version stays usable.
 /// @param upgradeEngine The bootstrap engine (`BootstrapUpgrade`), the committed cut's init

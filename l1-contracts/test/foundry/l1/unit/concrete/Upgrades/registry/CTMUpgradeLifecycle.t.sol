@@ -10,7 +10,6 @@ import {
 } from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {CTMUpgradeExecutorFixture} from "./CTMUpgradeExecutor.t.sol";
-import {Utils} from "../../Utils/Utils.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
 import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol";
@@ -43,7 +42,7 @@ import {
     NotCTMOwner,
     OperationNotPending,
     ProxyUpgradeRowMismatch,
-    RegistryCodehashMismatch,
+    RegistryTargetHasNoCode,
     Unauthorized,
     UpgradeLifecycleBusy,
     UpgradeStageOutOfOrder
@@ -74,23 +73,9 @@ contract LifecycleImplOther {
     }
 }
 
-/// @dev Not a `CTMTransition`: exercises the executor's codehash provenance check at stage 0.
-contract NotATransition {
-    function manifestHash() external pure returns (bytes32) {
-        return bytes32(uint256(1));
-    }
-}
-
-/// @dev Not an `EcosystemUpgradeOperation`: exercises the coordinator's provenance check.
-contract NotAnOperation {
-    function manifestHash() external pure returns (bytes32) {
-        return bytes32(uint256(2));
-    }
-}
-
 /// @notice The three-stage lifecycle of one operation over one CTM, driven by the coordinator
 ///         ({protocol-docs/ecosystem-upgrade-coordination.md}): ordering and authority of the
-///         stages, the stage-0 binding and provenance conditions, the all-or-nothing stage 1, the
+///         stages, the stage-0 binding and admission conditions, the all-or-nothing stage 1, the
 ///         verify-then-release stage 2, abandonment, coordinator replacement, and how the CTM's
 ///         own migration pause composes with the ecosystem pause on the fixture's real
 ///         `L1ChainAssetHandler`. Several CTMs under one operation are
@@ -329,11 +314,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
     // ─────────────────────────── coordinator replacement ───────────────────────────
 
     function test_replaceCoordinator_thenExecuteLifecycle() public {
-        EcosystemUpgradeExecutor successor = new EcosystemUpgradeExecutor(
-            governor,
-            coreExecutor,
-            Utils.operationCodehash()
-        );
+        EcosystemUpgradeExecutor successor = new EcosystemUpgradeExecutor(governor, coreExecutor);
         vm.startPrank(governor);
         vm.expectEmit(true, true, true, true, address(coreExecutor));
         emit CoreUpgradeExecutor.CoordinatorChanged(address(coordinator), address(successor));
@@ -528,11 +509,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
     ///      are not authorization. The domains enforce it themselves (`onlyCoordinator`); with a
     ///      core leg the core executor is the first to refuse.
     function test_revertWhen_aForeignCoordinatorDrivesTheDomains() public {
-        EcosystemUpgradeExecutor foreign = new EcosystemUpgradeExecutor(
-            governor,
-            coreExecutor,
-            Utils.operationCodehash()
-        );
+        EcosystemUpgradeExecutor foreign = new EcosystemUpgradeExecutor(governor, coreExecutor);
         CTMTransition full = _deployFullTransition();
         EcosystemUpgradeOperation operation = _operationFor(full);
 
@@ -775,56 +752,42 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)), "no leg was reserved");
     }
 
-    function test_revertWhen_stage0NamesANonGenuineCoreRegistry() public {
-        // The operation names whatever address it is given; the core executor refuses a registry
-        // that does not run the audited `CoreRegistry` code when asked to reserve it.
-        address impostor = makeAddr("notACoreRegistry");
-        vm.etch(impostor, hex"600046");
-        EcosystemUpgradeOperation misnamed = _operationWithCore(ICTMTransition(address(transition)), impostor);
+    /// @dev Retargeted from the removed codehash anchor: stage 0 still refuses an operation whose
+    ///      core leg is not DEPLOYED, and it refuses it where it always did — at the reservation,
+    ///      before any leg is paused. Without the check a call into the codeless address would
+    ///      succeed silently and the leg would report itself reserved over nothing.
+    function test_revertWhen_stage0NamesAnUndeployedCoreRegistry() public {
+        // The operation names whatever address it is given.
+        address codeless = makeAddr("codelessCoreRegistry");
+        EcosystemUpgradeOperation misnamed = _operationWithCore(ICTMTransition(address(transition)), codeless);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                RegistryCodehashMismatch.selector,
-                impostor,
-                Utils.coreRegistryCodehash(),
-                impostor.codehash
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, codeless));
         vm.prank(governor);
         coordinator.stage0(misnamed);
         _assertLifecycleIdle();
     }
 
-    function test_revertWhen_stage0WithNonGenuineTransition() public {
-        NotATransition impostor = new NotATransition();
-        EcosystemUpgradeOperation operation = _cachedOperationFor(ICTMTransition(address(impostor)));
+    /// @dev Retargeted from the removed codehash anchor: the CTM executor still requires the
+    ///      transition it is handed to be deployed — a codeless one would make every read of the
+    ///      manifest, and the whole CTM leg, a silent no-op reported as success.
+    function test_revertWhen_stage0WithAnUndeployedTransition() public {
+        address codeless = makeAddr("codelessTransition");
+        EcosystemUpgradeOperation operation = _cachedOperationFor(ICTMTransition(codeless));
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                RegistryCodehashMismatch.selector,
-                address(impostor),
-                Utils.transitionCodehash(),
-                address(impostor).codehash
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, codeless));
         vm.prank(governor);
         coordinator.stage0(operation);
         _assertLifecycleIdle();
     }
 
-    function test_revertWhen_stage0WithNonGenuineOperation() public {
-        NotAnOperation impostor = new NotAnOperation();
+    /// @dev Retargeted from the removed codehash anchor: the coordinator still requires the
+    ///      operation itself to be deployed before it reads a single manifest field from it.
+    function test_revertWhen_stage0WithAnUndeployedOperation() public {
+        address codeless = makeAddr("codelessOperation");
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                RegistryCodehashMismatch.selector,
-                address(impostor),
-                Utils.operationCodehash(),
-                address(impostor).codehash
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, codeless));
         vm.prank(governor);
-        coordinator.stage0(IEcosystemUpgradeOperation(address(impostor)));
+        coordinator.stage0(IEcosystemUpgradeOperation(codeless));
         _assertLifecycleIdle();
     }
 

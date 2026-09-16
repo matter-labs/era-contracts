@@ -32,8 +32,6 @@ import {
     GenesisBatchHashZero,
     GenesisUpgradeZero,
     MigrationsNotPaused,
-    EmptyBytes32,
-    RegistryReleaseCodehashAlreadySet,
     NoCommittedUpgradeCutForVersion,
     Unauthorized,
     ZeroAddress
@@ -44,14 +42,11 @@ import {IChainAssetHandlerBase} from "../core/chain-asset-handler/IChainAssetHan
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {TxStatus} from "../common/Messaging.sol";
-import {ObjectAnchorLib} from "../upgrades/registry/libraries/ObjectAnchorLib.sol";
 
 /// @title Chain Type Manager contract
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpgradeable {
-    using ObjectAnchorLib for address;
-
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
     /// @notice Address of the bridgehub
@@ -145,10 +140,6 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// version-keyed at read time, so patch upgrades can reuse it without making genesis data
     /// unanswerable.
     address public currentRelease;
-
-    /// @notice `EXTCODEHASH` of the audited `CTMRelease`. Every release this CTM pins must run
-    ///         exactly that code (see `_requireGenuineRelease`). Set once at initialization.
-    bytes32 public releaseCodehash;
 
     /// @notice The transition committed for chains departing from a given protocol version. The
     ///         ONLY commitment for registry-driven edges: {upgradeCutForVersion} derives the cut
@@ -259,21 +250,22 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         validatorTimelockPostV29 = _initializeData.validatorTimelock;
         serverNotifierAddress = _initializeData.serverNotifier;
 
-        if (_initializeData.releaseCodehash == bytes32(0)) {
-            revert EmptyBytes32();
-        }
-        releaseCodehash = _initializeData.releaseCodehash;
-        emit NewReleaseCodehash(_initializeData.releaseCodehash);
         _setCurrentRelease(_initializeData.currentRelease);
     }
 
     /// @dev THE single point every release passes through (initialization and every later
-    ///      transition alike): provenance against the stored anchor, then the genesis params.
+    ///      transition alike): the release's own check surface, then the genesis params.
+    /// @dev No codehash pin. A runtime hash cannot establish that the audited constructor
+    ///      produced the object it is applied to (creation code may return canonical runtime
+    ///      bytecode over storage of its own choosing), so the model does not ask the chain to
+    ///      pretend otherwise: the release reaching here is the one GOVERNANCE reviewed and named
+    ///      in the call it signed, and `protocol-ops ecosystem verify-bootstrap` re-derives that
+    ///      object's address from the reviewed creation code before it signs. What stays on-chain
+    ///      are the checks a chain can actually make — see {docs/registry-driven-upgrades.md}.
     function _setCurrentRelease(address _release) internal {
         if (_release == address(0)) {
             revert ZeroAddress();
         }
-        _requireGenuineRelease(_release);
         ICTMRelease release = ICTMRelease(_release);
         release.validate();
         // No version check here: a release is version-INDEPENDENT. The release <-> protocol-version
@@ -298,41 +290,6 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
     function setCurrentRelease(address _release) external onlyOwner {
         _setCurrentRelease(_release);
-    }
-
-    /// @notice One-shot migration setter for the canonical release codehash. Freshly initialized
-    ///         CTMs receive it in `initialize`; CTMs MIGRATED from pre-registry versions (whose
-    ///         storage predates the field) set it during their migration, BEFORE the first
-    ///         `setCurrentRelease` — release provenance cannot be checked against a zero factory.
-    /// @dev Deliberately NOT a rotation mechanism: the factory is the provenance anchor every
-    ///      pinned release is attested against, so RE-POINTING it would retroactively change what
-    ///      "factory-attested" means. It can only fill the gap left by migration. A genuine factory
-    ///      migration needs its own explicitly named entrypoint whose semantics governance reviews
-    ///      on its own terms.
-    /// @dev Re-setting the anchor to the value it already holds is a no-op rather than a revert, so
-    ///      one upgrade bundle works against both a migrated CTM (anchor still zero) and an
-    ///      already-anchored one without the calldata having to predict which it is.
-    function setReleaseCodehash(bytes32 _releaseCodehash) external onlyOwner {
-        if (_releaseCodehash == bytes32(0)) {
-            revert EmptyBytes32();
-        }
-        bytes32 current = releaseCodehash;
-        if (current == _releaseCodehash) {
-            return;
-        }
-        if (current != bytes32(0)) {
-            revert RegistryReleaseCodehashAlreadySet(current);
-        }
-        releaseCodehash = _releaseCodehash;
-        emit NewReleaseCodehash(_releaseCodehash);
-    }
-
-    /// @dev The pinned codehash is CTM state, never authored inside permissionless transition
-    ///      manifests, so a manifest cannot smuggle in an arbitrary (possibly mutable)
-    ///      `ICTMRelease` implementation. Callers check this BEFORE reading anything out of the
-    ///      candidate: a non-release answers those reads with an empty revert.
-    function _requireGenuineRelease(address _release) internal view {
-        _release.requireObjectType(releaseCodehash);
     }
 
     /// @notice The L1 genesis upgrade contract new chains run at creation, read from the genesis

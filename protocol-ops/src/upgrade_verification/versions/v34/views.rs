@@ -74,7 +74,6 @@ sol! {
     contract CTMUpgradeExecutorView {
         function CHAIN_TYPE_MANAGER() external view returns (address);
         function CTM_PROXY_ADMIN() external view returns (address);
-        function TRANSITION_CODEHASH() external view returns (bytes32);
         function coordinator() external view returns (address);
         function activeOperation() external view returns (address);
         function owner() external view returns (address);
@@ -87,7 +86,6 @@ sol! {
         function CORE_EXECUTOR() external view returns (address);
         function ctmExecutor() external view returns (address);
         function setCTMExecutor(address _ctmExecutor) external;
-        function OPERATION_CODEHASH() external view returns (bytes32);
         function pendingOperation() external view returns (address);
         function owner() external view returns (address);
     }
@@ -96,16 +94,86 @@ sol! {
     #[sol(rpc)]
     contract CoreUpgradeExecutorView {
         function PROXY_ADMIN() external view returns (address);
-        function CORE_REGISTRY_CODEHASH() external view returns (bytes32);
         function coordinator() external view returns (address);
         function owner() external view returns (address);
+    }
+
+    /// Positional mirror of `RegistryTypes.CoreRegistryManifest` — the whole constructor
+    /// argument of a `CoreRegistry`, which is what its address commits to.
+    #[derive(Debug)]
+    struct CoreRegistryManifest {
+        ProxyUpgradeRow[] proxyUpgrades;
     }
 
     #[sol(rpc)]
     contract CoreRegistryView {
         function manifestHash() external view returns (bytes32);
+        function getManifest() external view returns (CoreRegistryManifest memory);
         function ecosystemRows() external view returns (ProxyUpgradeRow[] memory);
         function validate() external view;
+    }
+
+    /// Positional mirror of `RegistryTypes.GenesisFacet`.
+    #[derive(Debug)]
+    struct GenesisFacet {
+        address facet;
+        bool isFreezable;
+    }
+
+    /// Positional mirror of `RegistryTypes.ReleaseGenesisData`.
+    #[derive(Debug)]
+    struct ReleaseGenesisData {
+        bytes fixedForceDeploymentsData;
+        bytes32 genesisBatchHash;
+        bytes32 genesisBatchCommitment;
+        uint64 genesisIndexRepeatedStorageChanges;
+    }
+
+    /// Positional mirror of `RegistryTypes.ReleaseManifest` — the whole constructor argument of
+    /// a `CTMRelease`.
+    #[derive(Debug)]
+    struct ReleaseManifest {
+        address diamondInit;
+        address verifier;
+        address genesisUpgrade;
+        GenesisFacet[] genesisFacets;
+        ReleaseGenesisData genesis;
+        bytes[] l2BytecodeInfos;
+        bytes l2SystemProxyBytecodeInfo;
+    }
+
+    /// The release's own reads, including the manifest its address commits to.
+    #[sol(rpc)]
+    contract CTMReleaseView {
+        function manifestHash() external view returns (bytes32);
+        function getManifest() external view returns (ReleaseManifest memory);
+        function validate() external view;
+    }
+
+    /// One force deployment of a composed L2 plan — `IComplexUpgrader`'s shape, mirrored so the
+    /// derived payload can be rendered for review.
+    #[derive(Debug)]
+    struct UniversalContractUpgradeInfo {
+        uint8 upgradeType;
+        bytes deployedBytecodeInfo;
+        address newAddress;
+    }
+
+    /// The FINAL L2 plan an object constructed at its own construction — derived state, so it is
+    /// exactly what a counterfeit would tamper with and what a reviewer must see.
+    #[derive(Debug)]
+    struct L2UpgradePlan {
+        UniversalContractUpgradeInfo[] deployments;
+        address delegateTo;
+        address delegateComposer;
+        uint256[] factoryDepHashes;
+    }
+
+    /// The derived payloads every committed object serves.
+    #[sol(rpc)]
+    contract CommittedUpgradeView {
+        function l2Plan() external view returns (L2UpgradePlan memory);
+        function upgradeTarget() external view returns (uint256, uint256, address);
     }
 
     #[sol(rpc)]
@@ -126,13 +194,18 @@ sol! {
         function publishingBlock(bytes32 bytecodeHash) external view returns (uint256);
     }
 
+    /// Only the hop from the CTM to its ChainAssetHandler, which the pause calls target.
+    #[sol(rpc)]
+    contract BridgehubForBootstrapView {
+        function chainAssetHandler() external view returns (address);
+    }
+
     #[sol(rpc)]
     contract CtmForBootstrapView {
         function protocolVersion() external view returns (uint256);
         function owner() external view returns (address);
         function pendingOwner() external view returns (address);
         function currentRelease() external view returns (address);
-        function releaseCodehash() external view returns (bytes32);
         function L1_BYTECODES_SUPPLIER() external view returns (address);
         function BRIDGE_HUB() external view returns (address);
     }

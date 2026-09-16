@@ -46,19 +46,29 @@ pub(crate) fn tolerate<T>(
     }
 }
 
-/// The reviewed commit's contracts, indexed both ways: by deployed-bytecode hash (what is this
-/// code?) and by short contract name (what should this contract's code hash to?).
+/// The reviewed commit's contracts, indexed by deployed-bytecode hash (what is this code?) and
+/// by short contract name (what creation code does the commit build for it?).
 pub(crate) struct CodeIdentity {
     by_codehash: HashMap<FixedBytes<32>, String>,
-    by_short_name: HashMap<String, FixedBytes<32>>,
+    creation_code_by_short_name: HashMap<String, FixedBytes<32>>,
 }
 
 impl CodeIdentity {
     pub(crate) fn from_local_hashes() -> anyhow::Result<Self> {
         let hashes = ContractHashes::init_from_local()?;
         let mut by_codehash = HashMap::new();
-        let mut by_short_name = HashMap::new();
+        let mut creation_code_by_short_name = HashMap::new();
         for contract in hashes.hashes {
+            if let Some(hash) = contract.evm_bytecode_hash.as_deref() {
+                if let (Ok(parsed), Some(short)) = (
+                    hash.parse::<FixedBytes<32>>(),
+                    contract.contract_name.rsplit('/').next(),
+                ) {
+                    creation_code_by_short_name
+                        .entry(short.to_string())
+                        .or_insert(parsed);
+                }
+            }
             if let Some(hash) = contract.evm_deployed_bytecode_hash.as_deref() {
                 if let Ok(parsed) = hash.parse::<FixedBytes<32>>() {
                     // First writer wins: a duplicate hash means two names share bytecode
@@ -66,15 +76,12 @@ impl CodeIdentity {
                     by_codehash
                         .entry(parsed)
                         .or_insert_with(|| contract.contract_name.clone());
-                    if let Some(short) = contract.contract_name.rsplit('/').next() {
-                        by_short_name.entry(short.to_string()).or_insert(parsed);
-                    }
                 }
             }
         }
         Ok(Self {
             by_codehash,
-            by_short_name,
+            creation_code_by_short_name,
         })
     }
 
@@ -83,14 +90,13 @@ impl CodeIdentity {
         self.by_codehash.get(codehash).map(String::as_str)
     }
 
-    /// The deployed-bytecode hash the reviewed commit produces for `short_name`.
+    /// The CREATION-code hash the reviewed commit produces for `short_name`.
     ///
-    /// Meaningful only for contracts with no constructor-set immutables — which is exactly what
-    /// the object-type anchors cover (`CTMTransition`, `CoreRegistry`,
-    /// `EcosystemUpgradeOperation`), so an executor's anchor immutable can be checked against
-    /// the commit rather than against whatever the package says it should be.
-    pub(crate) fn codehash_of(&self, short_name: &str) -> Option<FixedBytes<32>> {
-        self.by_short_name.get(short_name).copied()
+    /// What a locally built artifact is held against before its bytes are used to derive an
+    /// object's address: the bytes come from an uncommitted build directory, the hash from the
+    /// committed record.
+    pub(crate) fn creation_code_hash_of(&self, short_name: &str) -> Option<FixedBytes<32>> {
+        self.creation_code_by_short_name.get(short_name).copied()
     }
 }
 
@@ -302,15 +308,12 @@ mod tests {
 
     fn identity_from(pairs: &[(&str, &str)]) -> CodeIdentity {
         let mut by_codehash = HashMap::new();
-        let mut by_short_name = HashMap::new();
         for (name, hash) in pairs {
-            let parsed: FixedBytes<32> = hash.parse().unwrap();
-            by_codehash.insert(parsed, (*name).to_string());
-            by_short_name.insert(name.rsplit('/').next().unwrap().to_string(), parsed);
+            by_codehash.insert(hash.parse::<FixedBytes<32>>().unwrap(), (*name).to_string());
         }
         CodeIdentity {
             by_codehash,
-            by_short_name,
+            creation_code_by_short_name: HashMap::new(),
         }
     }
 
@@ -366,25 +369,12 @@ mod tests {
         }
         let id = CodeIdentity {
             by_codehash,
-            by_short_name: HashMap::new(),
+            creation_code_by_short_name: HashMap::new(),
         };
         assert_eq!(
             id.name_of(&HASH_A.parse().unwrap()),
             Some("l1-contracts/First")
         );
-    }
-
-    /// The anchor checks resolve a SHORT name to the reviewed commit's codehash, so an
-    /// executor's `TRANSITION_CODEHASH` can be held against the commit instead of against a
-    /// value the package supplied.
-    #[test]
-    fn resolves_a_short_name_to_its_codehash() {
-        let id = identity_from(&[("l1-contracts/CTMTransition", HASH_A)]);
-        assert_eq!(
-            id.codehash_of("CTMTransition"),
-            Some(HASH_A.parse().unwrap())
-        );
-        assert_eq!(id.codehash_of("CoreRegistry"), None);
     }
 
     /// An immutable is compared case-insensitively, because the two sides are rendered from
@@ -397,8 +387,8 @@ mod tests {
 
     /// The regression this verifier exists for: a deployment the reviewed commit does not
     /// produce is UNKNOWN and therefore a finding — whatever fingerprint a package might have
-    /// carried for it. Under the removed pin model a self-supplied hash of exactly this code
-    /// would have "matched" and reported success.
+    /// carried for it. A self-supplied hash of exactly this code would have "matched" and
+    /// reported success.
     #[test]
     fn unrecognized_code_is_a_verdict_of_its_own() {
         let id = identity_from(&[("l1-contracts/CTMRelease", HASH_A)]);

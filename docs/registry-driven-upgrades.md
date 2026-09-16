@@ -114,7 +114,7 @@ diff, never a wrong byte in offchain-authored data.
 | `CTMUpgradeComposer`          | the committed cut and the L2 protocol upgrade transaction, from a transition or the bootstrap migration |
 | `L2InventoryLib`, `L2PlanLib` | changed L2 deployments; executable plan construction from bytecode infos                                |
 | `ProxyUpgradeRowLib`          | `toRows`, `applyRows`, `requireRowsApplied` over the enum-indexed inventories                           |
-| `ObjectAnchorLib`             | `requireCode` (a named member is deployed) / `requireObjectType` (an anchor admits a candidate)         |
+| `ObjectAnchorLib`             | `requireCode` — a named object or member is deployed at all                                             |
 
 There is no intermediate genesis-manifest type between a build and its `ReleaseManifest`:
 `DeployCTMUtils.deployCurrentRelease` (and `deployAdditionalReleaseFacets`) assembles the
@@ -136,15 +136,15 @@ flowchart TB
       SEQ["RegistryBootstrapSequence<br/>the entry edge's governance calls, derived"]
     end
 
-    subgraph exe["Executors — immutable bindings + immutable object codehashes"]
-      EE["EcosystemUpgradeExecutor (coordinator)<br/>CORE_EXECUTOR · OPERATION_CODEHASH<br/>pendingOperation · pendingStage"]
-      CO["CoreUpgradeExecutor<br/>PROXY_ADMIN · CORE_REGISTRY_CODEHASH<br/>coordinator · reservation"]
-      CE["CTMUpgradeExecutor<br/>CHAIN_TYPE_MANAGER · CTM_PROXY_ADMIN<br/>TRANSITION_CODEHASH · coordinator · reservation"]
+    subgraph exe["Executors — immutable bindings"]
+      EE["EcosystemUpgradeExecutor (coordinator)<br/>CORE_EXECUTOR<br/>pendingOperation · pendingStage"]
+      CO["CoreUpgradeExecutor<br/>PROXY_ADMIN<br/>coordinator · reservation"]
+      CE["CTMUpgradeExecutor<br/>CHAIN_TYPE_MANAGER · CTM_PROXY_ADMIN<br/>coordinator · reservation"]
     end
 
     T["GovernanceUpgradeTimer<br/>TIMER_GOVERNANCE = coordinator"]
     OP -. "names the timer" .-> T
-    CTM["ChainTypeManager<br/>currentRelease · releaseCodehash<br/>upgradeTransition[old]"]
+    CTM["ChainTypeManager<br/>currentRelease<br/>upgradeTransition[old]"]
     CAH["L1ChainAssetHandler<br/>ecosystem pause · per-CTM pause"]
     PA["ecosystem ProxyAdmin"]
     CPA["CTM-domain ProxyAdmin"]
@@ -242,46 +242,87 @@ Who can do what once the CTM domain is owned by `CTMUpgradeExecutor`. "Chain sid
 | `changeFeeParams`, `setTokenMultiplier`                                                                                             | `forward` only                                                                                  | chain admin                             |
 | `setPendingAdmin`, `setServerNotifier`                                                                                              | `forward` only                                                                                  | CTM admin (`onlyOwnerOrAdmin`)          |
 | `executeUpgrade` (arbitrary cut), legacy `setNewVersionUpgrade` / `setUpgradeDiamondCut` / `setLegacyValidatorTimelock`             | `forward` only — deliberately: the bypass the object-driven path exists to remove               | —                                       |
-| `setReleaseCodehash`                                                                                                                | `forward` only — one-shot, installed by the bootstrap                                           | —                                       |
 | CTM / ProxyAdmin `transferOwnership` (executor succession)                                                                          | `forward` only                                                                                  | —                                       |
 
 ## Provenance and validation
 
-Three mechanisms, applied everywhere:
+Object trust is established by REVIEW, not by a check the chain can make. Everything below follows
+from one fact about the EVM: creation code can write arbitrary storage and then return whatever
+runtime bytecode it likes. A contract that returns the audited runtime code therefore proves only
+that it runs audited code — never that the audited CONSTRUCTOR produced the state that code reads.
 
-**Object-type anchors.** Each object takes its whole manifest as a constructor argument, so it has
-no initializer and no state-mutating function at all — write-once is structural, not a runtime
-guard. Consumers establish that a candidate IS one of these objects by checking its `EXTCODEHASH`
-against an expectation established EARLIER: the executors hold `TRANSITION_CODEHASH` /
-`CORE_REGISTRY_CODEHASH` / `OPERATION_CODEHASH` as construction-time immutables, and the CTM holds
-`releaseCodehash` as state, checked in `setCurrentRelease`. That direction is what makes the check
-worth anything — the expectation predates every input it is applied to, so an arbitrary contract
-cannot impersonate an object whose behavior the executor then trusts. A hash arriving WITH the
-candidate would prove nothing.
+That distinction is not academic for these objects. A `CTMTransition` DERIVES its facet cuts and L2
+plan at construction and stores them; every chain applies those cuts verbatim through delegatecall.
+A counterfeit built from adversarial creation code would answer `manifestHash()` with the approved
+manifest, hash identically to the audited object, pass `validate()`, and still route
+security-critical selectors wherever its author chose.
 
-What an anchor proves is that the address runs the audited, write-once code — not _which_ manifest
-it holds. Governance approving the address is what gates content. Because the manifest lives in the
-initcode, a CREATE2 address also commits to it. For this to hold, manifest data must live in
-**storage**, never in immutables: immutables are patched into runtime code, which would give every
-instance a different codehash.
+**There are no object-type codehash anchors.** An earlier iteration pinned one per object type
+(`releaseCodehash` on the CTM; `TRANSITION_CODEHASH` / `CORE_REGISTRY_CODEHASH` /
+`OPERATION_CODEHASH` on the executors). They were removed — all four, together — because they make
+exactly the claim the paragraph above refutes, and three survivors would have gone on implying a
+guarantee the fourth had just been admitted not to give. Objects consequently carry no fingerprint
+of themselves and none of their members: a hash the manifest author supplies beside the address it
+describes can only ever agree with itself.
+
+**What establishes an object, then.** Governance approves the exact deployed objects, and the
+review is a tool's output rather than an eyeball comparison of hashes. `protocol-ops ecosystem
+verify-bootstrap` answers three questions for every object a package names, and treats
+"unverifiable" as an error rather than a caveat:
+
+1. **Does it run the reviewed code?** Live `EXTCODEHASH` against `AllContractsHashes.json` for the
+   reviewed commit. Code the commit does not produce is UNKNOWN and therefore a finding.
+2. **Was it PRODUCED by that code's constructor, from the manifest it serves?** Every object is
+   deployed through the deterministic CREATE2 factory (`0x4e59…4956C`, the same address on L1 and
+   on ZKsync OS settlement layers), so
+   `address == keccak256(0xff ++ factory ++ salt ++ keccak256(creationCode ++ abi.encode(manifest)))[12:]`.
+   The verifier reads the manifest off the object, re-encodes it, and recomputes that address from
+   the reviewed creation code. A match proves the canonical constructor ran on that manifest, which
+   covers the object's WHOLE state — including derived fields, and including derived fields nobody
+   has added yet. The creation-code BYTES come from the local build (`l1-contracts/out`), which is
+   itself held against the committed `evmBytecodeHash`, so a doctored build directory cannot pass.
+3. **Do the governance calls execute those objects?** Every stage call's target must be a reviewed
+   object or a live contract the manifest itself names. An address no part of the review accounts
+   for is an error.
+
+Its limits, stated so they are not mistaken for coverage: the salt is a package input, so an
+attacker free to choose both a salt and a counterfeit deployment faces the standard ~2^80 CREATE2
+address-collision bound rather than a 160-bit preimage; and the derivation binds an object to its
+MANIFEST, never to what the manifest's members RUN. A genuine object built from a manifest naming
+an attacker's facet verifies perfectly — which is why governance reviews the member addresses. Both
+boundaries are pinned by `test/foundry/l1/upgrades/CounterfeitObject.t.sol`, which builds an actual
+counterfeit from real initcode and asserts the derivation rejects it.
+
+For this to hold, manifest data must live in **storage**, never in immutables: immutables are
+patched into runtime code, which would make an object's runtime bytes depend on its manifest and
+break question 1.
 
 **Members are named by address.** Everything executable an object names — facets, `DiamondInit`,
 the verifier, the genesis upgrade, the upgrade engine, the timer, the composer, each `implNew` — is
-an ADDRESS, and what it runs is what governance reviewed before approving the object. The object
-carries no fingerprint of that code: the manifest author would supply both halves of such a pair,
-so it could only ever agree with itself, and hashing whatever the deployment script produced never
-made that choice independently reviewed.
+an ADDRESS, and what it runs is what governance reviewed before approving the object.
 
-**Validation.** `validate()` reverts unless every contract an object names is deployed code, and
-runs where an object is committed or applied (`stage0` on the coordinator, `beginOperation` on both
-domain executors, `applyL1Upgrade`, `applyOperation`, `migrate()`, transition construction for both
-release edges).
-It is a real precondition rather than a formality: a codeless facet answers the routing read with
-an empty revert, and a codeless engine turns a chain's upgrade into a delegatecall that silently
-succeeds. It does NOT attest that the code is the reviewed code — that is governance's approval of
-the addresses, established off-chain. Two paths deliberately skip `validate()` and say so in code:
-the per-chain `upgradeChain` and the engine's `upgradeFromTransition` execute only the transition
-the CTM already committed, whose members cannot have lost their code since.
+**What the chain still enforces.** Removing the anchors removed a check that did not hold; it
+removed nothing that did. Every execution check stays, on every path:
+
+- `ObjectAnchorLib.requireCode` on every object and every member an object names. Not bookkeeping:
+  a call to a codeless address SUCCEEDS silently, and a codeless delegatecall target turns a
+  chain's upgrade into a no-op that reports success.
+- `validate()` on each object, where it is committed or applied (`stage0` on the coordinator,
+  `beginOperation` on both domain executors, `applyL1Upgrade`, `applyOperation`, `migrate()`,
+  transition construction for both release edges). Two paths deliberately skip it and say so in
+  code: the per-chain `upgradeChain` and the engine's `upgradeFromTransition` execute only the
+  transition the CTM already committed, whose members cannot have lost their code since.
+- The source-checked edges: every proxy row departs from `expectedOldImpl`, a transition departs
+  from the CTM's live `currentRelease` and its live `protocolVersion`, and the bootstrap refuses
+  unless the live ecosystem is exactly the starting state its manifest names.
+- Authority and bindings: the executors' bound CTM, ProxyAdmin, coordinator and owner, checked by
+  value against the manifest before the domain is handed over.
+- Lifecycle ordering and reservations: one operation at a time, stages in order, each domain
+  answering only to its coordinator.
+
+**Validation.** `validate()` reverts unless every contract an object names is deployed code. It
+does NOT attest that the code is the reviewed code — that is governance's approval of the
+addresses, established off-chain.
 
 **Post-state verification.** A second layer proves the upgrade LANDED, and stage 2 gates on it:
 
@@ -310,10 +351,6 @@ The CTM stores one release pointer and derives genesis data from it:
 
 - `currentRelease` — the release every new chain is created at. `storedBatchZero()` and
   `l1GenesisUpgrade()` are views over `ICTMRelease(currentRelease).genesisParams()`.
-- `releaseCodehash` — the provenance anchor every release this CTM installs is checked against.
-  Established once (in `initialize` for a fresh CTM, by `setReleaseCodehash` for a migrated one,
-  from the live runtime code of the release governance approved) and enforced for every release
-  afterwards. It is deliberately not a rotation mechanism.
 - `upgradeTransition[oldProtocolVersion]` — the transition committed for chains departing from that
   version, and the ONLY commitment for registry-driven edges: `upgradeCutForVersion` derives the cut
   from it on read (a chain is never handed cut bytes), and `protocolVersionDeadline` resolves the
@@ -371,9 +408,9 @@ sequenceDiagram
     participant D as Chain diamond
 
     G->>X: stage0(operation)
-    Note over X: OPERATION_CODEHASH; domain callbacks enforce onlyCoordinator
-    X->>CO: beginOperation(operation) — anchor + validate
-    X->>E: beginOperation(operation) — anchor, validate, both edges
+    Note over X: domain callbacks enforce onlyCoordinator
+    X->>CO: beginOperation(operation) — code present + validate
+    X->>E: beginOperation(operation) — code present, validate, both edges
     E->>H: pauseCTMMigration(ctm)
     X->>T: startTimer() — the operation's timer; onlyTimerAdmin, so TIMER_GOVERNANCE must be X
     G->>X: stage1(operation)
@@ -507,22 +544,16 @@ identifies the schema, coordinator and tooling changes needed to expand particip
 
 ## Bootstrap
 
-A pre-registry CTM has neither `currentRelease` nor `releaseCodehash`, and transitions never accept a
-zero `fromRelease`. It must therefore cross into the model once, through one-time migration code —
-never through an accommodation inside the transition model. Fresh CTMs set both at genesis and need
-no bootstrap.
+A pre-registry CTM has no `currentRelease`, and transitions never accept a zero `fromRelease`. It
+must therefore cross into the model once, through one-time migration code — never through an
+accommodation inside the transition model. Fresh CTMs pin their release at genesis and need no
+bootstrap.
 
 `RegistryBootstrapMigration` expresses that crossing as a single write-once object. Its manifest names
 the CTM and its departing version, the CTM-domain `ProxyAdmin`, the source-checked implementation
 swaps (the CTM's own among them), the genesis `currentRelease`, the version edge and deadline, the
 bootstrap engine and authored L2 plan, the timer, and the `CTMUpgradeExecutor` that receives the
 domain together with the owner and the `coordinator` it must already answer to.
-
-This is also where the CTM's provenance anchor is ESTABLISHED. After governance has approved the
-release ADDRESS, `migrate()` checks there is code at it and installs that live runtime hash as
-`releaseCodehash`; every release the CTM accepts afterwards is held against it. The step
-authenticates continuity from the approved release onward — it does not, and cannot, prove on-chain
-that the initial code was the audited code.
 
 Governance nominates the migration as CTM owner and transfers the CTM-domain `ProxyAdmin` to it;
 `migrate()` accepts the CTM, performs the whole edge and hands both to the bound executor in the
@@ -576,9 +607,9 @@ the two objects the edge already has — the migration and the `CoreRegistry` �
 sequence: the coordinator (named by the manifest) names the `CoreUpgradeExecutor`, that executor
 names the ecosystem `ProxyAdmin`, the manifest names the CTM, its `ProxyAdmin`, the bound CTM
 executor and the timer, and the CTM names the chain asset handler through its Bridgehub. The only
-input the edge does not already name is the registry, and it is bound through the edge anyway: the
-core executor's `CORE_REGISTRY_CODEHASH` anchor is checked at construction, so a registry stage 1
-would refuse cannot be described here either.
+input the edge does not already name is the registry, so the sequence pins it: stage 1 applies
+exactly the address this object was constructed over, and a reviewer reads it off the derived
+calls.
 
 The prepare reads the calls off that object — label and authority included — and declares each one,
 so governance reviews a sequence derived from the objects rather than one a script and the objects
@@ -609,11 +640,10 @@ CREATE2 address commits to it. There is no separate salt to reproduce and no win
 deployed-but-uninitialized instance exists. Every prepare deployment rides the CREATE2 factory,
 because the deployer Safe bundle replays factory transactions only.
 
-The object-type anchors the executors are constructed with are taken from the same build artifact
-the objects are deployed from (`BytecodeUtils.getDeployedBytecodeHash` / `readBytecodeL1`); an
-anchor read from one artifact and an object deployed from another can differ in CBOR metadata. The
-anchored contracts are built with a CBOR-metadata-free profile (`registry-deterministic`) so their
-hashes are byte-identical across platforms.
+The objects are built with a CBOR-metadata-free profile (`registry-deterministic`) so their
+bytecode is byte-identical across platforms. That is what lets a reviewer's own build reproduce the
+creation code a package's objects were deployed from, which is what the construction check in
+`protocol-ops ecosystem verify-bootstrap` rests on.
 
 **Gateway.** EraVM has no constructors, so these objects cannot be constructed there. A Gateway CTM
 therefore cannot deploy its own `CTMRelease` in-flow and the registry model cannot bump it yet; the

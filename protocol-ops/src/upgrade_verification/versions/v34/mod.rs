@@ -9,16 +9,19 @@
 //! different question — not "is this calldata what the scripts would produce?" but:
 //!
 //!   1. Does every object run the code the reviewed commit produces? (`provenance`)
-//!   2. Does every contract the manifest names exist, and does each object-type ANCHOR hold
-//!      the reviewed commit's codehash for the object type it admits?
-//!   3. Is authority bound as the manifest claims, and to the expected governance owner?
-//!   4. Does every proxy row depart from the implementation that is actually live?
-//!   5. Is the edge un-executed, and does the calldata contain only the expected calls?
+//!   2. Was every object PRODUCED by that code's constructor from the manifest it serves?
+//!      (`construction`) — the question a runtime codehash cannot answer, and the reason the
+//!      chain no longer pretends to answer it.
+//!   3. Does every contract the manifest names exist?
+//!   4. Is authority bound as the manifest claims, and to the expected governance owner?
+//!   5. Does every proxy row depart from the implementation that is actually live?
+//!   6. Is the edge un-executed, does the calldata contain only the expected calls, and does
+//!      every one of those calls target an address this review accounted for?
 //!
-//! Question 2 is deliberately NOT "does the manifest's own fingerprint of a member match that
-//! member's code": the manifest author supplies both halves of such a pair, so it can only ever
-//! agree with itself. Every comparison here is against the reviewed commit or against live
-//! state the package does not control.
+//! None of it is "does the manifest's own fingerprint of a member match that member's code": the
+//! manifest author supplies both halves of such a pair, so it can only ever agree with itself.
+//! Every comparison here is against the reviewed commit or against live state the package does
+//! not control.
 //!
 //! # What it deliberately does not do
 //!
@@ -29,17 +32,21 @@
 //! post-handover state (it requires the migration to already hold both ownerships), so
 //! pre-execution it reverts by design and tells a reviewer nothing.
 
-use alloy::primitives::{Address, U256};
+use std::collections::BTreeMap;
+
+use alloy::primitives::{Address, B256, U256};
 use alloy::providers::Provider;
-use alloy::sol_types::SolCall;
+use alloy::sol_types::{SolCall, SolValue};
 
 use crate::common::ethereum::get_provider;
 use crate::upgrade_verification::verifiers::VerificationResult;
 
+pub(crate) mod construction;
 pub(crate) mod package;
 pub(crate) mod provenance;
 pub(crate) mod views;
 
+use construction::{expect_canonical_construction, ReviewedBuild};
 use package::{
     BootstrapPackage, APPLY_L1_UPGRADE_SELECTOR, MIGRATE_SELECTOR, PAUSE_MIGRATION_SELECTOR,
     SET_COORDINATOR_SELECTOR, TRANSFER_OWNERSHIP_SELECTOR, UNPAUSE_MIGRATION_SELECTOR,
@@ -50,10 +57,10 @@ use provenance::{
     CodeIdentity, ImmutableValue,
 };
 use views::{
-    CTMUpgradeExecutorView, CoreRegistryView, CoreUpgradeExecutorView, CtmForBootstrapView,
-    EcosystemUpgradeExecutorView, GovernanceUpgradeTimerView,
-    GovernanceUpgradeTimerView::GovernanceUpgradeTimerViewInstance, ProxyAdminView,
-    RegistryBootstrapMigrationView,
+    BridgehubForBootstrapView, CTMReleaseView, CTMUpgradeExecutorView, CommittedUpgradeView,
+    CoreRegistryView, CoreUpgradeExecutorView, CtmForBootstrapView, EcosystemUpgradeExecutorView,
+    GovernanceUpgradeTimerView, GovernanceUpgradeTimerView::GovernanceUpgradeTimerViewInstance,
+    ProxyAdminView, RegistryBootstrapMigrationView,
 };
 
 /// Verify a v34 bootstrap package against the live L1 it targets.
@@ -65,11 +72,19 @@ pub(crate) async fn verify(
     ecosystem_toml: &std::path::Path,
     l1_rpc_url: &str,
     expected_governance_owner: Option<Address>,
+    extra_create2_salts: &[B256],
     result: &mut VerificationResult,
 ) -> anyhow::Result<()> {
     let package = BootstrapPackage::load(ecosystem_toml)?;
     let provider = get_provider(l1_rpc_url)?;
     let identity = CodeIdentity::from_local_hashes()?;
+    let build = ReviewedBuild::load(&identity);
+    let salts = merge_salts(&package.create2_salts, extra_create2_salts);
+    // The set of addresses this run establishes as reviewed. Every governance call must land on
+    // one of them (or on a live contract the manifest itself names), which is the last of the
+    // three things a reviewer has to be able to say: the calls execute the objects that were
+    // reviewed, not ones that merely look like them.
+    let mut reviewed: BTreeMap<Address, String> = BTreeMap::new();
 
     result.print_info("== Package ==");
     result.report_ok(&format!(
@@ -117,6 +132,44 @@ pub(crate) async fn verify(
         }
     };
 
+    // ── The construction check: did the reviewed creation code, run on THIS manifest, land
+    //    here? A codehash cannot answer that (creation code can return canonical runtime
+    //    bytecode over storage of its own choosing); an address can.
+    result.print_info("\n== Object construction ==");
+    if expect_canonical_construction(
+        &build,
+        result,
+        "the bootstrap migration",
+        package.migration,
+        "RegistryBootstrapMigration",
+        &manifest.abi_encode(),
+        &salts,
+    ) {
+        reviewed.insert(package.migration, "the bootstrap migration".to_string());
+    }
+    verify_release_construction(
+        &provider,
+        &build,
+        result,
+        manifest.currentRelease,
+        &salts,
+        &mut reviewed,
+    )
+    .await;
+    if let Some(core_registry_addr) = package.core_registry {
+        verify_core_registry_construction(
+            &provider,
+            &build,
+            result,
+            core_registry_addr,
+            &salts,
+            &mut reviewed,
+        )
+        .await;
+    }
+    render_derived_payloads(&provider, result, package.migration).await;
+
+    result.print_info("\n== Edge state ==");
     let executed = tolerate(
         migration.executed().call().await,
         result,
@@ -182,11 +235,6 @@ pub(crate) async fn verify(
         result,
         "the executor's bound ProxyAdmin",
     );
-    let transition_anchor = tolerate(
-        executor.TRANSITION_CODEHASH().call().await,
-        result,
-        "the executor's TRANSITION_CODEHASH",
-    );
     let executor_immutables = [
         ImmutableValue::new(
             "CHAIN_TYPE_MANAGER",
@@ -197,11 +245,6 @@ pub(crate) async fn verify(
             "CTM_PROXY_ADMIN",
             optional_display(bound_admin),
             manifest.ctmProxyAdmin,
-        ),
-        ImmutableValue::new(
-            "TRANSITION_CODEHASH",
-            optional_display(transition_anchor),
-            optional_display(identity.codehash_of("CTMTransition")),
         ),
     ];
     expect_immutable_bearing_identity(
@@ -277,33 +320,6 @@ pub(crate) async fn verify(
         )
         .await?;
         let core_executor = CoreUpgradeExecutorView::new(core_executor_addr, &provider);
-        // The two remaining object-type anchors, each held against the reviewed commit's own
-        // bytecode for the object type it admits. Neither object has immutables, so the
-        // artifact's deployed-bytecode hash IS what a genuine one carries once deployed.
-        let core_registry_anchor = tolerate(
-            core_executor.CORE_REGISTRY_CODEHASH().call().await,
-            result,
-            "the core executor's CORE_REGISTRY_CODEHASH",
-        );
-        expect_anchor_matches_commit(
-            &identity,
-            result,
-            "the core executor's CORE_REGISTRY_CODEHASH",
-            core_registry_anchor,
-            "CoreRegistry",
-        );
-        let operation_anchor = tolerate(
-            coordinator.OPERATION_CODEHASH().call().await,
-            result,
-            "the coordinator's OPERATION_CODEHASH",
-        );
-        expect_anchor_matches_commit(
-            &identity,
-            result,
-            "the coordinator's OPERATION_CODEHASH",
-            operation_anchor,
-            "EcosystemUpgradeOperation",
-        );
         for (label, owner) in [
             (
                 "the coordinator",
@@ -497,22 +513,6 @@ pub(crate) async fn verify(
             return Ok(());
         };
         let core_executor = CoreUpgradeExecutorView::new(core_executor_addr, &provider);
-        let anchor = tolerate(
-            core_executor.CORE_REGISTRY_CODEHASH().call().await,
-            result,
-            "the core executor's CORE_REGISTRY_CODEHASH",
-        );
-        let live_code = provider.get_code_at(core_registry_addr).await?;
-        let live_hash = alloy::primitives::keccak256(&live_code);
-        if anchor == Some(live_hash) {
-            result.report_ok("the core executor's CORE_REGISTRY_CODEHASH accepts this registry");
-        } else if let Some(anchor) = anchor {
-            result.report_error(&format!(
-                "the core executor anchors CORE_REGISTRY_CODEHASH {anchor} but the registry at \
-                 {core_registry_addr} runs {live_hash}: `applyL1Upgrade` would be rejected"
-            ));
-        }
-
         let Some(eco_admin_addr) = tolerate(
             core_executor.PROXY_ADMIN().call().await,
             result,
@@ -608,9 +608,12 @@ pub(crate) async fn verify(
     }
 
     if package.release != manifest.currentRelease {
-        result.report_warn(&format!(
-            "the package reports ctm_release_addr {} but the manifest names {}: the prepare's \
-             summary disagrees with the object governance will execute",
+        // An ERROR, not a note: `ctm_release_addr` is what a human reads out of the package, and
+        // the manifest is what executes. A disagreement means the reviewer reviewed a different
+        // object from the one governance would install.
+        result.report_error(&format!(
+            "the package reports ctm_release_addr {} but the manifest names {}: the summary a \
+             reviewer reads describes a different release from the one governance would install",
             package.release, manifest.currentRelease
         ));
     }
@@ -632,6 +635,29 @@ pub(crate) async fn verify(
     verify_stage1_shape(&package, &manifest, core_executor_addr, result);
     verify_stage2_shape(&package, &manifest, core_executor_addr, &provider, result).await;
 
+    // The pause/unpause calls land on the CTM's own ChainAssetHandler, which no manifest names;
+    // it is derived from the CTM's Bridgehub so a call to it is accounted for as that contract
+    // rather than as an unexplained address.
+    // An unreadable hop is not silently tolerated: it just leaves the handler unaccounted, and
+    // `verify_call_targets` then reports the pause call's target as an address this review does
+    // not explain — which is the honest outcome.
+    let chain_asset_handler = match ctm.BRIDGE_HUB().call().await {
+        Ok(bridgehub) => BridgehubForBootstrapView::new(bridgehub, &provider)
+            .chainAssetHandler()
+            .call()
+            .await
+            .ok(),
+        Err(_) => None,
+    };
+    verify_call_targets(
+        &package,
+        &manifest,
+        core_executor_addr,
+        chain_asset_handler,
+        &reviewed,
+        result,
+    );
+
     // A bootstrap edge legitimately declares external actions — the handovers and the pause
     // window are exactly the calls no object can describe yet, which is why the prepare
     // declares them. They are the reviewable list, so they are PRINTED rather than flagged;
@@ -652,6 +678,246 @@ pub(crate) async fn verify(
     }
 
     Ok(())
+}
+
+/// The reviewed salts: whatever the package recorded, plus whatever the reviewer supplied,
+/// de-duplicated and order-stable so the report names the same salt run after run.
+fn merge_salts(from_package: &[B256], from_reviewer: &[B256]) -> Vec<B256> {
+    let mut salts: Vec<B256> = Vec::new();
+    for salt in from_package.iter().chain(from_reviewer) {
+        if !salts.contains(salt) {
+            salts.push(*salt);
+        }
+    }
+    salts
+}
+
+/// The release's construction, re-derived from the manifest the release itself serves.
+async fn verify_release_construction<P: Provider>(
+    provider: &P,
+    build: &ReviewedBuild,
+    result: &mut VerificationResult,
+    release: Address,
+    salts: &[B256],
+    reviewed: &mut BTreeMap<Address, String>,
+) {
+    let view = CTMReleaseView::new(release, provider);
+    let manifest = match view.getManifest().call().await {
+        Ok(m) => m,
+        Err(e) => {
+            result.report_error(&format!(
+                "the release at {release} does not answer `getManifest()` ({e}): its construction \
+                 cannot be verified"
+            ));
+            return;
+        }
+    };
+    if expect_canonical_construction(
+        build,
+        result,
+        "the release the edge installs",
+        release,
+        "CTMRelease",
+        &manifest.abi_encode(),
+        salts,
+    ) {
+        reviewed.insert(release, "the release the edge installs".to_string());
+    }
+    result.print_info(&format!(
+        "  release manifest: diamondInit {}, verifier {}, genesisUpgrade {}, {} facet row(s), \
+         {} L2 bytecode slot(s)",
+        manifest.diamondInit,
+        manifest.verifier,
+        manifest.genesisUpgrade,
+        manifest.genesisFacets.len(),
+        manifest.l2BytecodeInfos.len()
+    ));
+    for (i, row) in manifest.genesisFacets.iter().enumerate() {
+        result.print_info(&format!(
+            "    facet {i}: {} (freezable: {})",
+            row.facet, row.isFreezable
+        ));
+    }
+}
+
+/// The core registry's construction, re-derived from the manifest it serves.
+async fn verify_core_registry_construction<P: Provider>(
+    provider: &P,
+    build: &ReviewedBuild,
+    result: &mut VerificationResult,
+    core_registry: Address,
+    salts: &[B256],
+    reviewed: &mut BTreeMap<Address, String>,
+) {
+    let view = CoreRegistryView::new(core_registry, provider);
+    let manifest = match view.getManifest().call().await {
+        Ok(m) => m,
+        Err(e) => {
+            result.report_error(&format!(
+                "the core registry at {core_registry} does not answer `getManifest()` ({e}): its \
+                 construction cannot be verified"
+            ));
+            return;
+        }
+    };
+    if expect_canonical_construction(
+        build,
+        result,
+        "the core registry",
+        core_registry,
+        "CoreRegistry",
+        &manifest.abi_encode(),
+        salts,
+    ) {
+        reviewed.insert(core_registry, "the core registry".to_string());
+    }
+}
+
+/// Prints the DERIVED payload an object constructed at its own construction.
+///
+/// This is the state a counterfeit exists to tamper with — the L2 force deployments and the
+/// delegate leg every chain executes — so it is rendered for the reviewer rather than only
+/// summarised. Its agreement with the manifest is what the construction check above establishes;
+/// what a human still has to read is whether the payload IS the proposal.
+async fn render_derived_payloads<P: Provider>(
+    provider: &P,
+    result: &mut VerificationResult,
+    object: Address,
+) {
+    let view = CommittedUpgradeView::new(object, provider);
+    let Ok(plan) = view.l2Plan().call().await else {
+        result.report_error(&format!(
+            "the object at {object} does not answer `l2Plan()`: its derived payload cannot be \
+             shown, so a reviewer cannot check it against the proposal"
+        ));
+        return;
+    };
+    result.print_info(&format!(
+        "  derived L2 plan: {} force deployment(s), delegateTo {}, composer {}, {} factory \
+         dependency hash(es)",
+        plan.deployments.len(),
+        plan.delegateTo,
+        plan.delegateComposer,
+        plan.factoryDepHashes.len()
+    ));
+    for (i, deployment) in plan.deployments.iter().enumerate() {
+        result.print_info(&format!(
+            "    deployment {i}: type {} at {} ({} bytes of bytecode info)",
+            deployment.upgradeType,
+            deployment.newAddress,
+            deployment.deployedBytecodeInfo.len()
+        ));
+    }
+}
+
+/// Answers the last question a reviewer must be able to answer: do the calls governance signs
+/// land on the objects this run established, and nowhere else?
+///
+/// Every target is either a reviewed object or a live contract the MANIFEST names (the CTM, its
+/// ProxyAdmin, the executors, the timer, the chain asset handler) — the manifest being itself
+/// covered by the construction check. Anything else is an ERROR: a call to an address no part of
+/// the review accounts for is precisely how a package would slip an unreviewed object past.
+fn verify_call_targets(
+    package: &BootstrapPackage,
+    manifest: &views::BootstrapManifest,
+    core_executor: Option<Address>,
+    chain_asset_handler: Option<Address>,
+    reviewed: &BTreeMap<Address, String>,
+    result: &mut VerificationResult,
+) {
+    let mut accounted: BTreeMap<Address, String> = reviewed.clone();
+    fn note(accounted: &mut BTreeMap<Address, String>, addr: Address, what: &str) {
+        if !addr.is_zero() {
+            accounted.entry(addr).or_insert_with(|| what.to_string());
+        }
+    }
+    note(&mut accounted, manifest.ctm, "the CTM the manifest names");
+    note(
+        &mut accounted,
+        manifest.ctmProxyAdmin,
+        "the CTM-domain ProxyAdmin the manifest names",
+    );
+    note(
+        &mut accounted,
+        manifest.ctmExecutor,
+        "the CTM executor the manifest names",
+    );
+    note(
+        &mut accounted,
+        manifest.coordinator,
+        "the coordinator the manifest names",
+    );
+    note(
+        &mut accounted,
+        manifest.upgradeTimer,
+        "the timer the manifest names",
+    );
+    if let Some(core_executor) = core_executor {
+        note(
+            &mut accounted,
+            core_executor,
+            "the core executor the coordinator names",
+        );
+    }
+    if let Some(handler) = chain_asset_handler {
+        note(
+            &mut accounted,
+            handler,
+            "the ChainAssetHandler the CTM's Bridgehub names",
+        );
+    }
+    // Stage 2 ends on the derived bootstrap sequence, which no manifest names; it is held
+    // against the package by `verify_completion_gate` instead, so it is accounted for here by
+    // that role rather than left looking unreviewed.
+    if let Some(last) = package.stage2.last() {
+        note(
+            &mut accounted,
+            last.target,
+            "the bootstrap sequence terminating stage 2",
+        );
+    }
+    // The ecosystem ProxyAdmin is handed to the core executor in stage 1 and is in no manifest;
+    // it is identified by that handover and checked there.
+    for call in &package.stage1 {
+        if call.data.get(..4) == Some(&TRANSFER_OWNERSHIP_SELECTOR[..])
+            && call.data.get(4..36).map(|w| Address::from_slice(&w[12..])) == core_executor
+        {
+            note(
+                &mut accounted,
+                call.target,
+                "the ecosystem ProxyAdmin handed to the core executor",
+            );
+        }
+    }
+
+    let mut unaccounted = 0usize;
+    for (stage, calls) in [
+        ("stage 0", &package.stage0),
+        ("stage 1", &package.stage1),
+        ("stage 2", &package.stage2),
+    ] {
+        for call in calls {
+            match accounted.get(&call.target) {
+                Some(what) => {
+                    result.print_info(&format!("  {stage} -> {what} ({})", call.target));
+                }
+                None => {
+                    unaccounted += 1;
+                    result.report_error(&format!(
+                        "{stage} calls {} (selector 0x{}), an address no part of this review \
+                         accounts for: the bundle would execute something that was not reviewed",
+                        call.target,
+                        alloy::hex::encode(call.data.get(..4).unwrap_or_default())
+                    ));
+                }
+            }
+        }
+    }
+    if unaccounted == 0 {
+        result.report_ok(
+            "every governance call targets an object or contract this review established",
+        );
+    }
 }
 
 /// Stage 0 opens the operational window: migrations must be paused before the CTM's own
@@ -905,39 +1171,6 @@ fn verify_stage1_shape(
     }
 }
 
-/// Holds one object-type ANCHOR against the reviewed commit's bytecode for the object type it
-/// admits.
-///
-/// The anchor is an executor immutable: an expectation established when the executor was
-/// deployed, which every later, arbitrary input is held against. So the question is whether it
-/// admits the REVIEWED object type — never whether it agrees with a value this package carries.
-fn expect_anchor_matches_commit(
-    identity: &CodeIdentity,
-    result: &mut VerificationResult,
-    label: &str,
-    anchor: Option<alloy::primitives::FixedBytes<32>>,
-    expected_short_name: &str,
-) {
-    let Some(anchor) = anchor else {
-        return;
-    };
-    match identity.codehash_of(expected_short_name) {
-        Some(reviewed) if reviewed == anchor => {
-            result.report_ok(&format!(
-                "{label} admits the reviewed {expected_short_name}"
-            ));
-        }
-        Some(reviewed) => result.report_error(&format!(
-            "{label} is {anchor}, but the reviewed commit builds {expected_short_name} to \
-             {reviewed}: an object built from the reviewed sources would be rejected"
-        )),
-        None => result.report_error(&format!(
-            "{label} cannot be checked: AllContractsHashes.json has no \
-             {expected_short_name} entry for the reviewed commit"
-        )),
-    }
-}
-
 /// Renders an optional read for an [`ImmutableValue`], so a getter that reverted compares
 /// unequal instead of silently dropping the check.
 fn optional_display<T: std::fmt::Display>(value: Option<T>) -> String {
@@ -960,6 +1193,56 @@ fn format_semver(packed: U256) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The address derivation feeds `abi_encode()` in as the object's CONSTRUCTOR ARGUMENTS, so
+    /// it must be Solidity's `abi.encode(manifest)` — for a dynamic struct, a 0x20 offset word
+    /// followed by the body. `abi_encode_params` (the function-argument spelling, which omits
+    /// that word) would derive a different address for every object, and the failure would look
+    /// like a counterfeit finding, so the assumption is pinned here rather than inferred from a
+    /// passing run.
+    #[test]
+    fn a_manifest_encodes_as_solidity_abi_encode() {
+        let manifest = views::BootstrapManifest {
+            ctm: Address::repeat_byte(0x11),
+            expectedProtocolVersion: U256::from(1),
+            ctmProxyAdmin: Address::repeat_byte(0x22),
+            proxyUpgrades: Vec::new(),
+            currentRelease: Address::repeat_byte(0x33),
+            newProtocolVersion: U256::from(2),
+            oldProtocolVersionDeadline: U256::from(3),
+            upgradeEngine: Address::repeat_byte(0x44),
+            l2Plan: views::AuthoredL2Plan {
+                delegateBytecodeInfo: Default::default(),
+                extraBytecodeInfos: Vec::new(),
+                delegateComposer: Address::ZERO,
+            },
+            upgradeTimestamp: U256::from(0),
+            ctmExecutor: Address::repeat_byte(0x55),
+            ctmExecutorOwner: Address::repeat_byte(0x66),
+            coordinator: Address::repeat_byte(0x77),
+            upgradeTimer: Address::repeat_byte(0x88),
+        };
+        let encoded = manifest.abi_encode();
+        assert_eq!(
+            U256::from_be_slice(&encoded[..32]),
+            U256::from(0x20),
+            "a dynamic struct's `abi.encode` starts with the offset to its body"
+        );
+        // The first body word is the struct's first field, so the body starts exactly there.
+        assert_eq!(
+            Address::from_slice(&encoded[44..64]),
+            Address::repeat_byte(0x11)
+        );
+    }
+
+    #[test]
+    fn salts_from_the_package_and_the_reviewer_merge_without_duplicates() {
+        let a = B256::repeat_byte(0xAA);
+        let b = B256::repeat_byte(0xBB);
+        assert_eq!(merge_salts(&[a, b], &[b, a]), vec![a, b]);
+        assert_eq!(merge_salts(&[], &[a]), vec![a]);
+        assert!(merge_salts(&[], &[]).is_empty());
+    }
 
     #[test]
     fn formats_a_packed_semver() {

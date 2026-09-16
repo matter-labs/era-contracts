@@ -16,10 +16,6 @@ interface ICTMUpgradeExecutor {
     // solhint-disable-next-line func-name-mixedcase
     function CHAIN_TYPE_MANAGER() external view returns (IChainTypeManager);
 
-    /// @notice `EXTCODEHASH` every transition this executor accepts must run.
-    // solhint-disable-next-line func-name-mixedcase
-    function TRANSITION_CODEHASH() external view returns (bytes32);
-
     /// @notice The only address allowed to drive the lifecycle callbacks below.
     function coordinator() external view returns (address);
 
