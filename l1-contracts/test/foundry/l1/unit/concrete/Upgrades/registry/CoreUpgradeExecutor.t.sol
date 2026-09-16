@@ -6,6 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
+import {ICoreUpgradeExecutor} from "contracts/upgrades/registry/executors/ICoreUpgradeExecutor.sol";
 import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
 import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol";
 import {ICoreRegistry} from "contracts/upgrades/registry/objects/ICoreRegistry.sol";
@@ -262,7 +263,7 @@ contract CoreUpgradeExecutorTest is Test {
     function test_setCoordinator_rebindsAndEmits() public {
         address successor = makeAddr("successor");
         vm.expectEmit(true, true, true, true, address(coreExecutor));
-        emit CoreUpgradeExecutor.CoordinatorChanged(coordinator, successor);
+        emit ICoreUpgradeExecutor.CoordinatorChanged(coordinator, successor);
         vm.prank(ecosystemGovernor);
         coreExecutor.setCoordinator(successor);
         assertEq(coreExecutor.coordinator(), successor, "the binding must be recorded");
@@ -293,7 +294,7 @@ contract CoreUpgradeExecutorTest is Test {
 
     function test_beginOperation_reservesTheRegistryTheOperationNames() public {
         vm.expectEmit(true, true, true, true, address(coreExecutor));
-        emit CoreUpgradeExecutor.OperationReserved(address(operation), address(coreRegistry));
+        emit ICoreUpgradeExecutor.OperationReserved(address(operation), address(coreRegistry));
         _reserve(operation);
 
         assertEq(address(coreExecutor.activeOperation()), address(operation), "the operation must be recorded");
@@ -348,7 +349,7 @@ contract CoreUpgradeExecutorTest is Test {
         _reserve(operation);
 
         vm.expectEmit(true, true, true, true, address(coreExecutor));
-        emit CoreUpgradeExecutor.L1UpgradeApplied(address(coreRegistry));
+        emit ICoreUpgradeExecutor.L1UpgradeApplied(address(coreRegistry));
         vm.prank(coordinator);
         coreExecutor.applyL1Upgrade(coreRegistry);
 
@@ -406,7 +407,7 @@ contract CoreUpgradeExecutorTest is Test {
         vm.prank(coordinator);
         coreExecutor.applyL1Upgrade(coreRegistry);
         vm.expectEmit(true, true, true, true, address(coreExecutor));
-        emit CoreUpgradeExecutor.OperationCompleted(address(operation));
+        emit ICoreUpgradeExecutor.OperationCompleted(address(operation));
         vm.prank(coordinator);
         coreExecutor.completeOperation();
 
@@ -423,7 +424,7 @@ contract CoreUpgradeExecutorTest is Test {
         _reserve(operation);
 
         vm.expectEmit(true, true, true, true, address(coreExecutor));
-        emit CoreUpgradeExecutor.OperationAbandoned(address(operation));
+        emit ICoreUpgradeExecutor.OperationAbandoned(address(operation));
         vm.prank(coordinator);
         coreExecutor.abandonOperation();
 

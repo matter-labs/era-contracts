@@ -68,9 +68,6 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
     ///      {CTMTransition} for why).
     bytes internal encodedL2Plan;
 
-    /// @notice Emitted once the ecosystem has crossed into the registry-driven model.
-    event EcosystemBootstrapped(address indexed ctm, address indexed currentRelease, uint256 newProtocolVersion);
-
     /// @notice Stores the audited manifest at construction; it is immutable afterwards.
     constructor(BootstrapManifest memory _manifest) {
         if (

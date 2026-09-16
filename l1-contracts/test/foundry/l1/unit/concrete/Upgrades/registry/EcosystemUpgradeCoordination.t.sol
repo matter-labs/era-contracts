@@ -19,7 +19,6 @@ import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol";
 import {ICTMUpgradeExecutor} from "contracts/upgrades/registry/executors/ICTMUpgradeExecutor.sol";
-import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {IEcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/IEcosystemUpgradeExecutor.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
@@ -200,7 +199,7 @@ contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
         previous.forward(calls);
         replacement.acceptCTMOwnership();
         vm.expectEmit(true, true, false, true, address(coordinator));
-        emit EcosystemUpgradeExecutor.CTMExecutorChanged(address(previous), address(replacement));
+        emit IEcosystemUpgradeExecutor.CTMExecutorChanged(address(previous), address(replacement));
         vm.prank(governor);
         coordinator.setCTMExecutor(replacement);
         ctmExecutor = replacement;

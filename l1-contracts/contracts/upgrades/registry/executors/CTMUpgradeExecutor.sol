@@ -62,25 +62,6 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
     /// @inheritdoc ICTMUpgradeExecutor
     IEcosystemUpgradeOperation public activeOperation;
 
-    /// @notice Emitted when the owner points this executor at another coordinator.
-    event CoordinatorChanged(address indexed previousCoordinator, address indexed newCoordinator);
-
-    /// @notice Emitted by `beginOperation`: the operation's CTM leg is reserved and the CTM's
-    ///         chain migrations are paused. `transition` is zero for an infrastructure-only leg.
-    event OperationReserved(address indexed operation, address indexed transition);
-
-    /// @notice Emitted after the bound CTM was moved to the transition's new protocol version.
-    event CTMUpgradeApplied(address indexed transition, uint256 oldProtocolVersion, uint256 newProtocolVersion);
-
-    /// @notice Emitted by `completeOperation`: the reservation is released and migrations resume.
-    event OperationCompleted(address indexed operation);
-
-    /// @notice Emitted by `abandonOperation`: the reservation is released, migrations stay paused.
-    event OperationAbandoned(address indexed operation);
-
-    /// @notice Emitted after a chain diamond was upgraded.
-    event ChainUpgradeApplied(uint256 indexed chainId, uint256 newProtocolVersion);
-
     modifier onlyCoordinator() {
         if (msg.sender != coordinator) {
             revert Unauthorized(msg.sender);

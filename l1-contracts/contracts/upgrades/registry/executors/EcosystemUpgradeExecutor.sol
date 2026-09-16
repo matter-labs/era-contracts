@@ -41,26 +41,11 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
     /// @inheritdoc IEcosystemUpgradeExecutor
     ICTMUpgradeExecutor public ctmExecutor;
 
-    event CTMExecutorChanged(address indexed previousExecutor, address indexed newExecutor);
-
     /// @inheritdoc IEcosystemUpgradeExecutor
     IEcosystemUpgradeOperation public pendingOperation;
 
     /// @inheritdoc IEcosystemUpgradeExecutor
     UpgradeStage public pendingStage;
-
-    /// @notice Emitted by `stage0`: every participant is reserved, migrations are paused and the
-    ///         operation's timer is running.
-    event OperationPrepared(address indexed operation);
-
-    /// @notice Emitted by `stage1` after the core leg and the operation's CTM leg were applied.
-    event OperationExecuted(address indexed operation);
-
-    /// @notice Emitted by `stage2` after every leg verified and the migration pause was released.
-    event OperationCompleted(address indexed operation);
-
-    /// @notice Emitted when governance abandons the pending operation.
-    event OperationAbandoned(address indexed operation, UpgradeStage stage);
 
     constructor(address _initialOwner, CoreUpgradeExecutor _coreExecutor) UpgradeExecutorBase(_initialOwner) {
         if (address(_coreExecutor) == address(0)) {

@@ -12,6 +12,7 @@ import {
 import {CTMUpgradeExecutorFixture} from "./CTMUpgradeExecutor.t.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
+import {ICTMUpgradeExecutor} from "contracts/upgrades/registry/executors/ICTMUpgradeExecutor.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {IEcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/IEcosystemUpgradeExecutor.sol";
@@ -172,7 +173,7 @@ contract CTMUpgradeForeignAdminRowTest is CTMUpgradeExecutorFixture {
         vm.expectEmit(true, true, true, true, address(ctmExecutor));
         emit ProxyUpgradeRowLib.ProxyRowLeftToAdministrator(address(notifierProxy), address(notifierAdmin));
         vm.expectEmit(true, true, true, true, address(coordinator));
-        emit EcosystemUpgradeExecutor.OperationExecuted(address(operation));
+        emit IEcosystemUpgradeExecutor.OperationExecuted(address(operation));
         _stage1(t);
 
         assertEq(_liveImpl(ctmProxyAdmin, ctmDomainProxy), implNew, "the bound-admin row must be applied");
@@ -191,9 +192,9 @@ contract CTMUpgradeForeignAdminRowTest is CTMUpgradeExecutorFixture {
 
         _chainAdminMovesNotifier(implNew);
         vm.expectEmit(true, true, true, true, address(ctmExecutor));
-        emit CTMUpgradeExecutor.OperationCompleted(address(operation));
+        emit ICTMUpgradeExecutor.OperationCompleted(address(operation));
         vm.expectEmit(true, true, true, true, address(coordinator));
-        emit EcosystemUpgradeExecutor.OperationCompleted(address(operation));
+        emit IEcosystemUpgradeExecutor.OperationCompleted(address(operation));
         _stage2(t);
 
         _assertLifecycleIdle();

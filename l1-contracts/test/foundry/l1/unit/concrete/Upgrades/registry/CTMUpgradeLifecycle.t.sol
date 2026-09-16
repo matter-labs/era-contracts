@@ -17,7 +17,9 @@ import {ICoreRegistry} from "contracts/upgrades/registry/objects/ICoreRegistry.s
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol";
 import {IEcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/IEcosystemUpgradeOperation.sol";
+import {ICTMUpgradeExecutor} from "contracts/upgrades/registry/executors/ICTMUpgradeExecutor.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
+import {ICoreUpgradeExecutor} from "contracts/upgrades/registry/executors/ICoreUpgradeExecutor.sol";
 import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {IEcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/IEcosystemUpgradeExecutor.sol";
@@ -240,15 +242,15 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         // Stage 0: the core leg is reserved, then the CTM leg — its migrations pause and its timer
         // starts — and the operation is recorded.
         vm.expectEmit(true, true, true, true, address(coreExecutor));
-        emit CoreUpgradeExecutor.OperationReserved(address(operation), address(coreRegistry));
+        emit ICoreUpgradeExecutor.OperationReserved(address(operation), address(coreRegistry));
         vm.expectEmit(true, true, true, true, address(chainAssetHandler));
         emit IChainAssetHandlerBase.PausedCTMMigration(address(chainContractAddress), address(ctmExecutor));
         vm.expectEmit(true, true, true, true, address(ctmExecutor));
-        emit CTMUpgradeExecutor.OperationReserved(address(operation), address(full));
+        emit ICTMUpgradeExecutor.OperationReserved(address(operation), address(full));
         vm.expectEmit(true, true, true, true, address(timer));
         emit GovernanceUpgradeTimer.TimerStarted(block.timestamp, block.timestamp);
         vm.expectEmit(true, true, true, true, address(coordinator));
-        emit EcosystemUpgradeExecutor.OperationPrepared(address(operation));
+        emit IEcosystemUpgradeExecutor.OperationPrepared(address(operation));
         _stage0(full);
 
         _assertPendingAndPaused(full, IEcosystemUpgradeExecutor.UpgradeStage.Prepared);
@@ -264,15 +266,15 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         vm.expectEmit(true, true, true, true, address(coreExecutor));
         emit ProxyUpgradeRowLib.ProxyImplementationUpgraded(address(ecosystemProxy), implNew);
         vm.expectEmit(true, true, true, true, address(coreExecutor));
-        emit CoreUpgradeExecutor.L1UpgradeApplied(address(coreRegistry));
+        emit ICoreUpgradeExecutor.L1UpgradeApplied(address(coreRegistry));
         vm.expectEmit(true, true, true, true, address(ctmExecutor));
         emit ProxyUpgradeRowLib.ProxyImplementationUpgraded(address(ctmDomainProxy), implNew);
         vm.expectEmit(true, true, true, true, address(chainContractAddress));
         emit IChainTypeManager.NewProtocolVersion(oldVersion, newVersion);
         vm.expectEmit(true, true, true, true, address(ctmExecutor));
-        emit CTMUpgradeExecutor.CTMUpgradeApplied(address(full), oldVersion, newVersion);
+        emit ICTMUpgradeExecutor.CTMUpgradeApplied(address(full), oldVersion, newVersion);
         vm.expectEmit(true, true, true, true, address(coordinator));
-        emit EcosystemUpgradeExecutor.OperationExecuted(address(operation));
+        emit IEcosystemUpgradeExecutor.OperationExecuted(address(operation));
         _stage1(full);
 
         _assertPendingAndPaused(full, IEcosystemUpgradeExecutor.UpgradeStage.Executed);
@@ -285,13 +287,13 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         // Stage 2: each domain verifies its own leg and releases its reservation (the CTM
         // executor its pause), core first.
         vm.expectEmit(true, true, true, true, address(coreExecutor));
-        emit CoreUpgradeExecutor.OperationCompleted(address(operation));
+        emit ICoreUpgradeExecutor.OperationCompleted(address(operation));
         vm.expectEmit(true, true, true, true, address(chainAssetHandler));
         emit IChainAssetHandlerBase.UnpausedCTMMigration(address(chainContractAddress), address(ctmExecutor));
         vm.expectEmit(true, true, true, true, address(ctmExecutor));
-        emit CTMUpgradeExecutor.OperationCompleted(address(operation));
+        emit ICTMUpgradeExecutor.OperationCompleted(address(operation));
         vm.expectEmit(true, true, true, true, address(coordinator));
-        emit EcosystemUpgradeExecutor.OperationCompleted(address(operation));
+        emit IEcosystemUpgradeExecutor.OperationCompleted(address(operation));
         _stage2(full);
 
         _assertLifecycleIdle();
@@ -317,10 +319,10 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         EcosystemUpgradeExecutor successor = new EcosystemUpgradeExecutor(governor, coreExecutor);
         vm.startPrank(governor);
         vm.expectEmit(true, true, true, true, address(coreExecutor));
-        emit CoreUpgradeExecutor.CoordinatorChanged(address(coordinator), address(successor));
+        emit ICoreUpgradeExecutor.CoordinatorChanged(address(coordinator), address(successor));
         coreExecutor.setCoordinator(address(successor));
         vm.expectEmit(true, true, true, true, address(ctmExecutor));
-        emit CTMUpgradeExecutor.CoordinatorChanged(address(coordinator), address(successor));
+        emit ICTMUpgradeExecutor.CoordinatorChanged(address(coordinator), address(successor));
         ctmExecutor.setCoordinator(address(successor));
         successor.setCTMExecutor(ctmExecutor);
         vm.stopPrank();
@@ -592,11 +594,11 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         coordinator.stage1(operation);
 
         vm.expectEmit(true, true, true, true, address(coreExecutor));
-        emit CoreUpgradeExecutor.OperationAbandoned(address(operation));
+        emit ICoreUpgradeExecutor.OperationAbandoned(address(operation));
         vm.expectEmit(true, true, true, true, address(ctmExecutor));
-        emit CTMUpgradeExecutor.OperationAbandoned(address(operation));
+        emit ICTMUpgradeExecutor.OperationAbandoned(address(operation));
         vm.expectEmit(true, true, true, true, address(coordinator));
-        emit EcosystemUpgradeExecutor.OperationAbandoned(
+        emit IEcosystemUpgradeExecutor.OperationAbandoned(
             address(operation),
             IEcosystemUpgradeExecutor.UpgradeStage.Prepared
         );
@@ -626,7 +628,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         _stage1(transition);
 
         vm.expectEmit(true, true, true, true, address(coordinator));
-        emit EcosystemUpgradeExecutor.OperationAbandoned(
+        emit IEcosystemUpgradeExecutor.OperationAbandoned(
             address(operation),
             IEcosystemUpgradeExecutor.UpgradeStage.Executed
         );
@@ -967,7 +969,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
     ///      edge and recovery apply a registry directly.
     function test_ecosystemLeg_ownerStillAppliesDirectly() public {
         vm.expectEmit(true, true, true, true, address(coreExecutor));
-        emit CoreUpgradeExecutor.L1UpgradeApplied(address(coreRegistry));
+        emit ICoreUpgradeExecutor.L1UpgradeApplied(address(coreRegistry));
         vm.prank(governor);
         coreExecutor.applyL1Upgrade(ICoreRegistry(address(coreRegistry)));
         assertEq(_liveImpl(ecosystemProxyAdmin, ecosystemProxy), implNew);

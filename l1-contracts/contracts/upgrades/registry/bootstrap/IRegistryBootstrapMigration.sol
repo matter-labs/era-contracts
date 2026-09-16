@@ -11,6 +11,9 @@ import {BootstrapManifest} from "../RegistryTypes.sol";
 ///         execution ({IBootstrapUpgrade.upgradeFromBootstrap}) and what tooling reads to relay
 ///         the edge's L2 leg.
 interface IRegistryBootstrapMigration is ICommittedUpgrade {
+    /// @notice Emitted once the ecosystem has crossed into the registry-driven model.
+    event EcosystemBootstrapped(address indexed ctm, address indexed currentRelease, uint256 newProtocolVersion);
+
     /// @notice The whole manifest, exactly as it was pinned.
     function getManifest() external view returns (BootstrapManifest memory);
 

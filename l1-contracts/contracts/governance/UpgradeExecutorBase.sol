@@ -5,6 +5,7 @@ pragma solidity 0.8.28;
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 import {Call} from "./Common.sol";
+import {IUpgradeExecutorBase} from "./IUpgradeExecutorBase.sol";
 import {ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @title UpgradeExecutorBase
@@ -27,10 +28,7 @@ import {ZeroAddress} from "../common/L1ContractErrors.sol";
 ///      entrypoints still guarantee is that the NORMAL upgrade path is object-driven — its inputs
 ///      are pinned write-once objects and its invariants cannot be bypassed without an explicit,
 ///      event-logged raw call.
-abstract contract UpgradeExecutorBase is Ownable2Step {
-    /// @notice Emitted for every raw call forwarded through the escape hatch.
-    event CallForwarded(address indexed target, uint256 value, bytes data);
-
+abstract contract UpgradeExecutorBase is Ownable2Step, IUpgradeExecutorBase {
     /// @param _initialOwner The governance executor that drives the fixed domain entrypoints.
     constructor(address _initialOwner) {
         // A zero owner would permanently disable every entrypoint (Ownable2Step cannot hand
@@ -41,11 +39,7 @@ abstract contract UpgradeExecutorBase is Ownable2Step {
         _transferOwnership(_initialOwner);
     }
 
-    /// @notice Escape hatch: forwards raw calls so the authority this executor holds (CTM /
-    ///         ProxyAdmin ownership) never becomes unreachable — recovery, ownership succession
-    ///         and one-off administrative actions outside the fixed entrypoints. Every call is
-    ///         logged, so a bypass of the object-driven path is always visible.
-    /// @param _calls The calls to forward, executed in order; reverts on the first failure.
+    /// @inheritdoc IUpgradeExecutorBase
     function forward(Call[] calldata _calls) external payable onlyOwner {
         // We disable this check because calldata array length is cheap.
         // solhint-disable-next-line gas-length-in-loops

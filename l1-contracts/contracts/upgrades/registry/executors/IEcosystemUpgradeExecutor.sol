@@ -20,6 +20,22 @@ interface IEcosystemUpgradeExecutor {
         Executed
     }
 
+    /// @notice Emitted when the owner binds the CTM executor or replaces it with a successor.
+    event CTMExecutorChanged(address indexed previousExecutor, address indexed newExecutor);
+
+    /// @notice Emitted by `stage0`: every participant is reserved, migrations are paused and the
+    ///         operation's timer is running.
+    event OperationPrepared(address indexed operation);
+
+    /// @notice Emitted by `stage1` after the core leg and the operation's CTM leg were applied.
+    event OperationExecuted(address indexed operation);
+
+    /// @notice Emitted by `stage2` after every leg verified and the migration pause was released.
+    event OperationCompleted(address indexed operation);
+
+    /// @notice Emitted when governance abandons the pending operation.
+    event OperationAbandoned(address indexed operation, UpgradeStage stage);
+
     /// @notice The executor of the single CTM coordinated by this contract.
     function ctmExecutor() external view returns (ICTMUpgradeExecutor);
 
