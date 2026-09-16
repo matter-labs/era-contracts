@@ -3,6 +3,8 @@ use alloy::{
     sol,
 };
 use serde::{Deserialize, Serialize};
+
+use crate::common::logger;
 use std::fs;
 
 use super::{
@@ -58,7 +60,32 @@ impl FeeParamVerifier {
         contracts_commit: Option<&str>,
     ) -> anyhow::Result<Self> {
         let config_based = Self::init_v31_from_source(contracts_commit).await?;
-        let era = Self::init_from_on_chain(bridgehub_addr, network_verifier).await?;
+
+        // The cross-check below reads the live Era diamond, which only exists in an
+        // ecosystem that registers an Era chain. A ZKsync-OS-only ecosystem does not:
+        // ADI's `era_chain_id` is 270 and its bridgehub registers only 36900, so
+        // `getHyperchain(270)` is address(0), the storage read returns zeros, and the
+        // comparison used to fail against all-zero fee params — aborting PUVT before it
+        // ran a single check. Same condition the provenance pass already tolerates with
+        // "Legacy era chain N has no registered diamond (address(0))".
+        let era_diamond = Self::era_diamond(bridgehub_addr, network_verifier).await?;
+        if era_diamond == Address::ZERO {
+            logger::info(format!(
+                "No Era diamond registered at era_chain_id {} — skipping the \
+                 SystemConfig.json/live fee-param cross-check and using the config values \
+                 (expected on ZKsync-OS-only ecosystems)",
+                network_verifier.era_chain_id
+            ));
+            return Ok(Self {
+                fee_params: config_based,
+            });
+        }
+
+        let era = Self::decode_storage_word(
+            network_verifier
+                .get_storage_at(&era_diamond, FEE_PARAM_STORAGE_SLOT)
+                .await,
+        )?;
 
         if config_based != era {
             anyhow::bail!(
@@ -85,17 +112,25 @@ impl FeeParamVerifier {
         })
     }
 
+    /// The Era chain's diamond, or `Address::ZERO` when this ecosystem registers no
+    /// Era chain at `era_chain_id`.
+    async fn era_diamond(
+        bridgehub_addr: &Address,
+        network_verifier: &NetworkVerifier,
+    ) -> anyhow::Result<Address> {
+        let bridgehub = Bridgehub::new(*bridgehub_addr, network_verifier.get_l1_provider().clone());
+        bridgehub
+            .getHyperchain(U256::from(network_verifier.era_chain_id))
+            .call()
+            .await
+            .map_err(|e| anyhow::anyhow!("failed to fetch Era diamond from Bridgehub: {e}"))
+    }
+
     pub(crate) async fn init_from_on_chain(
         bridgehub_addr: &Address,
         network_verifier: &NetworkVerifier,
     ) -> anyhow::Result<FeeParams> {
-        let bridgehub = Bridgehub::new(*bridgehub_addr, network_verifier.get_l1_provider().clone());
-
-        let diamond_proxy_address = bridgehub
-            .getHyperchain(U256::from(network_verifier.era_chain_id))
-            .call()
-            .await
-            .map_err(|e| anyhow::anyhow!("failed to fetch Era diamond from Bridgehub: {e}"))?;
+        let diamond_proxy_address = Self::era_diamond(bridgehub_addr, network_verifier).await?;
 
         let value = network_verifier
             .get_storage_at(&diamond_proxy_address, FEE_PARAM_STORAGE_SLOT)

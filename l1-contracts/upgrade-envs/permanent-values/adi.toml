@@ -89,10 +89,23 @@ bytecodes_supplier = "0xC9F20FC268Fc3e0e597660550033Bf2C24218fd8"
 # Verified: chain 36900's diamond reports this manager.
 rollup_da_manager = "0x57B05e2394B3A12708C552A891f8b0f93645EdEA"
 
-# No `[[ownable_proxies]]`: nothing here is owned by a keyless contract that would
-# need wrapping. The CTM, the bridgehub and the CTM's ProxyAdmin are all owned
-# directly by the single ecosystem Governance, which `governance_kind = "legacy"`
-# already drives (verified: ProxyAdmin 0x8140abb6….owner() == 0x8253F330…).
+# ADI's Governance-owning Safe. The CTM, the bridgehub and the CTM's ProxyAdmin are
+# all owned directly by the ecosystem Governance (verified: ProxyAdmin
+# 0x8140abb6….owner() == 0x8253F330…), which `governance_kind = "legacy"` drives.
+# The ValidatorTimelock is the exception: `validatorTimelockPostV29()` is
+# 0xe28cac160c2a79dfa1fbd2169ac5fa5d061cf186 and its owner() is this Safe, NOT the
+# Governance. Without this entry the v31 prepare's ownership pre-step reverts with
+# "ownable contract owner without registry entry" (run 34225368141).
+#
+# `kind = "safe"` issues the transferOwnership as the Safe itself, so it lands in a
+# `*.safe.json` bundle for ADI's signers rather than being executed by us. This
+# Safe is 2-of-3 and entirely ADI's (owners 0x2e48bd85…, 0x3740b047…, 0x288c1862…;
+# Safe v1.4.1 singleton 0x41675c09…), as is the securityCouncil Safe 0x95f0c748…,
+# so no path here may assume we can sign.
+[[ownable_proxies]]
+addr = "0xB272B188855128c10a933Edb62CC64c22B1f3754"
+kind = "safe"
+
 #
 # No `[legacy_gateway]`: chain 36900 settles on L1 (settlementLayerChainId == 1),
 # so v31 emits no settlement-layer decommission calls.

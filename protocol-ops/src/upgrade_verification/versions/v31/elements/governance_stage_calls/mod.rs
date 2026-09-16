@@ -30,8 +30,11 @@ use crate::upgrade_verification::{
     verifiers::{VerificationResult, Verifiers},
 };
 
-use super::super::get_expected_old_protocol_version_for_ctm_flavor;
+use super::super::{
+    expected_old_protocol_line_label, is_expected_old_protocol_version_for_ctm_flavor,
+};
 use super::call_list::CallList;
+use super::protocol_version::ProtocolVersion;
 
 mod facets;
 mod helpers;
@@ -211,13 +214,15 @@ pub(crate) async fn verify_per_chain_protocol_versions(
     let mut setup_errors = 0usize;
     for ctm in &artifact.ctms {
         let artifact_old_protocol_version = U256::from(ctm.contracts_config.old_protocol_version);
-        let expected_old_protocol_version: U256 =
-            get_expected_old_protocol_version_for_ctm_flavor(ctm.flavor).into();
-        if artifact_old_protocol_version != expected_old_protocol_version {
+        if !is_expected_old_protocol_version_for_ctm_flavor(
+            ProtocolVersion::from(artifact_old_protocol_version),
+            verifiers.env,
+            ctm.flavor,
+        ) {
             result.report_error(&format!(
-                "{} CTM old protocol version must be {}, got {}",
+                "{} CTM old protocol version must be on {}, got {}",
                 ctm.flavor.label(),
-                get_expected_old_protocol_version_for_ctm_flavor(ctm.flavor),
+                expected_old_protocol_line_label(verifiers.env, ctm.flavor),
                 protocol_label(artifact_old_protocol_version)
             ));
             setup_errors += 1;
@@ -233,7 +238,7 @@ pub(crate) async fn verify_per_chain_protocol_versions(
         };
 
         if let Some((previous_flavor, _)) =
-            expected_by_ctm.insert(ctm_proxy, (ctm.flavor, expected_old_protocol_version))
+            expected_by_ctm.insert(ctm_proxy, (ctm.flavor, artifact_old_protocol_version))
         {
             result.report_error(&format!(
                 "CTM proxy {} is configured for both {} and {}",
