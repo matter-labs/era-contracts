@@ -434,11 +434,6 @@
             "internalType": "address"
           },
           {
-            "name": "releaseCodehash",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
             "name": "currentRelease",
             "type": "address",
             "internalType": "address"
@@ -532,19 +527,6 @@
         "name": "",
         "type": "bool",
         "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "releaseCodehash",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
       }
     ],
     "stateMutability": "view"
@@ -730,19 +712,6 @@
         "name": "_timestamp",
         "type": "uint256",
         "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "setReleaseCodehash",
-    "inputs": [
-      {
-        "name": "_releaseCodehash",
-        "type": "bytes32",
-        "internalType": "bytes32"
       }
     ],
     "outputs": [],
@@ -1209,19 +1178,6 @@
         "type": "uint256",
         "indexed": true,
         "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "NewReleaseCodehash",
-    "inputs": [
-      {
-        "name": "releaseCodehash",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
       }
     ],
     "anonymous": false
