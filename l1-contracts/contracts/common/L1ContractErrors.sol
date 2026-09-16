@@ -460,6 +460,8 @@ error TooMuchGas();
 error TransactionNotAllowed();
 // 0x1b7def5a
 error TransitionDeadlineBeforeUpgrade(uint256 deadline, uint256 upgradeTimestamp);
+// 0x73932d31
+error TransitionDeadlineZero();
 // 0x8d905e8b
 error TransitionNotCommitted(address named, address committed);
 // 0x01a7d6aa

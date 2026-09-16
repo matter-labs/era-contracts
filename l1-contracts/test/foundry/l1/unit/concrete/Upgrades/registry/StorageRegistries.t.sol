@@ -49,6 +49,7 @@ import {
     RegistryUnknownKey,
     SameReleaseTransitionHasPayload,
     TransitionDeadlineBeforeUpgrade,
+    TransitionDeadlineZero,
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
 import {
@@ -600,6 +601,34 @@ contract StorageRegistriesTest is Test {
             )
         );
         new CTMTransition(manifest);
+    }
+
+    function test_revertWhen_deadlineZero() public {
+        // A zeroed deadline satisfies the relative check (`0 >= 0`) but expires the departing
+        // version the instant the edge is committed, halting batch commitment for every chain
+        // still on it — before any of them has had the chance to upgrade.
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.upgradeTimestamp = 0;
+        manifest.oldProtocolVersionDeadline = 0;
+
+        vm.expectRevert(TransitionDeadlineZero.selector);
+        new CTMTransition(manifest);
+    }
+
+    function test_upgradeTimestampZeroStaysValid() public {
+        // Zero is a legitimate `upgradeTimestamp`: it means chains may upgrade as soon as the
+        // edge is committed. Only the deadline carries a lower bound.
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.upgradeTimestamp = 0;
+
+        CTMTransition transition = new CTMTransition(manifest);
+
+        assertEq(transition.upgradeTimestamp(), 0, "upgradeTimestamp");
+        assertEq(
+            transition.oldProtocolVersionDeadline(),
+            manifest.oldProtocolVersionDeadline,
+            "oldProtocolVersionDeadline"
+        );
     }
 
     function test_revertWhen_fromReleaseZero() public {

@@ -24,6 +24,7 @@ import {
     PatchChangesL2GenesisState,
     SameReleaseTransitionHasPayload,
     TransitionDeadlineBeforeUpgrade,
+    TransitionDeadlineZero,
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
 import {L2UpgradePlan, TransitionManifest} from "../RegistryTypes.sol";
@@ -73,6 +74,14 @@ contract CTMTransition is ICTMTransition {
         // execution and the CTM enforces in `setNewVersionUpgrade`.
         if (_manifest.newProtocolVersion <= _manifest.oldProtocolVersion) {
             revert ProtocolVersionTooSmall(_manifest.oldProtocolVersion, _manifest.newProtocolVersion);
+        }
+        // A zero deadline expires the departing version the moment the edge is committed, which
+        // stops every chain still on it from committing batches before any of them can upgrade.
+        // The relative check below cannot catch it: a zeroed schedule satisfies `0 >= 0`.
+        // `upgradeTimestamp` has no such lower bound — zero there legitimately means chains may
+        // upgrade as soon as the edge is committed.
+        if (_manifest.oldProtocolVersionDeadline == 0) {
+            revert TransitionDeadlineZero();
         }
         // The old version must stay usable at least until chains are allowed to upgrade,
         // otherwise the schedule disables the old protocol before the new one is reachable.
