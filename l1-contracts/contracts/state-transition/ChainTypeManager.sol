@@ -90,7 +90,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     ///      which lets governance keep moving a deadline after the commit. When set (nonzero) it
     ///      takes precedence over a committed transition's pinned deadline — see
     ///      {protocolVersionDeadline}.
-    mapping(uint256 _protocolVersion => uint256) internal __DEPRECATED_protocolVersionDeadline;
+    mapping(uint256 _protocolVersion => uint256) internal protocolVersionDeadlineOverride;
 
     /// @dev The validatorTimelock contract address.
     /// @dev Note, that address contains validator timelock for pre-v29 protocol versions. It is deprecated and will be removed in the future.
@@ -465,7 +465,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     ///      stored slot — to expire a transition-committed version immediately, set a past
     ///      nonzero timestamp.
     function protocolVersionDeadline(uint256 _protocolVersion) public view returns (uint256) {
-        uint256 storedDeadline = __DEPRECATED_protocolVersionDeadline[_protocolVersion];
+        uint256 storedDeadline = protocolVersionDeadlineOverride[_protocolVersion];
         if (storedDeadline != 0) {
             return storedDeadline;
         }
@@ -483,7 +483,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @dev Zero means "not set" in the stored slot (the getter falls back to the transition), so
     ///      pass a nonzero timestamp; a past one expires the version immediately.
     function setProtocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) external onlyOwner {
-        __DEPRECATED_protocolVersionDeadline[_protocolVersion] = _timestamp;
+        protocolVersionDeadlineOverride[_protocolVersion] = _timestamp;
         emit UpdateProtocolVersionDeadline(_protocolVersion, _timestamp);
     }
 
@@ -719,7 +719,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         _commitVersionEdge(_oldProtocolVersion, _newProtocolVersion);
         // The departing version has no transition to resolve a deadline from, so the deadline is
         // stored directly.
-        __DEPRECATED_protocolVersionDeadline[_oldProtocolVersion] = _oldProtocolVersionDeadline;
+        protocolVersionDeadlineOverride[_oldProtocolVersion] = _oldProtocolVersionDeadline;
         emit UpdateProtocolVersionDeadline(_oldProtocolVersion, _oldProtocolVersionDeadline);
         setUpgradeDiamondCutInner(_cutData, _oldProtocolVersion);
         // Emit event with backward compatible hack.
