@@ -11,6 +11,17 @@ use zksync_multivm::zk_evm_latest::{
 
 use zksync_types::{u256_to_h256, U256};
 
+// Operator VM hook ids, mirroring `VM_HOOK_*` in `bootloader.yul` (and `VmHook` in zksync-era).
+pub(crate) const HOOK_ACCOUNT_VALIDATION_ENTERED: u32 = 0;
+pub(crate) const HOOK_PAYMASTER_VALIDATION_ENTERED: u32 = 1;
+/// `VM_HOOK_NO_VALIDATION_ENTERED` in the bootloader, `ValidationExited` on the server.
+pub(crate) const HOOK_VALIDATION_EXITED: u32 = 2;
+pub(crate) const HOOK_VALIDATION_STEP_ENDED: u32 = 3;
+pub(crate) const HOOK_TX_HAS_ENDED: u32 = 4;
+pub(crate) const HOOK_ASK_OPERATOR_FOR_REFUND: u32 = 8;
+pub(crate) const HOOK_NOTIFY_ABOUT_REFUND: u32 = 9;
+pub(crate) const HOOK_EXECUTION_RESULT: u32 = 10;
+
 #[derive(Clone, Debug)]
 pub(crate) enum TestVmHook {
     NoHook,
@@ -22,6 +33,8 @@ pub(crate) enum TestVmHook {
         success: bool,
         revert_data_hex: Option<String>,
     },
+    // Any other operator VM hook, identified by its id; used to check the emitted hook sequence.
+    OperatorHook(u32),
     // Testing framework reporting the number of tests.
     TestCount(u32),
     // 104 - test start.
@@ -170,7 +183,7 @@ impl TestVmHook {
             offset if offset == VM_HOOK_ENUM_POSITION * 32 => {
                 let vm_hook_params: Vec<U256> = get_operator_hook_params(memory);
                 match value.as_u32() {
-                    10 => {
+                    HOOK_EXECUTION_RESULT => {
                         let success = vm_hook_params[0] != U256::zero();
                         let revert_data_hex = if success {
                             None
@@ -182,7 +195,7 @@ impl TestVmHook {
                             revert_data_hex,
                         }
                     }
-                    _ => Self::NoHook,
+                    other => Self::OperatorHook(other),
                 }
             }
             _ => Self::NoHook,

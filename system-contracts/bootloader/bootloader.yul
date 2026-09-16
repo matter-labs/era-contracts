@@ -4559,10 +4559,22 @@ object "Bootloader" {
                 ret := add(val, callvalue())
             }
 
+            /// @notice Performs the memory write behind a VM hook (the trigger or one of its params).
+            /// @dev VM hooks are consumed by the server's tracer and never read back by the
+            /// bootloader, so as plain `mstore`s they are dead stores from the compiler's point of
+            /// view and the optimizer may keep only the last write of a sequence (zksolc >= 1.5.15
+            /// does). Doing the store inside a `NoInline` function leaves every write as an opaque
+            /// call with a memory side effect, which dead-store elimination does not remove. This
+            /// relies on the call staying opaque rather than on a language guarantee, so the
+            /// bootloader test infra asserts the emitted hook sequence.
+            function $llvm_NoInline_llvm$_storeVmHookMemory(_offset, _value) {
+                mstore(_offset, _value)
+            }
+
             /// @notice Triggers a VM hook.
             /// The server will recognize it and output corresponding logs.
             function setHook(hook) {
-                mstore(VM_HOOK_PTR(), $llvm_NoInline_llvm$_unoptimized(hook))
+                $llvm_NoInline_llvm$_storeVmHookMemory(VM_HOOK_PTR(), hook)
             }
 
             /// @notice Sets a value to a param of the vm hook.
@@ -4573,7 +4585,7 @@ object "Bootloader" {
             /// paramId smaller than the VM_HOOK_PARAMS()
             function storeVmHookParam(paramId, value) {
                 let offset := add(VM_HOOK_PARAMS_OFFSET(), mul(32, paramId))
-                mstore(offset, $llvm_NoInline_llvm$_unoptimized(value))
+                $llvm_NoInline_llvm$_storeVmHookMemory(offset, value)
             }
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
