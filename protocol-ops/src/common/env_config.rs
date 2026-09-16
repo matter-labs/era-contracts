@@ -188,6 +188,17 @@ pub struct PermanentContracts {
 pub struct UpgradeInputs {
     pub owner_address: Option<Address>,
     pub era_chain_id: Option<u64>,
+    /// Whether THIS release replaces the ecosystem's governance set (a new
+    /// `ProtocolUpgradeHandler` implementation plus Guardians / SecurityCouncil /
+    /// EmergencyUpgradeBoard, wired in by four stage-0 calls — see
+    /// [`crate::commands::ecosystem::zk_governance`]).
+    ///
+    /// Absent (the default) means no. `governance_kind = "puh"` is NOT this statement:
+    /// it says the ecosystem HAS a PUH, which is a permanent property, true of every
+    /// release prepared for that env. The redeploy is a one-off act of a particular
+    /// release, so it is declared in that release's own env input — the directory
+    /// moves with the release, so a later one omits the key and redeploys nothing.
+    pub redeploy_zk_governance: bool,
 }
 
 /// Fully-resolved per-env config.
@@ -310,6 +321,12 @@ impl EnvConfig {
         self.upgrade.era_chain_id
     }
 
+    /// Whether this release replaces the ecosystem's governance set — see
+    /// [`UpgradeInputs::redeploy_zk_governance`].
+    pub fn redeploys_zk_governance(&self) -> bool {
+        self.upgrade.redeploy_zk_governance
+    }
+
     /// Whether this is the mainnet ecosystem. Drives testnet-vs-real contract
     /// selection (e.g. the per-CTM verifier and the PUH redeploy: every
     /// non-mainnet env gets the zeroed-delay `TestnetProtocolUpgradeHandler`).
@@ -360,6 +377,8 @@ fn parse_upgrade_input(content: &str) -> UpgradeInputs {
             out.owner_address = Some(addr);
         } else if let Some(id) = match_unquoted_uint(line, "era_chain_id") {
             out.era_chain_id = Some(id);
+        } else if let Some(flag) = match_unquoted_bool(line, "redeploy_zk_governance") {
+            out.redeploy_zk_governance = flag;
         }
     }
     out
@@ -454,6 +473,15 @@ fn match_quoted_address(line: &str, key: &str) -> Option<Address> {
     rest[..end].parse().ok()
 }
 
+fn match_unquoted_bool(line: &str, key: &str) -> Option<bool> {
+    let prefix = format!("{key} = ");
+    if !line.starts_with(&prefix) {
+        return None;
+    }
+    // Strip optional trailing comment.
+    line[prefix.len()..].split('#').next()?.trim().parse().ok()
+}
+
 fn match_unquoted_uint(line: &str, key: &str) -> Option<u64> {
     let prefix = format!("{key} = ");
     if !line.starts_with(&prefix) {
@@ -478,6 +506,31 @@ fn match_quoted_h256(line: &str, key: &str) -> Option<B256> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The governance redeploy is a RELEASE's declaration, not a property of the env: absent means
+    /// no, whatever `governance_kind` says. Without this, every recurring preparation on a
+    /// PUH-governed env redeployed the whole governance set.
+    #[test]
+    fn zk_governance_redeploy_defaults_to_off() {
+        assert!(!parse_upgrade_input("era_chain_id = 270\n").redeploy_zk_governance);
+        assert!(!parse_upgrade_input("redeploy_zk_governance = false\n").redeploy_zk_governance);
+        assert!(parse_upgrade_input("redeploy_zk_governance = true\n").redeploy_zk_governance);
+        assert!(
+            parse_upgrade_input("redeploy_zk_governance = true # the bootstrap release\n")
+                .redeploy_zk_governance
+        );
+    }
+
+    /// The v34 release is the one that replaces the governance set, on both PUH-governed envs.
+    /// A later release's directory simply omits the key.
+    #[test]
+    fn v34_env_inputs_declare_the_governance_redeploy() {
+        for env in ["stage", "mainnet"] {
+            let cfg = EnvConfig::load(env).unwrap_or_else(|e| panic!("load {env}: {e}"));
+            assert_eq!(cfg.governance_kind(), GovernanceKind::Puh, "{env}");
+            assert!(cfg.redeploys_zk_governance(), "{env}");
+        }
+    }
 
     /// Smoke-tests that `permanent-values/stage.toml` (which is the env used
     /// for the v31 prepare-all rehearsal on Sepolia stage) deserializes into

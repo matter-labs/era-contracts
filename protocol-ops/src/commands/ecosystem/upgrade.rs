@@ -849,20 +849,33 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 
     // Phase 1b on the same fork: redeploy ProtocolUpgradeHandler + Guardians
     // and capture the stage-0 governance calls that wire them into the live
-    // PUH proxy. Only meaningful on PUH-governed envs (stage / mainnet) —
-    // legacy-Governance envs (e.g. testnet's internal `0xc4fd…` bridgehub
-    // owned by ZKsync `Governance.sol`) don't have a PUH to redeploy, so we
-    // skip this step entirely and the merged governance.toml carries only
-    // the core + per-CTM calls.
+    // PUH proxy.
+    //
+    // Two conditions, and both are necessary. `governance_kind == puh` says the
+    // ecosystem HAS a PUH to redeploy — legacy-Governance envs (e.g. testnet's
+    // internal `0xc4fd…` bridgehub owned by ZKsync `Governance.sol`) do not, so
+    // there is nothing to do there. But that is a permanent property of the
+    // ecosystem, not a statement that THIS release replaces its governance set:
+    // gating on it alone made every recurring preparation on a PUH env redeploy
+    // the whole governance set and fold four wiring calls into stage 0. The
+    // release's own env input declares the intent, per env, in the directory that
+    // moves with the release — so a later release simply omits the key and
+    // redeploys nothing.
     let governance_kind = env_cfg
         .as_ref()
         .map(|c| c.governance_kind())
         .unwrap_or_default();
     let is_puh_governed = governance_kind == crate::common::env_config::GovernanceKind::Puh;
+    let redeploy_declared = env_cfg
+        .as_ref()
+        .map(|c| c.redeploys_zk_governance())
+        .unwrap_or(false);
     // Every prepared CTM is ZKsync OS (prepare rejects anything else); the first
     // one in input order is the representative passed to the PUH redeploy.
     let zksync_os_ctm_proxy = prepared.ctm_tomls.first().map(|e| e.proxy);
-    let puh_outcome = if is_puh_governed {
+    let redeploy_zk_governance =
+        zk_governance_redeploy_decision(governance_kind, redeploy_declared)?;
+    let puh_outcome = if redeploy_zk_governance {
         let mut puh_inputs =
             crate::commands::ecosystem::zk_governance::ZkGovernanceInputs::from_env(
                 env_cfg.as_ref(),
@@ -878,6 +891,11 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
             .await
             .context("PUH/Guardians redeploy step")?,
         )
+    } else if is_puh_governed {
+        logger::info(
+            "Skipping PUH/Guardians redeploy (the upgrade input does not declare `redeploy_zk_governance = true`)",
+        );
+        None
     } else {
         logger::info(
             "Skipping PUH/Guardians redeploy (governance_kind != \"puh\" — env uses legacy Governance.sol)",
@@ -1393,9 +1411,51 @@ fn load_ctm_config(path: &Path) -> anyhow::Result<Vec<CtmInputs>> {
     Ok(ctms)
 }
 
+/// Whether this preparation replaces the ecosystem's governance set (see
+/// [`crate::commands::ecosystem::zk_governance`]).
+///
+/// Both inputs are necessary and neither is sufficient. `governance_kind` says the ecosystem HAS a
+/// `ProtocolUpgradeHandler` — a permanent property, true of every release prepared for that env, so
+/// gating on it alone made every RECURRING preparation on a PUH env redeploy the whole governance
+/// set and fold four wiring calls into stage 0. `redeploy_declared` is the release's own statement
+/// that it intends to. Declared-but-impossible is a misconfiguration to name, not to skip past:
+/// silently doing nothing would hide a release that thinks it is replacing governance.
+///
+/// Extracted from the prepare flow so this decision is exercised without a fork — the `--env`
+/// branch that reaches it has no end-to-end gate.
+fn zk_governance_redeploy_decision(
+    governance_kind: crate::common::env_config::GovernanceKind,
+    redeploy_declared: bool,
+) -> anyhow::Result<bool> {
+    let is_puh_governed = governance_kind == crate::common::env_config::GovernanceKind::Puh;
+    if redeploy_declared && !is_puh_governed {
+        anyhow::bail!(
+            "the upgrade input declares `redeploy_zk_governance = true`, but this env's \
+             `governance_kind` is not \"puh\": there is no ProtocolUpgradeHandler to redeploy"
+        );
+    }
+    Ok(is_puh_governed && redeploy_declared)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::env_config::GovernanceKind;
+
+    /// A PUH-governed env is not by itself a reason to replace its governance set: only the
+    /// release's own declaration is. Every recurring preparation used to take the first for the
+    /// second.
+    #[test]
+    fn the_governance_redeploy_needs_both_a_puh_env_and_a_declaration() {
+        assert!(!zk_governance_redeploy_decision(GovernanceKind::Puh, false).unwrap());
+        assert!(!zk_governance_redeploy_decision(GovernanceKind::Legacy, false).unwrap());
+        assert!(zk_governance_redeploy_decision(GovernanceKind::Puh, true).unwrap());
+
+        let err = zk_governance_redeploy_decision(GovernanceKind::Legacy, true).expect_err(
+            "declaring the redeploy on a legacy-governance env must be named, not skipped",
+        );
+        assert!(err.to_string().contains("redeploy_zk_governance"), "{err}");
+    }
     use crate::common::governance_calls::{encode_calls, GovernanceCall};
 
     fn call(target: u8, data: &[u8]) -> GovernanceCall {

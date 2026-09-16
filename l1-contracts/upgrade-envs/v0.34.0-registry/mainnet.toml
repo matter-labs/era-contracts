@@ -10,6 +10,15 @@ era_chain_id = 324
 owner_address = "0xE30Dca3047B37dc7d88849dE4A4Dc07937ad5Ab3"
 governance_upgrade_timer_initial_delay = 172800
 
+# This release replaces the ecosystem's governance set: a new ProtocolUpgradeHandler
+# implementation plus Guardians, SecurityCouncil and EmergencyUpgradeBoard, wired in by four
+# stage-0 calls (protocol-ops `zk_governance.rs`). Declared per RELEASE, here, rather than
+# inferred from `governance_kind = "puh"` in permanent-values — that key says the ecosystem
+# HAS a PUH, which is true of every release, so inferring from it made every recurring
+# preparation redeploy the governance set. A later release omits this key and redeploys
+# nothing. Revalidate at the release cut, like every other value in this file.
+redeploy_zk_governance = true
+
 [contracts]
 new_protocol_version = 0x2200000000 # v34.0.0
 latest_protocol_version = 0x2200000000
