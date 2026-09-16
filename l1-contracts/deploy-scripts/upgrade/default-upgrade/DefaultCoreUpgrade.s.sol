@@ -115,6 +115,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     ///      transactions only.
     function deployCoreRegistry() public virtual {
         ProxyUpgradeRow[] memory rows = _coreProxyUpgradeRows();
+        _requireDeployedImplementationsInstalled(rows);
         uint256 participating = 0;
         uint256 length = rows.length;
         for (uint256 i = 0; i < length; ++i) {
@@ -173,18 +174,121 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     }
 
     /// @dev The inert (all-zero) row when this run deployed no implementation for the proxy.
+    ///      Discovery fills `implementations` from the LIVE EIP-1967 slots, so "a new
+    ///      implementation" is the one that DIFFERS from what the proxy already runs — an
+    ///      implementation equal to the live one is the slot the version left alone, not a swap of
+    ///      a contract onto itself.
     function _row(address _proxy, address _implNew) internal view returns (ProxyUpgradeRow memory row) {
         if (_implNew == address(0)) {
+            return row;
+        }
+        address liveImpl = Utils.getImplementation(_proxy);
+        if (_implNew == liveImpl) {
             return row;
         }
         return
             ProxyUpgradeRow({
                 proxy: _proxy,
-                expectedOldImpl: Utils.getImplementation(_proxy),
+                expectedOldImpl: liveImpl,
                 implNew: _implNew,
                 callInitializeUpgrade: false,
                 admin: ProxyAdmin(address(0))
             });
+    }
+
+    /// @notice Ecosystem slots this version deploys an implementation for and deliberately does
+    ///         NOT install. Empty by default — see {_requireDeployedImplementationsInstalled}.
+    function uninstalledCoreDeployments() internal view virtual returns (L1EcosystemContract[] memory) {
+        return new L1EcosystemContract[](0);
+    }
+
+    /// @notice Refuses an ORPHANED deployment: an ecosystem implementation this run produced that
+    ///         the inventory does not install and the version did not name in
+    ///         {uninstalledCoreDeployments}. A deployment nothing references is either a swap that
+    ///         silently will not ship or a row builder that was never written, and both look
+    ///         exactly like a successful prepare from the output alone.
+    function _requireDeployedImplementationsInstalled(ProxyUpgradeRow[] memory _rows) internal view {
+        address[] memory deployed = _deployedCoreImplementations();
+        L1EcosystemContract[] memory excused = uninstalledCoreDeployments();
+        uint256 length = deployed.length;
+        for (uint256 i = 0; i < length; ++i) {
+            if (deployed[i] == address(0) || _rows[i].implNew == deployed[i]) {
+                continue;
+            }
+            bool accountedFor = false;
+            for (uint256 j = 0; j < excused.length; ++j) {
+                if (uint256(excused[j]) == i) {
+                    accountedFor = true;
+                    break;
+                }
+            }
+            require(
+                accountedFor,
+                string.concat(
+                    "orphaned ecosystem deployment at inventory slot ",
+                    vm.toString(i),
+                    " (",
+                    vm.toString(deployed[i]),
+                    "): this run deployed it but the CoreRegistry does not install it. Either add its row to "
+                    "`_coreProxyUpgradeRows()`, or name the slot in `uninstalledCoreDeployments()`."
+                )
+            );
+        }
+    }
+
+    /// @dev The implementations THIS RUN produced, over the same slot space as
+    ///      {_coreProxyUpgradeRows} so the orphan check compares like with like: an entry is set
+    ///      only where the address differs from the proxy's live implementation (discovery fills
+    ///      the struct from live, see {_row}).
+    function _deployedCoreImplementations() private view returns (address[] memory impls) {
+        impls = new address[](L1_ECOSYSTEM_CONTRACT_COUNT);
+        impls[uint256(L1EcosystemContract.L1Bridgehub)] = _deployedImpl(
+            coreAddresses.bridgehub.proxies.bridgehub,
+            coreAddresses.bridgehub.implementations.bridgehub
+        );
+        impls[uint256(L1EcosystemContract.L1ChainAssetHandler)] = _deployedImpl(
+            coreAddresses.bridgehub.proxies.chainAssetHandler,
+            coreAddresses.bridgehub.implementations.chainAssetHandler
+        );
+        impls[uint256(L1EcosystemContract.L1MessageRoot)] = _deployedImpl(
+            coreAddresses.bridgehub.proxies.messageRoot,
+            coreAddresses.bridgehub.implementations.messageRoot
+        );
+        impls[uint256(L1EcosystemContract.L1Nullifier)] = _deployedImpl(
+            coreAddresses.bridges.proxies.l1Nullifier,
+            coreAddresses.bridges.implementations.l1Nullifier
+        );
+        impls[uint256(L1EcosystemContract.L1AssetRouter)] = _deployedImpl(
+            coreAddresses.bridges.proxies.l1AssetRouter,
+            coreAddresses.bridges.implementations.l1AssetRouter
+        );
+        impls[uint256(L1EcosystemContract.L1NativeTokenVault)] = _deployedImpl(
+            coreAddresses.bridges.proxies.l1NativeTokenVault,
+            coreAddresses.bridges.implementations.l1NativeTokenVault
+        );
+        impls[uint256(L1EcosystemContract.L1InteropHandler)] = _deployedImpl(
+            coreAddresses.bridges.proxies.l1InteropHandler,
+            coreAddresses.bridges.implementations.l1InteropHandler
+        );
+        impls[uint256(L1EcosystemContract.CTMDeploymentTracker)] = _deployedImpl(
+            coreAddresses.bridgehub.proxies.ctmDeploymentTracker,
+            coreAddresses.bridgehub.implementations.ctmDeploymentTracker
+        );
+        impls[uint256(L1EcosystemContract.ChainRegistrationSender)] = _deployedImpl(
+            coreAddresses.bridgehub.proxies.chainRegistrationSender,
+            coreAddresses.bridgehub.implementations.chainRegistrationSender
+        );
+    }
+
+    /// @dev `_impl` when it is a REPLACEMENT this run produced, zero otherwise: zero when the
+    ///      address is what the proxy already runs, and zero when there is no proxy at all — an
+    ///      implementation for a proxy that does not exist yet cannot be installed by a row, so it
+    ///      is not a replacement this check can hold anyone to.
+    function _deployedImpl(address _proxy, address _impl) private view returns (address) {
+        if (_impl == address(0) || _proxy == address(0)) {
+            return address(0);
+        }
+        return _impl == Utils.getImplementation(_proxy) ? address(0) : _impl;
     }
 
     /// @notice Declares one governance/admin call this prepare emits that the upgrade objects do

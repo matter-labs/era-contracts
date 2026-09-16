@@ -11,6 +11,7 @@ import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/Ec
 
 import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
 import {BytecodeUtils} from "../../utils/bytecode/BytecodeUtils.s.sol";
+import {L1EcosystemContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 /// @notice Core (ecosystem) side of the v34 upgrade: deploys the new shared-singleton
 ///         implementation set, pins it in a write-once `CoreRegistry` (the enum-indexed
@@ -49,6 +50,19 @@ contract CoreUpgrade_v34 is DefaultCoreUpgrade {
         coreAddresses.bridgehub.implementations.chainRegistrationSender = deploySimpleContract(
             "ChainRegistrationSender"
         );
+    }
+
+    /// @inheritdoc DefaultCoreUpgrade
+    /// @dev TODO(EVM-1644): decide whether this edge installs the ChainRegistrationSender or stops
+    ///      deploying it. This run deploys a fresh implementation that `_coreProxyUpgradeRows()`
+    ///      has no row for, so it ships nowhere; naming the slot here is what keeps that VISIBLE
+    ///      until the question is settled, rather than a dangling address in the output. Both
+    ///      readings are open: the sender's source has not changed since v0.33.0, but the live
+    ///      implementation this edge departs from is a v31-era build, and
+    ///      {protocol-docs/chain-lifecycle.md} still describes the upgrade as refreshing it.
+    function uninstalledCoreDeployments() internal view virtual override returns (L1EcosystemContract[] memory slots) {
+        slots = new L1EcosystemContract[](1);
+        slots[0] = L1EcosystemContract.ChainRegistrationSender;
     }
 
     /// @notice The coordinator this run deployed — the CTM prepare constructs its executor
