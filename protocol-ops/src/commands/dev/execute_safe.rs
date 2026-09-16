@@ -15,12 +15,15 @@ use serde_json::Value;
 use crate::common::ethereum::get_provider;
 use crate::common::{logger, PrivateKey};
 
-/// One replayed Safe tx as it lands on L1, persisted to `--out` so the
-/// PUVT (`ecosystem verify-upgrade`) can later reconstruct CREATE2 / TUPP
-/// deployments from the prepare bundles. The fields mirror the legacy
-/// `UpgradeOutput.transactions` shape but with the raw input data alongside
-/// each hash, so verifier-side parsing doesn't need an extra
-/// `eth_getTransactionByHash` round trip.
+/// One replayed Safe tx as it lands on L1, persisted to `--out` as the
+/// deployment record of a prepare run. The fields mirror the legacy
+/// `UpgradeOutput.transactions` shape but carry the raw input data alongside
+/// each hash, so a reader does not need an extra `eth_getTransactionByHash`
+/// round trip.
+///
+/// The registry verifier does NOT consume this: an object's provenance is
+/// re-derived from the reviewed creation code and its own manifest, not
+/// reconstructed from a deployment history. It remains an operational record.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecutedTx {
     pub tx_hash: String,

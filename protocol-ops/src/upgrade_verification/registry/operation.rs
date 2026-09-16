@@ -1173,6 +1173,8 @@ mod tests {
     use super::*;
     use alloy::primitives::U256;
 
+    use super::super::package::RegistryPackage;
+
     use crate::common::external_actions::ExternalAction;
 
     const OPERATION: Address = Address::repeat_byte(0xA0);
@@ -1431,6 +1433,106 @@ mod tests {
             "the core registry",
         );
         assert_eq!(result.errors, 1);
+    }
+
+    // ───────────────── a release with no verifier module of its own ─────────────────
+    //
+    // `CTMUpgrade_v35 is DefaultCTMUpgrade {}` — the first registry-driven release after the
+    // bootstrap is an empty subclass of the base prepare. Its package therefore reaches THIS
+    // path, and these drive the whole of it that runs without a chain: the merged TOML the
+    // prepare emits, loaded through the same entry point production uses, and its calldata held
+    // against the two addresses the package names.
+    //
+    // Nothing here names a release. That is the point: the package format carries no protocol
+    // version (the version lives in the `CTMTransition`, read on chain), so the same code serves
+    // v36 and everything after it. A release that needed its own module would fail these.
+
+    /// Writes `body` to a scratch file and loads it the way `registry::verify` does.
+    fn load_package(body: &str) -> RegistryPackage {
+        let dir = std::env::temp_dir().join(format!(
+            "protocol-ops-operation-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("ecosystem.toml");
+        std::fs::write(&path, body).unwrap();
+        RegistryPackage::load(&path).expect("a prepared release package must load")
+    }
+
+    fn stage_hex(call: &GovernanceCall) -> String {
+        format!(
+            "0x{}",
+            alloy::hex::encode(crate::common::governance_calls::encode_calls(
+                std::slice::from_ref(call)
+            ))
+        )
+    }
+
+    /// The merged prepare output of an ordinary release, with the three lifecycle calls the merge
+    /// DERIVES from the operation's address — real ABI-encoded `Call[]` hex, not a placeholder.
+    fn prepared_release_package() -> String {
+        format!(
+            "[operation]\n\
+             operation_addr = \"{OPERATION:#x}\"\n\
+             coordinator_addr = \"{COORDINATOR:#x}\"\n\
+             [ctms.zksync_os.registry]\n\
+             ctm_transition_addr = \"0x00000000000000000000000000000000000000cc\"\n\
+             bootstrap_migration_addr = \"0x0000000000000000000000000000000000000000\"\n\
+             [core.registry]\n\
+             core_registry_addr = \"0x00000000000000000000000000000000000000ee\"\n\
+             [governance_calls]\n\
+             stage0_calls = \"{}\"\n\
+             stage1_calls = \"{}\"\n\
+             stage2_calls = \"{}\"\n",
+            stage_hex(&stage_call(0, COORDINATOR, OPERATION)),
+            stage_hex(&stage_call(1, COORDINATOR, OPERATION)),
+            stage_hex(&stage_call(2, COORDINATOR, OPERATION)),
+        )
+    }
+
+    /// End to end over everything that does not need a chain: the package loads as an ordinary
+    /// operation, and the calldata governance would sign passes the check that it invokes the
+    /// reviewed upgrade at the reviewed address — with no module, branch or constant naming the
+    /// release anywhere in this path.
+    #[test]
+    fn a_prepared_release_verifies_through_the_general_path() {
+        let RegistryPackage::Operation(package) = load_package(&prepared_release_package()) else {
+            panic!("an ordinary release must verify as an operation");
+        };
+        assert_eq!(package.operation, OPERATION);
+        assert_eq!(package.coordinator, COORDINATOR);
+
+        let mut result = VerificationResult::default();
+        verify_stage_calls(&package, &mut result);
+        assert_eq!(
+            result.errors, 0,
+            "a prepared release must pass the calldata check"
+        );
+        assert_eq!(result.warnings, 0);
+        assert!(result.ensure_success().is_ok());
+    }
+
+    /// And the check still bites on that package: a bundle that drives a DIFFERENT operation
+    /// through the same coordinator fails, so the test above is not passing on a check that
+    /// accepts anything.
+    #[test]
+    fn the_general_path_still_rejects_a_substituted_operation() {
+        let impostor = Address::repeat_byte(0x9E);
+        let body = prepared_release_package().replace(
+            &stage_hex(&stage_call(1, COORDINATOR, OPERATION)),
+            &stage_hex(&stage_call(1, COORDINATOR, impostor)),
+        );
+        let RegistryPackage::Operation(package) = load_package(&body) else {
+            panic!("still an operation package");
+        };
+        let mut result = VerificationResult::default();
+        verify_stage_calls(&package, &mut result);
+        assert!(
+            result.errors > 0,
+            "a substituted operation must fail the run"
+        );
+        assert!(result.ensure_success().is_err());
     }
 
     #[test]

@@ -169,8 +169,9 @@ library SystemContractsProcessing {
     ///      - L2WrappedBaseToken: upgrades must not touch the impl (since v31).
     ///      - L2V34Upgrade: the version-specific delegate is an UNSAFE deployment at a
     ///        bytecode-derived address — constructed from the pinned
-    ///        `AuthoredL2Plan.delegateBytecodeInfo`, never table-derived; the PUVT guards that no
-    ///        other unsafe deployment is present.
+    ///        `AuthoredL2Plan.delegateBytecodeInfo`, never table-derived. That no OTHER unsafe
+    ///        deployment rides along is established by reviewing this table: the pre-registry
+    ///        verifier that used to assert it has been retired.
     function buildL2BytecodeInfoTable() internal returns (bytes[] memory rows) {
         return buildL2BytecodeInfoTable(Utils.getZKOSBytecodeInfoForContract);
     }

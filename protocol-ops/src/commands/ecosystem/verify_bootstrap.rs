@@ -19,7 +19,7 @@ use clap::Parser;
 
 use crate::{
     common::logger,
-    upgrade_verification::{report::VerificationResult, versions::v34},
+    upgrade_verification::{registry, report::VerificationResult},
 };
 
 #[derive(Debug, Clone, Parser)]
@@ -53,7 +53,7 @@ pub async fn run(args: VerifyBootstrapArgs) -> anyhow::Result<()> {
     logger::intro();
 
     let mut result = VerificationResult::default();
-    v34::verify(
+    registry::verify(
         &args.ecosystem_toml,
         &args.l1_rpc_url,
         args.expected_governance_owner,

@@ -1,129 +1,44 @@
-//! Verification of a v34 registry-driven upgrade package.
+//! Verification of the one-time BOOTSTRAP edge onto the registry model.
 //!
-//! # What this replaces
+//! This is the only version-specific verifier in the tree, and it is version-specific because the
+//! thing it verifies happens exactly once: a CTM that predates the registry model is handed to a
+//! `CTMUpgradeExecutor`, and from then on every upgrade of that CTM is an ordinary operation
+//! ([`super::operation`]). There is no second bootstrap to generalise over.
 //!
-//! The v31 verifier re-derived ~60 governance calls and cross-checked each against live state,
-//! because the reviewable artifact WAS the calldata. A registry-driven package inverts that:
-//! governance executes a handful of calls naming write-once objects, and everything executable
-//! is derived on-chain from those objects at execution time. So this verifier answers a
-//! different question — not "is this calldata what the scripts would produce?" but:
+//! Two things follow from an edge having no executor to invoke yet:
 //!
-//!   1. Does every object run the code the reviewed commit produces? (`provenance`)
-//!   2. Was every object PRODUCED by that code's constructor from the manifest it serves?
-//!      (`construction`) — the question a runtime codehash cannot answer, and the reason the
-//!      chain no longer pretends to answer it.
-//!   3. Does every contract the manifest names exist?
-//!   4. Is authority bound as the manifest claims, and to the expected governance owner?
-//!   5. Does every proxy row depart from the implementation that is actually live?
-//!   6. Does the transaction governance signs invoke the reviewed upgrade, at the reviewed
-//!      address?
-//!
-//! None of it is "does the manifest's own fingerprint of a member match that member's code": the
-//! manifest author supplies both halves of such a pair, so it can only ever agree with itself.
-//! Every comparison here is against the reviewed commit or against live state the package does
-//! not control.
-//!
-//! # Two kinds of package
-//!
-//! The ordinary case is a RECURRING upgrade, verified by [`operation`]: one
-//! `EcosystemUpgradeOperation`, and three governance calls that are a pure function of its
-//! address. This module handles the other kind — the one-time BOOTSTRAP edge that installs the
-//! registry model on a CTM that predates it. A bootstrap has no operation and no coordinator, so
-//! governance executes a list of ordinary calls instead; see [`verify_derived_sequence`] for why
-//! that list has to be compared at all, and why nothing else should be built on that comparison.
-//!
-//! # What it deliberately does not do
-//!
-//! It does not re-derive facet cuts, L2 transactions or proposals. Those are derived on-chain
-//! from the release pair, and `TransitionDerivationLib` is audited code — re-deriving them here
-//! would be a second implementation to keep in sync, which is exactly what the registry model
-//! set out to remove. It also does not call the objects' own `validate()`: that runs against
-//! post-handover state (it requires the migration to already hold both ownerships), so
-//! pre-execution it reverts by design and tells a reviewer nothing.
+//! * governance executes a LIST of ordinary calls rather than `stageN(operation)`, so the list has
+//!   to be compared against the one `RegistryBootstrapSequence` derives — see
+//!   [`verify_derived_sequence`], which says why that comparison is transitional scaffolding and
+//!   must not be generalised;
+//! * the objects it names (`RegistryBootstrapMigration`, the bootstrap sequence) exist only for
+//!   this edge, and so do the views and checks below.
 
 use std::collections::BTreeMap;
 
-use alloy::primitives::{Address, B256, U256};
+use alloy::primitives::{Address, B256};
 use alloy::providers::Provider;
 use alloy::sol_types::SolValue;
 
-use crate::common::ethereum::get_provider;
 use crate::upgrade_verification::report::VerificationResult;
 
-pub(crate) mod construction;
-pub(crate) mod operation;
-pub(crate) mod package;
-pub(crate) mod provenance;
-pub(crate) mod views;
-
-use construction::{expect_canonical_construction, ReviewedBuild};
-use package::{
-    BootstrapPackage, RegistryPackage, TRANSFER_OWNERSHIP_SELECTOR, VALIDATE_APPLIED_SELECTOR,
-};
-use provenance::{
+use super::construction::{expect_canonical_construction, ReviewedBuild};
+use super::package::{BootstrapPackage, TRANSFER_OWNERSHIP_SELECTOR, VALIDATE_APPLIED_SELECTOR};
+use super::provenance::{
     expect_code_identity, expect_code_present, expect_immutable_bearing_identity, tolerate,
     CodeIdentity, ImmutableValue,
 };
-use views::{
-    BridgehubView, CTMReleaseView, CTMUpgradeExecutorView, CommittedUpgradeView, CoreRegistryView,
+use super::views::{
+    self, BridgehubView, CTMReleaseView, CTMUpgradeExecutorView, CoreRegistryView,
     CoreUpgradeExecutorView, CtmView, EcosystemUpgradeExecutorView, GovernanceUpgradeTimerView,
     GovernanceUpgradeTimerView::GovernanceUpgradeTimerViewInstance, ProxyAdminView,
     RegistryBootstrapMigrationView,
 };
-
-/// Verify a v34 registry-driven upgrade package against the live L1 it targets.
-///
-/// The package's own content decides which verifier runs — a recurring operation or a bootstrap
-/// edge (see [`RegistryPackage::load`]); a package that is neither is refused rather than
-/// verified as the nearest match.
-///
-/// `expected_governance_owner` is the reviewed address the upgrade must be driven by. For a
-/// bootstrap that is the owner the CTM domain lands on permanently; for a recurring upgrade it is
-/// the owner of the whole lifecycle.
-pub(crate) async fn verify(
-    ecosystem_toml: &std::path::Path,
-    l1_rpc_url: &str,
-    expected_governance_owner: Option<Address>,
-    extra_create2_salts: &[B256],
-    result: &mut VerificationResult,
-) -> anyhow::Result<()> {
-    let provider = get_provider(l1_rpc_url)?;
-    let identity = CodeIdentity::from_local_hashes()?;
-    let build = ReviewedBuild::load(&identity);
-
-    match RegistryPackage::load(ecosystem_toml)? {
-        RegistryPackage::Operation(package) => {
-            let salts = merge_salts(&package.create2_salts, extra_create2_salts);
-            operation::verify(
-                &provider,
-                &identity,
-                &build,
-                &package,
-                expected_governance_owner,
-                &salts,
-                result,
-            )
-            .await
-        }
-        RegistryPackage::Bootstrap(package) => {
-            let salts = merge_salts(&package.create2_salts, extra_create2_salts);
-            verify_bootstrap(
-                &provider,
-                &identity,
-                &build,
-                &package,
-                expected_governance_owner,
-                &salts,
-                result,
-            )
-            .await
-        }
-    }
-}
+use super::{format_semver, render_derived_payloads};
 
 /// Verify the one-time bootstrap edge onto the registry model.
 #[allow(clippy::too_many_arguments)]
-async fn verify_bootstrap<P: Provider>(
+pub(crate) async fn verify<P: Provider>(
     provider: &P,
     identity: &CodeIdentity,
     build: &ReviewedBuild,
@@ -729,18 +644,6 @@ async fn verify_bootstrap<P: Provider>(
     Ok(())
 }
 
-/// The reviewed salts: whatever the package recorded, plus whatever the reviewer supplied,
-/// de-duplicated and order-stable so the report names the same salt run after run.
-fn merge_salts(from_package: &[B256], from_reviewer: &[B256]) -> Vec<B256> {
-    let mut salts: Vec<B256> = Vec::new();
-    for salt in from_package.iter().chain(from_reviewer) {
-        if !salts.contains(salt) {
-            salts.push(*salt);
-        }
-    }
-    salts
-}
-
 /// The release's construction, re-derived from the manifest the release itself serves.
 async fn verify_release_construction<P: Provider>(
     provider: &P,
@@ -819,43 +722,6 @@ async fn verify_core_registry_construction<P: Provider>(
         salts,
     ) {
         reviewed.insert(core_registry, "the core registry".to_string());
-    }
-}
-
-/// Prints the DERIVED payload an object constructed at its own construction.
-///
-/// This is the state a counterfeit exists to tamper with — the L2 force deployments and the
-/// delegate leg every chain executes — so it is rendered for the reviewer rather than only
-/// summarised. Its agreement with the manifest is what the construction check above establishes;
-/// what a human still has to read is whether the payload IS the proposal.
-async fn render_derived_payloads<P: Provider>(
-    provider: &P,
-    result: &mut VerificationResult,
-    object: Address,
-) {
-    let view = CommittedUpgradeView::new(object, provider);
-    let Ok(plan) = view.l2Plan().call().await else {
-        result.report_error(&format!(
-            "the object at {object} does not answer `l2Plan()`: its derived payload cannot be \
-             shown, so a reviewer cannot check it against the proposal"
-        ));
-        return;
-    };
-    result.print_info(&format!(
-        "  derived L2 plan: {} force deployment(s), delegateTo {}, composer {}, {} factory \
-         dependency hash(es)",
-        plan.deployments.len(),
-        plan.delegateTo,
-        plan.delegateComposer,
-        plan.factoryDepHashes.len()
-    ));
-    for (i, deployment) in plan.deployments.iter().enumerate() {
-        result.print_info(&format!(
-            "    deployment {i}: type {} at {} ({} bytes of bytecode info)",
-            deployment.upgradeType,
-            deployment.newAddress,
-            deployment.deployedBytecodeInfo.len()
-        ));
     }
 }
 
@@ -1124,22 +990,10 @@ fn optional_display<T: std::fmt::Display>(value: Option<T>) -> String {
     value.map_or_else(|| "<unreadable>".to_string(), |v| v.to_string())
 }
 
-/// Renders a packed SemVer protocol version the way the upgrade envs and release notes write it.
-fn format_semver(packed: U256) -> String {
-    // A version wider than the packed encoding is malformed rather than unrepresentable, so it
-    // is reported verbatim: panicking would take the whole report down over one bad field.
-    let Ok(raw) = TryInto::<u128>::try_into(packed) else {
-        return format!("<malformed version {packed}>");
-    };
-    let major = raw >> 64;
-    let minor = (raw >> 32) & 0xffff_ffff;
-    let patch = raw & 0xffff_ffff;
-    format!("v{major}.{minor}.{patch}")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy::primitives::U256;
 
     /// The address derivation feeds `abi_encode()` in as the object's CONSTRUCTOR ARGUMENTS, so
     /// it must be Solidity's `abi.encode(manifest)` — for a dynamic struct, a 0x20 offset word
@@ -1180,22 +1034,5 @@ mod tests {
             Address::from_slice(&encoded[44..64]),
             Address::repeat_byte(0x11)
         );
-    }
-
-    #[test]
-    fn salts_from_the_package_and_the_reviewer_merge_without_duplicates() {
-        let a = B256::repeat_byte(0xAA);
-        let b = B256::repeat_byte(0xBB);
-        assert_eq!(merge_salts(&[a, b], &[b, a]), vec![a, b]);
-        assert_eq!(merge_salts(&[], &[a]), vec![a]);
-        assert!(merge_salts(&[], &[]).is_empty());
-    }
-
-    #[test]
-    fn formats_a_packed_semver() {
-        // 0x2200000001 is v0.34.1 in the packed encoding the CTM stores.
-        assert_eq!(format_semver(U256::from(0x22_0000_0001u64)), "v0.34.1");
-        assert_eq!(format_semver(U256::from(0x22_0000_0000u64)), "v0.34.0");
-        assert_eq!(format_semver(U256::from(0x21_0000_0000u64)), "v0.33.0");
     }
 }

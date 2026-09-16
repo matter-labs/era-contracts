@@ -79,8 +79,8 @@ pub(crate) struct ReviewedBuild {
 }
 
 impl ReviewedBuild {
-    /// Loads the creation code of every object type a v34 package can name, cross-checking each
-    /// against `AllContractsHashes.json`.
+    /// Loads the creation code of every object type a registry package can name, cross-checking
+    /// each against `AllContractsHashes.json`.
     pub(crate) fn load(identity: &CodeIdentity) -> Self {
         const OBJECT_TYPES: &[(&str, &str)] = &[
             (
@@ -485,11 +485,9 @@ mod tests {
     // code layout, the Foundry test would keep passing, and it would be proving something about a
     // function the tool does not use.
 
-    const UTILS_SOL: &str =
-        include_str!("../../../../../l1-contracts/deploy-scripts/utils/Utils.sol");
-    const COUNTERFEIT_SOL: &str = include_str!(
-        "../../../../../l1-contracts/test/foundry/l1/upgrades/CounterfeitObject.t.sol"
-    );
+    const UTILS_SOL: &str = include_str!("../../../../l1-contracts/deploy-scripts/utils/Utils.sol");
+    const COUNTERFEIT_SOL: &str =
+        include_str!("../../../../l1-contracts/test/foundry/l1/upgrades/CounterfeitObject.t.sol");
 
     /// The body of the Solidity function named `name`, from `{` to the matching top-level `}`.
     fn solidity_fn_body<'a>(source: &'a str, name: &str) -> &'a str {

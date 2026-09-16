@@ -889,12 +889,12 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     // PUH/Guardians stage-0 calls + (when present) the new-Gateway bring-up
     // bundle into a single `<env-out>/ecosystem.toml`. The Solidity
     // scripts each emit their own toml under `script-out/` (forge
-    // requirement), but downstream (PUVT + governance replay) only consumes
-    // the merged file.
+    // requirement), but downstream (verification + governance replay) only
+    // consumes the merged file.
     // Write the merged TOML straight to the canonical tracked path
     // (`<env-out>/ecosystem.toml`) — that's the file reviewers diff and the
-    // path every downstream consumer (PUVT, simulator emitter, fork tests)
-    // reads from. The `prepare/` subtree under `--out` keeps the per-bundle
+    // path every downstream consumer (the verifier, simulator emitter, fork
+    // tests) reads from. The `prepare/` subtree under `--out` keeps the per-bundle
     // intermediates (safe.json + manifest.json + executed.json) which stay
     // untracked.
     let merged_ecosystem =
@@ -1316,8 +1316,7 @@ fn write_merged_ecosystem_toml(
          # mirrors GatewayVotePreparation's output (deployed GW CTM addresses +\n\
          # diamond cut data) — its `governance_calls_to_execute` has already been\n\
          # folded into stage 2 above. When [zk_governance] is present, it names\n\
-         # the zk-governance contracts deployed in stage 0 and used by PUVT for\n\
-         # CREATE2 provenance checks.\n\n{}",
+         # the zk-governance contracts deployed in stage 0.\n\n{}",
         1 + ctm_entries.len() + new_gateway_count,
         toml::to_string(&doc).context("serialize merged ecosystem TOML")?
     );

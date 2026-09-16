@@ -19,31 +19,34 @@
 
 ## Verifying a package before it is signed
 
-Two verifiers, for two shapes of package.
+One verifier, `ecosystem verify-bootstrap` (alias `verify-package`,
+`upgrade_verification/registry/`). It decides from the package itself which of the two kinds
+it drives — a RECURRING upgrade, or the one-time BOOTSTRAP edge onto the registry model — and
+refuses a package that is neither rather than verifying it as the nearest match. It needs only
+the merged prepare TOML and an L1 RPC: the registry model moved the reviewable content off the
+calldata and onto write-once objects, so objects are identified against the reviewed commit's own
+artifacts rather than reconstructed from a CREATE2 deployment history.
 
-`ecosystem verify-upgrade` (`upgrade_verification/versions/v31/`) is the original PUVT: it
-re-derives ~60 governance calls and cross-checks each against live state, because for a v31
-package the reviewable artifact WAS the calldata. It also reconstructs each deployment from an
-append-only `transactions.txt` to establish provenance.
+> The pre-registry (v31) calldata verifier, `ecosystem verify-upgrade`, has been RETIRED along
+> with its whole `upgrade_verification/versions/` tree. Verifying v31-era packages is no longer a
+> supported capability; the tool and its procedure live on in the release branches that shipped
+> them. There is no `versions/` directory any more, and adding one back would be the mistake this
+> removed: a registry-driven upgrade is reviewed the same way for every release, so a release does
+> NOT get a verifier module of its own. `v35` needs no code here — its prepare is
+> `CTMUpgrade_v35 is DefaultCTMUpgrade {}`, an ordinary operation, and the recurring path verifies
+> it as one. If a future release ever seems to need version-specific handling, it belongs as an
+> INPUT to the general path, not as a new module.
 
-`ecosystem verify-bootstrap` (`upgrade_verification/versions/v34/`) verifies a **registry
-bootstrap** package, and is much smaller because the registry model moved the reviewable content
-off the calldata and onto write-once objects. It needs only the merged prepare TOML and an L1
-RPC — no gateway RPC, no zk-governance commit, and no transaction log, since the objects are
-identified against the reviewed commit's own artifacts rather than a CREATE2 history to
-reconstruct. What it checks:
+It answers two questions and keeps them apart.
+
+**What does this upgrade do?** is answered by reviewing the objects, never by reconstructing them
+from calldata:
 
 - **Object provenance** — the code at each address, looked up in `AllContractsHashes.json`. Code
   attributable to a _different_ contract is an ERROR, and so is code attributable to NO contract:
   the reviewer cannot say what is deployed there, and an unresolved deployment must not ride along
   with an otherwise successful review. (The usual cause is an un-regenerated hash file, which makes
   every lookup miss at once — fixed before the review concludes, not annotated in it.)
-- **Constructor-set immutables.** `AllContractsHashes.json` records the ARTIFACT's deployed
-  bytecode, whose immutable slots are zero, so a contract that sets immutables never hashes to its
-  own artifact once deployed. Those are identified from their immutable VALUES instead — read back
-  from the deployment, each held against the reviewed value, each mismatch an error. The CTM
-  executor's `CHAIN_TYPE_MANAGER` / `CTM_PROXY_ADMIN` go against the manifest — never against a
-  value the package supplied.
 - **Construction.** The check that carries object trust, because a runtime codehash cannot give
   it: creation code can write any storage it likes and then return the canonical runtime
   bytecode. Every object is deployed through the deterministic CREATE2 factory, so its address is
@@ -54,51 +57,55 @@ reconstruct. What it checks:
   `evmBytecodeHash`. The salt comes from the package when it records one and from
   `--create2-salt` otherwise; with no salt the check cannot run, and that is an ERROR rather than
   a silent pass.
-- **Call targets.** Every governance call must target a reviewed object or a live contract the
-  manifest names. An address no part of the review accounts for is an error.
-- **Named members exist.** Every contract the manifest names by address must be deployed code,
+- **Constructor-set immutables.** `AllContractsHashes.json` records the ARTIFACT's deployed
+  bytecode, whose immutable slots are zero, so a contract that sets immutables never hashes to its
+  own artifact once deployed. Those are identified from their immutable VALUES instead — read back
+  from the deployment, each held against a value the review fixes, each mismatch an error. Never
+  against itself: a read compared with itself always agrees and would report a check that
+  established nothing.
+- **Named members exist.** Every contract an object names by address must be deployed code,
   which is what the objects' own `validate()` refuses on-chain.
-- **Bound authority** — the CTM executor's CTM, its ProxyAdmin, its coordinator
-  (`coordinator()`), its owner, and that no nomination is outstanding. The owner check is the
-  consequential one, so pass `--expected-governance-owner` for anything that will actually be
-  signed: after `migrate()` the CTM domain belongs to that owner permanently.
-- **Departing state** — the CTM's live version against the manifest's expectation, and every
-  proxy row's `expectedOldImpl` against the implementation actually live behind that proxy.
-- **Calldata shape** — stage 0 pauses and starts the timer; stage 1 re-asserts the pause,
-  hands the ecosystem ProxyAdmin to the `CoreUpgradeExecutor` and applies the `CoreRegistry`
-  through it (when the edge has an ecosystem leg), then hands the CTM and its ProxyAdmin to the
-  migration and runs `migrate()`; stage 2 asserts `validateUpgradeApplied()` /
-  `validateApplied()`, binds the core executor to the coordinator (`setCoordinator`) and
-  unpauses. The prepare's declared external actions are printed as the reviewable list rather
-  than flagged: a bootstrap edge's handovers and pause window are exactly the calls no object can
-  describe. A bootstrap package carries no coordinator stage call — the edge predates the
-  lifecycle.
+- **Bound authority** — the coordinator, both domain executors, the CTM and both ProxyAdmins,
+  and the governance owner the whole lifecycle answers to. That owner check is the consequential
+  one, so pass `--expected-governance-owner` for anything that will actually be signed.
+- **Departing state** — the version and release edge against live, and every proxy row's
+  `expectedOldImpl` against the implementation actually live behind that proxy.
+- **Readiness**, reported apart from anything about value: the transition's L2 factory
+  dependencies published on the CTM's supplier, the timer startable, no lifecycle in flight.
+
+**Does the signed transaction invoke the reviewed upgrade, at the reviewed address?** For a
+recurring upgrade that is the whole of it: each stage must call
+`EcosystemUpgradeExecutor.stageN(operation)` on the reviewed coordinator, re-encoded here and
+compared byte for byte. Any other call must be a declared external action; one that is neither
+fails the run. The operation's INTERNAL calls are deliberately not re-derived — the executors
+derive them on chain from the same pinned object, and a second derivation in the tool would be a
+second implementation to keep in sync.
+
+A bootstrap edge is the exception, and only because it has no executor to invoke: governance
+executes a LIST of ordinary calls that `RegistryBootstrapSequence` derives, so the submitted
+bundle is compared against the list that contract itself emits. That comparison is transitional
+scaffolding for the bootstrap alone — it is not generalised to recurring upgrades, and nothing
+new should be built on it.
 
 It deliberately does NOT re-derive facet cuts, L2 transactions or proposals — those come from the
-audited on-chain derivation, and a second implementation here would be one more thing to keep in
-sync. It also does not call the objects' own `validate()`: that runs against post-handover state,
-so pre-execution it reverts by design.
+audited on-chain derivation. It also does not call the objects' own `validate()`: that runs
+against post-handover state, so pre-execution it reverts by design.
 
 ```bash
 cargo run --release --bin protocol_ops -- ecosystem verify-bootstrap \
   --ecosystem-toml <out>/prepare/ecosystem.toml \
   --l1-rpc-url $L1_RPC \
-  --expected-governance-owner 0x...
+  --expected-governance-owner 0x... \
+  --create2-salt 0x...
 ```
 
-The prepare output names every object the edge runs, including the one a bootstrap has that a
-recurring upgrade does not: `bootstrap_migration_addr`. `ctm_upgrade_executor_addr` names the
-bound executor in both cases; `ctm_transition_addr` stays zero for a bootstrap on purpose —
-the edge has no transition, so the prepare deploys no operation and the package carries no
-`[operation]` section and no coordinator stage calls. The verifier still derives the migration
-from the stage-1 `migrate()` call and treats the reported field as a cross-check, so it checks
-the calldata governance will execute rather than the prepare's summary of it.
+In both kinds the executing object is recovered from the CALLDATA governance will run — the
+`[operation]` section for a recurring upgrade, the stage-1 `migrate()` call for a bootstrap — and
+the prepare's summary fields (`ctm_transition_addr`, `core_registry_addr`,
+`ctm_upgrade_executor_addr`, `upgrade_timer_addr`, `bootstrap_migration_addr`) are cross-checks
+against it. A disagreement is an ERROR: the reviewer read one upgrade and governance would sign
+another.
 
-A recurring registry-driven package — `EcosystemUpgradeExecutor.stage0/1/2(operation)` over
-transitions — has no verifier yet. Until it does, what gates it is the prepare's own object checks
-(each object against the codehash its executor pins), the coordinator's stage-0 enforcement of the
-bindings at execution, and the merge's provenance invariant: every bundled call is either a derived
-coordinator stage call or a declared external action.
 
 ## What protocol-ops is
 

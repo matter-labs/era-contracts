@@ -1,5 +1,9 @@
-//! The reviewable inputs of a v34 package — the merged prepare TOML
+//! The reviewable inputs of a registry-driven package — the merged prepare TOML
 //! (`ecosystem upgrade-prepare-all`'s output) plus the live L1 it targets.
+//!
+//! The format carries NO protocol version: which version an upgrade moves chains to lives in the
+//! `CTMTransition` the operation pins, and is read from that object on chain. That is why one
+//! loader serves every release.
 //!
 //! Two kinds, told apart by what the prepare deployed rather than by a flag:
 //!
@@ -486,5 +490,91 @@ mod tests {
         let body = recurring_toml("");
         let err = format!("{:#}", load_str(&body).unwrap_err());
         assert!(err.contains("no `migrate()` call"), "{err}");
+    }
+
+    // ───────────────────────── a release the tool has never heard of ─────────────────────────
+    //
+    // `CTMUpgrade_v35 is DefaultCTMUpgrade {}` — an empty subclass. A v35 upgrade is an ORDINARY
+    // registry operation, so it must verify through the general path with no v35 module, no v35
+    // branch and no v35 constant anywhere in this tree. These pin that: the loader never learns
+    // a release name, so the same code serves v36 and everything after it.
+
+    /// The merged prepare output of a v35-shaped release, in the exact shape
+    /// `write_merged_ecosystem_toml` emits for a CTM prepare that deployed an operation: the
+    /// derived `[operation]` section, the CTM's summary fields, and a ZERO
+    /// `bootstrap_migration_addr` — the field a bootstrap fills and every later release does not.
+    fn ordinary_release_toml() -> String {
+        format!(
+            "[operation]\n\
+             operation_addr = \"{OPERATION}\"\n\
+             coordinator_addr = \"{COORDINATOR}\"\n\
+             [ctms.zksync_os.registry]\n\
+             ctm_transition_addr = \"0x00000000000000000000000000000000000000cc\"\n\
+             ctm_release_addr = \"0x00000000000000000000000000000000000000c1\"\n\
+             upgrade_timer_addr = \"0x00000000000000000000000000000000000000c2\"\n\
+             bootstrap_migration_addr = \"0x0000000000000000000000000000000000000000\"\n\
+             ctm_upgrade_executor_addr = \"0x00000000000000000000000000000000000000dd\"\n\
+             coordinator_addr = \"{COORDINATOR}\"\n\
+             operation_addr = \"{OPERATION}\"\n\
+             [ctms.zksync_os.state_transition]\n\
+             chain_type_manager_proxy = \"0x00000000000000000000000000000000000000f1\"\n\
+             [ctms.zksync_os.deployed_addresses]\n\
+             transparent_proxy_admin = \"0x00000000000000000000000000000000000000f2\"\n\
+             [core.registry]\n\
+             core_registry_addr = \"0x00000000000000000000000000000000000000ee\"\n\
+             [governance_calls]\n\
+             stage0_calls = \"0x\"\n\
+             stage1_calls = \"0x\"\n\
+             stage2_calls = \"0x\"\n"
+        )
+    }
+
+    /// A release with no module of its own loads as an ordinary operation, and every summary
+    /// field the verifier cross-checks is picked up — including the two that hold the CTM
+    /// executor's immutables to something the review fixes.
+    #[test]
+    fn a_release_with_no_module_of_its_own_loads_as_an_ordinary_operation() {
+        let RegistryPackage::Operation(package) = load_str(&ordinary_release_toml()).unwrap()
+        else {
+            panic!("an ordinary release must not need a verifier module of its own");
+        };
+        assert_eq!(package.operation, OPERATION.parse::<Address>().unwrap());
+        assert_eq!(package.coordinator, COORDINATOR.parse::<Address>().unwrap());
+        assert_eq!(
+            package.reported_timer,
+            Some(
+                "0x00000000000000000000000000000000000000c2"
+                    .parse()
+                    .unwrap()
+            )
+        );
+        assert_eq!(
+            package.reported_ctm,
+            Some(
+                "0x00000000000000000000000000000000000000f1"
+                    .parse()
+                    .unwrap()
+            )
+        );
+        assert_eq!(
+            package.reported_ctm_proxy_admin,
+            Some(
+                "0x00000000000000000000000000000000000000f2"
+                    .parse()
+                    .unwrap()
+            )
+        );
+    }
+
+    /// The zero `bootstrap_migration_addr` a post-bootstrap release carries must not divert it
+    /// into the bootstrap path — where it would be refused for having no `migrate()` call.
+    #[test]
+    fn a_zero_bootstrap_field_does_not_divert_an_ordinary_release() {
+        let body = ordinary_release_toml();
+        assert!(body.contains("bootstrap_migration_addr"));
+        assert!(matches!(
+            load_str(&body).unwrap(),
+            RegistryPackage::Operation(_)
+        ));
     }
 }

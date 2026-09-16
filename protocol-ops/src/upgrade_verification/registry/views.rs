@@ -1,5 +1,5 @@
-//! Read-only views of the registry objects and the live contracts a v34 package touches —
-//! a bootstrap edge or an ordinary recurring operation.
+//! Read-only views of the registry objects and the live contracts a package touches — an
+//! ordinary recurring operation, or the one-time bootstrap edge.
 //!
 //! Declared inline rather than bound from `zkstack-out/` because the verifier needs a
 //! handful of getters per object, not the objects' full ABIs, and because a package is

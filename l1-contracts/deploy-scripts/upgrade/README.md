@@ -95,13 +95,13 @@ cargo run --release --bin protocol_ops -- ecosystem verify-bootstrap \
   --ecosystem-toml <env-out>/ecosystem.toml --l1-rpc-url <rpc> --expected-governance-owner 0x...
 ```
 
-`verify-bootstrap` (`upgrade_verification/versions/v34/`) verifies a v34 bootstrap package
-against live L1 — object provenance, the manifest's pins, the bound authority and the owner it
-lands on, every row's departing implementation, and the stage calldata shape. What it checks and
-deliberately does not is in [`docs/ai-review/docs/protocol-ops.md`](../../../docs/ai-review/docs/protocol-ops.md).
-A recurring registry-driven package (an operation over transitions) has no verifier yet; the CTM
-prepare's own object checks and `protocol-ops`' provenance invariant are what gate it today.
-`ecosystem verify-upgrade` is the pre-registry (v31) calldata verifier and does not apply.
+`verify-bootstrap` (alias `verify-package`, `upgrade_verification/registry/`) verifies a
+registry-driven package against live L1 and decides from the package itself which kind it is: a
+recurring upgrade driven through its coordinator, or the one-time bootstrap edge. It checks object
+provenance and construction, the bound authority and the owner the upgrade is driven by, every
+row's departing implementation, readiness, and that the calldata governance signs invokes the
+reviewed upgrade. What it checks and deliberately does not is in
+[`docs/ai-review/docs/protocol-ops.md`](../../../docs/ai-review/docs/protocol-ops.md).
 
 ## 5. Deployer broadcast
 

@@ -98,37 +98,6 @@ from anything about value.
 Anything a reviewer could not establish is an ERROR, never a warning: warnings do not fail a run,
 so an unverifiable input reported as one reads, afterwards, exactly like a check that passed.
 
-## Running the Protocol Upgrade Verification Tool (PUVT)
-
-> **Historical.** `ecosystem verify-upgrade` is the pre-registry (v31) calldata verifier. It is
-> kept to re-review v31-era packages; current packages go through `verify-bootstrap` above.
-
-`ecosystem verify-upgrade` re-derives and cross-checks the calldata produced by
-`ecosystem upgrade-prepare-all` for the **v31 → v32 ZKsync OS upgrade**. It is
-**read-only**: it never runs forge or spins up an Anvil fork. It reads the merged
-`ecosystem.toml`, replays the append-only `transactions.txt` deployment log against L1,
-and matches every CREATE2 deployment against `AllContractsHashes.json`. The tool is
-OS-only — an `ecosystem.toml` carrying a `[ctms.era]` section is rejected at parse time.
-
-```bash
-cargo run --release --bin protocol_ops -- ecosystem verify-upgrade \
-  --env stage \
-  --ecosystem-toml <path-to>/ecosystem.toml \
-  --gw-rpc-url <gateway-rpc-url> \
-  --zk-governance-commit <commit>
-```
-
-| Flag                         | Role                                                                                           |
-| ---------------------------- | ---------------------------------------------------------------------------------------------- |
-| **`--env`**                  | `stage` / `testnet` / `mainnet`; selects the permanent-values + v31 input TOMLs.               |
-| **`--ecosystem-toml`**       | Merged artifact from `upgrade-prepare-all`.                                                    |
-| **`--zk-governance-commit`** | zk-governance commit for PUH / Guardians / SecurityCouncil / EUB bytecode metadata (required). |
-| **`--contracts-commit`**     | Optional era-contracts commit; when omitted, the local checkout is the authority.              |
-| **`--transactions-log`**     | Deployment tx-hash log; defaults to the env's `output/<env>/transactions.txt`.                 |
-| **`--l1-rpc-url`**           | L1 RPC (default `http://localhost:8545`).                                                      |
-| **`--gw-rpc-url`**           | Gateway RPC (alias `--gw-rpc`) for read-only gateway-side checks.                              |
-| **`--display-upgrade-data`** | Print each stage's ABI-encoded `UpgradeProposal` and skip the rest of the verifier.            |
-
 ## Output
 
 Commands that support **`--out`** write a **`CommandEnvelope`** snapshot after a successful run:
