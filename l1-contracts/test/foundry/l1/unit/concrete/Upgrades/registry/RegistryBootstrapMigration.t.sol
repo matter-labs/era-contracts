@@ -170,14 +170,13 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
         // The coordinator is deployed first: the CTM executor is constructed answering to it, and
         // the edge checks that binding.
-        coreExecutor = new CoreUpgradeExecutor(governor, ecosystemProxyAdmin, Utils.coreRegistryCodehash());
-        coordinator = new EcosystemUpgradeExecutor(governor, coreExecutor, Utils.operationCodehash());
+        coreExecutor = new CoreUpgradeExecutor(governor, ecosystemProxyAdmin);
+        coordinator = new EcosystemUpgradeExecutor(governor, coreExecutor);
         ctmExecutor = new CTMUpgradeExecutor(
             governor,
             IChainTypeManager(address(chainContractAddress)),
             ecosystemProxyAdmin,
-            address(coordinator),
-            Utils.transitionCodehash()
+            address(coordinator)
         );
 
         vm.prank(governor);
@@ -442,15 +441,8 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             implV32,
             "proxy must point at the row's implementation"
         );
-        // The provenance anchor is ESTABLISHED from the code actually deployed at the approved
-        // release address, and the version edge committed with the cut the object composes
-        // on-chain.
-        assertEq(chainContractAddress.releaseCodehash(), Utils.releaseCodehash(), "anchor must be installed");
-        assertEq(
-            chainContractAddress.releaseCodehash(),
-            address(genesisRelease).codehash,
-            "the anchor must be the live runtime hash of the approved release"
-        );
+        // The release the edge names is the one the CTM ends up pointing at, and the version edge
+        // is committed with the cut the object composes on-chain.
         assertEq(chainContractAddress.currentRelease(), address(genesisRelease), "release must be installed");
         assertEq(chainContractAddress.protocolVersion(), newVersion, "version must be bumped");
         assertEq(
@@ -778,8 +770,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             governor,
             IChainTypeManager(address(chainContractAddress)),
             ecosystemProxyAdmin,
-            address(coordinator),
-            Utils.transitionCodehash()
+            address(coordinator)
         );
         vm.prank(governor);
         coordinator.setCTMExecutor(replacement);
@@ -865,8 +856,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             governor,
             IChainTypeManager(foreignCtm),
             ecosystemProxyAdmin,
-            address(coordinator),
-            Utils.transitionCodehash()
+            address(coordinator)
         );
         BootstrapManifest memory manifest = _manifest();
         manifest.ctmExecutor = address(foreignExecutor);
@@ -894,8 +884,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             governor,
             IChainTypeManager(address(chainContractAddress)),
             foreignProxyAdmin,
-            address(coordinator),
-            Utils.transitionCodehash()
+            address(coordinator)
         );
         BootstrapManifest memory manifest = _manifest();
         manifest.ctmExecutor = address(foreignExecutor);
@@ -949,17 +938,12 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     ///      between operations), and it is the only address that will drive the executor's
     ///      lifecycle callbacks.
     function test_revertWhen_ctmExecutorAnswersToAnotherCoordinator() public {
-        EcosystemUpgradeExecutor foreignCoordinator = new EcosystemUpgradeExecutor(
-            governor,
-            coreExecutor,
-            Utils.operationCodehash()
-        );
+        EcosystemUpgradeExecutor foreignCoordinator = new EcosystemUpgradeExecutor(governor, coreExecutor);
         CTMUpgradeExecutor redirected = new CTMUpgradeExecutor(
             governor,
             IChainTypeManager(address(chainContractAddress)),
             ecosystemProxyAdmin,
-            address(foreignCoordinator),
-            Utils.transitionCodehash()
+            address(foreignCoordinator)
         );
         BootstrapManifest memory manifest = _manifest();
         manifest.ctmExecutor = address(redirected);

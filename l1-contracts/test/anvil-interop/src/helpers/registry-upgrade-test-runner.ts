@@ -12,10 +12,10 @@
  *      of a synthetic minor version bump (fresh `AdminFacet` as the facet change,
  *      `DefaultUpgrade` as the init contract, fresh `ZKsyncOSTestnetVerifier`, fresh
  *      `DiamondInit`, and a fresh `L1MessageRoot` implementation for the ecosystem leg). Every
- *      contract whose codehash an object-type ANCHOR constrains is deployed from the
+ *      contract the committed manifest pins by a bytecode-DERIVED value is deployed from the
  *      `registry-deterministic` forge profile output (CBOR-metadata-free ⇒ byte-identical
  *      across platforms), and the deployer key + starting nonce are fixed by the committed
- *      chain states, so all addresses AND anchors are reproducible run-to-run and
+ *      chain states, so all addresses AND bytecode hashes are reproducible run-to-run and
  *      machine-to-machine.
  *   3. Deploy the fixed `CTMRelease` + `CTMTransition` + `CoreRegistry` implementations and
  *      initialize them (write-once) from the COMMITTED manifest
@@ -133,9 +133,9 @@ const STALE_REGISTRIES_HINT =
   `(${REGISTRY_MANIFEST_REL}).`;
 
 // Sources compiled with the `registry-deterministic` forge profile (CBOR-metadata-free ⇒
-// byte-identical across platforms; see foundry.toml). Everything an object-type anchor or a
-// committed bytecode hash covers MUST be deployed from this build, otherwise an anchor
-// established on one machine would reject the same object built on another.
+// byte-identical across platforms; see foundry.toml). Everything a committed bytecode hash or
+// bytecode-derived address covers MUST be deployed from this build, otherwise a value recorded
+// on one machine would not match the same contract built on another.
 const DETERMINISTIC_FOUNDRY_PROFILE = "registry-deterministic";
 
 // The forge script emitting the L2 inventory of the CURRENT artifacts (the release's L2 bytecode
@@ -911,9 +911,8 @@ async function deployUpgradeMachinery(
   };
   const deploy = (name: Parameters<typeof getAbi>[0], args: unknown[]) =>
     deployFrom(name, getCreationBytecode(name), args);
-  // The committed manifest names these contracts by address and the object-type anchors cover
-  // several of them, so they are deployed from the deterministic (CBOR-metadata-free) build —
-  // see buildDeterministicArtifacts().
+  // Deployed from the deterministic (CBOR-metadata-free) build, the one the committed manifest's
+  // bytecode-DERIVED values are taken from — see buildDeterministicArtifacts().
   const deployDeterministic = (name: Parameters<typeof getAbi>[0], args: unknown[]) =>
     deployFrom(name, getDeterministicCreationBytecode(name), args);
 
@@ -1114,8 +1113,7 @@ async function buildRegistryManifest(
   l1Provider: ethers.providers.JsonRpcProvider,
   live: LiveUpgradeInputs,
   deployed: DeployedMachinery,
-  ctmProxy: string,
-  releaseCodehashAnchor: string
+  ctmProxy: string
 ): Promise<Record<string, unknown>> {
   // The L2 leg of the synthetic bump: the (no-op) L2 upgrade implementation's bytecode info. The
   // transition constructs its Unsafe deployment at the bytecode-derived address and delegatecalls
@@ -1219,8 +1217,6 @@ async function buildRegistryManifest(
         // CTMRelease address (nonce-deterministic, passed by the runner at initialization);
         // `fromRelease` is the release the bootstrap edge installs (nonce-deterministic too).
         transition: {
-          // The audited release code BOTH edges must run (the CTM's own provenance anchor).
-          releaseCodehash: releaseCodehashAnchor,
           fromRelease: deployed.bootstrapRelease,
           upgradeEngine: { address: deployed.newDefaultUpgrade },
           // Schedule: immediately executable, old version stays usable indefinitely.
@@ -1239,10 +1235,10 @@ async function buildRegistryManifest(
 }
 
 /**
- * Compile the anchor-covered sources with the `registry-deterministic` forge profile
+ * Compile the pinned sources with the `registry-deterministic` forge profile
  * (CBOR-metadata-free ⇒ byte-identical across platforms) into out-registry-deterministic/.
- * Both modes run this: emit records the resulting addresses, consume deploys the exact same
- * bytecode so the object-type anchors hold.
+ * Both modes run this: emit records the resulting addresses and bytecode-derived values, consume
+ * deploys the exact same bytecode so those committed values still describe this run.
  */
 function buildDeterministicArtifacts(): void {
   console.log(`  compiling pinned sources with FOUNDRY_PROFILE=${DETERMINISTIC_FOUNDRY_PROFILE}…`);
@@ -1273,8 +1269,7 @@ function assertCommittedManifestMatchesLiveDeployment(
   manifestPath: string,
   live: LiveUpgradeInputs,
   deployed: DeployedMachinery,
-  ctmProxy: string,
-  releaseCodehashAnchor: string
+  ctmProxy: string
 ): void {
   if (!fs.existsSync(manifestPath)) {
     throw new Error(`Committed registry manifest not found at ${manifestPath}.\n\n${STALE_REGISTRIES_HINT}`);
@@ -1312,7 +1307,6 @@ function assertCommittedManifestMatchesLiveDeployment(
     ],
     ["ctm.ctmProxy", ctm?.ctmProxy, ctmProxy],
     ["ctm.transition.fromRelease", ctm?.transition?.fromRelease, deployed.bootstrapRelease],
-    ["ctm.transition.releaseCodehash", ctm?.transition?.releaseCodehash, releaseCodehashAnchor],
     ["ctm.release.verifier.address", ctm?.release?.verifier?.address, deployed.newVerifier],
     ["ctm.transition.upgradeEngine.address", ctm?.transition?.upgradeEngine?.address, deployed.newDefaultUpgrade],
     // No facet swaps in the manifest at all: the delta is DERIVED on-chain from the release
@@ -1344,14 +1338,13 @@ function assertCommittedManifestMatchesLiveDeployment(
  * production surface, since each takes its manifest as a constructor argument. The release
  * deploys first: the transition's constructor validates its target release and derives the
  * facet/hash delta from the release pair, so the ordering is functional, not stylistic.
- * Artifacts come from the deterministic (CBOR-metadata-free) build — the one the chain states'
- * release was deployed from, so the CTM's `releaseCodehash` anchor holds.
+ * Artifacts come from the deterministic (CBOR-metadata-free) build, the same one the rest of the
+ * run's machinery is deployed from — see buildDeterministicArtifacts().
  */
 async function deployUpgradeObjectsFromManifest(
   deployer: ethers.Wallet,
   manifestPath: string,
-  deployed: DeployedMachinery,
-  releaseCodehashAnchor: string
+  deployed: DeployedMachinery
 ): Promise<{ release: string; transition: string; coreRegistry: string; upgradeTimer: string }> {
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
   const ctm = (manifest.ctms || []).find((c: { name?: string }) => c.name === CTM_REGISTRY_NAME);
@@ -1360,28 +1353,24 @@ async function deployUpgradeObjectsFromManifest(
   }
 
   // The manifest IS the constructor argument, so each object is fully formed the moment it
-  // exists — no factory in the path and no deployed-but-uninitialized window. What the CTM and
-  // the executors check is that the deployed code matches the anchored codehash.
+  // exists — no factory in the path and no deployed-but-uninitialized window. Trust in the object
+  // rests on governance reviewing the exact deployed object (re-derived from its creation code by
+  // `protocol-ops ecosystem verify-bootstrap`), not on any on-chain codehash pin.
   const deployObject = async (
     name: "CTMRelease" | "CTMTransition" | "CoreRegistry",
-    manifestArg: unknown,
-    expectedCodehash: string
+    manifestArg: unknown
   ): Promise<string> => {
     const factory = new ethers.ContractFactory(getAbi(name), getDeterministicCreationBytecode(name), deployer);
     const contract = await factory.deploy(manifestArg);
     await contract.deployed();
-    const actual = ethers.utils.keccak256(await contract.provider.getCode(contract.address));
-    if (actual !== expectedCodehash) {
-      throw new Error(`${name} deployed with codehash ${actual}, anchored ${expectedCodehash}`);
-    }
     return contract.address;
   };
 
-  const release = await deployObject("CTMRelease", releaseInitArgs(ctm), releaseCodehashAnchor);
+  const release = await deployObject("CTMRelease", releaseInitArgs(ctm));
   // The OPERATION names the stage-1 timer and the core registry; the transition names neither.
   // The timer is bound to the coordinator (only it can start it); zero delays make the stage-1
   // window pass immediately in the harness, and the deployer keeps the (unused) extension right.
-  const coreRegistry = await deployObject("CoreRegistry", coreInitArgs(manifest), deployed.coreRegistryCodehash);
+  const coreRegistry = await deployObject("CoreRegistry", coreInitArgs(manifest));
   const timerFactory = new ethers.ContractFactory(
     getAbi("GovernanceUpgradeTimer"),
     getCreationBytecode("GovernanceUpgradeTimer"),
@@ -1393,8 +1382,7 @@ async function deployUpgradeObjectsFromManifest(
     release,
     transition: await deployObject(
       "CTMTransition",
-      transitionInitArgs(manifest, ctm, release, deployed.delegateComposer),
-      deployed.transitionCodehash
+      transitionInitArgs(manifest, ctm, release, deployed.delegateComposer)
     ),
     coreRegistry,
     upgradeTimer: upgradeTimer.address,

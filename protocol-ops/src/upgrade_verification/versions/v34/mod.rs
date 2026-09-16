@@ -46,20 +46,19 @@ pub(crate) mod package;
 pub(crate) mod provenance;
 pub(crate) mod views;
 
+use construction::{expect_canonical_construction, ReviewedBuild};
 use package::{
     BootstrapPackage, APPLY_L1_UPGRADE_SELECTOR, MIGRATE_SELECTOR, PAUSE_MIGRATION_SELECTOR,
     SET_COORDINATOR_SELECTOR, TRANSFER_OWNERSHIP_SELECTOR, UNPAUSE_MIGRATION_SELECTOR,
     VALIDATE_APPLIED_SELECTOR,
 };
-use construction::{expect_canonical_construction, ReviewedBuild};
 use provenance::{
     expect_code_identity, expect_code_present, expect_immutable_bearing_identity, tolerate,
     CodeIdentity, ImmutableValue,
 };
 use views::{
     BridgehubForBootstrapView, CTMReleaseView, CTMUpgradeExecutorView, CommittedUpgradeView,
-    CoreRegistryView,
-    CoreUpgradeExecutorView, CtmForBootstrapView, EcosystemUpgradeExecutorView,
+    CoreRegistryView, CoreUpgradeExecutorView, CtmForBootstrapView, EcosystemUpgradeExecutorView,
     GovernanceUpgradeTimerView, GovernanceUpgradeTimerView::GovernanceUpgradeTimerViewInstance,
     ProxyAdminView, RegistryBootstrapMigrationView,
 };
@@ -609,9 +608,12 @@ pub(crate) async fn verify(
     }
 
     if package.release != manifest.currentRelease {
-        result.report_warn(&format!(
-            "the package reports ctm_release_addr {} but the manifest names {}: the prepare's \
-             summary disagrees with the object governance will execute",
+        // An ERROR, not a note: `ctm_release_addr` is what a human reads out of the package, and
+        // the manifest is what executes. A disagreement means the reviewer reviewed a different
+        // object from the one governance would install.
+        result.report_error(&format!(
+            "the package reports ctm_release_addr {} but the manifest names {}: the summary a \
+             reviewer reads describes a different release from the one governance would install",
             package.release, manifest.currentRelease
         ));
     }
@@ -636,15 +638,15 @@ pub(crate) async fn verify(
     // The pause/unpause calls land on the CTM's own ChainAssetHandler, which no manifest names;
     // it is derived from the CTM's Bridgehub so a call to it is accounted for as that contract
     // rather than as an unexplained address.
+    // An unreadable hop is not silently tolerated: it just leaves the handler unaccounted, and
+    // `verify_call_targets` then reports the pause call's target as an address this review does
+    // not explain — which is the honest outcome.
     let chain_asset_handler = match ctm.BRIDGE_HUB().call().await {
-        Ok(bridgehub) => match BridgehubForBootstrapView::new(bridgehub, &provider)
+        Ok(bridgehub) => BridgehubForBootstrapView::new(bridgehub, &provider)
             .chainAssetHandler()
             .call()
             .await
-        {
-            Ok(handler) => Some(handler),
-            Err(_) => None,
-        },
+            .ok(),
         Err(_) => None,
     };
     verify_call_targets(

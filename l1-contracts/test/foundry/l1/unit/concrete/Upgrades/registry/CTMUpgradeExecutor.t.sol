@@ -3,7 +3,6 @@
 pragma solidity 0.8.28;
 
 import {ChainTypeManagerTest} from "../../state-transition/ChainTypeManager/_ChainTypeManager_Shared.t.sol";
-import {Utils} from "../../Utils/Utils.sol";
 import {UtilsFacet} from "../../Utils/UtilsFacet.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
@@ -36,7 +35,6 @@ import {MAX_GAS_PER_TRANSACTION} from "contracts/common/Config.sol";
 import {
     L2BytecodeNotPublished,
     TransitionNotCommitted,
-    RegistryCodehashMismatch,
     TransitionReleaseMismatch,
     Unauthorized,
     UpgradeNotPermissionlessYet
@@ -95,9 +93,9 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
         // constructed over it. The core executor is then pointed at the coordinator (the v34
         // bootstrap's stage-2 binding).
         ecosystemProxyAdmin = new ProxyAdmin();
-        coreExecutor = new CoreUpgradeExecutor(governor, ecosystemProxyAdmin, Utils.coreRegistryCodehash());
+        coreExecutor = new CoreUpgradeExecutor(governor, ecosystemProxyAdmin);
         ecosystemProxyAdmin.transferOwnership(address(coreExecutor));
-        coordinator = new EcosystemUpgradeExecutor(governor, coreExecutor, Utils.operationCodehash());
+        coordinator = new EcosystemUpgradeExecutor(governor, coreExecutor);
         vm.prank(governor);
         coreExecutor.setCoordinator(address(coordinator));
 
@@ -107,8 +105,7 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
             governor,
             IChainTypeManager(address(chainContractAddress)),
             ctmProxyAdmin,
-            address(coordinator),
-            Utils.transitionCodehash()
+            address(coordinator)
         );
         vm.prank(governor);
         coordinator.setCTMExecutor(ctmExecutor);
@@ -124,9 +121,8 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
         assertEq(chainContractAddress.owner(), address(ctmExecutor));
 
         newVersion = SemVer.packSemVer(0, 1, 0);
-        // The pinned genesisUpgrade / upgradeEngine stand-ins must carry real code — the
-        // registry's codehash pin rejects codeless targets — so etch them and pin their real
-        // codehash below.
+        // The pinned genesisUpgrade / upgradeEngine stand-ins must carry real code — a release's
+        // and a transition's `validate()` reject codeless members — so etch them.
         genesisUpgradeAddr = makeAddr("genesisUpgrade");
         vm.etch(genesisUpgradeAddr, hex"600042");
         upgradeEngineAddr = makeAddr("upgradeEngine");
@@ -434,31 +430,6 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
         );
         vm.prank(governor);
         coordinator.stage0(replay);
-    }
-
-    function test_revertWhen_setCurrentReleaseIsNotTheAuditedCode() public {
-        // Release provenance is the CTM's own invariant — the transition deliberately delegates it
-        // upward. An object that does not run the audited `CTMRelease` code is refused when set as
-        // `currentRelease`, however well-formed it otherwise looks.
-        address impostor = makeAddr("notARelease");
-        vm.etch(impostor, hex"600044");
-        Call[] memory repoint = new Call[](1);
-        repoint[0] = Call({
-            target: address(chainContractAddress),
-            value: 0,
-            data: abi.encodeCall(IChainTypeManager.setCurrentRelease, (impostor))
-        });
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                RegistryCodehashMismatch.selector,
-                impostor,
-                Utils.releaseCodehash(),
-                impostor.codehash
-            )
-        );
-        vm.prank(governor);
-        ctmExecutor.forward(repoint);
     }
 
     function test_revertWhen_stage0FromWrongVersion() public {

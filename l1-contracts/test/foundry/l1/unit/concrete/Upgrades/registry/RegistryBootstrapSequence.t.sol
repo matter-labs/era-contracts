@@ -27,7 +27,6 @@ import {
 import {
     BootstrapNotYetExecuted,
     ProxyUpgradeRowMismatch,
-    RegistryCodehashMismatch,
     RegistryTargetHasNoCode,
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
@@ -49,7 +48,6 @@ import {
 } from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 import {ChainTypeManagerTest} from "../../state-transition/ChainTypeManager/_ChainTypeManager_Shared.t.sol";
-import {Utils} from "../../Utils/Utils.sol";
 import {L2PlanFixtures} from "./L2PlanFixtures.sol";
 import {LegacyBootstrapSequence} from "./_LegacyBootstrapSequence.t.sol";
 
@@ -119,14 +117,13 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
         upgradeEngine = makeAddr("upgradeEngine");
         vm.etch(upgradeEngine, hex"600043");
 
-        coreExecutor = new CoreUpgradeExecutor(governor, ecosystemProxyAdmin, Utils.coreRegistryCodehash());
-        coordinator = new EcosystemUpgradeExecutor(governor, coreExecutor, Utils.operationCodehash());
+        coreExecutor = new CoreUpgradeExecutor(governor, ecosystemProxyAdmin);
+        coordinator = new EcosystemUpgradeExecutor(governor, coreExecutor);
         ctmExecutor = new CTMUpgradeExecutor(
             governor,
             IChainTypeManager(address(chainContractAddress)),
             ctmProxyAdmin,
-            address(coordinator),
-            Utils.transitionCodehash()
+            address(coordinator)
         );
 
         newVersion = SemVer.packSemVer(0, 1, 0);
@@ -330,19 +327,13 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
 
     // ──────────────────── it refuses inputs the edge does not name ────────────────────
 
-    function test_revertWhen_coreRegistryIsNotTheOneTheEdgeNames() public {
-        // A registry-shaped contract the edge's own core executor would refuse in stage 1: the
-        // anchor it pins is the audited `CoreRegistry` codehash.
-        CoreRegistry notTheRegistry = CoreRegistry(address(coreExecutor));
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                RegistryCodehashMismatch.selector,
-                address(coreExecutor),
-                Utils.coreRegistryCodehash(),
-                address(coreExecutor).codehash
-            )
-        );
-        new RegistryBootstrapSequence(migration, ICoreRegistry(address(notTheRegistry)));
+    /// @dev Retargeted from the removed codehash anchor: the registry is the one input the edge
+    ///      does not name, so the sequence still refuses to pin an address that is not deployed —
+    ///      stage 1 would otherwise "apply" it against nothing.
+    function test_revertWhen_theCoreRegistryIsNotDeployed() public {
+        address codeless = makeAddr("codelessCoreRegistry");
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, codeless));
+        new RegistryBootstrapSequence(migration, ICoreRegistry(codeless));
     }
 
     function test_revertWhen_anInputIsZero() public {

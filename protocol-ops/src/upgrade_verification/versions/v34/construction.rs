@@ -83,7 +83,10 @@ impl ReviewedBuild {
     /// against `AllContractsHashes.json`.
     pub(crate) fn load(identity: &CodeIdentity) -> Self {
         const OBJECT_TYPES: &[(&str, &str)] = &[
-            ("RegistryBootstrapMigration.sol", "RegistryBootstrapMigration"),
+            (
+                "RegistryBootstrapMigration.sol",
+                "RegistryBootstrapMigration",
+            ),
             ("CTMRelease.sol", "CTMRelease"),
             ("CoreRegistry.sol", "CoreRegistry"),
             ("CTMTransition.sol", "CTMTransition"),
@@ -120,8 +123,8 @@ fn load_one(
             path.display()
         )
     })?;
-    let json: serde_json::Value =
-        serde_json::from_str(&raw).map_err(|e| format!("{} is not valid JSON ({e})", path.display()))?;
+    let json: serde_json::Value = serde_json::from_str(&raw)
+        .map_err(|e| format!("{} is not valid JSON ({e})", path.display()))?;
     let hex = json
         .get("bytecode")
         .and_then(|b| b.get("object"))

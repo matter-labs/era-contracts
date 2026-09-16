@@ -77,7 +77,6 @@ contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
                         ChainTypeManagerInitializeData({
                             owner: governor,
                             validatorTimelock: validator,
-                            releaseCodehash: Utils.releaseCodehash(),
                             currentRelease: Utils.TEST_GENESIS_REGISTRY,
                             protocolVersion: 0,
                             serverNotifier: serverNotifier
@@ -93,8 +92,7 @@ contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
             governor,
             IChainTypeManager(address(ctm2)),
             ctmProxyAdmin2,
-            address(coordinator),
-            Utils.transitionCodehash()
+            address(coordinator)
         );
         ctmProxyAdmin2.transferOwnership(address(ctmExecutor2));
         vm.prank(governor);
@@ -132,8 +130,7 @@ contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
                 governor,
                 IChainTypeManager(address(chainContractAddress)),
                 ctmProxyAdmin,
-                _coordinator,
-                Utils.transitionCodehash()
+                _coordinator
             );
     }
 
