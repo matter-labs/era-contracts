@@ -1,0 +1,18 @@
+# Foundry-specific upgrade configuration for the RECURRING hops the local pipeline tests run on
+# top of the v34 bootstrap fixture (test/foundry/l1/integration/UpgradeTestRecurring_Local.t.sol).
+#
+# The bootstrap hop leaves the ecosystem at v35.0.0 (`foundry-upgrade.toml`'s
+# `new_protocol_version`), so a chain-release hop from there targets v36.0.0. An
+# INFRASTRUCTURE-ONLY hop reads `foundry-upgrade.toml` instead: its version equals the live one,
+# which is what `DefaultCTMUpgrade` requires of an edge declared to move no version.
+
+old_protocol_version = 0x2300000000 # v35.0.0 (informational: the prepare reads it from the CTM)
+
+# The fixture's chains are labelled at the same version as the core contracts, so autodetection
+# would classify correctly on its own; the key is kept explicit so the classification does not
+# depend on the introspection heuristic.
+pre_v32_introspection = false
+
+[contracts]
+new_protocol_version = 0x2400000000  # v36.0.0 (target for a chain-release hop)
+latest_protocol_version = 0x2400000000  # v36.0.0

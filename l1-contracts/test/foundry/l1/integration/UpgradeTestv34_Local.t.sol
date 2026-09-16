@@ -91,17 +91,16 @@ contract ChainUpgrade_v34_Test is DefaultChainUpgrade {
     }
 }
 
-/// @notice Local (non-fork) test of the v34 BOOTSTRAP edge through the real prepare pipeline:
-///         a fresh ecosystem + Era chain at the baseline version, `CTMUpgrade_v34` deploying
-///         the executor + `RegistryBootstrapMigration`, and the collapsed three-call stage-1 leg
-///         (nominate the CTM, hand over its ProxyAdmin, `migrate()` — which itself completes
-///         the executor's accept) performing the whole edge. Complements the anvil two-stage
-///         test: same flow, but
-///         driven end to end by the production prepare script.
-/// @dev Heavy execution + event assertions run in `setUp -> internalTest()` (RAM constraint);
-///      the body checks persisted state — the version bump, the authority handover to the
-///      bound executor, and the legacy commit shape.
-contract UpgradeIntegrationTest_v34_Local is
+/// @notice The fixture the v34 BOOTSTRAP edge leaves behind, built through the real prepare
+///         pipeline: a fresh ecosystem + Era chain at the baseline version, `CTMUpgrade_v34`
+///         deploying the executor + `RegistryBootstrapMigration`, and the collapsed three-call
+///         stage-1 leg (nominate the CTM, hand over its ProxyAdmin, `migrate()` — which itself
+///         completes the executor's accept) performing the whole edge.
+/// @dev Abstract so the post-bootstrap state can be reused: it is the only in-forge fixture whose
+///      ecosystem is registry-driven, which is what a RECURRING prepare needs to run against (see
+///      `UpgradeTestRecurring_Local.t.sol`). Heavy execution + event assertions run in
+///      `setUp -> internalTest()` (RAM constraint).
+abstract contract UpgradeIntegrationV34BootstrapFixture is
     UpgradeIntegrationTestBase,
     L1ContractDeployer,
     ZKChainDeployer,
@@ -155,12 +154,15 @@ contract UpgradeIntegrationTest_v34_Local is
         IChainTypeManager(ctm).executeUpgrade(chainId, addCut);
     }
 
-    /// @dev The local fixture is Era-shaped: the CTM proxy shares the ecosystem's
+    /// @dev The local fixture is Era-shaped: the CTM-domain proxies share the ecosystem's
     ///      transparentProxyAdmin. Production ZKsyncOS CTMs sit under their OWN ProxyAdmin
     ///      (see upgrade-envs/v0.31.0-interopB), which the v34 bootstrap requires — the core
     ///      leg hands the ecosystem admin to the ecosystem executor, the CTM leg hands the
-    ///      CTM-domain admin to the CTM executor. Model that shape by moving the CTM proxy
-    ///      onto a fresh admin (owned by the same identity as the shared one) before prepare.
+    ///      CTM-domain admin to the CTM executor. Model that shape by moving the CTM proxy and
+    ///      the per-CTM proxies that can carry an inventory row (`CTMContract`) onto a fresh
+    ///      admin, owned by the same identity as the shared one, before prepare. The
+    ///      ServerNotifier is deliberately left where it is: its ProxyAdmin is chainAdmin-owned
+    ///      in production too, which is the foreign-admin row case.
     function _splitCTMProxyAdmin() private {
         address ctm = address(addresses.chainTypeManager);
         ProxyAdmin sharedAdmin = ProxyAdmin(DeployScriptUtils.getProxyAdminAddress(ctm));
@@ -169,11 +171,22 @@ contract UpgradeIntegrationTest_v34_Local is
         ProxyAdmin ctmAdmin = new ProxyAdmin();
         ctmAdmin.transferOwnership(sharedAdminOwner);
 
-        vm.prank(sharedAdminOwner);
-        sharedAdmin.changeProxyAdmin(ITransparentUpgradeableProxy(payable(ctm)), address(ctmAdmin));
+        address[] memory ctmDomainProxies = new address[](4);
+        ctmDomainProxies[0] = ctm;
+        ctmDomainProxies[1] = ctmAddresses.stateTransition.proxies.validatorTimelock;
+        ctmDomainProxies[2] = ctmAddresses.stateTransition.proxies.permissionlessValidator;
+        ctmDomainProxies[3] = ctmAddresses.stateTransition.proxies.bytecodesSupplier;
+        for (uint256 i = 0; i < ctmDomainProxies.length; ++i) {
+            address proxy = ctmDomainProxies[i];
+            if (proxy == address(0) || DeployScriptUtils.getProxyAdminAddress(proxy) != address(sharedAdmin)) {
+                continue;
+            }
+            vm.prank(sharedAdminOwner);
+            sharedAdmin.changeProxyAdmin(ITransparentUpgradeableProxy(payable(proxy)), address(ctmAdmin));
+        }
     }
 
-    function setUp() public {
+    function setUp() public virtual {
         console.log("setUp: Starting");
         _deployL1Contracts();
         _deployTokens();
@@ -207,7 +220,11 @@ contract UpgradeIntegrationTest_v34_Local is
         internalTest();
         console.log("setUp: Internal test complete");
     }
+}
 
+/// @notice The bootstrap edge's own assertions over the fixture above: the version bump, the
+///         authority handover to the bound executor, and the legacy commit shape.
+contract UpgradeIntegrationTest_v34_Local is UpgradeIntegrationV34BootstrapFixture {
     function test_v34BootstrapUpgrade_Local() public {
         CTMUpgrade_v34_Test v34 = CTMUpgrade_v34_Test(address(ctmUpgrade));
         address ctm = ctmUpgrade.getCTMAddress();
