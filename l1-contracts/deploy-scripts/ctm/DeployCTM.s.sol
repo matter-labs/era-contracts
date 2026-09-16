@@ -214,15 +214,10 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         }
     }
 
-    /// @dev The production Boojum router, used as the gate's Boojum lane regardless of `testnetVerifier`.
-    function _eraDualVerifierName() private view returns (string memory name) {
-        (, name) = DeployCTML1OrGateway.resolve(false, CTMContract.DualVerifier);
-    }
-
     function deployVerifiers() internal {
         (, string memory fflonkName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.VerifierFflonk);
         (, string memory plonkName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.VerifierPlonk);
-        (, string memory boojumVerifierName) = DeployCTML1OrGateway.resolveMainVerifier(
+        (, string memory chainVerifierName) = DeployCTML1OrGateway.resolveChainVerifier(
             config.isZKsyncOS,
             config.testnetVerifier
         );
@@ -230,36 +225,21 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         ctmAddresses.stateTransition.verifiers.verifierFflonk = deploySimpleContract(fflonkName, false);
         ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract(plonkName, false);
 
-        bool deployAirbenderLane = DeployCTML1OrGateway.hasAirbenderLane(config.airbenderVerifier, config.isZKsyncOS);
-
-        // The Boojum router is deployed either way. Behind the multi-proof gate it must be the production
-        // router even on testnets: the gate already provides the empty-proof skip, and a second skip inside
-        // the lane would let a non-empty envelope declare a zero-length Boojum slice and settle without a
-        // Boojum proof.
-        ctmAddresses.stateTransition.verifiers.boojumVerifier = deploySimpleContract(
-            deployAirbenderLane ? _eraDualVerifierName() : boojumVerifierName,
-            false
-        );
-        if (deployAirbenderLane) {
-            // Each contract must exist before the one that takes it as a constructor argument: generated
-            // PLONK verifier, then the Airbender lane, then the gate.
-            ctmAddresses.stateTransition.verifiers.airbenderVerifierPlonk = deploySimpleContract(
-                "AirbenderVerifierPlonk",
-                false
-            );
-            ctmAddresses.stateTransition.verifiers.airbenderVerifier = deploySimpleContract("AirbenderVerifier", false);
-        }
-
-        if (deployAirbenderLane) {
-            (, string memory gateName) = DeployCTML1OrGateway.resolveChainVerifier(
-                config.isZKsyncOS,
-                config.testnetVerifier,
-                true
-            );
-            ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(gateName, false);
+        if (config.isZKsyncOS) {
+            ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(chainVerifierName, false);
         } else {
-            // Without the Airbender lane the Boojum router is the chain's verifier, exactly as before.
-            ctmAddresses.stateTransition.verifiers.verifier = ctmAddresses.stateTransition.verifiers.boojumVerifier;
+            (, string memory boojumVerifierName) = DeployCTML1OrGateway.resolveBoojumVerifier(
+                false,
+                config.testnetVerifier
+            );
+            ctmAddresses.stateTransition.verifiers.boojumVerifier = deploySimpleContract(boojumVerifierName, false);
+            if (DeployCTML1OrGateway.hasAirbenderLane(config.airbenderVerifier, false)) {
+                ctmAddresses.stateTransition.verifiers.airbenderVerifierPlonk = deploySimpleContract(
+                    "AirbenderVerifierPlonk",
+                    false
+                );
+            }
+            ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(chainVerifierName, false);
         }
 
         // Use getDeployerAddress() to ensure the correct sender even when called from nested contracts
@@ -388,16 +368,9 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             ctmAddresses.stateTransition.proxies.chainTypeManager
         );
         vm.serializeAddress("state_transition", "verifier_addr", ctmAddresses.stateTransition.verifiers.verifier);
-        // `airbender_verifier_addr` is the lane the gate points at; the generated PLONK verifier it wraps is
-        // reported separately.
         vm.serializeAddress(
             "state_transition",
             "airbender_verifier_addr",
-            ctmAddresses.stateTransition.verifiers.airbenderVerifier
-        );
-        vm.serializeAddress(
-            "state_transition",
-            "airbender_verifier_plonk_addr",
             ctmAddresses.stateTransition.verifiers.airbenderVerifierPlonk
         );
         vm.serializeAddress(

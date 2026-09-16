@@ -42,10 +42,9 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// `ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT`
     function setZKsyncOSMaxTxGasLimit(uint64 _newMaxTxGasLimit) external;
 
-    /// @notice Enables or disables one proof system for an Era chain. Never both: a call that would
-    /// leave no system required is rejected, as is enabling one with batches still unverified.
+    /// @notice Enables or disables one of the proof systems an Era chain requires. At least one must stay enabled.
     /// @param _proofSystem The proof system to configure.
-    /// @param _enabled Whether the selected proof system is enabled.
+    /// @param _enabled Whether the selected proof system is required.
     function setProofSystemStatus(ProofSystem _proofSystem, bool _enabled) external;
 
     /// @notice Change the fee params for L1->L2 transactions
@@ -155,10 +154,6 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     event NewZKsyncOSMaxTxGasLimit(uint64 oldMaxTxGasLimit, uint64 newMaxTxGasLimit);
 
     /// @notice The set of proof systems this chain does not require has changed
-    /// @dev Both values indexed, matching the ZKsync OS lane's event of the same name. `indexed` does not
-    /// enter the signature, so the two already share a topic0 and one filter matches both; without this the
-    /// values would sit in topics on one lane and in the data field on the other, and a consumer decoding
-    /// from the wrong place reads zeros rather than failing.
     event NewDisabledProofSystems(uint8 indexed oldDisabledProofSystems, uint8 indexed newDisabledProofSystems);
 
     /// @notice Fee params for L1->L2 transactions changed

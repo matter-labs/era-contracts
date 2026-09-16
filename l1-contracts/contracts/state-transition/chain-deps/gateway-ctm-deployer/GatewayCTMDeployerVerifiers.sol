@@ -5,7 +5,8 @@ pragma solidity 0.8.28;
 import {EraVerifierFflonk} from "../../verifiers/EraVerifierFflonk.sol";
 import {EraVerifierPlonk} from "../../verifiers/EraVerifierPlonk.sol";
 import {EraDualVerifier} from "../../verifiers/EraDualVerifier.sol";
-import {EraTestnetVerifier} from "../../verifiers/EraTestnetVerifier.sol";
+import {EraMultiProofVerifier} from "../../verifiers/EraMultiProofVerifier.sol";
+import {EraMultiProofTestnetVerifier} from "../../verifiers/EraMultiProofTestnetVerifier.sol";
 
 import {IVerifier} from "../../chain-interfaces/IVerifier.sol";
 import {IVerifierV2} from "../../chain-interfaces/IVerifierV2.sol";
@@ -19,7 +20,8 @@ import {GatewayVerifiersDeployerConfig} from "./GatewayCTMDeployer.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Gateway CTM Era Verifiers deployer: deploys Era verifier contracts.
-/// @dev Deploys: EraVerifierFflonk, EraVerifierPlonk, and Era DualVerifier/TestnetVerifier.
+/// @dev Deploys: EraVerifierFflonk, EraVerifierPlonk, EraDualVerifier, and the chain verifier
+/// EraMultiProofVerifier/EraMultiProofTestnetVerifier over it.
 /// For ZKsyncOS verifiers, use GatewayCTMDeployerVerifiersZKsyncOS instead.
 contract GatewayCTMDeployerVerifiers {
     Verifiers internal deployedResult;
@@ -42,15 +44,18 @@ contract GatewayCTMDeployerVerifiers {
         result.verifierFflonk = address(new EraVerifierFflonk{salt: salt}());
         result.verifierPlonk = address(new EraVerifierPlonk{salt: salt}());
 
-        // Deploy main verifier. The Airbender lane is not deployed on Gateway: it lives behind
-        // `AirbenderVerifier` and `EraMultiProofVerifier`, which the Gateway flow does not wire.
+        result.boojumVerifier = address(
+            new EraDualVerifier{salt: salt}(IVerifierV2(result.verifierFflonk), IVerifier(result.verifierPlonk))
+        );
+
+        // No Airbender verifier is deployed on Gateway; `DiamondInit` disables that proof system.
         if (_config.testnetVerifier) {
             result.verifier = address(
-                new EraTestnetVerifier{salt: salt}(IVerifierV2(result.verifierFflonk), IVerifier(result.verifierPlonk))
+                new EraMultiProofTestnetVerifier{salt: salt}(IVerifier(result.boojumVerifier), IVerifier(address(0)))
             );
         } else {
             result.verifier = address(
-                new EraDualVerifier{salt: salt}(IVerifierV2(result.verifierFflonk), IVerifier(result.verifierPlonk))
+                new EraMultiProofVerifier{salt: salt}(IVerifier(result.boojumVerifier), IVerifier(address(0)))
             );
         }
 

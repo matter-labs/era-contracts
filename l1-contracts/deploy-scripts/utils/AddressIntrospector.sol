@@ -520,16 +520,13 @@ library AddressIntrospector {
         (address verifierFflonk, address verifierPlonk) = _isV29
             ? (address(0), address(0))
             : _getSubVerifiers(_verifier, _isZKsyncOS);
-        // The gate's lanes are not probed here. Detecting them needs a fail-soft call, and reporting a
-        // miswired verifier as a zero address would hide the misconfiguration rather than surface it. The
-        // deploy scripts report them instead, under `airbender_verifier_addr` and `boojum_verifier_addr`.
+        // The multi-proof verifier's sub-verifiers are not probed here; the deploy output reports them.
         return
             Verifiers({
                 verifier: _verifier,
                 verifierFflonk: verifierFflonk,
                 verifierPlonk: verifierPlonk,
                 airbenderVerifierPlonk: address(0),
-                airbenderVerifier: address(0),
                 boojumVerifier: address(0)
             });
     }

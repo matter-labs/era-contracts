@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {EraDualVerifier} from "contracts/state-transition/verifiers/EraDualVerifier.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {EmptyProofLength, InvalidPublicInputsLength, UnknownVerifierType} from "contracts/common/L1ContractErrors.sol";
+import {EmptyProofLength, UnknownVerifierType} from "contracts/common/L1ContractErrors.sol";
 
 /// @notice Mock FFLONK verifier for testing.
 contract MockFflonkVerifier is IVerifierV2 {
@@ -44,27 +44,7 @@ contract MockPlonkVerifier is IVerifier {
     }
 }
 
-/// @notice Sub-verifier that reports back the public input it was handed.
-/// @dev `verify` is `view`, so reverting is the only way to observe the argument.
-contract PublicInputRevealingSubVerifier is IVerifier, IVerifierV2 {
-    error RevealedPublicInput(uint256 publicInput, uint256 length);
-
-    function verify(
-        uint256[] calldata _publicInputs,
-        uint256[] calldata
-    ) external pure override(IVerifier, IVerifierV2) returns (bool) {
-        revert RevealedPublicInput(_publicInputs[0], _publicInputs.length);
-    }
-
-    function verificationKeyHash() external pure override(IVerifier, IVerifierV2) returns (bytes32) {
-        return bytes32(0);
-    }
-}
-
-/// @notice Unit tests for EraDualVerifier, the Boojum router between the FFLONK and PLONK wrappers.
-/// @dev The Airbender lane deliberately does not live here: it is a separate proof system with its own
-/// public-input binding, reached only through `AirbenderVerifier`. Keeping a second Airbender route inside
-/// this router would let a caller satisfy both halves of a two-proof-system requirement with one system.
+/// @notice Unit tests for EraDualVerifier routing between the Boojum FFLONK and PLONK verifiers.
 contract EraDualVerifierTest is Test {
     EraDualVerifier internal verifier;
     MockFflonkVerifier internal fflonkVerifier;
@@ -88,8 +68,9 @@ contract EraDualVerifierTest is Test {
     }
 
     function _makePublicInputs() internal pure returns (uint256[] memory publicInputs) {
-        publicInputs = new uint256[](1);
+        publicInputs = new uint256[](2);
         publicInputs[0] = 123;
+        publicInputs[1] = 456;
     }
 
     // ============ Constructor Tests ============
@@ -109,8 +90,7 @@ contract EraDualVerifierTest is Test {
         assertTrue(verifier.verify(_makePublicInputs(), _makeProof(PLONK_VERIFICATION_TYPE)));
     }
 
-    /// The Airbender type must not be routable here. If it were, a caller could satisfy the Boojum half
-    /// of the dual-prover requirement with an Airbender proof.
+    /// Airbender proofs are verified by `EraMultiProofVerifier`, never routed through the Boojum verifier.
     function test_verify_rejectsAirbenderType() public {
         vm.expectRevert(UnknownVerifierType.selector);
         verifier.verify(_makePublicInputs(), _makeProof(AIRBENDER_PLONK_VERIFICATION_TYPE));
@@ -166,65 +146,5 @@ contract EraDualVerifierTest is Test {
 
         vm.expectRevert(UnknownVerifierType.selector);
         verifier.verificationKeyHash(verifierType);
-    }
-
-    // ============ Public input fold and shift ============
-
-    uint256 internal constant PUBLIC_INPUT_SHIFT = 32;
-
-    /// The Executor now emits the untruncated transition hash, so the verifier owns the shift. Mirrors
-    /// `ZKsyncOSVerifier.computeZKsyncOSHash`, which applies `PUBLIC_INPUT_SHIFT` once after the fold.
-    function _verifierRevealing() internal returns (EraDualVerifier revealing, uint256 rawPublicInput) {
-        PublicInputRevealingSubVerifier revealer = new PublicInputRevealingSubVerifier();
-        revealing = new EraDualVerifier(IVerifierV2(address(revealer)), IVerifier(address(revealer)));
-        rawPublicInput = uint256(keccak256("untruncated-transition-hash"));
-    }
-
-    function test_verify_shiftsPublicInputForFflonk() public {
-        (EraDualVerifier revealing, uint256 raw) = _verifierRevealing();
-        uint256[] memory publicInputs = new uint256[](1);
-        publicInputs[0] = raw;
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                PublicInputRevealingSubVerifier.RevealedPublicInput.selector,
-                raw >> PUBLIC_INPUT_SHIFT,
-                uint256(1)
-            )
-        );
-        revealing.verify(publicInputs, _makeProof(FFLONK_VERIFICATION_TYPE));
-    }
-
-    function test_verify_shiftsPublicInputForPlonk() public {
-        (EraDualVerifier revealing, uint256 raw) = _verifierRevealing();
-        uint256[] memory publicInputs = new uint256[](1);
-        publicInputs[0] = raw;
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                PublicInputRevealingSubVerifier.RevealedPublicInput.selector,
-                raw >> PUBLIC_INPUT_SHIFT,
-                uint256(1)
-            )
-        );
-        revealing.verify(publicInputs, _makeProof(PLONK_VERIFICATION_TYPE));
-    }
-
-    /// Era proves one batch at a time. Folding a range here would define an aggregation rule that no Era
-    /// prover implements, so more than one public input is refused rather than combined.
-    function test_verify_rejectsMultiplePublicInputs() public {
-        (EraDualVerifier revealing, ) = _verifierRevealing();
-        uint256[] memory publicInputs = new uint256[](2);
-        publicInputs[0] = uint256(keccak256("batch-1"));
-        publicInputs[1] = uint256(keccak256("batch-2"));
-
-        vm.expectRevert(InvalidPublicInputsLength.selector);
-        revealing.verify(publicInputs, _makeProof(PLONK_VERIFICATION_TYPE));
-    }
-
-    function test_verify_rejectsEmptyPublicInputs() public {
-        (EraDualVerifier revealing, ) = _verifierRevealing();
-        vm.expectRevert(InvalidPublicInputsLength.selector);
-        revealing.verify(new uint256[](0), _makeProof(PLONK_VERIFICATION_TYPE));
     }
 }

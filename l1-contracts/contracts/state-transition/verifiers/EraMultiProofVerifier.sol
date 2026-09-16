@@ -5,8 +5,8 @@ pragma solidity 0.8.28;
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IEraDualVerifier} from "../chain-interfaces/IEraDualVerifier.sol";
+import {EraDualVerifier} from "./EraDualVerifier.sol";
 import {IEraMultiProofVerifier} from "../chain-interfaces/IEraMultiProofVerifier.sol";
-import {IEraVerifier} from "../chain-interfaces/IEraVerifier.sol";
 import {IGetters} from "../chain-interfaces/IGetters.sol";
 import {
     AirbenderVerificationFailed,
@@ -29,32 +29,22 @@ import {
 /// @title Era Multi-Proof Verifier
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Requires BOTH a Boojum proof and an Airbender proof for each Era state transition, unless the
-/// calling chain has masked one off. Accepts only the combined proof type.
-///
-/// @dev Envelope layout:
-///      `_proof[0]` = proof type in the low 8 bits; bits 8-255 reserved and must be zero.
-///      `_proof[1]` = N, the number of words in the Boojum sub-proof.
-///      `_proof[2 .. 2+N]`   = the Boojum sub-proof as `EraDualVerifier` parses it; its leading word
-///                             selects the FFLONK (0) or PLONK (1) wrapper.
-///      `_proof[2+N .. end]` = the Airbender SNARK, exactly `AIRBENDER_SNARK_PROOF_LENGTH` words.
-///      The total length is exact, so a trailing word is refused. 71 words with FFLONK, 91 with PLONK.
-///
-/// @dev No carried-hash slot, unlike the ZKsync OS envelope: Era has no continuation proofs.
-/// @dev Public inputs reach both lanes untruncated; each lane applies `PUBLIC_INPUT_SHIFT` itself.
+/// @notice Requires both a Boojum proof and an Airbender proof for each Era batch, unless the calling
+/// chain has disabled one of the proof systems.
+/// @dev Proof layout: `[ERA_MULTI_PROOF_TYPE, N, boojumProof(N words), airbenderProof(44 words)]`, where the
+/// Boojum sub-proof is what `EraDualVerifier` accepts. Public inputs: `[boojum, airbender]`, one per system.
 contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVerifier {
-    /// @notice The Boojum router (`EraDualVerifier`), which dispatches the FFLONK and PLONK wrappers.
-    /// @dev Immutable, so the pair of proof systems a batch is checked against is a property of the
-    /// deployed gate rather than of mutable state.
+    /// @notice The Boojum verifier (`EraDualVerifier`).
     IVerifier public immutable BOOJUM_VERIFIER;
 
     /// @inheritdoc IEraMultiProofVerifier
     IVerifier public immutable AIRBENDER_VERIFIER;
 
-    /// @dev Proof type naming the Airbender lane for key discovery. Kept at the value the Boojum
-    /// router used before the Airbender route was removed from it, so existing tooling reads the
-    /// same index.
+    /// @dev Proof type under which `verificationKeyHash(uint256)` reports the Airbender key.
     uint256 internal constant AIRBENDER_VERIFICATION_TYPE = 2;
+
+    /// @dev Both systems are required by default.
+    uint8 internal constant ALL_PROOF_SYSTEMS = BOOJUM_PROOF_SYSTEM_MASK | AIRBENDER_PROOF_SYSTEM_MASK;
 
     constructor(IVerifier _boojumVerifier, IVerifier _airbenderVerifier) {
         BOOJUM_VERIFIER = _boojumVerifier;
@@ -66,16 +56,12 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
         if (_proof.length == 0) {
             revert EmptyProofLength();
         }
-
-        // Reserved bits must be clear, so a dirty header is not read as a bare type.
         if (_proof[0] >> 8 != 0) {
             revert InvalidProofFormat();
         }
         if ((_proof[0] & 255) != ERA_MULTI_PROOF_TYPE) {
             revert UnknownVerifierType();
         }
-        // The Airbender SNARK is fixed-size, so the length is exact rather than a minimum. Derived by
-        // subtracting from `_proof.length`, so an out-of-range `_proof[1]` reverts instead of overflowing.
         if (_proof.length < 2 + AIRBENDER_SNARK_PROOF_LENGTH) {
             revert InvalidProofFormat();
         }
@@ -83,27 +69,18 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
         if (boojumLength != _proof.length - 2 - AIRBENDER_SNARK_PROOF_LENGTH) {
             revert InvalidProofFormat();
         }
+        if (_publicInputs.length != 2) {
+            revert InvalidPublicInputsLength();
+        }
 
-        // One verifier instance serves every chain of a protocol version, so the policy comes from the
-        // calling chain. Resolved through the same getter callers use, so settlement and discovery agree.
+        // One verifier serves every chain of a protocol version, so the policy is read from the caller.
         DisabledProofSystems memory disabled = IGetters(msg.sender).disabledProofSystems();
         uint8 disabledMask = (disabled.boojum ? BOOJUM_PROOF_SYSTEM_MASK : 0) |
             (disabled.airbender ? AIRBENDER_PROOF_SYSTEM_MASK : 0);
         uint8 required = requiredProofSystems(disabledMask);
 
-        // One word per lane, since the two systems commit to different `auxiliaryOutputHash` values.
-        // A single word is accepted only while the Airbender lane is masked off, which is what keeps
-        // Boojum-only settlement working for batches carrying no Airbender commitment.
-        //
-        // A two-word batch stays acceptable under a masked lane, its Airbender segment riding along
-        // unverified. Unlike the ZKsync OS lane, which refuses an envelope it will not fully check: here
-        // the kill switch has to rescue batches already committed with Airbender data.
-        if (_publicInputs.length != 2 && !(required & AIRBENDER_PROOF_SYSTEM_MASK == 0 && _publicInputs.length == 1)) {
-            revert InvalidPublicInputsLength();
-        }
-
         if (required & BOOJUM_PROOF_SYSTEM_MASK != 0) {
-            // A zero-length slice reaches a router that treats an empty proof as "skip".
+            // A testnet Boojum verifier would accept an empty proof.
             if (boojumLength == 0) {
                 revert BoojumVerificationFailed();
             }
@@ -121,15 +98,8 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
         return true;
     }
 
-    /// @notice The pair of systems this contract is built to check, before deployment wiring.
-    /// @dev Requirement is derived from this, not from `supportedProofSystems`: an unwired lane is
-    /// missing, not exempt, so deriving it from the wiring would let `verify` skip that lane and settle
-    /// a broken deployment single-proof. Kept required, the call to a zero address reverts instead.
-    uint8 internal constant GATE_PROOF_SYSTEMS = BOOJUM_PROOF_SYSTEM_MASK | AIRBENDER_PROOF_SYSTEM_MASK;
-
     /// @inheritdoc IEraMultiProofVerifier
-    /// @dev Reports what this deployment can check, so an unwired lane drops out of the answer.
-    function supportedProofSystems() public view virtual returns (uint8) {
+    function supportedProofSystems() external view returns (uint8) {
         uint8 supported;
         if (address(BOOJUM_VERIFIER) != address(0)) {
             supported |= BOOJUM_PROOF_SYSTEM_MASK;
@@ -141,29 +111,19 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
     }
 
     /// @inheritdoc IEraMultiProofVerifier
-    function requiredProofSystems(uint8 _disabledProofSystems) public pure virtual returns (uint8) {
-        // A mask switching off everything would settle a batch behind no proof at all. Refused here as
-        // well as in the setter, so a caller is told what settlement would act on.
+    function requiredProofSystems(uint8 _disabledProofSystems) public pure returns (uint8) {
         if (_disabledProofSystems >= ALL_PROOF_SYSTEMS_DISABLED) {
             revert InvalidDisabledProofSystemsMask(_disabledProofSystems);
         }
-        return GATE_PROOF_SYSTEMS & ~_disabledProofSystems;
+        return ALL_PROOF_SYSTEMS & ~_disabledProofSystems;
     }
 
     /// @inheritdoc IEraMultiProofVerifier
-    function acceptedProofType() external pure virtual returns (uint256) {
+    function acceptedProofType() external pure returns (uint256) {
         return ERA_MULTI_PROOF_TYPE;
     }
 
-    /// @inheritdoc IEraVerifier
-    function isTestnetVerifier() external view virtual returns (bool) {
-        return false;
-    }
-
     /// @inheritdoc IEraDualVerifier
-    /// @dev Deployment and upgrade tooling introspects a chain's verifier for its Boojum sub-verifiers
-    /// (`AddressIntrospector` reads them off `IZKChain.getVerifier()`). With the gate installed that is this
-    /// contract, so it answers for the router it wraps rather than leaving the staticcall to revert.
     // solhint-disable-next-line func-name-mixedcase
     function FFLONK_VERIFIER() external view returns (IVerifierV2) {
         return IEraDualVerifier(address(BOOJUM_VERIFIER)).FFLONK_VERIFIER();
@@ -176,21 +136,16 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
     }
 
     /// @inheritdoc IVerifier
-    /// @dev Kept for backward compatibility with tooling that reads a single hash off the chain's verifier.
-    /// It reports the Boojum lane's key, which is the one that has always been reported for Era chains; the
-    /// Airbender lane's key is read from `AIRBENDER_VERIFIER` directly.
+    /// @dev Reports the Boojum key, as Era chain verifiers always have.
     function verificationKeyHash() external view returns (bytes32) {
         return BOOJUM_VERIFIER.verificationKeyHash();
     }
 
-    /// @inheritdoc IEraDualVerifier
-    /// @dev Both lanes' keys are readable here, so tooling that discovers keys off the chain's verifier
-    /// keeps working once the gate is installed. Discovery only: the Airbender key is reachable while an
-    /// Airbender proof still is not, since `verify` routes the Boojum segment to the Boojum router alone.
+    /// @notice The verification key hash of one sub-verifier: `0` FFLONK, `1` PLONK, `2` Airbender.
     function verificationKeyHash(uint256 _verifierType) external view returns (bytes32) {
         if (_verifierType == AIRBENDER_VERIFICATION_TYPE) {
             return AIRBENDER_VERIFIER.verificationKeyHash();
         }
-        return IEraDualVerifier(address(BOOJUM_VERIFIER)).verificationKeyHash(_verifierType);
+        return EraDualVerifier(address(BOOJUM_VERIFIER)).verificationKeyHash(_verifierType);
     }
 }

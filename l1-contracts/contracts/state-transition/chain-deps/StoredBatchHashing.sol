@@ -10,10 +10,7 @@ library StoredBatchHashing {
         return keccak256(abi.encode(_storedBatchInfo));
     }
 
-    /// @notice Returns the keccak hash of a StoredBatchInfo in its pre-Airbender form.
-    /// @dev A batch committed before the lane existed was hashed without `airbenderCommitment`. It
-    /// still has to authenticate, and it necessarily has no Airbender commitment to offer, so the
-    /// caller must treat a batch that matches only this form as Boojum-only.
+    /// @notice Returns the keccak hash of the ABI-encoded pre-Airbender StoredBatchInfo
     function hashPreAirbenderStoredBatchInfo(
         IExecutor.StoredBatchInfo memory _storedBatchInfo
     ) internal pure returns (bytes32) {

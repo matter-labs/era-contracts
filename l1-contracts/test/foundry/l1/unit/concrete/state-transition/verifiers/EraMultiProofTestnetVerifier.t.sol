@@ -5,12 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {AirbenderVerificationFailed, BoojumVerificationFailed} from "contracts/common/L1ContractErrors.sol";
 
 import {EraMultiProofTestnetVerifier} from "contracts/state-transition/verifiers/EraMultiProofTestnetVerifier.sol";
-import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMultiProofVerifier.sol";
-import {EraDualVerifier} from "contracts/state-transition/verifiers/EraDualVerifier.sol";
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
-import {IEraVerifier} from "contracts/state-transition/chain-interfaces/IEraVerifier.sol";
 import {
     AIRBENDER_PROOF_SYSTEM_MASK,
     AIRBENDER_SNARK_PROOF_LENGTH,
@@ -145,32 +140,5 @@ contract EraMultiProofTestnetVerifierTest is Test {
 
         vm.expectRevert(BoojumVerificationFailed.selector);
         chain.callVerify(v, _publicInputs(), proof);
-    }
-}
-
-/// @notice Every Era verifier a chain can install answers `isTestnetVerifier()`, production ones included.
-/// @dev A flag only the testnet build exposes cannot be told apart from a call that failed for another
-/// reason, so the production `false` is the point of this test.
-contract EraVerifierTestnetFlagTest is Test {
-    function test_productionVerifiersAnswerFalse() public {
-        EraDualVerifier boojumRouter = new EraDualVerifier(IVerifierV2(address(0)), IVerifier(address(0)));
-        EraMultiProofVerifier gate = new EraMultiProofVerifier(
-            IVerifier(address(boojumRouter)),
-            IVerifier(address(new AcceptingVerifier()))
-        );
-
-        assertFalse(IEraVerifier(address(boojumRouter)).isTestnetVerifier(), "Boojum router");
-        assertFalse(IEraVerifier(address(gate)).isTestnetVerifier(), "multi-proof gate");
-    }
-
-    function test_testnetVerifiersAnswerTrue() public {
-        EraTestnetVerifier boojumRouter = new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)));
-        EraMultiProofTestnetVerifier gate = new EraMultiProofTestnetVerifier(
-            IVerifier(address(boojumRouter)),
-            IVerifier(address(new AcceptingVerifier()))
-        );
-
-        assertTrue(IEraVerifier(address(boojumRouter)).isTestnetVerifier(), "Boojum router");
-        assertTrue(IEraVerifier(address(gate)).isTestnetVerifier(), "multi-proof gate");
     }
 }

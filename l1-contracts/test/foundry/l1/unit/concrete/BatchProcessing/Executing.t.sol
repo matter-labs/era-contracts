@@ -36,6 +36,8 @@ contract ExecutingTest is ExecutorTest {
 
     bytes32 l2DAValidatorOutputHash;
     bytes32[] blobVersionedHashes;
+    bytes32 uncompressedStateDiffHash;
+    bytes32 blobLinearHash;
 
     bytes32[] priorityOpsHashes;
     bytes32 correctRollingHash;
@@ -66,17 +68,28 @@ contract ExecutingTest is ExecutorTest {
         return keccak256(abi.encodePacked(_chainId, uint256(11)));
     }
 
+    function _airbenderCommitment(CommitBatchInfo memory _batch) internal view returns (bytes32) {
+        return
+            Utils.airbenderCommitmentForSingleBlob(
+                _batch,
+                uncompressedStateDiffHash,
+                blobLinearHash,
+                blobVersionedHashes[0]
+            );
+    }
+
     function setUp() public {
         generatePriorityOps(2);
 
         bytes1 source = bytes1(0x01);
         bytes memory defaultBlobCommitment = Utils.getDefaultBlobCommitment();
 
-        bytes32 uncompressedStateDiffHash = Utils.randomBytes32("uncompressedStateDiffHash");
+        uncompressedStateDiffHash = Utils.randomBytes32("uncompressedStateDiffHash");
         bytes32 totalL2PubdataHash = Utils.randomBytes32("totalL2PubdataHash");
         uint8 numberOfBlobs = 1;
         bytes32[] memory blobsLinearHashes = new bytes32[](1);
         blobsLinearHashes[0] = Utils.randomBytes32("blobsLinearHashes");
+        blobLinearHash = blobsLinearHashes[0];
 
         bytes memory operatorDAInput = abi.encodePacked(
             uncompressedStateDiffHash,
@@ -161,7 +174,7 @@ contract ExecutingTest is ExecutorTest {
             l2LogsTreeRoot: 0,
             timestamp: currentTimestamp,
             commitment: entries[EVENT_INDEX].topics[3],
-            airbenderCommitment: bytes32(0)
+            airbenderCommitment: _airbenderCommitment(newCommitBatchInfo)
         });
 
         IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
@@ -294,6 +307,7 @@ contract ExecutingTest is ExecutorTest {
         correctNewStoredBatchInfo.numberOfLayer1Txs = 1;
         correctNewStoredBatchInfo.priorityOperationsHash = correctRollingHash;
         correctNewStoredBatchInfo.commitment = entries[EVENT_INDEX].topics[3];
+        correctNewStoredBatchInfo.airbenderCommitment = _airbenderCommitment(correctNewCommitBatchInfo);
 
         IExecutor.StoredBatchInfo[] memory correctNewStoredBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
         correctNewStoredBatchInfoArray[0] = correctNewStoredBatchInfo;
@@ -375,6 +389,7 @@ contract ExecutingTest is ExecutorTest {
         correctNewStoredBatchInfo.numberOfLayer1Txs = 2;
         correctNewStoredBatchInfo.priorityOperationsHash = correctRollingHash;
         correctNewStoredBatchInfo.commitment = entries[EVENT_INDEX].topics[3];
+        correctNewStoredBatchInfo.airbenderCommitment = _airbenderCommitment(correctNewCommitBatchInfo);
 
         IExecutor.StoredBatchInfo[] memory correctNewStoredBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
         correctNewStoredBatchInfoArray[0] = correctNewStoredBatchInfo;

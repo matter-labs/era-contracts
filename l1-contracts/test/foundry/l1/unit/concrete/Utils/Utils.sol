@@ -630,8 +630,25 @@ library Utils {
         bytes32[] memory _blobCommitments,
         bytes32[] memory _blobHashes
     ) public pure returns (bytes32) {
+        return
+            createAirbenderBatchCommitment(
+                _newBatchData,
+                _stateDiffHash,
+                _blobCommitments,
+                _blobHashes,
+                keccak256(_batchMetaParameters())
+            );
+    }
+
+    /// @dev For chains whose metaparameters are not the shared test constants.
+    function createAirbenderBatchCommitment(
+        CommitBatchInfo calldata _newBatchData,
+        bytes32 _stateDiffHash,
+        bytes32[] memory _blobCommitments,
+        bytes32[] memory _blobHashes,
+        bytes32 _metadataHash
+    ) public pure returns (bytes32) {
         bytes32 passThroughDataHash = keccak256(_batchPassThroughData(_newBatchData));
-        bytes32 metadataHash = keccak256(_batchMetaParameters());
         bytes32 auxiliaryOutputHash = keccak256(
             // solhint-disable-next-line func-named-parameters
             abi.encodePacked(
@@ -642,7 +659,22 @@ library Utils {
                 _encodeBlobAuxiliaryOutput(_blobCommitments, _blobHashes)
             )
         );
-        return keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
+        return keccak256(abi.encode(passThroughDataHash, _metadataHash, auxiliaryOutputHash));
+    }
+
+    /// @dev The Airbender commitment a commit carrying one blob produces. The commit event carries only
+    /// the Boojum commitment, so a test that builds `StoredBatchInfo` from it derives this one itself.
+    function airbenderCommitmentForSingleBlob(
+        CommitBatchInfo calldata _batch,
+        bytes32 _stateDiffHash,
+        bytes32 _blobLinearHash,
+        bytes32 _blobVersionedHash
+    ) public pure returns (bytes32) {
+        bytes32[] memory blobHashes = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
+        blobHashes[0] = _blobLinearHash;
+        bytes32[] memory blobCommitments = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
+        blobCommitments[0] = defaultBlobOpeningCommitment(_blobVersionedHash);
+        return createAirbenderBatchCommitment(_batch, _stateDiffHash, blobCommitments, blobHashes);
     }
 
     function _batchPassThroughData(CommitBatchInfo calldata _batch) internal pure returns (bytes memory) {

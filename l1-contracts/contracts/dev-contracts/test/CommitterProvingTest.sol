@@ -24,11 +24,6 @@ contract CommitterProvingTest is CommitterFacet {
         s.l2EvmEmulatorBytecodeHash = _evmEmulatorHash;
     }
 
-    /// @dev Test-only: sets which proof systems this chain does not require.
-    function setDisabledProofSystems(uint8 _disabledProofSystems) external {
-        s.disabledProofSystems = _disabledProofSystems;
-    }
-
     function createBatchCommitment(
         CommitBatchInfo calldata _newBatchData,
         bytes32 _stateDiffHash,

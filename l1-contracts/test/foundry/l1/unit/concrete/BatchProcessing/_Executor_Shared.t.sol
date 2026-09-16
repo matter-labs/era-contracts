@@ -13,11 +13,7 @@ import {
     L2_DA_COMMITMENT_SCHEME,
     TEST_ROLLUP_DA_MANAGER_OWNER
 } from "../Utils/Utils.sol";
-import {
-    ETH_TOKEN_ADDRESS,
-    TESTNET_COMMIT_TIMESTAMP_NOT_OLDER,
-    AIRBENDER_PROOF_SYSTEM_MASK
-} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER} from "contracts/common/Config.sol";
 import {DummyEraBaseTokenBridge} from "contracts/dev-contracts/test/DummyEraBaseTokenBridge.sol";
 import {IAssetRouterShared} from "contracts/bridge/asset-router/IAssetRouterShared.sol";
 import {DummyChainTypeManagerForValidatorTimelock as DummyCTM} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
@@ -39,7 +35,8 @@ import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifier
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
+import {EraDualVerifier} from "contracts/state-transition/verifiers/EraDualVerifier.sol";
+import {EraMultiProofTestnetVerifier} from "contracts/state-transition/verifiers/EraMultiProofTestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {MessageRootBase} from "contracts/core/message-root/MessageRootBase.sol";
@@ -295,7 +292,13 @@ contract ExecutorTest is UtilsCallMockerTest {
             abi.encode(bool(true))
         );
         DiamondInit diamondInit = new DiamondInit(isZKsyncOS(), true);
-        EraTestnetVerifier testnetVerifier = new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)));
+        // What an Era chain runs: the multi-proof verifier over the Boojum router, here the testnet
+        // variant so an empty proof settles. No Airbender lane is wired, and none of these suites
+        // sends a non-empty proof without installing its own verifier first.
+        EraMultiProofTestnetVerifier testnetVerifier = new EraMultiProofTestnetVerifier(
+            IVerifier(address(new EraDualVerifier(IVerifierV2(address(0)), IVerifier(address(0))))),
+            IVerifier(address(0))
+        );
         // Mock the CTM to return a verifier for protocol version 0
         vm.mockCall(
             address(chainTypeManager),
@@ -413,12 +416,6 @@ contract ExecutorTest is UtilsCallMockerTest {
         vm.prank(address(chainTypeManager));
         admin.setValidator(address(validator), true);
 
-        // These suites commit single-proof batches, so the Airbender lane is masked off. The tests
-        // that exercise the lane bring it up themselves.
-        if (!isZKsyncOS()) {
-            utilsFacet.util_setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
-        }
-
         // foundry's default value is 1 for the block's timestamp, it is expected
         // that block.timestamp > COMMIT_TIMESTAMP_NOT_OLDER + 1
         vm.warp(TESTNET_COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
@@ -434,7 +431,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             priorityOperationsHash: keccak256(""),
             bootloaderHeapInitialContentsHash: Utils.randomBytes32("bootloaderHeapInitialContentsHash"),
             eventsQueueStateHash: Utils.randomBytes32("eventsQueueStateHash"),
-            airbenderBootloaderHeapHash: bytes32(0),
+            airbenderBootloaderHeapHash: Utils.randomBytes32("airbenderBootloaderHeapHash"),
             systemLogs: l2Logs,
             operatorDAInput: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         });

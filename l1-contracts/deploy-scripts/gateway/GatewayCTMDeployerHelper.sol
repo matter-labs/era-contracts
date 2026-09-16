@@ -395,9 +395,8 @@ library GatewayCTMDeployerHelper {
             true
         );
 
-        // DiamondInit
-        // The Gateway flow wires no Airbender lane (see `GatewayCTMDeployerVerifiers`), so chains
-        // created by this CTM are Boojum-only.
+        // DiamondInit. The Gateway flow deploys no Airbender verifier, so its chains start with that
+        // proof system disabled.
         bytes memory diamondInitArgs = abi.encode(config.isZKsyncOS, false);
         (addresses.facets.diamondInit, data.diamondInitCalldata) = _calculateCreate2AddressAndCalldata(
             _create2Salt,
@@ -606,26 +605,50 @@ library GatewayCTMDeployerHelper {
             result.verifierPlonk = _deployInternalEmptyParams(plonkName, plonkFile, innerConfig, _isZKsyncOS);
         }
         {
-            (string memory mainVerifierFile, string memory mainVerifierName) = DeployCTML1OrGateway.resolveMainVerifier(
+            (string memory boojumFile, string memory boojumName) = DeployCTML1OrGateway.resolveBoojumVerifier(
                 _isZKsyncOS,
                 config.testnetVerifier
             );
-            // Gateway CTM deployment does not wire in the Airbender lane, so the chain's verifier there is
-            // the Boojum router itself rather than the multi-proof gate.
             bytes memory creationArgs = DeployCTML1OrGateway.verifierCreationArgs(
                 _isZKsyncOS,
                 result.verifierFflonk,
                 result.verifierPlonk,
                 config.aliasedGovernanceAddress
             );
-            result.verifier = _deployInternalWithParams(
-                mainVerifierName,
-                mainVerifierFile,
+            address boojumVerifier = _deployInternalWithParams(
+                boojumName,
+                boojumFile,
                 creationArgs,
                 innerConfig,
                 _isZKsyncOS
             );
+            if (_isZKsyncOS) {
+                result.verifier = boojumVerifier;
+            } else {
+                result.boojumVerifier = boojumVerifier;
+                result.verifier = _deployEraChainVerifier(boojumVerifier, config.testnetVerifier, innerConfig);
+            }
         }
+    }
+
+    /// @dev The Gateway flow deploys no Airbender verifier; see `GatewayCTMDeployerVerifiers`.
+    function _deployEraChainVerifier(
+        address _boojumVerifier,
+        bool _testnetVerifier,
+        InnerDeployConfig memory _innerConfig
+    ) internal returns (address) {
+        (string memory chainVerifierFile, string memory chainVerifierName) = DeployCTML1OrGateway.resolveChainVerifier(
+            false,
+            _testnetVerifier
+        );
+        return
+            _deployInternalWithParams(
+                chainVerifierName,
+                chainVerifierFile,
+                abi.encode(_boojumVerifier, address(0)),
+                _innerConfig,
+                false
+            );
     }
 
     function _calculateCTMDeployerAddresses(
@@ -829,9 +852,8 @@ library GatewayCTMDeployerHelper {
                 eip7702Checker: address(0),
                 verifierFflonk: _deployedContracts.stateTransition.verifiers.verifierFflonk,
                 verifierPlonk: _deployedContracts.stateTransition.verifiers.verifierPlonk,
-                // Gateway CTM deployment does not wire in the Airbender lane at all.
+                // Gateway CTM deployment does not deploy an Airbender verifier.
                 airbenderVerifierPlonk: address(0),
-                airbenderVerifier: address(0),
                 airbenderLane: false,
                 boojumVerifier: address(0),
                 verifierOwner: _config.aliasedGovernanceAddress,

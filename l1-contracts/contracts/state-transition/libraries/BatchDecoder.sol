@@ -20,20 +20,13 @@ import {InteropRoot, L2Log} from "../../common/Messaging.sol";
 /// @dev This library decodes commit, proof, and execution batch data and verifies batch number bounds.
 ///      It reverts with custom errors when the data is invalid or unsupported encoding is used.
 library BatchDecoder {
-    /// @notice The currently supported encoding version for commit, prove and execute payloads.
-    /// @dev Bumped from `1` when `StoredBatchInfo` and `CommitBatchInfo` gained their Airbender
-    /// fields. A client still emitting the previous layout is rejected by name rather than
-    /// misdecoded: the old commit payload's array offset word would otherwise land in
-    /// `airbenderCommitment` and the struct would half-decode before the arrays failed.
+    /// @notice The currently supported encoding version for commit, prove and execute data.
     uint8 internal constant SUPPORTED_ENCODING_VERSION = 5;
     /// @notice The currently supported encoding version for ZKSync OS commit data.
     /// We use different encoding only for commit, while prove/execute are common for Era VM and ZKsync OS chains.
-    /// @dev Bumped from `4` alongside the above: these payloads embed `StoredBatchInfo` too, so their
-    /// layout moved even though a ZKsync OS batch always carries a zero Airbender commitment.
     uint8 internal constant SUPPORTED_ENCODING_VERSION_COMMIT_ZKSYNC_OS = 6;
     /// @notice The currently supported encoding version for precommit data.
-    /// @dev Split from `SUPPORTED_ENCODING_VERSION` to preserve precommit encoding version 1;
-    /// `PrecommitInfo` is unaffected by the Airbender changes.
+    /// `PrecommitInfo` does not embed `StoredBatchInfo`, so its encoding did not change.
     uint8 internal constant SUPPORTED_ENCODING_VERSION_PRECOMMIT = 1;
 
     /// @notice Decodes commit data from a calldata bytes into the last committed batch data and an array of new batch data.

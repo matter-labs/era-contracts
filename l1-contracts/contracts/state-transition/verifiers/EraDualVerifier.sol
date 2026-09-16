@@ -5,9 +5,7 @@ pragma solidity 0.8.28;
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {IEraDualVerifier} from "../chain-interfaces/IEraDualVerifier.sol";
-import {IEraVerifier} from "../chain-interfaces/IEraVerifier.sol";
-import {EmptyProofLength, InvalidPublicInputsLength, UnknownVerifierType} from "../../common/L1ContractErrors.sol";
-import {PUBLIC_INPUT_SHIFT} from "../../common/Config.sol";
+import {EmptyProofLength, UnknownVerifierType} from "../../common/L1ContractErrors.sol";
 
 /// @title ZKsync Era Dual Verifier
 /// @author Matter Labs
@@ -36,21 +34,12 @@ contract EraDualVerifier is IVerifier, IEraDualVerifier {
         PLONK_VERIFIER = _plonkVerifier;
     }
 
-    /// @inheritdoc IEraVerifier
-    function isTestnetVerifier() external view virtual returns (bool) {
-        return false;
-    }
-
     /// @notice Routes zk-SNARK proof verification to the appropriate verifier based on the proof type.
     /// @param _publicInputs The public inputs to the proof.
     /// @param _proof The zk-SNARK proof itself.
     /// @dev The first element of the `_proof` determines the verifier type.
     ///     - 0 indicates the Boojum FFLONK verifier should be used.
     ///     - 1 indicates the Boojum PLONK verifier should be used.
-    /// @dev Airbender is deliberately not routable here. It is a separate proof system with its own
-    /// public-input binding, reached only through `AirbenderVerifier`. An Airbender route inside this router
-    /// would make the Boojum lane of `EraMultiProofVerifier` satisfiable by an Airbender proof, so the two
-    /// lanes would no longer be two proof systems.
     /// @return Returns `true` if the proof verification succeeds, otherwise throws an error.
     function verify(uint256[] calldata _publicInputs, uint256[] calldata _proof) public view virtual returns (bool) {
         // Ensure the proof has a valid length (at least one element
@@ -62,9 +51,9 @@ contract EraDualVerifier is IVerifier, IEraDualVerifier {
         // The first element of `_proof` determines the verifier type.
         uint256 verifierType = _proof[0];
         if (verifierType == FFLONK_VERIFICATION_TYPE) {
-            return FFLONK_VERIFIER.verify(_shiftPublicInputs(_publicInputs), _extractProof(_proof));
+            return FFLONK_VERIFIER.verify(_publicInputs, _extractProof(_proof));
         } else if (verifierType == PLONK_VERIFICATION_TYPE) {
-            return PLONK_VERIFIER.verify(_shiftPublicInputs(_publicInputs), _extractProof(_proof));
+            return PLONK_VERIFIER.verify(_publicInputs, _extractProof(_proof));
         }
         // If the verifier type is unknown, revert with an error.
         else {
@@ -90,22 +79,6 @@ contract EraDualVerifier is IVerifier, IEraDualVerifier {
         else {
             revert UnknownVerifierType();
         }
-    }
-
-    /// @notice Applies `PUBLIC_INPUT_SHIFT` to the untruncated transition hash the Executor emitted.
-    /// @dev The Executor emits the per-batch transition hash untruncated so that each proof system can
-    /// apply its own derivation, so this verifier owns the shift for the Boojum lane.
-    /// @dev Unlike `ZKsyncOSVerifier.computeZKsyncOSHash` there is no range fold: Era proves one batch per
-    /// call (`CanOnlyProcessOneBatch`), and folding here would define an aggregation rule that no Era prover
-    /// implements. `verify` is permissionless, so the length is checked here rather than assumed from the
-    /// Executor.
-    function _shiftPublicInputs(uint256[] calldata _publicInputs) internal pure returns (uint256[] memory result) {
-        if (_publicInputs.length != 1) {
-            revert InvalidPublicInputsLength();
-        }
-
-        result = new uint256[](1);
-        result[0] = _publicInputs[0] >> PUBLIC_INPUT_SHIFT;
     }
 
     /// @notice Extract the proof by removing the first element (proof type differentiator).

@@ -249,7 +249,6 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
             dependencyRootsRollingHash: bytes32(0),
             timestamp: 0,
             commitment: _chainCreationParams.genesisBatchCommitment,
-            // Genesis predates any proof, so the lane seeds from the first batch it verifies.
             airbenderCommitment: bytes32(0)
         });
         storedBatchZero = keccak256(abi.encode(batchZero));

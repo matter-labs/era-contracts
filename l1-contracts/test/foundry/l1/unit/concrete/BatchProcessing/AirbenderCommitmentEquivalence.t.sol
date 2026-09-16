@@ -9,7 +9,6 @@ import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/IComm
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {StoredBatchHashing} from "contracts/state-transition/chain-deps/StoredBatchHashing.sol";
 import {AirbenderCommitmentRequired} from "contracts/common/L1ContractErrors.sol";
-import {AIRBENDER_PROOF_SYSTEM_MASK, BOOJUM_PROOF_SYSTEM_MASK} from "contracts/common/Config.sol";
 
 /// @notice Pins the Airbender-shape batch commitment against values produced by the Rust
 /// implementation the guest runs.
@@ -90,7 +89,6 @@ contract AirbenderCommitmentEquivalenceTest is Test {
         // The recorded batch was built with the emulator hash equal to the default-AA hash, which is
         // what Rust substitutes for `None`.
         committer.setBatchMetaParameters(false, BOOTLOADER_CODE_HASH, DEFAULT_AA_CODE_HASH, DEFAULT_AA_CODE_HASH);
-        committer.setDisabledProofSystems(0);
     }
 
     function _callableBatch() internal pure returns (CommitBatchInfo memory batch) {
@@ -130,10 +128,10 @@ contract AirbenderCommitmentEquivalenceTest is Test {
         );
     }
 
-    /// A chain running the gate needs Airbender data on every batch: without it the batch carries no
-    /// Airbender commitment and could never be proved, so the commit is refused rather than the
-    /// failure surfacing later as an unexplained verification error.
-    function test_multiProofChainRequiresAirbenderData() public {
+    /// Every Era batch carries an Airbender commitment, so the heap hash it is built from is required.
+    /// Without it the batch could never be proved on that system, so the commit is refused rather than
+    /// the failure surfacing later as an unexplained verification error.
+    function test_requiresTheAirbenderHeapHash() public {
         (bytes32[] memory commitments, bytes32[] memory hashes) = _callableBlobs();
         CommitBatchInfo memory batch = _callableBatch();
         batch.airbenderBootloaderHeapHash = bytes32(0);
@@ -142,98 +140,19 @@ contract AirbenderCommitmentEquivalenceTest is Test {
         committer.createAirbenderBatchCommitment(batch, CALLABLE_STATE_DIFF_HASH, commitments, hashes);
     }
 
-    /// With Boojum masked, the two words only that lane reproduces are pinned to zero rather than
-    /// carried as unverified operator input. Asserting only that the commitment changed would pass
-    /// with one of the two still live, so each is varied independently and must move nothing.
-    function test_boojumDisabledZeroesItsOwnAuxWords() public {
+    /// The two commitments must stay distinct: a single proof satisfying both public inputs is exactly
+    /// what requiring two proof systems exists to prevent.
+    function test_theTwoCommitmentsAreDistinct() public view {
         (bytes32[] memory commitments, bytes32[] memory hashes) = _callableBlobs();
 
-        committer.setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_MASK);
-        bytes32 masked = committer.createBatchCommitment(
-            _callableBatch(),
-            CALLABLE_STATE_DIFF_HASH,
-            commitments,
-            hashes
-        );
-
-        CommitBatchInfo memory otherHeap = _callableBatch();
-        otherHeap.bootloaderHeapInitialContentsHash = keccak256("a different Boojum heap hash");
-        assertEq(
-            committer.createBatchCommitment(otherHeap, CALLABLE_STATE_DIFF_HASH, commitments, hashes),
-            masked,
-            "the Boojum heap hash must not reach a commitment built with that lane masked"
-        );
-
-        CommitBatchInfo memory otherEvents = _callableBatch();
-        otherEvents.eventsQueueStateHash = keccak256("a different events queue hash");
-        assertEq(
-            committer.createBatchCommitment(otherEvents, CALLABLE_STATE_DIFF_HASH, commitments, hashes),
-            masked,
-            "the events queue hash must not reach a commitment built with that lane masked"
-        );
-
-        // Both are live again once the lane is required, so the zeroing is the mask's doing.
-        committer.setDisabledProofSystems(0);
         assertTrue(
-            committer.createBatchCommitment(otherHeap, CALLABLE_STATE_DIFF_HASH, commitments, hashes) !=
-                committer.createBatchCommitment(_callableBatch(), CALLABLE_STATE_DIFF_HASH, commitments, hashes),
-            "with the lane required the heap hash must change the commitment"
-        );
-
-        // Zeroing must not collapse the two lanes onto one value: a single proof satisfying both
-        // public inputs is exactly what the two-system requirement exists to prevent.
-        committer.setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_MASK);
-        assertTrue(
-            masked !=
+            committer.createBatchCommitment(_callableBatch(), CALLABLE_STATE_DIFF_HASH, commitments, hashes) !=
                 committer.createAirbenderBatchCommitment(
                     _callableBatch(),
                     CALLABLE_STATE_DIFF_HASH,
                     commitments,
                     hashes
-                ),
-            "the two commitments must stay distinct"
-        );
-    }
-
-    /// Disabling Boojum leaves the Airbender lane required, so the batch still carries an Airbender
-    /// commitment. The Boojum commitment keeps being built either way — it is the base commitment
-    /// `storedBatchHashes` authenticates and the lane's fallback seed, not something the mask gates.
-    function test_boojumDisabledStillCommitsAirbenderData() public {
-        committer.setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_MASK);
-        (bytes32[] memory commitments, bytes32[] memory hashes) = _callableBlobs();
-
-        assertTrue(
-            committer.createAirbenderBatchCommitment(_callableBatch(), CALLABLE_STATE_DIFF_HASH, commitments, hashes) !=
-                bytes32(0),
-            "an Airbender-only chain must still carry an Airbender commitment"
-        );
-    }
-
-    /// With the lane masked the heap hash is ignored rather than rejected, so the commitment comes
-    /// out zero even when the sequencer is still sending one. That is what lets the kill switch take
-    /// effect without the sequencer having to change shape in the same block.
-    function test_maskedLaneIgnoresAirbenderData() public {
-        committer.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
-        (bytes32[] memory commitments, bytes32[] memory hashes) = _callableBlobs();
-
-        assertEq(
-            committer.createAirbenderBatchCommitment(_callableBatch(), CALLABLE_STATE_DIFF_HASH, commitments, hashes),
-            bytes32(0),
-            "a masked lane must produce no Airbender commitment"
-        );
-    }
-
-    /// A chain that does not run the gate commits no Airbender commitment at all.
-    function test_singleProofChainCommitsNoAirbenderCommitment() public {
-        committer.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
-        (bytes32[] memory commitments, bytes32[] memory hashes) = _callableBlobs();
-        CommitBatchInfo memory batch = _callableBatch();
-        batch.airbenderBootloaderHeapHash = bytes32(0);
-
-        assertEq(
-            committer.createAirbenderBatchCommitment(batch, CALLABLE_STATE_DIFF_HASH, commitments, hashes),
-            bytes32(0),
-            "a single-proof chain must carry no Airbender commitment"
+                )
         );
     }
 

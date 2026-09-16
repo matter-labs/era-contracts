@@ -6,7 +6,6 @@ import {EraDualVerifier} from "./EraDualVerifier.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {IEraDualVerifier} from "../chain-interfaces/IEraDualVerifier.sol";
-import {IEraVerifier} from "../chain-interfaces/IEraVerifier.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -16,18 +15,12 @@ import {IEraVerifier} from "../chain-interfaces/IEraVerifier.sol";
 /// otherwise, it will skip the verification.
 contract EraTestnetVerifier is IVerifier, IEraDualVerifier {
     EraDualVerifier public immutable DUAL_VERIFIER;
-    /// @dev Kept alongside `isTestnetVerifier()` for tooling that predates the getter.
     bool public constant IS_TESTNET_VERIFIER = true;
 
     constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) {
         assert(block.chainid != 1);
 
         DUAL_VERIFIER = new EraDualVerifier(_fflonkVerifier, _plonkVerifier);
-    }
-
-    /// @inheritdoc IEraVerifier
-    function isTestnetVerifier() external pure returns (bool) {
-        return true;
     }
 
     /// @dev Verifies a zk-SNARK proof, skipping the verification if the proof is empty.
@@ -45,11 +38,6 @@ contract EraTestnetVerifier is IVerifier, IEraDualVerifier {
     /// @inheritdoc IVerifier
     function verificationKeyHash() external view override returns (bytes32) {
         return DUAL_VERIFIER.verificationKeyHash();
-    }
-
-    /// @inheritdoc IEraDualVerifier
-    function verificationKeyHash(uint256 _verifierType) external view override returns (bytes32) {
-        return DUAL_VERIFIER.verificationKeyHash(_verifierType);
     }
 
     /// @inheritdoc IEraDualVerifier

@@ -14,9 +14,7 @@ import {
     PACKED_NUMBER_OF_L1_TRANSACTIONS_LOG_MASK,
     PACKED_NUMBER_OF_L2_TRANSACTIONS_LOG_SPLIT_BITS,
     TESTNET_COMMIT_TIMESTAMP_NOT_OLDER,
-    DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH,
-    AIRBENDER_PROOF_SYSTEM_MASK,
-    BOOJUM_PROOF_SYSTEM_MASK
+    DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH
 } from "../../../common/Config.sol";
 import {
     IExecutor,
@@ -523,7 +521,6 @@ contract CommitterFacet is ZKChainBase, ICommitter {
             dependencyRootsRollingHash: _newBatch.dependencyRootsRollingHash,
             timestamp: 0,
             commitment: batchOutputHash,
-            // Era-specific: the second commitment exists for Era's multi-proof gate.
             airbenderCommitment: bytes32(0)
         });
 
@@ -764,91 +761,17 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         view
         returns (bytes32 metadataHash, bytes32 auxiliaryOutputHash, bytes32 commitment, bytes32 airbenderCommitment)
     {
-        if (_newBatchData.systemLogs.length > MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES) {
-            revert SystemLogsSizeTooBig();
-        }
-
         bytes32 passThroughDataHash = keccak256(_batchPassThroughData(_newBatchData));
         metadataHash = keccak256(_batchMetaParameters());
-
-        bytes32 airbenderAuxiliaryOutputHash;
-        (auxiliaryOutputHash, airbenderAuxiliaryOutputHash) = _batchAuxiliaryOutputHashes(
-            _newBatchData,
-            _stateDiffHash,
-            _blobCommitments,
-            _blobHashes
+        auxiliaryOutputHash = keccak256(
+            _batchAuxiliaryOutput(_newBatchData, _stateDiffHash, _blobCommitments, _blobHashes)
+        );
+        bytes32 airbenderAuxiliaryOutputHash = keccak256(
+            _batchAirbenderAuxiliaryOutput(_newBatchData, _stateDiffHash, _blobCommitments, _blobHashes)
         );
 
         commitment = keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
-        if (airbenderAuxiliaryOutputHash != bytes32(0)) {
-            airbenderCommitment = keccak256(
-                abi.encode(passThroughDataHash, metadataHash, airbenderAuxiliaryOutputHash)
-            );
-        }
-    }
-
-    /// @dev Both lanes' auxiliary outputs, sharing one hashing of the logs and one blob encoding.
-    /// @dev A masked lane's input is ignored rather than rejected, so the kill switch cannot lock out
-    /// a sequencer still sending the old shape. Boojum's two exclusive words are zeroed rather than
-    /// kept: nothing verifies them while that lane is masked, and they would otherwise put
-    /// operator-chosen entropy into a commitment that stays in the chain.
-    function _batchAuxiliaryOutputHashes(
-        CommitBatchInfo memory _batch,
-        bytes32 _stateDiffHash,
-        bytes32[] memory _blobCommitments,
-        bytes32[] memory _blobHashes
-    ) internal view returns (bytes32 boojumAuxiliaryOutputHash, bytes32 airbenderAuxiliaryOutputHash) {
-        bytes32 l2ToL1LogsHash = keccak256(_batch.systemLogs);
-        bytes32[] memory blobAuxOutputWords = _encodeBlobAuxiliaryOutput(_blobCommitments, _blobHashes);
-
-        bool boojumRequired = s.disabledProofSystems & BOOJUM_PROOF_SYSTEM_MASK == 0;
-        // solhint-disable-next-line func-named-parameters
-        boojumAuxiliaryOutputHash = _auxiliaryOutputHash(
-            l2ToL1LogsHash,
-            _stateDiffHash,
-            boojumRequired ? _batch.bootloaderHeapInitialContentsHash : bytes32(0),
-            boojumRequired ? _batch.eventsQueueStateHash : bytes32(0),
-            blobAuxOutputWords
-        );
-
-        if (s.disabledProofSystems & AIRBENDER_PROOF_SYSTEM_MASK != 0) {
-            return (boojumAuxiliaryOutputHash, bytes32(0));
-        }
-        if (_batch.airbenderBootloaderHeapHash == bytes32(0)) {
-            revert AirbenderCommitmentRequired();
-        }
-
-        // Airbender uses Blake2s for the heap hash where Boojum uses Poseidon2, and pins the events
-        // queue to zero.
-        // solhint-disable-next-line func-named-parameters
-        airbenderAuxiliaryOutputHash = _auxiliaryOutputHash(
-            l2ToL1LogsHash,
-            _stateDiffHash,
-            _batch.airbenderBootloaderHeapHash,
-            bytes32(0),
-            blobAuxOutputWords
-        );
-    }
-
-    /// @dev The shared digest both lanes build, over the words they agree on plus the two they do not.
-    function _auxiliaryOutputHash(
-        bytes32 _l2ToL1LogsHash,
-        bytes32 _stateDiffHash,
-        bytes32 _bootloaderHeapHash,
-        bytes32 _eventsQueueStateHash,
-        bytes32[] memory _blobAuxOutputWords
-    ) internal pure returns (bytes32) {
-        return
-            keccak256(
-                // solhint-disable-next-line func-named-parameters
-                abi.encodePacked(
-                    _l2ToL1LogsHash,
-                    _stateDiffHash,
-                    _bootloaderHeapHash,
-                    _eventsQueueStateHash,
-                    _blobAuxOutputWords
-                )
-            );
+        airbenderCommitment = keccak256(abi.encode(passThroughDataHash, metadataHash, airbenderAuxiliaryOutputHash));
     }
 
     function _batchPassThroughData(CommitBatchInfo memory _batch) internal pure returns (bytes memory) {
@@ -869,6 +792,52 @@ contract CommitterFacet is ZKChainBase, ICommitter {
                 s.l2BootloaderBytecodeHash,
                 s.l2DefaultAccountBytecodeHash,
                 s.l2EvmEmulatorBytecodeHash
+            );
+    }
+
+    function _batchAuxiliaryOutput(
+        CommitBatchInfo memory _batch,
+        bytes32 _stateDiffHash,
+        bytes32[] memory _blobCommitments,
+        bytes32[] memory _blobHashes
+    ) internal pure returns (bytes memory) {
+        if (_batch.systemLogs.length > MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES) {
+            revert SystemLogsSizeTooBig();
+        }
+
+        bytes32 l2ToL1LogsHash = keccak256(_batch.systemLogs);
+
+        return
+            // solhint-disable-next-line func-named-parameters
+            abi.encodePacked(
+                l2ToL1LogsHash,
+                _stateDiffHash,
+                _batch.bootloaderHeapInitialContentsHash,
+                _batch.eventsQueueStateHash,
+                _encodeBlobAuxiliaryOutput(_blobCommitments, _blobHashes)
+            );
+    }
+
+    /// @dev The auxiliary output as the Airbender prover computes it: the bootloader heap is hashed with
+    /// Blake2s instead of Poseidon2 and the events queue hash is zero.
+    function _batchAirbenderAuxiliaryOutput(
+        CommitBatchInfo memory _batch,
+        bytes32 _stateDiffHash,
+        bytes32[] memory _blobCommitments,
+        bytes32[] memory _blobHashes
+    ) internal pure returns (bytes memory) {
+        if (_batch.airbenderBootloaderHeapHash == bytes32(0)) {
+            revert AirbenderCommitmentRequired();
+        }
+
+        return
+            // solhint-disable-next-line func-named-parameters
+            abi.encodePacked(
+                keccak256(_batch.systemLogs),
+                _stateDiffHash,
+                _batch.airbenderBootloaderHeapHash,
+                bytes32(0),
+                _encodeBlobAuxiliaryOutput(_blobCommitments, _blobHashes)
             );
     }
 

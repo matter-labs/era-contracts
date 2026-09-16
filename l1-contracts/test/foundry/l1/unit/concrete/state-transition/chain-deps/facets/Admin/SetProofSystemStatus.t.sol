@@ -3,12 +3,7 @@ pragma solidity 0.8.28;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
 
-import {
-    ZKsyncOSChainConfigUpdateWithUnverifiedBatches,
-    InvalidDisabledProofSystemsMask,
-    MustBeEraChain,
-    Unauthorized
-} from "contracts/common/L1ContractErrors.sol";
+import {InvalidDisabledProofSystemsMask, MustBeEraChain, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {NotSettlementLayer} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {AIRBENDER_PROOF_SYSTEM_MASK, BOOJUM_PROOF_SYSTEM_MASK, ProofSystem} from "contracts/common/Config.sol";
 
@@ -19,13 +14,6 @@ import {AIRBENDER_PROOF_SYSTEM_MASK, BOOJUM_PROOF_SYSTEM_MASK, ProofSystem} from
 /// pair becomes rather than on the argument.
 contract SetProofSystemStatusTest is AdminTest {
     event NewDisabledProofSystems(uint8 indexed oldDisabledProofSystems, uint8 indexed newDisabledProofSystems);
-
-    /// Brings the chain to the state where the Airbender lane may be required: committing Airbender data,
-    /// with one settled batch for the lane's first batch to chain to, and nothing in flight.
-    function _readyForTheAirbenderLane() internal {
-        utilsFacet.util_setTotalBatchesCommitted(1);
-        utilsFacet.util_setTotalBatchesVerified(1);
-    }
 
     /// A new chain requires every proof system, the same posture an upgraded chain comes out in.
     function test_defaultsToRequiringEverySystem() public view {
@@ -58,11 +46,7 @@ contract SetProofSystemStatusTest is AdminTest {
         adminFacet.setProofSystemStatus(ProofSystem.Airbender, false);
     }
 
-    /// The kill switch, exercised from a chain that has the lane brought up.
     function test_disablesAirbender() public {
-        _readyForTheAirbenderLane();
-        utilsFacet.util_setDisabledProofSystems(0);
-
         vm.startPrank(utilsFacet.util_getAdmin());
         vm.expectEmit(true, true, true, true);
         emit NewDisabledProofSystems(0, AIRBENDER_PROOF_SYSTEM_MASK);
@@ -72,9 +56,6 @@ contract SetProofSystemStatusTest is AdminTest {
     }
 
     function test_disablesBoojum() public {
-        _readyForTheAirbenderLane();
-        utilsFacet.util_setDisabledProofSystems(0);
-
         vm.startPrank(utilsFacet.util_getAdmin());
         adminFacet.setProofSystemStatus(ProofSystem.Boojum, false);
 
@@ -82,9 +63,11 @@ contract SetProofSystemStatusTest is AdminTest {
     }
 
     function test_restoresBothRequired() public {
-        _readyForTheAirbenderLane();
+        utilsFacet.util_setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
 
         vm.startPrank(utilsFacet.util_getAdmin());
+        vm.expectEmit(true, true, true, true);
+        emit NewDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK, 0);
         adminFacet.setProofSystemStatus(ProofSystem.Airbender, true);
 
         assertEq(utilsFacet.util_getDisabledProofSystems(), 0);
@@ -101,58 +84,9 @@ contract SetProofSystemStatusTest is AdminTest {
         adminFacet.setProofSystemStatus(ProofSystem.Boojum, false);
     }
 
-    /// A chain that has settled nothing may still require the lane: its genesis batch is an ordinary
-    /// predecessor, opened by the guest the same way the Boojum scheduler opens its own.
-    function test_requiresAirbenderBeforeAnyBatchHasSettled() public {
+    /// Restating the chain's own state changes nothing and is not an error.
+    function test_enablingAnAlreadyEnabledSystemIsANoOp() public {
         utilsFacet.util_setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
-        assertEq(utilsFacet.util_getTotalBatchesVerified(), 0);
-
-        vm.startPrank(utilsFacet.util_getAdmin());
-        adminFacet.setProofSystemStatus(ProofSystem.Airbender, true);
-
-        assertEq(utilsFacet.util_getDisabledProofSystems(), 0);
-    }
-
-    function test_requiresAirbenderOnceABatchHasSettled() public {
-        _readyForTheAirbenderLane();
-
-        vm.startPrank(utilsFacet.util_getAdmin());
-        adminFacet.setProofSystemStatus(ProofSystem.Airbender, true);
-
-        assertEq(utilsFacet.util_getDisabledProofSystems(), 0);
-    }
-
-    /// Requiring a lane again is the one direction that can strand batches: those committed while it
-    /// was off carry a single public input the lane has nothing to read, so the gate refuses them and
-    /// the chain stalls behind the oldest. Draining first is the only order that works.
-    function test_revertWhen_requiringAirbenderWithUnverifiedBatches() public {
-        utilsFacet.util_setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
-        utilsFacet.util_setTotalBatchesCommitted(5);
-        utilsFacet.util_setTotalBatchesVerified(1);
-
-        vm.startPrank(utilsFacet.util_getAdmin());
-        vm.expectRevert(abi.encodeWithSelector(ZKsyncOSChainConfigUpdateWithUnverifiedBatches.selector, 1, 5));
-        adminFacet.setProofSystemStatus(ProofSystem.Airbender, true);
-    }
-
-    /// The same guard on the other lane, so it is the enable direction being tested and not the
-    /// Airbender bit specifically.
-    function test_revertWhen_requiringBoojumWithUnverifiedBatches() public {
-        utilsFacet.util_setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_MASK | AIRBENDER_PROOF_SYSTEM_MASK);
-        utilsFacet.util_setTotalBatchesCommitted(5);
-        utilsFacet.util_setTotalBatchesVerified(1);
-
-        vm.startPrank(utilsFacet.util_getAdmin());
-        vm.expectRevert(abi.encodeWithSelector(ZKsyncOSChainConfigUpdateWithUnverifiedBatches.selector, 1, 5));
-        adminFacet.setProofSystemStatus(ProofSystem.Boojum, true);
-    }
-
-    /// Enabling a system that is already on changes nothing, so the drain it would otherwise need does
-    /// not apply. Requiring one here would refuse the call that merely restates the chain's own state.
-    function test_enablingAnAlreadyEnabledSystemNeedsNoDrain() public {
-        utilsFacet.util_setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
-        utilsFacet.util_setTotalBatchesCommitted(5);
-        utilsFacet.util_setTotalBatchesVerified(1);
 
         vm.startPrank(utilsFacet.util_getAdmin());
         vm.expectEmit(true, true, true, true);
@@ -164,7 +98,7 @@ contract SetProofSystemStatusTest is AdminTest {
 
     /// The switch exists for the case where committed batches cannot be proved, so it has to take effect
     /// while those batches are still waiting.
-    function test_appliesWithCommittedButUnverifiedBatches() public {
+    function test_disablingAppliesWithCommittedButUnverifiedBatches() public {
         utilsFacet.util_setTotalBatchesCommitted(5);
         utilsFacet.util_setTotalBatchesVerified(1);
 
@@ -172,5 +106,19 @@ contract SetProofSystemStatusTest is AdminTest {
         adminFacet.setProofSystemStatus(ProofSystem.Airbender, false);
 
         assertEq(utilsFacet.util_getDisabledProofSystems(), AIRBENDER_PROOF_SYSTEM_MASK);
+    }
+
+    /// Every batch carries both commitments whatever the mask was when it was committed, so re-enabling
+    /// a system needs no drained pipeline: the waiting batches are provable on it if the operator
+    /// supplied correct data while it was off.
+    function test_enablingAppliesWithCommittedButUnverifiedBatches() public {
+        utilsFacet.util_setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
+        utilsFacet.util_setTotalBatchesCommitted(5);
+        utilsFacet.util_setTotalBatchesVerified(1);
+
+        vm.startPrank(utilsFacet.util_getAdmin());
+        adminFacet.setProofSystemStatus(ProofSystem.Airbender, true);
+
+        assertEq(utilsFacet.util_getDisabledProofSystems(), 0);
     }
 }

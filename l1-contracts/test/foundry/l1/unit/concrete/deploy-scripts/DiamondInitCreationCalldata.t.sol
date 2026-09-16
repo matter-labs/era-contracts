@@ -7,9 +7,8 @@ import {CTMContract, CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "deploy
 
 /// @notice `DiamondInit` takes the Airbender lane as a constructor bool, and the deploy scripts are the only
 /// thing that sets it.
-/// @dev The struct carries both an `airbenderVerifier` address and an `airbenderLane` bool. Encoding the
-/// address into the bool argument compiles, and reverts only once the constructor decodes it — during a real
-/// CTM deployment. Decoding here catches that without one.
+/// @dev Encoding an address into the bool argument compiles and reverts only once the constructor decodes
+/// it, during a real CTM deployment. Decoding here catches that without one.
 contract DiamondInitCreationCalldataTest is Test {
     function _config(bool _airbenderLane, bool _isZKsyncOS) internal pure returns (CTMCoreDeploymentConfig memory) {
         return
@@ -26,9 +25,8 @@ contract DiamondInitCreationCalldataTest is Test {
                 eip7702Checker: address(0),
                 verifierFflonk: address(0),
                 verifierPlonk: address(0),
-                airbenderVerifierPlonk: address(0),
                 // Deliberately set: the bug this guards against is encoding this address instead of the flag.
-                airbenderVerifier: address(0xA1B2),
+                airbenderVerifierPlonk: address(0xA1B2),
                 airbenderLane: _airbenderLane,
                 boojumVerifier: address(0),
                 verifierOwner: address(0),

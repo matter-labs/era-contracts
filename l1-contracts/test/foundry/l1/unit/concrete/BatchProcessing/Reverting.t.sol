@@ -21,6 +21,8 @@ contract RevertingTest is ExecutorTest {
     bytes32 l2DAValidatorOutputHash;
     bytes32[] blobVersionedHashes;
     bytes operatorDAInput;
+    bytes32 uncompressedStateDiffHash;
+    bytes32 blobLinearHash;
 
     function setUp() public {
         setUpCommitBatch();
@@ -64,7 +66,12 @@ contract RevertingTest is ExecutorTest {
             l2LogsTreeRoot: 0,
             timestamp: currentTimestamp,
             commitment: entries[EVENT_INDEX].topics[3],
-            airbenderCommitment: bytes32(0)
+            airbenderCommitment: Utils.airbenderCommitmentForSingleBlob(
+                newCommitBatchInfo,
+                uncompressedStateDiffHash,
+                blobLinearHash,
+                blobVersionedHashes[0]
+            )
         });
 
         IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
@@ -83,11 +90,12 @@ contract RevertingTest is ExecutorTest {
         bytes1 source = bytes1(0x01);
         bytes memory defaultBlobCommitment = Utils.getDefaultBlobCommitment();
 
-        bytes32 uncompressedStateDiffHash = Utils.randomBytes32("uncompressedStateDiffHash");
+        uncompressedStateDiffHash = Utils.randomBytes32("uncompressedStateDiffHash");
         bytes32 totalL2PubdataHash = Utils.randomBytes32("totalL2PubdataHash");
         uint8 numberOfBlobs = 1;
         bytes32[] memory blobsLinearHashes = new bytes32[](1);
         blobsLinearHashes[0] = Utils.randomBytes32("blobsLinearHashes");
+        blobLinearHash = blobsLinearHashes[0];
 
         operatorDAInput = abi.encodePacked(
             uncompressedStateDiffHash,

@@ -10,7 +10,6 @@ import {AddressIntrospector} from "deploy-scripts/utils/AddressIntrospector.sol"
 import {CTMDeployedAddresses} from "deploy-scripts/utils/Types.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMultiProofVerifier.sol";
-import {AirbenderVerifier} from "contracts/state-transition/verifiers/AirbenderVerifier.sol";
 import {IEraDualVerifier} from "contracts/state-transition/chain-interfaces/IEraDualVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
@@ -42,10 +41,7 @@ contract AirbenderDeploymentTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         assertTrue(boojumLane != address(0), "Boojum lane not wired");
         assertTrue(airbenderLane != address(0), "Airbender lane not wired");
         assertTrue(boojumLane != airbenderLane, "lanes must be distinct contracts");
-        assertTrue(
-            address(AirbenderVerifier(airbenderLane).AIRBENDER_PLONK_VERIFIER()) != address(0),
-            "generated Airbender PLONK verifier not wired"
-        );
+        assertTrue(IVerifier(airbenderLane).verificationKeyHash() != bytes32(0), "Airbender verifier has no key");
     }
 
     /// Tooling reads the Boojum sub-verifiers straight off a chain's verifier. With the gate installed that

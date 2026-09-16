@@ -29,7 +29,8 @@ import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChain
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
+import {EraDualVerifier} from "contracts/state-transition/verifiers/EraDualVerifier.sol";
+import {EraMultiProofTestnetVerifier} from "contracts/state-transition/verifiers/EraMultiProofTestnetVerifier.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
@@ -90,8 +91,14 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         console.log("Deploying L2 contracts");
         instantiateCreate2Factory();
         ctmAddresses.stateTransition.genesisUpgrade = address(new L1GenesisUpgrade());
+        ctmAddresses.stateTransition.verifiers.boojumVerifier = address(
+            new EraDualVerifier(IVerifierV2(ADDRESS_ONE), IVerifier(ADDRESS_ONE))
+        );
         ctmAddresses.stateTransition.verifiers.verifier = address(
-            new EraTestnetVerifier(IVerifierV2(ADDRESS_ONE), IVerifier(ADDRESS_ONE))
+            new EraMultiProofTestnetVerifier(
+                IVerifier(ctmAddresses.stateTransition.verifiers.boojumVerifier),
+                IVerifier(address(0))
+            )
         );
         uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
         ctmAddresses.stateTransition.proxies.validatorTimelock = address(

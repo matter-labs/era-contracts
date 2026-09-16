@@ -31,17 +31,11 @@ struct Verifiers {
     address verifierFflonk;
     /// @notice Address of the VerifierPlonk contract.
     address verifierPlonk;
-    /// @notice Address of the generated Airbender PLONK verifier, which `airbenderVerifier` wraps.
-    ///         `address(0)` when Airbender support was not requested.
+    /// @notice Address of the Airbender PLONK verifier. `address(0)` when Airbender support was not requested.
     address airbenderVerifierPlonk;
-    /// @notice Address of `AirbenderVerifier`, the Airbender lane of the multi-proof gate. Owns that
-    ///         lane's public-input derivation. `address(0)` when Airbender support was not requested.
-    address airbenderVerifier;
-    /// @notice Address of the Boojum router (`EraDualVerifier` / `EraTestnetVerifier`). With Airbender
-    ///         support this is a lane of `verifier` rather than the chain's verifier itself.
+    /// @notice Address of the Boojum verifier (`EraDualVerifier`). `address(0)` for ZKsync OS.
     address boojumVerifier;
-    /// @notice Address of the verifier the chain's diamond points at. With Airbender support this is
-    ///         `EraMultiProofVerifier`, which requires both proof systems; otherwise the Boojum router.
+    /// @notice Address of the main Verifier contract. For Era chains this is `EraMultiProofVerifier`.
     address verifier;
 }
 

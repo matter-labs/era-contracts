@@ -245,23 +245,21 @@ contract ZKChainBase is ReentrancyGuard {
     /// @dev Checks that the batch hash is correct and matches the expected hash.
     /// @param _lastCommittedBatchData The last committed batch.
     /// @param _batchNumber The batch number to check.
-    /// @param _checkLegacy Whether to check the legacy hash.
-    /// @return airbenderCommitmentBound Whether the batch matched the current hash form, which is
-    /// the only one covering `airbenderCommitment`. A batch that matched an older form carries an
-    /// `airbenderCommitment` nothing authenticated, so the caller must not use it.
+    /// @param _checkLegacy Whether the batch may authenticate under an older hash form. Only a
+    /// predecessor may: every batch proved or executed was committed under the current form, since
+    /// each upgrade that changed it required a drained pipeline.
     function _checkBatchHashMismatch(
         IExecutor.StoredBatchInfo memory _lastCommittedBatchData,
         uint256 _batchNumber,
         bool _checkLegacy
-    ) internal view returns (bool airbenderCommitmentBound) {
+    ) internal view {
         bytes32 cachedStoredBatchHashes = s.storedBatchHashes[_batchNumber];
-        airbenderCommitmentBound =
-            cachedStoredBatchHashes == StoredBatchHashing.hashStoredBatchInfo(_lastCommittedBatchData);
         if (
-            !airbenderCommitmentBound &&
-            cachedStoredBatchHashes != StoredBatchHashing.hashPreAirbenderStoredBatchInfo(_lastCommittedBatchData) &&
+            cachedStoredBatchHashes != StoredBatchHashing.hashStoredBatchInfo(_lastCommittedBatchData) &&
             (!_checkLegacy ||
-                cachedStoredBatchHashes != StoredBatchHashing.hashLegacyStoredBatchInfo(_lastCommittedBatchData))
+                (cachedStoredBatchHashes !=
+                    StoredBatchHashing.hashPreAirbenderStoredBatchInfo(_lastCommittedBatchData) &&
+                    cachedStoredBatchHashes != StoredBatchHashing.hashLegacyStoredBatchInfo(_lastCommittedBatchData)))
         ) {
             // incorrect previous batch data
             revert BatchHashMismatch(

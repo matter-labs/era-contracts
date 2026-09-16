@@ -85,10 +85,10 @@ contract EraMultiProofVerifierTest is Test {
     LaneVerifier internal airbender;
     ChainStub internal chain;
 
-    uint256 internal constant RAW_PUBLIC_INPUT = uint256(keccak256("untruncated-transition-hash"));
+    uint256 internal constant BOOJUM_PUBLIC_INPUT = uint256(keccak256("boojum-transition-hash"));
     /// Distinct from the Boojum word, so routing the wrong one to a lane is caught rather than
     /// passing by coincidence.
-    uint256 internal constant RAW_AIRBENDER_PUBLIC_INPUT = uint256(keccak256("airbender-transition-hash"));
+    uint256 internal constant AIRBENDER_PUBLIC_INPUT = uint256(keccak256("airbender-transition-hash"));
     uint256 internal constant BOOJUM_SEGMENT_LENGTH = 3;
 
     function setUp() public {
@@ -102,8 +102,8 @@ contract EraMultiProofVerifierTest is Test {
     /// a batch has a different transition hash under each.
     function _publicInputs() internal pure returns (uint256[] memory pi) {
         pi = new uint256[](2);
-        pi[0] = RAW_PUBLIC_INPUT;
-        pi[1] = RAW_AIRBENDER_PUBLIC_INPUT;
+        pi[0] = BOOJUM_PUBLIC_INPUT;
+        pi[1] = AIRBENDER_PUBLIC_INPUT;
     }
 
     /// `[type, nBoojum, boojum..., airbender(44 words)]`
@@ -151,54 +151,44 @@ contract EraMultiProofVerifierTest is Test {
         chain.callVerify(v, _publicInputs(), _default());
     }
 
-    /// The single-word exemption exists for the kill switch and for chains that never enabled the
-    /// lane, and it is keyed on the Airbender mask specifically. Keying it on the Boojum mask would
-    /// leave the suite green while bricking every Boojum-only chain and letting a Boojum-disabled
-    /// call reach an out-of-range `_publicInputs[1:2]`.
-    function test_acceptsOneWordOnlyWhileAirbenderIsDisabled() public {
-        uint256[] memory single = new uint256[](1);
-        single[0] = RAW_PUBLIC_INPUT;
-
-        chain.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
-        assertTrue(chain.callVerify(verifier, single, _default()), "one word must settle on Boojum alone");
-
-        chain.setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_MASK);
-        vm.expectRevert(InvalidPublicInputsLength.selector);
-        chain.callVerify(verifier, single, _default());
-
-        chain.setDisabledProofSystems(0);
-        vm.expectRevert(InvalidPublicInputsLength.selector);
-        chain.callVerify(verifier, single, _default());
-    }
-
-    /// One word per lane, bounded on both sides. The Executor never builds more than two for Era,
-    /// but the gate is deployed independently and enforces its own envelope.
+    /// One word per proof system, whatever the mask: a disabled system's word rides along unverified.
+    /// The Executor always builds two for Era, but the verifier is deployed independently and enforces
+    /// its own envelope.
     function test_revertsOnWrongPublicInputCount() public {
         uint256[] memory tooFew = new uint256[](1);
-        tooFew[0] = RAW_PUBLIC_INPUT;
+        tooFew[0] = BOOJUM_PUBLIC_INPUT;
         vm.expectRevert(InvalidPublicInputsLength.selector);
         chain.callVerify(verifier, tooFew, _default());
 
+        chain.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
+        vm.expectRevert(InvalidPublicInputsLength.selector);
+        chain.callVerify(verifier, tooFew, _default());
+        chain.setDisabledProofSystems(0);
+
         uint256[] memory tooMany = new uint256[](3);
-        tooMany[0] = RAW_PUBLIC_INPUT;
-        tooMany[1] = RAW_AIRBENDER_PUBLIC_INPUT;
+        tooMany[0] = BOOJUM_PUBLIC_INPUT;
+        tooMany[1] = AIRBENDER_PUBLIC_INPUT;
         vm.expectRevert(InvalidPublicInputsLength.selector);
         chain.callVerify(verifier, tooMany, _default());
     }
 
-    /// Each lane must receive the untruncated public input whole; the sub-verifiers own their derivations.
-    function test_passesUntruncatedPublicInputToBoojumLane() public {
+    function test_passesFirstPublicInputToBoojum() public {
         EraMultiProofVerifier v = new EraMultiProofVerifier(
             IVerifier(address(new LaneVerifier(true, true))),
             IVerifier(address(airbender))
         );
         vm.expectRevert(
-            abi.encodeWithSelector(LaneVerifier.Reached.selector, uint256(1), BOOJUM_SEGMENT_LENGTH, RAW_PUBLIC_INPUT)
+            abi.encodeWithSelector(
+                LaneVerifier.Reached.selector,
+                uint256(1),
+                BOOJUM_SEGMENT_LENGTH,
+                BOOJUM_PUBLIC_INPUT
+            )
         );
         chain.callVerify(v, _publicInputs(), _default());
     }
 
-    function test_passesUntruncatedPublicInputToAirbenderLane() public {
+    function test_passesSecondPublicInputToAirbender() public {
         EraMultiProofVerifier v = new EraMultiProofVerifier(
             IVerifier(address(boojum)),
             IVerifier(address(new LaneVerifier(true, true)))
@@ -208,7 +198,7 @@ contract EraMultiProofVerifierTest is Test {
                 LaneVerifier.Reached.selector,
                 uint256(0xa0),
                 AIRBENDER_SNARK_PROOF_LENGTH,
-                RAW_AIRBENDER_PUBLIC_INPUT
+                AIRBENDER_PUBLIC_INPUT
             )
         );
         chain.callVerify(v, _publicInputs(), _default());
@@ -402,9 +392,8 @@ contract EraMultiProofVerifierTest is Test {
         assertEq(gate.verificationKeyHash(2), airbenderLane.verificationKeyHash(), "Airbender key");
     }
 
-    function test_reportsAcceptedProofTypeAndProductionFlag() public view {
+    function test_reportsAcceptedProofType() public view {
         assertEq(verifier.acceptedProofType(), ERA_MULTI_PROOF_TYPE);
-        assertFalse(verifier.isTestnetVerifier(), "the production gate must answer the flag, not omit it");
     }
 
     /// One verifier instance serves every chain, so a mask belongs to the chain that set it. Caching it in

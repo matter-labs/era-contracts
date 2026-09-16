@@ -41,8 +41,7 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
 
     bool public immutable IS_ZKSYNC_OS;
 
-    /// @dev Whether the CTM this initializer belongs to wires an Airbender lane onto its verifier.
-    /// Era only; a ZKsync OS chain ignores it.
+    /// @dev Whether the CTM deploys an Airbender verifier for its Era chains.
     bool public immutable HAS_AIRBENDER_LANE;
 
     /// @dev Initialize the implementation to prevent any possibility of a Parity hack.
@@ -134,8 +133,6 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.precommitmentForTheLatestBatch = DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH;
         s.zksyncOS = IS_ZKSYNC_OS;
 
-        // Keeps the chain from committing Airbender data no installed verifier can check: without the
-        // lane its verifier is the Boojum router alone, which reads a single public input.
         if (!IS_ZKSYNC_OS && !HAS_AIRBENDER_LANE) {
             s.disabledProofSystems = AIRBENDER_PROOF_SYSTEM_MASK;
         }
