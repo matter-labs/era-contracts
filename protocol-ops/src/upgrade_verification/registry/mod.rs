@@ -122,8 +122,8 @@ fn merge_salts(from_package: &[B256], from_reviewer: &[B256]) -> Vec<B256> {
 ///
 /// This is the state a counterfeit exists to tamper with — the L2 force deployments and the
 /// delegate leg every chain executes — so it is rendered for the reviewer rather than only
-/// summarised. Its agreement with the manifest is what the construction check above establishes;
-/// what a human still has to read is whether the payload IS the proposal.
+/// summarised. Its agreement with the manifest is what [`construction`] establishes; what a human
+/// still has to read is whether the payload IS the proposal.
 async fn render_derived_payloads<P: Provider>(
     provider: &P,
     result: &mut VerificationResult,
