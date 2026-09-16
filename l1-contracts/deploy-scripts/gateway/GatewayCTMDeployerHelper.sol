@@ -547,7 +547,6 @@ library GatewayCTMDeployerHelper {
                 genesis: ReleaseGenesisData({
                     fixedForceDeploymentsData: _baseConfig.forceDeploymentsData,
                     genesisBatchHash: _baseConfig.genesisRoot,
-                    genesisBatchCommitment: _baseConfig.genesisBatchCommitment,
                     genesisIndexRepeatedStorageChanges: uint64(_baseConfig.genesisRollupLeafIndex)
                 }),
                 l2BytecodeInfos: _l2BytecodeInfos,

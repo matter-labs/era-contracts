@@ -6,11 +6,7 @@ import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
-import {
-    GenesisBatchCommitmentIncorrect,
-    GenesisBatchHashZero,
-    GenesisUpgradeZero
-} from "contracts/common/L1ContractErrors.sol";
+import {GenesisBatchHashZero, GenesisUpgradeZero} from "contracts/common/L1ContractErrors.sol";
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 
 contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
@@ -32,14 +28,13 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
     function _deployCtmExpectingRevert(
         address _genesisUpgrade,
         bytes32 _genesisBatchHash,
-        bytes32 _genesisBatchCommitment,
         uint64 _genesisIndexRepeatedStorageChanges,
         bytes4 _err
     ) internal {
         vm.mockCall(
             Utils.TEST_GENESIS_REGISTRY,
             abi.encodeWithSelector(ICTMRelease.genesisParams.selector),
-            abi.encode(_genesisUpgrade, _genesisBatchHash, _genesisBatchCommitment, _genesisIndexRepeatedStorageChanges)
+            abi.encode(_genesisUpgrade, _genesisBatchHash, _genesisIndexRepeatedStorageChanges)
         );
 
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
@@ -61,32 +56,15 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
     }
 
     function test_RevertWhen_genesisUpgradeIsZero() public asBridgeHub {
-        _deployCtmExpectingRevert(
-            address(0),
-            bytes32(uint256(0x01)),
-            bytes32(uint256(0x01)),
-            0x01,
-            GenesisUpgradeZero.selector
-        );
+        _deployCtmExpectingRevert(address(0), bytes32(uint256(0x01)), 0x01, GenesisUpgradeZero.selector);
     }
 
     function test_RevertWhen_genesBatchHashIsZero() public asBridgeHub {
         _deployCtmExpectingRevert(
             address(genesisUpgradeContract),
             bytes32(uint256(0)),
-            bytes32(uint256(0x01)),
             0x01,
             GenesisBatchHashZero.selector
-        );
-    }
-
-    function test_RevertWhen_genesisBatchCommitmentIsZero() public asBridgeHub {
-        _deployCtmExpectingRevert(
-            address(genesisUpgradeContract),
-            bytes32(uint256(0x01)),
-            bytes32(uint256(0)),
-            0x01,
-            GenesisBatchCommitmentIncorrect.selector
         );
     }
 }

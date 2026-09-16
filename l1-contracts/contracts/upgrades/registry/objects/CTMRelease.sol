@@ -101,14 +101,9 @@ contract CTMRelease is ICTMRelease {
         return getManifest().l2SystemProxyBytecodeInfo;
     }
 
-    function genesisParams() external view returns (address, bytes32, bytes32, uint64) {
+    function genesisParams() external view returns (address, bytes32, uint64) {
         ReleaseManifest memory m = getManifest();
-        return (
-            m.genesisUpgrade,
-            m.genesis.genesisBatchHash,
-            m.genesis.genesisBatchCommitment,
-            m.genesis.genesisIndexRepeatedStorageChanges
-        );
+        return (m.genesisUpgrade, m.genesis.genesisBatchHash, m.genesis.genesisIndexRepeatedStorageChanges);
     }
 
     /// @notice Whether `_chain`'s live diamond routing is EXACTLY this release's: same facets,

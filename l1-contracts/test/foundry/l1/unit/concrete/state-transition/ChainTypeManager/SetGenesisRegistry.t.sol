@@ -26,13 +26,12 @@ contract SetGenesisRegistryTest is ChainTypeManagerTest {
         address _registry,
         address _genesisUpgrade,
         bytes32 _genesisBatchHash,
-        bytes32 _genesisBatchCommitment,
         uint64 _genesisIndexRepeatedStorageChanges
     ) internal {
         vm.mockCall(
             _registry,
             abi.encodeWithSelector(ICTMRelease.genesisParams.selector),
-            abi.encode(_genesisUpgrade, _genesisBatchHash, _genesisBatchCommitment, _genesisIndexRepeatedStorageChanges)
+            abi.encode(_genesisUpgrade, _genesisBatchHash, _genesisIndexRepeatedStorageChanges)
         );
         vm.mockCall(_registry, abi.encodeWithSelector(ICTMRelease.validate.selector), bytes(""));
         // The release is CALLED by `setCurrentRelease`, so the mocked one has to be a deployed
@@ -52,13 +51,7 @@ contract SetGenesisRegistryTest is ChainTypeManagerTest {
         uint64 genesisIndexRepeatedStorageChanges = 2;
         bytes32 genesisBatchCommitment = bytes32(uint256(0x01));
 
-        _mockRegistry(
-            newRegistry,
-            newGenesisUpgrade,
-            genesisBatchHash,
-            genesisBatchCommitment,
-            genesisIndexRepeatedStorageChanges
-        );
+        _mockRegistry(newRegistry, newGenesisUpgrade, genesisBatchHash, genesisIndexRepeatedStorageChanges);
 
         vm.expectEmit(true, true, false, false);
         emit IChainTypeManager.NewCurrentRelease(0, newRegistry);
@@ -98,7 +91,7 @@ contract SetGenesisRegistryTest is ChainTypeManagerTest {
 
     function test_RevertWhen_NotOwner() public {
         address newRegistry = makeAddr("newGenesisRegistry");
-        _mockRegistry(newRegistry, makeAddr("gu"), bytes32(uint256(1)), bytes32(uint256(1)), 1);
+        _mockRegistry(newRegistry, makeAddr("gu"), bytes32(uint256(1)), 1);
 
         vm.expectRevert();
         vm.prank(makeAddr("notOwner"));

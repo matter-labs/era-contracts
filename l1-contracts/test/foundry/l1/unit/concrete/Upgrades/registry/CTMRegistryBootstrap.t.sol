@@ -69,7 +69,6 @@ contract CTMRegistryBootstrapTest is Test {
                 genesis: ReleaseGenesisData({
                     fixedForceDeploymentsData: bytes(""),
                     genesisBatchHash: bytes32(uint256(1)),
-                    genesisBatchCommitment: bytes32(uint256(1)),
                     genesisIndexRepeatedStorageChanges: 1
                 }),
                 // Length-checked inventory; content is irrelevant to these fixtures.

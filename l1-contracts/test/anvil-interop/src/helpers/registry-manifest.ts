@@ -166,7 +166,6 @@ export function releaseInitArgs(ctm: any): any {
     genesis: {
       fixedForceDeploymentsData: release.fixedForceDeploymentsData,
       genesisBatchHash: release.genesis.batchHash,
-      genesisBatchCommitment: release.genesis.batchCommitment,
       genesisIndexRepeatedStorageChanges: release.genesis.indexRepeatedStorageChanges,
     },
     l2BytecodeInfos: l2BytecodeInfoSlots(release.l2BytecodeInfos ?? {}),

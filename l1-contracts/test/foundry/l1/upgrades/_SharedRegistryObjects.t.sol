@@ -217,7 +217,6 @@ abstract contract RegistryObjectsFixture is Test {
                     genesis: ReleaseGenesisData({
                         fixedForceDeploymentsData: FIXED_FORCE_DEPLOYMENTS_DATA,
                         genesisBatchHash: bytes32(uint256(1)),
-                        genesisBatchCommitment: bytes32(uint256(1)),
                         genesisIndexRepeatedStorageChanges: 54
                     }),
                     l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT),

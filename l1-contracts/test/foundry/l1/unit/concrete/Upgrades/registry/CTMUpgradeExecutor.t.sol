@@ -171,7 +171,6 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
                 genesis: ReleaseGenesisData({
                     fixedForceDeploymentsData: hex"f1f2",
                     genesisBatchHash: bytes32(_manifestNonce),
-                    genesisBatchCommitment: bytes32(uint256(1)),
                     genesisIndexRepeatedStorageChanges: 54
                 }),
                 // Length-checked inventory; content is irrelevant to this fixture.

@@ -169,7 +169,6 @@ contract ReleaseFacetRowsTest is Test {
                 genesis: ReleaseGenesisData({
                     fixedForceDeploymentsData: hex"f1",
                     genesisBatchHash: bytes32(uint256(1)),
-                    genesisBatchCommitment: bytes32(uint256(1)),
                     genesisIndexRepeatedStorageChanges: 1
                 }),
                 l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT),

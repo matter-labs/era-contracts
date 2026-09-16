@@ -269,7 +269,6 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
                 genesis: ReleaseGenesisData({
                     fixedForceDeploymentsData: _fixedForceDeploymentsData,
                     genesisBatchHash: bytes32(uint256(1)),
-                    genesisBatchCommitment: bytes32(uint256(1)),
                     genesisIndexRepeatedStorageChanges: 54
                 }),
                 l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT),

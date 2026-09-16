@@ -28,7 +28,6 @@ import {AdminZero, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol"
 import {ProtocolVersionTooSmall} from "../upgrades/ZkSyncUpgradeErrors.sol";
 import {
     ChainAlreadyLive,
-    GenesisBatchCommitmentIncorrect,
     GenesisBatchHashZero,
     GenesisUpgradeZero,
     MigrationsNotPaused,
@@ -272,16 +271,13 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         // binding is established atomically by the transition (which calls `setNewVersionUpgrade`
         // and `setCurrentRelease` from the same pinned object), not re-derived from the release.
         // slither-disable-next-line unused-return
-        (address genesisUpgrade, bytes32 genesisBatchHash, bytes32 genesisBatchCommitment, ) = release.genesisParams();
+        (address genesisUpgrade, bytes32 genesisBatchHash, ) = release.genesisParams();
 
         if (genesisUpgrade == address(0)) {
             revert GenesisUpgradeZero();
         }
         if (genesisBatchHash == bytes32(0)) {
             revert GenesisBatchHashZero();
-        }
-        if (genesisBatchCommitment != GENESIS_BATCH_COMMITMENT) {
-            revert GenesisBatchCommitmentIncorrect();
         }
 
         currentRelease = _release;
@@ -296,19 +292,15 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     ///         registry (used to set chainId + force-deploy the L2 system contracts).
     function l1GenesisUpgrade() public view returns (address genesisUpgrade) {
         // slither-disable-next-line unused-return
-        (genesisUpgrade, , , ) = ICTMRelease(currentRelease).genesisParams();
+        (genesisUpgrade, , ) = ICTMRelease(currentRelease).genesisParams();
     }
 
     /// @notice The genesis (batch zero) stored-batch hash new chains start from — derived from
     ///         the genesis params the registry pins, so it stays consistent with the registry.
     function storedBatchZero() public view returns (bytes32) {
         // slither-disable-next-line unused-return
-        (
-            ,
-            bytes32 genesisBatchHash,
-            bytes32 genesisBatchCommitment,
-            uint64 genesisIndexRepeatedStorageChanges
-        ) = ICTMRelease(currentRelease).genesisParams();
+        (, bytes32 genesisBatchHash, uint64 genesisIndexRepeatedStorageChanges) = ICTMRelease(currentRelease)
+            .genesisParams();
         IExecutor.StoredBatchInfo memory batchZero = IExecutor.StoredBatchInfo({
             batchNumber: 0,
             batchHash: genesisBatchHash,
@@ -318,7 +310,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             dependencyRootsRollingHash: bytes32(0),
             timestamp: 0,
-            commitment: genesisBatchCommitment
+            // Fixed for the ZKsync OS line: there is no per-ecosystem genesis commitment to
+            // carry, so the release does not describe one.
+            commitment: GENESIS_BATCH_COMMITMENT
         });
         return keccak256(abi.encode(batchZero));
     }

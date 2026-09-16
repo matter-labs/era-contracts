@@ -30,7 +30,6 @@ struct GenesisFacet {
 struct ReleaseGenesisData {
     bytes fixedForceDeploymentsData;
     bytes32 genesisBatchHash;
-    bytes32 genesisBatchCommitment;
     uint64 genesisIndexRepeatedStorageChanges;
 }
 

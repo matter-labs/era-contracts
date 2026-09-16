@@ -16,12 +16,7 @@ import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {
-    ZeroAddress,
-    GenesisBatchHashZero,
-    GenesisBatchCommitmentIncorrect,
-    GenesisUpgradeZero
-} from "contracts/common/L1ContractErrors.sol";
+import {ZeroAddress, GenesisBatchHashZero, GenesisUpgradeZero} from "contracts/common/L1ContractErrors.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
@@ -116,13 +111,12 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
     function _mockGenesisParams(
         address _genesisUpgrade,
         bytes32 _genesisBatchHash,
-        bytes32 _genesisBatchCommitment,
         uint64 _genesisIndexRepeatedStorageChanges
     ) internal {
         vm.mockCall(
             Utils.TEST_GENESIS_REGISTRY,
             abi.encodeWithSelector(ICTMRelease.genesisParams.selector),
-            abi.encode(_genesisUpgrade, _genesisBatchHash, _genesisBatchCommitment, _genesisIndexRepeatedStorageChanges)
+            abi.encode(_genesisUpgrade, _genesisBatchHash, _genesisIndexRepeatedStorageChanges)
         );
         vm.mockCall(Utils.TEST_GENESIS_REGISTRY, abi.encodeWithSelector(ICTMRelease.validate.selector), bytes(""));
         // The CTM CALLS its genesis release while initializing, so the mocked one has to be a
@@ -184,25 +178,11 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
     }
 
     // ============================================================
-    // Genesis params validation - GenesisBatchCommitmentIncorrect
-    // ============================================================
-
-    function test_RevertWhen_genesisBatchCommitmentNotOne() public {
-        _mockGenesisParams(address(genesisUpgradeContract), bytes32(uint256(0x01)), bytes32(uint256(0x02)), 0x01);
-        _expectInitRevert(GenesisBatchCommitmentIncorrect.selector);
-    }
-
-    function test_RevertWhen_genesisBatchCommitmentZero() public {
-        _mockGenesisParams(address(genesisUpgradeContract), bytes32(uint256(0x01)), bytes32(0), 0x01);
-        _expectInitRevert(GenesisBatchCommitmentIncorrect.selector);
-    }
-
-    // ============================================================
     // Genesis params validation - GenesisUpgradeZero
     // ============================================================
 
     function test_RevertWhen_genesisUpgradeIsZero() public {
-        _mockGenesisParams(address(0), bytes32(uint256(0x01)), bytes32(uint256(0x01)), 0x01);
+        _mockGenesisParams(address(0), bytes32(uint256(0x01)), 0x01);
         _expectInitRevert(GenesisUpgradeZero.selector);
     }
 
@@ -211,7 +191,7 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
     // ============================================================
 
     function test_RevertWhen_genesisBatchHashIsZero() public {
-        _mockGenesisParams(address(genesisUpgradeContract), bytes32(0), bytes32(uint256(0x01)), 0x01);
+        _mockGenesisParams(address(genesisUpgradeContract), bytes32(0), 0x01);
         _expectInitRevert(GenesisBatchHashZero.selector);
     }
 
@@ -220,7 +200,7 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
     // ============================================================
 
     function test_successful_setNewVersionUpgrade() public {
-        _mockGenesisParams(address(genesisUpgradeContract), bytes32(uint256(0x01)), bytes32(uint256(0x01)), 0x01);
+        _mockGenesisParams(address(genesisUpgradeContract), bytes32(uint256(0x01)), 0x01);
         chainContractAddress = _deployChainTypeManager();
 
         // Mock migration paused check
@@ -255,7 +235,7 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
     }
 
     function test_RevertWhen_setNewVersionUpgradeNotOwner() public {
-        _mockGenesisParams(address(genesisUpgradeContract), bytes32(uint256(0x01)), bytes32(uint256(0x01)), 0x01);
+        _mockGenesisParams(address(genesisUpgradeContract), bytes32(uint256(0x01)), 0x01);
         chainContractAddress = _deployChainTypeManager();
 
         Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
@@ -283,7 +263,7 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
     // ============================================================
 
     function test_successful_initialization() public {
-        _mockGenesisParams(address(genesisUpgradeContract), bytes32(uint256(0x01)), bytes32(uint256(0x01)), 0x01);
+        _mockGenesisParams(address(genesisUpgradeContract), bytes32(uint256(0x01)), 0x01);
         chainContractAddress = _deployChainTypeManager();
 
         assertEq(chainContractAddress.owner(), governor);
@@ -293,12 +273,4 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
     // ============================================================
     // Fuzz tests
     // ============================================================
-
-    function test_fuzz_RevertWhen_invalidGenesisBatchCommitment(bytes32 commitment) public {
-        // Skip the valid case
-        vm.assume(commitment != bytes32(uint256(1)));
-
-        _mockGenesisParams(address(genesisUpgradeContract), bytes32(uint256(0x01)), commitment, 0x01);
-        _expectInitRevert(GenesisBatchCommitmentIncorrect.selector);
-    }
 }

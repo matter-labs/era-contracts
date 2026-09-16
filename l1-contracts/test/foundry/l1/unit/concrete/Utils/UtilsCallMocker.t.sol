@@ -267,7 +267,6 @@ contract UtilsCallMockerTest is Test {
             abi.encode(
                 Utils.TEST_GENESIS_REGISTRY, // genesisUpgrade (placeholder non-zero)
                 bytes32(uint256(0x01)), // genesisBatchHash
-                bytes32(uint256(0x01)), // genesisBatchCommitment
                 uint64(0x01) // genesisIndexRepeatedStorageChanges
             )
         );

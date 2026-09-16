@@ -155,7 +155,6 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
                     genesis: ReleaseGenesisData({
                         fixedForceDeploymentsData: hex"f1f2",
                         genesisBatchHash: bytes32(uint256(1)),
-                        genesisBatchCommitment: bytes32(uint256(1)),
                         genesisIndexRepeatedStorageChanges: 54
                     }),
                     l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT),

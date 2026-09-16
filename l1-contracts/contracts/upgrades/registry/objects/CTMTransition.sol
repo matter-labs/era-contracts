@@ -193,10 +193,10 @@ contract CTMTransition is ICTMTransition {
             revert PatchChangesL2GenesisState();
         }
         // slither-disable-next-line unused-return
-        (, bytes32 fromBatchHash, bytes32 fromCommitment, uint64 fromIndex) = _fromRelease.genesisParams();
+        (, bytes32 fromBatchHash, uint64 fromIndex) = _fromRelease.genesisParams();
         // slither-disable-next-line unused-return
-        (, bytes32 newBatchHash, bytes32 newCommitment, uint64 newIndex) = _newRelease.genesisParams();
-        if (fromBatchHash != newBatchHash || fromCommitment != newCommitment || fromIndex != newIndex) {
+        (, bytes32 newBatchHash, uint64 newIndex) = _newRelease.genesisParams();
+        if (fromBatchHash != newBatchHash || fromIndex != newIndex) {
             revert PatchChangesL2GenesisState();
         }
     }

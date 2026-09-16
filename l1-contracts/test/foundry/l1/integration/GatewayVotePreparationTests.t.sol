@@ -293,7 +293,6 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
                 genesis: ReleaseGenesisData({
                     fixedForceDeploymentsData: config.forceDeploymentsData,
                     genesisBatchHash: config.genesisRoot,
-                    genesisBatchCommitment: config.genesisBatchCommitment,
                     genesisIndexRepeatedStorageChanges: uint64(config.genesisRollupLeafIndex)
                 }),
                 // Length-checked inventory; content is irrelevant to this fixture.

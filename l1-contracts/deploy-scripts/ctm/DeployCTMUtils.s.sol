@@ -311,7 +311,6 @@ abstract contract DeployCTMUtils is DeployUtils {
                 // release commits zeros, the same values a fresh chain geneses with.
                 fixedForceDeploymentsData: generatedData.forceDeploymentsData,
                 genesisBatchHash: config.contracts.chainCreationParams.genesisRoot,
-                genesisBatchCommitment: config.contracts.chainCreationParams.genesisBatchCommitment,
                 genesisIndexRepeatedStorageChanges: uint64(config.contracts.chainCreationParams.genesisRollupLeafIndex)
             }),
             l2BytecodeInfos: getL2BytecodeInfoTable(),

@@ -1029,7 +1029,6 @@ async function bootstrapReleaseManifest(
     genesis: {
       fixedForceDeploymentsData: manifest.genesis.fixedForceDeploymentsData,
       genesisBatchHash: manifest.genesis.genesisBatchHash,
-      genesisBatchCommitment: manifest.genesis.genesisBatchCommitment,
       genesisIndexRepeatedStorageChanges: manifest.genesis.genesisIndexRepeatedStorageChanges,
     },
     l2BytecodeInfos,
@@ -1204,7 +1203,6 @@ async function buildRegistryManifest(
             genesisUpgrade: { address: live.genesisUpgrade },
             batchHash: ethers.utils.hexZeroPad("0x01", 32),
             // ChainTypeManager requires the genesis batch commitment to be exactly 1.
-            batchCommitment: ethers.utils.hexZeroPad("0x01", 32),
             indexRepeatedStorageChanges: 54,
           },
         },

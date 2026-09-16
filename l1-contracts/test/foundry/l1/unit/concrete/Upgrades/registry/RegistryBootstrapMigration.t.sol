@@ -223,7 +223,6 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                     fixedForceDeploymentsData: hex"f1f2",
                     genesisBatchHash: bytes32(uint256(1)),
                     // ChainTypeManager requires the commitment to be exactly 1.
-                    genesisBatchCommitment: bytes32(uint256(1)),
                     genesisIndexRepeatedStorageChanges: 54
                 }),
                 l2BytecodeInfos: _l2BytecodeInfos,

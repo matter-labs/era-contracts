@@ -188,7 +188,6 @@ contract StorageRegistriesTest is Test {
                 genesis: ReleaseGenesisData({
                     fixedForceDeploymentsData: hex"f1f2",
                     genesisBatchHash: bytes32(uint256(1)),
-                    genesisBatchCommitment: bytes32(uint256(1)),
                     genesisIndexRepeatedStorageChanges: 54
                 }),
                 // Length-checked inventory; content is irrelevant to this fixture. The shell is

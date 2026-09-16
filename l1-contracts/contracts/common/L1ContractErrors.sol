@@ -160,7 +160,6 @@ error FeeParamsChangeTooLarge(uint256 oldPrice, uint256 newPrice, uint256 maxAll
 // 0xc91cf3b1
 error GasPerPubdataMismatch();
 // 0x5ca97564
-error GenesisBatchCommitmentIncorrect();
 // 0x7940c83f
 error GenesisBatchHashZero();
 // 0x3a1a8589
