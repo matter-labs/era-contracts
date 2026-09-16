@@ -190,14 +190,6 @@ struct GovernanceCalls {
     stage2_calls: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-struct TestUpgradeCalls {
-    test_create_chain: String,
-    test_create_chain_caller: String,
-    test_upgrade_chain: String,
-    test_upgrade_chain_caller: String,
-}
-
 #[derive(Debug, Deserialize)]
 struct EcosystemUpgradeOutput {
     governance_calls: GovernanceCalls,
@@ -1046,12 +1038,6 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 /// coordinator_addr = "0x..."      # are derived on
 /// coordinator_addr = "0x..."
 ///
-/// [test_upgrade_calls]            # optional: copied from CTM prepare output
-/// test_create_chain_zkos = "0x..."
-/// test_create_chain_zkos_caller = "0x..."
-/// test_upgrade_chain_zkos = "0x..."
-/// test_upgrade_chain_zkos_caller = "0x..."
-///
 /// [core]                          # whole core TOML minus its [governance_calls]
 /// ...
 ///
@@ -1085,14 +1071,11 @@ fn write_merged_ecosystem_toml(
         fs::create_dir_all(parent)?;
     }
 
-    // Read each source as a generic TOML table; pop [governance_calls] (always
-    // present), the optional [test_upgrade_calls] and the script's `external_actions`
-    // out so governance can be merged at top level and test calls can be lifted to
-    // top-level `ecosystem.toml`.
+    // Read each source as a generic TOML table; pop [governance_calls] (always present) and
+    // the script's `external_actions` out, so governance can be merged at top level.
     struct PrepareOutput {
         body: Table,
         gov: GovernanceCalls,
-        test_calls: Option<TestUpgradeCalls>,
         /// The script's declared `external_actions` (see `ExternalActionsLib.serialize`).
         external_actions: Vec<ExternalAction>,
     }
@@ -1107,13 +1090,6 @@ fn write_merged_ecosystem_toml(
             .try_into()
             .with_context(|| format!("invalid [governance_calls] in {}", path.display()))?;
 
-        let test_calls = value
-            .remove("test_upgrade_calls")
-            .map(|v| {
-                v.try_into()
-                    .with_context(|| format!("invalid [test_upgrade_calls] in {}", path.display()))
-            })
-            .transpose()?;
         let external_actions: Vec<ExternalAction> = value
             .remove("external_actions")
             .map(|v| {
@@ -1126,7 +1102,6 @@ fn write_merged_ecosystem_toml(
         Ok(PrepareOutput {
             body: value,
             gov,
-            test_calls,
             external_actions,
         })
     }
@@ -1152,7 +1127,6 @@ fn write_merged_ecosystem_toml(
     let mut stage0: Vec<String> = vec![core_gov.stage0_calls];
     let mut stage1: Vec<String> = vec![core_gov.stage1_calls];
     let mut stage2: Vec<String> = vec![core_gov.stage2_calls];
-    let mut zksync_os_test_calls: Option<TestUpgradeCalls> = None;
 
     // The lifecycle calls: the coordinator's three stage calls over the operation the CTM prepare
     // deployed, DERIVED from its address and ordered after the core prepare's declared actions and
@@ -1185,7 +1159,6 @@ fn write_merged_ecosystem_toml(
         let PrepareOutput {
             body,
             gov,
-            test_calls,
             external_actions: ctm_external_actions,
         } = load_and_split(&entry.toml)?;
         let label = "zksync_os";
@@ -1204,10 +1177,6 @@ fn write_merged_ecosystem_toml(
         stage0.push(gov.stage0_calls);
         stage1.push(gov.stage1_calls);
         stage2.push(gov.stage2_calls);
-
-        if let Some(test_calls) = test_calls {
-            zksync_os_test_calls = Some(test_calls);
-        }
     }
 
     if !extra_stage0.is_empty() {
@@ -1289,9 +1258,8 @@ fn write_merged_ecosystem_toml(
     governance_calls_table.insert("stage1_calls".into(), Value::String(s1));
     governance_calls_table.insert("stage2_calls".into(), Value::String(s2));
 
-    // Build the document with [governance_calls] first, then optional
-    // [test_upgrade_calls], then [core], [ctms.*], optional [new_gateway],
-    // and [misc] last. `toml::to_string` orders keys as inserted.
+    // Build the document with [governance_calls] first, then [core], [ctms.*], optional
+    // [new_gateway], and [misc] last. `toml::to_string` orders keys as inserted.
     let mut doc = Table::new();
     doc.insert(
         "external_actions".into(),
@@ -1301,26 +1269,6 @@ fn write_merged_ecosystem_toml(
         "governance_calls".into(),
         Value::Table(governance_calls_table),
     );
-    if let Some(test_calls) = zksync_os_test_calls {
-        let mut test_table = Table::new();
-        test_table.insert(
-            "test_create_chain_zkos".into(),
-            Value::String(test_calls.test_create_chain),
-        );
-        test_table.insert(
-            "test_create_chain_zkos_caller".into(),
-            Value::String(test_calls.test_create_chain_caller),
-        );
-        test_table.insert(
-            "test_upgrade_chain_zkos".into(),
-            Value::String(test_calls.test_upgrade_chain),
-        );
-        test_table.insert(
-            "test_upgrade_chain_zkos_caller".into(),
-            Value::String(test_calls.test_upgrade_chain_caller),
-        );
-        doc.insert("test_upgrade_calls".into(), Value::Table(test_table));
-    }
     doc.insert("core".into(), Value::Table(core_body));
     doc.insert("ctms".into(), Value::Table(ctms_table));
     if let Some(body) = operation_body {
@@ -1359,9 +1307,8 @@ fn write_merged_ecosystem_toml(
          # Merged ecosystem upgrade artifact: top-level [governance_calls] holds\n\
          # the stage 0/1/2 hex of {} prepare TOML(s) plus the derived stage calls\n\
          # in source order and never composed here; `external_actions` names every\n\
-         # call in them that is not an `EcosystemUpgradeExecutor.stageN(operation)` call. Optional\n\
-         # [test_upgrade_calls] is copied from the per-CTM prepare output under\n\
-         # `*_zkos` keys. [core] mirrors the\n\
+         # call in them that is not an `EcosystemUpgradeExecutor.stageN(operation)` call.\n\
+         # [core] mirrors the\n\
          # core prepare output (minus its own [governance_calls]); [ctms.zksync_os]\n\
          # mirrors the ZKsyncOS CTM prepare output\n\
          # for downstream verification. [misc] carries shared metadata used\n\
