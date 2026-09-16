@@ -1894,6 +1894,7 @@ fn expect_create2_params_by_file(
             None
         }
         [addr] => {
+            result.verified_create2.insert(*addr);
             result.report_ok(&format!("{label}: {expected_file} deployed at {addr}"));
             Some(*addr)
         }

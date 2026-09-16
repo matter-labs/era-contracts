@@ -283,6 +283,11 @@ pub(crate) struct VerificationResult {
     pub(crate) result: String,
     pub(crate) warnings: u64,
     pub(crate) errors: u64,
+    /// CREATE2 deployments whose *init code* was verified, i.e. whose constructor params were
+    /// compared against an independently declared expectation. Deliberately not populated by
+    /// runtime-bytecode checks: runtime code cannot see a constructor suffix, so counting those
+    /// as coverage would reproduce the gap that let a phantom argument reach mainnet.
+    pub(crate) verified_create2: std::collections::HashSet<Address>,
 }
 
 impl VerificationResult {
@@ -466,6 +471,7 @@ impl VerificationResult {
         expected_file: &str,
         report_ok: bool,
     ) -> bool {
+        self.verified_create2.insert(*address);
         let deployed_file = match verifiers
             .network_verifier
             .create2_known_bytecodes
@@ -565,6 +571,41 @@ impl VerificationResult {
             expected_impl_constructor_params,
             expected_file,
         );
+    }
+}
+
+impl VerificationResult {
+    /// Every CREATE2 deployment in the transactions log came from this upgrade, so every one of
+    /// them should have had its constructor params checked by some element above. Anything left
+    /// over was deployed and never verified — the state RollupL1DAValidator was in, which is why
+    /// its 32 phantom bytes went unnoticed.
+    ///
+    /// Reported as a warning only because the unverified set has never been enumerated on a real
+    /// run: promoting it to `report_error` (one call below) is the intended end state, once a
+    /// clean run shows the list is empty or the stragglers are triaged.
+    pub(crate) fn report_unverified_create2_deployments(&mut self, verifiers: &Verifiers) {
+        let mut unverified: Vec<String> = verifiers
+            .network_verifier
+            .create2_known_bytecodes
+            .iter()
+            .filter(|(address, _)| !self.verified_create2.contains(*address))
+            .map(|(address, file)| format!("{address} ({file})"))
+            .collect();
+        unverified.sort();
+
+        if unverified.is_empty() {
+            self.report_ok(&format!(
+                "Init-code coverage: all {} CREATE2 deployments had their constructor params verified",
+                self.verified_create2.len()
+            ));
+            return;
+        }
+
+        self.report_warn(&format!(
+            "Init-code coverage: {} CREATE2 deployment(s) were never checked against a declared constructor expectation, so their addresses are unverified: {}",
+            unverified.len(),
+            unverified.join(", ")
+        ));
     }
 }
 

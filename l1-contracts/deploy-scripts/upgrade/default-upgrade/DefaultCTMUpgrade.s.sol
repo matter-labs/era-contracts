@@ -623,10 +623,17 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         allCalls[1] = prepareCheckMigrationsPausedCalls();
         console.log("prepareStage1GovernanceCalls: prepareUpgradeProxiesCalls");
         allCalls[2] = prepareUpgradeCTMCalls();
-        console.log("prepareStage1GovernanceCalls: prepareNewChainCreationParamsCall");
-        allCalls[3] = prepareNewChainCreationParamsCall();
+        // setNewVersionUpgrade first: setChainCreationParams stores
+        // newChainCreationParamsBlock[protocolVersion] against the version *currently* set on the
+        // CTM (ChainTypeManagerBase._setChainCreationParams), and setNewVersionUpgrade is what
+        // advances protocolVersion. Emitting them the other way round keyed the pointer under the
+        // old version — leaving the new version's pointer at zero, so GetDiamondCutData's log
+        // discovery reverted NoLogsFound for fresh chains, and overwriting the predecessor's
+        // pointer with this upgrade's event block. Only the patch path carries a pointer forward.
         console.log("prepareStage1GovernanceCalls: provideSetNewVersionUpgradeCall");
-        allCalls[4] = provideSetNewVersionUpgradeCall();
+        allCalls[3] = provideSetNewVersionUpgradeCall();
+        console.log("prepareStage1GovernanceCalls: prepareNewChainCreationParamsCall");
+        allCalls[4] = prepareNewChainCreationParamsCall();
         console.log("prepareStage1GovernanceCalls: prepareDAValidatorCall");
         allCalls[5] = prepareDAValidatorCall();
         console.log("prepareStage1GovernanceCalls: prepareGatewaySpecificStage1GovernanceCalls");
