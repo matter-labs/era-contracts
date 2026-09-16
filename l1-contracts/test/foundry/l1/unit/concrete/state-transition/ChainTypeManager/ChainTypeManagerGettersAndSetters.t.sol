@@ -51,40 +51,6 @@ contract ChainTypeManagerGettersAndSettersTest is ChainTypeManagerTest {
         assertEq(chainAdmin, newChainAdmin, "getChainAdmin should return the chain admin");
     }
 
-    // Test setLegacyValidatorTimelock
-    function test_setLegacyValidatorTimelock() public {
-        address newLegacyTimelock = makeAddr("newLegacyTimelock");
-
-        vm.prank(governor);
-        chainContractAddress.setLegacyValidatorTimelock(newLegacyTimelock);
-
-        address result = chainContractAddress.validatorTimelock();
-        assertEq(result, newLegacyTimelock, "Legacy validator timelock should be updated");
-    }
-
-    // Test setLegacyValidatorTimelock emits event
-    function test_setLegacyValidatorTimelockEmitsEvent() public {
-        address newLegacyTimelock = makeAddr("newLegacyTimelock");
-
-        vm.expectEmit(true, true, true, true);
-        emit NewValidatorTimelock(address(0), newLegacyTimelock);
-
-        vm.prank(governor);
-        chainContractAddress.setLegacyValidatorTimelock(newLegacyTimelock);
-    }
-
-    // Test setLegacyValidatorTimelock reverts when not owner
-    function test_RevertWhen_setLegacyValidatorTimelockNotOwner() public {
-        vm.stopPrank();
-
-        address notOwner = makeAddr("notOwner");
-        address newLegacyTimelock = makeAddr("newLegacyTimelock");
-
-        vm.prank(notOwner);
-        vm.expectRevert("Ownable: caller is not the owner");
-        chainContractAddress.setLegacyValidatorTimelock(newLegacyTimelock);
-    }
-
     // Test setServerNotifier
     function test_setServerNotifier() public {
         address newServerNotifier = makeAddr("newServerNotifier");
@@ -162,14 +128,6 @@ contract ChainTypeManagerGettersAndSettersTest is ChainTypeManagerTest {
         assertFalse(isActive, "Unset protocol version should be inactive");
     }
 
-    // Test validatorTimelock (deprecated getter)
-    function test_validatorTimelock() public view {
-        // Initially the deprecated validator timelock is address(0)
-        address result = chainContractAddress.validatorTimelock();
-        assertEq(result, address(0), "Deprecated validator timelock should be zero initially");
-    }
-
     // Events
-    event NewValidatorTimelock(address indexed oldValidatorTimelock, address indexed newValidatorTimelock);
     event NewServerNotifier(address indexed oldServerNotifier, address indexed newServerNotifier);
 }

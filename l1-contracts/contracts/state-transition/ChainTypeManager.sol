@@ -88,6 +88,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
     /// @dev The validatorTimelock contract address.
     /// @dev Note, that address contains validator timelock for pre-v29 protocol versions. It is deprecated and will be removed in the future.
+    /// @dev Deprecated pre-v29 validator timelock. From v29 on only `validatorTimelockPostV29`
+    ///      is consulted and the readers are gone. The DECLARATION stays: this slot exists on
+    ///      deployed CTMs, so removing it would shift every storage slot after it.
     address internal __DEPRECATED_validatorTimelock;
 
     /// @dev Deprecated. Written only by the legacy cut-taking commit path: pre-v32 Admin facets
@@ -713,24 +716,5 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     //             legacy-committed cut from logs (`GetDiamondCutData.getDiamondCutData`).
     function upgradeCutDataBlock(uint256 _protocolVersion) public view returns (uint256) {
         return __DEPRECATED_upgradeCutDataBlock[_protocolVersion];
-    }
-
-    /// @dev Used to set legacy validatorTimelock.
-    /// @dev Note, that the validator timelock that this function sets is only used for pre-v29 protocol versions.
-    /// It is kept only for convenience.
-    /// @param _validatorTimelock the new validatorTimelock address
-    // TODO: DELETE with {validatorTimelock} once no chain settles batches under a pre-v29
-    //       protocol version (from v29 on only `validatorTimelockPostV29` is consulted).
-    function setLegacyValidatorTimelock(address _validatorTimelock) external onlyOwner {
-        address oldValidatorTimelock = __DEPRECATED_validatorTimelock;
-        __DEPRECATED_validatorTimelock = _validatorTimelock;
-        emit NewValidatorTimelock(oldValidatorTimelock, _validatorTimelock);
-    }
-
-    /// @notice Returns the legacy validator timelock address.
-    /// @dev This function is used to return the validator timelock address for pre-v29 protocol versions.
-    // TODO: DELETE with {setLegacyValidatorTimelock}.
-    function validatorTimelock() external view returns (address) {
-        return __DEPRECATED_validatorTimelock;
     }
 }

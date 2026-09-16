@@ -42,8 +42,7 @@ import {
     BridgeContracts,
     CTMDeployedAddresses,
     CTMAdminAddresses,
-    DataAvailabilityDeployedAddresses,
-    L1SpecificStateTransitionAddresses
+    DataAvailabilityDeployedAddresses
 } from "./Types.sol";
 import {DeployCTML1OrGateway} from "../ctm/DeployCTML1OrGateway.sol";
 
@@ -258,7 +257,6 @@ library AddressIntrospector {
             // registry-era CTM and reported as zero otherwise.
             currentRelease: ctm.protocolVersion() >= SemVer.packSemVer(0, 34, 0) ? ctm.currentRelease() : address(0)
         });
-        info.l1Specific = L1SpecificStateTransitionAddresses({legacyValidatorTimelock: ctm.validatorTimelock()});
         info.admin = CTMAdminAddresses({
             transparentProxyAdmin: Utils.getProxyAdminAddress(_ctmAddr),
             governance: IOwnable(_ctmAddr).owner(),

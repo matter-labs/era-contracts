@@ -41,9 +41,6 @@ interface IChainTypeManager {
     /// @notice Admin changed
     event NewAdmin(address indexed oldAdmin, address indexed newAdmin);
 
-    /// @notice ValidatorTimelock changed
-    event NewValidatorTimelock(address indexed oldValidatorTimelock, address indexed newValidatorTimelock);
-
     /// @notice ValidatorTimelockPostV29 changed
     event NewValidatorTimelockPostV29(
         address indexed oldValidatorTimelockPostV29,
@@ -116,13 +113,9 @@ interface IChainTypeManager {
 
     function serverNotifierAddress() external view returns (address);
 
-    function validatorTimelock() external view returns (address);
-
     function validatorTimelockPostV29() external view returns (address);
 
     function initialize(ChainTypeManagerInitializeData calldata _initializeData) external;
-
-    function setLegacyValidatorTimelock(address _validatorTimelock) external;
 
     function setValidatorTimelockPostV29(address _validatorTimelockPostV29) external;
 

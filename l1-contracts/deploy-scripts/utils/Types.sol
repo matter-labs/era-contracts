@@ -83,11 +83,6 @@ struct DataAvailabilityDeployedAddresses {
     address l1BlobsDAValidatorZKsyncOS;
 }
 
-/// @notice L1-specific state transition addresses that are not used in the Gateway context.
-struct L1SpecificStateTransitionAddresses {
-    address legacyValidatorTimelock;
-}
-
 struct CTMAdminAddresses {
     address transparentProxyAdmin;
     address governance;
@@ -99,7 +94,6 @@ struct CTMAdminAddresses {
 
 struct CTMDeployedAddresses {
     StateTransitionDeployedAddresses stateTransition;
-    L1SpecificStateTransitionAddresses l1Specific;
     DataAvailabilityDeployedAddresses daAddresses;
     CTMAdminAddresses admin;
     address chainAdmin;
