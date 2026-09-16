@@ -19,6 +19,7 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Utils} from "../../utils/Utils.sol";
 import {ChainCreationParamsConfig, ZkChainAddresses} from "../../utils/Types.sol";
+import {StateTransitionContracts} from "contracts/common/StateTransitionTypes.sol";
 
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
@@ -50,7 +51,7 @@ import {DeployCTMScript} from "../../ctm/DeployCTM.s.sol";
 import {BytecodeUtils} from "../../utils/bytecode/BytecodeUtils.s.sol";
 import {ReleaseMemberProbe} from "./ReleaseMemberProbe.sol";
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
-import {CTMUpgradeParams} from "./UpgradeParams.sol";
+import {CTMUpgradeParams, UpgradeKind} from "./UpgradeParams.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
@@ -245,14 +246,18 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         config.l1ChainId = block.chainid;
         newConfig.ctm = permanentConfig.ctmProxy;
 
-        setAddressesBasedOnCTM();
         // Must be non-zero: `InteropCenter.initL2` reverts on a zero asset ID. It runs on the genesis path
         // of `performForceDeployedContractsInit` only, so this aborts the genesis of chains created from the
         // release rather than this upgrade — caught here so the misconfiguration surfaces during
         // preparation instead of at a chain's creation.
         require(permanentConfig.zkTokenAssetId != bytes32(0), "zkTokenAssetId must be non-zero");
         config.zkTokenAssetId = permanentConfig.zkTokenAssetId;
+        // BEFORE the introspection below, which holds the live protocol version against the target
+        // one: reading it there while this assignment still came after left the target at zero, so
+        // the check could never fire.
         config.contracts.chainCreationParams = chainCreationParams;
+
+        setAddressesBasedOnCTM();
 
         address ctmGov = ctmGovernance();
         if (governance != address(0)) {
@@ -341,17 +346,61 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         generateUpgradeData();
         console.log("Upgrade data generated!");
         deployUpgradeObjects();
+        _requireDeployedImplementationsInstalled();
         saveOutput(upgradeConfig.outputPath);
     }
 
-    /// @notice The upgrade objects of the CTM side. The default deploys the upgrade engine the
-    ///         transition pins, the transition of this edge, and the operation the coordinator's
-    ///         stage calls name; the bootstrap edge deploys its migration and its call sequence
-    ///         instead.
+    /// @notice What this version's prepare SETS OUT to change — a chain-version edge by default,
+    ///         or an infrastructure-only one that moves nothing chain-facing. The version
+    ///         relationship is held AGAINST this declaration (see {_requireDeclaredKindHolds}),
+    ///         never used to derive it: two releases carrying the same version number is a
+    ///         consequence of an infrastructure-only edge, not a statement that one is intended,
+    ///         and inferring the kind from it would let a mistyped version silently change what is
+    ///         being prepared.
+    /// @dev A version-script hook rather than a per-environment input key, for the reason
+    ///      {changedReleaseMembers} is one: what an upgrade sets out to change is a property of
+    ///      the RELEASE, identical on every environment it is prepared for, and reviewed in the
+    ///      same diff as the contracts it ships. A TOML key would let the same upgrade be a
+    ///      different KIND on two environments, which is the failure this declaration exists to
+    ///      remove.
+    function upgradeKind() public view virtual returns (UpgradeKind) {
+        return UpgradeKind.ChainRelease;
+    }
+
+    /// @notice The upgrade objects of the CTM side. A chain-release edge deploys the upgrade
+    ///         engine the transition pins, the transition of this edge, and the operation the
+    ///         coordinator's stage calls name; an infrastructure-only edge deploys the operation
+    ///         alone; the bootstrap edge deploys its migration and its call sequence instead.
     function deployUpgradeObjects() public virtual {
+        _requireDeclaredKindHolds();
+        if (upgradeKind() == UpgradeKind.InfrastructureOnly) {
+            deployEcosystemUpgradeOperation();
+            return;
+        }
         upgradeAddresses.upgradeEngine = deployUsedUpgradeContract();
         deployCTMTransition();
         deployEcosystemUpgradeOperation();
+    }
+
+    /// @notice Holds this run against the kind it DECLARED (see {upgradeKind}), at the point where
+    ///         the declaration decides the shape of the objects and nothing can still move the
+    ///         inputs. The version is checked again here — {setAddressesBasedOnCTM} checks the
+    ///         INPUT, this checks what the run ended up with — because a version script may set it
+    ///         afterwards, and the release pointer because reusing every release member is what
+    ///         makes an infrastructure-only edge chain-invisible.
+    function _requireDeclaredKindHolds() internal view virtual {
+        if (upgradeKind() != UpgradeKind.InfrastructureOnly) {
+            return;
+        }
+        require(
+            getNewProtocolVersion() == getOldProtocolVersion(),
+            "an infrastructure-only upgrade must not move the protocol version"
+        );
+        address ctm = ctmAddresses.stateTransition.proxies.chainTypeManager;
+        require(
+            ctmAddresses.stateTransition.currentRelease == IChainTypeManager(ctm).currentRelease(),
+            "an infrastructure-only upgrade must not publish a new release"
+        );
     }
 
     /// @notice Deploys the write-once `CTMTransition` of this upgrade — what governance reviews and
@@ -397,7 +446,20 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     ///      factory transactions only, so a plain CREATE would leave the stage calls pointing at a
     ///      codeless address on the real chain.
     function deployEcosystemUpgradeOperation() public virtual {
-        require(upgradeAddresses.ctmTransition != address(0), "transition not deployed");
+        require(
+            upgradeAddresses.ctmTransition != address(0) || upgradeKind() == UpgradeKind.InfrastructureOnly,
+            "transition not deployed"
+        );
+        ProxyUpgradeRow[] memory inventory = ctmProxyInventory();
+        // The object refuses a manifest that changes nothing, but its constructor runs inside the
+        // CREATE2 factory, whose failure says only "Failed to deploy contract via create2". Refuse
+        // here instead, where the message can name all three legs the version left empty.
+        require(
+            upgradeAddresses.coreRegistry != address(0) ||
+                upgradeAddresses.ctmTransition != address(0) ||
+                _participatingRows(inventory) != 0,
+            "this upgrade changes nothing: no core registry, no infrastructure row and no transition"
+        );
         address coordinator = upgradeAddresses.ecosystemUpgradeExecutor;
         // A call to a codeless address is a silent success, so a coordinator that is not deployed
         // would turn all three stage calls into no-ops the governance bundle reports as executed.
@@ -411,7 +473,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
                     coreRegistry: upgradeAddresses.coreRegistry,
                     // The CTM-domain rows ride the OPERATION, not the transition: replacing an
                     // ecosystem singleton is not a chain-version edge.
-                    ctmInfrastructure: ctmProxyInventory(),
+                    ctmInfrastructure: inventory,
                     transition: upgradeAddresses.ctmTransition,
                     timer: upgradeAddresses.upgradeTimer
                 })
@@ -447,6 +509,9 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     }
 
     /// @dev The inert (all-zero) row when this run deployed no implementation for the proxy.
+    ///      Discovery fills `implementations` from the LIVE EIP-1967 slots, so "a new
+    ///      implementation" is the one that DIFFERS from what the proxy already runs (see
+    ///      `DefaultCoreUpgrade._row` for the same rule on the ecosystem side).
     function _ctmRow(
         address _proxy,
         address _implNew,
@@ -455,14 +520,107 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         if (_implNew == address(0)) {
             return row;
         }
+        address liveImpl = Utils.getImplementation(_proxy);
+        if (_implNew == liveImpl) {
+            return row;
+        }
         return
             ProxyUpgradeRow({
                 proxy: _proxy,
-                expectedOldImpl: Utils.getImplementation(_proxy),
+                expectedOldImpl: liveImpl,
                 implNew: _implNew,
                 callInitializeUpgrade: false,
                 admin: _admin
             });
+    }
+
+    /// @notice CTM-domain slots this version deploys an implementation for and deliberately does
+    ///         NOT install. Empty by default — see {_requireDeployedImplementationsInstalled}.
+    function uninstalledCTMDeployments() internal view virtual returns (CTMContract[] memory) {
+        return new CTMContract[](0);
+    }
+
+    /// @notice Refuses an ORPHANED deployment: a CTM-domain implementation this run produced that
+    ///         the pinned inventory does not install and the version did not name in
+    ///         {uninstalledCTMDeployments}. A deployment nothing references is either a swap that
+    ///         silently will not ship or a row builder that was never written, and both look
+    ///         exactly like a successful prepare from the output alone.
+    function _requireDeployedImplementationsInstalled() internal view virtual {
+        ProxyUpgradeRow[] memory rows = ctmProxyInventory();
+        address[] memory deployed = _deployedCTMImplementations();
+        CTMContract[] memory excused = uninstalledCTMDeployments();
+        uint256 length = deployed.length;
+        for (uint256 i = 0; i < length; ++i) {
+            if (deployed[i] == address(0) || rows[i].implNew == deployed[i]) {
+                continue;
+            }
+            bool accountedFor = false;
+            for (uint256 j = 0; j < excused.length; ++j) {
+                if (uint256(excused[j]) == i) {
+                    accountedFor = true;
+                    break;
+                }
+            }
+            require(
+                accountedFor,
+                string.concat(
+                    "orphaned CTM-domain deployment at inventory slot ",
+                    vm.toString(i),
+                    " (",
+                    vm.toString(deployed[i]),
+                    "): this run deployed it but the pinned inventory does not install it. Either add its row to "
+                    "`_ctmProxyUpgradeRows()`, or name the slot in `uninstalledCTMDeployments()`."
+                )
+            );
+        }
+    }
+
+    /// @dev The implementations THIS RUN produced, over the same slot space as
+    ///      {_ctmProxyUpgradeRows} so the orphan check compares like with like (see
+    ///      `DefaultCoreUpgrade._deployedCoreImplementations` for the ecosystem counterpart).
+    function _deployedCTMImplementations() private view returns (address[] memory impls) {
+        impls = new address[](CTM_CONTRACT_COUNT);
+        StateTransitionContracts memory proxies = ctmAddresses.stateTransition.proxies;
+        StateTransitionContracts memory implementations = ctmAddresses.stateTransition.implementations;
+        impls[uint256(CTMContract.ChainTypeManager)] = _deployedCTMImpl(
+            proxies.chainTypeManager,
+            implementations.chainTypeManager
+        );
+        impls[uint256(CTMContract.ValidatorTimelock)] = _deployedCTMImpl(
+            proxies.validatorTimelock,
+            implementations.validatorTimelock
+        );
+        impls[uint256(CTMContract.ServerNotifier)] = _deployedCTMImpl(
+            proxies.serverNotifier,
+            implementations.serverNotifier
+        );
+        impls[uint256(CTMContract.BytecodesSupplier)] = _deployedCTMImpl(
+            proxies.bytecodesSupplier,
+            implementations.bytecodesSupplier
+        );
+        impls[uint256(CTMContract.PermissionlessValidator)] = _deployedCTMImpl(
+            proxies.permissionlessValidator,
+            implementations.permissionlessValidator
+        );
+    }
+
+    /// @dev `_impl` when it is a REPLACEMENT this run produced, zero otherwise — see
+    ///      `DefaultCoreUpgrade._deployedImpl`.
+    function _deployedCTMImpl(address _proxy, address _impl) private view returns (address) {
+        if (_impl == address(0) || _proxy == address(0)) {
+            return address(0);
+        }
+        return _impl == Utils.getImplementation(_proxy) ? address(0) : _impl;
+    }
+
+    /// @dev How many slots of an enum-indexed inventory actually participate.
+    function _participatingRows(ProxyUpgradeRow[] memory _inventory) internal pure returns (uint256 count) {
+        uint256 length = _inventory.length;
+        for (uint256 i = 0; i < length; ++i) {
+            if (_inventory[i].implNew != address(0)) {
+                ++count;
+            }
+        }
     }
 
     /// @notice The L2 side this version authors (see {AuthoredL2Side}). The default is an L1-only
@@ -495,6 +653,11 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         if (transition != address(0)) {
             return ICTMTransition(transition).upgradeEngine();
         }
+        if (upgradeKind() == UpgradeKind.InfrastructureOnly) {
+            // No chain crosses an infrastructure-only edge, so there is no engine to commit and
+            // the output must not name one.
+            return address(0);
+        }
         require(upgradeAddresses.upgradeEngine != address(0), "upgrade engine not deployed");
         return upgradeAddresses.upgradeEngine;
     }
@@ -516,7 +679,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             return RegistryBootstrapMigration(migration).getManifest().proxyUpgrades;
         }
         require(
-            upgradeAddresses.ctmTransition != address(0),
+            upgradeAddresses.ctmTransition != address(0) || upgradeKind() == UpgradeKind.InfrastructureOnly,
             "no upgrade object deployed: the CTM-domain rows are read from it"
         );
         return _ctmProxyUpgradeRows();
@@ -750,6 +913,22 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
 
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
         newConfig.oldProtocolVersion = ctmProtocolVersion;
+        if (upgradeKind() == UpgradeKind.InfrastructureOnly) {
+            // The declaration decides the kind; the configured version is held against it. An
+            // input naming a version the CTM is not already on describes a chain-version edge,
+            // which is not what this version script prepares — and the two disagreeing is exactly
+            // the misconfiguration the declaration exists to surface rather than silently obey.
+            require(
+                ctmProtocolVersion == getNewProtocolVersion(),
+                string.concat(
+                    "an infrastructure-only upgrade must not move the protocol version: the input names ",
+                    vm.toString(getNewProtocolVersion()),
+                    " and the ChainTypeManager runs ",
+                    vm.toString(ctmProtocolVersion)
+                )
+            );
+            return;
+        }
         require(
             ctmProtocolVersion != getNewProtocolVersion(),
             "The new protocol version is already present on the ChainTypeManager"
@@ -1038,12 +1217,12 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         vm.serializeAddress("registry", "ctm_transition_addr", upgradeAddresses.ctmTransition);
         vm.serializeAddress("registry", "ctm_release_addr", ctmAddresses.stateTransition.currentRelease);
         vm.serializeAddress("registry", "upgrade_timer_addr", upgradeAddresses.upgradeTimer);
-        // The CTM-domain rows of this edge, for the compose step to pin on the operation. A
-        // bootstrap edge composes nothing — its own object already carries them.
+        // The CTM-domain rows of this edge, as the operation this prepare deployed pins them. A
+        // bootstrap edge deploys no operation — its own object already carries them.
         vm.serializeBytes(
             "registry",
             "ctm_infrastructure",
-            upgradeAddresses.ctmTransition != address(0) ? abi.encode(_ctmProxyUpgradeRows()) : bytes("")
+            upgradeAddresses.ecosystemUpgradeOperation != address(0) ? abi.encode(_ctmProxyUpgradeRows()) : bytes("")
         );
         address bootstrapMigrationAddr = bootstrapMigrationAddress();
         vm.serializeAddress("registry", "bootstrap_migration_addr", bootstrapMigrationAddr);
@@ -1075,8 +1254,12 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         return newConfig.ctm;
     }
 
-    /// @notice Reads the upgrade cut from the pinned transition.
+    /// @notice Reads the upgrade cut from the pinned transition. Empty on an infrastructure-only
+    ///         edge: no chain crosses it, so there is no cut for one to take.
     function getChainUpgradeDiamondCutData() public view virtual returns (bytes memory) {
+        if (upgradeAddresses.ctmTransition == address(0) && upgradeKind() == UpgradeKind.InfrastructureOnly) {
+            return bytes("");
+        }
         require(upgradeAddresses.ctmTransition != address(0), "transition not deployed");
         return abi.encode(CTMUpgradeComposer.buildUpgradeCutData(ICTMTransition(upgradeAddresses.ctmTransition)));
     }

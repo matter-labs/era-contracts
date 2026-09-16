@@ -1,6 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+/// @notice What a version's prepare SETS OUT to change. Declared by the version script
+///         (`DefaultCTMUpgrade.upgradeKind`), never inferred from the version numbers the run
+///         happens to see. See "Infrastructure-only operations" in
+///         {protocol-docs/ecosystem-upgrade-coordination.md}.
+enum UpgradeKind {
+    // A chain-version edge: the prepare deploys the upgrade engine and the `CTMTransition` chains
+    // cross, and the protocol version moves.
+    ChainRelease,
+    // Ecosystem and CTM-domain singletons behind their proxies, and nothing else: no transition,
+    // no upgrade engine, and nothing chain-facing moves.
+    InfrastructureOnly
+}
+
 /// @notice Parameters for the ecosystem upgrade entry point.
 ///         Passed as a struct to avoid stack-depth issues as the parameter list grows.
 // solhint-disable-next-line gas-struct-packing
