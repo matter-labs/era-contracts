@@ -46,8 +46,6 @@ import {TxStatus} from "../common/Messaging.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpgradeable {
-    using EnumerableMap for EnumerableMap.UintToAddressMap;
-
     /// @notice Address of the bridgehub
     address public immutable BRIDGE_HUB;
 
@@ -60,7 +58,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @notice Address of the permissionless validator used in Priority Mode
     address public immutable PERMISSIONLESS_VALIDATOR;
 
-    /// @notice The map from chainId => zkChain contract
+    /// @dev Deprecated chainId => zkChain map. Chains resolve through the Bridgehub now, and
+    ///      the legacy readers are gone. The DECLARATION stays: this slot exists on deployed
+    ///      CTMs, so removing it would shift every storage slot after it.
     EnumerableMap.UintToAddressMap internal __DEPRECATED_zkChainMap;
 
     /// @dev Deprecated. Genesis batch zero, the initial diamond cut hash and the L1 genesis
@@ -209,13 +209,6 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @notice return the chain contract address for a chainId
     function getZKChain(uint256 _chainId) public view returns (address) {
         return IL1Bridgehub(BRIDGE_HUB).getZKChain(_chainId);
-    }
-
-    /// @notice return the chain contract address for a chainId
-    /// @notice Do not use! use getZKChain instead. This will be removed.
-    function getZKChainLegacy(uint256 _chainId) public view returns (address chainAddress) {
-        // slither-disable-next-line unused-return
-        (, chainAddress) = __DEPRECATED_zkChainMap.tryGet(_chainId);
     }
 
     /// @notice Returns the address of the ZK chain admin with the corresponding chainID.
@@ -732,24 +725,6 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         address oldValidatorTimelock = __DEPRECATED_validatorTimelock;
         __DEPRECATED_validatorTimelock = _validatorTimelock;
         emit NewValidatorTimelock(oldValidatorTimelock, _validatorTimelock);
-    }
-
-    /// @notice return the chain contract address for a chainId
-    // TODO: DELETE once no deployed ValidatorTimelock still resolves chains through this getter
-    //       (kept for the upgrade window in which the bridgehub's zkChains mapping is not yet
-    //       filled while the old ValidatorTimelock still queries by chain id).
-    function getHyperchain(uint256 _chainId) public view returns (address) {
-        // During upgrade, there will be a period when the zkChains mapping on
-        // bridgehub will not be filled yet, while the ValidatorTimelock
-        // will still query the address to obtain the chain id.
-        //
-        // To cover this case, we firstly use the existing storage and only then
-        // we use the bridgehub if the former was not present.
-        address legacyAddress = getZKChainLegacy(_chainId);
-        if (legacyAddress != address(0)) {
-            return legacyAddress;
-        }
-        return getZKChain(_chainId);
     }
 
     /// @notice Returns the legacy validator timelock address.

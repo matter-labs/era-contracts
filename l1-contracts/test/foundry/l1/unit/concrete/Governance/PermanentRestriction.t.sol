@@ -76,7 +76,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         createNewChainBridgehub();
 
         owner = makeAddr("owner");
-        hyperchain = chainContractAddress.getHyperchain(chainId);
+        hyperchain = chainContractAddress.getZKChain(chainId);
         (permRestriction, ) = _deployPermRestriction(bridgehub, L2_FACTORY_ADDR, owner);
         restriction = new AccessControlRestriction(0, owner);
         address[] memory restrictions = new address[](1);
