@@ -140,7 +140,7 @@ jobs:
       #
       # Gating the save on the suites cost real time for no integrity gain: a base branch that is red
       # for a day would hand out no cache at all, so every PR targeting it built cold in four jobs.
-      - name: Save the verified solc build cache
+      - name: Save the clean solc build cache
         uses: ./.github/actions/save-solc-cache
 
       # The four checks whose answers come from the artifacts, so a cache could have shifted them.

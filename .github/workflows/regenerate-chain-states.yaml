@@ -97,8 +97,8 @@ jobs:
 
       - name: Cleanup Anvil
         if: always()
-        run: |
-          pkill -9 anvil 2>/dev/null || true
+        working-directory: l1-contracts/test/anvil-interop
+        run: bash cleanup.sh
 
       # Deliberately commits on any byte difference, which for these gzipped dumps of a
       # wall-clock-dependent chain means every run. Suppressing that with
