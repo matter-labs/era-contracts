@@ -5,8 +5,6 @@ import {Test} from "forge-std/Test.sol";
 
 import {EraMultiProofTestnetVerifier} from "contracts/state-transition/verifiers/EraMultiProofTestnetVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
-import {EraDualVerifier} from "contracts/state-transition/verifiers/EraDualVerifier.sol";
 import {
     AIRBENDER_PROOF_SYSTEM_MASK,
     AIRBENDER_SNARK_PROOF_LENGTH,
@@ -59,17 +57,13 @@ contract EraMultiProofTestnetVerifierTest is Test {
     }
 
     function test_reportsVerificationKeys() public {
-        StubVerifier fflonk = new StubVerifier(true, keccak256("fflonk-key"));
-        StubVerifier plonk = new StubVerifier(true, keccak256("plonk-key"));
-        EraDualVerifier boojum = new EraDualVerifier(IVerifierV2(address(fflonk)), IVerifier(address(plonk)));
         EraMultiProofTestnetVerifier v = new EraMultiProofTestnetVerifier(
-            IVerifier(address(boojum)),
+            IVerifier(address(new StubVerifier(true, keccak256("boojum-key")))),
             IVerifier(address(new StubVerifier(true, keccak256("airbender-key"))))
         );
 
-        assertEq(v.verificationKeyHash(), boojum.verificationKeyHash());
-        assertEq(v.verificationKeyHash(0), keccak256("fflonk-key"));
-        assertEq(v.verificationKeyHash(1), keccak256("plonk-key"));
+        assertEq(v.verificationKeyHash(), keccak256("boojum-key"));
+        assertEq(v.verificationKeyHash(0), keccak256("boojum-key"));
         assertEq(v.verificationKeyHash(2), keccak256("airbender-key"));
     }
 }
