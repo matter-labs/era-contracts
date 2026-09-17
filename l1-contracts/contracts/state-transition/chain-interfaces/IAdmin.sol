@@ -42,7 +42,8 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// `ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT`
     function setZKsyncOSMaxTxGasLimit(uint64 _newMaxTxGasLimit) external;
 
-    /// @notice Enables or disables one of the proof systems an Era chain requires. At least one must stay enabled.
+    /// @notice Enables or disables one of the proof systems an Era chain requires. At least one of the systems the
+    /// installed verifier supports must stay enabled.
     /// @param _proofSystem The proof system to configure.
     /// @param _enabled Whether the selected proof system is required.
     function setProofSystemStatus(ProofSystem _proofSystem, bool _enabled) external;

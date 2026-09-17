@@ -11,6 +11,7 @@ import {CTMDeployedAddresses} from "deploy-scripts/utils/Types.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMultiProofVerifier.sol";
 import {IEraDualVerifier} from "contracts/state-transition/chain-interfaces/IEraDualVerifier.sol";
+import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 
@@ -61,10 +62,9 @@ contract AirbenderDeploymentTest is L1ContractDeployer, ZKChainDeployer, TokenDe
     }
 
     /// The Boojum verifier must be the production `EraDualVerifier`, not `EraTestnetVerifier`.
-    function test_boojumVerifierIsTheProductionRouter() public view {
-        (bool ok, ) = address(_verifier().BOOJUM_VERIFIER()).staticcall(
-            abi.encodeWithSignature("IS_TESTNET_VERIFIER()")
-        );
-        assertFalse(ok);
+    function test_boojumVerifierIsTheProductionRouter() public {
+        EraTestnetVerifier boojum = EraTestnetVerifier(address(_verifier().BOOJUM_VERIFIER()));
+        vm.expectRevert();
+        boojum.IS_TESTNET_VERIFIER();
     }
 }

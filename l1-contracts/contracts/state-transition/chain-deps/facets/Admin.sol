@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
+import {IEraMultiProofVerifier} from "../../chain-interfaces/IEraMultiProofVerifier.sol";
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {
@@ -16,7 +17,6 @@ import {
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
     ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT,
-    ALL_PROOF_SYSTEMS_DISABLED,
     ProofSystem
 } from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
@@ -50,7 +50,6 @@ import {
     ProtocolIdMismatch,
     ProtocolIdNotGreater,
     TokenMultiplierChangeTooFrequent,
-    InvalidDisabledProofSystemsMask,
     TooMuchGas,
     Unauthorized,
     UpgradeTimestampNotReached,
@@ -206,9 +205,8 @@ contract AdminFacet is ZKChainBase, IAdmin {
             ? oldDisabledProofSystems & ~proofSystemMask
             : oldDisabledProofSystems | proofSystemMask;
 
-        if (newDisabledProofSystems == ALL_PROOF_SYSTEMS_DISABLED) {
-            revert InvalidDisabledProofSystemsMask(newDisabledProofSystems);
-        }
+        // Reverts if the installed verifier would be left with no proof system to require.
+        IEraMultiProofVerifier(address(s.verifier)).requiredProofSystems(newDisabledProofSystems);
 
         s.disabledProofSystems = newDisabledProofSystems;
         emit NewDisabledProofSystems(oldDisabledProofSystems, newDisabledProofSystems);

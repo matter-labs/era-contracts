@@ -6,6 +6,8 @@ import {AdminTest} from "./_Admin_Shared.t.sol";
 import {InvalidDisabledProofSystemsMask, MustBeEraChain, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {NotSettlementLayer} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {AIRBENDER_PROOF_SYSTEM_MASK, BOOJUM_PROOF_SYSTEM_MASK, ProofSystem} from "contracts/common/Config.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMultiProofVerifier.sol";
 
 contract SetProofSystemStatusTest is AdminTest {
     event NewDisabledProofSystems(uint8 indexed oldDisabledProofSystems, uint8 indexed newDisabledProofSystems);
@@ -71,6 +73,17 @@ contract SetProofSystemStatusTest is AdminTest {
 
         vm.startPrank(utilsFacet.util_getAdmin());
         vm.expectRevert(abi.encodeWithSelector(InvalidDisabledProofSystemsMask.selector, both));
+        adminFacet.setProofSystemStatus(ProofSystem.Boojum, false);
+    }
+
+    /// A CTM without an Airbender verifier requires Boojum only, so Boojum cannot be disabled there.
+    function test_revertWhen_disablingTheOnlySupportedSystem() public {
+        utilsFacet.util_setVerifier(
+            IVerifier(address(new EraMultiProofVerifier(IVerifier(address(1)), IVerifier(address(0)))))
+        );
+
+        vm.startPrank(utilsFacet.util_getAdmin());
+        vm.expectRevert(abi.encodeWithSelector(InvalidDisabledProofSystemsMask.selector, BOOJUM_PROOF_SYSTEM_MASK));
         adminFacet.setProofSystemStatus(ProofSystem.Boojum, false);
     }
 

@@ -21,6 +21,7 @@ pub struct DeployCTMConfig {
     pub is_zk_sync_os: bool,
     pub zk_token_asset_id: B256,
     /// Deploy the Airbender verifier, so batches require both a Boojum and an Airbender proof. Era only.
+    #[serde(default)]
     pub airbender_verifier: bool,
 }
 
