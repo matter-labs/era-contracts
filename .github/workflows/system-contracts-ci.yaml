@@ -120,6 +120,7 @@ jobs:
             system-contracts/cache-zk
             system-contracts/typechain
             system-contracts/contracts-preprocessed
+            l1-contracts/zkout
 
       - name: Generate GitHub App token
         id: anvil_token
