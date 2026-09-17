@@ -50,6 +50,7 @@ import {
     ProtocolIdMismatch,
     ProtocolIdNotGreater,
     TokenMultiplierChangeTooFrequent,
+    InvalidDisabledProofSystemsMask,
     TooMuchGas,
     Unauthorized,
     UpgradeTimestampNotReached,
@@ -205,8 +206,10 @@ contract AdminFacet is ZKChainBase, IAdmin {
             ? oldDisabledProofSystems & ~proofSystemMask
             : oldDisabledProofSystems | proofSystemMask;
 
-        // Reverts if the installed verifier would be left with no proof system to require.
-        IEraMultiProofVerifier(address(s.verifier)).requiredProofSystems(newDisabledProofSystems);
+        uint8 supported = IEraMultiProofVerifier(address(s.verifier)).supportedProofSystems();
+        if (supported & ~newDisabledProofSystems == 0) {
+            revert InvalidDisabledProofSystemsMask(newDisabledProofSystems);
+        }
 
         s.disabledProofSystems = newDisabledProofSystems;
         emit NewDisabledProofSystems(oldDisabledProofSystems, newDisabledProofSystems);
