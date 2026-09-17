@@ -44,6 +44,8 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
 
     /// @notice Enables or disables one of the proof systems an Era chain requires. At least one of the systems the
     /// installed verifier supports must stay enabled.
+    /// @dev Disabling only skips that system's proof. Both commitments are still built and stored, so the fields only
+    /// that system proves (its bootloader heap hash and events queue hash) stay unverified for the affected batches.
     /// @param _proofSystem The proof system to configure.
     /// @param _enabled Whether the selected proof system is required.
     function setProofSystemStatus(ProofSystem _proofSystem, bool _enabled) external;
