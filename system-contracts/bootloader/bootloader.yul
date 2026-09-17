@@ -1255,6 +1255,12 @@ object "Bootloader" {
                     // Sending the L2->L1 log so users will be able to prove transaction execution result on L1.
                     sendL2LogUsingL1Messenger(true, canonicalL1TxHash, success)
 
+                    // Operator-requested failures are otherwise indistinguishable from reverts. Record them so
+                    // watchers can react within the execution delay and users can prove the failure was forced.
+                    if forceFail {
+                        sendL2LogUsingL1Messenger(true, forceFailedL1TxLogKey(), canonicalL1TxHash)
+                    }
+
                     // Update priority txs L1 data
                     mstore(0, mload(PRIORITY_TXS_L1_DATA_BEGIN_BYTE()))
                     mstore(32, canonicalL1TxHash)
@@ -4643,6 +4649,12 @@ object "Bootloader" {
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
             function protocolUpgradeTxHashKey() -> ret {
                 ret := 10
+            }
+
+            /// @dev Key of the L1Messenger log emitted alongside the status log for each force-failed L1->L2
+            /// transaction. keccak256("zksync.bootloader.forceFailedL1TxLog").
+            function forceFailedL1TxLogKey() -> ret {
+                ret := 0xc347406c856ed927ab49919146282a0c9feb316c83a07792fce67353bcf0e474
             }
 
             ////////////////////////////////////////////////////////////////////////////
