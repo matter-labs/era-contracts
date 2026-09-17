@@ -31,6 +31,7 @@ contract SetChainCreationParamsTest is ChainTypeManagerTest {
             genesisBatchHash: genesisBatchHash,
             genesisIndexRepeatedStorageChanges: genesisIndexRepeatedStorageChanges,
             genesisBatchCommitment: genesisBatchCommitment,
+            genesisAirbenderBatchCommitment: genesisBatchCommitment,
             diamondCut: newDiamondCutData,
             forceDeploymentsData: bytes("")
         });
@@ -52,7 +53,7 @@ contract SetChainCreationParamsTest is ChainTypeManagerTest {
             dependencyRootsRollingHash: bytes32(0),
             timestamp: 0,
             commitment: genesisBatchCommitment,
-            airbenderCommitment: bytes32(0)
+            airbenderCommitment: genesisBatchCommitment
         });
         bytes32 expectedStoredBatchZero = keccak256(abi.encode(newBatchZero));
 

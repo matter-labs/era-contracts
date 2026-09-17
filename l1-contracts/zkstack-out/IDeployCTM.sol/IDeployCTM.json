@@ -398,6 +398,11 @@
                     "internalType": "bytes32"
                   },
                   {
+                    "name": "genesisAirbenderBatchCommitment",
+                    "type": "bytes32",
+                    "internalType": "bytes32"
+                  },
+                  {
                     "name": "latestProtocolVersion",
                     "type": "uint256",
                     "internalType": "uint256"

@@ -37,6 +37,9 @@ contract ZKsyncOSChainTypeManager is ChainTypeManagerBase {
         if (_chainCreationParams.genesisBatchCommitment != bytes32(uint256(1))) {
             revert GenesisBatchCommitmentIncorrect();
         }
+        if (_chainCreationParams.genesisAirbenderBatchCommitment != bytes32(0)) {
+            revert GenesisBatchCommitmentIncorrect();
+        }
 
         // Process the validated parameters
         _processValidatedChainCreationParams(_chainCreationParams);

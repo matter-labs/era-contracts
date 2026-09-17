@@ -249,7 +249,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
             dependencyRootsRollingHash: bytes32(0),
             timestamp: 0,
             commitment: _chainCreationParams.genesisBatchCommitment,
-            airbenderCommitment: bytes32(0)
+            airbenderCommitment: _chainCreationParams.genesisAirbenderBatchCommitment
         });
         storedBatchZero = keccak256(abi.encode(batchZero));
         bytes32 newInitialCutHash = keccak256(abi.encode(_chainCreationParams.diamondCut));

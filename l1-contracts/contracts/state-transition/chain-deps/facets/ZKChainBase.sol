@@ -246,7 +246,7 @@ contract ZKChainBase is ReentrancyGuard {
     /// @param _lastCommittedBatchData The last committed batch.
     /// @param _batchNumber The batch number to check.
     /// @param _checkLegacy Whether the pre-Airbender and legacy `StoredBatchInfo` encodings are also accepted
-    /// (predecessor batch only).
+    /// (predecessor batch only). Such a predecessor carries no Airbender commitment, so the field must be zero.
     function _checkBatchHashMismatch(
         IExecutor.StoredBatchInfo memory _lastCommittedBatchData,
         uint256 _batchNumber,
@@ -259,6 +259,7 @@ contract ZKChainBase is ReentrancyGuard {
         }
         if (
             _checkLegacy &&
+            _lastCommittedBatchData.airbenderCommitment == bytes32(0) &&
             (storedHash == StoredBatchHashing.hashPreAirbenderStoredBatchInfo(_lastCommittedBatchData) ||
                 storedHash == StoredBatchHashing.hashLegacyStoredBatchInfo(_lastCommittedBatchData))
         ) {
