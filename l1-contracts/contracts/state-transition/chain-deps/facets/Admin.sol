@@ -206,7 +206,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
             ? oldDisabledProofSystems & ~proofSystemMask
             : oldDisabledProofSystems | proofSystemMask;
 
-        if (newDisabledProofSystems >= ALL_PROOF_SYSTEMS_DISABLED) {
+        if (newDisabledProofSystems == ALL_PROOF_SYSTEMS_DISABLED) {
             revert InvalidDisabledProofSystemsMask(newDisabledProofSystems);
         }
 

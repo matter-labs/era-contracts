@@ -853,7 +853,7 @@ library GatewayCTMDeployerHelper {
                 verifierPlonk: _deployedContracts.stateTransition.verifiers.verifierPlonk,
                 // Gateway CTM deployment does not deploy an Airbender verifier.
                 airbenderVerifierPlonk: address(0),
-                boojumVerifier: address(0),
+                boojumVerifier: _deployedContracts.stateTransition.verifiers.boojumVerifier,
                 verifierOwner: _config.aliasedGovernanceAddress,
                 permissionlessValidator: address(0)
             });

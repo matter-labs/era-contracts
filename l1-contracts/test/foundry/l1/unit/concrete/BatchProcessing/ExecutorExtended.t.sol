@@ -23,7 +23,6 @@ import {
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 /// @title Extended tests for ExecutorFacet to increase coverage
 contract ExecutorExtendedTest is ExecutorTest {

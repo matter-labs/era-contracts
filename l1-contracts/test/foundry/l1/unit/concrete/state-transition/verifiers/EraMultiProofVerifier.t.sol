@@ -228,9 +228,9 @@ contract EraMultiProofVerifierTest is Test {
         chain.callVerify(verifier, _publicInputs(), proof);
     }
 
-    /// Uses the real `EraDualVerifier`: an Airbender-typed proof is not routable through the Boojum segment,
-    /// and an empty Boojum segment is refused while Boojum is required.
-    function test_boojumSegmentGoesThroughTheRealRouter() public {
+    /// With the real `EraDualVerifier`: an Airbender-typed proof is refused in the Boojum segment, and so is an
+    /// empty Boojum segment while Boojum is required.
+    function test_boojumSegmentGoesThroughTheRealBoojumVerifier() public {
         EraDualVerifier router = new EraDualVerifier(IVerifierV2(address(boojum)), IVerifier(address(boojum)));
         EraMultiProofVerifier v = _withBoojum(IVerifier(address(router)));
 
@@ -256,7 +256,7 @@ contract EraMultiProofVerifierTest is Test {
         verifier.requiredProofSystems(BOTH);
     }
 
-    /// `verificationKeyHash(type)`: 0 and 1 from the Boojum router, 2 from Airbender.
+    /// `verificationKeyHash(type)`: 0 and 1 from the Boojum verifier, 2 from Airbender.
     function test_reportsKeysByType() public {
         StubVerifier fflonk = new StubVerifier(true, keccak256("fflonk-key"));
         StubVerifier plonk = new StubVerifier(true, keccak256("plonk-key"));

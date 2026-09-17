@@ -70,7 +70,6 @@ library DeployCTML1OrGateway {
         fileName = string.concat(contractName, ".sol");
     }
 
-    /// @notice Resolve the main verifier (dual or testnet) for the active VM.
     /// @notice Resolve the verifier the chain's diamond points at. For Era this is `EraMultiProofVerifier`.
     function resolveChainVerifier(
         bool _isZKsyncOS,

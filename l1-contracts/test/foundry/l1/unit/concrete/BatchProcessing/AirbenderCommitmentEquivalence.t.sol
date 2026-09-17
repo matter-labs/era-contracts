@@ -9,7 +9,7 @@ import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/IComm
 
 /// @notice Checks the Boojum and Airbender batch commitments against vectors emitted by
 /// `zksync_types::commitment::airbender_l1_equivalence_tests` from a recorded post-gateway batch
-/// (`post_gateway_test.json` in `eravm-airbender-verifier`). The generators are not committed upstream.
+/// (`post_gateway_test.json` in `eravm-airbender-verifier`).
 contract AirbenderCommitmentEquivalenceTest is Test {
     uint256 internal constant TOTAL_BLOBS = 16;
 

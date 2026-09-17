@@ -114,10 +114,10 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable, IServer
         emit UpgradeTimestampUpdated(_chainId, _oldProtocolVersion, _upgradeTimestamp);
     }
 
-    /// @notice Emits an event to signal which proof systems the chain admin is about to disable or enable, so the
-    /// server can prepare the provers before `setProofSystemStatus` is called on the chain.
+    /// @notice Announces the `disabledProofSystems` mask the chain admin is about to set with `setProofSystemStatus`,
+    /// so the server can prepare the provers.
     /// @param _chainId The identifier of the chain.
-    /// @param _disabledProofSystems The mask of proof systems the chain will not require, in the chain's `ProofSystem` bits.
+    /// @param _disabledProofSystems The mask of proof systems the chain will not require.
     /// @dev Restricted to the chain administrator.
     function notifyProofSystemStatus(uint256 _chainId, uint8 _disabledProofSystems) external onlyChainAdmin(_chainId) {
         emit ProofSystemStatusNotified(_chainId, _disabledProofSystems);

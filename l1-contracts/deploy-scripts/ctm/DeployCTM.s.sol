@@ -228,10 +228,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         if (config.isZKsyncOS) {
             ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(chainVerifierName, false);
         } else {
-            (, string memory boojumVerifierName) = DeployCTML1OrGateway.resolveBoojumVerifier(
-                false,
-                config.testnetVerifier
-            );
+            (, string memory boojumVerifierName) = DeployCTML1OrGateway.resolve(false, CTMContract.DualVerifier);
             ctmAddresses.stateTransition.verifiers.boojumVerifier = deploySimpleContract(boojumVerifierName, false);
             if (config.airbenderVerifier) {
                 ctmAddresses.stateTransition.verifiers.airbenderVerifierPlonk = deploySimpleContract(

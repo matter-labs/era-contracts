@@ -5,6 +5,7 @@ import {EraSettlementLayerV33Upgrade} from "contracts/upgrades/EraSettlementLaye
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {MustBeEraChain} from "contracts/common/L1ContractErrors.sol";
 import {NotAllBatchesExecuted} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {AIRBENDER_PROOF_SYSTEM_MASK} from "contracts/common/Config.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
@@ -48,10 +49,10 @@ contract EraSettlementLayerV33UpgradeTest is BaseUpgrade {
     }
 
     function test_doesNotTouchTheProofSystemMask() public {
-        upgradeContract.setDisabledProofSystems(2);
+        upgradeContract.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
         upgradeContract.upgrade(proposedUpgrade);
 
-        assertEq(upgradeContract.getDisabledProofSystems(), 2);
+        assertEq(upgradeContract.getDisabledProofSystems(), AIRBENDER_PROOF_SYSTEM_MASK);
     }
 
     /// A batch committed before the upgrade carries no Airbender commitment and could not be proved.

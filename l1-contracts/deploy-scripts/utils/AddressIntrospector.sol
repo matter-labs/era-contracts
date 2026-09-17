@@ -520,7 +520,7 @@ library AddressIntrospector {
         (address verifierFflonk, address verifierPlonk) = _isV29
             ? (address(0), address(0))
             : _getSubVerifiers(_verifier, _isZKsyncOS);
-        // The multi-proof verifier's sub-verifiers are not probed here; the deploy output reports them.
+        // `boojumVerifier` and `airbenderVerifierPlonk` are not introspected.
         return
             Verifiers({
                 verifier: _verifier,

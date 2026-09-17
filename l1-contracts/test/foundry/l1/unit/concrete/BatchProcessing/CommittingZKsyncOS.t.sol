@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import "forge-std/console.sol";
 
-import {Utils} from "../Utils/Utils.sol";
+import {EVENT_INDEX, Utils} from "../Utils/Utils.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
 import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
@@ -19,7 +19,6 @@ import {BlobsL1DAValidatorZKsyncOS} from "../../../da-contracts-imports/BlobsL1D
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CountingVerifier} from "foundry-test/l1/unit/concrete/state-transition/verifiers/VerifierStubs.sol";
 import {Vm} from "forge-std/Test.sol";
-import {EVENT_INDEX} from "../Utils/Utils.sol";
 
 contract CommittingTest is ExecutorTest {
     function isZKsyncOS() internal pure override returns (bool) {

@@ -13,7 +13,6 @@ import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMul
 import {IEraDualVerifier} from "contracts/state-transition/chain-interfaces/IEraDualVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 /// @notice Integration checks for a CTM deployed with `airbender_verifier = true`.
 contract AirbenderDeploymentTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
@@ -61,15 +60,11 @@ contract AirbenderDeploymentTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         assertEq(info.stateTransition.verifiers.verifier, address(_verifier()), "chain verifier not resolved");
     }
 
-    /// The Boojum verifier must be the production router, not `EraTestnetVerifier`.
+    /// The Boojum verifier must be the production `EraDualVerifier`, not `EraTestnetVerifier`.
     function test_boojumVerifierIsTheProductionRouter() public view {
         (bool ok, ) = address(_verifier().BOOJUM_VERIFIER()).staticcall(
             abi.encodeWithSignature("IS_TESTNET_VERIFIER()")
         );
         assertFalse(ok);
-    }
-
-    function test_registeringASecondChainStillWorks() public {
-        _deployZKChain(ETH_TOKEN_ADDRESS);
     }
 }

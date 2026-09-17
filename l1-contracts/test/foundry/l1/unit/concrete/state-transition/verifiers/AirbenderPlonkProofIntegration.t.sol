@@ -37,8 +37,7 @@ contract AirbenderPlonkProofIntegrationTest is Test {
         airbenderVerifier = new AirbenderVerifierPlonk();
     }
 
-    /// Sanity-check: the airbender PLONK verifier accepts the real proof when
-    /// called directly, with no router in front.
+    /// The airbender PLONK verifier accepts the real proof when called directly.
     function test_airbenderVerifierPlonk_acceptsAirbenderProof() public view {
         bool ok = airbenderVerifier.verify(
             AirbenderPlonkProofFixture.publicInputs(),

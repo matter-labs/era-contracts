@@ -292,7 +292,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             abi.encode(bool(true))
         );
         DiamondInit diamondInit = new DiamondInit(isZKsyncOS());
-        // Testnet multi-proof verifier over a Boojum router, so an empty proof settles.
+        // Testnet multi-proof verifier, so an empty proof settles.
         EraMultiProofTestnetVerifier testnetVerifier = new EraMultiProofTestnetVerifier(
             IVerifier(address(new EraDualVerifier(IVerifierV2(address(0)), IVerifier(address(0))))),
             IVerifier(address(0))

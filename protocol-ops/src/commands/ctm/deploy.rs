@@ -23,7 +23,6 @@ pub struct CtmDeployInput {
     pub vm_type: VMOption,
     pub reuse_gov_and_admin: bool,
     pub with_testnet_verifier: bool,
-    /// Require both a Boojum and an Airbender proof to settle a batch (Era only).
     pub with_airbender_verifier: bool,
     pub with_legacy_bridge: bool,
     pub zk_token_asset_id: Option<B256>,

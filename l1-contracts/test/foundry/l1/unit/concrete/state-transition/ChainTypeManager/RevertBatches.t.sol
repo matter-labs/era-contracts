@@ -208,7 +208,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             blobCommitments,
             blobHashes
         );
-        // Storage, not a local: the stored-batch literal below is at the stack limit.
+        // Storage: a local would overflow the stack here.
         expectedAirbenderCommitment = Utils.createAirbenderBatchCommitment(
             correctNewCommitBatchInfo,
             uncompressedStateDiffHash,

@@ -232,10 +232,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             Utils.genesisConfigPath(isZKsyncOS)
         );
 
-        // Optional; Era only.
-        if (toml.keyExists("$.airbender_verifier")) {
-            config.airbenderVerifier = toml.readBool("$.airbender_verifier");
-        }
         // Optional override for v29 introspection selection
         if (toml.keyExists("$.use_v29_introspection")) {
             newConfig.hasV29IntrospectionOverride = true;

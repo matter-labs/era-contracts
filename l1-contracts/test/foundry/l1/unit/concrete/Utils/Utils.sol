@@ -626,23 +626,6 @@ library Utils {
         CommitBatchInfo calldata _newBatchData,
         bytes32 _stateDiffHash,
         bytes32[] memory _blobCommitments,
-        bytes32[] memory _blobHashes
-    ) public pure returns (bytes32) {
-        return
-            createAirbenderBatchCommitment(
-                _newBatchData,
-                _stateDiffHash,
-                _blobCommitments,
-                _blobHashes,
-                keccak256(_batchMetaParameters())
-            );
-    }
-
-    /// @dev For chains whose metaparameters are not the shared test constants.
-    function createAirbenderBatchCommitment(
-        CommitBatchInfo calldata _newBatchData,
-        bytes32 _stateDiffHash,
-        bytes32[] memory _blobCommitments,
         bytes32[] memory _blobHashes,
         bytes32 _metadataHash
     ) public pure returns (bytes32) {
@@ -672,7 +655,14 @@ library Utils {
         blobHashes[0] = _blobLinearHash;
         bytes32[] memory blobCommitments = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
         blobCommitments[0] = defaultBlobOpeningCommitment(_blobVersionedHash);
-        return createAirbenderBatchCommitment(_batch, _stateDiffHash, blobCommitments, blobHashes);
+        return
+            createAirbenderBatchCommitment(
+                _batch,
+                _stateDiffHash,
+                blobCommitments,
+                blobHashes,
+                keccak256(_batchMetaParameters())
+            );
     }
 
     function _batchPassThroughData(CommitBatchInfo calldata _batch) internal pure returns (bytes memory) {

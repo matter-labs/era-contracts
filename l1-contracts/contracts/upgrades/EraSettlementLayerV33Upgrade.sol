@@ -18,7 +18,7 @@ contract EraSettlementLayerV33Upgrade is BaseZkSyncUpgrade {
         if (s.zksyncOS) {
             revert MustBeEraChain();
         }
-        // Batches committed before the upgrade carry no Airbender commitment and could not be proved.
+        // Pre-upgrade batches are stored under the old `StoredBatchInfo` form, which only a predecessor may match.
         require(s.totalBatchesCommitted == s.totalBatchesExecuted, NotAllBatchesExecuted());
 
         super.upgrade(_proposedUpgrade);

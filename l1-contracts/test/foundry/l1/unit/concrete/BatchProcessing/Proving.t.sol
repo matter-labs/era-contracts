@@ -38,11 +38,9 @@ import {
 } from "foundry-test/l1/unit/concrete/state-transition/verifiers/VerifierStubs.sol";
 
 contract ProvingTest is ExecutorTest {
-    uint256 internal constant PLONK_VERIFICATION_TYPE = 1;
-
     bytes32 l2DAValidatorOutputHash;
-    bytes32 committedStateDiffHash;
-    bytes32 committedBlobLinearHash;
+    bytes32 uncompressedStateDiffHash;
+    bytes32 blobLinearHash;
     bytes32[] blobVersionedHashes;
     bytes operatorDAInput;
 
@@ -94,8 +92,8 @@ contract ProvingTest is ExecutorTest {
             commitment: entries[EVENT_INDEX].topics[3],
             airbenderCommitment: Utils.airbenderCommitmentForSingleBlob(
                 newCommitBatchInfo,
-                committedStateDiffHash,
-                committedBlobLinearHash,
+                uncompressedStateDiffHash,
+                blobLinearHash,
                 blobVersionedHashes[0]
             )
         });
@@ -105,13 +103,12 @@ contract ProvingTest is ExecutorTest {
         bytes1 source = bytes1(0x01);
         bytes memory defaultBlobCommitment = Utils.getDefaultBlobCommitment();
 
-        bytes32 uncompressedStateDiffHash = Utils.randomBytes32("uncompressedStateDiffHash");
-        committedStateDiffHash = uncompressedStateDiffHash;
+        uncompressedStateDiffHash = Utils.randomBytes32("uncompressedStateDiffHash");
         bytes32 totalL2PubdataHash = Utils.randomBytes32("totalL2PubdataHash");
         uint8 numberOfBlobs = 1;
         bytes32[] memory blobsLinearHashes = new bytes32[](1);
         blobsLinearHashes[0] = Utils.randomBytes32("blobsLinearHashes");
-        committedBlobLinearHash = blobsLinearHashes[0];
+        blobLinearHash = blobsLinearHashes[0];
 
         operatorDAInput = abi.encodePacked(
             uncompressedStateDiffHash,
@@ -295,23 +292,19 @@ contract ProvingTest is ExecutorTest {
 
     // ============ Public inputs ============
 
-    function test_executorEmitsTwoShiftedTransitionHashes() public {
+    function test_executorPassesTwoPublicInputs() public {
         vm.etch(getters.getVerifier(), address(new RevealingVerifier()).code);
-
-        uint256[] memory proof = new uint256[](2);
-        proof[0] = PLONK_VERIFICATION_TYPE;
-        proof[1] = 0xdeadbeef;
 
         vm.expectRevert(
             abi.encodeWithSelector(
                 RevealingVerifier.Revealed.selector,
                 _publicInput(genesisStoredBatchInfo.commitment, newStoredBatchInfo.commitment),
                 2,
-                PLONK_VERIFICATION_TYPE,
-                2
+                ERA_MULTI_PROOF_TYPE,
+                2 + 1 + AIRBENDER_SNARK_PROOF_LENGTH
             )
         );
-        _proveWith(proof);
+        _proveWith(_multiProof());
     }
 
     function test_eraProvesOneBatchPerCall() public {
@@ -332,52 +325,23 @@ contract ProvingTest is ExecutorTest {
     }
 
     /// Each proof system receives its own transition hash, both chained from the predecessor's Boojum
-    /// commitment, and the batch settles only if both accept.
+    /// commitment; the predecessor's `airbenderCommitment` is not used.
     function test_bothProofSystemsReceiveTheirOwnTransitionHash() public {
-        _installVerifier(
-            IVerifier(
-                address(
-                    new ExpectingVerifier(
-                        _publicInput(genesisStoredBatchInfo.commitment, newStoredBatchInfo.commitment)
-                    )
-                )
-            ),
-            IVerifier(
-                address(
-                    new ExpectingVerifier(
-                        _publicInput(genesisStoredBatchInfo.commitment, newStoredBatchInfo.airbenderCommitment)
-                    )
-                )
-            )
-        );
-
-        _proveWith(_multiProof());
-
-        assertEq(getters.getTotalBlocksVerified(), 1);
-    }
-
-    /// The predecessor's own `airbenderCommitment` is not used.
-    function test_airbenderInputChainsFromThePredecessorBoojumCommitment() public {
         IExecutor.StoredBatchInfo memory prev = genesisStoredBatchInfo;
         prev.commitment = Utils.randomBytes32("predecessorBoojumCommitment");
         prev.airbenderCommitment = Utils.randomBytes32("predecessorAirbenderCommitment");
         utilsFacet.util_setStoredBatchHashes(0, keccak256(abi.encode(prev)));
 
         _installVerifier(
-            IVerifier(address(new StubVerifier(true, bytes32(0)))),
-            IVerifier(address(new RevealingVerifier()))
-        );
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                RevealingVerifier.Revealed.selector,
-                _publicInput(prev.commitment, newStoredBatchInfo.airbenderCommitment),
-                1,
-                0,
-                AIRBENDER_SNARK_PROOF_LENGTH
+            IVerifier(address(new ExpectingVerifier(_publicInput(prev.commitment, newStoredBatchInfo.commitment)))),
+            IVerifier(
+                address(new ExpectingVerifier(_publicInput(prev.commitment, newStoredBatchInfo.airbenderCommitment)))
             )
         );
+
         _proveWithPrev(prev, _multiProof(), newStoredBatchInfo);
+
+        assertEq(getters.getTotalBlocksVerified(), 1);
     }
 
     /// Through the diamond: the verifier reads `disabledProofSystems` from the calling chain.

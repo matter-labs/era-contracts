@@ -78,7 +78,7 @@ struct DisabledProofSystems {
 uint8 constant BOOJUM_PROOF_SYSTEM_MASK = uint8(1 << uint8(ProofSystem.Boojum));
 uint8 constant AIRBENDER_PROOF_SYSTEM_MASK = uint8(1 << uint8(ProofSystem.Airbender));
 
-/// @dev A mask at or above this would leave the chain with no proof system.
+/// @dev Every proof system disabled, which `setProofSystemStatus` rejects.
 uint8 constant ALL_PROOF_SYSTEMS_DISABLED = BOOJUM_PROOF_SYSTEM_MASK | AIRBENDER_PROOF_SYSTEM_MASK;
 
 /// @dev `_proof[0]` of the combined Era proof carrying both a Boojum and an Airbender sub-proof.
