@@ -49,7 +49,6 @@ struct BridgeContracts {
     address l1InteropHandler;
 }
 
-// solhint-disable-next-line gas-struct-packing
 struct BridgesDeployedAddresses {
     BridgeContracts proxies;
     BridgeContracts implementations;
@@ -67,7 +66,6 @@ struct L1CoreAdminAddresses {
     address create2Factory;
 }
 
-// solhint-disable-next-line gas-struct-packing
 struct CoreDeployedAddresses {
     BridgehubAddresses bridgehub;
     BridgesDeployedAddresses bridges;

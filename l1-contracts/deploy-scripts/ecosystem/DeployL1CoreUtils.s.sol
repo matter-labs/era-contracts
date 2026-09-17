@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-// solhint-disable no-console, gas-custom-errors
-
 import {stdToml} from "forge-std/StdToml.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
@@ -16,7 +14,6 @@ import {ChainRegistrationSender} from "contracts/core/chain-registration/ChainRe
 import {CoreDeployedAddresses} from "../utils/Types.sol";
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
 
-// solhint-disable-next-line gas-struct-packing
 struct Config {
     uint256 l1ChainId;
     address ownerAddress;
@@ -26,7 +23,6 @@ struct Config {
     TokensConfig tokens;
 }
 
-// solhint-disable-next-line gas-struct-packing
 struct ContractsConfig {
     address governanceSecurityCouncilAddress;
     uint256 governanceMinDelay;

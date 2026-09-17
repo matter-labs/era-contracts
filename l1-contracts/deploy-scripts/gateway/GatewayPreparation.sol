@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// solhint-disable no-console, gas-custom-errors, reason-string
-
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
@@ -43,7 +41,6 @@ import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
-// solhint-disable-next-line gas-struct-packing
 struct Config {
     address bridgehub;
     address ctmDeploymentTracker;

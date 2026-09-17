@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// solhint-disable no-console, gas-custom-errors
-
 import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {stdToml} from "forge-std/StdToml.sol";
@@ -58,13 +56,11 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
 
     uint256 internal constant ZKSYNC_OS_TEST_CREATE_CHAIN_ID = 556;
 
-    // solhint-disable-next-line gas-struct-packing
     struct UpgradeDeployedAddresses {
         address upgradeTimer;
         address upgradeStageValidator;
     }
 
-    // solhint-disable-next-line gas-struct-packing
     struct AdditionalConfig {
         address ctm;
         uint256 oldProtocolVersion;
@@ -74,12 +70,10 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         bool usePreV32IntrospectionOverride;
     }
 
-    // solhint-disable-next-line gas-struct-packing
     struct GatewayConfig {
         uint256 chainId;
     }
 
-    // solhint-disable-next-line gas-struct-packing
     struct NewlyGeneratedData {
         bytes diamondCutData;
         bytes upgradeCutData;

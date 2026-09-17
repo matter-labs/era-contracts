@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-// solhint-disable gas-custom-errors, reason-string
-
 import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/Script.sol";
 import {BytecodeUtils} from "./bytecode/BytecodeUtils.s.sol";

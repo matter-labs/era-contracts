@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// solhint-disable no-console, gas-custom-errors, reason-string
-
 import {Script} from "forge-std/Script.sol";
 import {
     IGatewayUtils,

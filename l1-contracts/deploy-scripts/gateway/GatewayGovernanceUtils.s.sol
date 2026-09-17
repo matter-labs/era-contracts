@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-// solhint-disable no-console, gas-custom-errors, reason-string
-
 import {Script} from "forge-std/Script.sol";
 
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";

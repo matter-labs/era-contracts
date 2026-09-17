@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-// solhint-disable no-console, gas-custom-errors
-
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
@@ -29,7 +27,6 @@ import {CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "./DeployCTML1OrGate
 
 import {CTMDeployedAddresses} from "../utils/Types.sol";
 
-// solhint-disable-next-line gas-struct-packing
 struct Config {
     uint256 l1ChainId;
     address deployerAddress;
@@ -40,7 +37,6 @@ struct Config {
     ContractsConfig contracts;
 }
 
-// solhint-disable-next-line gas-struct-packing
 struct ContractsConfig {
     address multicall3Addr;
     uint256 validatorTimelockExecutionDelay;
@@ -53,7 +49,6 @@ struct ContractsConfig {
     ChainCreationParamsConfig chainCreationParams;
 }
 
-// solhint-disable-next-line gas-struct-packing
 struct GeneratedData {
     bytes forceDeploymentsData;
 }

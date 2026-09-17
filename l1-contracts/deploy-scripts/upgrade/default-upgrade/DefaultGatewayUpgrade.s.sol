@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// solhint-disable no-console, gas-custom-errors
-
 import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
@@ -59,7 +57,6 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
      */
     bytes32 internal constant ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
 
-    // solhint-disable-next-line gas-struct-packing
     struct AdditionalConfig {
         // This is the address of the ecosystem admin.
         // Note, that it is not the owner, but rather the address that is responsible
@@ -71,7 +68,6 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
         uint256 maxExpectedL1GasPrice;
     }
 
-    // solhint-disable-next-line gas-struct-packing
     struct Gateway {
         StateTransitionDeployedAddresses gatewayStateTransition;
         L1SpecificStateTransitionAddresses gatewayL1Specific;

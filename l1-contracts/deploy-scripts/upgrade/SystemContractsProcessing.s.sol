@@ -9,8 +9,6 @@ import {CoreContract, L2SystemContract} from "../ecosystem/CoreContract.sol";
 import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";
 import {DeduplicateBytecodesCountMismatch} from "../ecosystem/DeployScriptErrors.sol";
 
-// solhint-disable no-console
-
 /// @dev Fixed-address CoreContract entries backed by l1-contracts bytecodes.
 uint256 constant FIXED_ADDRESS_CORE_CONTRACTS_COUNT = 14;
 /// @dev System contracts (0x800x) with l1-contracts EVM bytecodes for proxy upgrades.

@@ -11,7 +11,6 @@ import {FIRST_PROTOCOL_VERSION_WITH_VERIFIER_FLAG} from "../../utils/Types.sol";
 /// @dev Getter that v32/v33 testnet verifiers exported as a public constant; pre-v34 production
 /// verifiers don't have it.
 interface ILegacyTestnetVerifier {
-    // solhint-disable-next-line func-name-mixedcase
     function IS_TESTNET_VERIFIER() external view returns (bool);
 }
 
