@@ -16,6 +16,7 @@ import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {IChainAssetHandlerBase} from "../core/chain-asset-handler/IChainAssetHandler.sol";
 import {IL1ChainAssetHandler} from "../core/chain-asset-handler/IL1ChainAssetHandler.sol";
 import {ChainNotReadyForMigration} from "../core/bridgehub/L1BridgehubErrors.sol";
+import {DisabledProofSystems} from "../common/Config.sol";
 
 /// @title ServerNotifier
 /// @author Matter Labs
@@ -114,12 +115,15 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable, IServer
         emit UpgradeTimestampUpdated(_chainId, _oldProtocolVersion, _upgradeTimestamp);
     }
 
-    /// @notice Announces the `disabledProofSystems` mask the chain admin is about to set with `setProofSystemStatus`,
+    /// @notice Announces which proof systems the chain admin is about to disable with `setProofSystemStatus`,
     /// so the server can prepare the provers.
     /// @param _chainId The identifier of the chain.
-    /// @param _disabledProofSystems The mask of proof systems the chain will not require.
+    /// @param _disabledProofSystems The proof systems the chain will not require.
     /// @dev Restricted to the chain administrator.
-    function notifyProofSystemStatus(uint256 _chainId, uint8 _disabledProofSystems) external onlyChainAdmin(_chainId) {
+    function notifyProofSystemStatus(
+        uint256 _chainId,
+        DisabledProofSystems calldata _disabledProofSystems
+    ) external onlyChainAdmin(_chainId) {
         emit ProofSystemStatusNotified(_chainId, _disabledProofSystems);
     }
 }
