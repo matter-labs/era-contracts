@@ -94,7 +94,7 @@ interface IExecutor is IZKChainBase {
         uint256 timestamp; // For ZKsync OS not used, always set to 0
         bytes32 commitment; // For ZKsync OS batches we'll store batch output hash here
         /// @dev Batch commitment as the Airbender prover computes it; see `Committer._batchAirbenderAuxiliaryOutput`.
-        /// Zero for ZKsync OS batches.
+        /// Zero for ZKsync OS batches, the genesis batch and pre-Airbender predecessors.
         bytes32 airbenderCommitment;
     }
 

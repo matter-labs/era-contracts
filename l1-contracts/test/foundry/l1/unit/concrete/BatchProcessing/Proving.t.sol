@@ -55,28 +55,11 @@ contract ProvingTest is ExecutorTest {
 
     /// Commits batch 1 on top of genesis and returns what the chain stored for it.
     function _commitBatch() internal returns (IExecutor.StoredBatchInfo memory stored) {
-        bytes[] memory logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-        logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
-        );
-
-        newCommitBatchInfo.timestamp = uint64(currentTimestamp);
-        newCommitBatchInfo.systemLogs = Utils.encodePacked(logs);
-        newCommitBatchInfo.operatorDAInput = operatorDAInput;
-
-        CommitBatchInfo[] memory commitBatchInfoArray = new CommitBatchInfo[](1);
-        commitBatchInfoArray[0] = newCommitBatchInfo;
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = _commitData(genesisStoredBatchInfo);
 
         vm.prank(validator);
         vm.blobhashes(blobVersionedHashes);
         vm.recordLogs();
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            commitBatchInfoArray
-        );
         committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
@@ -97,6 +80,25 @@ contract ProvingTest is ExecutorTest {
                 blobVersionedHashes[0]
             )
         });
+    }
+
+    /// Commit data for batch 1 on top of `_prev`.
+    function _commitData(IExecutor.StoredBatchInfo memory _prev) internal returns (uint256, uint256, bytes memory) {
+        bytes[] memory logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
+        logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
+        );
+
+        newCommitBatchInfo.timestamp = uint64(currentTimestamp);
+        newCommitBatchInfo.systemLogs = Utils.encodePacked(logs);
+        newCommitBatchInfo.operatorDAInput = operatorDAInput;
+
+        CommitBatchInfo[] memory commitBatchInfoArray = new CommitBatchInfo[](1);
+        commitBatchInfoArray[0] = newCommitBatchInfo;
+        return Utils.encodeCommitBatchesData(_prev, commitBatchInfoArray);
     }
 
     function setUpCommitBatch() public {
@@ -263,16 +265,59 @@ contract ProvingTest is ExecutorTest {
     }
 
     /// The last batch stored before `airbenderCommitment` existed is the predecessor of the first
-    /// batch committed and proved after the upgrade.
+    /// batch committed and proved after the upgrade; its Boojum commitment seeds the Airbender chain.
     function test_preAirbenderPredecessorAuthenticates() public {
         vm.prank(validator);
         executor.revertBatchesSharedBridge(address(0), 0);
         utilsFacet.util_setStoredBatchHashes(0, keccak256(abi.encode(_preAirbenderForm(genesisStoredBatchInfo))));
 
         newStoredBatchInfo = _commitBatch();
-        _proveWith(proofInput);
+        _installVerifier(
+            IVerifier(
+                address(
+                    new ExpectingVerifier(
+                        _publicInput(genesisStoredBatchInfo.commitment, newStoredBatchInfo.commitment)
+                    )
+                )
+            ),
+            IVerifier(
+                address(
+                    new ExpectingVerifier(
+                        _publicInput(genesisStoredBatchInfo.commitment, newStoredBatchInfo.airbenderCommitment)
+                    )
+                )
+            )
+        );
+        _proveWith(_multiProof());
 
         assertEq(getters.getTotalBlocksVerified(), 1);
+    }
+
+    /// A pre-Airbender predecessor is passed with a zero `airbenderCommitment`: its stored hash does not cover the
+    /// field, so any other value would be an unverified seed for the Airbender chain.
+    function test_RevertWhen_PreAirbenderPredecessorCarriesAnAirbenderCommitment() public {
+        vm.prank(validator);
+        executor.revertBatchesSharedBridge(address(0), 0);
+        bytes32 preAirbenderHash = keccak256(abi.encode(_preAirbenderForm(genesisStoredBatchInfo)));
+        utilsFacet.util_setStoredBatchHashes(0, preAirbenderHash);
+
+        IExecutor.StoredBatchInfo memory prev = genesisStoredBatchInfo;
+        prev.airbenderCommitment = Utils.randomBytes32("predecessorAirbenderCommitment");
+        bytes memory mismatch = abi.encodeWithSelector(
+            BatchHashMismatch.selector,
+            preAirbenderHash,
+            keccak256(abi.encode(prev))
+        );
+
+        (uint256 from, uint256 to, bytes memory commitData) = _commitData(prev);
+        vm.prank(validator);
+        vm.blobhashes(blobVersionedHashes);
+        vm.expectRevert(mismatch);
+        committer.commitBatchesSharedBridge(address(0), from, to, commitData);
+
+        newStoredBatchInfo = _commitBatch();
+        vm.expectRevert(mismatch);
+        _proveWithPrev(prev, _multiProof(), newStoredBatchInfo);
     }
 
     /// Only a predecessor may match the pre-Airbender form; the proved batch must carry its Airbender commitment.
@@ -324,12 +369,33 @@ contract ProvingTest is ExecutorTest {
         executor.proveBatchesSharedBridge(address(0), from, to, proveData);
     }
 
-    /// Each proof system receives its own transition hash, both chained from the predecessor's Boojum
-    /// commitment; the predecessor's `airbenderCommitment` is not used.
+    /// Each proof system receives its own transition hash, chained on its own commitments.
     function test_bothProofSystemsReceiveTheirOwnTransitionHash() public {
         IExecutor.StoredBatchInfo memory prev = genesisStoredBatchInfo;
         prev.commitment = Utils.randomBytes32("predecessorBoojumCommitment");
         prev.airbenderCommitment = Utils.randomBytes32("predecessorAirbenderCommitment");
+        utilsFacet.util_setStoredBatchHashes(0, keccak256(abi.encode(prev)));
+
+        _installVerifier(
+            IVerifier(address(new ExpectingVerifier(_publicInput(prev.commitment, newStoredBatchInfo.commitment)))),
+            IVerifier(
+                address(
+                    new ExpectingVerifier(
+                        _publicInput(prev.airbenderCommitment, newStoredBatchInfo.airbenderCommitment)
+                    )
+                )
+            )
+        );
+
+        _proveWithPrev(prev, _multiProof(), newStoredBatchInfo);
+
+        assertEq(getters.getTotalBlocksVerified(), 1);
+    }
+
+    /// Genesis has no Airbender commitment; its Boojum commitment seeds the Airbender chain.
+    function test_airbenderChainIsSeededByTheGenesisBoojumCommitment() public {
+        IExecutor.StoredBatchInfo memory prev = genesisStoredBatchInfo;
+        prev.commitment = Utils.randomBytes32("genesisBoojumCommitment");
         utilsFacet.util_setStoredBatchHashes(0, keccak256(abi.encode(prev)));
 
         _installVerifier(

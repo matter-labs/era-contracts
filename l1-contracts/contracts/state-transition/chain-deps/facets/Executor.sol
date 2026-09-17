@@ -263,6 +263,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         _checkBatchHashMismatch(prevBatch, currentTotalBatchesVerified, true);
 
         bytes32 prevBatchCommitment = prevBatch.commitment;
+        // Airbender chains on its own commitments. Genesis and pre-Airbender predecessors have none, so their Boojum
+        // commitment stands in; a proof binds only the state root of its predecessor, so either shape anchors it.
+        bytes32 prevBatchAirbenderCommitment = prevBatch.airbenderCommitment == bytes32(0)
+            ? prevBatch.commitment
+            : prevBatch.airbenderCommitment;
         bytes32 prevBatchStateCommitment = prevBatch.batchHash;
         for (uint256 i = 0; i < committedBatchesLength; ++i) {
             currentTotalBatchesVerified = currentTotalBatchesVerified.uncheckedInc();
@@ -277,16 +282,15 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     currentBatchCommitment
                 );
             } else {
-                // Both systems chain from the predecessor's Boojum commitment. A proof binds only the state root inside
-                // it, so a predecessor whose Boojum proof was skipped still anchors the chain.
                 proofPublicInput[0] = _getBatchProofPublicInput(prevBatchCommitment, currentBatchCommitment);
                 proofPublicInput[1] = _getBatchProofPublicInput(
-                    prevBatchCommitment,
+                    prevBatchAirbenderCommitment,
                     committedBatches[i].airbenderCommitment
                 );
             }
 
             prevBatchCommitment = currentBatchCommitment;
+            prevBatchAirbenderCommitment = committedBatches[i].airbenderCommitment;
             prevBatchStateCommitment = currentBatchStateCommitment;
         }
         if (currentTotalBatchesVerified > s.totalBatchesCommitted) {
