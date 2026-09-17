@@ -282,7 +282,7 @@ export function applyL1ToL2Alias(l1Address: string): string {
  * proof structure to extract settlementLayerChainId. Every chain in the harness settles directly
  * on L1, so the proof is the single non-zero element that getProofData() reads as
  * finalProofNode=true → settlementLayerChainId=0. The caller still reads the settlement layer live
- * from L1 Bridgehub; a chain settling elsewhere is rejected rather than mis-encoded.
+ * from L1 Bridgehub; a chain settling elsewhere is rejected rather than encoded incorrectly.
  */
 export function buildWithdrawalMerkleProof(settlementLayerChainId: number): string[] {
   if (settlementLayerChainId !== 0) {
