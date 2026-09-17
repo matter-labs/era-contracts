@@ -109,14 +109,14 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         facetCuts = getChainCreationFacetCuts(_stateTransition);
         facetCuts = FacetCutsLib.merge(facetCutsForDeletion, facetCuts);
         uint256 nonce = UpgradeHelperLib.getProtocolUpgradeNonce(_chainCreationParams.latestProtocolVersion);
-        ProposedUpgrade memory proposedUpgrade = getProposedUpgrade(
-            _stateTransition,
-            _chainCreationParams,
-            _l1ChainId,
-            _ownerAddress,
-            _factoryDepsResult,
-            nonce
-        );
+        ProposedUpgrade memory proposedUpgrade = getProposedUpgrade({
+            _stateTransition: _stateTransition,
+            _chainCreationParams: _chainCreationParams,
+            _l1ChainId: _l1ChainId,
+            _ownerAddress: _ownerAddress,
+            _factoryDepsResult: _factoryDepsResult,
+            _protocolUpgradeNonce: nonce
+        });
 
         upgradeCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,

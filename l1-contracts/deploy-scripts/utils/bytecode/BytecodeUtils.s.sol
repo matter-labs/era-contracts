@@ -16,6 +16,8 @@ library BytecodeUtils {
     function readDAContractBytecode(string memory contractIdentifier) internal view returns (bytes memory) {
         return
             readFoundryBytecode(
+                // `string.concat` is variadic, so named arguments are not possible.
+                // solhint-disable-next-line func-named-parameters
                 string.concat("/../da-contracts/out/", contractIdentifier, ".sol/", contractIdentifier, ".json")
             );
     }
@@ -40,6 +42,8 @@ library BytecodeUtils {
         string memory fileName,
         string memory contractName
     ) private view returns (bytes memory) {
+        // `string.concat` is variadic, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         string memory path = string.concat("/../l1-contracts/out/", fileName, "/", contractName, ".json");
         return readFoundryBytecode(path);
     }
@@ -58,6 +62,8 @@ library BytecodeUtils {
         string memory _fileName,
         string memory _contractName
     ) internal view returns (bytes memory) {
+        // `string.concat` is variadic, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         string memory path = string.concat("/../l1-contracts/out/", _fileName, "/", _contractName, ".json");
         return readFoundryDeployedBytecode(path);
     }

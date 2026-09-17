@@ -146,16 +146,16 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     ) public virtual {
         string memory root = vm.projectRoot();
         newConfigPath = string.concat(root, newConfigPath);
-        initializeConfigFromArgs(
-            ctmProxy,
-            bytecodesSupplier,
-            rollupDAManager,
-            create2FactorySalt,
-            newConfigPath,
-            governance,
-            zkTokenAssetId,
-            testnetVerifier
-        );
+        initializeConfigFromArgs({
+            ctmProxy: ctmProxy,
+            bytecodesSupplier: bytecodesSupplier,
+            rollupDAManager: rollupDAManager,
+            create2FactorySalt: create2FactorySalt,
+            newConfigPath: newConfigPath,
+            governance: governance,
+            zkTokenAssetId: zkTokenAssetId,
+            testnetVerifier: testnetVerifier
+        });
 
         console.log("Initialized config from %s", newConfigPath);
         upgradeConfig.outputPath = string.concat(root, _outputPath);
@@ -273,17 +273,17 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     ///         upgrade-prepare-all`, once per CTM proxy. Drives the whole CTM-side prepare phase
     ///         (deploy + bytecode publish + upgrade-cut generation + call serialization).
     function noGovernancePrepare(CTMUpgradeParams memory _params) public virtual {
-        initializeWithArgs(
-            _params.ctmProxy,
-            _params.bytecodesSupplier,
-            _params.rollupDAManager,
-            _params.create2FactorySalt,
-            _params.upgradeInputPath,
-            _params.outputPath,
-            _params.governance,
-            _params.zkTokenAssetId,
-            _params.testnetVerifier
-        );
+        initializeWithArgs({
+            ctmProxy: _params.ctmProxy,
+            bytecodesSupplier: _params.bytecodesSupplier,
+            rollupDAManager: _params.rollupDAManager,
+            create2FactorySalt: _params.create2FactorySalt,
+            newConfigPath: _params.upgradeInputPath,
+            _outputPath: _params.outputPath,
+            governance: _params.governance,
+            zkTokenAssetId: _params.zkTokenAssetId,
+            testnetVerifier: _params.testnetVerifier
+        });
         prepareCTMUpgrade();
         prepareDefaultGovernanceCalls();
         prepareDefaultCTMAdminCalls();
@@ -377,14 +377,14 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     function generateUpgradeCutDataFromLocalConfig(
         StateTransitionDeployedAddresses memory _stateTransition
     ) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
-        upgradeCutData = generateUpgradeCutData(
-            _stateTransition,
-            config.contracts.chainCreationParams,
-            config.l1ChainId,
-            config.ownerAddress,
-            factoryDepsResult,
-            upToDateZkChain.zkChainProxy
-        );
+        upgradeCutData = generateUpgradeCutData({
+            _stateTransition: _stateTransition,
+            _chainCreationParams: config.contracts.chainCreationParams,
+            _l1ChainId: config.l1ChainId,
+            _ownerAddress: config.ownerAddress,
+            _factoryDepsResult: factoryDepsResult,
+            _registeredChainIdDiamondProxy: upToDateZkChain.zkChainProxy
+        });
     }
 
     function getOwnerAddress() public virtual returns (address) {

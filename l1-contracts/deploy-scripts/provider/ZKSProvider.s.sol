@@ -82,13 +82,13 @@ contract ZKSProvider is Script {
         // IL1AssetRouter assetRouter = IL1AssetRouter(bridgehub.assetRouter());
         // IL1Nullifier nullifier = IL1Nullifier(assetRouter.L1_NULLIFIER());
         IMessageRootBase messageRoot = IMessageRootBase(bridgehub.messageRoot());
-        ProofData memory proofData = messageRoot.getProofData(
-            params.chainId,
-            params.l2BatchNumber,
-            params.l2MessageIndex,
-            bytes32(0),
-            params.merkleProof
-        );
+        ProofData memory proofData = messageRoot.getProofData({
+            _chainId: params.chainId,
+            _batchNumber: params.l2BatchNumber,
+            _leafProofMask: params.l2MessageIndex,
+            _leaf: bytes32(0),
+            _proof: params.merkleProof
+        });
 
         // console.log("proofData");
         uint256 actualChainId = chainId;
@@ -285,6 +285,8 @@ contract ZKSProvider is Script {
         args[7] = "--data";
         // Single quotes keep the JSON-RPC payload's inner quotes unescaped.
         // solhint-disable quotes
+        // `string.concat` is variadic, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         args[8] = string.concat(
             '{"jsonrpc":"2.0","id":1,"method":"zks_getL2ToL1LogProof","params":["',
             vm.toString(txHash),

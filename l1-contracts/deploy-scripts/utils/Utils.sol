@@ -205,6 +205,8 @@ library Utils {
 
     function getAllSelectorsForFacet(string memory facetName) internal returns (bytes4[] memory) {
         // TODO(EVM-746): use forge to read the bytecode
+        // `string.concat` is variadic, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         string memory path = string.concat("/../l1-contracts/out/", facetName, ".sol/", facetName, "Facet.json");
         bytes memory bytecode = BytecodeUtils.readFoundryDeployedBytecode(path);
         return getAllSelectors(bytecode);
@@ -599,16 +601,16 @@ library Utils {
         (
             L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
             uint256 requiredValueToDeploy
-        ) = prepareL1L2TransactionTwoBridges(
-                l1GasPrice,
-                l2GasLimit,
-                chainId,
-                bridgehubAddress,
-                secondBridgeAddress,
-                secondBridgeValue,
-                secondBridgeCalldata,
-                refundRecipient
-            );
+        ) = prepareL1L2TransactionTwoBridges({
+                l1GasPrice: l1GasPrice,
+                l2GasLimit: l2GasLimit,
+                chainId: chainId,
+                bridgehubAddress: bridgehubAddress,
+                secondBridgeAddress: secondBridgeAddress,
+                secondBridgeValue: secondBridgeValue,
+                secondBridgeCalldata: secondBridgeCalldata,
+                refundRecipient: refundRecipient
+            });
 
         (uint256 ethAmountToPass, Call[] memory newCalls) = prepareApproveBaseTokenGovernanceCalls(
             IL1Bridgehub(bridgehubAddress),
@@ -724,16 +726,16 @@ library Utils {
         (
             L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
             uint256 requiredValueToDeploy
-        ) = prepareL1L2TransactionTwoBridges(
-                l1GasPrice,
-                l2GasLimit,
-                chainId,
-                bridgehubAddress,
-                secondBridgeAddress,
-                secondBridgeValue,
-                secondBridgeCalldata,
-                refundRecipient
-            );
+        ) = prepareL1L2TransactionTwoBridges({
+                l1GasPrice: l1GasPrice,
+                l2GasLimit: l2GasLimit,
+                chainId: chainId,
+                bridgehubAddress: bridgehubAddress,
+                secondBridgeAddress: secondBridgeAddress,
+                secondBridgeValue: secondBridgeValue,
+                secondBridgeCalldata: secondBridgeCalldata,
+                refundRecipient: refundRecipient
+            });
 
         // 2) Prepare approval calls if base token != ETH
         (uint256 ethAmountToPass, Call[] memory approvalCalls) = prepareApproveBaseTokenAdminCalls(
@@ -774,18 +776,18 @@ library Utils {
         address refundRecipient
     ) internal returns (bytes32 txHash) {
         // 1) Prepare the calls (no actual execution done here)
-        Call[] memory calls = prepareAdminL1L2DirectTransaction(
-            gasPrice,
-            l2Calldata,
-            l2GasLimit,
-            factoryDeps,
-            dstAddress,
-            0,
-            chainId,
-            bridgehubAddress,
-            l1SharedBridgeProxy,
-            refundRecipient
-        );
+        Call[] memory calls = prepareAdminL1L2DirectTransaction({
+            gasPrice: gasPrice,
+            l2Calldata: l2Calldata,
+            l2GasLimit: l2GasLimit,
+            factoryDeps: factoryDeps,
+            dstAddress: dstAddress,
+            l2Value: 0,
+            chainId: chainId,
+            bridgehubAddress: bridgehubAddress,
+            l1SharedBridgeProxy: l1SharedBridgeProxy,
+            refundRecipient: refundRecipient
+        });
 
         console.log("Executing transaction");
         // 2) Record logs before we do the actual execution
@@ -819,17 +821,17 @@ library Utils {
         address refundRecipient
     ) internal returns (bytes32 txHash) {
         // 1) Prepare the calls
-        Call[] memory calls = prepareAdminL1L2TwoBridgesTransaction(
-            l1GasPrice,
-            l2GasLimit,
-            chainId,
-            bridgehubAddress,
-            l1SharedBridgeProxy,
-            secondBridgeAddress,
-            secondBridgeValue,
-            secondBridgeCalldata,
-            refundRecipient
-        );
+        Call[] memory calls = prepareAdminL1L2TwoBridgesTransaction({
+            l1GasPrice: l1GasPrice,
+            l2GasLimit: l2GasLimit,
+            chainId: chainId,
+            bridgehubAddress: bridgehubAddress,
+            l1SharedBridgeProxy: l1SharedBridgeProxy,
+            secondBridgeAddress: secondBridgeAddress,
+            secondBridgeValue: secondBridgeValue,
+            secondBridgeCalldata: secondBridgeCalldata,
+            refundRecipient: refundRecipient
+        });
 
         console.log("Executing transaction");
         // 2) Record logs
@@ -879,14 +881,14 @@ library Utils {
                 })
             );
 
-        requiredValueToDeploy = approveBaseTokenGovernance(
-            IL1Bridgehub(bridgehubAddress),
-            l1SharedBridgeProxy,
-            governor,
-            salt,
-            chainId,
-            requiredValueToDeploy
-        );
+        requiredValueToDeploy = approveBaseTokenGovernance({
+            bridgehub: IL1Bridgehub(bridgehubAddress),
+            l1SharedBridgeProxy: l1SharedBridgeProxy,
+            governor: governor,
+            salt: salt,
+            chainId: chainId,
+            amountToApprove: requiredValueToDeploy
+        });
 
         bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
             IL1Bridgehub.requestL2TransactionDirect,
@@ -895,7 +897,14 @@ library Utils {
 
         console.log("Executing transaction");
         vm.recordLogs();
-        executeUpgrade(governor, salt, bridgehubAddress, l2TransactionRequestDirectCalldata, requiredValueToDeploy, 0);
+        executeUpgrade({
+            _governor: governor,
+            _salt: salt,
+            _target: bridgehubAddress,
+            _data: l2TransactionRequestDirectCalldata,
+            _value: requiredValueToDeploy,
+            _delay: 0
+        });
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed successfully! Extracting logs...");
 
@@ -922,25 +931,25 @@ library Utils {
         (
             L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
             uint256 requiredValueToDeploy
-        ) = prepareL1L2TransactionTwoBridges(
-                l1GasPrice,
-                l2GasLimit,
-                chainId,
-                bridgehubAddress,
-                secondBridgeAddress,
-                secondBridgeValue,
-                secondBridgeCalldata,
-                msg.sender
-            );
+        ) = prepareL1L2TransactionTwoBridges({
+                l1GasPrice: l1GasPrice,
+                l2GasLimit: l2GasLimit,
+                chainId: chainId,
+                bridgehubAddress: bridgehubAddress,
+                secondBridgeAddress: secondBridgeAddress,
+                secondBridgeValue: secondBridgeValue,
+                secondBridgeCalldata: secondBridgeCalldata,
+                refundRecipient: msg.sender
+            });
 
-        requiredValueToDeploy = approveBaseTokenGovernance(
-            IL1Bridgehub(bridgehubAddress),
-            l1SharedBridgeProxy,
-            governor,
-            salt,
-            chainId,
-            requiredValueToDeploy
-        );
+        requiredValueToDeploy = approveBaseTokenGovernance({
+            bridgehub: IL1Bridgehub(bridgehubAddress),
+            l1SharedBridgeProxy: l1SharedBridgeProxy,
+            governor: governor,
+            salt: salt,
+            chainId: chainId,
+            amountToApprove: requiredValueToDeploy
+        });
 
         bytes memory l2TransactionRequestCalldata = abi.encodeCall(
             IL1Bridgehub.requestL2TransactionTwoBridges,
@@ -949,7 +958,14 @@ library Utils {
 
         console.log("Executing transaction");
         vm.recordLogs();
-        executeUpgrade(governor, salt, bridgehubAddress, l2TransactionRequestCalldata, requiredValueToDeploy, 0);
+        executeUpgrade({
+            _governor: governor,
+            _salt: salt,
+            _target: bridgehubAddress,
+            _data: l2TransactionRequestCalldata,
+            _value: requiredValueToDeploy,
+            _delay: 0
+        });
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed successfully! Extracting logs...");
 
@@ -976,7 +992,14 @@ library Utils {
 
             bytes memory approvalCalldata = abi.encodeCall(baseToken.approve, (l1SharedBridgeProxy, amountToApprove));
 
-            executeUpgrade(governor, salt, address(baseToken), approvalCalldata, 0, 0);
+            executeUpgrade({
+                _governor: governor,
+                _salt: salt,
+                _target: address(baseToken),
+                _data: approvalCalldata,
+                _value: 0,
+                _delay: 0
+            });
 
             ethAmountToPass = 0;
         } else {

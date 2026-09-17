@@ -163,13 +163,13 @@ contract GatewayPreparation is Script {
         address accessControlRestriction,
         uint256 chainId
     ) public {
-        Utils.adminExecute(
-            chainAdmin,
-            accessControlRestriction,
-            serverNotifier,
-            abi.encodeCall(ServerNotifier.migrateToGateway, (chainId)),
-            0
-        );
+        Utils.adminExecute({
+            _admin: chainAdmin,
+            _accessControlRestriction: accessControlRestriction,
+            _target: serverNotifier,
+            _data: abi.encodeCall(ServerNotifier.migrateToGateway, (chainId)),
+            _value: 0
+        });
     }
 
     function notifyServerMigrationFromGateway(
@@ -178,13 +178,13 @@ contract GatewayPreparation is Script {
         address accessControlRestriction,
         uint256 chainId
     ) public {
-        Utils.adminExecute(
-            chainAdmin,
-            accessControlRestriction,
-            serverNotifier,
-            abi.encodeCall(ServerNotifier.migrateFromGateway, (chainId)),
-            0
-        );
+        Utils.adminExecute({
+            _admin: chainAdmin,
+            _accessControlRestriction: accessControlRestriction,
+            _target: serverNotifier,
+            _data: abi.encodeCall(ServerNotifier.migrateFromGateway, (chainId)),
+            _value: 0
+        });
     }
 
     function saveOutput() internal {
@@ -242,18 +242,18 @@ contract GatewayPreparation is Script {
 
         bytes memory data = abi.encodeCall(IBridgehubBase.addChainTypeManager, (gatewayCTMAddress));
 
-        bytes32 l2TxHash = Utils.runGovernanceL1L2DirectTransaction(
-            _getL1GasPrice(),
-            config.governance,
-            governanoceOperationSalt,
-            data,
-            Utils.MAX_PRIORITY_TX_GAS,
-            new bytes[](0),
-            L2_BRIDGEHUB_ADDRESS,
-            config.gatewayChainId,
-            config.bridgehub,
-            config.sharedBridgeProxy
-        );
+        bytes32 l2TxHash = Utils.runGovernanceL1L2DirectTransaction({
+            l1GasPrice: _getL1GasPrice(),
+            governor: config.governance,
+            salt: governanoceOperationSalt,
+            l2Calldata: data,
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: new bytes[](0),
+            dstAddress: L2_BRIDGEHUB_ADDRESS,
+            chainId: config.gatewayChainId,
+            bridgehubAddress: config.bridgehub,
+            l1SharedBridgeProxy: config.sharedBridgeProxy
+        });
 
         saveOutput(l2TxHash);
     }
@@ -298,18 +298,18 @@ contract GatewayPreparation is Script {
             abi.encode(assetId, L2_BRIDGEHUB_ADDRESS)
         );
 
-        bytes32 l2TxHash = Utils.runGovernanceL1L2TwoBridgesTransaction(
-            _getL1GasPrice(),
-            config.governance,
-            governanoceOperationSalt,
-            Utils.MAX_PRIORITY_TX_GAS,
-            config.gatewayChainId,
-            config.bridgehub,
-            config.sharedBridgeProxy,
-            config.sharedBridgeProxy,
-            0,
-            secondBridgeData
-        );
+        bytes32 l2TxHash = Utils.runGovernanceL1L2TwoBridgesTransaction({
+            l1GasPrice: _getL1GasPrice(),
+            governor: config.governance,
+            salt: governanoceOperationSalt,
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            chainId: config.gatewayChainId,
+            bridgehubAddress: config.bridgehub,
+            l1SharedBridgeProxy: config.sharedBridgeProxy,
+            secondBridgeAddress: config.sharedBridgeProxy,
+            secondBridgeValue: 0,
+            secondBridgeCalldata: secondBridgeData
+        });
 
         saveOutput(l2TxHash);
     }
@@ -322,18 +322,18 @@ contract GatewayPreparation is Script {
             abi.encode(config.chainTypeManagerProxy, gatewayCTMAddress)
         );
 
-        bytes32 l2TxHash = Utils.runGovernanceL1L2TwoBridgesTransaction(
-            _getL1GasPrice(),
-            config.governance,
-            governanoceOperationSalt,
-            Utils.MAX_PRIORITY_TX_GAS,
-            config.gatewayChainId,
-            config.bridgehub,
-            config.sharedBridgeProxy,
-            config.ctmDeploymentTracker,
-            0,
-            secondBridgeData
-        );
+        bytes32 l2TxHash = Utils.runGovernanceL1L2TwoBridgesTransaction({
+            l1GasPrice: _getL1GasPrice(),
+            governor: config.governance,
+            salt: governanoceOperationSalt,
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            chainId: config.gatewayChainId,
+            bridgehubAddress: config.bridgehub,
+            l1SharedBridgeProxy: config.sharedBridgeProxy,
+            secondBridgeAddress: config.ctmDeploymentTracker,
+            secondBridgeValue: 0,
+            secondBridgeCalldata: secondBridgeData
+        });
 
         saveOutput(l2TxHash);
     }
@@ -411,19 +411,19 @@ contract GatewayPreparation is Script {
 
         bytes memory secondBridgeData = abi.encodePacked(NEW_ENCODING_VERSION, abi.encode(chainAssetId, bridgehubData));
 
-        bytes32 l2TxHash = Utils.runAdminL1L2TwoBridgesTransaction(
-            _getL1GasPrice(),
-            chainAdmin,
-            accessControlRestriction,
-            Utils.MAX_PRIORITY_TX_GAS,
-            config.gatewayChainId,
-            config.bridgehub,
-            config.sharedBridgeProxy,
-            config.sharedBridgeProxy,
-            0,
-            secondBridgeData,
-            msg.sender
-        );
+        bytes32 l2TxHash = Utils.runAdminL1L2TwoBridgesTransaction({
+            l1GasPrice: _getL1GasPrice(),
+            admin: chainAdmin,
+            accessControlRestriction: accessControlRestriction,
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            chainId: config.gatewayChainId,
+            bridgehubAddress: config.bridgehub,
+            l1SharedBridgeProxy: config.sharedBridgeProxy,
+            secondBridgeAddress: config.sharedBridgeProxy,
+            secondBridgeValue: 0,
+            secondBridgeCalldata: secondBridgeData,
+            refundRecipient: msg.sender
+        });
 
         saveOutput(l2TxHash);
     }
@@ -472,19 +472,19 @@ contract GatewayPreparation is Script {
             l2Calldata = abi.encodeCall(ChainAdmin.multicall, (calls, true));
         }
         // TODO(EVM-925): this should migrate to use L2 transactions directly
-        bytes32 l2TxHash = Utils.runAdminL1L2DirectTransaction(
-            _getL1GasPrice(),
-            chainAdmin,
-            accessControlRestriction,
-            l2Calldata,
-            Utils.MAX_PRIORITY_TX_GAS,
-            new bytes[](0),
-            l2ChainAdmin,
-            config.gatewayChainId,
-            config.bridgehub,
-            config.sharedBridgeProxy,
-            msg.sender
-        );
+        bytes32 l2TxHash = Utils.runAdminL1L2DirectTransaction({
+            gasPrice: _getL1GasPrice(),
+            admin: chainAdmin,
+            accessControlRestriction: accessControlRestriction,
+            l2Calldata: l2Calldata,
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: new bytes[](0),
+            dstAddress: l2ChainAdmin,
+            chainId: config.gatewayChainId,
+            bridgehubAddress: config.bridgehub,
+            l1SharedBridgeProxy: config.sharedBridgeProxy,
+            refundRecipient: msg.sender
+        });
 
         saveOutput(l2TxHash);
     }
@@ -529,19 +529,19 @@ contract GatewayPreparation is Script {
 
         bytes memory data = abi.encodeCall(IAdmin.setDAValidatorPair, (l1DAValidator, l2DACommitmentScheme));
 
-        bytes32 l2TxHash = Utils.runAdminL1L2DirectTransaction(
-            _getL1GasPrice(),
-            chainAdmin,
-            accessControlRestriction,
-            _callL2AdminCalldata(data, chainDiamondProxyOnGateway),
-            Utils.MAX_PRIORITY_TX_GAS,
-            new bytes[](0),
-            chainAdminOnGateway,
-            config.gatewayChainId,
-            config.bridgehub,
-            config.sharedBridgeProxy,
-            msg.sender
-        );
+        bytes32 l2TxHash = Utils.runAdminL1L2DirectTransaction({
+            gasPrice: _getL1GasPrice(),
+            admin: chainAdmin,
+            accessControlRestriction: accessControlRestriction,
+            l2Calldata: _callL2AdminCalldata(data, chainDiamondProxyOnGateway),
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: new bytes[](0),
+            dstAddress: chainAdminOnGateway,
+            chainId: config.gatewayChainId,
+            bridgehubAddress: config.bridgehub,
+            l1SharedBridgeProxy: config.sharedBridgeProxy,
+            refundRecipient: msg.sender
+        });
 
         saveOutput(l2TxHash);
     }
@@ -558,19 +558,19 @@ contract GatewayPreparation is Script {
 
         bytes memory data = abi.encodeCall(ValidatorTimelock.addValidatorForChainId, (chainId, validatorAddress));
 
-        bytes32 l2TxHash = Utils.runAdminL1L2DirectTransaction(
-            _getL1GasPrice(),
-            chainAdmin,
-            accessControlRestriction,
-            _callL2AdminCalldata(data, gatewayValidatorTimelock),
-            Utils.MAX_PRIORITY_TX_GAS,
-            new bytes[](0),
-            chainAdminOnGateway,
-            config.gatewayChainId,
-            config.bridgehub,
-            config.sharedBridgeProxy,
-            msg.sender
-        );
+        bytes32 l2TxHash = Utils.runAdminL1L2DirectTransaction({
+            gasPrice: _getL1GasPrice(),
+            admin: chainAdmin,
+            accessControlRestriction: accessControlRestriction,
+            l2Calldata: _callL2AdminCalldata(data, gatewayValidatorTimelock),
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: new bytes[](0),
+            dstAddress: chainAdminOnGateway,
+            chainId: config.gatewayChainId,
+            bridgehubAddress: config.bridgehub,
+            l1SharedBridgeProxy: config.sharedBridgeProxy,
+            refundRecipient: msg.sender
+        });
 
         saveOutput(l2TxHash);
     }
@@ -588,17 +588,17 @@ contract GatewayPreparation is Script {
     function supplyGatewayWallet(address addr, uint256 amount) public {
         initializeConfig();
 
-        Utils.runL1L2Transaction(
-            hex"",
-            Utils.MAX_PRIORITY_TX_GAS,
-            amount,
-            new bytes[](0),
-            addr,
-            config.gatewayChainId,
-            config.bridgehub,
-            config.sharedBridgeProxy,
-            msg.sender
-        );
+        Utils.runL1L2Transaction({
+            l2Calldata: hex"",
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            l2Value: amount,
+            factoryDeps: new bytes[](0),
+            dstAddress: addr,
+            chainId: config.gatewayChainId,
+            bridgehubAddress: config.bridgehub,
+            l1SharedBridgeProxy: config.sharedBridgeProxy,
+            refundRecipient: msg.sender
+        });
 
         // We record L2 tx hash only for governance operations
         saveOutput(bytes32(0));

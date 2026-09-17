@@ -124,15 +124,15 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
         string memory root = vm.projectRoot();
         newConfigPath = string.concat(root, newConfigPath);
 
-        initializeConfig(
-            _create2FactorySalt,
-            getChainCreationParamsConfig(Utils.genesisConfigPath()),
-            _representativeChainId,
-            _priorityTxsL2GasLimit,
-            _maxExpectedL1GasPrice,
-            _gatewayConfig,
-            _governance
-        );
+        initializeConfig({
+            _create2FactorySalt: _create2FactorySalt,
+            _chainCreationParams: getChainCreationParamsConfig(Utils.genesisConfigPath()),
+            _representativeChainId: _representativeChainId,
+            _priorityTxsL2GasLimit: _priorityTxsL2GasLimit,
+            _maxExpectedL1GasPrice: _maxExpectedL1GasPrice,
+            _gatewayConfig: _gatewayConfig,
+            _governance: _governance
+        });
 
         console.log("Initialized config from %s", newConfigPath);
         upgradeConfig.outputPath = string.concat(root, _outputPath);
@@ -224,14 +224,14 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
 
         gatewayConfig.facetCutsData = abi.encode(getChainCreationDiamondCutData(gatewayConfig.gatewayStateTransition));
         console.log("Prepared diamond cut data");
-        Diamond.DiamondCutData memory upgradeCutData = generateUpgradeCutData(
-            gatewayConfig.gatewayStateTransition,
-            config.contracts.chainCreationParams,
-            config.l1ChainId,
-            config.ownerAddress,
-            factoryDepsResult,
-            discoveredRepresentativeZkChain.zkChainProxy
-        );
+        Diamond.DiamondCutData memory upgradeCutData = generateUpgradeCutData({
+            _stateTransition: gatewayConfig.gatewayStateTransition,
+            _chainCreationParams: config.contracts.chainCreationParams,
+            _l1ChainId: config.l1ChainId,
+            _ownerAddress: config.ownerAddress,
+            _factoryDepsResult: factoryDepsResult,
+            _registeredChainIdDiamondProxy: discoveredRepresentativeZkChain.zkChainProxy
+        });
         gatewayConfig.upgradeCutData = abi.encode(upgradeCutData);
         upgradeConfig.upgradeCutPrepared = true;
         console.log("UpgradeCutGenerated");
@@ -584,17 +584,17 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
             "l1AssetRouterProxyAddress is zero in newConfig"
         );
 
-        calls = Utils.prepareGovernanceL1L2DirectTransaction(
-            l1GasPrice,
-            l2Calldata,
-            l2GasLimit,
-            new bytes[](0),
-            dstAddress,
-            gatewayConfig.chainId,
-            coreAddresses.bridgehub.proxies.bridgehub,
-            coreAddresses.bridges.proxies.l1AssetRouter,
-            msg.sender
-        );
+        calls = Utils.prepareGovernanceL1L2DirectTransaction({
+            l1GasPrice: l1GasPrice,
+            l2Calldata: l2Calldata,
+            l2GasLimit: l2GasLimit,
+            factoryDeps: new bytes[](0),
+            dstAddress: dstAddress,
+            chainId: gatewayConfig.chainId,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
+            refundRecipient: msg.sender
+        });
     }
 
     function prepareApproveGatewayBaseTokenCall(

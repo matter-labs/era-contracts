@@ -73,13 +73,13 @@ contract DefaultChainUpgrade is Script {
             );
         }
 
-        Utils.adminExecute(
-            IZKChain(config.chainDiamondProxyAddress).getAdmin(),
-            address(0),
-            config.chainDiamondProxyAddress,
-            callData,
-            0
-        );
+        Utils.adminExecute({
+            _admin: IZKChain(config.chainDiamondProxyAddress).getAdmin(),
+            _accessControlRestriction: address(0),
+            _target: config.chainDiamondProxyAddress,
+            _data: callData,
+            _value: 0
+        });
     }
 
     function setUpgradeTimestamp(uint256 timestamp) public {

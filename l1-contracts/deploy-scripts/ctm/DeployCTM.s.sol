@@ -70,6 +70,8 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     function runWithBridgehub(address bridgehub, bool reuseGovAndAdmin) public {
         console.log("Deploying CTM related contracts");
+        // `runInner`'s last parameter is deliberately unnamed, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         runInner(
             "/script-config/config-deploy-ctm.toml",
             "/script-out/output-deploy-ctm.toml",
@@ -92,6 +94,8 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         if (shouldSaveSelectors) {
             saveDiamondSelectors();
         }
+        // `runInner`'s last parameter is deliberately unnamed, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         runInner(vm.envString("CTM_CONFIG"), vm.envString("CTM_OUTPUT"), bridgehub, false, skipL1Deployments);
     }
 

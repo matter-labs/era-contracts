@@ -87,17 +87,17 @@ abstract contract GatewayGovernanceUtils is Script {
 
             calls = Utils.mergeCalls(
                 calls,
-                Utils.prepareGovernanceL1L2DirectTransaction(
-                    prepareGWGovCallsStruct._l1GasPrice,
-                    data,
-                    Utils.MAX_PRIORITY_TX_GAS,
-                    new bytes[](0),
-                    L2_BRIDGEHUB_ADDR,
-                    _gatewayGovernanceConfig.gatewayChainId,
-                    _gatewayGovernanceConfig.bridgehubProxy,
-                    _gatewayGovernanceConfig.l1AssetRouterProxy,
-                    prepareGWGovCallsStruct._refundRecipient
-                )
+                Utils.prepareGovernanceL1L2DirectTransaction({
+                    l1GasPrice: prepareGWGovCallsStruct._l1GasPrice,
+                    l2Calldata: data,
+                    l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+                    factoryDeps: new bytes[](0),
+                    dstAddress: L2_BRIDGEHUB_ADDR,
+                    chainId: _gatewayGovernanceConfig.gatewayChainId,
+                    bridgehubAddress: _gatewayGovernanceConfig.bridgehubProxy,
+                    l1SharedBridgeProxy: _gatewayGovernanceConfig.l1AssetRouterProxy,
+                    refundRecipient: prepareGWGovCallsStruct._refundRecipient
+                })
             );
         }
 
@@ -148,17 +148,17 @@ abstract contract GatewayGovernanceUtils is Script {
 
             calls = Utils.mergeCalls(
                 calls,
-                Utils.prepareGovernanceL1L2TwoBridgesTransaction(
-                    prepareGWGovCallsStruct._l1GasPrice,
-                    Utils.MAX_PRIORITY_TX_GAS,
-                    _gatewayGovernanceConfig.gatewayChainId,
-                    _gatewayGovernanceConfig.bridgehubProxy,
-                    _gatewayGovernanceConfig.l1AssetRouterProxy,
-                    _gatewayGovernanceConfig.l1AssetRouterProxy,
-                    0,
-                    secondBridgeData,
-                    prepareGWGovCallsStruct._refundRecipient
-                )
+                Utils.prepareGovernanceL1L2TwoBridgesTransaction({
+                    l1GasPrice: prepareGWGovCallsStruct._l1GasPrice,
+                    l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+                    chainId: _gatewayGovernanceConfig.gatewayChainId,
+                    bridgehubAddress: _gatewayGovernanceConfig.bridgehubProxy,
+                    l1SharedBridgeProxy: _gatewayGovernanceConfig.l1AssetRouterProxy,
+                    secondBridgeAddress: _gatewayGovernanceConfig.l1AssetRouterProxy,
+                    secondBridgeValue: 0,
+                    secondBridgeCalldata: secondBridgeData,
+                    refundRecipient: prepareGWGovCallsStruct._refundRecipient
+                })
             );
         }
 
@@ -172,17 +172,17 @@ abstract contract GatewayGovernanceUtils is Script {
 
             calls = Utils.mergeCalls(
                 calls,
-                Utils.prepareGovernanceL1L2TwoBridgesTransaction(
-                    prepareGWGovCallsStruct._l1GasPrice,
-                    Utils.MAX_PRIORITY_TX_GAS,
-                    _gatewayGovernanceConfig.gatewayChainId,
-                    _gatewayGovernanceConfig.bridgehubProxy,
-                    _gatewayGovernanceConfig.l1AssetRouterProxy,
-                    _gatewayGovernanceConfig.ctmDeploymentTrackerProxy,
-                    0,
-                    secondBridgeData,
-                    prepareGWGovCallsStruct._refundRecipient
-                )
+                Utils.prepareGovernanceL1L2TwoBridgesTransaction({
+                    l1GasPrice: prepareGWGovCallsStruct._l1GasPrice,
+                    l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+                    chainId: _gatewayGovernanceConfig.gatewayChainId,
+                    bridgehubAddress: _gatewayGovernanceConfig.bridgehubProxy,
+                    l1SharedBridgeProxy: _gatewayGovernanceConfig.l1AssetRouterProxy,
+                    secondBridgeAddress: _gatewayGovernanceConfig.ctmDeploymentTrackerProxy,
+                    secondBridgeValue: 0,
+                    secondBridgeCalldata: secondBridgeData,
+                    refundRecipient: prepareGWGovCallsStruct._refundRecipient
+                })
             );
         }
 
@@ -192,17 +192,17 @@ abstract contract GatewayGovernanceUtils is Script {
 
             calls = Utils.mergeCalls(
                 calls,
-                Utils.prepareGovernanceL1L2DirectTransaction(
-                    prepareGWGovCallsStruct._l1GasPrice,
-                    data,
-                    Utils.MAX_PRIORITY_TX_GAS,
-                    new bytes[](0),
-                    prepareGWGovCallsStruct._gatewayRollupDAManager,
-                    _gatewayGovernanceConfig.gatewayChainId,
-                    _gatewayGovernanceConfig.bridgehubProxy,
-                    _gatewayGovernanceConfig.l1AssetRouterProxy,
-                    prepareGWGovCallsStruct._refundRecipient
-                )
+                Utils.prepareGovernanceL1L2DirectTransaction({
+                    l1GasPrice: prepareGWGovCallsStruct._l1GasPrice,
+                    l2Calldata: data,
+                    l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+                    factoryDeps: new bytes[](0),
+                    dstAddress: prepareGWGovCallsStruct._gatewayRollupDAManager,
+                    chainId: _gatewayGovernanceConfig.gatewayChainId,
+                    bridgehubAddress: _gatewayGovernanceConfig.bridgehubProxy,
+                    l1SharedBridgeProxy: _gatewayGovernanceConfig.l1AssetRouterProxy,
+                    refundRecipient: prepareGWGovCallsStruct._refundRecipient
+                })
             );
             // Todo: can probably delete since ValidatorTimelock is now TUPP.
             // calls = Utils.mergeCalls(
@@ -221,17 +221,17 @@ abstract contract GatewayGovernanceUtils is Script {
             // );
             calls = Utils.mergeCalls(
                 calls,
-                Utils.prepareGovernanceL1L2DirectTransaction(
-                    prepareGWGovCallsStruct._l1GasPrice,
-                    data,
-                    Utils.MAX_PRIORITY_TX_GAS,
-                    new bytes[](0),
-                    prepareGWGovCallsStruct._gatewayServerNotifier,
-                    _gatewayGovernanceConfig.gatewayChainId,
-                    _gatewayGovernanceConfig.bridgehubProxy,
-                    _gatewayGovernanceConfig.l1AssetRouterProxy,
-                    prepareGWGovCallsStruct._refundRecipient
-                )
+                Utils.prepareGovernanceL1L2DirectTransaction({
+                    l1GasPrice: prepareGWGovCallsStruct._l1GasPrice,
+                    l2Calldata: data,
+                    l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+                    factoryDeps: new bytes[](0),
+                    dstAddress: prepareGWGovCallsStruct._gatewayServerNotifier,
+                    chainId: _gatewayGovernanceConfig.gatewayChainId,
+                    bridgehubAddress: _gatewayGovernanceConfig.bridgehubProxy,
+                    l1SharedBridgeProxy: _gatewayGovernanceConfig.l1AssetRouterProxy,
+                    refundRecipient: prepareGWGovCallsStruct._refundRecipient
+                })
             );
         }
     }

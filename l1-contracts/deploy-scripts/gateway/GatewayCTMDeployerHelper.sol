@@ -167,23 +167,23 @@ library GatewayCTMDeployerHelper {
         (directAddresses, directCalldata) = _calculateDirectDeployments(_create2Salt, config, im.daResult);
 
         GatewayCTMFinalResult memory ctmResult;
-        (deployers.ctmDeployer, deployerCalldata.ctmCalldata, ctmResult) = _calculateCTMDeployer(
-            _create2Salt,
-            config,
-            directAddresses,
-            im.proxyAdminResult,
-            im.validatorTimelockResult,
-            im.verifiersResult
-        );
+        (deployers.ctmDeployer, deployerCalldata.ctmCalldata, ctmResult) = _calculateCTMDeployer({
+            _create2Salt: _create2Salt,
+            config: config,
+            directAddresses: directAddresses,
+            proxyAdminResult: im.proxyAdminResult,
+            validatorTimelockResult: im.validatorTimelockResult,
+            verifiersResult: im.verifiersResult
+        });
 
-        contracts = _assembleContracts(
-            im.daResult,
-            im.proxyAdminResult,
-            im.validatorTimelockResult,
-            im.verifiersResult,
-            directAddresses,
-            ctmResult
-        );
+        contracts = _assembleContracts({
+            daResult: im.daResult,
+            proxyAdminResult: im.proxyAdminResult,
+            validatorTimelockResult: im.validatorTimelockResult,
+            verifiersResult: im.verifiersResult,
+            directAddresses: directAddresses,
+            ctmResult: ctmResult
+        });
     }
 
     // ============ DA Deployer ============
@@ -408,13 +408,13 @@ library GatewayCTMDeployerHelper {
         GatewayValidatorTimelockDeployerResult memory validatorTimelockResult,
         Verifiers memory verifiersResult
     ) internal view returns (address deployer, bytes memory data, GatewayCTMFinalResult memory result) {
-        GatewayCTMFinalConfig memory ctmConfig = _buildCTMFinalConfig(
-            config,
-            directAddresses,
-            proxyAdminResult,
-            validatorTimelockResult,
-            verifiersResult
-        );
+        GatewayCTMFinalConfig memory ctmConfig = _buildCTMFinalConfig({
+            config: config,
+            directAddresses: directAddresses,
+            proxyAdminResult: proxyAdminResult,
+            validatorTimelockResult: validatorTimelockResult,
+            verifiersResult: verifiersResult
+        });
         (deployer, data) = _calculateCreate2AddressAndCalldata(
             _create2Salt,
             CTMContract.GatewayCTMDeployerCTM,
@@ -551,6 +551,8 @@ library GatewayCTMDeployerHelper {
         );
 
         {
+            // The last parameter is deliberately unnamed, so named arguments are not possible.
+            // solhint-disable-next-line func-named-parameters
             bytes memory proxyConstructorArgs = _buildCTMProxyConstructorArgs(
                 config,
                 baseConfig,
@@ -783,8 +785,12 @@ library GatewayCTMDeployerHelper {
     ) internal pure {
         string memory msgStr;
         if (constructorArgs.length == 0) {
+            // `string.concat` is variadic, so named arguments are not possible.
+            // solhint-disable-next-line func-named-parameters
             msgStr = string.concat("forge verify-contract ", Utils.vm.toString(contractAddr), " ", contractName);
         } else {
+            // `string.concat` is variadic, so named arguments are not possible.
+            // solhint-disable-next-line func-named-parameters
             msgStr = string.concat(
                 "forge verify-contract ",
                 Utils.vm.toString(contractAddr),

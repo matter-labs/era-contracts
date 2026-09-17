@@ -147,13 +147,13 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         IL1Bridgehub bridgehub = IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub);
         L1ChainAssetHandler chainAssetHandler = L1ChainAssetHandler(coreAddresses.bridgehub.proxies.chainAssetHandler);
         vm.startBroadcast(getDeployerAddress());
-        BridgehubBase(address(bridgehub)).setAddresses(
-            coreAddresses.bridges.proxies.l1AssetRouter,
-            ICTMDeploymentTracker(coreAddresses.bridgehub.proxies.ctmDeploymentTracker),
-            IMessageRootBase(coreAddresses.bridgehub.proxies.messageRoot),
-            coreAddresses.bridgehub.proxies.chainAssetHandler,
-            coreAddresses.bridgehub.proxies.chainRegistrationSender
-        );
+        BridgehubBase(address(bridgehub)).setAddresses({
+            _assetRouter: coreAddresses.bridges.proxies.l1AssetRouter,
+            _l1CtmDeployer: ICTMDeploymentTracker(coreAddresses.bridgehub.proxies.ctmDeploymentTracker),
+            _messageRoot: IMessageRootBase(coreAddresses.bridgehub.proxies.messageRoot),
+            _chainAssetHandler: coreAddresses.bridgehub.proxies.chainAssetHandler,
+            _chainRegistrationSender: coreAddresses.bridgehub.proxies.chainRegistrationSender
+        });
         chainAssetHandler.setAddresses();
         vm.stopBroadcast();
         console.log("SharedBridge registered");
