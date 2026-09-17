@@ -76,7 +76,7 @@ contract L2AssetRouterReceiveMessageAccessControlRegressionL1Test is Test, Share
     /// @notice Test that receiveMessage does not revert with Unauthorized when called by L2InteropHandler
     /// @dev We craft a payload with a deliberately wrong selector. Reaching the InvalidSelector revert in
     ///      `AssetRouterBase.receiveMessage` is causally downstream of:
-    ///        - the `msg.sender == _interopHandler()` gate, and
+    ///        - the `msg.sender == _getInteropHandler()` gate, and
     ///        - the `_isValidInteropSender` sender validation.
     ///      Therefore an InvalidSelector revert proves the access-control gate is open for L2InteropHandler.
     function test_regression_receiveMessageAllowedForInteropHandler() public {

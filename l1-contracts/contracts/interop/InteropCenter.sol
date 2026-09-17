@@ -686,7 +686,7 @@ contract InteropCenter is
     }
 
     /// @notice Hashes an assembled {InteropBundle} into its canonical `bundleHash`.
-    function _hashBundle(InteropBundle memory _bundle) internal view returns (bytes32) {
+    function _hashBundle(InteropBundle memory _bundle) internal pure returns (bytes32) {
         return InteropDataEncoding.encodeInteropBundleHash(abi.encode(_bundle));
     }
 

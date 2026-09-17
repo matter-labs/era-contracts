@@ -53,19 +53,19 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
                         IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    function _l1ChainId() internal view override returns (uint256) {
+    function _getL1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
     }
 
-    function _bridgehub() internal view override returns (IL1Bridgehub) {
+    function _getBridgehub() internal view override returns (IL1Bridgehub) {
         return BRIDGEHUB;
     }
 
-    function _messageRoot() internal view override returns (IMessageRootBase) {
+    function _getMessageRoot() internal view override returns (IMessageRootBase) {
         return MESSAGE_ROOT;
     }
 
-    function _assetRouter() internal view override returns (IAssetRouterBase) {
+    function _getAssetRouter() internal view override returns (IAssetRouterBase) {
         return ASSET_ROUTER;
     }
 
@@ -117,7 +117,7 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
         uint256 _previousSettlementLayerChainId,
         uint256 _currentSettlementLayerChainId
     ) external onlySystemContext {
-        if (_previousSettlementLayerChainId == 0 && _currentSettlementLayerChainId == _l1ChainId()) {
+        if (_previousSettlementLayerChainId == 0 && _currentSettlementLayerChainId == _getL1ChainId()) {
             /// For the initial call if we are settling on L1, we return, as there is no real migration.
             return;
         }
@@ -128,7 +128,7 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
 
     /// @notice Used to pause deposits on Gateway from L1 for migration back to L1.
     function requestPauseDepositsForChainOnGateway(uint256 _chainId) external onlyServiceTransactionSender {
-        address zkChain = _bridgehub().getZKChain(_chainId);
+        address zkChain = _getBridgehub().getZKChain(_chainId);
         require(zkChain != address(0), ChainIdNotRegistered(_chainId));
         IMigrator(zkChain).pauseDepositsOnGateway(block.timestamp);
     }

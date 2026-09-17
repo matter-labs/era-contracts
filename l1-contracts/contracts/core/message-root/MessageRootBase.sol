@@ -43,9 +43,9 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
                             IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    function _bridgehub() internal view virtual returns (address);
+    function _getBridgehub() internal view virtual returns (address);
 
-    function _chainAssetHandler() internal view virtual returns (address);
+    function _getChainAssetHandler() internal view virtual returns (address);
 
     // solhint-disable-next-line func-name-mixedcase
     function L1_CHAIN_ID() public view virtual returns (uint256);
@@ -112,16 +112,16 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
 
     /// @notice Checks that the message sender is the bridgehub or the chain asset handler.
     modifier onlyBridgehubOrChainAssetHandler() {
-        if (msg.sender != _bridgehub() && msg.sender != _chainAssetHandler()) {
-            revert OnlyBridgehubOrChainAssetHandler(msg.sender, address(_bridgehub()), _chainAssetHandler());
+        if (msg.sender != _getBridgehub() && msg.sender != _getChainAssetHandler()) {
+            revert OnlyBridgehubOrChainAssetHandler(msg.sender, address(_getBridgehub()), _getChainAssetHandler());
         }
         _;
     }
 
     /// @notice Checks that the message sender is the chain asset handler.
     modifier onlyChainAssetHandler() {
-        if (msg.sender != _chainAssetHandler()) {
-            revert OnlyChainAssetHandler(msg.sender, _chainAssetHandler());
+        if (msg.sender != _getChainAssetHandler()) {
+            revert OnlyChainAssetHandler(msg.sender, _getChainAssetHandler());
         }
         _;
     }
@@ -129,8 +129,8 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     /// @notice Checks that the message sender is the specified ZK Chain.
     /// @param _chainId The ID of the chain that is required to be the caller.
     modifier onlyChain(uint256 _chainId) {
-        if (msg.sender != IBridgehubBase(_bridgehub()).getZKChain(_chainId)) {
-            revert OnlyChain(msg.sender, IBridgehubBase(_bridgehub()).getZKChain(_chainId));
+        if (msg.sender != IBridgehubBase(_getBridgehub()).getZKChain(_chainId)) {
+            revert OnlyChain(msg.sender, IBridgehubBase(_getBridgehub()).getZKChain(_chainId));
         }
         _;
     }
@@ -138,8 +138,8 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     /// @notice Restricts batch-root appends to the chain's own diamond (its `Executor` calls
     /// directly while settling).
     modifier addChainBatchRootRestriction(uint256 _chainId) {
-        if (msg.sender != IBridgehubBase(_bridgehub()).getZKChain(_chainId)) {
-            revert OnlyChain(msg.sender, IBridgehubBase(_bridgehub()).getZKChain(_chainId));
+        if (msg.sender != IBridgehubBase(_getBridgehub()).getZKChain(_chainId)) {
+            revert OnlyChain(msg.sender, IBridgehubBase(_getBridgehub()).getZKChain(_chainId));
         }
         _;
     }
@@ -303,10 +303,10 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
 
     /// @inheritdoc IMessageRootBase
     function seedGenesisRoot(uint256 _chainId) external {
-        if (msg.sender != _bridgehub()) {
-            revert OnlyBridgehub(msg.sender, _bridgehub());
+        if (msg.sender != _getBridgehub()) {
+            revert OnlyBridgehub(msg.sender, _getBridgehub());
         }
-        IGetters zkChain = IGetters(IBridgehubBase(_bridgehub()).getZKChain(_chainId));
+        IGetters zkChain = IGetters(IBridgehubBase(_getBridgehub()).getZKChain(_chainId));
         // A ZKsync OS chain always stores its genesis root in DiamondInit; a zero read is a bug.
         bytes32 genesisChainBatchRoot = zkChain.l2LogsRootHash(0);
         require(genesisChainBatchRoot != bytes32(0), ChainBatchRootZero());

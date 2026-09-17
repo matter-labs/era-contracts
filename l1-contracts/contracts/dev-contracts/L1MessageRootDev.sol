@@ -28,7 +28,7 @@ contract L1MessageRootDev is L1MessageRoot {
         uint256[] memory allZKChains = IBridgehubBase(BRIDGE_HUB).getAllZKChainChainIDs();
         uint256 allZKChainsLength = allZKChains.length;
         for (uint256 i = 0; i < allZKChainsLength; ++i) {
-            require(IBridgehubBase(_bridgehub()).settlementLayer(allZKChains[i]) == block.chainid, NotAllChainsOnL1());
+            require(IBridgehubBase(_getBridgehub()).settlementLayer(allZKChains[i]) == block.chainid, NotAllChainsOnL1());
             v31UpgradeChainBatchNumber[allZKChains[i]] = V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE;
         }
     }
