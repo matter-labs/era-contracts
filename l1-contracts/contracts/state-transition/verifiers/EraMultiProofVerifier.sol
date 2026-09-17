@@ -5,7 +5,6 @@ pragma solidity 0.8.28;
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IEraDualVerifier} from "../chain-interfaces/IEraDualVerifier.sol";
-import {EraDualVerifier} from "./EraDualVerifier.sol";
 import {IEraMultiProofVerifier} from "../chain-interfaces/IEraMultiProofVerifier.sol";
 import {IGetters} from "../chain-interfaces/IGetters.sol";
 import {
@@ -133,6 +132,6 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
         if (_verifierType == AIRBENDER_VERIFICATION_TYPE) {
             return AIRBENDER_VERIFIER.verificationKeyHash();
         }
-        return EraDualVerifier(address(BOOJUM_VERIFIER)).verificationKeyHash(_verifierType);
+        return IEraDualVerifier(address(BOOJUM_VERIFIER)).verificationKeyHash(_verifierType);
     }
 }
