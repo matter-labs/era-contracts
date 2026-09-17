@@ -29,7 +29,6 @@ fs_permissions = [
 ]
 ignored_error_codes = ["missing-receive-ether", "code-size"]
 ignored_warnings_from = ["test", "contracts/dev-contracts"]
-suppressed_warnings = ["txorigin"]
 remappings = [
   "forge-std/=lib/forge-std/src/",
   "murky/=lib/murky/src/",
