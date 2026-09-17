@@ -1,5 +1,8 @@
 name: System contracts CI
 
+env:
+  ANVIL_ZKSYNC_VERSION: v0.7.0
+
 on:
   pull_request:
 
@@ -101,15 +104,6 @@ jobs:
           node-version-file: .nvmrc
           cache: yarn
 
-      - name: Run anvil-zksync
-        uses: dutterbutter/anvil-zksync-action@v1.3.0
-        with:
-          mode: run
-          protocolVersion: 29
-          evmInterpreter: true
-          logFilePath: "anvil_zksync.log"
-          offline: true
-
       - name: Install dependencies
         run: yarn
 
@@ -126,6 +120,33 @@ jobs:
             system-contracts/cache-zk
             system-contracts/typechain
             system-contracts/contracts-preprocessed
+
+      - name: Install anvil-zksync
+        env:
+          GH_TOKEN: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_READ }}
+        run: |
+          gh release download ${{ env.ANVIL_ZKSYNC_VERSION }} -R matter-labs/anvil-zksync-private \
+            --pattern "anvil-zksync-${{ env.ANVIL_ZKSYNC_VERSION }}-x86_64-unknown-linux-gnu.tar.gz" -O - | tar -xz
+          sudo mv anvil-zksync /usr/local/bin/anvil-zksync
+          anvil-zksync --version
+
+      # The node's built-in system contracts are used, but the EVM emulator is the one built
+      # from this repo, so EvmEmulation.spec.ts exercises the emulator under review.
+      - name: Run anvil-zksync
+        run: |
+          anvil-zksync --offline --protocol-version 29 --evm-interpreter \
+            --evm-emulator-path system-contracts/zkout/EvmEmulator.yul/EvmEmulator.json \
+            run > anvil_zksync.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -sf -o /dev/null http://127.0.0.1:8011 -X POST -H "Content-Type: application/json" \
+                -d '{"jsonrpc":"2.0","method":"eth_chainId","id":1}'; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "anvil-zksync did not become ready"
+          cat anvil_zksync.log
+          exit 1
 
       - name: Run tests
         run: yarn sc test
