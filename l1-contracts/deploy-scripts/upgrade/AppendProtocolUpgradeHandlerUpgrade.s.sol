@@ -16,7 +16,7 @@ interface ProxyAdminV5 {
 contract AppendProtocolUpgradeHandlerUpgrade is Script {
     using stdToml for string;
 
-    function run() public {
+    function run() public view {
         string memory root = vm.projectRoot();
         string memory config = vm.envString("GATEWAY_UPGRADE_ECOSYSTEM_INPUT");
 
@@ -51,7 +51,7 @@ contract AppendProtocolUpgradeHandlerUpgrade is Script {
         address transparentProxyAdmin,
         address protocolUpgradeHandlerProxyAddress,
         address protocolUpgradeHandlerImplAddress
-    ) internal returns (Call memory) {
+    ) internal pure returns (Call memory) {
         return
             Call({
                 target: transparentProxyAdmin,

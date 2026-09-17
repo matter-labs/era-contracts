@@ -95,7 +95,7 @@ contract GatewayUtils is Script, IGatewayUtils {
 
     function finishMigrateChainFromGateway(
         address bridgehubAddr,
-        uint256 migratingChainId,
+        uint256 /* migratingChainId */,
         uint256 gatewayChainId,
         uint256 l2BatchNumber,
         uint256 l2MessageIndex,

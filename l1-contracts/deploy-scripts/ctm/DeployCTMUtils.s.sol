@@ -114,7 +114,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         ctmAddresses.stateTransition.facets.diamondInit = deploySimpleContract("DiamondInit");
     }
 
-    function initializeConfig(string memory configPath, address bridgehub) internal virtual {
+    function initializeConfig(string memory configPath, address /* bridgehub */) internal virtual {
         string memory toml = vm.readFile(configPath);
 
         config.l1ChainId = block.chainid;
@@ -247,7 +247,7 @@ abstract contract DeployCTMUtils is DeployUtils {
 
     ////////////////////////////// Contract deployment modes /////////////////////////////////
 
-    function getRollupL2DACommitmentScheme() internal returns (L2DACommitmentScheme) {
+    function getRollupL2DACommitmentScheme() internal pure returns (L2DACommitmentScheme) {
         return ROLLUP_L2_DA_COMMITMENT_SCHEME;
     }
 

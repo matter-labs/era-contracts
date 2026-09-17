@@ -113,7 +113,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         string memory outputPath,
         address bridgehub,
         bool reuseGovAndAdmin,
-        bool skipL1Deployments
+        bool /* skipL1Deployments */
     ) public {
         string memory root = vm.projectRoot();
         inputPath = string.concat(root, inputPath);
@@ -303,7 +303,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function saveOutput(string memory outputPath) internal virtual {
-        string memory bridgehub = vm.serializeAddress(
+        vm.serializeAddress(
             "bridgehub",
             "bridgehub_proxy_addr",
             coreAddresses.bridgehub.proxies.bridgehub
@@ -506,7 +506,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     function _getProxyUpgradeBytecodeInfo(
         string memory _fileName,
         string memory _contractName
-    ) private returns (bytes memory) {
+    ) private view returns (bytes memory) {
         bytes memory implBytecode = BytecodeUtils.readDeployedBytecodeL1(_fileName, _contractName);
         bytes memory proxyBytecode = BytecodeUtils.readDeployedBytecodeL1(
             "SystemContractProxy.sol",

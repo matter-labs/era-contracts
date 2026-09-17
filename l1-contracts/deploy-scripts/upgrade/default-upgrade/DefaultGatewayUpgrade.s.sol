@@ -7,6 +7,8 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
+import {CHAIN_MIGRATIONS_ENABLED} from "contracts/common/Config.sol";
+
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {Utils} from "../../utils/Utils.sol";
@@ -198,7 +200,8 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
     ///      than at the individual call sites — keeps any future gateway step from silently slipping a
     ///      deployment into an upgrade bundle.
     function deployGWContract(string memory contractName) internal returns (address contractAddress) {
-        revert(
+        require(
+            CHAIN_MIGRATIONS_ENABLED,
             string.concat(
                 "DefaultGatewayUpgrade: v33 deploys nothing onto a gateway; refusing to deploy ",
                 contractName
@@ -328,8 +331,8 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
     }
 
     function prepareVersionSpecificStage0GovernanceCallsGW(
-        uint256 priorityTxsL2GasLimit,
-        uint256 maxExpectedL1GasPrice
+        uint256 /* priorityTxsL2GasLimit */,
+        uint256 /* maxExpectedL1GasPrice */
     ) public virtual returns (Call[] memory calls) {
         // Empty by default.
         return calls;
@@ -341,8 +344,8 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
     }
 
     function prepareVersionSpecificStage1GovernanceCallsGW(
-        uint256 priorityTxsL2GasLimit,
-        uint256 maxExpectedL1GasPrice
+        uint256 /* priorityTxsL2GasLimit */,
+        uint256 /* maxExpectedL1GasPrice */
     ) public virtual returns (Call[] memory calls) {
         // Empty by default.
         return calls;
@@ -354,8 +357,8 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
     }
 
     function prepareVersionSpecificStage2GovernanceCallsGW(
-        uint256 priorityTxsL2GasLimit,
-        uint256 maxExpectedL1GasPrice
+        uint256 /* priorityTxsL2GasLimit */,
+        uint256 /* maxExpectedL1GasPrice */
     ) public virtual returns (Call[] memory calls) {
         // Empty by default.
         return calls;
