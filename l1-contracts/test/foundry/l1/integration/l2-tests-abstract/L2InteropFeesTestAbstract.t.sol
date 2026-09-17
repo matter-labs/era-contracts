@@ -124,8 +124,8 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
                     sendBundle Fee Collection Tests
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Enables gateway mode (mocked settlement-layer chain id) so that `sendBundle` does not revert.
-    function _setupGatewayMode() internal {
+    /// @notice Mocks a non-L1 settlement-layer chain id so that `sendBundle` does not revert.
+    function _setupSettlementLayerMode() internal {
         vm.mockCall(
             address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
             abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
@@ -146,7 +146,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
     /// @notice Test that base token protocol fees are accumulated when useFixedFee=false
     function test_sendBundle_collectsBaseTokenFees() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
 
         uint256 protocolFee = 0.01 ether;
         vm.prank(L2_BOOTLOADER_ADDRESS);
@@ -224,7 +224,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
     /// @notice Test that base token fees scale with call count
     function test_sendBundle_baseTokenFeesScaleWithCallCount() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
 
         uint256 protocolFee = 0.01 ether;
         vm.prank(L2_BOOTLOADER_ADDRESS);
@@ -272,7 +272,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
     /// @notice Test that no base token fees are charged when interopProtocolFee is zero
     function test_sendBundle_noFeesWhenProtocolFeeZero() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
 
         assertEq(l2InteropCenter.interopProtocolFee(), 0, "Protocol fee should start at zero");
 
@@ -304,7 +304,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
     /// @notice Test that ProtocolFeesAccumulated event is emitted
     function test_sendBundle_emitsProtocolFeesAccumulatedEvent() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
 
         uint256 protocolFee = 0.02 ether;
         vm.prank(L2_BOOTLOADER_ADDRESS);
@@ -338,7 +338,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
     /// @notice Test ZK token fee collection when useFixedFee=true
     function test_sendBundle_collectsZKTokenFees() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
 
         zkToken = new TestnetERC20Token("ZK Token", "ZK", 18);
 
@@ -389,7 +389,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
     /// @notice Test that ZK token fees scale with call count
     function test_sendBundle_zkTokenFeesScaleWithCallCount() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
 
         zkToken = new TestnetERC20Token("ZK Token", "ZK", 18);
         bytes32 zkTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, address(zkToken));
@@ -447,7 +447,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
     /// @notice Test that FixedZKFeesAccumulated event is emitted
     function test_sendBundle_emitsFixedZKFeesAccumulatedEvent() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
 
         zkToken = new TestnetERC20Token("ZK Token", "ZK", 18);
         bytes32 zkTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, address(zkToken));
@@ -492,7 +492,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
     /// @notice Test that useFixedFee=true skips base token protocol fee
     function test_sendBundle_fixedFeeSkipsBaseTokenFee() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
 
         uint256 protocolFee = 0.01 ether;
         vm.prank(L2_BOOTLOADER_ADDRESS);
@@ -542,7 +542,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
     /// @notice Test that ZKTokenNotAvailable is thrown when ZK token is not set up
     function test_sendBundle_revertsWhenZKTokenNotAvailable() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
 
         // ZK token deliberately not set up: NTV mocked to resolve the asset ID to address(0).
         vm.mockCall(
@@ -574,7 +574,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
     /// @notice Test that protocol fees accumulate when coinbase is a reverting contract
     function test_sendBundle_accumulatesProtocolFeesWhenCoinbaseReverts() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
 
         uint256 protocolFee = 0.01 ether;
         vm.prank(L2_BOOTLOADER_ADDRESS);
@@ -615,7 +615,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
     /// @notice Test claiming accumulated protocol fees
     function test_claimProtocolFees_Success() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
 
         uint256 protocolFee = 0.01 ether;
         vm.prank(L2_BOOTLOADER_ADDRESS);
@@ -673,7 +673,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
     /// @notice Test that ZK fees are always accumulated for coinbase
     function test_sendBundle_accumulatesZKFees() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
 
         zkToken = new TestnetERC20Token("ZK Token", "ZK", 18);
         bytes32 zkTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, address(zkToken));
@@ -727,7 +727,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
     /// @notice Test claiming accumulated ZK fees
     function test_claimZKFees_Success() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
 
         zkToken = new TestnetERC20Token("ZK Token", "ZK", 18);
         bytes32 zkTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, address(zkToken));
@@ -810,7 +810,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
     /// @notice Test that sendBundle succeeds when useFixedFee attribute is missing (defaults to false = base token fees)
     function test_sendBundle_succeedsWhenUseFixedFeeMissing() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
 
         // Set a protocol fee to verify base token fee path is taken
         uint256 protocolFee = 0.01 ether;
@@ -868,7 +868,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
     /// @notice Test that sendMessage succeeds when useFixedFee attribute is missing (defaults to false = base token fees)
     function test_sendMessage_succeedsWhenUseFixedFeeMissing() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
 
         address sender = makeAddr("sender");
         vm.deal(sender, 10 ether);
@@ -903,7 +903,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
     /// @notice Test that claimProtocolFees reverts with FeeWithdrawalFailed when receiver reverts
     function test_claimProtocolFees_revertsWhenReceiverReverts() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
 
         uint256 protocolFee = 0.01 ether;
         vm.prank(L2_BOOTLOADER_ADDRESS);
@@ -939,7 +939,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
     /// @notice Test claimProtocolFees with zero-address receiver
     function test_claimProtocolFees_zeroAddressReceiver() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
 
         uint256 protocolFee = 0.01 ether;
         vm.prank(L2_BOOTLOADER_ADDRESS);
@@ -975,7 +975,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
     /// @notice Test claimZKFees with zero-address receiver
     function test_claimZKFees_zeroAddressReceiver() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
 
         zkToken = new TestnetERC20Token("ZK Token", "ZK", 18);
         bytes32 zkTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, address(zkToken));
@@ -1025,7 +1025,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
     /// @notice Test exact fee accounting with multiple bundles to the same coinbase
     function test_sendBundle_multipleBundlesAccumulateFees() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
 
         uint256 protocolFee = 0.005 ether;
         vm.prank(L2_BOOTLOADER_ADDRESS);
@@ -1114,7 +1114,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
     /// @notice Test exact fee accounting: ZK fees across multiple bundles
     function test_sendBundle_multipleZKBundlesExactAccounting() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
 
         zkToken = new TestnetERC20Token("ZK Token", "ZK", 18);
         bytes32 zkTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, address(zkToken));
@@ -1206,7 +1206,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
     /// @notice Test multiple fee accumulations before claiming
     function test_claimProtocolFees_MultipleAccumulations() public {
-        _setupGatewayMode();
+        _setupSettlementLayerMode();
 
         uint256 protocolFee = 0.01 ether;
         vm.prank(L2_BOOTLOADER_ADDRESS);

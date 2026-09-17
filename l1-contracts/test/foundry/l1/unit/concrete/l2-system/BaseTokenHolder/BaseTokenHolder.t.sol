@@ -103,7 +103,7 @@ contract BaseTokenHolderTest is Test {
     uint256 internal constant INITIAL_BALANCE = 100 ether;
     uint256 internal constant L1_CHAIN_ID = 9;
     uint256 internal constant ERA_CHAIN_ID = 271;
-    uint256 internal constant GATEWAY_CHAIN_ID = 505;
+    uint256 internal constant OTHER_CHAIN_ID = 505;
 
     function setUp() public {
         baseTokenHolder = new BaseTokenHolder();
@@ -433,7 +433,7 @@ contract BaseTokenHolderTest is Test {
         emit IBaseTokenHolder.BaseTokenRecovered(recipient, amount);
 
         vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
-        baseTokenHolder.recoverBaseToken(recipient, amount, GATEWAY_CHAIN_ID);
+        baseTokenHolder.recoverBaseToken(recipient, amount, OTHER_CHAIN_ID);
 
         assertEq(recipient.balance, recipientBalanceBefore + amount, "recipient must receive the recovered value");
         assertEq(address(baseTokenHolder).balance, holderBalanceBefore - amount, "holder balance must decrease");
@@ -454,14 +454,14 @@ contract BaseTokenHolderTest is Test {
 
         vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
         vm.expectRevert(BaseTokenNativeToThisChain.selector);
-        baseTokenHolder.recoverBaseToken(recipient, 1 ether, GATEWAY_CHAIN_ID);
+        baseTokenHolder.recoverBaseToken(recipient, 1 ether, OTHER_CHAIN_ID);
     }
 
     function test_recoverBaseToken_zeroAmountIsNoop() public {
         uint256 holderBalanceBefore = address(baseTokenHolder).balance;
 
         vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
-        baseTokenHolder.recoverBaseToken(recipient, 0, GATEWAY_CHAIN_ID);
+        baseTokenHolder.recoverBaseToken(recipient, 0, OTHER_CHAIN_ID);
 
         assertEq(recipient.balance, 0);
         assertEq(address(baseTokenHolder).balance, holderBalanceBefore);
@@ -472,13 +472,13 @@ contract BaseTokenHolderTest is Test {
     function test_recoverBaseToken_revertFromInteropCenter() public {
         vm.prank(L2_INTEROP_CENTER_ADDR);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, L2_INTEROP_CENTER_ADDR));
-        baseTokenHolder.recoverBaseToken(recipient, 1 ether, GATEWAY_CHAIN_ID);
+        baseTokenHolder.recoverBaseToken(recipient, 1 ether, OTHER_CHAIN_ID);
     }
 
     function test_recoverBaseToken_revertFromInteropHandler() public {
         vm.prank(L2_INTEROP_HANDLER_ADDR);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, L2_INTEROP_HANDLER_ADDR));
-        baseTokenHolder.recoverBaseToken(recipient, 1 ether, GATEWAY_CHAIN_ID);
+        baseTokenHolder.recoverBaseToken(recipient, 1 ether, OTHER_CHAIN_ID);
     }
 }
 

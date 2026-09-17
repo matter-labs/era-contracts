@@ -69,7 +69,7 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable, IServer
         chainTypeManager = IChainTypeManager(_chainTypeManager);
     }
 
-    /// @notice Emits an event to signal that the chain is migrating to a gateway.
+    /// @notice Emits an event to signal that the chain is migrating to a settlement layer.
     /// @param _chainId The identifier of the chain that is migrating.
     /// @dev Restricted to the chain administrator.
     /// @dev The migration number is incremented by 1 to match the value that ChainAssetHandler will emit after increment.
@@ -87,7 +87,7 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable, IServer
         emit MigrateToGateway(_chainId, migrationNumber);
     }
 
-    /// @notice Emits an event to signal that the chain is migrating from a gateway.
+    /// @notice Emits an event to signal that the chain is migrating from a settlement layer.
     /// @param _chainId The identifier of the chain that is migrating.
     /// @dev Restricted to the chain administrator.
     /// @dev The migration number is incremented by 1 to match the value that ChainAssetHandler will emit after increment.

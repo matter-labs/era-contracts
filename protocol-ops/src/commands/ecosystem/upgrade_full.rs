@@ -15,12 +15,11 @@ use anyhow::Context;
 use serde::Deserialize;
 
 use crate::common::abi::AdminFunctionsAbi;
-use crate::common::env_config::{NewGatewayConfig, OwnableProxyEntry};
+use crate::common::env_config::OwnableProxyEntry;
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
 use crate::common::wallets::Wallet;
 
-use super::new_gateway_prepare::prepare_new_gateway;
 use super::upgrade_inner::{CtmPrepareEntry, PrepareInputs, PrepareOutput, UpgradeInner};
 
 pub struct UpgradeFull<'a> {
@@ -29,12 +28,6 @@ pub struct UpgradeFull<'a> {
     /// (see `OwnerWrap` in `IAdminFunctions.sol`). Empty for envs where every
     /// current owner is already an EOA.
     ownable_proxies: Vec<OwnableProxyEntry>,
-    /// Optional new-Gateway bring-up config from the env's `[new_gateway]`
-    /// block. When present, the prepare phase runs
-    /// `GatewayVotePreparation.s.sol` against this gateway on the same anvil
-    /// fork and stashes the output TOML path in `PrepareOutput` for the
-    /// stage-2 merge.
-    new_gateway: Option<NewGatewayConfig>,
 }
 
 impl<'a> UpgradeFull<'a> {
@@ -42,7 +35,6 @@ impl<'a> UpgradeFull<'a> {
         Self {
             inner,
             ownable_proxies: Vec::new(),
-            new_gateway: None,
         }
     }
 
@@ -51,20 +43,11 @@ impl<'a> UpgradeFull<'a> {
         self
     }
 
-    pub fn with_new_gateway(mut self, new_gateway: Option<NewGatewayConfig>) -> Self {
-        self.new_gateway = new_gateway;
-        self
-    }
-
     /// Run the prepare phase: `ensureCtmsAndProxyAdminsOwnedByGovernance` as
     /// a precondition, then `inner.prepare`, then the CTM admin calls that are
     /// intentionally outside governance ownership (currently ServerNotifier).
     /// All steps broadcast against the supplied runner so every deployer/owner
     /// tx goes into the prepare Safe-bundle set.
-    ///
-    /// When `[new_gateway]` is configured, also runs `GatewayVotePreparation`
-    /// after Core+CTM prepares — those broadcasts (CREATE2 deploys of the GW
-    /// CTM contract set) merge into the same deployer Safe bundle.
     pub async fn prepare(
         &self,
         runner: &mut ForgeRunner,
@@ -72,47 +55,8 @@ impl<'a> UpgradeFull<'a> {
         inputs: &PrepareInputs,
     ) -> anyhow::Result<PrepareOutput> {
         self.run_pre_steps(runner, deployer).await?;
-        let mut prepared = self.inner.prepare(runner, deployer, inputs).await?;
+        let prepared = self.inner.prepare(runner, deployer, inputs).await?;
         self.run_ctm_admin_steps(runner, deployer, &prepared.ctm_tomls)?;
-
-        if let Some(ref new_gw) = self.new_gateway {
-            // Look up the per-CTM salt: resolve the CTM proxy from the
-            // representative chain, then find its salt in the prepare entries.
-            let ctm_proxy = crate::common::l1_contracts::resolve_ctm_proxy(
-                &runner.rpc_url,
-                self.inner.bridgehub(),
-                new_gw.ctm_representative_chain_id,
-            )
-            .await
-            .ok();
-            let gw_salt = ctm_proxy.and_then(|proxy| {
-                prepared
-                    .ctm_tomls
-                    .iter()
-                    .find(|e| e.proxy == proxy)
-                    .and_then(|_| {
-                        inputs
-                            .create2_factory_salt_per_ctm
-                            .as_ref()?
-                            .get(&proxy)
-                            .copied()
-                    })
-            });
-            let path = prepare_new_gateway(
-                runner,
-                deployer,
-                self.inner.bridgehub(),
-                &prepared.core_toml,
-                new_gw,
-                new_gw.ctm_representative_chain_id,
-                &prepared.ctm_tomls,
-                inputs.zk_token_asset_id,
-                gw_salt,
-            )
-            .await?;
-            prepared.new_gateway_tomls.push(path);
-        }
-
         Ok(prepared)
     }
 

@@ -40,7 +40,7 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
     using LogFinder for Vm.Log[];
 
     uint256 constant TEST_USERS_COUNT = 10;
-    uint256 constant GATEWAY_CHAIN_ID = 506;
+    uint256 constant SETTLEMENT_LAYER_CHAIN_ID = 506;
     address[] public users;
     address[] public l2ContractAddresses;
 
@@ -211,8 +211,8 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
     }
 
     function test_chainRegistrationSender_revertWhen_settlementLayersMismatch() public {
-        uint256 firstSettlementLayer = GATEWAY_CHAIN_ID;
-        uint256 secondSettlementLayer = GATEWAY_CHAIN_ID + 1;
+        uint256 firstSettlementLayer = SETTLEMENT_LAYER_CHAIN_ID;
+        uint256 secondSettlementLayer = SETTLEMENT_LAYER_CHAIN_ID + 1;
 
         // Isolate ChainRegistrationSender's comparison from the separately-tested migration machinery.
         // Exact-calldata mocks avoid mutating Bridgehub storage and only affect the two queried chains.

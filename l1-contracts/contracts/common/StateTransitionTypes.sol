@@ -2,8 +2,8 @@
 
 pragma solidity ^0.8.21;
 
-// Shared types for state transition contracts, used by both deploy-scripts and
-// Gateway CTM deployer contracts. Canonical single source of truth.
+// Shared types for state transition contracts, used by deploy-scripts. Canonical single
+// source of truth.
 
 /// @notice Diamond facet contract addresses.
 // solhint-disable-next-line gas-struct-packing
@@ -45,20 +45,18 @@ struct StateTransitionContracts {
     address permissionlessValidator;
 }
 
-/// @notice Core Data Availability contract addresses, shared by both
-///         deploy-scripts (L1 CTM deployment) and Gateway CTM deployer.
+/// @notice Core Data Availability contract addresses used by deploy-scripts (L1 CTM deployment).
 // solhint-disable-next-line gas-struct-packing
 struct DAContracts {
     /// @notice Address of the RollupDAManager contract.
     address rollupDAManager;
-    /// @notice Address of the rollup SL DA validator (RelayedSLDAValidator on GW, RollupL1DAValidator on L1).
+    /// @notice Address of the rollup SL DA validator (RollupL1DAValidator on L1, RelayedSLDAValidator on a settlement layer).
     address rollupSLDAValidator;
     /// @notice Address of the ValidiumL1DAValidator contract.
     address validiumDAValidator;
 }
 
-/// @notice Full set of deployed state transition addresses, shared by both
-///         deploy-scripts (L1 CTM deployment) and Gateway CTM deployer.
+/// @notice Full set of deployed state transition addresses used by deploy-scripts (L1 CTM deployment).
 // solhint-disable-next-line gas-struct-packing
 struct StateTransitionDeployedAddresses {
     StateTransitionContracts proxies;

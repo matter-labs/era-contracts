@@ -32,7 +32,7 @@ import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 contract MessageRoot_Extended_Test is Test {
     address bridgeHub;
     uint256 L1_CHAIN_ID;
-    uint256 gatewayChainId;
+    uint256 legacySettlementLayerChainId;
     L1MessageRoot messageRoot;
     L2MessageRoot l2MessageRoot;
     address assetTracker;
@@ -43,7 +43,7 @@ contract MessageRoot_Extended_Test is Test {
         chainAssetHandler = makeAddr("chainAssetHandler");
         assetTracker = makeAddr("assetTracker");
         L1_CHAIN_ID = 1;
-        gatewayChainId = 506;
+        legacySettlementLayerChainId = 506;
 
         vm.mockCall(bridgeHub, abi.encodeWithSelector(IL1Bridgehub.L1_CHAIN_ID.selector), abi.encode(L1_CHAIN_ID));
         vm.mockCall(
@@ -63,7 +63,7 @@ contract MessageRoot_Extended_Test is Test {
         messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(bridgeHub, gatewayChainId, chainAssetHandler)),
+                    address(new L1MessageRoot(bridgeHub, legacySettlementLayerChainId, chainAssetHandler)),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initialize, ())
                 )
@@ -366,7 +366,7 @@ contract MessageRoot_Extended_Test is Test {
         // Roll to a new block so the next emission increments the counter.
         vm.roll(block.number + 1);
 
-        // Add a batch root (the chain itself appends its batch root on Gateway now)
+        // Add a batch root (the chain itself appends its batch root on the settlement layer now)
         vm.prank(chainSender);
         l2MessageRoot.addChainBatchRootV32(chainId, 1, keccak256("batchRoot"));
 
@@ -389,8 +389,8 @@ contract MessageRoot_Extended_Test is Test {
     }
 
     function test_ERA_GATEWAY_CHAIN_ID() public view {
-        uint256 eraGatewayId = messageRoot.ERA_GATEWAY_CHAIN_ID();
-        assertEq(eraGatewayId, gatewayChainId);
+        uint256 legacySettlementLayerId = messageRoot.ERA_GATEWAY_CHAIN_ID();
+        assertEq(legacySettlementLayerId, legacySettlementLayerChainId);
     }
 
     function test_BRIDGE_HUB() public view {

@@ -51,7 +51,7 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
 
     bytes32 public BASE_TOKEN_ASSET_ID;
 
-    /// @dev L2-side accounting used to compute the amount to keep on L1 during L1 -> Gateway migration.
+    /// @dev L2-side accounting used to compute the amount to keep on L1 during an L1 -> settlement-layer migration.
     mapping(bytes32 assetId => InteropL2Info info) public interopInfo;
 
     /// @notice Token total-supply snapshot captured before the token's first post-v31 bridge operation.

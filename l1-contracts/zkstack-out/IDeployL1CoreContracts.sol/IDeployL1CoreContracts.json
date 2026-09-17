@@ -224,11 +224,6 @@
             "internalType": "address"
           },
           {
-            "name": "legacyGatewayChainId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
             "name": "contracts",
             "type": "tuple",
             "internalType": "struct ContractsConfig",

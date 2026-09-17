@@ -231,7 +231,7 @@ contract UpgradeIntegrationTest_Local is
         CTM_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-ctm.toml";
         CTM_OUTPUT = "/script-out/foundry-upgrade/local-ctm.toml";
         CHAIN_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-era.toml";
-        CHAIN_OUTPUT = "/script-out/foundry-upgrade/local-gateway.toml";
+        CHAIN_OUTPUT = "/script-out/foundry-upgrade/local-chain.toml";
         console.log("setUp: Paths configured");
         setupUpgrade(true);
         console.log("setUp: Upgrade setup complete");

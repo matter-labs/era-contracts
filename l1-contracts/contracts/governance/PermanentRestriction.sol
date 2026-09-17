@@ -335,7 +335,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
         }
 
         // From now on, we know that the used encoding version is `NEW_ENCODING_VERSION` that is
-        // supported only in the new protocol version with Gateway support, so we can assume
+        // supported only in the new protocol version with settlement-layer support, so we can assume
         // that the methods like e.g. Bridgehub.ctmAssetIdToAddress must exist.
 
         // This is the format of the `secondBridgeData` under the `NEW_ENCODING_VERSION`.

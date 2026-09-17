@@ -39,7 +39,7 @@ contract L2InteropHandler is InteropHandlerBase, IL2InteropHandler {
     /// @notice Executes a full atomic interop bundle. Instead of an L1-message inclusion proof it requires
     /// (via the AtomicFlowManager) that every leg of the flow was committed in its source chain's IMT before
     /// the deadline, and that this bundle is one of the flow's legs.
-    /// @dev No gateway-settlement requirement: an atomic bundle's cross-chain binding comes from the per-leg
+    /// @dev No settlement-layer requirement: an atomic bundle's cross-chain binding comes from the per-leg
     /// IMT inclusion proofs authenticated against the interop root. This release supports only L1 as the
     /// settlement layer — the flow's `settlementLayerChainId` must equal the L1 chain id, enforced in
     /// {AtomicFlowManager}/{AtomicInteropProof} (`ManagerSettlementLayerNotL1`). No

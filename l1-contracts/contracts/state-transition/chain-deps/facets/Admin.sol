@@ -440,7 +440,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         // In the common case, ZK Governance does not override `priorityModeInfo.transactionFilterer`,
         // so most of the time transaction filtering will be disabled.
         //
-        // For some chains (e.g., Prividium or Gateway), a custom filterer may be required
+        // For some chains (e.g., Prividium or a settlement layer), a custom filterer may be required
         // for correct system operation. This lets ZK Governance choose whether to remove the
         // transaction filterer entirely or set the one best suited for the special chain needs.
         _setTransactionFilterer(s.priorityModeInfo.transactionFilterer);

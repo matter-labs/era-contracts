@@ -129,9 +129,9 @@ interface IInteropCenter {
     /// @param _zkTokenAssetId The ZK token asset ID.
     function initL2(uint256 _l1ChainId, address _owner, bytes32 _zkTokenAssetId) external;
 
-    /// @notice Forwards a transaction from the gateway to a chain mailbox (from L1).
+    /// @notice Forwards a transaction from the settlement layer to a chain mailbox (from L1).
     /// @dev Note, that `_canonicalTxHash` is provided by the chain and so should not be trusted to be unique,
-    /// while the rest of the fields are trusted to be populated correctly inside the `Mailbox` of the Gateway.
+    /// while the rest of the fields are trusted to be populated correctly inside the `Mailbox` of the settlement layer.
     /// @param _chainId Target chain ID.
     /// @param _canonicalTxHash Canonical L1 transaction hash.
     /// @param _expirationTimestamp Deprecated, always 0.

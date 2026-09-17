@@ -250,7 +250,7 @@ struct ZKChainStorage {
     /// @dev The address of the native token vault
     /// @dev STORAGE SLOT: 61
     address nativeTokenVault;
-    /// @dev Timestamp when deposits were paused for chain migration to/from Gateway. 0 = not paused.
+    /// @dev Timestamp when deposits were paused for chain migration to/from a settlement layer. 0 = not paused.
     /// @dev STORAGE SLOT: 62
     uint256 pausedDepositsTimestamp;
     /// @dev Information required in the Priority Mode packed in one storage slot.

@@ -54,7 +54,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     /// @dev The mapping showing for each chain if migration is in progress or not, used for freezing deposits.
     mapping(uint256 chainId => bool isMigrationInProgress) public isMigrationInProgress;
 
-    /// @notice Tracks migration batch numbers for chains that migrated to Gateway.
+    /// @notice Tracks migration batch numbers for chains that migrated to a settlement layer.
     /// @dev Used to validate that settlement layer claims match the batch number.
     /// @dev Migration number 0 is reserved for legacy GW historical data.
     /// @dev Migration numbers 1+ are for regular L1 <-> SL migrations.
@@ -132,7 +132,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
         uint256 chainId = bridgehubBurnData.chainId;
 
-        // Note: _chainId is the settlement layer chain (e.g. gateway) where the migration tx was proven,
+        // Note: _chainId is the settlement layer chain where the migration tx was proven,
         // while bridgehubBurnData.chainId is the chain being migrated. These are intentionally different.
 
         (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeConfirmTransferResult(

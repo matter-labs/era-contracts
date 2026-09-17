@@ -36,10 +36,10 @@ contract CalldataDAGatewayHarness is CalldataDAGateway {
 
 /// @notice Unit tests for CalldataDAGateway contract
 contract CalldataDAGatewayTest is Test {
-    CalldataDAGatewayHarness public gateway;
+    CalldataDAGatewayHarness public harness;
 
     function setUp() public {
-        gateway = new CalldataDAGatewayHarness();
+        harness = new CalldataDAGatewayHarness();
     }
 
     // ============ _processCalldataDA Tests ============
@@ -51,7 +51,7 @@ contract CalldataDAGatewayTest is Test {
 
         bytes memory pubdataInput = abi.encodePacked(pubdata, commitment);
 
-        (bytes32[] memory blobCommitments, bytes memory returnedPubdata) = gateway.processCalldataDA(
+        (bytes32[] memory blobCommitments, bytes memory returnedPubdata) = harness.processCalldataDA(
             1, // blobsProvided
             pubdataHash,
             6, // maxBlobsSupported
@@ -71,7 +71,7 @@ contract CalldataDAGatewayTest is Test {
 
         bytes memory pubdataInput = abi.encodePacked(pubdata, commitment1, commitment2);
 
-        (bytes32[] memory blobCommitments, bytes memory returnedPubdata) = gateway.processCalldataDA(
+        (bytes32[] memory blobCommitments, bytes memory returnedPubdata) = harness.processCalldataDA(
             2, // blobsProvided
             pubdataHash,
             6, // maxBlobsSupported
@@ -91,7 +91,7 @@ contract CalldataDAGatewayTest is Test {
 
         bytes memory pubdataInput = abi.encodePacked(pubdata, commitment);
 
-        (bytes32[] memory blobCommitments, bytes memory returnedPubdata) = gateway.processCalldataDA(
+        (bytes32[] memory blobCommitments, bytes memory returnedPubdata) = harness.processCalldataDA(
             1,
             pubdataHash,
             6,
@@ -107,14 +107,14 @@ contract CalldataDAGatewayTest is Test {
         bytes memory pubdataInput = new bytes(31); // Less than BLOB_COMMITMENT_SIZE
 
         vm.expectRevert(abi.encodeWithSelector(PubdataInputTooSmall.selector, 31, 32));
-        gateway.processCalldataDA(1, bytes32(0), 6, pubdataInput);
+        harness.processCalldataDA(1, bytes32(0), 6, pubdataInput);
     }
 
     function test_processCalldataDA_revertsOnInputTooSmallForMultipleBlobs() public {
         bytes memory pubdataInput = new bytes(50); // Less than 2 * BLOB_COMMITMENT_SIZE = 64
 
         vm.expectRevert(abi.encodeWithSelector(PubdataInputTooSmall.selector, 50, 64));
-        gateway.processCalldataDA(2, bytes32(0), 6, pubdataInput);
+        harness.processCalldataDA(2, bytes32(0), 6, pubdataInput);
     }
 
     function test_processCalldataDA_revertsOnPubdataTooLarge() public {
@@ -126,7 +126,7 @@ contract CalldataDAGatewayTest is Test {
         bytes memory pubdataInput = abi.encodePacked(largePubdata, commitment);
 
         vm.expectRevert(abi.encodeWithSelector(PubdataLengthTooBig.selector, BLOB_SIZE_BYTES + 1, BLOB_SIZE_BYTES));
-        gateway.processCalldataDA(1, pubdataHash, 6, pubdataInput);
+        harness.processCalldataDA(1, pubdataHash, 6, pubdataInput);
     }
 
     function test_processCalldataDA_revertsOnPubdataTooLargeForMultipleBlobs() public {
@@ -141,7 +141,7 @@ contract CalldataDAGatewayTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(PubdataLengthTooBig.selector, BLOB_SIZE_BYTES * 2 + 1, BLOB_SIZE_BYTES * 2)
         );
-        gateway.processCalldataDA(2, pubdataHash, 6, pubdataInput);
+        harness.processCalldataDA(2, pubdataHash, 6, pubdataInput);
     }
 
     function test_processCalldataDA_revertsOnInvalidPubdataHash() public {
@@ -152,7 +152,7 @@ contract CalldataDAGatewayTest is Test {
         bytes memory pubdataInput = abi.encodePacked(pubdata, commitment);
 
         vm.expectRevert(abi.encodeWithSelector(InvalidPubdataHash.selector, wrongHash, keccak256(pubdata)));
-        gateway.processCalldataDA(1, wrongHash, 6, pubdataInput);
+        harness.processCalldataDA(1, wrongHash, 6, pubdataInput);
     }
 
     function test_processCalldataDA_exactMaxBlobSize() public view {
@@ -166,7 +166,7 @@ contract CalldataDAGatewayTest is Test {
 
         bytes memory pubdataInput = abi.encodePacked(pubdata, commitment);
 
-        (bytes32[] memory blobCommitments, bytes memory returnedPubdata) = gateway.processCalldataDA(
+        (bytes32[] memory blobCommitments, bytes memory returnedPubdata) = harness.processCalldataDA(
             1,
             pubdataHash,
             6,
@@ -183,7 +183,7 @@ contract CalldataDAGatewayTest is Test {
 
         bytes memory pubdataInput = pubdata;
 
-        (bytes32[] memory blobCommitments, bytes memory returnedPubdata) = gateway.processCalldataDA(
+        (bytes32[] memory blobCommitments, bytes memory returnedPubdata) = harness.processCalldataDA(
             0, // 0 blobs provided
             pubdataHash,
             6,
@@ -203,7 +203,7 @@ contract CalldataDAGatewayTest is Test {
 
         bytes memory pubdataInput = abi.encodePacked(pubdata, commitment1, commitment2, commitment3);
 
-        (bytes32[] memory blobCommitments, ) = gateway.processCalldataDA(3, pubdataHash, 6, pubdataInput);
+        (bytes32[] memory blobCommitments, ) = harness.processCalldataDA(3, pubdataHash, 6, pubdataInput);
 
         assertEq(blobCommitments[0], commitment1);
         assertEq(blobCommitments[1], commitment2);
@@ -221,10 +221,10 @@ contract CalldataDAGatewayTest is Test {
 
         bytes memory pubdataInput = abi.encodePacked(pubdata, commitment);
 
-        (bytes32[] memory blobCommitments1, ) = gateway.processCalldataDA(1, pubdataHash, 1, pubdataInput);
+        (bytes32[] memory blobCommitments1, ) = harness.processCalldataDA(1, pubdataHash, 1, pubdataInput);
         assertEq(blobCommitments1.length, 1);
 
-        (bytes32[] memory blobCommitments10, ) = gateway.processCalldataDA(1, pubdataHash, 10, pubdataInput);
+        (bytes32[] memory blobCommitments10, ) = harness.processCalldataDA(1, pubdataHash, 10, pubdataInput);
         assertEq(blobCommitments10.length, 10);
     }
 
@@ -238,7 +238,7 @@ contract CalldataDAGatewayTest is Test {
 
         bytes memory pubdataInput = abi.encodePacked(pubdata, commitment);
 
-        (bytes32[] memory blobCommitments, bytes memory returnedPubdata) = gateway.processCalldataDA(
+        (bytes32[] memory blobCommitments, bytes memory returnedPubdata) = harness.processCalldataDA(
             1,
             pubdataHash,
             6,
@@ -258,7 +258,7 @@ contract CalldataDAGatewayTest is Test {
         bytes memory pubdataInput = abi.encodePacked(pubdata, commitment);
 
         vm.expectRevert(abi.encodeWithSelector(InvalidPubdataHash.selector, wrongHash, keccak256(pubdata)));
-        gateway.processCalldataDA(1, wrongHash, 6, pubdataInput);
+        harness.processCalldataDA(1, wrongHash, 6, pubdataInput);
     }
 
     function testFuzz_processCalldataDA_anyCommitment(bytes32 commitment) public view {
@@ -267,7 +267,7 @@ contract CalldataDAGatewayTest is Test {
 
         bytes memory pubdataInput = abi.encodePacked(pubdata, commitment);
 
-        (bytes32[] memory blobCommitments, ) = gateway.processCalldataDA(1, pubdataHash, 6, pubdataInput);
+        (bytes32[] memory blobCommitments, ) = harness.processCalldataDA(1, pubdataHash, 6, pubdataInput);
 
         assertEq(blobCommitments[0], commitment);
     }
@@ -280,6 +280,6 @@ contract CalldataDAGatewayTest is Test {
         bytes memory pubdataInput = new bytes(inputLength);
 
         vm.expectRevert(abi.encodeWithSelector(PubdataInputTooSmall.selector, inputLength, requiredSize));
-        gateway.processCalldataDA(blobsProvided, bytes32(0), 6, pubdataInput);
+        harness.processCalldataDA(blobsProvided, bytes32(0), 6, pubdataInput);
     }
 }

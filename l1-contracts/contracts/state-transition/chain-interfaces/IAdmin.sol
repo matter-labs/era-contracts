@@ -54,7 +54,7 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
 
     /// @notice Sets the transaction filterer used in Priority Mode.
     /// By default, there is no transaction filtering in Priority Mode. This is the recommended setup.
-    /// However, for some chains (e.g., Prividium or Gateway), a custom filterer may be required
+    /// However, for some chains (e.g., Prividium or a settlement layer), a custom filterer may be required
     /// for correct system operation. This function allows ZK Governance to set it.
     function setPriorityModeTransactionFilterer(address _priorityModeTransactionFilterer) external;
 

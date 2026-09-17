@@ -7,13 +7,13 @@ import {IUpgradePreconditionChecker} from "../upgrades/IUpgradePreconditionCheck
 /// @title IServerNotifier
 /// @notice Events and external API for ServerNotifier.
 interface IServerNotifier {
-    /// @notice Emitted to notify the server before a chain migrates to the ZK gateway.
-    /// @param chainId The identifier for the chain initiating migration to the ZK gateway.
+    /// @notice Emitted to notify the server before a chain migrates to a settlement layer.
+    /// @param chainId The identifier for the chain initiating migration to a settlement layer.
     /// @param migrationNumber The migration number for this migration.
     event MigrateToGateway(uint256 indexed chainId, uint256 migrationNumber);
 
-    /// @notice Emitted to notify the server before a chain migrates from the ZK gateway.
-    /// @param chainId The identifier for the chain initiating migration from the ZK gateway.
+    /// @notice Emitted to notify the server before a chain migrates from a settlement layer.
+    /// @param chainId The identifier for the chain initiating migration from a settlement layer.
     /// @param migrationNumber The migration number for this migration.
     event MigrateFromGateway(uint256 indexed chainId, uint256 migrationNumber);
 

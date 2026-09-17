@@ -45,7 +45,7 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
-import {CTMContract} from "./DeployCTML1OrGateway.sol";
+import {CTMContract} from "./DeployCTMContracts.sol";
 import {ChainCreationParamsLib} from "./ChainCreationParamsLib.sol";
 
 import {
@@ -55,7 +55,7 @@ import {
     BridgehubAddresses,
     CoreDeployedAddresses
 } from "../utils/Types.sol";
-import {CTMContract, CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "./DeployCTML1OrGateway.sol";
+import {CTMContract, CTMCoreDeploymentConfig, DeployCTMContracts} from "./DeployCTMContracts.sol";
 
 import {CTMDeployedAddresses} from "../utils/Types.sol";
 
@@ -63,7 +63,6 @@ import {CTMDeployedAddresses} from "../utils/Types.sol";
 struct Config {
     uint256 l1ChainId;
     address deployerAddress;
-    uint256 gatewayChainId;
     address ownerAddress;
     bytes32 zkTokenAssetId;
     bool testnetVerifier;
@@ -156,8 +155,8 @@ abstract contract DeployCTMUtils is DeployUtils {
     function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual returns (Diamond.FacetCut[] memory facetCuts) {
-        // Note: we use the provided stateTransition for the facet address, but not to get the selectors, as we use this feature for Gateway, which we cannot query.
-        // If we start to use different selectors for Gateway, we should change this.
+        // Note: the provided stateTransition supplies the facet addresses; the selectors come from the
+        // local artifacts.
         facetCuts = new Diamond.FacetCut[](6);
         facetCuts[0] = Diamond.FacetCut({
             facet: stateTransition.facets.adminFacet,
@@ -310,9 +309,9 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode(coreAddresses.bridgehub.proxies.bridgehub);
         } else {
             return
-                DeployCTML1OrGateway.getCreationCalldata(
+                DeployCTMContracts.getCreationCalldata(
                     getCTMCoreDeploymentConfig(config),
-                    DeployCTML1OrGateway.getCTMContractFromName(contractName)
+                    DeployCTMContracts.getCTMContractFromName(contractName)
                 );
         }
     }
