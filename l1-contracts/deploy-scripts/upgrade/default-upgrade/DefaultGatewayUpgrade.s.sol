@@ -11,7 +11,6 @@ import {CHAIN_MIGRATIONS_ENABLED} from "contracts/common/Config.sol";
 
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
-import {BytecodeUtils} from "../../utils/bytecode/BytecodeUtils.s.sol";
 import {
     StateTransitionDeployedAddresses,
     ChainCreationParamsConfig,
@@ -21,7 +20,6 @@ import {
 import {DAContracts} from "contracts/common/StateTransitionTypes.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
-import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -34,8 +32,6 @@ import {Call} from "contracts/governance/Common.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 
 import {CTMDeployedAddresses} from "../../ctm/DeployCTMUtils.s.sol";
-
-import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";

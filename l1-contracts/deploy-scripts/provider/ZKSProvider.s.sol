@@ -5,12 +5,9 @@ pragma solidity ^0.8.0;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 
-import {stdJson} from "forge-std/StdJson.sol";
-
 import {FinalizeL1DepositParams, MessageInclusionProof, L2Message} from "contracts/common/Messaging.sol";
 import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
 import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";
-import {Utils} from "../utils/Utils.sol";
 import {
     AltL2ToL1Log,
     AltLog,

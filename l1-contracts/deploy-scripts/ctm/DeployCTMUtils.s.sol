@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 // solhint-disable no-console, gas-custom-errors
 
 import {stdToml} from "forge-std/StdToml.sol";
-import {console2 as console} from "forge-std/Script.sol";
 
 import {ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -14,47 +13,19 @@ import {Utils} from "../utils/Utils.sol";
 
 import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
 
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {Governance} from "contracts/governance/Governance.sol";
-import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
-
-import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
-import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-
-import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
-import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
-import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
-
-import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
-import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {MultisigCommitter} from "contracts/state-transition/validators/MultisigCommitter.sol";
 import {PermissionlessValidator} from "contracts/state-transition/validators/PermissionlessValidator.sol";
-import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
-import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
-import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
-import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
-import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
-import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 
-import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
-import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
 import {ChainCreationParamsLib} from "./ChainCreationParamsLib.sol";
 
-import {
-    StateTransitionDeployedAddresses,
-    DataAvailabilityDeployedAddresses,
-    ChainCreationParamsConfig,
-    BridgehubAddresses,
-    CoreDeployedAddresses
-} from "../utils/Types.sol";
-import {CTMContract, CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "./DeployCTML1OrGateway.sol";
+import {StateTransitionDeployedAddresses, ChainCreationParamsConfig, CoreDeployedAddresses} from "../utils/Types.sol";
+import {CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "./DeployCTML1OrGateway.sol";
 
 import {CTMDeployedAddresses} from "../utils/Types.sol";
 

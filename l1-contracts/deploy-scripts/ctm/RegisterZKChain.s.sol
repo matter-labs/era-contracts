@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 // solhint-disable no-console, gas-custom-errors, reason-string
 
-import {Script, console2 as console} from "forge-std/Script.sol";
+import {console2 as console} from "forge-std/Script.sol";
 
 import {stdToml} from "forge-std/StdToml.sol";
 
@@ -34,12 +34,7 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {Call} from "contracts/governance/Common.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {
-    ZkChainAddresses,
-    StateTransitionDeployedAddresses,
-    CTMDeployedAddresses,
-    CoreDeployedAddresses
-} from "../utils/Types.sol";
+import {ZkChainAddresses, CTMDeployedAddresses, CoreDeployedAddresses} from "../utils/Types.sol";
 import {IRegisterZKChain, RegisterZKChainConfig} from "contracts/script-interfaces/IRegisterZKChain.sol";
 import {GetDiamondCutData} from "../utils/GetDiamondCutData.sol";
 

@@ -6,25 +6,17 @@ pragma solidity 0.8.28;
 import {console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-// It's required to disable lints to force the compiler to compile the contracts
-// solhint-disable no-unused-import
-
 import {CHAIN_MIGRATIONS_ENABLED} from "contracts/common/Config.sol";
-import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 import {Utils} from "../utils/Utils.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
-import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
@@ -32,13 +24,7 @@ import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol"
 import {CTMDeployedAddresses, StateTransitionDeployedAddresses} from "../utils/Types.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 
-import {
-    GatewayCTMDeployerHelper,
-    DirectCreate2Calldata,
-    DeployerCreate2Calldata,
-    DeployerAddresses,
-    DirectDeployedAddresses
-} from "./GatewayCTMDeployerHelper.sol";
+import {GatewayCTMDeployerHelper, DirectCreate2Calldata, DeployerCreate2Calldata} from "./GatewayCTMDeployerHelper.sol";
 import {
     DeployedContracts,
     GatewayCTMDeployerConfig

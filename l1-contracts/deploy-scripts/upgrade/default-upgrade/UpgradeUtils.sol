@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// It's required to disable lints to force the compiler to compile the contracts
-// solhint-disable no-unused-import
-
 import {Call} from "contracts/governance/Common.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";

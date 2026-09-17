@@ -5,10 +5,8 @@ import {
     L2_ASSET_ROUTER_ADDR,
     L2_ASSET_ROUTER,
     L2_BRIDGEHUB,
-    L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_CENTER,
     L2_NATIVE_TOKEN_VAULT,
-    L2_NATIVE_TOKEN_VAULT_ADDR,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";

@@ -21,6 +21,10 @@ contract Create2AndTransfer {
             addr := create2(0x0, add(bytecode, 0x20), mload(bytecode), salt)
         }
 
+        // `type(Create2AndTransfer).creationCode` is fed to CREATE2 by `Create2FactoryUtils`, so
+        // switching this to a custom error would change the creation code and therefore every
+        // address derived from it.
+        // solhint-disable-next-line gas-custom-errors
         require(addr != address(0), "Create2: Failed on deploy");
         IOwnable(addr).transferOwnership(owner);
 

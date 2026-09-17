@@ -3,22 +3,15 @@ pragma solidity ^0.8.0;
 
 // solhint-disable no-console, gas-custom-errors, reason-string
 
-import {Script, console2 as console} from "forge-std/Script.sol";
+import {Script} from "forge-std/Script.sol";
 
-// It's required to disable lints to force the compiler to compile the contracts
-// solhint-disable no-unused-import
-
-import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "../utils/Utils.sol";
 
-import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
-
 import {
-    IAssetRouterBase,
     SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION,
     NEW_ENCODING_VERSION
 } from "contracts/bridge/asset-router/IAssetRouterBase.sol";

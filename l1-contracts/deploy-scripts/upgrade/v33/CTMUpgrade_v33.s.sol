@@ -13,8 +13,6 @@ import {IL2V32Upgrade} from "contracts/upgrades/IL2V32Upgrade.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
-import {Call} from "contracts/governance/Common.sol";
-
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {DeployCTMUtils} from "../../ctm/DeployCTMUtils.s.sol";
 import {CTMUpgradeParams} from "../default-upgrade/UpgradeParams.sol";

@@ -1,23 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {console2 as console} from "forge-std/Script.sol";
 import {Utils} from "../utils/Utils.sol";
 import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
-import {
-    L2_ASSET_TRACKER_ADDR,
-    L2_BASE_TOKEN_HOLDER_ADDR,
-    L2_INTEROP_CENTER_ADDR,
-    L2_INTEROP_HANDLER_ADDR,
-    L2_INTEROP_ROOT_STORAGE,
-    L2_MESSAGE_VERIFICATION,
-    L2_NATIVE_TOKEN_VAULT_ADDR,
-    L2_WRAPPED_BASE_TOKEN_IMPL_ADDR
-} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
-import {
-    L2_REMOVED_GW_ASSET_TRACKER_ADDR,
-    L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_REMOVED_GW_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {CoreContract, L2SystemContract} from "../ecosystem/CoreContract.sol";
 import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";

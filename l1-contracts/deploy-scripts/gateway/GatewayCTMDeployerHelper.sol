@@ -15,8 +15,6 @@ import {
     L2_CHAIN_ASSET_HANDLER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {
     ChainCreationParams,
     ChainTypeManagerInitializeData,
@@ -785,8 +783,6 @@ library GatewayCTMDeployerHelper {
     ) internal pure {
         string memory msgStr;
         if (constructorArgs.length == 0) {
-            // `string.concat` is variadic, so named arguments are not possible.
-            // solhint-disable-next-line func-named-parameters
             msgStr = string.concat("forge verify-contract ", Utils.vm.toString(contractAddr), " ", contractName);
         } else {
             // `string.concat` is variadic, so named arguments are not possible.

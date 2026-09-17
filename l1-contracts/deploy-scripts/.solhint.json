@@ -6,7 +6,6 @@
     "gas-length-in-loops": "off",
     "gas-struct-packing": "off",
     "no-console": "off",
-    "no-unused-import": "off",
     "reason-string": "off"
   }
 }
