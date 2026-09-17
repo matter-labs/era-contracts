@@ -256,8 +256,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         // Initialize the array, that will be used as public input to the ZKP.
-        // Era chains have one public input per proof system: Boojum and Airbender.
-        uint256[] memory proofPublicInput = new uint256[](s.zksyncOS ? committedBatchesLength : 2);
+        // Era chains have two public inputs per batch, one per proof system: Boojum and Airbender.
+        uint256[] memory proofPublicInput = new uint256[](
+            s.zksyncOS ? committedBatchesLength : 2 * committedBatchesLength
+        );
 
         // Check that the batch passed by the validator is indeed the first unverified batch
         _checkBatchHashMismatch(prevBatch, currentTotalBatchesVerified, true);
@@ -282,8 +284,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     currentBatchCommitment
                 );
             } else {
-                proofPublicInput[0] = _getBatchProofPublicInput(prevBatchCommitment, currentBatchCommitment);
-                proofPublicInput[1] = _getBatchProofPublicInput(
+                // Two slots per batch: Boojum first, Airbender second.
+                proofPublicInput[2 * i] = _getBatchProofPublicInput(prevBatchCommitment, currentBatchCommitment);
+                proofPublicInput[2 * i + 1] = _getBatchProofPublicInput(
                     prevBatchAirbenderCommitment,
                     committedBatches[i].airbenderCommitment
                 );
