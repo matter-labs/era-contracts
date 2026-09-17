@@ -901,13 +901,13 @@
   },
   {
     "contractName": "l1-contracts/CommitterFacet",
-    "zkBytecodeHash": "0x010005df283cbd0874ef25c719341ee63c1b6a248b460e7f4c32937eab87decd",
+    "zkBytecodeHash": "0x010005df0df6798ad50f1d92c313745cb4029dc2779364cee9097784291779a7",
     "zkBytecodePath": "/l1-contracts/zkout/Committer.sol/CommitterFacet.json",
-    "evmBytecodeHash": "0x4f101a55c90570ac8d0167343c8f7ea7abcf32ebd0c20ffc6194ea79c98ff354",
+    "evmBytecodeHash": "0x55d166fdb5410d1a66e6980373c32f548a2a29239f445de4c9cca9a7721a28ac",
     "evmBytecodePath": "/l1-contracts/out/Committer.sol/CommitterFacet.json",
-    "evmDeployedBytecodeHash": "0xbf5c1eeb5322d74d7d3a1cd37aab55b5dcc6da7ddc78483b4fe7a486db1e855d",
-    "evmDeployedBytecodeBlakeHash": "0x2225653137b8f52c9a413d855e7f324f8a1a0b0e632ede6dd7bfafff31407972",
-    "evmDeployedBytecodeLength": 14848
+    "evmDeployedBytecodeHash": "0xb364040e8effd8eabd0c1c808c9f284ffa27804ea0c178b68baa62786d2ed001",
+    "evmDeployedBytecodeBlakeHash": "0x004558bc8a07d5841c4e632aab76d821f109910b95b1d24ac7e7f9313593d131",
+    "evmDeployedBytecodeLength": 14849
   },
   {
     "contractName": "l1-contracts/CountersUpgradeable",
