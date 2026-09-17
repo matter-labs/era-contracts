@@ -580,6 +580,16 @@
     "evmDeployedBytecodeLength": null
   },
   {
+    "contractName": "system-contracts/ZeroLenMemoryOffset",
+    "zkBytecodeHash": "0x0100004b85907f63e7ad84dc7c927f0fcd19ffd0b8b169c3d8e6323a1b608054",
+    "zkBytecodePath": "/system-contracts/zkout/ZeroLenMemoryOffset.sol/ZeroLenMemoryOffset.json",
+    "evmBytecodeHash": null,
+    "evmBytecodePath": null,
+    "evmDeployedBytecodeHash": null,
+    "evmDeployedBytecodeBlakeHash": null,
+    "evmDeployedBytecodeLength": null
+  },
+  {
     "contractName": "system-contracts/console",
     "zkBytecodeHash": "0x010000073d8b8c8b9fb32e6d32e5a3d6596d8a3b0209bbc51db95c8f1e9aeb1a",
     "zkBytecodePath": "/system-contracts/zkout/console.sol/console.json",
@@ -2612,7 +2622,7 @@
   {
     "contractName": "EvmEmulator",
     "zkBytecodePath": "/system-contracts/zkout/EvmEmulator.yul/EvmEmulator.json",
-    "zkBytecodeHash": "0x01000d8bae37b82f311186426184866498b357f41d7a02ced11f3e3fbfbacd63",
+    "zkBytecodeHash": "0x01000d8f28f6b2384ab890a5f36459606e99cf87aabcb886fa51bbd3498abea5",
     "evmBytecodePath": null,
     "evmBytecodeHash": null,
     "evmDeployedBytecodeHash": null,
