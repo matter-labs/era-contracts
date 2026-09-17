@@ -787,6 +787,9 @@ object "Bootloader" {
                         // - They must be the first one in the batch
                         // - They have a different type to prevent tx hash collisions and preserve the expectation that the
                         // L1->L2 transactions have priorityTxId inside them.
+
+                        // Upgrade txs must always succeed, so the flag is never valid here. Aborting the
+                        // batch is safe: `txMeta` is written by the server alone (see `validateProvedTxMeta`).
                         if forceFail {
                             assertionError("forceFail on upgrade tx")
                         }
@@ -808,6 +811,8 @@ object "Bootloader" {
                         processL1Tx(txDataOffset, resultPtr, transactionIndex, userProvidedPubdataPrice, true, forceFail)
                     }
                     default {
+                        // The flag is only meaningful for priority ops; as above, reaching this means the
+                        // server built a malformed batch, not that a user did anything.
                         if forceFail {
                             assertionError("forceFail on L2 tx")
                         }
@@ -1258,12 +1263,10 @@ object "Bootloader" {
                     // Operator-requested failures are otherwise indistinguishable from reverts. Record them so
                     // watchers can react within the execution delay and users can prove the failure was forced.
                     //
-                    // Only chains settling on L1 may run this. On any other settlement layer `executeBatches`
-                    // feeds every bootloader-sent log to `GWAssetTracker._handlePotentialFailedDeposit`, which
-                    // reads `key` as the canonical hash of a relayed priority op: this constant key has no
-                    // `balanceChange` entry, so the call reverts with `InvalidCanonicalTxHash` and the batch
-                    // can never be executed. Gate the log or teach `GWAssetTracker` this key before a
-                    // Gateway-settled chain gets this bootloader.
+                    // Only for chains settling on L1: elsewhere `executeBatches` passes every bootloader-sent
+                    // log to `GWAssetTracker._handlePotentialFailedDeposit`, which reads `key` as a relayed
+                    // priority op's canonical hash and reverts with `InvalidCanonicalTxHash`, making the
+                    // batch unexecutable.
                     if forceFail {
                         sendL2LogUsingL1Messenger(true, forceFailedL1TxLogKey(), canonicalL1TxHash)
                     }
@@ -3074,7 +3077,8 @@ object "Bootloader" {
             /// @dev Returns the force-fail bit of a proved-batch `txMeta`, asserting the word is well formed.
             /// Proved batches carry exactly: byte 0 = execute (1 here; the main loop already broke on 0),
             /// byte 1 = forceFail (0 or 1), all other bytes 0. Anything else is a server bug and must not be
-            /// mistaken for a live transaction.
+            /// mistaken for a live transaction. Aborting the whole batch is the right response: `txMeta`
+            /// is operator-written, so a malformed word is a server bug that no user can cause.
             function validateProvedTxMeta(txMeta) -> forceFail {
                 forceFail := getWordByte(txMeta, 1)
                 if gt(forceFail, 1) {
@@ -4842,6 +4846,8 @@ object "Bootloader" {
                     debugLog("flags", processFlags)
                     debugLog("forceFail", forceFail)
 
+                    // Playground `txMeta` is server-written too, and a word the proved bootloader would
+                    // reject must not replay here as a successful transaction.
                     if gt(forceFail, 1) {
                         assertionError("invalid txMeta")
                     }
