@@ -255,11 +255,14 @@ contract ZKSProvider is Script {
         args[5] = "--header";
         args[6] = "Content-Type: application/json";
         args[7] = "--data";
+        // Single quotes keep the JSON-RPC payload's inner quotes unescaped.
+        // solhint-disable quotes
         args[8] = string.concat(
             '{"jsonrpc":"2.0","method":"eth_getTransactionReceipt","params":["',
             vm.toString(txHash),
             '"],"id":1}'
         );
+        // solhint-enable quotes
 
         bytes memory result = vm.ffi(args);
 
@@ -280,6 +283,8 @@ contract ZKSProvider is Script {
         args[5] = "--header";
         args[6] = "Content-Type: application/json";
         args[7] = "--data";
+        // Single quotes keep the JSON-RPC payload's inner quotes unescaped.
+        // solhint-disable quotes
         args[8] = string.concat(
             '{"jsonrpc":"2.0","id":1,"method":"zks_getL2ToL1LogProof","params":["',
             vm.toString(txHash),
@@ -287,9 +292,12 @@ contract ZKSProvider is Script {
             vm.toString(logIndex),
             "]}"
         ); // todo later: add ,"proof_based_gw" for interop
+        // solhint-enable quotes
         // Execute RPC call
 
         bytes memory nullProofBytes = "0x7b226a736f6e727063223a22322e30222c226964223a312c22726573756c74223a6e756c6c7d";
+        // Single quotes keep the JSON payload's inner quotes unescaped.
+        // solhint-disable-next-line quotes
         string memory nullProofString2 = '{"jsonrpc":"2.0","id":1,"result":null}';
         bytes memory result = nullProofBytes;
         while (

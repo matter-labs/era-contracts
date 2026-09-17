@@ -70,8 +70,8 @@ contract GatewayPreparation is Script {
 
     bytes32 internal constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewHyperchain(uint256,address)");
 
-    address deployerAddress;
-    uint256 l1ChainId;
+    address internal deployerAddress;
+    uint256 internal l1ChainId;
 
     struct Output {
         bytes32 governanceL2TxHash;

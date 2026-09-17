@@ -16,6 +16,8 @@ import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol"
 /// @dev Callable by any EOA — the amounts come from legacy storage that nothing writes anymore, so the
 /// caller cannot influence them. Version-neutral: usable by any pre-v32 -> v32 upgrade script.
 library BridgedOutPopulationLib {
+    // `vm` is forge-std's cheatcode handle; the lowercase name is forge's own convention.
+    // solhint-disable-next-line const-name-snakecase
     VmSafe private constant vm = VmSafe(address(uint160(uint256(keccak256("hevm cheat code")))));
 
     /// @dev Assets per `populateBridgedOut` call. Keeps a single transaction well inside a block even for

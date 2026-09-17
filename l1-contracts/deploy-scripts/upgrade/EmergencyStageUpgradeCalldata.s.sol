@@ -38,9 +38,9 @@ interface ISafeMsg {
 contract EmergencyStageUpgradeCalldata is Script {
     using stdToml for string;
 
-    IProtocolUpgradeHandler constant PUH = IProtocolUpgradeHandler(0x8f08627524aeD610192132A425D6b9C32a1727EF);
-    string constant TOML = "upgrade-envs/v0.33.0-atomic-interop/output/stage/ecosystem.toml";
-    bytes32 constant SALT = bytes32(0);
+    IProtocolUpgradeHandler internal constant PUH = IProtocolUpgradeHandler(0x8f08627524aeD610192132A425D6b9C32a1727EF);
+    string internal constant TOML = "upgrade-envs/v0.33.0-atomic-interop/output/stage/ecosystem.toml";
+    bytes32 internal constant SALT = bytes32(0);
 
     function runStage0() external view {
         _emit(0);

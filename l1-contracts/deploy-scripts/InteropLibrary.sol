@@ -136,7 +136,7 @@ library InteropLibrary {
         if (unbundlerAddress != address(0)) ++length;
         if (salt != bytes32(0)) ++length;
         bytes[] memory attributes = new bytes[](length);
-        uint attributesPointer = 0;
+        uint256 attributesPointer = 0;
         if (executionAddress != address(0)) {
             attributes[attributesPointer++] = abi.encodeCall(
                 IERC7786Attributes.executionAddress,
@@ -198,7 +198,7 @@ library InteropLibrary {
         uint256 length;
         if (indirectCall) ++length;
         bytes[] memory attributes = new bytes[](length);
-        uint attributesPointer = 0;
+        uint256 attributesPointer = 0;
         if (indirectCall) {
             attributes[attributesPointer++] = abi.encodeCall(IERC7786Attributes.indirectCall, (0));
         }

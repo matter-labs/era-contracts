@@ -36,11 +36,11 @@ import {MultisigCommitter} from "contracts/state-transition/validators/MultisigC
 ///          --sig 'runCalldata(address)' <newVtImpl> --rpc-url $L1_RPC_URL
 contract EmergencyValidatorTimelockRestore is EmergencyStageUpgradeCalldata, Create2FactoryUtils {
     /// @dev ZKsync-OS CTM ValidatorTimelock proxy (TransparentUpgradeableProxy).
-    address constant ZKOS_VT_PROXY = 0x1E4299F7a19597E09bD8593AB7B68277183e9778;
+    address internal constant ZKOS_VT_PROXY = 0x1E4299F7a19597E09bD8593AB7B68277183e9778;
     /// @dev Its ProxyAdmin — owned by the ProtocolUpgradeHandler.
-    address constant ZKOS_VT_PROXY_ADMIN = 0xff3582a0310916cd62442A4CA88Bf1C757D68938;
+    address internal constant ZKOS_VT_PROXY_ADMIN = 0xff3582a0310916cd62442A4CA88Bf1C757D68938;
     /// @dev The bridgehub the VT impl's immutable `BRIDGE_HUB` must point at.
-    address constant ZKOS_BRIDGEHUB = 0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE;
+    address internal constant ZKOS_BRIDGEHUB = 0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE;
 
     /// @notice Deploy the new MultisigCommitter implementation via the deterministic CREATE2 factory.
     /// @dev Run on the VPS with --broadcast. The CREATE2 helper broadcasts internally

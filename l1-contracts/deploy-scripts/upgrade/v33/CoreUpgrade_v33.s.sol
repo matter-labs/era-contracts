@@ -23,6 +23,8 @@ import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 ///      refresh of all L1 core implementations, the stage-1 `ProxyAdmin.upgrade` calls that point the
 ///      core proxies at them. This file holds what is specific to v33: `L1InteropHandler`, which has
 ///      no proxy on an older ecosystem, and `stage3`'s `bridgedOut` population.
+// The name is a forge script target hardcoded in protocol-ops; renaming it breaks that caller.
+// solhint-disable-next-line contract-name-capwords
 contract CoreUpgrade_v33 is Script, DefaultCoreUpgrade, ICoreUpgradeV33 {
     /// @dev Whether this run created the `L1InteropHandler` proxy, as opposed to finding one already
     ///      deployed. Gates the one-shot bridge setters in stage 1.

@@ -66,25 +66,25 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
 
     GatewayCTMOutput internal output;
 
-    uint256 constant EXPECTED_MAX_L1_GAS_PRICE = 50 gwei;
+    uint256 internal constant EXPECTED_MAX_L1_GAS_PRICE = 50 gwei;
 
     /// Packed protocol version of v31.0.0 — anything `>=` this exposes the
     /// `serverNotifierAddress()` getter directly. Pre-v31 CTMs predate the
     /// getter, so we fall back to a raw storage load. Temporary shim: once
     /// every active CTM is upgraded past v31 this branch can be deleted.
-    uint256 constant MIN_V31_PROTOCOL_VERSION = 0x1F00000000;
+    uint256 internal constant MIN_V31_PROTOCOL_VERSION = 0x1F00000000;
     /// Storage slot of `ChainTypeManager.serverNotifierAddress`. Confirmed
     /// via `forge inspect ChainTypeManager storage-layout`. Stays at the
     /// same slot across v30 → v31 (verified by reading the slot on both Atlas
     /// (v30.1) and Era (older) CTM on Sepolia). Drop with the version branch.
-    bytes32 constant SERVER_NOTIFIER_ADDRESS_SLOT = bytes32(uint256(164));
+    bytes32 internal constant SERVER_NOTIFIER_ADDRESS_SLOT = bytes32(uint256(164));
 
     uint256 internal gatewayChainId;
     bytes internal forceDeploymentsData;
 
     address internal serverNotifier;
     address internal refundRecipient;
-    address ctm;
+    address internal ctm;
 
     GatewayCTMDeployerConfig internal gatewayCTMDeployerConfig;
 
@@ -181,7 +181,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         // Deploy all factory dependencies
         bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps(gatewayCTMDeployerConfig);
 
-        for (uint i = 0; i < deps.length; i++) {
+        for (uint256 i = 0; i < deps.length; i++) {
             bytes[] memory localDeps = new bytes[](1);
             localDeps[0] = deps[i];
             runGatewayL1L2TransactionWithFactoryDeps(address(0), hex"", localDeps);

@@ -11,12 +11,10 @@ import {CHAIN_MIGRATIONS_ENABLED} from "contracts/common/Config.sol";
 
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
-import {Utils} from "../../utils/Utils.sol";
 import {BytecodeUtils} from "../../utils/bytecode/BytecodeUtils.s.sol";
 import {
     StateTransitionDeployedAddresses,
     ChainCreationParamsConfig,
-    StateTransitionDeployedAddresses,
     ZkChainAddresses,
     L1SpecificStateTransitionAddresses
 } from "../../utils/Types.sol";

@@ -27,8 +27,8 @@ contract DefaultChainUpgrade is Script {
         address bridgehubProxyAddress;
     }
 
-    address currentChainAdmin;
-    ChainConfig config;
+    address internal currentChainAdmin;
+    ChainConfig internal config;
 
     function getChainConfig() public view returns (ChainConfig memory) {
         return config;

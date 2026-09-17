@@ -30,10 +30,10 @@ interface ISafeApprove {
 ///   forge script deploy-scripts/upgrade/VerifyEmergencyApproveHash.s.sol:VerifyEmergencyApproveHash \
 ///     --sig 'run()' --rpc-url $SEPOLIA_RPC -vvvv
 contract VerifyEmergencyApproveHash is Script {
-    IProtocolUpgradeHandler constant PUH = IProtocolUpgradeHandler(0x8f08627524aeD610192132A425D6b9C32a1727EF);
-    uint256 constant GUARDIANS_SIZE = 8;
-    uint256 constant SECURITY_COUNCIL_SIZE = 12;
-    bytes32 constant SALT = bytes32(0);
+    IProtocolUpgradeHandler internal constant PUH = IProtocolUpgradeHandler(0x8f08627524aeD610192132A425D6b9C32a1727EF);
+    uint256 internal constant GUARDIANS_SIZE = 8;
+    uint256 internal constant SECURITY_COUNCIL_SIZE = 12;
+    bytes32 internal constant SALT = bytes32(0);
 
     function run() external {
         IProtocolUpgradeHandler.Call[] memory calls = new IProtocolUpgradeHandler.Call[](0); // empty: isolate sig path

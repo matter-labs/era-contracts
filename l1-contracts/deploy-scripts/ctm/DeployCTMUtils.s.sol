@@ -45,7 +45,6 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
-import {CTMContract} from "./DeployCTML1OrGateway.sol";
 import {ChainCreationParamsLib} from "./ChainCreationParamsLib.sol";
 
 import {
