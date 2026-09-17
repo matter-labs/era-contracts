@@ -3,7 +3,6 @@ pragma solidity 0.8.28;
 
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
-import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMultiProofVerifier.sol";
 import {AIRBENDER_PROOF_SYSTEM_MASK, BOOJUM_PROOF_SYSTEM_MASK, DisabledProofSystems} from "contracts/common/Config.sol";
 
 /// @notice Returns a fixed verdict and key.

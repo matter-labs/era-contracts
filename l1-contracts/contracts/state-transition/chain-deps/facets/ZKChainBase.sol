@@ -252,20 +252,19 @@ contract ZKChainBase is ReentrancyGuard {
         uint256 _batchNumber,
         bool _checkLegacy
     ) internal view {
-        bytes32 cachedStoredBatchHashes = s.storedBatchHashes[_batchNumber];
-        if (
-            cachedStoredBatchHashes != StoredBatchHashing.hashStoredBatchInfo(_lastCommittedBatchData) &&
-            (!_checkLegacy ||
-                (cachedStoredBatchHashes !=
-                    StoredBatchHashing.hashPreAirbenderStoredBatchInfo(_lastCommittedBatchData) &&
-                    cachedStoredBatchHashes != StoredBatchHashing.hashLegacyStoredBatchInfo(_lastCommittedBatchData)))
-        ) {
-            // incorrect previous batch data
-            revert BatchHashMismatch(
-                cachedStoredBatchHashes,
-                StoredBatchHashing.hashStoredBatchInfo(_lastCommittedBatchData)
-            );
+        bytes32 storedHash = s.storedBatchHashes[_batchNumber];
+        bytes32 expectedHash = StoredBatchHashing.hashStoredBatchInfo(_lastCommittedBatchData);
+        if (storedHash == expectedHash) {
+            return;
         }
+        if (
+            _checkLegacy &&
+            (storedHash == StoredBatchHashing.hashPreAirbenderStoredBatchInfo(_lastCommittedBatchData) ||
+                storedHash == StoredBatchHashing.hashLegacyStoredBatchInfo(_lastCommittedBatchData))
+        ) {
+            return;
+        }
+        revert BatchHashMismatch(storedHash, expectedHash);
     }
 
     /// @notice Derives the price for L2 gas in base token to be paid.

@@ -32,7 +32,7 @@ import {
 /// @dev Proof layout: `[ERA_MULTI_PROOF_TYPE, N, boojumProof(N words), airbenderProof(44 words)]`, where the
 /// Boojum sub-proof is what `EraDualVerifier` accepts. Public inputs: `[boojum, airbender]`, one per system.
 contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVerifier {
-    /// @notice The Boojum verifier (`EraDualVerifier`).
+    /// @inheritdoc IEraMultiProofVerifier
     IVerifier public immutable BOOJUM_VERIFIER;
 
     /// @inheritdoc IEraMultiProofVerifier
@@ -107,6 +107,12 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
     /// @inheritdoc IEraMultiProofVerifier
     function acceptedProofType() external pure returns (uint256) {
         return ERA_MULTI_PROOF_TYPE;
+    }
+
+    /// @inheritdoc IEraMultiProofVerifier
+    // solhint-disable-next-line func-name-mixedcase
+    function IS_TESTNET_VERIFIER() external pure virtual returns (bool) {
+        return false;
     }
 
     /// @inheritdoc IEraDualVerifier

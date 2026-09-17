@@ -6,6 +6,14 @@ import {Test} from "forge-std/Test.sol";
 import {AirbenderVerifierPlonk} from "contracts/state-transition/verifiers/AirbenderVerifierPlonk.sol";
 
 import {AirbenderPlonkProofFixture} from "./fixtures/AirbenderPlonkProofFixture.sol";
+import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMultiProofVerifier.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {
+    AIRBENDER_SNARK_PROOF_LENGTH,
+    BOOJUM_PROOF_SYSTEM_MASK,
+    ERA_MULTI_PROOF_TYPE
+} from "contracts/common/Config.sol";
+import {ChainStub, StubVerifier} from "./VerifierStubs.sol";
 
 /// @notice Verifies a real airbender PLONK SNARK proof produced by
 /// `eravm-prover-host prove-snark` against the regenerated `AirbenderVerifierPlonk`
@@ -35,6 +43,32 @@ contract AirbenderPlonkProofIntegrationTest is Test {
 
     function setUp() public {
         airbenderVerifier = new AirbenderVerifierPlonk();
+    }
+
+    /// The real proof through `EraMultiProofVerifier`, with Boojum disabled.
+    function test_multiProofVerifier_acceptsAirbenderProof() public {
+        EraMultiProofVerifier verifier = new EraMultiProofVerifier(
+            IVerifier(address(new StubVerifier(true, bytes32(0)))),
+            IVerifier(address(airbenderVerifier))
+        );
+        ChainStub chain = new ChainStub();
+        chain.setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_MASK);
+
+        uint256[] memory airbenderProof = AirbenderPlonkProofFixture.serializedProof();
+        assertEq(airbenderProof.length, AIRBENDER_SNARK_PROOF_LENGTH);
+        uint256[] memory proof = new uint256[](2 + AIRBENDER_SNARK_PROOF_LENGTH);
+        proof[0] = ERA_MULTI_PROOF_TYPE;
+        for (uint256 i = 0; i < AIRBENDER_SNARK_PROOF_LENGTH; ++i) {
+            proof[2 + i] = airbenderProof[i];
+        }
+        uint256[] memory publicInputs = new uint256[](2);
+        publicInputs[1] = AirbenderPlonkProofFixture.publicInputs()[0];
+
+        assertTrue(chain.callVerify(verifier, publicInputs, proof));
+
+        proof[2] ^= 1;
+        vm.expectRevert();
+        chain.callVerify(verifier, publicInputs, proof);
     }
 
     /// The airbender PLONK verifier accepts the real proof when called directly.

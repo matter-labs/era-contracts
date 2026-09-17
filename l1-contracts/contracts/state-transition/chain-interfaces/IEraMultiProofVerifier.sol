@@ -9,9 +9,17 @@ import {IVerifier} from "./IVerifier.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Masks use the `*_PROOF_SYSTEM_MASK` bits from `Config.sol`.
 interface IEraMultiProofVerifier {
+    /// @return The Boojum verifier.
+    // solhint-disable-next-line func-name-mixedcase
+    function BOOJUM_VERIFIER() external view returns (IVerifier);
+
     /// @return The Airbender verifier.
     // solhint-disable-next-line func-name-mixedcase
     function AIRBENDER_VERIFIER() external view returns (IVerifier);
+
+    /// @notice Whether an empty proof skips verification.
+    // solhint-disable-next-line func-name-mixedcase
+    function IS_TESTNET_VERIFIER() external view returns (bool);
 
     /// @notice Mask of the proof systems this deployment has a verifier for.
     function supportedProofSystems() external view returns (uint8);
