@@ -1,7 +1,7 @@
 name: System contracts CI
 
 env:
-  ANVIL_ZKSYNC_VERSION: v0.7.0
+  ANVIL_ZKSYNC_VERSION: v0.7.1
 
 on:
   pull_request:
