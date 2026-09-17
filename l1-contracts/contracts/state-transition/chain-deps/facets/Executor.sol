@@ -277,6 +277,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     currentBatchCommitment
                 );
             } else {
+                // Both systems chain from the predecessor's Boojum commitment. A proof binds only the state root inside
+                // it, so a predecessor whose Boojum proof was skipped still anchors the chain.
                 proofPublicInput[0] = _getBatchProofPublicInput(prevBatchCommitment, currentBatchCommitment);
                 proofPublicInput[1] = _getBatchProofPublicInput(
                     prevBatchCommitment,
