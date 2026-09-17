@@ -9,6 +9,7 @@ import {
     ChainTypeManagerInitializeData
 } from "contracts/state-transition/IChainTypeManager.sol";
 import {
+    GenesisAirbenderBatchCommitmentZero,
     GenesisBatchCommitmentZero,
     GenesisBatchHashZero,
     GenesisUpgradeZero
@@ -58,6 +59,7 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
             genesisBatchHash: bytes32(uint256(0x01)),
             genesisIndexRepeatedStorageChanges: 0x01,
             genesisBatchCommitment: bytes32(uint256(0x01)),
+            genesisAirbenderBatchCommitment: bytes32(uint256(0x01)),
             diamondCut: getDiamondCutData(address(diamondInit)),
             forceDeploymentsData: bytes("")
         });
@@ -71,6 +73,7 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
             genesisBatchHash: bytes32(uint256(0)),
             genesisIndexRepeatedStorageChanges: 0x01,
             genesisBatchCommitment: bytes32(uint256(0x01)),
+            genesisAirbenderBatchCommitment: bytes32(uint256(0x01)),
             diamondCut: getDiamondCutData(address(diamondInit)),
             forceDeploymentsData: bytes("")
         });
@@ -84,10 +87,25 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
             genesisBatchHash: bytes32(uint256(0x01)),
             genesisIndexRepeatedStorageChanges: 0x01,
             genesisBatchCommitment: bytes32(uint256(0)),
+            genesisAirbenderBatchCommitment: bytes32(uint256(0)),
             diamondCut: getDiamondCutData(address(diamondInit)),
             forceDeploymentsData: bytes("")
         });
 
         _deployCtmWithParams(chainCreationParams, GenesisBatchCommitmentZero.selector);
+    }
+
+    function test_RevertWhen_genesisAirbenderBatchCommitmentIsZero() public asBridgeHub {
+        ChainCreationParams memory chainCreationParams = ChainCreationParams({
+            genesisUpgrade: address(genesisUpgradeContract),
+            genesisBatchHash: bytes32(uint256(0x01)),
+            genesisIndexRepeatedStorageChanges: 0x01,
+            genesisBatchCommitment: bytes32(uint256(0x01)),
+            genesisAirbenderBatchCommitment: bytes32(0),
+            diamondCut: getDiamondCutData(address(diamondInit)),
+            forceDeploymentsData: bytes("")
+        });
+
+        _deployCtmWithParams(chainCreationParams, GenesisAirbenderBatchCommitmentZero.selector);
     }
 }

@@ -78,7 +78,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             dependencyRootsRollingHash: bytes32(0),
             timestamp: 0,
             commitment: bytes32(uint256(0x01)),
-            airbenderCommitment: bytes32(0)
+            airbenderCommitment: bytes32(uint256(0x01))
         });
         vm.warp(TESTNET_COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
         currentTimestamp = block.timestamp;

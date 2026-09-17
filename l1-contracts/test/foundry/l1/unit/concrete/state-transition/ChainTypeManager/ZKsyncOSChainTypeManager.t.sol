@@ -241,6 +241,37 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             genesisBatchHash: bytes32(uint256(0x01)),
             genesisIndexRepeatedStorageChanges: 0x01,
             genesisBatchCommitment: bytes32(uint256(0x02)), // Invalid: should be 1
+            genesisAirbenderBatchCommitment: bytes32(0),
+            diamondCut: getDiamondCutData(address(diamondInit)),
+            forceDeploymentsData: forceDeploymentsData
+        });
+
+        vm.startPrank(address(bridgehub));
+        ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
+            owner: governor,
+            validatorTimelock: validator,
+            chainCreationParams: chainCreationParams,
+            protocolVersion: 0,
+            verifier: testnetVerifier,
+            serverNotifier: serverNotifier
+        });
+
+        vm.expectRevert(GenesisBatchCommitmentIncorrect.selector);
+        new TransparentUpgradeableProxy(
+            address(chainTypeManager),
+            admin,
+            abi.encodeCall(IChainTypeManager.initialize, ctmInitializeData)
+        );
+        vm.stopPrank();
+    }
+
+    function test_RevertWhen_genesisAirbenderBatchCommitmentNotZero() public {
+        ChainCreationParams memory chainCreationParams = ChainCreationParams({
+            genesisUpgrade: address(genesisUpgradeContract),
+            genesisBatchHash: bytes32(uint256(0x01)),
+            genesisIndexRepeatedStorageChanges: 0x01,
+            genesisBatchCommitment: bytes32(uint256(0x01)),
+            genesisAirbenderBatchCommitment: bytes32(uint256(0x01)), // Invalid: ZKsync OS has none
             diamondCut: getDiamondCutData(address(diamondInit)),
             forceDeploymentsData: forceDeploymentsData
         });
@@ -270,6 +301,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             genesisBatchHash: bytes32(uint256(0x01)),
             genesisIndexRepeatedStorageChanges: 0x01,
             genesisBatchCommitment: bytes32(0), // Invalid: should be 1
+            genesisAirbenderBatchCommitment: bytes32(0),
             diamondCut: getDiamondCutData(address(diamondInit)),
             forceDeploymentsData: forceDeploymentsData
         });
@@ -303,6 +335,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             genesisBatchHash: bytes32(uint256(0x01)),
             genesisIndexRepeatedStorageChanges: 0x01,
             genesisBatchCommitment: bytes32(uint256(0x01)),
+            genesisAirbenderBatchCommitment: bytes32(0),
             diamondCut: getDiamondCutData(address(diamondInit)),
             forceDeploymentsData: forceDeploymentsData
         });
@@ -336,6 +369,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             genesisBatchHash: bytes32(0), // Invalid: should not be zero
             genesisIndexRepeatedStorageChanges: 0x01,
             genesisBatchCommitment: bytes32(uint256(0x01)),
+            genesisAirbenderBatchCommitment: bytes32(0),
             diamondCut: getDiamondCutData(address(diamondInit)),
             forceDeploymentsData: forceDeploymentsData
         });
@@ -369,6 +403,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             genesisBatchHash: bytes32(uint256(0x01)),
             genesisIndexRepeatedStorageChanges: 0x01,
             genesisBatchCommitment: bytes32(uint256(0x01)),
+            genesisAirbenderBatchCommitment: bytes32(0),
             diamondCut: getDiamondCutData(address(diamondInit)),
             forceDeploymentsData: forceDeploymentsData
         });
@@ -406,6 +441,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             genesisBatchHash: bytes32(uint256(0x01)),
             genesisIndexRepeatedStorageChanges: 0x01,
             genesisBatchCommitment: bytes32(uint256(0x01)),
+            genesisAirbenderBatchCommitment: bytes32(0),
             diamondCut: getDiamondCutData(address(diamondInit)),
             forceDeploymentsData: forceDeploymentsData
         });
@@ -439,6 +475,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             genesisBatchHash: bytes32(uint256(0x01)),
             genesisIndexRepeatedStorageChanges: 0x01,
             genesisBatchCommitment: bytes32(uint256(0x01)), // Valid: exactly 1
+            genesisAirbenderBatchCommitment: bytes32(0),
             diamondCut: getDiamondCutData(address(diamondInit)),
             forceDeploymentsData: forceDeploymentsData
         });
@@ -462,6 +499,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             genesisBatchHash: bytes32(uint256(0x01)),
             genesisIndexRepeatedStorageChanges: 0x01,
             genesisBatchCommitment: commitment,
+            genesisAirbenderBatchCommitment: bytes32(0),
             diamondCut: getDiamondCutData(address(diamondInit)),
             forceDeploymentsData: forceDeploymentsData
         });

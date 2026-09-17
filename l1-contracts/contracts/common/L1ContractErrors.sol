@@ -151,6 +151,8 @@ error FacetExists(bytes4 selector, address);
 error FeeParamsChangeTooLarge(uint256 oldPrice, uint256 newPrice, uint256 maxAllowedPrice);
 // 0xc91cf3b1
 error GasPerPubdataMismatch();
+// 0x281a2793
+error GenesisAirbenderBatchCommitmentZero();
 // 0x5ca97564
 error GenesisBatchCommitmentIncorrect();
 // 0x6d4a7df8

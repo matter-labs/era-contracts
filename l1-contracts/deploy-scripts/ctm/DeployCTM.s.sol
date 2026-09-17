@@ -471,10 +471,15 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             "genesis_rollup_leaf_index",
             config.contracts.chainCreationParams.genesisRollupLeafIndex
         );
-        string memory chainCreationParams = vm.serializeBytes32(
+        vm.serializeBytes32(
             "chain_creation_params",
             "genesis_batch_commitment",
             config.contracts.chainCreationParams.genesisBatchCommitment
+        );
+        string memory chainCreationParams = vm.serializeBytes32(
+            "chain_creation_params",
+            "genesis_airbender_batch_commitment",
+            config.contracts.chainCreationParams.genesisAirbenderBatchCommitment
         );
 
         vm.serializeAddress("contracts", "create2_factory_addr", create2FactoryState.create2FactoryAddress);

@@ -6,6 +6,7 @@ import {ChainTypeManagerBase} from "./ChainTypeManagerBase.sol";
 import {ChainCreationParams} from "./IChainTypeManager.sol";
 import {
     GenesisIndexStorageZero,
+    GenesisAirbenderBatchCommitmentZero,
     GenesisBatchCommitmentZero,
     GenesisBatchHashZero,
     GenesisUpgradeZero
@@ -57,6 +58,9 @@ contract EraChainTypeManager is ChainTypeManagerBase {
 
         if (_chainCreationParams.genesisBatchCommitment == bytes32(0)) {
             revert GenesisBatchCommitmentZero();
+        }
+        if (_chainCreationParams.genesisAirbenderBatchCommitment == bytes32(0)) {
+            revert GenesisAirbenderBatchCommitmentZero();
         }
     }
 }

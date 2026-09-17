@@ -392,24 +392,6 @@ contract ProvingTest is ExecutorTest {
         assertEq(getters.getTotalBlocksVerified(), 1);
     }
 
-    /// Genesis has no Airbender commitment; its Boojum commitment seeds the Airbender chain.
-    function test_airbenderChainIsSeededByTheGenesisBoojumCommitment() public {
-        IExecutor.StoredBatchInfo memory prev = genesisStoredBatchInfo;
-        prev.commitment = Utils.randomBytes32("genesisBoojumCommitment");
-        utilsFacet.util_setStoredBatchHashes(0, keccak256(abi.encode(prev)));
-
-        _installVerifier(
-            IVerifier(address(new ExpectingVerifier(_publicInput(prev.commitment, newStoredBatchInfo.commitment)))),
-            IVerifier(
-                address(new ExpectingVerifier(_publicInput(prev.commitment, newStoredBatchInfo.airbenderCommitment)))
-            )
-        );
-
-        _proveWithPrev(prev, _multiProof(), newStoredBatchInfo);
-
-        assertEq(getters.getTotalBlocksVerified(), 1);
-    }
-
     /// Through the diamond: the verifier reads `disabledProofSystems` from the calling chain.
     function test_multiProofVerifierReadsDisabledSystemsFromTheChain() public {
         _installVerifier(

@@ -191,6 +191,7 @@ contract GatewayCTMDeployerTest is Test {
             genesisRoot: bytes32(uint256(0x123)),
             genesisRollupLeafIndex: 10,
             genesisBatchCommitment: bytes32(uint256(0x456)),
+            genesisAirbenderBatchCommitment: bytes32(uint256(0x456)),
             forceDeploymentsData: hex"deadbeef",
             protocolVersion: 1
         });

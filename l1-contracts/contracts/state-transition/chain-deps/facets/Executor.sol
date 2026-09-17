@@ -263,8 +263,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         _checkBatchHashMismatch(prevBatch, currentTotalBatchesVerified, true);
 
         bytes32 prevBatchCommitment = prevBatch.commitment;
-        // Airbender chains on its own commitments. Genesis and pre-Airbender predecessors have none, so their Boojum
-        // commitment stands in; a proof binds only the state root of its predecessor, so either shape anchors it.
+        // Airbender chains on its own commitments. The last pre-Airbender batch has none, so its Boojum commitment
+        // stands in; a proof binds only the state root of its predecessor, so either shape anchors it.
         bytes32 prevBatchAirbenderCommitment = prevBatch.airbenderCommitment == bytes32(0)
             ? prevBatch.commitment
             : prevBatch.airbenderCommitment;
