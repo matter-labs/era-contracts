@@ -28,7 +28,6 @@ contract UpgradeLogicTest is DiamondCutTest {
     AdminFacet private proxyAsAdmin;
     GettersFacet private proxyAsGetters;
     PermissionlessValidator private permissionlessValidator;
-    address interopCenter = makeAddr("interopCenter");
     address private admin;
     address private chainTypeManager;
     address private randomSigner;
@@ -89,7 +88,6 @@ contract UpgradeLogicTest is DiamondCutTest {
             chainId: 1,
             bridgehub: address(dummyBridgehub),
             chainTypeManager: chainTypeManager,
-            interopCenter: interopCenter,
             protocolVersion: 0,
             admin: admin,
             validatorTimelock: makeAddr("validatorTimelock"),

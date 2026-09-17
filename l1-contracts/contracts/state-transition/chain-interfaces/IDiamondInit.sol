@@ -4,7 +4,6 @@ pragma solidity ^0.8.21;
 
 /// @param chainId the id of the chain
 /// @param bridgehub the address of the bridgehub contract
-/// @param interopCenter the address of the interop center contract
 /// @param chainTypeManager contract's address
 /// @param protocolVersion initial protocol version
 /// @param admin address who can manage the contract
@@ -15,7 +14,6 @@ pragma solidity ^0.8.21;
 struct InitializeData {
     uint256 chainId;
     address bridgehub;
-    address interopCenter;
     address chainTypeManager;
     uint256 protocolVersion;
     address admin;

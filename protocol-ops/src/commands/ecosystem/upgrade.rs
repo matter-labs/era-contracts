@@ -4,7 +4,7 @@
 //!
 //!   `upgrade-prepare-all` deploys new ecosystem contracts (deployer EOA signs)
 //!                         by running `CoreUpgrade_v33` once + `CTMUpgrade_v33`
-//!                         once per `--ctm-proxy` on a single anvil fork, then
+//!                         once for the target `--ctm-proxy` on a single anvil fork, then
 //!                         executes operational CTM-admin calls such as
 //!                         ServerNotifier ProxyAdmin upgrades. Emits per-script
 //!                         governance TOMLs.
@@ -315,7 +315,7 @@ async fn stage_governance_execute(
 // ── upgrade-prepare-all (split-flow orchestrator) ──────────────────────────
 
 /// Unified split-flow prepare. Runs the core script's `noGovernancePrepare` once
-/// and the CTM script's `noGovernancePrepare` once per `--ctm-proxy`, all on a
+/// and the CTM script's `noGovernancePrepare` for the target `--ctm-proxy`, all on a
 /// single anvil fork so deployer and operational admin broadcasts emit as one
 /// prepare bundle set. The downstream `upgrade-governance` consumes the
 /// per-step TOMLs (passed as `--governance-toml` once each).
@@ -340,11 +340,11 @@ pub struct UpgradePrepareAllArgs {
     #[clap(long)]
     pub deployer_address: Option<Address>,
 
-    /// Target CTMs to upgrade. Pass once per CTM. Only ZKsync OS CTMs can be
-    /// targeted on this release. Each must already have at least one registered
-    /// chain so rollup-DA-manager auto-resolution works.
-    #[clap(long = "ctm-proxy", num_args = 1..)]
-    pub ctm_proxies: Vec<Address>,
+    /// Target CTM to upgrade. Only a ZKsync OS CTM can be targeted on this
+    /// release. It must have at least one registered chain so rollup-DA-manager
+    /// auto-resolution works.
+    #[clap(long = "ctm-proxy")]
+    pub ctm_proxy: Option<Address>,
 
     #[clap(long)]
     pub create2_factory_salt: Option<B256>,
@@ -367,11 +367,11 @@ pub struct UpgradePrepareAllArgs {
     #[clap(long, default_value = CTM_UPGRADE_V33_SCRIPT_PATH, hide = true)]
     pub ctm_script_path: String,
 
-    /// Path to a TOML file describing per-CTM inputs (proxy + optional
+    /// Path to a TOML file describing the CTM inputs (proxy + optional
     /// overrides). Mutually exclusive with the direct CTM flags
     /// (`--ctm-proxy`, `--bytecodes-supplier-address`,
-    /// `--rollup-da-manager-address`). Anything that is not a ZKsync OS CTM
-    /// fails the prepare.
+    /// `--rollup-da-manager-address`). The file must contain exactly one CTM,
+    /// and anything that is not a ZKsync OS CTM fails the prepare.
     ///
     /// Schema:
     /// ```toml
@@ -381,7 +381,7 @@ pub struct UpgradePrepareAllArgs {
     /// rollup_da_manager  = "0x..."           # optional
     /// ```
     #[clap(long, conflicts_with_all = [
-        "ctm_proxies",
+        "ctm_proxy",
         "bytecodes_supplier_address",
         "rollup_da_manager_address",
     ])]
@@ -420,7 +420,7 @@ struct UpgradePrepareAllOutput {
     /// Merged ecosystem TOML written to `<env-out>/ecosystem.toml`, when
     /// `--out` is set. Contains top-level `[governance_calls]` (merged stage
     /// 0/1/2 hex), `[core]` (the CTM-agnostic core prepare output), and one
-    /// `[ctms.zksync_os]` table per CTM carrying the per-CTM diamond cut +
+    /// `[ctms.zksync_os]` table carrying the CTM diamond cut +
     /// contracts config (this release only upgrades ZKsyncOS CTMs). Downstream
     /// `upgrade-governance --env <env>` and `verify-upgrade` both consume this
     /// single file.
@@ -597,17 +597,12 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     // ── CTM list resolution ─────────────────────────────────────────
     let ctms = if let Some(cfg_path) = &args.ctm_config {
         load_ctm_config(cfg_path)?
-    } else if !args.ctm_proxies.is_empty() {
-        let ctms = args
-            .ctm_proxies
-            .iter()
-            .map(|proxy| CtmInputs {
-                proxy: *proxy,
-                bytecodes_supplier: args.bytecodes_supplier_address,
-                rollup_da_manager: args.rollup_da_manager_address,
-            })
-            .collect::<Vec<_>>();
-        ctms
+    } else if let Some(proxy) = args.ctm_proxy {
+        vec![CtmInputs {
+            proxy,
+            bytecodes_supplier: args.bytecodes_supplier_address,
+            rollup_da_manager: args.rollup_da_manager_address,
+        }]
     } else if let Some(ref cfg) = env_cfg {
         let entries = cfg.ctms();
         if entries.is_empty() {
@@ -641,6 +636,12 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
             "either --ctm-config, --ctm-proxy, or --env <name> (with [[ctm_contracts.ctms]] in permanent-values) must be provided"
         );
     };
+    if ctms.len() != 1 {
+        anyhow::bail!(
+            "this release prepares exactly one ZKsync OS CTM; received {} entries",
+            ctms.len()
+        );
+    }
 
     let bridgehub = args.topology.resolve()?;
     let zk_token_asset_id = match env_cfg.as_ref() {
@@ -727,7 +728,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     // PUH proxy. Only meaningful on PUH-governed envs (stage / mainnet) —
     // legacy-Governance envs (e.g. testnet's internal `0xc4fd…` bridgehub
     // owned by ZKsync `Governance.sol`) don't have a PUH to redeploy, so we
-    // skip this step entirely and the merged governance.toml carries only
+    // skip this step entirely and the merged ecosystem.toml carries only
     // the core + per-CTM calls.
     let governance_kind = env_cfg
         .as_ref()
