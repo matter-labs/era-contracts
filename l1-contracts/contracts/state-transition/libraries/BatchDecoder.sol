@@ -26,7 +26,6 @@ library BatchDecoder {
     /// We use different encoding only for commit, while prove/execute are common for Era VM and ZKsync OS chains.
     uint8 internal constant SUPPORTED_ENCODING_VERSION_COMMIT_ZKSYNC_OS = 6;
     /// @notice The currently supported encoding version for precommit data.
-    /// `PrecommitInfo` does not embed `StoredBatchInfo`, so its encoding did not change.
     uint8 internal constant SUPPORTED_ENCODING_VERSION_PRECOMMIT = 1;
 
     /// @notice Decodes commit data from a calldata bytes into the last committed batch data and an array of new batch data.

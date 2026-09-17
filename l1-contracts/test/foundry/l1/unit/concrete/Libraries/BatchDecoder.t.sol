@@ -22,9 +22,7 @@ import {
 
 /// @notice Unit tests for BatchDecoder library
 contract BatchDecoderTest is Test {
-    /// @dev Mirrored from `BatchDecoder` rather than imported, so that a version change has to be
-    /// made deliberately here too. The previous values are kept below to pin rejection of payloads
-    /// a client encoded under the pre-Airbender layout.
+    /// @dev Mirrors `BatchDecoder`; the pre-Airbender values are kept to assert their rejection.
     uint8 constant SUPPORTED_ENCODING_VERSION = 5;
     uint8 constant SUPPORTED_ENCODING_VERSION_COMMIT_ZKSYNC_OS = 6;
     uint8 constant SUPPORTED_ENCODING_VERSION_PRECOMMIT = 1;
@@ -301,114 +299,23 @@ contract BatchDecoderTest is Test {
         this.externalDecodeAndCheckPrecommitData(encodedData);
     }
 
-    // ============ Pre-Airbender wire format ============
+    // ============ Pre-Airbender encoding versions ============
 
-    /// `StoredBatchInfo` as a client encoded it before the Airbender field was appended.
-    struct PreAirbenderStoredBatchInfo {
-        uint64 batchNumber;
-        bytes32 batchHash;
-        uint64 indexRepeatedStorageChanges;
-        uint256 numberOfLayer1Txs;
-        bytes32 priorityOperationsHash;
-        bytes32 dependencyRootsRollingHash;
-        bytes32 l2LogsTreeRoot;
-        uint256 timestamp;
-        bytes32 commitment;
-    }
-
-    /// `CommitBatchInfo` as a client encoded it before `airbenderBootloaderHeapHash` was inserted.
-    struct PreAirbenderCommitBatchInfo {
-        uint64 batchNumber;
-        uint64 timestamp;
-        uint64 indexRepeatedStorageChanges;
-        bytes32 newStateRoot;
-        uint256 numberOfLayer1Txs;
-        bytes32 priorityOperationsHash;
-        bytes32 bootloaderHeapInitialContentsHash;
-        bytes32 eventsQueueStateHash;
-        bytes systemLogs;
-        bytes operatorDAInput;
-    }
-
-    function _preAirbenderStoredBatch(uint64 _batchNumber) internal pure returns (PreAirbenderStoredBatchInfo memory) {
-        return
-            PreAirbenderStoredBatchInfo({
-                batchNumber: _batchNumber,
-                batchHash: keccak256(abi.encodePacked("batchHash", _batchNumber)),
-                indexRepeatedStorageChanges: 1,
-                numberOfLayer1Txs: 2,
-                priorityOperationsHash: keccak256("priorityOperationsHash"),
-                dependencyRootsRollingHash: keccak256("dependencyRootsRollingHash"),
-                l2LogsTreeRoot: keccak256("l2LogsTreeRoot"),
-                timestamp: 3,
-                commitment: keccak256("commitment")
-            });
-    }
-
-    /// A payload a client still on the previous schema would send: the old struct layout under the
-    /// old version byte. It must be refused by name rather than decoded into the new shape, where
-    /// the array offset word would land in `airbenderCommitment`.
-    function test_decodeAndCheckCommitData_rejectsPreAirbenderPayload() public {
-        PreAirbenderCommitBatchInfo[] memory oldBatches = new PreAirbenderCommitBatchInfo[](1);
-        oldBatches[0] = PreAirbenderCommitBatchInfo({
-            batchNumber: 11,
-            timestamp: 0,
-            indexRepeatedStorageChanges: 0,
-            newStateRoot: bytes32(0),
-            numberOfLayer1Txs: 0,
-            priorityOperationsHash: bytes32(0),
-            bootloaderHeapInitialContentsHash: bytes32(0),
-            eventsQueueStateHash: bytes32(0),
-            systemLogs: "",
-            operatorDAInput: ""
-        });
-
-        bytes memory encodedData = abi.encodePacked(
-            PRE_AIRBENDER_ENCODING_VERSION,
-            abi.encode(_preAirbenderStoredBatch(10), oldBatches)
-        );
+    function test_rejectsPreAirbenderEncodingVersions() public {
+        bytes memory body = abi.encode(uint256(0));
 
         vm.expectRevert(
             abi.encodeWithSelector(UnsupportedCommitBatchEncoding.selector, PRE_AIRBENDER_ENCODING_VERSION)
         );
-        this.externalDecodeAndCheckCommitData(encodedData, 11, 11);
-    }
-
-    function test_decodeAndCheckProofData_rejectsPreAirbenderPayload() public {
-        PreAirbenderStoredBatchInfo[] memory proved = new PreAirbenderStoredBatchInfo[](1);
-        proved[0] = _preAirbenderStoredBatch(11);
-
-        bytes memory encodedData = abi.encodePacked(
-            PRE_AIRBENDER_ENCODING_VERSION,
-            abi.encode(_preAirbenderStoredBatch(10), proved, new uint256[](1))
-        );
+        this.externalDecodeAndCheckCommitData(abi.encodePacked(PRE_AIRBENDER_ENCODING_VERSION, body), 1, 1);
 
         vm.expectRevert(abi.encodeWithSelector(UnsupportedProofBatchEncoding.selector, PRE_AIRBENDER_ENCODING_VERSION));
-        this.externalDecodeAndCheckProofData(encodedData, 11, 11);
-    }
-
-    function test_decodeAndCheckExecuteData_rejectsPreAirbenderPayload() public {
-        PreAirbenderStoredBatchInfo[] memory batches = new PreAirbenderStoredBatchInfo[](1);
-        batches[0] = _preAirbenderStoredBatch(11);
-
-        bytes memory encodedData = abi.encodePacked(
-            PRE_AIRBENDER_ENCODING_VERSION,
-            abi.encode(batches, new PriorityOpsBatchInfo[](1))
-        );
+        this.externalDecodeAndCheckProofData(abi.encodePacked(PRE_AIRBENDER_ENCODING_VERSION, body), 1, 1);
 
         vm.expectRevert(
             abi.encodeWithSelector(UnsupportedExecuteBatchEncoding.selector, PRE_AIRBENDER_ENCODING_VERSION)
         );
-        this.externalDecodeAndCheckExecuteData(encodedData, 11, 11);
-    }
-
-    /// ZKsync OS commit payloads embed the same struct, so their version moved too — the claim that
-    /// those chains are untouched by this change is only true of the field's value, not the wire.
-    function test_decodeAndCheckCommitDataZKsyncOS_rejectsPreAirbenderPayload() public {
-        bytes memory encodedData = abi.encodePacked(
-            PRE_AIRBENDER_ENCODING_VERSION_COMMIT_ZKSYNC_OS,
-            abi.encode(_preAirbenderStoredBatch(10), new CommitBatchInfoZKsyncOS[](1))
-        );
+        this.externalDecodeAndCheckExecuteData(abi.encodePacked(PRE_AIRBENDER_ENCODING_VERSION, body), 1, 1);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -416,7 +323,11 @@ contract BatchDecoderTest is Test {
                 PRE_AIRBENDER_ENCODING_VERSION_COMMIT_ZKSYNC_OS
             )
         );
-        this.externalDecodeAndCheckCommitDataZKsyncOS(encodedData, 11, 11);
+        this.externalDecodeAndCheckCommitDataZKsyncOS(
+            abi.encodePacked(PRE_AIRBENDER_ENCODING_VERSION_COMMIT_ZKSYNC_OS, body),
+            1,
+            1
+        );
     }
 
     // ============ External Wrappers (for calldata) ============

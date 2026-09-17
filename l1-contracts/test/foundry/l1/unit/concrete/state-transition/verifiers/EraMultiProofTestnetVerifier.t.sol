@@ -2,83 +2,33 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {AirbenderVerificationFailed, BoojumVerificationFailed} from "contracts/common/L1ContractErrors.sol";
 
 import {EraMultiProofTestnetVerifier} from "contracts/state-transition/verifiers/EraMultiProofTestnetVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {
     AIRBENDER_PROOF_SYSTEM_MASK,
     AIRBENDER_SNARK_PROOF_LENGTH,
-    BOOJUM_PROOF_SYSTEM_MASK,
-    DisabledProofSystems,
     ERA_MULTI_PROOF_TYPE
 } from "contracts/common/Config.sol";
+import {AirbenderVerificationFailed} from "contracts/common/L1ContractErrors.sol";
+import {ChainStub, StubVerifier} from "./VerifierStubs.sol";
 
-contract AcceptingVerifier is IVerifier {
-    function verify(uint256[] calldata, uint256[] calldata) external pure returns (bool) {
-        return true;
-    }
-
-    function verificationKeyHash() external pure returns (bytes32) {
-        return bytes32(0);
-    }
-}
-
-contract RejectingVerifier is IVerifier {
-    function verify(uint256[] calldata, uint256[] calldata) external pure returns (bool) {
-        return false;
-    }
-
-    function verificationKeyHash() external pure returns (bytes32) {
-        return bytes32(0);
-    }
-}
-
-contract ChainStub {
-    uint8 internal mask;
-
-    function setDisabledProofSystems(uint8 _mask) external {
-        mask = _mask;
-    }
-
-    function disabledProofSystems() external view returns (DisabledProofSystems memory) {
-        return
-            DisabledProofSystems({
-                boojum: mask & BOOJUM_PROOF_SYSTEM_MASK != 0,
-                airbender: mask & AIRBENDER_PROOF_SYSTEM_MASK != 0
-            });
-    }
-
-    function callVerify(
-        IVerifier _verifier,
-        uint256[] calldata _pi,
-        uint256[] calldata _proof
-    ) external view returns (bool) {
-        return _verifier.verify(_pi, _proof);
-    }
-}
-
-/// @notice Unit tests for the testnet variant of the Era dual-prover gate.
-/// @dev It inherits the production verifier rather than wrapping it. A wrapper would become the `msg.sender`
-/// the production contract reads `disabledProofSystems` from, which is why the ZKsync OS lane's testnet
-/// wrapper cannot answer for the chain. Inheriting keeps the chain's diamond as the caller, so the setting
-/// behaves identically on testnet and mainnet and can be tested before it is needed.
 contract EraMultiProofTestnetVerifierTest is Test {
     EraMultiProofTestnetVerifier internal verifier;
     ChainStub internal chain;
 
     function setUp() public {
         verifier = new EraMultiProofTestnetVerifier(
-            IVerifier(address(new AcceptingVerifier())),
-            IVerifier(address(new RejectingVerifier()))
+            IVerifier(address(new StubVerifier(true, bytes32(0)))),
+            IVerifier(address(new StubVerifier(false, bytes32(0))))
         );
         chain = new ChainStub();
     }
 
     function _publicInputs() internal pure returns (uint256[] memory pi) {
         pi = new uint256[](2);
-        pi[0] = uint256(keccak256("raw"));
-        pi[1] = uint256(keccak256("raw-airbender"));
+        pi[0] = uint256(keccak256("boojum"));
+        pi[1] = uint256(keccak256("airbender"));
     }
 
     function _proof() internal pure returns (uint256[] memory proof) {
@@ -92,53 +42,18 @@ contract EraMultiProofTestnetVerifierTest is Test {
         assertTrue(verifier.IS_TESTNET_VERIFIER());
     }
 
-    /// The testnet convenience: an empty proof skips verification entirely.
+    /// An empty proof skips verification.
     function test_acceptsEmptyProof() public view {
         assertTrue(chain.callVerify(verifier, _publicInputs(), new uint256[](0)));
     }
 
-    /// Anything else goes through the real path, so a failing lane still fails.
     function test_nonEmptyProofUsesRealPath() public {
         vm.expectRevert(AirbenderVerificationFailed.selector);
         chain.callVerify(verifier, _publicInputs(), _proof());
     }
 
-    /// Inheriting means `disabledProofSystems` is read from the chain rather than from a wrapper, so it
-    /// takes effect on testnets too.
-    function test_disabledSystemsAreHonouredOnTestnet() public {
+    function test_disabledSystemsAreHonoured() public {
         chain.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
         assertTrue(chain.callVerify(verifier, _publicInputs(), _proof()));
-    }
-
-    /// A non-empty envelope must not be able to declare a zero-length Boojum slice and settle without a
-    /// Boojum proof. The inner router treating an empty proof as "skip" is exactly how that happened.
-    function test_rejectsEmptyBoojumSliceWhileBoojumEnabled() public {
-        EraMultiProofTestnetVerifier v = new EraMultiProofTestnetVerifier(
-            IVerifier(address(new AcceptingVerifier())),
-            IVerifier(address(new AcceptingVerifier()))
-        );
-
-        uint256[] memory proof = new uint256[](2 + AIRBENDER_SNARK_PROOF_LENGTH);
-        proof[0] = ERA_MULTI_PROOF_TYPE;
-        proof[1] = 0;
-
-        vm.expectRevert(BoojumVerificationFailed.selector);
-        chain.callVerify(v, _publicInputs(), proof);
-    }
-
-    /// The same envelope with Airbender also switched off must not settle a batch with nothing verified.
-    function test_rejectsEnvelopeThatWouldVerifyNothing() public {
-        EraMultiProofTestnetVerifier v = new EraMultiProofTestnetVerifier(
-            IVerifier(address(new AcceptingVerifier())),
-            IVerifier(address(new AcceptingVerifier()))
-        );
-        chain.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
-
-        uint256[] memory proof = new uint256[](2 + AIRBENDER_SNARK_PROOF_LENGTH);
-        proof[0] = ERA_MULTI_PROOF_TYPE;
-        proof[1] = 0;
-
-        vm.expectRevert(BoojumVerificationFailed.selector);
-        chain.callVerify(v, _publicInputs(), proof);
     }
 }

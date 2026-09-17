@@ -58,15 +58,10 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         registerCTMScript.runForTest(bridgehub, ctm);
     }
 
-    /// @dev Overridable so a suite can deploy the ecosystem under a different CTM configuration.
-    function _ctmConfigPath() internal view virtual returns (string memory) {
-        return "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-ctm.toml";
-    }
-
     function _deployL1Contracts() internal {
         vm.setEnv("L1_CONFIG", "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-l1.toml");
         vm.setEnv("L1_OUTPUT", "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-l1.toml");
-        vm.setEnv("CTM_CONFIG", _ctmConfigPath());
+        vm.setEnv("CTM_CONFIG", "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-ctm.toml");
         vm.setEnv("CTM_OUTPUT", "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-ctm.toml");
         vm.setEnv(
             "PERMANENT_VALUES_INPUT",

@@ -11,8 +11,7 @@ import {AirbenderPlonkProofFixture} from "./fixtures/AirbenderPlonkProofFixture.
 /// `eravm-prover-host prove-snark` against the regenerated `AirbenderVerifierPlonk`
 /// (generated from the matching `snark_vk.json` by
 /// `tools/verifier-gen/regenerate-airbender-verifier.sh`).
-/// Exercises the standalone `AirbenderVerifierPlonk.verify` path. The Airbender lane reaches this
-/// contract through `AirbenderVerifier`, which is covered by its own suite.
+/// Exercises `AirbenderVerifierPlonk.verify` directly; `EraMultiProofVerifier` calls it the same way.
 contract AirbenderPlonkProofIntegrationTest is Test {
     /// Commitment to the eravm-airbender-verifier guest binary, as the wrapper
     /// sees it. Sourced from `recursion_chain_hash` in the FRI proof for batch 1

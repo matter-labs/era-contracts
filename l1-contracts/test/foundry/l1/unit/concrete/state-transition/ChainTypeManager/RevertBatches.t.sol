@@ -133,8 +133,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
         adminFacet.setDAValidatorPair(address(rollupL1DAValidator), L2_DA_COMMITMENT_SCHEME);
     }
 
-    /// The chain's own metaparameters: this chain was created through the CTM, not with the shared
-    /// test constants `Utils` assumes.
+    /// The chain's own metaparameters, not the `Utils` constants.
     function _metadataHash() internal view returns (bytes32) {
         return
             keccak256(
@@ -209,7 +208,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             blobCommitments,
             blobHashes
         );
-        // Kept in storage: the stored-batch literal below is already at the stack limit.
+        // Storage, not a local: the stored-batch literal below is at the stack limit.
         expectedAirbenderCommitment = Utils.createAirbenderBatchCommitment(
             correctNewCommitBatchInfo,
             uncompressedStateDiffHash,

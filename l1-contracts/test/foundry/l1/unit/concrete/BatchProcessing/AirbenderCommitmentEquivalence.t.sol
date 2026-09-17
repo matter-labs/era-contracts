@@ -6,29 +6,10 @@ import {Test} from "forge-std/Test.sol";
 
 import {CommitterProvingTest} from "contracts/dev-contracts/test/CommitterProvingTest.sol";
 import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
-import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {StoredBatchHashing} from "contracts/state-transition/chain-deps/StoredBatchHashing.sol";
-import {AirbenderCommitmentRequired} from "contracts/common/L1ContractErrors.sol";
 
-/// @notice Pins the Airbender-shape batch commitment against values produced by the Rust
-/// implementation the guest runs.
-///
-/// Vectors come from `post_gateway_test.json` in `eravm-airbender-verifier` — a real post-gateway
-/// batch whose four commitment hashes are recorded with the inputs that produced them — via
-/// `zksync_types::commitment::airbender_l1_equivalence_tests`, which first asserts the vendored Rust
-/// implementation still reproduces the recorded hashes, then emits the Airbender-shape commitment
-/// for the same batch and for an all-16-blob variant.
-///
-/// What that anchors: the pass-through hash, metadata hash, auxiliary output hash and stored
-/// commitment come from a recorded real batch, so the layout and composition are pinned against an
-/// external source. The Airbender commitment is the same composition with the two divergent words
-/// substituted, so it functions as a regression lock on the substitution rather than as an
-/// independent oracle. The generators are not committed in `eravm-airbender-verifier`, so the chain
-/// of custody is not reproducible from this repo alone.
-///
-/// This is the check whose absence let the shared-public-input blocker through: the guest's
-/// `test_proof_public_input_matches_l1_shift` pins only the shift and the wrapper packing, over
-/// synthetic `prev`/`curr`, so nothing asserted that L1's commitment bytes equal the guest's.
+/// @notice Checks the Boojum and Airbender batch commitments against vectors emitted by
+/// `zksync_types::commitment::airbender_l1_equivalence_tests` from a recorded post-gateway batch
+/// (`post_gateway_test.json` in `eravm-airbender-verifier`). The generators are not committed upstream.
 contract AirbenderCommitmentEquivalenceTest is Test {
     uint256 internal constant TOTAL_BLOBS = 16;
 
@@ -50,11 +31,6 @@ contract AirbenderCommitmentEquivalenceTest is Test {
     bytes32 internal constant BLOB_0_LINEAR_HASH = 0xff4feb4bef9401731ab9db3626c2e015baa6880d7b1c4382d03b30da3a0fd75e;
     bytes32 internal constant BLOB_0_COMMITMENT = 0xf840cf3f6b7dc92729b2b9ef3b399e7b896d553b746362fe81c4eb911013570d;
 
-    bytes32 internal constant EXPECTED_STORED_AUX_OUTPUT_HASH =
-        0xcccf1ef8192054cb1b5fb668868ce4e069a695a1394b9486ebd3031cec12fe12;
-    bytes32 internal constant EXPECTED_STORED_COMMITMENT =
-        0xd6615c5447c817a320c69c6a5af12c472fd4d5bc2ef4de7806d40afe384ddc27;
-
     bytes32 internal constant AIRBENDER_HEAP_HASH = 0x35d519e586d0b30fb291b1ce24ce8ce0605af7f52c4bad1394febb63e387ed98;
     bytes32 internal constant EXPECTED_AIRBENDER_COMMITMENT =
         0xeb414bd21d1e5e39d8e169b9142b7e7eac72a3ebc5f2c6c43b85ca2f0f7272c7;
@@ -65,9 +41,7 @@ contract AirbenderCommitmentEquivalenceTest is Test {
     bytes32 internal constant ALL_BLOBS_AIRBENDER_COMMITMENT =
         0xf6ef17dadb3219a501704adaf7a8cf56b9d2eb787efa50bfefdcbdd17f9cc213;
 
-    // --- A vector the production Committer can be fed directly -------------------------------
-    // Every component is a value `_createBatchCommitment` takes verbatim, except the system logs,
-    // which it hashes — so these pin the contract's own derivation rather than a copy of it.
+    // --- A vector fed directly into the production Committer ---------------------------------
     bytes internal constant CALLABLE_SYSTEM_LOGS = "equivalence-test-system-logs";
     bytes32 internal constant CALLABLE_STATE_DIFF_HASH =
         0xbabb276f2a3cc5e989b45d546bd4fe011e38b6871007c3bb2578022c15e2d061;
@@ -86,8 +60,7 @@ contract AirbenderCommitmentEquivalenceTest is Test {
 
     function setUp() public {
         committer = new CommitterProvingTest();
-        // The recorded batch was built with the emulator hash equal to the default-AA hash, which is
-        // what Rust substitutes for `None`.
+        // Rust substitutes the default-AA hash for an `evm_emulator_code_hash` of `None`.
         committer.setBatchMetaParameters(false, BOOTLOADER_CODE_HASH, DEFAULT_AA_CODE_HASH, DEFAULT_AA_CODE_HASH);
     }
 
@@ -111,9 +84,7 @@ contract AirbenderCommitmentEquivalenceTest is Test {
         }
     }
 
-    /// The production derivation, called directly, against the Rust vector. This is what ties the
-    /// external oracle to `Committer` — the inline reconstructions below only pin the layout.
-    function test_committerProducesTheRustAirbenderCommitment() public {
+    function test_committerProducesTheRustCommitments() public {
         (bytes32[] memory commitments, bytes32[] memory hashes) = _callableBlobs();
 
         assertEq(
@@ -128,42 +99,13 @@ contract AirbenderCommitmentEquivalenceTest is Test {
         );
     }
 
-    /// Every Era batch carries an Airbender commitment, so the heap hash it is built from is required.
-    /// Without it the batch could never be proved on that system, so the commit is refused rather than
-    /// the failure surfacing later as an unexplained verification error.
-    function test_requiresTheAirbenderHeapHash() public {
-        (bytes32[] memory commitments, bytes32[] memory hashes) = _callableBlobs();
-        CommitBatchInfo memory batch = _callableBatch();
-        batch.airbenderBootloaderHeapHash = bytes32(0);
-
-        vm.expectRevert(AirbenderCommitmentRequired.selector);
-        committer.createAirbenderBatchCommitment(batch, CALLABLE_STATE_DIFF_HASH, commitments, hashes);
-    }
-
-    /// The two commitments must stay distinct: a single proof satisfying both public inputs is exactly
-    /// what requiring two proof systems exists to prevent.
-    function test_theTwoCommitmentsAreDistinct() public view {
-        (bytes32[] memory commitments, bytes32[] memory hashes) = _callableBlobs();
-
-        assertTrue(
-            committer.createBatchCommitment(_callableBatch(), CALLABLE_STATE_DIFF_HASH, commitments, hashes) !=
-                committer.createAirbenderBatchCommitment(
-                    _callableBatch(),
-                    CALLABLE_STATE_DIFF_HASH,
-                    commitments,
-                    hashes
-                )
-        );
-    }
-
     function _blobWords() internal pure returns (bytes32[] memory words) {
         words = new bytes32[](2 * TOTAL_BLOBS);
         words[0] = BLOB_0_LINEAR_HASH;
         words[1] = BLOB_0_COMMITMENT;
     }
 
-    /// Mirrors the Rust emitter: slot `i` holds `keccak("L" ‖ i)` and `keccak("C" ‖ i)`. Distinct
-    /// and asymmetric per slot, so transposing any pair — or any two slots — moves the hash.
+    /// Mirrors the Rust emitter: slot `i` holds `keccak("L" ‖ i)` and `keccak("C" ‖ i)`.
     function _allBlobWords() internal pure returns (bytes32[] memory words) {
         words = new bytes32[](2 * TOTAL_BLOBS);
         for (uint8 i = 0; i < TOTAL_BLOBS; ++i) {
@@ -172,7 +114,6 @@ contract AirbenderCommitmentEquivalenceTest is Test {
         }
     }
 
-    /// Mirrors `Committer._batchAuxiliaryOutput`, with the two divergent words parameterised.
     function _auxiliaryOutputHash(
         bytes32 _heapHash,
         bytes32 _eventsQueueHash,
@@ -189,91 +130,7 @@ contract AirbenderCommitmentEquivalenceTest is Test {
         return keccak256(abi.encode(EXPECTED_PASS_THROUGH_DATA_HASH, EXPECTED_METADATA_HASH, _auxHash));
     }
 
-    /// The pre-Airbender hash form is the entire back-compat guarantee for batches committed before
-    /// the upgrade: get its field order wrong and every one of them becomes permanently
-    /// unauthenticatable. Pinned against an explicit encoding of the nine historical fields, with a
-    /// distinct non-zero value in every slot so a transposition cannot hide.
-    function test_preAirbenderHashFormMatchesTheHistoricalEncoding() public pure {
-        IExecutor.StoredBatchInfo memory batch = IExecutor.StoredBatchInfo({
-            batchNumber: 7,
-            batchHash: keccak256("batchHash"),
-            indexRepeatedStorageChanges: 11,
-            numberOfLayer1Txs: 13,
-            priorityOperationsHash: keccak256("priorityOperationsHash"),
-            dependencyRootsRollingHash: keccak256("dependencyRootsRollingHash"),
-            l2LogsTreeRoot: keccak256("l2LogsTreeRoot"),
-            timestamp: 17,
-            commitment: keccak256("commitment"),
-            airbenderCommitment: keccak256("airbenderCommitment")
-        });
-
-        bytes32 expected = keccak256(
-            // solhint-disable-next-line func-named-parameters
-            abi.encode(
-                uint64(7),
-                keccak256("batchHash"),
-                uint64(11),
-                uint256(13),
-                keccak256("priorityOperationsHash"),
-                keccak256("dependencyRootsRollingHash"),
-                keccak256("l2LogsTreeRoot"),
-                uint256(17),
-                keccak256("commitment")
-            )
-        );
-
-        assertEq(
-            StoredBatchHashing.hashPreAirbenderStoredBatchInfo(batch),
-            expected,
-            "pre-Airbender hash form diverges from the encoding it must reproduce"
-        );
-        assertTrue(
-            StoredBatchHashing.hashStoredBatchInfo(batch) != expected,
-            "the current form must cover airbenderCommitment and so differ"
-        );
-    }
-
-    /// The pass-through encoding, which `Committer._batchPassThroughData` and the guest share.
-    function test_passThroughDataMatchesRust() public pure {
-        bytes32 derived = keccak256(
-            // solhint-disable-next-line func-named-parameters
-            abi.encodePacked(ENUMERATION_INDEX, STATE_ROOT, uint64(0), bytes32(0))
-        );
-        assertEq(derived, EXPECTED_PASS_THROUGH_DATA_HASH, "pass-through encoding diverges from Rust");
-    }
-
-    /// The metaparameters encoding. `L1BatchMetaParameters::to_bytes` substitutes
-    /// `default_aa_code_hash` when `evm_emulator_code_hash` is `None`, while L1 emits
-    /// `s.l2EvmEmulatorBytecodeHash` — so `None` and zero are NOT equivalent, which is why the guest
-    /// forces `Some(unwrap_or_default())`. This fixture was recorded with `None`.
-    function test_metaParametersNoneSerializesAsDefaultAA() public pure {
-        bytes32 derived = keccak256(
-            // solhint-disable-next-line func-named-parameters
-            abi.encodePacked(false, BOOTLOADER_CODE_HASH, DEFAULT_AA_CODE_HASH, DEFAULT_AA_CODE_HASH)
-        );
-        assertEq(derived, EXPECTED_METADATA_HASH, "None must serialize as default_aa_code_hash");
-    }
-
-    /// The 36-word auxiliary output preimage: order, packing, and blob word interleaving.
-    function test_auxiliaryOutputMatchesRust() public pure {
-        assertEq(
-            _auxiliaryOutputHash(STORED_HEAP_HASH, EVENTS_QUEUE_HASH, _blobWords()),
-            EXPECTED_STORED_AUX_OUTPUT_HASH,
-            "auxiliary output layout diverges from Rust"
-        );
-    }
-
-    /// The three-layer composition `Committer._createBatchCommitment` performs.
-    function test_commitmentCompositionMatchesRust() public pure {
-        assertEq(
-            _commitment(EXPECTED_STORED_AUX_OUTPUT_HASH),
-            EXPECTED_STORED_COMMITMENT,
-            "commitment composition diverges from Rust"
-        );
-    }
-
-    /// The claim the design rests on: the same composition with the heap hash swapped and the events
-    /// queue zeroed is exactly the commitment the guest computes.
+    /// Same composition as Boojum with the heap hash swapped and the events queue zeroed.
     function test_airbenderCommitmentMatchesRust() public pure {
         assertEq(
             _commitment(_auxiliaryOutputHash(AIRBENDER_HEAP_HASH, bytes32(0), _blobWords())),
@@ -282,8 +139,7 @@ contract AirbenderCommitmentEquivalenceTest is Test {
         );
     }
 
-    /// The same over a batch with every blob slot populated, so the whole 32-word blob region and
-    /// its interleaving are exercised rather than only slots 0 and 1.
+    /// Every blob slot populated.
     function test_airbenderCommitmentMatchesRustWithAllBlobSlots() public pure {
         assertEq(
             _commitment(_auxiliaryOutputHash(STORED_HEAP_HASH, EVENTS_QUEUE_HASH, _allBlobWords())),

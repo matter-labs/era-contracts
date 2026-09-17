@@ -13,8 +13,7 @@ import {
     DEFAULT_PRIORITY_TX_MAX_PUBDATA,
     DEFAULT_MINIMAL_L2_GAS_PRICE,
     DEFAULT_PUBDATA_PRICING_MODE,
-    DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT,
-    AIRBENDER_PROOF_SYSTEM_MASK
+    DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT
 } from "../../common/Config.sol";
 import {IDiamondInit, InitializeData} from "../chain-interfaces/IDiamondInit.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
@@ -41,13 +40,9 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
 
     bool public immutable IS_ZKSYNC_OS;
 
-    /// @dev Whether the CTM deploys an Airbender verifier for its Era chains.
-    bool public immutable HAS_AIRBENDER_LANE;
-
     /// @dev Initialize the implementation to prevent any possibility of a Parity hack.
-    constructor(bool _isZKOS, bool _hasAirbenderLane) reentrancyGuardInitializer {
+    constructor(bool _isZKOS) reentrancyGuardInitializer {
         IS_ZKSYNC_OS = _isZKOS;
-        HAS_AIRBENDER_LANE = _hasAirbenderLane;
     }
 
     /// @notice ZK chain diamond contract initialization
@@ -132,10 +127,6 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.priorityTree.setup(s.__DEPRECATED_priorityQueue.getTotalPriorityTxs());
         s.precommitmentForTheLatestBatch = DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH;
         s.zksyncOS = IS_ZKSYNC_OS;
-
-        if (!IS_ZKSYNC_OS && !HAS_AIRBENDER_LANE) {
-            s.disabledProofSystems = AIRBENDER_PROOF_SYSTEM_MASK;
-        }
 
         // All new chains (both ZKsync OS ones and not) have the totalSupply tracked for the base token of the chain.
         // The only exception are the legacy ZKsync OS chains.

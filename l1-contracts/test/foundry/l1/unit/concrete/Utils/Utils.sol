@@ -566,7 +566,7 @@ library Utils {
     }
 
     function makeDiamondProxy(Diamond.FacetCut[] memory facetCuts, address bridgehub) public returns (address) {
-        DiamondInit diamondInit = new DiamondInit(false, true);
+        DiamondInit diamondInit = new DiamondInit(false);
         bytes memory diamondInitData = abi.encodeWithSelector(
             diamondInit.initialize.selector,
             makeInitializeData(bridgehub)
@@ -622,8 +622,6 @@ library Utils {
         return keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
     }
 
-    /// @dev The same batch commitment in Airbender shape: the two words Airbender does not
-    /// reproduce are substituted, everything else is reused.
     function createAirbenderBatchCommitment(
         CommitBatchInfo calldata _newBatchData,
         bytes32 _stateDiffHash,
@@ -662,8 +660,8 @@ library Utils {
         return keccak256(abi.encode(passThroughDataHash, _metadataHash, auxiliaryOutputHash));
     }
 
-    /// @dev The Airbender commitment a commit carrying one blob produces. The commit event carries only
-    /// the Boojum commitment, so a test that builds `StoredBatchInfo` from it derives this one itself.
+    /// @dev The Airbender commitment of a batch committed with one blob; the commit event carries only the
+    /// Boojum one.
     function airbenderCommitmentForSingleBlob(
         CommitBatchInfo calldata _batch,
         bytes32 _stateDiffHash,
@@ -755,8 +753,7 @@ library Utils {
         return keccak256(abi.encodePacked(_stateDiffHash, _totalPubdataHash, _blobsAmount, _blobHashes));
     }
 
-    /// @dev The opening commitment the rollup DA validator derives for `getDefaultBlobCommitment()`,
-    /// which is what lands in the batch's auxiliary output.
+    /// @dev The opening commitment the rollup DA validator derives for `getDefaultBlobCommitment()`.
     function defaultBlobOpeningCommitment(bytes32 _versionedHash) public pure returns (bytes32) {
         bytes16 blobOpeningPoint = 0x7142c5851421a2dc03dde0aabdb0ffdb;
         bytes32 blobClaimedValue = 0x1e5eea3bbb85517461c1d1c7b84c7c2cec050662a5e81a71d5d7e2766eaff2f0;

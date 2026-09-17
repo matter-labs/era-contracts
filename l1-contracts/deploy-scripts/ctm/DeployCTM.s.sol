@@ -233,7 +233,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
                 config.testnetVerifier
             );
             ctmAddresses.stateTransition.verifiers.boojumVerifier = deploySimpleContract(boojumVerifierName, false);
-            if (DeployCTML1OrGateway.hasAirbenderLane(config.airbenderVerifier, false)) {
+            if (config.airbenderVerifier) {
                 ctmAddresses.stateTransition.verifiers.airbenderVerifierPlonk = deploySimpleContract(
                     "AirbenderVerifierPlonk",
                     false

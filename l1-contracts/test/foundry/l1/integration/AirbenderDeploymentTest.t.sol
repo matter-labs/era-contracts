@@ -15,13 +15,9 @@ import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.s
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
-/// @notice Deploys the ecosystem with the Airbender lane enabled and exercises the paths that only exist in
-/// that configuration.
-/// @dev The shared integration config enables the lane, so every integration suite deploys through it, and
-/// this suite asserts the properties that only hold in that configuration: lane deployment order, the gate
-/// becoming the chain's verifier, and the downstream consumers of a chain's verifier.
+/// @notice Integration checks for a CTM deployed with `airbender_verifier = true`.
 contract AirbenderDeploymentTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
-    function _gate() internal view returns (EraMultiProofVerifier) {
+    function _verifier() internal view returns (EraMultiProofVerifier) {
         return EraMultiProofVerifier(address(IZKChain(getZKChainAddress(eraZKChainId)).getVerifier()));
     }
 
@@ -32,71 +28,47 @@ contract AirbenderDeploymentTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         _deployEra();
     }
 
-    /// The chain must settle behind the gate, not the bare Boojum router, and both lanes must be wired.
-    function test_chainVerifierIsTheMultiProofGate() public view {
-        EraMultiProofVerifier gate = _gate();
+    /// Both verifiers are wired into the chain's `EraMultiProofVerifier`.
+    function test_chainVerifierIsTheMultiProofVerifier() public view {
+        EraMultiProofVerifier verifier = _verifier();
 
-        address boojumLane = address(gate.BOOJUM_VERIFIER());
-        address airbenderLane = address(gate.AIRBENDER_VERIFIER());
-        assertTrue(boojumLane != address(0), "Boojum lane not wired");
-        assertTrue(airbenderLane != address(0), "Airbender lane not wired");
-        assertTrue(boojumLane != airbenderLane, "lanes must be distinct contracts");
-        assertTrue(IVerifier(airbenderLane).verificationKeyHash() != bytes32(0), "Airbender verifier has no key");
+        address boojum = address(verifier.BOOJUM_VERIFIER());
+        address airbender = address(verifier.AIRBENDER_VERIFIER());
+        assertTrue(boojum != address(0), "Boojum verifier not wired");
+        assertTrue(airbender != address(0), "Airbender verifier not wired");
+        assertTrue(boojum != airbender, "verifiers must be distinct contracts");
+        assertTrue(IVerifier(airbender).verificationKeyHash() != bytes32(0), "Airbender verifier has no key");
     }
 
-    /// Tooling reads the Boojum sub-verifiers straight off a chain's verifier. With the gate installed that
-    /// is the gate itself, so it has to answer for the router it wraps — otherwise chain registration and
-    /// upgrade-calldata generation revert.
-    function test_gateAnswersSubVerifierIntrospection() public view {
-        IEraDualVerifier chainVerifier = IEraDualVerifier(address(_gate()));
-        IEraDualVerifier router = IEraDualVerifier(address(_gate().BOOJUM_VERIFIER()));
+    /// Tooling reads `FFLONK_VERIFIER`/`PLONK_VERIFIER` off the chain verifier.
+    function test_forwardsSubVerifierGetters() public view {
+        IEraDualVerifier chainVerifier = IEraDualVerifier(address(_verifier()));
+        IEraDualVerifier router = IEraDualVerifier(address(_verifier().BOOJUM_VERIFIER()));
 
-        // Identity, not merely non-zero: the gate forwards to the router it wraps, so a swapped or wrong
-        // lane would still look populated to tooling that only checks for a set address.
-        assertEq(
-            address(chainVerifier.FFLONK_VERIFIER()),
-            address(router.FFLONK_VERIFIER()),
-            "gate reports the wrong FFLONK verifier"
-        );
-        assertEq(
-            address(chainVerifier.PLONK_VERIFIER()),
-            address(router.PLONK_VERIFIER()),
-            "gate reports the wrong PLONK verifier"
-        );
-        assertTrue(
-            address(router.FFLONK_VERIFIER()) != address(router.PLONK_VERIFIER()),
-            "fflonk and plonk must be distinct, or the identity assertions above prove nothing"
-        );
-        assertEq(
-            _gate().verificationKeyHash(),
-            IVerifier(address(_gate().BOOJUM_VERIFIER())).verificationKeyHash(),
-            "gate must report the Boojum lane's verification key hash"
-        );
+        assertEq(address(chainVerifier.FFLONK_VERIFIER()), address(router.FFLONK_VERIFIER()));
+        assertEq(address(chainVerifier.PLONK_VERIFIER()), address(router.PLONK_VERIFIER()));
+        assertTrue(address(router.FFLONK_VERIFIER()) != address(router.PLONK_VERIFIER()));
+        assertEq(_verifier().verificationKeyHash(), IVerifier(address(router)).verificationKeyHash());
     }
 
-    /// `AddressIntrospector` runs against the live chain verifier and is used by `RegisterZKChain` and by the
-    /// upgrade-calldata generator, so it has to survive the gate being the chain's verifier.
-    function test_addressIntrospectorSurvivesTheGate() public {
+    function test_addressIntrospectorResolvesTheChainVerifier() public {
         CTMDeployedAddresses memory info = AddressIntrospector.getCTMAddresses(
             ChainTypeManagerBase(address(addresses.chainTypeManager))
         );
 
         assertTrue(info.stateTransition.verifiers.verifierFflonk != address(0), "fflonk not resolved");
         assertTrue(info.stateTransition.verifiers.verifierPlonk != address(0), "plonk not resolved");
-        assertEq(info.stateTransition.verifiers.verifier, address(_gate()), "chain verifier not resolved");
+        assertEq(info.stateTransition.verifiers.verifier, address(_verifier()), "chain verifier not resolved");
     }
 
-    /// The gate must not nest a second empty-proof skip inside its Boojum lane: the outer testnet gate
-    /// already provides that, and a nested one lets a non-empty envelope declare a zero-length Boojum slice
-    /// and settle with no Boojum proof.
-    function test_boojumLaneIsTheProductionRouter() public view {
-        address boojumLane = address(_gate().BOOJUM_VERIFIER());
-        (bool ok, ) = boojumLane.staticcall(abi.encodeWithSignature("IS_TESTNET_VERIFIER()"));
-        assertFalse(ok, "Boojum lane must be the production router, not the testnet one");
+    /// The Boojum verifier must be the production router, not `EraTestnetVerifier`.
+    function test_boojumVerifierIsTheProductionRouter() public view {
+        (bool ok, ) = address(_verifier().BOOJUM_VERIFIER()).staticcall(
+            abi.encodeWithSignature("IS_TESTNET_VERIFIER()")
+        );
+        assertFalse(ok);
     }
 
-    /// Registering a further chain runs introspection against an already-registered, up-to-date chain — the
-    /// exact ordering that makes an introspection failure invisible on the first registration.
     function test_registeringASecondChainStillWorks() public {
         _deployZKChain(ETH_TOKEN_ADDRESS);
     }

@@ -395,9 +395,8 @@ library GatewayCTMDeployerHelper {
             true
         );
 
-        // DiamondInit. The Gateway flow deploys no Airbender verifier, so its chains start with that
-        // proof system disabled.
-        bytes memory diamondInitArgs = abi.encode(config.isZKsyncOS, false);
+        // DiamondInit
+        bytes memory diamondInitArgs = abi.encode(config.isZKsyncOS);
         (addresses.facets.diamondInit, data.diamondInitCalldata) = _calculateCreate2AddressAndCalldata(
             _create2Salt,
             "DiamondInit.sol",
@@ -631,7 +630,7 @@ library GatewayCTMDeployerHelper {
         }
     }
 
-    /// @dev The Gateway flow deploys no Airbender verifier; see `GatewayCTMDeployerVerifiers`.
+    /// @dev The Gateway flow deploys no Airbender verifier, so Gateway chains require Boojum only.
     function _deployEraChainVerifier(
         address _boojumVerifier,
         bool _testnetVerifier,
@@ -854,7 +853,6 @@ library GatewayCTMDeployerHelper {
                 verifierPlonk: _deployedContracts.stateTransition.verifiers.verifierPlonk,
                 // Gateway CTM deployment does not deploy an Airbender verifier.
                 airbenderVerifierPlonk: address(0),
-                airbenderLane: false,
                 boojumVerifier: address(0),
                 verifierOwner: _config.aliasedGovernanceAddress,
                 permissionlessValidator: address(0)
@@ -917,7 +915,7 @@ library GatewayCTMDeployerHelper {
     /// @notice Bytecodes required for Gateway CTM deployers on Era.
     // solhint-disable-next-line code-complexity
     function _gatewayCTMEraFactoryDependencies() private returns (bytes[] memory dependencies) {
-        uint256 totalDependencies = 27;
+        uint256 totalDependencies = 28;
         dependencies = new bytes[](totalDependencies);
         uint256 idx = 0;
 
@@ -950,8 +948,13 @@ library GatewayCTMDeployerHelper {
         );
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "EraVerifierFflonk.sol", "EraVerifierFflonk");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "EraVerifierPlonk.sol", "EraVerifierPlonk");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "EraTestnetVerifier.sol", "EraTestnetVerifier");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "EraDualVerifier.sol", "EraDualVerifier");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "EraMultiProofVerifier.sol", "EraMultiProofVerifier");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(
+            false,
+            "EraMultiProofTestnetVerifier.sol",
+            "EraMultiProofTestnetVerifier"
+        );
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "ServerNotifier.sol", "ServerNotifier");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "EraChainTypeManager.sol", "EraChainTypeManager");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Admin.sol", "AdminFacet");

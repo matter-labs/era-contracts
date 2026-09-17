@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {
-    AirbenderVerificationFailed,
-    BoojumVerificationFailed,
-    InvalidPublicInputsLength
-} from "contracts/common/L1ContractErrors.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMultiProofVerifier.sol";
@@ -16,97 +11,46 @@ import {
     AIRBENDER_PROOF_SYSTEM_MASK,
     AIRBENDER_SNARK_PROOF_LENGTH,
     BOOJUM_PROOF_SYSTEM_MASK,
-    DisabledProofSystems,
     ERA_MULTI_PROOF_TYPE
 } from "contracts/common/Config.sol";
 import {
+    AirbenderVerificationFailed,
+    BoojumVerificationFailed,
     EmptyProofLength,
     InvalidDisabledProofSystemsMask,
     InvalidProofFormat,
+    InvalidPublicInputsLength,
     UnknownVerifierType
 } from "contracts/common/L1ContractErrors.sol";
+import {ChainStub, RevealingVerifier, StubVerifier} from "./VerifierStubs.sol";
 
-/// @notice Records whether it was reached, and with which proof, without needing storage.
-contract LaneVerifier is IVerifier {
-    error Reached(uint256 firstProofWord, uint256 proofLength, uint256 publicInput);
-
-    bool internal immutable SHOULD_REVEAL;
-    bool internal immutable RESULT;
-
-    constructor(bool _shouldReveal, bool _result) {
-        SHOULD_REVEAL = _shouldReveal;
-        RESULT = _result;
-    }
-
-    function verify(uint256[] calldata _publicInputs, uint256[] calldata _proof) external view returns (bool) {
-        if (SHOULD_REVEAL) {
-            revert Reached(_proof.length == 0 ? type(uint256).max : _proof[0], _proof.length, _publicInputs[0]);
-        }
-        return RESULT;
-    }
-
-    function verificationKeyHash() external pure returns (bytes32) {
-        return bytes32(0);
-    }
-}
-
-/// @notice Chain stand-in answering the `disabledProofSystems` getter the verifier reads from its caller.
-contract ChainStub {
-    uint8 internal mask;
-
-    function setDisabledProofSystems(uint8 _mask) external {
-        mask = _mask;
-    }
-
-    function disabledProofSystems() external view returns (DisabledProofSystems memory) {
-        return
-            DisabledProofSystems({
-                boojum: mask & BOOJUM_PROOF_SYSTEM_MASK != 0,
-                airbender: mask & AIRBENDER_PROOF_SYSTEM_MASK != 0
-            });
-    }
-
-    function callVerify(
-        EraMultiProofVerifier _verifier,
-        uint256[] calldata _pi,
-        uint256[] calldata _proof
-    ) external view returns (bool) {
-        return _verifier.verify(_pi, _proof);
-    }
-}
-
-/// @notice Unit tests for the Era dual-prover gate.
-/// @dev Both proof systems are required unless the calling chain has switched one off. One verifier instance
-/// serves every chain of a protocol version, so the requirement is read from the caller, which is the chain's
-/// own diamond.
 contract EraMultiProofVerifierTest is Test {
-    EraMultiProofVerifier internal verifier;
-    LaneVerifier internal boojum;
-    LaneVerifier internal airbender;
-    ChainStub internal chain;
-
     uint256 internal constant BOOJUM_PUBLIC_INPUT = uint256(keccak256("boojum-transition-hash"));
-    /// Distinct from the Boojum word, so routing the wrong one to a lane is caught rather than
-    /// passing by coincidence.
     uint256 internal constant AIRBENDER_PUBLIC_INPUT = uint256(keccak256("airbender-transition-hash"));
     uint256 internal constant BOOJUM_SEGMENT_LENGTH = 3;
+    uint8 internal constant BOTH = BOOJUM_PROOF_SYSTEM_MASK | AIRBENDER_PROOF_SYSTEM_MASK;
+
+    StubVerifier internal boojum;
+    StubVerifier internal airbender;
+    StubVerifier internal rejecting;
+    EraMultiProofVerifier internal verifier;
+    ChainStub internal chain;
 
     function setUp() public {
-        boojum = new LaneVerifier(false, true);
-        airbender = new LaneVerifier(false, true);
+        boojum = new StubVerifier(true, keccak256("boojum-key"));
+        airbender = new StubVerifier(true, keccak256("airbender-key"));
+        rejecting = new StubVerifier(false, bytes32(0));
         verifier = new EraMultiProofVerifier(IVerifier(address(boojum)), IVerifier(address(airbender)));
         chain = new ChainStub();
     }
 
-    /// `[boojum, airbender]` — the two systems commit to different `auxiliaryOutputHash` values, so
-    /// a batch has a different transition hash under each.
     function _publicInputs() internal pure returns (uint256[] memory pi) {
         pi = new uint256[](2);
         pi[0] = BOOJUM_PUBLIC_INPUT;
         pi[1] = AIRBENDER_PUBLIC_INPUT;
     }
 
-    /// `[type, nBoojum, boojum..., airbender(44 words)]`
+    /// `[type, N, boojum(N words), airbender(44 words)]`
     function _proof(uint256 _boojumType, uint256 _boojumLength) internal pure returns (uint256[] memory proof) {
         proof = new uint256[](2 + _boojumLength + AIRBENDER_SNARK_PROOF_LENGTH);
         proof[0] = ERA_MULTI_PROOF_TYPE;
@@ -119,86 +63,64 @@ contract EraMultiProofVerifierTest is Test {
         }
     }
 
-    function _default() internal view returns (uint256[] memory) {
+    function _default() internal pure returns (uint256[] memory) {
         return _proof(1, BOOJUM_SEGMENT_LENGTH);
     }
 
-    function test_constructor_setsLanes() public view {
+    function _withAirbender(IVerifier _airbender) internal returns (EraMultiProofVerifier) {
+        return new EraMultiProofVerifier(IVerifier(address(boojum)), _airbender);
+    }
+
+    function _withBoojum(IVerifier _boojum) internal returns (EraMultiProofVerifier) {
+        return new EraMultiProofVerifier(_boojum, IVerifier(address(airbender)));
+    }
+
+    // ============ Verification ============
+
+    function test_constructor_setsVerifiers() public view {
         assertEq(address(verifier.BOOJUM_VERIFIER()), address(boojum));
         assertEq(address(verifier.AIRBENDER_VERIFIER()), address(airbender));
     }
 
-    function test_acceptsWhenBothLanesAccept() public view {
+    function test_acceptsWhenBothAccept() public view {
         assertTrue(chain.callVerify(verifier, _publicInputs(), _default()));
     }
 
-    /// One lane rejecting must fail the batch even though the other accepted.
     function test_revertsWhenBoojumRejects() public {
-        EraMultiProofVerifier v = new EraMultiProofVerifier(
-            IVerifier(address(new LaneVerifier(false, false))),
-            IVerifier(address(airbender))
-        );
+        EraMultiProofVerifier v = _withBoojum(IVerifier(address(rejecting)));
         vm.expectRevert(BoojumVerificationFailed.selector);
         chain.callVerify(v, _publicInputs(), _default());
     }
 
     function test_revertsWhenAirbenderRejects() public {
-        EraMultiProofVerifier v = new EraMultiProofVerifier(
-            IVerifier(address(boojum)),
-            IVerifier(address(new LaneVerifier(false, false)))
-        );
+        EraMultiProofVerifier v = _withAirbender(IVerifier(address(rejecting)));
         vm.expectRevert(AirbenderVerificationFailed.selector);
         chain.callVerify(v, _publicInputs(), _default());
     }
 
-    /// One word per proof system, whatever the mask: a disabled system's word rides along unverified.
-    /// The Executor always builds two for Era, but the verifier is deployed independently and enforces
-    /// its own envelope.
-    function test_revertsOnWrongPublicInputCount() public {
-        uint256[] memory tooFew = new uint256[](1);
-        tooFew[0] = BOOJUM_PUBLIC_INPUT;
-        vm.expectRevert(InvalidPublicInputsLength.selector);
-        chain.callVerify(verifier, tooFew, _default());
-
-        chain.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
-        vm.expectRevert(InvalidPublicInputsLength.selector);
-        chain.callVerify(verifier, tooFew, _default());
-        chain.setDisabledProofSystems(0);
-
-        uint256[] memory tooMany = new uint256[](3);
-        tooMany[0] = BOOJUM_PUBLIC_INPUT;
-        tooMany[1] = AIRBENDER_PUBLIC_INPUT;
-        vm.expectRevert(InvalidPublicInputsLength.selector);
-        chain.callVerify(verifier, tooMany, _default());
-    }
-
-    function test_passesFirstPublicInputToBoojum() public {
-        EraMultiProofVerifier v = new EraMultiProofVerifier(
-            IVerifier(address(new LaneVerifier(true, true))),
-            IVerifier(address(airbender))
-        );
+    function test_passesFirstPublicInputAndBoojumSegmentToBoojum() public {
+        EraMultiProofVerifier v = _withBoojum(IVerifier(address(new RevealingVerifier())));
         vm.expectRevert(
             abi.encodeWithSelector(
-                LaneVerifier.Reached.selector,
-                uint256(1),
-                BOOJUM_SEGMENT_LENGTH,
-                BOOJUM_PUBLIC_INPUT
+                RevealingVerifier.Revealed.selector,
+                BOOJUM_PUBLIC_INPUT,
+                1,
+                1,
+                BOOJUM_SEGMENT_LENGTH
             )
         );
         chain.callVerify(v, _publicInputs(), _default());
     }
 
-    function test_passesSecondPublicInputToAirbender() public {
-        EraMultiProofVerifier v = new EraMultiProofVerifier(
-            IVerifier(address(boojum)),
-            IVerifier(address(new LaneVerifier(true, true)))
-        );
+    function test_passesSecondPublicInputAndAirbenderSegmentToAirbender() public {
+        EraMultiProofVerifier v = _withAirbender(IVerifier(address(new RevealingVerifier())));
         vm.expectRevert(
             abi.encodeWithSelector(
-                LaneVerifier.Reached.selector,
-                uint256(0xa0),
-                AIRBENDER_SNARK_PROOF_LENGTH,
-                AIRBENDER_PUBLIC_INPUT
+                RevealingVerifier.Revealed.selector,
+                AIRBENDER_PUBLIC_INPUT,
+                1,
+                0xa0,
+                AIRBENDER_SNARK_PROOF_LENGTH
             )
         );
         chain.callVerify(v, _publicInputs(), _default());
@@ -207,34 +129,64 @@ contract EraMultiProofVerifierTest is Test {
     // ============ Disabled proof systems ============
 
     function test_skipsAirbenderWhenChainDisabledIt() public {
-        EraMultiProofVerifier v = new EraMultiProofVerifier(
-            IVerifier(address(boojum)),
-            IVerifier(address(new LaneVerifier(false, false)))
-        );
+        EraMultiProofVerifier v = _withAirbender(IVerifier(address(rejecting)));
         chain.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
         assertTrue(chain.callVerify(v, _publicInputs(), _default()));
     }
 
     function test_skipsBoojumWhenChainDisabledIt() public {
-        EraMultiProofVerifier v = new EraMultiProofVerifier(
-            IVerifier(address(new LaneVerifier(false, false))),
-            IVerifier(address(airbender))
-        );
+        EraMultiProofVerifier v = _withBoojum(IVerifier(address(rejecting)));
         chain.setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_MASK);
         assertTrue(chain.callVerify(v, _publicInputs(), _proof(1, 0)));
     }
 
-    /// A chain that never set a policy must require both.
-    function test_defaultPolicyRequiresBothLanes() public {
-        EraMultiProofVerifier v = new EraMultiProofVerifier(
-            IVerifier(address(boojum)),
-            IVerifier(address(new LaneVerifier(false, false)))
-        );
+    function test_revertsWhenChainDisabledEverything() public {
+        chain.setDisabledProofSystems(BOTH);
+        vm.expectRevert(abi.encodeWithSelector(InvalidDisabledProofSystemsMask.selector, BOTH));
+        chain.callVerify(verifier, _publicInputs(), _default());
+    }
+
+    /// The mask is read from `msg.sender` on every call.
+    function test_maskIsReadPerCallingChain() public {
+        EraMultiProofVerifier v = _withAirbender(IVerifier(address(rejecting)));
+        ChainStub airbenderDisabled = new ChainStub();
+        airbenderDisabled.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
+
         vm.expectRevert(AirbenderVerificationFailed.selector);
+        chain.callVerify(v, _publicInputs(), _default());
+        assertTrue(airbenderDisabled.callVerify(v, _publicInputs(), _default()));
+    }
+
+    /// A CTM deployed without an Airbender verifier requires Boojum only, and Boojum cannot then be disabled.
+    function test_unwiredVerifierIsNotRequired() public {
+        EraMultiProofVerifier v = _withAirbender(IVerifier(address(0)));
+        assertEq(v.supportedProofSystems(), BOOJUM_PROOF_SYSTEM_MASK);
+        assertEq(v.requiredProofSystems(0), BOOJUM_PROOF_SYSTEM_MASK);
+        assertTrue(chain.callVerify(v, _publicInputs(), _default()));
+
+        chain.setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_MASK);
+        vm.expectRevert(abi.encodeWithSelector(InvalidDisabledProofSystemsMask.selector, BOOJUM_PROOF_SYSTEM_MASK));
         chain.callVerify(v, _publicInputs(), _default());
     }
 
-    // ============ Envelope discipline ============
+    // ============ Envelope ============
+
+    /// Two public inputs regardless of the mask.
+    function test_revertsOnWrongPublicInputCount() public {
+        uint256[] memory one = new uint256[](1);
+        one[0] = BOOJUM_PUBLIC_INPUT;
+        vm.expectRevert(InvalidPublicInputsLength.selector);
+        chain.callVerify(verifier, one, _default());
+
+        chain.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
+        vm.expectRevert(InvalidPublicInputsLength.selector);
+        chain.callVerify(verifier, one, _default());
+        chain.setDisabledProofSystems(0);
+
+        uint256[] memory three = new uint256[](3);
+        vm.expectRevert(InvalidPublicInputsLength.selector);
+        chain.callVerify(verifier, three, _default());
+    }
 
     function test_revertsOnEmptyProof() public {
         vm.expectRevert(EmptyProofLength.selector);
@@ -244,19 +196,10 @@ contract EraMultiProofVerifierTest is Test {
     function test_revertsOnUnknownProofType() public {
         uint256[] memory proof = _default();
         proof[0] = ERA_MULTI_PROOF_TYPE + 1;
-        vm.expectRevert(abi.encodeWithSelector(UnknownVerifierType.selector));
+        vm.expectRevert(UnknownVerifierType.selector);
         chain.callVerify(verifier, _publicInputs(), proof);
     }
 
-    /// Bits above the type byte are reserved, so a header carrying data in them is refused.
-    function test_revertsOnReservedHeaderBits() public {
-        uint256[] memory proof = _default();
-        proof[0] = ERA_MULTI_PROOF_TYPE | (uint256(1) << 8);
-        vm.expectRevert(InvalidProofFormat.selector);
-        chain.callVerify(verifier, _publicInputs(), proof);
-    }
-
-    /// The Airbender slot is fixed-length, so the envelope length is exact — no trailing bytes.
     function test_revertsOnWrongEnvelopeLength() public {
         uint256[] memory proof = _default();
         uint256[] memory tooLong = new uint256[](proof.length + 1);
@@ -265,24 +208,19 @@ contract EraMultiProofVerifierTest is Test {
         }
         vm.expectRevert(InvalidProofFormat.selector);
         chain.callVerify(verifier, _publicInputs(), tooLong);
+
+        uint256[] memory tooShort = new uint256[](2 + AIRBENDER_SNARK_PROOF_LENGTH - 1);
+        tooShort[0] = ERA_MULTI_PROOF_TYPE;
+        vm.expectRevert(InvalidProofFormat.selector);
+        chain.callVerify(verifier, _publicInputs(), tooShort);
+
+        uint256[] memory headerOnly = new uint256[](1);
+        headerOnly[0] = ERA_MULTI_PROOF_TYPE;
+        vm.expectRevert(InvalidProofFormat.selector);
+        chain.callVerify(verifier, _publicInputs(), headerOnly);
     }
 
-    /// The Boojum segment must not accept an Airbender-typed proof. Asserted against the real
-    /// `EraDualVerifier` rather than a stand-in: a stub that reimplements the type check would pass even if
-    /// the production router had started accepting type 2.
-    function test_boojumSegmentCannotCarryAirbenderType() public {
-        EraDualVerifier router = new EraDualVerifier(
-            IVerifierV2(address(new LaneVerifier(false, true))),
-            IVerifier(address(new LaneVerifier(false, true)))
-        );
-        EraMultiProofVerifier v = new EraMultiProofVerifier(IVerifier(address(router)), IVerifier(address(airbender)));
-
-        vm.expectRevert(UnknownVerifierType.selector);
-        chain.callVerify(v, _publicInputs(), _proof(2, BOOJUM_SEGMENT_LENGTH));
-    }
-
-    /// A declared Boojum length that would overflow a naive `2 + N + 44` must surface as the envelope
-    /// error, not a checked-arithmetic panic.
+    /// A declared Boojum length that would overflow `2 + N + 44` is an envelope error, not an arithmetic panic.
     function test_revertsOnOutOfRangeBoojumLength() public {
         uint256[] memory proof = _default();
         proof[1] = type(uint256).max;
@@ -290,130 +228,46 @@ contract EraMultiProofVerifierTest is Test {
         chain.callVerify(verifier, _publicInputs(), proof);
     }
 
-    function test_revertsOnEnvelopeShorterThanAirbenderSlot() public {
-        uint256[] memory proof = new uint256[](2 + AIRBENDER_SNARK_PROOF_LENGTH - 1);
-        proof[0] = ERA_MULTI_PROOF_TYPE;
-        proof[1] = 0;
-        vm.expectRevert(InvalidProofFormat.selector);
-        chain.callVerify(verifier, _publicInputs(), proof);
+    /// Uses the real `EraDualVerifier`: an Airbender-typed proof is not routable through the Boojum segment,
+    /// and an empty Boojum segment is refused while Boojum is required.
+    function test_boojumSegmentGoesThroughTheRealRouter() public {
+        EraDualVerifier router = new EraDualVerifier(IVerifierV2(address(boojum)), IVerifier(address(boojum)));
+        EraMultiProofVerifier v = _withBoojum(IVerifier(address(router)));
+
+        vm.expectRevert(UnknownVerifierType.selector);
+        chain.callVerify(v, _publicInputs(), _proof(2, BOOJUM_SEGMENT_LENGTH));
+
+        vm.expectRevert(EmptyProofLength.selector);
+        chain.callVerify(v, _publicInputs(), _proof(1, 0));
     }
 
-    function test_revertsOnHeaderOnlyProof() public {
-        uint256[] memory proof = new uint256[](1);
-        proof[0] = ERA_MULTI_PROOF_TYPE;
-        vm.expectRevert(InvalidProofFormat.selector);
-        chain.callVerify(verifier, _publicInputs(), proof);
-    }
+    // ============ Discovery ============
 
-    /// The gate must never accept a batch it verified nothing for, even if a both-disabled mask somehow
-    /// reaches storage past the Admin setter's guard.
-    function test_revertsWhenChainDisabledEverything() public {
-        chain.setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_MASK | AIRBENDER_PROOF_SYSTEM_MASK);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                InvalidDisabledProofSystemsMask.selector,
-                BOOJUM_PROOF_SYSTEM_MASK | AIRBENDER_PROOF_SYSTEM_MASK
-            )
-        );
-        chain.callVerify(verifier, _publicInputs(), _default());
-    }
-
-    // ---------------------------------------------------------------------------------------------
-    // Policy discovery
-    // ---------------------------------------------------------------------------------------------
-
-    function test_reportsBothSystemsSupported() public view {
-        assertEq(verifier.supportedProofSystems(), BOOJUM_PROOF_SYSTEM_MASK | AIRBENDER_PROOF_SYSTEM_MASK);
-    }
-
-    /// A lane left unwired is missing, not merely off, so it drops out of the capability answer. This is
-    /// what `Admin` reads before letting a chain declare itself multi-proof.
-    function test_unwiredLaneIsNotReportedAsSupported() public {
-        EraMultiProofVerifier noAirbender = new EraMultiProofVerifier(
-            IVerifier(address(boojum)),
-            IVerifier(address(0))
-        );
-        assertEq(noAirbender.supportedProofSystems(), BOOJUM_PROOF_SYSTEM_MASK);
-    }
-
-    /// Requirement comes from the pair the gate is built to check, not from what is wired, so an unwired
-    /// lane stays required rather than being skipped by `verify`.
-    function test_unwiredLaneStaysRequired() public {
-        EraMultiProofVerifier noAirbender = new EraMultiProofVerifier(
-            IVerifier(address(boojum)),
-            IVerifier(address(0))
-        );
-        assertEq(noAirbender.requiredProofSystems(0), BOOJUM_PROOF_SYSTEM_MASK | AIRBENDER_PROOF_SYSTEM_MASK);
-    }
-
-    function test_requiredSystemsFollowTheMask() public view {
-        assertEq(
-            verifier.requiredProofSystems(0),
-            BOOJUM_PROOF_SYSTEM_MASK | AIRBENDER_PROOF_SYSTEM_MASK,
-            "an empty mask requires both"
-        );
-        assertEq(
-            verifier.requiredProofSystems(AIRBENDER_PROOF_SYSTEM_MASK),
-            BOOJUM_PROOF_SYSTEM_MASK,
-            "masking Airbender leaves Boojum"
-        );
-        assertEq(
-            verifier.requiredProofSystems(BOOJUM_PROOF_SYSTEM_MASK),
-            AIRBENDER_PROOF_SYSTEM_MASK,
-            "masking Boojum leaves Airbender"
-        );
-    }
-
-    /// Discovery refuses the mask settlement refuses, so a caller is never told a policy the gate would
-    /// not honour.
-    function test_requiredSystemsRejectsTheAllDisabledMask() public {
-        uint8 mask = BOOJUM_PROOF_SYSTEM_MASK | AIRBENDER_PROOF_SYSTEM_MASK;
-        vm.expectRevert(abi.encodeWithSelector(InvalidDisabledProofSystemsMask.selector, mask));
-        verifier.requiredProofSystems(mask);
-    }
-
-    /// Installing the gate as a chain's verifier must not remove typed key discovery: tooling reads
-    /// both lanes' keys off `verificationKeyHash(type)` on whatever the chain points at. Discovery is
-    /// not acceptance — the Airbender key is readable while an Airbender proof is still not routable
-    /// through the Boojum segment.
-    function test_reportsBothLaneKeysByType() public {
-        EraDualVerifier boojumRouter = new EraDualVerifier(
-            IVerifierV2(address(new LaneVerifier(false, true))),
-            IVerifier(address(new LaneVerifier(false, true)))
-        );
-        LaneVerifier airbenderLane = new LaneVerifier(false, true);
-        EraMultiProofVerifier gate = new EraMultiProofVerifier(
-            IVerifier(address(boojumRouter)),
-            IVerifier(address(airbenderLane))
-        );
-
-        assertEq(gate.verificationKeyHash(0), boojumRouter.verificationKeyHash(0), "FFLONK key");
-        assertEq(gate.verificationKeyHash(1), boojumRouter.verificationKeyHash(1), "PLONK key");
-        assertEq(gate.verificationKeyHash(2), airbenderLane.verificationKeyHash(), "Airbender key");
-    }
-
-    function test_reportsAcceptedProofType() public view {
+    function test_reportsPolicy() public view {
+        assertEq(verifier.supportedProofSystems(), BOTH);
+        assertEq(verifier.requiredProofSystems(0), BOTH);
+        assertEq(verifier.requiredProofSystems(AIRBENDER_PROOF_SYSTEM_MASK), BOOJUM_PROOF_SYSTEM_MASK);
+        assertEq(verifier.requiredProofSystems(BOOJUM_PROOF_SYSTEM_MASK), AIRBENDER_PROOF_SYSTEM_MASK);
         assertEq(verifier.acceptedProofType(), ERA_MULTI_PROOF_TYPE);
     }
 
-    /// One verifier instance serves every chain, so a mask belongs to the chain that set it. Caching it in
-    /// the verifier would pass every other test here and hand one chain's policy to all of them.
-    function test_maskIsReadPerCallingChain() public {
-        EraMultiProofVerifier shared = new EraMultiProofVerifier(
-            IVerifier(address(new LaneVerifier(false, true))),
-            IVerifier(address(new LaneVerifier(false, false)))
-        );
+    function test_requiredSystemsRejectsTheAllDisabledMask() public {
+        vm.expectRevert(abi.encodeWithSelector(InvalidDisabledProofSystemsMask.selector, BOTH));
+        verifier.requiredProofSystems(BOTH);
+    }
 
-        ChainStub requiresBoth = new ChainStub();
-        ChainStub airbenderMasked = new ChainStub();
-        airbenderMasked.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
+    /// `verificationKeyHash(type)`: 0 and 1 from the Boojum router, 2 from Airbender.
+    function test_reportsKeysByType() public {
+        StubVerifier fflonk = new StubVerifier(true, keccak256("fflonk-key"));
+        StubVerifier plonk = new StubVerifier(true, keccak256("plonk-key"));
+        EraDualVerifier router = new EraDualVerifier(IVerifierV2(address(fflonk)), IVerifier(address(plonk)));
+        EraMultiProofVerifier v = _withBoojum(IVerifier(address(router)));
 
-        vm.expectRevert(AirbenderVerificationFailed.selector);
-        requiresBoth.callVerify(shared, _publicInputs(), _default());
-
-        assertTrue(
-            airbenderMasked.callVerify(shared, _publicInputs(), _default()),
-            "the other chain's mask must not follow the verifier"
-        );
+        assertEq(v.verificationKeyHash(), router.verificationKeyHash());
+        assertEq(v.verificationKeyHash(0), keccak256("fflonk-key"));
+        assertEq(v.verificationKeyHash(1), keccak256("plonk-key"));
+        assertEq(v.verificationKeyHash(2), keccak256("airbender-key"));
+        assertEq(address(v.FFLONK_VERIFIER()), address(fflonk));
+        assertEq(address(v.PLONK_VERIFIER()), address(plonk));
     }
 }

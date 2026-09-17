@@ -17,6 +17,7 @@ interface IEraMultiProofVerifier {
     function supportedProofSystems() external view returns (uint8);
 
     /// @notice Mask of the proof systems a batch must be proved against under `_disabledProofSystems`.
+    /// @dev Reverts if that would leave no proof system.
     function requiredProofSystems(uint8 _disabledProofSystems) external view returns (uint8);
 
     /// @notice The proof type accepted in `_proof[0]`.

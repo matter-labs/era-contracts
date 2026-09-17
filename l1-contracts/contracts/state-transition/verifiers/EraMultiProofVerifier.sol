@@ -20,7 +20,6 @@ import {
 import {
     AIRBENDER_PROOF_SYSTEM_MASK,
     AIRBENDER_SNARK_PROOF_LENGTH,
-    ALL_PROOF_SYSTEMS_DISABLED,
     BOOJUM_PROOF_SYSTEM_MASK,
     DisabledProofSystems,
     ERA_MULTI_PROOF_TYPE
@@ -29,8 +28,8 @@ import {
 /// @title Era Multi-Proof Verifier
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Requires both a Boojum proof and an Airbender proof for each Era batch, unless the calling
-/// chain has disabled one of the proof systems.
+/// @notice Requires a proof from every proof system it has a verifier for, unless the calling chain has
+/// disabled one of them.
 /// @dev Proof layout: `[ERA_MULTI_PROOF_TYPE, N, boojumProof(N words), airbenderProof(44 words)]`, where the
 /// Boojum sub-proof is what `EraDualVerifier` accepts. Public inputs: `[boojum, airbender]`, one per system.
 contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVerifier {
@@ -43,9 +42,6 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
     /// @dev Proof type under which `verificationKeyHash(uint256)` reports the Airbender key.
     uint256 internal constant AIRBENDER_VERIFICATION_TYPE = 2;
 
-    /// @dev Both systems are required by default.
-    uint8 internal constant ALL_PROOF_SYSTEMS = BOOJUM_PROOF_SYSTEM_MASK | AIRBENDER_PROOF_SYSTEM_MASK;
-
     constructor(IVerifier _boojumVerifier, IVerifier _airbenderVerifier) {
         BOOJUM_VERIFIER = _boojumVerifier;
         AIRBENDER_VERIFIER = _airbenderVerifier;
@@ -56,10 +52,7 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
         if (_proof.length == 0) {
             revert EmptyProofLength();
         }
-        if (_proof[0] >> 8 != 0) {
-            revert InvalidProofFormat();
-        }
-        if ((_proof[0] & 255) != ERA_MULTI_PROOF_TYPE) {
+        if (_proof[0] != ERA_MULTI_PROOF_TYPE) {
             revert UnknownVerifierType();
         }
         if (_proof.length < 2 + AIRBENDER_SNARK_PROOF_LENGTH) {
@@ -73,17 +66,13 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
             revert InvalidPublicInputsLength();
         }
 
-        // One verifier serves every chain of a protocol version, so the policy is read from the caller.
+        // The per-chain policy lives on the calling diamond.
         DisabledProofSystems memory disabled = IGetters(msg.sender).disabledProofSystems();
         uint8 disabledMask = (disabled.boojum ? BOOJUM_PROOF_SYSTEM_MASK : 0) |
             (disabled.airbender ? AIRBENDER_PROOF_SYSTEM_MASK : 0);
         uint8 required = requiredProofSystems(disabledMask);
 
         if (required & BOOJUM_PROOF_SYSTEM_MASK != 0) {
-            // A testnet Boojum verifier would accept an empty proof.
-            if (boojumLength == 0) {
-                revert BoojumVerificationFailed();
-            }
             if (!BOOJUM_VERIFIER.verify(_publicInputs[0:1], _proof[2:2 + boojumLength])) {
                 revert BoojumVerificationFailed();
             }
@@ -99,23 +88,21 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
     }
 
     /// @inheritdoc IEraMultiProofVerifier
-    function supportedProofSystems() external view returns (uint8) {
-        uint8 supported;
+    function supportedProofSystems() public view returns (uint8 supported) {
         if (address(BOOJUM_VERIFIER) != address(0)) {
             supported |= BOOJUM_PROOF_SYSTEM_MASK;
         }
         if (address(AIRBENDER_VERIFIER) != address(0)) {
             supported |= AIRBENDER_PROOF_SYSTEM_MASK;
         }
-        return supported;
     }
 
     /// @inheritdoc IEraMultiProofVerifier
-    function requiredProofSystems(uint8 _disabledProofSystems) public pure returns (uint8) {
-        if (_disabledProofSystems >= ALL_PROOF_SYSTEMS_DISABLED) {
+    function requiredProofSystems(uint8 _disabledProofSystems) public view returns (uint8 required) {
+        required = supportedProofSystems() & ~_disabledProofSystems;
+        if (required == 0) {
             revert InvalidDisabledProofSystemsMask(_disabledProofSystems);
         }
-        return ALL_PROOF_SYSTEMS & ~_disabledProofSystems;
     }
 
     /// @inheritdoc IEraMultiProofVerifier
@@ -136,7 +123,7 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
     }
 
     /// @inheritdoc IVerifier
-    /// @dev Reports the Boojum key, as Era chain verifiers always have.
+    /// @dev Reports the Boojum key.
     function verificationKeyHash() external view returns (bytes32) {
         return BOOJUM_VERIFIER.verificationKeyHash();
     }

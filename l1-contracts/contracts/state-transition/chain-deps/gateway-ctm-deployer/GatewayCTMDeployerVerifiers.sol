@@ -48,7 +48,7 @@ contract GatewayCTMDeployerVerifiers {
             new EraDualVerifier{salt: salt}(IVerifierV2(result.verifierFflonk), IVerifier(result.verifierPlonk))
         );
 
-        // No Airbender verifier is deployed on Gateway; `DiamondInit` disables that proof system.
+        // No Airbender verifier is deployed on Gateway, so Gateway chains require Boojum only.
         if (_config.testnetVerifier) {
             result.verifier = address(
                 new EraMultiProofTestnetVerifier{salt: salt}(IVerifier(result.boojumVerifier), IVerifier(address(0)))

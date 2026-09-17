@@ -245,9 +245,7 @@ contract ZKChainBase is ReentrancyGuard {
     /// @dev Checks that the batch hash is correct and matches the expected hash.
     /// @param _lastCommittedBatchData The last committed batch.
     /// @param _batchNumber The batch number to check.
-    /// @param _checkLegacy Whether the batch may authenticate under an older hash form. Only a
-    /// predecessor may: every batch proved or executed was committed under the current form, since
-    /// each upgrade that changed it required a drained pipeline.
+    /// @param _checkLegacy Whether the batch may also match an older `StoredBatchInfo` encoding (predecessors only).
     function _checkBatchHashMismatch(
         IExecutor.StoredBatchInfo memory _lastCommittedBatchData,
         uint256 _batchNumber,

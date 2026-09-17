@@ -10,8 +10,7 @@ import {CommitBatchInfo} from "../../state-transition/chain-interfaces/ICommitte
 contract CommitterProvingTest is CommitterFacet {
     constructor() CommitterFacet(block.chainid) {}
 
-    /// @dev Test-only configuration. `_batchMetaParameters` and the commitment derivation read these
-    /// from diamond storage, which a test would otherwise have to write by raw slot.
+    /// @dev Test-only setter for the meta-parameter storage.
     function setBatchMetaParameters(
         bool _zkPorterIsAvailable,
         bytes32 _bootloaderHash,
@@ -39,8 +38,7 @@ contract CommitterProvingTest is CommitterFacet {
         return commitment;
     }
 
-    /// @dev The Airbender-shape commitment the same call produces, so equivalence tests can pin the
-    /// production derivation against externally recorded vectors rather than a copy of it.
+    /// @dev Exposes the Airbender commitment for equivalence tests.
     function createAirbenderBatchCommitment(
         CommitBatchInfo calldata _newBatchData,
         bytes32 _stateDiffHash,

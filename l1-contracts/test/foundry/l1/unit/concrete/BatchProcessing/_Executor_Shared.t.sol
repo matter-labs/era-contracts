@@ -291,10 +291,8 @@ contract ExecutorTest is UtilsCallMockerTest {
             abi.encodeWithSelector(IChainTypeManager.protocolVersionIsActive.selector),
             abi.encode(bool(true))
         );
-        DiamondInit diamondInit = new DiamondInit(isZKsyncOS(), true);
-        // What an Era chain runs: the multi-proof verifier over the Boojum router, here the testnet
-        // variant so an empty proof settles. No Airbender lane is wired, and none of these suites
-        // sends a non-empty proof without installing its own verifier first.
+        DiamondInit diamondInit = new DiamondInit(isZKsyncOS());
+        // Testnet multi-proof verifier over a Boojum router, so an empty proof settles.
         EraMultiProofTestnetVerifier testnetVerifier = new EraMultiProofTestnetVerifier(
             IVerifier(address(new EraDualVerifier(IVerifierV2(address(0)), IVerifier(address(0))))),
             IVerifier(address(0))
@@ -380,8 +378,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             selectors: getMailboxSelectors()
         });
 
-        // Lets a test reach chain state that no legitimate call can produce — a fabricated stored batch
-        // hash, say — through Solidity rather than raw slot arithmetic.
+        // Test-only state setters.
         facetCuts[5] = Diamond.FacetCut({
             facet: address(new UtilsFacet()),
             action: Diamond.Action.Add,

@@ -59,7 +59,7 @@ contract UpgradeLogicTest is DiamondCutTest {
         DummyBridgehub dummyBridgehub = new DummyBridgehub();
 
         diamondCutTestContract = new DiamondCutTestContract();
-        diamondInit = new DiamondInit(false, true);
+        diamondInit = new DiamondInit(false);
         adminFacet = new AdminFacet(block.chainid, RollupDAManager(address(0)));
         gettersFacet = new GettersFacet();
         permissionlessValidator = new PermissionlessValidator();

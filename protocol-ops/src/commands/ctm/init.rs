@@ -210,10 +210,10 @@ pub async fn ctm_init(
 pub struct CtmInitInput {
     pub bridgehub: Address,
     pub owner: Address,
-    pub with_airbender_verifier: bool,
     pub vm_type: VMOption,
     pub reuse_gov_and_admin: bool,
     pub with_testnet_verifier: bool,
+    pub with_airbender_verifier: bool,
     pub with_legacy_bridge: bool,
     pub zk_token_asset_id: Option<B256>,
     pub create2_factory_salt: Option<B256>,

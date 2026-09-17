@@ -14,6 +14,10 @@ contract DummyEraSettlementLayerV33Upgrade is EraSettlementLayerV33Upgrade, Base
         s.zksyncOS = _zksyncOS;
     }
 
+    function setDisabledProofSystems(uint8 _mask) public {
+        s.disabledProofSystems = _mask;
+    }
+
     function getDisabledProofSystems() public view returns (uint8) {
         return s.disabledProofSystems;
     }
@@ -43,11 +47,11 @@ contract EraSettlementLayerV33UpgradeTest is BaseUpgrade {
         upgradeContract.mockProtocolVersionVerifier(protocolVersion, mockVerifier);
     }
 
-    /// `disabledProofSystems` is new in this version and reads zero, which requires both proof systems.
-    function test_leavesBothProofSystemsRequired() public {
+    function test_doesNotTouchTheProofSystemMask() public {
+        upgradeContract.setDisabledProofSystems(2);
         upgradeContract.upgrade(proposedUpgrade);
 
-        assertEq(upgradeContract.getDisabledProofSystems(), 0);
+        assertEq(upgradeContract.getDisabledProofSystems(), 2);
     }
 
     /// A batch committed before the upgrade carries no Airbender commitment and could not be proved.

@@ -11,6 +11,7 @@ import {DummyChainTypeManager} from "contracts/dev-contracts/test/DummyChainType
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DummyChainAssetHandler} from "contracts/dev-contracts/test/DummyChainAssetHandler.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {AIRBENDER_PROOF_SYSTEM_MASK} from "contracts/common/Config.sol";
 import {
     CutDataForProtocolVersionNotAvailable,
     InvalidProtocolVersion,
@@ -163,8 +164,8 @@ contract ServerNotifierTest is Test {
     function test_notifyProofSystemStatusEmitsEvent() public {
         vm.startPrank(chainAdmin);
         vm.expectEmit(true, false, false, true, address(serverNotifier));
-        emit IServerNotifier.ProofSystemStatusNotified(chainId, 2);
-        serverNotifier.notifyProofSystemStatus(chainId, 2);
+        emit IServerNotifier.ProofSystemStatusNotified(chainId, AIRBENDER_PROOF_SYSTEM_MASK);
+        serverNotifier.notifyProofSystemStatus(chainId, AIRBENDER_PROOF_SYSTEM_MASK);
         vm.stopPrank();
     }
 
@@ -173,7 +174,7 @@ contract ServerNotifierTest is Test {
 
         vm.startPrank(alice);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, alice));
-        serverNotifier.notifyProofSystemStatus(chainId, 2);
+        serverNotifier.notifyProofSystemStatus(chainId, AIRBENDER_PROOF_SYSTEM_MASK);
         vm.stopPrank();
     }
 

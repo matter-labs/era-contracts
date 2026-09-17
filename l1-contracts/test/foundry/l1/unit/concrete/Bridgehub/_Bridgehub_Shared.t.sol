@@ -20,7 +20,7 @@ contract BridgehubTest is Test {
         NON_GOVERNOR = makeAddr("NON_GOVERNOR");
 
         vm.chainId(31337);
-        bridgehubDiamondInit = new DiamondInit(false, true);
+        bridgehubDiamondInit = new DiamondInit(false);
 
         bridgehub = new DiamondProxy(block.chainid, getDiamondCutData(address(bridgehubDiamondInit)));
     }
