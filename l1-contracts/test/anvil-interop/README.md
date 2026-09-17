@@ -22,8 +22,8 @@ Every L2 chain is registered as an interop peer of every other L2 chain.
 ## Quick Start
 
 ```bash
-# From contracts/l1-contracts/ — run all tests with pregenerated state (~85s)
-cd contracts/l1-contracts
+# From the repository root — run all tests with pregenerated state (~85s)
+cd l1-contracts
 yarn test:hardhat:interop
 
 # Force full deployment from scratch (~5 min)
@@ -35,18 +35,18 @@ yarn test:hardhat:interop --keep-chains
 
 ## Pregenerated Chain States
 
-Tests load pregenerated Anvil snapshots from `chain-states/v0.35.0/` by default (the current protocol version, configured as `stateVersion` in `config/anvil-config.json`). This skips the full deployment and cuts test time from ~5 min to ~85s.
+Tests load pregenerated Anvil snapshots from `chain-states/v0.35.0/` by default (the current snapshot version, configured as `stateVersion` in `config/anvil-config.json`). This skips the full deployment and cuts test time from ~5 min to ~85s.
 
-The runner auto-detects pregenerated state by checking for `chain-states/<protocol-version>/addresses.json`. If found, it gunzips each `<chainId>.json.gz` dump and starts each Anvil process with `--load-state`. If not found (or `ANVIL_INTEROP_FRESH_DEPLOY=1`), it runs the full deployment.
+The runner auto-detects pregenerated state by checking for `chain-states/<state-version>/addresses.json`. If found, it gunzips each `<chainId>.json.gz` dump and starts each Anvil process with `--load-state`. If not found (or `ANVIL_INTEROP_FRESH_DEPLOY=1`), it runs the full deployment.
 
-Only the directory for the current protocol version, selected by `stateVersion`, is regenerated. Upgrade scenarios select their frozen source fixture explicitly; those fixtures must not be regenerated from current contracts.
+Only the current snapshot directory, selected by `stateVersion`, is regenerated. Upgrade scenarios select their frozen source fixture explicitly; those fixtures must not be regenerated from current contracts.
 
 The per-chain state dumps are committed **gzip-compressed** (`<chainId>.json.gz`). These snapshots are multi-MB; storing them as raw JSON floods every regeneration with an enormous, unreviewable diff. GitHub renders `.gz` as binary ("Binary file not shown"), keeping them out of PR diffs, and gzip shrinks them ~10x. `addresses.json` stays plain text so contract-address changes remain reviewable. Compression/decompression is handled automatically by `dumpAllStates()` / `loadChainStates()` in `deployment-runner.ts` — no manual step.
 
 To regenerate pregenerated state after contract changes:
 
 ```bash
-cd contracts/l1-contracts/test/anvil-interop
+cd l1-contracts/test/anvil-interop
 yarn setup-and-dump
 ```
 
@@ -58,9 +58,9 @@ After running once with `--keep-chains`, the Anvil chains and deployment state p
 
 ```bash
 # Run all test specs (no redeployment)
-cd contracts/l1-contracts
+cd l1-contracts
 ANVIL_INTEROP_SKIP_SETUP=1 ANVIL_INTEROP_SKIP_CLEANUP=1 \
-  yarn hardhat test test/anvil-interop/test/hardhat/0*.spec.ts \
+  yarn hardhat test test/anvil-interop/test/hardhat/*.spec.ts \
   --network hardhat --no-compile
 
 # Run a single spec file
@@ -86,7 +86,7 @@ deploys a fresh L1 `TestnetERC20Token`, mints it to `LIVE_SOURCE_PRIVATE_KEY`, d
 `L2NativeTokenVault` at execution time.
 
 ```bash
-cd contracts/l1-contracts
+cd l1-contracts
 
 ANVIL_INTEROP_LIVE=1 \
 LIVE_L1_RPC=<l1-rpc> \
@@ -284,7 +284,6 @@ test/anvil-interop/
 - **L1→L2 transaction failures / refundRecipient**: Priority requests always succeed on Anvil; failure + refund logic is untested
 - **Batch settlement**: No real sequencer or prover; batches are never committed/proved/executed
 - **Custom pubdata pricing**: Gas and pubdata costs use Anvil defaults, not ZKsync fee models
-- **Non-ETH base tokens**: All chains use ETH as the base token
 - **Validium mode**: All chains run as rollup (validium carries no meaning without batch settlement)
 - **Settlement fees**: `processLogsAndMessages` still uses a zero settlement fee payer; interop sends cover non-zero dynamic base-token fees and fixed ZK fees separately
 
@@ -349,6 +348,6 @@ Note: `cleanup.sh` reads ports from `anvil-config.json` automatically — no man
 
 ```bash
 # Full cleanup: kill chains, remove outputs, reset state
-cd contracts/l1-contracts/test/anvil-interop
+cd l1-contracts/test/anvil-interop
 yarn cleanup
 ```
