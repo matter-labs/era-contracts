@@ -1257,6 +1257,13 @@ object "Bootloader" {
 
                     // Operator-requested failures are otherwise indistinguishable from reverts. Record them so
                     // watchers can react within the execution delay and users can prove the failure was forced.
+                    //
+                    // Only chains settling on L1 may run this. On any other settlement layer `executeBatches`
+                    // feeds every bootloader-sent log to `GWAssetTracker._handlePotentialFailedDeposit`, which
+                    // reads `key` as the canonical hash of a relayed priority op: this constant key has no
+                    // `balanceChange` entry, so the call reverts with `InvalidCanonicalTxHash` and the batch
+                    // can never be executed. Gate the log or teach `GWAssetTracker` this key before a
+                    // Gateway-settled chain gets this bootloader.
                     if forceFail {
                         sendL2LogUsingL1Messenger(true, forceFailedL1TxLogKey(), canonicalL1TxHash)
                     }
