@@ -575,7 +575,10 @@ contract GatewayPreparation is Script {
         saveOutput(l2TxHash);
     }
 
-    function _callL2AdminCalldata(bytes memory _data, address _target) private pure returns (bytes memory adminCalldata) {
+    function _callL2AdminCalldata(
+        bytes memory _data,
+        address _target
+    ) private pure returns (bytes memory adminCalldata) {
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: _target, value: 0, data: _data});
         adminCalldata = abi.encodeCall(ChainAdmin.multicall, (calls, true));

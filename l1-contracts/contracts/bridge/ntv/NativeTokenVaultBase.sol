@@ -130,7 +130,10 @@ abstract contract NativeTokenVaultBase is
 
     function _registerToken(address _nativeToken) internal virtual returns (bytes32 newAssetId) {
         // WETH may only be registered in the L1 NTV. See {protocol-docs/bridging.md#native-token-vault}.
-        require(_nativeToken != _getWethToken() || block.chainid == _getL1ChainId(), TokenNotSupported(_getWethToken()));
+        require(
+            _nativeToken != _getWethToken() || block.chainid == _getL1ChainId(),
+            TokenNotSupported(_getWethToken())
+        );
         require(_nativeToken.code.length > 0, EmptyToken());
         require(assetId[_nativeToken] == bytes32(0), AssetIdAlreadyRegistered());
         newAssetId = _unsafeRegisterNativeToken(_nativeToken);
@@ -305,10 +308,7 @@ abstract contract NativeTokenVaultBase is
         whenNotPaused
         returns (bytes memory _bridgeMintData)
     {
-        (uint256 amount, address receiver, address parsedTokenAddress) = _decodeBurnAndCheckAssetId(
-            _data,
-            _assetId
-        );
+        (uint256 amount, address receiver, address parsedTokenAddress) = _decodeBurnAndCheckAssetId(_data, _assetId);
         _bridgeMintData = _bridgeBurnToken({
             _chainId: _chainId,
             _assetId: _assetId,

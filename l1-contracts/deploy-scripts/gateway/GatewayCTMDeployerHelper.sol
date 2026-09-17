@@ -116,7 +116,8 @@ library GatewayCTMDeployerHelper {
         bytes32 _create2Salt,
         GatewayCTMDeployerConfig memory config
     )
-        internal view
+        internal
+        view
         returns (
             DeployedContracts memory contracts,
             DeployerCreate2Calldata memory deployerCalldata,
@@ -134,7 +135,8 @@ library GatewayCTMDeployerHelper {
         bytes32 _create2Salt,
         GatewayCTMDeployerConfig memory config
     )
-        internal view
+        internal
+        view
         returns (
             DeployedContracts memory contracts,
             DeployerCreate2Calldata memory deployerCalldata,
@@ -235,7 +237,11 @@ library GatewayCTMDeployerHelper {
         bytes32 _create2Salt,
         GatewayCTMDeployerConfig memory config,
         GatewayProxyAdminDeployerResult memory proxyAdminResult
-    ) internal view returns (address deployer, bytes memory data, GatewayValidatorTimelockDeployerResult memory result) {
+    )
+        internal
+        view
+        returns (address deployer, bytes memory data, GatewayValidatorTimelockDeployerResult memory result)
+    {
         GatewayValidatorTimelockDeployerConfig memory vtConfig = GatewayValidatorTimelockDeployerConfig({
             salt: config.salt,
             aliasedGovernanceAddress: config.aliasedGovernanceAddress,

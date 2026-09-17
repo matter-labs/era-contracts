@@ -303,11 +303,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function saveOutput(string memory outputPath) internal virtual {
-        vm.serializeAddress(
-            "bridgehub",
-            "bridgehub_proxy_addr",
-            coreAddresses.bridgehub.proxies.bridgehub
-        );
+        vm.serializeAddress("bridgehub", "bridgehub_proxy_addr", coreAddresses.bridgehub.proxies.bridgehub);
         vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", coreAddresses.bridges.proxies.l1Nullifier);
         string memory bridges = vm.serializeAddress(
             "bridges",
