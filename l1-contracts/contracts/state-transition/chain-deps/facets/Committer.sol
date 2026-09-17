@@ -82,10 +82,10 @@ import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 
 /// @dev The version that is used for the `Executor` calldata used for relaying the
 /// stored batch info.
-uint8 constant RELAYED_EXECUTOR_VERSION = 0;
+uint8 constant RELAYED_EXECUTOR_VERSION = 2;
 /// @dev The version that is used for the `Executor` calldata used for relaying the
 /// ZKSync OS stored batch info.
-uint8 constant RELAYED_EXECUTOR_VERSION_ZKSYNC_OS = 1;
+uint8 constant RELAYED_EXECUTOR_VERSION_ZKSYNC_OS = 3;
 
 /// @title ZK chain Committer contract responsible for batch commitment operations.
 /// @author Matter Labs
