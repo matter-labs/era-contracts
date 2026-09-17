@@ -208,6 +208,26 @@ function TEST_saturatingSub() {
     testing_assertEq(saturatingSub(2, 4), 0, "Invalid subtraction")
 }
 
+function TEST_validateProvedTxMeta() {
+    testing_assertEq(validateProvedTxMeta(0x0001), 0, "execute only")
+    testing_assertEq(validateProvedTxMeta(0x0101), 1, "execute + forceFail")
+}
+
+function TEST_validateProvedTxMetaAssert_forceFailByteAboveOne() {
+    testing_testWillFailWith("invalid txMeta")
+    pop(validateProvedTxMeta(0x0201))
+}
+
+function TEST_validateProvedTxMetaAssert_executeClear() {
+    testing_testWillFailWith("invalid txMeta")
+    pop(validateProvedTxMeta(0x0100))
+}
+
+function TEST_validateProvedTxMetaAssert_executeByteAboveOne() {
+    testing_testWillFailWith("invalid txMeta")
+    pop(validateProvedTxMeta(0x0002))
+}
+
 function INT_TEST_evm_create_non_zero_to_reverts() {
     // tx(1) should be an EVM create transaction where `reserved1 == 1` and `to == 0`.
     let txDataOffset := testing_txDataOffset(1)
