@@ -19,6 +19,7 @@ import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+import {IEraMultiProofVerifier} from "contracts/state-transition/chain-interfaces/IEraMultiProofVerifier.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {Utils} from "../utils/Utils.sol";
 import {
@@ -511,23 +512,31 @@ library AddressIntrospector {
         return DeployCTML1OrGateway.getSubVerifiers(_verifier, _isZKsyncOS);
     }
 
-    /// @notice Build the `Verifiers` struct for a dual verifier, introspecting its sub-verifiers.
-    /// @param _verifier The main (dual) verifier address.
+    /// @notice Whether the chain verifier is an `EraMultiProofVerifier` (Era chains from v33).
+    function _isMultiProof(address _verifier) private view returns (bool) {
+        (bool ok, bytes memory data) = _verifier.staticcall(
+            abi.encodeCall(IEraMultiProofVerifier.acceptedProofType, ())
+        );
+        return ok && data.length == 32;
+    }
+
+    /// @notice Build the `Verifiers` struct for the chain verifier, introspecting its sub-verifiers.
+    /// @param _verifier The main verifier address.
     /// @param _isV29 The V29 verifier is a dual verifier, but the sub-verifier getters were only
     ///        added in V31, so they cannot be introspected and are reported as `address(0)`.
     /// @param _isZKsyncOS If true, uses the ZKsyncOSDualVerifier interface; otherwise EraDualVerifier.
-    function _getVerifiers(address _verifier, bool _isV29, bool _isZKsyncOS) private view returns (Verifiers memory) {
-        (address verifierFflonk, address verifierPlonk) = _isV29
-            ? (address(0), address(0))
-            : _getSubVerifiers(_verifier, _isZKsyncOS);
-        // `boojumVerifier` and `airbenderVerifierPlonk` are not introspected.
-        return
-            Verifiers({
-                verifier: _verifier,
-                verifierFflonk: verifierFflonk,
-                verifierPlonk: verifierPlonk,
-                airbenderVerifierPlonk: address(0),
-                boojumVerifier: address(0)
-            });
+    function _getVerifiers(
+        address _verifier,
+        bool _isV29,
+        bool _isZKsyncOS
+    ) private view returns (Verifiers memory verifiers) {
+        verifiers.verifier = _verifier;
+        if (_isMultiProof(_verifier)) {
+            IEraMultiProofVerifier multiProof = IEraMultiProofVerifier(_verifier);
+            verifiers.verifierFflonk = address(multiProof.BOOJUM_VERIFIER());
+            verifiers.airbenderVerifierPlonk = address(multiProof.AIRBENDER_VERIFIER());
+        } else if (!_isV29) {
+            (verifiers.verifierFflonk, verifiers.verifierPlonk) = _getSubVerifiers(_verifier, _isZKsyncOS);
+        }
     }
 }

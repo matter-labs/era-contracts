@@ -18,8 +18,7 @@ import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {DiamondAlreadyFrozen, DiamondNotFrozen, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {EraMultiProofTestnetVerifier} from "contracts/state-transition/verifiers/EraMultiProofTestnetVerifier.sol";
 import {PermissionlessValidator} from "contracts/state-transition/validators/PermissionlessValidator.sol";
 
 contract UpgradeLogicTest is DiamondCutTest {
@@ -65,7 +64,9 @@ contract UpgradeLogicTest is DiamondCutTest {
         permissionlessValidator = new PermissionlessValidator();
 
         // Mock CTM to return a verifier for protocol version 0
-        address testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+        address testnetVerifier = address(
+            new EraMultiProofTestnetVerifier(IVerifier(address(0)), IVerifier(address(0)))
+        );
         vm.mockCall(
             chainTypeManager,
             abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, uint256(0)),

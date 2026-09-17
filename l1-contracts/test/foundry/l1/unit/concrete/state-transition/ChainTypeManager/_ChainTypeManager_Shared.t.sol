@@ -31,7 +31,7 @@ import {
     ChainCreationParams,
     ChainTypeManagerInitializeData
 } from "contracts/state-transition/IChainTypeManager.sol";
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
+import {EraMultiProofTestnetVerifier} from "contracts/state-transition/verifiers/EraMultiProofTestnetVerifier.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
@@ -43,7 +43,6 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
@@ -74,7 +73,8 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
     address internal newChainAdmin;
     uint256 l1ChainId = 5;
     uint256 chainId = 112;
-    address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    address internal testnetVerifier =
+        address(new EraMultiProofTestnetVerifier(IVerifier(address(0)), IVerifier(address(0))));
     bytes internal forceDeploymentsData = hex"";
 
     uint256 eraChainId = 9;

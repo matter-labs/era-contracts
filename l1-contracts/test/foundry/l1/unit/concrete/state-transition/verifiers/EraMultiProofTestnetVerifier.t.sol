@@ -10,6 +10,7 @@ import {EraDualVerifier} from "contracts/state-transition/verifiers/EraDualVerif
 import {
     AIRBENDER_PROOF_SYSTEM_MASK,
     AIRBENDER_SNARK_PROOF_LENGTH,
+    BOOJUM_FFLONK_PROOF_LENGTH,
     ERA_MULTI_PROOF_TYPE
 } from "contracts/common/Config.sol";
 import {AirbenderVerificationFailed} from "contracts/common/L1ContractErrors.sol";
@@ -34,10 +35,8 @@ contract EraMultiProofTestnetVerifierTest is Test {
     }
 
     function _proof() internal pure returns (uint256[] memory proof) {
-        proof = new uint256[](2 + 1 + AIRBENDER_SNARK_PROOF_LENGTH);
+        proof = new uint256[](1 + BOOJUM_FFLONK_PROOF_LENGTH + AIRBENDER_SNARK_PROOF_LENGTH);
         proof[0] = ERA_MULTI_PROOF_TYPE;
-        proof[1] = 1;
-        proof[2] = 1;
     }
 
     function test_isTestnetVerifier() public view {

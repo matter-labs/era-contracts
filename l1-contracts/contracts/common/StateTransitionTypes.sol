@@ -27,14 +27,12 @@ struct Facets {
 /// @notice Verifier contract addresses.
 // solhint-disable-next-line gas-struct-packing
 struct Verifiers {
-    /// @notice Address of the VerifierFflonk contract.
+    /// @notice Address of the VerifierFflonk contract. For Era chains this is the Boojum verifier.
     address verifierFflonk;
-    /// @notice Address of the VerifierPlonk contract.
+    /// @notice Address of the VerifierPlonk contract. ZKsync OS only.
     address verifierPlonk;
     /// @notice Address of the Airbender PLONK verifier. `address(0)` when Airbender support was not requested.
     address airbenderVerifierPlonk;
-    /// @notice Address of the Boojum verifier (`EraDualVerifier`). `address(0)` for ZKsync OS.
-    address boojumVerifier;
     /// @notice Address of the main Verifier contract. For Era chains this is `EraMultiProofVerifier`.
     address verifier;
 }
