@@ -7,12 +7,6 @@ import { waitForChainReady, formatChainInfo, createProvider } from "../core/util
 
 export class AnvilManager {
   private chains: Map<number, AnvilChain> = new Map();
-  private pidFilePath: string;
-
-  constructor() {
-    const runSuffix = process.env.ANVIL_INTEROP_RUN_SUFFIX || "";
-    this.pidFilePath = path.join(__dirname, `../../outputs/anvil-pids${runSuffix}.json`);
-  }
 
   /**
    * Kill any existing process listening on the given port.
@@ -195,9 +189,6 @@ export class AnvilManager {
 
     this.chains.set(chainId, chain);
 
-    // Save PID to file for tracking
-    this.savePids();
-
     const isReady = await waitForChainReady(rpcUrl);
     if (!isReady) {
       // Log diagnostics to help debug CI failures
@@ -212,22 +203,6 @@ export class AnvilManager {
     }
 
     console.log(`✅ ${formatChainInfo(chainId, port, isL1)} started successfully`);
-  }
-
-  private savePids(): void {
-    const pids: Record<number, number> = {};
-    for (const [chainId, chain] of this.chains) {
-      if (chain.process && chain.process.pid) {
-        pids[chainId] = chain.process.pid;
-      }
-    }
-
-    const dir = path.dirname(this.pidFilePath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-
-    fs.writeFileSync(this.pidFilePath, JSON.stringify(pids, null, 2));
   }
 
   async stopChain(chainId: number): Promise<void> {
@@ -266,11 +241,6 @@ export class AnvilManager {
     const stopPromises = Array.from(this.chains.keys()).map((chainId) => this.stopChain(chainId));
     await Promise.all(stopPromises);
     this.chains.clear();
-
-    // Clean up PID file
-    if (fs.existsSync(this.pidFilePath)) {
-      fs.unlinkSync(this.pidFilePath);
-    }
 
     console.log("✅ All chains stopped");
   }

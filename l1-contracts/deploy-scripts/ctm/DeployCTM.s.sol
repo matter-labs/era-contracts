@@ -57,33 +57,33 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     function runWithBridgehub(address bridgehub, bool reuseGovAndAdmin) public {
         console.log("Deploying CTM related contracts");
-        // `runInner`'s last parameter is deliberately unnamed, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        runInner(
-            "/script-config/config-deploy-ctm.toml",
-            "/script-out/output-deploy-ctm.toml",
-            bridgehub,
-            reuseGovAndAdmin,
-            false
-        );
+        runInner({
+            inputPath: "/script-config/config-deploy-ctm.toml",
+            outputPath: "/script-out/output-deploy-ctm.toml",
+            bridgehub: bridgehub,
+            reuseGovAndAdmin: reuseGovAndAdmin
+        });
     }
 
-    function runForTest(address bridgehub, bool skipL1Deployments) public {
-        _runConfiguredTest(bridgehub, skipL1Deployments, true);
+    function runForTest(address bridgehub) public {
+        _runConfiguredTest(bridgehub, true);
     }
 
     /// @notice Like runForTest but skips saveDiamondSelectors().
-    function runForAnvilTest(address bridgehub, bool skipL1Deployments) public {
-        _runConfiguredTest(bridgehub, skipL1Deployments, false);
+    function runForAnvilTest(address bridgehub) public {
+        _runConfiguredTest(bridgehub, false);
     }
 
-    function _runConfiguredTest(address bridgehub, bool skipL1Deployments, bool shouldSaveSelectors) internal {
+    function _runConfiguredTest(address bridgehub, bool shouldSaveSelectors) internal {
         if (shouldSaveSelectors) {
             saveDiamondSelectors();
         }
-        // `runInner`'s last parameter is deliberately unnamed, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        runInner(vm.envString("CTM_CONFIG"), vm.envString("CTM_OUTPUT"), bridgehub, false, skipL1Deployments);
+        runInner({
+            inputPath: vm.envString("CTM_CONFIG"),
+            outputPath: vm.envString("CTM_OUTPUT"),
+            bridgehub: bridgehub,
+            reuseGovAndAdmin: false
+        });
     }
 
     function getAddresses() public view virtual returns (CTMDeployedAddresses memory) {
@@ -103,8 +103,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         string memory inputPath,
         string memory outputPath,
         address bridgehub,
-        bool reuseGovAndAdmin,
-        bool /* skipL1Deployments */
+        bool reuseGovAndAdmin
     ) public {
         string memory root = vm.projectRoot();
         inputPath = string.concat(root, inputPath);
@@ -114,7 +113,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         // clobber each other's batches.
         _blakeBatchTmpFile = string.concat(outputPath, ".blake-batch.txt");
 
-        initializeConfig(inputPath, bridgehub);
+        initializeConfig(inputPath);
 
         console.log("Initializing core contracts from BH");
         // Populate discovered addresses via inspector
