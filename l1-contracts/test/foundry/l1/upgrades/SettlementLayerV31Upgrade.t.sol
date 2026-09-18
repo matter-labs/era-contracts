@@ -483,7 +483,7 @@ contract SettlementLayerV31UpgradeEraV29Test is SettlementLayerV31UpgradeTestBas
         upgrade.getL2UpgradeTxData(mockBridgehub, testChainId, false, unexpectedUpgradeTxData);
     }
 
-    function test_PreservesOtherDeploymentOrderWhenDeferringNTV() public {
+    function test_PreservesSuppliedDeploymentList() public {
         _setupMocks();
         _prepareV31ProposedUpgrade();
         IL2ContractDeployer.ForceDeployment[] memory deployments = new IL2ContractDeployer.ForceDeployment[](3);
@@ -508,38 +508,13 @@ contract SettlementLayerV31UpgradeEraV29Test is SettlementLayerV31UpgradeTestBas
             value: 0,
             input: hex""
         });
-        IL2ContractDeployer.ForceDeployment[] memory expectedDeployments = new IL2ContractDeployer.ForceDeployment[](2);
-        expectedDeployments[0] = deployments[0];
-        expectedDeployments[1] = deployments[2];
         bytes memory input = abi.encodeCall(
             IComplexUpgrader.forceDeployAndUpgrade,
             (deployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, _placeholderV31Calldata())
         );
         bytes memory expected = abi.encodeCall(
             IComplexUpgrader.forceDeployAndUpgrade,
-            (expectedDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, _expectedV31Calldata())
-        );
-        assertEq(upgrade.getL2UpgradeTxData(mockBridgehub, testChainId, false, input), expected);
-    }
-
-    function test_RemovesNTVFromInitialForceDeployments() public {
-        _setupMocks();
-        _prepareV31ProposedUpgrade();
-        IL2ContractDeployer.ForceDeployment[] memory deployments = new IL2ContractDeployer.ForceDeployment[](1);
-        deployments[0] = IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: keccak256("ntv"),
-            newAddress: L2_NATIVE_TOKEN_VAULT_ADDR,
-            callConstructor: false,
-            value: 0,
-            input: hex""
-        });
-        bytes memory input = abi.encodeCall(
-            IComplexUpgrader.forceDeployAndUpgrade,
-            (deployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, _placeholderV31Calldata())
-        );
-        bytes memory expected = abi.encodeCall(
-            IComplexUpgrader.forceDeployAndUpgrade,
-            (new IL2ContractDeployer.ForceDeployment[](0), L2_VERSION_SPECIFIC_UPGRADER_ADDR, _expectedV31Calldata())
+            (deployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, _expectedV31Calldata())
         );
         assertEq(upgrade.getL2UpgradeTxData(mockBridgehub, testChainId, false, input), expected);
     }

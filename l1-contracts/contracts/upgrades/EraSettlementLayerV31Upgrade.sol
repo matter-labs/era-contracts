@@ -7,7 +7,6 @@ import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol"
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 import {L2UpgradeTxLib} from "./L2UpgradeTxLib.sol";
 import {Bytes} from "../vendor/Bytes.sol";
-import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 /// @author Matter Labs
 /// @title EraSettlementLayerV31Upgrade
@@ -40,20 +39,6 @@ contract EraSettlementLayerV31Upgrade is SettlementLayerV31UpgradeBase {
             _zksyncOS,
             existingUpgradeCalldata
         );
-
-        // Keep the old NTV code available until L2V31Upgrade has read its WETH immutable.
-        // The L2 helper deploys the new NTV from fixedForceDeploymentsData afterwards.
-        uint256 retainedCount;
-        uint256 deploymentCount = forceDeployments.length;
-        for (uint256 i; i < deploymentCount; ++i) {
-            if (forceDeployments[i].newAddress != L2_NATIVE_TOKEN_VAULT_ADDR) {
-                forceDeployments[retainedCount] = forceDeployments[i];
-                ++retainedCount;
-            }
-        }
-        assembly {
-            mstore(forceDeployments, retainedCount)
-        }
 
         return
             abi.encodeCall(

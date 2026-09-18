@@ -200,8 +200,8 @@ library L2GenesisForceDeploymentsHelper {
     /// @notice Initializes force-deployed contracts.
     /// @dev Note, that this function is expected to initialize all system contracts deployed within the user space
     /// with the only exception of the SystemContractProxyAdmin, which is expected to be initialized inside the Genesis.
-    /// @dev Contract deployment (conductContractUpgrade) is handled externally via the force deployment list.
-    /// This function only performs initialization (initL2/updateL2 calls).
+    /// @dev Era upgrades replace NTV here after reading its legacy WETH immutable.
+    /// All other contract deployments are handled externally via the force deployment list.
     /// @param _ctmDeployer Address of the CTM Deployer contract.
     /// @param _fixedForceDeploymentsData Encoded data for forced deployment that
     /// is the same for all the chains.
@@ -231,11 +231,13 @@ library L2GenesisForceDeploymentsHelper {
         // Validate it once here rather than at every individual initL2/updateL2 call site.
         require(fixedForceDeploymentsData.aliasedL1Governance != address(0), ZeroAddress());
 
-        // Era upgrades capture the immutable before replacing the NTV code.
-        // Genesis and ZKsyncOS keep their existing storage-based resolution.
-        address predeployedWeth = !_isGenesisUpgrade && !_isZKsyncOS
-            ? additionalForceDeploymentsData.predeployedL2WethAddress
-            : L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).WETH_TOKEN();
+        address predeployedWeth = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).WETH_TOKEN();
+        if (!_isGenesisUpgrade && !_isZKsyncOS) {
+            // Era's deployment list leaves NTV untouched so its old WETH immutable is still readable.
+            // Capture it before replacing the code, then initialize the new storage-based pointer below.
+            require(predeployedWeth != address(0), ZeroAddress());
+            forceDeployEra(fixedForceDeploymentsData.l2NtvBytecodeInfo, L2_NATIVE_TOKEN_VAULT_ADDR);
+        }
         address wrappedBaseTokenAddress = _ensureWethToken({
             _predeployedWethToken: predeployedWeth,
             _aliasedL1Governance: fixedForceDeploymentsData.aliasedL1Governance,
