@@ -13,6 +13,7 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
+import {IL1SharedBridgeLegacy} from "contracts/bridge/interfaces/IL1SharedBridgeLegacy.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
@@ -152,6 +153,12 @@ abstract contract SettlementLayerV31UpgradeTestBase is BaseUpgrade {
             mockAssetRouter,
             abi.encodeWithSelector(IL1AssetRouter.nativeTokenVault.selector),
             abi.encode(mockNativeTokenVault)
+        );
+        // Isolate upgrade calldata construction from the asset router's legacy bridge registry.
+        vm.mockCall(
+            mockAssetRouter,
+            abi.encodeCall(IL1SharedBridgeLegacy.l2BridgeAddress, (testChainId)),
+            abi.encode(address(0))
         );
 
         // Mock nativeTokenVault.l1AssetTracker
@@ -585,6 +592,12 @@ contract SettlementLayerV31UpgradeZKsyncOSV30Test is BaseUpgrade {
             mockAssetRouter,
             abi.encodeWithSelector(IL1AssetRouter.nativeTokenVault.selector),
             abi.encode(mockNativeTokenVault)
+        );
+        // Isolate upgrade calldata construction from the asset router's legacy bridge registry.
+        vm.mockCall(
+            mockAssetRouter,
+            abi.encodeCall(IL1SharedBridgeLegacy.l2BridgeAddress, (testChainId)),
+            abi.encode(address(0))
         );
         vm.mockCall(
             mockNativeTokenVault,
