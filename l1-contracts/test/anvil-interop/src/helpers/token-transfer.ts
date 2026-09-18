@@ -1,0 +1,201 @@
+import { BigNumber, Contract, ethers, providers, Wallet } from "ethers";
+import { DeploymentRunner } from "../deployment-runner";
+import type { MultiChainTokenTransferParams, MultiChainTokenTransferResult } from "../core/types";
+import { getAbi } from "../core/contracts";
+import { encodeEvmAddress } from "./erc7930";
+import {
+  indirectCallAttr,
+  interopCallValueAttr,
+  sendInteropBundle,
+  executeBundle,
+  getInteropProtocolFee,
+} from "./interop-helpers";
+import { ANVIL_DEFAULT_PRIVATE_KEY, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR } from "../core/const";
+import { encodeNtvAssetId, encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "../core/data-encoding";
+import { createBalanceTrackerFromState } from "./balance-tracker";
+
+type Logger = (line: string) => void;
+
+export interface ExecuteTokenTransferOptions extends MultiChainTokenTransferParams {
+  logger?: Logger;
+}
+
+function defaultLogger(line: string): void {
+  console.log(line);
+}
+
+export async function executeTokenTransfer(
+  options: ExecuteTokenTransferOptions
+): Promise<MultiChainTokenTransferResult> {
+  const log = options.logger || defaultLogger;
+  const { sourceChainId, targetChainId } = options;
+  const amount = options.amount || "10";
+
+  const runner = new DeploymentRunner();
+  const state = runner.loadState();
+  if (!state.chains?.l2 || !state.testTokens) {
+    throw new Error("State missing. Run 'yarn start' and 'yarn deploy:test-token' first.");
+  }
+
+  const sourceChain = state.chains.l2.find((chain) => chain.chainId === sourceChainId);
+  const targetChain = state.chains.l2.find((chain) => chain.chainId === targetChainId);
+  if (!sourceChain || !targetChain) {
+    throw new Error(`Chain not found. Available: ${state.chains.l2.map((chain) => chain.chainId).join(", ")}`);
+  }
+
+  const sourceTokenAddr = options.sourceTokenAddress || state.testTokens[sourceChainId];
+  const targetTokenAddr = state.testTokens[targetChainId];
+  if (!sourceTokenAddr) {
+    throw new Error(
+      `Source token not found for chain ${sourceChainId}. Run 'yarn deploy:test-token' or pass sourceTokenAddress.`
+    );
+  }
+
+  const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
+  const sourceProvider = new providers.JsonRpcProvider(sourceChain.rpcUrl);
+  const targetProvider = new providers.JsonRpcProvider(targetChain.rpcUrl);
+  const sourceWallet = new Wallet(privateKey, sourceProvider);
+  const tracker = createBalanceTrackerFromState(state);
+
+  const sourceToken = new Contract(sourceTokenAddr, getAbi("TestnetERC20Token"), sourceWallet);
+  const sourceVault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("L2NativeTokenVault"), sourceProvider);
+  const targetVault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("L2NativeTokenVault"), targetProvider);
+
+  const transferStart = Date.now();
+  const elapsed = () => `${((Date.now() - transferStart) / 1000).toFixed(1)}s`;
+
+  log("Configuration:");
+  log(`  Source Chain: ${sourceChainId}`);
+  log(`  Target Chain: ${targetChainId}`);
+  log(`  Source Token: ${sourceTokenAddr}`);
+  log(`  Target Token: ${targetTokenAddr}`);
+  log(`  Amount: ${amount} TEST`);
+  log(`  Sender: ${sourceWallet.address}`);
+  log("");
+
+  log(`⏱️  [${elapsed()}] Checking source balance...`);
+  const sourceBalanceBefore = await tracker.getL2TokenBalance(sourceChainId, sourceTokenAddr, sourceWallet.address);
+  log(`💰 Source balance: ${sourceBalanceBefore.toString()} TEST tokens`);
+  const amountWei = ethers.utils.parseUnits(amount, 18);
+  if (sourceBalanceBefore.lt(amountWei)) {
+    throw new Error(`Insufficient balance. Have: ${sourceBalanceBefore.toString()}, Need: ${amountWei.toString()}`);
+  }
+
+  log(`⏱️  [${elapsed()}] Checking allowance...`);
+  const currentAllowance = await sourceToken.allowance(sourceWallet.address, L2_NATIVE_TOKEN_VAULT_ADDR);
+  if (currentAllowance.lt(amountWei)) {
+    log(`\n📝 Approving L2NativeTokenVault to spend ${amount} TEST tokens...`);
+    const approveTx = await sourceToken.approve(L2_NATIVE_TOKEN_VAULT_ADDR, amountWei);
+    await approveTx.wait();
+    log("   ✅ Approval confirmed");
+  } else {
+    log(`\n✅ L2NativeTokenVault already approved for ${amount} TEST tokens`);
+  }
+
+  const assetId = encodeNtvAssetId(sourceChainId, sourceTokenAddr);
+  log(`\n🔑 Asset ID: ${assetId}`);
+
+  log(`⏱️  [${elapsed()}] Checking token registration...`);
+  const registeredAssetId = await sourceVault.assetId(sourceTokenAddr);
+  if (registeredAssetId === ethers.constants.HashZero) {
+    log("\n📝 Registering token in L2NativeTokenVault...");
+    const sourceVaultWithWallet = sourceVault.connect(sourceWallet);
+    const registerTx = await sourceVaultWithWallet.registerToken(sourceTokenAddr);
+    await registerTx.wait();
+    log("   ✅ Token registered in L2NativeTokenVault");
+  } else {
+    log("\n✅ Token already registered in L2NativeTokenVault");
+  }
+
+  log(`⏱️  [${elapsed()}] Reading destination balance before...`);
+  const destinationTokenBefore = await targetVault.tokenAddress(assetId);
+  const destinationBalanceBefore =
+    destinationTokenBefore === ethers.constants.AddressZero
+      ? BigNumber.from(0)
+      : await tracker.getL2TokenBalance(targetChainId, destinationTokenBefore, sourceWallet.address);
+
+  const transferData = encodeBridgeBurnData(amountWei, sourceWallet.address, sourceTokenAddr);
+  const depositData = encodeAssetRouterBridgehubDepositData(assetId, transferData);
+
+  log("\n📦 Encoded bridgehub deposit data");
+  log(`   Target Chain: ${targetChainId}`);
+  log(`   Asset ID: ${assetId}`);
+  log(`   Recipient: ${sourceWallet.address}`);
+  log(`   Amount: ${amountWei.toString()}`);
+
+  const targetAddressBytes = encodeEvmAddress(L2_ASSET_ROUTER_ADDR);
+  const callStarter = {
+    to: targetAddressBytes,
+    data: depositData,
+    callAttributes: [indirectCallAttr(), interopCallValueAttr(BigNumber.from(0))],
+  };
+
+  log(`\n⏱️  [${elapsed()}] Sending token transfer via InteropCenter...`);
+  log(`   Target: L2AssetRouter at ${L2_ASSET_ROUTER_ADDR}`);
+
+  const interopFee = await getInteropProtocolFee(sourceProvider);
+  const sendResult = await sendInteropBundle({
+    sourceProvider,
+    destinationChainId: targetChainId,
+    callStarters: [callStarter],
+    value: interopFee,
+  });
+  log(`\n   Transaction sent: cast run ${sendResult.txHash} -r ${sourceChain.rpcUrl}`);
+  log(`   ✅ Transaction confirmed in block ${sendResult.receipt.blockNumber} [${elapsed()}]`);
+
+  let targetTxHash: string | null = null;
+
+  {
+    log(`⏱️  [${elapsed()}] Executing bundle directly on destination chain via L2InteropHandler...`);
+    try {
+      const receipt = await executeBundle(targetProvider, sendResult.bundleData, sourceChainId);
+      targetTxHash = receipt.transactionHash;
+      log(`   ✅ executeBundle tx: cast run ${receipt.transactionHash} -r ${targetChain.rpcUrl}`);
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || String(error);
+      log(`   ⚠️ executeBundle failed: ${message}`);
+      const failedTxHash = (error as { transactionHash?: string })?.transactionHash;
+      if (!targetTxHash && failedTxHash) {
+        targetTxHash = failedTxHash;
+        log(`   ⚠️ using reverted executeBundle tx: cast run ${failedTxHash} -r ${targetChain.rpcUrl}`);
+      }
+    }
+  }
+
+  log(`⏱️  [${elapsed()}] Reading final balances...`);
+  const sourceBalanceAfter = await tracker.getL2TokenBalance(sourceChainId, sourceTokenAddr, sourceWallet.address);
+  const destinationToken = await targetVault.tokenAddress(assetId);
+  const destinationBalanceAfter =
+    destinationToken === ethers.constants.AddressZero
+      ? BigNumber.from(0)
+      : await tracker.getL2TokenBalance(targetChainId, destinationToken, sourceWallet.address);
+
+  log(`Target Chain: ${targetChainId}`);
+  log(`Target Tx:    ${targetTxHash || "not found yet (relay may still be pending)"}`);
+  log("");
+  log("Trace commands:");
+  log(`  cast run ${sendResult.txHash} -r ${sourceChain.rpcUrl}`);
+  if (targetTxHash) {
+    log(`  cast run ${targetTxHash} -r ${targetChain.rpcUrl}`);
+  }
+
+  log(`\n⏱️  [${elapsed()}] Token transfer complete`);
+
+  return {
+    sourceChainId,
+    targetChainId,
+    sourceRpcUrl: sourceChain.rpcUrl,
+    targetRpcUrl: targetChain.rpcUrl,
+    sender: sourceWallet.address,
+    sourceToken: sourceTokenAddr,
+    destinationToken,
+    assetId,
+    amountWei: amountWei.toString(),
+    sourceBalanceBefore: sourceBalanceBefore.toString(),
+    sourceBalanceAfter: sourceBalanceAfter.toString(),
+    destinationBalanceBefore: destinationBalanceBefore.toString(),
+    destinationBalanceAfter: destinationBalanceAfter.toString(),
+    sourceTxHash: sendResult.txHash,
+    targetTxHash,
+  };
+}

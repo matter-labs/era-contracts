@@ -1,0 +1,36 @@
+use structopt::StructOpt;
+use zksync_os_genesis_gen::{build_genesis_root_hash, Genesis, InitialGenesisInput};
+
+const PATH_TO_LOCAL_GENESIS: &str = "../../configs/genesis/zksync-os/latest.json";
+
+#[derive(StructOpt, Debug)]
+#[structopt(name = "zksync-os-genesis-gen")]
+struct Opt {
+    /// Output file path
+    #[structopt(long = "output-file", default_value = "../../zksync-os-genesis.json")]
+    output_file: String,
+}
+
+fn main() -> anyhow::Result<()> {
+    let opt = Opt::from_args();
+    println!("Output file: {}", opt.output_file);
+
+    let genesis = update_local_genesis()?;
+    let json = serde_json::to_string_pretty(&genesis)?;
+    std::fs::write(PATH_TO_LOCAL_GENESIS, &json)?;
+    std::fs::write(opt.output_file, &json)?;
+
+    Ok(())
+}
+
+fn update_local_genesis() -> anyhow::Result<Genesis> {
+    // Load the original genesis file for getting the correct version fields
+    let mut genesis: Genesis = serde_json::from_str(
+        &std::fs::read_to_string(PATH_TO_LOCAL_GENESIS).expect("Failed to read local genesis file"),
+    )?;
+    let additional_storage_raw = genesis.initial_genesis.additional_storage_raw.clone();
+    genesis.initial_genesis = InitialGenesisInput::local()?;
+    genesis.initial_genesis.additional_storage_raw = additional_storage_raw;
+    genesis.genesis_root = build_genesis_root_hash(&genesis.initial_genesis)?;
+    Ok(genesis)
+}

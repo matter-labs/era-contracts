@@ -32,7 +32,7 @@ export default {
     settings: {
       optimizer: {
         enabled: true,
-        runs: 27700,
+        runs: 20000,
       },
       outputSelection: {
         "*": {
@@ -45,7 +45,7 @@ export default {
   },
   zksolc: {
     compilerSource: "binary",
-    version: "1.5.11",
+    version: "1.5.17",
     settings: {
       isSystem: true,
     },

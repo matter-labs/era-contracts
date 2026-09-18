@@ -5,9 +5,16 @@ import {Test} from "forge-std/Test.sol";
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {PRIORITY_TX_MAX_GAS_LIMIT, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
-import {L2_FORCE_DEPLOYER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {ISystemContext} from "contracts/state-transition/l2-deps/ISystemContext.sol";
+import {
+    PRIORITY_TX_MAX_GAS_LIMIT,
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    SYSTEM_UPGRADE_L2_TX_TYPE
+} from "contracts/common/Config.sol";
+import {
+    L2_FORCE_DEPLOYER_ADDR,
+    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {ISystemContext} from "contracts/common/interfaces/ISystemContext.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
@@ -88,7 +95,7 @@ contract BaseUpgrade is Test {
             bootloaderHash: bytes32(0x01000121a363b3fbec270986067c1b553bf540c30a6f186f45313133ff1a1019),
             defaultAccountHash: bytes32(0x01000121a363b3fbec270986067c1b553bf540c30a6f186f45313133ff1a1019),
             evmEmulatorHash: bytes32(0x01000121a363b3fbec270986067c1b553bf540c30a6f186f45313133ff1a1019),
-            verifier: verifier,
+            verifier: address(0),
             verifierParams: VerifierParams({
                 recursionNodeLevelVkHash: bytes32(0),
                 recursionLeafLevelVkHash: bytes32(0),

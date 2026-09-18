@@ -6,4 +6,6 @@ import {ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 
 interface IDefaultUpgrade {
     function upgrade(ProposedUpgrade calldata _upgrade) external returns (bytes32);
+
+    function upgradeInner(ProposedUpgrade calldata _upgrade) external returns (bytes32);
 }

@@ -1,6 +1,6 @@
 import { ethers, network } from "hardhat";
-import { SystemContextFactory } from "../typechain";
-import type { SystemContext } from "../typechain";
+import { SystemContextTestFactory } from "../typechain";
+import type { SystemContextTest } from "../typechain";
 import { TEST_BOOTLOADER_FORMAL_ADDRESS, TEST_SYSTEM_CONTEXT_CONTRACT_ADDRESS } from "./shared/constants";
 import { deployContractOnAddress, getWallets } from "./shared/utils";
 import { prepareEnvironment } from "./shared/mocks";
@@ -8,13 +8,13 @@ import { expect } from "chai";
 
 describe("SystemContext tests", () => {
   const wallet = getWallets()[0];
-  let systemContext: SystemContext;
+  let systemContext: SystemContextTest;
   let bootloaderAccount: ethers.Signer;
 
   before(async () => {
     await prepareEnvironment();
-    await deployContractOnAddress(TEST_SYSTEM_CONTEXT_CONTRACT_ADDRESS, "SystemContext");
-    systemContext = SystemContextFactory.connect(TEST_SYSTEM_CONTEXT_CONTRACT_ADDRESS, wallet);
+    await deployContractOnAddress(TEST_SYSTEM_CONTEXT_CONTRACT_ADDRESS, "SystemContextTest");
+    systemContext = SystemContextTestFactory.connect(TEST_SYSTEM_CONTEXT_CONTRACT_ADDRESS, wallet);
     bootloaderAccount = await ethers.getImpersonatedSigner(TEST_BOOTLOADER_FORMAL_ADDRESS);
   });
 
@@ -65,20 +65,20 @@ describe("SystemContext tests", () => {
 
   describe("getBatchNumberAndTimestamp", async () => {
     it("should get batch number and timestamp", async () => {
-      const result = await systemContext.getBatchNumberAndTimestamp();
+      const result = await systemContext.getBatchNumberAndTimestampTesting();
       expect(result.batchNumber).to.be.equal(0);
       expect(result.batchTimestamp).to.be.equal(0);
     });
 
     it("should get changed batch data", async () => {
       await systemContext.connect(bootloaderAccount).unsafeOverrideBatch(222, 111, 333);
-      const batchDataAfterChanges = await systemContext.getBatchNumberAndTimestamp();
+      const batchDataAfterChanges = await systemContext.getBatchNumberAndTimestampTesting();
       const baseFee = await systemContext.baseFee();
       expect(batchDataAfterChanges.batchNumber).to.be.equal(111);
       expect(batchDataAfterChanges.batchTimestamp).to.be.equal(222);
       expect(baseFee).to.be.equal(333);
       await systemContext.connect(bootloaderAccount).unsafeOverrideBatch(0, 0, 0);
-      const batchDataRestored = await systemContext.getBatchNumberAndTimestamp();
+      const batchDataRestored = await systemContext.getBatchNumberAndTimestampTesting();
       const baseFeeRestored = await systemContext.baseFee();
       expect(batchDataRestored.batchNumber).to.be.equal(0);
       expect(batchDataRestored.batchTimestamp).to.be.equal(0);
@@ -88,22 +88,22 @@ describe("SystemContext tests", () => {
 
   describe("setNewBatch", async () => {
     it("should get hash of the given batch", async () => {
-      const batchData = await systemContext.getBatchNumberAndTimestamp();
-      const result = await systemContext.getBatchHash(batchData.batchNumber);
+      const batchData = await systemContext.getBatchNumberAndTimestampTesting();
+      const result = await systemContext.getBatchHashTesting(batchData.batchNumber);
       expect(result).to.equal(ethers.constants.HashZero);
     });
 
     it("should revert not called by bootlader", async () => {
-      const batchData = await systemContext.getBatchNumberAndTimestamp();
-      const batchHash = await systemContext.getBatchHash(batchData.batchNumber);
+      const batchData = await systemContext.getBatchNumberAndTimestampTesting();
+      const batchHash = await systemContext.getBatchHashTesting(batchData.batchNumber);
       await expect(
         systemContext.setNewBatch(batchHash, batchData.batchTimestamp.add(1), batchData.batchNumber.add(1), 1)
       ).to.be.revertedWithCustomError(systemContext, "CallerMustBeBootloader");
     });
 
     it("should revert timestamp should be incremental", async () => {
-      const batchData = await systemContext.getBatchNumberAndTimestamp();
-      const batchHash = await systemContext.getBatchHash(batchData.batchNumber);
+      const batchData = await systemContext.getBatchNumberAndTimestampTesting();
+      const batchHash = await systemContext.getBatchHashTesting(batchData.batchNumber);
       await expect(
         systemContext
           .connect(bootloaderAccount)
@@ -112,8 +112,8 @@ describe("SystemContext tests", () => {
     });
 
     it("should revert wrong block number", async () => {
-      const batchData = await systemContext.getBatchNumberAndTimestamp();
-      const batchHash = await systemContext.getBatchHash(batchData.batchNumber);
+      const batchData = await systemContext.getBatchNumberAndTimestampTesting();
+      const batchHash = await systemContext.getBatchHashTesting(batchData.batchNumber);
       await expect(
         systemContext
           .connect(bootloaderAccount)
@@ -122,16 +122,16 @@ describe("SystemContext tests", () => {
     });
 
     it("should set new batch", async () => {
-      const batchData = await systemContext.getBatchNumberAndTimestamp();
-      const batchHash = await systemContext.getBatchHash(batchData.batchNumber);
+      const batchData = await systemContext.getBatchNumberAndTimestampTesting();
+      const batchHash = await systemContext.getBatchHashTesting(batchData.batchNumber);
       const newBatchHash = await ethers.utils.keccak256(ethers.utils.solidityPack(["uint32"], [2137]));
       await systemContext
         .connect(bootloaderAccount)
         .setNewBatch(newBatchHash, batchData.batchTimestamp.add(42), batchData.batchNumber.add(1), 2);
-      const batchDataAfter = await systemContext.getBatchNumberAndTimestamp();
+      const batchDataAfter = await systemContext.getBatchNumberAndTimestampTesting();
       expect(batchDataAfter.batchNumber).to.be.equal(batchData.batchNumber.add(1));
       expect(batchDataAfter.batchTimestamp).to.be.equal(batchData.batchTimestamp.add(42));
-      const prevBatchHashAfter = await systemContext.getBatchHash(batchData.batchNumber);
+      const prevBatchHashAfter = await systemContext.getBatchHashTesting(batchData.batchNumber);
       expect(prevBatchHashAfter).to.not.be.equal(batchHash);
       expect(prevBatchHashAfter).to.be.equal(newBatchHash);
     });
@@ -235,7 +235,7 @@ describe("SystemContext tests", () => {
       expect(blockHash).to.be.equal(ethers.constants.HashZero);
       // block < currentVirtualBlockUpgradeInfo.virtualBlockStartBatch
       const blockHash1 = await systemContext.getBlockHashEVM(0);
-      const batchHash = await systemContext.getBatchHash(0);
+      const batchHash = await systemContext.getBatchHashTesting(0);
       expect(blockHash1).to.be.equal(batchHash);
     });
 
@@ -381,7 +381,7 @@ describe("SystemContext tests", () => {
   // They should go after `setL2Block` section since tests from there rely on the fact that function `setL2Block` is not called before.
   describe("setNewBatch after setL2Block", async () => {
     it("should revert InconsistentNewBatchTimestamp", async () => {
-      const batchData = await systemContext.getBatchNumberAndTimestamp();
+      const batchData = await systemContext.getBatchNumberAndTimestampTesting();
       const blockData = await systemContext.getL2BlockNumberAndTimestamp();
 
       const newBatchTimestamp = blockData.blockTimestamp.sub(1);
@@ -395,7 +395,7 @@ describe("SystemContext tests", () => {
     });
 
     it("should allow new batch timestamp to be the same as the timestamp of the previous L2 block", async () => {
-      const batchData = await systemContext.getBatchNumberAndTimestamp();
+      const batchData = await systemContext.getBatchNumberAndTimestampTesting();
       const blockData = await systemContext.getL2BlockNumberAndTimestamp();
 
       const newBatchTimestamp = blockData.blockTimestamp;
@@ -409,7 +409,7 @@ describe("SystemContext tests", () => {
 
   describe("publishTimestampDataToL1", async () => {
     it("should revert The current batch number must be greater than 0", async () => {
-      const batchData = await systemContext.getBatchNumberAndTimestamp();
+      const batchData = await systemContext.getBatchNumberAndTimestampTesting();
       const baseFee = await systemContext.baseFee();
       await systemContext.connect(bootloaderAccount).unsafeOverrideBatch(batchData.batchTimestamp, 0, baseFee);
       await expect(systemContext.connect(bootloaderAccount).publishTimestampDataToL1()).to.be.revertedWithCustomError(

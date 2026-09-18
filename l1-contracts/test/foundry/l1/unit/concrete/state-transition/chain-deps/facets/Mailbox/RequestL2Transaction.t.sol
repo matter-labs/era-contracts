@@ -3,16 +3,19 @@
 pragma solidity 0.8.28;
 
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";
-import {BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
-import {ETH_TOKEN_ADDRESS, MAX_NEW_FACTORY_DEPS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
-import {TransactionFiltererTrue} from "contracts/dev-contracts/test/DummyTransactionFiltererTrue.sol";
-import {TransactionFiltererFalse} from "contracts/dev-contracts/test/DummyTransactionFiltererFalse.sol";
-import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
-import {GasPerPubdataMismatch, MsgValueTooLow, OnlyEraSupported, TooManyFactoryDeps} from "contracts/common/L1ContractErrors.sol";
-import {Bridgehub, IBridgehub} from "contracts/bridgehub/Bridgehub.sol";
 
+import {ETH_TOKEN_ADDRESS, MAX_NEW_FACTORY_DEPS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
+
+import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
+import {
+    GasPerPubdataMismatch,
+    MsgValueTooLow,
+    OnlyEraSupported,
+    TooManyFactoryDeps
+} from "contracts/common/L1ContractErrors.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+
+// TODO(EVM-1216): delete test file after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
 contract MailboxRequestL2TransactionTest is MailboxTest {
     address tempAddress;
     bytes[] tempBytesArr;
@@ -25,7 +28,7 @@ contract MailboxRequestL2TransactionTest is MailboxTest {
 
         l1SharedBridge = new DummySharedBridge(keccak256("dummyDepositHash"));
         baseTokenBridgeAddress = address(l1SharedBridge);
-        vm.mockCall(bridgehub, abi.encodeCall(IBridgehub.assetRouter, ()), abi.encode(baseTokenBridgeAddress));
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.assetRouter, ()), abi.encode(baseTokenBridgeAddress));
 
         tempAddress = makeAddr("temp");
         tempBytesArr = new bytes[](0);
@@ -69,10 +72,9 @@ contract MailboxRequestL2TransactionTest is MailboxTest {
 
         uint256 baseCost = mailboxFacet.l2TransactionBaseCost(10000000, 1000000, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
         uint256 l2Value = 1 ether;
-        uint256 mintValue = baseCost + l2Value;
 
-        vm.expectRevert(abi.encodeWithSelector(MsgValueTooLow.selector, mintValue, mintValue - 1));
-        mailboxFacet.requestL2Transaction{value: mintValue - 1}({
+        vm.expectRevert(abi.encodeWithSelector(MsgValueTooLow.selector, baseCost, baseCost - 1));
+        mailboxFacet.requestL2Transaction{value: baseCost - 1}({
             _contractL2: tempAddress,
             _l2Value: l2Value,
             _calldata: tempBytes,
@@ -150,5 +152,30 @@ contract MailboxRequestL2TransactionTest is MailboxTest {
         assertTrue(canonicalTxHash != bytes32(0), "canonicalTxHash should not be 0");
         assertEq(baseTokenBridgeAddress.balance, mintValue);
         assertEq(l1SharedBridge.chainBalance(eraChainId, ETH_TOKEN_ADDRESS), mintValue);
+    }
+
+    function test_success_requestL2Transaction_onlyBaseCostRequired() public {
+        utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
+        utilsFacet.util_setPriorityTxMaxGasLimit(100000000);
+
+        uint256 l2GasLimit = 1000000;
+        uint256 baseCost = mailboxFacet.l2TransactionBaseCost(10000000, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
+        uint256 l2Value = type(uint256).max;
+
+        vm.deal(sender, baseCost);
+        vm.prank(sender);
+        bytes32 canonicalTxHash = mailboxFacet.requestL2Transaction{value: baseCost}({
+            _contractL2: tempAddress,
+            _l2Value: l2Value,
+            _calldata: tempBytes,
+            _l2GasLimit: l2GasLimit,
+            _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+            _factoryDeps: new bytes[](0),
+            _refundRecipient: tempAddress
+        });
+
+        assertTrue(canonicalTxHash != bytes32(0), "canonicalTxHash should not be 0");
+        assertEq(baseTokenBridgeAddress.balance, baseCost);
+        assertEq(l1SharedBridge.chainBalance(eraChainId, ETH_TOKEN_ADDRESS), baseCost);
     }
 }

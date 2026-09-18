@@ -5,46 +5,93 @@ pragma solidity 0.8.28;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {Vm} from "forge-std/Vm.sol";
-import {stdToml} from "forge-std/StdToml.sol";
+import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {
+    IGatewayUtils,
+    FinishMigrateChainToGatewayParams,
+    FinishMigrateChainToGatewayWithCutDataParams
+} from "contracts/script-interfaces/IGatewayUtils.sol";
 
 // It's required to disable lints to force the compiler to compile the contracts
 // solhint-disable no-unused-import
-import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
-import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehub, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
+import {BridgehubBurnCTMAssetData, IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {IAssetRouterBase, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION} from "contracts/bridgehub/CTMDeploymentTracker.sol";
-import {IL2AssetRouter, L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {Utils} from "../utils/Utils.sol";
+
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
-import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {FinalizeL1DepositParams, IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
-import {ContractsBytecodesLib} from "../ContractsBytecodesLib.sol";
-import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
-import {Call} from "contracts/governance/Common.sol";
-import {IGovernance} from "contracts/governance/IGovernance.sol";
-import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
-import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
-
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-
-import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+import {ConfirmTransferResultData, TxStatus} from "contracts/common/Messaging.sol";
+import {GetDiamondCutData} from "../utils/GetDiamondCutData.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
-contract GatewayUtils is Script {
+contract GatewayUtils is Script, IGatewayUtils {
+    function finishMigrateChainToGateway(FinishMigrateChainToGatewayParams calldata params) external {
+        IL1Bridgehub bridgehub = IL1Bridgehub(params.bridgehubAddr);
+        bytes32 assetId = bridgehub.ctmAssetIdFromChainId(params.migratingChainId);
+        bytes memory gatewayDiamondCutData = GetDiamondCutData.readFromGateway(params.gatewayRpcUrl, assetId);
+
+        _finishMigrateChainToGatewayInner(
+            FinishMigrateChainToGatewayWithCutDataParams({
+                bridgehubAddr: params.bridgehubAddr,
+                l2TxNumberInBatch: params.l2TxNumberInBatch,
+                txStatus: params.txStatus,
+                l2TxHash: params.l2TxHash,
+                migratingChainId: params.migratingChainId,
+                gatewayChainId: params.gatewayChainId,
+                l2BatchNumber: params.l2BatchNumber,
+                l2MessageIndex: params.l2MessageIndex,
+                gatewayDiamondCutData: gatewayDiamondCutData,
+                merkleProof: params.merkleProof
+            })
+        );
+    }
+
+    function finishMigrateChainToGatewayWithCutData(
+        FinishMigrateChainToGatewayWithCutDataParams calldata params
+    ) external {
+        _finishMigrateChainToGatewayInner(params);
+    }
+
+    function _finishMigrateChainToGatewayInner(FinishMigrateChainToGatewayWithCutDataParams memory data) private {
+        IL1Bridgehub bridgehub = IL1Bridgehub(data.bridgehubAddr);
+        address assetRouter = address(bridgehub.assetRouter());
+        IL1Nullifier l1Nullifier = L1AssetRouter(assetRouter).L1_NULLIFIER();
+
+        bytes32 assetId = bridgehub.ctmAssetIdFromChainId(data.migratingChainId);
+        address chainAdmin = IZKChain(bridgehub.getZKChain(data.migratingChainId)).getAdmin();
+        bytes memory transferData = abi.encode(
+            BridgehubBurnCTMAssetData({
+                chainId: data.migratingChainId,
+                ctmData: abi.encode(AddressAliasHelper.applyL1ToL2Alias(chainAdmin), data.gatewayDiamondCutData),
+                chainData: abi.encode(IZKChain(bridgehub.getZKChain(data.migratingChainId)).getProtocolVersion())
+            })
+        );
+
+        vm.broadcast();
+        l1Nullifier.bridgeConfirmTransferResult(
+            ConfirmTransferResultData({
+                _chainId: data.gatewayChainId,
+                _depositSender: chainAdmin,
+                _assetId: assetId,
+                _assetData: transferData,
+                _l2TxHash: data.l2TxHash,
+                _l2BatchNumber: data.l2BatchNumber,
+                _l2MessageIndex: data.l2MessageIndex,
+                _l2TxNumberInBatch: data.l2TxNumberInBatch,
+                _merkleProof: data.merkleProof,
+                _txStatus: data.txStatus
+            })
+        );
+    }
+
     function finishMigrateChainFromGateway(
         address bridgehubAddr,
         uint256 migratingChainId,
@@ -55,9 +102,9 @@ contract GatewayUtils is Script {
         bytes memory message,
         bytes32[] memory merkleProof
     ) public {
-        IBridgehub bridgehub = IBridgehub(bridgehubAddr);
+        IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubAddr);
 
-        address assetRouter = bridgehub.assetRouter();
+        address assetRouter = address(bridgehub.assetRouter());
         IL1Nullifier l1Nullifier = L1AssetRouter(assetRouter).L1_NULLIFIER();
 
         vm.broadcast();
@@ -72,5 +119,19 @@ contract GatewayUtils is Script {
                 merkleProof: merkleProof
             })
         );
+    }
+
+    /// @notice Writes CTM `forceDeploymentsData` (from `NewChainCreationParams` logs) to a TOML fragment
+    /// used to build the `gateway-vote-preparation` input. Set env `FORCE_DEPLOYMENTS_DUMP_TOML_REL_PATH`
+    /// to a path relative to project root (e.g. `/script-out/force-deployments-dump.toml`).
+    function dumpForceDeployments(address _ctm) external {
+        (, bytes memory forceDeploymentsData) = GetDiamondCutData.getDiamondCutAndForceDeployment(_ctm, false);
+
+        string memory root = vm.projectRoot();
+        string memory rel = vm.envString("FORCE_DEPLOYMENTS_DUMP_TOML_REL_PATH");
+        string memory path = string.concat(root, rel);
+
+        string memory toml = vm.serializeBytes("root", "force_deployments_data", forceDeploymentsData);
+        vm.writeToml(toml, path);
     }
 }

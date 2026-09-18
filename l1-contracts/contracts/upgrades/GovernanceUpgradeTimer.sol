@@ -2,7 +2,15 @@
 pragma solidity ^0.8.18;
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
-import {CallerNotTimerAdmin, DeadlineNotYetPassed, NewDeadlineExceedsMaxDeadline, NewDeadlineNotGreaterThanCurrent, TimerAlreadyStarted, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {
+    CallerNotTimerAdmin,
+    DeadlineNotYetPassed,
+    NewDeadlineExceedsMaxDeadline,
+    NewDeadlineNotGreaterThanCurrent,
+    TimerAlreadyStarted,
+    TimerNotStarted,
+    ZeroAddress
+} from "../common/L1ContractErrors.sol";
 
 /// @title Governance Upgrade Timer
 /// @author Matter Labs
@@ -80,6 +88,9 @@ contract GovernanceUpgradeTimer is Ownable2Step {
     ///
     /// Reverts with {DeadlineNotYetPassed} error if the current block timestamp is less than `deadline`.
     function checkDeadline() external view {
+        if (deadline == 0) {
+            revert TimerNotStarted();
+        }
         if (block.timestamp < deadline) {
             revert DeadlineNotYetPassed();
         }

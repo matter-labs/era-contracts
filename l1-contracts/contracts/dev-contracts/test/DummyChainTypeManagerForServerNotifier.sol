@@ -7,12 +7,23 @@ pragma solidity 0.8.28;
 contract DummyChainTypeManager {
     mapping(uint256 chainId => address chainAdmin) chainAdmin;
 
+    mapping(uint256 chainId => uint256 protocolVersion) public protocolVersion;
+
     mapping(uint256 _protocolVersion => uint256) public protocolVersionDeadline;
+
+    mapping(uint256 protocolVersion => bytes32 cutHash) public upgradeCutHash;
+
+    // solhint-disable-next-line var-name-mixedcase
+    address public BRIDGE_HUB;
 
     constructor() {}
 
     function setProtocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) external {
         protocolVersionDeadline[_protocolVersion] = _timestamp;
+    }
+
+    function setUpgradeCutHash(uint256 _oldProtocolVersion, bytes32 _upgradeCutHash) external {
+        upgradeCutHash[_oldProtocolVersion] = _upgradeCutHash;
     }
 
     function protocolVersionIsActive(uint256 _protocolVersion) external view returns (bool) {
@@ -23,8 +34,20 @@ contract DummyChainTypeManager {
         return chainAdmin[_chainId];
     }
 
+    function getProtocolVersion(uint256 _chainId) public view returns (uint256) {
+        return protocolVersion[_chainId];
+    }
+
     function setChainAdmin(uint256 _chainId, address _chainAdmin) external {
         chainAdmin[_chainId] = _chainAdmin;
+    }
+
+    function setBridgeHub(address _bridgeHub) external {
+        BRIDGE_HUB = _bridgeHub;
+    }
+
+    function _setChainProtocolVersion(uint256 _chainId, uint256 _protocolVersion) external {
+        protocolVersion[_chainId] = _protocolVersion;
     }
 
     // add this to be excluded from coverage report

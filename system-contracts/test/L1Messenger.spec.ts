@@ -19,6 +19,13 @@ const L2_TO_L1_LOGS_MERKLE_TREE_LEAVES = 16_384;
 const L2_TO_L1_LOG_SERIALIZE_SIZE = 88;
 const L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH = "0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba";
 
+const L2_DA_COMMITMENT_SCHEME = {
+  NONE: 0,
+  EMPTY: 1,
+  ROLLUP: 2,
+  KECCAK: 3,
+};
+
 describe("L1Messenger tests", () => {
   let l1Messenger: L1Messenger;
   let wallet: Wallet;
@@ -56,7 +63,7 @@ describe("L1Messenger tests", () => {
     await l1Messenger
       .connect(bootloaderAccount)
       .publishPubdataAndClearState(
-        ethers.constants.AddressZero,
+        L2_DA_COMMITMENT_SCHEME.EMPTY,
         await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger)
       );
     await network.provider.request({
@@ -85,7 +92,7 @@ describe("L1Messenger tests", () => {
         await l1Messenger
           .connect(bootloaderAccount)
           .publishPubdataAndClearState(
-            ethers.constants.AddressZero,
+            L2_DA_COMMITMENT_SCHEME.EMPTY,
             await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger),
             { gasLimit: 1000000000 }
           )
@@ -97,7 +104,7 @@ describe("L1Messenger tests", () => {
         l1Messenger
           .connect(bootloaderAccount)
           .publishPubdataAndClearState(
-            ethers.constants.AddressZero,
+            L2_DA_COMMITMENT_SCHEME.EMPTY,
             await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, { numberOfLogs: 0x4002 })
           )
       ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
@@ -107,7 +114,7 @@ describe("L1Messenger tests", () => {
         l1Messenger
           .connect(bootloaderAccount)
           .publishPubdataAndClearState(
-            ethers.constants.AddressZero,
+            L2_DA_COMMITMENT_SCHEME.EMPTY,
             await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, { l2DaValidatorFunctionSig: "0x12121212" })
           )
       ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
@@ -131,7 +138,7 @@ describe("L1Messenger tests", () => {
         l1Messenger
           .connect(bootloaderAccount)
           .publishPubdataAndClearState(
-            ethers.constants.AddressZero,
+            L2_DA_COMMITMENT_SCHEME.EMPTY,
             await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, overrideData)
           )
       ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
@@ -140,7 +147,7 @@ describe("L1Messenger tests", () => {
       const correctChainedMessagesHash = await l1Messenger.provider.getStorageAt(l1Messenger.address, 2);
       await expect(
         l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(
-          ethers.constants.AddressZero,
+          L2_DA_COMMITMENT_SCHEME.EMPTY,
           await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, {
             chainedMessagesHash: ethers.utils.keccak256(correctChainedMessagesHash),
           })
@@ -151,7 +158,7 @@ describe("L1Messenger tests", () => {
       const correctChainedBytecodesHash = await l1Messenger.provider.getStorageAt(l1Messenger.address, 3);
       await expect(
         l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(
-          ethers.constants.AddressZero,
+          L2_DA_COMMITMENT_SCHEME.EMPTY,
           await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, {
             chainedBytecodeHash: ethers.utils.keccak256(correctChainedBytecodesHash),
           })
@@ -161,7 +168,7 @@ describe("L1Messenger tests", () => {
     it("should revert Invalid offset", async () => {
       await expect(
         l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(
-          ethers.constants.AddressZero,
+          L2_DA_COMMITMENT_SCHEME.EMPTY,
           await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, {
             operatorDataOffset: EXPECTED_DA_INPUT_OFFSET + 1,
           })
@@ -173,7 +180,7 @@ describe("L1Messenger tests", () => {
         l1Messenger
           .connect(bootloaderAccount)
           .publishPubdataAndClearState(
-            ethers.constants.AddressZero,
+            L2_DA_COMMITMENT_SCHEME.EMPTY,
             await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, { operatorDataLength: 1 })
           )
       ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
@@ -181,7 +188,7 @@ describe("L1Messenger tests", () => {
     it("should revert Invalid root hash", async () => {
       await expect(
         l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(
-          ethers.constants.AddressZero,
+          L2_DA_COMMITMENT_SCHEME.EMPTY,
           await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, {
             chainedLogsRootHash: ethers.constants.HashZero,
           })

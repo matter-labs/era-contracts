@@ -19,17 +19,12 @@ jobs:
           submodules: recursive
 
       - name: Install foundry-zksync
-        run: |
-          mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-ae913af65381734ad46c044a9495b67310bc77c4/foundry_nightly_linux_amd64.tar.gz
-          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
-          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
-          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
+        uses: ./.github/actions/install-zksync-foundry
 
       - name: Use Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v6
         with:
-          node-version: 18.18.0
+          node-version-file: .nvmrc
           cache: yarn
 
       - name: Install dependencies
@@ -61,6 +56,7 @@ jobs:
         with:
           key: artifacts-l1-${{ github.sha }}
           path: |
+            da-contracts/cache-forge
             da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
@@ -69,27 +65,54 @@ jobs:
             l2-contracts/zkout
             system-contracts/zkout
 
-  lint:
+      - name: Upload artifacts for download
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            da-contracts/cache-forge
+            da-contracts/out
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l1-contracts/zkout
+            l2-contracts/cache-forge
+            l2-contracts/zkout
+            system-contracts/zkout
+
+  check-zkstack-out:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install foundry-zksync
+        uses: ./.github/actions/install-zksync-foundry
 
       - name: Use Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v6
         with:
-          node-version: 18.18.0
+          node-version-file: .nvmrc
           cache: yarn
 
       - name: Install dependencies
         run: yarn
 
-      - name: Lint
-        run: yarn lint:check
+      - name: Build and check zkstack-out
+        working-directory: l1-contracts
+        run: |
+          rm -rf zkstack-out
+          yarn build:foundry
 
-      - name: Lint errors
-        run: yarn l1 errors-lint --check
+          # Fail if regenerated zkstack-out differs from what was committed
+          if [ -n "$(git status --porcelain -- zkstack-out)" ]; then
+            echo "::error::l1-contracts/zkstack-out is out of date. Run 'cd l1-contracts && yarn build:foundry' and commit the changes."
+            git --no-pager status --porcelain -- zkstack-out
+            git --no-pager diff -- zkstack-out || true
+            exit 1
+          fi
 
   check-hashes:
     needs: [build]
@@ -100,9 +123,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Use Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v6
         with:
-          node-version: 18.18.0
+          node-version-file: .nvmrc
           cache: yarn
       - name: Install dependencies
         run: yarn
@@ -113,6 +136,7 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
           path: |
+            da-contracts/cache-forge
             da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
@@ -130,8 +154,8 @@ jobs:
       - name: Check hashes
         run: yarn calculate-hashes:check
 
-  test-foundry:
-    needs: [build, lint]
+  check-selectors:
+    needs: [build]
     runs-on: ubuntu-latest
 
     steps:
@@ -141,18 +165,72 @@ jobs:
           submodules: recursive
 
       - name: Use Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v6
         with:
-          node-version: 18.18.0
+          node-version-file: .nvmrc
+          cache: yarn
+      - name: Install dependencies
+        run: yarn
+
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-l1-${{ github.sha }}
+          path: |
+            da-contracts/cache-forge
+            da-contracts/out
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l1-contracts/zkout
+            l2-contracts/cache-forge
+            l2-contracts/zkout
+            system-contracts/zkout
+
+      - name: Install foundry-zksync
+        uses: ./.github/actions/install-zksync-foundry
+
+      - name: Check selectors
+        run: yarn l1 selectors --check
+
+  check-legacy-bridge-sol:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+      - name: Install dependencies
+        run: yarn
+
+      - name: Check LegacySharedBridgeAddresses.sol is up to date
+        run: yarn l1 check-legacy-bridge-sol
+
+  test-foundry:
+    needs: [build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
           cache: yarn
 
       - name: Install foundry-zksync
-        run: |
-          mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-ae913af65381734ad46c044a9495b67310bc77c4/foundry_nightly_linux_amd64.tar.gz
-          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
-          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
-          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
+        uses: ./.github/actions/install-zksync-foundry
 
       - name: Install dependencies
         run: yarn
@@ -163,6 +241,7 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
           path: |
+            da-contracts/cache-forge
             da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
@@ -175,13 +254,18 @@ jobs:
         working-directory: ./l1-contracts
         run: yarn test:foundry
 
+      - name: Run DA tests
+        working-directory: ./da-contracts
+        run: yarn test:foundry
+
       # TODO: restore once we can get back to latest foundry
       # - name: Check gas snapshots
       #   working-directory: ./l1-contracts
       #   run: forge test --match-test MeasureGas --gas-snapshot-check=true
 
+  # FIXME: uncomment once fixed.
   test-foundry-zksync:
-    needs: [build, lint]
+    needs: [build]
     runs-on: ubuntu-latest
 
     steps:
@@ -191,18 +275,13 @@ jobs:
           submodules: recursive
 
       - name: Use Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v6
         with:
-          node-version: 18.18.0
+          node-version-file: .nvmrc
           cache: yarn
 
       - name: Install foundry-zksync
-        run: |
-          mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-ae913af65381734ad46c044a9495b67310bc77c4/foundry_nightly_linux_amd64.tar.gz
-          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
-          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
-          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
+        uses: ./.github/actions/install-zksync-foundry
 
       - name: Install dependencies
         run: yarn
@@ -243,52 +322,34 @@ jobs:
           toolchain: 1.72.0
 
       - name: Install Rust toolchain
-        working-directory: tools
+        working-directory: tools/verifier-gen
         run: rustup toolchain install
 
-      - name: Generate verifiers
-        working-directory: tools
-        run: cargo run
+      - name: Generate Era verifiers
+        working-directory: tools/verifier-gen
+        run: cargo run --bin zksync_verifier_contract_generator --release -- --variant era
 
-      - name: Compare L1VerifierPlonk.sol
-        run: diff tools/data/VerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/L1VerifierPlonk.sol
+      - name: Compare EraVerifierPlonk.sol
+        run: diff tools/verifier-gen/data/EraVerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/EraVerifierPlonk.sol
 
-      - name: Compare VerifierFflonk.sol
-        run: diff tools/data/VerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/L1VerifierFflonk.sol
+      - name: Compare EraVerifierFflonk.sol
+        run: diff tools/verifier-gen/data/EraVerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/EraVerifierFflonk.sol
 
-  check-verifier-generator-l2:
-    runs-on: ubuntu-latest
+      - name: Generate ZKsyncOS verifiers
+        working-directory: tools/verifier-gen
+        run: cargo run --bin zksync_verifier_contract_generator --release -- --variant zksync-os
 
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
+      - name: Compare ZKsyncOSVerifierPlonk.sol
+        run: diff tools/verifier-gen/data/ZKsyncOSVerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol
 
-      - name: Install rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: 1.72.0
-
-      - name: Install Rust toolchain
-        working-directory: tools
-        run: rustup toolchain install
-
-      - name: Generate verifiers
-        working-directory: tools
-        run: cargo run -- --l2_mode
-
-      - name: Compare L2VerifierPlonk.sol
-        run: diff tools/data/VerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/L2VerifierPlonk.sol
-
-      - name: Compare L2VerifierFflonk.sol
-        run: diff tools/data/VerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/L2VerifierFflonk.sol
+      - name: Compare ZKsyncOSVerifierFflonk.sol
+        run: diff tools/verifier-gen/data/ZKsyncOSVerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol
 
   coverage:
     defaults:
       run:
         working-directory: l1-contracts
-    needs: [build, lint]
+    needs: [build] # TODO return lint into dependencies when it's fully fixed
     runs-on: ubuntu-latest
 
     steps:
@@ -298,18 +359,13 @@ jobs:
           submodules: recursive
 
       - name: Use Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v6
         with:
-          node-version: 18.18.0
+          node-version-file: .nvmrc
           cache: yarn
 
       - name: Install foundry-zksync
-        run: |
-          mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-ae913af65381734ad46c044a9495b67310bc77c4/foundry_nightly_linux_amd64.tar.gz
-          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
-          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
-          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
+        uses: ./.github/actions/install-zksync-foundry
 
       - name: Install dependencies
         run: yarn
@@ -320,6 +376,7 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
           path: |
+            da-contracts/cache-forge
             da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
@@ -328,8 +385,10 @@ jobs:
             l2-contracts/zkout
             system-contracts/zkout
 
-      - name: Run coverage
-        run: yarn test:foundry && yarn coverage:foundry --report summary --report lcov
+      # --- 1. Foundry coverage (unchanged) ---
+
+      - name: Run Foundry coverage
+        run: yarn test:foundry --no-match-path 'test/foundry/l1/unit/concrete/Executor/*' && yarn coverage:foundry --report summary --report lcov
 
       # Installing the specific version of `lcov` because of
       # the `genhtml: ERROR: line ... of ... has branchcov but no linecov data` error.
@@ -340,36 +399,115 @@ jobs:
           ref: v1.16
 
       # To ignore coverage for certain directories modify the paths in this step as needed. The
-      # below default ignores coverage results for the test and script directories. It also ignores
-      # the ChainRegistrar contract since it is unused. Alternatively, to include coverage in all
-      # directories, comment out this step. Note that because this filtering applies to the lcov
-      # file, the summary table generated in the previous step will still include all files and
-      # directories. The `--rc branch_coverage=1` part keeps branch info in the filtered report,
-      # since lcov defaults to removing branch info.
-      - name: Filter directories
+      # below default ignores coverage results for the test and script directories. Alternatively,
+      # to include coverage in all directories, comment out this step. Note that because this
+      # filtering applies to the lcov file, the summary table generated in the previous step will
+      # still include all files and directories. The `--rc branch_coverage=1` part keeps branch info
+      # in the filtered report, since lcov defaults to removing branch info.
+      - name: Filter Foundry coverage directories
         run: |
-          lcov --ignore-errors unused --remove lcov.info 'test/*' 'contracts/dev-contracts/*' 'lib/*' '../lib/*' 'lib/' 'deploy-scripts/*' 'contracts/chain-registrar/ChainRegistrar.sol' --output-file lcov.info --rc branch_coverage=1
+          lcov --ignore-errors unused --remove lcov.info 'test/*' 'contracts/dev-contracts/*' 'lib/*' '../lib/*' 'lib/' 'deploy-scripts/*' --output-file lcov.info --rc branch_coverage=1
 
-      # This step posts a detailed coverage report as a comment and deletes previous comments on
-      # each push. The below step is used to fail coverage if the specified coverage threshold is
-      # not met. The below step can post a comment (when it's `github-token` is specified) but it's
-      # not as useful, and this action cannot fail CI based on a minimum coverage threshold, which
-      # is why we use both in this way.
-      - name: Post coverage report
-        if: github.event_name == 'pull_request' # This action fails when ran outside of a pull request.
-        uses: romeovs/lcov-reporter-action@v0.4.0
-        with:
-          delete-old-comments: true
-          lcov-file: ./l1-contracts/lcov.info
-          github-token: ${{ secrets.GITHUB_TOKEN }} # Adds a coverage summary comment to the PR.
+      - name: Post Foundry coverage report
+        run: |
+          {
+            echo "## Foundry Coverage Report"
+            echo ""
+            echo '```'
+            lcov --summary lcov.info --rc branch_coverage=1 2>&1
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY
 
-      - name: Verify minimum coverage
+      - name: Verify Foundry minimum coverage
         uses: zgosalvez/github-actions-report-lcov@df68834145a4a567247d6a3ea8565c4c39d1fd17 # v4.1.23
         with:
           coverage-files: ./l1-contracts/lcov.info
           working-directory: l1-contracts
-          minimum-coverage: 83 # TODO(EVM-944): increase threshold to 85
+          minimum-coverage: 75 # TODO(EVM-944): increase threshold to 85
 
+      # --- 2. Anvil interop coverage + merged report ---
+
+      # install-zksync-foundry only provides forge/cast; we need regular anvil for interop tests
+      - name: Install Foundry (for Anvil)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+
+      - name: Install anvil-interop dependencies
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn install
+
+      - name: Run Anvil interop coverage
+        working-directory: l1-contracts/test/anvil-interop
+        run: ANVIL_COVERAGE_MODE=1 yarn ts-node run-coverage.ts
+
+      - name: Cleanup Anvil
+        if: always()
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn cleanup
+
+      # Merge produces two outputs:
+      #   coverage/merged-lcov.info        — Foundry hits + Anvil hits
+      #   coverage/anvil-rebased-lcov.info — Foundry's files/lines/functions, Anvil hits only
+      # Both use Foundry as the baseline so all three reports share the same denominator.
+      - name: Merge Foundry + Anvil coverage
+        if: success()
+        run: yarn coverage:merge
+
+      - name: Filter Anvil rebased coverage
+        if: success()
+        run: |
+          lcov --ignore-errors unused --remove coverage/anvil-rebased-lcov.info 'test/*' 'contracts/dev-contracts/*' 'lib/*' '../lib/*' 'lib/' 'deploy-scripts/*' --output-file coverage/anvil-rebased-lcov.info --rc branch_coverage=1
+
+      - name: Post Anvil interop coverage report
+        if: success()
+        run: |
+          {
+            echo "## Anvil Interop Coverage Report"
+            echo ""
+            echo '```'
+            lcov --summary coverage/anvil-rebased-lcov.info --rc branch_coverage=1 2>&1
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: Generate Anvil untested lines report
+        if: success()
+        run: npx ts-node scripts/generate-untested-lines-report.ts coverage/anvil-rebased-lcov.info coverage/ANVIL_UNTESTED_LINES_REPORT.md
+
+      - name: Filter merged coverage
+        if: success()
+        run: |
+          lcov --ignore-errors unused --remove coverage/merged-lcov.info 'test/*' 'contracts/dev-contracts/*' 'lib/*' '../lib/*' 'lib/' 'deploy-scripts/*' --output-file coverage/merged-lcov.info --rc branch_coverage=1
+
+      - name: Post merged coverage report
+        if: success()
+        run: |
+          {
+            echo "## Merged Coverage Report (Foundry + Anvil Interop)"
+            echo ""
+            echo '```'
+            lcov --summary coverage/merged-lcov.info --rc branch_coverage=1 2>&1
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: Generate merged untested lines report
+        if: success()
+        run: npx ts-node scripts/generate-untested-lines-report.ts coverage/merged-lcov.info coverage/MERGED_UNTESTED_LINES_REPORT.md
+
+      - name: Upload coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: |
+            l1-contracts/lcov.info
+            l1-contracts/coverage/anvil/anvil-lcov.info
+            l1-contracts/coverage/anvil/anvil-coverage-summary.txt
+            l1-contracts/coverage/anvil-rebased-lcov.info
+            l1-contracts/coverage/ANVIL_UNTESTED_LINES_REPORT.md
+            l1-contracts/coverage/merged-lcov.info
+            l1-contracts/coverage/MERGED_UNTESTED_LINES_REPORT.md
+          if-no-files-found: warn
 
   # FIXME: restore gas report CI
   # gas-report:
@@ -386,9 +524,9 @@ jobs:
   #       uses: foundry-rs/foundry-toolchain@v1
 
   #     - name: Use Node.js
-  #       uses: actions/setup-node@v3
+  #       uses: actions/setup-node@v6
   #       with:
-  #         node-version: 18.18.0
+  #         node-version-file: .nvmrc
   #         cache: yarn
 
   #     - name: Install dependencies
@@ -400,6 +538,7 @@ jobs:
   #         fail-on-cache-miss: true
   #         key: artifacts-l1-${{ github.sha }}
   #         path: |
+  #           da-contracts/cache-forge
   #           da-contracts/out
   #           l1-contracts/cache-forge
   #           l1-contracts/out

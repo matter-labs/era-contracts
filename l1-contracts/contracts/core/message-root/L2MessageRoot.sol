@@ -1,0 +1,134 @@
+// SPDX-License-Identifier: MIT
+
+pragma solidity 0.8.28;
+
+import {MessageRootBase} from "./MessageRootBase.sol";
+import {CHAIN_TREE_EMPTY_ENTRY_HASH, SHARED_ROOT_TREE_EMPTY_HASH} from "./IMessageRoot.sol";
+
+import {
+    L2_BRIDGEHUB_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR
+} from "../../common/l2-helpers/L2ContractAddresses.sol";
+
+import {OnlyL1} from "../bridgehub/L1BridgehubErrors.sol";
+import {MessageHashing, ProofData} from "../../common/libraries/MessageHashing.sol";
+
+import {FullMerkle} from "../../common/libraries/FullMerkle.sol";
+import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
+import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
+import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncrementalMerkleMemory.sol";
+import {InvalidCaller} from "../../common/L1ContractErrors.sol";
+
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
+/// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
+/// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
+contract L2MessageRoot is MessageRootBase {
+    using FullMerkle for FullMerkle.FullTree;
+    using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
+    using FullMerkleMemory for FullMerkleMemory.FullTree;
+    using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
+
+    /// @dev Chain ID of L1 for bridging reasons.
+    uint256 internal l1ChainId;
+
+    /*//////////////////////////////////////////////////////////////
+                        IMMUTABLE GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    function _bridgehub() internal pure override returns (address) {
+        return L2_BRIDGEHUB_ADDR;
+    }
+
+    function _chainAssetHandler() internal view override returns (address) {
+        return L2_CHAIN_ASSET_HANDLER_ADDR;
+    }
+
+    // A method for backwards compatibility with the old implementation
+    // solhint-disable-next-line func-name-mixedcase
+    function BRIDGE_HUB() public pure returns (address) {
+        return L2_BRIDGEHUB_ADDR;
+    }
+
+    // solhint-disable-next-line func-name-mixedcase
+    function L1_CHAIN_ID() public view override returns (uint256) {
+        return l1ChainId;
+    }
+
+    /// @dev Only allows calls from the complex upgrader contract on L2.
+    modifier onlyUpgrader() {
+        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
+            revert InvalidCaller(msg.sender);
+        }
+        _;
+    }
+
+    /// @notice Initializes the contract.
+    /// @dev This function is used to initialize the contract with the initial values.
+    /// @dev Expected to be called only once by the ComplexUpgrader and during genesis only, while
+    /// for already existing chains an `updateL2` function should be used.
+    /// @param _l1ChainId The chain id of L1.
+    function initL2(uint256 _l1ChainId) public reentrancyGuardInitializer onlyUpgrader {
+        _disableInitializers();
+        updateL2(_l1ChainId);
+        _initialize();
+    }
+
+    function updateL2(uint256 _l1ChainId) public onlyUpgrader {
+        l1ChainId = _l1ChainId;
+    }
+
+    /// @notice Adds a new chainBatchRoot to the chainTree.
+    /// @param _chainId The ID of the chain whose chainBatchRoot is being added to the chainTree.
+    /// @param _batchNumber The number of the batch to which _chainBatchRoot belongs.
+    /// @param _chainBatchRoot The value of chainBatchRoot which is being added.
+    function addChainBatchRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) public override {
+        super.addChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
+
+        // Push chainBatchRoot to the chainTree related to specified chainId and get the new root.
+        bytes32 chainRoot;
+        // slither-disable-next-line unused-return
+        (, chainRoot) = chainTree[_chainId].push(MessageHashing.batchLeafHash(_chainBatchRoot, _batchNumber));
+
+        emit AppendedChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
+
+        // Update leaf corresponding to the specified chainId with newly acquired value of the chainRoot.
+        bytes32 cachedChainIdLeafHash = MessageHashing.chainIdLeafHash(chainRoot, _chainId);
+        bytes32 sharedTreeRoot = sharedTree.updateLeaf(chainIndex[_chainId], cachedChainIdLeafHash);
+
+        emit NewChainRoot(_chainId, chainRoot, cachedChainIdLeafHash);
+
+        _emitRoot(sharedTreeRoot);
+        historicalRoot[block.number] = sharedTreeRoot;
+    }
+
+    function getEmptyMultichainBatchRoot(uint256 _chainId) external pure returns (bytes32) {
+        FullMerkleMemory.FullTree memory localSharedTree;
+        localSharedTree.createTree(1);
+        // slither-disable-next-line unused-return
+        localSharedTree.setup(SHARED_ROOT_TREE_EMPTY_HASH);
+
+        DynamicIncrementalMerkleMemory.Bytes32PushTree memory localChainTree;
+        localChainTree.createTree(1);
+        bytes32 initialChainTreeHash = localChainTree.setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
+        bytes32 leafHash = MessageHashing.chainIdLeafHash(initialChainTreeHash, _chainId);
+
+        return localSharedTree.pushNewLeaf(leafHash);
+    }
+
+    function _proveL2LeafInclusionOnSettlementLayer(
+        uint256,
+        uint256,
+        ProofData memory,
+        bytes32[] calldata,
+        uint256
+    ) internal pure override returns (bool) {
+        revert OnlyL1();
+    }
+
+    /// @inheritdoc MessageRootBase
+    function _noBatchFallback(uint256, uint256) internal pure override returns (bytes32) {
+        return bytes32(0);
+    }
+}

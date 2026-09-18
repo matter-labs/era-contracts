@@ -2,13 +2,34 @@
 
 pragma solidity 0.8.28;
 
-import {ICompressor, LENGTH_BITS_OFFSET, MAX_ENUMERATION_INDEX_SIZE, OPERATION_BITMASK} from "./interfaces/ICompressor.sol";
+import {
+    ICompressor,
+    LENGTH_BITS_OFFSET,
+    MAX_ENUMERATION_INDEX_SIZE,
+    OPERATION_BITMASK
+} from "./interfaces/ICompressor.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {UnsafeBytesCalldata} from "./libraries/UnsafeBytesCalldata.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
-import {KNOWN_CODE_STORAGE_CONTRACT, L1_MESSENGER_CONTRACT, STATE_DIFF_ENTRY_SIZE} from "./Constants.sol";
-import {CompressionValueAddError, CompressionValueSubError, CompressionValueTransformError, CompressorEnumIndexNotEqual, CompressorInitialWritesProcessedNotEqual, DerivedKeyNotEqualToCompressedValue, DictionaryDividedByEightNotGreaterThanEncodedDividedByTwo, EncodedAndRealBytecodeChunkNotEqual, EncodedLengthNotFourTimesSmallerThanOriginal, IndexOutOfBounds, IndexSizeError, StateDiffLengthMismatch, UnsupportedOperation} from "./SystemContractErrors.sol";
+import {STATE_DIFF_ENTRY_SIZE} from "./Constants.sol";
+import {KNOWN_CODE_STORAGE_CONTRACT, L1_MESSENGER_CONTRACT} from "./Contracts.sol";
+import {
+    CompressionValueAddError,
+    CompressionValueSubError,
+    CompressionValueTransformError,
+    CompressorEnumIndexNotEqual,
+    CompressorInitialWritesProcessedNotEqual,
+    DerivedKeyNotEqualToCompressedValue,
+    DictionaryDividedByEightNotGreaterThanEncodedDividedByTwo,
+    EncodedAndRealBytecodeChunkNotEqual,
+    EncodedLengthNotFourTimesSmallerThanOriginal,
+    IndexOutOfBounds,
+    IndexSizeError,
+    InvalidCompressionMetadata,
+    StateDiffLengthMismatch,
+    UnsupportedOperation
+} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -153,7 +174,15 @@ contract Compressor is ICompressor, SystemContractBase {
             uint8 metadata = uint8(bytes1(_compressedStateDiffs[stateDiffPtr]));
             ++stateDiffPtr;
             uint8 operation = metadata & OPERATION_BITMASK;
-            uint8 len = operation == 0 ? 32 : metadata >> LENGTH_BITS_OFFSET;
+            uint8 len;
+            if (operation == 0) {
+                if (metadata >> LENGTH_BITS_OFFSET != 0) {
+                    revert InvalidCompressionMetadata();
+                }
+                len = 32;
+            } else {
+                len = metadata >> LENGTH_BITS_OFFSET;
+            }
             _verifyValueCompression(
                 initValue,
                 finalValue,
@@ -188,7 +217,15 @@ contract Compressor is ICompressor, SystemContractBase {
             uint8 metadata = uint8(bytes1(_compressedStateDiffs[stateDiffPtr]));
             ++stateDiffPtr;
             uint8 operation = metadata & OPERATION_BITMASK;
-            uint8 len = operation == 0 ? 32 : metadata >> LENGTH_BITS_OFFSET;
+            uint8 len;
+            if (operation == 0) {
+                if (metadata >> LENGTH_BITS_OFFSET != 0) {
+                    revert InvalidCompressionMetadata();
+                }
+                len = 32;
+            } else {
+                len = metadata >> LENGTH_BITS_OFFSET;
+            }
             _verifyValueCompression(
                 initValue,
                 finalValue,

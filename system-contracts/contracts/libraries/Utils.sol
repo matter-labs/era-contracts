@@ -45,6 +45,14 @@ library Utils {
         return uint24(_x);
     }
 
+    function safeCastToU8(uint256 _x) internal pure returns (uint8) {
+        if (_x > type(uint8).max) {
+            revert Overflow();
+        }
+
+        return uint8(_x);
+    }
+
     /// @return If this bytecode hash for EVM contract or not
     function isCodeHashEVM(bytes32 _bytecodeHash) internal pure returns (bool) {
         return (uint8(_bytecodeHash[0]) == EVM_BYTECODE_FLAG);
@@ -128,8 +136,7 @@ library Utils {
             revert MalformedBytecode(BytecodeError.WordsMustBeOdd);
         }
         hashedBytecode =
-            EfficientCall.sha(_bytecode) &
-            0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+            EfficientCall.sha(_bytecode) & 0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
         // Setting the version of the hash
         hashedBytecode = (hashedBytecode | bytes32(uint256(ERA_VM_BYTECODE_FLAG) << 248));
         // Setting the length
@@ -169,8 +176,7 @@ library Utils {
         }
 
         hashedEVMBytecode =
-            EfficientCall.sha(_paddedBytecode) &
-            0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+            EfficientCall.sha(_paddedBytecode) & 0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
 
         // Setting the version of the hash
         hashedEVMBytecode = (hashedEVMBytecode | bytes32(uint256(EVM_BYTECODE_FLAG) << 248));

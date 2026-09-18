@@ -3,13 +3,15 @@ pragma solidity 0.8.28;
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {GatewayPreparationForTests} from "./_GatewayPreparationForTests.sol";
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+
 import "@openzeppelin/contracts-v4/utils/Strings.sol";
 
 contract GatewayDeployer is L1ContractDeployer {
     GatewayPreparationForTests gatewayScript;
 
     function _initializeGatewayScript() internal {
+        vm.setEnv("CTM_CONFIG", "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-ctm.toml");
+        vm.setEnv("CTM_OUTPUT", "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-ctm.toml");
         vm.setEnv("L1_CONFIG", "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-l1.toml");
         vm.setEnv("L1_OUTPUT", "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-l1.toml");
         vm.setEnv(
@@ -18,11 +20,11 @@ contract GatewayDeployer is L1ContractDeployer {
         );
         vm.setEnv(
             "GATEWAY_AS_CHAIN_CONFIG",
-            "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-zk-chain-11.toml"
+            "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-zk-chain-506.toml"
         );
         vm.setEnv(
             "GATEWAY_AS_CHAIN_OUTPUT",
-            "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-11.toml"
+            "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-506.toml"
         );
 
         gatewayScript = new GatewayPreparationForTests();

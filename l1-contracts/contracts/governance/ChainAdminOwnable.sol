@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {IChainAdminOwnable} from "./IChainAdminOwnable.sol";
 import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
-import {NoCallsProvided, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {NoCallsProvided, Unauthorized, ZeroAddress, ZeroUpgradeTimestamp} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -16,6 +16,7 @@ import {NoCallsProvided, Unauthorized, ZeroAddress} from "../common/L1ContractEr
 contract ChainAdminOwnable is IChainAdminOwnable, Ownable2Step {
     /// @notice Mapping of protocol versions to their expected upgrade timestamps.
     /// @dev Needed for the offchain node administration to know when to start building batches with the new protocol version.
+    /// @dev Starting from v31, value 0 means "unset" (upgrade not scheduled). Use value 1 for instant upgrades.
     mapping(uint256 protocolVersion => uint256 upgradeTimestamp) public protocolVersionToUpgradeTimestamp;
 
     /// @notice The address which can call `setTokenMultiplier` function to change the base token gas price in the Chain contract.
@@ -44,6 +45,9 @@ contract ChainAdminOwnable is IChainAdminOwnable, Ownable2Step {
     /// @param _protocolVersion The ZKsync chain protocol version.
     /// @param _upgradeTimestamp The timestamp at which the chain node should expect the upgrade to happen.
     function setUpgradeTimestamp(uint256 _protocolVersion, uint256 _upgradeTimestamp) external onlyOwner {
+        if (_upgradeTimestamp == 0) {
+            revert ZeroUpgradeTimestamp();
+        }
         protocolVersionToUpgradeTimestamp[_protocolVersion] = _upgradeTimestamp;
         emit UpdateUpgradeTimestamp(_protocolVersion, _upgradeTimestamp);
     }

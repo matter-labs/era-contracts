@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {IImmutableSimulator, ImmutableData} from "./interfaces/IImmutableSimulator.sol";
-import {DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
+import {DEPLOYER_SYSTEM_CONTRACT} from "./Contracts.sol";
 import {Unauthorized} from "./SystemContractErrors.sol";
 
 /**

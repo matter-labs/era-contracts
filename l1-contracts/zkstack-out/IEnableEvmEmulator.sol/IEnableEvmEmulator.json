@@ -1,0 +1,20 @@
+[
+  {
+    "type": "function",
+    "name": "chainAllowEvmEmulation",
+    "inputs": [
+      {
+        "name": "chainAdmin",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "target",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  }
+]

@@ -337,7 +337,7 @@ async function checkBridgehub() {
     throw new Error("Bridgehub zkChain is not correct");
   }
 
-  const sharedBridge = await contract.sharedBridge();
+  const sharedBridge = await contract.assetRouter();
   if (sharedBridge.toLowerCase() != sharedBridgeProxy.toLowerCase()) {
     throw new Error("Bridgehub sharedBridge is not correct");
   }
@@ -491,7 +491,7 @@ async function main() {
     await checkIdenticalBytecode(gettersFacet, "GettersFacet");
     await checkIdenticalBytecode(adminFacet, "AdminFacet");
     await checkIdenticalBytecode(bridgeHubImpl, "Bridgehub");
-    await checkIdenticalBytecode(verifier, eraChainId == "324" ? "Verifier" : "TestnetVerifier");
+    await checkIdenticalBytecode(verifier, eraChainId == "324" ? "Verifier" : "EraTestnetVerifier");
     await checkIdenticalBytecode(diamondInit, "DiamondInit");
 
     await checkMailbox();

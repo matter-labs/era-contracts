@@ -10,12 +10,12 @@ function TEST_HOOK_PARAMS_OFFSET() -> ret {
 }
 
 function setTestHook(hook) {
-    mstore(TEST_HOOK_PTR(), $llvm_NoInline_llvm$_unoptimized(hook))
+    $llvm_NoInline_llvm$_storeVmHookMemory(TEST_HOOK_PTR(), hook)
 }   
 
 function storeTestHookParam(paramId, value) {
     let offset := add(TEST_HOOK_PARAMS_OFFSET(), mul(32, paramId))
-    mstore(offset, $llvm_NoInline_llvm$_unoptimized(value))
+    $llvm_NoInline_llvm$_storeVmHookMemory(offset, value)
 }
 
 
@@ -42,6 +42,11 @@ function testing_assertEq(a, b, message) {
 function testing_testWillFailWith(message) {
     storeTestHookParam(0, $llvm_NoInline_llvm$_unoptimized(message))
     setTestHook(102)
+}
+
+function testing_testTransactionWillFailWith(message) {
+    storeTestHookParam(0, $llvm_NoInline_llvm$_unoptimized(message))
+    setTestHook(105)
 }
 function testing_totalTests(tests) {
     storeTestHookParam(0, $llvm_NoInline_llvm$_unoptimized(tests))

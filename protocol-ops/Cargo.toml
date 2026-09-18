@@ -1,0 +1,62 @@
+[package]
+name = "protocol_ops"
+version = "0.1.0" # x-release-please-version
+edition = "2021"
+homepage = "https://zksync.io/"
+license = "MIT OR Apache-2.0"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+exclude = ["./github"]
+repository = "https://github.com/matter-labs/era-contracts/tree/main/protocol-ops/"
+description = "Protocol Ops is a wrapper around forge scripts to simplify operations with ZKSync contracts."
+keywords = ["zk", "protocol", "blockchain", "ZKsync"]
+
+[dependencies]
+alloy = { version = "2.0.5", features = [
+    "node-bindings",
+    "providers",
+    "signer-local",
+    "signer-mnemonic",
+    "sol-types",
+    "dyn-abi",
+    "rpc-types",
+    "network",
+    "contract",
+    "transport-http",
+    "eips",
+    "consensus",
+] }
+anyhow = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+hex = "0.4"
+human-panic = "2.0"
+clap = { version = "4.5", features = ["derive", "wrap_help", "string"] }
+cliclack = "0.5"
+console = "0.16"
+# Used by the v31 upgrade_verification (PUVT) tree: bytecode fetching and
+# facet selector extraction. Kept out of #2210's slim dep set on purpose.
+evmole = "0.6.2"
+rand = "0.10"
+reqwest = { version = "0.12", features = ["blocking"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+strum = { version = "0.28", features = ["derive"] }
+thiserror = "2.0"
+tokio = { version = "1.52", features = ["full"] }
+toml = "1.1.2"
+xshell = "0.2.6"
+zeroize = "1"
+
+[lib]
+name = "protocol_ops"
+path = "src/lib.rs"
+
+[[bin]]
+name = "protocol_ops"
+path = "src/main.rs"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+strip = true

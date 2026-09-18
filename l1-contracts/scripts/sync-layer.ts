@@ -397,7 +397,7 @@ async function registerSLContractsOnL1(deployer: Deployer) {
   const receipt1 = await deployer.executeUpgrade(
     l1Bridgehub.address,
     0,
-    l1Bridgehub.interface.encodeFunctionData("registerSettlementLayer", [chainId, true])
+    l1Bridgehub.interface.encodeFunctionData("setSettlementLayerStatus", [chainId, true])
   );
 
   console.log("Registering Gateway as settlement layer on the L1", receipt1.transactionHash);

@@ -11,12 +11,8 @@ import {
   defaultDeployerForTests,
   registerZKChainWithBridgeRegistration,
 } from "../../src.ts/deploy-test-process";
-import {
-  ethTestConfig,
-  REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-  priorityTxMaxGasLimit,
-  L2_BRIDGEHUB_ADDRESS,
-} from "../../src.ts/utils";
+import { ethTestConfig, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_BRIDGEHUB_ADDRESS } from "../../src.ts/constants";
+import { priorityTxMaxGasLimit } from "../../src.ts/utils";
 import { SYSTEM_CONFIG } from "../../scripts/utils";
 
 import type { Deployer } from "../../src.ts/deploy";
@@ -76,7 +72,7 @@ describe("Gateway", function () {
   });
 
   it("Check register synclayer", async () => {
-    await gatewayDeployer.registerSettlementLayer();
+    await gatewayDeployer.setSettlementLayerStatus();
   });
 
   it("Check start move chain to synclayer", async () => {

@@ -3,31 +3,35 @@ pragma solidity ^0.8.0;
 
 import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {Utils} from "./../Utils.sol";
-import {ContractsBytecodesLib} from "../ContractsBytecodesLib.sol";
+import {Utils} from "./../utils/Utils.sol";
+import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
+import {CoreDeployedAddresses} from "../utils/Types.sol";
+import {Create2FactoryUtils} from "../utils/deploy/Create2FactoryUtils.s.sol";
+
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {DummyL1ERC20Bridge} from "contracts/dev-contracts/DummyL1ERC20Bridge.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {L2LegacySharedBridgeTestHelper} from "../L2LegacySharedBridgeTestHelper.sol";
+import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+
+import {ISetupLegacyBridge} from "contracts/script-interfaces/ISetupLegacyBridge.sol";
 
 /// This scripts is only for developer
-contract SetupLegacyBridge is Script {
+contract SetupLegacyBridge is Create2FactoryUtils, ISetupLegacyBridge {
     using stdToml for string;
 
     Config internal config;
-    Addresses internal addresses;
+    SetupLegacyBridgeAddresses internal addresses;
 
     struct Config {
         uint256 chainId;
-        bytes32 create2FactorySalt;
     }
 
-    struct Addresses {
-        address create2FactoryAddr;
+    struct SetupLegacyBridgeAddresses {
         address bridgehub;
         address l1Nullifier;
         address diamondProxy;
@@ -41,8 +45,8 @@ contract SetupLegacyBridge is Script {
         address l1NullifierProxyImpl;
     }
 
-    function run() public {
-        initializeConfig();
+    function run(address _bridgehub, uint256 _chainId) public {
+        initializeConfig(_bridgehub, _chainId);
         deploySharedBridgeImplementation();
         upgradeImplementation(addresses.sharedBridgeProxy, addresses.sharedBridgeProxyImpl);
         deployDummyErc20Bridge();
@@ -52,22 +56,21 @@ contract SetupLegacyBridge is Script {
         upgradeImplementation(addresses.l1Nullifier, addresses.l1NullifierProxyImpl);
     }
 
-    function initializeConfig() internal {
-        string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-config/setup-legacy-bridge.toml");
-        string memory toml = vm.readFile(path);
+    function initializeConfig(address bridgehub, uint256 chainId) internal {
+        addresses.bridgehub = bridgehub;
+        config.chainId = chainId;
 
-        addresses.bridgehub = toml.readAddress("$.bridgehub");
-        addresses.diamondProxy = toml.readAddress("$.diamond_proxy");
-        addresses.l1Nullifier = toml.readAddress("$.l1_nullifier_proxy");
-        addresses.sharedBridgeProxy = toml.readAddress("$.shared_bridge_proxy");
-        addresses.l1NativeTokenVault = toml.readAddress("$.l1_native_token_vault");
-        addresses.transparentProxyAdmin = toml.readAddress("$.transparent_proxy_admin");
-        addresses.erc20BridgeProxy = toml.readAddress("$.erc20bridge_proxy");
-        addresses.tokenWethAddress = toml.readAddress("$.token_weth_address");
-        addresses.create2FactoryAddr = toml.readAddress("$.create2factory_addr");
-        config.chainId = toml.readUint("$.chain_id");
-        config.create2FactorySalt = toml.readBytes32("$.create2factory_salt");
+        // Query diamond proxy from bridgehub using chain ID
+        addresses.diamondProxy = IL1Bridgehub(bridgehub).getZKChain(chainId);
+
+        // Use AddressIntrospector to get addresses from deployed contracts
+        CoreDeployedAddresses memory coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehub);
+        addresses.l1Nullifier = coreAddresses.bridges.proxies.l1Nullifier;
+        addresses.sharedBridgeProxy = coreAddresses.bridges.proxies.l1AssetRouter;
+        addresses.l1NativeTokenVault = coreAddresses.bridges.proxies.l1NativeTokenVault;
+        addresses.transparentProxyAdmin = coreAddresses.shared.transparentProxyAdmin;
+        addresses.tokenWethAddress = coreAddresses.bridges.l1WethToken;
+        addresses.erc20BridgeProxy = coreAddresses.bridges.proxies.erc20Bridge;
     }
 
     // We need to deploy new shared bridge for changing chain id and diamond proxy address
@@ -99,9 +102,11 @@ contract SetupLegacyBridge is Script {
     }
 
     function deployL1NullifierImplementation() internal {
+        IL1Bridgehub bridgehub = IL1Bridgehub(addresses.bridgehub);
+
         bytes memory bytecode = abi.encodePacked(
             type(L1NullifierDev).creationCode,
-            abi.encode(addresses.bridgehub, config.chainId, addresses.diamondProxy)
+            abi.encode(addresses.bridgehub, bridgehub.messageRoot(), config.chainId, addresses.diamondProxy)
         );
         address contractAddress = deployViaCreate2(bytecode);
 
@@ -118,7 +123,7 @@ contract SetupLegacyBridge is Script {
 
         Utils.executeUpgrade({
             _governor: address(governance),
-            _salt: bytes32(0),
+            _salt: Utils.currentLegacyGovSalt(),
             _target: address(addresses.transparentProxyAdmin),
             _data: proxyAdminUpgradeData,
             _value: 0,
@@ -159,9 +164,5 @@ contract SetupLegacyBridge is Script {
             bytecodeHash,
             keccak256(constructorargs)
         );
-    }
-
-    function deployViaCreate2(bytes memory _bytecode) internal returns (address) {
-        return Utils.deployViaCreate2(_bytecode, config.create2FactorySalt, addresses.create2FactoryAddr);
     }
 }

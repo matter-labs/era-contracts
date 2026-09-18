@@ -1,0 +1,54 @@
+[
+  {
+    "type": "function",
+    "name": "diamondCut",
+    "inputs": [
+      {
+        "name": "_diamondCut",
+        "type": "tuple",
+        "internalType": "struct Diamond.DiamondCutData",
+        "components": [
+          {
+            "name": "facetCuts",
+            "type": "tuple[]",
+            "internalType": "struct Diamond.FacetCut[]",
+            "components": [
+              {
+                "name": "facet",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "action",
+                "type": "uint8",
+                "internalType": "enum Diamond.Action"
+              },
+              {
+                "name": "isFreezable",
+                "type": "bool",
+                "internalType": "bool"
+              },
+              {
+                "name": "selectors",
+                "type": "bytes4[]",
+                "internalType": "bytes4[]"
+              }
+            ]
+          },
+          {
+            "name": "initAddress",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "initCalldata",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  }
+]

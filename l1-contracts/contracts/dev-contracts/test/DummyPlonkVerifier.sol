@@ -2,13 +2,13 @@
 
 pragma solidity 0.8.28;
 
-import {L1VerifierPlonk} from "../../state-transition/verifiers/L1VerifierPlonk.sol";
+import {EraVerifierPlonk} from "../../state-transition/verifiers/EraVerifierPlonk.sol";
 
-contract DummyPlonkVerifier is L1VerifierPlonk {
+contract DummyPlonkVerifier is EraVerifierPlonk {
     // add this to be excluded from coverage report
     function test() internal virtual {}
 
-    constructor() L1VerifierPlonk() {
+    constructor() EraVerifierPlonk() {
         assert(block.chainid != 1);
     }
 

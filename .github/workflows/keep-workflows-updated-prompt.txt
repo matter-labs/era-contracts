@@ -1,0 +1,43 @@
+All calldata-generation composite scripts have been retired. Each generate-*
+workflow invokes `protocol_ops` via `protocol-ops.sh --tag <docker-tag>`
+(the wrapper forwards all remaining args verbatim to `protocol_ops` unless
+the first post-flag word is `forge` or `cast`). Most workflows pass
+`--ecosystem /contracts/env/ecosystem.yaml --chain <name> …` explicitly.
+
+When modifying a workflow:
+
+1. Check that every required `protocol-ops` flag has a matching workflow input
+   (or is sourced from an auto-resolved L1 value — e.g. bridgehub is read from
+   ecosystem.yaml by the chain-init workflow via `yq`).
+2. Integration-test-only overrides (e.g. `--l1-diamond-cut-data`) must NOT be
+   exposed as workflow inputs — CI operators target real chains where those
+   values auto-resolve from L1.
+3. `[v30 only]` workflow inputs are annotated as such in their description and
+   correspond to `TODO(v30-removal)` flags in protocol-ops.
+4. Verify the workflow name matches the protocol-ops subcommand's purpose.
+
+Mapping (workflow -> protocol-ops command):
+
+  generate-chain-init-calldata                   <-> chain init
+  generate-chain-upgrade-calldata                <-> chain upgrade
+  generate-chain-set-upgrade-timestamp-calldata  <-> chain set-upgrade-timestamp
+  generate-chain-add-validator-calldata          <-> chain add-validator
+  generate-chain-remove-validator-calldata       <-> chain remove-validator
+  generate-gateway-convert-calldata              <-> chain gateway convert
+  generate-upgrade-calldata-prepare              <-> ecosystem upgrade-prepare
+  generate-upgrade-calldata-governance           <-> ecosystem upgrade-governance (stages 0+1+2)
+  generate-migrate-to-gw-phase0-pause      <-> chain gateway migrate-to phase-0-pause-deposits
+  generate-migrate-to-gw-phase1-submit     <-> chain gateway migrate-to phase-1-submit
+  generate-migrate-to-gw-phase2-finalize   <-> chain gateway migrate-to phase-2-finalize
+  generate-migrate-to-gw-phase3-validators <-> chain gateway migrate-to phase-3-validators
+  generate-migrate-from-gw-phase0-pause    <-> chain gateway migrate-from phase-0-pause-deposits
+  generate-migrate-from-gw-phase1-submit   <-> chain gateway migrate-from phase-1-submit
+  generate-migrate-from-gw-phase2-finalize <-> chain gateway migrate-from phase-2-finalize
+  generate-migrate-from-gw-phase3-set-da   <-> chain gateway migrate-from phase-3-set-da-validator-pair
+
+Conventions:
+- All workflows share: environment, protocol_ops_tag, l1_rpc_url
+- Artifact names:
+  - per-chain workflows: safe-bundles-{operation}-{chain_name}-{environment}
+  - ecosystem-wide workflows (upgrade-prepare / upgrade-governance):
+    safe-bundles-{operation}-{environment}  (no chain_name)

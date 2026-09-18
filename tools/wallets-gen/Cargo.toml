@@ -1,0 +1,17 @@
+[package]
+name = "wallets-gen"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
+sha2 = "0.10"
+sha3 = "0.10"
+k256 = "0.13"
+hex = "0.4"
+anyhow = "1"
+
+# Use workspace to allow using the tool from other workspaces without conflicts
+[workspace]

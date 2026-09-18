@@ -5,6 +5,7 @@ pragma solidity ^0.8.21;
 import {VerifierParams} from "../chain-interfaces/IVerifier.sol";
 import {PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
 import {IZKChainBase} from "./IZKChainBase.sol";
+import {L2DACommitmentScheme} from "../../common/Config.sol";
 
 /// @title The interface of the Getters Contract that implements functions for getting contract state from outside the blockchain.
 /// @author Matter Labs
@@ -40,6 +41,9 @@ interface IGetters is IZKChainBase {
 
     /// @return The address of the base token
     function getBaseTokenAssetId() external view returns (bytes32);
+
+    /// @return Whether the chain's base token exposes total supply in a trusted way.
+    function baseTokenSupportsTotalSupply() external view returns (bool);
 
     /// @return The total number of batches that were committed
     function getTotalBatchesCommitted() external view returns (uint256);
@@ -170,4 +174,10 @@ interface IGetters is IZKChainBase {
 
     /// @return The address of the current settlement layer.
     function getSettlementLayer() external view returns (address);
+
+    /// @return DA configuration.
+    function getDAValidatorPair() external view returns (address, L2DACommitmentScheme);
+
+    /// @return Whether the chain uses ZKsyncOS.
+    function getZKsyncOS() external view returns (bool);
 }

@@ -1,0 +1,67 @@
+name: "Chain Set Upgrade Timestamp Calldata"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options: [stage, stage-interop-tests, sepolia, mainnet]
+      protocol_ops_tag:
+        description: "protocol-ops Docker image tag"
+        required: true
+        type: string
+      l1_rpc_url:
+        description: "L1 RPC URL"
+        required: true
+        type: string
+      chain_name:
+        description: "Chain name (key in ecosystem.yaml `chains:`)"
+        required: true
+        type: string
+      new_protocol_version:
+        description: "Packed protocol version (uint256 as decimal or 0x-prefixed hex)"
+        required: true
+        type: string
+      upgrade_timestamp:
+        description: "Upgrade timestamp (unix seconds)"
+        required: true
+        type: string
+      access_control_restriction:
+        description: "AccessControlRestriction address (leave default for Ownable ChainAdmin)"
+        required: false
+        type: string
+        default: "0x0000000000000000000000000000000000000000"
+
+permissions:
+  contents: read
+
+jobs:
+  set-upgrade-timestamp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ENV_DIR: environments/${{ inputs.environment }}
+      WORK_DIR: ${{ github.workspace }}/protocol-ops-workdir
+      EXTRA_MOUNTS: ${{ github.workspace }}/environments/${{ inputs.environment }}:/contracts/env
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run set-upgrade-timestamp
+        run: |
+          mkdir -p "$WORK_DIR"
+          bash protocol-ops.sh --tag "${{ inputs.protocol_ops_tag }}" \
+            chain set-upgrade-timestamp \
+            --l1-rpc-url                 "${{ inputs.l1_rpc_url }}" \
+            --ecosystem                  /contracts/env/ecosystem.yaml \
+            --chain                      "${{ inputs.chain_name }}" \
+            --new-protocol-version       "${{ inputs.new_protocol_version }}" \
+            --upgrade-timestamp          "${{ inputs.upgrade_timestamp }}" \
+            --access-control-restriction "${{ inputs.access_control_restriction }}" \
+            --out /contracts/work/session/safe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: safe-bundles-chain-set-upgrade-timestamp-${{ inputs.chain_name }}-${{ inputs.environment }}
+          path: ${{ env.WORK_DIR }}/safe/
+          if-no-files-found: error
+          retention-days: 30

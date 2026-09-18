@@ -16,7 +16,7 @@ const SYSTEM_PARAMS = require("../../SystemConfig.json");
 const OUTPUT_DIR_1 = "contracts-preprocessed/bootloader";
 const OUTPUT_DIR_2 = "bootloader/build";
 
-const PREPROCCESING_MODES = ["proved_batch", "playground_batch"];
+const PREPROCESSING_MODES = ["proved_batch", "playground_batch"];
 
 function getSelector(contractName: string, method: string): string {
   let contractInterface;
@@ -24,9 +24,21 @@ function getSelector(contractName: string, method: string): string {
     const artifact = hre.artifacts.readArtifactSync(contractName);
     contractInterface = new ethers.utils.Interface(artifact.abi);
   } catch (e) {
-    const artifact = JSON.parse(
-      fs.readFileSync(`zkout/${contractName}.sol/${contractName}.json`, { encoding: "utf-8" })
-    );
+    // Try to find the artifact in zkout (system-contracts) or l1-contracts zkout
+    const paths = [
+      `zkout/${contractName}.sol/${contractName}.json`,
+      `../l1-contracts/zkout/${contractName}.sol/${contractName}.json`,
+    ];
+    let artifact;
+    for (const path of paths) {
+      if (fs.existsSync(path)) {
+        artifact = JSON.parse(fs.readFileSync(path, { encoding: "utf-8" }));
+        break;
+      }
+    }
+    if (!artifact) {
+      throw new Error(`Artifact not found for ${contractName} in paths: ${paths.join(", ")}`);
+    }
     contractInterface = new ethers.utils.Interface(artifact.abi);
   }
   return contractInterface.getSighash(method);
@@ -82,12 +94,13 @@ const params = {
   RIGHT_PADDED_SEND_L2_TO_L1_LOG_SELECTOR: getPaddedSelector("L1Messenger", "sendL2ToL1Log"),
   PUBLISH_PUBDATA_SELECTOR: getSelector("L1Messenger", "publishPubdataAndClearState"),
   RIGHT_PADDED_SET_NEW_BATCH_SELECTOR: getPaddedSelector("SystemContext", "setNewBatch"),
+  RIGHT_PADDED_SET_SETTLEMENT_LAYER_CHAIN_ID_SELECTOR: getPaddedSelector("SystemContext", "setSettlementLayerChainId"),
   RIGHT_PADDED_OVERRIDE_BATCH_SELECTOR: getPaddedSelector("SystemContext", "unsafeOverrideBatch"),
   // Error
   REVERT_ERROR_SELECTOR: padZeroRight(getRevertSelector(), PADDED_SELECTOR_LENGTH),
   RIGHT_PADDED_VALIDATE_NONCE_USAGE_SELECTOR: getPaddedSelector("INonceHolder", "validateNonceUsage"),
   INCREMENT_MIN_NONCE_IF_EQUALS_SELECTOR: getSelector("INonceHolder", "incrementMinNonceIfEquals"),
-  RIGHT_PADDED_MINT_ETHER_SELECTOR: getPaddedSelector("L2BaseToken", "mint"),
+  RIGHT_PADDED_MINT_ETHER_SELECTOR: getPaddedSelector("IBaseToken", "mint"),
   GET_TX_HASHES_SELECTOR: getSelector("BootloaderUtilities", "getTransactionHashes"),
   CREATE_SELECTOR: getSelector("ContractDeployer", "create"),
   CREATE2_SELECTOR: getSelector("ContractDeployer", "create2"),
@@ -95,18 +108,20 @@ const params = {
   CREATE2_EVM_SELECTOR: getSelector("ContractDeployer", "create2EVM"),
   CREATE_ACCOUNT_SELECTOR: getSelector("ContractDeployer", "createAccount"),
   CREATE2_ACCOUNT_SELECTOR: getSelector("ContractDeployer", "create2Account"),
-  PADDED_TRANSFER_FROM_TO_SELECTOR: getPaddedSelector("L2BaseToken", "transferFromTo"),
+  PADDED_TRANSFER_FROM_TO_SELECTOR: getPaddedSelector("IBaseToken", "transferFromTo"),
   SUCCESSFUL_ACCOUNT_VALIDATION_MAGIC_VALUE: getPaddedSelector("IAccount", "validateTransaction"),
   SUCCESSFUL_PAYMASTER_VALIDATION_MAGIC_VALUE: getPaddedSelector("IPaymaster", "validateAndPayForPaymasterTransaction"),
   PUBLISH_COMPRESSED_BYTECODE_SELECTOR: getSelector("Compressor", "publishCompressedBytecode"),
   GET_MARKER_PADDED_SELECTOR: getPaddedSelector("KnownCodesStorage", "getMarker"),
+  GET_CODE_SIZE_SELECTOR: getPaddedSelector("AccountCodeStorage", "getCodeSize"),
   RIGHT_PADDED_SET_L2_BLOCK_SELECTOR: getPaddedSelector("SystemContext", "setL2Block"),
   RIGHT_PADDED_APPEND_TRANSACTION_TO_L2_BLOCK_SELECTOR: getPaddedSelector(
     "SystemContext",
     "appendTransactionToCurrentL2Block"
   ),
   RIGHT_PADDED_PUBLISH_TIMESTAMP_DATA_TO_L1_SELECTOR: getPaddedSelector("SystemContext", "publishTimestampDataToL1"),
-  RIGHT_PADDED_SET_L2_INTEROP_ROOT_SELECTOR: getPaddedSelector("L2InteropRootStorage", "addInteropRoot"),
+  RIGHT_PADDED_SET_INTEROP_FEE_SELECTOR: getPaddedSelector("IInteropCenter", "setInteropFee"),
+  RIGHT_PADDED_SET_L2_INTEROP_ROOT_SELECTOR: getPaddedSelector("DummyL2InteropRootStorage", "addInteropRoot"),
   COMPRESSED_BYTECODES_SLOTS: 196608,
   ENSURE_RETURNED_MAGIC: 1,
   FORBID_ZERO_GAS_PER_PUBDATA: 1,
@@ -131,7 +146,7 @@ function extractTestFunctionNames(sourceCode: string): string[] {
   // Remove multi-line comments
   sourceCode = sourceCode.replace(/\/\*[\s\S]*?\*\//g, "");
 
-  const regexPatterns = [/function\s+(TEST\w+)/g];
+  const regexPatterns = [/function\s+(TEST\w+)/g, /function\s+(INT_TEST\w+)/g];
 
   const results: string[] = [];
   for (const pattern of regexPatterns) {
@@ -151,22 +166,24 @@ function createTestFramework(tests: string[]): string {
     switch test_id
     case 0 {
         testing_totalTests(${tests.length})
+        return(0, 0)
     }
     `;
 
   tests.forEach((value, index) => {
+    const isIntTest = value.startsWith("INT_TEST");
     testFramework += `
         case ${index + 1} {
             testing_start("${value}")
-            ${value}()
+            ${value}()${isIntTest ? "" : "\n            return(0, 0)"}
         }
         `;
   });
 
   testFramework += `
         default {
+            return(0, 0)
         }
-    return (0, 0)
     `;
 
   return testFramework;
@@ -175,7 +192,7 @@ function createTestFramework(tests: string[]): string {
 function validateSource(source: string) {
   const matches = source.matchAll(/<!-- @if BOOTLOADER_TYPE=='([^']*)' -->/g);
   for (const match of matches) {
-    if (!PREPROCCESING_MODES.includes(match[1])) {
+    if (!PREPROCESSING_MODES.includes(match[1])) {
       throw Error(`Invalid preprocessing mode '${match[1]}' at position ${match.index}`);
     }
   }

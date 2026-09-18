@@ -44,4 +44,10 @@ interface IL2ContractDeployer {
     /// @notice Changes what types of bytecodes are allowed to be deployed on the chain.
     /// @param newAllowedBytecodeTypes The new allowed bytecode types mode.
     function setAllowedBytecodeTypesToDeploy(AllowedBytecodeTypes newAllowedBytecodeTypes) external;
+
+    /// @notice Deploys an EVM contract from the given init code.
+    /// @param _initCode The EVM init code to deploy.
+    /// @return evmGasUsed The amount of EVM gas used during deployment.
+    /// @return newAddress The address of the newly deployed contract.
+    function createEVM(bytes calldata _initCode) external payable returns (uint256 evmGasUsed, address newAddress);
 }

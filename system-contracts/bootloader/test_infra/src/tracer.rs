@@ -1,4 +1,5 @@
-use std::sync::Arc;
+use std::collections::BTreeMap;
+use std::sync::{Arc, Mutex};
 
 use colored::Colorize;
 use once_cell::sync::OnceCell;
@@ -13,7 +14,7 @@ use zksync_multivm::zk_evm_latest::tracing::{BeforeExecutionData, VmLocalStateDa
 
 use zksync_state::interface::{StoragePtr, WriteStorage};
 
-use crate::hook::TestVmHook;
+use crate::hook::{TestVmHook, HOOK_EXECUTION_RESULT};
 
 /// Bootloader test tracer that is executing while the bootloader tests are running.
 /// It can check the asserts, return information about the running tests (and amount of tests) etc.
@@ -22,21 +23,42 @@ pub struct BootloaderTestTracer {
     test_result: Arc<OnceCell<Result<(), String>>>,
     /// Set, if the currently running test should fail with a given assert.
     requested_assert: Arc<OnceCell<String>>,
+    /// Set, if the currently running test expects tx-level failure with concrete returndata.
+    requested_tx_failure: Arc<OnceCell<String>>,
+    /// Full returndata hex of the latest failed tx execution captured via VM hook.
+    tx_failure_data_hex: Arc<OnceCell<String>>,
 
     test_name: Arc<OnceCell<String>>,
+    /// How many times each operator VM hook id was emitted during the run.
+    operator_hook_counts: Arc<Mutex<BTreeMap<u32, u32>>>,
 }
 
 impl BootloaderTestTracer {
     pub fn new(
         test_result: Arc<OnceCell<Result<(), String>>>,
         requested_assert: Arc<OnceCell<String>>,
+        requested_tx_failure: Arc<OnceCell<String>>,
+        tx_failure_data_hex: Arc<OnceCell<String>>,
         test_name: Arc<OnceCell<String>>,
+        operator_hook_counts: Arc<Mutex<BTreeMap<u32, u32>>>,
     ) -> Self {
         BootloaderTestTracer {
             test_result,
             requested_assert,
+            requested_tx_failure,
+            tx_failure_data_hex,
             test_name,
+            operator_hook_counts,
         }
+    }
+
+    fn count_operator_hook(&self, hook_id: u32) {
+        *self
+            .operator_hook_counts
+            .lock()
+            .unwrap()
+            .entry(hook_id)
+            .or_insert(0) += 1;
     }
 }
 
@@ -60,6 +82,24 @@ impl<S, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for BootloaderTestTracer {
         }
         if let TestVmHook::RequestedAssert(requested_assert) = &hook {
             let _ = self.requested_assert.set(requested_assert.clone());
+        }
+        if let TestVmHook::RequestedTxFailure(expected_revert_data) = &hook {
+            let _ = self.requested_tx_failure.set(expected_revert_data.clone());
+        }
+        if let TestVmHook::OperatorHook(hook_id) = &hook {
+            self.count_operator_hook(*hook_id);
+        }
+        if let TestVmHook::TxExecutionResult {
+            success,
+            revert_data_hex,
+        } = &hook
+        {
+            self.count_operator_hook(HOOK_EXECUTION_RESULT);
+            if !success {
+                if let Some(data_hex) = revert_data_hex {
+                    let _ = self.tx_failure_data_hex.set(data_hex.clone());
+                }
+            }
         }
 
         if let TestVmHook::TestStart(test_name) = &hook {

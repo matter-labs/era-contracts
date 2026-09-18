@@ -5,14 +5,23 @@ import {Test} from "forge-std/Test.sol";
 import {Utils} from "../Utils/Utils.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {CommitBatchInfo, ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {Unauthorized, TimeNotReached, RoleAccessDenied} from "contracts/common/L1ContractErrors.sol";
+
+import {
+    ExecutionDelayNotIncreased,
+    ExecutionDelayTooLarge,
+    NotAZKChain,
+    RoleAccessDenied,
+    TimeNotReached
+} from "contracts/common/L1ContractErrors.sol";
+import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {AccessControlEnumerablePerChainAddressUpgradeable} from "contracts/state-transition/AccessControlEnumerablePerChainAddressUpgradeable.sol";
 
 contract ValidatorTimelockTest is Test {
@@ -50,11 +59,13 @@ contract ValidatorTimelockTest is Test {
     bytes32 reverterRole;
     bytes32 proverRole;
     bytes32 executorRole;
+    bytes32 upgraderRole;
     bytes32 precommitterAdminRole;
     bytes32 committerAdminRole;
     bytes32 reverterAdminRole;
     bytes32 proverAdminRole;
     bytes32 executorAdminRole;
+    bytes32 upgraderAdminRole;
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -86,11 +97,13 @@ contract ValidatorTimelockTest is Test {
         reverterRole = validator.REVERTER_ROLE();
         proverRole = validator.PROVER_ROLE();
         executorRole = validator.EXECUTOR_ROLE();
+        upgraderRole = validator.UPGRADER_ROLE();
         precommitterAdminRole = validator.OPTIONAL_PRECOMMITTER_ADMIN_ROLE();
         committerAdminRole = validator.OPTIONAL_COMMITTER_ADMIN_ROLE();
         reverterAdminRole = validator.OPTIONAL_REVERTER_ADMIN_ROLE();
         proverAdminRole = validator.OPTIONAL_PROVER_ADMIN_ROLE();
         executorAdminRole = validator.OPTIONAL_EXECUTOR_ADMIN_ROLE();
+        upgraderAdminRole = validator.OPTIONAL_UPGRADER_ADMIN_ROLE();
     }
 
     function _deployValidatorTimelock(address _initialOwner, uint32 _initialExecutionDelay) internal returns (address) {
@@ -112,12 +125,46 @@ contract ValidatorTimelockTest is Test {
         assertEq(validator.executionDelay(), executionDelay);
     }
 
-    function _assertAllRoles(uint256 _chainId, address _addr, bool _expected) internal {
+    /// @dev Commits a single batch at the current block timestamp.
+    function _commitSingleBatch(uint64 _batchNumber) internal {
+        vm.mockCall(zkSync, abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector), abi.encode(chainId));
+
+        CommitBatchInfo[] memory batchesToCommit = new CommitBatchInfo[](1);
+        batchesToCommit[0] = Utils.createCommitBatchInfo();
+        batchesToCommit[0].batchNumber = _batchNumber;
+
+        (uint256 batchFrom, uint256 batchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+            Utils.createStoredBatchInfo(),
+            batchesToCommit
+        );
+        vm.prank(alice);
+        validator.commitBatchesSharedBridge(zkSync, batchFrom, batchTo, commitData);
+    }
+
+    /// @dev Encodes `executeBatchesSharedBridge` arguments for a single batch.
+    function _encodeExecuteSingleBatch(
+        uint64 _batchNumber
+    ) internal returns (uint256 batchFrom, uint256 batchTo, bytes memory executeData) {
+        IExecutor.StoredBatchInfo[] memory storedBatches = new IExecutor.StoredBatchInfo[](1);
+        storedBatches[0] = Utils.createStoredBatchInfo();
+        storedBatches[0].batchNumber = _batchNumber;
+
+        vm.mockCall(
+            zkSync,
+            abi.encodeWithSelector(IExecutor.executeBatchesSharedBridge.selector),
+            abi.encode(storedBatches)
+        );
+
+        return Utils.encodeExecuteBatchesData(storedBatches, Utils.emptyData());
+    }
+
+    function _assertAllRoles(uint256 _chainId, address _addr, bool _expected) internal view {
         require(validator.hasRoleForChainId(_chainId, validator.PRECOMMITTER_ROLE(), _addr) == _expected);
         require(validator.hasRoleForChainId(_chainId, validator.COMMITTER_ROLE(), _addr) == _expected);
         require(validator.hasRoleForChainId(_chainId, validator.REVERTER_ROLE(), _addr) == _expected);
         require(validator.hasRoleForChainId(_chainId, validator.PROVER_ROLE(), _addr) == _expected);
         require(validator.hasRoleForChainId(_chainId, validator.EXECUTOR_ROLE(), _addr) == _expected);
+        require(validator.hasRoleForChainId(_chainId, validator.UPGRADER_ROLE(), _addr) == _expected);
     }
 
     function test_addValidatorForChainId() public {
@@ -134,6 +181,8 @@ contract ValidatorTimelockTest is Test {
         emit AccessControlEnumerablePerChainAddressUpgradeable.RoleGranted(zkSync, proverRole, bob);
         vm.expectEmit(true, true, true, true, address(validator));
         emit AccessControlEnumerablePerChainAddressUpgradeable.RoleGranted(zkSync, executorRole, bob);
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit AccessControlEnumerablePerChainAddressUpgradeable.RoleGranted(zkSync, upgraderRole, bob);
         validator.addValidatorForChainId(chainId, bob);
 
         _assertAllRoles(chainId, bob, true);
@@ -155,6 +204,8 @@ contract ValidatorTimelockTest is Test {
         emit AccessControlEnumerablePerChainAddressUpgradeable.RoleRevoked(zkSync, proverRole, bob);
         vm.expectEmit(true, true, true, true, address(validator));
         emit AccessControlEnumerablePerChainAddressUpgradeable.RoleRevoked(zkSync, executorRole, bob);
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit AccessControlEnumerablePerChainAddressUpgradeable.RoleRevoked(zkSync, upgraderRole, bob);
         validator.removeValidatorForChainId(chainId, bob);
 
         _assertAllRoles(chainId, bob, false);
@@ -162,12 +213,12 @@ contract ValidatorTimelockTest is Test {
 
     function test_validatorCanMakeCall() public {
         // Setup Mock call to executor
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatchesSharedBridge.selector), "");
+        vm.mockCall(zkSync, abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector), "");
 
         IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();
-        IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
+        CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
 
-        IExecutor.CommitBatchInfo[] memory batchesToCommit = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory batchesToCommit = new CommitBatchInfo[](1);
         batchesToCommit[0] = batchToCommit;
 
         vm.prank(alice);
@@ -198,15 +249,15 @@ contract ValidatorTimelockTest is Test {
         vm.warp(timestamp);
         vm.mockCall(
             zkSync,
-            abi.encodeWithSelector(IExecutor.commitBatchesSharedBridge.selector),
+            abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector),
             abi.encode(eraChainId)
         );
 
         IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();
-        IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
+        CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
 
         batchToCommit.batchNumber = batchNumber;
-        IExecutor.CommitBatchInfo[] memory batchesToCommit = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory batchesToCommit = new CommitBatchInfo[](1);
         batchesToCommit[0] = batchToCommit;
 
         vm.prank(alice);
@@ -220,12 +271,12 @@ contract ValidatorTimelockTest is Test {
     }
 
     function test_commitBatches() public {
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatchesSharedBridge.selector), abi.encode(chainId));
+        vm.mockCall(zkSync, abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector), abi.encode(chainId));
 
         IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();
-        IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
+        CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
 
-        IExecutor.CommitBatchInfo[] memory batchesToCommit = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory batchesToCommit = new CommitBatchInfo[](1);
         batchesToCommit[0] = batchToCommit;
 
         vm.prank(alice);
@@ -265,46 +316,51 @@ contract ValidatorTimelockTest is Test {
         validator.proveBatchesSharedBridge(zkSync, proveBatchFrom, proveBatchTo, proveData);
     }
 
-    function test_executeBatchesSharedBridge() public {
-        uint64 timestamp = 123456;
-        uint64 batchNumber = 123;
-        // Commit batches first to have the valid timestamp
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatchesSharedBridge.selector), abi.encode(zkSync));
-
-        IExecutor.StoredBatchInfo memory storedBatch1 = Utils.createStoredBatchInfo();
-        IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
-
-        batchToCommit.batchNumber = batchNumber;
-        IExecutor.CommitBatchInfo[] memory batchesToCommit = new IExecutor.CommitBatchInfo[](1);
-        batchesToCommit[0] = batchToCommit;
-
-        vm.prank(alice);
-        vm.warp(timestamp);
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            storedBatch1,
-            batchesToCommit
-        );
-        validator.commitBatchesSharedBridge(zkSync, commitBatchFrom, commitBatchTo, commitData);
-
-        // Execute batches
-        IExecutor.StoredBatchInfo memory storedBatch2 = Utils.createStoredBatchInfo();
-        storedBatch2.batchNumber = batchNumber;
-        IExecutor.StoredBatchInfo[] memory storedBatches = new IExecutor.StoredBatchInfo[](1);
-        storedBatches[0] = storedBatch2;
+    function test_upgradeChainFromVersion_PropagatesToDiamondProxy() public {
+        uint256 oldProtocolVersion = 1;
+        Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
+            facetCuts: new Diamond.FacetCut[](0),
+            initAddress: address(0),
+            initCalldata: bytes("")
+        });
 
         vm.mockCall(
             zkSync,
-            abi.encodeWithSelector(IExecutor.proveBatchesSharedBridge.selector),
-            abi.encode(storedBatches)
+            abi.encodeCall(IAdmin.upgradeChainFromVersion, (zkSync, oldProtocolVersion, diamondCut)),
+            ""
         );
+        vm.expectCall(zkSync, abi.encodeCall(IAdmin.upgradeChainFromVersion, (zkSync, oldProtocolVersion, diamondCut)));
 
         vm.prank(alice);
+        validator.upgradeChainFromVersion(zkSync, oldProtocolVersion, diamondCut);
+    }
+
+    function test_RevertWhen_upgradeChainFromVersionNotUpgrader() public {
+        uint256 oldProtocolVersion = 1;
+        Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
+            facetCuts: new Diamond.FacetCut[](0),
+            initAddress: address(0),
+            initCalldata: bytes("")
+        });
+
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, zkSync, upgraderRole, bob));
+        validator.upgradeChainFromVersion(zkSync, oldProtocolVersion, diamondCut);
+    }
+
+    function test_executeBatchesSharedBridge() public {
+        uint64 timestamp = 123456;
+        uint64 batchNumber = 123;
+
+        // Commit batches first to have the valid timestamp
+        vm.warp(timestamp);
+        _commitSingleBatch(batchNumber);
+
+        (uint256 batchFrom, uint256 batchTo, bytes memory executeData) = _encodeExecuteSingleBatch(batchNumber);
+
         vm.warp(timestamp + executionDelay + 1);
-        (uint256 executeBatchFrom, uint256 executeBatchTo, bytes memory executeData) = Utils.encodeExecuteBatchesData(
-            storedBatches,
-            Utils.emptyData()
-        );
-        validator.executeBatchesSharedBridge(zkSync, executeBatchFrom, executeBatchTo, executeData);
+        vm.prank(alice);
+        validator.executeBatchesSharedBridge(zkSync, batchFrom, batchTo, executeData);
     }
 
     function test_RevertWhen_setExecutionDelayNotOwner() public {
@@ -333,9 +389,9 @@ contract ValidatorTimelockTest is Test {
 
     function test_RevertWhen_validatorCanMakeCallNotValidator() public {
         IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();
-        IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
+        CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
 
-        IExecutor.CommitBatchInfo[] memory batchesToCommit = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory batchesToCommit = new CommitBatchInfo[](1);
         batchesToCommit[0] = batchToCommit;
 
         vm.prank(bob);
@@ -376,56 +432,420 @@ contract ValidatorTimelockTest is Test {
     }
 
     function test_RevertWhen_executeBatchesSharedBridgeNotValidator() public {
-        IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();
+        (uint256 batchFrom, uint256 batchTo, bytes memory executeData) = _encodeExecuteSingleBatch(123);
 
-        IExecutor.StoredBatchInfo[] memory storedBatches = new IExecutor.StoredBatchInfo[](1);
-        storedBatches[0] = storedBatch;
-
-        vm.prank(bob);
         vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, zkSync, executorRole, bob));
-        (uint256 executeBatchFrom, uint256 executeBatchTo, bytes memory executeData) = Utils.encodeExecuteBatchesData(
-            storedBatches,
-            Utils.emptyData()
-        );
-        validator.executeBatchesSharedBridge(zkSync, executeBatchFrom, executeBatchTo, executeData);
+        vm.prank(bob);
+        validator.executeBatchesSharedBridge(zkSync, batchFrom, batchTo, executeData);
     }
 
     function test_RevertWhen_executeBatchesSharedBridgeTooEarly() public {
         uint64 timestamp = 123456;
         uint64 batchNumber = 123;
-        // Prove batches first to have the valid timestamp
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatchesSharedBridge.selector), abi.encode(chainId));
 
-        IExecutor.StoredBatchInfo memory storedBatch1 = Utils.createStoredBatchInfo();
-        IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
+        vm.warp(timestamp);
+        _commitSingleBatch(batchNumber);
 
-        batchToCommit.batchNumber = batchNumber;
-        IExecutor.CommitBatchInfo[] memory batchesToCommit = new IExecutor.CommitBatchInfo[](1);
-        batchesToCommit[0] = batchToCommit;
+        (uint256 batchFrom, uint256 batchTo, bytes memory executeData) = _encodeExecuteSingleBatch(batchNumber);
+
+        vm.warp(timestamp + executionDelay - 1);
+        vm.expectRevert(abi.encodeWithSelector(TimeNotReached.selector, timestamp + executionDelay, block.timestamp));
+        vm.prank(alice);
+        validator.executeBatchesSharedBridge(zkSync, batchFrom, batchTo, executeData);
+    }
+
+    function test_addValidatorRoles_PartialRoles() public {
+        // Add only precommitter and committer roles
+        IValidatorTimelock.ValidatorRotationParams memory params = IValidatorTimelock.ValidatorRotationParams({
+            rotatePrecommitterRole: true,
+            rotateCommitterRole: true,
+            rotateReverterRole: false,
+            rotateProverRole: false,
+            rotateExecutorRole: false,
+            rotateUpgraderRole: false
+        });
+
+        // Bob should not have any roles initially
+        assertFalse(validator.hasRoleForChainId(chainId, precommitterRole, bob));
+        assertFalse(validator.hasRoleForChainId(chainId, committerRole, bob));
+        assertFalse(validator.hasRoleForChainId(chainId, reverterRole, bob));
+        assertFalse(validator.hasRoleForChainId(chainId, proverRole, bob));
+        assertFalse(validator.hasRoleForChainId(chainId, executorRole, bob));
+
+        vm.prank(owner);
+        validator.addValidatorRoles(zkSync, bob, params);
+
+        // Only precommitter and committer roles should be granted
+        assertTrue(validator.hasRoleForChainId(chainId, precommitterRole, bob));
+        assertTrue(validator.hasRoleForChainId(chainId, committerRole, bob));
+        assertFalse(validator.hasRoleForChainId(chainId, reverterRole, bob));
+        assertFalse(validator.hasRoleForChainId(chainId, proverRole, bob));
+        assertFalse(validator.hasRoleForChainId(chainId, executorRole, bob));
+    }
+
+    function test_removeValidatorRoles_PartialRoles() public {
+        // First add all roles
+        vm.prank(owner);
+        validator.addValidatorForChainId(chainId, bob);
+        _assertAllRoles(chainId, bob, true);
+
+        // Remove only reverter and prover roles
+        IValidatorTimelock.ValidatorRotationParams memory params = IValidatorTimelock.ValidatorRotationParams({
+            rotatePrecommitterRole: false,
+            rotateCommitterRole: false,
+            rotateReverterRole: true,
+            rotateProverRole: true,
+            rotateExecutorRole: false,
+            rotateUpgraderRole: false
+        });
+
+        vm.prank(owner);
+        validator.removeValidatorRoles(zkSync, bob, params);
+
+        // Precommitter, committer, and executor should still be present
+        assertTrue(validator.hasRoleForChainId(chainId, precommitterRole, bob));
+        assertTrue(validator.hasRoleForChainId(chainId, committerRole, bob));
+        assertFalse(validator.hasRoleForChainId(chainId, reverterRole, bob));
+        assertFalse(validator.hasRoleForChainId(chainId, proverRole, bob));
+        assertTrue(validator.hasRoleForChainId(chainId, executorRole, bob));
+    }
+
+    function test_addValidatorRoles_OnlyExecutor() public {
+        IValidatorTimelock.ValidatorRotationParams memory params = IValidatorTimelock.ValidatorRotationParams({
+            rotatePrecommitterRole: false,
+            rotateCommitterRole: false,
+            rotateReverterRole: false,
+            rotateProverRole: false,
+            rotateExecutorRole: true,
+            rotateUpgraderRole: false
+        });
+
+        vm.prank(owner);
+        validator.addValidatorRoles(zkSync, bob, params);
+
+        assertFalse(validator.hasRoleForChainId(chainId, precommitterRole, bob));
+        assertFalse(validator.hasRoleForChainId(chainId, committerRole, bob));
+        assertFalse(validator.hasRoleForChainId(chainId, reverterRole, bob));
+        assertFalse(validator.hasRoleForChainId(chainId, proverRole, bob));
+        assertTrue(validator.hasRoleForChainId(chainId, executorRole, bob));
+    }
+
+    function test_precommitSharedBridge() public {
+        vm.mockCall(zkSync, abi.encodeWithSelector(ICommitter.precommitSharedBridge.selector), "");
 
         vm.prank(alice);
+        validator.precommitSharedBridge(zkSync, 1, "");
+    }
+
+    function test_RevertWhen_precommitSharedBridgeNotValidator() public {
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, zkSync, precommitterRole, bob));
+        validator.precommitSharedBridge(zkSync, 1, "");
+    }
+
+    function test_RevertWhen_addValidatorRolesNotChain() public {
+        // Create a fake chain address that has getChainId() and getAdmin() mocked
+        // but the bridgehub.getZKChain returns a different address
+        address fakeChain = makeAddr("fakeChain");
+        uint256 fakeChainId = 999;
+
+        vm.mockCall(fakeChain, abi.encodeCall(IGetters.getChainId, ()), abi.encode(fakeChainId));
+        vm.mockCall(fakeChain, abi.encodeCall(IGetters.getAdmin, ()), abi.encode(owner));
+        // Make bridgehub return a different address for this chain ID (simulating NotAZKChain)
+        dummyBridgehub.setZKChain(fakeChainId, zkSync); // zkSync != fakeChain
+
+        IValidatorTimelock.ValidatorRotationParams memory params = IValidatorTimelock.ValidatorRotationParams({
+            rotatePrecommitterRole: true,
+            rotateCommitterRole: false,
+            rotateReverterRole: false,
+            rotateProverRole: false,
+            rotateExecutorRole: false,
+            rotateUpgraderRole: false
+        });
+
+        vm.expectRevert(abi.encodeWithSelector(NotAZKChain.selector, fakeChain));
+        validator.addValidatorRoles(fakeChain, bob, params);
+    }
+
+    function test_executeBatchesSharedBridge_ZeroCommitTimestamp() public {
+        // When commit timestamp is 0 (batch was committed outside timelock or not committed),
+        // execution is allowed as long as block.timestamp >= delay
+        uint64 batchNumber = 999;
+
+        (uint256 batchFrom, uint256 batchTo, bytes memory executeData) = _encodeExecuteSingleBatch(batchNumber);
+
+        // No commit was done, so timestamp is 0
+        assertEq(validator.getCommittedBatchTimestamp(zkSync, batchNumber), 0);
+
+        // Warp to a time greater than executionDelay (block.timestamp must be >= 0 + delay)
+        vm.warp(executionDelay + 1);
+
+        vm.prank(alice);
+        validator.executeBatchesSharedBridge(zkSync, batchFrom, batchTo, executeData);
+    }
+
+    function test_commitBatches_MultipleBatches() public {
+        vm.mockCall(zkSync, abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector), abi.encode(chainId));
+
+        uint64 timestamp = 123456;
+        uint64 batchNumberStart = 10;
+
+        IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();
+        CommitBatchInfo memory batch1 = Utils.createCommitBatchInfo();
+        CommitBatchInfo memory batch2 = Utils.createCommitBatchInfo();
+        CommitBatchInfo memory batch3 = Utils.createCommitBatchInfo();
+
+        batch1.batchNumber = batchNumberStart;
+        batch2.batchNumber = batchNumberStart + 1;
+        batch3.batchNumber = batchNumberStart + 2;
+
+        CommitBatchInfo[] memory batchesToCommit = new CommitBatchInfo[](3);
+        batchesToCommit[0] = batch1;
+        batchesToCommit[1] = batch2;
+        batchesToCommit[2] = batch3;
+
         vm.warp(timestamp);
+        vm.prank(alice);
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            storedBatch1,
+            storedBatch,
             batchesToCommit
         );
         validator.commitBatchesSharedBridge(zkSync, commitBatchFrom, commitBatchTo, commitData);
 
-        // Execute batches
-        IExecutor.StoredBatchInfo memory storedBatch2 = Utils.createStoredBatchInfo();
-        storedBatch2.batchNumber = batchNumber;
-        IExecutor.StoredBatchInfo[] memory storedBatches = new IExecutor.StoredBatchInfo[](1);
-        storedBatches[0] = storedBatch2;
+        // All 3 batches should have the same timestamp
+        assertEq(validator.getCommittedBatchTimestamp(zkSync, batchNumberStart), timestamp);
+        assertEq(validator.getCommittedBatchTimestamp(zkSync, batchNumberStart + 1), timestamp);
+        assertEq(validator.getCommittedBatchTimestamp(zkSync, batchNumberStart + 2), timestamp);
+    }
 
+    /*//////////////////////////////////////////////////////////////
+                        PER-CHAIN EXECUTION DELAY
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Re-points the mocked `getAdmin` so the chain admin differs from the owner; in `setUp` both
+    /// roles are held by `owner`.
+    function _setChainAdmin(address _newAdmin) internal {
+        vm.mockCall(zkSync, abi.encodeCall(IGetters.getAdmin, ()), abi.encode(_newAdmin));
+    }
+
+    function test_getExecutionDelay_defaultsToEcosystemDelay() public view {
+        assertEq(validator.chainExecutionDelay(zkSync), 0);
+        assertEq(validator.getExecutionDelay(zkSync), executionDelay);
+    }
+
+    function test_increaseChainExecutionDelay() public {
+        // The chain admin is deliberately not the owner of the timelock here.
+        _setChainAdmin(bob);
+        uint32 newDelay = executionDelay + 5;
+
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit IValidatorTimelock.NewChainExecutionDelay(zkSync, newDelay);
+        vm.prank(bob);
+        validator.increaseChainExecutionDelay(zkSync, newDelay);
+
+        assertEq(validator.chainExecutionDelay(zkSync), newDelay);
+        assertEq(validator.getExecutionDelay(zkSync), newDelay);
+        // The ecosystem-wide value is untouched.
+        assertEq(validator.executionDelay(), executionDelay);
+    }
+
+    function test_increaseChainExecutionDelay_multipleTimes() public {
+        _setChainAdmin(bob);
+
+        vm.prank(bob);
+        validator.increaseChainExecutionDelay(zkSync, 100);
+        assertEq(validator.getExecutionDelay(zkSync), 100);
+
+        vm.prank(bob);
+        validator.increaseChainExecutionDelay(zkSync, 200);
+        assertEq(validator.getExecutionDelay(zkSync), 200);
+    }
+
+    /// @dev The cap is inclusive.
+    function test_increaseChainExecutionDelay_upToMax() public {
+        uint32 maxDelay = validator.MAX_EXECUTION_DELAY();
+        assertEq(maxDelay, 30 days);
+
+        _setChainAdmin(bob);
+        vm.prank(bob);
+        validator.increaseChainExecutionDelay(zkSync, maxDelay);
+
+        assertEq(validator.getExecutionDelay(zkSync), maxDelay);
+    }
+
+    /// @dev Raising the ecosystem delay above the chain's value wins; lowering it restores the chain's.
+    function test_getExecutionDelay_ecosystemDelayIsAFloor() public {
+        _setChainAdmin(bob);
+        vm.prank(bob);
+        validator.increaseChainExecutionDelay(zkSync, 100);
+
+        vm.prank(owner);
+        validator.setExecutionDelay(200);
+        assertEq(validator.chainExecutionDelay(zkSync), 100);
+        assertEq(validator.getExecutionDelay(zkSync), 200);
+
+        vm.prank(owner);
+        validator.setExecutionDelay(50);
+        assertEq(validator.getExecutionDelay(zkSync), 100);
+    }
+
+    function test_setChainExecutionDelay_ownerCanDecrease() public {
+        _setChainAdmin(bob);
+        vm.prank(bob);
+        validator.increaseChainExecutionDelay(zkSync, 1000);
+        assertEq(validator.getExecutionDelay(zkSync), 1000);
+
+        // The owner is not the chain admin here, yet is the only party able to lower the delay.
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit IValidatorTimelock.NewChainExecutionDelay(zkSync, 0);
+        vm.prank(owner);
+        validator.setChainExecutionDelay(zkSync, 0);
+
+        assertEq(validator.chainExecutionDelay(zkSync), 0);
+        assertEq(validator.getExecutionDelay(zkSync), executionDelay);
+    }
+
+    /// @dev The chain-specific delay is what `executeBatchesSharedBridge` actually enforces.
+    function test_executeBatches_respectsChainExecutionDelay() public {
+        uint32 chainDelay = 1 days;
+        _setChainAdmin(bob);
+        vm.prank(bob);
+        validator.increaseChainExecutionDelay(zkSync, chainDelay);
+
+        uint64 batchNumber = 10;
+        uint64 commitTimestamp = 123456;
+
+        vm.warp(commitTimestamp);
+        _commitSingleBatch(batchNumber);
+
+        (uint256 batchFrom, uint256 batchTo, bytes memory executeData) = _encodeExecuteSingleBatch(batchNumber);
+
+        // The ecosystem-wide delay has long passed, but the chain-specific one has not.
+        vm.warp(commitTimestamp + executionDelay + 1);
+        vm.expectRevert(abi.encodeWithSelector(TimeNotReached.selector, commitTimestamp + chainDelay, block.timestamp));
         vm.prank(alice);
-        vm.warp(timestamp + executionDelay - 1);
+        validator.executeBatchesSharedBridge(zkSync, batchFrom, batchTo, executeData);
+
+        vm.warp(commitTimestamp + chainDelay);
+        vm.prank(alice);
+        validator.executeBatchesSharedBridge(zkSync, batchFrom, batchTo, executeData);
+    }
+
+    function test_RevertWhen_increaseChainExecutionDelayNotChainAdmin() public {
+        _setChainAdmin(bob);
+
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, zkSync, DEFAULT_ADMIN_ROLE, alice));
+        vm.prank(alice);
+        validator.increaseChainExecutionDelay(zkSync, 1000);
+
+        assertEq(validator.chainExecutionDelay(zkSync), 0);
+    }
+
+    /// @dev Being the owner of the timelock does not by itself grant the right to raise a chain's delay.
+    function test_RevertWhen_increaseChainExecutionDelayOwnerNotChainAdmin() public {
+        _setChainAdmin(bob);
+
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, zkSync, DEFAULT_ADMIN_ROLE, owner));
+        vm.prank(owner);
+        validator.increaseChainExecutionDelay(zkSync, 1000);
+    }
+
+    function test_RevertWhen_increaseChainExecutionDelayAboveMax() public {
+        uint32 maxDelay = validator.MAX_EXECUTION_DELAY();
+        _setChainAdmin(bob);
+
+        vm.expectRevert(abi.encodeWithSelector(ExecutionDelayTooLarge.selector, maxDelay + 1, maxDelay));
+        vm.prank(bob);
+        validator.increaseChainExecutionDelay(zkSync, maxDelay + 1);
+    }
+
+    /// @dev A chain with no delay of its own must still clear the ecosystem one, else it is a no-op.
+    function test_RevertWhen_increaseChainExecutionDelayEqualToEcosystemDelay() public {
+        _setChainAdmin(bob);
+
+        vm.expectRevert(abi.encodeWithSelector(ExecutionDelayNotIncreased.selector, executionDelay, executionDelay));
+        vm.prank(bob);
+        validator.increaseChainExecutionDelay(zkSync, executionDelay);
+    }
+
+    function test_RevertWhen_increaseChainExecutionDelayBelowEcosystemDelay() public {
+        _setChainAdmin(bob);
+
         vm.expectRevert(
-            abi.encodeWithSelector(TimeNotReached.selector, timestamp + executionDelay, timestamp + executionDelay - 1)
+            abi.encodeWithSelector(ExecutionDelayNotIncreased.selector, executionDelay, executionDelay - 1)
         );
-        (uint256 executeBatchFrom, uint256 executeBatchTo, bytes memory executeData) = Utils.encodeExecuteBatchesData(
-            storedBatches,
-            Utils.emptyData()
+        vm.prank(bob);
+        validator.increaseChainExecutionDelay(zkSync, executionDelay - 1);
+    }
+
+    /// @dev The core property of this feature: a chain admin cannot walk back a delay it raised.
+    function test_RevertWhen_increaseChainExecutionDelayDecreasesOwnValue() public {
+        _setChainAdmin(bob);
+        vm.prank(bob);
+        validator.increaseChainExecutionDelay(zkSync, 1000);
+
+        vm.expectRevert(abi.encodeWithSelector(ExecutionDelayNotIncreased.selector, 1000, 999));
+        vm.prank(bob);
+        validator.increaseChainExecutionDelay(zkSync, 999);
+
+        assertEq(validator.getExecutionDelay(zkSync), 1000);
+    }
+
+    function test_RevertWhen_setChainExecutionDelayNotOwner() public {
+        // Even the chain admin cannot use the owner-only setter to lower the delay.
+        _setChainAdmin(bob);
+        vm.prank(bob);
+        validator.increaseChainExecutionDelay(zkSync, 1000);
+
+        vm.expectRevert("Ownable: caller is not the owner");
+        vm.prank(bob);
+        validator.setChainExecutionDelay(zkSync, 0);
+
+        assertEq(validator.getExecutionDelay(zkSync), 1000);
+    }
+
+    function test_RevertWhen_setChainExecutionDelayAboveMax() public {
+        uint32 maxDelay = validator.MAX_EXECUTION_DELAY();
+
+        vm.expectRevert(abi.encodeWithSelector(ExecutionDelayTooLarge.selector, maxDelay + 1, maxDelay));
+        vm.prank(owner);
+        validator.setChainExecutionDelay(zkSync, maxDelay + 1);
+    }
+
+    function test_RevertWhen_setExecutionDelayAboveMax() public {
+        uint32 maxDelay = validator.MAX_EXECUTION_DELAY();
+
+        vm.expectRevert(abi.encodeWithSelector(ExecutionDelayTooLarge.selector, maxDelay + 1, maxDelay));
+        vm.prank(owner);
+        validator.setExecutionDelay(maxDelay + 1);
+    }
+
+    function test_RevertWhen_initialExecutionDelayAboveMax() public {
+        uint32 maxDelay = validator.MAX_EXECUTION_DELAY();
+
+        // Deployed upfront so `expectRevert` applies to the proxy deployment, i.e. the initializer.
+        ProxyAdmin admin = new ProxyAdmin();
+        ValidatorTimelock timelockImplementation = new ValidatorTimelock(address(dummyBridgehub));
+
+        vm.expectRevert(abi.encodeWithSelector(ExecutionDelayTooLarge.selector, maxDelay + 1, maxDelay));
+        new TransparentUpgradeableProxy(
+            address(timelockImplementation),
+            address(admin),
+            abi.encodeCall(ValidatorTimelock.initialize, (owner, maxDelay + 1))
         );
-        validator.executeBatchesSharedBridge(zkSync, executeBatchFrom, executeBatchTo, executeData);
+    }
+
+    function testFuzz_getExecutionDelayIsTheMaximumOfBothValues(uint32 _ecosystemDelay, uint32 _chainDelay) public {
+        uint32 maxDelay = validator.MAX_EXECUTION_DELAY();
+        _ecosystemDelay = uint32(bound(_ecosystemDelay, 0, maxDelay));
+        _chainDelay = uint32(bound(_chainDelay, 0, maxDelay));
+
+        vm.startPrank(owner);
+        validator.setExecutionDelay(_ecosystemDelay);
+        validator.setChainExecutionDelay(zkSync, _chainDelay);
+        vm.stopPrank();
+
+        uint32 expected = _chainDelay > _ecosystemDelay ? _chainDelay : _ecosystemDelay;
+        assertEq(validator.getExecutionDelay(zkSync), expected);
     }
 }
