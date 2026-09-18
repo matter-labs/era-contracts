@@ -347,7 +347,7 @@ library L2GenesisForceDeploymentsHelper {
             _fixedForceDeploymentsData.l1ChainId,
             _fixedForceDeploymentsData.eraChainId,
             IL1AssetRouter(_fixedForceDeploymentsData.l1AssetRouter),
-            IL2SharedBridgeLegacy(_getLegacySharedBridge()),
+            IL2SharedBridgeLegacy(_additionalForceDeploymentsData.l2LegacySharedBridge),
             _additionalForceDeploymentsData.baseTokenBridgingData.assetId,
             _fixedForceDeploymentsData.aliasedL1Governance
         );
@@ -359,7 +359,7 @@ library L2GenesisForceDeploymentsHelper {
             // Legacy Era chains exposed this via an immutable. After the v31 code replacement,
             // reading it back from storage returns zero, so the L1-provided value is authoritative.
             _fixedForceDeploymentsData.l2TokenProxyBytecodeHash,
-            _getLegacySharedBridge(),
+            _additionalForceDeploymentsData.l2LegacySharedBridge,
             _wrappedBaseTokenAddress,
             _additionalForceDeploymentsData.baseTokenBridgingData,
             _additionalForceDeploymentsData.baseTokenMetadata
@@ -452,11 +452,6 @@ library L2GenesisForceDeploymentsHelper {
         // For Era: initializes holder balance, with __DEPRECATED_totalSupply kept in totalSupply().
         // For ZKOS: mints via MINT_BASE_TOKEN_HOOK and transfers to holder.
         IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
-    }
-
-    /// @notice Returns the address of the legacy shared bridge from the L2 Asset Router.
-    function _getLegacySharedBridge() private view returns (address) {
-        return address(L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE());
     }
 
     /// @notice Constructs the initialization calldata for the L2WrappedBaseToken.

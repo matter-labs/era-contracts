@@ -49,7 +49,10 @@ contract ChainRegistrationSender is
         _;
     }
 
-    constructor(IBridgehubBase _bridgehub) {
+    /// @dev Contract is expected to be used as proxy implementation on L1.
+    /// @notice to avoid parity hack
+    constructor(IBridgehubBase _bridgehub) reentrancyGuardInitializer {
+        _disableInitializers();
         BRIDGE_HUB = _bridgehub;
     }
 
