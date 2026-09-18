@@ -177,7 +177,14 @@ impl GovernanceStage2Calls {
 
         let canonical_prefix = decommission_count;
         let canonical_count = canonical_prefix + 1 + artifact.ctms.len() * 2;
-        let expected_call_count = canonical_count + 16;
+        // The new-Gateway bring-up appendix is 16 calls — present only when the
+        // upgrade brings up a Gateway (gateway-less envs omit `[new_gateway]`).
+        let expected_call_count = canonical_count
+            + if artifact.new_gateway.is_some() {
+                16
+            } else {
+                0
+            };
 
         // ── Section 2: Canonical activation ─────────────────────────
         // Call `canonical_prefix` — ChainAssetHandler.unpauseMigration()
@@ -194,7 +201,7 @@ impl GovernanceStage2Calls {
         // Per-CTM (2 calls per CTM, in artifact order):
         //   +0 stage-validator.checkProtocolUpgradePresence()
         //   +1 stage-validator.checkMigrationsUnpaused()
-        for (ctm_index, ctm) in artifact.ctms.iter().enumerate() {
+        for ctm in artifact.ctms.iter() {
             let validator_label = format!("{}.upgrade_stage_validator", ctm.flavor.label());
             let Some(validator) = required_ctm_address(
                 ctm,
@@ -205,7 +212,24 @@ impl GovernanceStage2Calls {
                 continue;
             };
 
-            let block = canonical_prefix + 1 + ctm_index * 2;
+            // Per-CTM blocks are emitted in env-config order, which can differ
+            // from artifact.ctms order — match each CTM's 2-call block by its
+            // validator target (order-independent; per-CTM order is cosmetic).
+            let Some(block) = (0..artifact.ctms.len())
+                .map(|k| canonical_prefix + 1 + k * 2)
+                .find(|&b| {
+                    self.calls
+                        .elems
+                        .get(b)
+                        .is_some_and(|c| c.target == validator)
+                })
+            else {
+                result.report_error(&format!(
+                    "Stage-2 per-CTM block for {validator_label} not found"
+                ));
+                errors += 2;
+                continue;
+            };
             errors += verify_call_by_address(
                 &self.calls,
                 block,
@@ -239,8 +263,10 @@ impl GovernanceStage2Calls {
                 .await;
             }
             None => {
-                result.report_error("v31 verification requires a [new_gateway] artifact block");
-                errors += 1;
+                // Gateway-less env: no new-Gateway bring-up appendix expected.
+                result.report_ok(
+                    "No [new_gateway] block — skipping new-Gateway bring-up verification (gateway-less env)",
+                );
             }
         }
 

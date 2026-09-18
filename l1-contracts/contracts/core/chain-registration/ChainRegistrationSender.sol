@@ -49,7 +49,13 @@ contract ChainRegistrationSender is
         _;
     }
 
-    constructor(IBridgehubBase _bridgehub) {
+    /// @dev Contract is expected to be used as proxy implementation on L1.
+    /// @dev Initialize the implementation to prevent Parity hack: the constructor consumes the
+    /// one-shot reentrancy-guard initializer and disables the upgradeable initializers, so
+    /// `initialize` can never be called on the implementation itself. Matches `L1Bridgehub` and
+    /// `L1ChainAssetHandler`.
+    constructor(IBridgehubBase _bridgehub) reentrancyGuardInitializer {
+        _disableInitializers();
         BRIDGE_HUB = _bridgehub;
     }
 
