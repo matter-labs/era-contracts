@@ -18,6 +18,8 @@ abstract contract L2InteropExecuteBundleTestAbstract is L2InteropTestUtils {
         vm.deal(address(this), 1000 ether);
         vm.recordLogs();
 
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         InteropLibrary.sendNative(destinationChainId, interopTargetContract, UNBUNDLER_ADDRESS, 100, false, bytes32(0));
         Vm.Log[] memory logs1 = vm.getRecordedLogs();
 
@@ -47,6 +49,8 @@ abstract contract L2InteropExecuteBundleTestAbstract is L2InteropTestUtils {
 
         // Distinct salt for the wrapper bundle: both sends originate from `address(this)` and InteropCenter
         // enforces a unique (sender, salt) pair.
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         InteropLibrary.sendDirectCall(
             destinationChainId,
             L2_INTEROP_HANDLER_ADDR,

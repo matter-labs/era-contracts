@@ -170,6 +170,8 @@ library L2UtilsBase {
             vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, ntv.code);
 
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+            // The callee declares unnamed parameters, so named arguments are not possible.
+            // solhint-disable-next-line func-named-parameters
             L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).initL2(
                 _args.l1ChainId,
                 _args.aliasedOwner,

@@ -116,6 +116,8 @@ contract GatewayTransactionFiltererAdditionalTest is Test {
         address highAddress = address(uint160(MIN_ALLOWED_ADDRESS) + 1);
         bytes memory txCalldata = hex"12345678";
 
+        // The argument list carries inline comments, which named-argument form would lose.
+        // solhint-disable-next-line func-named-parameters
         bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
             randomUser, // non-whitelisted sender
             highAddress,
@@ -132,6 +134,8 @@ contract GatewayTransactionFiltererAdditionalTest is Test {
         // contractL2 == L2_ASSET_ROUTER_ADDR should always be allowed
         bytes memory txCalldata = hex"12345678";
 
+        // The argument list carries inline comments, which named-argument form would lose.
+        // solhint-disable-next-line func-named-parameters
         bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
             randomUser, // non-whitelisted sender
             L2_ASSET_ROUTER_ADDR,
@@ -149,6 +153,8 @@ contract GatewayTransactionFiltererAdditionalTest is Test {
         address lowAddress = address(uint160(MIN_ALLOWED_ADDRESS) - 1);
         bytes memory txCalldata = hex"12345678";
 
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
             randomUser,
             lowAddress,
@@ -169,6 +175,8 @@ contract GatewayTransactionFiltererAdditionalTest is Test {
         vm.prank(owner);
         transactionFiltererProxy.grantWhitelist(randomUser);
 
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
             randomUser,
             lowAddress,
@@ -195,6 +203,8 @@ contract GatewayTransactionFiltererAdditionalTest is Test {
             abi.encode(makeAddr("ctmAddress"))
         );
 
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
             assetRouter,
             address(0),
@@ -221,6 +231,8 @@ contract GatewayTransactionFiltererAdditionalTest is Test {
             abi.encode(address(0))
         );
 
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
             assetRouter,
             address(0),
@@ -240,6 +252,8 @@ contract GatewayTransactionFiltererAdditionalTest is Test {
         // since the check is contractL2 > MIN_ALLOWED_ADDRESS
         bytes memory txCalldata = hex"12345678";
 
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
             randomUser,
             MIN_ALLOWED_ADDRESS,
@@ -257,6 +271,8 @@ contract GatewayTransactionFiltererAdditionalTest is Test {
         address justAbove = address(uint160(MIN_ALLOWED_ADDRESS) + 1);
         bytes memory txCalldata = hex"12345678";
 
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
             randomUser,
             justAbove,
@@ -277,6 +293,8 @@ contract GatewayTransactionFiltererAdditionalTest is Test {
         vm.assume(contractL2 != ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR); // Dangerous contract — restricted
         bytes memory txCalldata = hex"12345678";
 
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
             randomUser,
             contractL2,

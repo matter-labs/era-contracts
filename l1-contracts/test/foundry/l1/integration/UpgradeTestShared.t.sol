@@ -78,6 +78,8 @@ contract UpgradeIntegrationTestBase is Test {
             CORE_OUTPUT
         );
         console.log("setupUpgrade: Initializing CTM upgrade");
+        // The argument list carries inline comments, which named-argument form would lose.
+        // solhint-disable-next-line func-named-parameters
         ctmUpgrade.initializeWithArgs(
             params.ctmProxy,
             params.bytecodesSupplier,

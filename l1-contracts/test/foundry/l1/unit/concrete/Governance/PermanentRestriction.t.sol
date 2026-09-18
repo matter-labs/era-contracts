@@ -310,30 +310,40 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
     }
 
     function test_tryGetNewAdminFromMigrationRevertWhenInvalidSelector() public {
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         Call memory call = _encodeMigraationCall(false, true, true, true, true, address(0));
 
         assertInvalidMigrationCall(call);
     }
 
     function test_tryGetNewAdminFromMigrationRevertWhenNotBridgehub() public {
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         Call memory call = _encodeMigraationCall(true, false, true, true, true, address(0));
 
         assertInvalidMigrationCall(call);
     }
 
     function test_tryGetNewAdminFromMigrationRevertWhenNotSharedBridge() public {
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         Call memory call = _encodeMigraationCall(true, true, false, true, true, address(0));
 
         assertInvalidMigrationCall(call);
     }
 
     function test_tryGetNewAdminFromMigrationRevertWhenIncorrectEncoding() public {
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         Call memory call = _encodeMigraationCall(true, true, true, false, true, address(0));
 
         assertInvalidMigrationCall(call);
     }
 
     function test_tryGetNewAdminFromMigrationRevertWhenIncorrectAssetId() public {
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         Call memory call = _encodeMigraationCall(true, true, true, true, false, address(0));
 
         assertInvalidMigrationCall(call);
@@ -341,6 +351,8 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
 
     function test_tryGetNewAdminFromMigrationShouldWorkCorrectly() public {
         address l2Addr = makeAddr("l2Addr");
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         Call memory call = _encodeMigraationCall(true, true, true, true, true, l2Addr);
 
         (address newAdmin, bool migration) = permRestriction.getNewAdminFromMigration(call);
@@ -349,6 +361,8 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
     }
 
     function test_validateMigrationToL2RevertNotAllowed() public {
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         Call memory call = _encodeMigraationCall(true, true, true, true, true, address(0));
 
         vm.expectRevert(abi.encodeWithSelector(NotAllowed.selector, address(0)));
@@ -362,6 +376,8 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         emit IPermanentRestriction.AllowL2Admin(expectedAddress);
         permRestriction.allowL2Admin(uint256(1));
 
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         Call memory call = _encodeMigraationCall(true, true, true, true, true, expectedAddress);
 
         // Should not fail
@@ -387,6 +403,8 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         assertEq(deployedAdmin, expectedAdmin, "allowL2Admin must use the factory's EVM CREATE address");
         assertTrue(factoryRestriction.allowedL2Admins(deployedAdmin), "deployed admin not whitelisted");
 
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         Call memory call = _encodeMigraationCall(true, true, true, true, true, deployedAdmin);
         factoryRestriction.validateCall(call, owner);
     }
@@ -597,6 +615,8 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
             abi.encode(wrongHandler) // Not bridgehub
         );
 
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         Call memory call = _encodeMigraationCall(true, true, true, true, true, address(0));
 
         assertInvalidMigrationCall(call);

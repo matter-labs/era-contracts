@@ -250,6 +250,8 @@ contract ZKChainDeployer is L1ContractDeployer {
             );
         }
         {
+            // `string.concat` is variadic, so named arguments are not possible.
+            // solhint-disable-next-line func-named-parameters
             initData2 = bytes.concat(
                 bytes32(_protocolVersion),
                 bytes32(uint256(uint160(_admin))),

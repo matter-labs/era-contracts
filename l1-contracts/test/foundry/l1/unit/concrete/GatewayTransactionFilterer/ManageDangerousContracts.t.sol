@@ -117,6 +117,8 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
         vm.prank(owner);
         transactionFiltererProxy.addDangerousContract({contractAddress: dangerousAddr});
 
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
             randomUser,
             dangerousAddr,
@@ -138,6 +140,8 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
         transactionFiltererProxy.grantWhitelist(randomUser);
         vm.stopPrank();
 
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
             randomUser,
             dangerousAddr,
@@ -152,6 +156,8 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
 
     function test_isTransactionAllowed_blocksCreate2FactoryForNonWhitelisted() public view {
         // Deterministic Create2 factory is marked dangerous on initialization and is above MIN_ALLOWED_ADDRESS
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
             randomUser,
             ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR,
@@ -168,6 +174,8 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
         vm.prank(owner);
         transactionFiltererProxy.grantWhitelist(randomUser);
 
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
             randomUser,
             ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR,
@@ -184,6 +192,8 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
         // A high address that is NOT in dangerousContracts should still be freely accessible
         address highAddr = address(uint160(MIN_ALLOWED_ADDRESS) + 999);
 
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
             randomUser,
             highAddr,
@@ -202,6 +212,8 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
         vm.prank(owner);
         transactionFiltererProxy.addDangerousContract({contractAddress: highDangerousAddr});
 
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
             randomUser,
             highDangerousAddr,
@@ -225,6 +237,8 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
         transactionFiltererProxy.removeDangerousContract({contractAddress: highDangerousAddr});
         vm.stopPrank();
 
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
             randomUser,
             highDangerousAddr,

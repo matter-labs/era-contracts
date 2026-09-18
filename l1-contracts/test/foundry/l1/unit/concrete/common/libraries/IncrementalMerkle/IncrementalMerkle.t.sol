@@ -18,6 +18,8 @@ contract IncrementalMerkleTestTest is Test {
     }
 
     function setUpMemory() public returns (DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestMemory) {
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         merkleTestMemory = DynamicIncrementalMerkleMemory.Bytes32PushTree(
             0,
             new bytes32[](14),

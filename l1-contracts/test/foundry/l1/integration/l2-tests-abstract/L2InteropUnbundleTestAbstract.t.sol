@@ -20,6 +20,8 @@ abstract contract L2InteropUnbundleTestAbstract is L2InteropTestUtils {
         vm.deal(address(this), 1000 ether);
         vm.recordLogs();
 
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         InteropLibrary.sendNative(destinationChainId, interopTargetContract, UNBUNDLER_ADDRESS, 100, false, bytes32(0));
         Vm.Log[] memory logs1 = vm.getRecordedLogs();
 
@@ -64,6 +66,8 @@ abstract contract L2InteropUnbundleTestAbstract is L2InteropTestUtils {
         CallStatus[] memory callStatuses = new CallStatus[](1);
         callStatuses[0] = CallStatus.Executed;
         vm.prank(UNBUNDLER_ADDRESS);
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         InteropLibrary.sendDirectCall(
             destinationChainId,
             L2_INTEROP_HANDLER_ADDR,

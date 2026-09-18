@@ -303,6 +303,8 @@ contract MessageHashingTest is Test {
         // `_getProofData` runs a real Merkle climb over the batch-leaf section, so the mask must
         // address a leaf inside a tree of that depth.
         uint256 batchLeafProofMask = bound(_batchLeafProofMask, 0, (1 << batchLeafProofLen) - 1);
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         bytes32[] memory proof = _buildMultiHopProof(
             logLeafProofLen,
             batchLeafProofLen,
@@ -334,6 +336,8 @@ contract MessageHashingTest is Test {
     ) public {
         uint256 logLeafProofLen = bound(_logLeafProofLenSeed, 1, 32);
         uint256 batchLeafProofLen = bound(_batchLeafProofLenSeed, 0, 16);
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         bytes32[] memory proof = _buildMultiHopProof(
             logLeafProofLen,
             batchLeafProofLen,

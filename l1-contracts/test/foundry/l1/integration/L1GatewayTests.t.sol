@@ -257,6 +257,8 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         );
 
         uint256 expectedValue = 1000 ether;
+        // The argument list carries inline comments, which named-argument form would lose.
+        // solhint-disable-next-line func-named-parameters
         L2TransactionRequestDirect memory request = _createL2TransactionRequestDirect(
             migratingChainId,
             expectedValue,
@@ -450,6 +452,8 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         bytes memory message = _encodeWithdrawalBundleMessage(gatewayChainId, assetId, bridgehubMintData);
 
         GatewayUtils userUtils = new GatewayUtils();
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         userUtils.finishMigrateChainFromGateway(
             address(addresses.bridgehub),
             migratingChainId,
@@ -573,6 +577,8 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         address chainAdmin = IZKChain(zkChain).getAdmin();
 
         bytes memory transferData = _getTransferData();
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         ConfirmTransferResultData memory transferResultData = _getConfirmTransferResultData(
             gatewayChainId,
             merkleProofData,
@@ -618,6 +624,8 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
         _mockMessageInclusion(migratingChainId, merkleProofData, TxStatus.Success);
 
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         ConfirmTransferResultData memory transferResultData = _getConfirmTransferResultData(
             migratingChainId,
             merkleProofData,
@@ -742,6 +750,8 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         );
         _setDepositHappened(gatewayChainId, merkleProofData.l2TxHash, txDataHash);
 
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         ConfirmTransferResultData memory transferResultData = _getConfirmTransferResultData(
             gatewayChainId,
             merkleProofData,

@@ -293,6 +293,8 @@ contract MultisigCommitterTest is Test {
         }
 
         vm.prank(sequencer);
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         multisigCommitter.commitBatchesMultisig(
             chainAddress,
             commitBatchFrom,
@@ -318,6 +320,8 @@ contract MultisigCommitterTest is Test {
 
         vm.prank(sequencer);
         vm.expectRevert(abi.encodeWithSelector(NotEnoughSigners.selector, 1, 2));
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         multisigCommitter.commitBatchesMultisig(
             chainAddress,
             commitBatchFrom,
@@ -341,6 +345,8 @@ contract MultisigCommitterTest is Test {
 
         vm.prank(sequencer);
         vm.expectRevert(abi.encodeWithSelector(SignerNotAuthorized.selector, validator1Custom));
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         multisigCommitter.commitBatchesMultisig(
             chainAddress,
             commitBatchFrom,
@@ -357,6 +363,8 @@ contract MultisigCommitterTest is Test {
 
         vm.prank(sequencer);
         vm.expectRevert(abi.encodeWithSelector(SignersNotSorted.selector));
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         multisigCommitter.commitBatchesMultisig(
             chainAddress,
             commitBatchFrom,
@@ -411,6 +419,8 @@ contract MultisigCommitterTest is Test {
         signatures[0] = sign_digest(validator1CustomKey, digest);
 
         vm.prank(sequencer);
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         multisigCommitter.commitBatchesMultisig(
             chainAddress,
             commitBatchFrom,
@@ -440,6 +450,8 @@ contract MultisigCommitterTest is Test {
 
         vm.prank(sequencer);
         vm.expectRevert(abi.encodeWithSelector(SignerNotAuthorized.selector, validator1Shared));
+        // The callee declares unnamed parameters, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         multisigCommitter.commitBatchesMultisig(
             chainAddress,
             commitBatchFrom,

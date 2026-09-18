@@ -131,6 +131,8 @@ abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils
         address l2TokenAddress = initializeTokenByDeposit();
         vm.deal(address(this), 1000 ether);
 
+        // The argument list carries inline comments, which named-argument form would lose.
+        // solhint-disable-next-line func-named-parameters
         bytes32 bundleHash = InteropLibrary.sendToken(
             L1_CHAIN_ID,
             l2TokenAddress,
