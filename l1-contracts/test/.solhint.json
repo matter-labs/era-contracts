@@ -12,6 +12,7 @@
     "func-named-parameters": [
       "error",
       5
-    ]
+    ],
+    "reentrancy": "off"
   }
 }

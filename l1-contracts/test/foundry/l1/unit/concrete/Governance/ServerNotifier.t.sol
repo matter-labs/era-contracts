@@ -80,7 +80,7 @@ contract ServerNotifierTest is Test {
     }
 
     function test_setUpgradeTimestampValidProtocolVersionSucceeds() public {
-        uint deadline = block.timestamp + 7 days;
+        uint256 deadline = block.timestamp + 7 days;
 
         chainTypeManager.setUpgradeCutHash(protocolVersion, keccak256("upgradeCutHash"));
         chainTypeManager.setProtocolVersionDeadline(protocolVersion, deadline);
@@ -95,7 +95,7 @@ contract ServerNotifierTest is Test {
 
     function test_setUpgradeTimestampCutDataForProtocolVersionNotAvailableReverts() public {
         chainTypeManager.setUpgradeCutHash(protocolVersion, bytes32(0));
-        uint deadline = block.timestamp + 7 days;
+        uint256 deadline = block.timestamp + 7 days;
 
         chainTypeManager.setProtocolVersionDeadline(protocolVersion, deadline);
 
@@ -105,7 +105,7 @@ contract ServerNotifierTest is Test {
     }
 
     function test_setUpgradeTimestampInvalidCallerReverts() public {
-        uint deadline = block.timestamp + 7 days;
+        uint256 deadline = block.timestamp + 7 days;
 
         chainTypeManager.setProtocolVersionDeadline(protocolVersion, deadline);
 

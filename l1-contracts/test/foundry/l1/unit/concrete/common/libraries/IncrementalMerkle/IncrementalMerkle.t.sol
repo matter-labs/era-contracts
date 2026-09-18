@@ -396,7 +396,7 @@ contract IncrementalMerkleTestTest is Test {
         // Extend the tree to a larger depth
         bytes32[] memory newSides = new bytes32[](5);
         bytes32[] memory newZeros = new bytes32[](5);
-        for (uint i = 0; i < 1; i++) {
+        for (uint256 i = 0; i < 1; i++) {
             newSides[i] = merkleMemory._sides[i];
             newZeros[i] = merkleMemory._zeros[i];
         }
@@ -494,10 +494,10 @@ contract IncrementalMerkleTestTest is Test {
         bytes32[] memory newZeros = new bytes32[](8);
 
         // Copy existing data
-        for (uint i = 0; i < merkleMemory._sidesLengthMemory && i < newSides.length; i++) {
+        for (uint256 i = 0; i < merkleMemory._sidesLengthMemory && i < newSides.length; i++) {
             newSides[i] = merkleMemory._sides[i];
         }
-        for (uint i = 0; i < merkleMemory._zerosLengthMemory && i < newZeros.length; i++) {
+        for (uint256 i = 0; i < merkleMemory._zerosLengthMemory && i < newZeros.length; i++) {
             newZeros[i] = merkleMemory._zeros[i];
         }
 
