@@ -29,6 +29,7 @@ Fixtures are loaded from `src/test_transactions/*.json` in numeric filename orde
 - `0.json`, `1.json` — L2 transactions (EIP-712 and EIP-1559).
 - `2.json` — an L1->L2 transaction transferring its whole deposit, with a zero gas price.
 - `3.json` — the same with a non-zero gas price, so fee and refund effects are visible.
+- `4.json` — one that reverts in the target, the baseline a force-failed transaction must match.
 
 Only L2 fixtures get their sender funded by the runner; an L1->L2 transaction is funded by the
 bootloader minting its `mintValue`. That mint only works because the runner also presets the
@@ -44,6 +45,9 @@ To regenerate fixture transactions:
 ```shell
 cargo run -- --generate-transactions
 ```
+
+It rewrites every fixture, so run `yarn prettier:fix` afterwards and drop the `0.json`/`1.json`
+churn: the L2 fixtures stamp wall-clock time, while the L1->L2 ones are reproducible.
 
 ## Expectation hooks in Yul tests
 
@@ -62,8 +66,7 @@ This separation allows integration tests to assert tx-level revert payloads with
 Test bodies run before the transaction loop, so anything about the _outcome_ of a transaction is
 registered as an expectation and checked by the runner once the batch is done:
 
-- `testing_expectTxPanic(index)` — that transaction failed with empty returndata (a near-call panic,
-  as opposed to a revert carrying a reason).
+- `testing_expectTxFailureNoReturndata(index)` — expects transaction failure with empty returndata.
 - `testing_expectBootloaderLog(key, value)` — the bootloader sent exactly one such L2->L1 log.
 - `testing_expectNoBootloaderLogKey(key)` — it sent no log under this key.
 - `testing_expectNoBootloaderLog(key, value)` — it sent no such log, for a key another log owns.

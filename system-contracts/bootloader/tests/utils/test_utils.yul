@@ -50,8 +50,8 @@ function testing_testTransactionWillFailWith(message) {
 }
 // Post-execution expectations: test bodies run before the loop, so the runner checks these after.
 
-// Transaction `index` failed with empty returndata: a near-call panic, not a revert.
-function testing_expectTxPanic(index) {
+// Expects transaction failure with empty returndata.
+function testing_expectTxFailureNoReturndata(index) {
     storeTestHookParam(0, $llvm_NoInline_llvm$_unoptimized(index))
     setTestHook(106)
 }

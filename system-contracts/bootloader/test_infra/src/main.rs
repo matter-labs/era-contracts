@@ -50,14 +50,15 @@ fn get_balance_key(address: Address) -> StorageKey {
     StorageKey::new(account_id, key)
 }
 
-/// `L2AssetTracker` slots, from `forge inspect L2AssetTracker storageLayout`. zksync-era's
-/// `with_l1_base_token_minting` has the same, but the pinned rev predates it. Nothing ties them to
-/// `AssetTrackerBase.sol`: a layout change surfaces as a bare `Failed to mint ether`.
+/// `L2AssetTracker` slots, from `forge inspect L2AssetTracker storageLayout`.
 const ASSET_TRACKER_IS_ASSET_REGISTERED_SLOT: u64 = 203;
 const ASSET_TRACKER_L1_CHAIN_ID_SLOT: u64 = 204;
 const ASSET_TRACKER_BASE_TOKEN_ASSET_ID_SLOT: u64 = 205;
 /// Any non-zero id; the fixtures only need the base token registered.
 const TEST_BASE_TOKEN_ASSET_ID_BYTE: u8 = 0x11;
+/// The bootloader reads this back from the asset tracker to gate force-fail, so the batch's
+/// settlement layer has to name the same chain.
+const TEST_L1_CHAIN_ID: u64 = 1;
 /// Holder supply, comfortably above every fixture's `mintValue`.
 const BASE_TOKEN_HOLDER_BALANCE: u64 = 10u64.pow(19);
 
@@ -78,7 +79,7 @@ fn apply_l1_base_token_minting_slots(storage: &StoragePtr<StorageView<InMemorySt
                 asset_tracker,
                 H256::from_low_u64_be(ASSET_TRACKER_L1_CHAIN_ID_SLOT),
             ),
-            H256::from_low_u64_be(1),
+            H256::from_low_u64_be(TEST_L1_CHAIN_ID),
         ),
         (
             StorageKey::new(
@@ -118,7 +119,7 @@ fn check_expectations(
     result: &VmExecutionResultAndLogs,
     storage: &StoragePtr<StorageView<InMemoryStorage>>,
 ) -> Result<(), String> {
-    for index in &expectations.tx_panics {
+    for index in &expectations.tx_failures_no_returndata {
         match expectations.tx_results.get(*index) {
             Some((false, None)) => {}
             Some((false, Some(data))) => {
@@ -336,7 +337,7 @@ fn execute_internal_bootloader_test() {
             max_virtual_blocks_to_create: 1,
             interop_roots: vec![],
         },
-        settlement_layer: SettlementLayer::L1(SLChainId(10)),
+        settlement_layer: SettlementLayer::L1(SLChainId(TEST_L1_CHAIN_ID)),
     };
 
     // First - get the number of tests.

@@ -20,7 +20,7 @@ use crate::hook::TestVmHook;
 /// What the runner verifies once the batch is done; test bodies run before the transaction loop.
 #[derive(Default)]
 pub struct Expectations {
-    pub tx_panics: Vec<usize>,
+    pub tx_failures_no_returndata: Vec<usize>,
     pub bootloader_logs: Vec<(U256, U256)>,
     pub balances: Vec<(U256, U256)>,
     pub forbidden_log_keys: Vec<U256>,
@@ -33,7 +33,7 @@ pub struct Expectations {
 
 impl Expectations {
     pub fn any_registered(&self) -> bool {
-        !self.tx_panics.is_empty()
+        !self.tx_failures_no_returndata.is_empty()
             || !self.bootloader_logs.is_empty()
             || !self.forbidden_log_keys.is_empty()
             || !self.forbidden_logs.is_empty()
@@ -121,8 +121,12 @@ impl<S, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for BootloaderTestTracer {
         }
 
         match &hook {
-            TestVmHook::ExpectTxPanic(index) => {
-                self.expectations.lock().unwrap().tx_panics.push(*index);
+            TestVmHook::ExpectTxFailureNoReturndata(index) => {
+                self.expectations
+                    .lock()
+                    .unwrap()
+                    .tx_failures_no_returndata
+                    .push(*index);
             }
             TestVmHook::ExpectBootloaderLog(key, value) => {
                 self.expectations

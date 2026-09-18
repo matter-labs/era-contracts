@@ -234,6 +234,24 @@ function TEST_validateTxMeta_executeByte() {
     pop(validateProvedTxMeta(0x0002))
 }
 
+function TEST_validatePlaygroundTxMeta() {
+    let ethCallMode := shl(248, 0x02)
+    testing_assertEq(validatePlaygroundTxMeta(0x0001), 0, "execute only")
+    testing_assertEq(validatePlaygroundTxMeta(or(ethCallMode, 0x0001)), 0, "ethCall")
+    testing_assertEq(validatePlaygroundTxMeta(or(ethCallMode, 0x0101)), 1, "ethCall + forceFail")
+}
+
+function TEST_validatePlaygroundTxMeta_executeClear() {
+    // A non-zero word does not break the loop, so the execute byte has to be checked here.
+    testing_testWillFailWith("invalid txMeta")
+    pop(validatePlaygroundTxMeta(or(shl(248, 0x02), 0x0100)))
+}
+
+function TEST_validatePlaygroundTxMeta_unexpectedByte() {
+    testing_testWillFailWith("invalid txMeta")
+    pop(validatePlaygroundTxMeta(0x010001))
+}
+
 function INT_TEST_forceFailOnL2Tx() {
     // The bit is only valid on a priority op, and tx(0) is an L2 transaction.
     testing_testWillFailWith("forceFail on L2 tx")
@@ -261,13 +279,16 @@ function expectPriorityQueueAccounting() {
     mstore(0, rollingHash)
     mstore(32, getCanonicalL1TxHash(testing_txDataOffset(3)))
     rollingHash := keccak256(0, 64)
+    mstore(0, rollingHash)
+    mstore(32, getCanonicalL1TxHash(testing_txDataOffset(4)))
+    rollingHash := keccak256(0, 64)
 
     mstore(0, savedWord0)
     mstore(32, savedWord32)
 
     testing_expectSystemLog(chainedPriorityTxnHashLogKey(), rollingHash)
-    // Fixtures 0-1 are L2 txs, 2-3 priority ops; counters pack as `l1Count | l2Count << 128`.
-    testing_expectSystemLog(numberOfLayer1TxsLogKey(), add(2, mul(2, TWO_POW_128())))
+    // Fixtures 0-1 are L2 txs, 2-4 priority ops; counters pack as `l1Count | l2Count << 128`.
+    testing_expectSystemLog(numberOfLayer1TxsLogKey(), add(3, mul(2, TWO_POW_128())))
 }
 
 function INT_TEST_l1TxBaseline() {
@@ -295,24 +316,21 @@ function INT_TEST_forceFailL1Tx() {
 
     mstore(testing_txDescriptionPtr(2), 0x0101)
 
-    testing_expectTxPanic(2)
+    testing_expectTxFailureNoReturndata(2)
     // What `claimFailedDeposit` and `proveL1ToL2TransactionStatus` consume on L1 ...
     testing_expectBootloaderLog(canonicalL1TxHash, 0)
     // ... and nothing that lets the same hash prove as a success.
     testing_expectNoBootloaderLog(canonicalL1TxHash, 1)
     testing_expectBootloaderLog(forceFailedL1TxLogKey(), canonicalL1TxHash)
-    // The mint to the sender rolls back with the frame; the deposit goes to the refund recipient.
+    // The sender receives no mint; the refund recipient receives the refundable amount.
     testing_expectBalance(getFrom(innerTxDataOffset), 0)
     testing_expectBalance(getTo(innerTxDataOffset), 0)
     testing_expectBalance(getReserved1(innerTxDataOffset), getReserved0(innerTxDataOffset))
     expectPriorityQueueAccounting()
-
-    // Unpinned: `l1TxPreparation` runs before the panic, so factory deps would still publish.
 }
 
 function INT_TEST_forceFailL1TxFee() {
-    // The same transfer with a non-zero gas price. The panic burns the whole frame, so the operator
-    // is paid the entire gas budget of a transaction it did not run; the user loses that much.
+    // Checks the refund with a non-zero gas price.
     let txDataOffset := testing_txDataOffset(3)
     let innerTxDataOffset := add(txDataOffset, 0x20)
     testing_assertEq(getTxType(innerTxDataOffset), 255, "tx(3) must be a priority op")
@@ -324,7 +342,7 @@ function INT_TEST_forceFailL1TxFee() {
         getGasLimit(innerTxDataOffset),
         "fee overflow"
     )
-    testing_expectTxPanic(3)
+    testing_expectTxFailureNoReturndata(3)
     testing_expectBootloaderLog(getCanonicalL1TxHash(txDataOffset), 0)
     testing_expectBalance(getFrom(innerTxDataOffset), 0)
     testing_expectBalance(getTo(innerTxDataOffset), 0)
@@ -332,6 +350,31 @@ function INT_TEST_forceFailL1TxFee() {
         getReserved1(innerTxDataOffset),
         safeSub(getReserved0(innerTxDataOffset), billedToUser, "fee underflow")
     )
+}
+
+function INT_TEST_l1TxRevertBaseline() {
+    // The claim force-fail rests on: a priority op that reverts on its first instruction leaves the
+    // same balances and logs, minus the marker. tx(4) calls a system contract with no such selector.
+    let txDataOffset := testing_txDataOffset(4)
+    let innerTxDataOffset := add(txDataOffset, 0x20)
+    testing_assertEq(getTxType(innerTxDataOffset), 255, "tx(4) must be a priority op")
+    let canonicalL1TxHash := getCanonicalL1TxHash(txDataOffset)
+
+    testing_expectBootloaderLog(canonicalL1TxHash, 0)
+    testing_expectNoBootloaderLog(canonicalL1TxHash, 1)
+    // A natural revert carries no marker; only the operator's choice does.
+    testing_expectNoBootloaderLogKey(forceFailedL1TxLogKey())
+    testing_expectBalance(getFrom(innerTxDataOffset), 0)
+    testing_expectBalance(getTo(innerTxDataOffset), 0)
+    testing_expectBalance(getReserved1(innerTxDataOffset), getReserved0(innerTxDataOffset))
+    expectPriorityQueueAccounting()
+}
+
+function INT_TEST_forceFailOffL1Settle() {
+    // The marker log is only executable on L1, so the bit is rejected on any other settlement layer.
+    testing_testWillFailWith("forceFail off L1 settlement")
+    mstore(SETTLEMENT_LAYER_CHAIN_ID_BYTE(), add(getL1ChainId(), 1))
+    mstore(testing_txDescriptionPtr(2), 0x0101)
 }
 
 function INT_TEST_forceFailOnUpgradeTx() {

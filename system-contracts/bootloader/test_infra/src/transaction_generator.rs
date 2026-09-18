@@ -7,7 +7,7 @@ use zksync_types::transaction_request::{PaymasterParams, TransactionRequest};
 use zksync_types::web3::Bytes;
 use zksync_types::{
     abi, address_to_u256, Address, K256PrivateKey, L2ChainId, Nonce, PackedEthSignature,
-    Transaction, EIP_1559_TX_TYPE, H256, PRIORITY_OPERATION_L2_TX_TYPE,
+    Transaction, EIP_1559_TX_TYPE, H256, L2_ASSET_TRACKER_ADDRESS, PRIORITY_OPERATION_L2_TX_TYPE,
     REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_BYTE, U256,
 };
 
@@ -106,17 +106,21 @@ const L1_TX_VALUE: u64 = 1_000_000;
 const L1_TX_GAS_LIMIT: u64 = 20_000_000;
 /// Non-zero, so `payToOperator` is not identically zero and force-fail billing is visible.
 const L1_FEE_TX_GAS_PRICE: u64 = 100;
+const L1_REVERT_TX_SENDER: u64 = 0xf0021;
+const L1_REVERT_TX_REFUND_RECIPIENT: u64 = 0xf0023;
+/// No function matches it on the target, so the call reverts on its first instruction.
+const UNKNOWN_SELECTOR: [u8; 4] = [0xde, 0xad, 0xbe, 0xef];
 
 /// An L1->L2 transaction transferring its whole `value` to a fresh address. With
 /// `max_fee_per_gas = 0` the operator is paid nothing, so balances do not depend on gas burned.
 fn generate_l1_transaction(
     sender: u64,
-    target: u64,
+    target: Address,
     refund_recipient: u64,
     max_fee_per_gas: u64,
+    calldata: Vec<u8>,
 ) -> Transaction {
     let sender = Address::from_low_u64_be(sender);
-    let target = Address::from_low_u64_be(target);
     let refund_recipient = Address::from_low_u64_be(refund_recipient);
     let value = U256::from(L1_TX_VALUE);
     let gas_limit = U256::from(L1_TX_GAS_LIMIT);
@@ -142,7 +146,7 @@ fn generate_l1_transaction(
                 U256::zero(),
                 U256::zero(),
             ],
-            data: vec![],
+            data: calldata,
             signature: vec![],
             factory_deps: vec![],
             paymaster_input: vec![],
@@ -194,16 +198,33 @@ pub(crate) fn generate_transactions() {
     let tx1 = generate_eip1559_transaction(&key, chain_id);
     write_transaction(dir, 1, &tx1);
 
-    let tx2 = generate_l1_transaction(L1_TX_SENDER, L1_TX_TARGET, L1_TX_REFUND_RECIPIENT, 0);
+    let tx2 = generate_l1_transaction(
+        L1_TX_SENDER,
+        Address::from_low_u64_be(L1_TX_TARGET),
+        L1_TX_REFUND_RECIPIENT,
+        0,
+        vec![],
+    );
     write_transaction(dir, 2, &tx2);
 
     let tx3 = generate_l1_transaction(
         L1_FEE_TX_SENDER,
-        L1_FEE_TX_TARGET,
+        Address::from_low_u64_be(L1_FEE_TX_TARGET),
         L1_FEE_TX_REFUND_RECIPIENT,
         L1_FEE_TX_GAS_PRICE,
+        vec![],
     );
     write_transaction(dir, 3, &tx3);
 
-    println!("Done. Generated 4 test transactions.");
+    // Reverts in the target, which is what force-fail has to be indistinguishable from.
+    let tx4 = generate_l1_transaction(
+        L1_REVERT_TX_SENDER,
+        L2_ASSET_TRACKER_ADDRESS,
+        L1_REVERT_TX_REFUND_RECIPIENT,
+        0,
+        UNKNOWN_SELECTOR.to_vec(),
+    );
+    write_transaction(dir, 4, &tx4);
+
+    println!("Done. Generated 5 test transactions.");
 }
