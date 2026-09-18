@@ -99,11 +99,6 @@
                     "internalType": "address"
                   },
                   {
-                    "name": "boojumVerifier",
-                    "type": "address",
-                    "internalType": "address"
-                  },
-                  {
                     "name": "verifier",
                     "type": "address",
                     "internalType": "address"

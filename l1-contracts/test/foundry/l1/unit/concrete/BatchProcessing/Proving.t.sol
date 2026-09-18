@@ -12,6 +12,7 @@ import {
 
 import {
     AIRBENDER_SNARK_PROOF_LENGTH,
+    BOOJUM_FFLONK_PROOF_LENGTH,
     ERA_MULTI_PROOF_TYPE,
     POINT_EVALUATION_PRECOMPILE_ADDR,
     ProofSystem,
@@ -346,7 +347,7 @@ contract ProvingTest is ExecutorTest {
                 _publicInput(genesisStoredBatchInfo.commitment, newStoredBatchInfo.commitment),
                 2,
                 ERA_MULTI_PROOF_TYPE,
-                2 + 1 + AIRBENDER_SNARK_PROOF_LENGTH
+                1 + BOOJUM_FFLONK_PROOF_LENGTH + AIRBENDER_SNARK_PROOF_LENGTH
             )
         );
         _proveWith(_multiProof());
@@ -436,12 +437,10 @@ contract ProvingTest is ExecutorTest {
         vm.etch(getters.getVerifier(), address(new EraMultiProofVerifier(_boojum, _airbender)).code);
     }
 
-    /// `[type, N=1, boojum(1 word), airbender(44 words)]`
+    /// `[type, boojum(24 words), airbender(44 words)]`
     function _multiProof() internal pure returns (uint256[] memory proof) {
-        proof = new uint256[](2 + 1 + AIRBENDER_SNARK_PROOF_LENGTH);
+        proof = new uint256[](1 + BOOJUM_FFLONK_PROOF_LENGTH + AIRBENDER_SNARK_PROOF_LENGTH);
         proof[0] = ERA_MULTI_PROOF_TYPE;
-        proof[1] = 1;
-        proof[2] = 1;
     }
 
     function _proveWithPrev(

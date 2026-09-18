@@ -596,58 +596,38 @@ library GatewayCTMDeployerHelper {
             );
             result.verifierFflonk = _deployInternalEmptyParams(fflonkName, fflonkFile, innerConfig, _isZKsyncOS);
         }
-        {
-            (string memory plonkFile, string memory plonkName) = DeployCTML1OrGateway.resolve(
-                _isZKsyncOS,
-                CTMContract.VerifierPlonk
+        if (!_isZKsyncOS) {
+            // The Gateway flow deploys no Airbender verifier, so Gateway chains require Boojum only.
+            (string memory chainVerifierFile, string memory chainVerifierName) = DeployCTML1OrGateway
+                .resolveChainVerifier(false, config.testnetVerifier);
+            result.verifier = _deployInternalWithParams(
+                chainVerifierName,
+                chainVerifierFile,
+                abi.encode(result.verifierFflonk, address(0)),
+                innerConfig,
+                false
             );
-            result.verifierPlonk = _deployInternalEmptyParams(plonkName, plonkFile, innerConfig, _isZKsyncOS);
+            return result;
         }
         {
-            (string memory boojumFile, string memory boojumName) = DeployCTML1OrGateway.resolveBoojumVerifier(
-                _isZKsyncOS,
+            (string memory plonkFile, string memory plonkName) = DeployCTML1OrGateway.resolve(
+                true,
+                CTMContract.VerifierPlonk
+            );
+            result.verifierPlonk = _deployInternalEmptyParams(plonkName, plonkFile, innerConfig, true);
+        }
+        {
+            (string memory verifierFile, string memory verifierName) = DeployCTML1OrGateway.resolveChainVerifier(
+                true,
                 config.testnetVerifier
             );
             bytes memory creationArgs = DeployCTML1OrGateway.verifierCreationArgs(
-                _isZKsyncOS,
                 result.verifierFflonk,
                 result.verifierPlonk,
                 config.aliasedGovernanceAddress
             );
-            address boojumVerifier = _deployInternalWithParams(
-                boojumName,
-                boojumFile,
-                creationArgs,
-                innerConfig,
-                _isZKsyncOS
-            );
-            if (_isZKsyncOS) {
-                result.verifier = boojumVerifier;
-            } else {
-                result.boojumVerifier = boojumVerifier;
-                result.verifier = _deployEraChainVerifier(boojumVerifier, config.testnetVerifier, innerConfig);
-            }
+            result.verifier = _deployInternalWithParams(verifierName, verifierFile, creationArgs, innerConfig, true);
         }
-    }
-
-    /// @dev The Gateway flow deploys no Airbender verifier, so Gateway chains require Boojum only.
-    function _deployEraChainVerifier(
-        address _boojumVerifier,
-        bool _testnetVerifier,
-        InnerDeployConfig memory _innerConfig
-    ) internal returns (address) {
-        (string memory chainVerifierFile, string memory chainVerifierName) = DeployCTML1OrGateway.resolveChainVerifier(
-            false,
-            _testnetVerifier
-        );
-        return
-            _deployInternalWithParams(
-                chainVerifierName,
-                chainVerifierFile,
-                abi.encode(_boojumVerifier, address(0)),
-                _innerConfig,
-                false
-            );
     }
 
     function _calculateCTMDeployerAddresses(
@@ -854,7 +834,6 @@ library GatewayCTMDeployerHelper {
                 verifierPlonk: _deployedContracts.stateTransition.verifiers.verifierPlonk,
                 // Gateway CTM deployment does not deploy an Airbender verifier.
                 airbenderVerifierPlonk: address(0),
-                boojumVerifier: _deployedContracts.stateTransition.verifiers.boojumVerifier,
                 verifierOwner: _config.aliasedGovernanceAddress,
                 permissionlessValidator: address(0)
             });
@@ -916,7 +895,7 @@ library GatewayCTMDeployerHelper {
     /// @notice Bytecodes required for Gateway CTM deployers on Era.
     // solhint-disable-next-line code-complexity
     function _gatewayCTMEraFactoryDependencies() private returns (bytes[] memory dependencies) {
-        uint256 totalDependencies = 28;
+        uint256 totalDependencies = 26;
         dependencies = new bytes[](totalDependencies);
         uint256 idx = 0;
 
@@ -948,8 +927,6 @@ library GatewayCTMDeployerHelper {
             "TransparentUpgradeableProxy"
         );
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "EraVerifierFflonk.sol", "EraVerifierFflonk");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "EraVerifierPlonk.sol", "EraVerifierPlonk");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "EraDualVerifier.sol", "EraDualVerifier");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "EraMultiProofVerifier.sol", "EraMultiProofVerifier");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(
             false,

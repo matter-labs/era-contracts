@@ -223,13 +223,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         );
 
         ctmAddresses.stateTransition.verifiers.verifierFflonk = deploySimpleContract(fflonkName, false);
-        ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract(plonkName, false);
 
         if (config.isZKsyncOS) {
+            ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract(plonkName, false);
             ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(chainVerifierName, false);
         } else {
-            (, string memory boojumVerifierName) = DeployCTML1OrGateway.resolve(false, CTMContract.DualVerifier);
-            ctmAddresses.stateTransition.verifiers.boojumVerifier = deploySimpleContract(boojumVerifierName, false);
             if (config.airbenderVerifier) {
                 ctmAddresses.stateTransition.verifiers.airbenderVerifierPlonk = deploySimpleContract(
                     "AirbenderVerifierPlonk",
@@ -369,11 +367,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             "state_transition",
             "airbender_verifier_addr",
             ctmAddresses.stateTransition.verifiers.airbenderVerifierPlonk
-        );
-        vm.serializeAddress(
-            "state_transition",
-            "boojum_verifier_addr",
-            ctmAddresses.stateTransition.verifiers.boojumVerifier
         );
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", ctmAddresses.stateTransition.genesisUpgrade);
         vm.serializeAddress("state_transition", "default_upgrade_addr", ctmAddresses.stateTransition.defaultUpgrade);

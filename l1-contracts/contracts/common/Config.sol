@@ -81,6 +81,9 @@ uint8 constant AIRBENDER_PROOF_SYSTEM_MASK = uint8(1 << uint8(ProofSystem.Airben
 /// @dev `_proof[0]` of the combined Era proof carrying both a Boojum and an Airbender sub-proof.
 uint256 constant ERA_MULTI_PROOF_TYPE = 4;
 
+/// @dev Number of words in a Boojum FFLONK proof.
+uint256 constant BOOJUM_FFLONK_PROOF_LENGTH = 24;
+
 /// @dev Number of words in an Airbender PLONK SNARK proof.
 uint256 constant AIRBENDER_SNARK_PROOF_LENGTH = 44;
 

@@ -10,6 +10,7 @@ import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMul
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {
     AIRBENDER_SNARK_PROOF_LENGTH,
+    BOOJUM_FFLONK_PROOF_LENGTH,
     BOOJUM_PROOF_SYSTEM_MASK,
     ERA_MULTI_PROOF_TYPE
 } from "contracts/common/Config.sol";
@@ -56,17 +57,17 @@ contract AirbenderPlonkProofIntegrationTest is Test {
 
         uint256[] memory airbenderProof = AirbenderPlonkProofFixture.serializedProof();
         assertEq(airbenderProof.length, AIRBENDER_SNARK_PROOF_LENGTH);
-        uint256[] memory proof = new uint256[](2 + AIRBENDER_SNARK_PROOF_LENGTH);
+        uint256[] memory proof = new uint256[](1 + BOOJUM_FFLONK_PROOF_LENGTH + AIRBENDER_SNARK_PROOF_LENGTH);
         proof[0] = ERA_MULTI_PROOF_TYPE;
         for (uint256 i = 0; i < AIRBENDER_SNARK_PROOF_LENGTH; ++i) {
-            proof[2 + i] = airbenderProof[i];
+            proof[1 + BOOJUM_FFLONK_PROOF_LENGTH + i] = airbenderProof[i];
         }
         uint256[] memory publicInputs = new uint256[](2);
         publicInputs[1] = AirbenderPlonkProofFixture.publicInputs()[0];
 
         assertTrue(chain.callVerify(verifier, publicInputs, proof));
 
-        proof[2] ^= 1;
+        proof[1 + BOOJUM_FFLONK_PROOF_LENGTH] ^= 1;
         vm.expectRevert();
         chain.callVerify(verifier, publicInputs, proof);
     }

@@ -23,7 +23,7 @@ import {
     ChainCreationParams,
     ChainTypeManagerInitializeData
 } from "contracts/state-transition/IChainTypeManager.sol";
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
+import {EraMultiProofTestnetVerifier} from "contracts/state-transition/verifiers/EraMultiProofTestnetVerifier.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {
     ZeroAddress,
@@ -40,7 +40,6 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
@@ -91,7 +90,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         serverNotifier = makeAddr("serverNotifier");
         newChainAdmin = makeAddr("chainadmin");
         baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, baseToken);
-        testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+        testnetVerifier = address(new EraMultiProofTestnetVerifier(IVerifier(address(0)), IVerifier(address(0))));
 
         bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
         chainAssetHandler = new L1ChainAssetHandler(governor, address(bridgehub));

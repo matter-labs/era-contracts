@@ -31,11 +31,9 @@ import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7
 import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo, CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {EraDualVerifier} from "contracts/state-transition/verifiers/EraDualVerifier.sol";
 import {EraMultiProofTestnetVerifier} from "contracts/state-transition/verifiers/EraMultiProofTestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
@@ -294,7 +292,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         DiamondInit diamondInit = new DiamondInit(isZKsyncOS());
         // Testnet multi-proof verifier, so an empty proof settles.
         EraMultiProofTestnetVerifier testnetVerifier = new EraMultiProofTestnetVerifier(
-            IVerifier(address(new EraDualVerifier(IVerifierV2(address(0)), IVerifier(address(0))))),
+            IVerifier(address(0)),
             IVerifier(address(0))
         );
         // Mock the CTM to return a verifier for protocol version 0

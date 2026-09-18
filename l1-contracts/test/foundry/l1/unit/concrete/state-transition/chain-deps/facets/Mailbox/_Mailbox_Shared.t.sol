@@ -10,8 +10,7 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {EraMultiProofTestnetVerifier} from "contracts/state-transition/verifiers/EraMultiProofTestnetVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
@@ -26,7 +25,8 @@ contract MailboxTest is UtilsCallMockerTest {
     IGetters internal gettersFacet;
     address sender;
     uint256 constant eraChainId = 9;
-    address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    address internal testnetVerifier =
+        address(new EraMultiProofTestnetVerifier(IVerifier(address(0)), IVerifier(address(0))));
     address diamondProxy;
     address bridgehub;
     address chainAssetHandler;

@@ -4,19 +4,18 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMultiProofVerifier.sol";
-import {EraDualVerifier} from "contracts/state-transition/verifiers/EraDualVerifier.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {EraVerifierFflonk} from "contracts/state-transition/verifiers/EraVerifierFflonk.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {
     AIRBENDER_PROOF_SYSTEM_MASK,
     AIRBENDER_SNARK_PROOF_LENGTH,
+    BOOJUM_FFLONK_PROOF_LENGTH,
     BOOJUM_PROOF_SYSTEM_MASK,
     ERA_MULTI_PROOF_TYPE
 } from "contracts/common/Config.sol";
 import {
     AirbenderVerificationFailed,
     BoojumVerificationFailed,
-    EmptyProofLength,
     InvalidDisabledProofSystemsMask,
     InvalidProofFormat,
     InvalidPublicInputsLength,
@@ -27,7 +26,7 @@ import {ChainStub, RevealingVerifier, StubVerifier} from "./VerifierStubs.sol";
 contract EraMultiProofVerifierTest is Test {
     uint256 internal constant BOOJUM_PUBLIC_INPUT = uint256(keccak256("boojum-transition-hash"));
     uint256 internal constant AIRBENDER_PUBLIC_INPUT = uint256(keccak256("airbender-transition-hash"));
-    uint256 internal constant BOOJUM_SEGMENT_LENGTH = 3;
+    uint256 internal constant PROOF_LENGTH = 1 + BOOJUM_FFLONK_PROOF_LENGTH + AIRBENDER_SNARK_PROOF_LENGTH;
     uint8 internal constant BOTH = BOOJUM_PROOF_SYSTEM_MASK | AIRBENDER_PROOF_SYSTEM_MASK;
 
     StubVerifier internal boojum;
@@ -50,21 +49,16 @@ contract EraMultiProofVerifierTest is Test {
         pi[1] = AIRBENDER_PUBLIC_INPUT;
     }
 
-    /// `[type, N, boojum(N words), airbender(44 words)]`
-    function _proof(uint256 _boojumType, uint256 _boojumLength) internal pure returns (uint256[] memory proof) {
-        proof = new uint256[](2 + _boojumLength + AIRBENDER_SNARK_PROOF_LENGTH);
+    /// `[type, boojum(24 words), airbender(44 words)]`, with distinct words per segment.
+    function _proof() internal pure returns (uint256[] memory proof) {
+        proof = new uint256[](PROOF_LENGTH);
         proof[0] = ERA_MULTI_PROOF_TYPE;
-        proof[1] = _boojumLength;
-        if (_boojumLength > 0) {
-            proof[2] = _boojumType;
+        for (uint256 i = 0; i < BOOJUM_FFLONK_PROOF_LENGTH; ++i) {
+            proof[1 + i] = 0xb0 + i;
         }
         for (uint256 i = 0; i < AIRBENDER_SNARK_PROOF_LENGTH; ++i) {
-            proof[2 + _boojumLength + i] = 0xa0 + i;
+            proof[1 + BOOJUM_FFLONK_PROOF_LENGTH + i] = 0xa0 + i;
         }
-    }
-
-    function _default() internal pure returns (uint256[] memory) {
-        return _proof(1, BOOJUM_SEGMENT_LENGTH);
     }
 
     function _withAirbender(IVerifier _airbender) internal returns (EraMultiProofVerifier) {
@@ -83,19 +77,19 @@ contract EraMultiProofVerifierTest is Test {
     }
 
     function test_acceptsWhenBothAccept() public view {
-        assertTrue(chain.callVerify(verifier, _publicInputs(), _default()));
+        assertTrue(chain.callVerify(verifier, _publicInputs(), _proof()));
     }
 
     function test_revertsWhenBoojumRejects() public {
         EraMultiProofVerifier v = _withBoojum(IVerifier(address(rejecting)));
         vm.expectRevert(BoojumVerificationFailed.selector);
-        chain.callVerify(v, _publicInputs(), _default());
+        chain.callVerify(v, _publicInputs(), _proof());
     }
 
     function test_revertsWhenAirbenderRejects() public {
         EraMultiProofVerifier v = _withAirbender(IVerifier(address(rejecting)));
         vm.expectRevert(AirbenderVerificationFailed.selector);
-        chain.callVerify(v, _publicInputs(), _default());
+        chain.callVerify(v, _publicInputs(), _proof());
     }
 
     function test_passesFirstPublicInputAndBoojumSegmentToBoojum() public {
@@ -105,11 +99,11 @@ contract EraMultiProofVerifierTest is Test {
                 RevealingVerifier.Revealed.selector,
                 BOOJUM_PUBLIC_INPUT,
                 1,
-                1,
-                BOOJUM_SEGMENT_LENGTH
+                0xb0,
+                BOOJUM_FFLONK_PROOF_LENGTH
             )
         );
-        chain.callVerify(v, _publicInputs(), _default());
+        chain.callVerify(v, _publicInputs(), _proof());
     }
 
     function test_passesSecondPublicInputAndAirbenderSegmentToAirbender() public {
@@ -123,7 +117,14 @@ contract EraMultiProofVerifierTest is Test {
                 AIRBENDER_SNARK_PROOF_LENGTH
             )
         );
-        chain.callVerify(v, _publicInputs(), _default());
+        chain.callVerify(v, _publicInputs(), _proof());
+    }
+
+    /// A garbage Boojum segment is refused by the real FFLONK verifier.
+    function test_realBoojumVerifierRejectsGarbage() public {
+        EraMultiProofVerifier v = _withBoojum(IVerifier(address(new EraVerifierFflonk())));
+        vm.expectRevert();
+        chain.callVerify(v, _publicInputs(), _proof());
     }
 
     // ============ Disabled proof systems ============
@@ -131,19 +132,19 @@ contract EraMultiProofVerifierTest is Test {
     function test_skipsAirbenderWhenChainDisabledIt() public {
         EraMultiProofVerifier v = _withAirbender(IVerifier(address(rejecting)));
         chain.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
-        assertTrue(chain.callVerify(v, _publicInputs(), _default()));
+        assertTrue(chain.callVerify(v, _publicInputs(), _proof()));
     }
 
     function test_skipsBoojumWhenChainDisabledIt() public {
         EraMultiProofVerifier v = _withBoojum(IVerifier(address(rejecting)));
         chain.setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_MASK);
-        assertTrue(chain.callVerify(v, _publicInputs(), _proof(1, 0)));
+        assertTrue(chain.callVerify(v, _publicInputs(), _proof()));
     }
 
     function test_revertsWhenChainDisabledEverything() public {
         chain.setDisabledProofSystems(BOTH);
         vm.expectRevert(abi.encodeWithSelector(InvalidDisabledProofSystemsMask.selector, BOTH));
-        chain.callVerify(verifier, _publicInputs(), _default());
+        chain.callVerify(verifier, _publicInputs(), _proof());
     }
 
     /// The mask is read from `msg.sender` on every call.
@@ -153,8 +154,8 @@ contract EraMultiProofVerifierTest is Test {
         airbenderDisabled.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
 
         vm.expectRevert(AirbenderVerificationFailed.selector);
-        chain.callVerify(v, _publicInputs(), _default());
-        assertTrue(airbenderDisabled.callVerify(v, _publicInputs(), _default()));
+        chain.callVerify(v, _publicInputs(), _proof());
+        assertTrue(airbenderDisabled.callVerify(v, _publicInputs(), _proof()));
     }
 
     /// A CTM deployed without an Airbender verifier requires Boojum only, and Boojum cannot then be disabled.
@@ -162,11 +163,11 @@ contract EraMultiProofVerifierTest is Test {
         EraMultiProofVerifier v = _withAirbender(IVerifier(address(0)));
         assertEq(v.supportedProofSystems(), BOOJUM_PROOF_SYSTEM_MASK);
         assertEq(v.requiredProofSystems(0), BOOJUM_PROOF_SYSTEM_MASK);
-        assertTrue(chain.callVerify(v, _publicInputs(), _default()));
+        assertTrue(chain.callVerify(v, _publicInputs(), _proof()));
 
         chain.setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_MASK);
         vm.expectRevert(abi.encodeWithSelector(InvalidDisabledProofSystemsMask.selector, BOOJUM_PROOF_SYSTEM_MASK));
-        chain.callVerify(v, _publicInputs(), _default());
+        chain.callVerify(v, _publicInputs(), _proof());
     }
 
     // ============ Envelope ============
@@ -176,69 +177,39 @@ contract EraMultiProofVerifierTest is Test {
         uint256[] memory one = new uint256[](1);
         one[0] = BOOJUM_PUBLIC_INPUT;
         vm.expectRevert(InvalidPublicInputsLength.selector);
-        chain.callVerify(verifier, one, _default());
+        chain.callVerify(verifier, one, _proof());
 
         chain.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_MASK);
         vm.expectRevert(InvalidPublicInputsLength.selector);
-        chain.callVerify(verifier, one, _default());
+        chain.callVerify(verifier, one, _proof());
         chain.setDisabledProofSystems(0);
 
         uint256[] memory three = new uint256[](3);
         vm.expectRevert(InvalidPublicInputsLength.selector);
-        chain.callVerify(verifier, three, _default());
-    }
-
-    function test_revertsOnEmptyProof() public {
-        vm.expectRevert(EmptyProofLength.selector);
-        chain.callVerify(verifier, _publicInputs(), new uint256[](0));
+        chain.callVerify(verifier, three, _proof());
     }
 
     function test_revertsOnUnknownProofType() public {
-        uint256[] memory proof = _default();
+        uint256[] memory proof = _proof();
         proof[0] = ERA_MULTI_PROOF_TYPE + 1;
         vm.expectRevert(UnknownVerifierType.selector);
         chain.callVerify(verifier, _publicInputs(), proof);
     }
 
-    function test_revertsOnWrongEnvelopeLength() public {
-        uint256[] memory proof = _default();
-        uint256[] memory tooLong = new uint256[](proof.length + 1);
-        for (uint256 i = 0; i < proof.length; ++i) {
-            tooLong[i] = proof[i];
-        }
+    /// The envelope is fixed-size; anything else is refused, including an empty proof.
+    function test_revertsOnWrongProofLength() public {
         vm.expectRevert(InvalidProofFormat.selector);
-        chain.callVerify(verifier, _publicInputs(), tooLong);
+        chain.callVerify(verifier, _publicInputs(), new uint256[](0));
 
-        uint256[] memory tooShort = new uint256[](2 + AIRBENDER_SNARK_PROOF_LENGTH - 1);
+        uint256[] memory tooShort = new uint256[](PROOF_LENGTH - 1);
         tooShort[0] = ERA_MULTI_PROOF_TYPE;
         vm.expectRevert(InvalidProofFormat.selector);
         chain.callVerify(verifier, _publicInputs(), tooShort);
 
-        uint256[] memory headerOnly = new uint256[](1);
-        headerOnly[0] = ERA_MULTI_PROOF_TYPE;
+        uint256[] memory tooLong = new uint256[](PROOF_LENGTH + 1);
+        tooLong[0] = ERA_MULTI_PROOF_TYPE;
         vm.expectRevert(InvalidProofFormat.selector);
-        chain.callVerify(verifier, _publicInputs(), headerOnly);
-    }
-
-    /// A declared Boojum length that would overflow `2 + N + 44` is an envelope error, not an arithmetic panic.
-    function test_revertsOnOutOfRangeBoojumLength() public {
-        uint256[] memory proof = _default();
-        proof[1] = type(uint256).max;
-        vm.expectRevert(InvalidProofFormat.selector);
-        chain.callVerify(verifier, _publicInputs(), proof);
-    }
-
-    /// With the real `EraDualVerifier`: an Airbender-typed proof is refused in the Boojum segment, and so is an
-    /// empty Boojum segment while Boojum is required.
-    function test_boojumSegmentGoesThroughTheRealBoojumVerifier() public {
-        EraDualVerifier router = new EraDualVerifier(IVerifierV2(address(boojum)), IVerifier(address(boojum)));
-        EraMultiProofVerifier v = _withBoojum(IVerifier(address(router)));
-
-        vm.expectRevert(UnknownVerifierType.selector);
-        chain.callVerify(v, _publicInputs(), _proof(2, BOOJUM_SEGMENT_LENGTH));
-
-        vm.expectRevert(EmptyProofLength.selector);
-        chain.callVerify(v, _publicInputs(), _proof(1, 0));
+        chain.callVerify(verifier, _publicInputs(), tooLong);
     }
 
     // ============ Discovery ============
@@ -249,6 +220,7 @@ contract EraMultiProofVerifierTest is Test {
         assertEq(verifier.requiredProofSystems(AIRBENDER_PROOF_SYSTEM_MASK), BOOJUM_PROOF_SYSTEM_MASK);
         assertEq(verifier.requiredProofSystems(BOOJUM_PROOF_SYSTEM_MASK), AIRBENDER_PROOF_SYSTEM_MASK);
         assertEq(verifier.acceptedProofType(), ERA_MULTI_PROOF_TYPE);
+        assertFalse(verifier.IS_TESTNET_VERIFIER());
     }
 
     function test_requiredSystemsRejectsTheAllDisabledMask() public {
@@ -256,18 +228,13 @@ contract EraMultiProofVerifierTest is Test {
         verifier.requiredProofSystems(BOTH);
     }
 
-    /// `verificationKeyHash(type)`: 0 and 1 from the Boojum verifier, 2 from Airbender.
+    /// `verificationKeyHash(type)`: 0 Boojum, 2 Airbender; the retired PLONK type 1 is refused.
     function test_reportsKeysByType() public {
-        StubVerifier fflonk = new StubVerifier(true, keccak256("fflonk-key"));
-        StubVerifier plonk = new StubVerifier(true, keccak256("plonk-key"));
-        EraDualVerifier router = new EraDualVerifier(IVerifierV2(address(fflonk)), IVerifier(address(plonk)));
-        EraMultiProofVerifier v = _withBoojum(IVerifier(address(router)));
+        assertEq(verifier.verificationKeyHash(), keccak256("boojum-key"));
+        assertEq(verifier.verificationKeyHash(0), keccak256("boojum-key"));
+        assertEq(verifier.verificationKeyHash(2), keccak256("airbender-key"));
 
-        assertEq(v.verificationKeyHash(), router.verificationKeyHash());
-        assertEq(v.verificationKeyHash(0), keccak256("fflonk-key"));
-        assertEq(v.verificationKeyHash(1), keccak256("plonk-key"));
-        assertEq(v.verificationKeyHash(2), keccak256("airbender-key"));
-        assertEq(address(v.FFLONK_VERIFIER()), address(fflonk));
-        assertEq(address(v.PLONK_VERIFIER()), address(plonk));
+        vm.expectRevert(UnknownVerifierType.selector);
+        verifier.verificationKeyHash(1);
     }
 }

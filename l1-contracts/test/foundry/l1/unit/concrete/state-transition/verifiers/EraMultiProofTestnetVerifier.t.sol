@@ -5,11 +5,10 @@ import {Test} from "forge-std/Test.sol";
 
 import {EraMultiProofTestnetVerifier} from "contracts/state-transition/verifiers/EraMultiProofTestnetVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
-import {EraDualVerifier} from "contracts/state-transition/verifiers/EraDualVerifier.sol";
 import {
     AIRBENDER_PROOF_SYSTEM_MASK,
     AIRBENDER_SNARK_PROOF_LENGTH,
+    BOOJUM_FFLONK_PROOF_LENGTH,
     ERA_MULTI_PROOF_TYPE
 } from "contracts/common/Config.sol";
 import {AirbenderVerificationFailed} from "contracts/common/L1ContractErrors.sol";
@@ -34,10 +33,8 @@ contract EraMultiProofTestnetVerifierTest is Test {
     }
 
     function _proof() internal pure returns (uint256[] memory proof) {
-        proof = new uint256[](2 + 1 + AIRBENDER_SNARK_PROOF_LENGTH);
+        proof = new uint256[](1 + BOOJUM_FFLONK_PROOF_LENGTH + AIRBENDER_SNARK_PROOF_LENGTH);
         proof[0] = ERA_MULTI_PROOF_TYPE;
-        proof[1] = 1;
-        proof[2] = 1;
     }
 
     function test_isTestnetVerifier() public view {
@@ -60,17 +57,13 @@ contract EraMultiProofTestnetVerifierTest is Test {
     }
 
     function test_reportsVerificationKeys() public {
-        StubVerifier fflonk = new StubVerifier(true, keccak256("fflonk-key"));
-        StubVerifier plonk = new StubVerifier(true, keccak256("plonk-key"));
-        EraDualVerifier boojum = new EraDualVerifier(IVerifierV2(address(fflonk)), IVerifier(address(plonk)));
         EraMultiProofTestnetVerifier v = new EraMultiProofTestnetVerifier(
-            IVerifier(address(boojum)),
+            IVerifier(address(new StubVerifier(true, keccak256("boojum-key")))),
             IVerifier(address(new StubVerifier(true, keccak256("airbender-key"))))
         );
 
-        assertEq(v.verificationKeyHash(), boojum.verificationKeyHash());
-        assertEq(v.verificationKeyHash(0), keccak256("fflonk-key"));
-        assertEq(v.verificationKeyHash(1), keccak256("plonk-key"));
+        assertEq(v.verificationKeyHash(), keccak256("boojum-key"));
+        assertEq(v.verificationKeyHash(0), keccak256("boojum-key"));
         assertEq(v.verificationKeyHash(2), keccak256("airbender-key"));
     }
 }

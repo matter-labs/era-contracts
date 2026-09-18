@@ -10,8 +10,6 @@ import {AddressIntrospector} from "deploy-scripts/utils/AddressIntrospector.sol"
 import {CTMDeployedAddresses} from "deploy-scripts/utils/Types.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMultiProofVerifier.sol";
-import {IEraDualVerifier} from "contracts/state-transition/chain-interfaces/IEraDualVerifier.sol";
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 
@@ -37,34 +35,20 @@ contract AirbenderDeploymentTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         assertTrue(boojum != address(0), "Boojum verifier not wired");
         assertTrue(airbender != address(0), "Airbender verifier not wired");
         assertTrue(boojum != airbender, "verifiers must be distinct contracts");
+        assertTrue(IVerifier(boojum).verificationKeyHash() != bytes32(0), "Boojum verifier has no key");
         assertTrue(IVerifier(airbender).verificationKeyHash() != bytes32(0), "Airbender verifier has no key");
+        assertEq(verifier.verificationKeyHash(), IVerifier(boojum).verificationKeyHash());
     }
 
-    /// Tooling reads `FFLONK_VERIFIER`/`PLONK_VERIFIER` off the chain verifier.
-    function test_forwardsSubVerifierGetters() public view {
-        IEraDualVerifier chainVerifier = IEraDualVerifier(address(_verifier()));
-        IEraDualVerifier router = IEraDualVerifier(address(_verifier().BOOJUM_VERIFIER()));
-
-        assertEq(address(chainVerifier.FFLONK_VERIFIER()), address(router.FFLONK_VERIFIER()));
-        assertEq(address(chainVerifier.PLONK_VERIFIER()), address(router.PLONK_VERIFIER()));
-        assertTrue(address(router.FFLONK_VERIFIER()) != address(router.PLONK_VERIFIER()));
-        assertEq(_verifier().verificationKeyHash(), IVerifier(address(router)).verificationKeyHash());
-    }
-
-    function test_addressIntrospectorResolvesTheChainVerifier() public {
+    /// Tooling reads the verifiers off the chain verifier.
+    function test_addressIntrospectorResolvesTheVerifiers() public {
         CTMDeployedAddresses memory info = AddressIntrospector.getCTMAddresses(
             ChainTypeManagerBase(address(addresses.chainTypeManager))
         );
 
-        assertTrue(info.stateTransition.verifiers.verifierFflonk != address(0), "fflonk not resolved");
-        assertTrue(info.stateTransition.verifiers.verifierPlonk != address(0), "plonk not resolved");
         assertEq(info.stateTransition.verifiers.verifier, address(_verifier()), "chain verifier not resolved");
-    }
-
-    /// The Boojum verifier must be the production `EraDualVerifier`, not `EraTestnetVerifier`.
-    function test_boojumVerifierIsTheProductionRouter() public {
-        EraTestnetVerifier boojum = EraTestnetVerifier(address(_verifier().BOOJUM_VERIFIER()));
-        vm.expectRevert();
-        boojum.IS_TESTNET_VERIFIER();
+        assertEq(info.stateTransition.verifiers.verifierFflonk, address(_verifier().BOOJUM_VERIFIER()));
+        assertEq(info.stateTransition.verifiers.airbenderVerifierPlonk, address(_verifier().AIRBENDER_VERIFIER()));
+        assertEq(info.stateTransition.verifiers.verifierPlonk, address(0), "Era chains have no PLONK verifier");
     }
 }

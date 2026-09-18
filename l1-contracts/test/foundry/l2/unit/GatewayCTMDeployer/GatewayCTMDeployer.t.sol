@@ -40,11 +40,8 @@ import {RelayedSLDAValidator} from "contracts/state-transition/data-availability
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 
 import {EraVerifierFflonk} from "contracts/state-transition/verifiers/EraVerifierFflonk.sol";
-import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifierPlonk.sol";
-import {EraDualVerifier} from "contracts/state-transition/verifiers/EraDualVerifier.sol";
 import {EraMultiProofTestnetVerifier} from "contracts/state-transition/verifiers/EraMultiProofTestnetVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
@@ -147,8 +144,6 @@ contract GatewayCTMDeployerTest is Test {
 
         // Verifier contracts
         new EraVerifierFflonk();
-        new EraVerifierPlonk();
-        new EraDualVerifier(IVerifierV2(address(0)), IVerifier(address(0)));
         new EraMultiProofTestnetVerifier(IVerifier(address(0)), IVerifier(address(0)));
 
         // CTM contracts

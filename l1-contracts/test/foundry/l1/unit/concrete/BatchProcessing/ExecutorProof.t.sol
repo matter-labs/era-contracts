@@ -11,11 +11,10 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
 import {LogProcessingOutput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
+import {EraMultiProofTestnetVerifier} from "contracts/state-transition/verifiers/EraMultiProofTestnetVerifier.sol";
 
 contract TestExecutorFacet is ExecutorFacet {
     constructor() ExecutorFacet(block.chainid) {}
@@ -64,7 +63,8 @@ contract ExecutorProofTest is UtilsCallMockerTest {
     UtilsFacet internal utilsFacet;
     TestExecutorFacet internal executor;
     TestCommitterFacet internal committer;
-    address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    address internal testnetVerifier =
+        address(new EraMultiProofTestnetVerifier(IVerifier(address(0)), IVerifier(address(0))));
     DummyBridgehub internal dummyBridgehub;
 
     function getTestExecutorFacetSelectors() private pure returns (bytes4[] memory) {

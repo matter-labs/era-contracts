@@ -8,8 +8,7 @@ import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/Admin.sol";
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {EraMultiProofTestnetVerifier} from "contracts/state-transition/verifiers/EraMultiProofTestnetVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
@@ -41,7 +40,8 @@ bytes constant ERROR_ONLY_VALIDATOR_OR_STATE_TRANSITION_MANAGER = "ZKChain: Only
 contract ZKChainBaseTest is UtilsTest {
     TestBaseFacet internal testBaseFacet;
     UtilsFacet internal utilsFacet;
-    address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    address internal testnetVerifier =
+        address(new EraMultiProofTestnetVerifier(IVerifier(address(0)), IVerifier(address(0))));
     DummyBridgehub internal dummyBridgehub;
 
     function getTestBaseFacetSelectors() public pure returns (bytes4[] memory selectors) {
