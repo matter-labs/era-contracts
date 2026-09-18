@@ -545,15 +545,13 @@ library GatewayCTMDeployerHelper {
         );
 
         {
-            // The last parameter is deliberately unnamed, so named arguments are not possible.
-            // solhint-disable-next-line func-named-parameters
-            bytes memory proxyConstructorArgs = _buildCTMProxyConstructorArgs(
-                config,
-                baseConfig,
-                result.chainTypeManagerImplementation,
-                result.serverNotifierProxy,
-                deployerAddr
-            );
+            bytes memory proxyConstructorArgs = _buildCTMProxyConstructorArgs({
+                config: config,
+                baseConfig: baseConfig,
+                ctmImplementation: result.chainTypeManagerImplementation,
+                serverNotifierProxy: result.serverNotifierProxy,
+                temporaryOwner: deployerAddr
+            });
             result.diamondCutData = _buildDiamondCutDataEncoded(config.facets, baseConfig);
             result.chainTypeManagerProxy = _deployInternalWithParams(
                 "TransparentUpgradeableProxy",
@@ -618,7 +616,9 @@ library GatewayCTMDeployerHelper {
         GatewayCTMDeployerConfig memory baseConfig,
         address ctmImplementation,
         address serverNotifierProxy,
-        address /* temporaryOwner */
+        // Unused by this builder, but named so callers can use named arguments.
+        // solhint-disable-next-line no-unused-vars
+        address temporaryOwner
     ) private pure returns (bytes memory) {
         Diamond.DiamondCutData memory diamondCut = abi.decode(
             _buildDiamondCutDataEncoded(config.facets, baseConfig),

@@ -78,20 +78,18 @@ contract UpgradeIntegrationTestBase is Test {
             CORE_OUTPUT
         );
         console.log("setupUpgrade: Initializing CTM upgrade");
-        // The argument list carries inline comments, which named-argument form would lose.
-        // solhint-disable-next-line func-named-parameters
-        ctmUpgrade.initializeWithArgs(
-            params.ctmProxy,
-            params.bytecodesSupplier,
-            params.rollupDAManager,
-            params.create2FactorySalt,
-            params.upgradeInputPath,
-            CTM_OUTPUT,
-            params.governance,
-            params.zkTokenAssetId,
+        ctmUpgrade.initializeWithArgs({
+            ctmProxy: params.ctmProxy,
+            bytecodesSupplier: params.bytecodesSupplier,
+            rollupDAManager: params.rollupDAManager,
+            create2FactorySalt: params.create2FactorySalt,
+            newConfigPath: params.upgradeInputPath,
+            _outputPath: CTM_OUTPUT,
+            governance: params.governance,
+            zkTokenAssetId: params.zkTokenAssetId,
             // Anvil fixtures run the testnet verifier, as every non-mainnet env does.
-            true
-        );
+            testnetVerifier: true
+        });
 
         console.log("setupUpgrade: Deploying new ecosystem contracts");
         coreUpgrade.deployNewEcosystemContractsL1();

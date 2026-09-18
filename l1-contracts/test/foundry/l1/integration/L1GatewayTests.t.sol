@@ -255,16 +255,14 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         );
 
         uint256 expectedValue = 1000 ether;
-        // The argument list carries inline comments, which named-argument form would lose.
-        // solhint-disable-next-line func-named-parameters
-        L2TransactionRequestDirect memory request = _createL2TransactionRequestDirect(
-            migratingChainId,
-            expectedValue,
-            0, // l2Value
-            72000000, // l2GasLimit
-            800, // l2GasPerPubdataByteLimit
-            "0x"
-        );
+        L2TransactionRequestDirect memory request = _createL2TransactionRequestDirect({
+            _chainId: migratingChainId,
+            _mintValue: expectedValue,
+            _l2Value: 0,
+            _l2GasLimit: 72000000,
+            _l2GasPerPubdataByteLimit: 800,
+            _l2CallData: "0x"
+        });
 
         uint256 senderBalanceBefore = address(this).balance;
 

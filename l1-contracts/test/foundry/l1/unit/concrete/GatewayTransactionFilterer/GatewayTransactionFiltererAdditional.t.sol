@@ -116,16 +116,14 @@ contract GatewayTransactionFiltererAdditionalTest is Test {
         address highAddress = address(uint160(MIN_ALLOWED_ADDRESS) + 1);
         bytes memory txCalldata = hex"12345678";
 
-        // The argument list carries inline comments, which named-argument form would lose.
-        // solhint-disable-next-line func-named-parameters
-        bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
-            randomUser, // non-whitelisted sender
-            highAddress,
-            0,
-            0,
-            txCalldata,
-            address(0)
-        );
+        bool isAllowed = transactionFiltererProxy.isTransactionAllowed({
+            sender: randomUser, // non-whitelisted sender
+            contractL2: highAddress,
+            mintValue: 0,
+            l2Value: 0,
+            l2Calldata: txCalldata,
+            refundRecipient: address(0)
+        });
 
         assertTrue(isAllowed, "High address contracts should be allowed");
     }
@@ -134,16 +132,14 @@ contract GatewayTransactionFiltererAdditionalTest is Test {
         // contractL2 == L2_ASSET_ROUTER_ADDR should always be allowed
         bytes memory txCalldata = hex"12345678";
 
-        // The argument list carries inline comments, which named-argument form would lose.
-        // solhint-disable-next-line func-named-parameters
-        bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
-            randomUser, // non-whitelisted sender
-            L2_ASSET_ROUTER_ADDR,
-            0,
-            0,
-            txCalldata,
-            address(0)
-        );
+        bool isAllowed = transactionFiltererProxy.isTransactionAllowed({
+            sender: randomUser, // non-whitelisted sender
+            contractL2: L2_ASSET_ROUTER_ADDR,
+            mintValue: 0,
+            l2Value: 0,
+            l2Calldata: txCalldata,
+            refundRecipient: address(0)
+        });
 
         assertTrue(isAllowed, "L2 Asset Router should be allowed");
     }

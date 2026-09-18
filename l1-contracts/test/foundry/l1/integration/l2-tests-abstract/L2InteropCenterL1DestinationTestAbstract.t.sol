@@ -139,17 +139,15 @@ abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils
         address l2TokenAddress = initializeTokenByDeposit();
         vm.deal(address(this), 1000 ether);
 
-        // The argument list carries inline comments, which named-argument form would lose.
-        // solhint-disable-next-line func-named-parameters
-        bytes32 bundleHash = InteropLibrary.sendToken(
-            L1_CHAIN_ID,
-            l2TokenAddress,
-            100,
-            address(this),
-            UNBUNDLER_ADDRESS,
-            true, // useFixedFee
-            bytes32(uint256(1)) // distinct salt from the non-fixed-fee happy path
-        );
+        bytes32 bundleHash = InteropLibrary.sendToken({
+            destinationChainId: L1_CHAIN_ID,
+            l2TokenAddress: l2TokenAddress,
+            amount: 100,
+            recipient: address(this),
+            unbundlerAddress: UNBUNDLER_ADDRESS,
+            useFixedFee: true,
+            salt: bytes32(uint256(1)) // distinct salt from the non-fixed-fee happy path
+        });
 
         assertTrue(bundleHash != bytes32(0), "fixed-fee L1 bundle should send successfully");
         assertEq(
