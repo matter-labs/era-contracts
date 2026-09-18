@@ -95,11 +95,7 @@ library L2UpgradeTxLib {
         return
             abi.encode(
                 ZKChainSpecificForceDeploymentsData({
-                    // Read from L1, which is the only place that still knows it. The L2 side
-                    // used to expose this as an immutable; after the v31 code replacement a
-                    // storage read returns zero, so passing zero here would make the upgrade
-                    // write zero over a live chain's legacy bridge pointer. Same expression
-                    // `L1FixedForceDeploymentsHelper` uses for the genesis path.
+                    // Read from L1; the L2 side no longer stores it after the v31 code replacement.
                     l2LegacySharedBridge: IL1SharedBridgeLegacy(assetRouter).l2BridgeAddress(_chainId),
                     predeployedL2WethAddress: address(0),
                     baseTokenL1Address: originToken,
