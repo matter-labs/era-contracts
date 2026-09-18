@@ -285,14 +285,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         // MessageRoot cannot aggregate as remote — so this case (alone) stubs the leaf verifier.
         _mockVerifier(true);
         _seedSettlementLayerInteropRoot(SETTLEMENT_LAYER_CHAIN_ID, SL_BLOCK, uint256(DEADLINE) + 1);
-        ImtProof memory absence = _nonInclusionProof(
-            block.chainid,
-            REMOTE_BATCH_NUMBER,
-            AtomicFlowFixtures.commitValue(lateFlowId, lateLeg),
-            SETTLEMENT_LAYER_CHAIN_ID,
-            SL_BLOCK,
-            uint256(DEADLINE) + 1
-        );
+        ImtProof memory absence = _nonInclusionProof({_sourceChainId: block.chainid, _batchNumber: REMOTE_BATCH_NUMBER, _absentValue: AtomicFlowFixtures.commitValue(lateFlowId, lateLeg), _slChainId: SETTLEMENT_LAYER_CHAIN_ID, _slBlock: SL_BLOCK, _l1Timestamp: uint256(DEADLINE) + 1});
 
         vm.expectEmit(true, true, true, true, address(manager));
         emit IAtomicFlowManager.FlowRefundAuthorized(lateFlowId, lateLeg);
@@ -354,14 +347,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
     function test_RevertWhen_AbsenceProofNotAuthenticated() public {
         // The ONE force-failure negative: making the real verifier reject would require corrupting
         // settlement state, so this case alone stubs it false over a fixed-shape blob.
-        ImtProof memory absence = _nonInclusionProof(
-            MISSING_LEG_CHAIN,
-            REMOTE_BATCH_NUMBER,
-            AtomicFlowFixtures.commitValue(flowId, missingLeg),
-            SETTLEMENT_LAYER_CHAIN_ID,
-            SL_BLOCK,
-            uint256(DEADLINE) + 1
-        );
+        ImtProof memory absence = _nonInclusionProof({_sourceChainId: MISSING_LEG_CHAIN, _batchNumber: REMOTE_BATCH_NUMBER, _absentValue: AtomicFlowFixtures.commitValue(flowId, missingLeg), _slChainId: SETTLEMENT_LAYER_CHAIN_ID, _slBlock: SL_BLOCK, _l1Timestamp: uint256(DEADLINE) + 1});
         _mockVerifier(false);
 
         vm.expectRevert(

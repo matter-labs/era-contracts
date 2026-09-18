@@ -118,7 +118,7 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
         // Add a contract above MIN_ALLOWED_ADDRESS as dangerous
         address dangerousAddr = address(uint160(MIN_ALLOWED_ADDRESS) + 100);
         vm.prank(owner);
-        transactionFiltererProxy.addDangerousContract(dangerousAddr);
+        transactionFiltererProxy.addDangerousContract({contractAddress: dangerousAddr});
 
         bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
             randomUser,
@@ -203,7 +203,7 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
         // Even if a contract is above MIN_ALLOWED_ADDRESS, being in dangerousContracts blocks it
         address highDangerousAddr = address(uint160(MIN_ALLOWED_ADDRESS) + 500);
         vm.prank(owner);
-        transactionFiltererProxy.addDangerousContract(highDangerousAddr);
+        transactionFiltererProxy.addDangerousContract({contractAddress: highDangerousAddr});
 
         bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
             randomUser,
@@ -225,7 +225,7 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
 
         vm.startPrank(owner);
         transactionFiltererProxy.addDangerousContract(highDangerousAddr);
-        transactionFiltererProxy.removeDangerousContract(highDangerousAddr);
+        transactionFiltererProxy.removeDangerousContract({contractAddress: highDangerousAddr});
         vm.stopPrank();
 
         bool isAllowed = transactionFiltererProxy.isTransactionAllowed(

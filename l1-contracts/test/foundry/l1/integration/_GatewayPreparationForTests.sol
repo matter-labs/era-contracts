@@ -137,15 +137,7 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         // revert if we tried to derive the diamond-cut data on the fly.
         // `initializeConfig` preloads `gatewayDiamondCutData` from TOML, so we
         // pass the cached value directly to `migrateChainToGatewayWithCutData`.
-        adminScript.migrateChainToGatewayWithCutData(
-            _gatewayGovernanceConfig.bridgehubProxy,
-            _getL1GasPrice(),
-            migratingChainId,
-            _gatewayGovernanceConfig.gatewayChainId,
-            gatewayDiamondCutData,
-            msg.sender,
-            true
-        );
+        adminScript.migrateChainToGatewayWithCutData({_bridgehub: _gatewayGovernanceConfig.bridgehubProxy, _l1GasPrice: _getL1GasPrice(), _l2ChainId: migratingChainId, _gatewayChainId: _gatewayGovernanceConfig.gatewayChainId, _gatewayDiamondCutData: gatewayDiamondCutData, _refundRecipient: msg.sender, _shouldSend: true});
     }
 
     function fullGatewayRegistration() public {
