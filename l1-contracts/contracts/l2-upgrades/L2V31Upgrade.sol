@@ -3,6 +3,13 @@ pragma solidity 0.8.28;
 
 import {V31AcrossRecovery} from "./V31AcrossRecovery.sol";
 import {IL2V31Upgrade} from "../upgrades/IL2V31Upgrade.sol";
+import {IL2NativeTokenVault} from "../bridge/ntv/IL2NativeTokenVault.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {ZeroAddress} from "../common/L1ContractErrors.sol";
+import {
+    FixedForceDeploymentsData,
+    ZKChainSpecificForceDeploymentsData
+} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {L2GenesisForceDeploymentsHelper} from "./L2GenesisForceDeploymentsHelper.sol";
 
 /// @custom:security-contact security@matterlabs.dev
@@ -18,6 +25,24 @@ contract L2V31Upgrade is V31AcrossRecovery, IL2V31Upgrade {
         bytes calldata _fixedForceDeploymentsData,
         bytes calldata _additionalForceDeploymentsData
     ) external {
+        bytes memory additionalForceDeploymentsData = _additionalForceDeploymentsData;
+        if (!_isZKsyncOS) {
+            // EraSettlementLayerV31Upgrade leaves the old NTV code in place for this read.
+            address wethToken = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).WETH_TOKEN();
+            require(wethToken != address(0), ZeroAddress());
+            FixedForceDeploymentsData memory fixedData = abi.decode(
+                _fixedForceDeploymentsData,
+                (FixedForceDeploymentsData)
+            );
+            ZKChainSpecificForceDeploymentsData memory chainData = abi.decode(
+                additionalForceDeploymentsData,
+                (ZKChainSpecificForceDeploymentsData)
+            );
+            chainData.predeployedL2WethAddress = wethToken;
+            additionalForceDeploymentsData = abi.encode(chainData);
+            L2GenesisForceDeploymentsHelper.forceDeployEra(fixedData.l2NtvBytecodeInfo, L2_NATIVE_TOKEN_VAULT_ADDR);
+        }
+
         acrossRecovery();
 
         // Standard non-genesis initialization of all L2 system contracts.
@@ -28,7 +53,7 @@ contract L2V31Upgrade is V31AcrossRecovery, IL2V31Upgrade {
             _isZKsyncOS,
             _ctmDeployer,
             _fixedForceDeploymentsData,
-            _additionalForceDeploymentsData,
+            additionalForceDeploymentsData,
             false // isGenesisUpgrade
         );
     }

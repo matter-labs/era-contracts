@@ -97,6 +97,7 @@ library L2UpgradeTxLib {
                 ZKChainSpecificForceDeploymentsData({
                     // Read from L1; the L2 side no longer stores it after the v31 code replacement.
                     l2LegacySharedBridge: IL1SharedBridgeLegacy(assetRouter).l2BridgeAddress(_chainId),
+                    // Era captures this from the old NTV on L2 before replacing its code; ZKsyncOS keeps it in storage.
                     predeployedL2WethAddress: address(0),
                     baseTokenL1Address: originToken,
                     baseTokenMetadata: TokenMetadata({

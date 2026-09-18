@@ -231,11 +231,13 @@ library L2GenesisForceDeploymentsHelper {
         // Validate it once here rather than at every individual initL2/updateL2 call site.
         require(fixedForceDeploymentsData.aliasedL1Governance != address(0), ZeroAddress());
 
-        // Ensure WETH token exists. During genesis NTV.WETH_TOKEN() returns address(0)
-        // (uninitialized storage), so _ensureWethToken deploys a new proxy.
-        // During upgrades it returns the existing address and _ensureWethToken is a no-op.
+        // Era upgrades capture the immutable before replacing the NTV code.
+        // Genesis and ZKsyncOS keep their existing storage-based resolution.
+        address predeployedWeth = !_isGenesisUpgrade && !_isZKsyncOS
+            ? additionalForceDeploymentsData.predeployedL2WethAddress
+            : L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).WETH_TOKEN();
         address wrappedBaseTokenAddress = _ensureWethToken({
-            _predeployedWethToken: L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).WETH_TOKEN(),
+            _predeployedWethToken: predeployedWeth,
             _aliasedL1Governance: fixedForceDeploymentsData.aliasedL1Governance,
             _baseTokenL1Address: additionalForceDeploymentsData.baseTokenL1Address,
             _baseTokenAssetId: additionalForceDeploymentsData.baseTokenBridgingData.assetId,
