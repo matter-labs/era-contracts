@@ -7,8 +7,7 @@ import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {EraMultiProofTestnetVerifier} from "contracts/state-transition/verifiers/EraMultiProofTestnetVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
@@ -16,7 +15,8 @@ import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamo
 
 contract DiamondInitTest is UtilsCallMockerTest {
     Diamond.FacetCut[] internal facetCuts;
-    address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    address internal testnetVerifier =
+        address(new EraMultiProofTestnetVerifier(IVerifier(address(0)), IVerifier(address(0))));
     DummyBridgehub internal dummyBridgehub;
     InitializeData internal initializeData;
 

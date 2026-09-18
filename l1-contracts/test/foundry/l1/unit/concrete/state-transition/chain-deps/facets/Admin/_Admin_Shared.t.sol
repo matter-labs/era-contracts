@@ -10,10 +10,8 @@ import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {EraDualVerifier} from "contracts/state-transition/verifiers/EraDualVerifier.sol";
 import {EraMultiProofTestnetVerifier} from "contracts/state-transition/verifiers/EraMultiProofTestnetVerifier.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 
@@ -21,12 +19,7 @@ contract AdminTest is UtilsCallMockerTest {
     IAdmin internal adminFacet;
     UtilsFacet internal utilsFacet;
     address internal testnetVerifier =
-        address(
-            new EraMultiProofTestnetVerifier(
-                IVerifier(address(new EraDualVerifier(IVerifierV2(address(0)), IVerifier(address(0))))),
-                IVerifier(address(1))
-            )
-        );
+        address(new EraMultiProofTestnetVerifier(IVerifier(address(1)), IVerifier(address(2))));
     DummyBridgehub internal dummyBridgehub;
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {

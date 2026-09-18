@@ -104,8 +104,6 @@ pub struct L1StateTransitionOutput {
     pub state_transition_proxy_addr: Address,
     pub verifier_addr: Address,
     #[serde(default)]
-    pub boojum_verifier_addr: Option<Address>,
-    #[serde(default)]
     pub airbender_verifier_addr: Option<Address>,
     pub genesis_upgrade_addr: Address,
     pub default_upgrade_addr: Address,
