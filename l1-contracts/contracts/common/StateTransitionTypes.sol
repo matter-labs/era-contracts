@@ -31,10 +31,11 @@ struct Verifiers {
     address verifierFflonk;
     /// @notice Address of the VerifierPlonk contract.
     address verifierPlonk;
-    /// @notice Address of the Airbender PLONK verifier wired into the Era dual verifier's third
-    ///         slot. `address(0)` when Airbender support was not requested.
+    /// @notice Address of the Airbender PLONK verifier. `address(0)` when Airbender support was not requested.
     address airbenderVerifierPlonk;
-    /// @notice Address of the main Verifier contract.
+    /// @notice Address of the Boojum verifier (`EraDualVerifier`). `address(0)` for ZKsync OS.
+    address boojumVerifier;
+    /// @notice Address of the main Verifier contract. For Era chains this is `EraMultiProofVerifier`.
     address verifier;
 }
 

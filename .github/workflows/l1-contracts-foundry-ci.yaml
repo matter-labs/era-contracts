@@ -102,7 +102,7 @@ jobs:
           # dev-contracts/ and test/ respectively but their bare names are shown).
           forge build --sizes 2>&1 \
             | grep -E '^\|' \
-            | grep -v 'test/\|Test \|Mock\|dev-contracts/\|L2AssetTrackerData\|Dev \|TestHelper ' \
+            | grep -v 'test/\|Test \|Mock\|Dummy\|dev-contracts/\|L2AssetTrackerData\|Dev \|TestHelper ' \
             | tee /tmp/sizes.txt
 
           # Check for any negative runtime margin (= over the limit)

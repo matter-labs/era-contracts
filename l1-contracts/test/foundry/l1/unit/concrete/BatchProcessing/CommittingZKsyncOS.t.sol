@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import "forge-std/console.sol";
 
-import {Utils} from "../Utils/Utils.sol";
+import {EVENT_INDEX, Utils} from "../Utils/Utils.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
 import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
@@ -16,6 +16,9 @@ import {
     BlobNotPublished
 } from "../../../da-contracts-imports/DAContractsErrors.sol";
 import {BlobsL1DAValidatorZKsyncOS} from "../../../da-contracts-imports/BlobsL1DAValidatorZKsyncOS.sol";
+import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {CountingVerifier} from "foundry-test/l1/unit/concrete/state-transition/verifiers/VerifierStubs.sol";
+import {Vm} from "forge-std/Test.sol";
 
 contract CommittingTest is ExecutorTest {
     function isZKsyncOS() internal pure override returns (bool) {
@@ -23,6 +26,78 @@ contract CommittingTest is ExecutorTest {
     }
 
     function setUp() public {}
+
+    /// ZKsync OS proves a range: one public input per batch, several batches per call.
+    function test_ProvesTwoBatchesInOneCall() public {
+        IExecutor.StoredBatchInfo memory first = _commitCalldataBatch(genesisStoredBatchInfo, 1);
+        IExecutor.StoredBatchInfo memory second = _commitCalldataBatch(first, 2);
+
+        vm.etch(getters.getVerifier(), address(new CountingVerifier()).code);
+
+        IExecutor.StoredBatchInfo[] memory batches = new IExecutor.StoredBatchInfo[](2);
+        batches[0] = first;
+        batches[1] = second;
+        (uint256 from, uint256 to, bytes memory proveData) = Utils.encodeProveBatchesData(
+            genesisStoredBatchInfo,
+            batches,
+            proofInput
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(CountingVerifier.Count.selector, uint256(2)));
+        vm.prank(validator);
+        executor.proveBatchesSharedBridge(address(0), from, to, proveData);
+    }
+
+    function _commitCalldataBatch(
+        IExecutor.StoredBatchInfo memory _prev,
+        uint64 _batchNumber
+    ) internal returns (IExecutor.StoredBatchInfo memory) {
+        bytes memory pubdata = abi.encodePacked(Utils.randomBytes32("pubdata"), _batchNumber);
+        bytes32 totalL2PubdataHash = keccak256(pubdata);
+        bytes32[] memory blobsLinearHashes = new bytes32[](1);
+
+        CommitBatchInfoZKsyncOS memory batch = newCommitBatchInfoZKsyncOS;
+        batch.batchNumber = _batchNumber;
+        batch.newStateCommitment = Utils.randomBytes32(abi.encodePacked("newStateCommitment", _batchNumber));
+        batch.operatorDAInput = abi.encodePacked(
+            bytes32(0),
+            totalL2PubdataHash,
+            uint8(1),
+            blobsLinearHashes,
+            bytes1(0),
+            pubdata,
+            bytes32(0)
+        );
+        batch.daCommitment = Utils.constructRollupL2DAValidatorOutputHash(
+            bytes32(0),
+            totalL2PubdataHash,
+            uint8(1),
+            blobsLinearHashes
+        );
+
+        CommitBatchInfoZKsyncOS[] memory batches = new CommitBatchInfoZKsyncOS[](1);
+        batches[0] = batch;
+        (uint256 from, uint256 to, bytes memory commitData) = Utils.encodeCommitBatchesDataZKsyncOS(_prev, batches);
+        vm.recordLogs();
+        vm.prank(validator);
+        committer.commitBatchesSharedBridge(address(0), from, to, commitData);
+        // `ReportCommittedBatchRangeZKsyncOS` is emitted before `BlockCommit`.
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+
+        return
+            IExecutor.StoredBatchInfo({
+                batchNumber: _batchNumber,
+                batchHash: batch.newStateCommitment,
+                indexRepeatedStorageChanges: 0,
+                numberOfLayer1Txs: batch.numberOfLayer1Txs,
+                priorityOperationsHash: batch.priorityOperationsHash,
+                l2LogsTreeRoot: batch.l2LogsTreeRoot,
+                dependencyRootsRollingHash: batch.dependencyRootsRollingHash,
+                timestamp: 0,
+                commitment: entries[EVENT_INDEX + 1].topics[3],
+                airbenderCommitment: bytes32(0)
+            });
+    }
 
     function test_SuccessfullyCommitBatchWithCalldata() public {
         // Calldata DA

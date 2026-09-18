@@ -604,7 +604,7 @@ library GatewayCTMDeployerHelper {
             result.verifierPlonk = _deployInternalEmptyParams(plonkName, plonkFile, innerConfig, _isZKsyncOS);
         }
         {
-            (string memory mainVerifierFile, string memory mainVerifierName) = DeployCTML1OrGateway.resolveMainVerifier(
+            (string memory boojumFile, string memory boojumName) = DeployCTML1OrGateway.resolveBoojumVerifier(
                 _isZKsyncOS,
                 config.testnetVerifier
             );
@@ -612,18 +612,42 @@ library GatewayCTMDeployerHelper {
                 _isZKsyncOS,
                 result.verifierFflonk,
                 result.verifierPlonk,
-                config.aliasedGovernanceAddress,
-                // Gateway CTM deployment does not wire in the Airbender verifier.
-                address(0)
+                config.aliasedGovernanceAddress
             );
-            result.verifier = _deployInternalWithParams(
-                mainVerifierName,
-                mainVerifierFile,
+            address boojumVerifier = _deployInternalWithParams(
+                boojumName,
+                boojumFile,
                 creationArgs,
                 innerConfig,
                 _isZKsyncOS
             );
+            if (_isZKsyncOS) {
+                result.verifier = boojumVerifier;
+            } else {
+                result.boojumVerifier = boojumVerifier;
+                result.verifier = _deployEraChainVerifier(boojumVerifier, config.testnetVerifier, innerConfig);
+            }
         }
+    }
+
+    /// @dev The Gateway flow deploys no Airbender verifier, so Gateway chains require Boojum only.
+    function _deployEraChainVerifier(
+        address _boojumVerifier,
+        bool _testnetVerifier,
+        InnerDeployConfig memory _innerConfig
+    ) internal returns (address) {
+        (string memory chainVerifierFile, string memory chainVerifierName) = DeployCTML1OrGateway.resolveChainVerifier(
+            false,
+            _testnetVerifier
+        );
+        return
+            _deployInternalWithParams(
+                chainVerifierName,
+                chainVerifierFile,
+                abi.encode(_boojumVerifier, address(0)),
+                _innerConfig,
+                false
+            );
     }
 
     function _calculateCTMDeployerAddresses(
@@ -756,6 +780,7 @@ library GatewayCTMDeployerHelper {
             genesisBatchHash: baseConfig.genesisRoot,
             genesisIndexRepeatedStorageChanges: uint64(baseConfig.genesisRollupLeafIndex),
             genesisBatchCommitment: baseConfig.genesisBatchCommitment,
+            genesisAirbenderBatchCommitment: baseConfig.genesisAirbenderBatchCommitment,
             diamondCut: diamondCut,
             forceDeploymentsData: baseConfig.forceDeploymentsData
         });
@@ -827,8 +852,9 @@ library GatewayCTMDeployerHelper {
                 eip7702Checker: address(0),
                 verifierFflonk: _deployedContracts.stateTransition.verifiers.verifierFflonk,
                 verifierPlonk: _deployedContracts.stateTransition.verifiers.verifierPlonk,
-                // Gateway CTM deployment does not wire in the Airbender verifier.
+                // Gateway CTM deployment does not deploy an Airbender verifier.
                 airbenderVerifierPlonk: address(0),
+                boojumVerifier: _deployedContracts.stateTransition.verifiers.boojumVerifier,
                 verifierOwner: _config.aliasedGovernanceAddress,
                 permissionlessValidator: address(0)
             });
@@ -890,7 +916,7 @@ library GatewayCTMDeployerHelper {
     /// @notice Bytecodes required for Gateway CTM deployers on Era.
     // solhint-disable-next-line code-complexity
     function _gatewayCTMEraFactoryDependencies() private returns (bytes[] memory dependencies) {
-        uint256 totalDependencies = 27;
+        uint256 totalDependencies = 28;
         dependencies = new bytes[](totalDependencies);
         uint256 idx = 0;
 
@@ -923,8 +949,13 @@ library GatewayCTMDeployerHelper {
         );
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "EraVerifierFflonk.sol", "EraVerifierFflonk");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "EraVerifierPlonk.sol", "EraVerifierPlonk");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "EraTestnetVerifier.sol", "EraTestnetVerifier");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "EraDualVerifier.sol", "EraDualVerifier");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "EraMultiProofVerifier.sol", "EraMultiProofVerifier");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(
+            false,
+            "EraMultiProofTestnetVerifier.sol",
+            "EraMultiProofTestnetVerifier"
+        );
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "ServerNotifier.sol", "ServerNotifier");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "EraChainTypeManager.sol", "EraChainTypeManager");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Admin.sol", "AdminFacet");

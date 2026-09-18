@@ -11,6 +11,7 @@ import {DummyChainTypeManager} from "contracts/dev-contracts/test/DummyChainType
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DummyChainAssetHandler} from "contracts/dev-contracts/test/DummyChainAssetHandler.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {DisabledProofSystems} from "contracts/common/Config.sol";
 import {
     CutDataForProtocolVersionNotAvailable,
     InvalidProtocolVersion,
@@ -157,6 +158,23 @@ contract ServerNotifierTest is Test {
         vm.startPrank(alice);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, alice));
         serverNotifier.migrateFromGateway(chainId);
+        vm.stopPrank();
+    }
+
+    function test_notifyProofSystemStatusEmitsEvent() public {
+        vm.startPrank(chainAdmin);
+        vm.expectEmit(true, false, false, true, address(serverNotifier));
+        emit IServerNotifier.ProofSystemStatusNotified(chainId, DisabledProofSystems({boojum: false, airbender: true}));
+        serverNotifier.notifyProofSystemStatus(chainId, DisabledProofSystems({boojum: false, airbender: true}));
+        vm.stopPrank();
+    }
+
+    function test_notifyProofSystemStatusInvalidCallerReverts() public {
+        address alice = makeAddr("alice");
+
+        vm.startPrank(alice);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, alice));
+        serverNotifier.notifyProofSystemStatus(chainId, DisabledProofSystems({boojum: false, airbender: true}));
         vm.stopPrank();
     }
 

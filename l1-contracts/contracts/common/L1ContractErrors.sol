@@ -15,6 +15,10 @@ error AddressHasNoCode(address);
 error AddressMismatch(address expected, address supplied);
 // 0x42573d7a
 error AddressNotZero();
+// 0x615e82fc
+error AirbenderCommitmentRequired();
+// 0x2271414b
+error AirbenderVerificationFailed();
 // 0xb577eb6c
 error AlreadyDangerousContract(address);
 // 0x2a5989a0
@@ -55,6 +59,8 @@ error BatchHashMismatch(bytes32 expected, bytes32 actual);
 error BatchNumberMismatch(uint256 expectedBatchNumber, uint256 providedBatchNumber);
 // 0x41c329f7
 error BatchTimestampGreaterThanLastL2BlockTimestamp();
+// 0x5a9935ba
+error BoojumVerificationFailed();
 // 0x6cf12312
 error BridgeHubAlreadyRegistered();
 // 0xdb538614
@@ -145,6 +151,8 @@ error FacetExists(bytes4 selector, address);
 error FeeParamsChangeTooLarge(uint256 oldPrice, uint256 newPrice, uint256 maxAllowedPrice);
 // 0xc91cf3b1
 error GasPerPubdataMismatch();
+// 0x281a2793
+error GenesisAirbenderBatchCommitmentZero();
 // 0x5ca97564
 error GenesisBatchCommitmentIncorrect();
 // 0x6d4a7df8
@@ -186,6 +194,8 @@ error InvalidChainId();
 error InvalidDAForPermanentRollup();
 // 0x4fbe5dba
 error InvalidDelay();
+// 0x1b6712bc
+error InvalidDisabledProofSystemsMask(uint8 mask);
 // 0x075aaa80
 error InvalidInteropCalldata(bytes4);
 // 0x3f98a77e
@@ -214,6 +224,8 @@ error InvalidProofLengthForFinalNode();
 error InvalidProtocolVersion();
 // 0x6f1cf752
 error InvalidPubdataPricingMode();
+// 0x3e157423
+error InvalidPublicInputsLength();
 // 0x12ba286f
 error InvalidSelector(bytes4 func);
 // 0xbe7193d4

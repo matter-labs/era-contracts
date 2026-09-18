@@ -31,6 +31,7 @@ import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgra
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 contract RevertBatchesTest is ChainTypeManagerTest {
+    bytes32 internal expectedAirbenderCommitment;
     // Items for logs & commits
     uint256 internal currentTimestamp;
     CommitBatchInfo internal newCommitBatchInfo;
@@ -76,7 +77,8 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             dependencyRootsRollingHash: bytes32(0),
             timestamp: 0,
-            commitment: bytes32(uint256(0x01))
+            commitment: bytes32(uint256(0x01)),
+            airbenderCommitment: bytes32(uint256(0x01))
         });
         vm.warp(TESTNET_COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
         currentTimestamp = block.timestamp;
@@ -89,6 +91,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             priorityOperationsHash: keccak256(""),
             bootloaderHeapInitialContentsHash: Utils.randomBytes32("bootloaderHeapInitialContentsHash"),
             eventsQueueStateHash: Utils.randomBytes32("eventsQueueStateHash"),
+            airbenderBootloaderHeapHash: Utils.randomBytes32("airbenderBootloaderHeapHash"),
             systemLogs: l2Logs,
             operatorDAInput: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         });
@@ -128,6 +131,19 @@ contract RevertBatchesTest is ChainTypeManagerTest {
         vm.stopPrank();
         vm.prank(newChainAdmin);
         adminFacet.setDAValidatorPair(address(rollupL1DAValidator), L2_DA_COMMITMENT_SCHEME);
+    }
+
+    /// The chain's own metaparameters, not the `Utils` constants.
+    function _metadataHash() internal view returns (bytes32) {
+        return
+            keccak256(
+                abi.encodePacked(
+                    false,
+                    gettersFacet.getL2BootloaderBytecodeHash(),
+                    gettersFacet.getL2DefaultAccountBytecodeHash(),
+                    gettersFacet.getL2EvmEmulatorBytecodeHash()
+                )
+            );
     }
 
     function test_SuccessfulBatchReverting() public {
@@ -192,6 +208,14 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             blobCommitments,
             blobHashes
         );
+        // Storage: a local would overflow the stack here.
+        expectedAirbenderCommitment = Utils.createAirbenderBatchCommitment(
+            correctNewCommitBatchInfo,
+            uncompressedStateDiffHash,
+            blobCommitments,
+            blobHashes,
+            _metadataHash()
+        );
 
         CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
@@ -226,7 +250,8 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             dependencyRootsRollingHash: bytes32(0),
             timestamp: currentTimestamp,
-            commitment: entries[EVENT_INDEX].topics[3]
+            commitment: entries[EVENT_INDEX].topics[3],
+            airbenderCommitment: expectedAirbenderCommitment
         });
 
         IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);

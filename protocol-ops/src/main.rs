@@ -85,3 +85,15 @@ async fn run_subcommand(cli_args: ProtocolOps) -> anyhow::Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod cli_tests {
+    use super::ProtocolOps;
+    use clap::CommandFactory;
+
+    /// Clap validates argument definitions at runtime; check them here instead of on first use.
+    #[test]
+    fn cli_definition_is_valid() {
+        ProtocolOps::command().debug_assert();
+    }
+}

@@ -10,6 +10,24 @@ library StoredBatchHashing {
         return keccak256(abi.encode(_storedBatchInfo));
     }
 
+    /// @notice Returns the keccak hash of the ABI-encoded pre-Airbender StoredBatchInfo
+    function hashPreAirbenderStoredBatchInfo(
+        IExecutor.StoredBatchInfo memory _storedBatchInfo
+    ) internal pure returns (bytes32) {
+        IExecutor.PreAirbenderStoredBatchInfo memory preAirbender = IExecutor.PreAirbenderStoredBatchInfo({
+            batchNumber: _storedBatchInfo.batchNumber,
+            batchHash: _storedBatchInfo.batchHash,
+            indexRepeatedStorageChanges: _storedBatchInfo.indexRepeatedStorageChanges,
+            numberOfLayer1Txs: _storedBatchInfo.numberOfLayer1Txs,
+            priorityOperationsHash: _storedBatchInfo.priorityOperationsHash,
+            dependencyRootsRollingHash: _storedBatchInfo.dependencyRootsRollingHash,
+            l2LogsTreeRoot: _storedBatchInfo.l2LogsTreeRoot,
+            timestamp: _storedBatchInfo.timestamp,
+            commitment: _storedBatchInfo.commitment
+        });
+        return keccak256(abi.encode(preAirbender));
+    }
+
     /// @notice Returns the keccak hash of the ABI-encoded Legacy StoredBatchInfo
     function hashLegacyStoredBatchInfo(
         IExecutor.StoredBatchInfo memory _storedBatchInfo

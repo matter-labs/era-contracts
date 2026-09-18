@@ -266,4 +266,7 @@ struct ZKChainStorage {
     /// this field was introduced.
     /// @dev STORAGE SLOT: 68
     uint64 zksyncOSMaxTxGasLimit;
+    /// @dev Bit mask of the proof systems this Era chain does not require (see `ProofSystem`). `0` requires all.
+    /// @dev STORAGE SLOT: 68
+    uint8 disabledProofSystems;
 }

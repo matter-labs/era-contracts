@@ -161,7 +161,8 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
                 l2LogsTreeRoot: commitInfo.l2LogsTreeRoot,
                 dependencyRootsRollingHash: commitInfo.dependencyRootsRollingHash,
                 timestamp: 0,
-                commitment: _batchOutputHash(commitInfo)
+                commitment: _batchOutputHash(commitInfo),
+                airbenderCommitment: bytes32(0)
             });
     }
 

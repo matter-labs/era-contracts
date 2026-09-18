@@ -9,5 +9,7 @@ import {IVerifier} from "./IVerifier.sol";
 interface IEraDualVerifier {
     function FFLONK_VERIFIER() external view returns (IVerifierV2);
     function PLONK_VERIFIER() external view returns (IVerifier);
-    function AIRBENDER_PLONK_VERIFIER() external view returns (IVerifier);
+
+    /// @notice The verification key hash of one sub-verifier, selected by proof type.
+    function verificationKeyHash(uint256 _verifierType) external view returns (bytes32);
 }

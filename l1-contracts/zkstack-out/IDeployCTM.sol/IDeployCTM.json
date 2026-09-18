@@ -99,6 +99,11 @@
                     "internalType": "address"
                   },
                   {
+                    "name": "boojumVerifier",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
                     "name": "verifier",
                     "type": "address",
                     "internalType": "address"
@@ -389,6 +394,11 @@
                   },
                   {
                     "name": "genesisBatchCommitment",
+                    "type": "bytes32",
+                    "internalType": "bytes32"
+                  },
+                  {
+                    "name": "genesisAirbenderBatchCommitment",
                     "type": "bytes32",
                     "internalType": "bytes32"
                   },

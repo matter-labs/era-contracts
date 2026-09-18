@@ -62,6 +62,28 @@ uint256 constant COMMIT_TIMESTAMP_APPROXIMATION_DELTA = 1 hours;
 /// @dev Shift to apply to verify public input before verifying.
 uint256 constant PUBLIC_INPUT_SHIFT = 32;
 
+/// @dev Proof systems an Era chain settles with. Ordinals are bit positions in
+/// `ZKChainStorage.disabledProofSystems`; append only.
+enum ProofSystem {
+    Boojum,
+    Airbender
+}
+
+/// @dev Which proof systems a chain does not require.
+struct DisabledProofSystems {
+    bool boojum;
+    bool airbender;
+}
+
+uint8 constant BOOJUM_PROOF_SYSTEM_MASK = uint8(1 << uint8(ProofSystem.Boojum));
+uint8 constant AIRBENDER_PROOF_SYSTEM_MASK = uint8(1 << uint8(ProofSystem.Airbender));
+
+/// @dev `_proof[0]` of the combined Era proof carrying both a Boojum and an Airbender sub-proof.
+uint256 constant ERA_MULTI_PROOF_TYPE = 4;
+
+/// @dev Number of words in an Airbender PLONK SNARK proof.
+uint256 constant AIRBENDER_SNARK_PROOF_LENGTH = 44;
+
 /// @dev The maximum number of L2 gas that a user can request for an L2 transaction
 uint256 constant MAX_GAS_PER_TRANSACTION = 80_000_000;
 

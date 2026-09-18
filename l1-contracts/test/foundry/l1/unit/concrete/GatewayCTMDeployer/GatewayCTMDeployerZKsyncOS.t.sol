@@ -135,6 +135,7 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
             genesisRollupLeafIndex: 10,
             // For ZKsyncOS mode, the genesis batch commitment must be equal to 1
             genesisBatchCommitment: bytes32(uint256(1)),
+            genesisAirbenderBatchCommitment: bytes32(0),
             forceDeploymentsData: hex"deadbeef",
             protocolVersion: 1
         });
