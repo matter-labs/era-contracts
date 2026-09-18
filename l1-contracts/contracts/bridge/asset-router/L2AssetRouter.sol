@@ -42,7 +42,7 @@ import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol"
 /// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
 contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAtomicRecoverable {
     /// @dev Deprecated: previously stored the L2 Bridgehub. Now the address is resolved via
-    /// `_bridgehub()` → `L2_BRIDGEHUB_ADDR` constant. Kept as an empty slot to preserve storage layout.
+    /// `_getBridgehub()` → `L2_BRIDGEHUB_ADDR` constant. Kept as an empty slot to preserve storage layout.
     IL2Bridgehub private __DEPRECATED_BRIDGE_HUB;
 
     /// @dev Chain ID of L1 for bridging reasons.
@@ -71,24 +71,24 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
     bytes32 public BASE_TOKEN_ASSET_ID;
 
     /// @notice Returns the bridgehub contract.
-    function _bridgehub() internal view virtual override returns (IBridgehubBase) {
+    function _getBridgehub() internal view virtual override returns (IBridgehubBase) {
         return IBridgehubBase(L2_BRIDGEHUB_ADDR);
     }
 
     /// @notice Returns the native token vault address. Virtual for private interop override.
-    function _nativeTokenVaultAddr() internal view virtual returns (address) {
+    function _getNativeTokenVaultAddr() internal view virtual returns (address) {
         return L2_NATIVE_TOKEN_VAULT_ADDR;
     }
 
     /// @notice Returns the interop center address. Virtual for private interop override.
-    function _interopCenterAddr() internal view virtual returns (address) {
+    function _getInteropCenterAddr() internal view virtual returns (address) {
         return L2_INTEROP_CENTER_ADDR;
     }
 
     /// @notice Returns the canonical atomic-flow manager address, the only caller allowed into
     /// `recoverAtomicCall`. Chains without the atomic-flow stack have nothing deployed there, so the
     /// auth gate never passes. Virtual for private interop override.
-    function _atomicFlowManagerAddr() internal view virtual returns (address) {
+    function _getAtomicFlowManagerAddr() internal view virtual returns (address) {
         return L2_ATOMIC_FLOW_MANAGER_ADDR;
     }
 
@@ -127,13 +127,13 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
 
     /// @notice Checks that the message sender is the interop center.
     modifier onlyL2InteropCenter() {
-        require(msg.sender == _interopCenterAddr(), Unauthorized(msg.sender));
+        require(msg.sender == _getInteropCenterAddr(), Unauthorized(msg.sender));
         _;
     }
 
     /// @notice Checks that the message sender is the canonical atomic-flow manager.
     modifier onlyAtomicFlowManager() {
-        require(msg.sender == _atomicFlowManagerAddr(), Unauthorized(msg.sender));
+        require(msg.sender == _getAtomicFlowManagerAddr(), Unauthorized(msg.sender));
         _;
     }
 
@@ -210,12 +210,12 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
         bytes32 _assetRegistrationData,
         address _assetHandlerAddress
     ) external override {
-        _setAssetHandlerAddressThisChain(_nativeTokenVaultAddr(), _assetRegistrationData, _assetHandlerAddress);
+        _setAssetHandlerAddressThisChain(_getNativeTokenVaultAddr(), _assetRegistrationData, _assetHandlerAddress);
     }
 
     /// @inheritdoc AssetRouterBase
     /// @dev Interop calls are delivered by the L2 interop handler system contract.
-    function _interopHandler() internal view override returns (address) {
+    function _getInteropHandler() internal pure override returns (address) {
         return L2_INTEROP_HANDLER_ADDR;
     }
 
@@ -256,7 +256,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
         bytes calldata _transferData
     ) public payable override onlyAssetRouterCounterpartOrSelf(_sourceChainId) nonReentrant {
         require(_assetId != BASE_TOKEN_ASSET_ID, AssetIdNotSupported(BASE_TOKEN_ASSET_ID));
-        _finalizeDeposit(_sourceChainId, _assetId, _transferData, _nativeTokenVaultAddr());
+        _finalizeDeposit(_sourceChainId, _assetId, _transferData, _getNativeTokenVaultAddr());
 
         emit DepositFinalizedAssetRouter(_sourceChainId, _assetId, _transferData);
     }
@@ -324,7 +324,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
         // this chain (it was burned from the depositor), so origin-token / erc20 metadata go unused.
         // solhint-disable-next-line func-named-parameters
         bytes memory mintData = DataEncoding.encodeBridgeMintData(_receiver, _receiver, address(0), _amount, "");
-        IL2NativeTokenVault(_nativeTokenVaultAddr()).bridgeRecoverFailedTransfer(_chainId, _assetId, mintData);
+        IL2NativeTokenVault(_getNativeTokenVaultAddr()).bridgeRecoverFailedTransfer(_chainId, _assetId, mintData);
     }
 
     /// @inheritdoc IL2CrossChainSender
@@ -334,7 +334,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
         uint256 _value,
         bytes calldata _data
     ) external payable onlyL2InteropCenter returns (InteropCallStarter memory interopCallStarter) {
-        address ntvAddr = _nativeTokenVaultAddr();
+        address ntvAddr = _getNativeTokenVaultAddr();
 
         L2TransactionRequestTwoBridgesInner memory request = _bridgehubDeposit({
             _chainId: _chainId,

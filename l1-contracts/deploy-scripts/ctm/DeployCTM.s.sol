@@ -301,11 +301,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function saveOutput(string memory outputPath) internal virtual {
-        string memory bridgehub = vm.serializeAddress(
-            "bridgehub",
-            "bridgehub_proxy_addr",
-            coreAddresses.bridgehub.proxies.bridgehub
-        );
+        vm.serializeAddress("bridgehub", "bridgehub_proxy_addr", coreAddresses.bridgehub.proxies.bridgehub);
         vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", coreAddresses.bridges.proxies.l1Nullifier);
         string memory bridges = vm.serializeAddress(
             "bridges",
@@ -504,7 +500,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     function _getProxyUpgradeBytecodeInfo(
         string memory _fileName,
         string memory _contractName
-    ) private returns (bytes memory) {
+    ) private view returns (bytes memory) {
         bytes memory implBytecode = BytecodeUtils.readDeployedBytecodeL1(_fileName, _contractName);
         bytes memory proxyBytecode = BytecodeUtils.readDeployedBytecodeL1(
             "SystemContractProxy.sol",

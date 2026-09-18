@@ -95,6 +95,9 @@ contract GatewayUtils is Script, IGatewayUtils {
 
     function finishMigrateChainFromGateway(
         address bridgehubAddr,
+        // Intentionally named though unused: this script's ABI is published to zkstack-out and
+        // consumed by the external zkstack CLI, so the parameter name is part of that interface.
+        // solhint-disable-next-line no-unused-vars
         uint256 migratingChainId,
         uint256 gatewayChainId,
         uint256 l2BatchNumber,

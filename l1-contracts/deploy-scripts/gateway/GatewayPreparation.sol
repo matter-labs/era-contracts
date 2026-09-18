@@ -163,7 +163,6 @@ contract GatewayPreparation is Script {
         address accessControlRestriction,
         uint256 chainId
     ) public {
-        ServerNotifier notifier = ServerNotifier(serverNotifier);
         Utils.adminExecute(
             chainAdmin,
             accessControlRestriction,
@@ -179,7 +178,6 @@ contract GatewayPreparation is Script {
         address accessControlRestriction,
         uint256 chainId
     ) public {
-        ServerNotifier notifier = ServerNotifier(serverNotifier);
         Utils.adminExecute(
             chainAdmin,
             accessControlRestriction,
@@ -381,7 +379,6 @@ contract GatewayPreparation is Script {
             address baseTokenAddress = nativeTokenVault.tokenAddress(gatewayBaseTokenAssetId);
             uint256 baseTokenOriginChainId = nativeTokenVault.originChainId(gatewayBaseTokenAssetId);
             TestnetERC20Token baseToken = TestnetERC20Token(baseTokenAddress);
-            uint256 deployerBalance = baseToken.balanceOf(deployerAddress);
             console.log("Base token origin id: ", baseTokenOriginChainId);
 
             vm.startBroadcast();
@@ -493,7 +490,7 @@ contract GatewayPreparation is Script {
     }
 
     function finishMigrateChainFromGateway(
-        uint256 migratingChainId,
+        uint256 /* migratingChainId */,
         uint256 gatewayChainId,
         uint256 l2BatchNumber,
         uint256 l2MessageIndex,
@@ -522,7 +519,7 @@ contract GatewayPreparation is Script {
     function setDAValidatorPair(
         address chainAdmin,
         address accessControlRestriction,
-        uint256 chainId,
+        uint256 /* chainId */,
         address l1DAValidator,
         L2DACommitmentScheme l2DACommitmentScheme,
         address chainDiamondProxyOnGateway,
@@ -578,7 +575,10 @@ contract GatewayPreparation is Script {
         saveOutput(l2TxHash);
     }
 
-    function _callL2AdminCalldata(bytes memory _data, address _target) private returns (bytes memory adminCalldata) {
+    function _callL2AdminCalldata(
+        bytes memory _data,
+        address _target
+    ) private pure returns (bytes memory adminCalldata) {
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: _target, value: 0, data: _data});
         adminCalldata = abi.encodeCall(ChainAdmin.multicall, (calls, true));

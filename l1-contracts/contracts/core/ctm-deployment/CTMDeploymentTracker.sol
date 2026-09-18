@@ -153,10 +153,9 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
     }
 
     /// @notice Used to register the ctm asset in L2 Bridgehub.
-    /// @param _chainId the chainId of the chain
+    /// @dev The first parameter is the (currently unused) chainId of the chain.
     function _registerCTMAssetOnL2Bridgehub(
-        // solhint-disable-next-line no-unused-vars
-        uint256 _chainId,
+        uint256 /* _chainId */,
         address _ctmL1Address,
         address _ctmL2Address
     ) internal pure returns (L2TransactionRequestTwoBridgesInner memory request) {

@@ -9,6 +9,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 // It's required to disable lints to force the compiler to compile the contracts
 // solhint-disable no-unused-import
 
+import {CHAIN_MIGRATIONS_ENABLED} from "contracts/common/Config.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
@@ -160,7 +161,10 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
     /// @dev `virtual` for the anvil-interop harness alone, which brings a gateway up to keep exercising
     ///      the machinery this release keeps but does not deploy — see `_GatewayVotePreparationForTests`.
     function deployGatewayCTM() internal virtual {
-        revert("GatewayVotePreparation: v33 deploys no gateway; see the note on deployGatewayCTM");
+        require(
+            CHAIN_MIGRATIONS_ENABLED,
+            "GatewayVotePreparation: v33 deploys no gateway; see the note on deployGatewayCTM"
+        );
     }
 
     /// @notice The gateway CTM deployment itself, kept intact for the harness and for the release that

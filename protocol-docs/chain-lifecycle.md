@@ -143,7 +143,7 @@ risks for the time being:
   the flag, since it only ever returns a chain back to settling on L1.
 - The whole migration machinery (chain asset handlers, `Migrator` facet, migration intervals,
   migration numbers) is kept intact and covered by tests, so a future release can bring settlement
-  layers (e.g. ZK Gateway) back by flipping the constant. `_chainMigrationsEnabled()` is `virtual`
+  layers (e.g. ZK Gateway) back by flipping the constant. `_getChainMigrationsEnabled()` is `virtual`
   only so dev/test variants can re-enable migrations for coverage; production contracts must not
   override it.
 

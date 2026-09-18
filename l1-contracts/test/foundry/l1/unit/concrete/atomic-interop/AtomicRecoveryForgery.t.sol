@@ -32,11 +32,11 @@ contract L2AssetRouterRecoveryHarness is L2AssetRouter {
         ntv = _ntv;
     }
 
-    function _atomicFlowManagerAddr() internal view override returns (address) {
+    function _getAtomicFlowManagerAddr() internal view override returns (address) {
         return manager;
     }
 
-    function _nativeTokenVaultAddr() internal view override returns (address) {
+    function _getNativeTokenVaultAddr() internal view override returns (address) {
         return ntv;
     }
 

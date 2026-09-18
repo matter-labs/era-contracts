@@ -86,7 +86,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         _;
     }
 
-    function _bridgehub() internal view virtual override returns (IBridgehubBase) {
+    function _getBridgehub() internal view virtual override returns (IBridgehubBase) {
         return IBridgehubBase(BRIDGE_HUB);
     }
 
@@ -248,7 +248,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
     /// @inheritdoc AssetRouterBase
     /// @dev Withdrawal bundles are executed by the configured L1 interop handler.
-    function _interopHandler() internal view override returns (address) {
+    function _getInteropHandler() internal view override returns (address) {
         return l1InteropHandler;
     }
 

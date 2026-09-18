@@ -86,12 +86,12 @@ contract L2InteropHandler is InteropHandlerBase, IL2InteropHandler {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc InteropHandlerBase
-    function _executeBundleSelector() internal view override returns (bytes4) {
+    function _getExecuteBundleSelector() internal pure override returns (bytes4) {
         return this.executeAtomicBundle.selector;
     }
 
     /// @inheritdoc InteropHandlerBase
-    function _verifyBundleSelector() internal view override returns (bytes4) {
+    function _getVerifyBundleSelector() internal pure override returns (bytes4) {
         return this.verifyAtomicBundle.selector;
     }
 
@@ -144,7 +144,7 @@ contract L2InteropHandler is InteropHandlerBase, IL2InteropHandler {
     }
 
     /// @inheritdoc InteropHandlerBase
-    function _expectedDestinationBaseTokenAssetId() internal view override returns (bytes32) {
+    function _getExpectedDestinationBaseTokenAssetId() internal view override returns (bytes32) {
         return L2_NATIVE_TOKEN_VAULT.BASE_TOKEN_ASSET_ID();
     }
 

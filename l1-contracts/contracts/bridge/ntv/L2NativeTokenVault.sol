@@ -231,22 +231,22 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Returns the L2 asset router for internal use.
-    function _assetRouter() internal view virtual override returns (IAssetRouterBase) {
+    function _getAssetRouter() internal view virtual override returns (IAssetRouterBase) {
         return IAssetRouterBase(L2_ASSET_ROUTER_ADDR);
     }
 
     /// @dev Returns the L1 chain ID for internal use.
-    function _l1ChainId() internal view override returns (uint256) {
+    function _getL1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
     }
 
     /// @dev Returns the base token asset ID for internal use.
-    function _baseTokenAssetId() internal view override returns (bytes32) {
+    function _getBaseTokenAssetId() internal view override returns (bytes32) {
         return BASE_TOKEN_ASSET_ID;
     }
 
     /// @dev Returns the WETH token address for internal use.
-    function _wethToken() internal view override returns (address) {
+    function _getWethToken() internal view override returns (address) {
         return WETH_TOKEN;
     }
 
