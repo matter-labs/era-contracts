@@ -487,26 +487,13 @@ pub async fn execute_one_bundle(
                     ));
                     continue;
                 }
-                // Check revert data for known idempotent errors from prior
-                // partial broadcasts:
-                // - OperationExists (0x876e8b23): legacy Governance.scheduleTransparent
-                // - AddressAlreadySet (0x0dfb42bf): setup call already executed
-                // - OperationMustBePending (0xb926a6b0): legacy Gov executeInstant
-                //   on an already-done operation
-                // - EVMBytecodeAlreadyPublished (0x61733a89) /
-                //   EraBytecodeAlreadyPublished (0x876e8b23): BytecodesSupplier
-                //   re-publish of a hash already published in a prior partial
-                //   broadcast (no-op; later txs don't depend on the re-publish).
-                let err_str = format!("{e}");
-                let known_idempotent = [
-                    "876e8b23", // OperationExists / EraBytecodeAlreadyPublished
-                    "0dfb42bf", // AddressAlreadySet
-                    "b926a6b0", // OperationMustBePending
-                    "61733a89", // EVMBytecodeAlreadyPublished
-                ];
-                if let Some(sig) = known_idempotent.iter().find(|s| err_str.contains(**s)) {
+                // Reverts that mean the call already took effect in a prior
+                // partial broadcast (see `idempotent_revert`).
+                if let Some(reason) =
+                    idempotent_revert(&provider, to, &data, &e.to_string()).await?
+                {
                     logger::info(format!(
-                        "Skipping Safe tx #{idx} (to {to:#x}) — idempotent revert ({sig})"
+                        "Skipping Safe tx #{idx} (to {to:#x}) — idempotent revert ({reason})"
                     ));
                     continue;
                 }
@@ -625,6 +612,147 @@ fn journal_entry_matches(entry: &ExecutedTx, to: Address, data: &Bytes, value: U
         return false;
     };
     entry_to == to && entry_data.as_slice() == data.as_ref() && entry_value == value
+}
+
+// Error selectors (4 bytes, lowercase hex, as they appear in an
+// `eth_estimateGas` revert) that mean the call already took effect in a prior
+// partial broadcast, so replaying it is a no-op the bundle can skip.
+/// `Governance.OperationExists()`: `scheduleTransparent` of an operation that is
+/// already scheduled.
+const OPERATION_EXISTS_SELECTOR: &str = "1a21feed";
+/// `BytecodesSupplier.EraBytecodeAlreadyPublished(bytes32)`.
+const ERA_BYTECODE_ALREADY_PUBLISHED_SELECTOR: &str = "876e8b23";
+/// `BytecodesSupplier.EVMBytecodeAlreadyPublished(bytes32)`.
+const EVM_BYTECODE_ALREADY_PUBLISHED_SELECTOR: &str = "61733a89";
+/// `AddressAlreadySet(address)`: a one-shot setup call already executed.
+const ADDRESS_ALREADY_SET_SELECTOR: &str = "0dfb42bf";
+/// `Governance.OperationMustBePending()`. Ambiguous on its own — see
+/// `idempotent_revert`.
+const OPERATION_MUST_BE_PENDING_SELECTOR: &str = "eda2fbb1";
+/// The pre-custom-errors Governance (mainnet's legacy instance) reverts with
+/// this string where the current one raises `OperationMustBePending()`.
+const OPERATION_MUST_BE_PENDING_LEGACY_MESSAGE: &str = "operation must be pending";
+
+// `Governance.executeInstant(Operation)`, `execute(Operation)` and
+// `hashOperation(Operation)` share one parameter encoding, so an operation's id
+// is obtained by re-sending the call's own arguments under the `hashOperation`
+// selector.
+const GOVERNANCE_EXECUTE_INSTANT_SELECTOR: [u8; 4] = [0x95, 0x21, 0x8e, 0xcd];
+const GOVERNANCE_EXECUTE_SELECTOR: [u8; 4] = [0x74, 0xda, 0x75, 0x6b];
+const GOVERNANCE_HASH_OPERATION_SELECTOR: [u8; 4] = [0xc1, 0x26, 0xe8, 0x60];
+const GOVERNANCE_IS_OPERATION_DONE_SELECTOR: [u8; 4] = [0x2a, 0xb0, 0xf5, 0x29];
+
+/// What an `eth_estimateGas` revert string says about replaying the call.
+#[derive(Debug, PartialEq, Eq)]
+enum RevertClass {
+    /// Already took effect; skip. Carries the matched error name for the log.
+    AlreadyDone(&'static str),
+    /// `OperationMustBePending`: skip only if Governance says the operation is
+    /// `Done`.
+    GovernanceOperationNotPending,
+    /// Anything else: not ours to skip.
+    Unknown,
+}
+
+/// Pure part of `idempotent_revert`: map a revert string to a `RevertClass`.
+fn classify_revert(err: &str) -> RevertClass {
+    let lower = err.to_lowercase();
+    for (selector, name) in [
+        (OPERATION_EXISTS_SELECTOR, "OperationExists"),
+        (
+            ERA_BYTECODE_ALREADY_PUBLISHED_SELECTOR,
+            "EraBytecodeAlreadyPublished",
+        ),
+        (
+            EVM_BYTECODE_ALREADY_PUBLISHED_SELECTOR,
+            "EVMBytecodeAlreadyPublished",
+        ),
+        (ADDRESS_ALREADY_SET_SELECTOR, "AddressAlreadySet"),
+    ] {
+        if lower.contains(selector) {
+            return RevertClass::AlreadyDone(name);
+        }
+    }
+    if lower.contains(OPERATION_MUST_BE_PENDING_SELECTOR)
+        || lower.contains(OPERATION_MUST_BE_PENDING_LEGACY_MESSAGE)
+    {
+        return RevertClass::GovernanceOperationNotPending;
+    }
+    RevertClass::Unknown
+}
+
+/// Whether an `eth_estimateGas` revert means the call already took effect in a
+/// prior partial broadcast, so the tx can be skipped instead of aborting the
+/// bundle. Returns what matched, for the log line.
+///
+/// `OperationMustBePending` is not enough by itself: `Governance.executeInstant`
+/// / `execute` raise it for an operation that is Done (skipping is right) and
+/// for one that was never scheduled or was cancelled (skipping would hide a
+/// missing governance effect behind "Safe file executed"). For that revert the
+/// operation's state is read from the Governance contract and only `Done`
+/// skips.
+async fn idempotent_revert<P: Provider>(
+    provider: &P,
+    to: Address,
+    data: &Bytes,
+    err: &str,
+) -> anyhow::Result<Option<String>> {
+    match classify_revert(err) {
+        RevertClass::AlreadyDone(name) => Ok(Some(name.to_string())),
+        RevertClass::GovernanceOperationNotPending => {
+            if governance_operation_is_done(provider, to, data).await? {
+                Ok(Some(
+                    "OperationMustBePending; Governance reports the operation Done".to_string(),
+                ))
+            } else {
+                Ok(None)
+            }
+        }
+        RevertClass::Unknown => Ok(None),
+    }
+}
+
+/// Whether the operation carried by an `executeInstant(Operation)` /
+/// `execute(Operation)` call to `governance` is already `Done` there. False for
+/// any other call shape.
+async fn governance_operation_is_done<P: Provider>(
+    provider: &P,
+    governance: Address,
+    data: &Bytes,
+) -> anyhow::Result<bool> {
+    let Some((selector, operation)) = data.split_first_chunk::<4>() else {
+        return Ok(false);
+    };
+    if *selector != GOVERNANCE_EXECUTE_INSTANT_SELECTOR && *selector != GOVERNANCE_EXECUTE_SELECTOR
+    {
+        return Ok(false);
+    }
+    let mut hash_call = GOVERNANCE_HASH_OPERATION_SELECTOR.to_vec();
+    hash_call.extend_from_slice(operation);
+    let id = provider
+        .call(
+            TransactionRequest::default()
+                .with_to(governance)
+                .with_input(Bytes::from(hash_call)),
+        )
+        .await
+        .context("Governance.hashOperation")?;
+    anyhow::ensure!(
+        id.len() == 32,
+        "Governance.hashOperation returned {} bytes, expected 32",
+        id.len()
+    );
+    let mut done_call = GOVERNANCE_IS_OPERATION_DONE_SELECTOR.to_vec();
+    done_call.extend_from_slice(&id);
+    let done = provider
+        .call(
+            TransactionRequest::default()
+                .with_to(governance)
+                .with_input(Bytes::from(done_call)),
+        )
+        .await
+        .context("Governance.isOperationDone")?;
+    Ok(done.len() == 32 && done[..31].iter().all(|b| *b == 0) && done[31] == 1)
 }
 
 /// Well-known deterministic deployment proxy (EIP-2470 style).
@@ -867,18 +995,11 @@ pub async fn execute_one_bundle_unlocked(
                     skipped += 1;
                     continue;
                 }
-                let err_str = format!("{e}");
-                let known_idempotent = [
-                    "1a21feed", // OperationExists (current Governance)
-                    "876e8b23", // OperationExists / EraBytecodeAlreadyPublished
-                    "61733a89", // EVMBytecodeAlreadyPublished(bytes32)
-                    "0dfb42bf", // AddressAlreadySet
-                    "eda2fbb1", // OperationMustBePending (current Governance)
-                    "b926a6b0", // OperationMustBePending
-                ];
-                if let Some(sig) = known_idempotent.iter().find(|s| err_str.contains(**s)) {
+                if let Some(reason) =
+                    idempotent_revert(&provider, to, &data, &e.to_string()).await?
+                {
                     logger::info(format!(
-                        "Skipping Safe tx #{idx} (to {to:#x}) — idempotent revert ({sig})"
+                        "Skipping Safe tx #{idx} (to {to:#x}) — idempotent revert ({reason})"
                     ));
                     skipped += 1;
                     continue;
@@ -960,6 +1081,50 @@ fn parse_decimal_or_hex_u256(raw: &str) -> anyhow::Result<U256> {
 
 #[cfg(test)]
 mod tests {
+    /// Reverts whose selector proves the effect already happened skip outright;
+    /// `OperationMustBePending` (either spelling) is deferred to a Governance
+    /// state check; everything else — including the `b926a6b0` value the old
+    /// list carried, which is no known selector — is left alone.
+    #[test]
+    fn classify_revert_separates_done_from_ambiguous_and_unknown() {
+        use super::RevertClass;
+        let wrap = |sel: &str| {
+            format!("server returned an error response: error code 3: execution reverted, data: \"0x{sel}00000000000000000000000000000000000000000000000000000000deadbeef\"")
+        };
+        assert_eq!(
+            super::classify_revert(&wrap("1a21feed")),
+            RevertClass::AlreadyDone("OperationExists")
+        );
+        assert_eq!(
+            super::classify_revert(&wrap("876E8B23")),
+            RevertClass::AlreadyDone("EraBytecodeAlreadyPublished")
+        );
+        assert_eq!(
+            super::classify_revert(&wrap("61733a89")),
+            RevertClass::AlreadyDone("EVMBytecodeAlreadyPublished")
+        );
+        assert_eq!(
+            super::classify_revert(&wrap("0dfb42bf")),
+            RevertClass::AlreadyDone("AddressAlreadySet")
+        );
+        assert_eq!(
+            super::classify_revert(&wrap("eda2fbb1")),
+            RevertClass::GovernanceOperationNotPending
+        );
+        assert_eq!(
+            super::classify_revert("execution reverted: Operation must be pending"),
+            RevertClass::GovernanceOperationNotPending
+        );
+        assert_eq!(
+            super::classify_revert(&wrap("b926a6b0")),
+            RevertClass::Unknown
+        );
+        assert_eq!(
+            super::classify_revert("execution reverted: Ownable: caller is not the owner"),
+            RevertClass::Unknown
+        );
+    }
+
     fn journal_entry(to: &str, data: &str, value: &str, status: u64) -> super::ExecutedTx {
         super::ExecutedTx {
             tx_hash: format!("0x{}", "11".repeat(32)),
