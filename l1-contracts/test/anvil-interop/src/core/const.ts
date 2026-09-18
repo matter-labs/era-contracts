@@ -87,6 +87,10 @@ export const CHAIN_ID_LEAF_PADDING = "0x39bc69363bb9e26cf14240de4e22569e95cf175c
 // L2 bootloader address (used for failed deposit logs)
 export const L2_BOOTLOADER_ADDR = "0x0000000000000000000000000000000000008001";
 
+// Bit offsets of the packed protocol version, from common/libraries/SemVer.sol
+export const SEMVER_MINOR_OFFSET = 32;
+export const SEMVER_MAJOR_OFFSET = 64;
+
 // NTV (L2NativeTokenVault) storage slot numbers.
 // Obtained via: forge inspect L2NativeTokenVault storageLayout
 export const NTV_WETH_TOKEN_SLOT = 251;

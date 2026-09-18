@@ -242,7 +242,7 @@
   "protocol_semantic_version": {
     "major": 0,
     "minor": 31,
-    "patch": 0
+    "patch": 2
   },
   "prover": {
     "fflonk_snark_wrapper_vk_hash": "0x49eae0bf5c7ea580f4979b366e52b386adc5f42e2ce50fc1d3c4de9a86052bff",

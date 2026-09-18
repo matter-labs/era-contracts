@@ -20,6 +20,8 @@ import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamond
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
+import {ChainCreationParamsConfig} from "deploy-scripts/utils/Types.sol";
+import {ChainCreationParamsLib} from "deploy-scripts/ctm/ChainCreationParamsLib.sol";
 
 /// @notice Test-friendly subclass of GatewayVotePreparation that exposes the
 /// initialization + calculateAddresses path without executing L1->L2 transactions.
@@ -45,6 +47,14 @@ contract GatewayVotePreparationForTest is GatewayVotePreparation {
     /// @notice Exposes the populated config for test assertions.
     function getDeployerConfig() public view returns (GatewayCTMDeployerConfig memory) {
         return gatewayCTMDeployerConfig;
+    }
+
+    /// @dev The fixture runs in ZKsyncOS mode so the gateway contracts resolve to EVM bytecode
+    /// that this test can actually deploy, but the CTM the harness registers is an Era one.
+    /// The two genesis files carry different protocol versions, so read the params from the Era
+    /// genesis to match the CTM that `setAddressesBasedOnBridgehub` checks against.
+    function getChainCreationParamsConfig(string memory) internal override returns (ChainCreationParamsConfig memory) {
+        return ChainCreationParamsLib.getChainCreationParams(Utils.genesisConfigPath(false), false);
     }
 }
 
