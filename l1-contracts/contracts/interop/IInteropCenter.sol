@@ -106,12 +106,6 @@ interface IInteropCenter {
     /// @param _receiver Address to receive the fees.
     function claimZKFees(address _receiver) external;
 
-    /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
-    function pause() external;
-
-    /// @notice Unpauses the contract, allowing all functions marked with the `whenNotPaused` modifier to be called again.
-    function unpause() external;
-
     /// @notice One-shot initialization for the InteropCenter.
     /// @dev InteropCenter is introduced in v31, so this is called for BOTH new chains (genesis)
     ///      and existing chains being upgraded to v31. In both cases the contract storage is
