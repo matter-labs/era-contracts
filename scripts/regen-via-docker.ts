@@ -22,6 +22,11 @@
  *                                  real-chain broadcast)
  *
  * Optional env:
+ *   GW_RPC_URL=<gateway-rpc>     — Gateway RPC for PUVT's read-only GW-side
+ *                                  checks. Stage has `[new_gateway]`, so
+ *                                  `rehearse-upgrade` refuses to run without
+ *                                  one. Defaults to the stage gateway,
+ *                                  https://zksync-os-stage-gateway.zksync.dev
  *   PROTOCOL_OPS_IMAGE=...       — full image ref. Defaults to
  *                                  ghcr.io/matter-labs/protocol-ops:v31-camp-split
  *   PROTOCOL_OPS_BIN_HOST=...    — explicit path to a pre-built linux/amd64
@@ -167,6 +172,17 @@ function commonMounts(): string[] {
  * ignores `--disable-labels` for `forge script`, otherwise the prepare
  * hangs 5–30 min per CTM).
  */
+/**
+ * Stage's gateway. PUVT needs a Gateway RPC for every env with `[new_gateway]`
+ * (it bails with "this upgrade brings up a Gateway; pass --gw-rpc-url"), and
+ * this script only rehearses stage. Override with GW_RPC_URL.
+ */
+const DEFAULT_STAGE_GW_RPC_URL = "https://zksync-os-stage-gateway.zksync.dev";
+
+function gwRpcUrl(): string {
+  return process.env.GW_RPC_URL || DEFAULT_STAGE_GW_RPC_URL;
+}
+
 function sourcifyBlock(): string[] {
   return ["--add-host", "sourcify.dev:127.0.0.1", "--add-host", "repo.sourcify.dev:127.0.0.1"];
 }
@@ -201,6 +217,8 @@ function cmdRegen(pk: string, rpc: string, binMount: string[]): number {
     rpc,
     "--deployer-address",
     deployer,
+    "--gw-rpc-url",
+    gwRpcUrl(),
   ];
   return dockerRun(args);
 }
