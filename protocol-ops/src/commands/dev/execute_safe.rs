@@ -106,6 +106,25 @@ fn bump_gas(current: u128, max: u128) -> Option<u128> {
     Some(std::cmp::min(std::cmp::max(bumped, current + 1), max))
 }
 
+/// Receipt of whichever of `hashes` has mined, if any. The sender broadcasts
+/// several hashes per nonce (the original plus gas-bumped replacements), so
+/// every "did our tx land?" question has to be asked about all of them.
+async fn find_mined<P: Provider>(
+    provider: &P,
+    hashes: &[B256],
+) -> anyhow::Result<Option<(B256, u64)>> {
+    for hash in hashes {
+        if let Some(receipt) = provider
+            .get_transaction_receipt(*hash)
+            .await
+            .context("eth_getTransactionReceipt")?
+        {
+            return Ok(Some((*hash, u64::from(receipt.status()))));
+        }
+    }
+    Ok(None)
+}
+
 /// Submit one tx and confirm it, robust to the two public-chain hazards a naive
 /// send-and-await hits:
 ///
@@ -113,8 +132,12 @@ fn bump_gas(current: u128, max: u128) -> Option<u128> {
 ///    bump the legacy gas price (≥ +15%) and re-broadcast the SAME nonce (a
 ///    replacement), up to `max_gas_price_wei`, until it mines or `MAX_TX_WAIT_MS`.
 ///  * **Nonce takeover** — if the sender's on-chain nonce advances past ours
-///    without our tx landing (some other tx grabbed the nonce), re-fetch the
-///    next free nonce and re-broadcast our calldata there.
+///    without any of OUR submissions landing (some other tx grabbed the nonce),
+///    re-fetch the next free nonce and re-broadcast our calldata there. Every
+///    hash sent for the nonce — the original and each gas-bumped replacement —
+///    is checked first: a replacement can reach the builder after the original
+///    was already included, and mistaking that for a takeover would re-send
+///    the same call at a fresh nonce and execute it twice.
 ///
 /// Callers award this before submitting the next tx, so the pending nonce is
 /// always the next free one (strict one-at-a-time). Returns `(hash, status)` of
@@ -142,7 +165,9 @@ async fn submit_and_confirm<P: Provider>(
     let mut nonce = pending_nonce(provider, from).await?;
     let mut gas_price = std::cmp::min(resolve_gas_price(provider).await?, max_gas_price_wei);
     let started = std::time::Instant::now();
-    let mut last_hash: Option<B256> = None;
+    // Every hash broadcast for the CURRENT nonce: the original plus each
+    // gas-bumped replacement. Any one of them may be the one that mines.
+    let mut submitted: Vec<B256> = Vec::new();
 
     loop {
         let req = TransactionRequest::default()
@@ -157,7 +182,7 @@ async fn submit_and_confirm<P: Provider>(
         match provider.send_transaction(req).await {
             Ok(p) => {
                 let h = *p.tx_hash();
-                last_hash = Some(h);
+                submitted.push(h);
                 logger::info(format!(
                     "  submitted {h:#x} (nonce {nonce}, {} gwei)",
                     format_gwei(gas_price)
@@ -166,16 +191,15 @@ async fn submit_and_confirm<P: Provider>(
             Err(e) => {
                 let es = e.to_string().to_lowercase();
                 if es.contains("nonce too low") || es.contains("nonce_too_low") {
-                    // Our nonce was consumed. If our own last submission actually
-                    // landed, take it; otherwise resubmit our calldata at the
-                    // next free nonce.
-                    if let Some(h) = last_hash {
-                        if let Some(r) = provider.get_transaction_receipt(h).await? {
-                            return Ok((h, u64::from(r.status())));
-                        }
+                    // Our nonce was consumed. If any of our own submissions for
+                    // it actually landed, take that one; otherwise resubmit our
+                    // calldata at the next free nonce.
+                    if let Some(mined) = find_mined(provider, &submitted).await? {
+                        return Ok(mined);
                     }
                     let old = nonce;
                     nonce = pending_nonce(provider, from).await?;
+                    submitted.clear();
                     logger::info(format!(
                         "  nonce {old} taken by another tx; resubmitting at nonce {nonce}"
                     ));
@@ -188,7 +212,7 @@ async fn submit_and_confirm<P: Provider>(
                     if let Some(g) = bump_gas(gas_price, max_gas_price_wei) {
                         gas_price = g;
                     }
-                    if last_hash.is_none() {
+                    if submitted.is_empty() {
                         if started.elapsed().as_millis() >= MAX_TX_WAIT_MS {
                             return Err(e).context("eth_sendTransaction (gave up after retries)");
                         }
@@ -201,17 +225,17 @@ async fn submit_and_confirm<P: Provider>(
             }
         }
 
-        let hash = last_hash.expect("a hash is set once we reach the wait loop");
+        let hash = *submitted
+            .last()
+            .expect("a hash is set once we reach the wait loop");
 
-        // Wait up to STUCK_WAIT_MS for a receipt.
+        // Wait up to STUCK_WAIT_MS for a receipt on any of our submissions for
+        // this nonce (an earlier, lower-priced one can still be the one that
+        // mines).
         let wait_start = std::time::Instant::now();
         loop {
-            if let Some(r) = provider
-                .get_transaction_receipt(hash)
-                .await
-                .context("eth_getTransactionReceipt")?
-            {
-                return Ok((hash, u64::from(r.status())));
+            if let Some(mined) = find_mined(provider, &submitted).await? {
+                return Ok(mined);
             }
             if wait_start.elapsed().as_millis() >= STUCK_WAIT_MS {
                 break;
@@ -234,12 +258,14 @@ async fn submit_and_confirm<P: Provider>(
             .await
             .context("eth_getTransactionCount(latest)")?;
         if latest > nonce {
-            // Our nonce is spent. Our tx (edge race), or someone else's?
-            if let Some(r) = provider.get_transaction_receipt(hash).await? {
-                return Ok((hash, u64::from(r.status())));
+            // Our nonce is spent. One of our submissions (edge race), or
+            // someone else's tx?
+            if let Some(mined) = find_mined(provider, &submitted).await? {
+                return Ok(mined);
             }
             let old = nonce;
             nonce = pending_nonce(provider, from).await?;
+            submitted.clear();
             logger::info(format!(
                 "  nonce {old} taken by another tx; resubmitting at nonce {nonce}"
             ));
@@ -386,6 +412,10 @@ pub async fn execute_one_bundle(
     // Load the prior receipt journal so a retry in the same working directory
     // extends it instead of losing the provenance of an earlier partial run.
     let mut executed = load_executed_bundle(out_path)?;
+    // Entries of that journal a resume may still match against this run's txs
+    // (see `find_journaled_execution`). Entries this run appends sit past this
+    // length and never match.
+    let mut journal_claimed = vec![false; executed.transactions.len()];
 
     // Parse + sign + submit each tx sequentially, awaiting its receipt
     // before the next. Some bundle txs depend on contracts deployed by
@@ -416,6 +446,20 @@ pub async fn execute_one_bundle(
             .ok_or_else(|| anyhow::anyhow!("Safe tx #{idx} missing `value`"))?;
         let value = parse_decimal_or_hex_u256(value_str)
             .with_context(|| format!("Safe tx #{idx} `value` is not a valid number"))?;
+
+        // Resume: a prior partial run may already have mined this exact call.
+        // Skip it if the journal says so and the chain confirms it; re-sending
+        // would at best waste a tx and at worst revert the whole bundle (e.g. a
+        // deployer's `transferOwnership` after ownership already moved on).
+        if let Some(hash) =
+            find_journaled_execution(&provider, &executed, &mut journal_claimed, to, &data, value)
+                .await?
+        {
+            logger::info(format!(
+                "Skipping Safe tx #{idx} (to {to:#x}) — already mined in a prior run as {hash:#x}"
+            ));
+            continue;
+        }
 
         // Estimate gas per tx so we don't trip node-side `gas limit too
         // high` rejections (reth caps tx gas at the current elastic block
@@ -521,6 +565,66 @@ pub async fn execute_one_bundle(
 
     logger::success("Safe file executed");
     Ok(())
+}
+
+/// A journaled call from a prior run that this run may skip: same target,
+/// calldata and value, recorded with status 1, not yet claimed by an earlier
+/// tx of this run, and confirmed on THIS chain — the recorded hash must have a
+/// receipt with status 1 for the recorded target (a journal carried over from
+/// another chain, or a re-orged receipt, does not count). Claims the entry, so
+/// a call that legitimately appears twice is skipped only as many times as it
+/// already mined.
+async fn find_journaled_execution<P: Provider>(
+    provider: &P,
+    executed: &ExecutedBundle,
+    claimed: &mut [bool],
+    to: Address,
+    data: &Bytes,
+    value: U256,
+) -> anyhow::Result<Option<B256>> {
+    for (i, entry) in executed.transactions.iter().take(claimed.len()).enumerate() {
+        if claimed[i] || !journal_entry_matches(entry, to, data, value) {
+            continue;
+        }
+        let hash: B256 = entry.tx_hash.parse().with_context(|| {
+            format!(
+                "journal entry #{i} has an invalid tx hash {}",
+                entry.tx_hash
+            )
+        })?;
+        let Some(receipt) = provider
+            .get_transaction_receipt(hash)
+            .await
+            .context("eth_getTransactionReceipt")?
+        else {
+            continue;
+        };
+        if receipt.status() && receipt.to == Some(to) {
+            claimed[i] = true;
+            return Ok(Some(hash));
+        }
+    }
+    Ok(None)
+}
+
+/// Whether a journal entry records a successful execution of exactly this
+/// call. Compares parsed values, not strings, so the journal's own spelling
+/// (`{:#x}` address, `0x` hex data, decimal value) and the Safe file's agree.
+/// Pure; the on-chain confirmation lives in `find_journaled_execution`.
+fn journal_entry_matches(entry: &ExecutedTx, to: Address, data: &Bytes, value: U256) -> bool {
+    if entry.status != 1 {
+        return false;
+    }
+    let Ok(entry_to) = entry.to.parse::<Address>() else {
+        return false;
+    };
+    let Ok(entry_data) = alloy::hex::decode(entry.data.trim_start_matches("0x")) else {
+        return false;
+    };
+    let Ok(entry_value) = parse_decimal_or_hex_u256(&entry.value) else {
+        return false;
+    };
+    entry_to == to && entry_data.as_slice() == data.as_ref() && entry_value == value
 }
 
 /// Well-known deterministic deployment proxy (EIP-2470 style).
@@ -700,8 +804,10 @@ pub async fn execute_one_bundle_unlocked(
     let gas_price = GAS_PRICE_FLOOR_WEI;
     logger::info(format!("Using gas price {} gwei", format_gwei(gas_price)));
 
-    // Same append-on-each-receipt journal as the signed path.
+    // Same append-on-each-receipt journal and resume bookkeeping as the signed
+    // path.
     let mut executed = load_executed_bundle(out_path)?;
+    let mut journal_claimed = vec![false; executed.transactions.len()];
 
     let mut skipped: usize = 0;
     for (idx, tx) in safe_txs.iter().enumerate() {
@@ -725,6 +831,21 @@ pub async fn execute_one_bundle_unlocked(
             .ok_or_else(|| anyhow::anyhow!("Safe tx #{idx} missing `value`"))?;
         let value = parse_decimal_or_hex_u256(value_str)
             .with_context(|| format!("Safe tx #{idx} `value` is not a valid number"))?;
+
+        // Resume: a prior partial run may already have mined this exact call.
+        // Skip it if the journal says so and the chain confirms it; re-sending
+        // would at best waste a tx and at worst revert the whole bundle (e.g. a
+        // deployer's `transferOwnership` after ownership already moved on).
+        if let Some(hash) =
+            find_journaled_execution(&provider, &executed, &mut journal_claimed, to, &data, value)
+                .await?
+        {
+            logger::info(format!(
+                "Skipping Safe tx #{idx} (to {to:#x}) — already mined in a prior run as {hash:#x}"
+            ));
+            skipped += 1;
+            continue;
+        }
 
         let estimate_req = TransactionRequest::default()
             .with_from(sender)
@@ -839,6 +960,80 @@ fn parse_decimal_or_hex_u256(raw: &str) -> anyhow::Result<U256> {
 
 #[cfg(test)]
 mod tests {
+    fn journal_entry(to: &str, data: &str, value: &str, status: u64) -> super::ExecutedTx {
+        super::ExecutedTx {
+            tx_hash: format!("0x{}", "11".repeat(32)),
+            to: to.to_string(),
+            data: data.to_string(),
+            value: value.to_string(),
+            status,
+        }
+    }
+
+    const JOURNAL_TO: &str = "0x7e7bc292a71b73cebe77633937ddad3dc1f80ed2";
+    const JOURNAL_DATA: &str =
+        "0xf2fde38b000000000000000000000000000000000000000000000000000000000000dead";
+
+    fn safe_call() -> (alloy::primitives::Address, alloy::primitives::Bytes) {
+        // Checksummed address, as a Safe TX Builder file spells it.
+        let to = "0x7E7bc292A71B73CeBE77633937dDaD3dc1f80ED2"
+            .parse()
+            .unwrap();
+        let data = alloy::primitives::Bytes::from(
+            alloy::hex::decode(JOURNAL_DATA.trim_start_matches("0x")).unwrap(),
+        );
+        (to, data)
+    }
+
+    /// The journal spells the address lowercase and the value in decimal; the
+    /// Safe file may not. Matching is on parsed values.
+    #[test]
+    fn journal_entry_matches_ignores_spelling() {
+        let (to, data) = safe_call();
+        let entry = journal_entry(JOURNAL_TO, JOURNAL_DATA, "0", 1);
+        assert!(super::journal_entry_matches(
+            &entry,
+            to,
+            &data,
+            alloy::primitives::U256::ZERO
+        ));
+        let hex_value = journal_entry(JOURNAL_TO, JOURNAL_DATA, "0x0", 1);
+        assert!(super::journal_entry_matches(
+            &hex_value,
+            to,
+            &data,
+            alloy::primitives::U256::ZERO
+        ));
+    }
+
+    /// A reverted entry, or one differing in target, calldata or value, is not
+    /// a completed execution of this call and must not make a resume skip it.
+    #[test]
+    fn journal_entry_matches_rejects_reverted_and_different_calls() {
+        let (to, data) = safe_call();
+        let value = alloy::primitives::U256::ZERO;
+        let reverted = journal_entry(JOURNAL_TO, JOURNAL_DATA, "0", 0);
+        assert!(!super::journal_entry_matches(&reverted, to, &data, value));
+        let other_to = journal_entry(
+            "0x0000000000000000000000000000000000000001",
+            JOURNAL_DATA,
+            "0",
+            1,
+        );
+        assert!(!super::journal_entry_matches(&other_to, to, &data, value));
+        let other_data = journal_entry(JOURNAL_TO, &JOURNAL_DATA.replace("dead", "beef"), "0", 1);
+        assert!(!super::journal_entry_matches(&other_data, to, &data, value));
+        let other_value = journal_entry(JOURNAL_TO, JOURNAL_DATA, "1", 1);
+        assert!(!super::journal_entry_matches(
+            &other_value,
+            to,
+            &data,
+            value
+        ));
+        let garbage = journal_entry("not-an-address", JOURNAL_DATA, "0", 1);
+        assert!(!super::journal_entry_matches(&garbage, to, &data, value));
+    }
+
     use std::fs;
 
     use alloy::primitives::B256;
