@@ -4,7 +4,8 @@ on:
   push:
     branches:
       - main
-      - gateway-commands-in-protocol-ops
+      - kl/l2V31upgrade
+      - draft-v31
 
 jobs:
   build-and-push:
@@ -22,6 +23,17 @@ jobs:
         with:
           submodules: recursive
 
+      # The protocol Dockerfile bakes zk-governance into the image
+      # (`COPY zk-governance /zk-governance`), so it must be present in the
+      # build context. Same checkout as in build-docker.yaml.
+      - name: Checkout zk-governance
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: zksync-association/zk-governance
+          ref: kl/v31-puh-guardians-redeploy
+          submodules: recursive
+          path: zk-governance
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
 
@@ -38,7 +50,9 @@ jobs:
         run: |
           SHA=$(git rev-parse HEAD)
           SHORT_SHA=$(git rev-parse --short HEAD)
-          BRANCH=${GITHUB_REF_NAME}
+          # Docker tags can't contain `/`; convert to `-` so branches like
+          # `kl/l2V31upgrade` produce a valid tag.
+          BRANCH=${GITHUB_REF_NAME//\//-}
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
           echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
           echo "Tags: $SHA, $BRANCH"

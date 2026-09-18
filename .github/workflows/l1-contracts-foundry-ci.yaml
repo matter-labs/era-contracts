@@ -34,6 +34,13 @@ jobs:
       - name: Build artifacts
         run: yarn l1 build:foundry
 
+      # `deploy-scripts/` is outside the default forge build set (`src`/`test`),
+      # so scripts that are only invoked at runtime via `forge script` would
+      # otherwise bit-rot without CI noticing. Compile them all explicitly.
+      - name: Check deploy-scripts compile
+        working-directory: ./l1-contracts
+        run: forge build deploy-scripts
+
       - name: Build system-contract artifacts
         run: yarn sc build:foundry
 
@@ -53,6 +60,59 @@ jobs:
             l2-contracts/cache-forge
             l2-contracts/zkout
             system-contracts/zkout
+
+  contract-size:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install foundry-zksync
+        uses: ./.github/actions/install-zksync-foundry
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Restore l1-contracts artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-l1-contracts-foudry-${{ github.sha }}
+          path: |
+            l1-contracts/cache-forge
+            l1-contracts/out
+
+      - name: Check contract sizes (EIP-170)
+        working-directory: ./l1-contracts
+        run: |
+          # `forge build --sizes` prints a table and exits with error if any contract
+          # exceeds 24,576 bytes. We exclude test/dev/mock contracts and known data-only
+          # contracts that are never deployed standalone. `forge build --sizes` prints
+          # bare contract names when they are unique, so the filter must match by name as
+          # well as by path (e.g. GWAssetTrackerDev and GWAssetTrackerTestHelper live under
+          # dev-contracts/ and test/ respectively but their bare names are shown).
+          forge build --sizes 2>&1 \
+            | grep -E '^\|' \
+            | grep -v 'test/\|Test \|Mock\|dev-contracts/\|L2AssetTrackerData\|Dev \|TestHelper ' \
+            | tee /tmp/sizes.txt
+
+          # Check for any negative runtime margin (= over the limit)
+          if grep -qE '\|\s+-[0-9]' /tmp/sizes.txt; then
+            echo ""
+            echo "❌ The following production contracts exceed the EIP-170 size limit (24,576 bytes):"
+            grep -E '\|\s+-[0-9]' /tmp/sizes.txt
+            exit 1
+          fi
+          echo "✅ All production contracts are within the EIP-170 size limit."
 
   scripts:
     runs-on: ubuntu-latest

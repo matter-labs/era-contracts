@@ -58,7 +58,7 @@ import {
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR
 } from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {AllowedBytecodeTypes, IL2ContractDeployer} from "../../../common/interfaces/IL2ContractDeployer.sol";
-import {IChainAdmin} from "../../../governance/IChainAdmin.sol";
+import {IServerNotifier} from "../../../governance/IServerNotifier.sol";
 import {IL2BaseTokenZKOS} from "../../../l2-system/zksync-os/interfaces/IL2BaseTokenZKOS.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -226,14 +226,18 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
         _enforceMinUpdateInterval();
 
-        _enforcePriceChangeBound({
-            _oldFeeParams: s.feeParams,
-            _newFeeParams: s.feeParams,
-            _oldNominator: s.baseTokenGasPriceMultiplierNominator,
-            _oldDenominator: s.baseTokenGasPriceMultiplierDenominator,
-            _newNominator: _nominator,
-            _newDenominator: _denominator
-        });
+        // Match changeFeeParams(): price-change bounds are only enforced for chains that can
+        // activate priority mode. Non-stage1 chains retain flexibility for fee tuning.
+        if (s.priorityModeInfo.canBeActivated) {
+            _enforcePriceChangeBound({
+                _oldFeeParams: s.feeParams,
+                _newFeeParams: s.feeParams,
+                _oldNominator: s.baseTokenGasPriceMultiplierNominator,
+                _oldDenominator: s.baseTokenGasPriceMultiplierDenominator,
+                _newNominator: _nominator,
+                _newDenominator: _denominator
+            });
+        }
 
         uint128 oldNominator = s.baseTokenGasPriceMultiplierNominator;
         uint128 oldDenominator = s.baseTokenGasPriceMultiplierDenominator;
@@ -272,6 +276,10 @@ contract AdminFacet is ZKChainBase, IAdmin {
             return;
         }
 
+        // Note that the allowed range is intentionally computed with the configured ratio and its
+        // reciprocal using integer arithmetic. This means the effective bounds are asymmetric:
+        // with 13/10, increases are capped just below +30% due to rounding down, while decreases
+        // are capped at approximately -23.08% (10/13), not -30%.
         uint256 maxAllowedPrice = (oldPrice * MAX_PRICE_CHANGE_NUMERATOR) / MAX_PRICE_CHANGE_DENOMINATOR;
         if (newPrice > maxAllowedPrice) {
             revert FeeParamsChangeTooLarge(oldPrice, newPrice, maxAllowedPrice);
@@ -491,7 +499,10 @@ contract AdminFacet is ZKChainBase, IAdmin {
         // The timestamp is keyed on _oldProtocolVersion (the version we are upgrading *from*), because
         // the new version is not known until the diamond cut is executed.
         if (msg.sender != s.admin && msg.sender != s.chainTypeManager) {
-            uint256 timestamp = IChainAdmin(s.admin).protocolVersionToUpgradeTimestamp(_oldProtocolVersion);
+            IServerNotifier serverNotifier = IServerNotifier(
+                IChainTypeManager(s.chainTypeManager).serverNotifierAddress()
+            );
+            uint256 timestamp = serverNotifier.protocolVersionToUpgradeTimestamp(s.chainId, _oldProtocolVersion);
             if (timestamp == 0 || block.timestamp < timestamp) {
                 revert UpgradeTimestampNotReached(timestamp, block.timestamp);
             }

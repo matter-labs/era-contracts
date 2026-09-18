@@ -40,13 +40,13 @@ import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBas
 
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 
+import {LogFinder} from "test-utils/LogFinder.sol";
+
+import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestConstants.sol";
+
 contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using stdStorage for StdStorage;
-
-    bytes32 constant NEW_PRIORITY_REQUEST_HASH =
-        keccak256(
-            "NewPriorityRequest(uint256,bytes32,uint64,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[4],bytes,bytes,uint256[],bytes,bytes),bytes[])"
-        );
+    using LogFinder for Vm.Log[];
 
     struct NewPriorityRequest {
         uint256 txId;
@@ -88,7 +88,6 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         for (uint256 i = 0; i < zkChainIds.length; i++) {
             address contractAddress = makeAddr(string(abi.encode("contract", i)));
             l2ContractAddresses.push(contractAddress);
-
             _addL2ChainContract(zkChainIds[i], contractAddress);
         }
     }
@@ -265,6 +264,9 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
             abi.encodeWithSignature("L1_CHAIN_ID()"),
             abi.encode(block.chainid)
         );
+
+        vm.expectEmit(true, true, false, true, address(bridgedToken));
+        emit IERC20.Transfer(address(this), address(0), 100);
         vm.broadcast(L2_NATIVE_TOKEN_VAULT_ADDR); // kl todo call ntv, or even assetRouter/bridgehub
         bridgedToken.bridgeBurn(address(this), 100);
     }
@@ -309,10 +311,16 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
     function test_DepositDirect() public {
         depositToL1(ETH_TOKEN_ADDRESS);
 
+        // Capture pre-state
+        uint256 ethBalanceBefore = address(this).balance;
+        uint256 tokenBalanceBefore = IERC20(tokenL1Address).balanceOf(address(this));
+
         bytes memory secondBridgeCalldata = bytes.concat(
             NEW_ENCODING_VERSION,
             abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this)))
         );
+        // Note: this approve is not consumed by the Direct path (only base token ETH is transferred).
+        // Kept to match the original test setup; the token balance assertion below proves it's unused.
         IERC20(tokenL1Address).approve(address(addresses.l1NativeTokenVault), 100);
 
         vm.recordLogs();
@@ -332,12 +340,37 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        // Verify transaction was recorded (logs were emitted)
-        assertTrue(logs.length > 0, "Direct transaction should emit logs");
+        // Verify balances
+        assertEq(ethBalanceBefore - address(this).balance, 250000000000100, "ETH balance should decrease by mintValue");
+        // Direct path only deposits base token (ETH); ERC20 tokens are NOT transferred on L1
+        assertEq(
+            IERC20(tokenL1Address).balanceOf(address(this)),
+            tokenBalanceBefore,
+            "ERC20 token balance should remain unchanged in direct deposit"
+        );
 
-        // Direct transactions send calldata to L2 without going through the bridge's token transfer
-        // Verify the calldata was properly encoded
-        assertTrue(secondBridgeCalldata.length > 0, "Second bridge calldata should not be empty");
+        // Verify BridgehubDepositBaseTokenInitiated event emission
+        Vm.Log memory depositLog = logs.requireOne(
+            "BridgehubDepositBaseTokenInitiated(uint256,address,bytes32,uint256)"
+        );
+        assertEq(uint256(depositLog.topics[1]), eraZKChainId, "Deposit base token event chainId mismatch");
+
+        // Verify NewPriorityRequest event and validate L2 transaction
+        NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
+
+        assertTrue(request.txHash != bytes32(0), "Canonical tx hash should be non-zero");
+        assertEq(
+            address(uint160(request.transaction.to)),
+            address(addresses.sharedBridge),
+            "L2 contract should be the shared bridge"
+        );
+        assertEq(
+            keccak256(request.transaction.data),
+            keccak256(secondBridgeCalldata),
+            "L2 calldata should match the encoded bridge calldata"
+        );
+        assertEq(request.transaction.value, 0, "L2 value should be 0");
+        assertEq(request.transaction.reserved[0], 250000000000100, "Mint value should match requested amount");
     }
 
     function test_DepositToL1AndWithdraw7702() public {
@@ -428,19 +461,12 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
     function test() internal override {}
 
     // gets event from logs
-    function _getNewPriorityQueueFromLogs(Vm.Log[] memory logs) internal returns (NewPriorityRequest memory request) {
-        for (uint256 i = 0; i < logs.length; i++) {
-            Vm.Log memory log = logs[i];
+    function _getNewPriorityQueueFromLogs(
+        Vm.Log[] memory logs
+    ) internal pure returns (NewPriorityRequest memory request) {
+        Vm.Log memory log = logs.requireOne(NEW_PRIORITY_REQUEST_SIGNATURE);
 
-            if (log.topics[0] == NEW_PRIORITY_REQUEST_HASH) {
-                (
-                    request.txId,
-                    request.txHash,
-                    request.expirationTimestamp,
-                    request.transaction,
-                    request.factoryDeps
-                ) = abi.decode(log.data, (uint256, bytes32, uint64, L2CanonicalTransaction, bytes[]));
-            }
-        }
+        (request.txId, request.txHash, request.expirationTimestamp, request.transaction, request.factoryDeps) = abi
+            .decode(log.data, (uint256, bytes32, uint64, L2CanonicalTransaction, bytes[]));
     }
 }

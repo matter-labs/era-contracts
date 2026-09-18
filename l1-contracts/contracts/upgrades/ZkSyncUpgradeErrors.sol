@@ -36,3 +36,5 @@ error ProtocolVersionMinorDeltaTooBig(uint256 limit, uint256 proposed);
 error ProtocolVersionTooSmall(uint256 _previousProtocolVersion, uint256 _newProtocolVersion);
 // 0x364b6f8b
 error SettlementLayerUpgradeMustPrecedeChainUpgrade();
+// 0xccf3f08a
+error UnexpectedZKsyncOSFlag(bool expected, bool actual);

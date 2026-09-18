@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
+import {RAND_ADDRESS} from "test/foundry/TestConstants.sol";
 
 /// @notice Helper contract to test InteroperableAddress library with calldata functions
 contract InteroperableAddressHelper {
@@ -224,6 +225,23 @@ contract InteroperableAddressTest is Test {
         assertFalse(success);
     }
 
+    function test_tryParseV1Calldata_failsOnMissingAddressLengthByte() public view {
+        bytes memory tooShort = hex"0001000000";
+
+        (bool success, , , ) = helper.tryParseV1Calldata(tooShort);
+        assertFalse(success);
+    }
+
+    function test_tryParseV1Calldata_failsOnTrailingBytes() public view {
+        bytes memory formattedWithTrailingByte = bytes.concat(
+            InteroperableAddress.formatEvmV1(uint256(1), address(0x1234)),
+            hex"00"
+        );
+
+        (bool success, , , ) = helper.tryParseV1Calldata(formattedWithTrailingByte);
+        assertFalse(success);
+    }
+
     // ============ parseEvmV1 Tests ============
 
     function test_parseEvmV1_validInput() public pure {
@@ -328,7 +346,7 @@ contract InteroperableAddressTest is Test {
 
     function test_roundtrip_formatAndParseEvmV1() public pure {
         uint256 originalChainId = 137;
-        address originalAddr = address(0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF);
+        address originalAddr = RAND_ADDRESS;
 
         bytes memory formatted = InteroperableAddress.formatEvmV1(originalChainId, originalAddr);
         (uint256 parsedChainId, address parsedAddr) = formatted.parseEvmV1();
@@ -348,7 +366,7 @@ contract InteroperableAddressTest is Test {
     }
 
     function test_roundtrip_formatAndParseEvmV1_onlyAddress() public pure {
-        address originalAddr = address(0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF);
+        address originalAddr = RAND_ADDRESS;
 
         bytes memory formatted = InteroperableAddress.formatEvmV1(originalAddr);
         (uint256 parsedChainId, address parsedAddr) = formatted.parseEvmV1();

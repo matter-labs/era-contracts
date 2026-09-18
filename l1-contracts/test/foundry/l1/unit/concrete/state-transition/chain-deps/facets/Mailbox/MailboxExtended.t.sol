@@ -23,7 +23,7 @@ import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7
 import {AddressNotZero, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {
     DepositsPaused,
-    NotHyperchain,
+    NotZKChain,
     NotL1,
     NotSettlementLayer
 } from "contracts/state-transition/L1StateTransitionErrors.sol";

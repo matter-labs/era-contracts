@@ -448,82 +448,32 @@ contract ExperimentalBridgeTest is Test {
         assertTrue(isCTMRegistered);
     }
 
-    // function test_removeChainTypeManager(address randomAddressWithoutTheCorrectInterface) public {
-    //     vm.assume(randomAddressWithoutTheCorrectInterface != address(0));
-    //     bool isCTMRegistered = bridgehub.chainTypeManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
-    //     assertTrue(!isCTMRegistered);
+    function test_removeChainTypeManager_cannotBeCalledByRandomAddress(
+        address _chainTypeManager,
+        address _randomCaller
+    ) public {
+        vm.assume(_chainTypeManager != address(0));
+        vm.assume(_randomCaller != bridgeOwner);
 
-    //     // A non-existent CTM cannot be removed
-    //     vm.prank(bridgeOwner);
-    //     vm.expectRevert(CTMNotRegistered.selector);
-    //     bridgehub.removeChainTypeManager(randomAddressWithoutTheCorrectInterface);
+        // Removing a non-registered CTM is still owner-only.
+        vm.prank(_randomCaller);
+        vm.expectRevert(bytes("Ownable: caller is not the owner"));
+        bridgehub.removeChainTypeManager(_chainTypeManager);
 
-    //     // Let's first register our particular chainTypeManager
-    //     vm.prank(bridgeOwner);
-    //     bridgehub.addChainTypeManager(randomAddressWithoutTheCorrectInterface);
+        // Register the CTM so the second check covers the successful-removal path.
+        vm.prank(bridgeOwner);
+        bridgehub.addChainTypeManager(_chainTypeManager);
+        assertTrue(bridgehub.chainTypeManagerIsRegistered(_chainTypeManager));
 
-    //     isCTMRegistered = bridgehub.chainTypeManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
-    //     assertTrue(isCTMRegistered);
+        vm.prank(_randomCaller);
+        vm.expectRevert(bytes("Ownable: caller is not the owner"));
+        bridgehub.removeChainTypeManager(_chainTypeManager);
+        assertTrue(bridgehub.chainTypeManagerIsRegistered(_chainTypeManager));
 
-    //     // Only an address that has already been registered, can be removed.
-    //     vm.prank(bridgeOwner);
-    //     bridgehub.removeChainTypeManager(randomAddressWithoutTheCorrectInterface);
-
-    //     isCTMRegistered = bridgehub.chainTypeManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
-    //     assertTrue(!isCTMRegistered);
-
-    //     // An already removed CTM cannot be removed again
-    //     vm.prank(bridgeOwner);
-    //     vm.expectRevert(CTMNotRegistered.selector);
-    //     bridgehub.removeChainTypeManager(randomAddressWithoutTheCorrectInterface);
-    // }
-
-    // function test_removeChainTypeManager_cannotBeCalledByRandomAddress(
-    //     address randomAddressWithoutTheCorrectInterface,
-    //     address randomCaller
-    // ) public {
-    //     vm.assume(randomAddressWithoutTheCorrectInterface != address(0));
-    //     bool isCTMRegistered = bridgehub.chainTypeManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
-    //     assertTrue(!isCTMRegistered);
-
-    //     if (randomCaller != bridgeOwner) {
-    //         vm.prank(randomCaller);
-    //         vm.expectRevert(bytes("Ownable: caller is not the owner"));
-
-    //         bridgehub.removeChainTypeManager(randomAddressWithoutTheCorrectInterface);
-    //     }
-
-    //     // A non-existent CTM cannot be removed
-    //     vm.prank(bridgeOwner);
-    //     vm.expectRevert(CTMNotRegistered.selector);
-    //     bridgehub.removeChainTypeManager(randomAddressWithoutTheCorrectInterface);
-
-    //     // Let's first register our particular chainTypeManager
-    //     vm.prank(bridgeOwner);
-    //     bridgehub.addChainTypeManager(randomAddressWithoutTheCorrectInterface);
-
-    //     isCTMRegistered = bridgehub.chainTypeManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
-    //     assertTrue(isCTMRegistered);
-
-    //     // Only an address that has already been registered, can be removed.
-    //     vm.prank(bridgeOwner);
-    //     bridgehub.removeChainTypeManager(randomAddressWithoutTheCorrectInterface);
-
-    //     isCTMRegistered = bridgehub.chainTypeManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
-    //     assertTrue(!isCTMRegistered);
-
-    //     // An already removed CTM cannot be removed again
-    //     vm.prank(bridgeOwner);
-    //     vm.expectRevert(CTMNotRegistered.selector);
-    //     bridgehub.removeChainTypeManager(randomAddressWithoutTheCorrectInterface);
-
-    //     // Not possible by a randomcaller as well
-    //     if (randomCaller != bridgeOwner) {
-    //         vm.prank(randomCaller);
-    //         vm.expectRevert(bytes("Ownable: caller is not the owner"));
-    //         bridgehub.removeChainTypeManager(randomAddressWithoutTheCorrectInterface);
-    //     }
-    // }
+        vm.prank(bridgeOwner);
+        bridgehub.removeChainTypeManager(_chainTypeManager);
+        assertFalse(bridgehub.chainTypeManagerIsRegistered(_chainTypeManager));
+    }
 
     function test_addAssetId(address randomAddress) public {
         vm.startPrank(bridgeOwner);

@@ -1,10 +1,38 @@
 #!/usr/bin/env node
 
+import type { BigNumber } from "ethers";
 import { ethers, providers, Wallet, ContractFactory } from "ethers";
 import { DeploymentRunner } from "../deployment-runner";
-import { ANVIL_DEFAULT_PRIVATE_KEY } from "../core/const";
+import { ANVIL_DEFAULT_PRIVATE_KEY, TEST_TOKEN_DECIMALS, TEST_TOKEN_MINT_AMOUNT_UNITS } from "../core/const";
+import { getAbi, getCreationBytecode } from "../core/contracts";
+import { getInteropSourcePrivateKey } from "../core/accounts";
 import * as fs from "fs";
 import * as path from "path";
+
+export interface DeployL2NativeTokenParams {
+  provider: providers.JsonRpcProvider;
+  chainId: number;
+  name: string;
+  symbol: string;
+  decimals?: number;
+  mintAmount?: BigNumber;
+  privateKey?: string;
+}
+
+export async function deployL2NativeToken(params: DeployL2NativeTokenParams): Promise<string> {
+  const decimals = params.decimals ?? TEST_TOKEN_DECIMALS;
+  const mintAmount = params.mintAmount ?? ethers.utils.parseUnits(TEST_TOKEN_MINT_AMOUNT_UNITS, decimals);
+  const wallet = new Wallet(params.privateKey || getInteropSourcePrivateKey(), params.provider);
+  const factory = new ContractFactory(getAbi("TestnetERC20Token"), getCreationBytecode("TestnetERC20Token"), wallet);
+  const token = await factory.deploy(params.name, params.symbol, decimals);
+  await token.deployed();
+
+  const mintTx = await token.mint(wallet.address, mintAmount);
+  await mintTx.wait();
+  console.log(`   L2 native token deployed on chain ${params.chainId}: ${token.address}`);
+
+  return token.address;
+}
 
 /**
  * Deploy TestToken ERC20 to all L2 chains for testing token transfers.
@@ -46,7 +74,7 @@ export async function deployTestTokens(): Promise<void> {
 
       try {
         const factory = new ContractFactory(abi, bytecode, wallet);
-        const token = await factory.deploy("Test Token", "TEST", 18);
+        const token = await factory.deploy("Test Token", "TEST", TEST_TOKEN_DECIMALS);
         await token.deployed();
 
         const tokenAddress = token.address;
@@ -54,10 +82,15 @@ export async function deployTestTokens(): Promise<void> {
 
         console.log(`   ✅ TestnetERC20Token deployed at ${tokenAddress} (chain ${chain.chainId})`);
 
-        const mintTx = await token.mint(wallet.address, ethers.utils.parseUnits("1000", 18));
+        const mintTx = await token.mint(
+          wallet.address,
+          ethers.utils.parseUnits(TEST_TOKEN_MINT_AMOUNT_UNITS, TEST_TOKEN_DECIMALS)
+        );
         await mintTx.wait();
 
-        console.log(`   ✅ Minted 1000 TEST tokens to ${wallet.address} (chain ${chain.chainId})`);
+        console.log(
+          `   ✅ Minted ${TEST_TOKEN_MINT_AMOUNT_UNITS} TEST tokens to ${wallet.address} (chain ${chain.chainId})`
+        );
       } catch (error: unknown) {
         console.error(`   ❌ Failed to deploy on chain ${chain.chainId}: ${(error as Error).message}\n`);
       }

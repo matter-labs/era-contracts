@@ -14,6 +14,24 @@
   },
   {
     "type": "function",
+    "name": "deployAndSetOnChain",
+    "inputs": [
+      {
+        "name": "_bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "getCreate2FactoryParams",
     "inputs": [],
     "outputs": [

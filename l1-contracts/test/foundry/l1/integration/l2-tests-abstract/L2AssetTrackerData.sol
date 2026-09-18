@@ -64,7 +64,7 @@ library L2AssetTrackerData {
 
     /// Note: Either manually create logs, or get them from real chain's data.
     function getData() public view returns (ProcessLogsInput[] memory) {
-        ProcessLogsInput[] memory logsInput = new ProcessLogsInput[](37);
+        ProcessLogsInput[] memory logsInput = new ProcessLogsInput[](35);
         uint256 i;
         uint256 j;
         L2Log[] memory emptyLogs = new L2Log[](0);
@@ -761,30 +761,6 @@ library L2AssetTrackerData {
             logs[i][j++] = L2Log({
                 l2ShardId: 0,
                 isService: true,
-                txNumberInBatch: 1,
-                sender: 0x0000000000000000000000000000000000008008,
-                key: 0x000000000000000000000000000000000000000000000000000000000001000d,
-                value: 0x3c6a230d06016e59c81dd8779cf310c0ee295b8cb22c838ce0c67cfacdc109c3
-            });
-            j = 0;
-            messages[i] = new bytes[](1);
-            messages[i][0] = hex"743565a6d28c074cee524a2c9ef2f22c6026b385ccd8ab91a4d99e730d69510b4f92a512";
-
-            logsInput[i++] = ProcessLogsInput({
-                logs: logs[i],
-                messages: messages[i],
-                chainId: 271,
-                batchNumber: 16,
-                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_271),
-                multichainBatchRoot: multichainBatchRoot_271,
-                settlementFeePayer: address(0)
-            });
-        }
-        {
-            logs[i] = new L2Log[](1);
-            logs[i][j++] = L2Log({
-                l2ShardId: 0,
-                isService: true,
                 txNumberInBatch: 0,
                 sender: 0x0000000000000000000000000000000000008008,
                 key: 0x000000000000000000000000000000000000000000000000000000000001000f,
@@ -801,30 +777,6 @@ library L2AssetTrackerData {
                 messages: messages[i],
                 chainId: 271,
                 batchNumber: 8,
-                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_271),
-                multichainBatchRoot: multichainBatchRoot_271,
-                settlementFeePayer: address(0)
-            });
-        }
-        {
-            logs[i] = new L2Log[](1);
-            logs[i][j++] = L2Log({
-                l2ShardId: 0,
-                isService: true,
-                txNumberInBatch: 1,
-                sender: 0x0000000000000000000000000000000000008008,
-                key: 0x000000000000000000000000000000000000000000000000000000000001000d,
-                value: 0x47247015a85b431d96dec0c8661b0e772dba3734ea505b4d63f18262144ea0a4
-            });
-            j = 0;
-            messages[i] = new bytes[](1);
-            messages[i][0] = hex"743565a63389ca15c11c4e7f0d4c314d7068725de276f34e1a5a7a6327550d2db8ae7eaf";
-
-            logsInput[i++] = ProcessLogsInput({
-                logs: logs[i],
-                messages: messages[i],
-                chainId: 271,
-                batchNumber: 17,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_271),
                 multichainBatchRoot: multichainBatchRoot_271,
                 settlementFeePayer: address(0)

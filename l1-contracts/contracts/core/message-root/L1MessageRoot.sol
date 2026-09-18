@@ -88,7 +88,7 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
         _v31InitializeInner(allZKChains);
     }
 
-    function _v31InitializeInner(uint256[] memory _allZKChains) internal {
+    function _v31InitializeInner(uint256[] memory _allZKChains) internal virtual {
         uint256 allZKChainsLength = _allZKChains.length;
         for (uint256 i = 0; i < allZKChainsLength; ++i) {
             require(IBridgehubBase(_bridgehub()).settlementLayer(_allZKChains[i]) == block.chainid, NotAllChainsOnL1());
@@ -165,10 +165,6 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
     // solhint-disable-next-line func-name-mixedcase
     function L1_CHAIN_ID() public view override returns (uint256) {
         return block.chainid;
-    }
-
-    function _eraGatewayChainId() internal view override returns (uint256) {
-        return ERA_GATEWAY_CHAIN_ID;
     }
 
     function _chainAssetHandler() internal view override returns (address) {

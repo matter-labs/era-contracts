@@ -6,7 +6,12 @@ import {MigrationConfirmationData} from "../../common/Messaging.sol";
 
 interface IL2AssetTracker {
     struct InteropL2Info {
+        // Amount withdrawn to L1 while the chain settled on L1.
         uint256 totalWithdrawalsToL1;
+        // Amount successfully finalized from L1 while the chain settled on L1.
+        // For base token, failed deposits are refunded on L2 to the refundRecipient rather than
+        // later claimed on L1, so the gap between initiated deposits and this counter should not
+        // be interpreted as uniformly "claimable on L1" across all asset types.
         uint256 totalSuccessfulDepositsFromL1;
     }
 

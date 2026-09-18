@@ -10,7 +10,7 @@ import {BalanceChange, MigrationConfirmationData, TokenBridgingData} from "../..
 /// @title IGWAssetTracker
 /// @dev IMPORTANT - Settlement Fee Payer Setup:
 ///      To pay settlement fees for a chain, you must:
-///      1. Call `agreeToPaySettlementFees(chainId)` to opt-in for that specific chain
+///      1. Call `setSettlementFeePayerAgreement(chainId, true)` to opt-in for that specific chain
 ///      2. Approve this contract to spend your wrapped ZK tokens
 ///      The agreement mechanism prevents front-running attacks where malicious operators
 ///      could make you pay for other chains' settlements.
@@ -65,14 +65,9 @@ interface IGWAssetTracker {
     /// @param _chainId Chain ID to check.
     function settlementFeePayerAgreement(address _payer, uint256 _chainId) external view returns (bool);
 
-    /// @notice Opt-in to pay settlement fees for a specific chain.
+    /// @notice Set whether the caller agrees to pay settlement fees for a specific chain.
     /// @dev The fee payer must also approve wrapped ZK tokens for this contract.
-    /// @param _chainId Chain ID to agree to pay fees for.
-    function agreeToPaySettlementFees(uint256 _chainId) external;
-
-    /// @notice Revoke agreement to pay settlement fees for a specific chain.
-    /// @param _chainId Chain ID to revoke agreement for.
-    function revokeSettlementFeePayerAgreement(uint256 _chainId) external;
+    function setSettlementFeePayerAgreement(uint256 _chainId, bool _agreed) external;
 
     /// @notice Initializes the GWAssetTracker on L2.
     /// @param _l1ChainId The chain ID of L1.
@@ -120,10 +115,6 @@ interface IGWAssetTracker {
     /// @param _chainId The chain ID for which to set the legacy bridge address.
     /// @param _legacySharedBridgeAddress The address of the legacy shared bridge contract.
     function setLegacySharedBridgeAddress(uint256 _chainId, address _legacySharedBridgeAddress) external;
-
-    /// @notice Used to pause deposits on Gateway from L1 for migration back to L1.
-    /// @param _chainId The chain ID for which to pause deposits.
-    function requestPauseDepositsForChain(uint256 _chainId) external;
 
     /// @notice Returns the L1 chain ID.
     function L1_CHAIN_ID() external view returns (uint256);

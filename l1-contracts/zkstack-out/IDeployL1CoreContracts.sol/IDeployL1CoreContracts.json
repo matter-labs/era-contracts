@@ -249,6 +249,11 @@
             "internalType": "bool"
           },
           {
+            "name": "legacyGatewayChainId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
             "name": "contracts",
             "type": "tuple",
             "internalType": "struct ContractsConfig",
@@ -298,6 +303,24 @@
     "type": "function",
     "name": "runForTest",
     "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "runInner",
+    "inputs": [
+      {
+        "name": "inputPath",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "outputPath",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
     "outputs": [],
     "stateMutability": "nonpayable"
   }

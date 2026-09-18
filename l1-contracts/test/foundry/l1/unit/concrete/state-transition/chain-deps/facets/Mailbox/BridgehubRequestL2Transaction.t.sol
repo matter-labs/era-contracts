@@ -73,6 +73,17 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
         mailboxFacet.bridgehubRequestL2Transaction(req);
     }
 
+    function test_revertWhen_calledByInteropCenter() public {
+        address bridgehub = makeAddr("bridgehub");
+        utilsFacet.util_setBridgehub(bridgehub);
+
+        BridgehubL2TransactionRequest memory req = getBridgehubRequestL2TransactionRequest();
+
+        vm.prank(interopCenter);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, interopCenter));
+        mailboxFacet.bridgehubRequestL2Transaction(req);
+    }
+
     function getBridgehubRequestL2TransactionRequest() private returns (BridgehubL2TransactionRequest memory req) {
         bytes[] memory factoryDeps = new bytes[](1);
         factoryDeps[0] = "11111111111111111111111111111111";

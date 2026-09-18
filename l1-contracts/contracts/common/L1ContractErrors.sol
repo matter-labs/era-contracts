@@ -53,6 +53,8 @@ error BaseTokenTransferFailed();
 error BatchHashMismatch(bytes32 expected, bytes32 actual);
 // 0xbd4455ff
 error BatchNumberMismatch(uint256 expectedBatchNumber, uint256 providedBatchNumber);
+// 0x41c329f7
+error BatchTimestampGreaterThanLastL2BlockTimestamp();
 // 0x6cf12312
 error BridgeHubAlreadyRegistered();
 // 0xdb538614
@@ -91,6 +93,8 @@ error ConstructorsNotSupported();
 error CTMAlreadyRegistered();
 // 0xc630ef3c
 error CTMNotRegistered();
+// 0x13df796c
+error CutDataForProtocolVersionNotAvailable(uint256 oldProtocolVersion);
 // 0x907f8e51
 error DeadlineNotYetPassed();
 // 0xf2885eb3
@@ -135,6 +139,10 @@ error ETHDepositNotSupported();
 error EVMBytecodeAlreadyPublished(bytes32 bytecodeHash);
 // 0xf4072616
 error ExecuteMessageFailed();
+// 0x23298bd1
+error ExecutionDelayNotIncreased(uint32 currentDelay, uint32 newDelay);
+// 0xedfc1f1c
+error ExecutionDelayTooLarge(uint32 delay, uint32 maxDelay);
 // 0xac4a3f98
 error FacetExists(bytes4 selector, address);
 // 0x3fce21be
@@ -301,7 +309,7 @@ error NotAllowed(address addr);
 // 0x64846fe4
 error NotARestriction(address addr);
 // 0xf306a770
-error NotAssetRouter(address _sender, address _assetRouter);
+error NotAssetRouter(address sender, address assetRouter);
 // 0xb49df1f2
 error NotAZKChain(address addr);
 // 0x7fdf8632
@@ -352,6 +360,8 @@ error PriorityModeRequiresPermanentRollup();
 error PriorityOperationsRollingHashMismatch();
 // 0xbeda0935
 error PriorityOpsRequestTimestampMissing(uint256 requestId);
+// 0xa840274f
+error PriorityQueueNotReady();
 // 0x1a4d284a
 error PriorityTxPubdataExceedsMaxPubDataPerBatch();
 // 0xa461f651
@@ -408,6 +418,8 @@ error SystemLogsSizeTooBig();
 error TimeNotReached(uint256 expectedTimestamp, uint256 actualTimestamp);
 // 0x7a4902ad
 error TimerAlreadyStarted();
+// 0xf511412f
+error TimerNotStarted();
 // 0x2d50c33b
 error TimestampError();
 // 0xa51fa558
@@ -440,6 +452,8 @@ error Unauthorized(address caller);
 error UndefinedDiamondCutAction();
 // 0x6aa39880
 error UnexpectedSystemLog(uint256 logKey);
+// 0x8124d8ff
+error UnexpectedUpgradeSelector();
 // 0xc352bb73
 error UnknownVerifierType();
 // 0xf3dd1b9c

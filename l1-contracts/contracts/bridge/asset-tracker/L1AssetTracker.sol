@@ -9,7 +9,11 @@ import {
     L1ToGatewayTokenBalanceMigrationData,
     MigrationConfirmationData
 } from "../../common/Messaging.sol";
-import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {
+    GW_ASSET_TRACKER_ADDR,
+    L2_ASSET_TRACKER_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR
+} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {InvalidChainId, InvalidProof, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {
@@ -40,7 +44,6 @@ import {
     OnlyWhitelistedSettlementLayer,
     TransientBalanceChangeAlreadySet
 } from "./AssetTrackerErrors.sol";
-import {V31UpgradeChainBatchNumberNotSet} from "../../core/bridgehub/L1BridgehubErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {MAX_TOKEN_BALANCE, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
@@ -48,6 +51,7 @@ import {IL1AssetTracker} from "./IL1AssetTracker.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IChainAssetHandlerBase} from "../../core/chain-asset-handler/IChainAssetHandler.sol";
+import {IL2ChainAssetHandler} from "../../core/chain-asset-handler/IL2ChainAssetHandler.sol";
 import {IL1MessageRoot} from "../../core/message-root/IL1MessageRoot.sol";
 import {MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1} from "../../common/Config.sol";
 
@@ -297,11 +301,17 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         // For all the batches smaller than that, the responsibility lies with the chain itself.
         uint256 v31UpgradeChainBatchNumber = IL1MessageRoot(address(MESSAGE_ROOT)).v31UpgradeChainBatchNumber(_chainId);
 
-        // We need to wait for the proper v31UpgradeChainBatchNumber to be set on the MessageRoot, otherwise we might decrement the chain's chainBalance instead of the gateway's.
-        require(
-            v31UpgradeChainBatchNumber != V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE,
-            V31UpgradeChainBatchNumberNotSet()
-        );
+        // While a pre-existing chain still holds the placeholder, it has not finalized its v31 upgrade marker yet.
+        // The marker is written atomically inside the chain's own diamond upgrade, which is exactly the point at which
+        // the chain flips to the v31 protocol. Therefore, during this window the chain is still running the pre-v31
+        // protocol and every executed (hence finalizable) batch is necessarily pre-v31. Pre-v31 batches are always the
+        // responsibility of the chain itself (the settlement-layer accountability model only applies from the marker
+        // onwards), so we attribute the withdrawal to the chain rather than reverting. This keeps withdrawals available
+        // for all chains throughout the ecosystem upgrade window, and is safe because no post-v31 (settlement-layer
+        // backed) batch can exist for the chain before its marker is set.
+        if (v31UpgradeChainBatchNumber == V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE) {
+            return _chainId;
+        }
 
         /// For chains that were settling on GW before V31, we need to update the chain's chainBalance until the chain updates to V31.
         /// Logic: If no settlement layer OR the batch number is before V31 upgrade, update the chain itself.
@@ -474,10 +484,11 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     function requestPauseDepositsForChainOnGateway(uint256 _chainId) external onlyChain(_chainId) {
         uint256 settlementLayer = BRIDGE_HUB.settlementLayer(_chainId);
         require(settlementLayer != block.chainid, InvalidSettlementLayer());
+        /// It sends it to the L2 ChainAssetHandler to keep the GWAssetTracker small.
         _sendToChain(
             settlementLayer,
-            GW_ASSET_TRACKER_ADDR,
-            abi.encodeCall(IGWAssetTracker.requestPauseDepositsForChain, (_chainId))
+            L2_CHAIN_ASSET_HANDLER_ADDR,
+            abi.encodeCall(IL2ChainAssetHandler.requestPauseDepositsForChainOnGateway, (_chainId))
         );
         emit IL1AssetTracker.PauseDepositsForChainRequested(_chainId, settlementLayer);
     }
@@ -516,6 +527,11 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// *that would reduce the chainBalance of the chain*. One could say it is `totalWithdrawalsToL1 + totalFailedDepositsFromL1 - totalClaimed`.
     /// Note, both `totalWithdrawalsToL1` and `totalFailedDepositsFromL1` must only refer to messages that happened when the chain
     /// settled on L1, while `totalClaimed` should only include claims for such withdrawals/failed deposits.
+    /// For non-base tokens, failed L1 -> L2 deposits may later be claimed back on L1 and so naturally fit this model.
+    /// Base token is different: failed deposits are refunded on L2 to the refundRecipient instead of being claimed on L1.
+    /// We still use the same aggregate formula below, but the term `(totalDepositedFromL1 - totalSuccessfulDepositsFromL1)`
+    /// should be read as "deposits that did not end up in the chain's finalized L2 supply while settling on L1", not as a
+    /// statement that every such failed deposit will later be claimed on L1.
     /// We calculate `totalFailedDepositsFromL1` as the difference between the total deposits for when the chain settled on L1 and the total successful
     /// deposits from the same period. All in all, we get the following formula:
     /// `amountToKeep = totalWithdrawalsToL1 + (totalDepositedFromL1 - totalSuccessfulDepositsFromL1) - totalClaimedOnL1`.

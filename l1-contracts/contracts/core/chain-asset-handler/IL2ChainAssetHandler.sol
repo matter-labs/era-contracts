@@ -9,4 +9,6 @@ interface IL2ChainAssetHandler {
         uint256 _previousSettlementLayerChainId,
         uint256 _currentSettlementLayerChainId
     ) external;
+
+    function requestPauseDepositsForChainOnGateway(uint256 _chainId) external;
 }

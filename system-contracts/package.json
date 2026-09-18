@@ -5,7 +5,7 @@
   "license": "MIT",
   "dependencies": {
     "@matterlabs/hardhat-zksync-deploy": "^0.7.0",
-    "@matterlabs/hardhat-zksync-solc": "^1.2.5",
+    "@matterlabs/hardhat-zksync-solc": "^1.4.0",
     "@matterlabs/hardhat-zksync-verify": "^1.4.3",
     "commander": "^9.4.1",
     "eslint": "^8.51.0",
@@ -71,7 +71,6 @@
     "verify-on-explorer": "yarn ts-node scripts/verify-on-explorer.ts",
     "test": "yarn build:test-system-contracts && hardhat test --network zkSyncTestNode test/*.spec.ts test/**/*.spec.ts",
     "test-no-build": "hardhat test --network zkSyncTestNode test/*.spec.ts test/**/*.spec.ts",
-    "test-l2-v29-upgrade": "yarn build:system-contracts && hardhat test --network zkSyncTestNode test/manual-tests/L2V29Upgrade.manual.ts",
     "test-node": "./bin/anvil-zksync --protocol-version=29 --evm-interpreter",
     "test-node-local-contracts": "yarn build:foundry && ./bin/anvil-zksync --protocol-version=29 --dev-system-contracts=local --system-contracts-path='.'",
     "test:foundry": "FOUNDRY_PROFILE='test' forge test --zksync",

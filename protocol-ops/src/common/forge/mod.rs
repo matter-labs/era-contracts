@@ -1,9 +1,10 @@
 mod cast_transactions;
 mod runner;
 mod script;
+pub mod scripts;
 use std::path::{Path, PathBuf};
 
-pub use cast_transactions::all_runs_cast_transactions;
+pub use cast_transactions::{split_into_bundles, SafeBundle};
 pub use runner::ForgeRunner;
 pub use script::{ForgeScript, ForgeScriptArg, ForgeScriptArgs};
 
@@ -33,6 +34,7 @@ impl Forge {
             script_path: path.to_path_buf(),
             args,
             envs: Vec::new(),
+            timing_label: None,
         }
     }
 }

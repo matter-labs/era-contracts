@@ -1055,21 +1055,16 @@
     "name": "NotAssetRouter",
     "inputs": [
       {
-        "name": "_sender",
+        "name": "sender",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "_assetRouter",
+        "name": "assetRouter",
         "type": "address",
         "internalType": "address"
       }
     ]
-  },
-  {
-    "type": "error",
-    "name": "NotHyperchain",
-    "inputs": []
   },
   {
     "type": "error",
@@ -1090,6 +1085,11 @@
   {
     "type": "error",
     "name": "NotSettlementLayer",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotZKChain",
     "inputs": []
   },
   {
@@ -1153,6 +1153,22 @@
     "type": "error",
     "name": "ValidateTxnNotEnoughGas",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ValueMismatch",
+    "inputs": [
+      {
+        "name": "expected",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "actual",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
   },
   {
     "type": "error",

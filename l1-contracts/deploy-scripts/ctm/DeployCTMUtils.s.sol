@@ -62,7 +62,8 @@ import {
 import {CTMContract, CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "./DeployCTML1OrGateway.sol";
 
 import {CTMDeployedAddresses} from "../utils/Types.sol";
-import {SettlementLayerV31Upgrade} from "contracts/upgrades/SettlementLayerV31Upgrade.sol";
+import {EraSettlementLayerV31Upgrade} from "contracts/upgrades/EraSettlementLayerV31Upgrade.sol";
+import {ZKsyncOSSettlementLayerV31Upgrade} from "contracts/upgrades/ZKsyncOSSettlementLayerV31Upgrade.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct Config {
@@ -137,6 +138,9 @@ abstract contract DeployCTMUtils is DeployUtils {
         config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
         if (toml.keyExists("$.is_zk_sync_os")) {
             config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
+        }
+        if (toml.keyExists("$.era_chain_id")) {
+            config.eraChainId = toml.readUint("$.era_chain_id");
         }
         if (toml.keyExists("$.zk_token_asset_id")) {
             config.zkTokenAssetId = toml.readBytes32("$.zk_token_asset_id");
@@ -322,7 +326,10 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "SettlementLayerV31Upgrade")) {
+        } else if (
+            compareStrings(contractName, "EraSettlementLayerV31Upgrade") ||
+            compareStrings(contractName, "ZKsyncOSSettlementLayerV31Upgrade")
+        ) {
             return abi.encode();
         } else if (compareStrings(contractName, "Governance")) {
             return
@@ -349,12 +356,13 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "ServerNotifier")) {
             return abi.encode();
+        } else if (compareStrings(contractName, "MultisigCommitter")) {
+            // Same constructor as ValidatorTimelock (it derives from it): the bridgehub immutable.
+            return abi.encode(coreAddresses.bridgehub.proxies.bridgehub);
         } else if (compareStrings(contractName, "L1AssetTracker")) {
             return
                 abi.encode(
-                    config.l1ChainId,
                     coreAddresses.bridgehub.proxies.bridgehub,
-                    coreAddresses.bridges.proxies.l1AssetRouter,
                     coreAddresses.bridges.proxies.l1NativeTokenVault,
                     coreAddresses.bridgehub.proxies.messageRoot
                 );
@@ -372,7 +380,7 @@ abstract contract DeployCTMUtils is DeployUtils {
     function getCTMCoreDeploymentConfig(Config memory _config) internal view returns (CTMCoreDeploymentConfig memory) {
         return
             CTMCoreDeploymentConfig({
-                isZKsyncOS: config.isZKsyncOS,
+                isZKsyncOS: _config.isZKsyncOS,
                 testnetVerifier: _config.testnetVerifier,
                 eraChainId: _config.eraChainId,
                 l1ChainId: _config.l1ChainId,

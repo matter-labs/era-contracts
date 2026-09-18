@@ -10,9 +10,9 @@ interface IZKOSContractDeployer {
     /// @dev This function is used to set the bytecode details for a contract on ZKsyncOS,
     /// it is an alternative to the `forceDeployOnAddresses` function from Era.
     /// @param _addr The address of the contract.
-    /// @param _bytecodeHash The hash of the bytecode.
-    /// @param _bytecodeLength The length of the bytecode (used for both bytecode_length and observable_bytecode_length).
-    /// @param _observableBytecodeHash The hash of the observable bytecode.
+    /// @param _bytecodeHash The ZKsyncOS internal bytecode hash.
+    /// @param _bytecodeLength The bytecode length, used for both bytecode_length and observable_bytecode_length.
+    /// @param _observableBytecodeHash The observable keccak256 hash of the bytecode.
     function setBytecodeDetailsEVM(
         address _addr,
         bytes32 _bytecodeHash,

@@ -78,6 +78,8 @@ error OnlyBridgehub(address msgSender, address bridgehub);
 error OnlyBridgehubOrChainAssetHandler(address sender, address bridgehub, address chainAssetHandler);
 // 0x73fe6c1b
 error OnlyChain(address msgSender, address zkChainAddress);
+// 0x3e088470
+error OnlyChainAssetHandler(address sender, address chainAssetHandler);
 // 0xec76af13
 error OnlyGateway();
 // 0x8d14ca84
@@ -98,8 +100,6 @@ error TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber();
 error TotalBatchesExecutedZero();
 // 0x883fc41b
 error V31UpgradeChainBatchNumberAlreadySet();
-// 0xde6d7b2f
-error V31UpgradeChainBatchNumberNotSet();
 // 0x92626457
 error WrongCounterPart(address addressOnCounterPart, address l2BridgehubAddress);
 // 0x7b968d06

@@ -13,6 +13,11 @@ import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddr
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
 
+import {
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
+} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
+
 abstract contract L2InteropLibraryBasicTestAbstract is L2InteropTestUtils {
     function test_requestTokenTransferInteropViaLibrary() public {
         address l2TokenAddress = initializeTokenByDeposit();
@@ -110,28 +115,18 @@ abstract contract L2InteropLibraryBasicTestAbstract is L2InteropTestUtils {
     function test_sendMessageToL1ViaLibrary() public {
         bytes memory testMessage = "testing interop";
 
-        vm.recordLogs();
-        InteropLibrary.sendMessage(testMessage);
-        Vm.Log[] memory logs = vm.getRecordedLogs();
+        // InteropLibrary.sendMessage forwards directly to L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1
+        // (see deploy-scripts/InteropLibrary.sol:326-328). The shared fixture mocks sendToL1 to
+        // return bytes32(uint256(1)) (see _SharedL2ContractDeployer.sol:192-196), so the meaningful
+        // oracles are (a) the dispatch shape (target + calldata) and (b) the returned-hash plumbing
+        // through the library, rather than the real message hash that the mock never produces.
+        vm.expectCall(
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            abi.encodeCall(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1, (testMessage))
+        );
 
-        // Count InteropCenter logs if any were emitted
-        uint256 interopCenterLogCount = 0;
-        for (uint256 i = 0; i < logs.length; i++) {
-            if (logs[i].emitter == L2_INTEROP_CENTER_ADDR) {
-                interopCenterLogCount++;
-            }
-        }
+        bytes32 returnedHash = InteropLibrary.sendMessage(testMessage);
 
-        // Note: In L1 context, InteropLibrary.sendMessage may not emit logs
-        // since the L2 system contracts are not fully functional.
-        // The function completing without reverting is the primary success indicator.
-        if (logs.length > 0 && interopCenterLogCount > 0) {
-            // If InteropCenter logs were emitted, verify they contain data
-            assertTrue(interopCenterLogCount > 0, "InteropCenter should emit at least one log");
-        }
-
-        // Regardless of logs, verify the test message was valid
-        assertTrue(testMessage.length > 0, "Test message should not be empty");
-        assertEq(keccak256(testMessage), keccak256("testing interop"), "Message content should match");
+        assertEq(returnedHash, bytes32(uint256(1)), "sendMessage must forward sendToL1's mocked return value");
     }
 }

@@ -47,12 +47,13 @@ import {TxStatus} from "../../common/Messaging.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev Bridges assets between L1 and ZK chain, supporting both ETH and ERC20 tokens.
+/// @dev Handles the L1 side of asset routing for L1 <-> ZK chain bridging,
+/// supporting both ETH and ERC20 tokens.
 /// @dev Designed for use with a proxy for upgradability.
 contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
+    /// @dev Bridgehub smart contract used for asynchronous cross-chain requests, including deposits and interop-related routing.
     IL1Bridgehub public immutable BRIDGE_HUB;
 
     /// @dev Chain ID of Era for legacy reasons

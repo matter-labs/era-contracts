@@ -51,8 +51,8 @@ contract L1MessengerZKOS is IL2ToL1Messenger {
     // --- Burner entrypoint: only callable by self ---
     // slither-disable-next-line locked-ether
     fallback() external payable {
-        // This fallback is used *only* for self-call burning
-        // Any ETH sent here is intentionally burned and cannot be withdrawn
+        // This fallback is used only as a self-call target for consuming the forwarded gas.
+        // `invalid()` reverts the self-call, so any ETH forwarded with it is not retained here.
         require(msg.sender == address(this), NotSelfCall());
         assembly {
             invalid()

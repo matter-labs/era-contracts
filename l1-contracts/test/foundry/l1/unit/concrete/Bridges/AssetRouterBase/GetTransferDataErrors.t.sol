@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
-import {BadTransferDataLength, UnsupportedEncodingVersion} from "contracts/common/L1ContractErrors.sol";
+import {BadTransferDataLength} from "contracts/common/L1ContractErrors.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
@@ -59,11 +59,5 @@ contract AssetRouterBase_GetTransferDataErrors_Test is Test {
         bytes memory shortData = hex"01"; // NEW_ENCODING_VERSION but only 1 byte
         vm.expectRevert(BadTransferDataLength.selector);
         router.callGetTransferData(NEW_ENCODING_VERSION, shortData);
-    }
-
-    function test_UnsupportedEncodingVersion_WhenNotNew() public {
-        bytes memory data = hex"02"; // invalid encoding version
-        vm.expectRevert(UnsupportedEncodingVersion.selector);
-        router.callGetTransferData(bytes1(0x02), data);
     }
 }

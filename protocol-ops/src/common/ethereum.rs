@@ -1,44 +1,41 @@
-use std::sync::Arc;
+use std::str::FromStr;
 
+use alloy::network::Ethereum;
+use alloy::primitives::B256;
+use alloy::providers::{Provider, ProviderBuilder, RootProvider};
 use anyhow::Context;
-use ethers::{
-    core::k256::ecdsa::SigningKey,
-    middleware::{Middleware as _, MiddlewareBuilder},
-    prelude::{Http, LocalWallet, Provider, Signer, SignerMiddleware},
-};
 use tokio::task::block_in_place;
 
-pub fn get_ethers_provider(url: &str) -> anyhow::Result<Arc<Provider<Http>>> {
-    let provider = match Provider::<Http>::try_from(url) {
-        Ok(provider) => provider,
-        Err(err) => {
-            anyhow::bail!("Connection error: {:#?}", err);
-        }
-    };
-    Ok(Arc::new(provider))
+pub type AlloyProvider = RootProvider<Ethereum>;
+
+/// Convert a hex-string Merkle proof (as returned by JSON-RPC `zks_*` proof
+/// methods) into the `Vec<B256>` form expected by typed `bytes32[]` calldata
+/// encoders.
+pub fn parse_merkle_proof<S: AsRef<str>>(proof: &[S]) -> anyhow::Result<Vec<B256>> {
+    proof
+        .iter()
+        .map(|s| {
+            let s = s.as_ref();
+            B256::from_str(s.trim_start_matches("0x"))
+                .with_context(|| format!("invalid merkle proof element: {s}"))
+        })
+        .collect()
+}
+
+pub fn get_provider(url: &str) -> anyhow::Result<AlloyProvider> {
+    Ok(ProviderBuilder::new()
+        .disable_recommended_fillers()
+        .connect_http(url.parse().context("invalid RPC URL")?))
 }
 
 pub fn query_chain_id_sync(rpc_url: &str) -> anyhow::Result<u64> {
-    let provider = get_ethers_provider(rpc_url)?;
-    let fut = provider.get_chainid();
-    let id = if let Ok(handle) = tokio::runtime::Handle::try_current() {
-        block_in_place(|| handle.block_on(fut))?
+    let provider = get_provider(rpc_url)?;
+    if let Ok(handle) = tokio::runtime::Handle::try_current() {
+        block_in_place(|| handle.block_on(provider.get_chain_id())).context("eth_chainId")
     } else {
         tokio::runtime::Runtime::new()
             .context("failed to create Tokio runtime")?
-            .block_on(fut)?
-    };
-    Ok(id.as_u64())
-}
-
-pub fn create_ethers_client(
-    mut wallet: LocalWallet,
-    l1_rpc: String,
-    chain_id: Option<u64>,
-) -> anyhow::Result<SignerMiddleware<Provider<Http>, ethers::prelude::Wallet<SigningKey>>> {
-    if let Some(chain_id) = chain_id {
-        wallet = wallet.with_chain_id(chain_id);
+            .block_on(provider.get_chain_id())
+            .context("eth_chainId")
     }
-    let client = Provider::<Http>::try_from(l1_rpc)?.with_signer(wallet);
-    Ok(client)
 }

@@ -734,7 +734,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         bytes32 /* _assetInfo */,
         address /* _depositSender */,
         bytes calldata /* _ctmData */
-    ) external {
+    ) external onlyChainAssetHandler {
         // Function is empty due to the fact that when calling `forwardedBridgeBurn` there are no
         // state updates that occur.
     }

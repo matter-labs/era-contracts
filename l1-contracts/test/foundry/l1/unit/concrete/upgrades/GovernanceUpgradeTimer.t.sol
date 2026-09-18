@@ -12,6 +12,7 @@ import {
     NewDeadlineExceedsMaxDeadline,
     NewDeadlineNotGreaterThanCurrent,
     TimerAlreadyStarted,
+    TimerNotStarted,
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
 
@@ -153,6 +154,11 @@ contract GovernanceUpgradeTimerTest is Test {
 
         // Attempt to check deadline before it has passed
         vm.expectRevert(DeadlineNotYetPassed.selector);
+        timer.checkDeadline();
+    }
+
+    function testCheckDeadlineRevertsIfTimerNotStarted() public {
+        vm.expectRevert(TimerNotStarted.selector);
         timer.checkDeadline();
     }
 

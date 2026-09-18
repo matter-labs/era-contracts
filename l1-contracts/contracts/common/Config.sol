@@ -122,7 +122,7 @@ uint256 constant L1_TX_CALLDATA_COST_NATIVE_ZKSYNC_OS = 1;
 
 /// @dev The intrinsic cost of the L1->l2 transaction in pubdata for ZKsync OS
 /// It includes tx log, coinbase, treasury, refund recipient and asset tracker pubdata.
-uint256 constant L1_TX_INTRINSIC_PUBDATA_ZSKYNC_OS = 351;
+uint256 constant L1_TX_INTRINSIC_PUBDATA_ZKSYNC_OS = 351;
 
 /// @dev The native per gas ratio for 0 gas price(service/upgrade/gateway) transactions in ZKsync OS.
 /// This value is big enough to cover computational native resources usage for any operations.
@@ -270,7 +270,7 @@ uint64 constant DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
 /// @dev Used to derive the real circulating supply: circulatingSupply = INITIAL - TotalSupplyBeforeMigration
 uint256 constant INITIAL_BASE_TOKEN_HOLDER_BALANCE = (2 ** 127) - 1;
 
-/// @dev The total number of support interop attributes.
+/// @dev The total number of supported interop attributes.
 uint256 constant SUPPORTED_INTEROP_ATTRIBUTES = 5;
 
 /// @dev Migration number used when a chain migrates from L1 to a settlement layer.
@@ -288,3 +288,8 @@ uint256 constant PACKED_NUMBER_OF_L1_TRANSACTIONS_LOG_MASK = 0xfffffffffffffffff
 
 /// @dev Bit offset for extracting the upper 128 bits (L2 tx count) from the packed log value.
 uint256 constant PACKED_NUMBER_OF_L2_TRANSACTIONS_LOG_SPLIT_BITS = 128;
+
+/// @dev The maximal execution delay configurable in the `ValidatorTimelock`.
+/// @dev Footgun prevention only, not a trust guarantee: governance can upgrade the timelock, and outside
+/// stage 1 a chain admin can revoke the validator roles and stall execution anyway.
+uint32 constant MAX_VALIDATOR_TIMELOCK_EXECUTION_DELAY = 30 days;

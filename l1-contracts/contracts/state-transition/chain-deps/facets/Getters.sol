@@ -249,6 +249,11 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
         return s.baseTokenHasTotalSupply;
     }
 
+    /// @inheritdoc IGetters
+    function getZKsyncOS() external view returns (bool) {
+        return s.zksyncOS;
+    }
+
     /*//////////////////////////////////////////////////////////////
                             DIAMOND LOUPE
      //////////////////////////////////////////////////////////////*/

@@ -451,3 +451,11 @@ export async function getGWPendingInteropBalance(
   const tracker = new Contract(GW_ASSET_TRACKER_ADDR, getAbi("GWAssetTracker"), gwProvider);
   return tracker.pendingInteropBalance(chainId, assetId);
 }
+
+/**
+ * Query the base token asset ID from the Bridgehub on GW (baseTokenAssetId for a chain).
+ */
+export async function getBaseTokenAssetId(gwProvider: providers.JsonRpcProvider, chainId: number): Promise<string> {
+  const bridgehub = new Contract(L2_BRIDGEHUB_ADDR, getAbi("L2Bridgehub"), gwProvider);
+  return bridgehub.baseTokenAssetId(chainId);
+}

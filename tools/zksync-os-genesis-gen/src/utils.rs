@@ -16,7 +16,7 @@ use blake2::{Blake2s256, Digest};
 /// The 32 leading zero bytes in the outer keccak preimage ensure the resulting address can never
 /// collide with a CREATE or CREATE2 address (both of whose preimages start with a non-zero byte).
 pub fn generate_random_address(bytecode: &[u8]) -> Address {
-    // blake2s256 hash — matches `Utils.blakeHashBytecode` which calls `scripts/blake2s256.ts`
+    // blake2s256 hash — matches `Utils.blakeHashBytecode` which calls `scripts/blake2s256.js`
     let blake_hash: [u8; 32] = Blake2s256::digest(bytecode).into();
 
     // keccak256 observable hash

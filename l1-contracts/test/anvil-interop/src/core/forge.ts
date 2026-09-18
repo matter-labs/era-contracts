@@ -15,6 +15,7 @@ export async function runForgeScript(params: {
   projectRoot: string;
   sig?: string;
   args?: string;
+  extraForgeArgs?: string[];
 }): Promise<string> {
   const { scriptPath, envVars, rpcUrl, senderAddress, privateKey, projectRoot, sig, args } = params;
 
@@ -32,6 +33,10 @@ export async function runForgeScript(params: {
   }
 
   commandArgs.push("--broadcast", "--legacy", "--ffi", "--sig", sig || "runForTest()");
+
+  if (params.extraForgeArgs) {
+    commandArgs.push(...params.extraForgeArgs);
+  }
 
   if (args) {
     commandArgs.push(...args.split(" "));

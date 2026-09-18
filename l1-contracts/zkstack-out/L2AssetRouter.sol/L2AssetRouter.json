@@ -14,19 +14,6 @@
   },
   {
     "type": "function",
-    "name": "BRIDGE_HUB",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "contract IL2Bridgehub"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "ERA_CHAIN_ID",
     "inputs": [],
     "outputs": [
@@ -592,6 +579,11 @@
         "name": "_baseTokenAssetId",
         "type": "bytes32",
         "internalType": "bytes32"
+      },
+      {
+        "name": "_aliasedOwner",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [],

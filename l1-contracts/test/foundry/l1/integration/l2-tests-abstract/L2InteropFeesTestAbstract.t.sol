@@ -947,7 +947,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
         // SafeERC20 safeTransfer to address(0) will revert
         vm.prank(coinbaseAddr);
-        vm.expectRevert();
+        vm.expectRevert("ERC20: transfer to the zero address");
         l2InteropCenter.claimZKFees(address(0));
     }
 

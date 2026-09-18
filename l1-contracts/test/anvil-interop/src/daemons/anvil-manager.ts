@@ -1,4 +1,4 @@
-import { spawn } from "child_process";
+import { spawn, execSync } from "child_process";
 import { providers } from "ethers";
 import * as fs from "fs";
 import * as path from "path";
@@ -12,6 +12,32 @@ export class AnvilManager {
   constructor() {
     const runSuffix = process.env.ANVIL_INTEROP_RUN_SUFFIX || "";
     this.pidFilePath = path.join(__dirname, `../../outputs/anvil-pids${runSuffix}.json`);
+  }
+
+  /**
+   * Kill any existing process listening on the given port.
+   * Prevents stale anvil instances (e.g. from KEEP_CHAINS=1) from poisoning a fresh run.
+   */
+  private killProcessOnPort(port: number): void {
+    try {
+      const output = execSync(`lsof -ti :${port}`, { encoding: "utf-8" }).trim();
+      if (output) {
+        const pids = output
+          .split("\n")
+          .map((p) => p.trim())
+          .filter(Boolean);
+        for (const pid of pids) {
+          try {
+            process.kill(Number(pid), "SIGKILL");
+          } catch {
+            // Process may have already exited
+          }
+        }
+        console.log(`   Killed stale process(es) on port ${port}: ${pids.join(", ")}`);
+      }
+    } catch {
+      // lsof exits non-zero when no process is found — that's fine
+    }
   }
 
   private resolveAnvilBinary(): string {
@@ -42,11 +68,20 @@ export class AnvilManager {
       timestamp?: number;
       dumpStatePath?: string;
       loadStatePath?: string;
+      forkUrl?: string;
+      forkBlockNumber?: number;
     }
   ): Promise<void> {
-    const { chainId, port, role, blockTime, timestamp, dumpStatePath, loadStatePath } = config;
+    const { chainId, port, role, blockTime, timestamp, dumpStatePath, loadStatePath, forkUrl, forkBlockNumber } =
+      config;
+    if (loadStatePath && forkUrl) {
+      throw new Error(`Chain ${chainId}: loadStatePath and forkUrl are mutually exclusive`);
+    }
     const isL1 = role === "l1";
     const rpcUrl = `http://127.0.0.1:${port}`;
+
+    // Kill any stale process (e.g. from a previous KEEP_CHAINS run) on this port
+    this.killProcessOnPort(port);
 
     console.log(`🚀 Starting ${formatChainInfo(chainId, port, isL1)}...`);
     const anvilBinary = this.resolveAnvilBinary();
@@ -77,6 +112,12 @@ export class AnvilManager {
       "--auto-impersonate", // Allow impersonating any address without signatures
     ];
 
+    // Enable step-level tracing when running in coverage mode.
+    // This is required for debug_traceTransaction to return non-empty structLogs.
+    if (process.env.ANVIL_COVERAGE_MODE === "1") {
+      args.push("--steps-tracing");
+    }
+
     if (effectiveBlockTime > 0) {
       args.push("--block-time", effectiveBlockTime.toString());
     }
@@ -91,6 +132,13 @@ export class AnvilManager {
 
     if (loadStatePath) {
       args.push("--load-state", loadStatePath);
+    }
+
+    if (forkUrl) {
+      args.push("--fork-url", forkUrl);
+      if (forkBlockNumber !== undefined) {
+        args.push("--fork-block-number", forkBlockNumber.toString());
+      }
     }
 
     // Use pipe for stderr to capture error output, ignore stdin/stdout for detach

@@ -120,7 +120,17 @@ contract ChainTypeManagerBridgingTest is ChainTypeManagerTest {
 
     // Test forwardedBridgeConfirmTransferResult (empty function)
     function test_forwardedBridgeConfirmTransferResult() public {
+        // Mock chainAssetHandler so that calls from chainAssetHandlerMock pass the modifier
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSignature("chainAssetHandler()"),
+            abi.encode(chainAssetHandlerMock)
+        );
+
+        vm.stopPrank();
+
         // This function is empty, so just call it to increase coverage
+        vm.prank(chainAssetHandlerMock);
         chainContractAddress.forwardedBridgeConfirmTransferResult(
             chainId,
             TxStatus.Success,
@@ -130,12 +140,36 @@ contract ChainTypeManagerBridgingTest is ChainTypeManagerTest {
         );
 
         // Also test with failure status
+        vm.prank(chainAssetHandlerMock);
         chainContractAddress.forwardedBridgeConfirmTransferResult(
             chainId,
             TxStatus.Failure,
             bytes32(uint256(1)),
             makeAddr("sender2"),
             bytes("some data")
+        );
+    }
+
+    // Test forwardedBridgeConfirmTransferResult reverts for non-asset-handler
+    function test_RevertWhen_forwardedBridgeConfirmTransferResultNotChainAssetHandler() public {
+        vm.stopPrank();
+
+        address notAssetHandler = makeAddr("notAssetHandler");
+
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSignature("chainAssetHandler()"),
+            abi.encode(chainAssetHandlerMock)
+        );
+
+        vm.prank(notAssetHandler);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, notAssetHandler));
+        chainContractAddress.forwardedBridgeConfirmTransferResult(
+            chainId,
+            TxStatus.Success,
+            bytes32(0),
+            makeAddr("sender"),
+            bytes("")
         );
     }
 }

@@ -16,6 +16,7 @@ import {
     MessageRootNotRegistered,
     NonConsecutiveBatchNumber,
     OnlyAssetTracker,
+    OnlyChainAssetHandler,
     OnlyBridgehubOrChainAssetHandler,
     OnlyChain
 } from "../bridgehub/L1BridgehubErrors.sol";
@@ -48,8 +49,6 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
 
     // solhint-disable-next-line func-name-mixedcase
     function L1_CHAIN_ID() public view virtual returns (uint256);
-
-    function _eraGatewayChainId() internal view virtual returns (uint256);
 
     /// @notice The number of chains that are registered.
     uint256 public chainCount;
@@ -118,6 +117,14 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
         _;
     }
 
+    /// @notice Checks that the message sender is the chain asset handler.
+    modifier onlyChainAssetHandler() {
+        if (msg.sender != _chainAssetHandler()) {
+            revert OnlyChainAssetHandler(msg.sender, _chainAssetHandler());
+        }
+        _;
+    }
+
     /// @notice Checks that the message sender is the specified ZK Chain.
     /// @param _chainId The ID of the chain that is required to be the caller.
     modifier onlyChain(uint256 _chainId) {
@@ -159,10 +166,7 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     }
 
     /// @notice During the chain migration, we move the batch number from the old settlement layer to the new one to ensure consistency.
-    function setMigratingChainBatchNumber(
-        uint256 _chainId,
-        uint256 _batchNumber
-    ) external onlyBridgehubOrChainAssetHandler {
+    function setMigratingChainBatchNumber(uint256 _chainId, uint256 _batchNumber) external onlyChainAssetHandler {
         // Note, that it is possible that chain migrates to GW and returns to L1 without
         // committing any batches on GW.
         require(currentChainBatchNumber[_chainId] <= _batchNumber, ChainBatchRootAlreadyExists(_chainId, _batchNumber));

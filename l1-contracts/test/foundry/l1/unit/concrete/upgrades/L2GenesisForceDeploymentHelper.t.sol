@@ -10,7 +10,7 @@ import "forge-std/console.sol";
 import "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
 import "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
-import {TokenBridgingData} from "contracts/common/Messaging.sol";
+import {TokenBridgingData, TokenMetadata} from "contracts/common/Messaging.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import "contracts/core/message-root/IMessageRoot.sol";
@@ -138,7 +138,11 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         _deployMockContract(L2_ASSET_ROUTER_ADDR);
         _deployMockContract(L2_NATIVE_TOKEN_VAULT_ADDR);
         _deployMockContract(L2_CHAIN_ASSET_HANDLER_ADDR);
+        _deployMockContract(L2_ASSET_TRACKER_ADDR);
         _deployMockContract(GW_ASSET_TRACKER_ADDR);
+        _deployMockContract(L2_INTEROP_CENTER_ADDR);
+        _deployMockContract(L2_INTEROP_HANDLER_ADDR);
+        _deployMockContract(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
 
         vm.mockCall(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, abi.encodeWithSignature("owner()"), abi.encode(address(this)));
 
@@ -165,7 +169,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         MockSystemContractProxyAdmin etchedProxyAdmin = MockSystemContractProxyAdmin(
             L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
         );
-        assertEq(etchedProxyAdmin.upgradeCallCount(), 9);
+        assertEq(etchedProxyAdmin.upgradeCallCount(), 0);
     }
 
     function testEraForceDeployment() public {
@@ -178,7 +182,9 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         // Pre-deploy some mock contracts to simulate existing deployments
         _etchAllDeferredContracts();
 
-        // For Era deployments, no proxy admin is needed
+        // Proxy admin setup runs for consistency, but Era still does not use
+        // proxy-admin-managed system contract upgrades.
+        vm.mockCall(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, abi.encodeWithSignature("owner()"), abi.encode(address(this)));
         vm.startPrank(L2_COMPLEX_UPGRADER_ADDR);
         L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
             false, // _isZKsyncOS
@@ -425,13 +431,28 @@ contract MockContract {
 
     function initL2(uint256, address, bytes32, address, address, address, bytes32) external {}
 
-    function initL2(uint256, address, address, address, address) external {}
+    // L2ChainAssetHandler.initL2 (constants are resolved internally)
+    function initL2(uint256, address) external {}
 
-    function updateL2(uint256, bytes32, address, address, bytes32) external {}
+    // L2AssetRouter.updateL2
+    function updateL2(uint256, uint256, address, address, bytes32, address) external {}
 
-    function updateL2(uint256, address, address, address) external {}
+    // L2NativeTokenVault.updateL2
+    function updateL2(
+        uint256,
+        address,
+        bytes32,
+        address,
+        address,
+        TokenBridgingData calldata,
+        TokenMetadata calldata
+    ) external {}
 
-    function updateL2(uint256, uint256) external {}
+    // L2ChainAssetHandler.updateL2
+    function updateL2(uint256, address) external {}
+
+    // L2Bridgehub.updateL2
+    function updateL2(uint256, address, uint256) external {}
 
     function deployUpgradeableBeacon(address) external returns (address) {
         return makeAddr("upgradeableBeacon");

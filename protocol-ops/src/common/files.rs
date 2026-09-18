@@ -1,38 +1,27 @@
-use std::path::Path;
+use std::{fs, path::Path};
 
 use serde::{de::DeserializeOwned, Serialize};
-use xshell::Shell;
 
-pub fn read_yaml_file<T>(shell: &Shell, file_path: impl AsRef<Path>) -> anyhow::Result<T>
-where
-    T: DeserializeOwned,
-{
-    let content = shell.read_file(file_path)?;
-    let yaml = serde_yaml::from_str(&content)?;
-    Ok(yaml)
+pub fn read_yaml_file<T: DeserializeOwned>(path: impl AsRef<Path>) -> anyhow::Result<T> {
+    let content = fs::read_to_string(path.as_ref())
+        .map_err(|e| anyhow::anyhow!("read {}: {e}", path.as_ref().display()))?;
+    Ok(serde_yaml::from_str(&content)?)
 }
 
-pub fn read_toml_file<T>(shell: &Shell, file_path: impl AsRef<Path>) -> anyhow::Result<T>
-where
-    T: DeserializeOwned,
-{
-    let content = shell.read_file(file_path)?;
-    let toml = toml::from_str(&content)?;
-    Ok(toml)
+pub fn read_toml_file<T: DeserializeOwned>(path: impl AsRef<Path>) -> anyhow::Result<T> {
+    let content = fs::read_to_string(path.as_ref())
+        .map_err(|e| anyhow::anyhow!("read {}: {e}", path.as_ref().display()))?;
+    Ok(toml::from_str(&content)?)
 }
 
-pub fn read_json_file<T>(shell: &Shell, file_path: impl AsRef<Path>) -> anyhow::Result<T>
-where
-    T: DeserializeOwned,
-{
-    let content = shell.read_file(file_path)?;
-    let json = serde_json::from_str(&content)?;
-    Ok(json)
+pub fn read_json_file<T: DeserializeOwned>(path: impl AsRef<Path>) -> anyhow::Result<T> {
+    let content = fs::read_to_string(path.as_ref())
+        .map_err(|e| anyhow::anyhow!("read {}: {e}", path.as_ref().display()))?;
+    Ok(serde_json::from_str(&content)?)
 }
 
 pub fn save_yaml_file(
-    shell: &Shell,
-    file_path: impl AsRef<Path>,
+    path: impl AsRef<Path>,
     content: impl Serialize,
     comment: impl ToString,
 ) -> anyhow::Result<()> {
@@ -41,27 +30,21 @@ pub fn save_yaml_file(
         comment.to_string(),
         serde_yaml::to_string(&content)?
     );
-    shell.write_file(file_path, data)?;
-    Ok(())
+    fs::write(path.as_ref(), data)
+        .map_err(|e| anyhow::anyhow!("write {}: {e}", path.as_ref().display()))
 }
 
 pub fn save_toml_file(
-    shell: &Shell,
-    file_path: impl AsRef<Path>,
+    path: impl AsRef<Path>,
     content: impl Serialize,
     comment: impl ToString,
 ) -> anyhow::Result<()> {
     let data = format!("{}{}", comment.to_string(), toml::to_string(&content)?);
-    shell.write_file(file_path, data)?;
-    Ok(())
+    fs::write(path.as_ref(), data)
+        .map_err(|e| anyhow::anyhow!("write {}: {e}", path.as_ref().display()))
 }
 
-pub fn save_json_file(
-    shell: &Shell,
-    file_path: impl AsRef<Path>,
-    content: impl Serialize,
-) -> anyhow::Result<()> {
-    let data = serde_json::to_string_pretty(&content)?;
-    shell.write_file(file_path, data)?;
-    Ok(())
+pub fn save_json_file(path: impl AsRef<Path>, content: impl Serialize) -> anyhow::Result<()> {
+    fs::write(path.as_ref(), serde_json::to_string_pretty(&content)?)
+        .map_err(|e| anyhow::anyhow!("write {}: {e}", path.as_ref().display()))
 }

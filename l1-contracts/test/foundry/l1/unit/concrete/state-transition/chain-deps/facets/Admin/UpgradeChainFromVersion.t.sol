@@ -6,7 +6,7 @@ import {AdminTest} from "./_Admin_Shared.t.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
+import {IServerNotifier} from "contracts/governance/IServerNotifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
 import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
@@ -21,6 +21,29 @@ import {
 
 contract UpgradeChainFromVersionTest is AdminTest {
     event ExecuteUpgrade(Diamond.DiamondCutData diamondCut);
+
+    function _mockServerNotifierTimestamp(
+        address _chainTypeManager,
+        uint256 _oldProtocolVersion,
+        uint256 _upgradeTimestamp
+    ) private {
+        address serverNotifier = makeAddr("serverNotifier");
+
+        vm.mockCall(
+            _chainTypeManager,
+            abi.encodeWithSelector(IChainTypeManager.serverNotifierAddress.selector),
+            abi.encode(serverNotifier)
+        );
+        vm.mockCall(
+            serverNotifier,
+            abi.encodeWithSelector(
+                IServerNotifier.protocolVersionToUpgradeTimestamp.selector,
+                utilsFacet.util_getChainId(),
+                _oldProtocolVersion
+            ),
+            abi.encode(_upgradeTimestamp)
+        );
+    }
 
     function test_revertWhen_calledByNonAdminOrChainTypeManager() public {
         address nonAdminOrChainTypeManager = makeAddr("nonAdminOrChainTypeManager");
@@ -118,7 +141,6 @@ contract UpgradeChainFromVersionTest is AdminTest {
     // ============ Time-gate logic tests ============
 
     function test_revertWhen_validatorCallsBeforeTimestamp() public {
-        address admin = utilsFacet.util_getAdmin();
         address chainTypeManager = makeAddr("chainTypeManager");
         address validatorAddr = makeAddr("validator");
 
@@ -143,11 +165,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
         // Set upgrade timestamp to 1000, current time is 500 (before timestamp)
         uint256 upgradeTimestamp = 1000;
         vm.warp(500);
-        vm.mockCall(
-            admin,
-            abi.encodeWithSelector(IChainAdmin.protocolVersionToUpgradeTimestamp.selector, oldProtocolVersion),
-            abi.encode(upgradeTimestamp)
-        );
+        _mockServerNotifierTimestamp(chainTypeManager, oldProtocolVersion, upgradeTimestamp);
 
         vm.startPrank(validatorAddr);
         vm.expectRevert(abi.encodeWithSelector(UpgradeTimestampNotReached.selector, upgradeTimestamp, 500));
@@ -155,7 +173,6 @@ contract UpgradeChainFromVersionTest is AdminTest {
     }
 
     function test_revertWhen_validatorCallsWithTimestampZero() public {
-        address admin = utilsFacet.util_getAdmin();
         address chainTypeManager = makeAddr("chainTypeManager");
         address validatorAddr = makeAddr("validator");
 
@@ -179,11 +196,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
 
         // Timestamp 0 means no timestamp was set — validator should NOT be able to upgrade
         vm.warp(1000);
-        vm.mockCall(
-            admin,
-            abi.encodeWithSelector(IChainAdmin.protocolVersionToUpgradeTimestamp.selector, oldProtocolVersion),
-            abi.encode(uint256(0))
-        );
+        _mockServerNotifierTimestamp(chainTypeManager, oldProtocolVersion, 0);
 
         vm.startPrank(validatorAddr);
         vm.expectRevert(abi.encodeWithSelector(UpgradeTimestampNotReached.selector, uint256(0), uint256(1000)));
@@ -191,7 +204,6 @@ contract UpgradeChainFromVersionTest is AdminTest {
     }
 
     function test_validatorCallsAfterTimestamp() public {
-        address admin = utilsFacet.util_getAdmin();
         address chainTypeManager = makeAddr("chainTypeManager");
         address validatorAddr = makeAddr("validator");
         address mockVerifier = makeAddr("mockVerifier");
@@ -228,11 +240,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
         // Set upgrade timestamp to 1000, warp to exactly that time
         uint256 upgradeTimestamp = 1000;
         vm.warp(upgradeTimestamp);
-        vm.mockCall(
-            admin,
-            abi.encodeWithSelector(IChainAdmin.protocolVersionToUpgradeTimestamp.selector, oldProtocolVersion),
-            abi.encode(upgradeTimestamp)
-        );
+        _mockServerNotifierTimestamp(chainTypeManager, oldProtocolVersion, upgradeTimestamp);
 
         vm.startPrank(validatorAddr);
         adminFacet.upgradeChainFromVersion(address(adminFacet), oldProtocolVersion, diamondCutData);

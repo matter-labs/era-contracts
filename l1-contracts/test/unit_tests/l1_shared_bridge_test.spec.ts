@@ -187,30 +187,6 @@ describe("Shared Bridge tests", () => {
     expect(revertReason).contains("InvalidSelector");
   });
 
-  // it("Should deposit erc20 token successfully", async () => {
-  //   const amount = ethers.utils.parseEther("0.001");
-  //   const mintValue = ethers.utils.parseEther("0.002");
-  //   await l1Weth.connect(randomSigner).deposit({ value: amount });
-  //   await (await l1Weth.connect(randomSigner).approve(l1SharedBridge.address, amount)).wait();
-  //   bridgehub.connect(randomSigner).requestL2TransactionTwoBridges(
-  //     {
-  //       chainId,
-  //       mintValue,
-  //       l2Value: amount,
-  //       l2GasLimit: 1000000,
-  //       l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-  //       refundRecipient: ethers.constants.AddressZero,
-  //       secondBridgeAddress: l1SharedBridge.address,
-  //       secondBridgeValue: 0,
-  //       secondBridgeCalldata: new ethers.utils.AbiCoder().encode(
-  //         ["address", "uint256", "address"],
-  //         [l1Weth.address, amount, await randomSigner.getAddress()]
-  //       ),
-  //     },
-  //     { value: mintValue }
-  //   );
-  // });
-
   it("Should revert on finalizing a withdrawal with wrong message length", async () => {
     const revertReason = await getCallRevertReason(
       l1SharedBridge

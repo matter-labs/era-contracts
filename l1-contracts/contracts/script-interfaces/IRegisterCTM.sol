@@ -5,4 +5,13 @@ pragma solidity ^0.8.21;
 /// @notice Interface for RegisterCTM.s.sol script
 interface IRegisterCTM {
     function registerCTM(address bridgehub, address chainTypeManagerProxy, bool shouldSend) external;
+
+    /// @notice Same as `registerCTM`, with the output TOML path (project-root
+    /// relative) supplied by the caller instead of the conventional default.
+    function runInner(
+        string calldata outputPath,
+        address bridgehub,
+        address chainTypeManagerProxy,
+        bool shouldSend
+    ) external;
 }

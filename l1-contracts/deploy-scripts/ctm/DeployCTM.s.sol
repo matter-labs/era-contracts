@@ -60,7 +60,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     using stdToml for string;
 
     /// @dev Cache for batched blake2s hashing (keccak256(bytecode) => blake2s(bytecode)).
-    /// ZKsyncOS bytecode info requires blake2s hashes, computed via FFI (`yarn ts-node blake2s256.ts`).
+    /// ZKsyncOS bytecode info requires blake2s hashes, computed via FFI (`node blake2s256.js`).
     /// Without caching, each call to `Utils.getZKOSProxyUpgradeBytecodeInfo` spawns 2 FFI processes
     /// (one for the impl, one for SystemContractProxy). With ~10 contracts in `_buildForceDeploymentsData`,
     /// that's ~20 sequential FFI calls. The cache batches all bytecodes into a single FFI call in
@@ -118,10 +118,14 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         address bridgehub,
         bool reuseGovAndAdmin,
         bool skipL1Deployments
-    ) internal {
+    ) public {
         string memory root = vm.projectRoot();
         inputPath = string.concat(root, inputPath);
         outputPath = string.concat(root, outputPath);
+        // Scratch file for the batch blake2s FFI call lives next to the
+        // output file, so concurrent runs (distinct output paths) don't
+        // clobber each other's batches.
+        _blakeBatchTmpFile = string.concat(outputPath, ".blake-batch.txt");
 
         initializeConfig(inputPath, bridgehub);
 
@@ -467,7 +471,10 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         address dangerousTestOnlyForcedBeacon = _getDangerousTestOnlyForcedBeacon();
 
-        FixedForceDeploymentsData memory data = _buildForceDeploymentsData(dangerousTestOnlyForcedBeacon);
+        FixedForceDeploymentsData memory data = _buildForceDeploymentsData(
+            ctmAddresses.admin.governance,
+            dangerousTestOnlyForcedBeacon
+        );
 
         return abi.encode(data);
     }
@@ -486,6 +493,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         return beacon;
     }
 
+    /// @dev Scratch file for `_precomputeBlakeHashes`. Set by `runInner`
+    ///      from the caller's output path; falls back to the conventional
+    ///      fixed name for entrypoints that don't take paths.
+    string private _blakeBatchTmpFile;
+
     /// @dev Precompute blake2s hashes for all unique bytecodes in a single FFI call.
     function _precomputeBlakeHashes() private {
         CoreContract[10] memory contracts = [
@@ -501,7 +513,9 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             CoreContract.BaseTokenHolder
         ];
 
-        string memory tmpFile = string.concat(vm.projectRoot(), "/script-out/tmp-blake-batch.txt");
+        string memory tmpFile = bytes(_blakeBatchTmpFile).length != 0
+            ? _blakeBatchTmpFile
+            : string.concat(vm.projectRoot(), "/script-out/tmp-blake-batch.txt");
         vm.writeFile(tmpFile, "");
 
         bytes[10] memory bytecodes;
@@ -519,13 +533,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         vm.writeLine(tmpFile, vm.toString(proxyBytecode));
 
         // Single FFI call to batch-hash all bytecodes
-        string[] memory input = new string[](6);
-        input[0] = "yarn";
-        input[1] = "--silent";
-        input[2] = "ts-node";
-        input[3] = "./scripts/blake2s256.ts";
-        input[4] = "--batch";
-        input[5] = tmpFile;
+        string[] memory input = new string[](4);
+        input[0] = "node";
+        input[1] = "./scripts/blake2s256.js";
+        input[2] = "--batch";
+        input[3] = tmpFile;
         bytes memory result = vm.ffi(input);
 
         uint256 totalBytecodes = 11;
@@ -574,7 +586,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     /// @dev Get bytecode info, using cached blake hashes for ZKsyncOS or CoreOnGatewayHelper for Era.
-    function _getBytecodeInfo(CoreContract _c) private returns (bytes memory) {
+    function _getBytecodeInfo(CoreContract _c) internal virtual returns (bytes memory) {
         if (config.isZKsyncOS) {
             (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(true, _c);
             return _getProxyUpgradeBytecodeInfo(fileName, contractName);
@@ -583,22 +595,22 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function _buildForceDeploymentsData(
-        address dangerousTestOnlyForcedBeacon
-    ) private returns (FixedForceDeploymentsData memory data) {
+        address _governance,
+        address _dangerousTestOnlyForcedBeacon
+    ) internal virtual returns (FixedForceDeploymentsData memory data) {
         if (config.isZKsyncOS) {
             _precomputeBlakeHashes();
         }
 
         data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
-            gatewayChainId: config.gatewayChainId,
             eraChainId: config.eraChainId,
             l1AssetRouter: coreAddresses.bridges.proxies.l1AssetRouter,
             l2TokenProxyBytecodeHash: CoreOnGatewayHelper.getDeployedBytecodeHash(
                 config.isZKsyncOS,
                 CoreContract.BeaconProxy
             ),
-            aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(ctmAddresses.admin.governance),
+            aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(_governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
             bridgehubBytecodeInfo: _getBytecodeInfo(CoreContract.L2Bridgehub),
             l2AssetRouterBytecodeInfo: _getBytecodeInfo(CoreContract.L2AssetRouter),
@@ -615,7 +627,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
                 coreAddresses.bridgehub.proxies.chainRegistrationSender
             ),
-            dangerousTestOnlyForcedBeacon: dangerousTestOnlyForcedBeacon,
+            dangerousTestOnlyForcedBeacon: _dangerousTestOnlyForcedBeacon,
             zkTokenAssetId: config.zkTokenAssetId
         });
     }

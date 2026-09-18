@@ -6,8 +6,6 @@ pragma solidity ^0.8.20;
 error CallerMustBeBootloader();
 // 0xbe4bf9e4
 error CallerMustBeEvmContract();
-// 0x95ae848f
-error CallerMustBeInteropCenterOrNTV();
 // 0x9eedbd2b
 error CallerMustBeSystemContract();
 // 0xee455381
@@ -108,8 +106,6 @@ error KeccakShouldStartWorkingAgain();
 error L2BlockAndBatchTimestampMismatch(uint128 l2BlockTimestamp, uint128 currentBatchTimestamp);
 // 0x543f4c07
 error L2BlockNumberZero();
-// 0xd2324131
-error LegacyBridgeNotProxy();
 // 0x43e266b0
 error MalformedBytecode(BytecodeError);
 // 0x9bb54c35

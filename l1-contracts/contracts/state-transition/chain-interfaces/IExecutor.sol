@@ -35,7 +35,7 @@ uint256 constant MAX_LOG_KEY = uint256(type(SystemLogKey).max);
 /// @param settlementFeePayer Address that pays gateway settlement fees for interop calls in this batch.
 ///
 /// @dev Settlement Fee Payer Requirements:
-///      1. Must have called `agreeToPaySettlementFees(chainId)` on GWAssetTracker to opt-in for this specific chain
+///      1. Must have called `setSettlementFeePayerAgreement(chainId, true)` on GWAssetTracker to opt-in for this specific chain
 ///      2. Must have sufficient wrapped ZK token balance to cover: gatewaySettlementFee * chargeableInteropCount
 ///      3. Must have approved GWAssetTracker to spend wrapped ZK tokens
 ///      The opt-in mechanism prevents front-running attacks where a malicious operator could

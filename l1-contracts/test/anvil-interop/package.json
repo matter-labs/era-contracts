@@ -9,7 +9,12 @@
     "test:hardhat": "yarn --cwd ../.. test:hardhat:interop",
     "deploy:test-token": "ts-node src/helpers/deploy-test-token.ts",
     "setup-and-dump": "ts-node setup-and-dump-state.ts",
-    "test:v29-to-v31": "ts-node run-v29-to-v31-upgrade-test.ts"
+    "test:v29-to-v31": "ts-node run-v29-to-v31-upgrade-test.ts",
+    "test:v30-to-v31": "ts-node run-v30-to-v31-upgrade-test.ts",
+    "coverage": "ANVIL_COVERAGE_MODE=1 ts-node run-coverage.ts",
+    "coverage:html": "ANVIL_COVERAGE_MODE=1 ts-node run-coverage.ts --html",
+    "coverage:collect": "ts-node collect-coverage.ts",
+    "coverage:collect:html": "ts-node collect-coverage.ts --html"
   },
   "keywords": [
     "anvil",
@@ -21,11 +26,13 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "ethers": "5.7.2"
+    "@matterlabs/zksync-js": "0.0.17",
+    "ethers": "5.7.2",
+    "viem": "2.48.4"
   },
   "devDependencies": {
     "@types/node": "^20.11.19",
-    "typescript": "^5.3.3",
-    "ts-node": "^10.9.2"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
   }
 }

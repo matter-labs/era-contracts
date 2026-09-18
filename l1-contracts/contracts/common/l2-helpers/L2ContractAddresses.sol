@@ -71,7 +71,7 @@ address constant L2_PUBDATA_CHUNK_PUBLISHER_ADDR = address(SYSTEM_CONTRACTS_OFFS
 // @dev The address of the compressor contract.
 address constant L2_COMPRESSOR_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x0e);
 
-/// @dev The address used to execute complex upgragedes, also used for the genesis upgrade
+/// @dev The address used to execute complex upgrades, also used for the genesis upgrade
 address constant L2_COMPLEX_UPGRADER_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x0f);
 
 ////////////////////////////////////////////////////////////

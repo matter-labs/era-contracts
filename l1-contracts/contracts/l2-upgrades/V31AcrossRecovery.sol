@@ -21,12 +21,12 @@ struct AcrossInfo {
 }
 
 struct LensSpokePoolConstructorParams {
-    address _wrappedNativeTokenAddress;
-    address _circleUSDC;
-    address _zkUSDCBridge;
-    address _cctpTokenMessenger;
-    uint32 _depositQuoteTimeBuffer;
-    uint32 _fillDeadlineBuffer;
+    address wrappedNativeTokenAddress;
+    address circleUSDC;
+    address zkUSDCBridge;
+    address cctpTokenMessenger;
+    uint32 depositQuoteTimeBuffer;
+    uint32 fillDeadlineBuffer;
 }
 
 /// @dev The L2 chain id of the Lens network where the Across proxy is deployed.
@@ -50,12 +50,12 @@ abstract contract V31AcrossRecovery {
                 evmImplementation: 0xc7772Ce23a3ED7F87fE51b87617C7C7d21f15d39,
                 zkevmRecoveryImplementation: 0x11c9d12cC96Ae9B1fb30eb5D2D2a6F85656917e5,
                 zkevmRecoveryImplConstructorParams: LensSpokePoolConstructorParams({
-                    _wrappedNativeTokenAddress: address(0x6bDc36E20D267Ff0dd6097799f82e78907105e2F),
-                    _circleUSDC: address(0x88F08E304EC4f90D644Cec3Fb69b8aD414acf884),
-                    _zkUSDCBridge: address(0x7188B6975EeC82ae914b6eC7AC32b3c9a18b2c81),
-                    _cctpTokenMessenger: address(0x0000000000000000000000000000000000000000),
-                    _depositQuoteTimeBuffer: uint32(3600),
-                    _fillDeadlineBuffer: uint32(21600)
+                    wrappedNativeTokenAddress: address(0x6bDc36E20D267Ff0dd6097799f82e78907105e2F),
+                    circleUSDC: address(0x88F08E304EC4f90D644Cec3Fb69b8aD414acf884),
+                    zkUSDCBridge: address(0x7188B6975EeC82ae914b6eC7AC32b3c9a18b2c81),
+                    cctpTokenMessenger: address(0x0000000000000000000000000000000000000000),
+                    depositQuoteTimeBuffer: uint32(3600),
+                    fillDeadlineBuffer: uint32(21600)
                 })
             });
         }
@@ -84,12 +84,12 @@ abstract contract V31AcrossRecovery {
             callConstructor: true,
             value: 0,
             input: abi.encode(
-                info.zkevmRecoveryImplConstructorParams._wrappedNativeTokenAddress,
-                info.zkevmRecoveryImplConstructorParams._circleUSDC,
-                info.zkevmRecoveryImplConstructorParams._zkUSDCBridge,
-                info.zkevmRecoveryImplConstructorParams._cctpTokenMessenger,
-                info.zkevmRecoveryImplConstructorParams._depositQuoteTimeBuffer,
-                info.zkevmRecoveryImplConstructorParams._fillDeadlineBuffer
+                info.zkevmRecoveryImplConstructorParams.wrappedNativeTokenAddress,
+                info.zkevmRecoveryImplConstructorParams.circleUSDC,
+                info.zkevmRecoveryImplConstructorParams.zkUSDCBridge,
+                info.zkevmRecoveryImplConstructorParams.cctpTokenMessenger,
+                info.zkevmRecoveryImplConstructorParams.depositQuoteTimeBuffer,
+                info.zkevmRecoveryImplConstructorParams.fillDeadlineBuffer
             )
         });
 

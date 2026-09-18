@@ -7,6 +7,7 @@ import "contracts/bridge/BridgeHelper.sol"; // adjust path
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {RAND_ADDRESS} from "test/foundry/TestConstants.sol";
 
 // A simple ERC20 mock that returns fixed values
 contract MockERC20 is IERC20Metadata {
@@ -166,7 +167,7 @@ contract BridgeHelperTest is Test {
     }
     function testGetERC20Getters_InvalidAddress() public view {
         // Use an address with no code
-        address invalidToken = address(0xdead); // nothing deployed here
+        address invalidToken = RAND_ADDRESS; // nothing deployed here
 
         bytes memory result = BridgeHelper.getERC20Getters(invalidToken, ORIGIN_CHAIN_ID);
 

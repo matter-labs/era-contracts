@@ -16,6 +16,7 @@ fs_permissions = [
     { access = "read-write", path = "./test/foundry/l1/integration/upgrade-envs/script-out/" },
     { access = "read-write", path = "./test/foundry/l1/integration/upgrade-envs/permanent-values/" },
     { access = "read-write", path = "./upgrade-envs/permanent-values/local.toml" },
+    { access = "read-write", path = "./upgrade-envs/" },
     { access = "read-write", path = "./script-out" },
     { access = "read", path = "../system-contracts/bootloader/build/artifacts" },
     { access = "read", path = "../system-contracts/artifacts-zk/" },
@@ -49,6 +50,7 @@ remappings = [
     "system-contracts/=../system-contracts/",
   "@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/",
   "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
+  "test-utils/=test/foundry/l1/integration/utils/",
 ]
 optimizer = true
 optimizer_runs = 9999999
@@ -67,7 +69,7 @@ bytecode_hash = "none"
 
 [profile.default.zksync]
 enable_eravm_extensions = true
-zksolc = "1.5.11"
+zksolc = "1.5.17"
 
 [profile.invariant_tests_l1context]
 test = "test"
@@ -108,3 +110,6 @@ suppressed_warnings = ["txorigin"]
 [profile.invariant_tests_l2context_ci.invariant]
 runs = 2
 depth = 1000
+
+[lint]
+lint_on_build = false

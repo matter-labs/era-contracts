@@ -13,11 +13,11 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {
     ChainExists,
     MessageRootNotRegistered,
+    OnlyChainAssetHandler,
     OnlyChain,
     OnlyGateway,
     OnlyOnSettlementLayer,
-    TotalBatchesExecutedZero,
-    V31UpgradeChainBatchNumberNotSet
+    TotalBatchesExecutedZero
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
 import {
@@ -83,7 +83,7 @@ contract MessageRoot_Extended_Test is Test {
         );
 
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        l2MessageRoot.initL2(L1_CHAIN_ID, gatewayChainId);
+        l2MessageRoot.initL2(L1_CHAIN_ID);
     }
 
     function test_ChainRegistered_CurrentChain() public {
@@ -206,10 +206,19 @@ contract MessageRoot_Extended_Test is Test {
         uint256 chainId = 271;
         uint256 batchNumber = 1;
 
-        vm.prank(bridgeHub);
+        vm.prank(chainAssetHandler);
         messageRoot.setMigratingChainBatchNumber(chainId, batchNumber);
 
         assertEq(messageRoot.currentChainBatchNumber(chainId), batchNumber);
+    }
+
+    function test_setMigratingChainBatchNumber_RevertWhenCalledByBridgehub() public {
+        uint256 chainId = 271;
+        uint256 batchNumber = 1;
+
+        vm.prank(bridgeHub);
+        vm.expectRevert(abi.encodeWithSelector(OnlyChainAssetHandler.selector, bridgeHub, chainAssetHandler));
+        messageRoot.setMigratingChainBatchNumber(chainId, batchNumber);
     }
 
     function test_GetProofData() public {
@@ -266,7 +275,7 @@ contract MessageRoot_Extended_Test is Test {
         uint256 chainId = 271;
         uint256 v31UpgradeBatchNumber = 0;
 
-        vm.prank(bridgeHub);
+        vm.prank(chainAssetHandler);
         messageRoot.setMigratingChainBatchNumber(chainId, 1);
 
         uint256 v31Batch = messageRoot.v31UpgradeChainBatchNumber(chainId);

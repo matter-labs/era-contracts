@@ -15,7 +15,7 @@ import {
     L1_TX_INTRINSIC_L2_GAS,
     L1_TX_INTRINSIC_L2_GAS_ZKSYNC_OS,
     L1_TX_INTRINSIC_PUBDATA,
-    L1_TX_INTRINSIC_PUBDATA_ZSKYNC_OS,
+    L1_TX_INTRINSIC_PUBDATA_ZKSYNC_OS,
     L1_TX_MIN_L2_GAS_BASE,
     L1_TX_STATIC_NATIVE_ZKSYNC_OS,
     MEMORY_OVERHEAD_GAS,
@@ -156,7 +156,7 @@ library TransactionValidator {
                     (nativeComputationalCost * ZKSYNC_OS_L1_TX_NATIVE_PRICE) / _maxFeePerGas;
             }
 
-            uint256 pubdataGasCost = L1_TX_INTRINSIC_PUBDATA_ZSKYNC_OS * _l2GasPricePerPubdata;
+            uint256 pubdataGasCost = L1_TX_INTRINSIC_PUBDATA_ZKSYNC_OS * _l2GasPricePerPubdata;
 
             uint256 totalGasForNative = gasNeededToCoverComputationalNative + pubdataGasCost;
 

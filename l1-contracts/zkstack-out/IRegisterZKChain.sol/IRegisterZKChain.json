@@ -182,5 +182,33 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "runWithPaths",
+    "inputs": [
+      {
+        "name": "inputPath",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "outputPath",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "_chainTypeManagerProxy",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_chainChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   }
 ]

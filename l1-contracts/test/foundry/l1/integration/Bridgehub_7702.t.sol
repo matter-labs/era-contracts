@@ -22,7 +22,11 @@ import {
 
 import {BridgehubInvariantTests} from "test/foundry/l1/integration/BridgehubTests.t.sol";
 
+import {LogFinder} from "test-utils/LogFinder.sol";
+
 contract Bridgehub_7702 is BridgehubInvariantTests {
+    using LogFinder for Vm.Log[];
+
     function setUp() public {
         prepare();
     }
@@ -40,7 +44,6 @@ contract Bridgehub_7702 is BridgehubInvariantTests {
         for (uint256 i = 0; i < zkChainIds.length; i++) {
             address contractAddress = makeAddr(string(abi.encode("contract", i)));
             l2ContractAddresses.push(contractAddress);
-
             _addL2ChainContract(zkChainIds[i], contractAddress);
         }
     }
@@ -50,7 +53,8 @@ contract Bridgehub_7702 is BridgehubInvariantTests {
         address payable randomCaller = payable(vm.addr(randomCallerPk));
         currentUser = randomCaller;
         uint256 l2Value = 100;
-        uint256 currentChainId = 10;
+        currentChainId = 10;
+        currentChainAddress = getZKChainAddress(currentChainId);
         uint256 gasPrice = 10000000;
         vm.txGasPrice(gasPrice);
 
@@ -88,40 +92,47 @@ contract Bridgehub_7702 is BridgehubInvariantTests {
         SimpleExecutor(randomCaller).execute(address(addresses.bridgehub), mintValue, calldataForExecutor);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        // Verify logs were emitted
-        assertTrue(logs.length > 0, "Deposit should emit at least one log event");
+        // Verify ETH balance
+        // Caller was dealt exactly mintValue; all of it should be consumed
+        assertEq(randomCaller.balance, 0, "Caller ETH balance should be fully consumed");
 
+        // Verify NewPriorityRequest event and validate L2 transaction
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
-
-        // Verify the transaction was created correctly
-        assertEq(
-            currentUser,
-            address(uint160(request.transaction.from)),
-            "Transaction sender should be the current user"
-        );
         assertNotEq(request.txHash, bytes32(0), "Transaction hash should not be zero");
-        assertTrue(request.transaction.to != 0, "Transaction recipient should not be zero");
-        assertEq(request.transaction.value, l2Value, "Transaction value should match l2Value");
 
+        // 7702-specific: sender must NOT be aliased — the EIP-7702 delegation means
+        // the EOA itself is the msg.sender, so no L1-to-L2 alias should be applied.
+        assertEq(address(uint160(request.transaction.from)), randomCaller, "7702: sender should not be aliased");
+
+        // L2 target should be the actual chain contract, not just non-zero
+        assertEq(
+            address(uint160(request.transaction.to)),
+            chainContracts[currentChainId],
+            "L2 contract should match the chain's registered contract"
+        );
+
+        assertEq(request.transaction.value, l2Value, "Transaction value should match l2Value");
+        assertEq(request.transaction.reserved[0], mintValue, "Mint value should match");
+
+        // Verify BridgehubDepositBaseTokenInitiated event emission
+        Vm.Log memory depositLog = logs.requireOne(
+            "BridgehubDepositBaseTokenInitiated(uint256,address,bytes32,uint256)"
+        );
+        assertEq(uint256(depositLog.topics[1]), currentChainId, "Deposit base token event chainId mismatch");
+
+        // Simulate L2 side
         _handleRequestByMockL2Contract(request, RequestType.DIRECT);
 
-        // Update tracking variables and verify they were updated
+        // Update tracking variables for invariant harness
         depositsUsers[currentUser][ETH_TOKEN_ADDRESS] += mintValue;
         depositsBridge[currentChainAddress][ETH_TOKEN_ADDRESS] += mintValue;
         tokenSumDeposit[ETH_TOKEN_ADDRESS] += mintValue;
         l2ValuesSum[ETH_TOKEN_ADDRESS] += l2Value;
-
-        // Verify tracking variables are consistent
-        assertTrue(
-            depositsUsers[currentUser][ETH_TOKEN_ADDRESS] >= mintValue,
-            "User deposit tracking should be updated"
-        );
-        assertTrue(tokenSumDeposit[ETH_TOKEN_ADDRESS] >= mintValue, "Token sum deposit should be updated");
     }
 
     function depositEthSuccess(uint256 userIndexSeed, uint256 chainIndexSeed, uint256 l2Value) public {
         uint64 MAX = 2 ** 64 - 1;
-        uint256 l2Value = bound(l2Value, 0.1 ether, MAX);
+        l2Value = bound(l2Value, 0.1 ether, MAX);
 
         emit log_string("DEPOSIT ETH");
         super.depositEthToBridgeSuccess(userIndexSeed, chainIndexSeed, l2Value);
@@ -134,7 +145,7 @@ contract Bridgehub_7702 is BridgehubInvariantTests {
         uint256 l2Value
     ) public {
         uint64 MAX = 2 ** 64 - 1;
-        uint256 l2Value = bound(l2Value, 0.1 ether, MAX);
+        l2Value = bound(l2Value, 0.1 ether, MAX);
 
         emit log_string("DEPOSIT ERC20");
         super.depositERC20ToBridgeSuccess(userIndexSeed, chainIndexSeed, tokenIndexSeed, l2Value);
@@ -142,7 +153,7 @@ contract Bridgehub_7702 is BridgehubInvariantTests {
 
     function withdrawERC20Success(uint256 userIndexSeed, uint256 chainIndexSeed, uint256 amountToWithdraw) public {
         uint64 MAX = (2 ** 32 - 1) + 0.1 ether;
-        uint256 amountToWithdraw = bound(amountToWithdraw, 0.1 ether, MAX);
+        amountToWithdraw = bound(amountToWithdraw, 0.1 ether, MAX);
 
         emit log_string("WITHDRAW ERC20");
         super.withdrawSuccess(userIndexSeed, chainIndexSeed, amountToWithdraw);

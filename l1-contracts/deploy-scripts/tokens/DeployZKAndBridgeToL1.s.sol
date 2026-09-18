@@ -22,6 +22,7 @@ import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol"
 import {Utils} from "../utils/Utils.sol";
 import {MintFailed} from "../utils/ZkSyncScriptErrors.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
+import {BridgesDeployedAddresses} from "../utils/Types.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 contract DeployZKScript is Script {
@@ -88,9 +89,10 @@ contract DeployZKScript is Script {
 
         // Use AddressIntrospector to get addresses from deployed contracts
         config.bridgehub = bridgehub;
-        BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(IL1Bridgehub(bridgehub));
-        config.l1SharedBridge = bhAddresses.assetRouter;
-        config.l1Nullifier = bhAddresses.assetRouterAddresses.l1Nullifier;
+        address assetRouter = address(IL1Bridgehub(bridgehub).assetRouter());
+        BridgesDeployedAddresses memory bridges = AddressIntrospector.getBridgesDeployedAddresses(assetRouter);
+        config.l1SharedBridge = assetRouter;
+        config.l1Nullifier = bridges.proxies.l1Nullifier;
         config.chainId = chainId;
 
         // Grab config from custom config file
@@ -143,8 +145,8 @@ contract DeployZKScript is Script {
     }
 
     /// TODO(EVM-748): make that function support non-ETH based chains
-    function supplyEraWallet(address addr, uint256 amount) public {
-        initializeConfig();
+    function supplyEraWallet(address _bridgehub, uint256 _chainId, address addr, uint256 amount) public {
+        initializeConfig(_bridgehub, _chainId);
 
         Utils.runL1L2Transaction(
             hex"",
@@ -160,6 +162,7 @@ contract DeployZKScript is Script {
     }
 
     function finalizeZkTokenWithdrawal(
+        address _bridgehub,
         uint256 _chainId,
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
@@ -167,7 +170,7 @@ contract DeployZKScript is Script {
         bytes memory _message,
         bytes32[] memory _merkleProof
     ) public {
-        initializeConfig();
+        initializeConfig(_bridgehub, _chainId);
 
         L1Nullifier l1Nullifier = L1Nullifier(config.l1Nullifier);
 
@@ -185,8 +188,8 @@ contract DeployZKScript is Script {
         );
     }
 
-    function saveL1Address() public {
-        initializeConfig();
+    function saveL1Address(address _bridgehub, uint256 _chainId) public {
+        initializeConfig(_bridgehub, _chainId);
         initializeAdditionalConfig();
 
         string memory root = vm.projectRoot();
@@ -210,8 +213,8 @@ contract DeployZKScript is Script {
         vm.writeToml(tokenInfo, path, ".ZK.l1Address");
     }
 
-    function fundChainGovernor() public {
-        initializeConfig();
+    function fundChainGovernor(address _bridgehub, uint256 _chainId) public {
+        initializeConfig(_bridgehub, _chainId);
 
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, vm.envString("ZK_TOKEN_OUTPUT"));

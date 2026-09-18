@@ -114,7 +114,6 @@ contract L2GenesisUpgradeTestHelper {
             abi.encode(
                 FixedForceDeploymentsData({
                     l1ChainId: 1,
-                    gatewayChainId: 1,
                     eraChainId: _chainId,
                     l1AssetRouter: address(1),
                     l2TokenProxyBytecodeHash: bytes32(
