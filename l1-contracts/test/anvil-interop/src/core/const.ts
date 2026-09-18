@@ -128,3 +128,6 @@ export enum CallStatus {
 
 // Selector for a non-existent function: someVeryUnfortunateCall()
 export const FAILING_CALL_CALLDATA = "0x00056d83";
+
+// Leading bytes omitted when deriving an EVM address from a 32-byte hash.
+export const HASH_TO_ADDRESS_BYTE_OFFSET = 12;
