@@ -14,12 +14,7 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
 
-import {
-    FeeParams,
-    IVerifier,
-    PubdataPricingMode,
-    VerifierParams
-} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {IVerifier} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
@@ -27,7 +22,6 @@ import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfac
 import {InteropRoot, L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
-import {Utils as DeployUtils} from "deploy-scripts/utils/Utils.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {ContractsBytecodesLib} from "deploy-scripts/utils/bytecode/ContractsBytecodesLib.sol";
 

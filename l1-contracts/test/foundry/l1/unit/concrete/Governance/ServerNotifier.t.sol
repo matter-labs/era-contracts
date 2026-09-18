@@ -12,12 +12,7 @@ import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DummyChainAssetHandler} from "contracts/dev-contracts/test/DummyChainAssetHandler.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IUpgradePreconditionChecker} from "contracts/upgrades/IUpgradePreconditionChecker.sol";
-import {
-    CutDataForProtocolVersionNotAvailable,
-    InvalidProtocolVersion,
-    Unauthorized,
-    ZeroAddress
-} from "contracts/common/L1ContractErrors.sol";
+import {CutDataForProtocolVersionNotAvailable, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 // Isolates notifier behavior from any release-specific prerequisites.
 contract UpgradePreconditionCheckerStub is IUpgradePreconditionChecker {

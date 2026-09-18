@@ -3,21 +3,13 @@
 pragma solidity 0.8.28;
 
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";
-import {
-    L2CanonicalTransaction,
-    L2Log,
-    L2Message,
-    MessageInclusionProof,
-    TxStatus
-} from "contracts/common/Messaging.sol";
+import {L2Log, L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import "forge-std/Test.sol";
-import {L2_TO_L1_LOG_SERIALIZE_SIZE} from "contracts/common/Config.sol";
 import {
     L2_BOOTLOADER_ADDRESS,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
-import {HashedLogIsDefault} from "contracts/common/L1ContractErrors.sol";
 
 import {MerkleTest} from "contracts/dev-contracts/test/MerkleTest.sol";
 
@@ -29,7 +21,7 @@ import {MigrationInterval} from "contracts/core/chain-asset-handler/IChainAssetH
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {L1MessageRootDev} from "contracts/dev-contracts/L1MessageRootDev.sol";
 import {MerkleTreeNoSort} from "test/foundry/l1/unit/concrete/common/libraries/Merkle/MerkleTreeNoSort.sol";
-import {MessageHashing, ProofData} from "contracts/common/libraries/MessageHashing.sol";
+import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";

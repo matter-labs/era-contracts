@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 import {PrividiumTransactionFiltererTest} from "./_PrividiumTransactionFilterer_Shared.t.sol";
 
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
-import {InvalidSelector} from "contracts/common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {PrividiumTransactionFilterer} from "contracts/transactionFilterer/PrividiumTransactionFilterer.sol";
 

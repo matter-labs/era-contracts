@@ -1,24 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
-import {console2 as console} from "forge-std/console2.sol";
 
-import {
-    IL1Bridgehub,
-    L2TransactionRequestDirect,
-    L2TransactionRequestTwoBridgesOuter
-} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
-import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
-import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
-import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {SharedBridgehubWithdrawal} from "./_SharedBridgehubWithdrawal.t.sol";
 import {
     DEFAULT_L2_LOGS_TREE_ROOT_HASH,

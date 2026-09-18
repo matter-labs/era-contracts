@@ -4,22 +4,7 @@ pragma solidity 0.8.28;
 
 import {MigratorTest} from "./_Migrator_Shared.t.sol";
 import {NotAZKChain, RemovingPermanentRestriction, Unauthorized} from "contracts/common/L1ContractErrors.sol";
-import {
-    NotL1,
-    AlreadyMigrated,
-    NotChainAdmin,
-    SettlementLayerCTMMismatch,
-    NotAllBatchesExecuted,
-    ProtocolVersionNotUpToDate,
-    OutdatedProtocolVersion,
-    ExecutedIsNotConsistentWithVerified,
-    VerifiedIsNotConsistentWithCommitted,
-    InvalidNumberOfBatchHashes,
-    NotMigrated,
-    NotHistoricalRoot,
-    ContractNotDeployed,
-    DepositsNotPaused
-} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {AlreadyMigrated, NotChainAdmin, SettlementLayerCTMMismatch, NotAllBatchesExecuted, ProtocolVersionNotUpToDate, OutdatedProtocolVersion, ExecutedIsNotConsistentWithVerified, VerifiedIsNotConsistentWithCommitted, InvalidNumberOfBatchHashes, NotMigrated, NotHistoricalRoot, DepositsNotPaused} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {ZKChainCommitment} from "contracts/common/Config.sol";
 import {TxStatus} from "contracts/common/Messaging.sol";
 import {PriorityTreeCommitment} from "contracts/state-transition/libraries/PriorityTree.sol";

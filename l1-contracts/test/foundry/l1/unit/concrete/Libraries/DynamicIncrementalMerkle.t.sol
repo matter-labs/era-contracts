@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {DynamicIncrementalMerkle} from "contracts/common/libraries/DynamicIncrementalMerkle.sol";
-import {Merkle} from "contracts/common/libraries/Merkle.sol";
 
 /// @notice Unit tests for DynamicIncrementalMerkle library
 contract DynamicIncrementalMerkleTest is Test {

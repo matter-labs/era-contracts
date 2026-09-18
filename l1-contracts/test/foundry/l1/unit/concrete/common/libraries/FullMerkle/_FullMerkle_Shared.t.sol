@@ -5,7 +5,6 @@ import {Test} from "forge-std/Test.sol";
 
 import {FullMerkleTest as FullMerkleTestContract} from "contracts/dev-contracts/test/FullMerkleTest.sol";
 import {FullMerkleMemory} from "contracts/common/libraries/FullMerkleMemory.sol";
-import {console2 as console} from "forge-std/console2.sol";
 
 contract FullMerkleTest is Test {
     using FullMerkleMemory for FullMerkleMemory.FullTree;

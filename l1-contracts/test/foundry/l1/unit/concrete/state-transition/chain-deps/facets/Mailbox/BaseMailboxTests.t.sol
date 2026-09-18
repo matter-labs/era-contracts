@@ -5,7 +5,6 @@ pragma solidity 0.8.28;
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
-import {DummyZKChain} from "contracts/dev-contracts/test/DummyZKChain.sol";
 import {BaseTokenGasPriceDenominatorNotSet, ValueMismatch} from "contracts/common/L1ContractErrors.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";

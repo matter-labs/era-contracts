@@ -4,12 +4,7 @@ pragma solidity 0.8.28;
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 
 import {GatewayVotePreparation} from "deploy-scripts/gateway/GatewayVotePreparation.s.sol";
-import {
-    GatewayCTMDeployerHelper,
-    DeployerCreate2Calldata,
-    DeployerAddresses,
-    DirectCreate2Calldata
-} from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
+import {GatewayCTMDeployerHelper, DirectCreate2Calldata} from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
 import {
     DeployedContracts,
     GatewayCTMDeployerConfig

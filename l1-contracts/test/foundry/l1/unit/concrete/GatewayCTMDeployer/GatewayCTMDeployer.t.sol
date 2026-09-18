@@ -20,13 +20,7 @@ import {GatewayCTMDeployerValidatorTimelock} from "contracts/state-transition/ch
 import {GatewayCTMDeployerVerifiers} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerVerifiers.sol";
 import {GatewayCTMDeployerCTM} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerCTM.sol";
 
-import {
-    GatewayCTMDeployerHelper,
-    DeployerCreate2Calldata,
-    DeployerAddresses,
-    DirectDeployedAddresses,
-    DirectCreate2Calldata
-} from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
+import {GatewayCTMDeployerHelper, DeployerCreate2Calldata, DeployerAddresses, DirectCreate2Calldata} from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
 
 import {

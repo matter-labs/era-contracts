@@ -10,7 +10,6 @@ import {
 import {Vm} from "forge-std/Vm.sol";
 
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
-import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 
 import {IMessageRootBase, IMessageVerification} from "contracts/core/message-root/IMessageRoot.sol";

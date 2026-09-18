@@ -8,7 +8,6 @@ import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddr
 import {IMessageRootBase} from "../../core/message-root/IMessageRoot.sol";
 import {L2TransactionRequestDirect} from "../../core/bridgehub/IBridgehubBase.sol";
 import {IAssetRouterShared} from "../../bridge/asset-router/IAssetRouterShared.sol";
-import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 
 /// @title DummyBridgehub

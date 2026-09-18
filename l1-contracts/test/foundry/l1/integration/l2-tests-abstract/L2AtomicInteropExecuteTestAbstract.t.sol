@@ -7,7 +7,6 @@ import {AtomicFlowFixtures} from "../../unit/concrete/atomic-interop/AtomicFlowF
 
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 import {AtomicInteropProofBuilder} from "../../unit/concrete/atomic-interop/AtomicInteropProofBuilder.sol";
-import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
@@ -28,12 +27,7 @@ import {IMTLeafValueMismatch} from "contracts/common/L1ContractErrors.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {BundleStatus, CallStatus, InteropBundle, InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
-import {
-    L2_ASSET_ROUTER_ADDR,
-    L2_INTEROP_COMMITMENT_TREE_ADDR,
-    L2_INTEROP_HANDLER_ADDR
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {L2_NATIVE_TOKEN_VAULT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_INTEROP_COMMITMENT_TREE_ADDR, L2_INTEROP_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 /// @notice The DESTINATION side of an atomic flow through the real execution entry point:

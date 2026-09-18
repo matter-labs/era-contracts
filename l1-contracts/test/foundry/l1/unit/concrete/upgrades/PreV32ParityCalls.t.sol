@@ -11,10 +11,9 @@ import {BridgesDeployedAddresses} from "deploy-scripts/utils/Types.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";

@@ -6,7 +6,6 @@ import {FeeParams, IVerifier, VerifierParams} from "contracts/state-transition/c
 import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/ZKChainBase.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {L2DACommitmentScheme, PubdataContent} from "contracts/common/Config.sol";
-import {PriorityTree} from "contracts/state-transition/libraries/PriorityTree.sol";
 
 contract UtilsFacet is ZKChainBase {
     function util_setChainId(uint256 _chainId) external {

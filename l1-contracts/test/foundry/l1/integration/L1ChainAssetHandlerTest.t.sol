@@ -2,11 +2,6 @@
 pragma solidity 0.8.28;
 
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
-import {
-    IBridgehubBase,
-    L2TransactionRequestDirect,
-    L2TransactionRequestTwoBridgesOuter
-} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 
@@ -15,14 +10,8 @@ import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 
-import {
-    L2_ASSET_ROUTER_ADDR,
-    L2_COMPLEX_UPGRADER_ADDR,
-    L2_NATIVE_TOKEN_VAULT_ADDR,
-    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {IChainAssetHandlerBase, MigrationInterval} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {

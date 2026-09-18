@@ -5,9 +5,8 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-import {Merkle} from "contracts/common/libraries/Merkle.sol";
 import {L2MessageVerification} from "contracts/interop/L2MessageVerification.sol";
-import {L2Log, L2Message} from "contracts/common/Messaging.sol";
+import {L2Log} from "contracts/common/Messaging.sol";
 import {L2_INTEROP_ROOT_STORAGE} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {DepthMoreThanOneForRecursiveMerkleProof} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 

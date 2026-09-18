@@ -17,7 +17,6 @@ import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol"
 import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../../../deploy-scripts/utils/Types.sol";
 import {PublishFactoryDepsResult} from "../../../../deploy-scripts/utils/bytecode/BytecodePublisher.s.sol";
-import {Test} from "forge-std/Test.sol";
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";

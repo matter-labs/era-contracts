@@ -19,12 +19,7 @@ import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainA
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 
 import {AddressNotZero, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
-import {
-    DepositsPaused,
-    NotZKChain,
-    NotL1,
-    NotSettlementLayer
-} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {NotL1} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 contract MailboxOnGatewayTest is UtilsCallMockerTest {
     IMailbox internal mailboxFacet;

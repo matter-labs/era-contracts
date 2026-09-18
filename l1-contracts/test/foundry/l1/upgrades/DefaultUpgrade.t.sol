@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";

@@ -11,15 +11,7 @@ import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {
-    ChainExists,
-    MessageRootNotRegistered,
-    OnlyChainAssetHandler,
-    OnlyChain,
-    OnlyGateway,
-    OnlyOnSettlementLayer,
-    TotalBatchesExecutedZero
-} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+import {ChainExists, MessageRootNotRegistered, OnlyChainAssetHandler, OnlyChain, OnlyOnSettlementLayer, TotalBatchesExecutedZero} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
 import {L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 

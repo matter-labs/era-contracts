@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import "forge-std/console.sol";
-import {Test, Vm} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Test.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
@@ -20,7 +20,7 @@ import {DummyChainTypeManagerForValidatorTimelock as DummyCTM} from "contracts/d
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {FeeParams, PubdataPricingMode, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {TestExecutor} from "contracts/dev-contracts/test/TestExecutor.sol";
 import {TestCommitter} from "contracts/dev-contracts/test/TestCommitter.sol";
 import {UtilsFacet} from "../Utils/UtilsFacet.sol";

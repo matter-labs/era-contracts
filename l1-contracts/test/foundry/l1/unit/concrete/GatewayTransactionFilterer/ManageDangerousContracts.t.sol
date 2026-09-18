@@ -8,10 +8,7 @@ import {
     GatewayTransactionFilterer,
     MIN_ALLOWED_ADDRESS
 } from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
-import {
-    L2_ASSET_ROUTER_ADDR,
-    ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {AlreadyDangerousContract, NotDangerousContract} from "contracts/common/L1ContractErrors.sol";
 
 contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {

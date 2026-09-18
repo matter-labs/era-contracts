@@ -9,24 +9,7 @@ import "forge-std/console.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "contracts/common/Config.sol";
 
-import {
-    L2_ASSET_ROUTER_ADDR,
-    L2_ASSET_TRACKER_ADDR,
-    L2_BASE_TOKEN_HOLDER,
-    L2_BASE_TOKEN_HOLDER_ADDR,
-    L2_BASE_TOKEN_SYSTEM_CONTRACT,
-    L2_BRIDGEHUB_ADDR,
-    L2_CHAIN_ASSET_HANDLER_ADDR,
-    L2_COMPLEX_UPGRADER_ADDR,
-    L2_INTEROP_CENTER_ADDR,
-    L2_INTEROP_HANDLER_ADDR,
-    L2_INTEROP_HANDLER,
-    L2_MESSAGE_VERIFICATION,
-    L2_NATIVE_TOKEN_VAULT_ADDR,
-    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT,
-    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
-    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
-} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_HOLDER, L2_BASE_TOKEN_HOLDER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_INTEROP_HANDLER, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
@@ -46,20 +29,10 @@ import {AtomicFinalityProof} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
-import {
-    BundleAttributes,
-    INTEROP_BUNDLE_VERSION,
-    INTEROP_CALL_VERSION,
-    InteropBundle,
-    InteropCall,
-    InteropCallStarter,
-    L2Message,
-    MessageInclusionProof
-} from "contracts/common/Messaging.sol";
+import {BundleAttributes, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, InteropBundle, InteropCall, L2Message, MessageInclusionProof} from "contracts/common/Messaging.sol";
 
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
-import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 
 abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;

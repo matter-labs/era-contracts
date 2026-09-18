@@ -1,17 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test, console2} from "forge-std/Test.sol";
+import {console2} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
-import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 import {IBridgehubBase, L2TransactionRequestTwoBridgesOuter} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {
-    CHAIN_REGISTRATION_SENDER_ENCODING_VERSION,
-    ChainRegistrationSender
-} from "contracts/core/chain-registration/ChainRegistrationSender.sol";
-import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
+import {CHAIN_REGISTRATION_SENDER_ENCODING_VERSION} from "contracts/core/chain-registration/ChainRegistrationSender.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";

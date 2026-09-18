@@ -7,7 +7,6 @@ pragma solidity ^0.8.20;
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {IBridgedStandardToken} from "contracts/bridge/interfaces/IBridgedStandardToken.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IAssetHandler} from "contracts/bridge/interfaces/IAssetHandler.sol";
 import {SharedL2ContractL1Deployer} from "./_SharedL2ContractL1Deployer.sol";

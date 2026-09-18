@@ -17,7 +17,6 @@ import {
     ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
-import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 /// @notice Additional unit tests for GatewayTransactionFilterer to improve coverage
 contract GatewayTransactionFiltererAdditionalTest is Test {
