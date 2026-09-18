@@ -6,12 +6,18 @@
  *
  * Formula used by the v31 asset-tracker code:
  *
- *   preV31TotalSupply = totalSuccessfulDepositsFromL1 - totalWithdrawalsToL1
+ *   preV31TotalSupply = totalExecutedDepositsFromL1 - totalWithdrawalsToL1
  *
  * For ZKsync OS chains before v31:
  *   - withdrawals are observable as L2BaseToken.Withdrawal logs at 0x...800a;
- *   - successful deposits are L1 NewPriorityRequest logs whose L2 priority tx
- *     receipt exists, succeeded, and landed before the v31 L2 boundary.
+ *   - executed deposits are L1 NewPriorityRequest logs whose L2 priority tx
+ *     receipt exists and landed before the v31 L2 boundary, whatever its
+ *     status. The bootloader mints reserved[0] for every priority tx it
+ *     processes: the fee goes to the operator and, on revert, the rest goes to
+ *     the refund recipient instead of the target. A reverted deposit therefore
+ *     still adds its full mintValue to the L2 supply (Era behaves the same, so
+ *     Era's L2BaseToken.totalSupply() includes them too). Only deposits with
+ *     no L2 receipt (never processed) or processed after the boundary are out.
  *
  * The deposited amount is L2CanonicalTransaction.reserved[0], i.e. mintValue.
  *
@@ -66,9 +72,11 @@ interface DepositCandidate {
 
 interface ReceiptStats {
   missingReceipt: number;
-  failedReceipt: number;
   afterBoundary: number;
-  successfulBeforeBoundary: number;
+  /** Executed before the boundary with status 1. Counted. */
+  succeededBeforeBoundary: number;
+  /** Executed before the boundary with status 0. Counted too: the mintValue was still minted. */
+  revertedBeforeBoundary: number;
 }
 
 interface CacheInput {
@@ -106,7 +114,7 @@ interface CachedDepositCandidates {
   zeroMintValue: number;
 }
 
-interface CachedSuccessfulDeposits {
+interface CachedExecutedDeposits {
   total: string;
   stats: ReceiptStats;
 }
@@ -144,7 +152,9 @@ interface SupplyCache {
   logQueries?: Record<string, CachedLogQuery>;
   withdrawals?: CachedWithdrawals;
   candidates?: CachedDepositCandidates;
-  deposits?: CachedSuccessfulDeposits;
+  // Keyed `executedDeposits` (not `deposits`) so caches written by the earlier
+  // revision, which dropped reverted deposits from the total, are recomputed.
+  executedDeposits?: CachedExecutedDeposits;
 }
 
 function parseNonNegativeInt(value: string): number {
@@ -613,7 +623,7 @@ async function getReceiptWithRetry(
   throw lastErr;
 }
 
-async function sumSuccessfulDeposits({
+async function sumExecutedDeposits({
   provider,
   deposits,
   toL2Block,
@@ -624,11 +634,11 @@ async function sumSuccessfulDeposits({
   toL2Block: number;
   receiptConcurrency: number;
 }): Promise<{ total: ethers.BigNumber; stats: ReceiptStats }> {
-  const stats = {
+  const stats: ReceiptStats = {
     missingReceipt: 0,
-    failedReceipt: 0,
     afterBoundary: 0,
-    successfulBeforeBoundary: 0,
+    succeededBeforeBoundary: 0,
+    revertedBeforeBoundary: 0,
   };
 
   let checked = 0;
@@ -652,12 +662,13 @@ async function sumSuccessfulDeposits({
       stats.afterBoundary += 1;
       continue;
     }
-    if (receipt.status !== 1) {
-      stats.failedReceipt += 1;
-      continue;
+    // Processed before the boundary: the bootloader minted the full mintValue
+    // whether or not the call itself succeeded (see the header comment).
+    if (receipt.status === 1) {
+      stats.succeededBeforeBoundary += 1;
+    } else {
+      stats.revertedBeforeBoundary += 1;
     }
-
-    stats.successfulBeforeBoundary += 1;
     total = total.add(deposit.mintValue);
   }
 
@@ -828,14 +839,14 @@ async function main(): Promise<void> {
   console.log(`  zero mintValue logs:      ${candidates.zeroMintValue}`);
 
   console.log("\n[3/3] Checking L2 priority transaction receipts...");
-  if (!cache.deposits) {
-    const deposits = await sumSuccessfulDeposits({
+  if (!cache.executedDeposits) {
+    const deposits = await sumExecutedDeposits({
       provider: l2Provider,
       deposits: candidates.deposits,
       toL2Block,
       receiptConcurrency: opts.receiptConcurrency,
     });
-    cache.deposits = {
+    cache.executedDeposits = {
       total: deposits.total.toString(),
       stats: deposits.stats,
     };
@@ -844,14 +855,14 @@ async function main(): Promise<void> {
     console.log("  loaded from cache");
   }
   const deposits = {
-    total: bn(cache.deposits.total),
-    stats: cache.deposits.stats,
+    total: bn(cache.executedDeposits.total),
+    stats: cache.executedDeposits.stats,
   };
-  console.log(`  successful before v31:    ${deposits.stats.successfulBeforeBoundary}`);
-  console.log(`  failed before v31:        ${deposits.stats.failedReceipt}`);
+  console.log(`  succeeded before v31:     ${deposits.stats.succeededBeforeBoundary}`);
+  console.log(`  reverted before v31:      ${deposits.stats.revertedBeforeBoundary} (counted: mintValue was minted)`);
   console.log(`  landed after boundary:    ${deposits.stats.afterBoundary}`);
   console.log(`  missing L2 receipt:       ${deposits.stats.missingReceipt}`);
-  console.log(`  totalSuccessfulDeposits:  ${formatAmount(deposits.total)}`);
+  console.log(`  totalExecutedDeposits:    ${formatAmount(deposits.total)}`);
 
   if (deposits.total.lt(withdrawals.total)) {
     throw new Error(
