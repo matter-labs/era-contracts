@@ -54,6 +54,11 @@ yarn setup-and-dump
 
 This runs the full deployment with pinned settings (`blockTime=1`, `timestamp=1`) and dumps each chain's state to the `chain-states/` directory. Interval mining makes the final block height and block-indexed state wall-clock-dependent, so the CI determinism check uses `compare-chain-states.ts` to normalize the documented drift and requires every non-normalized field to match.
 
+Spec `01` compares all predeploy runtimes byte-for-byte against artifacts compiled with the
+`anvil-interop` Foundry profile used by the snapshots. Its setup builds those reference artifacts
+in `outputs/predeploy-identity<run-suffix>/`, leaving the default artifacts used by coverage intact.
+A cold identity build adds compilation time; reruns reuse that separate cache. No snapshots are regenerated.
+
 ## Running Tests Without Redeployment
 
 After running once with `--keep-chains`, the Anvil chains and deployment state persist. Re-run just the hardhat tests:
