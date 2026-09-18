@@ -138,10 +138,11 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
     ///      stays reachable and is still covered by `GatewayVotePreparationTests`.
     /// @dev When gateway support returns, re-enabling this is not enough: the deployed gateway CTM never
     ///      receives a `setDefaultUpgrade` call, so `createNewVerifierOnlyUpgrade` on it would revert with
-    ///      `ZeroAddress`. The upgrade path solves this in `DefaultGatewayUpgrade`
-    ///      (`deployUsedUpgradeContractGW` + `prepareSetDefaultUpgradeCallForGateway`); the fresh path needs
-    ///      the equivalent — a per-VM default upgrade among the direct CREATE2 deployments plus an L1->L2
-    ///      `IChainTypeManager.setDefaultUpgrade` in `GatewayGovernanceUtils`.
+    ///      `ZeroAddress`. `DefaultGatewayUpgrade` used to solve this on the upgrade path
+    ///      (`deployUsedUpgradeContractGW` + `prepareSetDefaultUpgradeCallForGateway`) but was removed in
+    ///      #2499, so whoever brings gateways back needs to build it here: a per-VM default upgrade among
+    ///      the direct CREATE2 deployments plus an L1->L2 `IChainTypeManager.setDefaultUpgrade` in
+    ///      `GatewayGovernanceUtils`.
     /// @dev `virtual` for the anvil-interop harness alone, which brings a gateway up to keep exercising
     ///      the machinery this release keeps but does not deploy — see `_GatewayVotePreparationForTests`.
     function deployGatewayCTM() internal virtual {
