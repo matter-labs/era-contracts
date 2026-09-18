@@ -6,8 +6,9 @@ use zksync_types::l2::L2Tx;
 use zksync_types::transaction_request::{PaymasterParams, TransactionRequest};
 use zksync_types::web3::Bytes;
 use zksync_types::{
-    H256, K256PrivateKey, L2ChainId, Nonce, PackedEthSignature, Transaction, EIP_1559_TX_TYPE,
-    U256,
+    abi, address_to_u256, Address, K256PrivateKey, L2ChainId, Nonce, PackedEthSignature,
+    Transaction, EIP_1559_TX_TYPE, H256, PRIORITY_OPERATION_L2_TX_TYPE,
+    REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_BYTE, U256,
 };
 
 fn generate_eip712_transaction(key: &K256PrivateKey, chain_id: L2ChainId) -> Transaction {
@@ -68,8 +69,7 @@ fn generate_eip1559_transaction(key: &K256PrivateKey, chain_id: L2ChainId) -> Tr
     let msg = PackedEthSignature::message_to_signed_bytes(&unsigned_data);
 
     // Step 3: Sign via sign_raw
-    let signature =
-        PackedEthSignature::sign_raw(key, &msg).expect("Failed to sign EIP-1559 tx");
+    let signature = PackedEthSignature::sign_raw(key, &msg).expect("Failed to sign EIP-1559 tx");
     tx_request.raw = Some(Bytes(unsigned_data));
 
     // Step 4: RLP-encode signed tx, prepend type byte
@@ -92,6 +92,73 @@ fn generate_eip1559_transaction(key: &K256PrivateKey, chain_id: L2ChainId) -> Tr
     Transaction::from(l2tx)
 }
 
+/// Each fixture owns its addresses — unfunded and codeless — so its effects show up in balances.
+const L1_TX_SENDER: u64 = 0xf0001;
+const L1_TX_TARGET: u64 = 0xf0002;
+const L1_TX_REFUND_RECIPIENT: u64 = 0xf0003;
+const L1_FEE_TX_SENDER: u64 = 0xf0011;
+const L1_FEE_TX_TARGET: u64 = 0xf0012;
+const L1_FEE_TX_REFUND_RECIPIENT: u64 = 0xf0013;
+/// Value transferred by both L1->L2 fixtures.
+const L1_TX_VALUE: u64 = 1_000_000;
+/// Well under `MAX_GAS_PER_TRANSACTION`, so `reservedGas` is zero and only execution decides the
+/// refund.
+const L1_TX_GAS_LIMIT: u64 = 20_000_000;
+/// Non-zero, so `payToOperator` is not identically zero and force-fail billing is visible.
+const L1_FEE_TX_GAS_PRICE: u64 = 100;
+
+/// An L1->L2 transaction transferring its whole `value` to a fresh address. With
+/// `max_fee_per_gas = 0` the operator is paid nothing, so balances do not depend on gas burned.
+fn generate_l1_transaction(
+    sender: u64,
+    target: u64,
+    refund_recipient: u64,
+    max_fee_per_gas: u64,
+) -> Transaction {
+    let sender = Address::from_low_u64_be(sender);
+    let target = Address::from_low_u64_be(target);
+    let refund_recipient = Address::from_low_u64_be(refund_recipient);
+    let value = U256::from(L1_TX_VALUE);
+    let gas_limit = U256::from(L1_TX_GAS_LIMIT);
+    let max_fee_per_gas = U256::from(max_fee_per_gas);
+
+    let tx = abi::Transaction::L1 {
+        tx: abi::L2CanonicalTransaction {
+            tx_type: PRIORITY_OPERATION_L2_TX_TYPE.into(),
+            from: address_to_u256(&sender),
+            to: address_to_u256(&target),
+            gas_limit,
+            gas_per_pubdata_byte_limit: REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_BYTE.into(),
+            max_fee_per_gas,
+            max_priority_fee_per_gas: U256::zero(),
+            paymaster: U256::zero(),
+            // Serial id of the priority operation.
+            nonce: U256::one(),
+            value,
+            reserved: [
+                // `mintValue`
+                gas_limit * max_fee_per_gas + value,
+                address_to_u256(&refund_recipient),
+                U256::zero(),
+                U256::zero(),
+            ],
+            data: vec![],
+            signature: vec![],
+            factory_deps: vec![],
+            paymaster_input: vec![],
+            reserved_dynamic: vec![],
+        }
+        .into(),
+        factory_deps: vec![],
+        eth_block: 0,
+    };
+
+    let mut tx = Transaction::from_abi(tx, false).expect("Failed to build the L1->L2 fixture");
+    // `from_abi` stamps the current time, which would make the fixture differ on every run.
+    tx.received_timestamp_ms = 0;
+    tx
+}
+
 fn write_transaction(dir: &str, index: usize, tx: &Transaction) {
     let json = serde_json::to_string_pretty(tx).expect("Failed to serialize transaction to JSON");
 
@@ -106,9 +173,9 @@ fn write_transaction(dir: &str, index: usize, tx: &Transaction) {
 
 pub(crate) fn generate_transactions() {
     let key = K256PrivateKey::from_bytes(H256([
-        0xb5, 0xb1, 0x87, 0x0d, 0x4a, 0x32, 0x0e, 0x3a, 0x2b, 0x9c, 0x4f, 0x6e, 0x8d, 0x7a,
-        0x1c, 0x5f, 0x3b, 0x6e, 0x2d, 0x9a, 0x8c, 0x7f, 0x1e, 0x4d, 0x6b, 0x3a, 0x5c, 0x9e,
-        0x2f, 0x8d, 0x7b, 0x4a,
+        0xb5, 0xb1, 0x87, 0x0d, 0x4a, 0x32, 0x0e, 0x3a, 0x2b, 0x9c, 0x4f, 0x6e, 0x8d, 0x7a, 0x1c,
+        0x5f, 0x3b, 0x6e, 0x2d, 0x9a, 0x8c, 0x7f, 0x1e, 0x4d, 0x6b, 0x3a, 0x5c, 0x9e, 0x2f, 0x8d,
+        0x7b, 0x4a,
     ]))
     .expect("Invalid private key bytes");
 
@@ -127,5 +194,16 @@ pub(crate) fn generate_transactions() {
     let tx1 = generate_eip1559_transaction(&key, chain_id);
     write_transaction(dir, 1, &tx1);
 
-    println!("Done. Generated 2 test transactions.");
+    let tx2 = generate_l1_transaction(L1_TX_SENDER, L1_TX_TARGET, L1_TX_REFUND_RECIPIENT, 0);
+    write_transaction(dir, 2, &tx2);
+
+    let tx3 = generate_l1_transaction(
+        L1_FEE_TX_SENDER,
+        L1_FEE_TX_TARGET,
+        L1_FEE_TX_REFUND_RECIPIENT,
+        L1_FEE_TX_GAS_PRICE,
+    );
+    write_transaction(dir, 3, &tx3);
+
+    println!("Done. Generated 4 test transactions.");
 }

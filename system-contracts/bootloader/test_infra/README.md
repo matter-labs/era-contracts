@@ -22,8 +22,22 @@ cargo run
 
 ## Transaction fixtures for integration tests
 
-Integration tests can access bootloader tx slots via `testing_txDataOffset(index)`.
-Fixtures are loaded from `src/test_transactions/*.json` in numeric filename order (`0.json`, `1.json`, ...).
+Integration tests can access bootloader tx slots via `testing_txDataOffset(index)`, and the
+description slot the server writes (`txMeta`) via `testing_txDescriptionPtr(index)`.
+Fixtures are loaded from `src/test_transactions/*.json` in numeric filename order (`0.json`, `1.json`, ...):
+
+- `0.json`, `1.json` — L2 transactions (EIP-712 and EIP-1559).
+- `2.json` — an L1->L2 transaction transferring its whole deposit, with a zero gas price.
+- `3.json` — the same with a non-zero gas price, so fee and refund effects are visible.
+
+Only L2 fixtures get their sender funded by the runner; an L1->L2 transaction is funded by the
+bootloader minting its `mintValue`. That mint only works because the runner also presets the
+`L2AssetTracker` slots that register the base token (`apply_l1_base_token_minting_slots` in
+`src/main.rs`) — a new L1->L2 fixture needs nothing more, but a change to that contract's storage
+layout shows up here as a bare `Failed to mint ether`.
+
+Each fixture runs in every test, so a test that force-fails one must expect the others to run
+normally around it.
 
 To regenerate fixture transactions:
 
@@ -42,3 +56,20 @@ Use these helpers from `../tests/utils/test_utils.yul`:
   - compares expected full revert returndata hex (normalized to lowercase, optional `0x`)
 
 This separation allows integration tests to assert tx-level revert payloads without conflating them with assertion failures.
+
+## Post-execution expectations
+
+Test bodies run before the transaction loop, so anything about the _outcome_ of a transaction is
+registered as an expectation and checked by the runner once the batch is done:
+
+- `testing_expectTxPanic(index)` — that transaction failed with empty returndata (a near-call panic,
+  as opposed to a revert carrying a reason).
+- `testing_expectBootloaderLog(key, value)` — the bootloader sent exactly one such L2->L1 log.
+- `testing_expectNoBootloaderLogKey(key)` — it sent no log under this key.
+- `testing_expectNoBootloaderLog(key, value)` — it sent no such log, for a key another log owns.
+- `testing_expectSystemLog(key, value)` — it sent this system log (priority-queue accounting).
+- `testing_expectBalance(account, balance)` — exact base token balance at the end of the batch.
+
+Expectations fail closed: a test that registers them and also expects the batch to fail is an
+error (they could never be checked), and an `INT_TEST_*` that registers no assertion at all fails
+rather than passing vacuously.

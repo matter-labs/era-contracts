@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use colored::Colorize;
 use once_cell::sync::OnceCell;
@@ -13,7 +13,34 @@ use zksync_multivm::zk_evm_latest::tracing::{BeforeExecutionData, VmLocalStateDa
 
 use zksync_state::interface::{StoragePtr, WriteStorage};
 
+use zksync_types::U256;
+
 use crate::hook::TestVmHook;
+
+/// What the runner verifies once the batch is done; test bodies run before the transaction loop.
+#[derive(Default)]
+pub struct Expectations {
+    pub tx_panics: Vec<usize>,
+    pub bootloader_logs: Vec<(U256, U256)>,
+    pub balances: Vec<(U256, U256)>,
+    pub forbidden_log_keys: Vec<U256>,
+    /// Pairs that must not appear; unlike `forbidden_log_keys`, the key may be shared.
+    pub forbidden_logs: Vec<(U256, U256)>,
+    pub system_logs: Vec<(U256, U256)>,
+    /// Result of every transaction the bootloader reported, in execution order.
+    pub tx_results: Vec<(bool, Option<String>)>,
+}
+
+impl Expectations {
+    pub fn any_registered(&self) -> bool {
+        !self.tx_panics.is_empty()
+            || !self.bootloader_logs.is_empty()
+            || !self.forbidden_log_keys.is_empty()
+            || !self.forbidden_logs.is_empty()
+            || !self.system_logs.is_empty()
+            || !self.balances.is_empty()
+    }
+}
 
 /// Bootloader test tracer that is executing while the bootloader tests are running.
 /// It can check the asserts, return information about the running tests (and amount of tests) etc.
@@ -26,6 +53,8 @@ pub struct BootloaderTestTracer {
     requested_tx_failure: Arc<OnceCell<String>>,
     /// Full returndata hex of the latest failed tx execution captured via VM hook.
     tx_failure_data_hex: Arc<OnceCell<String>>,
+    /// What the test registered for the runner to check, plus the data to check it against.
+    expectations: Arc<Mutex<Expectations>>,
 
     test_name: Arc<OnceCell<String>>,
 }
@@ -36,6 +65,7 @@ impl BootloaderTestTracer {
         requested_assert: Arc<OnceCell<String>>,
         requested_tx_failure: Arc<OnceCell<String>>,
         tx_failure_data_hex: Arc<OnceCell<String>>,
+        expectations: Arc<Mutex<Expectations>>,
         test_name: Arc<OnceCell<String>>,
     ) -> Self {
         BootloaderTestTracer {
@@ -43,6 +73,7 @@ impl BootloaderTestTracer {
             requested_assert,
             requested_tx_failure,
             tx_failure_data_hex,
+            expectations,
             test_name,
         }
     }
@@ -82,6 +113,53 @@ impl<S, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for BootloaderTestTracer {
                     let _ = self.tx_failure_data_hex.set(data_hex.clone());
                 }
             }
+            self.expectations
+                .lock()
+                .unwrap()
+                .tx_results
+                .push((*success, revert_data_hex.clone()));
+        }
+
+        match &hook {
+            TestVmHook::ExpectTxPanic(index) => {
+                self.expectations.lock().unwrap().tx_panics.push(*index);
+            }
+            TestVmHook::ExpectBootloaderLog(key, value) => {
+                self.expectations
+                    .lock()
+                    .unwrap()
+                    .bootloader_logs
+                    .push((*key, *value));
+            }
+            TestVmHook::ExpectBalance(account, balance) => {
+                self.expectations
+                    .lock()
+                    .unwrap()
+                    .balances
+                    .push((*account, *balance));
+            }
+            TestVmHook::ExpectNoBootloaderLogKey(key) => {
+                self.expectations
+                    .lock()
+                    .unwrap()
+                    .forbidden_log_keys
+                    .push(*key);
+            }
+            TestVmHook::ExpectNoBootloaderLog(key, value) => {
+                self.expectations
+                    .lock()
+                    .unwrap()
+                    .forbidden_logs
+                    .push((*key, *value));
+            }
+            TestVmHook::ExpectSystemLog(key, value) => {
+                self.expectations
+                    .lock()
+                    .unwrap()
+                    .system_logs
+                    .push((*key, *value));
+            }
+            _ => {}
         }
 
         if let TestVmHook::TestStart(test_name) = &hook {

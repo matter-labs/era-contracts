@@ -22,6 +22,12 @@ pub(crate) enum TestVmHook {
         success: bool,
         revert_data_hex: Option<String>,
     },
+    ExpectTxPanic(usize),
+    ExpectBootloaderLog(U256, U256),
+    ExpectBalance(U256, U256),
+    ExpectNoBootloaderLogKey(U256),
+    ExpectNoBootloaderLog(U256, U256),
+    ExpectSystemLog(U256, U256),
     // Testing framework reporting the number of tests.
     TestCount(u32),
     // 104 - test start.
@@ -35,6 +41,15 @@ const TEST_HOOK_START: u32 = TEST_HOOK_ENUM_POSITION - TEST_HOOKS;
 const VM_HOOK_PARAMS: u32 = 3;
 const VM_HOOK_PARAMS_START: u32 = TEST_HOOK_ENUM_POSITION + 1;
 const VM_HOOK_ENUM_POSITION: u32 = VM_HOOK_PARAMS_START + VM_HOOK_PARAMS;
+
+/// Clamped, so a bogus index fails its own test instead of panicking the runner.
+fn as_tx_index(value: U256) -> usize {
+    if value > U256::from(usize::MAX as u64) {
+        usize::MAX
+    } else {
+        value.as_usize()
+    }
+}
 
 pub fn get_vm_hook_params<H: HistoryMode>(memory: &SimpleMemory<H>) -> Vec<U256> {
     memory.dump_page_content_as_u256_words(
@@ -164,6 +179,12 @@ impl TestVmHook {
                     103 => Self::TestCount(vm_hook_params[0].as_u32()),
                     104 => Self::TestStart(test_hook_as_string(vm_hook_params[0])),
                     105 => Self::RequestedTxFailure(test_hook_as_string(vm_hook_params[0])),
+                    106 => Self::ExpectTxPanic(as_tx_index(vm_hook_params[0])),
+                    107 => Self::ExpectBootloaderLog(vm_hook_params[0], vm_hook_params[1]),
+                    108 => Self::ExpectBalance(vm_hook_params[0], vm_hook_params[1]),
+                    109 => Self::ExpectNoBootloaderLogKey(vm_hook_params[0]),
+                    110 => Self::ExpectNoBootloaderLog(vm_hook_params[0], vm_hook_params[1]),
+                    111 => Self::ExpectSystemLog(vm_hook_params[0], vm_hook_params[1]),
                     _ => Self::NoHook,
                 }
             }

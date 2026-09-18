@@ -1,16 +1,23 @@
-use crate::{test_count_tracer::TestCountTracer, tracer::BootloaderTestTracer};
+use crate::{
+    test_count_tracer::TestCountTracer,
+    tracer::{BootloaderTestTracer, Expectations},
+};
 use colored::Colorize;
 use once_cell::sync::OnceCell;
 use std::fs;
 use std::process;
-use std::{env, sync::Arc};
+use std::{
+    env,
+    sync::{Arc, Mutex},
+};
 use zksync_multivm::interface::{
     InspectExecutionMode, L1BatchEnv, L2BlockEnv, SystemEnv, TxExecutionMode, VmFactory,
     VmInterface,
 };
 use zksync_multivm::vm_latest::{HistoryDisabled, ToTracerPointer, TracerDispatcher, Vm};
 use zksync_state::interface::{
-    InMemoryStorage, StorageView, WriteStorage, IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID,
+    InMemoryStorage, ReadStorage, StoragePtr, StorageView, WriteStorage,
+    IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID,
 };
 use zksync_types::fee_model::BatchFeeInput;
 
@@ -20,21 +27,22 @@ use tracing_subscriber::util::SubscriberInitExt;
 use zksync_contracts::{
     BaseSystemContracts, ContractLanguage, SystemContractCode, SystemContractsRepo,
 };
-use zksync_multivm::interface::{ExecutionResult, Halt};
+use zksync_multivm::interface::{ExecutionResult, Halt, VmExecutionResultAndLogs};
 use zksync_types::bytecode::BytecodeHash;
 use zksync_types::system_contracts::get_system_smart_contracts_from_dir;
 use zksync_types::{
-    block::L2BlockHasher, get_address_mapping_key, settlement::SettlementLayer, u256_to_h256,
-    Address, L1BatchNumber, L2BlockNumber, SLChainId, U256,
+    block::L2BlockHasher, get_address_mapping_key, h256_to_u256, settlement::SettlementLayer,
+    u256_to_address, u256_to_h256, Address, L1BatchNumber, L2BlockNumber, SLChainId, H256, U256,
 };
 use zksync_types::{
-    AccountTreeId, L2ChainId, L2_BASE_TOKEN_ADDRESS, StorageKey, Transaction,
+    web3::keccak256, AccountTreeId, ExecuteTransactionCommon, L2ChainId, StorageKey, Transaction,
+    BASE_TOKEN_HOLDER_ADDRESS, BOOTLOADER_ADDRESS, L2_ASSET_TRACKER_ADDRESS, L2_BASE_TOKEN_ADDRESS,
 };
 
 mod hook;
 mod test_count_tracer;
-mod transaction_generator;
 mod tracer;
+mod transaction_generator;
 
 fn get_balance_key(address: Address) -> StorageKey {
     let account_id = AccountTreeId::new(L2_BASE_TOKEN_ADDRESS);
@@ -42,10 +50,177 @@ fn get_balance_key(address: Address) -> StorageKey {
     StorageKey::new(account_id, key)
 }
 
+/// `L2AssetTracker` slots, from `forge inspect L2AssetTracker storageLayout`. zksync-era's
+/// `with_l1_base_token_minting` has the same, but the pinned rev predates it. Nothing ties them to
+/// `AssetTrackerBase.sol`: a layout change surfaces as a bare `Failed to mint ether`.
+const ASSET_TRACKER_IS_ASSET_REGISTERED_SLOT: u64 = 203;
+const ASSET_TRACKER_L1_CHAIN_ID_SLOT: u64 = 204;
+const ASSET_TRACKER_BASE_TOKEN_ASSET_ID_SLOT: u64 = 205;
+/// Any non-zero id; the fixtures only need the base token registered.
+const TEST_BASE_TOKEN_ASSET_ID_BYTE: u8 = 0x11;
+/// Holder supply, comfortably above every fixture's `mintValue`.
+const BASE_TOKEN_HOLDER_BALANCE: u64 = 10u64.pow(19);
+
+/// Storage slots an L1->L2 transaction needs before the bootloader can mint its `mintValue`.
+fn apply_l1_base_token_minting_slots(storage: &StoragePtr<StorageView<InMemoryStorage>>) {
+    let base_token_asset_id = H256::repeat_byte(TEST_BASE_TOKEN_ASSET_ID_BYTE);
+
+    let asset_tracker = AccountTreeId::new(L2_ASSET_TRACKER_ADDRESS);
+    // `isAssetRegistered[base_token_asset_id]`, a mapping.
+    let mut registered_key_input = [0u8; 64];
+    registered_key_input[..32].copy_from_slice(base_token_asset_id.as_bytes());
+    registered_key_input[32..]
+        .copy_from_slice(H256::from_low_u64_be(ASSET_TRACKER_IS_ASSET_REGISTERED_SLOT).as_bytes());
+
+    let slots = [
+        (
+            StorageKey::new(
+                asset_tracker,
+                H256::from_low_u64_be(ASSET_TRACKER_L1_CHAIN_ID_SLOT),
+            ),
+            H256::from_low_u64_be(1),
+        ),
+        (
+            StorageKey::new(
+                asset_tracker,
+                H256::from_low_u64_be(ASSET_TRACKER_BASE_TOKEN_ASSET_ID_SLOT),
+            ),
+            base_token_asset_id,
+        ),
+        (
+            StorageKey::new(asset_tracker, H256(keccak256(&registered_key_input))),
+            H256::from_low_u64_be(1),
+        ),
+        (
+            get_balance_key(BASE_TOKEN_HOLDER_ADDRESS),
+            u256_to_h256(U256::from(BASE_TOKEN_HOLDER_BALANCE)),
+        ),
+    ];
+
+    for (key, value) in slots {
+        storage.borrow_mut().set_value(key, value);
+    }
+}
+
+/// A test expecting the batch to fail has nothing for the hooks to read; skipping them silently
+/// would let it pass with any expectation at all.
+fn return_expectations_unreachable(test_name: &str) -> Result<(), String> {
+    Err(format!(
+        "`{}` registered `testing_expect*` expectations and also expects the batch to fail; \
+         the expectations could never be checked.",
+        test_name
+    ))
+}
+
+/// Verifies the post-execution expectations a test registered through the `testing_expect*` hooks.
+fn check_expectations(
+    expectations: &Expectations,
+    result: &VmExecutionResultAndLogs,
+    storage: &StoragePtr<StorageView<InMemoryStorage>>,
+) -> Result<(), String> {
+    for index in &expectations.tx_panics {
+        match expectations.tx_results.get(*index) {
+            Some((false, None)) => {}
+            Some((false, Some(data))) => {
+                return Err(format!(
+                    "tx {} should have failed with empty returndata, but returned `0x{}`.",
+                    index, data
+                ))
+            }
+            Some((true, _)) => {
+                return Err(format!("tx {} should have failed, but succeeded.", index))
+            }
+            None => {
+                return Err(format!(
+                    "tx {} should have failed, but the bootloader reported no result for it.",
+                    index
+                ))
+            }
+        }
+    }
+
+    for (key, value) in &expectations.bootloader_logs {
+        let expected_key = u256_to_h256(*key);
+        let expected_value = u256_to_h256(*value);
+        // Exactly one: a second log under the same canonical hash would prove the tx twice on L1.
+        let matches = result
+            .logs
+            .user_l2_to_l1_logs
+            .iter()
+            .filter(|log| {
+                log.0.sender == BOOTLOADER_ADDRESS
+                    && log.0.key == expected_key
+                    && log.0.value == expected_value
+            })
+            .count();
+        if matches != 1 {
+            return Err(format!(
+                "Expected exactly one bootloader L2->L1 log with key {:?} and value {:?}, found {}. Logs sent: {:?}",
+                expected_key, expected_value, matches, result.logs.user_l2_to_l1_logs
+            ));
+        }
+    }
+
+    for key in &expectations.forbidden_log_keys {
+        let forbidden_key = u256_to_h256(*key);
+        if let Some(log) = result
+            .logs
+            .user_l2_to_l1_logs
+            .iter()
+            .find(|log| log.0.sender == BOOTLOADER_ADDRESS && log.0.key == forbidden_key)
+        {
+            return Err(format!(
+                "Bootloader sent an unexpected L2->L1 log under key {:?}: {:?}",
+                forbidden_key, log
+            ));
+        }
+    }
+
+    for (key, value) in &expectations.forbidden_logs {
+        let forbidden_key = u256_to_h256(*key);
+        let forbidden_value = u256_to_h256(*value);
+        if let Some(log) = result.logs.user_l2_to_l1_logs.iter().find(|log| {
+            log.0.sender == BOOTLOADER_ADDRESS
+                && log.0.key == forbidden_key
+                && log.0.value == forbidden_value
+        }) {
+            return Err(format!("Bootloader sent a forbidden L2->L1 log {:?}", log));
+        }
+    }
+
+    // Priority-queue accounting arrives as system logs.
+    for (key, value) in &expectations.system_logs {
+        let expected_key = u256_to_h256(*key);
+        let expected_value = u256_to_h256(*value);
+        let found = result.logs.system_l2_to_l1_logs.iter().any(|log| {
+            log.0.sender == BOOTLOADER_ADDRESS
+                && log.0.key == expected_key
+                && log.0.value == expected_value
+        });
+        if !found {
+            return Err(format!(
+                "Missing bootloader system log with key {:?} and value {:?}. System logs sent: {:?}",
+                expected_key, expected_value, result.logs.system_l2_to_l1_logs
+            ));
+        }
+    }
+
+    for (account, balance) in &expectations.balances {
+        let account = u256_to_address(account);
+        let actual = h256_to_u256(storage.borrow_mut().read_value(&get_balance_key(account)));
+        if actual != *balance {
+            return Err(format!(
+                "Balance of {:?} is {}, expected {}.",
+                account, actual, balance
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 fn load_test_transactions() -> Vec<Transaction> {
-    let transactions_dir = env::current_dir()
-        .unwrap()
-        .join("src/test_transactions");
+    let transactions_dir = env::current_dir().unwrap().join("src/test_transactions");
 
     let mut fixture_files: Vec<(usize, std::path::PathBuf)> = fs::read_dir(&transactions_dir)
         .unwrap_or_else(|e| {
@@ -116,8 +291,7 @@ fn execute_internal_bootloader_test() {
         hash,
     };
 
-    let bytecode =
-        repo.read_sys_contract_bytecode("", "EvmEmulator", None, ContractLanguage::Yul);
+    let bytecode = repo.read_sys_contract_bytecode("", "EvmEmulator", None, ContractLanguage::Yul);
     let hash = BytecodeHash::for_bytecode(&bytecode).value();
     let evm_emulator = SystemContractCode {
         code: bytecode,
@@ -199,6 +373,7 @@ fn execute_internal_bootloader_test() {
             get_system_smart_contracts_from_dir(env::current_dir().unwrap().join("../../")),
         ))
         .to_rc_ptr();
+        apply_l1_base_token_minting_slots(&storage);
 
         // We are passing id of the test in location (0) where we normally put the operator.
         // This is then picked up by the testing framework.
@@ -210,6 +385,7 @@ fn execute_internal_bootloader_test() {
         let requested_assert = Arc::new(OnceCell::default());
         let requested_tx_failure = Arc::new(OnceCell::default());
         let tx_failure_data_hex = Arc::new(OnceCell::default());
+        let expectations = Arc::new(Mutex::new(Expectations::default()));
         let test_name = Arc::new(OnceCell::default());
 
         let custom_tracers = BootloaderTestTracer::new(
@@ -217,6 +393,7 @@ fn execute_internal_bootloader_test() {
             requested_assert.clone(),
             requested_tx_failure.clone(),
             tx_failure_data_hex.clone(),
+            expectations.clone(),
             test_name.clone(),
         )
         .into_tracer_pointer();
@@ -224,11 +401,14 @@ fn execute_internal_bootloader_test() {
 
         // Insert all fixture transactions into slots in numeric filename order.
         for tx in load_test_transactions() {
-            // Fund the sender so each transaction can pay fees.
-            storage.borrow_mut().set_value(
-                get_balance_key(tx.initiator_account()),
-                u256_to_h256(U256::MAX),
-            );
+            // An L1->L2 sender is funded by the bootloader's mint, which `U256::MAX` would
+            // overflow — and it would mask the balances the force-fail tests assert.
+            if matches!(tx.common_data, ExecuteTransactionCommon::L2(_)) {
+                storage.borrow_mut().set_value(
+                    get_balance_key(tx.initiator_account()),
+                    u256_to_h256(U256::MAX),
+                );
+            }
 
             vm.push_transaction(tx);
         }
@@ -236,6 +416,7 @@ fn execute_internal_bootloader_test() {
         let result = vm.inspect(&mut tracer_dispatcher, InspectExecutionMode::Bootloader);
         drop(tracer_dispatcher);
 
+        let expectations = Arc::into_inner(expectations).unwrap().into_inner().unwrap();
         let mut test_result = Arc::into_inner(test_result).unwrap().into_inner();
         let requested_assert = Arc::into_inner(requested_assert).unwrap().into_inner();
         let requested_tx_failure = Arc::into_inner(requested_tx_failure).unwrap().into_inner();
@@ -245,6 +426,11 @@ fn execute_internal_bootloader_test() {
             .into_inner()
             .unwrap_or_default();
 
+        // An `INT_TEST_*` runs the whole batch, so one that registers nothing passes vacuously.
+        let asserted_something = requested_assert.is_some()
+            || requested_tx_failure.is_some()
+            || expectations.any_registered();
+
         if test_result.is_none() {
             test_result = Some(if let Some(requested_tx_failure) = requested_tx_failure {
                 let expected_data_hex = requested_tx_failure
@@ -252,7 +438,21 @@ fn execute_internal_bootloader_test() {
                     .trim_start_matches("0x")
                     .to_ascii_lowercase();
                 if tx_failure_data_hex.as_deref() == Some(expected_data_hex.as_str()) {
-                    Ok(())
+                    // `tx_failure_data_hex` latches on the first failure, so without this a later
+                    // transaction taking the batch down is reported as a pass.
+                    match &result.result {
+                        ExecutionResult::Success { .. } => {
+                            check_expectations(&expectations, &result, &storage)
+                        }
+                        ExecutionResult::Revert { output } => Err(format!(
+                            "tx failed with the expected returndata, but the batch reverted with `{}`.",
+                            output.to_user_friendly_string()
+                        )),
+                        ExecutionResult::Halt { reason } => Err(format!(
+                            "tx failed with the expected returndata, but the batch halted with `{}`.",
+                            reason
+                        )),
+                    }
                 } else if tx_failure_data_hex.is_none() {
                     match &result.result {
                         ExecutionResult::Success { .. } => Err(format!(
@@ -277,49 +477,65 @@ fn execute_internal_bootloader_test() {
                     ))
                 }
             } else if let Some(requested_assert) = requested_assert {
-                match &result.result {
-                    ExecutionResult::Success { .. } => Err(format!(
-                        "Should have failed with {}, but run successfully.",
-                        requested_assert
-                    )),
-                    ExecutionResult::Revert { output } => {
-                        let reason = output.to_user_friendly_string();
-                        if reason.contains(&requested_assert) {
-                            Ok(())
-                        } else {
-                            Err(format!(
-                                "Should have failed with `{}`, but run reverted with `{}`.",
-                                requested_assert, reason
-                            ))
-                        }
-                    }
-                    ExecutionResult::Halt { reason } => {
-                        if let Halt::UnexpectedVMBehavior(reason) = reason {
-                            let reason =
-                                reason.strip_prefix("Assertion error: ").unwrap_or(&reason);
-                            if reason == requested_assert {
+                if expectations.any_registered() {
+                    return_expectations_unreachable(&test_name)
+                } else {
+                    match &result.result {
+                        ExecutionResult::Success { .. } => Err(format!(
+                            "Should have failed with {}, but run successfully.",
+                            requested_assert
+                        )),
+                        ExecutionResult::Revert { output } => {
+                            let reason = output.to_user_friendly_string();
+                            if reason.contains(&requested_assert) {
                                 Ok(())
                             } else {
                                 Err(format!(
+                                    "Should have failed with `{}`, but run reverted with `{}`.",
+                                    requested_assert, reason
+                                ))
+                            }
+                        }
+                        ExecutionResult::Halt { reason } => {
+                            if let Halt::UnexpectedVMBehavior(reason) = reason {
+                                let reason =
+                                    reason.strip_prefix("Assertion error: ").unwrap_or(&reason);
+                                if reason == requested_assert {
+                                    Ok(())
+                                } else {
+                                    Err(format!(
                                         "Should have failed with `{}`, but failed with different assert `{}`",
                                         requested_assert, reason
                                     ))
+                                }
+                            } else {
+                                Err(format!(
+                                    "Should have failed with `{}`, but halted with`{}`",
+                                    requested_assert, reason
+                                ))
                             }
-                        } else {
-                            Err(format!(
-                                "Should have failed with `{}`, but halted with`{}`",
-                                requested_assert, reason
-                            ))
                         }
                     }
                 }
             } else {
                 match &result.result {
-                    ExecutionResult::Success { .. } => Ok(()),
+                    ExecutionResult::Success { .. } => {
+                        check_expectations(&expectations, &result, &storage)
+                    }
                     ExecutionResult::Revert { output } => Err(output.to_user_friendly_string()),
                     ExecutionResult::Halt { reason } => Err(reason.to_string()),
                 }
             });
+        }
+
+        if matches!(test_result, Some(Ok(())))
+            && test_name.starts_with("INT_TEST")
+            && !asserted_something
+        {
+            test_result = Some(Err(
+                "Integration test registered no assertion: it runs the batch and checks nothing."
+                    .to_string(),
+            ));
         }
 
         match &test_result.unwrap() {
