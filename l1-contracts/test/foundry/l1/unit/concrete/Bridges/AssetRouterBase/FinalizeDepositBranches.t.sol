@@ -83,9 +83,9 @@ contract TestAssetRouterBase is AssetRouterBase {
 }
 
 contract AssetRouterBase_FinalizeDepositBranches_Test is Test {
-    TestAssetRouterBase router;
-    MockAssetHandler existingHandler;
-    MockAssetHandler ntvHandler;
+    TestAssetRouterBase internal router;
+    MockAssetHandler internal existingHandler;
+    MockAssetHandler internal ntvHandler;
 
     function setUp() public {
         router = new TestAssetRouterBase();

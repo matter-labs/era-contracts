@@ -24,8 +24,8 @@ import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 contract ExecutingTest is ExecutorTest {
     using stdStorage for StdStorage;
 
-    bytes32[] priorityOpsHashes;
-    bytes32 correctRollingHash;
+    bytes32[] internal priorityOpsHashes;
+    bytes32 internal correctRollingHash;
 
     function appendPriorityOps() internal {
         for (uint256 i = 0; i < priorityOpsHashes.length; i++) {

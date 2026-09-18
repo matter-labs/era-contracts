@@ -24,9 +24,9 @@ import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 contract L1ContractDeployer is UtilsCallMockerTest {
     using stdStorage for StdStorage;
 
-    DeployL1CoreContractsIntegrationScript l1CoreContractsScript;
-    DeployCTMIntegrationScript ctmScript;
-    RegisterCTM registerCTMScript;
+    DeployL1CoreContractsIntegrationScript internal l1CoreContractsScript;
+    DeployCTMIntegrationScript internal ctmScript;
+    RegisterCTM internal registerCTMScript;
 
     struct AllAddresses {
         address bridgehubProxyAddress;
@@ -45,8 +45,8 @@ contract L1ContractDeployer is UtilsCallMockerTest {
     Config public ecosystemConfig;
 
     AllAddresses public addresses;
-    CoreDeployedAddresses ecosystemAddresses;
-    CTMDeployedAddresses ctmAddresses;
+    CoreDeployedAddresses internal ecosystemAddresses;
+    CTMDeployedAddresses internal ctmAddresses;
 
     function deployEcosystem() public returns (CoreDeployedAddresses memory ecosystemAddresses) {
         l1CoreContractsScript = new DeployL1CoreContractsIntegrationScript();

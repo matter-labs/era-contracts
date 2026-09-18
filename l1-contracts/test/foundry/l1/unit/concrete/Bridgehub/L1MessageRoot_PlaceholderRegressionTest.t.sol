@@ -14,10 +14,10 @@ import {V31UpgradeChainBatchNumberAlreadySet} from "contracts/core/bridgehub/L1B
 /// @title L1MessageRootPlaceholderRegressionTest
 /// @notice Regression tests for the V31 upgrade batch number placeholder fix
 contract L1MessageRootPlaceholderRegressionTest is Test {
-    address bridgeHub;
+    address internal bridgeHub;
 
-    uint256 constant CHAIN_ID = 271;
-    uint256 constant TOTAL_BATCHES_EXECUTED = 100;
+    uint256 internal constant CHAIN_ID = 271;
+    uint256 internal constant TOTAL_BATCHES_EXECUTED = 100;
 
     function setUp() public {
         bridgeHub = makeAddr("bridgeHub");

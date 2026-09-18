@@ -18,11 +18,11 @@ import {
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
 contract L1MessageRootV31UpgradeTest is Test {
-    address bridgeHub;
-    L1MessageRoot messageRoot;
+    address internal bridgeHub;
+    L1MessageRoot internal messageRoot;
 
-    uint256 constant CHAIN_ID = 271;
-    uint256 constant TOTAL_BATCHES_EXECUTED = 100;
+    uint256 internal constant CHAIN_ID = 271;
+    uint256 internal constant TOTAL_BATCHES_EXECUTED = 100;
 
     function setUp() public {
         bridgeHub = makeAddr("bridgeHub");

@@ -71,10 +71,10 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
 
     UpgradeableBeacon internal beacon;
 
-    IL2AssetRouter l2AssetRouter = IL2AssetRouter(L2_ASSET_ROUTER_ADDR);
-    IL2Bridgehub l2Bridgehub = IL2Bridgehub(L2_BRIDGEHUB_ADDR);
-    InteropCenter l2InteropCenter = InteropCenter(L2_INTEROP_CENTER_ADDR);
-    IL2NativeTokenVault l2NativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+    IL2AssetRouter internal l2AssetRouter = IL2AssetRouter(L2_ASSET_ROUTER_ADDR);
+    IL2Bridgehub internal l2Bridgehub = IL2Bridgehub(L2_BRIDGEHUB_ADDR);
+    InteropCenter internal l2InteropCenter = InteropCenter(L2_INTEROP_CENTER_ADDR);
+    IL2NativeTokenVault internal l2NativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
     uint256 internal constant L1_CHAIN_ID = 10; // it cannot be 9, the default block.chainid
     uint256 internal ERA_CHAIN_ID = 270;
@@ -102,10 +102,10 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
 
     IChainTypeManager internal chainTypeManager;
 
-    address UNBUNDLER_ADDRESS;
-    address EXECUTION_ADDRESS;
-    address interopTargetContract;
-    uint256 originalChainId;
+    address internal UNBUNDLER_ADDRESS;
+    address internal EXECUTION_ADDRESS;
+    address internal interopTargetContract;
+    uint256 internal originalChainId;
 
     function setUp() public virtual {
         setUpInner(false);

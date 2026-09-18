@@ -12,7 +12,7 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 import {L1ChainAssetHandlerDev} from "contracts/dev-contracts/L1ChainAssetHandlerDev.sol";
 
 contract GatewayDeployer is L1ContractDeployer {
-    GatewayPreparationForTests gatewayScript;
+    GatewayPreparationForTests internal gatewayScript;
 
     /// @dev v32 disables chain migrations in production (`CHAIN_MIGRATIONS_ENABLED` in `Config.sol`;
     /// see {protocol-docs/chain-lifecycle.md#v32-chain-migrations-are-explicitly-disabled}), but the gateway tests exercise the migration machinery

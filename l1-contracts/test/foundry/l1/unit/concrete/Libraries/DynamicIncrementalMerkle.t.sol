@@ -12,7 +12,7 @@ contract DynamicIncrementalMerkleTest is Test {
 
     DynamicIncrementalMerkle.Bytes32PushTree internal tree;
 
-    bytes32 constant ZERO = bytes32(uint256(0));
+    bytes32 internal constant ZERO = bytes32(uint256(0));
 
     // ============ setup Tests ============
 

@@ -14,11 +14,11 @@ import {
 } from "contracts/common/L1ContractErrors.sol";
 
 contract MerkleTestTest is Test {
-    MerkleTreeNoSort merkleTree;
-    MerkleTreeNoSort smallMerkleTree;
-    MerkleTest merkleTest;
-    bytes32[] elements;
-    bytes32 root;
+    MerkleTreeNoSort internal merkleTree;
+    MerkleTreeNoSort internal smallMerkleTree;
+    MerkleTest internal merkleTest;
+    bytes32[] internal elements;
+    bytes32 internal root;
 
     function setUp() public {
         merkleTree = new MerkleTreeNoSort();

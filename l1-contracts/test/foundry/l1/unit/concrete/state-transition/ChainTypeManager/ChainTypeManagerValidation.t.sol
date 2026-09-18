@@ -65,12 +65,12 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
     address internal serverNotifier;
     bytes32 internal baseTokenAssetId;
     address internal newChainAdmin;
-    uint256 l1ChainId = 5;
-    uint256 chainId = 112;
+    uint256 internal l1ChainId = 5;
+    uint256 internal chainId = 112;
     address internal testnetVerifier;
     bytes internal forceDeploymentsData = hex"";
 
-    uint256 zkChainId = 9;
+    uint256 internal zkChainId = 9;
     uint256 internal constant MAX_NUMBER_OF_ZK_CHAINS = 10;
 
     Diamond.FacetCut[] internal facetCuts;

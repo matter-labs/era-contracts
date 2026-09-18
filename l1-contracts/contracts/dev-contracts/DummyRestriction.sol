@@ -9,7 +9,7 @@ import {IRestriction, RESTRICTION_MAGIC} from "../governance/restriction/IRestri
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract DummyRestriction is IRestriction {
-    bool immutable correctMagic;
+    bool internal immutable correctMagic;
 
     constructor(bool useCorrectMagic) {
         correctMagic = useCorrectMagic;

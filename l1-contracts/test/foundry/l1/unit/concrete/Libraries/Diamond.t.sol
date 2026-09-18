@@ -46,7 +46,7 @@ contract MockFacet2 {
 
 /// @notice Mock initializer that returns correct magic value
 contract MockDiamondInit {
-    bytes32 constant DIAMOND_INIT_SUCCESS_RETURN_VALUE =
+    bytes32 internal constant DIAMOND_INIT_SUCCESS_RETURN_VALUE =
         0x33774e659306e47509050e97cb651e731180a42d458212294d30751925c551a2;
 
     function init() external pure returns (bytes32) {

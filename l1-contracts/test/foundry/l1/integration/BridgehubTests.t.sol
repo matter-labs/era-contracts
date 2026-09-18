@@ -37,7 +37,7 @@ import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestConstants.sol";
 contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
     using LogFinder for Vm.Log[];
 
-    uint256 constant TEST_USERS_COUNT = 10;
+    uint256 internal constant TEST_USERS_COUNT = 10;
 
     enum RequestType {
         DIRECT,
@@ -56,7 +56,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
     address[] public l2ContractAddresses;
     address[] public addressesToExclude;
     address public currentChainAddress;
-    SimpleExecutor simpleExecutor;
+    SimpleExecutor internal simpleExecutor;
 
     // Amounts deposited by each user, mapped by user address and token address
     mapping(address user => mapping(address token => uint256 deposited)) public depositsUsers;

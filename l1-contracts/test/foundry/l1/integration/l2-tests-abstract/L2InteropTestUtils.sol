@@ -39,8 +39,8 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
     /// @dev Token amount the atomic integration fixtures move.
     uint256 internal constant TRANSFER_AMOUNT = 100;
 
-    uint256 destinationChainId = INTEROP_DESTINATION_CHAIN_ID;
-    bytes32 destinationBaseTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
+    uint256 internal destinationChainId = INTEROP_DESTINATION_CHAIN_ID;
+    bytes32 internal destinationBaseTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
 
     /// @dev The AtomicFlowManager `append`/`requireFlowFinalized` gates are mocked to succeed in
     /// {SharedL2ContractDeployer.setUp}; the real gates are covered by the atomic suites and, on a

@@ -14,7 +14,7 @@ contract FullMerkleTest is Test {
     function test() internal {}
 
     FullMerkleTestContract internal merkleTest;
-    bytes32 constant zeroHash = keccak256(abi.encodePacked("ZERO"));
+    bytes32 internal constant zeroHash = keccak256(abi.encodePacked("ZERO"));
 
     function setUp() public {
         merkleTest = new FullMerkleTestContract(zeroHash);

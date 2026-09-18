@@ -7,7 +7,7 @@ import "contracts/l2-system/zksync-os/L1Messenger.sol";
 import {IL2ToL1Messenger} from "contracts/common/l2-helpers/IL2ToL1Messenger.sol";
 
 contract L1MessengerTest is Test {
-    L1Messenger messenger;
+    L1Messenger internal messenger;
 
     function setUp() public {
         messenger = new L1Messenger();

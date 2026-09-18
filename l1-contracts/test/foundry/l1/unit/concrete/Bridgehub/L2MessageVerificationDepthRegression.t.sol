@@ -15,7 +15,7 @@ import {DepthMoreThanOneForRecursiveMerkleProof} from "contracts/core/bridgehub/
 /// @notice Regression tests for the depth argument fix in L2MessageVerification
 /// passes _depth + 1.
 contract L2MessageVerificationDepthRegressionTest is Test {
-    L2MessageVerification l2MessageVerification;
+    L2MessageVerification internal l2MessageVerification;
 
     function setUp() public {
         l2MessageVerification = new L2MessageVerification();

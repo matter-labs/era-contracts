@@ -53,9 +53,9 @@ contract GatewayVotePreparationForTest is GatewayVotePreparation {
 /// @dev Deploys the full L1 environment (bridgehub, CTM, era chain), then calls through
 /// GatewayVotePreparation's initialization path and exercises calculateAddresses.
 contract GatewayVotePreparationTests is ZKChainDeployer {
-    GatewayVotePreparationForTest votePreparationScript;
+    GatewayVotePreparationForTest internal votePreparationScript;
 
-    uint256 constant GATEWAY_CHAIN_ID = 506;
+    uint256 internal constant GATEWAY_CHAIN_ID = 506;
     string internal constant GATEWAY_VOTE_PREPARATION_CONFIG_PATH =
         "/script-out/foundry-gateway-vote-preparation/config.toml";
     string internal constant GATEWAY_VOTE_PREPARATION_OUTPUT_PATH =

@@ -30,13 +30,13 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
 contract MessageRoot_Extended_Test is Test {
-    address bridgeHub;
-    uint256 L1_CHAIN_ID;
-    uint256 gatewayChainId;
-    L1MessageRoot messageRoot;
-    L2MessageRoot l2MessageRoot;
-    address assetTracker;
-    address chainAssetHandler;
+    address internal bridgeHub;
+    uint256 internal L1_CHAIN_ID;
+    uint256 internal gatewayChainId;
+    L1MessageRoot internal messageRoot;
+    L2MessageRoot internal l2MessageRoot;
+    address internal assetTracker;
+    address internal chainAssetHandler;
 
     function setUp() public {
         bridgeHub = address(new L1Bridgehub(makeAddr("owner"), 10));

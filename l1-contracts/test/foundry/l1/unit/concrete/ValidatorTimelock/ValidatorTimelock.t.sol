@@ -32,33 +32,33 @@ contract ValidatorTimelockTest is Test {
     error ValidatorDoesNotExist(uint256 _chainId);
 
     /// @notice The default admin role identifier.
-    bytes32 constant DEFAULT_ADMIN_ROLE = bytes32(0);
+    bytes32 internal constant DEFAULT_ADMIN_ROLE = bytes32(0);
 
-    ValidatorTimelock validator;
-    DummyChainTypeManagerForValidatorTimelock chainTypeManager;
-    DummyBridgehub dummyBridgehub;
+    ValidatorTimelock internal validator;
+    DummyChainTypeManagerForValidatorTimelock internal chainTypeManager;
+    DummyBridgehub internal dummyBridgehub;
 
-    address owner;
-    address zkSync;
-    address alice;
-    address bob;
-    address dan;
-    uint256 chainId;
-    uint256 eraChainId;
-    uint256 lastBatchNumber;
-    uint32 executionDelay;
+    address internal owner;
+    address internal zkSync;
+    address internal alice;
+    address internal bob;
+    address internal dan;
+    uint256 internal chainId;
+    uint256 internal eraChainId;
+    uint256 internal lastBatchNumber;
+    uint32 internal executionDelay;
 
-    bytes32 precommitterRole;
-    bytes32 committerRole;
-    bytes32 reverterRole;
-    bytes32 proverRole;
-    bytes32 executorRole;
-    bytes32 upgraderRole;
-    bytes32 committerAdminRole;
-    bytes32 reverterAdminRole;
-    bytes32 proverAdminRole;
-    bytes32 executorAdminRole;
-    bytes32 upgraderAdminRole;
+    bytes32 internal precommitterRole;
+    bytes32 internal committerRole;
+    bytes32 internal reverterRole;
+    bytes32 internal proverRole;
+    bytes32 internal executorRole;
+    bytes32 internal upgraderRole;
+    bytes32 internal committerAdminRole;
+    bytes32 internal reverterAdminRole;
+    bytes32 internal proverAdminRole;
+    bytes32 internal executorAdminRole;
+    bytes32 internal upgraderAdminRole;
 
     function setUp() public {
         owner = makeAddr("owner");

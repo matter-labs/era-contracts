@@ -1,0 +1,13 @@
+{
+  "rules": {
+    "func-name-mixedcase": "off",
+    "gas-calldata-parameters": "off",
+    "gas-custom-errors": "off",
+    "gas-increment-by-one": "off",
+    "gas-length-in-loops": "off",
+    "gas-struct-packing": "off",
+    "no-console": "off",
+    "one-contract-per-file": "off",
+    "reason-string": "off"
+  }
+}

@@ -29,11 +29,11 @@ import {
 contract MailboxOnGatewayTest is UtilsCallMockerTest {
     IMailbox internal mailboxFacet;
     UtilsFacet internal utilsFacet;
-    address bridgehub;
-    address chainAssetHandler;
-    uint256 constant eraChainId = 9;
-    uint256 constant l1ChainId = 1;
-    uint256 constant gatewayChainId = 505; // Different from L1
+    address internal bridgehub;
+    address internal chainAssetHandler;
+    uint256 internal constant eraChainId = 9;
+    uint256 internal constant l1ChainId = 1;
+    uint256 internal constant gatewayChainId = 505; // Different from L1
 
     function setUp() public {
         // Set up on a non-L1 chain (Gateway)

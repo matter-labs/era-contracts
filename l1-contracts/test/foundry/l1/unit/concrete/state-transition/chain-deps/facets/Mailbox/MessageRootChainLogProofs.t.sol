@@ -40,19 +40,19 @@ import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 /// settlement-layer proof with its migration-interval validation. Leaf hashing itself is covered by
 /// `Libraries/Merkle` and `Libraries/MessageHashing`, and the L2 side by `Bridgehub/L2MessageVerification`.
 contract MessageRootChainLogProofs is MailboxTest {
-    bytes32[] elements;
-    MerkleTest merkle;
-    MerkleTreeNoSort merkleTree;
-    bytes data;
-    uint256 batchNumber;
+    bytes32[] internal elements;
+    MerkleTest internal merkle;
+    MerkleTreeNoSort internal merkleTree;
+    bytes internal data;
+    uint256 internal batchNumber;
     /// @dev Cached so that proof calls made after `vm.expectRevert` do not issue an extra external call.
-    uint256 chainId;
-    bool isService;
-    uint8 shardId;
-    L1MessageRoot messageRoot;
+    uint256 internal chainId;
+    bool internal isService;
+    uint8 internal shardId;
+    L1MessageRoot internal messageRoot;
 
     /// @dev Gateway chain ID used for legacy historical migration intervals.
-    uint256 constant LEGACY_GW_CHAIN_ID = 1;
+    uint256 internal constant LEGACY_GW_CHAIN_ID = 1;
 
     function setUp() public virtual {
         setupDiamondProxy();

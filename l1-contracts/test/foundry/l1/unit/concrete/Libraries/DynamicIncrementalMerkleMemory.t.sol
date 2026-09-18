@@ -10,7 +10,7 @@ import {Merkle} from "contracts/common/libraries/Merkle.sol";
 contract DynamicIncrementalMerkleMemoryTest is Test {
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
 
-    bytes32 constant ZERO = bytes32(0);
+    bytes32 internal constant ZERO = bytes32(0);
 
     // ============ createTree Tests ============
 

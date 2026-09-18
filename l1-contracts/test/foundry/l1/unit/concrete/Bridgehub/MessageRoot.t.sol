@@ -40,11 +40,11 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
 );
 
 contract MessageRootTest is Test {
-    address bridgeHub;
-    L1MessageRoot messageRoot;
-    L2MessageRoot l2MessageRoot;
-    uint256 L1_CHAIN_ID;
-    address assetTracker;
+    address internal bridgeHub;
+    L1MessageRoot internal messageRoot;
+    L2MessageRoot internal l2MessageRoot;
+    uint256 internal L1_CHAIN_ID;
+    address internal assetTracker;
 
     function setUp() public {
         bridgeHub = makeAddr("bridgeHub");

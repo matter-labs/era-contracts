@@ -19,8 +19,8 @@ import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeI
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
 contract BaseUpgrade is Test {
-    L2CanonicalTransaction l2CanonicalTransaction;
-    ProposedUpgrade proposedUpgrade;
+    L2CanonicalTransaction internal l2CanonicalTransaction;
+    ProposedUpgrade internal proposedUpgrade;
 
     uint256 public protocolVersion;
     uint256 public chainId;
@@ -29,7 +29,7 @@ contract BaseUpgrade is Test {
     address public stateTransitionManager;
     address public sharedBridge;
 
-    address verifier;
+    address internal verifier;
 
     function _prepareEmptyProposedUpgrade() internal {
         protocolVersion = SemVer.packSemVer(0, 1, 0);

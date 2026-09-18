@@ -16,8 +16,8 @@ import {Call} from "contracts/governance/Common.sol";
 contract AccessRestrictionTest is Test {
     AccessControlRestriction internal restriction;
     ChainAdmin internal chainAdmin;
-    address owner;
-    address randomCaller;
+    address internal owner;
+    address internal randomCaller;
     bytes32 public constant DEFAULT_ADMIN_ROLE = 0x00;
 
     function getChainAdminSelectors() public pure returns (bytes4[] memory) {

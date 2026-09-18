@@ -12,9 +12,9 @@ import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
 contract DummyDefaultUpgrade is DefaultUpgrade, BaseUpgradeUtils {}
 
 contract DefaultUpgradeTest is BaseUpgrade {
-    DummyDefaultUpgrade baseZkSyncUpgrade;
-    address mockChainTypeManager = makeAddr("mockChainTypeManager");
-    address mockVerifier = makeAddr("mockVerifier");
+    DummyDefaultUpgrade internal baseZkSyncUpgrade;
+    address internal mockChainTypeManager = makeAddr("mockChainTypeManager");
+    address internal mockVerifier = makeAddr("mockVerifier");
 
     function setUp() public {
         baseZkSyncUpgrade = new DummyDefaultUpgrade();

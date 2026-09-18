@@ -39,8 +39,8 @@ import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestConstants.sol";
 contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using LogFinder for Vm.Log[];
 
-    uint256 constant TEST_USERS_COUNT = 10;
-    uint256 constant GATEWAY_CHAIN_ID = 506;
+    uint256 internal constant TEST_USERS_COUNT = 10;
+    uint256 internal constant GATEWAY_CHAIN_ID = 506;
     address[] public users;
     address[] public l2ContractAddresses;
 

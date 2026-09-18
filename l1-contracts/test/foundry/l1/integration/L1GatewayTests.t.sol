@@ -65,20 +65,20 @@ import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestConstants.sol";
 contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
     using LogFinder for Vm.Log[];
 
-    uint256 constant TEST_USERS_COUNT = 10;
+    uint256 internal constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
 
-    uint256 migratingChainId = eraZKChainId;
-    IZKChain migratingChain;
+    uint256 internal migratingChainId = eraZKChainId;
+    IZKChain internal migratingChain;
 
-    uint256 gatewayChainId = 506;
-    IZKChain gatewayChain;
+    uint256 internal gatewayChainId = 506;
+    IZKChain internal gatewayChain;
 
-    uint256 mintChainId = 12;
+    uint256 internal mintChainId = 12;
 
     // The `pausedDepositsTimestamp` sits at slot 62 of ZKChainStorage
-    bytes32 pausedDepositsTimestampSlot = bytes32(uint256(62));
+    bytes32 internal pausedDepositsTimestampSlot = bytes32(uint256(62));
 
     // generate MAX_USERS addresses and append it to users array
     function _generateUserAddresses() internal {

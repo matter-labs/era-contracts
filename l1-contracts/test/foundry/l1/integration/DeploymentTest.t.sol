@@ -19,7 +19,7 @@ import {ChainCreationParamsLib} from "../../../../deploy-scripts/ctm/ChainCreati
 import {Utils} from "../../../../deploy-scripts/utils/Utils.sol";
 
 contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
-    uint256 constant TEST_USERS_COUNT = 10;
+    uint256 internal constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
 

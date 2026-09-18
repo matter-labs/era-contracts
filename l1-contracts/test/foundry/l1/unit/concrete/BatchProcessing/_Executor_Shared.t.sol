@@ -75,12 +75,12 @@ contract ExecutorTest is UtilsCallMockerTest {
     PermissionlessValidator internal permissionlessValidator;
     address internal rollupL1DAValidator;
     L1MessageRoot internal messageRoot;
-    DummyBridgehub dummyBridgehub;
+    DummyBridgehub internal dummyBridgehub;
     L1ChainAssetHandler internal chainAssetHandler;
     RollupDAManager internal rollupDAManager;
     bytes32 internal baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
 
-    uint256 l2ChainId;
+    uint256 internal l2ChainId;
 
     IExecutor.StoredBatchInfo internal genesisStoredBatchInfo;
     uint256[] internal proofInput;

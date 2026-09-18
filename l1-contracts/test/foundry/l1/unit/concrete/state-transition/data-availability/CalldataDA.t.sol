@@ -21,7 +21,7 @@ import {
 } from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 contract CalldataDATest is Test {
-    TestCalldataDA calldataDA;
+    TestCalldataDA internal calldataDA;
 
     function setUp() public {
         calldataDA = new TestCalldataDA();

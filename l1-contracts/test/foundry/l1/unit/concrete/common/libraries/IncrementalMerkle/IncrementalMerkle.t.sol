@@ -10,8 +10,8 @@ contract IncrementalMerkleTestTest is Test {
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
 
-    IncrementalMerkleTest merkleTest;
-    bytes32 constant zero = 0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba;
+    IncrementalMerkleTest internal merkleTest;
+    bytes32 internal constant zero = 0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba;
 
     function setUp() public {
         merkleTest = new IncrementalMerkleTest(zero);

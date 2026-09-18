@@ -65,7 +65,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
     AccessControlRestriction internal restriction;
     TestPermanentRestriction internal permRestriction;
 
-    address constant L2_FACTORY_ADDR = address(0);
+    address internal constant L2_FACTORY_ADDR = address(0);
 
     address internal owner;
     address internal hyperchain;

@@ -30,11 +30,11 @@ contract UpgradeIntegrationTestBase is Test {
 
     uint256 internal constant NEW_CHAIN_ID = 555;
 
-    uint256 chainId;
+    uint256 internal chainId;
 
-    CoreUpgrade_v33 coreUpgrade;
-    CTMUpgrade_v33 ctmUpgrade;
-    DefaultChainUpgrade chainUpgrade;
+    CoreUpgrade_v33 internal coreUpgrade;
+    CTMUpgrade_v33 internal ctmUpgrade;
+    DefaultChainUpgrade internal chainUpgrade;
 
     /// @notice Per-test fixed paths for the deploy outputs the upgrade scripts read.
     string public ECOSYSTEM_INPUT = "file_1.toml";

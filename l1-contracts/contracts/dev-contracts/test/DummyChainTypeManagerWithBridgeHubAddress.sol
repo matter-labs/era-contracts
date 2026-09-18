@@ -11,7 +11,7 @@ import {ChainTypeManager} from "../../state-transition/ChainTypeManager.sol";
 contract DummyChainTypeManagerWBH is ChainTypeManager {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
-    address zkChain;
+    address internal zkChain;
     /// @notice Constructor
     constructor(address bridgeHub) ChainTypeManager(bridgeHub, address(0), address(0), address(0)) {}
 

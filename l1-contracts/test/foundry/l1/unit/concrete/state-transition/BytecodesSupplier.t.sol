@@ -9,7 +9,7 @@ import "contracts/common/L1ContractErrors.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 contract BytecodesSupplierTest is Test {
-    BytecodesSupplier bytecodesSupplier;
+    BytecodesSupplier internal bytecodesSupplier;
     bytes internal bytecode1 = hex"0000000000000000000000000000000000000000000000000000000000000000";
     bytes internal bytecode2 = hex"1111111111111111111111111111111111111111111111111111111111111111";
     // EVM bytecodes can be arbitrary bytes (no specific format requirements)

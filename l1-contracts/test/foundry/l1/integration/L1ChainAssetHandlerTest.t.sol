@@ -58,12 +58,12 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
     using stdStorage for StdStorage;
     using LogFinder for Vm.Log[];
 
-    uint256 constant TEST_USERS_COUNT = 10;
+    uint256 internal constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
     bytes32 public l2TokenAssetId;
     address public tokenL1Address;
-    SimpleExecutor simpleExecutor;
+    SimpleExecutor internal simpleExecutor;
 
     IL2ChainAssetHandler public l2ChainAssetHandler;
 

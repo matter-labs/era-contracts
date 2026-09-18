@@ -24,14 +24,14 @@ contract SomeToken {
 }
 
 contract L1NativeTokenVaultTest is Test {
-    address assetRouter;
+    address internal assetRouter;
 
-    L1NativeTokenVault ntv;
-    SomeToken token;
-    address owner;
+    L1NativeTokenVault internal ntv;
+    SomeToken internal token;
+    address internal owner;
 
-    uint256 constant CHAIN_ID = 123;
-    bytes32 constant ASSET_ID = keccak256("assetId");
+    uint256 internal constant CHAIN_ID = 123;
+    bytes32 internal constant ASSET_ID = keccak256("assetId");
 
     function setUp() public {
         assetRouter = makeAddr("assetRouter");

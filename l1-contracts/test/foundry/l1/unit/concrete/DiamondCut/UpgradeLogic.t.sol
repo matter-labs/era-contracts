@@ -31,7 +31,7 @@ contract UpgradeLogicTest is DiamondCutTest {
     address private admin;
     address private chainTypeManager;
     address private randomSigner;
-    bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(1, (makeAddr("baseToken")));
+    bytes32 internal baseTokenAssetId = DataEncoding.encodeNTVAssetId(1, (makeAddr("baseToken")));
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](10);

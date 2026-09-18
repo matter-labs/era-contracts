@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 /// @title DummyChainTypeManagerForServerNotifier
 /// @notice A test smart contract implementing the subset of ChainTypeManager functionality for testing purposes.
 contract DummyChainTypeManager {
-    mapping(uint256 chainId => address chainAdmin) chainAdmin;
+    mapping(uint256 chainId => address chainAdmin) internal chainAdmin;
 
     mapping(uint256 chainId => uint256 protocolVersion) public protocolVersion;
 

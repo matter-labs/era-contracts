@@ -29,7 +29,7 @@ contract ZKChainBaseModifiersTest is UtilsCallMockerTest {
     UtilsFacet internal utilsFacet;
     DummyBridgehub internal dummyBridgehub;
     address internal testnetVerifier = address(new ZKsyncOSTestnetVerifier(IVerifier(address(0))));
-    uint256 constant eraChainId = 9;
+    uint256 internal constant eraChainId = 9;
 
     function getAdminSelectors() internal pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](15);

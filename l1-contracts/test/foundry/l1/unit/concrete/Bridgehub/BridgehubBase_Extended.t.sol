@@ -21,9 +21,9 @@ import {AlreadyCurrentSL, NotChainAssetHandler} from "contracts/core/bridgehub/L
 import {TokenBridgingData} from "contracts/common/Messaging.sol";
 
 contract BridgehubBase_Extended_Test is Test {
-    L1Bridgehub bridgehub;
-    address owner;
-    uint256 maxNumberOfChains;
+    L1Bridgehub internal bridgehub;
+    address internal owner;
+    uint256 internal maxNumberOfChains;
 
     function setUp() public {
         owner = makeAddr("owner");

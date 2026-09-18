@@ -13,14 +13,14 @@ contract MockAccessControlEnumerable is AccessControlEnumerablePerChainAddressUp
 }
 
 contract AccessControlEnumerablePerChainAddressUpgradeableTest is Test {
-    MockAccessControlEnumerable accessControl;
+    MockAccessControlEnumerable internal accessControl;
 
-    address chainAddress1;
-    address chainAddress2;
-    address account1;
-    address account2;
-    bytes32 role1 = keccak256("ROLE_1");
-    bytes32 role2 = keccak256("ROLE_2");
+    address internal chainAddress1;
+    address internal chainAddress2;
+    address internal account1;
+    address internal account2;
+    bytes32 internal role1 = keccak256("ROLE_1");
+    bytes32 internal role2 = keccak256("ROLE_2");
 
     event RoleGranted(address indexed chainAddress, bytes32 indexed role, address indexed account);
     event RoleRevoked(address indexed chainAddress, bytes32 indexed role, address indexed account);
@@ -31,7 +31,7 @@ contract AccessControlEnumerablePerChainAddressUpgradeableTest is Test {
         bytes32 newAdminRole
     );
 
-    bytes32 constant DEFAULT_ADMIN_ROLE = bytes32(0);
+    bytes32 internal constant DEFAULT_ADMIN_ROLE = bytes32(0);
 
     function setUp() public {
         chainAddress1 = makeAddr("chainAddress1");

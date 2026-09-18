@@ -48,7 +48,7 @@ contract BoundedBridgehubInvariantTests_2 is BridgehubInvariantTests_1 {
 }
 
 contract InvariantTesterZKChains is Test {
-    BoundedBridgehubInvariantTests_2 tests;
+    BoundedBridgehubInvariantTests_2 internal tests;
 
     function setUp() public {
         tests = new BoundedBridgehubInvariantTests_2();

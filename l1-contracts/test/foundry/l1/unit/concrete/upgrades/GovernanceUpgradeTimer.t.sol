@@ -18,18 +18,18 @@ import {
 
 contract GovernanceUpgradeTimerTest is Test {
     // Instance of the contract under test
-    GovernanceUpgradeTimer timer;
+    GovernanceUpgradeTimer internal timer;
 
     // Addresses used in tests
-    address owner;
-    address newOwner;
-    address timerGovernance;
-    address nonAdmin;
-    address anotherAddress;
+    address internal owner;
+    address internal newOwner;
+    address internal timerGovernance;
+    address internal nonAdmin;
+    address internal anotherAddress;
 
     // Immutable parameters for the contract
-    uint256 initialDelay = 1000; // seconds
-    uint256 maxAdditionalDelay = 2000; // seconds
+    uint256 internal initialDelay = 1000; // seconds
+    uint256 internal maxAdditionalDelay = 2000; // seconds
 
     // Events from the GovernanceUpgradeTimer contract
     event TimerStarted(uint256 deadline, uint256 maxDeadline);

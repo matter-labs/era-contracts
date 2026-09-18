@@ -12,7 +12,7 @@ import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.
 
 // Concrete implementation of L1FixedForceDeploymentsHelper for testing
 contract TestL1FixedForceDeploymentsHelper is L1FixedForceDeploymentsHelper {
-    ZKChainStorage s;
+    ZKChainStorage internal s;
 
     // For testing, we need to be able to call the internal function from outside
     function requestGetZKChainSpecificForceDeploymentsData(
@@ -56,19 +56,19 @@ contract MockERC20TokenWithMetadata {
 contract MockERC20TokenWithoutMetadata {}
 
 contract L1FixedForceDeploymentsHelperTest is Test {
-    TestL1FixedForceDeploymentsHelper testGateway;
+    TestL1FixedForceDeploymentsHelper internal testGateway;
     // Mocks for dependencies
-    address bridgehubMock;
-    address sharedBridgeMock;
-    address nativeTokenVaultMock;
+    address internal bridgehubMock;
+    address internal sharedBridgeMock;
+    address internal nativeTokenVaultMock;
     // MockL2WrappedBaseTokenStore wrappedBaseTokenStoreMock;
 
     // Addresses
-    address sharedBridgeAddress;
+    address internal sharedBridgeAddress;
 
     // Chain ID for testing
-    uint256 chainId = 123;
-    bytes32 baseTokenAssetId;
+    uint256 internal chainId = 123;
+    bytes32 internal baseTokenAssetId;
 
     function setUp() public {
         baseTokenAssetId = bytes32("baseTokenAssetId");

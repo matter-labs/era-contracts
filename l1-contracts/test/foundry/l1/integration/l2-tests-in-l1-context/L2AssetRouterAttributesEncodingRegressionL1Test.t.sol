@@ -19,7 +19,7 @@ import {SharedL2ContractL1Deployer} from "./_SharedL2ContractL1Deployer.sol";
 /// @notice L1 context test for L2AssetRouter callAttributes encoding regression (PR #1714)
 /// @dev Tests that callAttributes are encoded using abi.encodeCall (correct) instead of abi.encode (buggy)
 contract L2AssetRouterAttributesEncodingRegressionL1Test is Test, SharedL2ContractL1Deployer {
-    uint256 destinationChainId = 271;
+    uint256 internal destinationChainId = 271;
 
     /// @notice Test that abi.encodeCall produces the correct format for parseAttributes
     /// @dev This is a unit test verifying the encoding format difference

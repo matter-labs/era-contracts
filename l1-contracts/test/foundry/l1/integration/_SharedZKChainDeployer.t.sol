@@ -19,7 +19,7 @@ import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.s
 contract ZKChainDeployer is L1ContractDeployer {
     using stdStorage for StdStorage;
 
-    RegisterZKChainScript deployScript;
+    RegisterZKChainScript internal deployScript;
 
     struct ZKChainDescription {
         uint256 zkChainChainId;
@@ -36,8 +36,8 @@ contract ZKChainDeployer is L1ContractDeployer {
 
     ChainConfig internal eraConfig;
 
-    uint256 currentZKChainId = 10;
-    uint256 eraZKChainId = 9;
+    uint256 internal currentZKChainId = 10;
+    uint256 internal eraZKChainId = 9;
     uint256[] public zkChainIds;
 
     function _deployEra() internal {

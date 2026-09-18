@@ -57,12 +57,12 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         bytes[] factoryDeps;
     }
 
-    uint256 constant TEST_USERS_COUNT = 10;
+    uint256 internal constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
     bytes32 public l2TokenAssetId;
     address public tokenL1Address;
-    SimpleExecutor simpleExecutor;
+    SimpleExecutor internal simpleExecutor;
 
     // generate MAX_USERS addresses and append it to users array
     function _generateUserAddresses() internal {

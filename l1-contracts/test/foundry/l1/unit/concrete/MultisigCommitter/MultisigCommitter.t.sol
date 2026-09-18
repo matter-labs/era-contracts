@@ -25,32 +25,32 @@ import {
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 
 contract MultisigCommitterTest is Test {
-    MultisigCommitter multisigCommitter;
-    DummyChainTypeManagerForValidatorTimelock chainTypeManager;
-    DummyBridgehub dummyBridgehub;
+    MultisigCommitter internal multisigCommitter;
+    DummyChainTypeManagerForValidatorTimelock internal chainTypeManager;
+    DummyBridgehub internal dummyBridgehub;
 
-    bytes32 constant DEFAULT_ADMIN_ROLE = bytes32(0);
+    bytes32 internal constant DEFAULT_ADMIN_ROLE = bytes32(0);
 
-    address ecosystemOwner;
-    address chainAdmin;
-    address chainAddress;
-    address sequencer;
-    address validator1Shared;
-    uint256 validator1SharedKey;
-    address validator2Shared;
-    uint256 validator2SharedKey;
-    address validator1Custom;
-    uint256 validator1CustomKey;
-    uint256 chainId;
-    uint256 lastBatchNumber;
-    uint32 executionDelay;
+    address internal ecosystemOwner;
+    address internal chainAdmin;
+    address internal chainAddress;
+    address internal sequencer;
+    address internal validator1Shared;
+    uint256 internal validator1SharedKey;
+    address internal validator2Shared;
+    uint256 internal validator2SharedKey;
+    address internal validator1Custom;
+    uint256 internal validator1CustomKey;
+    uint256 internal chainId;
+    uint256 internal lastBatchNumber;
+    uint32 internal executionDelay;
 
-    bytes32 committerRole;
-    bytes32 validatorRole;
-    bytes32 constant EIP712_DOMAIN_TYPEHASH =
+    bytes32 internal committerRole;
+    bytes32 internal validatorRole;
+    bytes32 internal constant EIP712_DOMAIN_TYPEHASH =
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
-    bytes32 constant EIP712_NAME_HASH = keccak256("MultisigCommitter");
-    bytes32 constant EIP712_VERSION_HASH = keccak256("1");
+    bytes32 internal constant EIP712_NAME_HASH = keccak256("MultisigCommitter");
+    bytes32 internal constant EIP712_VERSION_HASH = keccak256("1");
 
     function setUp() public {
         ecosystemOwner = makeAddr("ecosystemOwner");

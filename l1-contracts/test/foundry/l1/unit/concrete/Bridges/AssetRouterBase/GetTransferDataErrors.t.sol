@@ -53,7 +53,7 @@ contract TestAssetRouterBase is AssetRouterBase {
 }
 
 contract AssetRouterBase_GetTransferDataErrors_Test is Test {
-    TestAssetRouterBase router;
+    TestAssetRouterBase internal router;
 
     function setUp() public {
         router = new TestAssetRouterBase();

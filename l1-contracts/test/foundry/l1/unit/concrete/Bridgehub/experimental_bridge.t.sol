@@ -73,47 +73,47 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 contract ExperimentalBridgeTest is Test {
     using stdStorage for StdStorage;
 
-    address weth;
-    L1Bridgehub bridgehub;
-    IInteropCenter interopCenter;
-    DummyBridgehubSetter dummyBridgehub;
+    address internal weth;
+    L1Bridgehub internal bridgehub;
+    IInteropCenter internal interopCenter;
+    DummyBridgehubSetter internal dummyBridgehub;
     address public bridgeOwner;
     address public testTokenAddress;
-    DummyChainTypeManagerWBH mockCTM;
-    DummyZKChain mockChainContract;
+    DummyChainTypeManagerWBH internal mockCTM;
+    DummyZKChain internal mockChainContract;
     // These are real `L1AssetRouter` instances used as stand-in asset routers in the
     // bridgehub tests; the legacy `DummySharedBridge` dev stub has been removed.
-    L1AssetRouter mockSharedBridge;
-    L1AssetRouter mockSecondSharedBridge;
-    L1AssetRouter sharedBridge;
-    address sharedBridgeAddress;
-    address secondBridgeAddress;
-    address l1NullifierAddress;
-    L1AssetRouter secondBridge;
-    TestnetERC20Token testToken;
-    L1NativeTokenVault ntv;
-    IMessageRootBase messageRoot;
-    L1Nullifier l1Nullifier;
-    SimpleExecutor simpleExecutor;
+    L1AssetRouter internal mockSharedBridge;
+    L1AssetRouter internal mockSecondSharedBridge;
+    L1AssetRouter internal sharedBridge;
+    address internal sharedBridgeAddress;
+    address internal secondBridgeAddress;
+    address internal l1NullifierAddress;
+    L1AssetRouter internal secondBridge;
+    TestnetERC20Token internal testToken;
+    L1NativeTokenVault internal ntv;
+    IMessageRootBase internal messageRoot;
+    L1Nullifier internal l1Nullifier;
+    SimpleExecutor internal simpleExecutor;
 
-    bytes32 tokenAssetId;
+    bytes32 internal tokenAssetId;
 
     bytes32 private constant LOCK_FLAG_ADDRESS = 0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4;
 
-    bytes32 ETH_TOKEN_ASSET_ID =
+    bytes32 internal ETH_TOKEN_ASSET_ID =
         keccak256(abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDR, bytes32(uint256(uint160(ETH_TOKEN_ADDRESS)))));
 
-    TestnetERC20Token testToken6;
-    TestnetERC20Token testToken8;
-    TestnetERC20Token testToken18;
+    TestnetERC20Token internal testToken6;
+    TestnetERC20Token internal testToken8;
+    TestnetERC20Token internal testToken18;
 
-    address mockL2Contract;
+    address internal mockL2Contract;
 
-    uint256 l1ChainId;
-    uint256 zkTokenOriginChainId;
-    uint256 gatewayChainId;
+    uint256 internal l1ChainId;
+    uint256 internal zkTokenOriginChainId;
+    uint256 internal gatewayChainId;
 
-    address deployerAddress;
+    address internal deployerAddress;
 
     event NewChain(uint256 indexed chainId, address chainTypeManager, address indexed chainGovernance);
 
@@ -565,8 +565,8 @@ contract ExperimentalBridgeTest is Test {
         assertTrue(bridgehub.messageRoot() == IMessageRootBase(address(0)), "Message root is already there");
     }
 
-    uint256 newChainId;
-    address admin;
+    uint256 internal newChainId;
+    address internal admin;
 
     function test_pause_createNewChain(
         uint256 chainId,

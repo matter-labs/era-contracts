@@ -34,8 +34,8 @@ import {
 } from "contracts/common/Config.sol";
 
 contract ForwardedBridgeFunctionsTest is MigratorTest {
-    address chainAssetHandler;
-    address admin;
+    address internal chainAssetHandler;
+    address internal admin;
 
     function setUp() public override {
         super.setUp();
