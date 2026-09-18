@@ -23,6 +23,7 @@ import {MigrationInterval} from "contracts/core/chain-asset-handler/IChainAssetH
 
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {MerkleTreeNoSort} from "test/foundry/l1/unit/concrete/common/libraries/Merkle/MerkleTreeNoSort.sol";
+import {FORCE_FAILED_L1_TX_LOG_KEY} from "test/foundry/TestConstants.sol";
 import {MessageHashing, ProofData} from "contracts/common/libraries/MessageHashing.sol";
 
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
@@ -347,6 +348,78 @@ contract MailboxL2LogsProve is MailboxTest {
         });
         // Assert that the proof was successful
         assertEq(ret, true);
+    }
+
+    /// @dev A force-failed priority op sends two bootloader logs: the usual `Failure` status log,
+    ///      and a marker log keyed by a constant whose value is the canonical hash. The pair must
+    ///      prove exactly like a natural revert, which `claimFailedDeposit` relies on, and the
+    ///      marker must prove on its own so a watcher can show the failure was operator-requested.
+    function test_success_proveForceFailedL1ToL2Transaction() public {
+        bytes32 l2TxHash = keccak256("forceFailedL1Transaction");
+        uint16 txNumberInBatch = 0;
+
+        uint256 statusLogIndex = _addHashedLogToMerkleTree({
+            _shardId: shardId,
+            _isService: isService,
+            _txNumberInBatch: txNumberInBatch,
+            _sender: L2_BOOTLOADER_ADDRESS,
+            _key: l2TxHash,
+            _value: bytes32(uint256(TxStatus.Failure))
+        });
+
+        // Same transaction, so the same index in the batch.
+        uint256 markerLogIndex = _addHashedLogToMerkleTree({
+            _shardId: shardId,
+            _isService: isService,
+            _txNumberInBatch: txNumberInBatch,
+            _sender: L2_BOOTLOADER_ADDRESS,
+            _key: FORCE_FAILED_L1_TX_LOG_KEY,
+            _value: l2TxHash
+        });
+
+        bytes32 root = merkleTree.getRoot(elements);
+        utilsFacet.util_setL2LogsRootHash(batchNumber, root);
+
+        // L1 confirms it as reverted, so the deposit is recoverable.
+        assertTrue(
+            _proveL1ToL2TransactionStatus({
+                _l2TxHash: l2TxHash,
+                _l2BatchNumber: batchNumber,
+                _l2MessageIndex: statusLogIndex,
+                _l2TxNumberInBatch: txNumberInBatch,
+                _merkleProof: merkleTree.getProof(elements, statusLogIndex),
+                _status: TxStatus.Failure
+            })
+        );
+
+        assertFalse(
+            _proveL1ToL2TransactionStatus({
+                _l2TxHash: l2TxHash,
+                _l2BatchNumber: batchNumber,
+                _l2MessageIndex: statusLogIndex,
+                _l2TxNumberInBatch: txNumberInBatch,
+                _merkleProof: merkleTree.getProof(elements, statusLogIndex),
+                _status: TxStatus.Success
+            })
+        );
+
+        L2Log memory markerLog = L2Log({
+            l2ShardId: shardId,
+            isService: isService,
+            txNumberInBatch: txNumberInBatch,
+            sender: L2_BOOTLOADER_ADDRESS,
+            key: FORCE_FAILED_L1_TX_LOG_KEY,
+            value: l2TxHash
+        });
+        assertTrue(
+            _proveL2LogInclusion({
+                _batchNumber: batchNumber,
+                _index: markerLogIndex,
+                _log: markerLog,
+                _proof: merkleTree.getProof(elements, markerLogIndex),
+                _expectedError: bytes("")
+            })
+        );
     }
 
     /// @dev Sets up a historical migration interval so that `batchNumber` (the main chain's batch)

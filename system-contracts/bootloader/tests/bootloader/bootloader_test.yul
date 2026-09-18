@@ -189,6 +189,12 @@ function TEST_systemLogKeys() {
      testing_assertEq(chainedPriorityTxnHashLogKey, 2, "Invalid priority txn hash log key")
      testing_assertEq(numberOfLayer1TxsLogKey, 3, "Invalid num layer 1 txns log key")
      testing_assertEq(protocolUpgradeTxHashKey, 10, "Invalid protocol upgrade txn hash log key")
+     // keccak256("zksync.bootloader.forceFailedL1TxLog"). Watchers key off it; nothing else pins it.
+     testing_assertEq(
+        forceFailedL1TxLogKey(),
+        0xc347406c856ed927ab49919146282a0c9feb316c83a07792fce67353bcf0e474,
+        "Invalid force-fail log key"
+     )
  }
 
 function TEST_safeAdd() {
@@ -208,7 +214,177 @@ function TEST_saturatingSub() {
     testing_assertEq(saturatingSub(2, 4), 0, "Invalid subtraction")
 }
 
-function INT_TEST_evm_create_non_zero_to_reverts() {
+function TEST_validateProvedTxMeta() {
+    testing_assertEq(validateProvedTxMeta(0x0001), 0, "execute only")
+    testing_assertEq(validateProvedTxMeta(0x0101), 1, "execute + forceFail")
+}
+
+function TEST_validateTxMeta_forceFailBit() {
+    testing_testWillFailWith("invalid txMeta")
+    pop(validateProvedTxMeta(0x0201))
+}
+
+function TEST_validateTxMeta_executeClear() {
+    testing_testWillFailWith("invalid txMeta")
+    pop(validateProvedTxMeta(0x0100))
+}
+
+function TEST_validateTxMeta_executeByte() {
+    testing_testWillFailWith("invalid txMeta")
+    pop(validateProvedTxMeta(0x0002))
+}
+
+function TEST_validatePlaygroundTxMeta() {
+    let ethCallMode := shl(248, 0x02)
+    testing_assertEq(validatePlaygroundTxMeta(0x0001), 0, "execute only")
+    testing_assertEq(validatePlaygroundTxMeta(or(ethCallMode, 0x0001)), 0, "ethCall")
+    testing_assertEq(validatePlaygroundTxMeta(or(ethCallMode, 0x0101)), 1, "ethCall + forceFail")
+}
+
+function TEST_validatePlaygroundTxMeta_executeClear() {
+    // A non-zero word does not break the loop, so the execute byte has to be checked here.
+    testing_testWillFailWith("invalid txMeta")
+    pop(validatePlaygroundTxMeta(or(shl(248, 0x02), 0x0100)))
+}
+
+function TEST_validatePlaygroundTxMeta_unexpectedByte() {
+    testing_testWillFailWith("invalid txMeta")
+    pop(validatePlaygroundTxMeta(0x010001))
+}
+
+function INT_TEST_forceFailOnL2Tx() {
+    // The bit is only valid on a priority op, and tx(0) is an L2 transaction.
+    testing_testWillFailWith("forceFail on L2 tx")
+    mstore(testing_txDescriptionPtr(0), 0x0101)
+}
+
+function INT_TEST_invalidTxMetaInLoop() {
+    // Pins that the loop validates the meta word it actually reads.
+    testing_testWillFailWith("invalid txMeta")
+    mstore(testing_txDescriptionPtr(0), 0x0201)
+}
+
+// Executor reconciles these system logs on L1, so a force-failed priority op that stopped
+// contributing to them would make its batch unexecutable.
+function expectPriorityQueueAccounting() {
+    // Words 0 and 32 are the operator address and previous batch hash, which the loop has not read
+    // yet: borrow them as keccak scratch and put them back.
+    let savedWord0 := mload(0)
+    let savedWord32 := mload(32)
+
+    let rollingHash := EMPTY_STRING_KECCAK()
+    mstore(0, rollingHash)
+    mstore(32, getCanonicalL1TxHash(testing_txDataOffset(2)))
+    rollingHash := keccak256(0, 64)
+    mstore(0, rollingHash)
+    mstore(32, getCanonicalL1TxHash(testing_txDataOffset(3)))
+    rollingHash := keccak256(0, 64)
+    mstore(0, rollingHash)
+    mstore(32, getCanonicalL1TxHash(testing_txDataOffset(4)))
+    rollingHash := keccak256(0, 64)
+
+    mstore(0, savedWord0)
+    mstore(32, savedWord32)
+
+    testing_expectSystemLog(chainedPriorityTxnHashLogKey(), rollingHash)
+    // Fixtures 0-1 are L2 txs, 2-4 priority ops; counters pack as `l1Count | l2Count << 128`.
+    testing_expectSystemLog(numberOfLayer1TxsLogKey(), add(3, mul(2, TWO_POW_128())))
+}
+
+function INT_TEST_l1TxBaseline() {
+    // Control for INT_TEST_forceFailL1Tx: the same deposit, unmutated. Zero gas price, so the
+    // operator takes nothing and the refund recipient stays empty.
+    let txDataOffset := testing_txDataOffset(2)
+    let innerTxDataOffset := add(txDataOffset, 0x20)
+    testing_assertEq(getTxType(innerTxDataOffset), 255, "tx(2) must be a priority op")
+
+    testing_expectBootloaderLog(getCanonicalL1TxHash(txDataOffset), 1)
+    // The marker is for force-failed transactions only.
+    testing_expectNoBootloaderLogKey(forceFailedL1TxLogKey())
+    testing_expectBalance(getFrom(innerTxDataOffset), 0)
+    testing_expectBalance(getTo(innerTxDataOffset), getValue(innerTxDataOffset))
+    testing_expectBalance(getReserved1(innerTxDataOffset), 0)
+    expectPriorityQueueAccounting()
+}
+
+function INT_TEST_forceFailL1Tx() {
+    // Same transaction as INT_TEST_l1TxBaseline, force-failed by the operator.
+    let txDataOffset := testing_txDataOffset(2)
+    let innerTxDataOffset := add(txDataOffset, 0x20)
+    testing_assertEq(getTxType(innerTxDataOffset), 255, "tx(2) must be a priority op")
+    let canonicalL1TxHash := getCanonicalL1TxHash(txDataOffset)
+
+    mstore(testing_txDescriptionPtr(2), 0x0101)
+
+    testing_expectTxFailureNoReturndata(2)
+    // What `claimFailedDeposit` and `proveL1ToL2TransactionStatus` consume on L1 ...
+    testing_expectBootloaderLog(canonicalL1TxHash, 0)
+    // ... and nothing that lets the same hash prove as a success.
+    testing_expectNoBootloaderLog(canonicalL1TxHash, 1)
+    testing_expectBootloaderLog(forceFailedL1TxLogKey(), canonicalL1TxHash)
+    // The sender receives no mint; the refund recipient receives the refundable amount.
+    testing_expectBalance(getFrom(innerTxDataOffset), 0)
+    testing_expectBalance(getTo(innerTxDataOffset), 0)
+    testing_expectBalance(getReserved1(innerTxDataOffset), getReserved0(innerTxDataOffset))
+    expectPriorityQueueAccounting()
+}
+
+function INT_TEST_forceFailL1TxFee() {
+    // Checks the refund with a non-zero gas price.
+    let txDataOffset := testing_txDataOffset(3)
+    let innerTxDataOffset := add(txDataOffset, 0x20)
+    testing_assertEq(getTxType(innerTxDataOffset), 255, "tx(3) must be a priority op")
+
+    mstore(testing_txDescriptionPtr(3), 0x0101)
+
+    let billedToUser := safeMul(
+        getMaxFeePerGas(innerTxDataOffset),
+        getGasLimit(innerTxDataOffset),
+        "fee overflow"
+    )
+    testing_expectTxFailureNoReturndata(3)
+    testing_expectBootloaderLog(getCanonicalL1TxHash(txDataOffset), 0)
+    testing_expectBalance(getFrom(innerTxDataOffset), 0)
+    testing_expectBalance(getTo(innerTxDataOffset), 0)
+    testing_expectBalance(
+        getReserved1(innerTxDataOffset),
+        safeSub(getReserved0(innerTxDataOffset), billedToUser, "fee underflow")
+    )
+}
+
+function INT_TEST_l1TxRevertBaseline() {
+    // The claim force-fail rests on: a priority op that reverts on its first instruction leaves the
+    // same balances and logs, minus the marker. tx(4) calls a system contract with no such selector.
+    let txDataOffset := testing_txDataOffset(4)
+    let innerTxDataOffset := add(txDataOffset, 0x20)
+    testing_assertEq(getTxType(innerTxDataOffset), 255, "tx(4) must be a priority op")
+    let canonicalL1TxHash := getCanonicalL1TxHash(txDataOffset)
+
+    testing_expectBootloaderLog(canonicalL1TxHash, 0)
+    testing_expectNoBootloaderLog(canonicalL1TxHash, 1)
+    // A natural revert carries no marker; only the operator's choice does.
+    testing_expectNoBootloaderLogKey(forceFailedL1TxLogKey())
+    testing_expectBalance(getFrom(innerTxDataOffset), 0)
+    testing_expectBalance(getTo(innerTxDataOffset), 0)
+    testing_expectBalance(getReserved1(innerTxDataOffset), getReserved0(innerTxDataOffset))
+    expectPriorityQueueAccounting()
+}
+
+function INT_TEST_forceFailOffL1Settle() {
+    // The marker log is only executable on L1, so the bit is rejected on any other settlement layer.
+    testing_testWillFailWith("forceFail off L1 settlement")
+    mstore(SETTLEMENT_LAYER_CHAIN_ID_BYTE(), add(getL1ChainId(), 1))
+    mstore(testing_txDescriptionPtr(2), 0x0101)
+}
+
+function INT_TEST_forceFailOnUpgradeTx() {
+    // Retyping tx(0) makes it an upgrade tx. The bit's guard runs before the "must be first" one.
+    testing_testWillFailWith("forceFail on upgrade tx")
+    mstore(add(testing_txDataOffset(0), 0x20), 254)
+    mstore(testing_txDescriptionPtr(0), 0x0101)
+}
+
+function INT_TEST_evmCreateNonZeroToFails() {
     // tx(1) should be an EVM create transaction where `reserved1 == 1` and `to == 0`.
     let txDataOffset := testing_txDataOffset(1)
     let innerTxDataOffset := add(txDataOffset, 0x20)
