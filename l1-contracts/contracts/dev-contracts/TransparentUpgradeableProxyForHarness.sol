@@ -10,8 +10,12 @@ pragma solidity 0.8.28;
 // when installing `L1ChainAssetHandlerDev`.
 // See `test/anvil-interop/build-dev-artifacts.sh`.
 // Both names are imported only so the compiler emits their artifacts; neither is referenced in code.
-// solhint-disable-next-line no-unused-import
+// This is load-bearing here, unlike in deploy-scripts: the harness runs a TARGETED
+// `forge build <this file>`, which compiles only this file's dependency closure rather
+// than all of `src`. A block disable is needed because the rule reports per imported name.
+// solhint-disable no-unused-import
 import {
     ITransparentUpgradeableProxy,
     TransparentUpgradeableProxy
 } from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+// solhint-enable no-unused-import
