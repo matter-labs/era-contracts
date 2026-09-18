@@ -99,7 +99,7 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
         address executionAddress,
         uint256 _destinationChainId
     ) internal returns (BundleExecutionResult memory result) {
-        (bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle memory interopBundle) = abi.decode(
+        (, , InteropBundle memory interopBundle) = abi.decode(
             logsData,
             (bytes32, bytes32, InteropBundle)
         );

@@ -388,7 +388,6 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
     }
 
     function migrateBackChain() public {
-        IBridgehubBase bridgehub = IBridgehubBase(addresses.bridgehub);
         IZKChain migratingChainContract = IZKChain(addresses.bridgehub.getZKChain(migratingChainId));
         bytes32 assetId = addresses.bridgehub.ctmAssetIdFromChainId(migratingChainId);
 

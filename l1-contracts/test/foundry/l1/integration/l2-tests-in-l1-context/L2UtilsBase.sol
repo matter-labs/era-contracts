@@ -35,7 +35,6 @@ import {DummyL2InteropAccount} from "../../../../../contracts/dev-contracts/test
 
 import {SystemContractsArgs} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {TokenBridgingData, TokenMetadata} from "contracts/common/Messaging.sol";
-import {L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 library L2UtilsBase {
     using stdToml for string;

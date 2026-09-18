@@ -258,7 +258,7 @@ contract MessageRootChainLogProofs is MailboxTest {
         bytes32 secondL2TxHash = keccak256("SecondL2Transaction");
         TxStatus txStatus = TxStatus.Success;
 
-        uint256 firstLogIndex = _addHashedLogToMerkleTree({
+        _addHashedLogToMerkleTree({
             _shardId: shardId,
             _isService: isService,
             _txNumberInBatch: 0,

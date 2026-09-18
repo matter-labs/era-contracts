@@ -125,7 +125,6 @@ contract ExperimentalBridgeTest is Test {
 
     function _setRandomToken(uint256 randomValue) internal {
         uint256 tokenIndex = randomValue % 3;
-        TestnetERC20Token token;
         if (tokenIndex == 0) {
             testToken = testToken18;
         } else if (tokenIndex == 1) {
@@ -954,6 +953,8 @@ contract ExperimentalBridgeTest is Test {
         uint256 mockL2GasLimit,
         uint256 mockL2GasPerPubdataByteLimit,
         bytes[] memory mockFactoryDeps,
+        // Unused in the body, but both call sites pass it as a named argument.
+        // solhint-disable-next-line no-unused-vars
         address randomCaller
     ) internal returns (L2TransactionRequestDirect memory l2TxnReqDirect, bytes32 canonicalHash) {
         vm.assume(mockFactoryDeps.length <= MAX_NEW_FACTORY_DEPS);
@@ -1011,7 +1012,7 @@ contract ExperimentalBridgeTest is Test {
         address randomCaller = makeAddr("RANDOM_CALLER");
         vm.assume(msgValue != mockMintValue);
 
-        (L2TransactionRequestDirect memory l2TxnReqDirect, bytes32 hash) = _prepareETHL2TransactionDirectRequest({
+        (L2TransactionRequestDirect memory l2TxnReqDirect, ) = _prepareETHL2TransactionDirectRequest({
             mockChainId: mockChainId,
             mockMintValue: mockMintValue,
             mockL2Contract: mockL2Contract,
@@ -1209,7 +1210,7 @@ contract ExperimentalBridgeTest is Test {
     function test_requestL2TransactionTwoBridgesWrongBridgeAddress(
         uint256 chainId,
         uint256 mintValue,
-        uint256 msgValue,
+        uint256 /* msgValue */,
         uint256 l2Value,
         uint256 l2GasLimit,
         uint256 l2GasPerPubdataByteLimit,

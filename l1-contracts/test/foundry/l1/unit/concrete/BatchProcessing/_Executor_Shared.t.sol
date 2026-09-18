@@ -196,7 +196,6 @@ contract ExecutorTest is UtilsCallMockerTest {
     }
 
     constructor() {
-        uint256 l1ChainID = 1;
         owner = makeAddr("owner");
         validator = makeAddr("validator");
         randomSigner = makeAddr("randomSigner");

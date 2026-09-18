@@ -9,7 +9,6 @@ import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {L2_ASSET_ROUTER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
@@ -23,7 +22,6 @@ import {
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 import {NotAssetRouter, MigrationPaused, ChainMigrationsDisabled} from "contracts/common/L1ContractErrors.sol";
 
-import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 

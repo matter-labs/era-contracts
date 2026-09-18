@@ -42,7 +42,6 @@ abstract contract L2InteropLibraryBasicTestAbstract is L2InteropTestUtils {
 
     function test_requestSendCallViaLibrary() public {
         address l2TokenAddress = initializeTokenByDeposit();
-        bytes32 l2TokenAssetId = l2NativeTokenVault.assetId(l2TokenAddress);
         vm.deal(address(this), 1000 ether);
 
         vm.recordLogs();

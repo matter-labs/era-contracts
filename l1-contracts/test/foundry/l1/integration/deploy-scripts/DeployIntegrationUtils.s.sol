@@ -14,7 +14,6 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
-import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 abstract contract DeployIntegrationUtils is Script, DeployCTMUtils {
