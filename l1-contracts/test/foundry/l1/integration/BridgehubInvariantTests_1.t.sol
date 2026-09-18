@@ -121,7 +121,7 @@ contract BridgehubInvariantTests1 is SharedBridgehubWithdrawal {
 
     // TODO: consider what should be actually committed, do we need to simulate operator:
     // blocks -> batches -> commits or just mock it.
-    function _commitBatchInfo(uint256 _chainId) internal {
+    function _commitBatchInfo(uint256 _chainId) internal view {
         //vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
 
         GettersFacet zkChainGetters = GettersFacet(getZKChainAddress(_chainId));
@@ -158,7 +158,7 @@ contract BridgehubInvariantTests1 is SharedBridgehubWithdrawal {
     // to deposit into mock l2 contract
     function _getDecodedDepositL2Calldata(
         bytes memory callData
-    ) internal view returns (address l1Sender, address l2Receiver, address l1Token, uint256 amount, bytes memory b) {
+    ) internal pure returns (address l1Sender, address l2Receiver, address l1Token, uint256 amount, bytes memory b) {
         // UnsafeBytes approach doesn't work, because abi is not deterministic
         bytes memory slicedData = new bytes(callData.length - 4);
 
@@ -209,7 +209,9 @@ contract BridgehubInvariantTests1 is SharedBridgehubWithdrawal {
     }
 
     // gets event from logs
-    function _getNewPriorityQueueFromLogs(Vm.Log[] memory logs) internal returns (NewPriorityRequest memory request) {
+    function _getNewPriorityQueueFromLogs(
+        Vm.Log[] memory logs
+    ) internal pure returns (NewPriorityRequest memory request) {
         for (uint256 i = 0; i < logs.length; i++) {
             Vm.Log memory log = logs[i];
 

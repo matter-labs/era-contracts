@@ -41,7 +41,7 @@ contract L2TxMocker is Test {
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit,
         bytes memory _l2CallData
-    ) internal returns (L2TransactionRequestDirect memory request) {
+    ) internal view returns (L2TransactionRequestDirect memory request) {
         request.chainId = _chainId;
         request.mintValue = _mintValue;
         request.l2Value = _l2Value;
@@ -64,7 +64,7 @@ contract L2TxMocker is Test {
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit,
         bytes memory _secondBridgeCalldata
-    ) internal returns (L2TransactionRequestTwoBridgesOuter memory request) {
+    ) internal view returns (L2TransactionRequestTwoBridgesOuter memory request) {
         request.chainId = _chainId;
         request.mintValue = _mintValue;
         request.secondBridgeAddress = _secondBridgeAddress;

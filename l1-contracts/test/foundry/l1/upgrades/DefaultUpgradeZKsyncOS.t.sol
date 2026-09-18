@@ -180,7 +180,7 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
 
     /// @notice The placeholder per-chain data is replaced with this chain's, and nothing else in the
     ///         ecosystem-wide transaction changes.
-    function test_substitutesThisChainsForceDeploymentsData() public {
+    function test_substitutesThisChainsForceDeploymentsData() public view {
         bytes memory placeholder = _placeholderUpgradeTxData();
 
         bytes memory rewritten = upgradeContract.getL2UpgradeTxData(mockBridgehub, CHAIN_ID, placeholder);

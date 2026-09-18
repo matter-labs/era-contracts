@@ -123,7 +123,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
 
     // TODO: consider what should be actually committed, do we need to simulate operator:
     // blocks -> batches -> commits or just mock it.
-    function _commitBatchInfo(uint256 _chainId) internal {
+    function _commitBatchInfo(uint256 _chainId) internal view {
         //vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
 
         GettersFacet zkChainGetters = GettersFacet(getZKChainAddress(_chainId));
@@ -160,7 +160,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
     // to deposit into mock l2 contract
     function _getDecodedDepositL2Calldata(
         bytes memory callData
-    ) internal view returns (address l1Sender, address l2Receiver, address l1Token, uint256 amount, bytes memory b) {
+    ) internal pure returns (address l1Sender, address l2Receiver, address l1Token, uint256 amount, bytes memory b) {
         // UnsafeBytes approach doesn't work, because abi is not deterministic
         bytes memory slicedData = new bytes(callData.length - 4);
 

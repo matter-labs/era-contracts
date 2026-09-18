@@ -17,7 +17,7 @@ contract FullMerkleMemoryEdgeCasesTest is FullMerkleTest {
     }
 
     /// @dev Test tree expansion when reaching power of 2 boundary (pushNewLeaf edge case)
-    function test_pushNewLeafTreeExpansion() public {
+    function test_pushNewLeafTreeExpansion() public pure {
         // Create tree with capacity for exactly 4 leaves (height 2)
         FullMerkleMemory.FullTree memory memoryTree = _setupMemoryTree(8);
 
@@ -43,7 +43,7 @@ contract FullMerkleMemoryEdgeCasesTest is FullMerkleTest {
     }
 
     /// @dev Test node array initialization on first access (line 114)
-    function test_nodeArrayInitialization() public {
+    function test_nodeArrayInitialization() public pure {
         FullMerkleMemory.FullTree memory memoryTree = _setupMemoryTree(8);
 
         // Push elements to trigger node creation at different levels
@@ -61,7 +61,7 @@ contract FullMerkleMemoryEdgeCasesTest is FullMerkleTest {
     }
 
     /// @dev Test updateLeaf() with various edge cases
-    function test_updateLeafEdgeCases() public {
+    function test_updateLeafEdgeCases() public pure {
         FullMerkleMemory.FullTree memory memoryTree = _setupMemoryTree(16);
 
         // Add several leaves
@@ -88,7 +88,7 @@ contract FullMerkleMemoryEdgeCasesTest is FullMerkleTest {
     }
 
     /// @dev Test updateAllLeaves() functionality
-    function test_updateAllLeaves() public {
+    function test_updateAllLeaves() public pure {
         FullMerkleMemory.FullTree memory memoryTree = _setupMemoryTree(8);
 
         // Add initial leaves
@@ -117,7 +117,7 @@ contract FullMerkleMemoryEdgeCasesTest is FullMerkleTest {
     }
 
     /// @dev Test updateAllNodesAtHeight() edge cases
-    function test_updateAllNodesAtHeight() public {
+    function test_updateAllNodesAtHeight() public pure {
         FullMerkleMemory.FullTree memory memoryTree = _setupMemoryTree(16);
 
         // Build tree with several leaves
@@ -140,7 +140,7 @@ contract FullMerkleMemoryEdgeCasesTest is FullMerkleTest {
     }
 
     /// @dev Test tree behavior with single element
-    function test_singleElementTree() public {
+    function test_singleElementTree() public pure {
         FullMerkleMemory.FullTree memory memoryTree = _setupMemoryTree(1);
 
         bytes32 leafValue = keccak256("single");
@@ -153,7 +153,7 @@ contract FullMerkleMemoryEdgeCasesTest is FullMerkleTest {
     }
 
     /// @dev Test ZERO value handling in calculations
-    function test_zeroValueHandling() public {
+    function test_zeroValueHandling() public pure {
         FullMerkleMemory.FullTree memory memoryTree = _setupMemoryTree(8);
 
         // Push some ZERO values
@@ -200,7 +200,7 @@ contract FullMerkleMemoryEdgeCasesTest is FullMerkleTest {
     }
 
     /// @dev Test large tree operations for gas and correctness
-    function test_largeTreeOperations() public {
+    function test_largeTreeOperations() public pure {
         uint256 treeSize = 63; // Large non-power-of-2 number
         FullMerkleMemory.FullTree memory memoryTree = _setupMemoryTree(treeSize);
 

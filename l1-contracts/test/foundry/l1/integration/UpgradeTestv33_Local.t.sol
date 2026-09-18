@@ -266,7 +266,7 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationTestBase, L1ContractDe
         assertEq(ctmUpgrade.getCTMAddress(), ctm);
     }
 
-    function test_DefaultUpgradeZKsyncOS_Local() public {
+    function test_DefaultUpgradeZKsyncOS_Local() public view {
         // Heavy execution and event assertions live in setUp -> internalTest()
         // (RAM constraint). This body validates persisted state outcomes.
         address ctm = ctmUpgrade.getCTMAddress();

@@ -146,7 +146,7 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
     /// @dev Replicates the stored batch info that _commitOneBatch produces for the given commit info.
     function _buildStoredBatchInfoZKsyncOS(
         CommitBatchInfoZKsyncOS memory commitInfo
-    ) internal view returns (IExecutor.StoredBatchInfo memory) {
+    ) internal pure returns (IExecutor.StoredBatchInfo memory) {
         return
             IExecutor.StoredBatchInfo({
                 batchNumber: commitInfo.batchNumber,

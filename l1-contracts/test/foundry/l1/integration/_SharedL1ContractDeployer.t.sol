@@ -48,10 +48,10 @@ contract L1ContractDeployer is UtilsCallMockerTest {
     CoreDeployedAddresses internal ecosystemAddresses;
     CTMDeployedAddresses internal ctmAddresses;
 
-    function deployEcosystem() public returns (CoreDeployedAddresses memory ecosystemAddresses) {
+    function deployEcosystem() public returns (CoreDeployedAddresses memory deployedEcosystem) {
         l1CoreContractsScript = new DeployL1CoreContractsIntegrationScript();
         l1CoreContractsScript.runForTest();
-        ecosystemAddresses = l1CoreContractsScript.getAddresses();
+        deployedEcosystem = l1CoreContractsScript.getAddresses();
     }
 
     function registerCTM(address bridgehub, address ctm) public {

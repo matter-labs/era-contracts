@@ -344,7 +344,7 @@ library Utils {
         return address(diamondProxy);
     }
 
-    function makeEmptyL2CanonicalTransaction() public returns (L2CanonicalTransaction memory) {
+    function makeEmptyL2CanonicalTransaction() public pure returns (L2CanonicalTransaction memory) {
         uint256[4] memory reserved;
         uint256[] memory factoryDeps = new uint256[](1);
         return

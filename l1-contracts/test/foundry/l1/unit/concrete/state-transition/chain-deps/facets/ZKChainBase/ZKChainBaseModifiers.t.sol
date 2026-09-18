@@ -103,7 +103,7 @@ contract ZKChainBaseModifiersTest is UtilsCallMockerTest {
     }
 
     // Test that onlySettlementLayer passes when settlementLayer is zero
-    function test_onlySettlementLayerPassesWhenZero() public {
+    function test_onlySettlementLayerPassesWhenZero() public view {
         // By default, settlementLayer is address(0), so the modifier should pass
         address settlementLayer = utilsFacet.util_getSettlementLayer();
         assertEq(settlementLayer, address(0), "Settlement layer should be zero by default");

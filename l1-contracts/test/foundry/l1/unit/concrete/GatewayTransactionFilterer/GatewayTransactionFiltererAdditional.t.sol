@@ -153,16 +153,14 @@ contract GatewayTransactionFiltererAdditionalTest is Test {
         address lowAddress = address(uint160(MIN_ALLOWED_ADDRESS) - 1);
         bytes memory txCalldata = hex"12345678";
 
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
-            randomUser,
-            lowAddress,
-            0,
-            0,
-            txCalldata,
-            address(0)
-        );
+        bool isAllowed = transactionFiltererProxy.isTransactionAllowed({
+            sender: randomUser,
+            contractL2: lowAddress,
+            mintValue: 0,
+            l2Value: 0,
+            l2Calldata: txCalldata,
+            refundRecipient: address(0)
+        });
 
         assertFalse(isAllowed, "Low address without whitelist should be blocked");
     }
@@ -175,16 +173,14 @@ contract GatewayTransactionFiltererAdditionalTest is Test {
         vm.prank(owner);
         transactionFiltererProxy.grantWhitelist(randomUser);
 
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
-            randomUser,
-            lowAddress,
-            0,
-            0,
-            txCalldata,
-            address(0)
-        );
+        bool isAllowed = transactionFiltererProxy.isTransactionAllowed({
+            sender: randomUser,
+            contractL2: lowAddress,
+            mintValue: 0,
+            l2Value: 0,
+            l2Calldata: txCalldata,
+            refundRecipient: address(0)
+        });
 
         assertTrue(isAllowed, "Whitelisted sender should be allowed to use low addresses");
     }
@@ -203,16 +199,14 @@ contract GatewayTransactionFiltererAdditionalTest is Test {
             abi.encode(makeAddr("ctmAddress"))
         );
 
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
-            assetRouter,
-            address(0),
-            0,
-            0,
-            txCalldata,
-            address(0)
-        );
+        bool isAllowed = transactionFiltererProxy.isTransactionAllowed({
+            sender: assetRouter,
+            contractL2: address(0),
+            mintValue: 0,
+            l2Value: 0,
+            l2Calldata: txCalldata,
+            refundRecipient: address(0)
+        });
 
         assertTrue(isAllowed, "setAssetHandlerAddress with valid CTM should be allowed");
     }
@@ -231,16 +225,14 @@ contract GatewayTransactionFiltererAdditionalTest is Test {
             abi.encode(address(0))
         );
 
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
-            assetRouter,
-            address(0),
-            0,
-            0,
-            txCalldata,
-            address(0)
-        );
+        bool isAllowed = transactionFiltererProxy.isTransactionAllowed({
+            sender: assetRouter,
+            contractL2: address(0),
+            mintValue: 0,
+            l2Value: 0,
+            l2Calldata: txCalldata,
+            refundRecipient: address(0)
+        });
 
         assertFalse(isAllowed, "setAssetHandlerAddress with invalid CTM should be blocked");
     }
@@ -252,16 +244,14 @@ contract GatewayTransactionFiltererAdditionalTest is Test {
         // since the check is contractL2 > MIN_ALLOWED_ADDRESS
         bytes memory txCalldata = hex"12345678";
 
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
-            randomUser,
-            MIN_ALLOWED_ADDRESS,
-            0,
-            0,
-            txCalldata,
-            address(0)
-        );
+        bool isAllowed = transactionFiltererProxy.isTransactionAllowed({
+            sender: randomUser,
+            contractL2: MIN_ALLOWED_ADDRESS,
+            mintValue: 0,
+            l2Value: 0,
+            l2Calldata: txCalldata,
+            refundRecipient: address(0)
+        });
 
         assertFalse(isAllowed, "Exactly MIN_ALLOWED_ADDRESS should not be allowed without whitelist");
     }
@@ -271,16 +261,14 @@ contract GatewayTransactionFiltererAdditionalTest is Test {
         address justAbove = address(uint160(MIN_ALLOWED_ADDRESS) + 1);
         bytes memory txCalldata = hex"12345678";
 
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
-            randomUser,
-            justAbove,
-            0,
-            0,
-            txCalldata,
-            address(0)
-        );
+        bool isAllowed = transactionFiltererProxy.isTransactionAllowed({
+            sender: randomUser,
+            contractL2: justAbove,
+            mintValue: 0,
+            l2Value: 0,
+            l2Calldata: txCalldata,
+            refundRecipient: address(0)
+        });
 
         assertTrue(isAllowed, "Just above MIN_ALLOWED_ADDRESS should be allowed");
     }
@@ -293,16 +281,14 @@ contract GatewayTransactionFiltererAdditionalTest is Test {
         vm.assume(contractL2 != ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR); // Dangerous contract — restricted
         bytes memory txCalldata = hex"12345678";
 
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
-            randomUser,
-            contractL2,
-            0,
-            0,
-            txCalldata,
-            address(0)
-        );
+        bool isAllowed = transactionFiltererProxy.isTransactionAllowed({
+            sender: randomUser,
+            contractL2: contractL2,
+            mintValue: 0,
+            l2Value: 0,
+            l2Calldata: txCalldata,
+            refundRecipient: address(0)
+        });
 
         assertTrue(isAllowed, "High addresses should always be allowed");
     }

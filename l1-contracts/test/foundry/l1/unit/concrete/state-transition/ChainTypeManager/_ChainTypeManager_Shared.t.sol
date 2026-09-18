@@ -233,7 +233,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
     function getDiamondCutDataWithCustomFacets(
         address _diamondInit,
         Diamond.FacetCut[] memory _facetCuts
-    ) internal returns (Diamond.DiamondCutData memory) {
+    ) internal pure returns (Diamond.DiamondCutData memory) {
         return Diamond.DiamondCutData({facetCuts: _facetCuts, initAddress: _diamondInit, initCalldata: bytes("")});
     }
 

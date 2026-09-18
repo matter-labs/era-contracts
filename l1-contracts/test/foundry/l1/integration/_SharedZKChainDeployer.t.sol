@@ -141,7 +141,7 @@ contract ZKChainDeployer is L1ContractDeployer {
         uint256 __chainId,
         address __baseToken,
         uint256 __salt
-    ) internal returns (ZKChainDescription memory description) {
+    ) internal pure returns (ZKChainDescription memory description) {
         description = ZKChainDescription({
             zkChainChainId: __chainId,
             baseToken: __baseToken,

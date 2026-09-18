@@ -57,7 +57,7 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
 
     // Check whether the sum of ETH deposits from tests, updated on each deposit and withdrawal,
     // equals the balance of L1Shared bridge.
-    function test_initialDeployment() public {
+    function test_initialDeployment() public view {
         uint256 chainId = zkChainIds[0];
         address newChainAddress = addresses.bridgehub.getZKChain(chainId);
         address admin = IZKChain(addresses.bridgehub.getZKChain(chainId)).getAdmin();

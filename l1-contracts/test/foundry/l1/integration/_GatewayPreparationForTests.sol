@@ -285,7 +285,7 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         initializeConfig();
     }
 
-    function _getL1GasPrice() internal view returns (uint256) {
+    function _getL1GasPrice() internal pure returns (uint256) {
         return 10;
     }
 

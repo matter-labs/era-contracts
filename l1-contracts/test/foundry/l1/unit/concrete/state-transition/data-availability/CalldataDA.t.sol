@@ -97,7 +97,7 @@ contract CalldataDATest is Test {
         calldataDA.processL2RollupDAValidatorOutputHash(l2DAValidatorOutputHash, maxBlobsSupported, operatorDAInput);
     }
 
-    function test_ProcessL2RollupDAValidatorOutputHash() public {
+    function test_ProcessL2RollupDAValidatorOutputHash() public view {
         bytes32 stateDiffHash = Utils.randomBytes32("stateDiffHash");
         bytes32 fullPubdataHash = Utils.randomBytes32("fullPubdataHash");
         uint8 blobsProvided = 1;
@@ -179,7 +179,7 @@ contract CalldataDATest is Test {
         calldataDA.processCalldataDA(blobsProvided, fullPubdataHash, maxBlobsSupported, pubdataInput);
     }
 
-    function test_ProcessCalldataDA() public {
+    function test_ProcessCalldataDA() public view {
         uint256 blobsProvided = 1;
         uint256 maxBlobsSupported = 6;
         bytes memory pubdataInputWithoutBlobCommitment = "verifydonttrustzkistheendgamemagicmoonmath";
@@ -208,7 +208,7 @@ contract CalldataDATest is Test {
                                     Util Functions
     //////////////////////////////////////////////////////////////////////////*/
 
-    function makeBytesArrayOfLength(uint256 len) internal returns (bytes calldata arr) {
+    function makeBytesArrayOfLength(uint256 len) internal pure returns (bytes calldata arr) {
         assembly {
             arr.length := len
         }

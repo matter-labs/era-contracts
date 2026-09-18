@@ -152,7 +152,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
 
         coreAddresses.bridgehub.proxies.bridgehub = L2_BRIDGEHUB_ADDR;
 
-        L2WrappedBaseToken weth = deployL2Weth();
+        L2WrappedBaseToken l2WethToken = deployL2Weth();
         if (_skip) {
             vm.stopBroadcast();
         }
@@ -168,7 +168,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
                 contractsDeployedAlready: false,
                 l1CtmDeployer: l1CTMDeployer,
                 maxNumberOfZKChains: 100,
-                wethToken: address(weth)
+                wethToken: address(l2WethToken)
             })
         );
         if (!_skip) {
@@ -233,7 +233,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         );
     }
 
-    function getExampleChainCommitment() internal returns (bytes memory) {
+    function getExampleChainCommitment() internal {
         address chainAdmin = makeAddr("chainAdmin");
 
         vm.mockCall(
@@ -382,7 +382,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
     function getInclusionProof(
         address messageSender,
         uint256 _chainId
-    ) public view returns (MessageInclusionProof memory) {
+    ) public pure returns (MessageInclusionProof memory) {
         bytes32[] memory proof = new bytes32[](27);
         proof[0] = bytes32(0x010f050000000000000000000000000000000000000000000000000000000000);
         proof[1] = bytes32(0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba);

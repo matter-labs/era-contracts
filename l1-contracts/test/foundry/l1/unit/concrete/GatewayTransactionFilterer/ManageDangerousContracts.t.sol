@@ -117,16 +117,14 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
         vm.prank(owner);
         transactionFiltererProxy.addDangerousContract({contractAddress: dangerousAddr});
 
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
-            randomUser,
-            dangerousAddr,
-            0,
-            0,
-            hex"12345678",
-            address(0)
-        );
+        bool isAllowed = transactionFiltererProxy.isTransactionAllowed({
+            sender: randomUser,
+            contractL2: dangerousAddr,
+            mintValue: 0,
+            l2Value: 0,
+            l2Calldata: hex"12345678",
+            refundRecipient: address(0)
+        });
 
         assertFalse(isAllowed, "Non-whitelisted sender should be blocked from calling a dangerous contract");
     }
@@ -140,32 +138,28 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
         transactionFiltererProxy.grantWhitelist(randomUser);
         vm.stopPrank();
 
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
-            randomUser,
-            dangerousAddr,
-            0,
-            0,
-            hex"12345678",
-            address(0)
-        );
+        bool isAllowed = transactionFiltererProxy.isTransactionAllowed({
+            sender: randomUser,
+            contractL2: dangerousAddr,
+            mintValue: 0,
+            l2Value: 0,
+            l2Calldata: hex"12345678",
+            refundRecipient: address(0)
+        });
 
         assertTrue(isAllowed, "Whitelisted sender should be allowed to call a dangerous contract");
     }
 
     function test_isTransactionAllowed_blocksCreate2FactoryForNonWhitelisted() public view {
         // Deterministic Create2 factory is marked dangerous on initialization and is above MIN_ALLOWED_ADDRESS
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
-            randomUser,
-            ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR,
-            0,
-            0,
-            hex"12345678",
-            address(0)
-        );
+        bool isAllowed = transactionFiltererProxy.isTransactionAllowed({
+            sender: randomUser,
+            contractL2: ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR,
+            mintValue: 0,
+            l2Value: 0,
+            l2Calldata: hex"12345678",
+            refundRecipient: address(0)
+        });
 
         assertFalse(isAllowed, "Non-whitelisted sender should be blocked from calling Create2Factory");
     }
@@ -174,16 +168,14 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
         vm.prank(owner);
         transactionFiltererProxy.grantWhitelist(randomUser);
 
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
-            randomUser,
-            ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR,
-            0,
-            0,
-            hex"12345678",
-            address(0)
-        );
+        bool isAllowed = transactionFiltererProxy.isTransactionAllowed({
+            sender: randomUser,
+            contractL2: ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR,
+            mintValue: 0,
+            l2Value: 0,
+            l2Calldata: hex"12345678",
+            refundRecipient: address(0)
+        });
 
         assertTrue(isAllowed, "Whitelisted sender should be allowed to call Create2Factory");
     }
@@ -192,16 +184,14 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
         // A high address that is NOT in dangerousContracts should still be freely accessible
         address highAddr = address(uint160(MIN_ALLOWED_ADDRESS) + 999);
 
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
-            randomUser,
-            highAddr,
-            0,
-            0,
-            hex"12345678",
-            address(0)
-        );
+        bool isAllowed = transactionFiltererProxy.isTransactionAllowed({
+            sender: randomUser,
+            contractL2: highAddr,
+            mintValue: 0,
+            l2Value: 0,
+            l2Calldata: hex"12345678",
+            refundRecipient: address(0)
+        });
 
         assertTrue(isAllowed, "High address not in dangerousContracts should be allowed");
     }
@@ -212,16 +202,14 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
         vm.prank(owner);
         transactionFiltererProxy.addDangerousContract({contractAddress: highDangerousAddr});
 
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
-            randomUser,
-            highDangerousAddr,
-            0,
-            0,
-            hex"12345678",
-            address(0)
-        );
+        bool isAllowed = transactionFiltererProxy.isTransactionAllowed({
+            sender: randomUser,
+            contractL2: highDangerousAddr,
+            mintValue: 0,
+            l2Value: 0,
+            l2Calldata: hex"12345678",
+            refundRecipient: address(0)
+        });
 
         assertFalse(
             isAllowed,
@@ -237,16 +225,14 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
         transactionFiltererProxy.removeDangerousContract({contractAddress: highDangerousAddr});
         vm.stopPrank();
 
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
-            randomUser,
-            highDangerousAddr,
-            0,
-            0,
-            hex"12345678",
-            address(0)
-        );
+        bool isAllowed = transactionFiltererProxy.isTransactionAllowed({
+            sender: randomUser,
+            contractL2: highDangerousAddr,
+            mintValue: 0,
+            l2Value: 0,
+            l2Calldata: hex"12345678",
+            refundRecipient: address(0)
+        });
 
         assertTrue(isAllowed, "After removal from dangerousContracts, high address should be freely accessible");
     }

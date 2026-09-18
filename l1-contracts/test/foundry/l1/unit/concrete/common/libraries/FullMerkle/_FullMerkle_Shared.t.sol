@@ -24,7 +24,7 @@ contract FullMerkleTest is Test {
         return keccak256(abi.encodePacked(left, right));
     }
 
-    function _setupMemoryTree(uint256 _maxLeafNumber) internal view returns (FullMerkleMemory.FullTree memory) {
+    function _setupMemoryTree(uint256 _maxLeafNumber) internal pure returns (FullMerkleMemory.FullTree memory) {
         FullMerkleMemory.FullTree memory memoryTree;
         memoryTree.createTree(_maxLeafNumber);
         memoryTree.setup(ZERO_HASH);

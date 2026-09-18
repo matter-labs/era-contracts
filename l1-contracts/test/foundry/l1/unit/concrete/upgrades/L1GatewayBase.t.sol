@@ -103,7 +103,7 @@ contract L1FixedForceDeploymentsHelperTest is Test {
     }
 
     // Test with ETH as the base token
-    function testWithETH() public {
+    function testWithETH() public view {
         // No wrapped base token store
         address _wrappedBaseTokenStore = address(0);
 

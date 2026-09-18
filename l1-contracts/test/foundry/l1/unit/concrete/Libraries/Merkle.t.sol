@@ -17,7 +17,7 @@ import {
 contract MerkleTest is Test {
     // ============ calculateRoot Tests ============
 
-    function test_calculateRoot_singleLeaf() public {
+    function test_calculateRoot_singleLeaf() public view {
         bytes32[] memory path = new bytes32[](0);
         bytes32 leaf = keccak256("leaf");
 
@@ -27,7 +27,7 @@ contract MerkleTest is Test {
         assertEq(root, leaf);
     }
 
-    function test_calculateRoot_twoLeaves_leftChild() public {
+    function test_calculateRoot_twoLeaves_leftChild() public view {
         bytes32 leaf0 = keccak256("leaf0");
         bytes32 leaf1 = keccak256("leaf1");
 
@@ -40,7 +40,7 @@ contract MerkleTest is Test {
         assertEq(root, expectedRoot);
     }
 
-    function test_calculateRoot_twoLeaves_rightChild() public {
+    function test_calculateRoot_twoLeaves_rightChild() public view {
         bytes32 leaf0 = keccak256("leaf0");
         bytes32 leaf1 = keccak256("leaf1");
 
@@ -53,7 +53,7 @@ contract MerkleTest is Test {
         assertEq(root, expectedRoot);
     }
 
-    function test_calculateRoot_fourLeaves() public {
+    function test_calculateRoot_fourLeaves() public view {
         bytes32 leaf0 = keccak256("leaf0");
         bytes32 leaf1 = keccak256("leaf1");
         bytes32 leaf2 = keccak256("leaf2");
@@ -73,7 +73,7 @@ contract MerkleTest is Test {
         assertEq(root, expectedRoot);
     }
 
-    function test_calculateRoot_fourLeaves_rightmostLeaf() public {
+    function test_calculateRoot_fourLeaves_rightmostLeaf() public view {
         bytes32 leaf0 = keccak256("leaf0");
         bytes32 leaf1 = keccak256("leaf1");
         bytes32 leaf2 = keccak256("leaf2");
@@ -132,7 +132,7 @@ contract MerkleTest is Test {
         assertEq(root, expectedRoot);
     }
 
-    function test_calculateRootMemory_matchesCalculateRoot() public {
+    function test_calculateRootMemory_matchesCalculateRoot() public view {
         bytes32 leaf0 = keccak256("leaf0");
         bytes32 leaf1 = keccak256("leaf1");
         bytes32 leaf2 = keccak256("leaf2");

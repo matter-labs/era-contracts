@@ -183,20 +183,18 @@ library L2UtilsBase {
             vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, ntv.code);
 
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-            // The callee declares unnamed parameters, so named arguments are not possible.
-            // solhint-disable-next-line func-named-parameters
-            L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).initL2(
-                _args.l1ChainId,
-                _args.aliasedOwner,
-                _args.l2TokenBeacon,
-                wethToken,
-                TokenBridgingData({
+            L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).initL2({
+                _l1ChainId: _args.l1ChainId,
+                _aliasedOwner: _args.aliasedOwner,
+                _bridgedTokenBeacon: _args.l2TokenBeacon,
+                _wethToken: wethToken,
+                _baseTokenBridgingData: TokenBridgingData({
                     assetId: baseTokenAssetId,
                     originChainId: _args.l1ChainId,
                     originToken: ETH_TOKEN_ADDRESS
                 }),
-                TokenMetadata({name: "Ether", symbol: "ETH", decimals: 18})
-            );
+                _baseTokenMetadata: TokenMetadata({name: "Ether", symbol: "ETH", decimals: 18})
+            });
             L2NativeTokenVaultDev(L2_NATIVE_TOKEN_VAULT_ADDR).deployBridgedStandardERC20(_args.aliasedOwner);
 
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);

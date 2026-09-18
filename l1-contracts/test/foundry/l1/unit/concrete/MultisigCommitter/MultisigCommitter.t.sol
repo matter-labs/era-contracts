@@ -121,11 +121,9 @@ contract MultisigCommitterTest is Test {
     }
 
     function test_SuccessfulConstruction() public {
-        MultisigCommitter multisigCommitter = MultisigCommitter(
-            _deployMultisigCommitter(ecosystemOwner, executionDelay)
-        );
-        assertEq(multisigCommitter.owner(), ecosystemOwner);
-        assertEq(multisigCommitter.executionDelay(), executionDelay);
+        MultisigCommitter committer = MultisigCommitter(_deployMultisigCommitter(ecosystemOwner, executionDelay));
+        assertEq(committer.owner(), ecosystemOwner);
+        assertEq(committer.executionDelay(), executionDelay);
     }
 
     function test_customVsDefaultSigningSet() public {
@@ -274,7 +272,7 @@ contract MultisigCommitterTest is Test {
         return digest;
     }
 
-    function sign_digest(uint256 key, bytes32 digest) internal view returns (bytes memory) {
+    function sign_digest(uint256 key, bytes32 digest) internal pure returns (bytes memory) {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(key, digest);
         return abi.encodePacked(r, s, v);
     }
@@ -298,16 +296,14 @@ contract MultisigCommitterTest is Test {
         }
 
         vm.prank(sequencer);
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        multisigCommitter.commitBatchesMultisig(
-            chainAddress,
-            commitBatchFrom,
-            commitBatchTo,
-            commitData,
-            signers,
-            signatures
-        );
+        multisigCommitter.commitBatchesMultisig({
+            chainAddress: chainAddress,
+            processBatchFrom: commitBatchFrom,
+            processBatchTo: commitBatchTo,
+            batchData: commitData,
+            signers: signers,
+            signatures: signatures
+        });
     }
 
     function test_commit_with_signatures_failure_cases() public {
@@ -325,16 +321,14 @@ contract MultisigCommitterTest is Test {
 
         vm.prank(sequencer);
         vm.expectRevert(abi.encodeWithSelector(NotEnoughSigners.selector, 1, 2));
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        multisigCommitter.commitBatchesMultisig(
-            chainAddress,
-            commitBatchFrom,
-            commitBatchTo,
-            commitData,
-            signers,
-            signatures
-        );
+        multisigCommitter.commitBatchesMultisig({
+            chainAddress: chainAddress,
+            processBatchFrom: commitBatchFrom,
+            processBatchTo: commitBatchTo,
+            batchData: commitData,
+            signers: signers,
+            signatures: signatures
+        });
 
         // Unauthorized signer case
 
@@ -350,16 +344,14 @@ contract MultisigCommitterTest is Test {
 
         vm.prank(sequencer);
         vm.expectRevert(abi.encodeWithSelector(SignerNotAuthorized.selector, validator1Custom));
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        multisigCommitter.commitBatchesMultisig(
-            chainAddress,
-            commitBatchFrom,
-            commitBatchTo,
-            commitData,
-            signers,
-            signatures
-        );
+        multisigCommitter.commitBatchesMultisig({
+            chainAddress: chainAddress,
+            processBatchFrom: commitBatchFrom,
+            processBatchTo: commitBatchTo,
+            batchData: commitData,
+            signers: signers,
+            signatures: signatures
+        });
 
         // Duplicated signer
 
@@ -368,16 +360,14 @@ contract MultisigCommitterTest is Test {
 
         vm.prank(sequencer);
         vm.expectRevert(abi.encodeWithSelector(SignersNotSorted.selector));
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        multisigCommitter.commitBatchesMultisig(
-            chainAddress,
-            commitBatchFrom,
-            commitBatchTo,
-            commitData,
-            signers,
-            signatures
-        );
+        multisigCommitter.commitBatchesMultisig({
+            chainAddress: chainAddress,
+            processBatchFrom: commitBatchFrom,
+            processBatchTo: commitBatchTo,
+            batchData: commitData,
+            signers: signers,
+            signatures: signatures
+        });
     }
 
     function test_getValidatorsMember_Shared() public view {
@@ -424,16 +414,14 @@ contract MultisigCommitterTest is Test {
         signatures[0] = sign_digest(validator1CustomKey, digest);
 
         vm.prank(sequencer);
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        multisigCommitter.commitBatchesMultisig(
-            chainAddress,
-            commitBatchFrom,
-            commitBatchTo,
-            commitData,
-            signers,
-            signatures
-        );
+        multisigCommitter.commitBatchesMultisig({
+            chainAddress: chainAddress,
+            processBatchFrom: commitBatchFrom,
+            processBatchTo: commitBatchTo,
+            batchData: commitData,
+            signers: signers,
+            signatures: signatures
+        });
     }
 
     function test_commit_with_custom_validators_unauthorized_shared() public {
@@ -455,16 +443,14 @@ contract MultisigCommitterTest is Test {
 
         vm.prank(sequencer);
         vm.expectRevert(abi.encodeWithSelector(SignerNotAuthorized.selector, validator1Shared));
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        multisigCommitter.commitBatchesMultisig(
-            chainAddress,
-            commitBatchFrom,
-            commitBatchTo,
-            commitData,
-            signers,
-            signatures
-        );
+        multisigCommitter.commitBatchesMultisig({
+            chainAddress: chainAddress,
+            processBatchFrom: commitBatchFrom,
+            processBatchTo: commitBatchTo,
+            batchData: commitData,
+            signers: signers,
+            signatures: signatures
+        });
     }
 
     function test_sharedValidatorsMember() public view {

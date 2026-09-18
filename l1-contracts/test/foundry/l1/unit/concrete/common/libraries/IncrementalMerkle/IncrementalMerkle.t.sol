@@ -17,23 +17,25 @@ contract IncrementalMerkleTestTest is Test {
         merkleTest = new IncrementalMerkleTest(ZERO);
     }
 
-    function setUpMemory() public returns (DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestMemory) {
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        merkleTestMemory = DynamicIncrementalMerkleMemory.Bytes32PushTree(
-            0,
-            new bytes32[](14),
-            new bytes32[](14),
-            0,
-            0,
-            false,
-            bytes32(0)
-        );
+    function setUpMemory()
+        public
+        pure
+        returns (DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestMemory)
+    {
+        merkleTestMemory = DynamicIncrementalMerkleMemory.Bytes32PushTree({
+            _nextLeafIndex: 0,
+            _sides: new bytes32[](14),
+            _zeros: new bytes32[](14),
+            _sidesLengthMemory: 0,
+            _zerosLengthMemory: 0,
+            _needsRootRecalculation: false,
+            _lastLeafValue: bytes32(0)
+        });
         merkleTestMemory.setup(ZERO);
     }
 
     /// @dev Test basic setup and initialization (storage vs memory)
-    function testSetup() public {
+    function testSetup() public view {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestMemory = setUpMemory();
 
         // Storage tree
@@ -107,7 +109,7 @@ contract IncrementalMerkleTestTest is Test {
     }
 
     /// @dev Test lazy vs regular pushes in memory (single element)
-    function testLazyVsRegularSingle() public {
+    function testLazyVsRegularSingle() public pure {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleRegular = setUpMemory();
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleLazy = setUpMemory();
 
@@ -122,7 +124,7 @@ contract IncrementalMerkleTestTest is Test {
     }
 
     /// @dev Test mixed lazy and regular operations
-    function testMixedLazyRegular() public {
+    function testMixedLazyRegular() public pure {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleRegular = setUpMemory();
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleMixed = setUpMemory();
 
@@ -167,7 +169,7 @@ contract IncrementalMerkleTestTest is Test {
     }
 
     /// @dev Test the original failing lazy push batch processing
-    function testPushLazyBatchProcessing() public {
+    function testPushLazyBatchProcessing() public pure {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestRegular = setUpMemory();
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestLazy = setUpMemory();
 
@@ -190,7 +192,7 @@ contract IncrementalMerkleTestTest is Test {
     }
 
     /// @dev Test non-sequential arbitrary values
-    function testNonSequentialOddIndex() public {
+    function testNonSequentialOddIndex() public view {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleRegular = setUpMemory();
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleLazy = setUpMemory();
 
@@ -222,7 +224,7 @@ contract IncrementalMerkleTestTest is Test {
     }
 
     /// @dev Test edge cases - ZERO values and extreme values
-    function testEdgeCases() public {
+    function testEdgeCases() public pure {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleRegular = setUpMemory();
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleLazy = setUpMemory();
 
@@ -245,7 +247,7 @@ contract IncrementalMerkleTestTest is Test {
     }
 
     /// @dev Test power-of-2 boundary expansions
-    function testPowerOfTwoBoundaries() public {
+    function testPowerOfTwoBoundaries() public pure {
         // Test critical power-of-2 transitions
         uint256[] memory boundaries = new uint256[](6);
         boundaries[0] = 1; // Single element
@@ -272,7 +274,7 @@ contract IncrementalMerkleTestTest is Test {
     }
 
     /// @dev Test intermediate root calls during lazy operations
-    function testIntermediateRoots() public {
+    function testIntermediateRoots() public pure {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleRegular = setUpMemory();
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleLazy = setUpMemory();
 
@@ -309,7 +311,7 @@ contract IncrementalMerkleTestTest is Test {
     }
 
     /// @dev Test large tree with various data patterns
-    function testLargeTreeVariedPatterns() public {
+    function testLargeTreeVariedPatterns() public view {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleRegular = setUpMemory();
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleLazy = setUpMemory();
 
@@ -383,7 +385,7 @@ contract IncrementalMerkleTestTest is Test {
     }
 
     /// @dev Test extendUntilEnd() edge cases
-    function testExtendUntilEndEdgeCases() public {
+    function testExtendUntilEndEdgeCases() public pure {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleMemory = setUpMemory();
 
         // Test extending from empty tree (nextLeafIndex == 0)
@@ -453,7 +455,7 @@ contract IncrementalMerkleTestTest is Test {
     }
 
     /// @dev Test createTree() function initialization
-    function testCreateTreeInitialization() public {
+    function testCreateTreeInitialization() public pure {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleMemory;
 
         // Initialize with createTree
@@ -470,7 +472,7 @@ contract IncrementalMerkleTestTest is Test {
     }
 
     /// @dev Test _recalculateRoot() with empty tree (leafCount == 0)
-    function testRecalculateRootEmptyTree() public {
+    function testRecalculateRootEmptyTree() public pure {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleMemory = setUpMemory();
 
         // Ensure tree is empty
@@ -484,7 +486,7 @@ contract IncrementalMerkleTestTest is Test {
     }
 
     /// @dev Test various extendUntilEnd() scenarios for memory tree
-    function testExtendUntilEndScenarios() public {
+    function testExtendUntilEndScenarios() public pure {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleMemory = setUpMemory();
 
         // Setup initial state with some elements

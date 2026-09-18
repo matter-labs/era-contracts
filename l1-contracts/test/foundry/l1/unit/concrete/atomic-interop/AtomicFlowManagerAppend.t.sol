@@ -171,7 +171,7 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
 
     /// @notice Pins the v1 version literal: it is mirrored off-chain by hand in
     /// `test/anvil-interop/src/helpers/imt-engine-lib.ts`, so a bump must break something here.
-    function test_atomicFlowPreimageVersion_isPinnedToV1() public {
+    function test_atomicFlowPreimageVersion_isPinnedToV1() public pure {
         assertEq(ATOMIC_FLOW_PREIMAGE_VERSION, bytes1(0x01), "v1 preimage version literal must be pinned");
     }
 

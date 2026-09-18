@@ -124,11 +124,11 @@ contract MailboxTest is UtilsCallMockerTest {
 
     function setupDiamondProxy() public {
         setupEcosystem();
-        address diamondProxy = deployDiamondProxy();
+        address proxy = deployDiamondProxy();
 
-        mailboxFacet = IMailbox(diamondProxy);
-        utilsFacet = UtilsFacet(diamondProxy);
-        gettersFacet = IGetters(diamondProxy);
+        mailboxFacet = IMailbox(proxy);
+        utilsFacet = UtilsFacet(proxy);
+        gettersFacet = IGetters(proxy);
 
         // utilsFacet.util_setBridgehub(bridgehub);
         // utilsFacet.util_setInteropCenter(interopCenter);

@@ -56,7 +56,7 @@ contract L2AssetRouterAttributesEncodingRegressionL1Test is Test, SharedL2Contra
 
     /// @notice Test that InteropCenter.parseAttributes correctly decodes the attributes from L2AssetRouter
     /// @dev This verifies the fix works end-to-end with parseAttributes
-    function test_regression_parseAttributesDecodesCorrectly() public view {
+    function test_regression_parseAttributesDecodesCorrectly() public pure {
         uint256 testValue = 1 ether;
 
         // Create attributes using the CORRECT encoding (as fixed in PR #1714)
@@ -79,7 +79,7 @@ contract L2AssetRouterAttributesEncodingRegressionL1Test is Test, SharedL2Contra
 
     /// @notice Test that the buggy encoding would cause parseAttributes to return wrong value
     /// @dev This demonstrates the bug that was fixed
-    function test_regression_buggyEncodingWouldReturnWrongValue() public view {
+    function test_regression_buggyEncodingWouldReturnWrongValue() public pure {
         uint256 testValue = 1 ether;
         bytes4 selector = IERC7786Attributes.interopCallValue.selector;
 
@@ -104,7 +104,7 @@ contract L2AssetRouterAttributesEncodingRegressionL1Test is Test, SharedL2Contra
 
     /// @notice Fuzz test for various values
     /// @dev Ensures the encoding works for any uint256 value
-    function testFuzz_regression_attributesEncodingVariousValues(uint256 testValue) public view {
+    function testFuzz_regression_attributesEncodingVariousValues(uint256 testValue) public pure {
         // Create attributes using the correct encoding
         bytes[] memory attributes = new bytes[](1);
         attributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, testValue);

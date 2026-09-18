@@ -605,7 +605,7 @@ contract MessageRootChainLogProofs is MailboxTest {
         uint16 _l2TxNumberInBatch,
         bytes32[] memory _merkleProof,
         TxStatus _status
-    ) internal returns (bool) {
+    ) internal view returns (bool) {
         bool retOldEncoding = messageRoot.proveL1ToL2TransactionStatusShared({
             _chainId: chainId,
             _l2TxHash: _l2TxHash,
@@ -711,7 +711,7 @@ contract MessageRootChainLogProofs is MailboxTest {
     }
 
     /// @notice Appends the proof metadata to the log proof as if the proof is for a batch that settled on L1.
-    function _appendProofMetadata(bytes32[] memory logProof) internal returns (bytes32[] memory result) {
+    function _appendProofMetadata(bytes32[] memory logProof) internal pure returns (bytes32[] memory result) {
         result = new bytes32[](logProof.length + 1);
 
         result[0] = _composeMetadata(logProof.length, 0, true);
@@ -747,7 +747,7 @@ contract MessageRootChainLogProofs is MailboxTest {
 
     function _composeRecursiveProof(
         RecursiveProofInfo memory info
-    ) internal returns (bytes32[] memory proof, bytes32 chainBRoot) {
+    ) internal view returns (bytes32[] memory proof, bytes32 chainBRoot) {
         uint256 ptr;
         proof = new bytes32[](
             1 + info.logProof.length + 1 + 1 + info.batchProof.length + 2 + 1 + info.chainIdProof.length

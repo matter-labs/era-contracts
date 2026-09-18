@@ -143,7 +143,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         assertTrue(result, "Message verification should succeed");
     }
 
-    function test_l2MessageInclusion() public {
+    function test_l2MessageInclusion() public pure {
         // Real proof captured for chainId 271, L1 batch 26, message index 0.
         // Encoded as abi.encode of proveL2MessageInclusionShared's argument tuple:
         // (uint256 chainId, uint256 l1BatchNumber, uint256 l2MessageIndex, L2Message message, bytes32[] proof).

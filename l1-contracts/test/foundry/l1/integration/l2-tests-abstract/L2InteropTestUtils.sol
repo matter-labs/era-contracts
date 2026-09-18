@@ -79,7 +79,7 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
         result = executeBundle(data, executionAddress, _destinationChainId);
     }
 
-    function extractFirstBundleFromLogs(Vm.Log[] memory logs) internal returns (bytes memory data) {
+    function extractFirstBundleFromLogs(Vm.Log[] memory logs) internal view returns (bytes memory data) {
         for (uint256 i = 0; i < logs.length; i++) {
             if (
                 logs[i].emitter == address(l2InteropCenter) &&

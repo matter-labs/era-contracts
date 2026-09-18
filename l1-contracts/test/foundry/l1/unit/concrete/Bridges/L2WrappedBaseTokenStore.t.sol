@@ -38,11 +38,11 @@ contract L2WrappedBaseTokenStoreTest is Test {
     }
 
     // Deployment Tests
-    function testInitialOwner() public {
+    function testInitialOwner() public view {
         assertEq(store.owner(), owner, "Owner should be set correctly");
     }
 
-    function testInitialAdmin() public {
+    function testInitialAdmin() public view {
         assertEq(store.admin(), admin, "Admin should be set correctly");
     }
 

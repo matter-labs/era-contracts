@@ -32,7 +32,7 @@ contract MerkleTestTest is Test {
         root = merkleTree.getRoot(elements);
     }
 
-    function testElements(uint256 i) public {
+    function testElements(uint256 i) public view {
         vm.assume(i < elements.length);
         bytes32 leaf = elements[i];
         bytes32[] memory proof = merkleTree.getProof(elements, i);
@@ -45,7 +45,7 @@ contract MerkleTestTest is Test {
     function prepareRangeProof(
         uint256 start,
         uint256 end
-    ) public returns (bytes32[] memory, bytes32[] memory, bytes32[] memory) {
+    ) public view returns (bytes32[] memory, bytes32[] memory, bytes32[] memory) {
         bytes32[] memory left = merkleTree.getProof(elements, start);
         bytes32[] memory right = merkleTree.getProof(elements, end);
         bytes32[] memory leaves = new bytes32[](end - start + 1);
@@ -56,20 +56,20 @@ contract MerkleTestTest is Test {
         return (left, right, leaves);
     }
 
-    function testFirstElement() public {
+    function testFirstElement() public view {
         testElements(0);
     }
 
-    function testLastElement() public {
+    function testLastElement() public view {
         testElements(elements.length - 1);
     }
 
-    function testEmptyProof_shouldSucceed() public {
+    function testEmptyProof_shouldSucceed() public view {
         bytes32 leaf = elements[0];
         bytes32[] memory proof;
 
-        bytes32 root = merkleTest.calculateRoot(proof, 0, leaf);
-        assertEq(root, leaf);
+        bytes32 calculatedRoot = merkleTest.calculateRoot(proof, 0, leaf);
+        assertEq(calculatedRoot, leaf);
     }
 
     function testLeafIndexTooBig_shouldRevert() public {
@@ -88,13 +88,13 @@ contract MerkleTestTest is Test {
         merkleTest.calculateRoot(proof, 0, leaf);
     }
 
-    function testRangeProof() public {
+    function testRangeProof() public view {
         (bytes32[] memory left, bytes32[] memory right, bytes32[] memory leaves) = prepareRangeProof(10, 13);
         bytes32 rootFromContract = merkleTest.calculateRoot(left, right, 10, leaves);
         assertEq(rootFromContract, root);
     }
 
-    function testRangeProofIncorrect() public {
+    function testRangeProofIncorrect() public view {
         (bytes32[] memory left, bytes32[] memory right, bytes32[] memory leaves) = prepareRangeProof(10, 13);
         bytes32 rootFromContract = merkleTest.calculateRoot(left, right, 9, leaves);
         assertNotEq(rootFromContract, root);
@@ -123,7 +123,7 @@ contract MerkleTestTest is Test {
         merkleTest.calculateRoot(left, right, 128, leaves);
     }
 
-    function testRangeProofSingleLeaf() public {
+    function testRangeProofSingleLeaf() public view {
         (bytes32[] memory left, bytes32[] memory right, bytes32[] memory leaves) = prepareRangeProof(10, 10);
         bytes32 rootFromContract = merkleTest.calculateRoot(left, right, 10, leaves);
         assertEq(rootFromContract, root);
@@ -137,7 +137,7 @@ contract MerkleTestTest is Test {
         merkleTest.calculateRoot(left, right, 10, leaves);
     }
 
-    function testRangeProofSingleElementTree() public {
+    function testRangeProofSingleElementTree() public view {
         bytes32[] memory leaves = new bytes32[](1);
         leaves[0] = elements[10];
         bytes32[] memory left = new bytes32[](0);

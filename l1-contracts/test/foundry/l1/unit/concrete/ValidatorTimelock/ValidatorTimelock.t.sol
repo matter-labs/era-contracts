@@ -112,9 +112,9 @@ contract ValidatorTimelockTest is Test {
     }
 
     function test_SuccessfulConstruction() public {
-        ValidatorTimelock validator = ValidatorTimelock(_deployValidatorTimelock(owner, executionDelay));
-        assertEq(validator.owner(), owner);
-        assertEq(validator.executionDelay(), executionDelay);
+        ValidatorTimelock timelock = ValidatorTimelock(_deployValidatorTimelock(owner, executionDelay));
+        assertEq(timelock.owner(), owner);
+        assertEq(timelock.executionDelay(), executionDelay);
     }
 
     function test_DeprecatedPrecommitterGettersRemainAvailable() public view {

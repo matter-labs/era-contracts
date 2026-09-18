@@ -82,12 +82,12 @@ contract MessageRootExtendedTest is Test {
         l2MessageRoot.initL2(L1_CHAIN_ID);
     }
 
-    function test_ChainRegistered_CurrentChain() public {
+    function test_ChainRegistered_CurrentChain() public view {
         // Test that current chain is always registered
         assertTrue(messageRoot.chainRegistered(block.chainid));
     }
 
-    function test_ChainRegistered_UnregisteredChain() public {
+    function test_ChainRegistered_UnregisteredChain() public view {
         uint256 unregisteredChainId = 999;
         assertFalse(messageRoot.chainRegistered(unregisteredChainId));
     }
@@ -210,7 +210,7 @@ contract MessageRootExtendedTest is Test {
         messageRoot.setMigratingChainBatchNumber(chainId, batchNumber);
     }
 
-    function test_GetProofData() public {
+    function test_GetProofData() public view {
         uint256 chainId = 271;
         uint256 batchNumber = 1;
         uint256 leafProofMask = 1;

@@ -280,7 +280,7 @@ contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeploy
         );
     }
 
-    function test_getHyperchain_returnsZKChainAddress() public {
+    function test_getHyperchain_returnsZKChainAddress() public view {
         // Test that getHyperchain is a legacy function that calls getZKChain
         // It should return the same value as getZKChain for any chainId
 
@@ -292,7 +292,7 @@ contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeploy
         assertEq(hyperchainAddress, zkChainAddress, "getHyperchain should return the same address as getZKChain");
     }
 
-    function test_getHyperchain_unregisteredChain() public {
+    function test_getHyperchain_unregisteredChain() public view {
         // Test that getHyperchain returns zero address for an unregistered chain
         uint256 unregisteredChainId = 999999;
         address zkChainAddress = addresses.bridgehub.getHyperchain(unregisteredChainId);
@@ -300,7 +300,7 @@ contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeploy
         assertEq(zkChainAddress, address(0), "Unregistered chain should return zero address");
     }
 
-    function test_sharedBridge() public {
+    function test_sharedBridge() public view {
         // Test that sharedBridge returns the asset router address
         address sharedBridgeAddress = addresses.bridgehub.sharedBridge();
 

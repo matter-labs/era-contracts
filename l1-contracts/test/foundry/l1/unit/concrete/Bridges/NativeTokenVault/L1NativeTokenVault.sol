@@ -88,7 +88,7 @@ contract L1NativeTokenVaultTest is Test {
         assertEq(address(ntv.WETH_TOKEN()), makeAddr("wethToken"));
     }
 
-    function test_ASSET_ROUTER() external {
+    function test_ASSET_ROUTER() external view {
         assertEq(address(ntv.ASSET_ROUTER()), assetRouter);
     }
 

@@ -8,31 +8,31 @@ import {GovernanceTest} from "./_Governance_Shared.t.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 
 contract OperationStatusTest is GovernanceTest {
-    function test_RandomIdIsNotOperation() public {
+    function test_RandomIdIsNotOperation() public view {
         bytes32 randomId = Utils.randomBytes32("randomId");
         bool isOperation = governance.isOperation(randomId);
         assertFalse(isOperation);
     }
 
-    function test_RandomIdIsNotPendingOperation() public {
+    function test_RandomIdIsNotPendingOperation() public view {
         bytes32 randomId = Utils.randomBytes32("randomId");
         bool isOperationPending = governance.isOperationPending(randomId);
         assertFalse(isOperationPending);
     }
 
-    function test_RandomIdIsNotReadyOperation() public {
+    function test_RandomIdIsNotReadyOperation() public view {
         bytes32 randomId = Utils.randomBytes32("randomId");
         bool isOperationReady = governance.isOperationReady(randomId);
         assertFalse(isOperationReady);
     }
 
-    function test_RandomIdIsNotDoneOperation() public {
+    function test_RandomIdIsNotDoneOperation() public view {
         bytes32 randomId = Utils.randomBytes32("randomId");
         bool isOperationDone = governance.isOperationDone(randomId);
         assertFalse(isOperationDone);
     }
 
-    function test_RandomIdIsHasUnsetStatus() public {
+    function test_RandomIdIsHasUnsetStatus() public view {
         bytes32 randomId = Utils.randomBytes32("randomId");
         IGovernance.OperationState opState = governance.getOperationState(randomId);
         assertTrue(opState == IGovernance.OperationState.Unset);

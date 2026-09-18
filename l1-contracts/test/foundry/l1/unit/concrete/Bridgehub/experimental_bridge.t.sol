@@ -947,10 +947,12 @@ contract ExperimentalBridgeTest is Test {
     function _prepareETHL2TransactionDirectRequest(
         uint256 mockChainId,
         uint256 mockMintValue,
-        address mockL2Contract,
+        address _mockL2Contract,
         uint256 mockL2Value,
         bytes memory mockL2Calldata,
         uint256 mockL2GasLimit,
+        // Unused in the body, but call sites pass it as a named argument.
+        // solhint-disable-next-line no-unused-vars
         uint256 mockL2GasPerPubdataByteLimit,
         bytes[] memory mockFactoryDeps,
         // Unused in the body, but both call sites pass it as a named argument.
@@ -962,7 +964,7 @@ contract ExperimentalBridgeTest is Test {
         l2TxnReqDirect = _createMockL2TransactionRequestDirect({
             mockChainId: mockChainId,
             mockMintValue: mockMintValue,
-            mockL2Contract: mockL2Contract,
+            _mockL2Contract: _mockL2Contract,
             mockL2Value: mockL2Value,
             mockL2Calldata: mockL2Calldata,
             mockL2GasLimit: mockL2GasLimit,
@@ -998,7 +1000,7 @@ contract ExperimentalBridgeTest is Test {
     function test_requestL2TransactionDirect_RevertWhen_incorrectETHParams(
         uint256 mockChainId,
         uint256 mockMintValue,
-        address mockL2Contract,
+        address _mockL2Contract,
         uint256 mockL2Value,
         uint256 msgValue,
         bytes memory mockL2Calldata,
@@ -1015,7 +1017,7 @@ contract ExperimentalBridgeTest is Test {
         (L2TransactionRequestDirect memory l2TxnReqDirect, ) = _prepareETHL2TransactionDirectRequest({
             mockChainId: mockChainId,
             mockMintValue: mockMintValue,
-            mockL2Contract: mockL2Contract,
+            _mockL2Contract: _mockL2Contract,
             mockL2Value: mockL2Value,
             mockL2Calldata: mockL2Calldata,
             mockL2GasLimit: mockL2GasLimit,
@@ -1033,7 +1035,7 @@ contract ExperimentalBridgeTest is Test {
     function test_requestL2TransactionDirect_ETHCase(
         uint256 mockChainId,
         uint256 mockMintValue,
-        address mockL2Contract,
+        address _mockL2Contract,
         uint256 mockL2Value,
         bytes memory mockL2Calldata,
         uint256 mockL2GasLimit,
@@ -1052,7 +1054,7 @@ contract ExperimentalBridgeTest is Test {
         (L2TransactionRequestDirect memory l2TxnReqDirect, bytes32 hash) = _prepareETHL2TransactionDirectRequest({
             mockChainId: mockChainId,
             mockMintValue: mockMintValue,
-            mockL2Contract: mockL2Contract,
+            _mockL2Contract: _mockL2Contract,
             mockL2Value: mockL2Value,
             mockL2Calldata: mockL2Calldata,
             mockL2GasLimit: mockL2GasLimit,
@@ -1074,7 +1076,7 @@ contract ExperimentalBridgeTest is Test {
     function test_requestL2TransactionDirect_NonETHCase7702(
         uint256 mockChainId,
         uint256 mockMintValue,
-        address mockL2Contract,
+        address _mockL2Contract,
         uint256 mockL2Value,
         bytes memory mockL2Calldata,
         uint256 mockL2GasLimit,
@@ -1096,7 +1098,7 @@ contract ExperimentalBridgeTest is Test {
         L2TransactionRequestDirect memory l2TxnReqDirect = _createMockL2TransactionRequestDirect({
             mockChainId: mockChainId,
             mockMintValue: mockMintValue,
-            mockL2Contract: mockL2Contract,
+            _mockL2Contract: _mockL2Contract,
             mockL2Value: mockL2Value,
             mockL2Calldata: mockL2Calldata,
             mockL2GasLimit: mockL2GasLimit,
@@ -1264,7 +1266,7 @@ contract ExperimentalBridgeTest is Test {
             txDataHash: bytes32("")
         });
         secondBridgeAddressValue = uint160(bound(uint256(secondBridgeAddressValue), 0, uint256(type(uint16).max)));
-        address secondBridgeAddress = address(secondBridgeAddressValue);
+        address secondBridgeAddr = address(secondBridgeAddressValue);
 
         vm.mockCall(
             address(secondBridgeAddressValue),
@@ -1283,7 +1285,7 @@ contract ExperimentalBridgeTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(
                 SecondBridgeAddressTooLow.selector,
-                secondBridgeAddress,
+                secondBridgeAddr,
                 BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS
             )
         );
@@ -1402,7 +1404,7 @@ contract ExperimentalBridgeTest is Test {
     function _createMockL2TransactionRequestDirect(
         uint256 mockChainId,
         uint256 mockMintValue,
-        address mockL2Contract,
+        address _mockL2Contract,
         uint256 mockL2Value,
         bytes memory mockL2Calldata,
         uint256 mockL2GasLimit,
@@ -1415,7 +1417,7 @@ contract ExperimentalBridgeTest is Test {
 
         l2TxnReqDirect.chainId = mockChainId;
         l2TxnReqDirect.mintValue = mockMintValue;
-        l2TxnReqDirect.l2Contract = mockL2Contract;
+        l2TxnReqDirect.l2Contract = _mockL2Contract;
         l2TxnReqDirect.l2Value = mockL2Value;
         l2TxnReqDirect.l2Calldata = mockL2Calldata;
         l2TxnReqDirect.l2GasLimit = mockL2GasLimit;

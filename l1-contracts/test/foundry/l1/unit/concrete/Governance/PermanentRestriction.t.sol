@@ -139,7 +139,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         return permRestriction.isAdminOfAChain(chainAddr);
     }
 
-    function test_isAdminOfAChainIsAddressZero() public {
+    function test_isAdminOfAChainIsAddressZero() public view {
         assertFalse(permRestriction.isAdminOfAChain(address(0)));
     }
 
@@ -147,7 +147,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         assertFalse(permRestriction.isAdminOfAChain(makeAddr("random")));
     }
 
-    function test_isAdminOfAChainOfAChainNotAnAdmin() public {
+    function test_isAdminOfAChainOfAChainNotAnAdmin() public view {
         assertFalse(permRestriction.isAdminOfAChain(hyperchain));
     }
 
@@ -264,7 +264,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         bool correctEncodingVersion,
         bool correctAssetId,
         address l2Admin
-    ) internal returns (Call memory call) {
+    ) internal view returns (Call memory call) {
         if (!correctTarget) {
             call.target = address(0);
             return call;
@@ -311,57 +311,87 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         call.data = abi.encodeCall(IL1Bridgehub.requestL2TransactionTwoBridges, (outer));
     }
 
-    function assertInvalidMigrationCall(Call memory call) public {
+    function assertInvalidMigrationCall(Call memory call) public view {
         (address newAdmin, bool migration) = permRestriction.getNewAdminFromMigration(call);
         assertFalse(migration);
         assertEq(newAdmin, address(0));
     }
 
-    function test_tryGetNewAdminFromMigrationRevertWhenInvalidSelector() public {
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        Call memory call = _encodeMigraationCall(false, true, true, true, true, address(0));
+    function test_tryGetNewAdminFromMigrationRevertWhenInvalidSelector() public view {
+        Call memory call = _encodeMigraationCall({
+            correctTarget: false,
+            correctSelector: true,
+            correctSecondBridge: true,
+            correctEncodingVersion: true,
+            correctAssetId: true,
+            l2Admin: address(0)
+        });
 
         assertInvalidMigrationCall(call);
     }
 
-    function test_tryGetNewAdminFromMigrationRevertWhenNotBridgehub() public {
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        Call memory call = _encodeMigraationCall(true, false, true, true, true, address(0));
+    function test_tryGetNewAdminFromMigrationRevertWhenNotBridgehub() public view {
+        Call memory call = _encodeMigraationCall({
+            correctTarget: true,
+            correctSelector: false,
+            correctSecondBridge: true,
+            correctEncodingVersion: true,
+            correctAssetId: true,
+            l2Admin: address(0)
+        });
 
         assertInvalidMigrationCall(call);
     }
 
-    function test_tryGetNewAdminFromMigrationRevertWhenNotSharedBridge() public {
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        Call memory call = _encodeMigraationCall(true, true, false, true, true, address(0));
+    function test_tryGetNewAdminFromMigrationRevertWhenNotSharedBridge() public view {
+        Call memory call = _encodeMigraationCall({
+            correctTarget: true,
+            correctSelector: true,
+            correctSecondBridge: false,
+            correctEncodingVersion: true,
+            correctAssetId: true,
+            l2Admin: address(0)
+        });
 
         assertInvalidMigrationCall(call);
     }
 
-    function test_tryGetNewAdminFromMigrationRevertWhenIncorrectEncoding() public {
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        Call memory call = _encodeMigraationCall(true, true, true, false, true, address(0));
+    function test_tryGetNewAdminFromMigrationRevertWhenIncorrectEncoding() public view {
+        Call memory call = _encodeMigraationCall({
+            correctTarget: true,
+            correctSelector: true,
+            correctSecondBridge: true,
+            correctEncodingVersion: false,
+            correctAssetId: true,
+            l2Admin: address(0)
+        });
 
         assertInvalidMigrationCall(call);
     }
 
-    function test_tryGetNewAdminFromMigrationRevertWhenIncorrectAssetId() public {
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        Call memory call = _encodeMigraationCall(true, true, true, true, false, address(0));
+    function test_tryGetNewAdminFromMigrationRevertWhenIncorrectAssetId() public view {
+        Call memory call = _encodeMigraationCall({
+            correctTarget: true,
+            correctSelector: true,
+            correctSecondBridge: true,
+            correctEncodingVersion: true,
+            correctAssetId: false,
+            l2Admin: address(0)
+        });
 
         assertInvalidMigrationCall(call);
     }
 
     function test_tryGetNewAdminFromMigrationShouldWorkCorrectly() public {
         address l2Addr = makeAddr("l2Addr");
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        Call memory call = _encodeMigraationCall(true, true, true, true, true, l2Addr);
+        Call memory call = _encodeMigraationCall({
+            correctTarget: true,
+            correctSelector: true,
+            correctSecondBridge: true,
+            correctEncodingVersion: true,
+            correctAssetId: true,
+            l2Admin: l2Addr
+        });
 
         (address newAdmin, bool migration) = permRestriction.getNewAdminFromMigration(call);
         assertTrue(migration);
@@ -369,9 +399,14 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
     }
 
     function test_validateMigrationToL2RevertNotAllowed() public {
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        Call memory call = _encodeMigraationCall(true, true, true, true, true, address(0));
+        Call memory call = _encodeMigraationCall({
+            correctTarget: true,
+            correctSelector: true,
+            correctSecondBridge: true,
+            correctEncodingVersion: true,
+            correctAssetId: true,
+            l2Admin: address(0)
+        });
 
         vm.expectRevert(abi.encodeWithSelector(NotAllowed.selector, address(0)));
         permRestriction.validateCall(call, owner);
@@ -384,9 +419,14 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         emit IPermanentRestriction.AllowL2Admin(expectedAddress);
         permRestriction.allowL2Admin(uint256(1));
 
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        Call memory call = _encodeMigraationCall(true, true, true, true, true, expectedAddress);
+        Call memory call = _encodeMigraationCall({
+            correctTarget: true,
+            correctSelector: true,
+            correctSecondBridge: true,
+            correctEncodingVersion: true,
+            correctAssetId: true,
+            l2Admin: expectedAddress
+        });
 
         // Should not fail
         permRestriction.validateCall(call, owner);
@@ -411,9 +451,14 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         assertEq(deployedAdmin, expectedAdmin, "allowL2Admin must use the factory's EVM CREATE address");
         assertTrue(factoryRestriction.allowedL2Admins(deployedAdmin), "deployed admin not whitelisted");
 
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        Call memory call = _encodeMigraationCall(true, true, true, true, true, deployedAdmin);
+        Call memory call = _encodeMigraationCall({
+            correctTarget: true,
+            correctSelector: true,
+            correctSecondBridge: true,
+            correctEncodingVersion: true,
+            correctAssetId: true,
+            l2Admin: deployedAdmin
+        });
         factoryRestriction.validateCall(call, owner);
     }
 
@@ -578,7 +623,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         vm.stopPrank();
     }
 
-    function test_tryGetNewAdminFromMigration_ShortData() public {
+    function test_tryGetNewAdminFromMigration_ShortData() public view {
         // Call with data length < 4 targeting bridgehub
         Call memory call = Call({
             target: address(bridgehub),
@@ -589,7 +634,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         assertInvalidMigrationCall(call);
     }
 
-    function test_tryGetNewAdminFromMigration_EmptySecondBridgeCalldata() public {
+    function test_tryGetNewAdminFromMigration_EmptySecondBridgeCalldata() public view {
         // Create a call with empty secondBridgeCalldata
         L2TransactionRequestTwoBridgesOuter memory outer = L2TransactionRequestTwoBridgesOuter({
             chainId: chainId,
@@ -623,9 +668,14 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
             abi.encode(wrongHandler) // Not bridgehub
         );
 
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        Call memory call = _encodeMigraationCall(true, true, true, true, true, address(0));
+        Call memory call = _encodeMigraationCall({
+            correctTarget: true,
+            correctSelector: true,
+            correctSecondBridge: true,
+            correctEncodingVersion: true,
+            correctAssetId: true,
+            l2Admin: address(0)
+        });
 
         assertInvalidMigrationCall(call);
     }

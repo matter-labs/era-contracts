@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {UncheckedMathSharedTest} from "./_UncheckedMath_Shared.t.sol";
 
 contract UncheckedAddTest is UncheckedMathSharedTest {
-    function test_Add() public {
+    function test_Add() public view {
         uint256 a = 1234;
         uint256 b = 4321;
         uint256 c = uncheckedMath.uncheckedAdd(a, b);

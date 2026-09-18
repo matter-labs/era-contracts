@@ -43,12 +43,12 @@ contract ChainAdminTest is Test {
         dummyRestriction = new DummyRestriction(true);
     }
 
-    function test_getRestrictions() public {
+    function test_getRestrictions() public view {
         address[] memory restrictions = chainAdmin.getRestrictions();
         assertEq(restrictions[0], address(restriction));
     }
 
-    function test_isRestrictionActive() public {
+    function test_isRestrictionActive() public view {
         bool isActive = chainAdmin.isRestrictionActive(address(restriction));
         assertEq(isActive, true);
     }
@@ -176,15 +176,15 @@ contract ChainAdminTest is Test {
     }
 
     function packSemver(
-        uint32 major,
-        uint32 minor,
-        uint32 patch,
+        uint32 _major,
+        uint32 _minor,
+        uint32 _patch,
         uint256 semverMinorVersionMultiplier
-    ) public returns (uint256) {
-        if (major != 0) {
+    ) public pure returns (uint256) {
+        if (_major != 0) {
             revert("Major version must be 0");
         }
 
-        return minor * semverMinorVersionMultiplier + patch;
+        return _minor * semverMinorVersionMultiplier + _patch;
     }
 }

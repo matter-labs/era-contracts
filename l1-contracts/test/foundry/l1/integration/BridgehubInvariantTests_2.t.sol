@@ -8,7 +8,7 @@ import {BridgehubInvariantTests1} from "test/foundry/l1/integration/BridgehubInv
 contract BoundedBridgehubInvariantTests2 is BridgehubInvariantTests1 {
     function depositEthSuccess(uint256 userIndexSeed, uint256 chainIndexSeed, uint256 l2Value) public {
         uint64 MAX = 2 ** 64 - 1;
-        uint256 l2Value = bound(l2Value, 0.1 ether, MAX);
+        l2Value = bound(l2Value, 0.1 ether, MAX);
 
         emit log_string("DEPOSIT ETH");
         super.depositEthToBridgeSuccess(userIndexSeed, chainIndexSeed, l2Value);
@@ -21,7 +21,7 @@ contract BoundedBridgehubInvariantTests2 is BridgehubInvariantTests1 {
         uint256 l2Value
     ) public {
         uint64 MAX = 2 ** 64 - 1;
-        uint256 l2Value = bound(l2Value, 0.1 ether, MAX);
+        l2Value = bound(l2Value, 0.1 ether, MAX);
 
         emit log_string("DEPOSIT ERC20");
         super.depositERC20ToBridgeSuccess(userIndexSeed, chainIndexSeed, tokenIndexSeed, l2Value);
@@ -29,7 +29,7 @@ contract BoundedBridgehubInvariantTests2 is BridgehubInvariantTests1 {
 
     function withdrawERC20Success(uint256 userIndexSeed, uint256 chainIndexSeed, uint256 amountToWithdraw) public {
         uint64 MAX = (2 ** 32 - 1) + 0.1 ether;
-        uint256 amountToWithdraw = bound(amountToWithdraw, 0.1 ether, MAX);
+        amountToWithdraw = bound(amountToWithdraw, 0.1 ether, MAX);
 
         emit log_string("WITHDRAW ERC20");
         super.withdrawSuccess(userIndexSeed, chainIndexSeed, amountToWithdraw);

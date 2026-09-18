@@ -7,7 +7,7 @@ import {DefaultAdminTransferNotAllowed, RoleAccessDenied} from "contracts/common
 
 // Mock implementation for testing
 contract MockAccessControlEnumerable is AccessControlEnumerablePerChainAddressUpgradeable {
-    function _getChainAdmin(address _chainAddress) internal view override returns (address) {
+    function _getChainAdmin(address _chainAddress) internal pure override returns (address) {
         return _chainAddress; // For testing, we'll use the chain address as its admin
     }
 }
@@ -231,7 +231,7 @@ contract AccessControlEnumerablePerChainAddressUpgradeableTest is Test {
         accessControl.getRoleMember(chainAddress1, role1, 0);
     }
 
-    function test_EnumerationFunctionsOnDefaultAdminRole() public {
+    function test_EnumerationFunctionsOnDefaultAdminRole() public view {
         assertEq(accessControl.getRoleMember(chainAddress1, DEFAULT_ADMIN_ROLE, 0), chainAddress1);
         assertEq(accessControl.getRoleMemberCount(chainAddress1, DEFAULT_ADMIN_ROLE), 1);
     }

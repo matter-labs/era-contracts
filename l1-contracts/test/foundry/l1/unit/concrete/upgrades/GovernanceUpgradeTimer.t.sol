@@ -51,13 +51,13 @@ contract GovernanceUpgradeTimerTest is Test {
 
     /* ========== Deployment Tests ========== */
 
-    function testDeploymentSetsImmutableVariablesCorrectly() public {
+    function testDeploymentSetsImmutableVariablesCorrectly() public view {
         assertEq(timer.INITIAL_DELAY(), initialDelay, "INITIAL_DELAY should be set correctly");
         assertEq(timer.MAX_ADDITIONAL_DELAY(), maxAdditionalDelay, "MAX_ADDITIONAL_DELAY should be set correctly");
         assertEq(timer.TIMER_GOVERNANCE(), timerGovernance, "TIMER_GOVERNANCE should be set correctly");
     }
 
-    function testDeploymentSetsOwnerCorrectly() public {
+    function testDeploymentSetsOwnerCorrectly() public view {
         assertEq(timer.owner(), owner, "Owner should be set correctly");
     }
 

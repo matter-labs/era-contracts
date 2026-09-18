@@ -18,7 +18,8 @@ contract L2WethL1Test is Test, SharedL2ContractL1Deployer {
 
     function test_shouldDepositWethBySendingEth() public {
         uint256 amount = 100;
-        address(weth).call{value: amount}("");
+        (bool success, ) = address(weth).call{value: amount}("");
+        assertTrue(success);
         assertEq(weth.balanceOf(address(this)), amount);
     }
 

@@ -172,9 +172,14 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
     function _commitRemoteLegAndBuildFinality() internal returns (AtomicFinalityProof memory finality) {
         uint256 remoteIndex = _insertCommit(AtomicFlowFixtures.commitValue(ectx.flowId, REMOTE_LEG));
         finality = _buildFinality(
-            // The callee declares unnamed parameters, so named arguments are not possible.
-            // solhint-disable-next-line func-named-parameters
-            _inclusionProof(destinationChainId, REMOTE_BATCH_NUMBER, remoteIndex, L1_CHAIN_ID, SL_BLOCK, DEADLINE - 1)
+            _inclusionProof({
+                _sourceChainId: destinationChainId,
+                _batchNumber: REMOTE_BATCH_NUMBER,
+                _leafIndex: remoteIndex,
+                _slChainId: L1_CHAIN_ID,
+                _slBlock: SL_BLOCK,
+                _l1Timestamp: DEADLINE - 1
+            })
         );
     }
 

@@ -25,30 +25,38 @@ contract CheckTransactionTest is PrividiumTransactionFiltererTest {
         vm.prank(owner);
         transactionFiltererProxy.setDepositsAllowed(false);
 
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(sender, sender, 0, 1 ether, "", address(0));
+        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed({
+            _sender: sender,
+            _contractL2: sender,
+            _mintValue: 0,
+            _l2Value: 1 ether,
+            _l2Calldata: "",
+            _refundRecipient: address(0)
+        });
         assertFalse(isTxAllowed, "Transaction should not be allowed");
     }
 
     function test_TransactionAllowedBaseTokenDeposit() public view {
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(sender, sender, 0, 1 ether, "", address(0));
+        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed({
+            _sender: sender,
+            _contractL2: sender,
+            _mintValue: 0,
+            _l2Value: 1 ether,
+            _l2Calldata: "",
+            _refundRecipient: address(0)
+        });
         assertTrue(isTxAllowed, "Transaction should be allowed");
     }
 
     function test_TransactionRejectedDepositNotToSelf() public {
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
-            sender,
-            makeAddr("random"),
-            0,
-            1 ether,
-            "",
-            address(0)
-        ); // Other arguments do not make a difference for the test
+        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed({
+            _sender: sender,
+            _contractL2: makeAddr("random"),
+            _mintValue: 0,
+            _l2Value: 1 ether,
+            _l2Calldata: "",
+            _refundRecipient: address(0)
+        }); // Other arguments do not make a difference for the test
         assertFalse(isTxAllowed, "Transaction should not be allowed");
     }
 
@@ -58,16 +66,14 @@ contract CheckTransactionTest is PrividiumTransactionFiltererTest {
             AssetRouterBase.finalizeDeposit,
             (uint256(10), bytes32("0x12345"), depositData)
         );
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
-            assetRouter,
-            L2_ASSET_ROUTER_ADDR,
-            0,
-            0,
-            txCalladata,
-            address(0)
-        ); // Other arguments do not make a difference for the test
+        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed({
+            _sender: assetRouter,
+            _contractL2: L2_ASSET_ROUTER_ADDR,
+            _mintValue: 0,
+            _l2Value: 0,
+            _l2Calldata: txCalladata,
+            _refundRecipient: address(0)
+        }); // Other arguments do not make a difference for the test
         assertTrue(isTxAllowed, "Transaction should be allowed");
     }
 
@@ -77,31 +83,27 @@ contract CheckTransactionTest is PrividiumTransactionFiltererTest {
             AssetRouterBase.finalizeDeposit,
             (uint256(10), bytes32("0x12345"), depositData)
         );
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
-            assetRouter,
-            L2_ASSET_ROUTER_ADDR,
-            0,
-            0,
-            txCalladata,
-            address(0)
-        ); // Other arguments do not make a difference for the test
+        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed({
+            _sender: assetRouter,
+            _contractL2: L2_ASSET_ROUTER_ADDR,
+            _mintValue: 0,
+            _l2Value: 0,
+            _l2Calldata: txCalladata,
+            _refundRecipient: address(0)
+        }); // Other arguments do not make a difference for the test
         assertFalse(isTxAllowed, "Transaction should not be allowed");
     }
 
     function test_ArbitraryTransactionNotAllowed() public {
         bytes memory txCalladata = abi.encodeWithSelector(bytes4(0xdeadbeef), "0x12345");
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
-            sender,
-            makeAddr("contract"),
-            0,
-            0,
-            txCalladata,
-            address(0)
-        ); // Other arguments do not make a difference for the test
+        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed({
+            _sender: sender,
+            _contractL2: makeAddr("contract"),
+            _mintValue: 0,
+            _l2Value: 0,
+            _l2Calldata: txCalladata,
+            _refundRecipient: address(0)
+        }); // Other arguments do not make a difference for the test
         assertFalse(isTxAllowed, "Transaction should not be allowed");
     }
 
@@ -109,16 +111,14 @@ contract CheckTransactionTest is PrividiumTransactionFiltererTest {
         bytes memory txCalladata = abi.encodeWithSelector(bytes4(0xdeadbeef), "0x12345");
         vm.prank(owner);
         transactionFiltererProxy.grantWhitelist(sender);
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
-            sender,
-            address(0),
-            0,
-            0,
-            txCalladata,
-            address(0)
-        ); // Other arguments do not make a difference for the test
+        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed({
+            _sender: sender,
+            _contractL2: address(0),
+            _mintValue: 0,
+            _l2Value: 0,
+            _l2Calldata: txCalladata,
+            _refundRecipient: address(0)
+        }); // Other arguments do not make a difference for the test
         assertTrue(isTxAllowed, "Transaction should be allowed");
     }
 
@@ -127,16 +127,14 @@ contract CheckTransactionTest is PrividiumTransactionFiltererTest {
             AssetRouterBase.setAssetHandlerAddressThisChain,
             (bytes32("0x12345"), makeAddr("random"))
         );
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
-            assetRouter,
-            L2_ASSET_ROUTER_ADDR,
-            0,
-            0,
-            txCalladata,
-            address(0)
-        ); // Other arguments do not make a difference for the test
+        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed({
+            _sender: assetRouter,
+            _contractL2: L2_ASSET_ROUTER_ADDR,
+            _mintValue: 0,
+            _l2Value: 0,
+            _l2Calldata: txCalladata,
+            _refundRecipient: address(0)
+        }); // Other arguments do not make a difference for the test
         assertFalse(isTxAllowed, "Transaction should not be allowed");
     }
 }

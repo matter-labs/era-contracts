@@ -137,7 +137,7 @@ contract MessageRootTest is Test {
         );
     }
 
-    function test_init() public {
+    function test_init() public view {
         // The settlement layer's own entry starts with an empty chain tree: there is no diamond to
         // report a genesis root for the layer itself, and interop proofs never target it.
         assertEq(messageRoot.getAggregatedRoot(), (MessageHashing.chainIdLeafHash(bytes32(0), block.chainid)));

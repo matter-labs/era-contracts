@@ -130,7 +130,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
     // This is a method to simplify porting the tests for now.
     // Here we rely that the first restriction is the AccessControlRestriction
     // TODO(EVM-924): this function is not used.
-    function _extractAccessControlRestriction(address admin) internal returns (address) {
+    function _extractAccessControlRestriction(address admin) internal view returns (address) {
         return ChainAdmin(payable(admin)).getRestrictions()[0];
     }
 
@@ -449,18 +449,16 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         bytes memory message = _encodeWithdrawalBundleMessage(gatewayChainId, assetId, bridgehubMintData);
 
         GatewayUtils userUtils = new GatewayUtils();
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        userUtils.finishMigrateChainFromGateway(
-            address(addresses.bridgehub),
-            migratingChainId,
-            gatewayChainId,
-            0,
-            0,
-            0,
-            message,
-            new bytes32[](0)
-        );
+        userUtils.finishMigrateChainFromGateway({
+            bridgehubAddr: address(addresses.bridgehub),
+            migratingChainId: migratingChainId,
+            gatewayChainId: gatewayChainId,
+            l2BatchNumber: 0,
+            l2MessageIndex: 0,
+            l2TxNumberInBatch: 0,
+            message: message,
+            merkleProof: new bytes32[](0)
+        });
 
         vm.chainId(currentChainId);
 
@@ -561,7 +559,10 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             memory data = hex"74beea820000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000010f00000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000300000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000002e49c884fd1000000000000000000000000000000000000000000000000000000000000010f93d0008af83c021d815bd4e76d7297c69d7f4cc4cf0b8892f7f74f6e33e11829000000000000000000000000c71d126d294a5d2e4002a62d0017b7109f18ade9000000000000000000000000c71d126d294a5d2e4002a62d0017b7109f18ade90000000000000000000000058dc094d71c4c3740bc1ef43d46b58717fa3595a000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000001c101000000000000000000000000000000000000000000000000000000000000000900000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000457425443000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000045742544300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c0101030000000000000000000000000000000000000000000000000000000000e4ed1ec13a28c40715db6399f6f99ce04e5f19d60ad3ff6831f098cb6cf7594400000000000000000000000000000000000000000000000000000000000000079ba301ae10c10e68bffcc2b466aac46d7c7cd6f87eb055e4d43897f303c7a03a21b22cb4099a976636357d5d1f46deeb36f60ec6557eef0da85abaa8222c8c018dba9883941a824d6545029e626b54bd10404b2b8fff432a39ad36d9a36fe3d60000000000000000000000000000001100000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000001fa0103000100000000000000000000000000000000000000000000000000000000f84927dc03d95cc652990ba75874891ccc5a4d79a0e10a2ffdd238a34a39f82823d18b4879c426cf1cb583e1102d9d7f4a5a3a2d01e3f7cc6d042de25409fef1178cf3cbada927540027845a799eab8cf1d788869a9cc11c0f3ebfec198ff347";
 
         vm.expectRevert(abi.encodeWithSelector(InvalidProof.selector));
-        address(addresses.l1Nullifier).call(data);
+        (bool success, ) = address(addresses.l1Nullifier).call(data);
+        // Here the revert originates in an inner frame, so `vm.expectRevert` does not absorb
+        // it at this boundary and the low-level call does report failure.
+        assertFalse(success);
     }
 
     function test_revertWhen_migrationNeverHappened() public {
@@ -574,16 +575,14 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         address chainAdmin = IZKChain(zkChain).getAdmin();
 
         bytes memory transferData = _getTransferData();
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        ConfirmTransferResultData memory transferResultData = _getConfirmTransferResultData(
-            gatewayChainId,
-            merkleProofData,
-            chainAdmin,
-            assetId,
-            transferData,
-            TxStatus.Success
-        );
+        ConfirmTransferResultData memory transferResultData = _getConfirmTransferResultData({
+            chainId: gatewayChainId,
+            merkleProofData: merkleProofData,
+            sender: chainAdmin,
+            assetId: assetId,
+            assetData: transferData,
+            txStatus: TxStatus.Success
+        });
 
         // Reverts if message is not found
         vm.expectRevert(abi.encodeWithSelector(InvalidProof.selector));
@@ -621,16 +620,14 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
         _mockMessageInclusion(migratingChainId, merkleProofData, TxStatus.Success);
 
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        ConfirmTransferResultData memory transferResultData = _getConfirmTransferResultData(
-            migratingChainId,
-            merkleProofData,
-            alice,
-            ETH_TOKEN_ASSET_ID,
-            transferData,
-            TxStatus.Success
-        );
+        ConfirmTransferResultData memory transferResultData = _getConfirmTransferResultData({
+            chainId: migratingChainId,
+            merkleProofData: merkleProofData,
+            sender: alice,
+            assetId: ETH_TOKEN_ASSET_ID,
+            assetData: transferData,
+            txStatus: TxStatus.Success
+        });
 
         vm.expectRevert(abi.encodeWithSelector(OnlyFailureStatusAllowed.selector));
         addresses.l1Nullifier.bridgeConfirmTransferResult(transferResultData);
@@ -654,7 +651,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         bytes32[] merkleProof;
     }
 
-    function _getMerkleProofData() internal returns (MerkleProofData memory) {
+    function _getMerkleProofData() internal pure returns (MerkleProofData memory) {
         bytes32[] memory merkleProof = new bytes32[](1);
         merkleProof[0] = bytes32(uint256(1));
         return
@@ -688,7 +685,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         );
     }
 
-    function _getTransferData() internal returns (bytes memory) {
+    function _getTransferData() internal view returns (bytes memory) {
         return
             abi.encode(
                 BridgehubBurnCTMAssetData({
@@ -711,7 +708,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         bytes32 assetId,
         bytes memory assetData,
         TxStatus txStatus
-    ) internal returns (ConfirmTransferResultData memory) {
+    ) internal pure returns (ConfirmTransferResultData memory) {
         return
             ConfirmTransferResultData({
                 _chainId: chainId,
@@ -747,16 +744,14 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         );
         _setDepositHappened(gatewayChainId, merkleProofData.l2TxHash, txDataHash);
 
-        // The callee declares unnamed parameters, so named arguments are not possible.
-        // solhint-disable-next-line func-named-parameters
-        ConfirmTransferResultData memory transferResultData = _getConfirmTransferResultData(
-            gatewayChainId,
-            merkleProofData,
-            chainAdmin,
-            assetId,
-            transferData,
-            txStatus
-        );
+        ConfirmTransferResultData memory transferResultData = _getConfirmTransferResultData({
+            chainId: gatewayChainId,
+            merkleProofData: merkleProofData,
+            sender: chainAdmin,
+            assetId: assetId,
+            assetData: transferData,
+            txStatus: txStatus
+        });
 
         // Sanity check before
         assertNotEq(addresses.l1Nullifier.depositHappened(gatewayChainId, merkleProofData.l2TxHash), 0x00);
@@ -781,9 +776,9 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             uint256 pausedDepositsTimestamp = uint256(vm.load(address(zkChain), pausedDepositsTimestampSlot));
             assertEq(pausedDepositsTimestamp, 0);
             // Migration is no longer in progress
-            bool isMigrationInProgress = IL1ChainAssetHandler(chainAssetHandler).isMigrationInProgress(
-                migratingChainId
-            );
+            bool isMigrationInProgress = IL1ChainAssetHandler(chainAssetHandler).isMigrationInProgress({
+                _chainId: migratingChainId
+            });
             assertEq(isMigrationInProgress, false);
         }
 
