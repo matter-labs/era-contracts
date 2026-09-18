@@ -33,6 +33,7 @@ const ARTIFACTS = {
   InteropCenter: "InteropCenter.sol/InteropCenter.json",
   InteropHandler: "InteropHandler.sol/InteropHandler.json",
   IComplexUpgraderZKsyncOSV29: "IComplexUpgraderZKsyncOSV29.sol/IComplexUpgraderZKsyncOSV29.json",
+  ISystemContractProxy: "ISystemContractProxy.sol/ISystemContractProxy.json",
   ITransparentUpgradeableProxy: "TransparentUpgradeableProxy.sol/ITransparentUpgradeableProxy.json",
   L1AssetRouter: "L1AssetRouter.sol/L1AssetRouter.json",
   L1MessengerZKOS: "L1MessengerZKOS.sol/L1MessengerZKOS.json",
