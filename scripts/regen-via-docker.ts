@@ -22,11 +22,10 @@
  *                                  real-chain broadcast)
  *
  * Optional env:
- *   GW_RPC_URL=<gateway-rpc>     — Gateway RPC for PUVT's read-only GW-side
- *                                  checks. Stage has `[new_gateway]`, so
- *                                  `rehearse-upgrade` refuses to run without
- *                                  one. Defaults to the stage gateway,
- *                                  https://zksync-os-stage-gateway.zksync.dev
+ *   GW_RPC_URL=<gateway-rpc>     — overrides the Gateway RPC PUVT uses for
+ *                                  its read-only GW-side checks. Defaults to
+ *                                  stage's permanent-values
+ *                                  `[new_gateway] rpc_url`.
  *   PROTOCOL_OPS_IMAGE=...       — full image ref. Defaults to
  *                                  ghcr.io/matter-labs/protocol-ops:v31-camp-split
  *   PROTOCOL_OPS_BIN_HOST=...    — explicit path to a pre-built linux/amd64
@@ -173,14 +172,11 @@ function commonMounts(): string[] {
  * hangs 5–30 min per CTM).
  */
 /**
- * Stage's gateway. PUVT needs a Gateway RPC for every env with `[new_gateway]`
- * (it bails with "this upgrade brings up a Gateway; pass --gw-rpc-url"), and
- * this script only rehearses stage. Override with GW_RPC_URL.
+ * `--gw-rpc-url` only when the operator overrides it; otherwise
+ * `rehearse-upgrade` falls back to stage's `[new_gateway] rpc_url`.
  */
-const DEFAULT_STAGE_GW_RPC_URL = "https://zksync-os-stage-gateway.zksync.dev";
-
-function gwRpcUrl(): string {
-  return process.env.GW_RPC_URL || DEFAULT_STAGE_GW_RPC_URL;
+function gwRpcOverride(): string[] {
+  return process.env.GW_RPC_URL ? ["--gw-rpc-url", process.env.GW_RPC_URL] : [];
 }
 
 function sourcifyBlock(): string[] {
@@ -217,8 +213,7 @@ function cmdRegen(pk: string, rpc: string, binMount: string[]): number {
     rpc,
     "--deployer-address",
     deployer,
-    "--gw-rpc-url",
-    gwRpcUrl(),
+    ...gwRpcOverride(),
   ];
   return dockerRun(args);
 }

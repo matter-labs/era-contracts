@@ -254,7 +254,8 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 #                                    nothing)
 #   GW_RPC_URL                    — Gateway RPC for PUVT GW-side checks
 #                                   (only exercised on gateway-enabled envs;
-#                                    defaults to the script's built-in).
+#                                    blank = the env's permanent-values
+#                                    `[new_gateway] rpc_url`).
 
 on:
   workflow_dispatch:
@@ -636,7 +637,8 @@ jobs:
           echo "::add-mask::$rpc"
           echo "L1_FORK_URL=$rpc" >> "$GITHUB_ENV"
           # PUVT's read-only gateway checks (gateway-enabled envs only). Blank
-          # falls back to the replay script's built-in, as it does for the regen.
+          # falls back to the env's permanent-values `[new_gateway] rpc_url`, as
+          # it does for the regen.
           if [ -n "${GW_RPC_URL:-}" ]; then
             echo "::add-mask::$GW_RPC_URL"
             echo "GW_RPC_URL=$GW_RPC_URL" >> "$GITHUB_ENV"

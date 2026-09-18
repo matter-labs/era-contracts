@@ -129,6 +129,11 @@ pub struct NewGatewayConfig {
     /// preamble. Leave absent on first GW bring-up.
     #[serde(default)]
     pub server_notifier: Option<Address>,
+    /// Gateway RPC for PUVT's read-only GW-side checks. `--gw-rpc-url`
+    /// overrides it; without either, the verifier refuses to run for an env
+    /// that has `[new_gateway]`.
+    #[serde(default)]
+    pub rpc_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone, Copy)]
@@ -409,6 +414,12 @@ impl EnvConfig {
     pub fn new_gateway(&self) -> Option<&NewGatewayConfig> {
         self.permanent.new_gateway.as_ref()
     }
+
+    /// The env's declared Gateway RPC (`[new_gateway] rpc_url`), the default
+    /// behind the CLI's `--gw-rpc-url`.
+    pub fn gw_rpc_url(&self) -> Option<&str> {
+        self.new_gateway().and_then(|gw| gw.rpc_url.as_deref())
+    }
 }
 
 /// Default output dir for an env, e.g.
@@ -577,6 +588,15 @@ mod tests {
         assert_eq!(ng.settlement_fee, U256::from(200_000_000_000_000_000u128));
         // GW 2708 is a ZKsync OS chain → CTM source is Atlas (witness 2702).
         assert_eq!(ng.ctm_representative_chain_id, 2702);
+        // PUVT needs a Gateway RPC for every env with [new_gateway]; the
+        // workflows and the Docker regen rely on this default when no
+        // GW_RPC_URL is supplied.
+        assert!(
+            ng.rpc_url
+                .as_deref()
+                .is_some_and(|url| url.starts_with("https://")),
+            "permanent-values/stage.toml [new_gateway] must declare rpc_url"
+        );
     }
 
     /// Confirms `EnvConfig`'s on-demand readers pick up the

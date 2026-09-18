@@ -671,6 +671,9 @@ async fn verify_upgrade(
     transactions_log_override: Option<&Path>,
 ) -> anyhow::Result<()> {
     logger::step("verify-upgrade (PUVT)");
+    // `--gw-rpc-url` overrides the env's declared Gateway RPC; PUVT needs one
+    // for every env with `[new_gateway]`.
+    let gateway_rpc_url = gateway_rpc_url.or_else(|| env_cfg.gw_rpc_url());
     fs::create_dir_all(&paths.work_dir)?;
     let transactions_log = resolve_transactions_log(
         transactions_log_override,
@@ -722,6 +725,7 @@ pub struct RehearseUpgradeArgs {
     #[clap(long)]
     pub fork_block: Option<u64>,
     /// Gateway RPC for PUVT's read-only gateway checks; needed only for envs with `[new_gateway]`.
+    /// Defaults to the env's `[new_gateway] rpc_url` (permanent-values).
     #[clap(long)]
     pub gw_rpc_url: Option<String>,
     /// zk-governance commit PUVT verifies the governance bytecodes against; recorded in the bundle.
@@ -848,6 +852,7 @@ pub struct ReplayBundleArgs {
     #[clap(long, group = "rpc_mode", requires = "rpc")]
     pub verify_only: bool,
     /// Gateway RPC for PUVT's read-only gateway checks; needed only for envs with `[new_gateway]`.
+    /// Defaults to the env's `[new_gateway] rpc_url` (permanent-values).
     #[clap(long)]
     pub gw_rpc_url: Option<String>,
     /// zk-governance commit for PUVT; defaults to the one recorded in the bundle.
