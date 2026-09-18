@@ -32,7 +32,6 @@ import {BALANCE_CHANGE_VERSION} from "contracts/bridge/asset-tracker/IAssetTrack
 import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 
 import {
-    InvalidCanonicalTxHash,
     RegisterNewTokenNotAllowed,
     InvalidFunctionSignature,
     InvalidBuiltInContractMessage,
@@ -58,7 +57,6 @@ import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol"
 
 import {DynamicIncrementalMerkleMemory} from "contracts/common/libraries/DynamicIncrementalMerkleMemory.sol";
 import {GWAssetTrackerTestHelper} from "./GWAssetTracker.t.sol";
-import {FORCE_FAILED_L1_TX_LOG_KEY} from "test/foundry/TestConstants.sol";
 import {ProcessLogsTestHelper} from "./ProcessLogsTestHelper.sol";
 
 contract GWAssetTrackerExtendedTest is Test {
@@ -728,68 +726,6 @@ contract GWAssetTrackerExtendedTest is Test {
         // Base token balance is NOT decreased for failed deposits,
         // as the funds stay on L2 inside the refundRecipient's balance.
         assertEq(gwAssetTracker.chainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID), BASE_TOKEN_AMOUNT);
-    }
-
-    /// @dev Characterization, not intent: `_handlePotentialFailedDeposit` rejects any bootloader log
-    ///      whose key is not a registered `balanceChange`, so force-failing on a Gateway-settled
-    ///      chain yields a batch that can never be executed. The fix belongs in the bootloader,
-    ///      which knows the settlement layer. Holds for any unregistered key, so it does not pin the
-    ///      marker's key — `TEST_systemLogKeys` does.
-    function test_ProcessLogsAndMessages_ForceFailMarkerLogReverts() public {
-        BalanceChange memory balanceChange = BalanceChange({
-            version: BALANCE_CHANGE_VERSION,
-            assetId: ASSET_ID,
-            baseTokenAssetId: BASE_TOKEN_ASSET_ID,
-            amount: AMOUNT,
-            baseTokenAmount: BASE_TOKEN_AMOUNT,
-            originToken: ORIGIN_TOKEN,
-            tokenOriginChainId: ORIGIN_CHAIN_ID
-        });
-        vm.prank(INTEROP_CENTER_ADDR);
-        gwAssetTracker.handleChainBalanceIncreaseOnGateway(CHAIN_ID, CANONICAL_TX_HASH, balanceChange);
-
-        // The pair a force-failed priority op emits: service logs, same transaction.
-        L2Log[] memory logs = new L2Log[](2);
-        logs[0] = L2Log({
-            l2ShardId: 0,
-            isService: true,
-            txNumberInBatch: 0,
-            sender: L2_BOOTLOADER_ADDRESS,
-            key: CANONICAL_TX_HASH,
-            value: bytes32(uint256(TxStatus.Failure))
-        });
-        logs[1] = L2Log({
-            l2ShardId: 0,
-            isService: true,
-            txNumberInBatch: 0,
-            sender: L2_BOOTLOADER_ADDRESS,
-            key: FORCE_FAILED_L1_TX_LOG_KEY,
-            value: CANONICAL_TX_HASH
-        });
-
-        ProcessLogsInput memory input = ProcessLogsTestHelper.buildProcessLogsInput(
-            gwAssetTracker,
-            CHAIN_ID,
-            1,
-            logs,
-            new bytes[](0),
-            address(0)
-        );
-
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, CHAIN_ID),
-            abi.encode(mockZKChain)
-        );
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector, CHAIN_ID),
-            abi.encode(BASE_TOKEN_ASSET_ID)
-        );
-        // No `addChainBatchRoot` mock: the revert fires inside the log loop.
-        vm.prank(mockZKChain);
-        vm.expectRevert(abi.encodeWithSelector(InvalidCanonicalTxHash.selector, FORCE_FAILED_L1_TX_LOG_KEY));
-        gwAssetTracker.processLogsAndMessages(input);
     }
 
     // Test Gateway->L1 confirmation does not modify chain balance on Gateway.

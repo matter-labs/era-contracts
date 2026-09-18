@@ -101,6 +101,7 @@ const params = {
   RIGHT_PADDED_VALIDATE_NONCE_USAGE_SELECTOR: getPaddedSelector("INonceHolder", "validateNonceUsage"),
   INCREMENT_MIN_NONCE_IF_EQUALS_SELECTOR: getSelector("INonceHolder", "incrementMinNonceIfEquals"),
   RIGHT_PADDED_MINT_ETHER_SELECTOR: getPaddedSelector("IBaseToken", "mint"),
+  RIGHT_PADDED_GET_L1_CHAIN_ID_SELECTOR: getPaddedSelector("IL2AssetTracker", "L1_CHAIN_ID"),
   GET_TX_HASHES_SELECTOR: getSelector("BootloaderUtilities", "getTransactionHashes"),
   CREATE_SELECTOR: getSelector("ContractDeployer", "create"),
   CREATE2_SELECTOR: getSelector("ContractDeployer", "create2"),

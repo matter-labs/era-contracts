@@ -567,14 +567,13 @@ object "Bootloader" {
             // }
             //
             // `txMeta` contains flags to manipulate the transaction execution flow.
-            // For playground batches:
-            //      It can have the following information (0 byte is LSB and 31 byte is MSB):
-            //      0 byte: `execute`, bool. Denotes whether transaction should be executed by the bootloader.
-            //      31 byte: server-side tx execution mode
+            // (0 byte is LSB and 31 byte is MSB)
             // For proved batches:
             //      0 byte: `execute`, bool. 0 stops executing the batch, 1 continues.
             //      1 byte: `forceFail`, bool. Operator-requested failure of an L1->L2 transaction (see `processTx`).
             //      All other bytes must be zero: `validateProvedTxMeta` accepts exactly 0x0001 and 0x0101.
+            // For playground batches:
+            //      The same, plus 31 byte: server-side tx execution mode (see `validatePlaygroundTxMeta`).
             //
             // Each such encoded struct consumes 2 words
             function TX_DESCRIPTION_SIZE() -> ret {
@@ -685,6 +684,10 @@ object "Bootloader" {
                 ret := 0x000000000000000000000000000000000000800e
             }
 
+            function L2_ASSET_TRACKER_ADDR() -> ret {
+                ret := 0x000000000000000000000000000000000001000f
+            }
+
             function MAX_SYSTEM_CONTRACT_ADDR() -> ret {
                 ret := 0x000000000000000000000000000000000000ffff
             }
@@ -765,6 +768,13 @@ object "Bootloader" {
                 gasPerPubdata,
                 forceFail
             ) {
+                // Force-fail is supported only for batches settling on L1.
+                if forceFail {
+                    if iszero(eq(getSettlementLayerChainId(), getL1ChainId())) {
+                        assertionError("forceFail off L1 settlement")
+                    }
+                }
+
                 // We set the L2 block info for this particular transaction
                 setL2Block(transactionIndex)
                 setInteropRoots(transactionIndex)
@@ -788,8 +798,7 @@ object "Bootloader" {
                         // - They have a different type to prevent tx hash collisions and preserve the expectation that the
                         // L1->L2 transactions have priorityTxId inside them.
 
-                        // Upgrade txs must always succeed, so the flag is never valid here. Aborting the
-                        // batch is safe: `txMeta` is written by the server alone (see `validateProvedTxMeta`).
+                        // Upgrade txs must always succeed, so the flag is never valid here.
                         if forceFail {
                             assertionError("forceFail on upgrade tx")
                         }
@@ -811,8 +820,7 @@ object "Bootloader" {
                         processL1Tx(txDataOffset, resultPtr, transactionIndex, userProvidedPubdataPrice, true, forceFail)
                     }
                     default {
-                        // The flag is only meaningful for priority ops; as above, reaching this means the
-                        // server built a malformed batch, not that a user did anything.
+                        // The flag is only meaningful for priority ops.
                         if forceFail {
                             assertionError("forceFail on L2 tx")
                         }
@@ -899,6 +907,25 @@ object "Bootloader" {
 
                     // Most likely not enough gas provided, revert the current frame.
                     nearCallPanic()
+                }
+
+                ret := mload(0)
+            }
+
+            /// @dev The chain id of the L1 this chain settles to, as recorded on the asset tracker
+            /// during the genesis upgrade.
+            function getL1ChainId() -> ret {
+                mstore(0, {{RIGHT_PADDED_GET_L1_CHAIN_ID_SELECTOR}})
+                let success := staticcall(
+                    gas(),
+                    L2_ASSET_TRACKER_ADDR(),
+                    0,
+                    4,
+                    0,
+                    32
+                )
+                if iszero(success) {
+                    assertionError("getL1ChainId failed")
                 }
 
                 ret := mload(0)
@@ -1260,13 +1287,7 @@ object "Bootloader" {
                     // Sending the L2->L1 log so users will be able to prove transaction execution result on L1.
                     sendL2LogUsingL1Messenger(true, canonicalL1TxHash, success)
 
-                    // Operator-requested failures are otherwise indistinguishable from reverts. Record them so
-                    // watchers can react within the execution delay and users can prove the failure was forced.
-                    //
-                    // Only for chains settling on L1: elsewhere `executeBatches` passes every bootloader-sent
-                    // log to `GWAssetTracker._handlePotentialFailedDeposit`, which reads `key` as a relayed
-                    // priority op's canonical hash and reverts with `InvalidCanonicalTxHash`, making the
-                    // batch unexecutable.
+                    // Records the operator's choice, which a revert is otherwise indistinguishable from.
                     if forceFail {
                         sendL2LogUsingL1Messenger(true, forceFailedL1TxLogKey(), canonicalL1TxHash)
                     }
@@ -3074,11 +3095,9 @@ object "Bootloader" {
                 ret := and(ret, 0xFF)
             }
 
-            /// @dev Returns the force-fail bit of a proved-batch `txMeta`, asserting the word is well formed.
-            /// Proved batches carry exactly: byte 0 = execute (1 here; the main loop already broke on 0),
-            /// byte 1 = forceFail (0 or 1), all other bytes 0. Anything else is a server bug and must not be
-            /// mistaken for a live transaction. Aborting the whole batch is the right response: `txMeta`
-            /// is operator-written, so a malformed word is a server bug that no user can cause.
+            /// @dev Validates proved-batch metadata and returns the force-fail flag.
+            /// The word carries byte 0 = execute (1 here; the main loop already broke on 0),
+            /// byte 1 = forceFail (0 or 1), all other bytes 0.
             function validateProvedTxMeta(txMeta) -> forceFail {
                 forceFail := getWordByte(txMeta, 1)
                 if gt(forceFail, 1) {
@@ -3087,6 +3106,12 @@ object "Bootloader" {
                 if iszero(eq(txMeta, add(1, shl(8, forceFail)))) {
                     assertionError("invalid txMeta")
                 }
+            }
+
+            /// @dev Playground variant of `validateProvedTxMeta`: byte 31 carries the server-side
+            /// execution mode and is masked off before the check.
+            function validatePlaygroundTxMeta(txMeta) -> forceFail {
+                forceFail := validateProvedTxMeta(and(txMeta, not(shl(248, 0xFF))))
             }
 
 
@@ -4842,15 +4867,9 @@ object "Bootloader" {
                 {
                     let txMeta := mload(txPtr)
                     let processFlags := getWordByte(txMeta, 31)
-                    let forceFail := getWordByte(txMeta, 1)
+                    let forceFail := validatePlaygroundTxMeta(txMeta)
                     debugLog("flags", processFlags)
                     debugLog("forceFail", forceFail)
-
-                    // Playground `txMeta` is server-written too, and a word the proved bootloader would
-                    // reject must not replay here as a successful transaction.
-                    if gt(forceFail, 1) {
-                        assertionError("invalid txMeta")
-                    }
 
                     // `processFlags` argument denotes which parts of execution should be done:
                     //  Possible values:
