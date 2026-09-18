@@ -131,10 +131,6 @@ contract BridgehubBase_Extended_Test is Test {
         // ETH asset ID should be registered by default
         // The ETH asset ID is calculated as encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS)
         // where ETH_TOKEN_ADDRESS = address(1)
-        address ETH_TOKEN_ADDRESS = address(1);
-        bytes32 ethAssetId = keccak256(
-            abi.encode(block.chainid, address(0x10004), bytes32(uint256(uint160(ETH_TOKEN_ADDRESS))))
-        );
         // Actually we can't easily get the correct ETH asset ID, so let's just check that
         // random asset IDs are not registered
         bytes32 randomAssetId = keccak256("randomAsset");
@@ -236,7 +232,6 @@ contract BridgehubBase_Extended_Test is Test {
 
     // Test baseToken reverts when asset handler not registered (line 299)
     function test_RevertWhen_baseTokenAssetHandlerNotRegistered() public {
-        uint256 chainId = 123;
         bytes32 assetId = keccak256("testAsset");
         address assetRouter = makeAddr("assetRouter");
         address chainAssetHandler = makeAddr("chainAssetHandler");

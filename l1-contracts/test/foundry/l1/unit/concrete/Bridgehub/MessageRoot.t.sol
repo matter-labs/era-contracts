@@ -253,7 +253,6 @@ contract MessageRootTest is Test {
 
     function test_RevertWhen_addChainNotBridgeHub() public {
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
-        uint256 betaChainId = uint256(uint160(makeAddr("betaChainId")));
 
         assertFalse(messageRoot.chainRegistered(alphaChainId), "alpha chain 1");
 
@@ -485,7 +484,7 @@ contract MessageRootTest is Test {
         assertEq(finalBatchNumber, 3, "Final batch number should be 3");
 
         // No root assertion: the value depends on the tree implementation; the call just must not revert.
-        bytes32 finalChainRoot = messageRoot.getChainRoot(alphaChainId);
+        messageRoot.getChainRoot(alphaChainId);
     }
 
     /// @notice Verify that multiple _emitRoot calls within the same block share the same logId.

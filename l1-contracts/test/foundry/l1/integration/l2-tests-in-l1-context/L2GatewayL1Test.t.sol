@@ -6,7 +6,6 @@ pragma solidity ^0.8.20;
 
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
-import "forge-std/console.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_BRIDGEHUB_ADDR,

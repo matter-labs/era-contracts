@@ -259,8 +259,6 @@ contract DynamicIncrementalMerkleTest is Test {
         tree.push(keccak256("leaf1"));
         tree.push(keccak256("leaf2"));
 
-        bytes32 rootBefore = tree.root();
-
         tree.extendUntilEnd(10);
 
         bytes32 rootAfter = tree.root();

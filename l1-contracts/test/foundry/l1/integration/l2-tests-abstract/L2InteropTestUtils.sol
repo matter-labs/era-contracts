@@ -9,7 +9,6 @@ import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddres
 import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {Test} from "forge-std/Test.sol";
-import "forge-std/console.sol";
 
 import {L2_INTEROP_HANDLER, L2_INTEROP_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";

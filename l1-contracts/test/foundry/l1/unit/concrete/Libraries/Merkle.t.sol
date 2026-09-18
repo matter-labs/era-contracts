@@ -138,7 +138,6 @@ contract MerkleTest is Test {
         bytes32 leaf2 = keccak256("leaf2");
         bytes32 leaf3 = keccak256("leaf3");
 
-        bytes32 hash01 = Merkle.efficientHash(leaf0, leaf1);
         bytes32 hash23 = Merkle.efficientHash(leaf2, leaf3);
 
         bytes32[] memory path = new bytes32[](2);

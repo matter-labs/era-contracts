@@ -7,7 +7,7 @@ import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.
 import {console2 as console} from "forge-std/Script.sol";
 
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
-import "forge-std/console.sol";
+import {console} from "forge-std/console.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";

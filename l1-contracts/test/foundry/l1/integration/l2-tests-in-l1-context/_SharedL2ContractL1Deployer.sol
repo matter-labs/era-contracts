@@ -36,7 +36,7 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         deployL2ContractsInner(_l1ChainId, false);
     }
 
-    function deployL2ContractsInner(uint256 _l1ChainId, bool _skip) public {
+    function deployL2ContractsInner(uint256 _l1ChainId, bool /* _skip */) public {
         string memory root = vm.projectRoot();
         string memory CONTRACTS_PATH = vm.envString("CONTRACTS_PATH");
         string memory inputPath = string.concat(

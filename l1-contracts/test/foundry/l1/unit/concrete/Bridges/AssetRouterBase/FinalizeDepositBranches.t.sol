@@ -22,11 +22,11 @@ contract MockAssetHandler is IAssetHandler {
     }
 
     function bridgeBurn(
-        uint256 _chainId,
-        uint256 _msgValue,
-        bytes32 _assetId,
-        address _originalCaller,
-        bytes calldata _data
+        uint256 /* _chainId */,
+        uint256 /* _msgValue */,
+        bytes32 /* _assetId */,
+        address /* _originalCaller */,
+        bytes calldata /* _data */
     ) external payable override returns (bytes memory) {
         return abi.encode("mock");
     }

@@ -3,8 +3,6 @@ pragma solidity 0.8.28;
 
 import {Vm} from "forge-std/Vm.sol";
 
-import "forge-std/console.sol";
-
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";

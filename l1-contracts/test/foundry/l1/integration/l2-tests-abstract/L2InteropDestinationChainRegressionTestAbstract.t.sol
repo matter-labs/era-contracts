@@ -3,8 +3,6 @@
 pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
-import "forge-std/console.sol";
-
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";

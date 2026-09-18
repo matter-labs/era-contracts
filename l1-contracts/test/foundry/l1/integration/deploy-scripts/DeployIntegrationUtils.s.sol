@@ -25,7 +25,7 @@ abstract contract DeployIntegrationUtils is Script, DeployCTMUtils {
     }
 
     function getChainCreationFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
+        StateTransitionDeployedAddresses memory /* stateTransition */
     ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
         facetCuts = new Diamond.FacetCut[](6);
         facetCuts[0] = Diamond.FacetCut({
@@ -85,7 +85,6 @@ abstract contract DeployIntegrationUtils is Script, DeployCTMUtils {
 
     function pauseDepositsBeforeInitiatingMigration(address _bridgehub, uint256 _chainId) public {
         IZKChain chain = IZKChain(IBridgehubBase(_bridgehub).getZKChain(_chainId));
-        uint256 l1ChainId = IL1Bridgehub(_bridgehub).L1_CHAIN_ID();
         vm.prank(L2_CHAIN_ASSET_HANDLER_ADDR);
         IMigrator(address(chain)).pauseDepositsOnGateway(block.timestamp);
         vm.warp(block.timestamp + 1);

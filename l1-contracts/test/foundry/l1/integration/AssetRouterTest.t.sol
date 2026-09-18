@@ -451,13 +451,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
 
         // Step 2: Decode assetData into the bridge mint fields
         {
-            (
-                address originalCaller,
-                address remoteReceiver,
-                address parsedOriginToken,
-                uint256 amount,
-                bytes memory erc20Metadata
-            ) = abi.decode(assetData, (address, address, address, uint256, bytes));
+            (, address remoteReceiver, , , ) = abi.decode(assetData, (address, address, address, uint256, bytes));
 
             // Checking that caller hasn't been aliased
             assertEq(remoteReceiver, randomCaller, "Remote receiver mismatch");

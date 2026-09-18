@@ -9,16 +9,16 @@ import {IRestriction, RESTRICTION_MAGIC} from "../governance/restriction/IRestri
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract DummyRestriction is IRestriction {
-    bool internal immutable correctMagic;
+    bool internal immutable CORRECT_MAGIC;
 
     constructor(bool useCorrectMagic) {
-        correctMagic = useCorrectMagic;
+        CORRECT_MAGIC = useCorrectMagic;
     }
 
     /// @notice A method used to check that the contract supports this interface.
     /// @return Returns the `RESTRICTION_MAGIC`
     function getSupportsRestrictionMagic() external view returns (bytes32) {
-        if (correctMagic) {
+        if (CORRECT_MAGIC) {
             return RESTRICTION_MAGIC;
         } else {
             // Invalid magic

@@ -114,7 +114,7 @@ contract CalldataDATest is Test {
             bytes32 outputStateDiffHash,
             bytes32 outputFullPubdataHash,
             bytes32[] memory blobsLinearHashes,
-            uint256 outputBlobsProvided,
+            ,
             bytes memory outputL1DaInput
         ) = calldataDA.processL2RollupDAValidatorOutputHash(l2DAValidatorOutputHash, blobsProvided, operatorDAInput);
 

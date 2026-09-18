@@ -63,7 +63,6 @@ contract BaseUpgrade is Test {
         bytes memory systemContextCalldata = abi.encodeCall(ISystemContext.setSettlementLayerChainId, (chainId));
 
         verifier = makeAddr("verifier");
-        bytes32 txHash = bytes32(bytes("txHash"));
 
         bridgeHub = makeAddr("brigheHub");
         stateTransitionManager = makeAddr("stateTransitionManager");

@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import "forge-std/Test.sol";
-import "contracts/upgrades/BytecodesSupplier.sol";
-import "contracts/common/l2-helpers/L2ContractHelper.sol";
-import "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
-import "contracts/common/L1ContractErrors.sol";
+import {Test} from "forge-std/Test.sol";
+import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
+import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
+import {EVMBytecodeAlreadyPublished} from "contracts/common/L1ContractErrors.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 contract BytecodesSupplierTest is Test {

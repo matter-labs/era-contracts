@@ -393,7 +393,6 @@ library Utils {
         uint256 priorityOpsLength
     ) internal pure returns (PriorityOpsBatchInfo[] memory _ops) {
         _ops = new PriorityOpsBatchInfo[](len);
-        bytes32[] memory empty;
         bytes32[] memory hashes = new bytes32[](priorityOpsLength);
         for (uint256 i = 0; i < priorityOpsLength; ++i) {
             hashes[i] = keccak256(abi.encodePacked("hash", i));

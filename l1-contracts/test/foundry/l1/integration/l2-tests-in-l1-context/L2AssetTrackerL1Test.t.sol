@@ -146,7 +146,6 @@ contract L2AssetTrackerL1Test is Test, SharedL2ContractL1Deployer {
         L2AssetTracker tracker = L2AssetTracker(L2_ASSET_TRACKER_ADDR);
         bytes32 liveBaseTokenAssetId = tracker.BASE_TOKEN_ASSET_ID();
         uint256 nonL1DestinationChainId = 505;
-        uint256 amount = 300;
 
         uint256 withdrawalsBefore = _readTotalWithdrawalsToL1(liveBaseTokenAssetId);
         uint256 chainBalanceBefore = tracker.chainBalance(block.chainid, liveBaseTokenAssetId);

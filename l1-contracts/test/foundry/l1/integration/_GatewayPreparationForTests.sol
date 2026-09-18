@@ -206,7 +206,7 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         // This sets isMigrationInProgress[chainId] = true and pausedDepositsTimestamp on the diamond proxy.
         // Capture the canonical L2 tx hash returned by the function.
         vm.startBroadcast(chainAdmin);
-        bytes32 canonicalTxHash = bridgehub.requestL2TransactionTwoBridges{value: requiredValue}(
+        bridgehub.requestL2TransactionTwoBridges{value: requiredValue}(
             L2TransactionRequestTwoBridgesOuter({
                 chainId: _gatewayGovernanceConfig.gatewayChainId,
                 mintValue: requiredValue,

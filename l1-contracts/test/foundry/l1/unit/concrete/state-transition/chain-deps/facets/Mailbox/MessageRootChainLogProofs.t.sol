@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";
 import {L2Log, L2Message, TxStatus} from "contracts/common/Messaging.sol";
-import "forge-std/Test.sol";
 import {
     L2_BOOTLOADER_ADDRESS,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR

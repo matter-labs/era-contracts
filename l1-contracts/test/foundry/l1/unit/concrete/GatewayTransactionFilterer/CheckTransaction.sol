@@ -97,7 +97,7 @@ contract CheckTransactionTest is GatewayTransactionFiltererTest {
         );
         // The callee declares unnamed parameters, so named arguments are not possible.
         // solhint-disable-next-line func-named-parameters
-        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
+        transactionFiltererProxy.isTransactionAllowed(
             assetRouter,
             address(0),
             0,

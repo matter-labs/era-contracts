@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.28;
 
-import "forge-std/console.sol";
 import {Vm} from "forge-std/Test.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";

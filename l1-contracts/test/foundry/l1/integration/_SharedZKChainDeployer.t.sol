@@ -8,7 +8,7 @@ import {RegisterZKChainScript} from "deploy-scripts/ctm/RegisterZKChain.s.sol";
 import {RegisterZKChainConfig as ChainConfig} from "contracts/script-interfaces/IRegisterZKChain.sol";
 import {ETH_TOKEN_ADDRESS, L2DACommitmentScheme} from "contracts/common/Config.sol";
 
-import "@openzeppelin/contracts-v4/utils/Strings.sol";
+import {Strings} from "@openzeppelin/contracts-v4/utils/Strings.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";

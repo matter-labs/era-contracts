@@ -16,7 +16,7 @@ contract DeployCTMIntegrationScript is Script, DeployCTMScript {
     function test() internal virtual override {}
 
     function getChainCreationFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
+        StateTransitionDeployedAddresses memory /* stateTransition */
     ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
         string memory root = vm.projectRoot();
         string memory inputPath = string.concat(root, "/script-out/diamond-selectors.toml");

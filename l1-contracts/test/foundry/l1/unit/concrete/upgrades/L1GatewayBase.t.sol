@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {L1FixedForceDeploymentsHelper} from "contracts/upgrades/L1FixedForceDeploymentsHelper.sol"; // Adjust the import path accordingly
 import {ZKChainStorage} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
