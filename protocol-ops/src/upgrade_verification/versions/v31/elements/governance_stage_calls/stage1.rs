@@ -26,9 +26,7 @@ use crate::upgrade_verification::{
     verifiers::{VerificationResult, Verifiers},
 };
 
-use super::super::{
-    super::get_expected_new_protocol_version, super::get_expected_old_protocol_version,
-};
+use super::super::{super::expected_protocol_versions, super::get_expected_old_protocol_version};
 use super::super::{
     fixed_force_deployment::FixedForceDeploymentsData,
     initialize_data_new_chain::InitializeDataNewChain, protocol_version::ProtocolVersion,
@@ -1229,13 +1227,12 @@ async fn verify_set_new_version_upgrade_payload(
     }
 
     let decoded_new_protocol_version = ProtocolVersion::from(artifact_new_protocol_version);
-    let expected_new_protocol_version =
-        get_expected_new_protocol_version(verifiers.env, ctm.flavor);
-    if decoded_new_protocol_version != expected_new_protocol_version {
+    let expected = expected_protocol_versions(verifiers.env, ctm.flavor);
+    if !expected.accepts_new(decoded_new_protocol_version) {
         result.report_error(&format!(
             "Invalid new protocol version in TOML for the {} CTM. Expected {}, got {}",
             ctm.flavor.label(),
-            expected_new_protocol_version,
+            expected.describe_new(),
             decoded_new_protocol_version
         ));
         errors += 1;
