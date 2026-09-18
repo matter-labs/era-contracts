@@ -56,7 +56,14 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
             bytes memory executeData
         ) = _encodeSettleData(commitInfo, priorityOps);
 
-        permissionlessValidator.settleBatchesSharedBridge({_chainAddress: address(executor), _processBatchFrom: txFrom, _processBatchTo: txTo, _commitData: commitData, _proveData: proveData, _executeData: executeData});
+        permissionlessValidator.settleBatchesSharedBridge({
+            _chainAddress: address(executor),
+            _processBatchFrom: txFrom,
+            _processBatchTo: txTo,
+            _commitData: commitData,
+            _proveData: proveData,
+            _executeData: executeData
+        });
 
         assertEq(getters.getTotalBatchesCommitted(), 1);
         assertEq(getters.getTotalBatchesVerified(), 1);

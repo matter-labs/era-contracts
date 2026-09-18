@@ -82,7 +82,7 @@ contract TestAssetRouterBase is AssetRouterBase {
     }
 }
 
-contract AssetRouterBase_FinalizeDepositBranches_Test is Test {
+contract AssetRouterBaseFinalizeDepositBranchesTest is Test {
     TestAssetRouterBase internal router;
     MockAssetHandler internal existingHandler;
     MockAssetHandler internal ntvHandler;

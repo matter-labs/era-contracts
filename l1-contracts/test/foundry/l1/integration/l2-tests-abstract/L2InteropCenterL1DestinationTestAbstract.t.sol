@@ -38,7 +38,15 @@ abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils
         vm.deal(address(this), 1000 ether);
         vm.recordLogs();
 
-        bytes32 bundleHash = InteropLibrary.sendToken({destinationChainId: L1_CHAIN_ID, l2TokenAddress: l2TokenAddress, amount: 100, recipient: address(this), unbundlerAddress: UNBUNDLER_ADDRESS, useFixedFee: false, salt: bytes32(0)});
+        bytes32 bundleHash = InteropLibrary.sendToken({
+            destinationChainId: L1_CHAIN_ID,
+            l2TokenAddress: l2TokenAddress,
+            amount: 100,
+            recipient: address(this),
+            unbundlerAddress: UNBUNDLER_ADDRESS,
+            useFixedFee: false,
+            salt: bytes32(0)
+        });
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         assertTrue(bundleHash != bytes32(0), "L1-destined bundle should return a non-zero hash");

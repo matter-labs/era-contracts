@@ -24,7 +24,11 @@ import {
 } from "contracts/state-transition/IChainTypeManager.sol";
 import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {GenesisBatchHashZero, GenesisBatchCommitmentIncorrect, GenesisUpgradeZero} from "contracts/common/L1ContractErrors.sol";
+import {
+    GenesisBatchHashZero,
+    GenesisBatchCommitmentIncorrect,
+    GenesisUpgradeZero
+} from "contracts/common/L1ContractErrors.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";

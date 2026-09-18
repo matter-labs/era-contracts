@@ -11,7 +11,16 @@ import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 import {PermanentRestriction} from "contracts/governance/PermanentRestriction.sol";
 import {IPermanentRestriction} from "contracts/governance/IPermanentRestriction.sol";
-import {AlreadyWhitelisted, CallNotAllowed, NotAllowed, RemovingPermanentRestriction, TooHighDeploymentNonce, UnallowedImplementation, ZeroAddress, ZeroDeploymentNonce} from "contracts/common/L1ContractErrors.sol";
+import {
+    AlreadyWhitelisted,
+    CallNotAllowed,
+    NotAllowed,
+    RemovingPermanentRestriction,
+    TooHighDeploymentNonce,
+    UnallowedImplementation,
+    ZeroAddress,
+    ZeroDeploymentNonce
+} from "contracts/common/L1ContractErrors.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";

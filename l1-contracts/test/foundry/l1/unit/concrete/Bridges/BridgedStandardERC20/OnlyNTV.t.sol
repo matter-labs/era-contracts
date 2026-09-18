@@ -14,7 +14,7 @@ contract MockNTV {
     }
 }
 
-contract BridgedStandardERC20_OnlyNTV_Test is Test {
+contract BridgedStandardERC20OnlyNTVTest is Test {
     using stdStorage for StdStorage;
 
     BridgedStandardERC20 internal implementation;

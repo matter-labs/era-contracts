@@ -35,7 +35,7 @@ import {DefaultUpgradeZKsyncOS} from "contracts/upgrades/DefaultUpgradeZKsyncOS.
 import {Bytes} from "contracts/vendor/Bytes.sol";
 
 /// @notice Test-only CTM upgrade that mocks large bytecode reads to avoid MemoryOOG
-contract CTMUpgrade_v33_Test is CTMUpgrade_v33 {
+contract CTMUpgradeV33Test is CTMUpgrade_v33 {
     /// @notice Exposes the deployed PriorityOpLowerBound registry for the test's chain-upgrade precondition.
     function exposedPriorityOpLowerBound() external view returns (address) {
         return priorityOpLowerBound;
@@ -88,7 +88,7 @@ contract CTMUpgrade_v33_Test is CTMUpgrade_v33 {
 }
 
 /// @notice Test-only Core upgrade that skips governance calls the local fixture cannot satisfy.
-contract CoreUpgrade_v33_Test is CoreUpgrade_v33 {
+contract CoreUpgradeV33Test is CoreUpgrade_v33 {
     /// @notice Override to skip the ownership-acceptance and `setAddresses` calls, which need ownership
     ///         hand-offs the fixture does not perform.
     /// @dev The interop-handler wiring is kept: it is what makes a v31 ecosystem match a from-scratch v32
@@ -102,7 +102,7 @@ contract CoreUpgrade_v33_Test is CoreUpgrade_v33 {
 
 // Note: there is no longer a separate `EcosystemUpgrade_v31_Test` orchestrator subclass.
 // The local-fork integration test injects mocked Core and CTM upgrades by overriding
-// `createCoreUpgrade` / `createCTMUpgrade` on `UpgradeIntegrationTest_Local` directly,
+// `createCoreUpgrade` / `createCTMUpgrade` on `UpgradeIntegrationTestLocal` directly,
 // and bumps the protocol version in `setUp` after `setupUpgrade()`.
 
 // AGENTS.md mandates "NEVER override storage slots in tests" with no exceptions,
@@ -128,12 +128,7 @@ uint256 constant ZK_CHAIN_TOTAL_BATCHES_COMMITTED_SLOT = 13;
 // `Initializable(0)`, `MessageRootBase(1-12)`, `__gap[37](13-49)`, this(50).
 uint256 constant L1_MESSAGE_ROOT_V31_UPGRADE_BATCH_NUMBER_SLOT = 50;
 
-contract UpgradeIntegrationTest_Local is
-    UpgradeIntegrationTestBase,
-    L1ContractDeployer,
-    ZKChainDeployer,
-    TokenDeployer
-{
+contract UpgradeIntegrationTestLocal is UpgradeIntegrationTestBase, L1ContractDeployer, ZKChainDeployer, TokenDeployer {
     using stdToml for string;
     using Bytes for bytes;
 
@@ -144,12 +139,12 @@ contract UpgradeIntegrationTest_Local is
 
     /// @notice Override to inject the mocked Core upgrade (keeps only the interop-handler wiring in stage 1).
     function createCoreUpgrade() internal override returns (CoreUpgrade_v33) {
-        return new CoreUpgrade_v33_Test();
+        return new CoreUpgradeV33Test();
     }
 
     /// @notice Override to inject the mocked CTM upgrade (skips bytecode-heavy reads).
     function createCTMUpgrade() internal override returns (CTMUpgrade_v33) {
-        return new CTMUpgrade_v33_Test();
+        return new CTMUpgradeV33Test();
     }
 
     /// @notice Bump the CTM's protocol version from the upgrade input TOML so the local fixture
@@ -180,7 +175,7 @@ contract UpgradeIntegrationTest_Local is
 
         // v32 upgrade precondition: the chain's priority-op lower bound must be recorded before the
         // upgrade executes (permissionless; production runs RecordPriorityOpLowerBound.s.sol).
-        IPriorityOpLowerBound(CTMUpgrade_v33_Test(address(ctmUpgrade)).exposedPriorityOpLowerBound())
+        IPriorityOpLowerBound(CTMUpgradeV33Test(address(ctmUpgrade)).exposedPriorityOpLowerBound())
             .lowerBoundPriorityOp(sourceChainDiamond);
     }
 
@@ -383,7 +378,7 @@ contract UpgradeIntegrationTest_Local is
 /// one: `DefaultCTMUpgrade.initializeConfig` must resolve testnetVerifier=false and the upgrade
 /// must install a production verifier for the new version. Guards against the resolution being
 /// hardcoded or ignored, which the testnet fixture alone cannot detect.
-contract UpgradeIntegrationTest_LocalProductionVerifier is UpgradeIntegrationTest_Local {
+contract UpgradeIntegrationTestLocalProductionVerifier is UpgradeIntegrationTestLocal {
     function _expectTestnetEcosystem() internal pure override returns (bool) {
         return false;
     }

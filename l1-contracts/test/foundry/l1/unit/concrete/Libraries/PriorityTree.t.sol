@@ -5,7 +5,12 @@ import {Test} from "forge-std/Test.sol";
 
 import {PriorityTree} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {PriorityTreeCommitment} from "contracts/common/Config.sol";
-import {InvalidCommitment, InvalidNextLeafIndex, InvalidStartIndex, InvalidUnprocessedIndex} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {
+    InvalidCommitment,
+    InvalidNextLeafIndex,
+    InvalidStartIndex,
+    InvalidUnprocessedIndex
+} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 /// @notice Unit tests for PriorityTree library
 contract PriorityTreeTest is Test {

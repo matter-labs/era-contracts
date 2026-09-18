@@ -77,7 +77,14 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
         bytes32 _localLeg,
         bytes32 _remoteLeg
     ) internal view returns (AtomicFlowPreimage memory preimage) {
-        (preimage, , ) = AtomicFlowFixtures.twoLegPreimage({_legA: _localLeg, _chainA: block.chainid, _legB: _remoteLeg, _chainB: OTHER_CHAIN_ID, _deadline: DEADLINE, _settlementLayerChainId: L1_CHAIN_ID});
+        (preimage, , ) = AtomicFlowFixtures.twoLegPreimage({
+            _legA: _localLeg,
+            _chainA: block.chainid,
+            _legB: _remoteLeg,
+            _chainB: OTHER_CHAIN_ID,
+            _deadline: DEADLINE,
+            _settlementLayerChainId: L1_CHAIN_ID
+        });
     }
 
     function _appendAsInteropCenter(bytes32 _bundleHash, AtomicFlowPreimage memory _preimage) internal {

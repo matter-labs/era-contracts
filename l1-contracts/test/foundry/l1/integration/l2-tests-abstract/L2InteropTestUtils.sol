@@ -99,10 +99,7 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
         address executionAddress,
         uint256 _destinationChainId
     ) internal returns (BundleExecutionResult memory result) {
-        (, , InteropBundle memory interopBundle) = abi.decode(
-            logsData,
-            (bytes32, bytes32, InteropBundle)
-        );
+        (, , InteropBundle memory interopBundle) = abi.decode(logsData, (bytes32, bytes32, InteropBundle));
         bytes memory bundle = abi.encode(interopBundle);
 
         // Finality is proven via the AtomicFlowManager's IMT gate, mocked to succeed here (the real

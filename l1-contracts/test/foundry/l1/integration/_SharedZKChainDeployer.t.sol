@@ -157,7 +157,6 @@ contract ZKChainDeployer is L1ContractDeployer {
     }
 
     function saveZKChainConfig(ZKChainDescription memory description) public {
-
         vm.serializeAddress("toml1", "owner_address", 0x70997970C51812dc3A010C7d01b50e0d17dc79C8);
         vm.serializeUint("chain", "chain_chain_id", description.zkChainChainId);
         vm.serializeAddress("chain", "base_token_addr", description.baseToken);

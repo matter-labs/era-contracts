@@ -113,7 +113,14 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
 
     function test_RevertWhen_inclusion_imtRootInclusionFails() public {
         _mockVerifier(false);
-        ImtProof memory proof = _inclusionProof({_sourceChainId: SOURCE_CHAIN_ID, _batchNumber: BATCH_N, _leafIndex: committedIndex, _slChainId: SETTLEMENT_LAYER_CHAIN_ID, _slBlock: SL_BLOCK, _l1Timestamp: DEADLINE - 1});
+        ImtProof memory proof = _inclusionProof({
+            _sourceChainId: SOURCE_CHAIN_ID,
+            _batchNumber: BATCH_N,
+            _leafIndex: committedIndex,
+            _slChainId: SETTLEMENT_LAYER_CHAIN_ID,
+            _slBlock: SL_BLOCK,
+            _l1Timestamp: DEADLINE - 1
+        });
         _expectRootAuthentication(proof, ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX);
         vm.expectRevert(
             abi.encodeWithSelector(ProofImtRootInclusionFailed.selector, SOURCE_CHAIN_ID, BATCH_N, proof.chainImtRoot)
@@ -125,7 +132,14 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// a longer path could descend INTO the IMT and pass off an internal node as "the root". The depth
     /// check runs before the verifier, so no stub is needed.
     function test_RevertWhen_inclusion_invalidChainBatchRootDepth() public {
-        ImtProof memory proof = _inclusionProof({_sourceChainId: SOURCE_CHAIN_ID, _batchNumber: BATCH_N, _leafIndex: committedIndex, _slChainId: SETTLEMENT_LAYER_CHAIN_ID, _slBlock: SL_BLOCK, _l1Timestamp: DEADLINE - 1});
+        ImtProof memory proof = _inclusionProof({
+            _sourceChainId: SOURCE_CHAIN_ID,
+            _batchNumber: BATCH_N,
+            _leafIndex: committedIndex,
+            _slChainId: SETTLEMENT_LAYER_CHAIN_ID,
+            _slBlock: SL_BLOCK,
+            _l1Timestamp: DEADLINE - 1
+        });
         uint256 wrongDepth = ChainBatchRootTree.TREE_DEPTH + 1;
         // Contents are irrelevant: the depth check runs before any hashing.
         proof.settlementProof[0] = _composeMetadata({
@@ -142,7 +156,14 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// @dev The symmetric direction: without it the depth equality can be weakened to `>`, still
     /// rejecting the over-long path above while accepting one that stops short of the root.
     function test_RevertWhen_inclusion_chainBatchRootDepthTooShort() public {
-        ImtProof memory proof = _inclusionProof({_sourceChainId: SOURCE_CHAIN_ID, _batchNumber: BATCH_N, _leafIndex: committedIndex, _slChainId: SETTLEMENT_LAYER_CHAIN_ID, _slBlock: SL_BLOCK, _l1Timestamp: DEADLINE - 1});
+        ImtProof memory proof = _inclusionProof({
+            _sourceChainId: SOURCE_CHAIN_ID,
+            _batchNumber: BATCH_N,
+            _leafIndex: committedIndex,
+            _slChainId: SETTLEMENT_LAYER_CHAIN_ID,
+            _slBlock: SL_BLOCK,
+            _l1Timestamp: DEADLINE - 1
+        });
         uint256 shortDepth = ChainBatchRootTree.TREE_DEPTH - 1;
         proof.settlementProof[0] = _composeMetadata({
             _logLeafProofLen: shortDepth,
@@ -159,7 +180,14 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         // Branch isolation: a final-node blob cannot be produced by real aggregation, so the leaf
         // verifier is stubbed to reach the `finalProofNode` check.
         _mockVerifier(true);
-        ImtProof memory proof = _inclusionProof({_sourceChainId: SOURCE_CHAIN_ID, _batchNumber: BATCH_N, _leafIndex: committedIndex, _slChainId: SETTLEMENT_LAYER_CHAIN_ID, _slBlock: SL_BLOCK, _l1Timestamp: DEADLINE - 1});
+        ImtProof memory proof = _inclusionProof({
+            _sourceChainId: SOURCE_CHAIN_ID,
+            _batchNumber: BATCH_N,
+            _leafIndex: committedIndex,
+            _slChainId: SETTLEMENT_LAYER_CHAIN_ID,
+            _slBlock: SL_BLOCK,
+            _l1Timestamp: DEADLINE - 1
+        });
         // A final-node (single-level) proof carries no settlement-layer batch reference.
         proof.settlementProof = _finalSettlementProof();
         _expectRootAuthentication(proof, ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX);
@@ -170,7 +198,14 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     function test_RevertWhen_inclusion_settlementLayerMismatch() public {
         _mockVerifier(true);
         uint256 proofSl = SETTLEMENT_LAYER_CHAIN_ID + 1;
-        ImtProof memory proof = _inclusionProof({_sourceChainId: SOURCE_CHAIN_ID, _batchNumber: BATCH_N, _leafIndex: committedIndex, _slChainId: proofSl, _slBlock: SL_BLOCK, _l1Timestamp: DEADLINE - 1});
+        ImtProof memory proof = _inclusionProof({
+            _sourceChainId: SOURCE_CHAIN_ID,
+            _batchNumber: BATCH_N,
+            _leafIndex: committedIndex,
+            _slChainId: proofSl,
+            _slBlock: SL_BLOCK,
+            _l1Timestamp: DEADLINE - 1
+        });
         _expectRootAuthentication(proof, ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX);
         vm.expectRevert(
             abi.encodeWithSelector(ProofSettlementLayerMismatch.selector, SETTLEMENT_LAYER_CHAIN_ID, proofSl)
@@ -237,7 +272,14 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// helpers, so the leaf verifier is stubbed over the synthetic path.
     function test_verifyTimeoutAbsence_inTimeLastBatch_acceptsEmptySubtreeCascade() public {
         _mockVerifier(true);
-        ImtProof memory absence = _nonInclusionProof({_sourceChainId: SOURCE_CHAIN_ID, _batchNumber: BATCH_N, _absentValue: absentValue, _slChainId: SETTLEMENT_LAYER_CHAIN_ID, _slBlock: SL_BLOCK, _l1Timestamp: DEADLINE - 1});
+        ImtProof memory absence = _nonInclusionProof({
+            _sourceChainId: SOURCE_CHAIN_ID,
+            _batchNumber: BATCH_N,
+            _absentValue: absentValue,
+            _slChainId: SETTLEMENT_LAYER_CHAIN_ID,
+            _slBlock: SL_BLOCK,
+            _l1Timestamp: DEADLINE - 1
+        });
         absence.settlementProof = _settlementProof(
             SETTLEMENT_LAYER_CHAIN_ID,
             SL_BLOCK,
@@ -261,7 +303,14 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         siblings[0] = _emptySubtreeCascade(1)[0];
         siblings[1] = keccak256("populated subtree of batches 0..1");
 
-        ImtProof memory absence = _nonInclusionProof({_sourceChainId: SOURCE_CHAIN_ID, _batchNumber: BATCH_N, _absentValue: absentValue, _slChainId: SETTLEMENT_LAYER_CHAIN_ID, _slBlock: SL_BLOCK, _l1Timestamp: DEADLINE - 1});
+        ImtProof memory absence = _nonInclusionProof({
+            _sourceChainId: SOURCE_CHAIN_ID,
+            _batchNumber: BATCH_N,
+            _absentValue: absentValue,
+            _slChainId: SETTLEMENT_LAYER_CHAIN_ID,
+            _slBlock: SL_BLOCK,
+            _l1Timestamp: DEADLINE - 1
+        });
         absence.settlementProof = _settlementProofWithMask(
             SETTLEMENT_LAYER_CHAIN_ID,
             SL_BLOCK,
@@ -286,7 +335,14 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         siblings[0] = levelZeroHash;
         siblings[1] = levelZeroHash; // wrong: level 1 requires keccak(zeros[0] || zeros[0])
 
-        ImtProof memory absence = _nonInclusionProof({_sourceChainId: SOURCE_CHAIN_ID, _batchNumber: BATCH_N, _absentValue: absentValue, _slChainId: SETTLEMENT_LAYER_CHAIN_ID, _slBlock: SL_BLOCK, _l1Timestamp: DEADLINE - 1});
+        ImtProof memory absence = _nonInclusionProof({
+            _sourceChainId: SOURCE_CHAIN_ID,
+            _batchNumber: BATCH_N,
+            _absentValue: absentValue,
+            _slChainId: SETTLEMENT_LAYER_CHAIN_ID,
+            _slBlock: SL_BLOCK,
+            _l1Timestamp: DEADLINE - 1
+        });
         absence.settlementProof = _settlementProof(SETTLEMENT_LAYER_CHAIN_ID, SL_BLOCK, DEADLINE - 1, siblings);
         _expectRootAuthentication(absence, ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX);
         vm.expectRevert(abi.encodeWithSelector(ProofNotLastBatchInRoot.selector, 1, levelZeroHash));
@@ -301,7 +357,14 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         _mockVerifier(true);
         uint256 staleBlock = SL_BLOCK + 1;
         _seedSettlementLayerInteropRoot(SETTLEMENT_LAYER_CHAIN_ID, staleBlock, DEADLINE);
-        ImtProof memory absence = _nonInclusionProof({_sourceChainId: SOURCE_CHAIN_ID, _batchNumber: BATCH_N, _absentValue: absentValue, _slChainId: SETTLEMENT_LAYER_CHAIN_ID, _slBlock: staleBlock, _l1Timestamp: DEADLINE - 1});
+        ImtProof memory absence = _nonInclusionProof({
+            _sourceChainId: SOURCE_CHAIN_ID,
+            _batchNumber: BATCH_N,
+            _absentValue: absentValue,
+            _slChainId: SETTLEMENT_LAYER_CHAIN_ID,
+            _slBlock: staleBlock,
+            _l1Timestamp: DEADLINE - 1
+        });
         _expectRootAuthentication(absence, ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX);
         vm.expectRevert(abi.encodeWithSelector(ProofInteropRootNotAfterDeadline.selector, uint256(DEADLINE), DEADLINE));
         proofLib.verifyTimeoutAbsence(absence, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
@@ -311,7 +374,14 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     function test_RevertWhen_timeout_missingSettlementInteropRoot() public {
         _mockVerifier(true);
         uint256 unseededBlock = SL_BLOCK + 2;
-        ImtProof memory absence = _nonInclusionProof({_sourceChainId: SOURCE_CHAIN_ID, _batchNumber: BATCH_N, _absentValue: absentValue, _slChainId: SETTLEMENT_LAYER_CHAIN_ID, _slBlock: unseededBlock, _l1Timestamp: uint256(DEADLINE) + 1});
+        ImtProof memory absence = _nonInclusionProof({
+            _sourceChainId: SOURCE_CHAIN_ID,
+            _batchNumber: BATCH_N,
+            _absentValue: absentValue,
+            _slChainId: SETTLEMENT_LAYER_CHAIN_ID,
+            _slBlock: unseededBlock,
+            _l1Timestamp: uint256(DEADLINE) + 1
+        });
         _expectRootAuthentication(absence, ChainBatchRootTree.IMT_BEGIN_ROOT_LEAF_INDEX);
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -331,7 +401,14 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         bytes32[] memory siblings = new bytes32[](1);
         siblings[0] = populatedSibling;
 
-        ImtProof memory absence = _nonInclusionProof({_sourceChainId: SOURCE_CHAIN_ID, _batchNumber: BATCH_N, _absentValue: absentValue, _slChainId: SETTLEMENT_LAYER_CHAIN_ID, _slBlock: SL_BLOCK, _l1Timestamp: DEADLINE - 1});
+        ImtProof memory absence = _nonInclusionProof({
+            _sourceChainId: SOURCE_CHAIN_ID,
+            _batchNumber: BATCH_N,
+            _absentValue: absentValue,
+            _slChainId: SETTLEMENT_LAYER_CHAIN_ID,
+            _slBlock: SL_BLOCK,
+            _l1Timestamp: DEADLINE - 1
+        });
         absence.settlementProof = _settlementProof(SETTLEMENT_LAYER_CHAIN_ID, SL_BLOCK, DEADLINE - 1, siblings);
         _expectRootAuthentication(absence, ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX);
         vm.expectRevert(abi.encodeWithSelector(ProofNotLastBatchInRoot.selector, 0, populatedSibling));
@@ -345,7 +422,14 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// finalization.
     function test_RevertWhen_timeout_beginBranchWithBatchAtDeadline() public {
         _mockVerifier(true);
-        ImtProof memory absence = _nonInclusionProof({_sourceChainId: SOURCE_CHAIN_ID, _batchNumber: BATCH_N, _absentValue: absentValue, _slChainId: SETTLEMENT_LAYER_CHAIN_ID, _slBlock: SL_BLOCK, _l1Timestamp: DEADLINE});
+        ImtProof memory absence = _nonInclusionProof({
+            _sourceChainId: SOURCE_CHAIN_ID,
+            _batchNumber: BATCH_N,
+            _absentValue: absentValue,
+            _slChainId: SETTLEMENT_LAYER_CHAIN_ID,
+            _slBlock: SL_BLOCK,
+            _l1Timestamp: DEADLINE
+        });
         absence.provesAgainstBeginRoot = true;
         _expectRootAuthentication(absence, ChainBatchRootTree.IMT_BEGIN_ROOT_LEAF_INDEX);
         vm.expectRevert(abi.encodeWithSelector(ProofTimeoutBranchMismatch.selector, true, uint256(DEADLINE), DEADLINE));
@@ -356,7 +440,14 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// nothing for an in-time batch (its begin state predates the deadline moment).
     function test_RevertWhen_timeout_beginBranchWithInTimeBatch() public {
         _mockVerifier(true);
-        ImtProof memory absence = _nonInclusionProof({_sourceChainId: SOURCE_CHAIN_ID, _batchNumber: BATCH_N, _absentValue: absentValue, _slChainId: SETTLEMENT_LAYER_CHAIN_ID, _slBlock: SL_BLOCK, _l1Timestamp: DEADLINE - 1});
+        ImtProof memory absence = _nonInclusionProof({
+            _sourceChainId: SOURCE_CHAIN_ID,
+            _batchNumber: BATCH_N,
+            _absentValue: absentValue,
+            _slChainId: SETTLEMENT_LAYER_CHAIN_ID,
+            _slBlock: SL_BLOCK,
+            _l1Timestamp: DEADLINE - 1
+        });
         absence.provesAgainstBeginRoot = true;
         _expectRootAuthentication(absence, ChainBatchRootTree.IMT_BEGIN_ROOT_LEAF_INDEX);
         vm.expectRevert(
@@ -369,7 +460,14 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// batch must use its begin root (which needs no last-batch property).
     function test_RevertWhen_timeout_endBranchWithLateBatch() public {
         _mockVerifier(true);
-        ImtProof memory absence = _nonInclusionProof({_sourceChainId: SOURCE_CHAIN_ID, _batchNumber: BATCH_N, _absentValue: absentValue, _slChainId: SETTLEMENT_LAYER_CHAIN_ID, _slBlock: SL_BLOCK, _l1Timestamp: uint256(DEADLINE) + 1});
+        ImtProof memory absence = _nonInclusionProof({
+            _sourceChainId: SOURCE_CHAIN_ID,
+            _batchNumber: BATCH_N,
+            _absentValue: absentValue,
+            _slChainId: SETTLEMENT_LAYER_CHAIN_ID,
+            _slBlock: SL_BLOCK,
+            _l1Timestamp: uint256(DEADLINE) + 1
+        });
         absence.provesAgainstBeginRoot = false;
         _expectRootAuthentication(absence, ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX);
         vm.expectRevert(
@@ -386,7 +484,14 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         bytes32[] memory siblings = new bytes32[](1);
         siblings[0] = keccak256("populated-right-subtree");
 
-        ImtProof memory absence = _nonInclusionProof({_sourceChainId: SOURCE_CHAIN_ID, _batchNumber: BATCH_N, _absentValue: absentValue, _slChainId: SETTLEMENT_LAYER_CHAIN_ID, _slBlock: SL_BLOCK, _l1Timestamp: uint256(DEADLINE) + 1});
+        ImtProof memory absence = _nonInclusionProof({
+            _sourceChainId: SOURCE_CHAIN_ID,
+            _batchNumber: BATCH_N,
+            _absentValue: absentValue,
+            _slChainId: SETTLEMENT_LAYER_CHAIN_ID,
+            _slBlock: SL_BLOCK,
+            _l1Timestamp: uint256(DEADLINE) + 1
+        });
         absence.settlementProof = _settlementProof(
             SETTLEMENT_LAYER_CHAIN_ID,
             SL_BLOCK,
@@ -400,7 +505,14 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     function test_RevertWhen_timeout_missingSettlementLayerBatch() public {
         // Branch isolation: a final-node blob cannot be produced by real aggregation.
         _mockVerifier(true);
-        ImtProof memory absence = _nonInclusionProof({_sourceChainId: SOURCE_CHAIN_ID, _batchNumber: BATCH_N, _absentValue: absentValue, _slChainId: SETTLEMENT_LAYER_CHAIN_ID, _slBlock: SL_BLOCK, _l1Timestamp: uint256(DEADLINE) + 1});
+        ImtProof memory absence = _nonInclusionProof({
+            _sourceChainId: SOURCE_CHAIN_ID,
+            _batchNumber: BATCH_N,
+            _absentValue: absentValue,
+            _slChainId: SETTLEMENT_LAYER_CHAIN_ID,
+            _slBlock: SL_BLOCK,
+            _l1Timestamp: uint256(DEADLINE) + 1
+        });
         absence.settlementProof = _finalSettlementProof();
         vm.expectRevert(abi.encodeWithSelector(ProofMissingSettlementLayerBatch.selector, SOURCE_CHAIN_ID, BATCH_N));
         proofLib.verifyTimeoutAbsence(absence, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
@@ -409,7 +521,14 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     function test_RevertWhen_timeout_settlementLayerMismatch() public {
         _mockVerifier(true);
         uint256 proofSl = SETTLEMENT_LAYER_CHAIN_ID + 1;
-        ImtProof memory absence = _nonInclusionProof({_sourceChainId: SOURCE_CHAIN_ID, _batchNumber: BATCH_N, _absentValue: absentValue, _slChainId: proofSl, _slBlock: SL_BLOCK, _l1Timestamp: uint256(DEADLINE) + 1});
+        ImtProof memory absence = _nonInclusionProof({
+            _sourceChainId: SOURCE_CHAIN_ID,
+            _batchNumber: BATCH_N,
+            _absentValue: absentValue,
+            _slChainId: proofSl,
+            _slBlock: SL_BLOCK,
+            _l1Timestamp: uint256(DEADLINE) + 1
+        });
         _expectRootAuthentication(absence, ChainBatchRootTree.IMT_BEGIN_ROOT_LEAF_INDEX);
         vm.expectRevert(
             abi.encodeWithSelector(ProofSettlementLayerMismatch.selector, SETTLEMENT_LAYER_CHAIN_ID, proofSl)
@@ -419,7 +538,14 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
 
     function test_RevertWhen_timeout_imtRootInclusionFails() public {
         _mockVerifier(false);
-        ImtProof memory absence = _nonInclusionProof({_sourceChainId: SOURCE_CHAIN_ID, _batchNumber: BATCH_N, _absentValue: absentValue, _slChainId: SETTLEMENT_LAYER_CHAIN_ID, _slBlock: SL_BLOCK, _l1Timestamp: uint256(DEADLINE) + 1});
+        ImtProof memory absence = _nonInclusionProof({
+            _sourceChainId: SOURCE_CHAIN_ID,
+            _batchNumber: BATCH_N,
+            _absentValue: absentValue,
+            _slChainId: SETTLEMENT_LAYER_CHAIN_ID,
+            _slBlock: SL_BLOCK,
+            _l1Timestamp: uint256(DEADLINE) + 1
+        });
         _expectRootAuthentication(absence, ChainBatchRootTree.IMT_BEGIN_ROOT_LEAF_INDEX);
         vm.expectRevert(
             abi.encodeWithSelector(ProofImtRootInclusionFailed.selector, SOURCE_CHAIN_ID, BATCH_N, absence.chainImtRoot)
@@ -486,7 +612,14 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// authenticated proof is pinned by the non-fuzz deadline tests above.
     function testFuzz_verifyInclusion_deadlineBoundary(uint64 _l1Timestamp, uint64 _deadline) public {
         _mockVerifier(true);
-        ImtProof memory proof = _inclusionProof({_sourceChainId: SOURCE_CHAIN_ID, _batchNumber: BATCH_N, _leafIndex: committedIndex, _slChainId: SETTLEMENT_LAYER_CHAIN_ID, _slBlock: SL_BLOCK, _l1Timestamp: _l1Timestamp});
+        ImtProof memory proof = _inclusionProof({
+            _sourceChainId: SOURCE_CHAIN_ID,
+            _batchNumber: BATCH_N,
+            _leafIndex: committedIndex,
+            _slChainId: SETTLEMENT_LAYER_CHAIN_ID,
+            _slBlock: SL_BLOCK,
+            _l1Timestamp: _l1Timestamp
+        });
         if (uint256(_l1Timestamp) > uint256(_deadline)) {
             vm.expectRevert(abi.encodeWithSelector(ProofDeadlineExceeded.selector, uint256(_l1Timestamp), _deadline));
         }
@@ -507,7 +640,14 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         uint256 slBlock = SL_BLOCK + 10; // avoid the setUp-seeded key
         _seedSettlementLayerInteropRoot(SETTLEMENT_LAYER_CHAIN_ID, slBlock, _interopRootTimestamp);
 
-        ImtProof memory absence = _nonInclusionProof({_sourceChainId: SOURCE_CHAIN_ID, _batchNumber: BATCH_N, _absentValue: absentValue, _slChainId: SETTLEMENT_LAYER_CHAIN_ID, _slBlock: slBlock, _l1Timestamp: _batchTimestamp});
+        ImtProof memory absence = _nonInclusionProof({
+            _sourceChainId: SOURCE_CHAIN_ID,
+            _batchNumber: BATCH_N,
+            _absentValue: absentValue,
+            _slChainId: SETTLEMENT_LAYER_CHAIN_ID,
+            _slBlock: slBlock,
+            _l1Timestamp: _batchTimestamp
+        });
         // The builder declares the branch against the fixed test DEADLINE; redeclare it against the
         // fuzzed deadline the way an honest prover would.
         absence.provesAgainstBeginRoot = uint256(_batchTimestamp) > uint256(_deadline);

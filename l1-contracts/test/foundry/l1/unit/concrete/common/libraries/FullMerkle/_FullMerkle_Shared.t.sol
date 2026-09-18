@@ -13,10 +13,10 @@ contract FullMerkleTest is Test {
     function test() internal {}
 
     FullMerkleTestContract internal merkleTest;
-    bytes32 internal constant zeroHash = keccak256(abi.encodePacked("ZERO"));
+    bytes32 internal constant ZERO_HASH = keccak256(abi.encodePacked("ZERO"));
 
     function setUp() public {
-        merkleTest = new FullMerkleTestContract(zeroHash);
+        merkleTest = new FullMerkleTestContract(ZERO_HASH);
     }
 
     // ### Helper functions ###
@@ -27,7 +27,7 @@ contract FullMerkleTest is Test {
     function _setupMemoryTree(uint256 _maxLeafNumber) internal view returns (FullMerkleMemory.FullTree memory) {
         FullMerkleMemory.FullTree memory memoryTree;
         memoryTree.createTree(_maxLeafNumber);
-        memoryTree.setup(zeroHash);
+        memoryTree.setup(ZERO_HASH);
         return memoryTree;
     }
 }

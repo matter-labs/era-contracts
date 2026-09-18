@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
@@ -23,7 +22,7 @@ contract MailboxTest is UtilsCallMockerTest {
     UtilsFacet internal utilsFacet;
     IGetters internal gettersFacet;
     address internal sender;
-    uint256 internal constant eraChainId = 9;
+    uint256 internal constant ERA_CHAIN_ID = 9;
     address internal testnetVerifier = address(new ZKsyncOSTestnetVerifier(IVerifier(address(0))));
     address internal diamondProxy;
     address internal bridgehub;

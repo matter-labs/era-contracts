@@ -15,7 +15,12 @@ import {AtomicFlowPreimage, ATOMIC_FLOW_PREIMAGE_VERSION} from "contracts/atomic
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {FeeWithdrawalFailed, ZKTokenNotAvailable} from "contracts/interop/InteropErrors.sol";
-import {L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_INTEROP_CENTER_ADDR,
+    L2_NATIVE_TOKEN_VAULT_ADDR,
+    L2_BOOTLOADER_ADDRESS,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";

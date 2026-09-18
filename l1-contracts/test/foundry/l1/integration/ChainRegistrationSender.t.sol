@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 import {console2} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
-
 import {IBridgehubBase, L2TransactionRequestTwoBridgesOuter} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {CHAIN_REGISTRATION_SENDER_ENCODING_VERSION} from "contracts/core/chain-registration/ChainRegistrationSender.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";

@@ -13,7 +13,12 @@ import {CommitBatchInfoZKsyncOS, ICommitter} from "contracts/state-transition/ch
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 
-import {ChainRequiresValidatorsSignaturesForCommit, NotEnoughSigners, SignerNotAuthorized, SignersNotSorted} from "contracts/common/L1ContractErrors.sol";
+import {
+    ChainRequiresValidatorsSignaturesForCommit,
+    NotEnoughSigners,
+    SignerNotAuthorized,
+    SignersNotSorted
+} from "contracts/common/L1ContractErrors.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 
 contract MultisigCommitterTest is Test {

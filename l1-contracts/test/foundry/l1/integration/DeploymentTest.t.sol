@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
@@ -91,7 +90,15 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
             uint256 chainId = currentZKChainId++;
             bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(chainId, ETH_TOKEN_ADDRESS);
 
-            address chain = _deployZkChain({_chainId: chainId, _baseTokenAssetId: baseTokenAssetId, _admin: owner, _protocolVersion: addresses.chainTypeManager.protocolVersion(), _storedBatchZero: addresses.chainTypeManager.storedBatchZero(), _bridgehub: address(addresses.bridgehub), _chainTypeManager: address(addresses.chainTypeManager)});
+            address chain = _deployZkChain({
+                _chainId: chainId,
+                _baseTokenAssetId: baseTokenAssetId,
+                _admin: owner,
+                _protocolVersion: addresses.chainTypeManager.protocolVersion(),
+                _storedBatchZero: addresses.chainTypeManager.storedBatchZero(),
+                _bridgehub: address(addresses.bridgehub),
+                _chainTypeManager: address(addresses.chainTypeManager)
+            });
 
             address stmAddr = IZKChain(chain).getChainTypeManager();
 
@@ -124,7 +131,15 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
                 "Chain should not be registered before deployment"
             );
 
-            address chain = _deployZkChain({_chainId: chainId, _baseTokenAssetId: baseTokenAssetId, _admin: owner, _protocolVersion: addresses.chainTypeManager.protocolVersion(), _storedBatchZero: addresses.chainTypeManager.storedBatchZero(), _bridgehub: address(addresses.bridgehub), _chainTypeManager: address(addresses.chainTypeManager)});
+            address chain = _deployZkChain({
+                _chainId: chainId,
+                _baseTokenAssetId: baseTokenAssetId,
+                _admin: owner,
+                _protocolVersion: addresses.chainTypeManager.protocolVersion(),
+                _storedBatchZero: addresses.chainTypeManager.storedBatchZero(),
+                _bridgehub: address(addresses.bridgehub),
+                _chainTypeManager: address(addresses.chainTypeManager)
+            });
 
             // Verify chain was deployed
             assertTrue(chain != address(0), "Chain should be deployed at a valid address");

@@ -22,7 +22,7 @@ import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
-contract BridgehubInvariantTests_1 is SharedBridgehubWithdrawal {
+contract BridgehubInvariantTests1 is SharedBridgehubWithdrawal {
     //@check Why is this file practically the same as BridgehubTests.t.sol???
     uint256 internal constant TEST_USERS_COUNT = 10;
 

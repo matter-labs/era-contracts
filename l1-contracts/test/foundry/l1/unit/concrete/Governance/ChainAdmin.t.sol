@@ -54,8 +54,6 @@ contract ChainAdminTest is Test {
     }
 
     function test_addRestriction() public {
-        address[] memory restrictions = chainAdmin.getRestrictions();
-
         vm.expectEmit(true, false, false, true);
         emit IChainAdmin.RestrictionAdded(address(dummyRestriction));
 
@@ -80,8 +78,6 @@ contract ChainAdminTest is Test {
     }
 
     function test_addRestrictionZeroAddress() public {
-        address[] memory restrictions = chainAdmin.getRestrictions();
-
         vm.prank(address(chainAdmin));
         vm.expectRevert();
         chainAdmin.addRestriction(address(0));
@@ -97,8 +93,6 @@ contract ChainAdminTest is Test {
     }
 
     function test_removeRestriction() public {
-        address[] memory restrictions = chainAdmin.getRestrictions();
-
         vm.startPrank(address(chainAdmin));
         chainAdmin.addRestriction(address(dummyRestriction));
 
@@ -110,8 +104,6 @@ contract ChainAdminTest is Test {
     }
 
     function test_removeRestrictionRevert() public {
-        address[] memory restrictions = chainAdmin.getRestrictions();
-
         vm.startPrank(address(chainAdmin));
         chainAdmin.addRestriction(address(dummyRestriction));
         chainAdmin.removeRestriction(address(dummyRestriction));

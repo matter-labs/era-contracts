@@ -31,7 +31,14 @@ contract PermissionlessValidatorTest is Test {
         bytes memory proveData = abi.encode("prove", uint256(12));
         bytes memory executeData = abi.encode("execute", uint256(13));
 
-        validator.settleBatchesSharedBridge({_chainAddress: address(executor), _processBatchFrom: processFrom, _processBatchTo: processTo, _commitData: commitData, _proveData: proveData, _executeData: executeData});
+        validator.settleBatchesSharedBridge({
+            _chainAddress: address(executor),
+            _processBatchFrom: processFrom,
+            _processBatchTo: processTo,
+            _commitData: commitData,
+            _proveData: proveData,
+            _executeData: executeData
+        });
 
         assertEq(executor.callIndex(), 3);
 
@@ -63,6 +70,13 @@ contract PermissionlessValidatorTest is Test {
         reentrantExecutor.setReenterPayload(proveData, executeData);
 
         vm.expectRevert(Reentrancy.selector);
-        validator.settleBatchesSharedBridge({_chainAddress: address(reentrantExecutor), _processBatchFrom: processFrom, _processBatchTo: processTo, _commitData: commitData, _proveData: proveData, _executeData: executeData});
+        validator.settleBatchesSharedBridge({
+            _chainAddress: address(reentrantExecutor),
+            _processBatchFrom: processFrom,
+            _processBatchTo: processTo,
+            _commitData: commitData,
+            _proveData: proveData,
+            _executeData: executeData
+        });
     }
 }

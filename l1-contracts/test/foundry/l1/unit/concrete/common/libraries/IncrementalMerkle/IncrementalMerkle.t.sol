@@ -11,10 +11,10 @@ contract IncrementalMerkleTestTest is Test {
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
 
     IncrementalMerkleTest internal merkleTest;
-    bytes32 internal constant zero = 0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba;
+    bytes32 internal constant ZERO = 0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba;
 
     function setUp() public {
-        merkleTest = new IncrementalMerkleTest(zero);
+        merkleTest = new IncrementalMerkleTest(ZERO);
     }
 
     function setUpMemory() public returns (DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestMemory) {
@@ -29,7 +29,7 @@ contract IncrementalMerkleTestTest is Test {
             false,
             bytes32(0)
         );
-        merkleTestMemory.setup(zero);
+        merkleTestMemory.setup(ZERO);
     }
 
     /// @dev Test basic setup and initialization (storage vs memory)
@@ -221,7 +221,7 @@ contract IncrementalMerkleTestTest is Test {
         );
     }
 
-    /// @dev Test edge cases - zero values and extreme values
+    /// @dev Test edge cases - ZERO values and extreme values
     function testEdgeCases() public {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleRegular = setUpMemory();
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleLazy = setUpMemory();
@@ -231,7 +231,7 @@ contract IncrementalMerkleTestTest is Test {
         edgeValues[0] = bytes32(0);
         edgeValues[1] = bytes32(type(uint256).max);
         edgeValues[2] = bytes32(uint256(1));
-        edgeValues[3] = zero;
+        edgeValues[3] = ZERO;
         edgeValues[4] = keccak256("edge");
 
         for (uint256 i = 0; i < edgeValues.length; i++) {
@@ -350,7 +350,7 @@ contract IncrementalMerkleTestTest is Test {
         assertEq(merkleTest.index(), 3);
         assertTrue(merkleTest.height() > 0);
 
-        // Reset with different zero value
+        // Reset with different ZERO value
         bytes32 newZero = keccak256("NEW_ZERO");
         merkleTest.reset(newZero);
 
@@ -359,7 +359,7 @@ contract IncrementalMerkleTestTest is Test {
         assertEq(merkleTest.index(), 0);
         assertEq(merkleTest.height(), 0);
 
-        // Verify it works with new zero value
+        // Verify it works with new ZERO value
         merkleTest.push(bytes32(uint256(42)));
         assertEq(merkleTest.root(), bytes32(uint256(42)));
     }
@@ -374,7 +374,7 @@ contract IncrementalMerkleTestTest is Test {
         assertEq(merkleTest.index(), 2);
 
         // Reset should call clear internally
-        merkleTest.reset(zero);
+        merkleTest.reset(ZERO);
 
         // Verify tree is cleared
         assertEq(merkleTest.root(), bytes32(0));
@@ -390,8 +390,8 @@ contract IncrementalMerkleTestTest is Test {
         merkleMemory._nextLeafIndex = 0;
         merkleMemory._sides = new bytes32[](1);
         merkleMemory._zeros = new bytes32[](1);
-        merkleMemory._sides[0] = zero;
-        merkleMemory._zeros[0] = zero;
+        merkleMemory._sides[0] = ZERO;
+        merkleMemory._zeros[0] = ZERO;
         merkleMemory._sidesLengthMemory = 1;
         merkleMemory._zerosLengthMemory = 1;
 
@@ -411,7 +411,7 @@ contract IncrementalMerkleTestTest is Test {
         // Verify extension worked
         assertEq(merkleMemory._sidesLengthMemory, 5);
         assertEq(merkleMemory._zerosLengthMemory, 5);
-        assertTrue(merkleMemory._sides[0] == zero); // Should set _sides[0] = currentZero when _nextLeafIndex == 0
+        assertTrue(merkleMemory._sides[0] == ZERO); // Should set _sides[0] = currentZero when _nextLeafIndex == 0
     }
 
     /// @dev Gas comparison test - performance validation
@@ -532,7 +532,7 @@ contract IncrementalMerkleTestTest is Test {
 
         for (uint256 t = 0; t < testSizes.length; t++) {
             // Reset trees
-            merkleTest = new IncrementalMerkleTest(zero);
+            merkleTest = new IncrementalMerkleTest(ZERO);
             merkleMemory = setUpMemory();
 
             // Push same elements to both

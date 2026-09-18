@@ -3,11 +3,9 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
+import {BridgehubInvariantTests1} from "test/foundry/l1/integration/BridgehubInvariantTests_1.t.sol";
 
-
-import {BridgehubInvariantTests_1} from "test/foundry/l1/integration/BridgehubInvariantTests_1.t.sol";
-
-contract BoundedBridgehubInvariantTests_2 is BridgehubInvariantTests_1 {
+contract BoundedBridgehubInvariantTests2 is BridgehubInvariantTests1 {
     function depositEthSuccess(uint256 userIndexSeed, uint256 chainIndexSeed, uint256 l2Value) public {
         uint64 MAX = 2 ** 64 - 1;
         uint256 l2Value = bound(l2Value, 0.1 ether, MAX);
@@ -42,10 +40,10 @@ contract BoundedBridgehubInvariantTests_2 is BridgehubInvariantTests_1 {
 }
 
 contract InvariantTesterZKChains is Test {
-    BoundedBridgehubInvariantTests_2 internal tests;
+    BoundedBridgehubInvariantTests2 internal tests;
 
     function setUp() public {
-        tests = new BoundedBridgehubInvariantTests_2();
+        tests = new BoundedBridgehubInvariantTests2();
         // tests.prepare();
     }
     // TODO(EVM-1391): Invariant testing currently commented out. Harness ready but unused

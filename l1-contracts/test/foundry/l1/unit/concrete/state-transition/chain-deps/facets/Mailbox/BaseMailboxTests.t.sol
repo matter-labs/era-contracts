@@ -78,11 +78,11 @@ contract MailboxBaseTests is MailboxTest {
 
     function test_requestL2TransactionToGatewayMailbox_RevertWhen_ExpirationTimestampNotZero() public {
         uint256 chainId = 42;
-        utilsFacet.util_setChainId(eraChainId);
+        utilsFacet.util_setChainId(ERA_CHAIN_ID);
 
         vm.mockCall(
             address(bridgehub),
-            abi.encodeWithSelector(IBridgehubBase.whitelistedSettlementLayers.selector, eraChainId),
+            abi.encodeWithSelector(IBridgehubBase.whitelistedSettlementLayers.selector, ERA_CHAIN_ID),
             abi.encode(true)
         );
         vm.mockCall(

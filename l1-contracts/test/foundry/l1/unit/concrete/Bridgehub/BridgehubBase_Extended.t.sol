@@ -7,11 +7,19 @@ import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
-import {CTMNotRegistered, CTMAlreadyRegistered, ZeroAddress, ChainIdNotRegistered, AssetIdAlreadyRegistered, Unauthorized, NoCTMForAssetId} from "contracts/common/L1ContractErrors.sol";
+import {
+    CTMNotRegistered,
+    CTMAlreadyRegistered,
+    ZeroAddress,
+    ChainIdNotRegistered,
+    AssetIdAlreadyRegistered,
+    Unauthorized,
+    NoCTMForAssetId
+} from "contracts/common/L1ContractErrors.sol";
 import {AlreadyCurrentSL, NotChainAssetHandler} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 import {TokenBridgingData} from "contracts/common/Messaging.sol";
 
-contract BridgehubBase_Extended_Test is Test {
+contract BridgehubBaseExtendedTest is Test {
     L1Bridgehub internal bridgehub;
     address internal owner;
     uint256 internal maxNumberOfChains;

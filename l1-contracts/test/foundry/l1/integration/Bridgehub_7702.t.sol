@@ -13,7 +13,7 @@ import {BridgehubInvariantTests} from "test/foundry/l1/integration/BridgehubTest
 
 import {LogFinder} from "test-utils/LogFinder.sol";
 
-contract Bridgehub_7702 is BridgehubInvariantTests {
+contract Bridgehub7702 is BridgehubInvariantTests {
     using LogFinder for Vm.Log[];
 
     function setUp() public {
