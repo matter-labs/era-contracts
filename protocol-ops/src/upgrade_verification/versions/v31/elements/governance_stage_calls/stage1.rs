@@ -27,8 +27,7 @@ use crate::upgrade_verification::{
 };
 
 use super::super::{
-    super::get_expected_new_protocol_version_for_ctm_flavor,
-    super::get_expected_old_protocol_version_for_ctm_flavor,
+    super::get_expected_new_protocol_version, super::get_expected_old_protocol_version,
 };
 use super::super::{
     fixed_force_deployment::FixedForceDeploymentsData,
@@ -1171,12 +1170,12 @@ async fn verify_set_new_version_upgrade_payload(
 
     let decoded_old_protocol_version = ProtocolVersion::from(artifact_old_protocol_version);
     let expected_old_protocol_version: U256 =
-        get_expected_old_protocol_version_for_ctm_flavor(ctm.flavor).into();
+        get_expected_old_protocol_version(verifiers.env, ctm.flavor).into();
     if artifact_old_protocol_version != expected_old_protocol_version {
         result.report_error(&format!(
             "{} CTM old protocol version must be {}, got {}",
             ctm.flavor.label(),
-            get_expected_old_protocol_version_for_ctm_flavor(ctm.flavor),
+            get_expected_old_protocol_version(verifiers.env, ctm.flavor),
             decoded_old_protocol_version
         ));
         errors += 1;
@@ -1184,7 +1183,7 @@ async fn verify_set_new_version_upgrade_payload(
         result.report_ok(&format!(
             "{} CTM old protocol version is {}",
             ctm.flavor.label(),
-            get_expected_old_protocol_version_for_ctm_flavor(ctm.flavor)
+            get_expected_old_protocol_version(verifiers.env, ctm.flavor)
         ));
     }
 
@@ -1231,7 +1230,7 @@ async fn verify_set_new_version_upgrade_payload(
 
     let decoded_new_protocol_version = ProtocolVersion::from(artifact_new_protocol_version);
     let expected_new_protocol_version =
-        get_expected_new_protocol_version_for_ctm_flavor(ctm.flavor);
+        get_expected_new_protocol_version(verifiers.env, ctm.flavor);
     if decoded_new_protocol_version != expected_new_protocol_version {
         result.report_error(&format!(
             "Invalid new protocol version in TOML for the {} CTM. Expected {}, got {}",

@@ -25,27 +25,57 @@ use elements::{
     rpc_state::verify_v31_artifact_state,
 };
 
-// Target protocol versions, per CTM flavour. Each CTM upgrades to its own
-// flavour's chain-creation `latestProtocolVersion`, which comes from that
-// flavour's genesis config — `DefaultCTMUpgrade.getNewProtocolVersion()` returns
-// `config.contracts.chainCreationParams.latestProtocolVersion`. The two
-// flavours' genesis lines moved independently, so a single shared constant
-// cannot describe both: this branch ships Era genesis v0.32.2 (see the
-// `old_protocol_version` note in `upgrade-envs/v0.31.0-interopB/
-// foundry-upgrade.toml`) and ZKsync-OS genesis v0.31.2.
-pub(crate) const EXPECTED_ERA_NEW_PROTOCOL_VERSION_STR: &str = "0.32.2";
-pub(crate) const EXPECTED_ZKSYNC_OS_NEW_PROTOCOL_VERSION_STR: &str = "0.31.2";
-// Source protocol versions, per CTM flavour: the version each CTM is on when
-// v31 executes, checked against both the artifact's `old_protocol_version` and
-// the live CTM's `protocolVersion()`.
-//
-// Era is v0.30.1, not the v0.29.4 the July calldata was cut against. Mainnet's
-// Era CTM moved to v0.30.1 at block 25766158 — after that calldata was
-// generated and 268k blocks after its contracts were deployed — so the recorded
-// ceremony would revert (`setNewVersionUpgrade old protocol version mismatch`)
-// and the re-cut upgrades Era from v0.30.1.
-pub(crate) const EXPECTED_ERA_OLD_PROTOCOL_VERSION_STR: &str = "0.30.1";
-pub(crate) const EXPECTED_ZKSYNC_OS_OLD_PROTOCOL_VERSION_STR: &str = "0.30.1";
+/// Protocol versions a v31 ceremony moves a CTM between, per environment and
+/// CTM flavour. The source side is checked against both the artifact's
+/// `old_protocol_version` and the live CTM's `protocolVersion()`; the target
+/// side against the artifact's `new_protocol_version`, which each flavour takes
+/// from its own genesis config (`DefaultCTMUpgrade.getNewProtocolVersion()`
+/// returns `chainCreationParams.latestProtocolVersion`).
+///
+/// The environments do not share one pair, so a global constant cannot be right
+/// for all of them:
+///
+/// * Sepolia (testnet, stage) executed v31 from the July calldata — Era
+///   v0.29.4 → v0.31.0, ZKsync OS v0.30.1 → v0.31.0 — and their committed
+///   artifacts record that ceremony.
+/// * Mainnet's Era CTM moved to v0.30.1 at block 25766158, after that calldata
+///   was cut, so the recorded ceremony would revert (`setNewVersionUpgrade old
+///   protocol version mismatch`) and mainnet was re-cut from v0.30.1 against
+///   this branch's genesis lines, which moved independently per flavour: Era
+///   v0.32.2, ZKsync OS v0.31.2.
+/// * ADI is a ZKsync-OS-only ecosystem on L1 mainnet, cut from the same branch
+///   as mainnet.
+///
+/// `tests::expected_versions_match_committed_artifacts` pins this table to the
+/// committed `output/<env>/ecosystem.toml` files.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ExpectedProtocolVersions {
+    pub(crate) old: ProtocolVersion,
+    pub(crate) new: ProtocolVersion,
+}
+
+pub(crate) fn expected_protocol_versions(
+    env: VerifyUpgradeEnv,
+    flavor: CtmFlavor,
+) -> ExpectedProtocolVersions {
+    let (old, new) = match (env, flavor) {
+        (VerifyUpgradeEnv::Stage | VerifyUpgradeEnv::Testnet, CtmFlavor::Era) => {
+            ("0.29.4", "0.31.0")
+        }
+        (VerifyUpgradeEnv::Stage | VerifyUpgradeEnv::Testnet, CtmFlavor::ZksyncOs) => {
+            ("0.30.1", "0.31.0")
+        }
+        (VerifyUpgradeEnv::Mainnet | VerifyUpgradeEnv::Adi, CtmFlavor::Era) => ("0.30.1", "0.32.2"),
+        (VerifyUpgradeEnv::Mainnet | VerifyUpgradeEnv::Adi, CtmFlavor::ZksyncOs) => {
+            ("0.30.1", "0.31.2")
+        }
+    };
+    ExpectedProtocolVersions {
+        old: ProtocolVersion::from_str(old).expect("protocol version literal"),
+        new: ProtocolVersion::from_str(new).expect("protocol version literal"),
+    }
+}
+
 pub(crate) const MAX_NUMBER_OF_ZK_CHAINS: u32 = 100;
 pub(crate) const MAX_PRIORITY_TX_GAS_LIMIT: u32 = 72_000_000;
 
@@ -57,31 +87,18 @@ pub(crate) const MAX_PRIORITY_TX_GAS_LIMIT: u32 = 72_000_000;
 /// `Bridgehub.settlementLayer(chainId) == L1` invariant on stage.
 pub(crate) const STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID: u64 = 270;
 
-pub(crate) fn get_expected_new_protocol_version_for_ctm_flavor(
+pub(crate) fn get_expected_new_protocol_version(
+    env: VerifyUpgradeEnv,
     flavor: CtmFlavor,
 ) -> ProtocolVersion {
-    let version = match flavor {
-        CtmFlavor::Era => EXPECTED_ERA_NEW_PROTOCOL_VERSION_STR,
-        CtmFlavor::ZksyncOs => EXPECTED_ZKSYNC_OS_NEW_PROTOCOL_VERSION_STR,
-    };
-    ProtocolVersion::from_str(version).unwrap()
+    expected_protocol_versions(env, flavor).new
 }
 
-pub(crate) fn get_expected_old_protocol_version_for_ctm_flavor(
+pub(crate) fn get_expected_old_protocol_version(
+    env: VerifyUpgradeEnv,
     flavor: CtmFlavor,
 ) -> ProtocolVersion {
-    let version = match flavor {
-        CtmFlavor::Era => EXPECTED_ERA_OLD_PROTOCOL_VERSION_STR,
-        CtmFlavor::ZksyncOs => EXPECTED_ZKSYNC_OS_OLD_PROTOCOL_VERSION_STR,
-    };
-    ProtocolVersion::from_str(version).unwrap()
-}
-
-pub(crate) fn is_expected_old_protocol_version_for_ctm_flavor(
-    version: ProtocolVersion,
-    flavor: CtmFlavor,
-) -> bool {
-    version == get_expected_old_protocol_version_for_ctm_flavor(flavor)
+    expected_protocol_versions(env, flavor).old
 }
 
 /// Run the full v31 verification pipeline.
@@ -222,4 +239,52 @@ pub(crate) async fn verify(
     result.report_unverified_create2_deployments(&verifiers);
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::common::paths::path_from_root;
+
+    /// The per-env table must describe the ceremonies the committed artifacts
+    /// record; a regen that moves a version has to update both.
+    #[test]
+    fn expected_versions_match_committed_artifacts() {
+        for (env, dir) in [
+            (VerifyUpgradeEnv::Stage, "stage"),
+            (VerifyUpgradeEnv::Testnet, "testnet"),
+            (VerifyUpgradeEnv::Mainnet, "mainnet"),
+        ] {
+            let path = path_from_root(format!(
+                "l1-contracts/upgrade-envs/v0.31.0-interopB/output/{dir}/ecosystem.toml"
+            ));
+            let artifact = EcosystemUpgradeArtifact::read(&path)
+                .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+            assert!(!artifact.ctms.is_empty(), "{dir}: artifact lists no CTMs");
+            for ctm in &artifact.ctms {
+                let expected = expected_protocol_versions(env, ctm.flavor);
+                assert_eq!(
+                    ProtocolVersion::from(U256::from(ctm.contracts_config.old_protocol_version)),
+                    expected.old,
+                    "{dir} {} old_protocol_version",
+                    ctm.flavor.label()
+                );
+                assert_eq!(
+                    ProtocolVersion::from(U256::from(ctm.contracts_config.new_protocol_version)),
+                    expected.new,
+                    "{dir} {} new_protocol_version",
+                    ctm.flavor.label()
+                );
+            }
+        }
+    }
+
+    /// ADI ships no Era CTM and is cut from mainnet's branch: same ZKsync OS pair.
+    #[test]
+    fn adi_follows_mainnet() {
+        assert_eq!(
+            expected_protocol_versions(VerifyUpgradeEnv::Adi, CtmFlavor::ZksyncOs),
+            expected_protocol_versions(VerifyUpgradeEnv::Mainnet, CtmFlavor::ZksyncOs)
+        );
+    }
 }
