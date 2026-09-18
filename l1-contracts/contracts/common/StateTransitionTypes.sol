@@ -6,7 +6,6 @@ pragma solidity ^0.8.21;
 // Gateway CTM deployer contracts. Canonical single source of truth.
 
 /// @notice Diamond facet contract addresses.
-// solhint-disable-next-line gas-struct-packing
 struct Facets {
     /// @notice Address of the Admin facet contract.
     address adminFacet;
@@ -25,7 +24,6 @@ struct Facets {
 }
 
 /// @notice Verifier contract addresses.
-// solhint-disable-next-line gas-struct-packing
 struct Verifiers {
     /// @notice Address of the VerifierFflonk contract. Left unset by deployment tooling for ZKsync OS.
     address verifierFflonk;
@@ -47,7 +45,6 @@ struct StateTransitionContracts {
 
 /// @notice Core Data Availability contract addresses, shared by both
 ///         deploy-scripts (L1 CTM deployment) and Gateway CTM deployer.
-// solhint-disable-next-line gas-struct-packing
 struct DAContracts {
     /// @notice Address of the RollupDAManager contract.
     address rollupDAManager;
@@ -59,7 +56,6 @@ struct DAContracts {
 
 /// @notice Full set of deployed state transition addresses, shared by both
 ///         deploy-scripts (L1 CTM deployment) and Gateway CTM deployer.
-// solhint-disable-next-line gas-struct-packing
 struct StateTransitionDeployedAddresses {
     StateTransitionContracts proxies;
     StateTransitionContracts implementations;
