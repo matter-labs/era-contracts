@@ -4,8 +4,6 @@ pragma solidity 0.8.28;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {Call as GovernanceCall} from "contracts/governance/Common.sol";
-
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
@@ -53,8 +51,8 @@ contract FinalizeUpgrade is Script, IFinalizeUpgrade {
         }
     }
 
-    uint256 constant GAS_PER_TX = 500_000; // Adjust as needed
-    uint256 constant MAX_CALLS_PER_BATCH = 15; // Adjust as needed
+    uint256 internal constant GAS_PER_TX = 500_000; // Adjust as needed
+    uint256 internal constant MAX_CALLS_PER_BATCH = 15; // Adjust as needed
 
     // Helper function to flush calls to aggregator
     function flushBatch(MulticallWithGas _aggregator, MulticallWithGas.Call[] memory _calls, uint256 _count) internal {

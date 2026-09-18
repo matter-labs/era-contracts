@@ -138,7 +138,7 @@ contract SystemContractsProcessingTest is Test {
         );
     }
 
-    function test_factoryDependenciesIncludeTheNewBuiltInImplementations() public {
+    function test_factoryDependenciesIncludeTheNewBuiltInImplementations() public view {
         bytes[] memory factoryDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(new CoreContract[](0));
 
         CoreContract[2] memory builtIns = [CoreContract.L2InteropCommitmentTree, CoreContract.AtomicFlowManager];

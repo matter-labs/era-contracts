@@ -5,13 +5,8 @@ pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
 import {Test} from "forge-std/Test.sol";
-import "forge-std/console.sol";
 import {BridgeMintNotImplemented, Unauthorized} from "contracts/common/L1ContractErrors.sol";
-import {
-    L2_ASSET_ROUTER_ADDR,
-    L2_BRIDGEHUB_ADDR,
-    L2_NATIVE_TOKEN_VAULT_ADDR
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {SharedL2ContractL1Deployer} from "./_SharedL2ContractL1Deployer.sol";
 
 contract L2WethL1Test is Test, SharedL2ContractL1Deployer {
@@ -23,7 +18,8 @@ contract L2WethL1Test is Test, SharedL2ContractL1Deployer {
 
     function test_shouldDepositWethBySendingEth() public {
         uint256 amount = 100;
-        address(weth).call{value: amount}("");
+        (bool success, ) = address(weth).call{value: amount}("");
+        assertTrue(success);
         assertEq(weth.balanceOf(address(this)), amount);
     }
 

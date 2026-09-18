@@ -4,14 +4,8 @@ pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
 import {Vm} from "forge-std/Vm.sol";
-import {Test} from "forge-std/Test.sol";
-import "forge-std/console.sol";
 
-import {
-    L2_INTEROP_CENTER_ADDR,
-    L2_INTEROP_HANDLER,
-    L2_INTEROP_HANDLER_ADDR
-} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_INTEROP_HANDLER, L2_INTEROP_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {InteropBundle} from "contracts/common/Messaging.sol";
 import {AtomicFinalityProof} from "contracts/atomic-interop/IAtomicInterop.sol";
 
@@ -23,7 +17,14 @@ abstract contract L2InteropExecuteBundleTestAbstract is L2InteropTestUtils {
         vm.deal(address(this), 1000 ether);
         vm.recordLogs();
 
-        InteropLibrary.sendNative(destinationChainId, interopTargetContract, UNBUNDLER_ADDRESS, 100, false, bytes32(0));
+        InteropLibrary.sendNative({
+            destinationChainId: destinationChainId,
+            recipient: interopTargetContract,
+            unbundlerAddress: UNBUNDLER_ADDRESS,
+            amount: 100,
+            useFixedFee: false,
+            salt: bytes32(0)
+        });
         Vm.Log[] memory logs1 = vm.getRecordedLogs();
 
         // Verify the first bundle emission
@@ -52,14 +53,14 @@ abstract contract L2InteropExecuteBundleTestAbstract is L2InteropTestUtils {
 
         // Distinct salt for the wrapper bundle: both sends originate from `address(this)` and InteropCenter
         // enforces a unique (sender, salt) pair.
-        InteropLibrary.sendDirectCall(
-            destinationChainId,
-            L2_INTEROP_HANDLER_ADDR,
-            abi.encodeCall(L2_INTEROP_HANDLER.executeAtomicBundle, (bundle, proof)),
-            EXECUTION_ADDRESS,
-            UNBUNDLER_ADDRESS,
-            bytes32(uint256(1))
-        );
+        InteropLibrary.sendDirectCall({
+            destination: destinationChainId,
+            target: L2_INTEROP_HANDLER_ADDR,
+            data: abi.encodeCall(L2_INTEROP_HANDLER.executeAtomicBundle, (bundle, proof)),
+            executionAddress: EXECUTION_ADDRESS,
+            unbundlerAddress: UNBUNDLER_ADDRESS,
+            salt: bytes32(uint256(1))
+        });
         Vm.Log[] memory logs2 = vm.getRecordedLogs();
 
         // Verify the wrapped bundle emission

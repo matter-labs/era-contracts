@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
-import "forge-std/console.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "contracts/common/Config.sol";
@@ -17,7 +16,6 @@ import {
     L2_BASE_TOKEN_SYSTEM_CONTRACT,
     L2_BRIDGEHUB_ADDR,
     L2_CHAIN_ASSET_HANDLER_ADDR,
-    L2_COMPLEX_UPGRADER_ADDR,
     L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_HANDLER_ADDR,
     L2_INTEROP_HANDLER,
@@ -52,14 +50,12 @@ import {
     INTEROP_CALL_VERSION,
     InteropBundle,
     InteropCall,
-    InteropCallStarter,
     L2Message,
     MessageInclusionProof
 } from "contracts/common/Messaging.sol";
 
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
-import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 
 abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
@@ -147,7 +143,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         assertTrue(result, "Message verification should succeed");
     }
 
-    function test_l2MessageInclusion() public {
+    function test_l2MessageInclusion() public pure {
         // Real proof captured for chainId 271, L1 batch 26, message index 0.
         // Encoded as abi.encode of proveL2MessageInclusionShared's argument tuple:
         // (uint256 chainId, uint256 l1BatchNumber, uint256 l2MessageIndex, L2Message message, bytes32[] proof).

@@ -185,7 +185,6 @@ abstract contract NativeTokenVaultBase is
         address receiver;
         uint256 amount;
         (receiver, amount) = _bridgeMintToken(_chainId, _assetId, _data);
-        // solhint-disable-next-line func-named-parameters
         emit BridgeMint(_chainId, _assetId, receiver, amount);
     }
 
@@ -211,7 +210,6 @@ abstract contract NativeTokenVaultBase is
             _originToken: originTokenAddress,
             _erc20Data: erc20Data
         });
-        // solhint-disable-next-line func-named-parameters
         emit BridgeRecoverFailedTransfer(_chainId, _assetId, originalCaller, amount);
     }
 

@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-// solhint-disable no-console, gas-custom-errors
-
 import {stdJson} from "forge-std/StdJson.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
@@ -11,6 +9,8 @@ import {ChainCreationParamsConfig} from "../utils/Types.sol";
 library ChainCreationParamsLib {
     using stdJson for string;
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
+    // `vm` is forge-std's cheatcode handle; the lowercase name is forge's own convention.
+    // solhint-disable-next-line const-name-snakecase
     Vm internal constant vm = Vm(VM_ADDRESS);
 
     function getChainCreationParams(

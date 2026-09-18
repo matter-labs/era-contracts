@@ -331,7 +331,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
 
     /// @dev Both built-ins seeded exactly once: the tree holds its sentinel leaf and the manager the L1
     ///      chain id. `initL2` reverts on a second call, so reaching this state twice is impossible.
-    function _assertAtomicInteropInitialized() internal {
+    function _assertAtomicInteropInitialized() internal view {
         assertEq(L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafCount(), 1, "tree not seeded");
         assertEq(
             AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).L1_CHAIN_ID(),
@@ -411,8 +411,8 @@ contract MockL2ContractDeployer {
     function setBytecodeDetailsEVM(
         address _addr,
         bytes32 _bytecodeHash,
-        uint32 _bytecodeLength,
-        bytes32 _observableBytecodeHash
+        uint32 /* _bytecodeLength */,
+        bytes32 /* _observableBytecodeHash */
     ) external {
         deploymentCount[_addr]++;
         lastBytecodeHash[_addr] = _bytecodeHash;
@@ -516,13 +516,13 @@ contract MockContract {
     // L2Bridgehub.updateL2
     function updateL2(uint256, address, uint256) external {}
 
-    function deployUpgradeableBeacon(address) external returns (address) {
+    function deployUpgradeableBeacon(address) external pure returns (address) {
         return makeAddr("upgradeableBeacon");
     }
 
     function setAddresses(address, address, address, address) external {}
 
-    function WETH_TOKEN() external view returns (address) {
+    function WETH_TOKEN() external pure returns (address) {
         return makeAddr("wethToken");
     }
 

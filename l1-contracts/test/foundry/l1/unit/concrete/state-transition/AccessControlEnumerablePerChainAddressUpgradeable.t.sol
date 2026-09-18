@@ -7,20 +7,20 @@ import {DefaultAdminTransferNotAllowed, RoleAccessDenied} from "contracts/common
 
 // Mock implementation for testing
 contract MockAccessControlEnumerable is AccessControlEnumerablePerChainAddressUpgradeable {
-    function _getChainAdmin(address _chainAddress) internal view override returns (address) {
+    function _getChainAdmin(address _chainAddress) internal pure override returns (address) {
         return _chainAddress; // For testing, we'll use the chain address as its admin
     }
 }
 
 contract AccessControlEnumerablePerChainAddressUpgradeableTest is Test {
-    MockAccessControlEnumerable accessControl;
+    MockAccessControlEnumerable internal accessControl;
 
-    address chainAddress1;
-    address chainAddress2;
-    address account1;
-    address account2;
-    bytes32 role1 = keccak256("ROLE_1");
-    bytes32 role2 = keccak256("ROLE_2");
+    address internal chainAddress1;
+    address internal chainAddress2;
+    address internal account1;
+    address internal account2;
+    bytes32 internal role1 = keccak256("ROLE_1");
+    bytes32 internal role2 = keccak256("ROLE_2");
 
     event RoleGranted(address indexed chainAddress, bytes32 indexed role, address indexed account);
     event RoleRevoked(address indexed chainAddress, bytes32 indexed role, address indexed account);
@@ -31,7 +31,7 @@ contract AccessControlEnumerablePerChainAddressUpgradeableTest is Test {
         bytes32 newAdminRole
     );
 
-    bytes32 constant DEFAULT_ADMIN_ROLE = bytes32(0);
+    bytes32 internal constant DEFAULT_ADMIN_ROLE = bytes32(0);
 
     function setUp() public {
         chainAddress1 = makeAddr("chainAddress1");
@@ -231,7 +231,7 @@ contract AccessControlEnumerablePerChainAddressUpgradeableTest is Test {
         accessControl.getRoleMember(chainAddress1, role1, 0);
     }
 
-    function test_EnumerationFunctionsOnDefaultAdminRole() public {
+    function test_EnumerationFunctionsOnDefaultAdminRole() public view {
         assertEq(accessControl.getRoleMember(chainAddress1, DEFAULT_ADMIN_ROLE, 0), chainAddress1);
         assertEq(accessControl.getRoleMemberCount(chainAddress1, DEFAULT_ADMIN_ROLE), 1);
     }

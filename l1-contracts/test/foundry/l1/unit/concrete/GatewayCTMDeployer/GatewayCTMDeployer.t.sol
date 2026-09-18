@@ -24,7 +24,6 @@ import {
     GatewayCTMDeployerHelper,
     DeployerCreate2Calldata,
     DeployerAddresses,
-    DirectDeployedAddresses,
     DirectCreate2Calldata
 } from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
@@ -37,7 +36,7 @@ import {
 
 /// @notice Tester contract that deploys via the deterministic CREATE2 factory (Arachnid's)
 contract GatewayCTMDeployerTester {
-    address constant DETERMINISTIC_CREATE2_ADDRESS = Utils.DETERMINISTIC_CREATE2_ADDRESS;
+    address internal constant DETERMINISTIC_CREATE2_ADDRESS = Utils.DETERMINISTIC_CREATE2_ADDRESS;
 
     /// @notice Converts raw 20-byte return data to address
     /// @dev Arachnid's CREATE2 factory returns raw 20 bytes, not ABI-encoded
@@ -107,7 +106,7 @@ contract GatewayCTMDeployerTester {
 
 /// @notice Tests the Gateway CTM deployment flow.
 contract GatewayCTMDeployerTest is Test {
-    GatewayCTMDeployerConfig deployerConfig;
+    GatewayCTMDeployerConfig internal deployerConfig;
 
     function setUp() external {
         // Deploy the deterministic CREATE2 factory at the expected address

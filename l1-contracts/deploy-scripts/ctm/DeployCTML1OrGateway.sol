@@ -61,7 +61,6 @@ library DeployCTML1OrGateway {
 
     // ======================== Creation calldata ========================
 
-    // solhint-disable-next-line code-complexity
     function getCreationCalldata(
         CTMCoreDeploymentConfig memory _config,
         CTMContract _contractName
@@ -104,7 +103,6 @@ library DeployCTML1OrGateway {
     }
 
     /// @notice Convert a resolved contract name string to the corresponding CTMContract enum value.
-    // solhint-disable-next-line code-complexity
     function getCTMContractFromName(string memory _contractName) internal pure returns (CTMContract) {
         if (_compareStrings(_contractName, "AdminFacet")) {
             return CTMContract.AdminFacet;
@@ -149,7 +147,6 @@ library DeployCTML1OrGateway {
     // ======================== Private helpers ========================
 
     /// @notice Resolve a CTMContract enum to its contract name.
-    // solhint-disable-next-line code-complexity
     function _resolveCTMContractName(CTMContract _c) private pure returns (string memory) {
         if (_c == CTMContract.ChainTypeManager) {
             return "ChainTypeManager";

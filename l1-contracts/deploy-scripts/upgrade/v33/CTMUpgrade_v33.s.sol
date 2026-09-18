@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// solhint-disable no-console, gas-custom-errors
-
 import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
@@ -12,8 +10,6 @@ import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisFo
 import {IL2V32Upgrade} from "contracts/upgrades/IL2V32Upgrade.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-
-import {Call} from "contracts/governance/Common.sol";
 
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {DeployCTMUtils} from "../../ctm/DeployCTMUtils.s.sol";
@@ -36,6 +32,8 @@ import {CoreContract} from "../../ecosystem/CoreContract.sol";
 ///      `L2V32Upgrade`: this release was developed as v32 and renumbered to v33 when genesis moved
 ///      to `0.33.0`. The contracts are the v33 payload; only their names lag, and renaming them
 ///      would churn the bytecode vendored by zksync-os-server.
+// The name is a forge script target hardcoded in protocol-ops; renaming it breaks that caller.
+// solhint-disable-next-line contract-name-capwords
 contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
     /// @notice Priority-op lower-bound registry, deployed alongside the per-chain upgrade contract
     ///         which embeds it as an immutable. Lives here rather than in `DeployCTMUtils` because

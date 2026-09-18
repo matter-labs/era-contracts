@@ -4,12 +4,7 @@ pragma solidity 0.8.28;
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 
 import {GatewayVotePreparation} from "deploy-scripts/gateway/GatewayVotePreparation.s.sol";
-import {
-    GatewayCTMDeployerHelper,
-    DeployerCreate2Calldata,
-    DeployerAddresses,
-    DirectCreate2Calldata
-} from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
+import {GatewayCTMDeployerHelper, DirectCreate2Calldata} from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
 import {
     DeployedContracts,
     GatewayCTMDeployerConfig
@@ -53,9 +48,9 @@ contract GatewayVotePreparationForTest is GatewayVotePreparation {
 /// @dev Deploys the full L1 environment (bridgehub, CTM, era chain), then calls through
 /// GatewayVotePreparation's initialization path and exercises calculateAddresses.
 contract GatewayVotePreparationTests is ZKChainDeployer {
-    GatewayVotePreparationForTest votePreparationScript;
+    GatewayVotePreparationForTest internal votePreparationScript;
 
-    uint256 constant GATEWAY_CHAIN_ID = 506;
+    uint256 internal constant GATEWAY_CHAIN_ID = 506;
     string internal constant GATEWAY_VOTE_PREPARATION_CONFIG_PATH =
         "/script-out/foundry-gateway-vote-preparation/config.toml";
     string internal constant GATEWAY_VOTE_PREPARATION_OUTPUT_PATH =
@@ -215,6 +210,8 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
             bytes32(uint256(uint160(mockCTM))) // chainTypeManager
         );
         assertEq(diamondCut.initCalldata.length, 0, "chain-creation init tail must be empty");
+        // `string.concat` is variadic, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         bytes memory initData2 = bytes.concat(
             bytes32(config.protocolVersion), // protocolVersion
             bytes32(uint256(uint160(address(0xAD01)))), // admin

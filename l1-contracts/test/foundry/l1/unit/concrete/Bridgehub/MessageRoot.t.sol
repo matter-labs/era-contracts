@@ -40,11 +40,11 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
 );
 
 contract MessageRootTest is Test {
-    address bridgeHub;
-    L1MessageRoot messageRoot;
-    L2MessageRoot l2MessageRoot;
-    uint256 L1_CHAIN_ID;
-    address assetTracker;
+    address internal bridgeHub;
+    L1MessageRoot internal messageRoot;
+    L2MessageRoot internal l2MessageRoot;
+    uint256 internal L1_CHAIN_ID;
+    address internal assetTracker;
 
     function setUp() public {
         bridgeHub = makeAddr("bridgeHub");
@@ -137,7 +137,7 @@ contract MessageRootTest is Test {
         );
     }
 
-    function test_init() public {
+    function test_init() public view {
         // The settlement layer's own entry starts with an empty chain tree: there is no diamond to
         // report a genesis root for the layer itself, and interop proofs never target it.
         assertEq(messageRoot.getAggregatedRoot(), (MessageHashing.chainIdLeafHash(bytes32(0), block.chainid)));
@@ -253,7 +253,6 @@ contract MessageRootTest is Test {
 
     function test_RevertWhen_addChainNotBridgeHub() public {
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
-        uint256 betaChainId = uint256(uint160(makeAddr("betaChainId")));
 
         assertFalse(messageRoot.chainRegistered(alphaChainId), "alpha chain 1");
 
@@ -485,7 +484,7 @@ contract MessageRootTest is Test {
         assertEq(finalBatchNumber, 3, "Final batch number should be 3");
 
         // No root assertion: the value depends on the tree implementation; the call just must not revert.
-        bytes32 finalChainRoot = messageRoot.getChainRoot(alphaChainId);
+        messageRoot.getChainRoot(alphaChainId);
     }
 
     /// @notice Verify that multiple _emitRoot calls within the same block share the same logId.

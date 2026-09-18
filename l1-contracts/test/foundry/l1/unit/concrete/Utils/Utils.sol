@@ -14,12 +14,7 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
 
-import {
-    FeeParams,
-    IVerifier,
-    PubdataPricingMode,
-    VerifierParams
-} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {IVerifier} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
@@ -27,7 +22,6 @@ import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfac
 import {InteropRoot, L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
-import {Utils as DeployUtils} from "deploy-scripts/utils/Utils.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {ContractsBytecodesLib} from "deploy-scripts/utils/bytecode/ContractsBytecodesLib.sol";
 
@@ -350,7 +344,7 @@ library Utils {
         return address(diamondProxy);
     }
 
-    function makeEmptyL2CanonicalTransaction() public returns (L2CanonicalTransaction memory) {
+    function makeEmptyL2CanonicalTransaction() public pure returns (L2CanonicalTransaction memory) {
         uint256[4] memory reserved;
         uint256[] memory factoryDeps = new uint256[](1);
         return
@@ -399,7 +393,6 @@ library Utils {
         uint256 priorityOpsLength
     ) internal pure returns (PriorityOpsBatchInfo[] memory _ops) {
         _ops = new PriorityOpsBatchInfo[](len);
-        bytes32[] memory empty;
         bytes32[] memory hashes = new bytes32[](priorityOpsLength);
         for (uint256 i = 0; i < priorityOpsLength; ++i) {
             hashes[i] = keccak256(abi.encodePacked("hash", i));

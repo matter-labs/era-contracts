@@ -2,13 +2,7 @@
 pragma solidity ^0.8.10;
 
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
-import {
-    Facets,
-    Verifiers,
-    StateTransitionContracts,
-    StateTransitionDeployedAddresses,
-    DAContracts
-} from "contracts/common/StateTransitionTypes.sol";
+import {StateTransitionDeployedAddresses, DAContracts} from "contracts/common/StateTransitionTypes.sol";
 
 /// @dev First protocol version whose production verifier exports the testnet-verifier flag
 /// (`isTestnetVerifier()`). Earlier production verifiers export no flag; v31/v32/v33 testnet
@@ -55,7 +49,6 @@ struct BridgeContracts {
     address l1InteropHandler;
 }
 
-// solhint-disable-next-line gas-struct-packing
 struct BridgesDeployedAddresses {
     BridgeContracts proxies;
     BridgeContracts implementations;
@@ -73,7 +66,6 @@ struct L1CoreAdminAddresses {
     address create2Factory;
 }
 
-// solhint-disable-next-line gas-struct-packing
 struct CoreDeployedAddresses {
     BridgehubAddresses bridgehub;
     BridgesDeployedAddresses bridges;

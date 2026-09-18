@@ -9,7 +9,6 @@ import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol"
 import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {CTMDeploymentTracker} from "contracts/core/ctm-deployment/CTMDeploymentTracker.sol";
 
 import {
     L2_ASSET_ROUTER_ADDR,
@@ -24,8 +23,7 @@ import {
     L2_INTEROP_ROOT_STORAGE,
     L2_MESSAGE_ROOT_ADDR,
     L2_MESSAGE_VERIFICATION,
-    L2_NATIVE_TOKEN_VAULT_ADDR,
-    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
+    L2_NATIVE_TOKEN_VAULT_ADDR
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {L2_INTEROP_ACCOUNT_ADDR} from "../l2-tests-abstract/Utils.sol";
 
@@ -45,14 +43,12 @@ import {DummyL2InteropRootStorage} from "../../../../../contracts/dev-contracts/
 
 import {InteropCenter} from "../../../../../contracts/interop/InteropCenter.sol";
 import {L2InteropHandler} from "../../../../../contracts/interop/interop-handler/L2InteropHandler.sol";
-import {DummyL2L1Messenger} from "../../../../../contracts/dev-contracts/test/DummyL2L1Messenger.sol";
 
 import {DummyL2BaseTokenHolder} from "../../../../../contracts/dev-contracts/test/DummyL2BaseTokenHolder.sol";
 import {DummyL2InteropAccount} from "../../../../../contracts/dev-contracts/test/DummyL2InteropAccount.sol";
 
 import {SystemContractsArgs} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {TokenBridgingData, TokenMetadata} from "contracts/common/Messaging.sol";
-import {L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 library L2UtilsBase {
     using stdToml for string;
@@ -60,6 +56,8 @@ library L2UtilsBase {
 
     // Cheatcodes address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
+    // `vm` is forge-std's cheatcode handle; the lowercase name is forge's own convention.
+    // solhint-disable-next-line const-name-snakecase
     Vm internal constant vm = Vm(VM_ADDRESS);
 
     /// @dev We provide a fast form of debugging the L2 contracts using L1 foundry. We also test using zk foundry.
@@ -185,18 +183,18 @@ library L2UtilsBase {
             vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, ntv.code);
 
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-            L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).initL2(
-                _args.l1ChainId,
-                _args.aliasedOwner,
-                _args.l2TokenBeacon,
-                wethToken,
-                TokenBridgingData({
+            L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).initL2({
+                _l1ChainId: _args.l1ChainId,
+                _aliasedOwner: _args.aliasedOwner,
+                _bridgedTokenBeacon: _args.l2TokenBeacon,
+                _wethToken: wethToken,
+                _baseTokenBridgingData: TokenBridgingData({
                     assetId: baseTokenAssetId,
                     originChainId: _args.l1ChainId,
                     originToken: ETH_TOKEN_ADDRESS
                 }),
-                TokenMetadata({name: "Ether", symbol: "ETH", decimals: 18})
-            );
+                _baseTokenMetadata: TokenMetadata({name: "Ether", symbol: "ETH", decimals: 18})
+            });
             L2NativeTokenVaultDev(L2_NATIVE_TOKEN_VAULT_ADDR).deployBridgedStandardERC20(_args.aliasedOwner);
 
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);

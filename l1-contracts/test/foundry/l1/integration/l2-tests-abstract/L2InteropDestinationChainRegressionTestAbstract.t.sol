@@ -3,20 +3,13 @@
 pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
-import {Test} from "forge-std/Test.sol";
-import "forge-std/console.sol";
-
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {DestinationChainNotRegistered} from "contracts/interop/InteropErrors.sol";
 
-import {
-    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-    L2_BRIDGEHUB_ADDR,
-    L2_INTEROP_CENTER
-} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 

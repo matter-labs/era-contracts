@@ -215,7 +215,7 @@ contract DataEncodingTest is Test {
         assertEq(encoded[0], NEW_ENCODING_VERSION);
     }
 
-    function test_decodeTokenData_newEncodingVersion() public {
+    function test_decodeTokenData_newEncodingVersion() public view {
         uint256 chainId = 42;
         bytes memory name = abi.encode("TestToken");
         bytes memory symbol = abi.encode("TT");

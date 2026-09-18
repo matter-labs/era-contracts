@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "gas-calldata-parameters": "error",
+    "gas-increment-by-one": "error",
+    "gas-length-in-loops": "error",
+    "gas-struct-packing": "error",
+    "immutable-vars-naming": "off",
+    "reason-string": "error"
+  }
+}

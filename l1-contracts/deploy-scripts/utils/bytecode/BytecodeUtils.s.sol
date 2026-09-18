@@ -6,6 +6,8 @@ import {Vm} from "forge-std/Vm.sol";
 library BytecodeUtils {
     // Cheatcodes address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
+    // `vm` is forge-std's cheatcode handle; the lowercase name is forge's own convention.
+    // solhint-disable-next-line const-name-snakecase
     Vm internal constant vm = Vm(VM_ADDRESS);
 
     /**
@@ -14,6 +16,8 @@ library BytecodeUtils {
     function readDAContractBytecode(string memory contractIdentifier) internal view returns (bytes memory) {
         return
             readFoundryBytecode(
+                // `string.concat` is variadic, so named arguments are not possible.
+                // solhint-disable-next-line func-named-parameters
                 string.concat("/../da-contracts/out/", contractIdentifier, ".sol/", contractIdentifier, ".json")
             );
     }
@@ -38,6 +42,8 @@ library BytecodeUtils {
         string memory fileName,
         string memory contractName
     ) private view returns (bytes memory) {
+        // `string.concat` is variadic, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         string memory path = string.concat("/../l1-contracts/out/", fileName, "/", contractName, ".json");
         return readFoundryBytecode(path);
     }
@@ -56,6 +62,8 @@ library BytecodeUtils {
         string memory _fileName,
         string memory _contractName
     ) internal view returns (bytes memory) {
+        // `string.concat` is variadic, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         string memory path = string.concat("/../l1-contracts/out/", _fileName, "/", _contractName, ".json");
         return readFoundryDeployedBytecode(path);
     }

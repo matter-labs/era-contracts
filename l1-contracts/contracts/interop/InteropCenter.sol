@@ -497,7 +497,6 @@ contract InteropCenter is
             // Store original attributes for MessageSent event emission.
             originalCallAttributes[i] = _callStarters[i].callAttributes;
 
-            // solhint-disable-next-line no-unused-vars
             (CallAttributes memory callAttributes, ) = parseAttributes(
                 _callStarters[i].callAttributes,
                 AttributeParsingRestrictions.OnlyCallAttributes
@@ -509,7 +508,6 @@ contract InteropCenter is
             });
         }
 
-        // solhint-disable-next-line no-unused-vars
         (, bundleAttributes) = parseAttributes(_bundleAttributes, AttributeParsingRestrictions.OnlyBundleAttributes);
 
         // If the unbundler was not set for a bundle, we set the unbundler to be equal to the original sender, so
@@ -779,7 +777,6 @@ contract InteropCenter is
             InteropCallStarter memory actualCallStarter = IL2CrossChainSender(recipientAddress).initiateIndirectCall{
                 value: _callStarter.callAttributes.indirectCallMessageValue
             }(_destinationChainId, msg.sender, _callStarter.callAttributes.interopCallValue, _callStarter.data);
-            // solhint-disable-next-line no-unused-vars
             // slither-disable-next-line unused-return
             (CallAttributes memory indirectCallAttributes, ) = _parser().parseAttributes(
                 actualCallStarter.callAttributes,

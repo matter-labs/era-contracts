@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.28;
+
 import {stdToml} from "forge-std/StdToml.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
@@ -137,15 +140,15 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         // revert if we tried to derive the diamond-cut data on the fly.
         // `initializeConfig` preloads `gatewayDiamondCutData` from TOML, so we
         // pass the cached value directly to `migrateChainToGatewayWithCutData`.
-        adminScript.migrateChainToGatewayWithCutData(
-            _gatewayGovernanceConfig.bridgehubProxy,
-            _getL1GasPrice(),
-            migratingChainId,
-            _gatewayGovernanceConfig.gatewayChainId,
-            gatewayDiamondCutData,
-            msg.sender,
-            true
-        );
+        adminScript.migrateChainToGatewayWithCutData({
+            _bridgehub: _gatewayGovernanceConfig.bridgehubProxy,
+            _l1GasPrice: _getL1GasPrice(),
+            _l2ChainId: migratingChainId,
+            _gatewayChainId: _gatewayGovernanceConfig.gatewayChainId,
+            _gatewayDiamondCutData: gatewayDiamondCutData,
+            _refundRecipient: msg.sender,
+            _shouldSend: true
+        });
     }
 
     function fullGatewayRegistration() public {
@@ -211,7 +214,7 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         // This sets isMigrationInProgress[chainId] = true and pausedDepositsTimestamp on the diamond proxy.
         // Capture the canonical L2 tx hash returned by the function.
         vm.startBroadcast(chainAdmin);
-        bytes32 canonicalTxHash = bridgehub.requestL2TransactionTwoBridges{value: requiredValue}(
+        bridgehub.requestL2TransactionTwoBridges{value: requiredValue}(
             L2TransactionRequestTwoBridgesOuter({
                 chainId: _gatewayGovernanceConfig.gatewayChainId,
                 mintValue: requiredValue,
@@ -282,7 +285,7 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         initializeConfig();
     }
 
-    function _getL1GasPrice() internal view returns (uint256) {
+    function _getL1GasPrice() internal pure returns (uint256) {
         return 10;
     }
 

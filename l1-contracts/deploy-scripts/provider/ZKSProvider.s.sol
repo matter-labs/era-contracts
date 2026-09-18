@@ -1,16 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-// solhint-disable no-console, gas-custom-errors, reason-string
-
 import {Script, console2 as console} from "forge-std/Script.sol";
-
-import {stdJson} from "forge-std/StdJson.sol";
 
 import {FinalizeL1DepositParams, MessageInclusionProof, L2Message} from "contracts/common/Messaging.sol";
 import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
 import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";
-import {Utils} from "../utils/Utils.sol";
 import {
     AltL2ToL1Log,
     AltLog,
@@ -82,13 +77,13 @@ contract ZKSProvider is Script {
         // IL1AssetRouter assetRouter = IL1AssetRouter(bridgehub.assetRouter());
         // IL1Nullifier nullifier = IL1Nullifier(assetRouter.L1_NULLIFIER());
         IMessageRootBase messageRoot = IMessageRootBase(bridgehub.messageRoot());
-        ProofData memory proofData = messageRoot.getProofData(
-            params.chainId,
-            params.l2BatchNumber,
-            params.l2MessageIndex,
-            bytes32(0),
-            params.merkleProof
-        );
+        ProofData memory proofData = messageRoot.getProofData({
+            _chainId: params.chainId,
+            _batchNumber: params.l2BatchNumber,
+            _leafProofMask: params.l2MessageIndex,
+            _leaf: bytes32(0),
+            _proof: params.merkleProof
+        });
 
         // console.log("proofData");
         uint256 actualChainId = chainId;
@@ -255,11 +250,14 @@ contract ZKSProvider is Script {
         args[5] = "--header";
         args[6] = "Content-Type: application/json";
         args[7] = "--data";
+        // Single quotes keep the JSON-RPC payload's inner quotes unescaped.
+        // solhint-disable quotes
         args[8] = string.concat(
             '{"jsonrpc":"2.0","method":"eth_getTransactionReceipt","params":["',
             vm.toString(txHash),
             '"],"id":1}'
         );
+        // solhint-enable quotes
 
         bytes memory result = vm.ffi(args);
 
@@ -280,6 +278,10 @@ contract ZKSProvider is Script {
         args[5] = "--header";
         args[6] = "Content-Type: application/json";
         args[7] = "--data";
+        // Single quotes keep the JSON-RPC payload's inner quotes unescaped.
+        // solhint-disable quotes
+        // `string.concat` is variadic, so named arguments are not possible.
+        // solhint-disable-next-line func-named-parameters
         args[8] = string.concat(
             '{"jsonrpc":"2.0","id":1,"method":"zks_getL2ToL1LogProof","params":["',
             vm.toString(txHash),
@@ -287,9 +289,12 @@ contract ZKSProvider is Script {
             vm.toString(logIndex),
             "]}"
         ); // todo later: add ,"proof_based_gw" for interop
+        // solhint-enable quotes
         // Execute RPC call
 
         bytes memory nullProofBytes = "0x7b226a736f6e727063223a22322e30222c226964223a312c22726573756c74223a6e756c6c7d";
+        // Single quotes keep the JSON payload's inner quotes unescaped.
+        // solhint-disable-next-line quotes
         string memory nullProofString2 = '{"jsonrpc":"2.0","id":1,"result":null}';
         bytes memory result = nullProofBytes;
         while (

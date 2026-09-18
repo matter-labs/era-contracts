@@ -9,7 +9,7 @@ import {
 } from "../../state-transition/libraries/PriorityTree.sol";
 
 contract PriorityTreeTest {
-    PriorityTree.Tree priorityTree;
+    PriorityTree.Tree internal priorityTree;
 
     constructor() {
         PriorityTree.setup(priorityTree, 0);

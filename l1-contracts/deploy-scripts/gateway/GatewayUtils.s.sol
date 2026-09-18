@@ -1,35 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// solhint-disable no-console, gas-custom-errors, reason-string
-
-import {Script, console2 as console} from "forge-std/Script.sol";
-import {Vm} from "forge-std/Vm.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {Script} from "forge-std/Script.sol";
 import {
     IGatewayUtils,
     FinishMigrateChainToGatewayParams,
     FinishMigrateChainToGatewayWithCutDataParams
 } from "contracts/script-interfaces/IGatewayUtils.sol";
 
-// It's required to disable lints to force the compiler to compile the contracts
-// solhint-disable no-unused-import
-
-import {BridgehubBurnCTMAssetData, IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {BridgehubBurnCTMAssetData} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {Utils} from "../utils/Utils.sol";
 
-import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";
 import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
-import {ConfirmTransferResultData, TxStatus, MessageInclusionProof, L2Message} from "contracts/common/Messaging.sol";
+import {ConfirmTransferResultData, MessageInclusionProof, L2Message} from "contracts/common/Messaging.sol";
 import {GetDiamondCutData} from "../utils/GetDiamondCutData.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway

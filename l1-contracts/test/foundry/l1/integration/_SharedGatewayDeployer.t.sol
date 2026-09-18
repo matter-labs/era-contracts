@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {GatewayPreparationForTests} from "./_GatewayPreparationForTests.sol";
 
-import "@openzeppelin/contracts-v4/utils/Strings.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -12,7 +11,7 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 import {L1ChainAssetHandlerDev} from "contracts/dev-contracts/L1ChainAssetHandlerDev.sol";
 
 contract GatewayDeployer is L1ContractDeployer {
-    GatewayPreparationForTests gatewayScript;
+    GatewayPreparationForTests internal gatewayScript;
 
     /// @dev v32 disables chain migrations in production (`CHAIN_MIGRATIONS_ENABLED` in `Config.sol`;
     /// see {protocol-docs/chain-lifecycle.md#v32-chain-migrations-are-explicitly-disabled}), but the gateway tests exercise the migration machinery

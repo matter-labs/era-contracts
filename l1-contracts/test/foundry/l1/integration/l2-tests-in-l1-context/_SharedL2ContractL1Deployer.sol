@@ -2,12 +2,11 @@
 pragma solidity 0.8.28;
 
 import {StdStorage, stdStorage, stdToml} from "forge-std/Test.sol";
-import {Script, console2 as console} from "forge-std/Script.sol";
+import {console2 as console} from "forge-std/Script.sol";
 
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_BRIDGEHUB_ADDR,
-    L2_INTEROP_CENTER_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
@@ -41,7 +40,7 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         deployL2ContractsInner(_l1ChainId, false);
     }
 
-    function deployL2ContractsInner(uint256 _l1ChainId, bool _skip) public {
+    function deployL2ContractsInner(uint256 _l1ChainId, bool /* _skip */) public {
         string memory root = vm.projectRoot();
         string memory CONTRACTS_PATH = vm.envString("CONTRACTS_PATH");
         string memory inputPath = string.concat(

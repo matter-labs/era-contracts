@@ -9,7 +9,6 @@ import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddres
 import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {Test} from "forge-std/Test.sol";
-import "forge-std/console.sol";
 
 import {L2_INTEROP_HANDLER, L2_INTEROP_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -39,8 +38,8 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
     /// @dev Token amount the atomic integration fixtures move.
     uint256 internal constant TRANSFER_AMOUNT = 100;
 
-    uint256 destinationChainId = INTEROP_DESTINATION_CHAIN_ID;
-    bytes32 destinationBaseTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
+    uint256 internal destinationChainId = INTEROP_DESTINATION_CHAIN_ID;
+    bytes32 internal destinationBaseTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
 
     /// @dev The AtomicFlowManager `append`/`requireFlowFinalized` gates are mocked to succeed in
     /// {SharedL2ContractDeployer.setUp}; the real gates are covered by the atomic suites and, on a
@@ -80,7 +79,7 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
         result = executeBundle(data, executionAddress, _destinationChainId);
     }
 
-    function extractFirstBundleFromLogs(Vm.Log[] memory logs) internal returns (bytes memory data) {
+    function extractFirstBundleFromLogs(Vm.Log[] memory logs) internal view returns (bytes memory data) {
         for (uint256 i = 0; i < logs.length; i++) {
             if (
                 logs[i].emitter == address(l2InteropCenter) &&
@@ -100,10 +99,7 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
         address executionAddress,
         uint256 _destinationChainId
     ) internal returns (BundleExecutionResult memory result) {
-        (bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle memory interopBundle) = abi.decode(
-            logsData,
-            (bytes32, bytes32, InteropBundle)
-        );
+        (, , InteropBundle memory interopBundle) = abi.decode(logsData, (bytes32, bytes32, InteropBundle));
         bytes memory bundle = abi.encode(interopBundle);
 
         // Finality is proven via the AtomicFlowManager's IMT gate, mocked to succeed here (the real

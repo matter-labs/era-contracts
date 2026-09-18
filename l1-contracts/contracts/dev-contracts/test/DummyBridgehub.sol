@@ -8,7 +8,6 @@ import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddr
 import {IMessageRootBase} from "../../core/message-root/IMessageRoot.sol";
 import {L2TransactionRequestDirect} from "../../core/bridgehub/IBridgehubBase.sol";
 import {IAssetRouterShared} from "../../bridge/asset-router/IAssetRouterShared.sol";
-import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 
 /// @title DummyBridgehub
@@ -49,7 +48,7 @@ contract DummyBridgehub {
         return zkChain;
     }
 
-    function getAllZKChainChainIDs() external view returns (uint256[] memory) {
+    function getAllZKChainChainIDs() external pure returns (uint256[] memory) {
         uint256[] memory allZKChainChainIDs = new uint256[](0);
         // allZKChainChainIDs[0] = 271;
         return allZKChainChainIDs;
@@ -67,7 +66,7 @@ contract DummyBridgehub {
         return sharedBridge;
     }
 
-    function settlementLayer(uint256) external view returns (uint256) {
+    function settlementLayer(uint256) external pure returns (uint256) {
         return 0;
     }
 

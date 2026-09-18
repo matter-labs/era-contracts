@@ -132,7 +132,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 revert InvalidInteropRootTimestamp(correctTimestamp, interopRoot.timestamp);
             }
             dependencyRootsRollingHash = keccak256(
-                // solhint-disable-next-line func-named-parameters
                 abi.encodePacked(
                     dependencyRootsRollingHash,
                     interopRoot.chainId,

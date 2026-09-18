@@ -14,9 +14,6 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 
 import {
-    Unauthorized,
-    TimeNotReached,
-    RoleAccessDenied,
     ChainRequiresValidatorsSignaturesForCommit,
     NotEnoughSigners,
     SignerNotAuthorized,
@@ -25,32 +22,32 @@ import {
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 
 contract MultisigCommitterTest is Test {
-    MultisigCommitter multisigCommitter;
-    DummyChainTypeManagerForValidatorTimelock chainTypeManager;
-    DummyBridgehub dummyBridgehub;
+    MultisigCommitter internal multisigCommitter;
+    DummyChainTypeManagerForValidatorTimelock internal chainTypeManager;
+    DummyBridgehub internal dummyBridgehub;
 
-    bytes32 constant DEFAULT_ADMIN_ROLE = bytes32(0);
+    bytes32 internal constant DEFAULT_ADMIN_ROLE = bytes32(0);
 
-    address ecosystemOwner;
-    address chainAdmin;
-    address chainAddress;
-    address sequencer;
-    address validator1Shared;
-    uint256 validator1SharedKey;
-    address validator2Shared;
-    uint256 validator2SharedKey;
-    address validator1Custom;
-    uint256 validator1CustomKey;
-    uint256 chainId;
-    uint256 lastBatchNumber;
-    uint32 executionDelay;
+    address internal ecosystemOwner;
+    address internal chainAdmin;
+    address internal chainAddress;
+    address internal sequencer;
+    address internal validator1Shared;
+    uint256 internal validator1SharedKey;
+    address internal validator2Shared;
+    uint256 internal validator2SharedKey;
+    address internal validator1Custom;
+    uint256 internal validator1CustomKey;
+    uint256 internal chainId;
+    uint256 internal lastBatchNumber;
+    uint32 internal executionDelay;
 
-    bytes32 committerRole;
-    bytes32 validatorRole;
-    bytes32 constant EIP712_DOMAIN_TYPEHASH =
+    bytes32 internal committerRole;
+    bytes32 internal validatorRole;
+    bytes32 internal constant EIP712_DOMAIN_TYPEHASH =
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
-    bytes32 constant EIP712_NAME_HASH = keccak256("MultisigCommitter");
-    bytes32 constant EIP712_VERSION_HASH = keccak256("1");
+    bytes32 internal constant EIP712_NAME_HASH = keccak256("MultisigCommitter");
+    bytes32 internal constant EIP712_VERSION_HASH = keccak256("1");
 
     function setUp() public {
         ecosystemOwner = makeAddr("ecosystemOwner");
@@ -124,11 +121,9 @@ contract MultisigCommitterTest is Test {
     }
 
     function test_SuccessfulConstruction() public {
-        MultisigCommitter multisigCommitter = MultisigCommitter(
-            _deployMultisigCommitter(ecosystemOwner, executionDelay)
-        );
-        assertEq(multisigCommitter.owner(), ecosystemOwner);
-        assertEq(multisigCommitter.executionDelay(), executionDelay);
+        MultisigCommitter committer = MultisigCommitter(_deployMultisigCommitter(ecosystemOwner, executionDelay));
+        assertEq(committer.owner(), ecosystemOwner);
+        assertEq(committer.executionDelay(), executionDelay);
     }
 
     function test_customVsDefaultSigningSet() public {
@@ -277,7 +272,7 @@ contract MultisigCommitterTest is Test {
         return digest;
     }
 
-    function sign_digest(uint256 key, bytes32 digest) internal view returns (bytes memory) {
+    function sign_digest(uint256 key, bytes32 digest) internal pure returns (bytes memory) {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(key, digest);
         return abi.encodePacked(r, s, v);
     }
@@ -301,14 +296,14 @@ contract MultisigCommitterTest is Test {
         }
 
         vm.prank(sequencer);
-        multisigCommitter.commitBatchesMultisig(
-            chainAddress,
-            commitBatchFrom,
-            commitBatchTo,
-            commitData,
-            signers,
-            signatures
-        );
+        multisigCommitter.commitBatchesMultisig({
+            chainAddress: chainAddress,
+            processBatchFrom: commitBatchFrom,
+            processBatchTo: commitBatchTo,
+            batchData: commitData,
+            signers: signers,
+            signatures: signatures
+        });
     }
 
     function test_commit_with_signatures_failure_cases() public {
@@ -326,14 +321,14 @@ contract MultisigCommitterTest is Test {
 
         vm.prank(sequencer);
         vm.expectRevert(abi.encodeWithSelector(NotEnoughSigners.selector, 1, 2));
-        multisigCommitter.commitBatchesMultisig(
-            chainAddress,
-            commitBatchFrom,
-            commitBatchTo,
-            commitData,
-            signers,
-            signatures
-        );
+        multisigCommitter.commitBatchesMultisig({
+            chainAddress: chainAddress,
+            processBatchFrom: commitBatchFrom,
+            processBatchTo: commitBatchTo,
+            batchData: commitData,
+            signers: signers,
+            signatures: signatures
+        });
 
         // Unauthorized signer case
 
@@ -349,14 +344,14 @@ contract MultisigCommitterTest is Test {
 
         vm.prank(sequencer);
         vm.expectRevert(abi.encodeWithSelector(SignerNotAuthorized.selector, validator1Custom));
-        multisigCommitter.commitBatchesMultisig(
-            chainAddress,
-            commitBatchFrom,
-            commitBatchTo,
-            commitData,
-            signers,
-            signatures
-        );
+        multisigCommitter.commitBatchesMultisig({
+            chainAddress: chainAddress,
+            processBatchFrom: commitBatchFrom,
+            processBatchTo: commitBatchTo,
+            batchData: commitData,
+            signers: signers,
+            signatures: signatures
+        });
 
         // Duplicated signer
 
@@ -365,14 +360,14 @@ contract MultisigCommitterTest is Test {
 
         vm.prank(sequencer);
         vm.expectRevert(abi.encodeWithSelector(SignersNotSorted.selector));
-        multisigCommitter.commitBatchesMultisig(
-            chainAddress,
-            commitBatchFrom,
-            commitBatchTo,
-            commitData,
-            signers,
-            signatures
-        );
+        multisigCommitter.commitBatchesMultisig({
+            chainAddress: chainAddress,
+            processBatchFrom: commitBatchFrom,
+            processBatchTo: commitBatchTo,
+            batchData: commitData,
+            signers: signers,
+            signatures: signatures
+        });
     }
 
     function test_getValidatorsMember_Shared() public view {
@@ -419,14 +414,14 @@ contract MultisigCommitterTest is Test {
         signatures[0] = sign_digest(validator1CustomKey, digest);
 
         vm.prank(sequencer);
-        multisigCommitter.commitBatchesMultisig(
-            chainAddress,
-            commitBatchFrom,
-            commitBatchTo,
-            commitData,
-            signers,
-            signatures
-        );
+        multisigCommitter.commitBatchesMultisig({
+            chainAddress: chainAddress,
+            processBatchFrom: commitBatchFrom,
+            processBatchTo: commitBatchTo,
+            batchData: commitData,
+            signers: signers,
+            signatures: signatures
+        });
     }
 
     function test_commit_with_custom_validators_unauthorized_shared() public {
@@ -448,14 +443,14 @@ contract MultisigCommitterTest is Test {
 
         vm.prank(sequencer);
         vm.expectRevert(abi.encodeWithSelector(SignerNotAuthorized.selector, validator1Shared));
-        multisigCommitter.commitBatchesMultisig(
-            chainAddress,
-            commitBatchFrom,
-            commitBatchTo,
-            commitData,
-            signers,
-            signatures
-        );
+        multisigCommitter.commitBatchesMultisig({
+            chainAddress: chainAddress,
+            processBatchFrom: commitBatchFrom,
+            processBatchTo: commitBatchTo,
+            batchData: commitData,
+            signers: signers,
+            signatures: signatures
+        });
     }
 
     function test_sharedValidatorsMember() public view {

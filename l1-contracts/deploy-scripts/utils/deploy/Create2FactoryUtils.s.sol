@@ -195,6 +195,8 @@ abstract contract Create2FactoryUtils is Script {
                 deployedContractName
             );
         } else {
+            // `string.concat` is variadic, so named arguments are not possible.
+            // solhint-disable-next-line func-named-parameters
             forgeMessage = string.concat(
                 "forge verify-contract ",
                 vm.toString(contractAddr),

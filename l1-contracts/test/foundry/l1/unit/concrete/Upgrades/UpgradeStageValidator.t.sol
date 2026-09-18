@@ -126,7 +126,7 @@ contract UpgradeStageValidatorTest is Test {
 
     // ============ checkProtocolUpgradePresence Tests ============
 
-    function test_checkProtocolUpgradePresence_succeedsWhenVersionMatches() public {
+    function test_checkProtocolUpgradePresence_succeedsWhenVersionMatches() public view {
         // mockCTM is already set to NEW_PROTOCOL_VERSION
         validator.checkProtocolUpgradePresence();
     }
