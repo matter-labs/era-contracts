@@ -144,6 +144,7 @@ abstract contract GatewayCTMDeployerCTMBase {
             genesisBatchHash: baseConfig.genesisRoot,
             genesisIndexRepeatedStorageChanges: uint64(baseConfig.genesisRollupLeafIndex),
             genesisBatchCommitment: baseConfig.genesisBatchCommitment,
+            genesisAirbenderBatchCommitment: baseConfig.genesisAirbenderBatchCommitment,
             diamondCut: diamondCut,
             forceDeploymentsData: baseConfig.forceDeploymentsData
         });

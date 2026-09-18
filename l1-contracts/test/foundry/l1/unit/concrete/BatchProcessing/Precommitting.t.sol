@@ -29,7 +29,7 @@ contract PrecommittingTest is ExecutorTest {
             untrustedLastL2BlockNumberHint: l2BlockNumber
         });
 
-        return abi.encodePacked(BatchDecoder.SUPPORTED_ENCODING_VERSION, abi.encode(precommitInfo));
+        return abi.encodePacked(BatchDecoder.SUPPORTED_ENCODING_VERSION_PRECOMMIT, abi.encode(precommitInfo));
     }
 
     function test_SuccessfullyPrecommit() public {

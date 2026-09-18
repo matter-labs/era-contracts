@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
+import {IEraMultiProofVerifier} from "../../chain-interfaces/IEraMultiProofVerifier.sol";
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {
@@ -15,7 +16,8 @@ import {
     PRIORITY_EXPIRATION,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
-    ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT
+    ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT,
+    ProofSystem
 } from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
@@ -48,6 +50,7 @@ import {
     ProtocolIdMismatch,
     ProtocolIdNotGreater,
     TokenMultiplierChangeTooFrequent,
+    InvalidDisabledProofSystemsMask,
     TooMuchGas,
     Unauthorized,
     UpgradeTimestampNotReached,
@@ -189,6 +192,27 @@ contract AdminFacet is ZKChainBase, IAdmin {
         uint64 oldMaxTxGasLimit = _getZKsyncOSMaxTxGasLimit();
         s.zksyncOSMaxTxGasLimit = _newMaxTxGasLimit;
         emit NewZKsyncOSMaxTxGasLimit(oldMaxTxGasLimit, _newMaxTxGasLimit);
+    }
+
+    /// @inheritdoc IAdmin
+    function setProofSystemStatus(
+        ProofSystem _proofSystem,
+        bool _enabled
+    ) external onlyAdmin onlySettlementLayer onlyEra {
+        uint8 proofSystemMask = uint8(1 << uint8(_proofSystem));
+
+        uint8 oldDisabledProofSystems = s.disabledProofSystems;
+        uint8 newDisabledProofSystems = _enabled
+            ? oldDisabledProofSystems & ~proofSystemMask
+            : oldDisabledProofSystems | proofSystemMask;
+
+        uint8 supported = IEraMultiProofVerifier(address(s.verifier)).supportedProofSystems();
+        if (supported & ~newDisabledProofSystems == 0) {
+            revert InvalidDisabledProofSystemsMask(newDisabledProofSystems);
+        }
+
+        s.disabledProofSystems = newDisabledProofSystems;
+        emit NewDisabledProofSystems(oldDisabledProofSystems, newDisabledProofSystems);
     }
 
     /// @dev The runtime chain config is read from storage when the batch proof public input is

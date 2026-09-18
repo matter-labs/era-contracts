@@ -22,6 +22,7 @@ contract initializingCTMOwnerZeroTest is ChainTypeManagerTest {
             genesisBatchHash: bytes32(uint256(0x01)),
             genesisIndexRepeatedStorageChanges: 1,
             genesisBatchCommitment: bytes32(uint256(0x01)),
+            genesisAirbenderBatchCommitment: bytes32(uint256(0x01)),
             diamondCut: getDiamondCutData(address(diamondInit)),
             forceDeploymentsData: bytes("")
         });

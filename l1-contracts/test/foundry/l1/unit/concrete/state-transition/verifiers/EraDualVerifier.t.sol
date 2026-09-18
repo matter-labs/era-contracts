@@ -44,31 +44,11 @@ contract MockPlonkVerifier is IVerifier {
     }
 }
 
-/// @notice Mock Airbender PLONK verifier for testing.
-/// @dev Distinct contract so we can assert which verifier received the call.
-contract MockAirbenderPlonkVerifier is IVerifier {
-    bytes32 public constant VK_HASH = keccak256("airbender_plonk_vk");
-    bool public shouldVerify = true;
-
-    function verify(uint256[] calldata, uint256[] calldata) external view override returns (bool) {
-        return shouldVerify;
-    }
-
-    function verificationKeyHash() external pure override returns (bytes32) {
-        return VK_HASH;
-    }
-
-    function setShouldVerify(bool _value) external {
-        shouldVerify = _value;
-    }
-}
-
-/// @notice Unit tests for EraDualVerifier routing between Boojum FFLONK, Boojum PLONK, and Airbender PLONK verifiers.
+/// @notice Unit tests for EraDualVerifier routing between the Boojum FFLONK and PLONK verifiers.
 contract EraDualVerifierTest is Test {
     EraDualVerifier internal verifier;
     MockFflonkVerifier internal fflonkVerifier;
     MockPlonkVerifier internal plonkVerifier;
-    MockAirbenderPlonkVerifier internal airbenderVerifier;
 
     uint256 internal constant FFLONK_VERIFICATION_TYPE = 0;
     uint256 internal constant PLONK_VERIFICATION_TYPE = 1;
@@ -77,12 +57,7 @@ contract EraDualVerifierTest is Test {
     function setUp() public {
         fflonkVerifier = new MockFflonkVerifier();
         plonkVerifier = new MockPlonkVerifier();
-        airbenderVerifier = new MockAirbenderPlonkVerifier();
-        verifier = new EraDualVerifier(
-            IVerifierV2(address(fflonkVerifier)),
-            IVerifier(address(plonkVerifier)),
-            IVerifier(address(airbenderVerifier))
-        );
+        verifier = new EraDualVerifier(IVerifierV2(address(fflonkVerifier)), IVerifier(address(plonkVerifier)));
     }
 
     function _makeProof(uint256 _verifierType) internal pure returns (uint256[] memory proof) {
@@ -103,7 +78,6 @@ contract EraDualVerifierTest is Test {
     function test_constructor_setsAllVerifiers() public view {
         assertEq(address(verifier.FFLONK_VERIFIER()), address(fflonkVerifier));
         assertEq(address(verifier.PLONK_VERIFIER()), address(plonkVerifier));
-        assertEq(address(verifier.AIRBENDER_PLONK_VERIFIER()), address(airbenderVerifier));
     }
 
     // ============ verify Routing Tests ============
@@ -116,17 +90,10 @@ contract EraDualVerifierTest is Test {
         assertTrue(verifier.verify(_makePublicInputs(), _makeProof(PLONK_VERIFICATION_TYPE)));
     }
 
-    function test_verify_routesToAirbenderPlonk() public view {
-        assertTrue(verifier.verify(_makePublicInputs(), _makeProof(AIRBENDER_PLONK_VERIFICATION_TYPE)));
-    }
-
-    function test_verify_routesToAirbenderPlonk_returnsFalseWhenMockFails() public {
-        // When only the Airbender verifier fails, a proof tagged as Airbender should surface the failure,
-        // while proofs for other verifiers must remain unaffected.
-        airbenderVerifier.setShouldVerify(false);
-        assertFalse(verifier.verify(_makePublicInputs(), _makeProof(AIRBENDER_PLONK_VERIFICATION_TYPE)));
-        assertTrue(verifier.verify(_makePublicInputs(), _makeProof(FFLONK_VERIFICATION_TYPE)));
-        assertTrue(verifier.verify(_makePublicInputs(), _makeProof(PLONK_VERIFICATION_TYPE)));
+    /// Airbender proofs are verified by `EraMultiProofVerifier`, never routed through the Boojum verifier.
+    function test_verify_rejectsAirbenderType() public {
+        vm.expectRevert(UnknownVerifierType.selector);
+        verifier.verify(_makePublicInputs(), _makeProof(AIRBENDER_PLONK_VERIFICATION_TYPE));
     }
 
     function test_verify_revertsOnEmptyProof() public {
@@ -155,8 +122,9 @@ contract EraDualVerifierTest is Test {
         assertEq(verifier.verificationKeyHash(PLONK_VERIFICATION_TYPE), plonkVerifier.VK_HASH());
     }
 
-    function test_verificationKeyHash_airbenderPlonk() public view {
-        assertEq(verifier.verificationKeyHash(AIRBENDER_PLONK_VERIFICATION_TYPE), airbenderVerifier.VK_HASH());
+    function test_verificationKeyHash_rejectsAirbenderType() public {
+        vm.expectRevert(UnknownVerifierType.selector);
+        verifier.verificationKeyHash(AIRBENDER_PLONK_VERIFICATION_TYPE);
     }
 
     function test_verificationKeyHash_revertsOnUnknownType() public {
@@ -167,22 +135,14 @@ contract EraDualVerifierTest is Test {
     // ============ Fuzz Tests ============
 
     function testFuzz_verify_revertsOnUnknownType(uint256 verifierType) public {
-        vm.assume(
-            verifierType != FFLONK_VERIFICATION_TYPE &&
-                verifierType != PLONK_VERIFICATION_TYPE &&
-                verifierType != AIRBENDER_PLONK_VERIFICATION_TYPE
-        );
+        vm.assume(verifierType != FFLONK_VERIFICATION_TYPE && verifierType != PLONK_VERIFICATION_TYPE);
 
         vm.expectRevert(UnknownVerifierType.selector);
         verifier.verify(_makePublicInputs(), _makeProof(verifierType));
     }
 
     function testFuzz_verificationKeyHash_revertsOnUnknownType(uint256 verifierType) public {
-        vm.assume(
-            verifierType != FFLONK_VERIFICATION_TYPE &&
-                verifierType != PLONK_VERIFICATION_TYPE &&
-                verifierType != AIRBENDER_PLONK_VERIFICATION_TYPE
-        );
+        vm.assume(verifierType != FFLONK_VERIFICATION_TYPE && verifierType != PLONK_VERIFICATION_TYPE);
 
         vm.expectRevert(UnknownVerifierType.selector);
         verifier.verificationKeyHash(verifierType);

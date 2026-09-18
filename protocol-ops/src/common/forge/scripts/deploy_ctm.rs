@@ -20,6 +20,9 @@ pub struct DeployCTMConfig {
     pub contracts: ContractsDeployCTMConfig,
     pub is_zk_sync_os: bool,
     pub zk_token_asset_id: B256,
+    /// Deploy the Airbender verifier, so batches require both a Boojum and an Airbender proof. Era only.
+    #[serde(default)]
+    pub airbender_verifier: bool,
 }
 
 impl FileConfigTrait for DeployCTMConfig {}
@@ -32,10 +35,13 @@ impl DeployCTMConfig {
         zk_token_asset_id: B256,
         support_l2_legacy_shared_bridge_test: bool,
         vm_option: VMOption,
+        airbender_verifier: bool,
     ) -> Self {
         Self {
             is_zk_sync_os: vm_option.is_zksync_os(),
             testnet_verifier,
+            // ZKsync OS has no separate Airbender verifier.
+            airbender_verifier: airbender_verifier && !vm_option.is_zksync_os(),
             owner_address,
             support_l2_legacy_shared_bridge_test,
             zk_token_asset_id,
@@ -97,6 +103,10 @@ pub struct DeployCTMContractsConfigOutput {
 pub struct L1StateTransitionOutput {
     pub state_transition_proxy_addr: Address,
     pub verifier_addr: Address,
+    #[serde(default)]
+    pub boojum_verifier_addr: Option<Address>,
+    #[serde(default)]
+    pub airbender_verifier_addr: Option<Address>,
     pub genesis_upgrade_addr: Address,
     pub default_upgrade_addr: Address,
     pub bytecodes_supplier_addr: Address,

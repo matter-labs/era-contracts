@@ -7,7 +7,7 @@ import {IChainUpgrader} from "../chain-interfaces/IChainUpgrader.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {FeeParams, PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
-import {L2DACommitmentScheme} from "../../common/Config.sol";
+import {L2DACommitmentScheme, ProofSystem} from "../../common/Config.sol";
 
 /// @title The interface of the Admin Contract that controls access rights for contract management.
 /// @author Matter Labs
@@ -41,6 +41,14 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// @param _newMaxTxGasLimit The new single-transaction gas limit; must not be below
     /// `ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT`
     function setZKsyncOSMaxTxGasLimit(uint64 _newMaxTxGasLimit) external;
+
+    /// @notice Enables or disables one of the proof systems an Era chain requires. At least one of the systems the
+    /// installed verifier supports must stay enabled.
+    /// @dev Disabling only skips that system's proof. Both commitments are still built and stored, so the fields only
+    /// that system proves (its bootloader heap hash and events queue hash) stay unverified for the affected batches.
+    /// @param _proofSystem The proof system to configure.
+    /// @param _enabled Whether the selected proof system is required.
+    function setProofSystemStatus(ProofSystem _proofSystem, bool _enabled) external;
 
     /// @notice Change the fee params for L1->L2 transactions
     /// @param _newFeeParams The new fee params
@@ -147,6 +155,9 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
 
     /// @notice ZKsync OS single-transaction gas limit (EIP-7825) changed
     event NewZKsyncOSMaxTxGasLimit(uint64 oldMaxTxGasLimit, uint64 newMaxTxGasLimit);
+
+    /// @notice The set of proof systems this chain does not require has changed
+    event NewDisabledProofSystems(uint8 indexed oldDisabledProofSystems, uint8 indexed newDisabledProofSystems);
 
     /// @notice Fee params for L1->L2 transactions changed
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);

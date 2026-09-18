@@ -208,7 +208,8 @@ library Utils {
                 dependencyRootsRollingHash: bytes32(0),
                 l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
                 timestamp: 0,
-                commitment: bytes32("")
+                commitment: bytes32(""),
+                airbenderCommitment: bytes32(0)
             });
     }
 
@@ -223,6 +224,7 @@ library Utils {
                 priorityOperationsHash: keccak256(""),
                 bootloaderHeapInitialContentsHash: randomBytes32("bootloaderHeapInitialContentsHash"),
                 eventsQueueStateHash: randomBytes32("eventsQueueStateHash"),
+                airbenderBootloaderHeapHash: bytes32(0),
                 systemLogs: abi.encode(randomBytes32("systemLogs")),
                 operatorDAInput: abi.encodePacked(uint256(0))
             });
@@ -334,7 +336,7 @@ library Utils {
     }
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](19);
+        bytes4[] memory selectors = new bytes4[](20);
         uint256 i = 0;
         selectors[i++] = AdminFacet.setPendingAdmin.selector;
         selectors[i++] = AdminFacet.acceptAdmin.selector;
@@ -355,6 +357,7 @@ library Utils {
         selectors[i++] = AdminFacet.unfreezeDiamond.selector;
         selectors[i++] = AdminFacet.genesisUpgrade.selector;
         selectors[i++] = AdminFacet.setDAValidatorPair.selector;
+        selectors[i++] = AdminFacet.setProofSystemStatus.selector;
         return selectors;
     }
 
@@ -388,9 +391,10 @@ library Utils {
     }
 
     function getGettersSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](34);
+        bytes4[] memory selectors = new bytes4[](35);
         uint256 i = 0;
         selectors[i++] = GettersFacet.getVerifier.selector;
+        selectors[i++] = GettersFacet.disabledProofSystems.selector;
         selectors[i++] = GettersFacet.getAdmin.selector;
         selectors[i++] = GettersFacet.getPendingAdmin.selector;
         selectors[i++] = GettersFacet.getTotalBlocksCommitted.selector;
@@ -446,7 +450,7 @@ library Utils {
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](75);
+        bytes4[] memory selectors = new bytes4[](77);
 
         uint256 i = 0;
         selectors[i++] = UtilsFacet.util_setChainId.selector;
@@ -523,6 +527,8 @@ library Utils {
         selectors[i++] = UtilsFacet.util_setZksyncOS.selector;
         selectors[i++] = UtilsFacet.util_setZKsyncOSMaxTxGasLimit.selector;
         selectors[i++] = UtilsFacet.util_getZKsyncOSMaxTxGasLimit.selector;
+        selectors[i++] = UtilsFacet.util_setDisabledProofSystems.selector;
+        selectors[i++] = UtilsFacet.util_getDisabledProofSystems.selector;
         selectors[i++] = UtilsFacet.util_setBaseTokenHasTotalSupply.selector;
 
         return selectors;
@@ -616,6 +622,49 @@ library Utils {
         return keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
     }
 
+    function createAirbenderBatchCommitment(
+        CommitBatchInfo calldata _newBatchData,
+        bytes32 _stateDiffHash,
+        bytes32[] memory _blobCommitments,
+        bytes32[] memory _blobHashes,
+        bytes32 _metadataHash
+    ) public pure returns (bytes32) {
+        bytes32 passThroughDataHash = keccak256(_batchPassThroughData(_newBatchData));
+        bytes32 auxiliaryOutputHash = keccak256(
+            // solhint-disable-next-line func-named-parameters
+            abi.encodePacked(
+                keccak256(_newBatchData.systemLogs),
+                _stateDiffHash,
+                _newBatchData.airbenderBootloaderHeapHash,
+                bytes32(0),
+                _encodeBlobAuxiliaryOutput(_blobCommitments, _blobHashes)
+            )
+        );
+        return keccak256(abi.encode(passThroughDataHash, _metadataHash, auxiliaryOutputHash));
+    }
+
+    /// @dev The Airbender commitment of a batch committed with one blob; the commit event carries only the
+    /// Boojum one.
+    function airbenderCommitmentForSingleBlob(
+        CommitBatchInfo calldata _batch,
+        bytes32 _stateDiffHash,
+        bytes32 _blobLinearHash,
+        bytes32 _blobVersionedHash
+    ) public pure returns (bytes32) {
+        bytes32[] memory blobHashes = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
+        blobHashes[0] = _blobLinearHash;
+        bytes32[] memory blobCommitments = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
+        blobCommitments[0] = defaultBlobOpeningCommitment(_blobVersionedHash);
+        return
+            createAirbenderBatchCommitment(
+                _batch,
+                _stateDiffHash,
+                blobCommitments,
+                blobHashes,
+                keccak256(_batchMetaParameters())
+            );
+    }
+
     function _batchPassThroughData(CommitBatchInfo calldata _batch) internal pure returns (bytes memory) {
         return
             // solhint-disable-next-line func-named-parameters
@@ -692,6 +741,13 @@ library Utils {
         bytes32[] memory _blobHashes
     ) public pure returns (bytes32) {
         return keccak256(abi.encodePacked(_stateDiffHash, _totalPubdataHash, _blobsAmount, _blobHashes));
+    }
+
+    /// @dev The opening commitment the rollup DA validator derives for `getDefaultBlobCommitment()`.
+    function defaultBlobOpeningCommitment(bytes32 _versionedHash) public pure returns (bytes32) {
+        bytes16 blobOpeningPoint = 0x7142c5851421a2dc03dde0aabdb0ffdb;
+        bytes32 blobClaimedValue = 0x1e5eea3bbb85517461c1d1c7b84c7c2cec050662a5e81a71d5d7e2766eaff2f0;
+        return keccak256(abi.encodePacked(_versionedHash, abi.encodePacked(blobOpeningPoint, blobClaimedValue)));
     }
 
     function getDefaultBlobCommitment() public pure returns (bytes memory) {

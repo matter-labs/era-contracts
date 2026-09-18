@@ -5,7 +5,6 @@ pragma solidity 0.8.28;
 import "./_Executor_Shared.t.sol";
 
 import {Utils} from "../Utils/Utils.sol";
-import {UtilsFacet} from "../Utils/UtilsFacet.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {
@@ -24,7 +23,6 @@ import {
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 /// @title Extended tests for ExecutorFacet to increase coverage
 contract ExecutorExtendedTest is ExecutorTest {
@@ -99,7 +97,7 @@ contract ExecutorExtendedTest is ExecutorTest {
 
     function test_PrecommitSharedBridge_EmptyPrecommitData() public {
         bytes memory precommitData = bytes.concat(
-            bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
+            bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION_PRECOMMIT),
             abi.encode(uint256(0), bytes(""))
         );
 
@@ -145,32 +143,6 @@ contract ExecutorExtendedTest is ExecutorTest {
 
 /// @title Extended tests for ExecutorFacet revert batches functionality
 contract ExecutorRevertBatchesTest is ExecutorTest {
-    UtilsFacet internal utilsFacet;
-
-    constructor() {
-        // Add UtilsFacet to the diamond to manipulate state
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: address(new UtilsFacet()),
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: Utils.getUtilsFacetSelectors()
-        });
-
-        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: address(0),
-            initCalldata: bytes("")
-        });
-
-        // Execute the upgrade as chainTypeManager
-        address chainTypeManager = getters.getChainTypeManager();
-        vm.prank(chainTypeManager);
-        admin.executeUpgrade(diamondCutData);
-
-        utilsFacet = UtilsFacet(address(executor));
-    }
-
     function test_RevertBatches_RevertWhen_RevertedBatchNotAfterNewLastBatch() public {
         // Try to revert to a batch number greater than totalBatchesCommitted
         // This should revert with RevertedBatchNotAfterNewLastBatch
@@ -255,6 +227,7 @@ contract ExecutorRevertBatchesTest is ExecutorTest {
             priorityOperationsHash: keccak256(""),
             bootloaderHeapInitialContentsHash: bytes32(0),
             eventsQueueStateHash: bytes32(0),
+            airbenderBootloaderHeapHash: bytes32(0),
             systemLogs: new bytes(0),
             operatorDAInput: new bytes(0)
         });
@@ -271,7 +244,8 @@ contract ExecutorRevertBatchesTest is ExecutorTest {
                     l2LogsTreeRoot: bytes32(0),
                     dependencyRootsRollingHash: bytes32(0),
                     timestamp: 0,
-                    commitment: bytes32(0)
+                    commitment: bytes32(0),
+                    airbenderCommitment: bytes32(0)
                 }),
                 newBatchesData
             )

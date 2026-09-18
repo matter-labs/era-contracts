@@ -93,6 +93,23 @@ interface IExecutor is IZKChainBase {
         bytes32 l2LogsTreeRoot;
         uint256 timestamp; // For ZKsync OS not used, always set to 0
         bytes32 commitment; // For ZKsync OS batches we'll store batch output hash here
+        /// @dev Batch commitment as the Airbender prover computes it; see `Committer._batchAirbenderAuxiliaryOutput`.
+        /// Zero for ZKsync OS batches and pre-Airbender predecessors.
+        bytes32 airbenderCommitment;
+    }
+
+    /// @notice `StoredBatchInfo` before v33 added `airbenderCommitment`.
+    // solhint-disable-next-line gas-struct-packing
+    struct PreAirbenderStoredBatchInfo {
+        uint64 batchNumber;
+        bytes32 batchHash;
+        uint64 indexRepeatedStorageChanges;
+        uint256 numberOfLayer1Txs;
+        bytes32 priorityOperationsHash;
+        bytes32 dependencyRootsRollingHash;
+        bytes32 l2LogsTreeRoot;
+        uint256 timestamp;
+        bytes32 commitment;
     }
 
     /// @notice Legacy StoredBatchInfo struct

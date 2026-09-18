@@ -245,24 +245,27 @@ contract ZKChainBase is ReentrancyGuard {
     /// @dev Checks that the batch hash is correct and matches the expected hash.
     /// @param _lastCommittedBatchData The last committed batch.
     /// @param _batchNumber The batch number to check.
-    /// @param _checkLegacy Whether to check the legacy hash.
+    /// @param _checkLegacy Whether the pre-Airbender and legacy `StoredBatchInfo` encodings are also accepted
+    /// (predecessor batch only). Such a predecessor carries no Airbender commitment, so the field must be zero.
     function _checkBatchHashMismatch(
         IExecutor.StoredBatchInfo memory _lastCommittedBatchData,
         uint256 _batchNumber,
         bool _checkLegacy
     ) internal view {
-        bytes32 cachedStoredBatchHashes = s.storedBatchHashes[_batchNumber];
-        if (
-            cachedStoredBatchHashes != StoredBatchHashing.hashStoredBatchInfo(_lastCommittedBatchData) &&
-            (!_checkLegacy ||
-                cachedStoredBatchHashes != StoredBatchHashing.hashLegacyStoredBatchInfo(_lastCommittedBatchData))
-        ) {
-            // incorrect previous batch data
-            revert BatchHashMismatch(
-                cachedStoredBatchHashes,
-                StoredBatchHashing.hashStoredBatchInfo(_lastCommittedBatchData)
-            );
+        bytes32 storedHash = s.storedBatchHashes[_batchNumber];
+        bytes32 expectedHash = StoredBatchHashing.hashStoredBatchInfo(_lastCommittedBatchData);
+        if (storedHash == expectedHash) {
+            return;
         }
+        if (
+            _checkLegacy &&
+            _lastCommittedBatchData.airbenderCommitment == bytes32(0) &&
+            (storedHash == StoredBatchHashing.hashPreAirbenderStoredBatchInfo(_lastCommittedBatchData) ||
+                storedHash == StoredBatchHashing.hashLegacyStoredBatchInfo(_lastCommittedBatchData))
+        ) {
+            return;
+        }
+        revert BatchHashMismatch(storedHash, expectedHash);
     }
 
     /// @notice Derives the price for L2 gas in base token to be paid.

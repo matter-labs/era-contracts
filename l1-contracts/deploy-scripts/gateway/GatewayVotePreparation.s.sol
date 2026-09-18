@@ -129,6 +129,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             genesisRoot: config.contracts.chainCreationParams.genesisRoot,
             genesisRollupLeafIndex: uint64(config.contracts.chainCreationParams.genesisRollupLeafIndex),
             genesisBatchCommitment: config.contracts.chainCreationParams.genesisBatchCommitment,
+            genesisAirbenderBatchCommitment: config.contracts.chainCreationParams.genesisAirbenderBatchCommitment,
             forceDeploymentsData: forceDeploymentsData,
             protocolVersion: config.contracts.chainCreationParams.latestProtocolVersion
         });

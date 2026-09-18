@@ -246,6 +246,7 @@ abstract contract DeployCTMUtils is DeployUtils {
                 genesisBatchHash: config.contracts.chainCreationParams.genesisRoot,
                 genesisIndexRepeatedStorageChanges: uint64(config.contracts.chainCreationParams.genesisRollupLeafIndex),
                 genesisBatchCommitment: config.contracts.chainCreationParams.genesisBatchCommitment,
+                genesisAirbenderBatchCommitment: config.contracts.chainCreationParams.genesisAirbenderBatchCommitment,
                 diamondCut: diamondCut,
                 forceDeploymentsData: generatedData.forceDeploymentsData
             });
@@ -337,7 +338,8 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode();
         } else if (
             compareStrings(contractName, "EraSettlementLayerV31Upgrade") ||
-            compareStrings(contractName, "ZKsyncOSSettlementLayerV31Upgrade")
+            compareStrings(contractName, "ZKsyncOSSettlementLayerV31Upgrade") ||
+            compareStrings(contractName, "EraSettlementLayerV33Upgrade")
         ) {
             return abi.encode();
         } else if (compareStrings(contractName, "Governance")) {
@@ -402,6 +404,7 @@ abstract contract DeployCTMUtils is DeployUtils {
                 verifierFflonk: ctmAddresses.stateTransition.verifiers.verifierFflonk,
                 verifierPlonk: ctmAddresses.stateTransition.verifiers.verifierPlonk,
                 airbenderVerifierPlonk: ctmAddresses.stateTransition.verifiers.airbenderVerifierPlonk,
+                boojumVerifier: ctmAddresses.stateTransition.verifiers.boojumVerifier,
                 // For L1 deployment we need to use the deployer as the owner of the verifier,
                 // because we set the dual verifier later. Use getBroadcasterAddress() to get
                 // the actual EOA when this is called from a contract created via `new` during the script.

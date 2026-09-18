@@ -248,7 +248,8 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             dependencyRootsRollingHash: bytes32(0),
             timestamp: 0,
-            commitment: _chainCreationParams.genesisBatchCommitment
+            commitment: _chainCreationParams.genesisBatchCommitment,
+            airbenderCommitment: _chainCreationParams.genesisAirbenderBatchCommitment
         });
         storedBatchZero = keccak256(abi.encode(batchZero));
         bytes32 newInitialCutHash = keccak256(abi.encode(_chainCreationParams.diamondCut));

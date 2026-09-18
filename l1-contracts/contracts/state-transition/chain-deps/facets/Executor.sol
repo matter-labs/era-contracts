@@ -249,13 +249,27 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 currentTotalBatchesVerified = s.totalBatchesVerified;
         uint256 committedBatchesLength = committedBatches.length;
 
-        // Initialize the array, that will be used as public input to the ZKP
-        uint256[] memory proofPublicInput = new uint256[](committedBatchesLength);
+        // We only allow processing of 1 batch proof at a time on Era Chains.
+        // We allow processing multiple proofs at once on ZKsync OS Chains.
+        if (!s.zksyncOS && committedBatchesLength != 1) {
+            revert CanOnlyProcessOneBatch();
+        }
+
+        // Initialize the array, that will be used as public input to the ZKP.
+        // Era chains have two public inputs per batch, one per proof system: Boojum and Airbender.
+        uint256[] memory proofPublicInput = new uint256[](
+            s.zksyncOS ? committedBatchesLength : 2 * committedBatchesLength
+        );
 
         // Check that the batch passed by the validator is indeed the first unverified batch
         _checkBatchHashMismatch(prevBatch, currentTotalBatchesVerified, true);
 
         bytes32 prevBatchCommitment = prevBatch.commitment;
+        // Airbender chains on its own commitments. The last pre-Airbender batch has none, so its Boojum commitment
+        // stands in; a proof binds only the state root of its predecessor, so either shape anchors it.
+        bytes32 prevBatchAirbenderCommitment = prevBatch.airbenderCommitment == bytes32(0)
+            ? prevBatch.commitment
+            : prevBatch.airbenderCommitment;
         bytes32 prevBatchStateCommitment = prevBatch.batchHash;
         for (uint256 i = 0; i < committedBatchesLength; ++i) {
             currentTotalBatchesVerified = currentTotalBatchesVerified.uncheckedInc();
@@ -270,10 +284,16 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     currentBatchCommitment
                 );
             } else {
-                proofPublicInput[i] = _getBatchProofPublicInput(prevBatchCommitment, currentBatchCommitment);
+                // Two slots per batch: Boojum first, Airbender second.
+                proofPublicInput[2 * i] = _getBatchProofPublicInput(prevBatchCommitment, currentBatchCommitment);
+                proofPublicInput[2 * i + 1] = _getBatchProofPublicInput(
+                    prevBatchAirbenderCommitment,
+                    committedBatches[i].airbenderCommitment
+                );
             }
 
             prevBatchCommitment = currentBatchCommitment;
+            prevBatchAirbenderCommitment = committedBatches[i].airbenderCommitment;
             prevBatchStateCommitment = currentBatchStateCommitment;
         }
         if (currentTotalBatchesVerified > s.totalBatchesCommitted) {
@@ -287,12 +307,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     function _verifyProof(uint256[] memory proofPublicInput, uint256[] memory _proof) internal view {
-        // We only allow processing of 1 batch proof at a time on Era Chains.
-        // We allow processing multiple proofs at once on ZKsync OS Chains.
-        if (!s.zksyncOS && proofPublicInput.length != 1) {
-            revert CanOnlyProcessOneBatch();
-        }
-
         bool successVerifyProof = s.verifier.verify(proofPublicInput, _proof);
         if (!successVerifyProof) {
             revert InvalidProof();

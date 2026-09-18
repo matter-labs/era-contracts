@@ -217,7 +217,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     function deployVerifiers() internal {
         (, string memory fflonkName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.VerifierFflonk);
         (, string memory plonkName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.VerifierPlonk);
-        (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(
+        (, string memory chainVerifierName) = DeployCTML1OrGateway.resolveChainVerifier(
             config.isZKsyncOS,
             config.testnetVerifier
         );
@@ -225,18 +225,19 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         ctmAddresses.stateTransition.verifiers.verifierFflonk = deploySimpleContract(fflonkName, false);
         ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract(plonkName, false);
 
-        // The Airbender PLONK verifier occupies the third slot of the Era dual verifier. It must be
-        // deployed before the dual verifier so its address is included in the constructor args (see
-        // `getCTMCoreDeploymentConfig`). ZKsyncOS registers sub-verifiers separately, so the slot
-        // is skipped there.
-        if (config.airbenderVerifier && !config.isZKsyncOS) {
-            ctmAddresses.stateTransition.verifiers.airbenderVerifierPlonk = deploySimpleContract(
-                "AirbenderVerifierPlonk",
-                false
-            );
+        if (config.isZKsyncOS) {
+            ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(chainVerifierName, false);
+        } else {
+            (, string memory boojumVerifierName) = DeployCTML1OrGateway.resolve(false, CTMContract.DualVerifier);
+            ctmAddresses.stateTransition.verifiers.boojumVerifier = deploySimpleContract(boojumVerifierName, false);
+            if (config.airbenderVerifier) {
+                ctmAddresses.stateTransition.verifiers.airbenderVerifierPlonk = deploySimpleContract(
+                    "AirbenderVerifierPlonk",
+                    false
+                );
+            }
+            ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(chainVerifierName, false);
         }
-
-        ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName, false);
 
         // Use getDeployerAddress() to ensure the correct sender even when called from nested contracts
         vm.startBroadcast(getDeployerAddress());
@@ -369,6 +370,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             "airbender_verifier_addr",
             ctmAddresses.stateTransition.verifiers.airbenderVerifierPlonk
         );
+        vm.serializeAddress(
+            "state_transition",
+            "boojum_verifier_addr",
+            ctmAddresses.stateTransition.verifiers.boojumVerifier
+        );
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", ctmAddresses.stateTransition.genesisUpgrade);
         vm.serializeAddress("state_transition", "default_upgrade_addr", ctmAddresses.stateTransition.defaultUpgrade);
         vm.serializeAddress("state_transition", "eip7702_checker_addr", ctmAddresses.admin.eip7702Checker);
@@ -465,10 +471,15 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             "genesis_rollup_leaf_index",
             config.contracts.chainCreationParams.genesisRollupLeafIndex
         );
-        string memory chainCreationParams = vm.serializeBytes32(
+        vm.serializeBytes32(
             "chain_creation_params",
             "genesis_batch_commitment",
             config.contracts.chainCreationParams.genesisBatchCommitment
+        );
+        string memory chainCreationParams = vm.serializeBytes32(
+            "chain_creation_params",
+            "genesis_airbender_batch_commitment",
+            config.contracts.chainCreationParams.genesisAirbenderBatchCommitment
         );
 
         vm.serializeAddress("contracts", "create2_factory_addr", create2FactoryState.create2FactoryAddress);

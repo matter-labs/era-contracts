@@ -5,7 +5,11 @@ import {Test} from "forge-std/Test.sol";
 
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {CommitBatchInfo, PrecommitInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+import {
+    CommitBatchInfo,
+    CommitBatchInfoZKsyncOS,
+    PrecommitInfo
+} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {InteropRoot, L2Log} from "contracts/common/Messaging.sol";
 import {
@@ -18,8 +22,12 @@ import {
 
 /// @notice Unit tests for BatchDecoder library
 contract BatchDecoderTest is Test {
-    uint8 constant SUPPORTED_ENCODING_VERSION = 1;
-    uint8 constant SUPPORTED_ENCODING_VERSION_COMMIT_ZKSYNC_OS = 3;
+    /// @dev Mirrors `BatchDecoder`; the pre-Airbender values are kept to assert their rejection.
+    uint8 constant SUPPORTED_ENCODING_VERSION = 5;
+    uint8 constant SUPPORTED_ENCODING_VERSION_COMMIT_ZKSYNC_OS = 6;
+    uint8 constant SUPPORTED_ENCODING_VERSION_PRECOMMIT = 1;
+    uint8 constant PRE_AIRBENDER_ENCODING_VERSION = 1;
+    uint8 constant PRE_AIRBENDER_ENCODING_VERSION_COMMIT_ZKSYNC_OS = 4;
 
     // ============ decodeAndCheckCommitData Tests ============
 
@@ -273,7 +281,7 @@ contract BatchDecoderTest is Test {
     function test_decodeAndCheckPrecommitData_basicValues() public {
         PrecommitInfo memory precommitInfo = _createPrecommitInfo();
 
-        bytes memory encodedData = abi.encodePacked(SUPPORTED_ENCODING_VERSION, abi.encode(precommitInfo));
+        bytes memory encodedData = abi.encodePacked(SUPPORTED_ENCODING_VERSION_PRECOMMIT, abi.encode(precommitInfo));
 
         PrecommitInfo memory decodedPrecommit = this.externalDecodeAndCheckPrecommitData(encodedData);
 
@@ -291,7 +299,46 @@ contract BatchDecoderTest is Test {
         this.externalDecodeAndCheckPrecommitData(encodedData);
     }
 
+    // ============ Pre-Airbender encoding versions ============
+
+    function test_rejectsPreAirbenderEncodingVersions() public {
+        bytes memory body = abi.encode(uint256(0));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(UnsupportedCommitBatchEncoding.selector, PRE_AIRBENDER_ENCODING_VERSION)
+        );
+        this.externalDecodeAndCheckCommitData(abi.encodePacked(PRE_AIRBENDER_ENCODING_VERSION, body), 1, 1);
+
+        vm.expectRevert(abi.encodeWithSelector(UnsupportedProofBatchEncoding.selector, PRE_AIRBENDER_ENCODING_VERSION));
+        this.externalDecodeAndCheckProofData(abi.encodePacked(PRE_AIRBENDER_ENCODING_VERSION, body), 1, 1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(UnsupportedExecuteBatchEncoding.selector, PRE_AIRBENDER_ENCODING_VERSION)
+        );
+        this.externalDecodeAndCheckExecuteData(abi.encodePacked(PRE_AIRBENDER_ENCODING_VERSION, body), 1, 1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                UnsupportedCommitBatchEncoding.selector,
+                PRE_AIRBENDER_ENCODING_VERSION_COMMIT_ZKSYNC_OS
+            )
+        );
+        this.externalDecodeAndCheckCommitDataZKsyncOS(
+            abi.encodePacked(PRE_AIRBENDER_ENCODING_VERSION_COMMIT_ZKSYNC_OS, body),
+            1,
+            1
+        );
+    }
+
     // ============ External Wrappers (for calldata) ============
+
+    function externalDecodeAndCheckCommitDataZKsyncOS(
+        bytes calldata _commitData,
+        uint256 _processBatchFrom,
+        uint256 _processBatchTo
+    ) external pure returns (IExecutor.StoredBatchInfo memory, CommitBatchInfoZKsyncOS[] memory) {
+        return BatchDecoder.decodeAndCheckCommitDataZKsyncOS(_commitData, _processBatchFrom, _processBatchTo);
+    }
 
     function externalDecodeAndCheckCommitData(
         bytes calldata _commitData,
@@ -348,7 +395,8 @@ contract BatchDecoderTest is Test {
                 dependencyRootsRollingHash: bytes32(0),
                 l2LogsTreeRoot: bytes32(0),
                 timestamp: uint256(batchNumber) * 100,
-                commitment: bytes32(0)
+                commitment: bytes32(0),
+                airbenderCommitment: bytes32(0)
             });
     }
 
@@ -363,6 +411,7 @@ contract BatchDecoderTest is Test {
                 priorityOperationsHash: bytes32(0),
                 bootloaderHeapInitialContentsHash: bytes32(0),
                 eventsQueueStateHash: bytes32(0),
+                airbenderBootloaderHeapHash: bytes32(0),
                 systemLogs: "",
                 operatorDAInput: ""
             });

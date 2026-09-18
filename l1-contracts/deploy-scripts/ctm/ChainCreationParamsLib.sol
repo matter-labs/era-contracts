@@ -29,6 +29,9 @@ library ChainCreationParamsLib {
             // These fields are used only for zksync era
             chainCreationParams.genesisRollupLeafIndex = json.readUint("$.genesis_rollup_leaf_index");
             chainCreationParams.genesisBatchCommitment = json.readBytes32("$.genesis_batch_commitment");
+            chainCreationParams.genesisAirbenderBatchCommitment = json.readBytes32(
+                "$.genesis_airbender_batch_commitment"
+            );
             chainCreationParams.defaultAAHash = json.readBytes32("$.default_aa_hash");
             chainCreationParams.bootloaderHash = json.readBytes32("$.bootloader_hash");
             chainCreationParams.evmEmulatorHash = json.readBytes32("$.evm_emulator_hash");

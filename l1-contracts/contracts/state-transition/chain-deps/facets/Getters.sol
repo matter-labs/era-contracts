@@ -14,7 +14,12 @@ import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "../../chain-interfaces/ILegacyGetters.sol";
 import {SemVer} from "../../../common/libraries/SemVer.sol";
-import {L2DACommitmentScheme} from "../../../common/Config.sol";
+import {
+    AIRBENDER_PROOF_SYSTEM_MASK,
+    BOOJUM_PROOF_SYSTEM_MASK,
+    DisabledProofSystems,
+    L2DACommitmentScheme
+} from "../../../common/Config.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -217,6 +222,16 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     /// @inheritdoc IGetters
     function getZKsyncOSMaxTxGasLimit() external view returns (uint64) {
         return _getZKsyncOSMaxTxGasLimit();
+    }
+
+    /// @inheritdoc IGetters
+    function disabledProofSystems() external view returns (DisabledProofSystems memory) {
+        uint8 mask = s.disabledProofSystems;
+        return
+            DisabledProofSystems({
+                boojum: mask & BOOJUM_PROOF_SYSTEM_MASK != 0,
+                airbender: mask & AIRBENDER_PROOF_SYSTEM_MASK != 0
+            });
     }
 
     /// @inheritdoc IGetters

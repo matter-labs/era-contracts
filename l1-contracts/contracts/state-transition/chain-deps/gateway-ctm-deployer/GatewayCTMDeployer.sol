@@ -48,6 +48,8 @@ struct GatewayCTMDeployerConfig {
     uint256 genesisRollupLeafIndex;
     /// @notice Commitment of the genesis batch.
     bytes32 genesisBatchCommitment;
+    /// @notice Airbender commitment of the genesis batch.
+    bytes32 genesisAirbenderBatchCommitment;
     /// @notice Data for force deployments.
     bytes forceDeploymentsData;
     /// @notice The latest protocol version.

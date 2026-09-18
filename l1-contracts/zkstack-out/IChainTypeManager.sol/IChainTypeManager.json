@@ -494,6 +494,11 @@
                 "internalType": "bytes32"
               },
               {
+                "name": "genesisAirbenderBatchCommitment",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
                 "name": "diamondCut",
                 "type": "tuple",
                 "internalType": "struct Diamond.DiamondCutData",
@@ -700,6 +705,11 @@
           },
           {
             "name": "genesisBatchCommitment",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "genesisAirbenderBatchCommitment",
             "type": "bytes32",
             "internalType": "bytes32"
           },

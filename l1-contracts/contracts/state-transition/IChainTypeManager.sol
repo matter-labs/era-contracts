@@ -30,6 +30,7 @@ struct ChainTypeManagerInitializeData {
 /// @param genesisBatchHash Batch hash of the genesis (initial) batch
 /// @param genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for the genesis batch
 /// @param genesisBatchCommitment The zk-proof commitment for the genesis batch
+/// @param genesisAirbenderBatchCommitment The Airbender commitment for the genesis batch; zero for ZKsync OS
 /// @param diamondCut The diamond cut for the first upgrade transaction on the newly deployed chain
 // solhint-disable-next-line gas-struct-packing
 struct ChainCreationParams {
@@ -37,6 +38,7 @@ struct ChainCreationParams {
     bytes32 genesisBatchHash;
     uint64 genesisIndexRepeatedStorageChanges;
     bytes32 genesisBatchCommitment;
+    bytes32 genesisAirbenderBatchCommitment;
     Diamond.DiamondCutData diamondCut;
     bytes forceDeploymentsData;
 }
