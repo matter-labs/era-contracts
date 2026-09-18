@@ -60,6 +60,7 @@ const ARTIFACTS = {
   L2WrappedBaseToken: "L2WrappedBaseToken.sol/L2WrappedBaseToken.json",
   MailboxFacet: "Mailbox.sol/MailboxFacet.json",
   MigratorFacet: "Migrator.sol/MigratorFacet.json",
+  MockLegacyNtvWeth: "MockContractDeployer.sol/MockLegacyNtvWeth.json",
   MockContractDeployer: "MockContractDeployer.sol/MockContractDeployer.json",
   MockL1MessengerHook: "MockL1MessengerHook.sol/MockL1MessengerHook.json",
   MockL2MessageVerification: "MockL2MessageVerification.sol/MockL2MessageVerification.json",

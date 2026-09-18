@@ -29,3 +29,13 @@ contract MockContractDeployer {
 
     receive() external payable {}
 }
+
+/// @notice Legacy immutable getter fixture for synthetic Anvil states that omit constructor data.
+/// @dev Deployed normally on the EVM test chain; only the old getter is exercised before replacement.
+contract MockLegacyNtvWeth {
+    address public immutable WETH_TOKEN;
+
+    constructor(address _wethToken) {
+        WETH_TOKEN = _wethToken;
+    }
+}

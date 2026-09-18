@@ -114,6 +114,22 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
     const l1Provider = new ethers.providers.JsonRpcProvider(l1Chain.rpcUrl);
     const defaultSigner = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
 
+    // The synthetic v29 snapshot contains runtime bytecode without constructor-populated immutables.
+    // Supply the legacy getter explicitly; forked-chain upgrades never run this fixture setup.
+    if (!scenario.isZKsyncOS) {
+      for (const chain of anvilManager.getL2Chains()) {
+        if (!upgradeChainAddresses.some((target) => target.chainId === chain.chainId)) continue;
+        const provider = new ethers.providers.JsonRpcProvider(chain.rpcUrl);
+        const fixture = await new ethers.ContractFactory(
+          getAbi("MockLegacyNtvWeth"),
+          getCreationBytecode("MockLegacyNtvWeth"),
+          provider.getSigner()
+        ).deploy(L2_WRAPPED_BASE_TOKEN_IMPL_ADDR);
+        await fixture.deployed();
+        await provider.send("anvil_setCode", [L2_NATIVE_TOKEN_VAULT_ADDR, await provider.getCode(fixture.address)]);
+      }
+    }
+
     // ── Transfer L1 contract ownership to governance ──
     console.log("\n── Preparing L1 ownership for upgrade ──");
     await transferL1Ownership(l1Provider, defaultSigner, l1Addresses, ctmAddresses, scenario);

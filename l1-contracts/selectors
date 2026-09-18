@@ -12269,6 +12269,14 @@ MockL2MessageVerification
 | Function | proveL2MessageInclusionShared(uint256,uint256,uint256,(uint16,address,bytes),bytes32[])                  | 0x18b7fc22 |
 ╰----------+----------------------------------------------------------------------------------------------------------+------------╯
 
+MockLegacyNtvWeth
+
+╭----------+--------------+------------╮
+| Type     | Signature    | Selector   |
++======================================+
+| Function | WETH_TOKEN() | 0x37d277d4 |
+╰----------+--------------+------------╯
+
 MockMintBaseTokenHook
 
 ╭------+-----------+----------╮
