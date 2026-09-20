@@ -18,18 +18,22 @@ use crate::hook::{
 };
 
 /// Hooks the bootloader must emit exactly once for every processed transaction.
-const PER_TRANSACTION_HOOKS: [(u32, &str); 5] = [
-    (HOOK_VALIDATION_STEP_ENDED, "VALIDATION_STEP_ENDED"),
+const PER_TRANSACTION_HOOKS: [(u32, &str); 4] = [
     (HOOK_TX_HAS_ENDED, "TX_HAS_ENDED"),
     (HOOK_ASK_OPERATOR_FOR_REFUND, "ASK_OPERATOR_FOR_REFUND"),
     (HOOK_NOTIFY_ABOUT_REFUND, "NOTIFY_ABOUT_REFUND"),
     (HOOK_EXECUTION_RESULT, "EXECUTION_RESULT"),
 ];
 
-/// Checks that a bootloader run over `tx_count` transactions emitted the operator hooks the
-/// server relies on: the per-transaction hooks exactly once per transaction, and every
-/// validation-entered hook matched by a validation-exited one.
-pub fn check_operator_hooks(counts: &BTreeMap<u32, u32>, tx_count: u32) -> Result<(), String> {
+/// Checks that a bootloader run over `tx_count` transactions, `l2_tx_count` of them L2 ones,
+/// emitted the operator hooks the server relies on: the per-transaction hooks exactly once per
+/// transaction, `VALIDATION_STEP_ENDED` once per L2 transaction (L1 ones skip validation), and
+/// every validation-entered hook matched by a validation-exited one.
+pub fn check_operator_hooks(
+    counts: &BTreeMap<u32, u32>,
+    tx_count: u32,
+    l2_tx_count: u32,
+) -> Result<(), String> {
     let count = |hook_id: u32| counts.get(&hook_id).copied().unwrap_or(0);
     let mut problems = Vec::new();
 
@@ -40,6 +44,13 @@ pub fn check_operator_hooks(counts: &BTreeMap<u32, u32>, tx_count: u32) -> Resul
                 "hook {hook_id} ({name}) emitted {emitted} times, expected {tx_count}"
             ));
         }
+    }
+
+    let validation_step_ended = count(HOOK_VALIDATION_STEP_ENDED);
+    if validation_step_ended != l2_tx_count {
+        problems.push(format!(
+            "hook {HOOK_VALIDATION_STEP_ENDED} (VALIDATION_STEP_ENDED) emitted {validation_step_ended} times, expected {l2_tx_count}"
+        ));
     }
 
     let entered = count(HOOK_ACCOUNT_VALIDATION_ENTERED) + count(HOOK_PAYMASTER_VALIDATION_ENTERED);

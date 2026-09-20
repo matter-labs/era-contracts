@@ -14,10 +14,37 @@ use zksync_multivm::zk_evm_latest::tracing::{BeforeExecutionData, VmLocalStateDa
 
 use zksync_state::interface::{StoragePtr, WriteStorage};
 
+use zksync_types::U256;
+
 use crate::hook::{
     TestVmHook, HOOK_ASK_OPERATOR_FOR_REFUND, HOOK_EXECUTION_RESULT, HOOK_NOTIFY_ABOUT_REFUND,
     HOOK_TX_HAS_ENDED, HOOK_VALIDATION_STEP_ENDED, ROOT_HOOK_FRAME_DEPTH,
 };
+
+/// What the runner verifies once the batch is done; test bodies run before the transaction loop.
+#[derive(Default)]
+pub struct Expectations {
+    pub tx_failures_no_returndata: Vec<usize>,
+    pub bootloader_logs: Vec<(U256, U256)>,
+    pub balances: Vec<(U256, U256)>,
+    pub forbidden_log_keys: Vec<U256>,
+    /// Pairs that must not appear; unlike `forbidden_log_keys`, the key may be shared.
+    pub forbidden_logs: Vec<(U256, U256)>,
+    pub system_logs: Vec<(U256, U256)>,
+    /// Result of every transaction the bootloader reported, in execution order.
+    pub tx_results: Vec<(bool, Option<String>)>,
+}
+
+impl Expectations {
+    pub fn any_registered(&self) -> bool {
+        !self.tx_failures_no_returndata.is_empty()
+            || !self.bootloader_logs.is_empty()
+            || !self.forbidden_log_keys.is_empty()
+            || !self.forbidden_logs.is_empty()
+            || !self.system_logs.is_empty()
+            || !self.balances.is_empty()
+    }
+}
 
 /// Bootloader test tracer that is executing while the bootloader tests are running.
 /// It can check the asserts, return information about the running tests (and amount of tests) etc.
@@ -30,6 +57,8 @@ pub struct BootloaderTestTracer {
     requested_tx_failure: Arc<OnceCell<String>>,
     /// Full returndata hex of the latest failed tx execution captured via VM hook.
     tx_failure_data_hex: Arc<OnceCell<String>>,
+    /// What the test registered for the runner to check, plus the data to check it against.
+    expectations: Arc<Mutex<Expectations>>,
 
     test_name: Arc<OnceCell<String>>,
     /// How many times each operator VM hook id was emitted during the run.
@@ -42,6 +71,7 @@ impl BootloaderTestTracer {
         requested_assert: Arc<OnceCell<String>>,
         requested_tx_failure: Arc<OnceCell<String>>,
         tx_failure_data_hex: Arc<OnceCell<String>>,
+        expectations: Arc<Mutex<Expectations>>,
         test_name: Arc<OnceCell<String>>,
         operator_hook_counts: Arc<Mutex<BTreeMap<u32, u32>>>,
     ) -> Self {
@@ -50,6 +80,7 @@ impl BootloaderTestTracer {
             requested_assert,
             requested_tx_failure,
             tx_failure_data_hex,
+            expectations,
             test_name,
             operator_hook_counts,
         }
@@ -121,6 +152,57 @@ impl<S, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for BootloaderTestTracer {
                     let _ = self.tx_failure_data_hex.set(data_hex.clone());
                 }
             }
+            self.expectations
+                .lock()
+                .unwrap()
+                .tx_results
+                .push((*success, revert_data_hex.clone()));
+        }
+
+        match &hook {
+            TestVmHook::ExpectTxFailureNoReturndata(index) => {
+                self.expectations
+                    .lock()
+                    .unwrap()
+                    .tx_failures_no_returndata
+                    .push(*index);
+            }
+            TestVmHook::ExpectBootloaderLog(key, value) => {
+                self.expectations
+                    .lock()
+                    .unwrap()
+                    .bootloader_logs
+                    .push((*key, *value));
+            }
+            TestVmHook::ExpectBalance(account, balance) => {
+                self.expectations
+                    .lock()
+                    .unwrap()
+                    .balances
+                    .push((*account, *balance));
+            }
+            TestVmHook::ExpectNoBootloaderLogKey(key) => {
+                self.expectations
+                    .lock()
+                    .unwrap()
+                    .forbidden_log_keys
+                    .push(*key);
+            }
+            TestVmHook::ExpectNoBootloaderLog(key, value) => {
+                self.expectations
+                    .lock()
+                    .unwrap()
+                    .forbidden_logs
+                    .push((*key, *value));
+            }
+            TestVmHook::ExpectSystemLog(key, value) => {
+                self.expectations
+                    .lock()
+                    .unwrap()
+                    .system_logs
+                    .push((*key, *value));
+            }
+            _ => {}
         }
 
         if let TestVmHook::TestStart(test_name) = &hook {
