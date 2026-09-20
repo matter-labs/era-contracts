@@ -567,12 +567,13 @@ object "Bootloader" {
             // }
             //
             // `txMeta` contains flags to manipulate the transaction execution flow.
-            // For playground batches:
-            //      It can have the following information (0 byte is LSB and 31 byte is MSB):
-            //      0 byte: `execute`, bool. Denotes whether transaction should be executed by the bootloader.
-            //      31 byte: server-side tx execution mode
+            // (0 byte is LSB and 31 byte is MSB)
             // For proved batches:
-            //      It can simply denotes whether to execute the transaction (0 to stop executing the batch, 1 to continue)
+            //      0 byte: `execute`, bool. 0 stops executing the batch, 1 continues.
+            //      1 byte: `forceFail`, bool. Operator-requested failure of an L1->L2 transaction (see `processTx`).
+            //      All other bytes must be zero: `validateProvedTxMeta` accepts exactly 0x0001 and 0x0101.
+            // For playground batches:
+            //      The same, plus 31 byte: server-side tx execution mode (see `validatePlaygroundTxMeta`).
             //
             // Each such encoded struct consumes 2 words
             function TX_DESCRIPTION_SIZE() -> ret {
@@ -683,6 +684,10 @@ object "Bootloader" {
                 ret := 0x000000000000000000000000000000000000800e
             }
 
+            function L2_ASSET_TRACKER_ADDR() -> ret {
+                ret := 0x000000000000000000000000000000000001000f
+            }
+
             function MAX_SYSTEM_CONTRACT_ADDR() -> ret {
                 ret := 0x000000000000000000000000000000000000ffff
             }
@@ -753,13 +758,23 @@ object "Bootloader" {
             /// @param isETHCall Whether the call is an ethCall.
             /// @param gasPerPubdata The number of L2 gas to charge users for each byte of pubdata
             /// On proved batch this value should always be zero
+            /// @param forceFail Whether the operator asked to fail this transaction before any user code runs.
+            /// Only valid for L1->L2 transactions.
             function processTx(
                 txDataOffset,
                 resultPtr,
                 transactionIndex,
                 isETHCall,
-                gasPerPubdata
+                gasPerPubdata,
+                forceFail
             ) {
+                // Force-fail is supported only for batches settling on L1.
+                if forceFail {
+                    if iszero(eq(getSettlementLayerChainId(), getL1ChainId())) {
+                        assertionError("forceFail off L1 settlement")
+                    }
+                }
+
                 // We set the L2 block info for this particular transaction
                 setL2Block(transactionIndex)
                 setInteropRoots(transactionIndex)
@@ -782,6 +797,12 @@ object "Bootloader" {
                         // - They must be the first one in the batch
                         // - They have a different type to prevent tx hash collisions and preserve the expectation that the
                         // L1->L2 transactions have priorityTxId inside them.
+
+                        // Upgrade txs must always succeed, so the flag is never valid here.
+                        if forceFail {
+                            assertionError("forceFail on upgrade tx")
+                        }
+
                         if transactionIndex {
                             assertionError("Protocol upgrade tx not first")
                         }
@@ -792,13 +813,18 @@ object "Bootloader" {
                         let canonicalL1TxHash := getCanonicalL1TxHash(txDataOffset)
                         sendToL1Native(true, protocolUpgradeTxHashKey(), canonicalL1TxHash)
 
-                        processL1Tx(txDataOffset, resultPtr, transactionIndex, userProvidedPubdataPrice, false)
+                        processL1Tx(txDataOffset, resultPtr, transactionIndex, userProvidedPubdataPrice, false, 0)
                     }
                     case 255 {
                         // This is an L1->L2 transaction.
-                        processL1Tx(txDataOffset, resultPtr, transactionIndex, userProvidedPubdataPrice, true)
+                        processL1Tx(txDataOffset, resultPtr, transactionIndex, userProvidedPubdataPrice, true, forceFail)
                     }
                     default {
+                        // The flag is only meaningful for priority ops.
+                        if forceFail {
+                            assertionError("forceFail on L2 tx")
+                        }
+
                         // The user has not agreed to this pubdata price
                         if lt(userProvidedPubdataPrice, gasPerPubdata) {
                             revertWithReason(UNACCEPTABLE_GAS_PRICE_ERR_CODE(), 0)
@@ -881,6 +907,25 @@ object "Bootloader" {
 
                     // Most likely not enough gas provided, revert the current frame.
                     nearCallPanic()
+                }
+
+                ret := mload(0)
+            }
+
+            /// @dev The chain id of the L1 this chain settles to, as recorded on the asset tracker
+            /// during the genesis upgrade.
+            function getL1ChainId() -> ret {
+                mstore(0, {{RIGHT_PADDED_GET_L1_CHAIN_ID_SELECTOR}})
+                let success := staticcall(
+                    gas(),
+                    L2_ASSET_TRACKER_ADDR(),
+                    0,
+                    4,
+                    0,
+                    32
+                )
+                if iszero(success) {
+                    assertionError("getL1ChainId failed")
                 }
 
                 ret := mload(0)
@@ -1113,12 +1158,14 @@ object "Bootloader" {
             /// @param transactionIndex The index of the transaction
             /// @param gasPerPubdata The price per pubdata to be used
             /// @param isPriorityOp Whether the transaction is a priority one
+            /// @param forceFail See `processTx`
             function processL1Tx(
                 txDataOffset,
                 resultPtr,
                 transactionIndex,
                 gasPerPubdata,
-                isPriorityOp
+                isPriorityOp,
+                forceFail
             ) {
                 // For L1->L2 transactions we always use the pubdata price provided by the transaction.
                 // This is needed to ensure DDoS protection. All the excess expenditure
@@ -1169,6 +1216,7 @@ object "Bootloader" {
                         gasForExecution,
                         basePubdataSpent,
                         gasPerPubdata,
+                        forceFail
                     )
 
                     let ergsSpentOnPubdata := getErgsSpentForPubdata(
@@ -1239,6 +1287,11 @@ object "Bootloader" {
                     // Sending the L2->L1 log so users will be able to prove transaction execution result on L1.
                     sendL2LogUsingL1Messenger(true, canonicalL1TxHash, success)
 
+                    // Records the operator's choice, which a revert is otherwise indistinguishable from.
+                    if forceFail {
+                        sendL2LogUsingL1Messenger(true, forceFailedL1TxLogKey(), canonicalL1TxHash)
+                    }
+
                     // Update priority txs L1 data
                     mstore(0, mload(PRIORITY_TXS_L1_DATA_BEGIN_BYTE()))
                     mstore(32, canonicalL1TxHash)
@@ -1262,11 +1315,13 @@ object "Bootloader" {
             /// @param gasForExecution The amount of gas available for the execution
             /// @param basePubdataSpent The amount of pubdata spent at the start of the transaction
             /// @param gasPerPubdata The price per each pubdata byte in L2 gas
+            /// @param forceFail See `processTx`
             function getExecuteL1TxAndNotifyResult(
                 txDataOffset,
                 gasForExecution,
                 basePubdataSpent,
-                gasPerPubdata
+                gasPerPubdata,
+                forceFail
             ) -> gasSpentOnExecution, success {
                 debugLog("gasForExecution", gasForExecution)
 
@@ -1280,7 +1335,8 @@ object "Bootloader" {
                     callAbi,
                     txDataOffset,
                     basePubdataSpent,
-                    gasPerPubdata
+                    gasPerPubdata,
+                    forceFail
                 )
                 notifyExecutionResult(success)
                 gasSpentOnExecution := sub(gasBeforeExecution, gas())
@@ -2049,12 +2105,20 @@ object "Bootloader" {
             /// @param txDataOffset The offset to the ABI-encoded Transaction struct.
             /// @param basePubdataSpent The amount of pubdata spent at the beginning of the transaction.
             /// @param gasPerPubdata The price of each byte of pubdata in L2 gas.
+            /// @param forceFail Operator-requested failure: the frame panics before executing anything.
             function ZKSYNC_NEAR_CALL_executeL1Tx(
                 abi,
                 txDataOffset,
                 basePubdataSpent,
                 gasPerPubdata,
+                forceFail
             ) -> success {
+                // Operator-requested failure. Panic before touching tx.origin, gas price,
+                // the value mint, or any user code.
+                if forceFail {
+                    nearCallPanic()
+                }
+
                 // Skipping the first word of the ABI encoding of the struct
                 let innerTxDataOffset := add(txDataOffset, 32)
                 let from := getFrom(innerTxDataOffset)
@@ -3022,7 +3086,6 @@ object "Bootloader" {
                 ret := verbatim_7i_1o("system_mimic_call", to, whoToMimic, farCallAbi, extraAbi1, extraAbi2, extraAbi3, 0)
             }
 
-            <!-- @if BOOTLOADER_TYPE=='playground_batch' -->
             // Extracts the required byte from the 32-byte word.
             // 31 would mean the MSB, 0 would mean LSB.
             function getWordByte(word, byteIdx) -> ret {
@@ -3031,7 +3094,25 @@ object "Bootloader" {
                 // Clean everything else in the word
                 ret := and(ret, 0xFF)
             }
-            <!-- @endif -->
+
+            /// @dev Validates proved-batch metadata and returns the force-fail flag.
+            /// The word carries byte 0 = execute (1 here; the main loop already broke on 0),
+            /// byte 1 = forceFail (0 or 1), all other bytes 0.
+            function validateProvedTxMeta(txMeta) -> forceFail {
+                forceFail := getWordByte(txMeta, 1)
+                if gt(forceFail, 1) {
+                    assertionError("invalid txMeta")
+                }
+                if iszero(eq(txMeta, add(1, shl(8, forceFail)))) {
+                    assertionError("invalid txMeta")
+                }
+            }
+
+            /// @dev Playground variant of `validateProvedTxMeta`: byte 31 carries the server-side
+            /// execution mode and is masked off before the check.
+            function validatePlaygroundTxMeta(txMeta) -> forceFail {
+                forceFail := validateProvedTxMeta(and(txMeta, not(shl(248, 0xFF))))
+            }
 
 
             /// @dev Sends a L2->L1 log using L1Messengers' `sendL2ToL1Log`.
@@ -4606,6 +4687,12 @@ object "Bootloader" {
                 ret := 10
             }
 
+            /// @dev Key of the L1Messenger log emitted alongside the status log for each force-failed L1->L2
+            /// transaction. keccak256("zksync.bootloader.forceFailedL1TxLog").
+            function forceFailedL1TxLogKey() -> ret {
+                ret := 0xc347406c856ed927ab49919146282a0c9feb316c83a07792fce67353bcf0e474
+            }
+
             ////////////////////////////////////////////////////////////////////////////
             //                      Main Transaction Processing
             ////////////////////////////////////////////////////////////////////////////
@@ -4769,16 +4856,20 @@ object "Bootloader" {
 
                 <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
                 {
+                    let forceFail := validateProvedTxMeta(mload(txPtr))
+
                     debugLog("ethCall", 0)
-                    processTx(txDataOffset, resultPtr, transactionIndex, 0, GAS_PRICE_PER_PUBDATA)
+                    debugLog("forceFail", forceFail)
+                    processTx(txDataOffset, resultPtr, transactionIndex, 0, GAS_PRICE_PER_PUBDATA, forceFail)
                 }
                 <!-- @endif -->
                 <!-- @if BOOTLOADER_TYPE=='playground_batch' -->
                 {
                     let txMeta := mload(txPtr)
                     let processFlags := getWordByte(txMeta, 31)
+                    let forceFail := validatePlaygroundTxMeta(txMeta)
                     debugLog("flags", processFlags)
-
+                    debugLog("forceFail", forceFail)
 
                     // `processFlags` argument denotes which parts of execution should be done:
                     //  Possible values:
@@ -4787,7 +4878,7 @@ object "Bootloader" {
 
                     let isETHCall := eq(processFlags, 0x02)
                     debugLog("ethCall", isETHCall)
-                    processTx(txDataOffset, resultPtr, transactionIndex, isETHCall, GAS_PRICE_PER_PUBDATA)
+                    processTx(txDataOffset, resultPtr, transactionIndex, isETHCall, GAS_PRICE_PER_PUBDATA, forceFail)
                 }
                 <!-- @endif -->
                 // Signal to the vm that the transaction execution is complete
