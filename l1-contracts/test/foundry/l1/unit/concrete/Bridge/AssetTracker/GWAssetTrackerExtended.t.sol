@@ -32,7 +32,6 @@ import {BALANCE_CHANGE_VERSION} from "contracts/bridge/asset-tracker/IAssetTrack
 import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 
 import {
-    InvalidCanonicalTxHash,
     RegisterNewTokenNotAllowed,
     InvalidFunctionSignature,
     InvalidBuiltInContractMessage,

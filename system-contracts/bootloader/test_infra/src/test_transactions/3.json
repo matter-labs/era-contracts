@@ -1,0 +1,29 @@
+{
+  "common_data": {
+    "L1": {
+      "sender": "0x00000000000000000000000000000000000f0011",
+      "serialId": 1,
+      "layer2TipFee": "0x0",
+      "fullFee": "0x0",
+      "maxFeePerGas": "0x64",
+      "gasLimit": "0x1312d00",
+      "gasPerPubdataLimit": "0x320",
+      "opProcessingType": "Common",
+      "priorityQueueType": "Deque",
+      "canonicalTxHash": "0xecbccdd2b56ff489827ab0e5bc3491b74ffa1193c22a7e1393d24f93419dc3eb",
+      "toMint": "0x7744d640",
+      "refundRecipient": "0x00000000000000000000000000000000000f0013",
+      "deadlineBlock": 0,
+      "ethHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "ethBlock": 0
+    }
+  },
+  "execute": {
+    "contractAddress": "0x00000000000000000000000000000000000f0012",
+    "calldata": "0x",
+    "value": "0xf4240",
+    "factoryDeps": []
+  },
+  "received_timestamp_ms": 0,
+  "raw_bytes": null
+}
