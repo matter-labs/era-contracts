@@ -7,6 +7,7 @@ import { render, renderFile } from "template-file";
 import { utils } from "zksync-ethers";
 import { getRevertSelector, getTransactionUtils } from "./constants";
 import * as fs from "node:fs";
+import { assertBootloaderHookHelper, BOOTLOADER_LLVM_OPTIONS, BOOTLOADER_VARIANTS } from "./bootloader-compiler";
 
 /* eslint-disable @typescript-eslint/no-var-requires */
 const preprocess = require("preprocess");
@@ -272,6 +273,14 @@ async function main() {
   writeFileSync(`${OUTPUT_DIR_2}/fee_estimate.yul`, feeEstimationBootloader);
   writeFileSync(`${OUTPUT_DIR_2}/dummy.yul`, dummy);
   writeFileSync(`${OUTPUT_DIR_2}/transfer_test.yul`, transferTest);
+
+  for (const directory of [OUTPUT_DIR_1, OUTPUT_DIR_2]) {
+    for (const name of BOOTLOADER_VARIANTS) {
+      const sourcePath = `${directory}/${name}.yul`;
+      assertBootloaderHookHelper(readFileSync(sourcePath, "utf8"));
+      writeFileSync(`${sourcePath}.llvm.options`, `'${BOOTLOADER_LLVM_OPTIONS}'`);
+    }
+  }
 
   console.log("Bootloader preprocessing done!");
 }

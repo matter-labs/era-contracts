@@ -32,6 +32,7 @@ jobs:
         run: |
           yarn install
           yarn test:verification-input
+          yarn test:bootloader-compiler
           yarn build
           yarn build:foundry
 
@@ -86,6 +87,7 @@ jobs:
       - name: Run bootloader tests
         run: |
           cd system-contracts/bootloader/test_infra
+          cargo test --locked
           cargo run
 
   test-contracts:
