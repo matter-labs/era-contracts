@@ -67,7 +67,18 @@ struct Config {
     address ownerAddress;
     bytes32 zkTokenAssetId;
     bool testnetVerifier;
+    MultiProofConfig multiProof;
     ContractsConfig contracts;
+}
+
+/// @notice Deploy-time settings of the ZiSK multi-proof lane. They sit in
+///         their own struct so that `Config` stays within the stack budget the
+///         optimizer-free coverage build allows.
+// solhint-disable-next-line gas-struct-packing
+struct MultiProofConfig {
+    bool enabled;
+    address ziskPlonkVerifierAddr;
+    address ziskRangeVerifierAddr;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -126,6 +137,16 @@ abstract contract DeployCTMUtils is DeployUtils {
         config.ownerAddress = toml.readAddress("$.owner_address");
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
 
+        if (toml.keyExists("$.multi_proof_verifier")) {
+            config.multiProof.enabled = toml.readBool("$.multi_proof_verifier");
+        }
+        if (toml.keyExists("$.zisk_plonk_verifier_addr")) {
+            config.multiProof.ziskPlonkVerifierAddr = toml.readAddress("$.zisk_plonk_verifier_addr");
+        }
+        // When set, deploy uses this verifier instead of deploying the default ZiskVerifier.
+        if (toml.keyExists("$.zisk_range_verifier_addr")) {
+            config.multiProof.ziskRangeVerifierAddr = toml.readAddress("$.zisk_range_verifier_addr");
+        }
         if (toml.keyExists("$.zk_token_asset_id")) {
             config.zkTokenAssetId = toml.readBytes32("$.zk_token_asset_id");
         }
@@ -268,6 +289,25 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "ZKsyncOSVerifierPlonk")) {
             return abi.encode();
+        } else if (compareStrings(contractName, "ZiskVerifier")) {
+            // The standalone snarkJS Plonk verifier this wraps; deployed
+            // beforehand (see verifiers/README.md) and passed by address.
+            return abi.encode(config.multiProof.ziskPlonkVerifierAddr);
+        } else if (compareStrings(contractName, "ZiskTestnetVerifier")) {
+            address ziskRangeVerifier = ctmAddresses.multiProof.ziskVerifier;
+            return abi.encode(ziskRangeVerifier);
+        } else if (compareStrings(contractName, "MultiProofVerifier")) {
+            // The Airbender side is the ZKsync OS dual verifier, so the
+            // sub-verifier registry has one home.
+            // An operator may supply a range verifier of their own; otherwise
+            // the one deployed alongside this wrapper is used.
+            address ziskRangeVerifier = ctmAddresses.multiProof.ziskVerifier;
+            if (config.testnetVerifier) {
+                ziskRangeVerifier = ctmAddresses.multiProof.ziskTestnetVerifier;
+            }
+            return abi.encode(ctmAddresses.multiProof.airbenderVerifier, ziskRangeVerifier);
+        } else if (compareStrings(contractName, "MultiProofTestnetVerifier")) {
+            return abi.encode(ctmAddresses.multiProof.multiProofVerifier);
         } else if (compareStrings(contractName, "DefaultUpgrade")) {
             return abi.encode();
         } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
