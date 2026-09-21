@@ -991,6 +991,26 @@ contract AdminFunctions is Script, IAdminFunctions {
         saveAndSendAdminTx(chainInfo.admin, _accessControlRestriction, calls, _shouldSend);
     }
 
+    /// @inheritdoc IAdminFunctions
+    function setZKsyncOSL1TxFiltering(
+        address _bridgehub,
+        address _accessControlRestriction,
+        uint256 _chainId,
+        bool _enabled,
+        bool _shouldSend
+    ) public {
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: chainInfo.diamondProxy,
+            value: 0,
+            data: abi.encodeCall(IAdmin.setZKsyncOSL1TxFiltering, (_enabled))
+        });
+
+        saveAndSendAdminTx(chainInfo.admin, _accessControlRestriction, calls, _shouldSend);
+    }
+
     struct MigrateChainToGatewayParams {
         address bridgehub;
         uint256 l1GasPrice;

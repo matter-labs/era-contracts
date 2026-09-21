@@ -24,15 +24,8 @@ contract ExecutorZKsyncOSPublicInputHarness is ExecutorFacet {
     }
 }
 
-/// @notice Pins the ZKsync OS batch proof public input encoding to golden vectors shared with the
-/// ZKsync OS implementation (`public_input.rs` / `chain_config.rs` in the zksync-os repository):
-/// changing the encoding on either side must update both.
-/// @dev `_getBatchProofPublicInput` returns the hash UNTRUNCATED; `PUBLIC_INPUT_SHIFT` is
-/// applied once by `computeZKsyncOSHash` after the multi-batch fold.
-/// @dev The public input is `keccak256(state_before, state_after, chain_config_hash, batch_output)`,
-/// where `chain_config_hash = keccak256(chain_id, fri_proof_verification_enabled, max_tx_gas_limit,
-/// pubdata_content)` as four 32-byte big-endian words. FRI proof verification is always disabled from the
-/// settlement layer, so its word is always zero; `pubdata_content` is `FULL_PUBDATA` (0) / `LOGS_ONLY` (1).
+/// @notice Pins batch public inputs to the golden vectors in ZKsync OS's `public_input.rs`.
+/// @dev See {protocol-docs/chain-config.md#proof-commitment}.
 contract ZKsyncOSPublicInputTest is Test {
     ExecutorZKsyncOSPublicInputHarness internal executor;
     ZKsyncOSVerifier internal verifier;
@@ -41,13 +34,9 @@ contract ZKsyncOSPublicInputTest is Test {
     bytes32 internal constant BATCH_OUTPUT_HASH_GOLDEN =
         0x1c24f398aa0701f9348912ecca748ba93bfb84bfe4f283c16514311419f4f658;
 
-    /// @dev `BatchPublicInput::hash()` for zero state commitments, `chain_config_hash` of chain id 37
-    /// with FRI proof verification disabled, the default max tx gas limit and pubdata content `FULL_PUBDATA` (matching
-    /// zksync-os `ChainConfig::new(37, false, DEFAULT_MAX_TX_GAS_LIMIT).hash()`, which defaults to
-    /// `PubdataContent::FullPubdata`), and `BATCH_OUTPUT_HASH_GOLDEN`. Shared with zksync-os
-    /// `batch_public_input_hash_golden_vector`.
+    /// @dev Shared with ZKsync OS's `batch_public_input_hash_golden_vector` (filtering disabled).
     bytes32 internal constant PUBLIC_INPUT_HASH_GOLDEN =
-        0x0a5143e28ed3fc1728ef4d96319f2306bb5a81bfccd908154e44029988ef9e7c;
+        0xdf099e94dc933cb1e302ad66826a922df76c4759542b07311d99b0c5e9eb436d;
 
     uint256 internal constant GOLDEN_CHAIN_ID = 37;
 
