@@ -6,7 +6,7 @@ not by the Yul program. Ordinary dead-store elimination can remove them. The old
 `unoptimized` had no compiler meaning. Moving the stores into a `NoInline` helper
 preserved them but added a frame at the point where the server processes a hook.
 
-This candidate instead inlines the store wrapper and applies LLVM `optnone` only
+This candidate instead inlines the store wrapper and applies LLVM `optnone`
 to the existing value helper. That helper returns before the store executes, so
 the hook retains its previous frame placement. Validation hooks already emitted
 within transaction validation remain nested; not every hook must be at root.
@@ -17,17 +17,16 @@ within transaction validation remain nested; not every hook must be at root.
 
 ## Build scope and limitations
 
-Use `yarn build:foundry` or `yarn build:bootloader`. The preprocessor emits LLVM
-option sidecars for the five real bootloader variants. The Foundry build passes
-the same option only when compiling those explicit source paths. Other system
-contracts and the dummy/transfer fixtures retain their original compiler settings.
-Do not replace this with an unrestricted `forge build --zksync`: it omits the
-required option. Applying the flag globally is also wrong: LLVM options affect
-compiler metadata and would change unrelated bytecode hashes.
+The option lives in the normal system-contracts Foundry and Hardhat configuration.
+The standalone Yul build also reads that configuration. There is no separate
+bootloader compiler or compilation step. The function attribute targets only the
+named helper, but LLVM options also affect metadata of other system contracts;
+their hashes must be regenerated consistently. L1 EVM compiler settings are
+unchanged. Verification must retain `settings.llvmOptions` in Standard JSON input.
 
 The public zksolc option forwards a **hidden LLVM debugging facility**, not a stable
 hook API. An unmatched function name silently does nothing. Build-time source
-checks reject a missing helper, and runtime tests check emitted hooks, ordering,
+tests reject a missing helper or configuration drift, and runtime tests check emitted hooks, ordering,
 parameter writes and frame depth. Compiler-owner approval is required before
 adopting this workaround. Revalidate on every compiler change; a dedicated
 observable/ordered-store primitive would be a stronger long-term solution.
