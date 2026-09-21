@@ -2,14 +2,6 @@
 
 pragma solidity ^0.8.24;
 
-/// @notice How a built-in contract is deployed in ZKsyncOS upgrades.
-/// SystemProxy: deployed via conductContractUpgrade (behind a system proxy).
-/// Unsafe: force-deployed directly (no proxy upgrade flow).
-enum ZKsyncOSUpgradeType {
-    SystemProxy,
-    Unsafe
-}
-
 /// @notice Canonical identifier for core L2 contracts that participate in
 ///         force-deployments and factory-dependency publishing.
 ///         `CoreOnGatewayHelper.resolve` maps it to the contract and artifact name.
