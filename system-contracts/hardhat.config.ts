@@ -10,7 +10,7 @@ export default {
     version: "1.5.17",
     compilerSource: "binary",
     settings: {
-      llvmOptions: ["-force-attribute=$llvm_NoInline_llvm$_unoptimized:optnone"],
+      llvmOptions: ["-dse-memoryssa-scanlimit=0", "-dse-memoryssa-walklimit=0"],
       enableEraVMExtensions: true,
       suppressedErrors: ["sendtransfer"],
     },

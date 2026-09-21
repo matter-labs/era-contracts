@@ -4553,7 +4553,8 @@ object "Bootloader" {
                 ret := 12
             }
 
-            // The bootloader build applies LLVM `optnone` to this exact helper name.
+            // The pinned compiler configuration limits MemorySSA dead-store elimination.
+            // Hook and parameter writes are observable by the VM tracer, not by Yul reads.
             // NoInline alone does NOT prevent elimination of the surrounding hook stores.
             // Keep the stores in their caller: moving them into a near-call helper changes
             // the frame observed by server tracers.
