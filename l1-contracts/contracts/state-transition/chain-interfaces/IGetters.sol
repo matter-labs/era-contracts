@@ -134,6 +134,10 @@ interface IGetters is IZKChainBase {
     /// @return The hash used to validate batch commits; see {protocol-docs/chain-config.md}.
     function getZKsyncOSChainConfigHash() external view returns (bytes32);
 
+    /// @notice Returns whether operator filtering of priority transactions is enabled.
+    /// @return Whether L1 transaction filtering is enabled.
+    function getZKsyncOSL1TxFiltering() external view returns (bool);
+
     /// @return Whether a withdrawal has been finalized.
     /// @param _l2BatchNumber The L2 batch number within which the withdrawal happened.
     /// @param _l2MessageIndex The index of the L2->L1 message denoting the withdrawal.
