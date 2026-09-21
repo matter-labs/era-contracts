@@ -581,6 +581,61 @@ fn parse_l1_create2_deploy_from_input(
         salt,
     })
 }
+fn check_gw_create2_deploy_from_input(
+    to: Address,
+    input: &[u8],
+    bridgehub_addr: &Address,
+    bytecode_verifier: &BytecodeVerifier,
+) -> Option<ParsedCreate2Deployment> {
+    if to != *bridgehub_addr {
+        return None;
+    }
+
+    let l2_call = requestL2TransactionDirectCall::abi_decode(input).ok()?;
+    let l2_contract = l2_call._request.l2Contract;
+    let l2_calldata = l2_call._request.l2Calldata;
+
+    if l2_contract == ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR {
+        // ZKsync OS uses the standard EVM deterministic factory whose calldata
+        // is `bytes32 salt || initCode`.
+        let raw = l2_calldata.as_ref();
+        if raw.len() < 32 {
+            return None;
+        }
+        let salt = FixedBytes::<32>::from_slice(&raw[..32]);
+        let init_code = &raw[32..];
+        let (name, params) = bytecode_verifier.try_parse_bytecode(init_code)?;
+        let addr = compute_create2_address_evm(l2_contract, salt, keccak256(init_code));
+        return Some(ParsedCreate2Deployment {
+            addr,
+            name,
+            params,
+            salt,
+        });
+    }
+
+    if l2_contract == L2_CREATE2_FACTORY_ADDR {
+        // Era gateway deployments still call the ZKsync create2 system
+        // factory: create2(salt, bytecodeHash, constructorInput).
+        let create2_call = create2Call::abi_decode(&l2_calldata).ok()?;
+        let salt = create2_call._salt;
+        let addr = compute_create2_address_zk(
+            l2_contract,
+            salt,
+            create2_call._bytecodeHash,
+            keccak256(&create2_call._input),
+        );
+        let file_name = bytecode_verifier.zk_bytecode_hash_to_file(&create2_call._bytecodeHash)?;
+        return Some(ParsedCreate2Deployment {
+            addr,
+            name: file_name.to_string(),
+            params: create2_call._input.to_vec(),
+            salt,
+        });
+    }
+
+    None
+}
 
 #[cfg(test)]
 mod create2_provenance_tests {
@@ -676,60 +731,4 @@ mod create2_provenance_tests {
         );
         assert!(parse_l1_create2_deploy_from_input(Address::ZERO, &[0; 31], &verifier).is_none());
     }
-}
-
-fn check_gw_create2_deploy_from_input(
-    to: Address,
-    input: &[u8],
-    bridgehub_addr: &Address,
-    bytecode_verifier: &BytecodeVerifier,
-) -> Option<ParsedCreate2Deployment> {
-    if to != *bridgehub_addr {
-        return None;
-    }
-
-    let l2_call = requestL2TransactionDirectCall::abi_decode(input).ok()?;
-    let l2_contract = l2_call._request.l2Contract;
-    let l2_calldata = l2_call._request.l2Calldata;
-
-    if l2_contract == ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR {
-        // ZKsync OS uses the standard EVM deterministic factory whose calldata
-        // is `bytes32 salt || initCode`.
-        let raw = l2_calldata.as_ref();
-        if raw.len() < 32 {
-            return None;
-        }
-        let salt = FixedBytes::<32>::from_slice(&raw[..32]);
-        let init_code = &raw[32..];
-        let (name, params) = bytecode_verifier.try_parse_bytecode(init_code)?;
-        let addr = compute_create2_address_evm(l2_contract, salt, keccak256(init_code));
-        return Some(ParsedCreate2Deployment {
-            addr,
-            name,
-            params,
-            salt,
-        });
-    }
-
-    if l2_contract == L2_CREATE2_FACTORY_ADDR {
-        // Era gateway deployments still call the ZKsync create2 system
-        // factory: create2(salt, bytecodeHash, constructorInput).
-        let create2_call = create2Call::abi_decode(&l2_calldata).ok()?;
-        let salt = create2_call._salt;
-        let addr = compute_create2_address_zk(
-            l2_contract,
-            salt,
-            create2_call._bytecodeHash,
-            keccak256(&create2_call._input),
-        );
-        let file_name = bytecode_verifier.zk_bytecode_hash_to_file(&create2_call._bytecodeHash)?;
-        return Some(ParsedCreate2Deployment {
-            addr,
-            name: file_name.to_string(),
-            params: create2_call._input.to_vec(),
-            salt,
-        });
-    }
-
-    None
 }
