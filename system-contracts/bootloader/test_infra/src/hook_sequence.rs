@@ -5,8 +5,8 @@
 //! view those writes are dead stores, and an optimizer may legitimately drop all but the last one
 //! in a sequence: zksolc 1.5.15+ does exactly that when they are plain `mstore`s, which silently
 //! removed `EXECUTION_RESULT`, `NOTIFY_ABOUT_REFUND` and `VALIDATION_STEP_ENDED` from the
-//! production bootloader. The bootloader therefore performs these stores inside a `NoInline`
-//! helper, and this check makes the expected hook sequence explicit so that a regression shows up
+//! production bootloader. The pinned DSE limits preserve these stores in the caller frame,
+//! and this check makes the expected hook sequence explicit so that a regression shows up
 //! as a failed test instead of a sequencer that quietly stops seeing transaction results.
 
 use std::collections::BTreeMap;

@@ -21,6 +21,7 @@ pub(crate) const HOOK_TX_HAS_ENDED: u32 = 4;
 pub(crate) const HOOK_ASK_OPERATOR_FOR_REFUND: u32 = 8;
 pub(crate) const HOOK_NOTIFY_ABOUT_REFUND: u32 = 9;
 pub(crate) const HOOK_EXECUTION_RESULT: u32 = 10;
+pub(crate) const ROOT_HOOK_FRAME_DEPTH: usize = 1;
 
 #[derive(Clone, Debug)]
 pub(crate) enum TestVmHook {

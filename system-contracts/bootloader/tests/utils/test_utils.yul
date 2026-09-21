@@ -10,12 +10,12 @@ function TEST_HOOK_PARAMS_OFFSET() -> ret {
 }
 
 function setTestHook(hook) {
-    $llvm_NoInline_llvm$_storeVmHookMemory(TEST_HOOK_PTR(), hook)
+    $llvm_AlwaysInline_llvm$_storeVmHookMemory(TEST_HOOK_PTR(), hook)
 }   
 
 function storeTestHookParam(paramId, value) {
     let offset := add(TEST_HOOK_PARAMS_OFFSET(), mul(32, paramId))
-    $llvm_NoInline_llvm$_storeVmHookMemory(offset, value)
+    $llvm_AlwaysInline_llvm$_storeVmHookMemory(offset, value)
 }
 
 
