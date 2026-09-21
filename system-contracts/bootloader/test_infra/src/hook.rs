@@ -18,9 +18,14 @@ pub(crate) const HOOK_PAYMASTER_VALIDATION_ENTERED: u32 = 1;
 pub(crate) const HOOK_VALIDATION_EXITED: u32 = 2;
 pub(crate) const HOOK_VALIDATION_STEP_ENDED: u32 = 3;
 pub(crate) const HOOK_TX_HAS_ENDED: u32 = 4;
+pub(crate) const HOOK_DEBUG_LOG: u32 = 5;
+pub(crate) const HOOK_CATCH_NEAR_CALL: u32 = 6;
+pub(crate) const HOOK_DEBUG_RETURNDATA: u32 = 7;
 pub(crate) const HOOK_ASK_OPERATOR_FOR_REFUND: u32 = 8;
 pub(crate) const HOOK_NOTIFY_ABOUT_REFUND: u32 = 9;
 pub(crate) const HOOK_EXECUTION_RESULT: u32 = 10;
+pub(crate) const HOOK_FINAL_L2_STATE_INFO: u32 = 11;
+pub(crate) const HOOK_PUBDATA_REQUESTED: u32 = 12;
 
 #[derive(Clone, Debug)]
 pub(crate) enum TestVmHook {
@@ -33,8 +38,6 @@ pub(crate) enum TestVmHook {
         success: bool,
         revert_data_hex: Option<String>,
     },
-    // Any other operator VM hook, identified by its id; used to check the emitted hook sequence.
-    OperatorHook(u32),
     // Testing framework reporting the number of tests.
     TestCount(u32),
     // 104 - test start.
@@ -45,9 +48,62 @@ pub(crate) enum TestVmHook {
 const TEST_HOOKS: u32 = 5;
 const TEST_HOOK_ENUM_POSITION: u32 = get_vm_hook_start_position_latest() - 1;
 const TEST_HOOK_START: u32 = TEST_HOOK_ENUM_POSITION - TEST_HOOKS;
-const VM_HOOK_PARAMS: u32 = 3;
+pub(crate) const VM_HOOK_PARAMS: u32 = 3;
 const VM_HOOK_PARAMS_START: u32 = TEST_HOOK_ENUM_POSITION + 1;
 const VM_HOOK_ENUM_POSITION: u32 = VM_HOOK_PARAMS_START + VM_HOOK_PARAMS;
+
+/// Writes, rather than just hook counts, expose dead parameter stores and extra helper frames.
+#[derive(Clone, Debug)]
+pub(crate) enum OperatorHookWrite {
+    Parameter {
+        index: usize,
+        value: U256,
+        depth: usize,
+    },
+    Trigger {
+        id: u32,
+        params: [U256; VM_HOOK_PARAMS as usize],
+        depth: usize,
+    },
+}
+
+impl OperatorHookWrite {
+    pub(crate) fn from_opcode_memory<H: HistoryMode>(
+        state: &VmLocalStateData<'_>,
+        data: &BeforeExecutionData,
+        memory: &SimpleMemory<H>,
+    ) -> Option<Self> {
+        let heap_page =
+            heap_page_from_base(state.vm_local_state.callstack.current.base_memory_page).0;
+        if !matches!(
+            data.opcode.variant.opcode,
+            Opcode::UMA(UMAOpcode::HeapWrite)
+        ) || heap_page != BOOTLOADER_HEAP_PAGE
+        {
+            return None;
+        }
+        let offset = FatPointer::from_u256(data.src0_value.value).offset;
+        let value = data.src1_value.value;
+        let depth = state.vm_local_state.callstack.inner.len();
+        if offset == VM_HOOK_ENUM_POSITION * 32 {
+            Some(Self::Trigger {
+                id: value.as_u32(),
+                params: get_operator_hook_params(memory).try_into().unwrap(),
+                depth,
+            })
+        } else if offset % 32 == 0
+            && (VM_HOOK_PARAMS_START * 32..VM_HOOK_ENUM_POSITION * 32).contains(&offset)
+        {
+            Some(Self::Parameter {
+                index: (offset / 32 - VM_HOOK_PARAMS_START) as usize,
+                value,
+                depth,
+            })
+        } else {
+            None
+        }
+    }
+}
 
 pub fn get_vm_hook_params<H: HistoryMode>(memory: &SimpleMemory<H>) -> Vec<U256> {
     memory.dump_page_content_as_u256_words(
@@ -195,7 +251,7 @@ impl TestVmHook {
                             revert_data_hex,
                         }
                     }
-                    other => Self::OperatorHook(other),
+                    _ => Self::NoHook,
                 }
             }
             _ => Self::NoHook,
