@@ -288,4 +288,7 @@ struct ZKChainStorage {
     /// switched off (see `Admin.setProofSystemStatus`).
     /// @dev STORAGE SLOT: 68 (packed with baseTokenHasTotalSupply + zksyncOSMaxTxGasLimit + pubdataContent)
     uint8 disabledProofSystems;
+    /// @dev See {protocol-docs/chain-config.md#l1-transaction-filtering}.
+    /// @dev STORAGE SLOT: 68 (packed after disabledProofSystems)
+    bool zksyncOSL1TxFilteringEnabled;
 }
