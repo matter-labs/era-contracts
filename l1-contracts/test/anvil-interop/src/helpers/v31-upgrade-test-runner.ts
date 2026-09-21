@@ -7,6 +7,7 @@ import { AnvilManager } from "../daemons/anvil-manager";
 import { DeploymentRunner } from "../deployment-runner";
 import { runForgeScript } from "../core/forge";
 import {
+  HASH_TO_ADDRESS_BYTE_OFFSET,
   ANVIL_DEFAULT_ACCOUNT_ADDR,
   ANVIL_DEFAULT_PRIVATE_KEY,
   GW_ASSET_TRACKER_ADDR,
@@ -112,6 +113,22 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
     }
     const l1Provider = new ethers.providers.JsonRpcProvider(l1Chain.rpcUrl);
     const defaultSigner = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
+
+    // The synthetic v29 snapshot contains runtime bytecode without constructor-populated immutables.
+    // Supply the legacy getter explicitly; forked-chain upgrades never run this fixture setup.
+    if (!scenario.isZKsyncOS) {
+      for (const chain of anvilManager.getL2Chains()) {
+        if (!upgradeChainAddresses.some((target) => target.chainId === chain.chainId)) continue;
+        const provider = new ethers.providers.JsonRpcProvider(chain.rpcUrl);
+        const fixture = await new ethers.ContractFactory(
+          getAbi("MockLegacyNtvWeth"),
+          getCreationBytecode("MockLegacyNtvWeth"),
+          provider.getSigner()
+        ).deploy(L2_WRAPPED_BASE_TOKEN_IMPL_ADDR);
+        await fixture.deployed();
+        await provider.send("anvil_setCode", [L2_NATIVE_TOKEN_VAULT_ADDR, await provider.getCode(fixture.address)]);
+      }
+    }
 
     // ── Transfer L1 contract ownership to governance ──
     console.log("\n── Preparing L1 ownership for upgrade ──");
@@ -798,8 +815,8 @@ export async function runChainUpgradesPerCtm(params: {
  *
  * On Anvil EVM, neither the Era ContractDeployer nor ZKsyncOS bytecode deployer
  * infrastructure works. Instead we:
- *   1. Pre-deploy all known contracts via anvil_setCode
- *   2. Place a MockContractDeployer at 0x8006
+ *   1. Pre-deploy contracts from the outer list via anvil_setCode.
+ *   2. Use MockContractDeployer to switch deferred Era NTV code during the transaction.
  */
 async function prepareAndRelayL2Upgrade(
   l2Provider: ethers.providers.JsonRpcProvider,
@@ -807,16 +824,16 @@ async function prepareAndRelayL2Upgrade(
   isZKsyncOS: boolean
 ): Promise<string> {
   // Decode to extract addresses for pre-deployment, then send the ORIGINAL calldata.
-  // MockContractDeployer (no-op) handles the force deployment calls from both the outer
-  // ComplexUpgrader iteration and the inner performForceDeployedContractsInit calls.
+  // MockContractDeployer handles the deferred NTV switch; outer deployments are preinstalled.
   const { forceDeployEntries, delegateTo } = decodeUpgradeTxData(upgradeTxData);
+  const ntv = new ethers.Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("L2NativeTokenVault"), l2Provider);
+  const existingWeth = !isZKsyncOS ? await ntv.WETH_TOKEN() : undefined;
 
   // Pre-deploy all L2 contracts via anvil_setCode
   await deployL2Contracts(l2Provider, forceDeployEntries, delegateTo, isZKsyncOS);
 
   // Send the original upgrade calldata to ComplexUpgrader.
-  // The outer force deployments no-op (MockContractDeployer), then upgrade() delegatecalls
-  // to L2V31Upgrade which runs performForceDeployedContractsInit (inner deploys also no-op).
+  // The helper reads the legacy WETH getter before MockContractDeployer switches NTV implementations.
   const txHash = await impersonateAndRun(l2Provider, L2_FORCE_DEPLOYER_ADDR, async (signer) => {
     const tx = await signer.sendTransaction({
       to: L2_COMPLEX_UPGRADER_ADDR,
@@ -831,6 +848,9 @@ async function prepareAndRelayL2Upgrade(
     const trace = await traceFailedTx(l2Provider, receipt.transactionHash);
     throw new Error(`L2 upgrade relay reverted:\n${trace}`);
   }
+  if (!isZKsyncOS && (await ntv.WETH_TOKEN()) !== existingWeth) {
+    throw new Error("Era upgrade changed the existing wrapped base token address");
+  }
   return receipt.transactionHash;
 }
 
@@ -842,8 +862,8 @@ async function prepareAndRelayL2Upgrade(
  * The force deployment list from the calldata tells us which addresses the
  * production upgrade deploys to. We place EVM bytecodes at those addresses
  * (and a few extra addresses called during the upgrade but not in the force
- * deployment list). A MockContractDeployer at 0x8006 no-ops the actual
- * force-deploy calls from both ComplexUpgrader and performForceDeployedContractsInit.
+ * deployment list). MockContractDeployer leaves preinstalled contracts unchanged and
+ * switches the deferred Era NTV implementation when the helper requests its force deployment.
  *
  * For ZKsyncOS chains, contracts with ZKsyncOSSystemProxyUpgrade type are deployed
  * behind SystemContractProxy (matching production genesis layout):
@@ -858,8 +878,7 @@ async function deployL2Contracts(
   delegateTo: string,
   isZKsyncOS: boolean
 ): Promise<void> {
-  // MockContractDeployer: no-op fallback at ContractDeployer address so that
-  // forceDeployEra() and conductContractUpgrade() calls succeed silently.
+  // Emulate VM deployment calls, including the deferred Era NTV implementation switch.
   await l2Provider.send("anvil_setCode", [L2_CONTRACT_DEPLOYER_ADDR, getBytecode("MockContractDeployer")]);
 
   // SystemContractProxyAdmin: _setupProxyAdmin() calls owner() and forceSetOwner().
@@ -926,6 +945,11 @@ async function deployL2Contracts(
   // on the anvil chain or the transfer reverts with "Address: insufficient balance".
   await l2Provider.send("anvil_setBalance", [L2_BASE_TOKEN_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE]);
 
+  if (!isZKsyncOS) {
+    await prepareDeferredEraNtvDeployment(l2Provider);
+    return;
+  }
+
   // Seed critical storage values on L2 contracts that were deployed via anvil_setCode
   // but never initialized. performForceDeployedContractsInit reads these before calling
   // updateL2, which reverts if WETH_TOKEN is zero.
@@ -957,6 +981,36 @@ async function deployL2Contracts(
     ethers.utils.hexZeroPad("0x01", 32),
   ]);
   // AR: L2_LEGACY_SHARED_BRIDGE is zero (no legacy bridge) — no need to set
+}
+
+/**
+ * Anvil cannot replace code during a transaction. Model Era's deferred NTV force deployment
+ * with a real proxy upgrade: the old runtime serves WETH_TOKEN until the deployer call switches
+ * to the new runtime. Both implementations use the existing NTV storage, without slot overrides.
+ */
+async function prepareDeferredEraNtvDeployment(provider: ethers.providers.JsonRpcProvider): Promise<void> {
+  const oldCode = await provider.getCode(L2_NATIVE_TOKEN_VAULT_ADDR);
+  if (oldCode === "0x") throw new Error("Missing pre-upgrade NTV code");
+  const newCode = getBytecode("L2NativeTokenVault");
+  const oldImplementation = ethers.utils.getAddress(
+    ethers.utils.hexDataSlice(ethers.utils.keccak256(oldCode), HASH_TO_ADDRESS_BYTE_OFFSET)
+  );
+  const newImplementation = ethers.utils.getAddress(
+    ethers.utils.hexDataSlice(ethers.utils.keccak256(newCode), HASH_TO_ADDRESS_BYTE_OFFSET)
+  );
+  await provider.send("anvil_setCode", [oldImplementation, oldCode]);
+  await provider.send("anvil_setCode", [newImplementation, newCode]);
+  await provider.send("anvil_setCode", [L2_NATIVE_TOKEN_VAULT_ADDR, getBytecode("SystemContractProxy")]);
+  await impersonateAndRun(provider, L2_COMPLEX_UPGRADER_ADDR, async (signer) => {
+    const proxy = new ethers.Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("ISystemContractProxy"), signer);
+    await (await proxy.forceInitAdmin(L2_CONTRACT_DEPLOYER_ADDR)).wait();
+  });
+  await impersonateAndRun(provider, L2_CONTRACT_DEPLOYER_ADDR, async (signer) => {
+    const proxy = new ethers.Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("ITransparentUpgradeableProxy"), signer);
+    await (await proxy.upgradeTo(oldImplementation)).wait();
+  });
+  const deployer = new ethers.Contract(L2_CONTRACT_DEPLOYER_ADDR, getAbi("MockContractDeployer"), provider.getSigner());
+  await (await deployer.registerDeferredDeployment(L2_NATIVE_TOKEN_VAULT_ADDR, newImplementation)).wait();
 }
 
 /**
