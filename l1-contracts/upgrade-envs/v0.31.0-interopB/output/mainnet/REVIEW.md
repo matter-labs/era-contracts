@@ -1,5 +1,7 @@
 # Mainnet calldata candidate — 21 September 2026
 
+> Superseded source configuration: this output is still the optnone candidate below. DSE regeneration is pending; do not use these bytes as the new DSE handoff.
+
 Source: [generation and no-build handoff run 35605860870](https://github.com/matter-labs/era-contracts/actions/runs/35605860870), contracts commit `d3529c891eb0253b4a74fe93997ec26282444f9a`. This includes the root-frame bootloader replacement from #2520, canonical system-contract hashes and regenerated Era genesis.
 
 - Calldata artifact: `10643082130`.

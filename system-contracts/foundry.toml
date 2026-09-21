@@ -12,7 +12,7 @@ remappings = [
 
 [profile.default.zksync]
 zksolc = "1.5.17"
-llvm_options = ['-force-attribute=$llvm_NoInline_llvm$_unoptimized:optnone']
+llvm_options = ["-dse-memoryssa-scanlimit=0", "-dse-memoryssa-walklimit=0"]
 enable_eravm_extensions = true
 suppressed_errors = ["sendtransfer"]
 
@@ -27,6 +27,6 @@ solc_version = "0.8.28"
 
 [profile.test.zksync]
 zksolc = "1.5.17"
-llvm_options = ['-force-attribute=$llvm_NoInline_llvm$_unoptimized:optnone']
+llvm_options = ["-dse-memoryssa-scanlimit=0", "-dse-memoryssa-walklimit=0"]
 enable_eravm_extensions = true
 suppressed_errors = ["sendtransfer"]

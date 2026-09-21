@@ -2,7 +2,7 @@ import assert from "assert";
 import { parseForgeCompilerInput, yulVerificationRequest } from "./yul-verification-input";
 import type { CompilerInput } from "./yul-verification-input";
 
-const llvmOptions = ["-force-attribute=$llvm_NoInline_llvm$_unoptimized:optnone"];
+const llvmOptions = ["-dse-memoryssa-scanlimit=0", "-dse-memoryssa-walklimit=0"];
 const sourcePath = "contracts-preprocessed/Example.yul";
 const codeName = "Example";
 const name = `${sourcePath}:Example`;
