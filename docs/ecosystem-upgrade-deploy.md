@@ -200,10 +200,23 @@ having deployed nothing. `ETHERSCAN_API_KEY` is optional (verify only).
 > `--out` path. In CI, dispatch a new deploy run with `resume_deploy_run_id` set
 > to the failed deploy run; the workflow validates and restores that run's
 > partial result artifact before broadcasting. Do not use GitHub's plain
-> “re-run failed jobs” button, which cannot add the resume input. Ownership-
-> transfer txs are **not** idempotent-skipped, so if a bundle was interrupted
-> after some ownership moved off the deployer, see the notes in
-> `execute_safe.rs` for building a resume bundle.
+> “re-run failed jobs” button, which cannot add the resume input.
+>
+> With a journal, a resume skips every call the journal proves already mined —
+> matched on target, calldata and value, then confirmed by the on-chain
+> receipt's sender, target and status — so ownership transfers that already
+> moved off the deployer are skipped too, not re-sent into a revert. Without a
+> journal only CREATE2 deploys whose address has code and a few revert
+> signatures (already-published bytecodes, already-scheduled governance ops)
+> are skipped.
+>
+> The same mechanism completes a **re-cut** deployment: when contracts changed
+> after a partial or full broadcast, regenerate the bundle (forking BEFORE the
+> earlier broadcast, so the prepare still owns what it deploys) and dispatch
+> the deploy with `resume_deploy_run_id` = the earlier deploy run and
+> `resume_from_other_bundle` = true. Unchanged contracts and their setup calls
+> are byte-identical to the journaled ones and are skipped; only the changed
+> contracts, their setup calls and new bytecode publishes go out.
 
 ---
 

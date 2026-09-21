@@ -62,6 +62,11 @@ on:
         required: false
         default: ""
         type: string
+      resume_from_other_bundle:
+        description: "Allow resume_deploy_run_id to point at a run that deployed a DIFFERENT bundle of the same environment (a re-cut after contract changes). The executor then skips only the calls that journal proves already mined — matched on target, calldata and value and confirmed by the on-chain receipt — and sends the rest. Off by default: normally a resume must belong to the same generation run and bundle."
+        required: false
+        default: false
+        type: boolean
       max_gas_price_gwei:
         description: "Gas-price ceiling (gwei) for the stuck-tx bump loop"
         required: false
@@ -302,6 +307,7 @@ jobs:
           ENVIRONMENT: ${{ inputs.environment }}
           GENERATE_RUN_ID: ${{ inputs.generate_run_id }}
           RESUME_DEPLOY_RUN_ID: ${{ inputs.resume_deploy_run_id }}
+          RESUME_FROM_OTHER_BUNDLE: ${{ inputs.resume_from_other_bundle }}
         run: |
           set -euo pipefail
           OUTDIR="$GITHUB_WORKSPACE/deploy-result"
@@ -313,18 +319,33 @@ jobs:
             if [ -z "$previous_meta" ]; then
               echo "::error::resume artifact has no resume-metadata.json"; exit 1
             fi
-            jq -e \
-              --arg generation_run "$GENERATE_RUN_URL" \
-              --arg deployment_run "$RESUME_RUN_URL" \
-              --arg env "$ENVIRONMENT" \
-              --arg digest "$bundle_metadata_sha256" \
-              '.generation_run == $generation_run and
-               .deployment_run == $deployment_run and
-               .environment == $env and
-               .bundle_metadata_sha256 == $digest' \
-              "$previous_meta" >/dev/null || {
-                echo "::error::resume journal does not belong to this generation run, environment, and bundle"; exit 1;
-              }
+            if [ "$RESUME_FROM_OTHER_BUNDLE" = "true" ]; then
+              # Re-cut bundle: the journal comes from another generation run and
+              # bundle of the SAME environment. Only the environment is checked
+              # here; the executor decides per call, from the journal and the
+              # chain, what already mined.
+              jq -e \
+                --arg deployment_run "$RESUME_RUN_URL" \
+                --arg env "$ENVIRONMENT" \
+                '.deployment_run == $deployment_run and .environment == $env' \
+                "$previous_meta" >/dev/null || {
+                  echo "::error::resume journal does not belong to deploy run $RESUME_DEPLOY_RUN_ID and environment $ENVIRONMENT"; exit 1;
+                }
+              echo "::warning::resuming from a different bundle: journal generation run $(jq -r .generation_run "$previous_meta"), this bundle from $GENERATE_RUN_URL. Only calls the journal proves mined are skipped."
+            else
+              jq -e \
+                --arg generation_run "$GENERATE_RUN_URL" \
+                --arg deployment_run "$RESUME_RUN_URL" \
+                --arg env "$ENVIRONMENT" \
+                --arg digest "$bundle_metadata_sha256" \
+                '.generation_run == $generation_run and
+                 .deployment_run == $deployment_run and
+                 .environment == $env and
+                 .bundle_metadata_sha256 == $digest' \
+                "$previous_meta" >/dev/null || {
+                  echo "::error::resume journal does not belong to this generation run, environment, and bundle (set resume_from_other_bundle to resume a re-cut)"; exit 1;
+                }
+            fi
             previous_dir="$(dirname "$previous_meta")"
             [ ! -f "$previous_dir/transactions.txt" ] || cp "$previous_dir/transactions.txt" "$OUTDIR/transactions.txt"
             [ ! -f "$previous_dir/deploy-executed.json" ] || cp "$previous_dir/deploy-executed.json" "$OUTDIR/deploy-executed.json"
