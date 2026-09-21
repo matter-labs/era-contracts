@@ -86,12 +86,13 @@ contract ExecutorTest is UtilsCallMockerTest {
     uint256[] internal proofInput;
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](14);
+        bytes4[] memory selectors = new bytes4[](15);
         uint256 i = 0;
         selectors[i++] = admin.setPendingAdmin.selector;
         selectors[i++] = admin.acceptAdmin.selector;
         selectors[i++] = admin.setValidator.selector;
         selectors[i++] = admin.setPriorityTxMaxGasLimit.selector;
+        selectors[i++] = admin.setZKsyncOSL1TxFiltering.selector;
         selectors[i++] = admin.changeFeeParams.selector;
         selectors[i++] = admin.setTokenMultiplier.selector;
         selectors[i++] = admin.upgradeChainFromVersion.selector;
@@ -125,7 +126,7 @@ contract ExecutorTest is UtilsCallMockerTest {
     }
 
     function getGettersSelectors() public view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](30);
+        bytes4[] memory selectors = new bytes4[](31);
         uint256 i = 0;
         selectors[i++] = getters.getVerifier.selector;
         selectors[i++] = getters.getAdmin.selector;
@@ -143,6 +144,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         selectors[i++] = getters.getVerifierParams.selector;
         selectors[i++] = getters.isDiamondStorageFrozen.selector;
         selectors[i++] = getters.getPriorityTxMaxGasLimit.selector;
+        selectors[i++] = getters.getZKsyncOSL1TxFiltering.selector;
         selectors[i++] = getters.isEthWithdrawalFinalized.selector;
         selectors[i++] = getters.facets.selector;
         selectors[i++] = getters.facetFunctionSelectors.selector;

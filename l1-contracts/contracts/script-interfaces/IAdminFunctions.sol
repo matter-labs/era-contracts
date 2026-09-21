@@ -190,6 +190,20 @@ interface IAdminFunctions {
         bool shouldSend
     ) external;
 
+    /// @notice Prepares or sends the admin transaction for ZKsync OS L1 transaction filtering.
+    /// @param _bridgehub Bridgehub on the chain's settlement layer.
+    /// @param _accessControlRestriction Access control restriction used by the chain admin.
+    /// @param _chainId Chain to configure.
+    /// @param _enabled Whether L1 transaction filtering is enabled.
+    /// @param _shouldSend Whether to broadcast the transaction.
+    function setZKsyncOSL1TxFiltering(
+        address _bridgehub,
+        address _accessControlRestriction,
+        uint256 _chainId,
+        bool _enabled,
+        bool _shouldSend
+    ) external;
+
     function migrateChainToGateway(
         address bridgehub,
         uint256 l1GasPrice,

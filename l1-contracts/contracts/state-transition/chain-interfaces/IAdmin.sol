@@ -38,6 +38,10 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// `ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT`
     function setZKsyncOSMaxTxGasLimit(uint64 _newMaxTxGasLimit) external;
 
+    /// @notice Enables or disables operator filtering of ZKsync OS priority transactions.
+    /// @param _enabled Whether L1 transaction filtering is enabled.
+    function setZKsyncOSL1TxFiltering(bool _enabled) external;
+
     /// @notice Change the fee params for L1->L2 transactions
     /// @param _newFeeParams The new fee params
     function changeFeeParams(FeeParams calldata _newFeeParams) external;
@@ -144,6 +148,9 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
 
     /// @notice ZKsync OS single-transaction gas limit (EIP-7825) changed
     event NewZKsyncOSMaxTxGasLimit(uint64 oldMaxTxGasLimit, uint64 newMaxTxGasLimit);
+
+    /// @notice ZKsync OS L1 transaction filtering changed.
+    event NewZKsyncOSL1TxFiltering(bool oldEnabled, bool newEnabled);
 
     /// @notice Fee params for L1->L2 transactions changed
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);
