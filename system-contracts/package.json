@@ -69,6 +69,7 @@
     "preprocess:emulator": "rm -f ./contracts/EvmEmulator.yul && yarn ts-node scripts/preprocess-emulator.ts",
     "preprocess:system-contracts": "rm -rf ./contracts-preprocessed && ts-node scripts/preprocess-system-contracts.ts",
     "verify-on-explorer": "yarn ts-node scripts/verify-on-explorer.ts",
+    "test:verification-input": "ts-node scripts/yul-verification-input.test.ts",
     "test": "yarn build:test-system-contracts && hardhat test --network zkSyncTestNode test/*.spec.ts test/**/*.spec.ts",
     "test-no-build": "hardhat test --network zkSyncTestNode test/*.spec.ts test/**/*.spec.ts",
     "test-node": "./bin/anvil-zksync --protocol-version=29 --evm-interpreter",

@@ -43,6 +43,7 @@ sol! {
         function l1CtmDeployer() external view returns (address);
         function messageRoot() external view returns (address);
         function chainAssetHandler() external view returns (address);
+        function chainRegistrationSender() external view returns (address);
         function getZKChain(uint256 _chainId) external view returns (address chainAddress);
         function baseToken(uint256 _chainId) external view returns (address);
         function requestL2TransactionDirect(
@@ -58,6 +59,11 @@ sol! {
         function ERA_CHAIN_ID() public view returns (uint256);
 
         function nativeTokenVault() public view returns (address);
+    }
+
+    #[sol(rpc)]
+    contract L1NativeTokenVault {
+        function bridgedTokenBeacon() external view returns (address);
     }
 
     #[sol(rpc)]
@@ -112,6 +118,11 @@ sol! {
         function executionDelay() external view returns (uint32);
     }
 
+    #[sol(rpc)]
+    contract RollupDAManager {
+        function isAllowedDAConfiguration(address l1DAValidator, uint8 l2DACommitmentScheme) external view returns (bool);
+    }
+
     function create2AndTransferParams(bytes memory bytecode, bytes32 salt, address owner);
 
     function create2(
@@ -125,8 +136,10 @@ pub struct NetworkVerifier {
     pub l1_provider: RootProvider,
     pub era_chain_id: u64,
     pub l1_chain_id: u64,
-    pub gateway_chain_id: u64,
-    pub gw_provider: RootProvider,
+    /// Both absent on gateway-less envs; every gateway-side check is gated on the artifact's
+    /// `[new_gateway]` and errors out if it is reached without a gateway RPC.
+    pub gateway_chain_id: Option<u64>,
+    pub gw_provider: Option<RootProvider>,
 
     // todo: maybe merge into one struct.
     pub create2_known_bytecodes: HashMap<Address, String>,
@@ -143,7 +156,7 @@ struct ParsedCreate2Deployment {
 impl NetworkVerifier {
     pub async fn new_v31(
         l1_rpc: String,
-        gw_rpc: String,
+        gw_rpc: Option<String>,
         era_chain_id: u64,
     ) -> anyhow::Result<Self> {
         let l1_provider = RootProvider::new_http(l1_rpc.parse().context("invalid L1 RPC URL")?);
@@ -151,12 +164,22 @@ impl NetworkVerifier {
             .get_chain_id()
             .await
             .context("failed to fetch L1 chain id")?;
-        let gw_provider =
-            RootProvider::new_http(gw_rpc.parse().context("invalid gateway RPC URL")?);
-        let gateway_chain_id = gw_provider
-            .get_chain_id()
-            .await
-            .context("failed to fetch gateway chain id")?;
+        let gw_provider = gw_rpc
+            .map(|url| {
+                url.parse()
+                    .context("invalid gateway RPC URL")
+                    .map(RootProvider::new_http)
+            })
+            .transpose()?;
+        let gateway_chain_id = match &gw_provider {
+            Some(provider) => Some(
+                provider
+                    .get_chain_id()
+                    .await
+                    .context("failed to fetch gateway chain id")?,
+            ),
+            None => None,
+        };
 
         Ok(Self {
             l1_provider,
@@ -184,16 +207,25 @@ impl NetworkVerifier {
     ///     natural filter for the append-only file)
     ///
     /// Surfaces two classes of issue via `result`:
-    ///   - Salt sanity (`expected_salts`): every recognized deploy whose salt
-    ///     isn't in the env-declared set is a hard ERROR.
+    ///   - Salt sanity (`expected_salts`, only when `enforce_salts`): every
+    ///     recognized deploy whose salt isn't in the env-declared set is a hard
+    ///     ERROR. Pass `enforce_salts = false` for a *reference* log — a prior
+    ///     regen's already-broadcast deployment, fed in only to enrich the
+    ///     address book. Its deploys legitimately carry the salts of that
+    ///     regen, and rotating `create2_factory_salt` (which every regen must
+    ///     do) would otherwise make every one of them an error.
     ///   - Duplicate metadata: if the same deployed address shows up twice
     ///     with different `(name, ctor_args)`, that's a hard ERROR.
+    // Eight positional parameters: the RPC-facing addresses, the salt policy and
+    // the two sinks. Grouping them into a struct would just move the same fields.
+    #[allow(clippy::too_many_arguments)]
     pub async fn populate_create2_from_transactions_log(
         &mut self,
         tx_hashes: &[FixedBytes<32>],
         create2_factory: &Address,
         bridgehub_addr: &Address,
         expected_salts: &[FixedBytes<32>],
+        enforce_salts: bool,
         bytecode_verifier: &BytecodeVerifier,
         result: &mut crate::upgrade_verification::verifiers::VerificationResult,
     ) {
@@ -262,14 +294,14 @@ impl NetworkVerifier {
 
             if to == *bridgehub_addr {
                 parsed_gateway_deployments += 1;
-                if !expected_salts.contains(&deployment.salt) {
+                if enforce_salts && !expected_salts.contains(&deployment.salt) {
                     result.report_error(&format!(
                         "Gateway CREATE2 deployment of {} at {} (tx {hash:#x}) used salt {} \
                          which is not in the env-declared salt set",
                         deployment.name, deployment.addr, deployment.salt
                     ));
                 }
-            } else if !expected_salts.contains(&deployment.salt) {
+            } else if enforce_salts && !expected_salts.contains(&deployment.salt) {
                 // Salt sanity: only enforced after recognition, so non-deploy tx
                 // first-32 bytes (which aren't salts at all) don't trigger errors.
                 // Hard ERROR per offending deploy — `ensure_success` rejects the
@@ -344,7 +376,7 @@ impl NetworkVerifier {
         self.create2_constructor_params.insert(addr, params);
     }
 
-    pub fn get_gateway_chain_id(&self) -> u64 {
+    pub fn get_gateway_chain_id(&self) -> Option<u64> {
         self.gateway_chain_id
     }
 
@@ -382,8 +414,10 @@ impl NetworkVerifier {
         self.l1_provider.clone()
     }
 
-    pub fn get_gw_provider(&self) -> RootProvider {
-        self.gw_provider.clone()
+    pub fn get_gw_provider(&self) -> anyhow::Result<RootProvider> {
+        self.gw_provider
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("this check needs the Gateway RPC; pass --gw-rpc-url"))
     }
 
     pub async fn try_get_l1_chain_id(&self) -> anyhow::Result<u64> {
@@ -473,7 +507,7 @@ impl NetworkVerifier {
         let slot = FixedBytes::<32>::from_hex(EIP1967_PROXY_ADMIN_SLOT)
             .context("invalid EIP-1967 admin slot literal")?;
         let storage = self
-            .gw_provider
+            .get_gw_provider()?
             .get_storage_at(addr, U256::from_be_bytes(slot.0))
             .await
             .with_context(|| format!("failed to read Gateway proxy admin slot for {addr}"))?;
@@ -509,19 +543,11 @@ fn parse_l1_create2_deploy_from_input(
     let salt = &input[0..32];
     let salt = FixedBytes::<32>::from_slice(salt);
 
-    if let Some((name, params)) = bytecode_verifier.try_parse_bytecode(&input[32..]) {
-        let addr = compute_create2_address_evm(to, salt, keccak256(&input[32..]));
-        return Some(ParsedCreate2Deployment {
-            addr,
-            name,
-            params,
-            salt,
-        });
-    };
-
     let bytecode_input = &input[32..];
 
-    // Okay, this may be the `Create2AndTransfer` method.
+    // Recognize the wrapper FIRST: its creation code is itself in the hash registry.
+    // Parsing it as an ordinary deployment would index the wrapper, losing the inner
+    // contract's address and constructor provenance (e.g. Era's RollupDAManager).
     if let Some(create2_and_transfer_input) =
         bytecode_verifier.is_create2_and_transfer_bytecode_prefix(bytecode_input)
     {
@@ -547,9 +573,14 @@ fn parse_l1_create2_deploy_from_input(
         });
     }
 
-    None
+    let (name, params) = bytecode_verifier.try_parse_bytecode(bytecode_input)?;
+    Some(ParsedCreate2Deployment {
+        addr: compute_create2_address_evm(to, salt, keccak256(bytecode_input)),
+        name,
+        params,
+        salt,
+    })
 }
-
 fn check_gw_create2_deploy_from_input(
     to: Address,
     input: &[u8],
@@ -604,4 +635,100 @@ fn check_gw_create2_deploy_from_input(
     }
 
     None
+}
+
+#[cfg(test)]
+mod create2_provenance_tests {
+    use super::super::bytecode_verifier::ContractHashes;
+    use super::*;
+
+    // Synthetic inner code isolates transaction parsing; the real, hash-pinned
+    // wrapper stays registered too, which reproduces the shadowing regression.
+    const INNER_CODE: &[u8] = &[0x60; 64];
+    const INNER_NAME: &str = "test/Inner";
+
+    fn verifier() -> BytecodeVerifier {
+        let mut hashes = ContractHashes::init_from_local().unwrap();
+        hashes.hashes.push(
+            serde_json::from_value(serde_json::json!({
+                "contractName": INNER_NAME,
+                "evmBytecodeHash": format!("{:#x}", keccak256(INNER_CODE))
+            }))
+            .unwrap(),
+        );
+        BytecodeVerifier::from_contract_hashes(hashes)
+    }
+
+    fn wrapped_input(
+        verifier: &BytecodeVerifier,
+        outer_salt: FixedBytes<32>,
+        inner_salt: FixedBytes<32>,
+        inner: Vec<u8>,
+    ) -> Vec<u8> {
+        let mut input = outer_salt.to_vec();
+        input.extend(verifier.get_create2_and_transfer_bytecode());
+        input.extend(
+            create2AndTransferParamsCall {
+                bytecode: inner.into(),
+                salt: inner_salt,
+                owner: Address::ZERO,
+            }
+            .abi_encode()[4..]
+                .iter()
+                .copied(),
+        );
+        input
+    }
+
+    #[test]
+    fn registered_wrapper_indexes_inner_address_and_constructor_params() {
+        let verifier = verifier();
+        let salt = FixedBytes::<32>::ZERO;
+        let factory = Address::ZERO;
+        for params in [vec![], vec![0x42; 32]] {
+            let inner = [INNER_CODE, params.as_slice()].concat();
+            let input = wrapped_input(&verifier, salt, salt, inner.clone());
+            let wrapper = compute_create2_address_evm(factory, salt, keccak256(&input[32..]));
+            let parsed = parse_l1_create2_deploy_from_input(factory, &input, &verifier).unwrap();
+            assert_eq!(parsed.name, INNER_NAME);
+            assert_eq!(
+                parsed.addr,
+                compute_create2_address_evm(wrapper, salt, keccak256(&inner))
+            );
+            assert_ne!(parsed.addr, wrapper);
+            assert_eq!(parsed.params, params);
+            assert_eq!(parsed.salt, salt);
+        }
+    }
+
+    #[test]
+    fn malformed_wrapper_does_not_fall_back_to_outer_deployment() {
+        let verifier = verifier();
+        let salt = FixedBytes::<32>::ZERO;
+        let wrong_salt = FixedBytes::<32>::repeat_byte(1);
+        let input = wrapped_input(&verifier, salt, wrong_salt, INNER_CODE.to_vec());
+        assert!(parse_l1_create2_deploy_from_input(Address::ZERO, &input, &verifier).is_none());
+        let mut input = salt.to_vec();
+        input.extend(verifier.get_create2_and_transfer_bytecode());
+        assert!(parse_l1_create2_deploy_from_input(Address::ZERO, &input, &verifier).is_none());
+        let input = wrapped_input(&verifier, salt, salt, vec![0xff]);
+        assert!(parse_l1_create2_deploy_from_input(Address::ZERO, &input, &verifier).is_none());
+    }
+
+    #[test]
+    fn direct_create2_still_preserves_constructor_params() {
+        let verifier = verifier();
+        let salt = FixedBytes::<32>::ZERO;
+        let params = vec![0x42; 32];
+        let init = [INNER_CODE, params.as_slice()].concat();
+        let input = [salt.as_slice(), init.as_slice()].concat();
+        let parsed = parse_l1_create2_deploy_from_input(Address::ZERO, &input, &verifier).unwrap();
+        assert_eq!(parsed.name, INNER_NAME);
+        assert_eq!(parsed.params, params);
+        assert_eq!(
+            parsed.addr,
+            compute_create2_address_evm(Address::ZERO, salt, keccak256(&init))
+        );
+        assert!(parse_l1_create2_deploy_from_input(Address::ZERO, &[0; 31], &verifier).is_none());
+    }
 }

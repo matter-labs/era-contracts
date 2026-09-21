@@ -10,7 +10,7 @@
 use std::{fs, path::Path};
 
 use alloy::hex;
-use alloy::primitives::Bytes;
+use alloy::primitives::{Address, Bytes};
 use anyhow::Context;
 use serde::Deserialize;
 
@@ -76,6 +76,8 @@ impl<'a> V31UpgradeFull<'a> {
         self.run_pre_steps(runner, deployer).await?;
         let mut prepared = self.inner.prepare(runner, deployer, inputs).await?;
         self.run_ctm_admin_steps(runner, deployer, &prepared.ctm_tomls)?;
+        self.run_aux_ownership_steps(runner, deployer, &prepared.core_toml, &prepared.ctm_tomls)
+            .await?;
 
         if let Some(ref new_gw) = self.new_gateway {
             // Look up the per-CTM salt: resolve the CTM proxy from the
@@ -169,22 +171,29 @@ impl<'a> V31UpgradeFull<'a> {
         deployer: &Wallet,
         ctm_entries: &[CtmPrepareEntry],
     ) -> anyhow::Result<()> {
-        let wraps = encode_owner_wraps(&self.ownable_proxies);
         for entry in ctm_entries {
-            let encoded_calls_hex = read_server_notifier_upgrade_calls(&entry.toml)?;
-            let encoded_calls = hex::decode(encoded_calls_hex.trim_start_matches("0x"))
-                .with_context(|| {
-                    format!("invalid CTM admin calls hex in {}", entry.toml.display())
-                })?;
+            let admin_calls = read_ctm_admin_calls(&entry.toml)?;
+
+            // ServerNotifier ProxyAdmin upgrade (+ deferred acceptOwnership when the
+            // ServerNotifier's ownership was transferred to this ChainAdmin) executed
+            // as a single ChainAdmin.multicall — see `executeChainAdminMulticall`.
+            let sn_calls =
+                hex::decode(admin_calls.server_notifier_upgrade.trim_start_matches("0x"))
+                    .with_context(|| {
+                        format!(
+                            "invalid server_notifier_upgrade hex in {}",
+                            entry.toml.display()
+                        )
+                    })?;
             logger::step(format!(
                 "Running v31 CTM admin calls for {:#x}",
                 entry.proxy
             ));
             runner.run(
                 runner
-                    .script_call(AdminFunctionsAbi::executeOwnableCallsWithWrapsCall {
-                        _callsToExecute: Bytes::from(encoded_calls),
-                        _wraps: wraps.clone(),
+                    .script_call(AdminFunctionsAbi::executeChainAdminMulticallCall {
+                        _callsToExecute: Bytes::from(sn_calls),
+                        _chainAdmin: admin_calls.chain_admin,
                     })
                     .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
                     .with_wallet(deployer),
@@ -192,6 +201,175 @@ impl<'a> V31UpgradeFull<'a> {
         }
         Ok(())
     }
+
+    /// After prepare, several Ownable2Step contracts still owned by the deployer
+    /// (or whose transfer was only just initiated) are known only from the prepare
+    /// output TOMLs: the core ecosystem AssetTracker + ChainRegistrationSender
+    /// (from the Core TOML) and the CTM-adjacent GovernanceUpgradeTimer /
+    /// RollupDAManager / ZKsync-OS verifier (from each CTM TOML). Transfer them to
+    /// governance through the same owner-wrapper machinery and persist their
+    /// deferred PUH accepts — these all land in the single stage-0 trailing block.
+    async fn run_aux_ownership_steps(
+        &self,
+        runner: &mut ForgeRunner,
+        deployer: &Wallet,
+        core_toml: &Path,
+        ctm_entries: &[CtmPrepareEntry],
+    ) -> anyhow::Result<()> {
+        let targets = read_aux_ownership_targets(core_toml, ctm_entries)?;
+        let governance = crate::common::l1_contracts::resolve_governance(
+            &runner.rpc_url,
+            self.inner.bridgehub(),
+        )
+        .await?;
+        let wraps = encode_owner_wraps(&self.ownable_proxies);
+
+        logger::step(format!(
+            "Running v31 auxiliary ownership checks for {} target(s)",
+            targets.len()
+        ));
+        runner.run(
+            runner
+                .script_call(
+                    AdminFunctionsAbi::ensureOwnable2StepTargetsOwnedByGovernanceWithWrapsCall {
+                        _targets: targets,
+                        _governance: governance,
+                        _wraps: wraps,
+                    },
+                )
+                .with_wallet(deployer),
+        )?;
+        Ok(())
+    }
+}
+
+fn read_aux_ownership_targets(
+    core_toml: &Path,
+    ctm_entries: &[CtmPrepareEntry],
+) -> anyhow::Result<Vec<Address>> {
+    #[derive(Deserialize)]
+    struct CoreOutput {
+        asset_tracker_proxy_addr: String,
+        upgrade_addresses: CoreUpgradeAddresses,
+    }
+
+    #[derive(Deserialize)]
+    struct CoreUpgradeAddresses {
+        bridgehub: CoreBridgehub,
+    }
+
+    #[derive(Deserialize)]
+    struct CoreBridgehub {
+        chain_registration_sender_proxy_addr: String,
+    }
+
+    #[derive(Deserialize)]
+    struct CtmOutput {
+        deployed_addresses: DeployedAddresses,
+        state_transition: StateTransition,
+    }
+
+    #[derive(Deserialize)]
+    struct DeployedAddresses {
+        l1_governance_upgrade_timer: String,
+        l1_rollup_da_manager: String,
+    }
+
+    #[derive(Deserialize)]
+    struct StateTransition {
+        verifier_addr: String,
+    }
+
+    fn parse_addr(path: &Path, label: &str, value: &str) -> anyhow::Result<Address> {
+        value.parse().with_context(|| {
+            format!(
+                "{label} in {} is not a valid address: {value}",
+                path.display()
+            )
+        })
+    }
+
+    fn push_unique(targets: &mut Vec<Address>, target: Address) {
+        if target != Address::ZERO && !targets.contains(&target) {
+            targets.push(target);
+        }
+    }
+
+    let mut targets = Vec::new();
+
+    // Core ecosystem Ownable2Step contracts: AssetTracker + ChainRegistrationSender.
+    // Their transfer to governance is initiated during the core deploy
+    // (`updateContractConnections`); routing them through this aux flow folds the
+    // deferred acceptOwnership() into stage 0 next to the CTM accepts.
+    {
+        let raw = fs::read_to_string(core_toml)
+            .with_context(|| format!("read {}", core_toml.display()))?;
+        let parsed: CoreOutput =
+            toml::from_str(&raw).with_context(|| format!("parse {}", core_toml.display()))?;
+        push_unique(
+            &mut targets,
+            parse_addr(
+                core_toml,
+                "asset_tracker_proxy_addr",
+                &parsed.asset_tracker_proxy_addr,
+            )?,
+        );
+        push_unique(
+            &mut targets,
+            parse_addr(
+                core_toml,
+                "upgrade_addresses.bridgehub.chain_registration_sender_proxy_addr",
+                &parsed
+                    .upgrade_addresses
+                    .bridgehub
+                    .chain_registration_sender_proxy_addr,
+            )?,
+        );
+    }
+
+    for entry in ctm_entries {
+        let raw = fs::read_to_string(&entry.toml)
+            .with_context(|| format!("read {}", entry.toml.display()))?;
+        let parsed: CtmOutput =
+            toml::from_str(&raw).with_context(|| format!("parse {}", entry.toml.display()))?;
+
+        push_unique(
+            &mut targets,
+            parse_addr(
+                &entry.toml,
+                "deployed_addresses.l1_governance_upgrade_timer",
+                &parsed.deployed_addresses.l1_governance_upgrade_timer,
+            )?,
+        );
+
+        // RollupDAManagers with an explicit DA pair are accepted in stage 1
+        // immediately before updateDAPair(). Others still need ownership
+        // cleanup when their owner is legacy governance.
+        if entry.rollup_da_pair.is_none() {
+            push_unique(
+                &mut targets,
+                parse_addr(
+                    &entry.toml,
+                    "deployed_addresses.l1_rollup_da_manager",
+                    &parsed.deployed_addresses.l1_rollup_da_manager,
+                )?,
+            );
+        }
+
+        // Era verifiers are not Ownable; ZKsync OS verifiers are Ownable2Step.
+        if entry.is_zk_sync_os {
+            push_unique(
+                &mut targets,
+                parse_addr(
+                    &entry.toml,
+                    "state_transition.verifier_addr",
+                    &parsed.state_transition.verifier_addr,
+                )?,
+            );
+        }
+    }
+
+    Ok(targets)
 }
 
 fn encode_owner_wraps(entries: &[OwnableProxyEntry]) -> Vec<AdminFunctionsAbi::OwnerWrap> {
@@ -211,12 +389,15 @@ struct CtmAdminCallsToml {
 
 #[derive(Debug, Deserialize)]
 struct CtmAdminCalls {
+    /// ChainAdmin that owns the ServerNotifier's ProxyAdmin and executes the
+    /// `server_notifier_upgrade` multicall.
+    chain_admin: Address,
     server_notifier_upgrade: String,
 }
 
-fn read_server_notifier_upgrade_calls(path: &Path) -> anyhow::Result<String> {
+fn read_ctm_admin_calls(path: &Path) -> anyhow::Result<CtmAdminCalls> {
     let raw = fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
     let parsed: CtmAdminCallsToml =
         toml::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
-    Ok(parsed.ctm_admin_calls.server_notifier_upgrade)
+    Ok(parsed.ctm_admin_calls)
 }
