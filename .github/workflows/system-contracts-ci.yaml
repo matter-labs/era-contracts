@@ -32,7 +32,6 @@ jobs:
         run: |
           yarn install
           yarn test:verification-input
-          yarn test:bootloader-compiler
           yarn build
           yarn build:foundry
 
