@@ -10,6 +10,7 @@ export default {
     version: "1.5.17",
     compilerSource: "binary",
     settings: {
+      llvmOptions: ["-force-attribute=$llvm_NoInline_llvm$_unoptimized:optnone"],
       enableEraVMExtensions: true,
       suppressedErrors: ["sendtransfer"],
     },

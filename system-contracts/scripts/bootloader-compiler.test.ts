@@ -1,16 +1,23 @@
+import * as hre from "hardhat";
+import "@matterlabs/hardhat-zksync-solc";
 import assert from "assert";
 import { readFileSync } from "fs";
-import { assertBootloaderHookHelper, BOOTLOADER_HOOK_HELPER, BOOTLOADER_LLVM_OPTIONS } from "./bootloader-compiler";
+import { execFileSync } from "child_process";
 
 const source = readFileSync("bootloader/bootloader.yul", "utf8");
-assert.doesNotThrow(() => assertBootloaderHookHelper(source));
-assert.throws(
-  () => assertBootloaderHookHelper(source.replace(`function ${BOOTLOADER_HOOK_HELPER}(`, "function renamed(")),
-  /Missing bootloader LLVM attribute target/
-);
-assert.throws(
-  () => assertBootloaderHookHelper(`${source}\nfunction $llvm_NoInline_llvm$_storeVmHookMemory() {}`),
-  /must not run inside a NoInline store helper/
-);
-assert.strictEqual(BOOTLOADER_LLVM_OPTIONS, `-force-attribute=${BOOTLOADER_HOOK_HELPER}:optnone`);
-console.log("Bootloader compiler configuration checks passed");
+// LLVM silently ignores an unmatched target; runtime tests additionally prove effectiveness.
+const helper = "$llvm_NoInline_llvm$_unoptimized";
+const options = [`-force-attribute=${helper}:optnone`];
+assert(source.includes(`function ${helper}(`), "Missing LLVM attribute target");
+assert(!source.includes("function $llvm_NoInline_llvm$_storeVmHookMemory("), "Hook store must stay in caller");
+assert.deepStrictEqual((hre.config.zksolc.settings as { llvmOptions?: string[] }).llvmOptions, options);
+for (const profile of ["default", "test"]) {
+  const foundry = JSON.parse(
+    execFileSync("forge", ["config", "--json"], {
+      encoding: "utf8",
+      env: { ...process.env, FOUNDRY_PROFILE: profile },
+    })
+  );
+  assert.deepStrictEqual(foundry.zksync.llvm_options, options);
+}
+console.log("Bootloader helper and normal compiler configurations agree");

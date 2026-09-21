@@ -52,7 +52,7 @@
     ]
   },
   "scripts": {
-    "build": "yarn preprocess:emulator && yarn preprocess:system-contracts && forge build --zksync --skip bootloader && yarn preprocess:bootloader && ts-node scripts/compile-bootloader-foundry.ts",
+    "build": "yarn preprocess:emulator && yarn preprocess:system-contracts && forge build --zksync && yarn preprocess:bootloader && forge build --zksync",
     "build:foundry": "yarn build",
     "build:bootloader": "yarn preprocess:bootloader && yarn compile-yul compile-bootloader",
     "build:system-contracts": "yarn preprocess:emulator && yarn preprocess:system-contracts && hardhat compile && yarn compile-yul compile-precompiles",
