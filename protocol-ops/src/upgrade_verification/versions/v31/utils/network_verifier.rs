@@ -543,19 +543,11 @@ fn parse_l1_create2_deploy_from_input(
     let salt = &input[0..32];
     let salt = FixedBytes::<32>::from_slice(salt);
 
-    if let Some((name, params)) = bytecode_verifier.try_parse_bytecode(&input[32..]) {
-        let addr = compute_create2_address_evm(to, salt, keccak256(&input[32..]));
-        return Some(ParsedCreate2Deployment {
-            addr,
-            name,
-            params,
-            salt,
-        });
-    };
-
     let bytecode_input = &input[32..];
 
-    // Okay, this may be the `Create2AndTransfer` method.
+    // Recognize the wrapper FIRST: its creation code is itself in the hash registry.
+    // Parsing it as an ordinary deployment would index the wrapper, losing the inner
+    // contract's address and constructor provenance (e.g. Era's RollupDAManager).
     if let Some(create2_and_transfer_input) =
         bytecode_verifier.is_create2_and_transfer_bytecode_prefix(bytecode_input)
     {
@@ -581,7 +573,109 @@ fn parse_l1_create2_deploy_from_input(
         });
     }
 
-    None
+    let (name, params) = bytecode_verifier.try_parse_bytecode(bytecode_input)?;
+    Some(ParsedCreate2Deployment {
+        addr: compute_create2_address_evm(to, salt, keccak256(bytecode_input)),
+        name,
+        params,
+        salt,
+    })
+}
+
+#[cfg(test)]
+mod create2_provenance_tests {
+    use super::super::bytecode_verifier::ContractHashes;
+    use super::*;
+
+    // Synthetic inner code isolates transaction parsing; the real, hash-pinned
+    // wrapper stays registered too, which reproduces the shadowing regression.
+    const INNER_CODE: &[u8] = &[0x60; 64];
+    const INNER_NAME: &str = "test/Inner";
+
+    fn verifier() -> BytecodeVerifier {
+        let mut hashes = ContractHashes::init_from_local().unwrap();
+        hashes.hashes.push(
+            serde_json::from_value(serde_json::json!({
+                "contractName": INNER_NAME,
+                "evmBytecodeHash": format!("{:#x}", keccak256(INNER_CODE))
+            }))
+            .unwrap(),
+        );
+        BytecodeVerifier::from_contract_hashes(hashes)
+    }
+
+    fn wrapped_input(
+        verifier: &BytecodeVerifier,
+        outer_salt: FixedBytes<32>,
+        inner_salt: FixedBytes<32>,
+        inner: Vec<u8>,
+    ) -> Vec<u8> {
+        let mut input = outer_salt.to_vec();
+        input.extend(verifier.get_create2_and_transfer_bytecode());
+        input.extend(
+            create2AndTransferParamsCall {
+                bytecode: inner.into(),
+                salt: inner_salt,
+                owner: Address::ZERO,
+            }
+            .abi_encode()[4..]
+                .iter()
+                .copied(),
+        );
+        input
+    }
+
+    #[test]
+    fn registered_wrapper_indexes_inner_address_and_constructor_params() {
+        let verifier = verifier();
+        let salt = FixedBytes::<32>::ZERO;
+        let factory = Address::ZERO;
+        for params in [vec![], vec![0x42; 32]] {
+            let inner = [INNER_CODE, params.as_slice()].concat();
+            let input = wrapped_input(&verifier, salt, salt, inner.clone());
+            let wrapper = compute_create2_address_evm(factory, salt, keccak256(&input[32..]));
+            let parsed = parse_l1_create2_deploy_from_input(factory, &input, &verifier).unwrap();
+            assert_eq!(parsed.name, INNER_NAME);
+            assert_eq!(
+                parsed.addr,
+                compute_create2_address_evm(wrapper, salt, keccak256(&inner))
+            );
+            assert_ne!(parsed.addr, wrapper);
+            assert_eq!(parsed.params, params);
+            assert_eq!(parsed.salt, salt);
+        }
+    }
+
+    #[test]
+    fn malformed_wrapper_does_not_fall_back_to_outer_deployment() {
+        let verifier = verifier();
+        let salt = FixedBytes::<32>::ZERO;
+        let wrong_salt = FixedBytes::<32>::repeat_byte(1);
+        let input = wrapped_input(&verifier, salt, wrong_salt, INNER_CODE.to_vec());
+        assert!(parse_l1_create2_deploy_from_input(Address::ZERO, &input, &verifier).is_none());
+        let mut input = salt.to_vec();
+        input.extend(verifier.get_create2_and_transfer_bytecode());
+        assert!(parse_l1_create2_deploy_from_input(Address::ZERO, &input, &verifier).is_none());
+        let input = wrapped_input(&verifier, salt, salt, vec![0xff]);
+        assert!(parse_l1_create2_deploy_from_input(Address::ZERO, &input, &verifier).is_none());
+    }
+
+    #[test]
+    fn direct_create2_still_preserves_constructor_params() {
+        let verifier = verifier();
+        let salt = FixedBytes::<32>::ZERO;
+        let params = vec![0x42; 32];
+        let init = [INNER_CODE, params.as_slice()].concat();
+        let input = [salt.as_slice(), init.as_slice()].concat();
+        let parsed = parse_l1_create2_deploy_from_input(Address::ZERO, &input, &verifier).unwrap();
+        assert_eq!(parsed.name, INNER_NAME);
+        assert_eq!(parsed.params, params);
+        assert_eq!(
+            parsed.addr,
+            compute_create2_address_evm(Address::ZERO, salt, keccak256(&init))
+        );
+        assert!(parse_l1_create2_deploy_from_input(Address::ZERO, &[0; 31], &verifier).is_none());
+    }
 }
 
 fn check_gw_create2_deploy_from_input(
