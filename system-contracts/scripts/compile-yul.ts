@@ -6,7 +6,7 @@ import * as fs from "fs";
 import { Command } from "commander";
 import * as _path from "path";
 
-const COMPILER_VERSION = "1.5.11";
+const COMPILER_VERSION = "1.5.17";
 const IS_COMPILER_PRE_RELEASE = false;
 const CONTRACTS_DIR = "contracts-preprocessed";
 const BOOTLOADER_DIR = "bootloader";
@@ -19,17 +19,17 @@ export async function compileYul(paths: CompilerPaths, file: string) {
 
   const filePath = `${paths.absolutePathSources}/${file}`;
   const llvmOptionsFilePath = `${filePath}${LLVM_OPTIONS_FILE_EXTENSION}`;
-  let llvmOptions = "";
+  const llvmOptions: string[] = [...((hre.config.zksolc.settings as { llvmOptions?: string[] }).llvmOptions ?? [])];
   if (existsSync(llvmOptionsFilePath)) {
     const llvmOptionsFileContent = (await fs.promises.readFile(llvmOptionsFilePath)).toString();
     if (!llvmOptionsFileContent.startsWith("'") || !llvmOptionsFileContent.endsWith("'")) {
       throw new Error(`Content in ${llvmOptionsFilePath} must start and end with a single quote.`);
     }
-    llvmOptions = `--llvm-options=${llvmOptionsFileContent}`;
+    llvmOptions.push(llvmOptionsFileContent.slice(1, -1));
   }
 
   await spawn(
-    `${zksolcLocation} ${paths.absolutePathSources}/${file} --optimization 3 ${llvmOptions} --enable-eravm-extensions --yul --bin --overwrite -o ${paths.absolutePathArtifacts}`
+    `${zksolcLocation} ${paths.absolutePathSources}/${file} --optimization 3 --llvm-options='${llvmOptions.join(" ")}' --enable-eravm-extensions --yul --bin --overwrite -o ${paths.absolutePathArtifacts}`
   );
 }
 
