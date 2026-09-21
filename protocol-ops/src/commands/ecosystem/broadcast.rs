@@ -23,7 +23,9 @@ use anyhow::Context;
 use clap::Parser;
 use serde::Deserialize;
 
-use crate::commands::dev::execute_safe::{execute_one_bundle, execute_one_bundle_unlocked};
+use crate::commands::dev::execute_safe::{
+    execute_one_bundle, execute_one_bundle_unlocked, ResumeJournal,
+};
 use crate::common::logger;
 
 #[derive(Debug, Clone, Parser)]
@@ -159,7 +161,10 @@ pub async fn run(args: UpgradeBroadcastArgs) -> anyhow::Result<()> {
         },
     ));
 
-    let out_path = args.out.as_deref();
+    // One journal for the whole run: a resume must see every bundle's prior
+    // receipts, and a claim made while executing one bundle must hold for the
+    // next (see `ResumeJournal`).
+    let mut journal = ResumeJournal::load(args.out.as_deref())?;
     let max_gas_price_wei =
         crate::commands::dev::execute_safe::gwei_to_wei(args.max_gas_price_gwei);
     let mut broadcast = 0usize;
@@ -183,16 +188,21 @@ pub async fn run(args: UpgradeBroadcastArgs) -> anyhow::Result<()> {
             bundle.file,
         ));
         if args.unlocked {
-            execute_one_bundle_unlocked(&bundle_path, &args.l1_rpc_url, bundle.target, out_path)
-                .await
-                .with_context(|| format!("bundle #{} ({})", bundle.index, bundle.file))?;
+            execute_one_bundle_unlocked(
+                &bundle_path,
+                &args.l1_rpc_url,
+                bundle.target,
+                &mut journal,
+            )
+            .await
+            .with_context(|| format!("bundle #{} ({})", bundle.index, bundle.file))?;
         } else {
             let key = &key_map[&bundle.target];
             execute_one_bundle(
                 &bundle_path,
                 &args.l1_rpc_url,
                 key,
-                out_path,
+                &mut journal,
                 max_gas_price_wei,
             )
             .await

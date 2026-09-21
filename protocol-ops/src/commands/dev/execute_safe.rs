@@ -32,7 +32,7 @@ pub struct ExecutedTx {
     /// before resume support; such entries are never skipped on resume.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub from: Option<String>,
-    /// Safe bundle file name the tx came from — see `find_journaled_execution`.
+    /// Safe bundle file name the tx came from (provenance; not used for matching).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bundle: Option<String>,
     /// Zero-based position of the tx in that bundle.
@@ -46,6 +46,119 @@ pub struct ExecutedTx {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExecutedBundle {
     pub transactions: Vec<ExecutedTx>,
+}
+
+/// The receipt journal of one broadcast run, shared by every bundle the run
+/// executes. Two jobs: append each confirmed receipt (persisted to `--out` as
+/// it lands, so a later failure cannot erase it), and let a resume skip calls
+/// a prior run already executed.
+///
+/// A resume matches a tx against the journal on the CALL — target, calldata,
+/// value — not on where it sits in a bundle: a re-cut bundle (same deployer,
+/// changed contracts) reorders and interleaves calls, while the calls that
+/// already executed are byte-identical. The signer is checked too when the
+/// entry records one; entries from journals written before that field existed
+/// carry none, and for them the on-chain receipt's `from` is the check. Every
+/// candidate is then confirmed on THIS chain (receipt with status 1, same
+/// target, same sender), so a journal carried over from another chain, or a
+/// re-orged receipt, never skips anything.
+///
+/// One `--out` journal spans every bundle of a run, and two bundles can carry
+/// byte-identical calls. An entry therefore justifies at most one skip per
+/// run, across bundles: a call is skipped only as many times as it actually
+/// mined. Entries this run appends are never candidates.
+pub struct ResumeJournal {
+    path: Option<PathBuf>,
+    bundle: ExecutedBundle,
+    /// Entries loaded from disk, i.e. prior runs' receipts. Entries this run
+    /// appends sit past this index.
+    prior: usize,
+    /// Prior entries already used to skip a tx this run.
+    claimed: Vec<bool>,
+}
+
+impl ResumeJournal {
+    /// Load the journal at `out_path` (missing file or `None` = empty; with
+    /// `None` nothing is persisted).
+    pub fn load(out_path: Option<&Path>) -> anyhow::Result<Self> {
+        let bundle = load_executed_bundle(out_path)?;
+        let prior = bundle.transactions.len();
+        Ok(Self {
+            path: out_path.map(Path::to_path_buf),
+            bundle,
+            prior,
+            claimed: vec![false; prior],
+        })
+    }
+
+    /// Every entry, prior and appended, in execution order.
+    pub fn transactions(&self) -> &[ExecutedTx] {
+        &self.bundle.transactions
+    }
+
+    /// Append one confirmed receipt; persisted immediately when the journal
+    /// has a path (see `record_executed_tx`).
+    fn record(&mut self, tx_hash: B256, tx: ExecutedTx) -> anyhow::Result<()> {
+        match &self.path {
+            Some(path) => record_executed_tx(path, &mut self.bundle, tx_hash, tx),
+            None => {
+                self.bundle.transactions.push(tx);
+                Ok(())
+            }
+        }
+    }
+
+    /// A prior run's confirmed execution of exactly this call, if the chain
+    /// agrees; claims the entry so it cannot justify a second skip.
+    async fn find_prior_execution<P: Provider>(
+        &mut self,
+        provider: &P,
+        from: Address,
+        to: Address,
+        data: &Bytes,
+        value: U256,
+    ) -> anyhow::Result<Option<B256>> {
+        let mut start = 0;
+        while let Some(i) = self.next_prior_match_from(start, from, to, data, value) {
+            start = i + 1;
+            let entry = &self.bundle.transactions[i];
+            let hash: B256 = entry.tx_hash.parse().with_context(|| {
+                format!(
+                    "journal entry #{i} has an invalid tx hash {}",
+                    entry.tx_hash
+                )
+            })?;
+            let Some(receipt) = provider
+                .get_transaction_receipt(hash)
+                .await
+                .context("eth_getTransactionReceipt")?
+            else {
+                continue;
+            };
+            if receipt.status() && receipt.to == Some(to) && receipt.from == from {
+                self.claimed[i] = true;
+                return Ok(Some(hash));
+            }
+        }
+        Ok(None)
+    }
+
+    /// Index of the first prior, unclaimed entry at or after `start` that
+    /// records a successful execution of this call (pure half of
+    /// `find_prior_execution`; see `journal_entry_matches`).
+    fn next_prior_match_from(
+        &self,
+        start: usize,
+        from: Address,
+        to: Address,
+        data: &Bytes,
+        value: U256,
+    ) -> Option<usize> {
+        (start..self.prior).find(|&i| {
+            !self.claimed[i]
+                && journal_entry_matches(&self.bundle.transactions[i], from, to, data, value)
+        })
+    }
 }
 
 /// Per-tx gas estimate buffer in basis points (12500 = 125% = 25% headroom).
@@ -351,11 +464,12 @@ pub struct DevExecuteSafeArgs {
 }
 
 pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
+    let mut journal = ResumeJournal::load(args.out.as_deref())?;
     execute_one_bundle(
         &args.safe_file,
         &args.l1_rpc_url,
         args.private_key.expose(),
-        args.out.as_deref(),
+        &mut journal,
         gwei_to_wei(args.max_gas_price_gwei),
     )
     .await
@@ -376,7 +490,7 @@ pub async fn execute_one_bundle(
     safe_file: &Path,
     l1_rpc_url: &str,
     private_key: &str,
-    out_path: Option<&Path>,
+    journal: &mut ResumeJournal,
     max_gas_price_wei: u128,
 ) -> anyhow::Result<()> {
     logger::step(format!("Execute Safe file: {}", safe_file.display()));
@@ -419,10 +533,6 @@ pub async fn execute_one_bundle(
         format_gwei(max_gas_price_wei)
     ));
 
-    // Load the prior receipt journal so a retry in the same working directory
-    // extends it instead of losing the provenance of an earlier partial run.
-    let mut executed = load_executed_bundle(out_path)?;
-
     // Parse + sign + submit each tx sequentially, awaiting its receipt
     // before the next. Some bundle txs depend on contracts deployed by
     // earlier txs in the same bundle (e.g. an initializer call after a
@@ -457,9 +567,9 @@ pub async fn execute_one_bundle(
         // Skip it if the journal says so and the chain confirms it; re-sending
         // would at best waste a tx and at worst revert the whole bundle (e.g. a
         // deployer's `transferOwnership` after ownership already moved on).
-        if let Some(hash) =
-            find_journaled_execution(&provider, &executed, safe_file, idx, from, to, &data, value)
-                .await?
+        if let Some(hash) = journal
+            .find_prior_execution(&provider, from, to, &data, value)
+            .await?
         {
             logger::info(format!(
                 "Skipping Safe tx #{idx} (to {to:#x}) — already mined in a prior run as {hash:#x}"
@@ -540,23 +650,19 @@ pub async fn execute_one_bundle(
             "Safe tx #{idx} (hash {tx_hash:#x}) reverted (status=0)",
         );
 
-        if let Some(path) = out_path {
-            record_executed_tx(
-                path,
-                &mut executed,
-                tx_hash,
-                ExecutedTx {
-                    tx_hash: format!("{tx_hash:#x}"),
-                    to: format!("{to:#x}"),
-                    data: format!("0x{}", alloy::hex::encode(receipt_input(tx)?)),
-                    value: format!("{value}"),
-                    status,
-                    from: Some(format!("{from:#x}")),
-                    bundle: Some(bundle_name(safe_file)),
-                    index: Some(idx),
-                },
-            )?;
-        }
+        journal.record(
+            tx_hash,
+            ExecutedTx {
+                tx_hash: format!("{tx_hash:#x}"),
+                to: format!("{to:#x}"),
+                data: format!("0x{}", alloy::hex::encode(receipt_input(tx)?)),
+                value: format!("{value}"),
+                status,
+                from: Some(format!("{from:#x}")),
+                bundle: Some(bundle_name(safe_file)),
+                index: Some(idx),
+            },
+        )?;
     }
 
     logger::success("Safe file executed");
@@ -571,76 +677,27 @@ fn bundle_name(safe_file: &Path) -> String {
         .unwrap_or_else(|| safe_file.display().to_string())
 }
 
-/// A journaled execution of exactly this tx from a prior run, so a resume can
-/// skip it instead of re-sending it. Identity is positional — the same bundle
-/// file, the same position in it, the same signer — plus the call itself
-/// (target, calldata, value) and a status-1 record. Matching on the call alone
-/// is not enough: one `--out` journal spans every bundle of a run, and two
-/// bundles may carry byte-identical calls (from different signers, or the
-/// same), so a later bundle would otherwise skip a call that only the earlier
-/// one executed. Entries written before these fields existed never match and
-/// are re-sent, the pre-resume behaviour.
-///
-/// The record is then confirmed on THIS chain: the hash must have a receipt
-/// with status 1, the same target and the same signer (a journal carried over
-/// from another chain, or a re-orged receipt, does not count).
-#[allow(clippy::too_many_arguments)]
-async fn find_journaled_execution<P: Provider>(
-    provider: &P,
-    executed: &ExecutedBundle,
-    safe_file: &Path,
-    idx: usize,
-    from: Address,
-    to: Address,
-    data: &Bytes,
-    value: U256,
-) -> anyhow::Result<Option<B256>> {
-    let bundle = bundle_name(safe_file);
-    for (i, entry) in executed.transactions.iter().enumerate() {
-        if !journal_entry_matches(entry, &bundle, idx, from, to, data, value) {
-            continue;
-        }
-        let hash: B256 = entry.tx_hash.parse().with_context(|| {
-            format!(
-                "journal entry #{i} has an invalid tx hash {}",
-                entry.tx_hash
-            )
-        })?;
-        let Some(receipt) = provider
-            .get_transaction_receipt(hash)
-            .await
-            .context("eth_getTransactionReceipt")?
-        else {
-            continue;
-        };
-        if receipt.status() && receipt.to == Some(to) && receipt.from == from {
-            return Ok(Some(hash));
-        }
-    }
-    Ok(None)
-}
-
-/// Whether a journal entry records a successful execution of exactly this tx:
-/// same bundle file, position and signer, same target, calldata and value,
-/// status 1. Compares parsed values, not strings, so the journal's own spelling
-/// (`{:#x}` addresses, `0x` hex data, decimal value) and the Safe file's agree.
-/// Pure; the on-chain confirmation lives in `find_journaled_execution`.
-#[allow(clippy::too_many_arguments)]
+/// Whether a journal entry records a successful execution of exactly this call:
+/// same target, calldata and value, status 1, and — when the entry recorded a
+/// signer — the same signer. Compares parsed values, not strings, so the
+/// journal's own spelling (`{:#x}` addresses, `0x` hex data, decimal value) and
+/// the Safe file's agree. Pure; the on-chain confirmation lives in
+/// `ResumeJournal::find_prior_execution`.
 fn journal_entry_matches(
     entry: &ExecutedTx,
-    bundle: &str,
-    idx: usize,
     from: Address,
     to: Address,
     data: &Bytes,
     value: U256,
 ) -> bool {
-    if entry.status != 1 || entry.bundle.as_deref() != Some(bundle) || entry.index != Some(idx) {
+    if entry.status != 1 {
         return false;
     }
-    let Some(Ok(entry_from)) = entry.from.as_deref().map(str::parse::<Address>) else {
-        return false;
-    };
+    match entry.from.as_deref().map(str::parse::<Address>) {
+        None => {}
+        Some(Ok(entry_from)) if entry_from == from => {}
+        Some(_) => return false,
+    }
     let Ok(entry_to) = entry.to.parse::<Address>() else {
         return false;
     };
@@ -650,10 +707,7 @@ fn journal_entry_matches(
     let Ok(entry_value) = parse_decimal_or_hex_u256(&entry.value) else {
         return false;
     };
-    entry_from == from
-        && entry_to == to
-        && entry_data.as_slice() == data.as_ref()
-        && entry_value == value
+    entry_to == to && entry_data.as_slice() == data.as_ref() && entry_value == value
 }
 
 // Error selectors (4 bytes, lowercase hex, as they appear in an
@@ -932,7 +986,7 @@ pub async fn execute_one_bundle_unlocked(
     safe_file: &Path,
     l1_rpc_url: &str,
     sender: Address,
-    out_path: Option<&Path>,
+    journal: &mut ResumeJournal,
 ) -> anyhow::Result<()> {
     logger::step(format!(
         "Execute Safe file (unlocked): {}",
@@ -974,9 +1028,6 @@ pub async fn execute_one_bundle_unlocked(
     let gas_price = GAS_PRICE_FLOOR_WEI;
     logger::info(format!("Using gas price {} gwei", format_gwei(gas_price)));
 
-    // Same append-on-each-receipt journal and resume skip as the signed path.
-    let mut executed = load_executed_bundle(out_path)?;
-
     let mut skipped: usize = 0;
     for (idx, tx) in safe_txs.iter().enumerate() {
         let to: Address = tx
@@ -1004,10 +1055,9 @@ pub async fn execute_one_bundle_unlocked(
         // Skip it if the journal says so and the chain confirms it; re-sending
         // would at best waste a tx and at worst revert the whole bundle (e.g. a
         // deployer's `transferOwnership` after ownership already moved on).
-        if let Some(hash) = find_journaled_execution(
-            &provider, &executed, safe_file, idx, sender, to, &data, value,
-        )
-        .await?
+        if let Some(hash) = journal
+            .find_prior_execution(&provider, sender, to, &data, value)
+            .await?
         {
             logger::info(format!(
                 "Skipping Safe tx #{idx} (to {to:#x}) — already mined in a prior run as {hash:#x}"
@@ -1084,23 +1134,19 @@ pub async fn execute_one_bundle_unlocked(
             "Safe tx #{idx} (hash {tx_hash:#x}) reverted (status=0)",
         );
 
-        if let Some(path) = out_path {
-            record_executed_tx(
-                path,
-                &mut executed,
-                tx_hash,
-                ExecutedTx {
-                    tx_hash: format!("{tx_hash:#x}"),
-                    to: format!("{to:#x}"),
-                    data: format!("0x{}", alloy::hex::encode(receipt_input(tx)?)),
-                    value: format!("{value}"),
-                    status: u64::from(receipt.status()),
-                    from: Some(format!("{sender:#x}")),
-                    bundle: Some(bundle_name(safe_file)),
-                    index: Some(idx),
-                },
-            )?;
-        }
+        journal.record(
+            tx_hash,
+            ExecutedTx {
+                tx_hash: format!("{tx_hash:#x}"),
+                to: format!("{to:#x}"),
+                data: format!("0x{}", alloy::hex::encode(receipt_input(tx)?)),
+                value: format!("{value}"),
+                status: u64::from(receipt.status()),
+                from: Some(format!("{sender:#x}")),
+                bundle: Some(bundle_name(safe_file)),
+                index: Some(idx),
+            },
+        )?;
     }
 
     logger::success("Safe file executed");
@@ -1169,19 +1215,14 @@ mod tests {
         );
     }
 
-    const JOURNAL_BUNDLE: &str = "01_ecosystem.upgrade-prepare-all_0xab75.safe.json";
     const JOURNAL_FROM: &str = "0xab75e283274247b43a1f220885850ebefa399b88";
     const JOURNAL_TO: &str = "0x7e7bc292a71b73cebe77633937ddad3dc1f80ed2";
     const JOURNAL_DATA: &str =
         "0xf2fde38b000000000000000000000000000000000000000000000000000000000000dead";
 
     /// A journal entry as the executor writes it (lowercase addresses, decimal
-    /// value), with the resume identity fields optional so legacy entries can
-    /// be modelled.
-    #[allow(clippy::too_many_arguments)]
+    /// value); `from` optional so legacy entries can be modelled.
     fn journal_entry(
-        bundle: Option<&str>,
-        index: Option<usize>,
         from: Option<&str>,
         to: &str,
         data: &str,
@@ -1195,27 +1236,17 @@ mod tests {
             value: value.to_string(),
             status,
             from: from.map(str::to_string),
-            bundle: bundle.map(str::to_string),
-            index,
+            ..Default::default()
         }
     }
 
     fn full_entry() -> super::ExecutedTx {
-        journal_entry(
-            Some(JOURNAL_BUNDLE),
-            Some(3),
-            Some(JOURNAL_FROM),
-            JOURNAL_TO,
-            JOURNAL_DATA,
-            "0",
-            1,
-        )
+        journal_entry(Some(JOURNAL_FROM), JOURNAL_TO, JOURNAL_DATA, "0", 1)
     }
 
-    /// The tx as the executor sees it: checksummed addresses (as a Safe TX
-    /// Builder file spells them), bundle path with a directory prefix.
+    /// The call as the executor sees it: checksummed addresses, as a Safe TX
+    /// Builder file spells them.
     fn safe_call() -> (
-        std::path::PathBuf,
         alloy::primitives::Address,
         alloy::primitives::Address,
         alloy::primitives::Bytes,
@@ -1229,26 +1260,19 @@ mod tests {
         let data = alloy::primitives::Bytes::from(
             alloy::hex::decode(JOURNAL_DATA.trim_start_matches("0x")).unwrap(),
         );
-        (
-            std::path::PathBuf::from("/work/prepare").join(JOURNAL_BUNDLE),
-            from,
-            to,
-            data,
-        )
+        (from, to, data)
     }
 
     /// The journal spells addresses lowercase and the value in decimal; the
-    /// Safe file may not, and the bundle path carries a directory. Matching is
-    /// on parsed values and the file name.
+    /// Safe file may not. Matching is on parsed values. A legacy entry without
+    /// a recorded signer matches on the call alone (the receipt's `from` is
+    /// checked on chain instead).
     #[test]
-    fn journal_entry_matches_ignores_spelling() {
-        let (path, from, to, data) = safe_call();
-        let bundle = super::bundle_name(&path);
+    fn journal_entry_matches_ignores_spelling_and_accepts_legacy_entries() {
+        let (from, to, data) = safe_call();
         let value = alloy::primitives::U256::ZERO;
         assert!(super::journal_entry_matches(
             &full_entry(),
-            &bundle,
-            3,
             from,
             to,
             &data,
@@ -1257,43 +1281,35 @@ mod tests {
         let mut hex_value = full_entry();
         hex_value.value = "0x0".to_string();
         assert!(super::journal_entry_matches(
-            &hex_value, &bundle, 3, from, to, &data, value
+            &hex_value, from, to, &data, value
+        ));
+        let legacy = journal_entry(None, JOURNAL_TO, JOURNAL_DATA, "0", 1);
+        assert!(super::journal_entry_matches(
+            &legacy, from, to, &data, value
         ));
     }
 
-    /// Only the exact same tx — same bundle file, position and signer, same
-    /// call, status 1 — counts as already executed. In particular a
-    /// byte-identical call in another bundle or from another signer, and any
-    /// entry from a journal written before the identity fields existed, must
-    /// not make a resume skip this tx.
+    /// A reverted entry, another signer, or a different target / calldata /
+    /// value is not an execution of this call.
     #[test]
-    fn journal_entry_matches_requires_the_same_tx_and_a_success() {
-        let (path, from, to, data) = safe_call();
-        let bundle = super::bundle_name(&path);
+    fn journal_entry_matches_rejects_reverted_and_different_calls() {
+        let (from, to, data) = safe_call();
         let value = alloy::primitives::U256::ZERO;
         let rejects = |label: &str, entry: super::ExecutedTx| {
             assert!(
-                !super::journal_entry_matches(&entry, &bundle, 3, from, to, &data, value),
+                !super::journal_entry_matches(&entry, from, to, &data, value),
                 "{label} must not match"
             );
         };
         let mut e = full_entry();
-        e.bundle = Some("03_ecosystem.upgrade-prepare-all_0xab75.safe.json".to_string());
-        rejects("other bundle", e);
-        let mut e = full_entry();
-        e.index = Some(4);
-        rejects("other position", e);
+        e.status = 0;
+        rejects("reverted", e);
         let mut e = full_entry();
         e.from = Some("0x0000000000000000000000000000000000000001".to_string());
         rejects("other signer", e);
         let mut e = full_entry();
-        e.bundle = None;
-        e.index = None;
-        e.from = None;
-        rejects("legacy entry without identity", e);
-        let mut e = full_entry();
-        e.status = 0;
-        rejects("reverted", e);
+        e.from = Some("not-an-address".to_string());
+        rejects("garbage signer", e);
         let mut e = full_entry();
         e.to = "0x0000000000000000000000000000000000000001".to_string();
         rejects("other target", e);
@@ -1303,9 +1319,55 @@ mod tests {
         let mut e = full_entry();
         e.value = "1".to_string();
         rejects("other value", e);
-        let mut e = full_entry();
-        e.from = Some("not-an-address".to_string());
-        rejects("garbage signer", e);
+    }
+
+    /// One journal entry justifies one skip per run: two identical prior
+    /// entries serve two identical calls (in any bundle) and no more, and
+    /// entries appended by this run are never candidates.
+    #[test]
+    fn resume_journal_claims_each_prior_entry_once_and_ignores_new_entries() {
+        let (from, to, data) = safe_call();
+        let value = alloy::primitives::U256::ZERO;
+        let mut journal = super::ResumeJournal {
+            path: None,
+            bundle: super::ExecutedBundle {
+                transactions: vec![full_entry(), full_entry()],
+            },
+            prior: 2,
+            claimed: vec![false, false],
+        };
+        assert_eq!(
+            journal.next_prior_match_from(0, from, to, &data, value),
+            Some(0)
+        );
+        journal.claimed[0] = true;
+        assert_eq!(
+            journal.next_prior_match_from(0, from, to, &data, value),
+            Some(1)
+        );
+        journal.claimed[1] = true;
+        assert_eq!(
+            journal.next_prior_match_from(0, from, to, &data, value),
+            None
+        );
+        // A receipt this run records is not a resume candidate.
+        journal
+            .record(alloy::primitives::B256::from([1_u8; 32]), full_entry())
+            .unwrap();
+        assert_eq!(journal.transactions().len(), 3);
+        assert_eq!(
+            journal.next_prior_match_from(0, from, to, &data, value),
+            None
+        );
+        // Another signer's identical call finds nothing.
+        let other: alloy::primitives::Address = "0x0000000000000000000000000000000000000001"
+            .parse()
+            .unwrap();
+        journal.claimed = vec![false, false];
+        assert_eq!(
+            journal.next_prior_match_from(0, other, to, &data, value),
+            None
+        );
     }
 
     use std::fs;
