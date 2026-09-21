@@ -222,6 +222,11 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
+    function getZKsyncOSL1TxFiltering() external view returns (bool) {
+        return s.zksyncOSL1TxFilteringEnabled;
+    }
+
+    /// @inheritdoc IGetters
     function isFunctionFreezable(bytes4 _selector) external view returns (bool) {
         Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
         if (ds.selectorToFacet[_selector].facetAddress == address(0)) {

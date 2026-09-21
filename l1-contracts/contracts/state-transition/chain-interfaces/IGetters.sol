@@ -130,6 +130,10 @@ interface IGetters is IZKChainBase {
     /// substituted when the value was never set explicitly.
     function getZKsyncOSMaxTxGasLimit() external view returns (uint64);
 
+    /// @notice Returns whether operator filtering of priority transactions is enabled.
+    /// @return Whether L1 transaction filtering is enabled.
+    function getZKsyncOSL1TxFiltering() external view returns (bool);
+
     /// @return Whether a withdrawal has been finalized.
     /// @param _l2BatchNumber The L2 batch number within which the withdrawal happened.
     /// @param _l2MessageIndex The index of the L2->L1 message denoting the withdrawal.

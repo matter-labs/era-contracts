@@ -259,10 +259,15 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         bytes32 _currentBatchCommitment
     ) internal view returns (uint256) {
         // `fri_proof_verification_enabled` is always disabled, hence the `0` word.
-        // The final word is the pubdata content (`FULL_PUBDATA=0`/`LOGS_ONLY=1`), mirroring `ChainConfig::hash`
-        // on ZKsync OS, which appends `pubdata_content` after `max_tx_gas_limit`.
+        // See {protocol-docs/chain-config.md#proof-commitment} for the shared ZKsync OS encoding.
         bytes32 chainConfigHash = keccak256(
-            abi.encodePacked(s.chainId, uint256(0), uint256(_getZKsyncOSMaxTxGasLimit()), uint256(s.pubdataContent))
+            abi.encodePacked(
+                s.chainId,
+                uint256(0),
+                uint256(_getZKsyncOSMaxTxGasLimit()),
+                uint256(s.pubdataContent),
+                uint256(s.zksyncOSL1TxFilteringEnabled ? 1 : 0)
+            )
         );
         // Untruncated: the prover folds the full per-batch hashes, so PUBLIC_INPUT_SHIFT is
         // applied once by `computeZKsyncOSHash` after the fold.
