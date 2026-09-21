@@ -1,6 +1,7 @@
 use crate::{test_count_tracer::TestCountTracer, tracer::BootloaderTestTracer};
 use colored::Colorize;
 use once_cell::sync::OnceCell;
+use std::collections::BTreeMap;
 use std::fs;
 use std::process;
 use std::sync::Mutex;
@@ -212,7 +213,7 @@ fn execute_internal_bootloader_test() {
         let requested_tx_failure = Arc::new(OnceCell::default());
         let tx_failure_data_hex = Arc::new(OnceCell::default());
         let test_name = Arc::new(OnceCell::default());
-        let operator_hook_writes = Arc::new(Mutex::new(Vec::new()));
+        let operator_hook_counts = Arc::new(Mutex::new(BTreeMap::new()));
 
         let custom_tracers = BootloaderTestTracer::new(
             test_result.clone(),
@@ -220,7 +221,7 @@ fn execute_internal_bootloader_test() {
             requested_tx_failure.clone(),
             tx_failure_data_hex.clone(),
             test_name.clone(),
-            operator_hook_writes.clone(),
+            operator_hook_counts.clone(),
         )
         .into_tracer_pointer();
         let mut tracer_dispatcher = TracerDispatcher::from(custom_tracers);
@@ -247,7 +248,7 @@ fn execute_internal_bootloader_test() {
             .unwrap()
             .into_inner()
             .unwrap_or_default();
-        let operator_hook_writes = Arc::into_inner(operator_hook_writes)
+        let operator_hook_counts = Arc::into_inner(operator_hook_counts)
             .unwrap()
             .into_inner()
             .unwrap();
@@ -333,7 +334,7 @@ fn execute_internal_bootloader_test() {
         // as the regression check that every operator VM hook the server relies on is emitted.
         if test_name.starts_with("INT_TEST") && matches!(test_result, Some(Ok(()))) {
             if let Err(error) =
-                hook_sequence::check_operator_hooks(&operator_hook_writes, fixture_tx_count)
+                hook_sequence::check_operator_hooks(&operator_hook_counts, fixture_tx_count)
             {
                 test_result = Some(Err(error));
             }
@@ -424,14 +425,14 @@ fn check_production_bootloader_hooks(
     .to_rc_ptr();
     let mut vm: Vm<_, HistoryDisabled> = Vm::new(l1_batch_env, system_env, storage.clone());
 
-    let operator_hook_writes = Arc::new(Mutex::new(Vec::new()));
+    let operator_hook_counts = Arc::new(Mutex::new(BTreeMap::new()));
     let tracer = BootloaderTestTracer::new(
         Arc::new(OnceCell::default()),
         Arc::new(OnceCell::default()),
         Arc::new(OnceCell::default()),
         Arc::new(OnceCell::default()),
         Arc::new(OnceCell::default()),
-        operator_hook_writes.clone(),
+        operator_hook_counts.clone(),
     )
     .into_tracer_pointer();
     let mut tracer_dispatcher = TracerDispatcher::from(tracer);
@@ -446,7 +447,7 @@ fn check_production_bootloader_hooks(
 
     let result = vm.inspect(&mut tracer_dispatcher, InspectExecutionMode::Bootloader);
     drop(tracer_dispatcher);
-    let operator_hook_writes = Arc::into_inner(operator_hook_writes)
+    let operator_hook_counts = Arc::into_inner(operator_hook_counts)
         .unwrap()
         .into_inner()
         .unwrap();
@@ -463,5 +464,5 @@ fn check_production_bootloader_hooks(
             return Err(format!("production bootloader halted: {reason}"))
         }
     }
-    hook_sequence::check_production_operator_hooks(&operator_hook_writes, fixture_tx_count)
+    hook_sequence::check_operator_hooks(&operator_hook_counts, fixture_tx_count)
 }
