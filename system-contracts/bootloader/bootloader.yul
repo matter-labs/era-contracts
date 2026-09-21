@@ -4556,7 +4556,7 @@ object "Bootloader" {
             // The bootloader build applies LLVM `optnone` to this exact helper name.
             // NoInline alone does NOT prevent elimination of the surrounding hook stores.
             // Keep the stores in their caller: moving them into a near-call helper changes
-            // the frame observed by server tracers. See bootloader/COMPILER_HOOKS.md.
+            // the frame observed by server tracers.
             function $llvm_NoInline_llvm$_unoptimized(val) -> ret {
                 ret := add(val, callvalue())
             }
