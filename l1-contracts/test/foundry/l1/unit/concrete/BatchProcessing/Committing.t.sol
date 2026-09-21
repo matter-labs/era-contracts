@@ -700,29 +700,6 @@ contract CommittingTest is ExecutorTest {
         );
     }
 
-    /// @dev Mirrors the `batchOutputHash` formula from Committer._commitOneBatch.
-    function _batchOutputHash(
-        CommitBatchInfoZKsyncOS memory _batch,
-        bytes32 _upgradeTxHash
-    ) internal pure returns (bytes32) {
-        return
-            keccak256(
-                abi.encodePacked(
-                    _batch.firstBlockTimestamp,
-                    _batch.lastBlockTimestamp,
-                    uint256(_batch.daCommitmentScheme),
-                    _batch.daCommitment,
-                    _batch.numberOfLayer1Txs,
-                    _batch.numberOfLayer2Txs,
-                    _batch.priorityOperationsHash,
-                    _batch.l2LogsTreeRoot,
-                    _upgradeTxHash,
-                    _batch.dependencyRootsRollingHash,
-                    _batch.slChainId
-                )
-            );
-    }
-
     function test_RevertWhen_CommittingWithWrongLastCommittedBatchData() public {
         CommitBatchInfoZKsyncOS[] memory commitInfos = new CommitBatchInfoZKsyncOS[](1);
         commitInfos[0] = newCommitBatchInfoZKsyncOS;
