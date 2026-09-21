@@ -177,7 +177,13 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             maxTxGasLimit = ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT;
         }
         bytes32 chainConfigHash = keccak256(
-            abi.encodePacked(chainId, uint256(0), maxTxGasLimit, uint256(utilsFacet.util_getPubdataContent()))
+            abi.encodePacked(
+                chainId,
+                uint256(0),
+                maxTxGasLimit,
+                uint256(utilsFacet.util_getPubdataContent()),
+                uint256(0)
+            )
         );
         uint256 publicInput = uint256(
             keccak256(

@@ -281,4 +281,7 @@ struct ZKChainStorage {
     /// Permanent-rollup chains are locked to `FULL_PUBDATA` (see `Admin.setPubdataContent` / `makePermanentRollup`).
     /// @dev STORAGE SLOT: 68 (packed with baseTokenHasTotalSupply + zksyncOSMaxTxGasLimit)
     PubdataContent pubdataContent;
+    /// @dev See {protocol-docs/chain-config.md#l1-transaction-filtering}.
+    /// @dev STORAGE SLOT: 68 (packed after pubdataContent)
+    bool zksyncOSL1TxFilteringEnabled;
 }
