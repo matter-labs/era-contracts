@@ -29,6 +29,8 @@ fs_permissions = [
     { access = "read", path = "./out" },
     { access = "read", path = "zkout" },
     { access = "read", path = "./deploy-scripts/evm-predeploys/evm-predeploy-datas" },
+    { access = "read-write", path = "./test/anvil-interop/config/" },
+    { access = "read-write", path = "./test/anvil-interop/outputs/" },
 ]
 ignored_error_codes = ["missing-receive-ether", "code-size"]
 ignored_warnings_from = ["test", "contracts/dev-contracts"]
