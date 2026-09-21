@@ -66,6 +66,11 @@
   },
   {
     "type": "error",
+    "name": "DeployFailed",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidChainId",
     "inputs": []
   },

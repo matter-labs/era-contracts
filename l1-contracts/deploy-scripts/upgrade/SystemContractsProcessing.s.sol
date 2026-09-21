@@ -51,6 +51,8 @@ uint256 constant SYSTEM_CONTRACTS_COUNT = 31;
 /// @dev Fixed-address CoreContract entries backed by l1-contracts bytecodes.
 ///      Era deploys them directly; ZKsyncOS upgrades them via universal force deployments.
 uint256 constant FIXED_ADDRESS_CORE_CONTRACTS_COUNT = 12;
+/// @dev NTV is deployed separately after capturing its legacy WETH immutable.
+uint256 constant ERA_DEFERRED_CORE_CONTRACTS_COUNT = 1;
 /// @dev Era runtime creation bytecodes published as factory deps but not force-deployed.
 uint256 constant RUNTIME_ONLY_FACTORY_DEPS_COUNT = 2;
 /// @dev Era factory deps: fixed-address core contracts plus runtime-only proxy creation bytecodes.
@@ -229,10 +231,16 @@ library SystemContractsProcessing {
         returns (FixedAddressCoreContractDeployInfo[] memory contracts)
     {
         CoreContract[] memory ids = getFixedAddressCoreContracts();
-        contracts = new FixedAddressCoreContractDeployInfo[](ids.length);
+        // NTV is deployed by the L2 initialization helper after reading its WETH immutable.
+        // Keep it in the shared registry so ZKsyncOS deployments and Era factory deps still include it.
+        contracts = new FixedAddressCoreContractDeployInfo[](ids.length - ERA_DEFERRED_CORE_CONTRACTS_COUNT);
+        uint256 deploymentIndex;
         for (uint256 i = 0; i < ids.length; i++) {
+            if (ids[i] == CoreContract.L2NativeTokenVault) {
+                continue;
+            }
             string memory eraName = CoreOnGatewayHelper._resolveContractName(false, ids[i]);
-            contracts[i] = FixedAddressCoreContractDeployInfo({
+            contracts[deploymentIndex++] = FixedAddressCoreContractDeployInfo({
                 id: ids[i],
                 addr: CoreOnGatewayHelper._resolveAddress(ids[i]),
                 bytecode: ContractsBytecodesLib.getCreationCodeEra(eraName)

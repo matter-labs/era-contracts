@@ -200,8 +200,8 @@ library L2GenesisForceDeploymentsHelper {
     /// @notice Initializes force-deployed contracts.
     /// @dev Note, that this function is expected to initialize all system contracts deployed within the user space
     /// with the only exception of the SystemContractProxyAdmin, which is expected to be initialized inside the Genesis.
-    /// @dev Contract deployment (conductContractUpgrade) is handled externally via the force deployment list.
-    /// This function only performs initialization (initL2/updateL2 calls).
+    /// @dev Era upgrades replace NTV here after reading its legacy WETH immutable.
+    /// All other contract deployments are handled externally via the force deployment list.
     /// @param _ctmDeployer Address of the CTM Deployer contract.
     /// @param _fixedForceDeploymentsData Encoded data for forced deployment that
     /// is the same for all the chains.
@@ -231,11 +231,15 @@ library L2GenesisForceDeploymentsHelper {
         // Validate it once here rather than at every individual initL2/updateL2 call site.
         require(fixedForceDeploymentsData.aliasedL1Governance != address(0), ZeroAddress());
 
-        // Ensure WETH token exists. During genesis NTV.WETH_TOKEN() returns address(0)
-        // (uninitialized storage), so _ensureWethToken deploys a new proxy.
-        // During upgrades it returns the existing address and _ensureWethToken is a no-op.
+        address predeployedWeth = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).WETH_TOKEN();
+        if (!_isGenesisUpgrade && !_isZKsyncOS) {
+            // Era's deployment list leaves NTV untouched so its old WETH immutable is still readable.
+            // Capture it before replacing the code, then initialize the new storage-based pointer below.
+            require(predeployedWeth != address(0), ZeroAddress());
+            forceDeployEra(fixedForceDeploymentsData.l2NtvBytecodeInfo, L2_NATIVE_TOKEN_VAULT_ADDR);
+        }
         address wrappedBaseTokenAddress = _ensureWethToken({
-            _predeployedWethToken: L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).WETH_TOKEN(),
+            _predeployedWethToken: predeployedWeth,
             _aliasedL1Governance: fixedForceDeploymentsData.aliasedL1Governance,
             _baseTokenL1Address: additionalForceDeploymentsData.baseTokenL1Address,
             _baseTokenAssetId: additionalForceDeploymentsData.baseTokenBridgingData.assetId,
@@ -347,7 +351,7 @@ library L2GenesisForceDeploymentsHelper {
             _fixedForceDeploymentsData.l1ChainId,
             _fixedForceDeploymentsData.eraChainId,
             IL1AssetRouter(_fixedForceDeploymentsData.l1AssetRouter),
-            IL2SharedBridgeLegacy(_getLegacySharedBridge()),
+            IL2SharedBridgeLegacy(_additionalForceDeploymentsData.l2LegacySharedBridge),
             _additionalForceDeploymentsData.baseTokenBridgingData.assetId,
             _fixedForceDeploymentsData.aliasedL1Governance
         );
@@ -359,7 +363,7 @@ library L2GenesisForceDeploymentsHelper {
             // Legacy Era chains exposed this via an immutable. After the v31 code replacement,
             // reading it back from storage returns zero, so the L1-provided value is authoritative.
             _fixedForceDeploymentsData.l2TokenProxyBytecodeHash,
-            _getLegacySharedBridge(),
+            _additionalForceDeploymentsData.l2LegacySharedBridge,
             _wrappedBaseTokenAddress,
             _additionalForceDeploymentsData.baseTokenBridgingData,
             _additionalForceDeploymentsData.baseTokenMetadata
@@ -452,11 +456,6 @@ library L2GenesisForceDeploymentsHelper {
         // For Era: initializes holder balance, with __DEPRECATED_totalSupply kept in totalSupply().
         // For ZKOS: mints via MINT_BASE_TOKEN_HOOK and transfers to holder.
         IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
-    }
-
-    /// @notice Returns the address of the legacy shared bridge from the L2 Asset Router.
-    function _getLegacySharedBridge() private view returns (address) {
-        return address(L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE());
     }
 
     /// @notice Constructs the initialization calldata for the L2WrappedBaseToken.
