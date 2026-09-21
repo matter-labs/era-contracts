@@ -4,14 +4,15 @@
     "minor": 32,
     "patch": 2
   },
-  "genesis_root": "0xdaa969e5b4764b6be3fd4afdd93882cd9ee2d2732e23b6e33ab39b9c4375b58d",
+  "genesis_root": "0x9e6a69f0e8e991a77e0c48ff3ac9a3357dcc092f65f1b0df609d9b5344e19148",
   "genesis_rollup_leaf_index": 102,
-  "genesis_batch_commitment": "0x67cd3cb5533a132c0cb068e6af53165ffc5cf94b37dbbc0f81eccefe8f11d489",
-  "bootloader_hash": "0x010008db687281e3c50bd1086862d4fc1475c5be9bec49ae529ac5ac8300e48c",
-  "default_aa_hash": "0x010005d9eafc637c5d36dee714ef394b2f87f61dc6120f891f28b641b90cec1b",
-  "evm_emulator_hash": "0x01000be94ca18a0bf04e07a4e7746c1d78468bf2cf0fa8a954ec1bcd0a7b0f87",
+  "genesis_batch_commitment": "0x975d39063e1f2a81d509aecfa0c7598698195045d07f209394da75ca0dabcc0b",
+  "bootloader_hash": "0x0100098333c7eac3d7ad6388fcf7271666afa3f3622b70447099bb28aaf9ff17",
+  "default_aa_hash": "0x010005d969c84d1151755f6f32c73f6696466cecf1bff0db3129a6c6619ace37",
+  "evm_emulator_hash": "0x01000be964777e1ce46f83e4126f6a7f8c98bebe750c4b90ee2fafc06283e702",
   "prover": {
     "recursion_scheduler_level_vk_hash": "0xbaaa46d644f7034d609eea327e818bd9a93a3c0fdd60e887d233da8a35c4f8ae",
-    "fflonk_snark_wrapper_vk_hash": "0xd89b62ac599b15d9dc47860c8ebca5964c99e7b177e9b8ea38a0c13714dc32bb"
+    "fflonk_snark_wrapper_vk_hash": "0xd89b62ac599b15d9dc47860c8ebca5964c99e7b177e9b8ea38a0c13714dc32bb",
+    "airbender_snark_wrapper_vk_hash": null
   }
 }
