@@ -92,18 +92,18 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 # contracts still owned by the old governor, and those must be gone after it.
 #
 # ── 5. Upgrade an individual chain ────────────────────────────────────────
-# Once the ecosystem is on the new version, per chain (`chain_name` is a key under
-# `chains:` in `environments/<env>/ecosystem.yaml`):
+# Once the ecosystem is on the new version, per chain (`chain_id` is the numeric
+# chain id; the target version per env/flavour is in protocol-ops/docs/v31-upgrade.md):
 #
 #   # a) the chain's upgrade calldata for its ChainAdmin
 #   gh workflow run generate-chain-upgrade-calldata.yaml --ref <branch> \
 #     -f environment=<env> -f protocol_ops_tag=<tag> \
-#     -f l1_rpc_url=<l1-rpc> -f chain_name=<chain>
+#     -f l1_rpc_url=<l1-rpc> -f chain_id=<chain-id>
 #
 #   # b) when the chain schedules the switch itself
 #   gh workflow run generate-chain-set-upgrade-timestamp-calldata.yaml --ref <branch> \
 #     -f environment=<env> -f protocol_ops_tag=<tag> -f l1_rpc_url=<l1-rpc> \
-#     -f chain_name=<chain> -f new_protocol_version=<packed> -f upgrade_timestamp=<unix>
+#     -f chain_id=<chain-id> -f new_protocol_version=<packed> -f upgrade_timestamp=<unix>
 #
 # Both emit `safe-bundles-*` artifacts for the chain's admin multisig. Bundles
 # targeting the ecosystem deployer EOA instead go through

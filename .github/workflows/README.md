@@ -49,5 +49,5 @@ transfers between machines.
 - **Integration-test-only** env vars (e.g. `L1_DIAMOND_CUT_DATA`) are NOT workflow inputs
 - **v30-only** overrides are marked `[v30 only]` in descriptions and `TODO(v30-removal)` in code
 - **Artifact names**:
-  - per-chain workflows: `safe-bundles-{operation}-{chain_name}-{environment}`
-  - ecosystem-wide workflows (`upgrade-prepare`, `upgrade-governance`): `safe-bundles-{operation}-{environment}` (no `chain_name`)
+  - per-chain workflows: `safe-bundles-{operation}-{chain_id}-{environment}` (the two upgrade workflows; older per-chain workflows still take `chain_name`)
+  - ecosystem-wide workflows (`upgrade-prepare`, `upgrade-governance`): `safe-bundles-{operation}-{environment}` (no chain component)
