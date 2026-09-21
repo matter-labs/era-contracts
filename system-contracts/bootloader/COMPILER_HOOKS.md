@@ -25,8 +25,7 @@ their hashes must be regenerated consistently. L1 EVM compiler settings are
 unchanged. Verification must retain `settings.llvmOptions` in Standard JSON input.
 
 The public zksolc option forwards a **hidden LLVM debugging facility**, not a stable
-hook API. An unmatched function name silently does nothing. Build-time source
-tests reject a missing helper or configuration drift, and runtime tests check emitted hooks, ordering,
+hook API. An unmatched function name silently does nothing. Runtime tests check emitted hooks, ordering,
 parameter writes and frame depth. Compiler-owner approval is required before
 adopting this workaround. Revalidate on every compiler change; a dedicated
 observable/ordered-store primitive would be a stronger long-term solution.

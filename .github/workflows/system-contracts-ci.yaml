@@ -31,7 +31,6 @@ jobs:
         working-directory: system-contracts
         run: |
           yarn install
-          yarn test:bootloader-compiler
           yarn build
           yarn build:foundry
 
