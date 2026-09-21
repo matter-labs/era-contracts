@@ -77,16 +77,6 @@ jobs:
 
           yarn calculate-hashes:fix
 
-      # The PR branch is checked out into the workspace above and local actions are read from the
-      # working tree when their step runs, so take this action from the dispatched ref instead: a PR
-      # branched before the action existed can then still be regenerated.
-      - name: Fetch the signed-commit action from the dispatched ref
-        uses: actions/checkout@v4
-        with:
-          path: .ci-actions
-          sparse-checkout: .github/actions/signed-commit
-          persist-credentials: false
-
       # Minted only after the PR's own build scripts have run, so no write-capable credential exists
       # while they execute. Scoped to this repository's contents, valid for an hour, revoked at job end.
       - name: Mint GitHub App token
@@ -101,9 +91,11 @@ jobs:
       # required-signatures rule no longer blocks the PR. The App token, unlike GITHUB_TOKEN, also
       # triggers the PR's workflows on the new commit.
       - name: Commit and push changes (signed by GitHub)
-        uses: ./.ci-actions/.github/actions/signed-commit
+        uses: planetscale/ghcommit-action@a6b150b81dca5dd027baa898604418eec9e11465 # v0.2.22
         with:
-          token: ${{ steps.app-token.outputs.token }}
+          commit_message: "chore: Updated hashes from CI"
+          repo: ${{ github.repository }}
           branch: ${{ steps.pr.outputs.head_ref }}
-          headline: "chore: Updated hashes from CI"
-          paths: AllContractsHashes.json
+          file_pattern: AllContractsHashes.json
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
