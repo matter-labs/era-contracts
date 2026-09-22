@@ -38,13 +38,19 @@ Under normal operation, user may send signed transactions to operator RPC or req
 Operator runs the node in the normal mode.
 
 - Transactions that were accepted through the RPC are executed.
-- Transactions that have been sent to the priority queue (priority transactions or L1 → L2 transactions) are executed during 4 **days** window.
+- Transactions that have been added to the priority tree (priority transactions or L1 → L2 transactions) are executed during a 4 **day** window.
 
 ## Criteria to activate priority mode
 
-The only ‘objective’ way to prove that operator is censoring is L1. If there are priority transactions on L1 that were requested 4 days before and not yet executed - Priority Mode can be activated.
+Priority Mode is available only after the chain admin irreversibly opts in through
+`permanentlyAllowPriorityMode`. Opt-in is restricted to ZKsync OS chains settling on L1 and requires
+at least one pending priority operation with a recorded request timestamp. The chain must also be a
+permanent rollup before activation.
 
-The priority mode can be activated immediately permissionless by any account on L1 via `AdminFacet.activatePriorityMode`.
+After opt-in, the objective censorship signal is an unprocessed priority operation whose recorded
+request timestamp is at least `PRIORITY_EXPIRATION` old. Once that condition is met, any account can
+activate Priority Mode on L1 through `AdminFacet.activatePriorityMode`. Activation reverts all batches
+that have not yet executed so permissionless settlement can resume from the finalized state.
 
 ## Priority mode
 

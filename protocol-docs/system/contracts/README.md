@@ -15,7 +15,6 @@ were ported from `zksync-era` and retained for the current `era-contracts` layou
 - [Settlement](./settlement_contracts/zkchain_basics.md)
   - [Priority operations and L1 <-> L2 communication](./settlement_contracts/priority_queue/README.md)
   - [Data availability](./settlement_contracts/data_availability/README.md)
-- [Gateway / settlement-layer machinery](./gateway/README.md)
 - [Consensus registry](./consensus/README.md)
 - [ZKsync OS genesis and built-ins](../../chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins)
 

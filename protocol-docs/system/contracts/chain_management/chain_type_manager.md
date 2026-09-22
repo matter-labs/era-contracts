@@ -11,7 +11,8 @@ rules needed for them to trust one another's settled state.
 - Deploy and initialize a chain diamond when called by Bridgehub, then record the chain ID -> diamond
   association.
 - Publish semver protocol versions, verifier addresses, diamond cuts, and upgrade deadlines.
-- Execute an approved upgrade for a chain and freeze chains that miss required upgrade conditions.
+- Execute an approved upgrade for a chain. Once a protocol-version deadline expires, commits under
+  that version fail; freezing and unfreezing remain separate CTM-owner operations.
 - Forward the limited administrative operations exposed by the chain diamond, such as validator, fee,
   and porter configuration.
 

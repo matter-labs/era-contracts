@@ -13,7 +13,9 @@ Relevant contracts and libraries:
 
 ## Aggregation structure
 
-The `MessageRoot` contract (deployed as `L1MessageRoot` on L1 and `L2MessageRoot` on settlement-layer L2s such as Gateway) stores the cross-chain message roots of all registered chains and aggregates them into one root. From v31 onwards it also performs L2->L1 message verification directly, bypassing the `Mailbox` of individual chains.
+The `MessageRoot` contract stores the cross-chain message roots of all registered chains and aggregates
+them into one root. `L1MessageRoot` also performs L2 -> L1 message verification directly, bypassing the
+`Mailbox` of individual chains.
 
 The structure is a two-level Merkle forest plus a per-batch record:
 
@@ -53,7 +55,7 @@ Two entry points exist on `MessageRootBase`, both restricted to the chain's own 
   3. The chain's shared-tree leaf is updated to `chainIdLeafHash(newChainRoot, chainId)` (event `NewChainRoot`).
   4. The new shared root is emitted (`NewInteropRoot`) and recorded in `historicalRoots`.
 
-Only v32 executors call the v32 entry point, so the interop trees contain v32-format roots exclusively — a non-empty chain tree implies the chain uses the current chain-batch-root format. On both L1 and Gateway the executor appends the committed `l2LogsTreeRoot` via `addChainBatchRootV32` (`ExecutorFacet._appendMessageRoot`); on Gateway that value is already the chain batch root (it commits to an empty multichain batch root), so the paths are identical and no per-batch log reconstruction or balance accounting is performed.
+Only v32 executors call the v32 entry point, so the interop trees contain v32-format roots exclusively — a non-empty chain tree implies the chain uses the current chain-batch-root format. On L1 the executor appends the committed `l2LogsTreeRoot` via `addChainBatchRootV32` (`ExecutorFacet._appendMessageRoot`).
 
 ## Chain batch root (ZKsync OS)
 
@@ -111,12 +113,12 @@ All verification goes through `MessageHashing._getProofData` (exposed as `Messag
 **Hop 1 — log leaf to batch root.** The leaf (an L2 log/message hash, rejected if it equals the default leaf) plus `logLeafProofLen` siblings and the leaf mask yield `batchSettlementRoot`.
 
 - If `finalProofNode` is set, verification terminates here against the verifier's local record:
-  - On the settlement layer (`MessageRootBase._proveL2LeafInclusionRecursive`): the root must equal the recorded `chainBatchRoots[chainId][batchNumber]` (never the layer's own aggregate root). Batch 0 is not provable (`BatchZeroNotAllowed`). If no root is recorded, `_noBatchFallback` applies: on L1, batches produced before the chain's `v31UpgradeChainBatchNumber` are looked up on the chain itself via `l2LogsRootHash` (trust-bounded: a malicious chain can only damage itself while L1 is the only settlement layer; once the ZKsync OS CTM's ownership is transferred to decentralized governance, the chain-reported pre-v31 batch root can be trusted completely — until then the assumption is that no ZKsync OS-based Gateway exists); on L2 it returns 0, since newer implementations guarantee all available batch roots are stored.
+  - On the settlement layer (`MessageRootBase._proveL2LeafInclusionRecursive`): the root must equal the recorded `chainBatchRoots[chainId][batchNumber]` (never the layer's own aggregate root). Batch 0 is not provable (`BatchZeroNotAllowed`). If no root is recorded, `_noBatchFallback` applies: on L1, batches produced before the chain's `v31UpgradeChainBatchNumber` are looked up on the chain itself via `l2LogsRootHash`. A malicious chain can only damage itself while L1 is the only settlement layer; once the ZKsync OS CTM's ownership is transferred to decentralized governance, the chain-reported pre-v31 batch root can be trusted completely. On L2 the fallback returns 0, since newer implementations guarantee all available batch roots are stored.
   - On an L2 consumer (`L2MessageVerification`): the root must equal the imported `interopRoots(chainId, blockOrBatchNumber).root` — an L2 has no per-chain roots, only imported aggregate roots.
 
 **Hop 2 — batch leaf to chain root.** For non-final proofs the next words are `[l1Timestamp][batchLeafProofMask][batchLeafProofLen siblings]`. The verifier reconstructs the batch leaf as `batchLeafHash(batchSettlementRoot, batchNumber, l1Timestamp)` — a wrong timestamp makes the leaf mismatch the tree, which is what authenticates the proof-supplied timestamp — and hashes up to the chain root of `chainTree[chainId]`. `MessageHashing.readAggregationHopPath` is the single accessor for this section's word layout (mask + siblings); its output is trustworthy only after the same proof bytes passed the leaf verifier.
 
-**Hop 3 — chain-id leaf to aggregated root.** The chain root becomes `chainIdLeafHash(chainRoot, chainId)`, followed by two words: packed `(settlementLayerBatchNumber << 128 | settlementLayerBatchRootMask)` and `settlementLayerChainId`. `MessageHashing.readSettlementLayerReference` is the single accessor for these settlement-layer words (plus the hop-2 `l1Timestamp`); like its hop-2 sibling, its output is trustworthy only after the same proof bytes passed the leaf verifier. Verification recurses with the chain-id leaf as the new leaf: on L1, `L1MessageRoot` first checks the claimed settlement layer via `IL1ChainAssetHandler.isValidSettlementLayer`; on L2, the recursion anchors in the imported aggregate root, using the settlement layer's **block** number as `blockOrBatchNumber`. Recursion depth is capped at 1 (`DepthMoreThanOneForRecursiveMerkleProof`) — at most a single intermediate Gateway between the chain and L1.
+**Hop 3 — chain-id leaf to aggregated root.** The chain root becomes `chainIdLeafHash(chainRoot, chainId)`, followed by two words: packed `(settlementLayerBatchNumber << 128 | settlementLayerBatchRootMask)` and `settlementLayerChainId`. `MessageHashing.readSettlementLayerReference` is the single accessor for these settlement-layer words (plus the hop-2 `l1Timestamp`); like its hop-2 sibling, its output is trustworthy only after the same proof bytes passed the leaf verifier. Verification recurses with the chain-id leaf as the new leaf: on L1, `L1MessageRoot` first checks the claimed settlement layer via `IL1ChainAssetHandler.isValidSettlementLayer`; on L2, the recursion anchors in the imported aggregate root, using the settlement layer's **block** number as `blockOrBatchNumber`. Recursion depth is capped at 1 (`DepthMoreThanOneForRecursiveMerkleProof`).
 
 Full path, innermost to outermost:
 

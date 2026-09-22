@@ -11,12 +11,11 @@ Chain management is split between the ecosystem-wide L1 Bridgehub, one or more c
 - **Chain diamond** is the per-chain L1 settlement contract. Its admin, executor, mailbox, and getter
   facets share storage. The chain admin controls the limited per-chain settings exposed by `AdminFacet`;
   CTM governance controls protocol-level changes.
-- **ValidatorTimelock** authorizes validators and delays batch execution according to the configured
-  chain type.
+- **ValidatorTimelock** holds per-chain operator roles and delays batch execution. Its per-chain
+  default role administrator is the chain admin reported by that chain's diamond.
 
-The current release creates supported chains on L1. Settlement-layer migration machinery remains in
-the codebase but new migrations are disabled. See {protocol-docs/chain-lifecycle.md} for the complete
-creation, genesis, interop-registration, migration, and upgrade-onboarding flow.
+The current release creates supported chains on L1. See {protocol-docs/chain-lifecycle.md} for the
+complete creation, genesis, interop-registration, and upgrade-onboarding flow.
 
 ## Detailed pages
 

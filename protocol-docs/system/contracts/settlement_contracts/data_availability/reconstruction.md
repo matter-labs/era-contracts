@@ -1,7 +1,13 @@
-# L2 State Reconstruction Tool
+# State reconstruction
 
-Given that we post all data to L1, there is a tool, created by the [Equilibrium Team](https://equilibrium.co/) that
-solely uses L1 pubdata for reconstructing the state and verifying that the state root on L1 can be created using
-pubdata. A link to the repo can be found [here](https://github.com/eqlabs/zksync-state-reconstruct). The way the tool
-works is by parsing out all the L1 pubdata for an executed batch, comparing the state roots after each batch is
-processed.
+State reconstruction from Ethereum data is a property of rollup DA configurations, not of every DA
+mode. With the standard ZKsync OS blob validator, the data committed by the ZKsync OS batch output is
+published in EIP-4844 blobs whose versioned hashes are checked on L1.
+
+A reconstruction tool must understand the ZKsync OS batch-output and pubdata formats as well as the
+configured L1 validator. The contracts in this repository authenticate the DA commitment and its L1
+publication evidence; they do not themselves reconstruct the L2 state.
+
+Validium and custom DA configurations may keep the reconstruction data outside Ethereum. In those
+modes, reconstruction additionally depends on the availability guarantees of the selected external
+system.

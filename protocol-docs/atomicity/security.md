@@ -161,7 +161,7 @@ The timeout proof relies on three preconditions, each enforced on chain:
 - **L1-only settlement (this release).** Every flow's `settlementLayerChainId` must be the L1 chain id;
   `AtomicFlowManager` re-checks this wherever the settlement layer is consumed (`append`, finality,
   refund). Anchoring timeout proofs only on the L1 message root is what makes the settlement-layer
-  migration case in precondition 1 acceptable. Extending atomic interop to gateway-settled flows would
+  migration case in precondition 1 acceptable. Extending atomic interop to non-L1 settlement would
   require revisiting that migration argument.
 - **Honest majority / valid settlement.** The proofs are only as trustworthy as the imported interop
   roots and the settlement-layer batch execution that double-checks them; atomic interop adds no trust

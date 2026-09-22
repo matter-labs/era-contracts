@@ -93,7 +93,7 @@ Checks performed before sending the registration:
 - Both chains settle on the **same** settlement layer (`ChainsSettlementLayerMismatch` otherwise).
   Both settling directly on L1 is permitted as of v32: L1 itself builds interop roots
   (`MessageRootBase.addChainBatchRootV32`) and serves the corresponding inclusion proofs, so
-  L1-settled chains participate in interop without a gateway. (In v31 this case was rejected with
+  L1-settled chains participate in interop directly. (In v31 this case was rejected with
   the now-removed `ChainsSettlingOnL1` error.)
 - The chain to be registered has at least one batch leaf in this layer's message root
   (`messageRoot.chainTreeLeafCount(chainId) > 0`), else it reverts with
@@ -101,7 +101,7 @@ Checks performed before sending the registration:
   timeout precondition: interop towards a chain is only enabled once the chain both has its
   `sharedTree` leaf and has a batch in its chain tree.
 
-No backfill of pre-existing chains is needed for this gate: during v31 the ZK Gateway was never
+No backfill of pre-existing chains is needed for this gate: during v31 non-L1 settlement was never
 activated and registration required that a chain does **not** settle on L1, so at the start of v32
 no chains have been registered for interop — every chain passes through this gate (and gets its
 tree populated) before interop can target it.
@@ -141,7 +141,7 @@ to remove migration-related risks:
   the flag, since it only ever returns a chain back to settling on L1.
 - The whole migration machinery (chain asset handlers, `Migrator` facet, migration intervals,
   migration numbers) is kept intact and covered by tests, so a future release can bring settlement
-  layers (e.g. ZK Gateway) back by flipping the constant. `_chainMigrationsEnabled()` is `virtual`
+  layers back by flipping the constant. `_chainMigrationsEnabled()` is `virtual`
   only so dev/test variants can re-enable migrations for coverage; production contracts must not
   override it.
 
@@ -185,7 +185,7 @@ not follow from swapping implementations are:
 - **Atomic-interop built-ins** exist on ZKsync OS chains only. New chains get them from genesis and
   pre-existing ones from this upgrade's force deployments (next section).
 
-Scope of this release's upgrade: **ZKsync OS chains that settle on L1**. Gateway-settled chains are not
+Scope of this release's upgrade: **ZKsync OS chains that settle on L1**. Non-L1-settled chains are not
 included; their upgrade takes
 the `s.settlementLayer != address(0)` path through their settlement layer instead of recording the L2
 upgrade transaction on L1.

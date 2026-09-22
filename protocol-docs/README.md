@@ -6,7 +6,7 @@ restating them (see the "Documentation and Comments" section of `AGENTS.md`).
 
 | Document                                   | Covers                                                                                                                                                                              |
 | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [system/](./system/README.md)              | Complete contracts architecture: system map, trust boundaries, Bridgehub and chain management, settlement, DA, bridges, Gateway status, consensus, and execution environments       |
+| [system/](./system/README.md)              | Complete contracts architecture: system map, trust boundaries, Bridgehub and chain management, settlement, DA, bridges, consensus, and execution environments                       |
 | [interop.md](./interop.md)                 | Canonical interop protocol: bundles and calls, ERC-7786/ERC-7930 usage, attributes, fees, send flow, handlers, interop-root import, and restrictions                                |
 | [interop/](./interop/README.md)            | Complete contract architecture, supported finality forms, source-page porting map, and message/asset/multi-leg examples                                                             |
 | [atomicity/](./atomicity/README.md)        | Atomic multi-leg interop flows (folder): the commitment tree, the send/finalize/timeout lifecycle, the finality & timeout proofs, refund/recovery semantics, and the security model |

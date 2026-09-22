@@ -26,9 +26,6 @@ complete ordering and guards are in {protocol-docs/chain-lifecycle.md#chain-crea
 The Bridgehub does not itself mint bridged assets. It authenticates the route and coordinates the
 asset router with the destination chain. See {protocol-docs/bridging.md}.
 
-## L2 and settlement-layer variants
+## L2 variant
 
 A fixed-address L2 Bridgehub implements the shared registry interface needed by L2 protocol contracts.
-Generic settlement-layer relay entry points are also retained. In the current release all supported
-chains settle on L1 and new settlement-layer migrations are disabled; see
-[settlement-layer status](../gateway/README.md).

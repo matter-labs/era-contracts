@@ -240,7 +240,7 @@ source legs become recoverable.
 This replaces both ported atomicity proposals:
 
 - there is no L1 atomic coordinator, escrow, or freeze contract;
-- there is no Gateway-DA simulation protocol or locked-state execution mode;
+- there is no DA-simulation protocol or locked-state execution mode;
 - contracts do not execute tentatively and later commit/abort destination state;
 - atomicity gates whether destination execution or source recovery is permitted; it does not force
   every destination transaction to be submitted.

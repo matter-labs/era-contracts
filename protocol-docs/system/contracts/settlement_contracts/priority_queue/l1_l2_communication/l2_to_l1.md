@@ -5,29 +5,31 @@ executed batch. A message becomes actionable on L1 only after its batch has been
 
 ## Inclusion proofs
 
-The chain diamond exposes inclusion checks for the leaves committed by an executed batch:
+The message-verification contracts expose inclusion checks for leaves committed by an executed batch.
+On L1 these checks are implemented by `L1MessageRoot`; on L2 they are implemented by
+`L2MessageVerification`:
 
 ```solidity
-function proveL2LogInclusion(
+function proveL2LogInclusionShared(
   uint256 _chainId,
-  uint256 _batchNumber,
+  uint256 _blockOrBatchNumber,
   uint256 _index,
   L2Log calldata _log,
   bytes32[] calldata _proof
 ) external view returns (bool);
 
-function proveL2LeafInclusion(
+function proveL2LeafInclusionShared(
   uint256 _chainId,
-  uint256 _batchNumber,
-  uint256 _mask,
+  uint256 _blockOrBatchNumber,
+  uint256 _leafProofMask,
   bytes32 _leaf,
   bytes32[] calldata _proof
 ) external view returns (bool);
 ```
 
 The proof connects the message or log leaf to the chain batch root recorded during execution. The
-second form also supports nested message-root proofs used by interop and dormant settlement-layer
-relaying. See {protocol-docs/message-root.md} for the exact root hierarchy and proof formats.
+second form also supports the recursive message-root proofs used by interop. See
+{protocol-docs/message-root.md} for the exact root hierarchy and proof formats.
 
 ## Withdrawals and failed deposits
 
