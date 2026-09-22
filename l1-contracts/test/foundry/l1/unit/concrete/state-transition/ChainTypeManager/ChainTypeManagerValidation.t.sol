@@ -119,6 +119,12 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
             abi.encode(_genesisUpgrade, _genesisBatchHash, _genesisIndexRepeatedStorageChanges)
         );
         vm.mockCall(Utils.TEST_GENESIS_REGISTRY, abi.encodeWithSelector(ICTMRelease.validate.selector), bytes(""));
+        // The CTM starts at its genesis release's version (0 here).
+        vm.mockCall(
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(ICTMRelease.protocolVersion.selector),
+            abi.encode(uint256(0))
+        );
         // The CTM CALLS its genesis release while initializing, so the mocked one has to be a
         // deployed contract at all; the audited `CTMRelease` runtime code is what gets etched.
         vm.etch(Utils.TEST_GENESIS_REGISTRY, type(CTMRelease).runtimeCode);
@@ -129,13 +135,29 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
         );
     }
 
+    /// @dev A second mocked release, of `_protocolVersion`: what a cut-taking edge names and installs.
+    function _releaseAt(uint256 _protocolVersion) internal returns (address release) {
+        release = makeAddr(string.concat("release-", vm.toString(_protocolVersion)));
+        vm.etch(release, type(CTMRelease).runtimeCode);
+        vm.mockCall(release, abi.encodeWithSelector(ICTMRelease.validate.selector), bytes(""));
+        vm.mockCall(
+            release,
+            abi.encodeWithSelector(ICTMRelease.protocolVersion.selector),
+            abi.encode(_protocolVersion)
+        );
+        vm.mockCall(
+            release,
+            abi.encodeWithSelector(ICTMRelease.genesisParams.selector),
+            abi.encode(address(genesisUpgradeContract), bytes32(uint256(0x01)), uint64(0x01))
+        );
+    }
+
     function _deployChainTypeManager() internal returns (ChainTypeManager) {
         vm.startPrank(address(bridgehub));
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
             owner: governor,
             validatorTimelock: validator,
             currentRelease: Utils.TEST_GENESIS_REGISTRY,
-            protocolVersion: 0,
             serverNotifier: serverNotifier
         });
 
@@ -154,11 +176,29 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
             owner: governor,
             validatorTimelock: validator,
             currentRelease: Utils.TEST_GENESIS_REGISTRY,
-            protocolVersion: 0,
             serverNotifier: serverNotifier
         });
 
         vm.expectRevert(_err);
+        new TransparentUpgradeableProxy(
+            address(chainTypeManager),
+            admin,
+            abi.encodeCall(IChainTypeManager.initialize, ctmInitializeData)
+        );
+        vm.stopPrank();
+    }
+
+    /// @dev The genesis release is where the CTM reads its initial version from, so it is
+    ///      refused before anything is read from it.
+    function test_RevertWhen_initializedWithoutARelease() public {
+        vm.startPrank(address(bridgehub));
+        ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
+            owner: governor,
+            validatorTimelock: validator,
+            currentRelease: address(0),
+            serverNotifier: serverNotifier
+        });
+        vm.expectRevert(ZeroAddress.selector);
         new TransparentUpgradeableProxy(
             address(chainTypeManager),
             admin,
@@ -218,14 +258,11 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
         uint256 oldProtocolVersion = 0;
         uint256 oldProtocolVersionDeadline = block.timestamp + 100;
         uint256 newProtocolVersion = 1;
+        address newRelease = _releaseAt(newProtocolVersion);
 
         vm.prank(governor);
-        chainContractAddress.setNewVersionUpgrade(
-            cutData,
-            oldProtocolVersion,
-            oldProtocolVersionDeadline,
-            newProtocolVersion
-        );
+        chainContractAddress.setNewVersionUpgrade(cutData, oldProtocolVersion, oldProtocolVersionDeadline, newRelease);
+        assertEq(chainContractAddress.currentRelease(), newRelease, "the edge installs the release of its version");
 
         // Verify that the protocol version deadline was set
         assertEq(chainContractAddress.protocolVersionDeadline(oldProtocolVersion), oldProtocolVersionDeadline);
@@ -245,17 +282,12 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
         });
         uint256 oldProtocolVersion = 0;
         uint256 oldProtocolVersionDeadline = block.timestamp + 100;
-        uint256 newProtocolVersion = 1;
+        address newRelease = _releaseAt(1);
 
         address notOwner = makeAddr("notOwner");
         vm.prank(notOwner);
         vm.expectRevert("Ownable: caller is not the owner");
-        chainContractAddress.setNewVersionUpgrade(
-            cutData,
-            oldProtocolVersion,
-            oldProtocolVersionDeadline,
-            newProtocolVersion
-        );
+        chainContractAddress.setNewVersionUpgrade(cutData, oldProtocolVersion, oldProtocolVersionDeadline, newRelease);
     }
 
     // ============================================================

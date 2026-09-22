@@ -55,6 +55,10 @@ struct ReleaseDiff {
     bool genesisBatch;
 }
 
+/// @param protocolVersion The protocol version this release IS, packed SemVer: the version of every
+///        chain on it, and the edge every transition into or out of it reads instead of authoring
+///        one. One release per version — a bump that changes no member still deploys a release,
+///        differing from its predecessor in this field alone.
 /// @param l2BytecodeInfos The release's L2 contract set, indexed by {L2EcosystemContract}
 ///        (length == `L2_ECOSYSTEM_CONTRACT_COUNT` at construction, same slot semantics as the
 ///        L1 inventories): per member, the ZKsync OS bytecode info of the IMPLEMENTATION this
@@ -71,6 +75,7 @@ struct ReleaseDiff {
 ///        upgrade executes, so the shell is never repeated per row. Empty only when the table is.
 // solhint-disable-next-line gas-struct-packing
 struct ReleaseManifest {
+    uint256 protocolVersion;
     address diamondInit;
     address verifier;
     address genesisUpgrade;
@@ -123,9 +128,10 @@ struct AuthoredL2Plan {
     address delegateComposer;
 }
 
-/// @notice What chains upgrade FROM and TO, and by when — nothing else. Infrastructure changes
-///         and the operation's execution delay live on {OperationManifest}; see
-///         {protocol-docs/ecosystem-upgrade-coordination.md}.
+/// @notice What chains upgrade FROM and TO, and by when — nothing else. The version edge is not a
+///         field: it is the two releases' own versions ({ReleaseManifest.protocolVersion}).
+///         Infrastructure changes and the operation's execution delay live on {OperationManifest};
+///         see {protocol-docs/ecosystem-upgrade-coordination.md}.
 /// @param upgradeEngine The diamond cut's init delegatecall target implementing
 ///        `upgradeFromTransition` — the registry-model name for what deploy tooling calls the
 ///        per-version "default upgrade" contract (`DefaultUpgrade` and its versioned subclasses).
@@ -133,8 +139,6 @@ struct AuthoredL2Plan {
 /// @param upgradeTimestamp The earliest a chain may execute its own diamond upgrade.
 // solhint-disable-next-line gas-struct-packing
 struct TransitionManifest {
-    uint256 oldProtocolVersion;
-    uint256 newProtocolVersion;
     address fromRelease;
     address newRelease;
     address upgradeEngine;
@@ -202,7 +206,7 @@ struct OperationManifest {
 }
 
 /// @notice Everything a core transition instance pins, set exactly once at construction.
-/// @dev Carries NO protocol version (version-schedule identity is owned by {CTMTransition})
+/// @dev Carries NO protocol version (a version is a CTM release's, {ReleaseManifest.protocolVersion})
 ///      and NO proxy admin (the `EcosystemUpgradeExecutor` is bound to its immutable
 ///      `ProxyAdmin`). A core transition pins ONLY the ecosystem inventory.
 /// @param proxyUpgrades The ecosystem inventory, indexed by {L1EcosystemContract}: slot
@@ -224,8 +228,8 @@ struct CoreTransitionManifest {
 ///        ServerNotifier's) is left to that administrator: `migrate()` hands onward only
 ///        `ctmProxyAdmin`, so a foreign admin must never be transferred to this one-shot object —
 ///        hand it to the executor, or keep it and apply the row yourself before stage 2.
-/// @param currentRelease The genesis release the edge installs as the CTM's `currentRelease`.
-/// @param newProtocolVersion The version the CTM moves to.
+/// @param currentRelease The genesis release the edge installs as the CTM's `currentRelease`. The
+///        version the CTM moves to is this release's own ({ReleaseManifest.protocolVersion}).
 /// @param oldProtocolVersionDeadline Until when the departing version stays usable.
 /// @param upgradeEngine The bootstrap engine (`BootstrapUpgrade`), the committed cut's init
 ///        target. The cut carries NO facet cuts and NO authored calldata: the facet
@@ -263,7 +267,6 @@ struct BootstrapManifest {
     ProxyAdmin ctmProxyAdmin;
     ProxyUpgradeRow[] proxyUpgrades;
     address currentRelease;
-    uint256 newProtocolVersion;
     uint256 oldProtocolVersionDeadline;
     address upgradeEngine;
     AuthoredL2Plan l2Plan;

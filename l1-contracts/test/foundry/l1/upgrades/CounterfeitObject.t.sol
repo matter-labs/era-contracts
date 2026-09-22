@@ -82,11 +82,9 @@ contract CounterfeitObjectTest is RegistryObjectsFixture {
         _setUpRegistryObjects(hex"");
         _ensureDeterministicFactory();
 
-        departingRelease = _release(_departingFacets(), _deployedStub("departingVerifier"));
-        arrivingRelease = _release(_arrivingFacets(), _deployedStub("arrivingVerifier"));
+        departingRelease = _release(_departingFacets(), _deployedStub("departingVerifier"), OLD_VERSION);
+        arrivingRelease = _release(_arrivingFacets(), _deployedStub("arrivingVerifier"), NEW_VERSION);
         approvedManifest = TransitionManifest({
-            oldProtocolVersion: OLD_VERSION,
-            newProtocolVersion: NEW_VERSION,
             fromRelease: address(departingRelease),
             newRelease: address(arrivingRelease),
             upgradeEngine: _deployedStub("upgradeEngine"),

@@ -162,6 +162,7 @@ contract ReleaseFacetRowsTest is Test {
     function _manifest(GenesisFacet[] memory _rows) internal returns (ReleaseManifest memory) {
         return
             ReleaseManifest({
+                protocolVersion: 0,
                 diamondInit: _stub("diamondInit"),
                 verifier: _stub("verifier"),
                 genesisUpgrade: _stub("genesisUpgrade"),

@@ -70,6 +70,9 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
     ///      {CTMTransition} for why).
     bytes internal encodedL2Plan;
 
+    /// @dev The genesis release's version, read at construction (see {newProtocolVersion}).
+    uint256 internal derivedNewProtocolVersion;
+
     /// @notice Stores the audited manifest at construction; it is immutable afterwards.
     constructor(BootstrapManifest memory _manifest) {
         if (
@@ -96,6 +99,7 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
         // state, installed in full — there is no departing release to diff against) plus the
         // authored delegate and extras, with the same shape rules ({L2PlanLib.build}).
         ICTMRelease release = ICTMRelease(_manifest.currentRelease);
+        derivedNewProtocolVersion = release.protocolVersion();
         encodedL2Plan = abi.encode(
             L2PlanLib.build(
                 TransitionDerivationLib.deriveL2DeploymentsFromTable(
@@ -119,12 +123,17 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
         return abi.decode(encodedManifest, (BootstrapManifest));
     }
 
+    /// @inheritdoc IRegistryBootstrapMigration
+    function newProtocolVersion() external view returns (uint256) {
+        return derivedNewProtocolVersion;
+    }
+
     /// @inheritdoc ICommittedUpgrade
     /// @dev The genesis release is the edge's target: a chain crossing this edge after the CTM has
     ///      moved on still installs the release ITS OWN committed migration names.
     function upgradeTarget() external view returns (uint256, uint256, address) {
         BootstrapManifest memory m = getManifest();
-        return (m.newProtocolVersion, m.upgradeTimestamp, m.currentRelease);
+        return (derivedNewProtocolVersion, m.upgradeTimestamp, m.currentRelease);
     }
 
     /// @inheritdoc ICommittedUpgrade
@@ -141,7 +150,7 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
             CTMUpgradeComposer.buildL2UpgradeTxFromPlan({
                 _plan: l2Plan(),
                 _newRelease: ICTMRelease(m.currentRelease),
-                _newProtocolVersion: m.newProtocolVersion,
+                _newProtocolVersion: derivedNewProtocolVersion,
                 _bridgehub: IChainTypeManager(m.ctm).BRIDGE_HUB(),
                 _chainId: _chainId
             });
@@ -271,8 +280,8 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
 
         IChainTypeManager ctm = IChainTypeManager(m.ctm);
         uint256 liveVersion = ctm.protocolVersion();
-        if (liveVersion != m.newProtocolVersion) {
-            revert OutdatedProtocolVersion(liveVersion, m.newProtocolVersion);
+        if (liveVersion != derivedNewProtocolVersion) {
+            revert OutdatedProtocolVersion(liveVersion, derivedNewProtocolVersion);
         }
         address liveRelease = ctm.currentRelease();
         if (liveRelease != m.currentRelease) {
@@ -352,14 +361,14 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
         // The cut-taking form, not `setNewVersionUpgradeFromTransition`: there is no transition for
         // this edge to derive from. Chains crossing it therefore use the cut-taking chain-side
         // entrypoint too — `upgradeTransition` stays zero for the departing version, and only
-        // registry-driven hops after this one populate it.
+        // registry-driven hops after this one populate it. It installs the genesis release in the
+        // same call, at the release's own version.
         ctm.setNewVersionUpgrade({
             _cutData: upgradeCut(),
             _oldProtocolVersion: m.expectedProtocolVersion,
             _oldProtocolVersionDeadline: m.oldProtocolVersionDeadline,
-            _newProtocolVersion: m.newProtocolVersion
+            _newRelease: m.currentRelease
         });
-        ctm.setCurrentRelease(m.currentRelease);
 
         // Authority leaves in the same transaction it arrived. The ProxyAdmin is plain `Ownable`,
         // so its transfer lands immediately. The CTM is `Ownable2Step`: nominate the executor and
@@ -370,6 +379,6 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
         m.ctmProxyAdmin.transferOwnership(m.ctmExecutor);
         CTMUpgradeExecutor(payable(m.ctmExecutor)).acceptCTMOwnership();
 
-        emit EcosystemBootstrapped(m.ctm, m.currentRelease, m.newProtocolVersion);
+        emit EcosystemBootstrapped(m.ctm, m.currentRelease, derivedNewProtocolVersion);
     }
 }

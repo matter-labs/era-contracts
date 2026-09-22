@@ -220,6 +220,8 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         }
         result = new CTMRelease(
             ReleaseManifest({
+                // The version the edge moves the CTM to is its genesis release's own.
+                protocolVersion: newVersion,
                 diamondInit: diamondInit,
                 verifier: address(testnetVerifier),
                 genesisUpgrade: genesisUpgradeAddr,
@@ -294,7 +296,6 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                 ctmProxyAdmin: ecosystemProxyAdmin,
                 proxyUpgrades: upgrades,
                 currentRelease: address(genesisRelease),
-                newProtocolVersion: newVersion,
                 oldProtocolVersionDeadline: type(uint256).max,
                 upgradeEngine: upgradeEngine,
                 l2Plan: _l2Plan,
@@ -503,7 +504,8 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         // The inputs the engine reads at execution.
         BootstrapManifest memory served = composed.getManifest();
         assertEq(served.currentRelease, address(tableRelease), "the release whose verifier the engine installs");
-        assertEq(served.newProtocolVersion, newVersion);
+        assertEq(composed.newProtocolVersion(), newVersion, "the edge lands on its genesis release's version");
+        assertEq(composed.newProtocolVersion(), tableRelease.protocolVersion());
         assertEq(served.upgradeTimestamp, PLAN_UPGRADE_TIMESTAMP, "the schedule is the manifest's");
 
         vm.expectCall(

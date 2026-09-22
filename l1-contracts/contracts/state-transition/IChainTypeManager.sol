@@ -11,15 +11,14 @@ import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error
 /// @param owner The address who can manage non-critical updates in the contract
 /// @param validatorTimelock The address that serves as consensus, i.e. can submit blocks to be processed
-/// @param currentRelease The `CTMRelease` new chains read their genesis data from
-/// @param protocolVersion The initial protocol version on the newly deployed chain
+/// @param currentRelease The `CTMRelease` new chains read their genesis data from; the CTM starts at
+///        its protocol version
 /// @param serverNotifier The address that serves as server notifier
 // solhint-disable-next-line gas-struct-packing
 struct ChainTypeManagerInitializeData {
     address owner;
     address validatorTimelock;
     address currentRelease;
-    uint256 protocolVersion;
     address serverNotifier;
 }
 
@@ -119,8 +118,6 @@ interface IChainTypeManager {
 
     function setValidatorTimelockPostV29(address _validatorTimelockPostV29) external;
 
-    function setCurrentRelease(address _release) external;
-
     function getChainAdmin(uint256 _chainId) external view returns (address);
 
     /// @notice Deploys a new chain. The bridgehub passes only the minimal chain-specific data
@@ -133,7 +130,7 @@ interface IChainTypeManager {
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion,
         uint256 _oldProtocolVersionDeadline,
-        uint256 _newProtocolVersion
+        address _newRelease
     ) external;
 
     function setNewVersionUpgradeFromTransition(ICTMTransition _transition) external;

@@ -24,8 +24,10 @@ interface ICTMTransition is ICommittedUpgrade {
     ///         decodes the full manifest).
     function getManifest() external view returns (TransitionManifest memory);
 
+    /// @notice The version chains depart from: `fromRelease`'s own, read at construction.
     function oldProtocolVersion() external view returns (uint256);
 
+    /// @notice The version chains land on: `newRelease`'s own, read at construction.
     function newProtocolVersion() external view returns (uint256);
 
     /// @notice The release this transition departs from. Never zero — bootstrapping a pre-registry
@@ -49,8 +51,8 @@ interface ICTMTransition is ICommittedUpgrade {
     function facetCuts() external view returns (Diamond.FacetCut[] memory);
 
     /// @notice Which release members differ between `fromRelease` and `newRelease`, so a reviewer
-    ///         learns what an edge actually changes without diffing two manifests. All-false for a
-    ///         same-release (schedule-only) transition.
+    ///         learns what an edge actually changes without diffing two manifests. All-false when
+    ///         the target release differs from the departing one in its version alone.
     function releaseDiff() external view returns (ReleaseDiff memory);
 
     /// @notice The L2 protocol upgrade transaction this transition's engine commits on chain

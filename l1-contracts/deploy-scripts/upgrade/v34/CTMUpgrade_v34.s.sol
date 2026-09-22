@@ -274,7 +274,6 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
             ctmProxyAdmin: _ctmProxyAdmin,
             proxyUpgrades: proxyUpgrades,
             currentRelease: release,
-            newProtocolVersion: getNewProtocolVersion(),
             oldProtocolVersionDeadline: UpgradeHelperLib.getOldProtocolDeadline(),
             upgradeEngine: engine,
             l2Plan: authoredL2Plan(),

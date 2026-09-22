@@ -41,7 +41,6 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
             owner: governor,
             validatorTimelock: validator,
             currentRelease: Utils.TEST_GENESIS_REGISTRY,
-            protocolVersion: 0,
             serverNotifier: serverNotifier
         });
 

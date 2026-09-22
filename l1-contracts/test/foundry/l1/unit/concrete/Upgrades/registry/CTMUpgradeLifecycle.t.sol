@@ -500,9 +500,9 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         // prepares normally.
         _stage2(transition);
         address appliedRelease = address(release);
-        release = _deployRelease(4);
         newVersion = SemVer.packSemVer(0, 2, 0);
-        CTMTransition next = _deployTransitionFrom(880, appliedRelease, SemVer.packSemVer(0, 1, 0));
+        release = _deployRelease(4, newVersion);
+        CTMTransition next = _deployTransitionFrom(880, appliedRelease);
         _stage0(next);
         _assertPendingAndPaused(next, IEcosystemUpgradeExecutor.UpgradeStage.Prepared);
     }
@@ -866,7 +866,6 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         CTMTransition unpublished = _deployTransitionWithDelegate(
             777,
             chainContractAddress.currentRelease(),
-            0,
             unpublishedDelegate
         );
         assertEq(bytecodesSupplier.evmPublishingBlock(keccak256(unpublishedDelegate)), 0, "fixture: not yet published");

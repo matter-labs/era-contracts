@@ -51,7 +51,6 @@ import {
     RegistryTargetHasNoCode,
     OperationChangesNothing,
     RegistryUnknownKey,
-    SameReleaseTransitionHasPayload,
     TransitionDeadlineBeforeUpgrade,
     TransitionDeadlineZero,
     ZeroAddress
@@ -89,6 +88,8 @@ contract StorageRegistriesTest is Test {
     CoreTransition internal coreTransition;
     CTMRelease internal fromRelease;
     CTMRelease internal newRelease;
+    /// @dev `newRelease` one patch version up and otherwise identical: the target of a version-only patch.
+    CTMRelease internal patchRelease;
     CTMTransition internal transition;
 
     address internal diamondInit;
@@ -156,6 +157,7 @@ contract StorageRegistriesTest is Test {
         // factory provenance on BOTH edges.
         fromRelease = new CTMRelease(_fromReleaseManifest());
         newRelease = new CTMRelease(_newReleaseManifest());
+        patchRelease = new CTMRelease(_patchReleaseManifest());
         transition = new CTMTransition(_transitionManifest());
     }
 
@@ -179,13 +181,17 @@ contract StorageRegistriesTest is Test {
         });
     }
 
-    function _releaseManifest(address _adminFacet) internal view returns (ReleaseManifest memory manifest) {
+    function _releaseManifest(
+        address _adminFacet,
+        uint256 _protocolVersion
+    ) internal view returns (ReleaseManifest memory manifest) {
         GenesisFacet[] memory facets = new GenesisFacet[](3);
         facets[0] = GenesisFacet({facet: _adminFacet, isFreezable: false});
         facets[1] = GenesisFacet({facet: facetShared, isFreezable: false});
         facets[2] = GenesisFacet({facet: facetFrozen, isFreezable: true});
         return
             ReleaseManifest({
+                protocolVersion: _protocolVersion,
                 diamondInit: diamondInit,
                 verifier: verifier,
                 genesisUpgrade: genesisUpgrade,
@@ -203,13 +209,18 @@ contract StorageRegistriesTest is Test {
     }
 
     function _fromReleaseManifest() internal view returns (ReleaseManifest memory) {
-        return _releaseManifest(facetOldAdmin);
+        return _releaseManifest(facetOldAdmin, OLD_VERSION);
     }
 
     function _newReleaseManifest() internal view returns (ReleaseManifest memory) {
         // The hop replaces the admin facet (new address AND new selector set); the shared +
         // frozen facets carry over unchanged.
-        return _releaseManifest(facetNewAdmin);
+        return _releaseManifest(facetNewAdmin, NEW_VERSION);
+    }
+
+    function _patchReleaseManifest() internal view returns (ReleaseManifest memory manifest) {
+        manifest = _newReleaseManifest();
+        manifest.protocolVersion = NEW_VERSION + 1;
     }
 
     /// @dev The authored L2 input with everything a version can author: the delegate's bytecode
@@ -256,8 +267,6 @@ contract StorageRegistriesTest is Test {
     function _transitionManifest() internal view returns (TransitionManifest memory manifest) {
         return
             TransitionManifest({
-                oldProtocolVersion: OLD_VERSION,
-                newProtocolVersion: NEW_VERSION,
                 fromRelease: address(fromRelease),
                 newRelease: address(newRelease),
                 upgradeEngine: upgradeEngine,
@@ -304,6 +313,18 @@ contract StorageRegistriesTest is Test {
     }
 
     // ─────────────────────────── derived delta ───────────────────────────
+
+    /// @dev The version edge is not authored: it is the two releases' own versions, and the
+    ///      transition serves exactly those.
+    function test_transitionReadsItsVersionEdgeOffItsReleases() public view {
+        assertEq(fromRelease.protocolVersion(), OLD_VERSION, "a release serves its version");
+        assertEq(newRelease.protocolVersion(), NEW_VERSION);
+        assertEq(transition.oldProtocolVersion(), fromRelease.protocolVersion(), "departs from fromRelease's");
+        assertEq(transition.newProtocolVersion(), newRelease.protocolVersion(), "lands on newRelease's");
+        (uint256 targetVersion, , address targetRelease) = transition.upgradeTarget();
+        assertEq(targetVersion, NEW_VERSION, "and commits the same edge to chains");
+        assertEq(targetRelease, address(newRelease));
+    }
 
     function test_transitionDerivesFacetDeltaFromReleasePair() public view {
         assertEq(transition.oldProtocolVersion(), OLD_VERSION);
@@ -383,45 +404,38 @@ contract StorageRegistriesTest is Test {
         assertEq(transaction.factoryDeps.length, 1, "only the delegate's bytecode rides as a factory dep");
     }
 
-    // ─────────────────────────── patches / same-release ───────────────────────────
+    // ─────────────────────────── patches ───────────────────────────
 
-    /// @dev A verifier/schedule-only SemVer patch: same release on both edges, +1 patch
-    ///      version, and NO L2 payload — the only shape a same-release hop may take.
+    /// @dev A version-only SemVer patch: from `newRelease` to its copy one patch version up, with
+    ///      NO L2 payload. One release per version, so even a bump that changes nothing names a
+    ///      release of its own.
     function _patchManifest() internal view returns (TransitionManifest memory manifest) {
         manifest = _transitionManifest();
-        manifest.oldProtocolVersion = NEW_VERSION;
-        manifest.newProtocolVersion = NEW_VERSION + 1;
         manifest.fromRelease = address(newRelease);
+        manifest.newRelease = address(patchRelease);
         manifest.l2Plan = L2PlanFixtures.emptyPlan();
     }
 
-    function test_patchTransitionVerifierOnlyInitializes() public {
+    function test_versionOnlyPatchInitializes() public {
         CTMTransition patchTransition = new CTMTransition(_patchManifest());
-        assertEq(patchTransition.fromRelease(), patchTransition.newRelease());
-        // The derived delta of a same-release hop is empty by construction — the L2 force
-        // deployments included, even though the release's table is only read cross-release.
+        assertEq(patchTransition.oldProtocolVersion(), NEW_VERSION);
+        assertEq(patchTransition.newProtocolVersion(), NEW_VERSION + 1);
+        // The derived delta of two releases that differ in their version alone is empty by value:
+        // identical routing derives no cut, an identical table no L2 deployment.
         assertEq(patchTransition.facetCuts().length, 0);
-        assertEq(patchTransition.l2Plan().deployments.length, 0, "same-release pair must derive no deployments");
-        // Both edges are live releases, so runtime validation holds.
+        assertEq(patchTransition.l2Plan().deployments.length, 0, "an identical table derives no deployments");
         patchTransition.validate();
     }
 
-    function test_revertWhen_sameReleaseTransitionCarriesL2Payload() public {
-        TransitionManifest memory manifest = _patchManifest();
-        // A fully well-formed authored plan, so only the same-release rule can fire.
-        manifest.l2Plan = _l2Plan();
+    /// @dev A release IS one version, so a transition naming the same release on both edges would
+    ///      move the version nowhere — refused by the version rule itself.
+    function test_revertWhen_theSameReleaseIsNamedOnBothEdges() public {
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.fromRelease = address(newRelease);
+        manifest.newRelease = address(newRelease);
+        manifest.l2Plan = L2PlanFixtures.emptyPlan();
 
-        vm.expectRevert(SameReleaseTransitionHasPayload.selector);
-        new CTMTransition(manifest);
-    }
-
-    function test_revertWhen_sameReleaseTransitionCarriesAnUncomposedDelegate() public {
-        TransitionManifest memory manifest = _patchManifest();
-        // The smallest payload a plan can carry: the delegate alone, no composer. Shape-valid, so
-        // only the same-release rule can fire.
-        manifest.l2Plan = L2PlanFixtures.delegatePlan(DELEGATE_CODE, address(0));
-
-        vm.expectRevert(SameReleaseTransitionHasPayload.selector);
+        vm.expectRevert(abi.encodeWithSelector(ProtocolVersionTooSmall.selector, NEW_VERSION, NEW_VERSION));
         new CTMTransition(manifest);
     }
 
@@ -429,13 +443,14 @@ contract StorageRegistriesTest is Test {
     ///      contracts, and replacing an L1 member of it changes no chain-visible L2 state. Here
     ///      the target release replaces the admin facet, so the patch even derives real cuts.
     function test_patchMayTargetANewRelease() public {
+        CTMRelease oldAdminRelease = new CTMRelease(_releaseManifest(facetOldAdmin, NEW_VERSION));
         TransitionManifest memory manifest = _patchManifest();
-        manifest.fromRelease = address(fromRelease);
+        manifest.fromRelease = address(oldAdminRelease);
 
         CTMTransition patch = new CTMTransition(manifest);
 
-        assertEq(patch.fromRelease(), address(fromRelease));
-        assertEq(patch.newRelease(), address(newRelease));
+        assertEq(patch.fromRelease(), address(oldAdminRelease));
+        assertEq(patch.newRelease(), address(patchRelease));
         assertTrue(patch.facetCuts().length != 0, "the target release replaces a facet, so cuts are derived");
         assertEq(patch.l2Plan().deployments.length, 0, "an unchanged L2 table derives no L2 deployment");
     }
@@ -446,7 +461,6 @@ contract StorageRegistriesTest is Test {
     ///      on a patch would commit fine, bump the CTM, and then revert on every chain.
     function test_revertWhen_patchCarriesAnAuthoredL2Payload() public {
         TransitionManifest memory manifest = _patchManifest();
-        manifest.fromRelease = address(fromRelease);
         manifest.l2Plan = _l2Plan();
 
         vm.expectRevert(PatchCannotCarryL2Upgrade.selector);
@@ -459,8 +473,7 @@ contract StorageRegistriesTest is Test {
     ///      rejects it.
     function test_revertWhen_patchDerivesL2DeploymentsFromItsTargetRelease() public {
         TransitionManifest memory manifest = _patchManifest();
-        manifest.fromRelease = address(fromRelease);
-        manifest.newRelease = address(_tableRelease());
+        manifest.newRelease = address(_tableReleaseAt(NEW_VERSION + 1));
         manifest.l2Plan = _l2Plan();
 
         vm.expectRevert(PatchCannotCarryL2Upgrade.selector);
@@ -472,12 +485,11 @@ contract StorageRegistriesTest is Test {
     ///      would start from a state the patched chains never reached. An empty DERIVED deployment
     ///      list does not cover this — only the tables agree there.
     function test_revertWhen_patchTargetsAReleaseWithDifferentGenesisState() public {
-        ReleaseManifest memory releaseManifest = _newReleaseManifest();
+        ReleaseManifest memory releaseManifest = _patchReleaseManifest();
         releaseManifest.genesis.fixedForceDeploymentsData = hex"f1f3";
         CTMRelease genesisRelease = new CTMRelease(releaseManifest);
 
         TransitionManifest memory manifest = _patchManifest();
-        manifest.fromRelease = address(fromRelease);
         manifest.newRelease = address(genesisRelease);
 
         vm.expectRevert(PatchChangesL2GenesisState.selector);
@@ -485,12 +497,11 @@ contract StorageRegistriesTest is Test {
     }
 
     function test_revertWhen_patchTargetsAReleaseWithADifferentGenesisBatch() public {
-        ReleaseManifest memory releaseManifest = _newReleaseManifest();
+        ReleaseManifest memory releaseManifest = _patchReleaseManifest();
         releaseManifest.genesis.genesisBatchHash = bytes32(uint256(2));
         CTMRelease genesisRelease = new CTMRelease(releaseManifest);
 
         TransitionManifest memory manifest = _patchManifest();
-        manifest.fromRelease = address(fromRelease);
         manifest.newRelease = address(genesisRelease);
 
         vm.expectRevert(PatchChangesL2GenesisState.selector);
@@ -500,12 +511,11 @@ contract StorageRegistriesTest is Test {
     /// @dev The shell is part of the release's L2 description like the table it belongs to: a
     ///      patch derives no L2 deployment, so a changed shell would reach no existing chain.
     function test_revertWhen_patchTargetsAReleaseWithADifferentSystemProxyShell() public {
-        ReleaseManifest memory releaseManifest = _newReleaseManifest();
+        ReleaseManifest memory releaseManifest = _patchReleaseManifest();
         releaseManifest.l2SystemProxyBytecodeInfo = L2PlanFixtures.bytecodeInfo(CHANGED_SYSTEM_PROXY_CODE);
         CTMRelease shellRelease = new CTMRelease(releaseManifest);
 
         TransitionManifest memory manifest = _patchManifest();
-        manifest.fromRelease = address(fromRelease);
         manifest.newRelease = address(shellRelease);
 
         vm.expectRevert(PatchChangesL2GenesisState.selector);
@@ -534,10 +544,10 @@ contract StorageRegistriesTest is Test {
         }
     }
 
-    function test_releaseDiff_isEmptyForASameReleaseTransition() public {
+    function test_releaseDiff_isEmptyForAVersionOnlyRelease() public {
         CTMTransition patchTransition = new CTMTransition(_patchManifest());
 
-        assertEq(_setFlags(patchTransition.releaseDiff()), 0, "one release on both edges differs from itself nowhere");
+        assertEq(_setFlags(patchTransition.releaseDiff()), 0, "a copy one version up differs nowhere else");
     }
 
     /// @dev The fixture releases differ in the admin facet alone, so the hop's diff is exactly the
@@ -552,7 +562,7 @@ contract StorageRegistriesTest is Test {
     /// @dev A verifier-only patch is the reviewer's common case: one flag set and an empty
     ///      `facetCuts()` say everything about the edge.
     function test_releaseDiff_namesOnlyTheVerifierForAVerifierOnlyRelease() public {
-        ReleaseManifest memory releaseManifest = _newReleaseManifest();
+        ReleaseManifest memory releaseManifest = _patchReleaseManifest();
         releaseManifest.verifier = _deployedStub("verifierNext");
         CTMRelease verifierRelease = new CTMRelease(releaseManifest);
 
@@ -570,7 +580,7 @@ contract StorageRegistriesTest is Test {
 
     function test_revertWhen_transitionVersionNotIncreasing() public {
         TransitionManifest memory manifest = _transitionManifest();
-        manifest.newProtocolVersion = manifest.oldProtocolVersion;
+        manifest.newRelease = address(new CTMRelease(_releaseManifest(facetNewAdmin, OLD_VERSION)));
 
         vm.expectRevert(abi.encodeWithSelector(ProtocolVersionTooSmall.selector, OLD_VERSION, OLD_VERSION));
         new CTMTransition(manifest);
@@ -598,7 +608,7 @@ contract StorageRegistriesTest is Test {
     function test_revertWhen_transitionUsesNonzeroMajorVersion() public {
         TransitionManifest memory manifest = _transitionManifest();
         // major = 1 — rejected per-chain, so it must be rejected at pin time too.
-        manifest.newProtocolVersion = SemVer.packSemVer(1, 0, 0);
+        manifest.newRelease = address(new CTMRelease(_releaseManifest(facetNewAdmin, SemVer.packSemVer(1, 0, 0))));
 
         vm.expectRevert(NewProtocolMajorVersionNotZero.selector);
         new CTMTransition(manifest);
@@ -606,9 +616,9 @@ contract StorageRegistriesTest is Test {
 
     function test_revertWhen_transitionMinorDeltaTooBig() public {
         TransitionManifest memory manifest = _transitionManifest();
-        (, uint32 oldMinor, ) = SemVer.unpackSemVer(uint96(manifest.oldProtocolVersion));
+        (, uint32 oldMinor, ) = SemVer.unpackSemVer(uint96(OLD_VERSION));
         uint32 tooFar = oldMinor + uint32(MAX_ALLOWED_MINOR_VERSION_DELTA) + 1;
-        manifest.newProtocolVersion = SemVer.packSemVer(0, tooFar, 0);
+        manifest.newRelease = address(new CTMRelease(_releaseManifest(facetNewAdmin, SemVer.packSemVer(0, tooFar, 0))));
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -847,6 +857,13 @@ contract StorageRegistriesTest is Test {
         return new CTMRelease(_tableReleaseManifest());
     }
 
+    /// @dev {_tableRelease} at another version: a departing table release, or a patch target.
+    function _tableReleaseAt(uint256 _protocolVersion) internal returns (CTMRelease) {
+        ReleaseManifest memory manifest = _tableReleaseManifest();
+        manifest.protocolVersion = _protocolVersion;
+        return new CTMRelease(manifest);
+    }
+
     function _tableReleaseManifest() internal view returns (ReleaseManifest memory manifest) {
         manifest = _newReleaseManifest();
         manifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2Bridgehub)] = L2PlanFixtures.bytecodeInfo(
@@ -959,7 +976,7 @@ contract StorageRegistriesTest is Test {
     ///      both releases is not touched, so a facet-only or verifier-only upgrade toward a release
     ///      carrying the same table has no L2 leg at all — no delegate, no factory dependency.
     function test_transitionDerivesNoL2RowsWhenTheTableIsUnchanged() public {
-        CTMRelease departing = _tableRelease();
+        CTMRelease departing = _tableReleaseAt(OLD_VERSION);
         CTMRelease target = _tableRelease();
         TransitionManifest memory manifest = _transitionManifest();
         manifest.fromRelease = address(departing);
@@ -974,7 +991,7 @@ contract StorageRegistriesTest is Test {
     /// @dev Only the members whose descriptor changed are derived (a member new to the set counts as
     ///      changed); the rows identical to the departing release stay out of the L2 leg.
     function test_transitionDerivesOnlyTheChangedL2Rows() public {
-        CTMRelease departing = _tableRelease();
+        CTMRelease departing = _tableReleaseAt(OLD_VERSION);
         ReleaseManifest memory targetManifest = _newReleaseManifest();
         // Unchanged member, changed implementation, member new to the set.
         targetManifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2Bridgehub)] = L2PlanFixtures.bytecodeInfo(
@@ -1031,7 +1048,7 @@ contract StorageRegistriesTest is Test {
     /// @dev A shell change alone is not an L2 delta: an existing member's proxy is never
     ///      redeployed by `updateZKsyncOSContract`, so only implementation rows are compared.
     function test_transitionDerivesNoL2RowsWhenOnlyTheShellChanges() public {
-        CTMRelease departing = _tableRelease();
+        CTMRelease departing = _tableReleaseAt(OLD_VERSION);
         ReleaseManifest memory targetManifest = _tableReleaseManifest();
         targetManifest.l2SystemProxyBytecodeInfo = L2PlanFixtures.bytecodeInfo(CHANGED_SYSTEM_PROXY_CODE);
         CTMRelease target = new CTMRelease(targetManifest);

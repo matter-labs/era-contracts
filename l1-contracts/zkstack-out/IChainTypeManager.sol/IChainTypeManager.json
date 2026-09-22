@@ -401,11 +401,6 @@
             "internalType": "address"
           },
           {
-            "name": "protocolVersion",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
             "name": "serverNotifier",
             "type": "address",
             "internalType": "address"
@@ -526,19 +521,6 @@
   },
   {
     "type": "function",
-    "name": "setCurrentRelease",
-    "inputs": [
-      {
-        "name": "_release",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "setNewVersionUpgrade",
     "inputs": [
       {
@@ -596,9 +578,9 @@
         "internalType": "uint256"
       },
       {
-        "name": "_newProtocolVersion",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "_newRelease",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [],

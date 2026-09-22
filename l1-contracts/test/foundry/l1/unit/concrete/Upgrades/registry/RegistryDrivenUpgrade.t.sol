@@ -90,7 +90,6 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
     address internal verifierV32;
     address internal verifierV33;
     address internal defaultUpgrade;
-    address internal genesisUpgradeAddr;
 
     uint256 internal constant V32 = uint256(32) << 32; // 0.32.0
     uint256 internal constant V33 = uint256(33) << 32; // 0.33.0
@@ -166,31 +165,16 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
         verifierV32 = address(new AcceptingVerifier());
         verifierV33 = address(new AcceptingVerifier());
         delegateComposer = new FixedDelegateCalldataComposer(DELEGATE_CALLDATA);
-        // The pinned genesisUpgrade must carry real code — a release's `validate()` rejects a
-        // codeless member — so etch a stand-in.
-        genesisUpgradeAddr = makeAddr("genesisUpgrade");
-        vm.etch(genesisUpgradeAddr, hex"600042");
 
-        // Transitions require real releases on BOTH edges, so the fixture CTM's mocked genesis
-        // release is replaced by a real one describing the chain's current routing — hop 1 then
-        // departs from (and, being facet-neutral, also targets) exactly that release.
-        address genesisRelease = address(new CTMRelease(_releaseManifest(address(0), address(testnetVerifier))));
-
-        // Hand CTM ownership to the executor through its fixed entrypoint, then perform two raw
-        // one-off admin actions through the owner-gated escape hatch (exactly what it exists for):
-        // re-point currentRelease at the real genesis release and raise the chain's priority-tx
-        // gas limit.
+        // Hand CTM ownership to the executor through its fixed entrypoint, then perform one raw
+        // admin action through the owner-gated escape hatch (exactly what it exists for): raise the
+        // chain's priority-tx gas limit.
         vm.prank(governor);
         chainContractAddress.transferOwnership(address(ctmExecutor));
         vm.prank(governor);
         ctmExecutor.acceptCTMOwnership();
-        Call[] memory calls = new Call[](2);
+        Call[] memory calls = new Call[](1);
         calls[0] = Call({
-            target: address(chainContractAddress),
-            value: 0,
-            data: abi.encodeCall(IChainTypeManager.setCurrentRelease, (genesisRelease))
-        });
-        calls[1] = Call({
             target: address(chainContractAddress),
             value: 0,
             data: abi.encodeCall(IChainTypeManager.setPriorityTxMaxGasLimit, (chainId, PRIORITY_TX_MAX_GAS_LIMIT))
@@ -214,18 +198,31 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
 
         // The first hop departs from the fixture CTM's genesis (current) release; V33 then
         // transitions from the V32 release the first hop pinned.
-        transitionV32 = _makeTransition(0, V32, verifierV32, chainContractAddress.currentRelease(), address(0));
-        transitionV33 = _makeTransition(V32, V33, verifierV33, transitionV32.newRelease(), newAdminFacet);
+        transitionV32 = _makeTransition(V32, verifierV32, chainContractAddress.currentRelease(), address(0));
+        transitionV33 = _makeTransition(V33, verifierV33, transitionV32.newRelease(), newAdminFacet);
     }
 
-    /// @dev One release's full manifest: the fixture's routing (AdminFacet swapped for
-    ///      `_adminFacet` when nonzero), the verifier, genesis params and the L2 bytecode table.
+    /// @inheritdoc ChainTypeManagerTest
+    /// @dev The genesis release, describing the chain's routing at version 0: the fixture chain is
+    ///      created from it and hop 1 departs from it.
+    function _fixtureGenesisRelease() internal virtual override returns (address) {
+        return address(new CTMRelease(_releaseManifest(address(0), address(testnetVerifier), 0)));
+    }
+
+    /// @dev One release's full manifest at `_protocolVersion`: the fixture's routing (AdminFacet
+    ///      swapped for `_adminFacet` when nonzero), the verifier, genesis params (with the fixture's
+    ///      real genesis upgrade, since the fixture chain is created from a release) and the L2
+    ///      bytecode table.
     ///      Hop 1 changes only the verifier, so its target release differs from genesis in that
     ///      one field and the DERIVED facet/deployment delta is empty — an L1-only upgrade. The
     ///      v33 release (nonzero `_adminFacet`) also carries one table row, the L2Bridgehub
     ///      implementation behind the shared shell, which the v33 transition derives as a
     ///      system-proxy upgrade. A release with an empty table names no shell.
-    function _releaseManifest(address _adminFacet, address _verifier) internal returns (ReleaseManifest memory) {
+    function _releaseManifest(
+        address _adminFacet,
+        address _verifier,
+        uint256 _protocolVersion
+    ) internal returns (ReleaseManifest memory) {
         bytes[] memory l2BytecodeInfos = new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
         bytes memory l2SystemProxyBytecodeInfo;
         if (_adminFacet != address(0)) {
@@ -236,9 +233,10 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
         }
         return
             ReleaseManifest({
+                protocolVersion: _protocolVersion,
                 diamondInit: diamondInit,
                 verifier: _verifier,
-                genesisUpgrade: genesisUpgradeAddr,
+                genesisUpgrade: address(genesisUpgradeContract),
                 genesisFacets: _releaseFacets(_adminFacet),
                 genesis: ReleaseGenesisData({
                     fixedForceDeploymentsData: hex"f1f2",
@@ -271,13 +269,12 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
     ///      side — the table-derived L2Bridgehub row plus the authored upgrade delegate — making
     ///      it a full minor upgrade.
     function _makeTransition(
-        uint256 _oldVersion,
         uint256 _newVersion,
         address _verifier,
         address _fromRelease,
         address _newAdminFacet
     ) internal returns (CTMTransition transition) {
-        address release = address(new CTMRelease(_releaseManifest(_newAdminFacet, _verifier)));
+        address release = address(new CTMRelease(_releaseManifest(_newAdminFacet, _verifier, _newVersion)));
 
         // A nonempty L2 plan MUST carry a delegate: `L2ComplexUpgrader` always ends with the final
         // delegatecall, so a deployments-only plan would revert on L2. The delegate is the one
@@ -290,8 +287,6 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
 
         transition = new CTMTransition(
             TransitionManifest({
-                oldProtocolVersion: _oldVersion,
-                newProtocolVersion: _newVersion,
                 fromRelease: _fromRelease,
                 newRelease: release,
                 upgradeEngine: defaultUpgrade,
@@ -491,12 +486,12 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
     ///      addresses and selectors but the OPPOSITE freezability for any one facet must not match.
     function test_verifyChainRoutingRejectsFreezabilityMismatch() public {
         // Control: the same manifest builder, unflipped, describes the live chain.
-        ReleaseManifest memory manifest = _releaseManifest(address(0), address(testnetVerifier));
+        ReleaseManifest memory manifest = _releaseManifest(address(0), address(testnetVerifier), 0);
         CTMRelease unflipped = new CTMRelease(manifest);
         assertTrue(unflipped.verifyChainRouting(chainAddress), "the unflipped manifest must match the live chain");
 
         for (uint256 i = 0; i < manifest.genesisFacets.length; ++i) {
-            ReleaseManifest memory flippedManifest = _releaseManifest(address(0), address(testnetVerifier));
+            ReleaseManifest memory flippedManifest = _releaseManifest(address(0), address(testnetVerifier), 0);
             flippedManifest.genesisFacets[i].isFreezable = !flippedManifest.genesisFacets[i].isFreezable;
             CTMRelease flipped = new CTMRelease(flippedManifest);
 
@@ -549,6 +544,14 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
 contract RegistryDrivenUpgradeConcreteTest is ChainTypeManagerTest, RegistryDrivenUpgradeTestBase {
     function _deployFixture() internal override {
         deploy();
+    }
+
+    function _fixtureGenesisRelease()
+        internal
+        override(ChainTypeManagerTest, RegistryDrivenUpgradeTestBase)
+        returns (address)
+    {
+        return RegistryDrivenUpgradeTestBase._fixtureGenesisRelease();
     }
 
     function _isZKsyncOSVariant() internal pure override returns (bool) {

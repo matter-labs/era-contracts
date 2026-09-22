@@ -41,7 +41,6 @@ sol! {
         address ctmProxyAdmin;
         ProxyUpgradeRow[] proxyUpgrades;
         address currentRelease;
-        uint256 newProtocolVersion;
         uint256 oldProtocolVersionDeadline;
         address upgradeEngine;
         AuthoredL2Plan l2Plan;
@@ -57,6 +56,8 @@ sol! {
         function executed() external view returns (bool);
         function manifestHash() external view returns (bytes32);
         function getManifest() external view returns (BootstrapManifest memory);
+        /// The version the edge lands on: its genesis release's own, read at construction.
+        function newProtocolVersion() external view returns (uint256);
         function validate() external view;
     }
 
@@ -141,11 +142,9 @@ sol! {
     }
 
     /// Positional mirror of `RegistryTypes.TransitionManifest` — the whole constructor argument of
-    /// a `CTMTransition`.
+    /// a `CTMTransition`. The version edge is not in it: the object reads it off its two releases.
     #[derive(Debug)]
     struct TransitionManifest {
-        uint256 oldProtocolVersion;
-        uint256 newProtocolVersion;
         address fromRelease;
         address newRelease;
         address upgradeEngine;
@@ -172,6 +171,8 @@ sol! {
     contract CTMTransitionView {
         function manifestHash() external view returns (bytes32);
         function getManifest() external view returns (TransitionManifest memory);
+        function oldProtocolVersion() external view returns (uint256);
+        function newProtocolVersion() external view returns (uint256);
         function facetCuts() external view returns (FacetCut[] memory);
         function validate() external view;
     }
@@ -213,7 +214,6 @@ sol! {
     struct ReleaseGenesisData {
         bytes fixedForceDeploymentsData;
         bytes32 genesisBatchHash;
-        bytes32 genesisBatchCommitment;
         uint64 genesisIndexRepeatedStorageChanges;
     }
 
@@ -221,6 +221,7 @@ sol! {
     /// a `CTMRelease`.
     #[derive(Debug)]
     struct ReleaseManifest {
+        uint256 protocolVersion;
         address diamondInit;
         address verifier;
         address genesisUpgrade;

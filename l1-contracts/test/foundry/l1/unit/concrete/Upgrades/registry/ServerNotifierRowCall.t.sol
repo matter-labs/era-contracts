@@ -308,7 +308,6 @@ contract ServerNotifierRowCallTest is CTMUpgradeExecutorFixture {
                     ctmProxyAdmin: ctmProxyAdmin,
                     proxyUpgrades: _inventoryWith(_row),
                     currentRelease: address(release),
-                    newProtocolVersion: newVersion,
                     oldProtocolVersionDeadline: 1000,
                     upgradeEngine: upgradeEngineAddr,
                     l2Plan: AuthoredL2Plan({

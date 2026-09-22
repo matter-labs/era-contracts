@@ -11,9 +11,9 @@ from an audited manifest. There is no per-version generated `.sol` file and no `
   values (facets, DiamondInit, base-system hashes, force-deployments, genesis params for the
   release; version, verifier, facet transitions, L2 deployments for the transition). Auditors
   verify a deployed registry by re-deriving its `manifestHash` from this file.
-- **On-chain shape:** a `CTMRelease` describes the version-independent post-upgrade chain state;
-  a `CTMTransition` commits `fromRelease -> newRelease` and
-  `oldProtocolVersion -> newProtocolVersion` plus the verifier and facet swaps. Both expose
+- **On-chain shape:** a `CTMRelease` describes the post-upgrade chain state of one protocol
+  version; a `CTMTransition` commits `fromRelease -> newRelease`, reads its version edge off the two
+  releases and derives the facet swaps. Both expose
   `validate()`, which reverts unless every contract the manifest names is deployed code and is
   called on every execution path. What that code IS is governance's review of the member
   addresses, not something the object can attest to.

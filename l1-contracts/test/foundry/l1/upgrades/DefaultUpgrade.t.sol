@@ -57,8 +57,8 @@ contract DefaultUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         _mockEcosystemForComposer(mockBridgehub, ctmDeployerStub);
         fromVerifier = _deployedStub("fromVerifier");
         newVerifier = _deployedStub("newVerifier");
-        fromRelease = _release(_departingFacets(), fromVerifier);
-        newRelease = _release(_arrivingFacets(), newVerifier);
+        fromRelease = _release(_departingFacets(), fromVerifier, 0);
+        newRelease = _release(_arrivingFacets(), newVerifier, protocolVersion);
 
         // The chain under test runs the departing release: its routing installed, its verifier live.
         engine.applyFacetCuts(ReleaseFacetReader.newChainInstallations(ICTMRelease(address(fromRelease))));
@@ -66,21 +66,12 @@ contract DefaultUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
     }
 
     function _defaultTransition(uint256 _upgradeTimestamp) internal returns (CTMTransition) {
-        return
-            _transition(
-                fromRelease,
-                newRelease,
-                0,
-                protocolVersion,
-                _upgradeTimestamp,
-                address(engine),
-                _delegatePlan()
-            );
+        return _transition(fromRelease, newRelease, _upgradeTimestamp, address(engine), _delegatePlan());
     }
 
     /// @dev The same hop with the REAL v34 composer pinned (see the shared fixture).
     function _v34Transition() internal returns (CTMTransition) {
-        return _transition(fromRelease, newRelease, 0, protocolVersion, 0, address(engine), _v34Plan());
+        return _transition(fromRelease, newRelease, 0, address(engine), _v34Plan());
     }
 
     function test_upgradeFromTransition_appliesTheCommittedTransition() public {
@@ -114,7 +105,7 @@ contract DefaultUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         address ctm = makeAddr("chainTypeManager");
         engine.setChainTypeManager(ctm);
         address laterVerifier = _deployedStub("laterVerifier");
-        CTMRelease laterRelease = _release(_arrivingFacets(), laterVerifier);
+        CTMRelease laterRelease = _release(_arrivingFacets(), laterVerifier, SemVer.packSemVer(0, 2, 0));
         vm.mockCall(ctm, abi.encodeCall(IChainTypeManager.currentRelease, ()), abi.encode(address(laterRelease)));
 
         engine.upgradeFromTransition(address(_defaultTransition(0)));
@@ -126,16 +117,8 @@ contract DefaultUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
     /// @dev A verifier-only hop: same facets on both releases, no authored L2 side. The derived
     ///      cuts are empty and the composer yields the all-zero transaction the engine skips.
     function test_upgradeFromTransition_l1OnlyTransitionSetsNoL2Transaction() public {
-        CTMRelease verifierOnly = _release(_departingFacets(), newVerifier);
-        CTMTransition transition = _transition(
-            fromRelease,
-            verifierOnly,
-            0,
-            protocolVersion,
-            0,
-            address(engine),
-            _emptyPlan()
-        );
+        CTMRelease verifierOnly = _release(_departingFacets(), newVerifier, protocolVersion);
+        CTMTransition transition = _transition(fromRelease, verifierOnly, 0, address(engine), _emptyPlan());
 
         vm.expectEmit(address(engine));
         emit BaseZkSyncUpgrade.UpgradeComplete(
@@ -183,16 +166,10 @@ contract DefaultUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         bytes32 pending = keccak256("pending");
         engine.setL2SystemContractsUpgradeTxHash(pending);
         uint256 patchVersion = SemVer.packSemVer(0, 1, 1);
-        CTMRelease patched = _release(_departingFacets(), newVerifier);
-        CTMTransition patch = _transition(
-            fromRelease,
-            patched,
-            protocolVersion,
-            patchVersion,
-            0,
-            address(engine),
-            _emptyPlan()
-        );
+        // The patch departs from the chain's routing at the version the chain is at.
+        CTMRelease departing = _release(_departingFacets(), fromVerifier, protocolVersion);
+        CTMRelease patched = _release(_departingFacets(), newVerifier, patchVersion);
+        CTMTransition patch = _transition(departing, patched, 0, address(engine), _emptyPlan());
 
         engine.upgradeFromTransition(address(patch));
 

@@ -444,15 +444,23 @@ pub(crate) async fn verify<P: Provider>(
         ));
     }
 
-    if manifest.newProtocolVersion > live_version {
+    // The target version is the genesis release's own; the migration serves it.
+    let Some(new_version) = tolerate(
+        migration.newProtocolVersion().call().await,
+        result,
+        "the migration's newProtocolVersion()",
+    ) else {
+        return Ok(());
+    };
+    if new_version > live_version {
         result.report_ok(&format!(
             "the target version {} is ahead of live",
-            format_semver(manifest.newProtocolVersion)
+            format_semver(new_version)
         ));
     } else {
         result.report_error(&format!(
             "the target version {} does not move forward from live {}",
-            format_semver(manifest.newProtocolVersion),
+            format_semver(new_version),
             format_semver(live_version)
         ));
     }
@@ -637,8 +645,9 @@ async fn verify_release_construction<P: Provider>(
         reviewed.insert(release, "the release the edge installs".to_string());
     }
     result.print_info(&format!(
-        "  release manifest: diamondInit {}, verifier {}, genesisUpgrade {}, {} facet row(s), \
-         {} L2 bytecode slot(s)",
+        "  release manifest: protocolVersion {}, diamondInit {}, verifier {}, genesisUpgrade {}, \
+         {} facet row(s), {} L2 bytecode slot(s)",
+        format_semver(manifest.protocolVersion),
         manifest.diamondInit,
         manifest.verifier,
         manifest.genesisUpgrade,
@@ -1027,7 +1036,6 @@ mod tests {
             ctmProxyAdmin: Address::repeat_byte(0x22),
             proxyUpgrades: Vec::new(),
             currentRelease: Address::repeat_byte(0x33),
-            newProtocolVersion: U256::from(2),
             oldProtocolVersionDeadline: U256::from(3),
             upgradeEngine: Address::repeat_byte(0x44),
             l2Plan: views::AuthoredL2Plan {

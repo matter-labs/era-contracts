@@ -286,6 +286,7 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
 
         CTMRelease release = new CTMRelease(
             ReleaseManifest({
+                protocolVersion: config.protocolVersion,
                 diamondInit: (contracts.stateTransition.facets.diamondInit),
                 verifier: (contracts.stateTransition.verifiers.verifier),
                 genesisUpgrade: (contracts.stateTransition.genesisUpgrade),

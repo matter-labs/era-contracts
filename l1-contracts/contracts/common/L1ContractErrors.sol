@@ -422,6 +422,8 @@ error RegistryMemberHasNoFixedAddress(uint256 member);
 error RegistryTargetHasNoCode(address target);
 // 0x1f20dafa
 error RegistryUnknownKey();
+// 0xc99ade52
+error ReleaseProtocolVersionMismatch(uint256 protocolVersion, uint256 releaseProtocolVersion);
 // 0x667d17de
 error RemoveFunctionFacetAddressNotZero(address facet);
 // 0xa2d4b16c
@@ -438,8 +440,6 @@ error RestrictionWasNotPresent(address restriction);
 error RevertedBatchNotAfterNewLastBatch();
 // 0xfe0aa4f2
 error RoleAccessDenied(address chainAddress, bytes32 role, address account);
-// 0xec81deed
-error SameReleaseTransitionHasPayload();
 // 0xd3b6535b
 error SelectorsMustAllHaveSameFreezability();
 // 0x02181a13

@@ -62,6 +62,7 @@ contract CTMRegistryBootstrapTest is Test {
         }
         return
             ReleaseManifest({
+                protocolVersion: VERSION,
                 diamondInit: (DIAMOND_INIT),
                 verifier: (VERIFIER),
                 genesisUpgrade: (GENESIS_UPGRADE),
@@ -84,6 +85,7 @@ contract CTMRegistryBootstrapTest is Test {
         CTMRelease release = new CTMRelease(manifest);
 
         assertEq(release.manifestHash(), keccak256(abi.encode(manifest)), "manifest hash");
+        assertEq(release.protocolVersion(), VERSION, "the release serves the version it IS");
 
         // The rows are served exactly as pinned: address, codehash and freezability per facet.
         GenesisFacet[] memory list = release.genesisFacets();

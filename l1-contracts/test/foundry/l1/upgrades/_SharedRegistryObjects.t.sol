@@ -200,9 +200,13 @@ abstract contract RegistryObjectsFixture is Test {
 
     // ─────────────────────────────── objects ───────────────────────────────
 
-    /// @dev A release naming `_facets` (all non-freezable), `_verifier`, the fixture's DiamondInit
-    ///      and an empty L2 table.
-    function _release(address[] memory _facets, address _verifier) internal returns (CTMRelease) {
+    /// @dev A release at `_protocolVersion` naming `_facets` (all non-freezable), `_verifier`, the
+    ///      fixture's DiamondInit and an empty L2 table.
+    function _release(
+        address[] memory _facets,
+        address _verifier,
+        uint256 _protocolVersion
+    ) internal returns (CTMRelease) {
         GenesisFacet[] memory rows = new GenesisFacet[](_facets.length);
         for (uint256 i = 0; i < _facets.length; ++i) {
             rows[i] = GenesisFacet({facet: _facets[i], isFreezable: false});
@@ -210,6 +214,7 @@ abstract contract RegistryObjectsFixture is Test {
         return
             new CTMRelease(
                 ReleaseManifest({
+                    protocolVersion: _protocolVersion,
                     diamondInit: diamondInit,
                     verifier: _verifier,
                     genesisUpgrade: genesisUpgradeStub,
@@ -258,11 +263,10 @@ abstract contract RegistryObjectsFixture is Test {
         return L2PlanFixtures.delegatePlan(DELEGATE_CODE, _composer);
     }
 
+    /// @dev The version edge is the two releases' own.
     function _transition(
         CTMRelease _fromRelease,
         CTMRelease _newRelease,
-        uint256 _oldProtocolVersion,
-        uint256 _newProtocolVersion,
         uint256 _upgradeTimestamp,
         address _upgradeEngine,
         AuthoredL2Plan memory _plan
@@ -270,8 +274,6 @@ abstract contract RegistryObjectsFixture is Test {
         return
             new CTMTransition(
                 TransitionManifest({
-                    oldProtocolVersion: _oldProtocolVersion,
-                    newProtocolVersion: _newProtocolVersion,
                     fromRelease: address(_fromRelease),
                     newRelease: address(_newRelease),
                     upgradeEngine: _upgradeEngine,
@@ -282,14 +284,13 @@ abstract contract RegistryObjectsFixture is Test {
             );
     }
 
-    /// @dev A bootstrap manifest toward `_release`. The CTM-side authorities are labelled
-    ///      stand-ins: the engine reads only the version edge, the schedule, the release and the
+    /// @dev A bootstrap manifest toward `_release` (whose version the edge lands on). The CTM-side
+    ///      authorities are labelled stand-ins: the engine reads only the version edge, the schedule, the release and the
     ///      L2 plan; the one participating proxy row exists because the object refuses an edge
     ///      without implementation swaps.
     function _bootstrapManifest(
         CTMRelease _release,
         uint256 _oldProtocolVersion,
-        uint256 _newProtocolVersion,
         uint256 _upgradeTimestamp,
         address _upgradeEngine,
         AuthoredL2Plan memory _plan
@@ -309,7 +310,6 @@ abstract contract RegistryObjectsFixture is Test {
                 ctmProxyAdmin: ProxyAdmin(makeAddr("ctmProxyAdmin")),
                 proxyUpgrades: rows,
                 currentRelease: address(_release),
-                newProtocolVersion: _newProtocolVersion,
                 oldProtocolVersionDeadline: type(uint256).max,
                 upgradeEngine: _upgradeEngine,
                 l2Plan: _plan,

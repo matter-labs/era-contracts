@@ -28,7 +28,7 @@
 
 use std::collections::BTreeMap;
 
-use alloy::primitives::{Address, B256};
+use alloy::primitives::{Address, B256, U256};
 use alloy::providers::Provider;
 use alloy::sol_types::{SolCall, SolValue};
 
@@ -412,7 +412,7 @@ pub(crate) async fn verify<P: Provider>(
     // ── 3. The state the upgrade departs from ──
     result.print_info("\n== Departing state ==");
     let ctm = CtmView::new(ctm_addr, provider);
-    if let Some(transition_manifest) = &transition_manifest {
+    if let Some(edge) = &transition_manifest {
         let Some(live_version) = tolerate(
             ctm.protocolVersion().call().await,
             result,
@@ -420,7 +420,7 @@ pub(crate) async fn verify<P: Provider>(
         ) else {
             return Ok(());
         };
-        if live_version == transition_manifest.oldProtocolVersion {
+        if live_version == edge.old_version {
             result.report_ok(&format!(
                 "the CTM is at the transition's departing version {}",
                 format_semver(live_version)
@@ -430,12 +430,12 @@ pub(crate) async fn verify<P: Provider>(
                 "the CTM is at version {} but the transition departs from {}: the version edge \
                  is refused on chain",
                 format_semver(live_version),
-                format_semver(transition_manifest.oldProtocolVersion)
+                format_semver(edge.old_version)
             ));
         }
         result.report_ok(&format!(
             "the transition moves chains to {}",
-            format_semver(transition_manifest.newProtocolVersion)
+            format_semver(edge.new_version)
         ));
 
         let Some(live_release) = tolerate(
@@ -445,7 +445,7 @@ pub(crate) async fn verify<P: Provider>(
         ) else {
             return Ok(());
         };
-        if live_release == transition_manifest.fromRelease {
+        if live_release == edge.manifest.fromRelease {
             result.report_ok(&format!(
                 "the transition departs from the release the CTM is actually on ({live_release})"
             ));
@@ -453,7 +453,7 @@ pub(crate) async fn verify<P: Provider>(
             result.report_error(&format!(
                 "the transition departs from release {} but the CTM is on {live_release}: the \
                  release edge is refused on chain, and the two describe different starting points",
-                transition_manifest.fromRelease
+                edge.manifest.fromRelease
             ));
         }
     }
@@ -600,6 +600,14 @@ fn verify_stage_calls(package: &OperationPackage, result: &mut VerificationResul
     }
 }
 
+/// The transition as the departing-state check reads it: the manifest its address commits to, and
+/// the version edge it serves — read off its two releases at construction, so no manifest field.
+struct TransitionEdge {
+    manifest: super::views::TransitionManifest,
+    old_version: U256,
+    new_version: U256,
+}
+
 /// The transition's provenance, construction and derived payload.
 #[allow(clippy::too_many_arguments)]
 async fn verify_transition<P: Provider>(
@@ -610,7 +618,7 @@ async fn verify_transition<P: Provider>(
     transition: Address,
     salts: &[B256],
     reviewed: &mut BTreeMap<Address, String>,
-) -> anyhow::Result<Option<super::views::TransitionManifest>> {
+) -> anyhow::Result<Option<TransitionEdge>> {
     expect_code_identity(
         provider,
         identity,
@@ -687,7 +695,25 @@ async fn verify_transition<P: Provider>(
 
     render_facet_cuts(&view, result, transition).await;
     render_derived_payloads(provider, result, transition).await;
-    Ok(Some(manifest))
+    let Some(old_version) = tolerate(
+        view.oldProtocolVersion().call().await,
+        result,
+        "the transition's oldProtocolVersion()",
+    ) else {
+        return Ok(None);
+    };
+    let Some(new_version) = tolerate(
+        view.newProtocolVersion().call().await,
+        result,
+        "the transition's newProtocolVersion()",
+    ) else {
+        return Ok(None);
+    };
+    Ok(Some(TransitionEdge {
+        manifest,
+        old_version,
+        new_version,
+    }))
 }
 
 /// A release's provenance and construction, re-derived from the manifest it serves.
@@ -726,8 +752,9 @@ async fn verify_release<P: Provider>(
         reviewed.insert(release, label.to_string());
     }
     result.print_info(&format!(
-        "  release manifest: diamondInit {}, verifier {}, genesisUpgrade {}, {} facet row(s), \
-         {} L2 bytecode slot(s)",
+        "  release manifest: protocolVersion {}, diamondInit {}, verifier {}, genesisUpgrade {}, \
+         {} facet row(s), {} L2 bytecode slot(s)",
+        format_semver(manifest.protocolVersion),
         manifest.diamondInit,
         manifest.verifier,
         manifest.genesisUpgrade,

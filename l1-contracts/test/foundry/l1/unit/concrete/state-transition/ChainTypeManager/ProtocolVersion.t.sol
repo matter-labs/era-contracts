@@ -23,18 +23,17 @@ contract ProtocolVersion is ChainTypeManagerTest {
         assertEq(oldProtocolVersionDeadline, type(uint256).max);
 
         uint256 newProtocolVersionSemVer = SemVer.packSemVer(0, 1, 0);
+        address newRelease = _releaseAt(newProtocolVersionSemVer);
 
         _mockGetZKChainFromBridgehub(chainAddress);
         _mockMigrationPausedFromBridgehub();
 
         vm.startPrank(governor);
-        chainContractAddress.setNewVersionUpgrade(
-            getDiamondCutData(diamondInit),
-            oldProtocolVersion,
-            1000,
-            newProtocolVersionSemVer
-        );
+        chainContractAddress.setNewVersionUpgrade(getDiamondCutData(diamondInit), oldProtocolVersion, 1000, newRelease);
         vm.stopPrank();
+
+        // The edge installs the release OF the version it moves to, in the same call.
+        assertEq(chainContractAddress.currentRelease(), newRelease, "the release moved with the version");
 
         uint256 newProtocolVersion = chainContractAddress.protocolVersion();
         uint256 newProtocolVersionDeadline = chainContractAddress.protocolVersionDeadline(newProtocolVersion);
@@ -61,7 +60,7 @@ contract ProtocolVersion is ChainTypeManagerTest {
         _mockMigrationPausedFromBridgehub();
 
         vm.startPrank(governor);
-        chainContractAddress.setNewVersionUpgrade(getDiamondCutData(diamondInit), 0, 0, 1);
+        chainContractAddress.setNewVersionUpgrade(getDiamondCutData(diamondInit), 0, 0, _releaseAt(1));
         vm.stopPrank();
 
         assertEq(chainContractAddress.protocolVersionIsActive(1), true);
@@ -87,7 +86,12 @@ contract ProtocolVersion is ChainTypeManagerTest {
         _mockMigrationPausedFromBridgehub();
 
         vm.prank(governor);
-        chainContractAddress.setNewVersionUpgrade(getDiamondCutData(diamondInit), 0, 1000, SemVer.packSemVer(0, 1, 0));
+        chainContractAddress.setNewVersionUpgrade(
+            getDiamondCutData(diamondInit),
+            0,
+            1000,
+            _releaseAt(SemVer.packSemVer(0, 1, 0))
+        );
         assertEq(chainContractAddress.protocolVersionDeadline(0), 1000, "committed deadline");
 
         vm.expectEmit(true, false, false, true);
@@ -145,7 +149,7 @@ contract ProtocolVersion is ChainTypeManagerTest {
             getDiamondCutDataWithCustomFacets(address(0), customFacetCuts),
             0,
             0,
-            1
+            _releaseAt(1)
         );
 
         // The edge above was committed via the legacy cut-taking setter, which registers no

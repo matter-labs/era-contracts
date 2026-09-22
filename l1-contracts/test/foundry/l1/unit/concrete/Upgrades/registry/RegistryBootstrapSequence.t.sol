@@ -148,6 +148,7 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
         return
             new CTMRelease(
                 ReleaseManifest({
+                    protocolVersion: newVersion,
                     diamondInit: diamondInit,
                     verifier: address(testnetVerifier),
                     genesisUpgrade: genesisUpgradeAddr,
@@ -194,7 +195,6 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
                 ctmProxyAdmin: ctmProxyAdmin,
                 proxyUpgrades: upgrades,
                 currentRelease: address(genesisRelease),
-                newProtocolVersion: newVersion,
                 oldProtocolVersionDeadline: type(uint256).max,
                 upgradeEngine: upgradeEngine,
                 l2Plan: L2PlanFixtures.emptyPlan(),

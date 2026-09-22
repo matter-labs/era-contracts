@@ -544,6 +544,7 @@ library GatewayCTMDeployerHelper {
     ) private pure returns (ReleaseManifest memory) {
         return
             ReleaseManifest({
+                protocolVersion: _baseConfig.protocolVersion,
                 diamondInit: _direct.facets.diamondInit,
                 verifier: _direct.verifier,
                 genesisUpgrade: _direct.genesisUpgrade,
@@ -715,7 +716,6 @@ library GatewayCTMDeployerHelper {
             owner: baseConfig.aliasedGovernanceAddress,
             validatorTimelock: config.validatorTimelockProxy,
             currentRelease: currentRelease,
-            protocolVersion: baseConfig.protocolVersion,
             serverNotifier: serverNotifierProxy
         });
         bytes memory initCalldata = abi.encodeCall(IChainTypeManager.initialize, (diamondInitData));

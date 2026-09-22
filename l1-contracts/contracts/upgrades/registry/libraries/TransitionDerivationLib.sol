@@ -40,18 +40,14 @@ library TransitionDerivationLib {
     ///      one `Add` cut per arriving facet. There is deliberately no selector-level diffing:
     ///      each release redeploys its facets, so a "minimal" delta re-routes almost everything
     ///      anyway — the diff engine bought little and cost a routing model.
-    /// @dev Two shortcuts to an EMPTY cut, both by value rather than by release identity: the same
-    ///      release on both edges, and two releases whose routing is byte-identical. The latter is
-    ///      what a release change that touches no facet — a verifier replacement, say — costs a
-    ///      chain: nothing. Without it, replacing one non-facet member of the snapshot would
+    /// @dev One shortcut to an EMPTY cut, by value: two releases whose routing is byte-identical.
+    ///      That is what a release change that touches no facet — a verifier replacement, say —
+    ///      costs a chain: nothing. Without it, replacing one non-facet member of the snapshot would
     ///      remove and re-add every selector to the very same facets.
     function deriveFacetCuts(
         ICTMRelease _fromRelease,
         ICTMRelease _newRelease
     ) internal view returns (Diamond.FacetCut[] memory facetCuts) {
-        if (address(_fromRelease) == address(_newRelease)) {
-            return facetCuts;
-        }
         FacetRouting[] memory fromFacets = _loadRouting(_fromRelease);
         FacetRouting[] memory newFacets = _loadRouting(_newRelease);
         // Order-sensitive on purpose: the producers keep one row order (the facets' deploy order
@@ -114,9 +110,8 @@ library TransitionDerivationLib {
     ///         ({L2InventoryLib}), behind the target release's shared proxy shell.
     /// @dev Same philosophy as {deriveFacetCuts}: the delta is derived from the pair, never
     ///      authored, and members whose implementation did not change are not touched — a
-    ///      facet-only or verifier-only upgrade derives an empty L2 set. A same-release pair
-    ///      derives an empty list by identity. The bootstrap edge has no departing release and
-    ///      installs the target table in full ({deriveL2DeploymentsFromTable}).
+    ///      facet-only or verifier-only upgrade derives an empty L2 set. The bootstrap edge has no
+    ///      departing release and installs the target table in full ({deriveL2DeploymentsFromTable}).
     /// @dev A shell change alone derives nothing: `updateZKsyncOSContract` deploys the shell only
     ///      at a system address that has no code yet, so an existing member's proxy is never
     ///      replaced — the new shell reaches exactly the members new to the set, which are derived
@@ -125,9 +120,6 @@ library TransitionDerivationLib {
         ICTMRelease _fromRelease,
         ICTMRelease _newRelease
     ) internal view returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments) {
-        if (address(_fromRelease) == address(_newRelease)) {
-            return deployments;
-        }
         return
             deriveL2DeploymentsFromTable(
                 changedL2Rows(_fromRelease.l2BytecodeInfos(), _newRelease.l2BytecodeInfos()),

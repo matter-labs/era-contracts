@@ -64,8 +64,6 @@ library Utils {
         address _verifier
     ) internal {
         TransitionManifest memory manifest = TransitionManifest({
-            oldProtocolVersion: _oldProtocolVersion,
-            newProtocolVersion: _newProtocolVersion,
             fromRelease: address(0),
             newRelease: _newRelease,
             upgradeEngine: address(0),
@@ -78,6 +76,17 @@ library Utils {
             })
         });
         vm.mockCall(_transition, abi.encodeCall(ICTMTransition.getManifest, ()), abi.encode(manifest));
+        // The version edge is the transition's own read (off its releases), not a manifest field.
+        vm.mockCall(
+            _transition,
+            abi.encodeCall(ICTMTransition.oldProtocolVersion, ()),
+            abi.encode(_oldProtocolVersion)
+        );
+        vm.mockCall(
+            _transition,
+            abi.encodeCall(ICTMTransition.newProtocolVersion, ()),
+            abi.encode(_newProtocolVersion)
+        );
         vm.mockCall(_transition, abi.encodeCall(ICTMTransition.facetCuts, ()), abi.encode(new Diamond.FacetCut[](0)));
         vm.mockCall(
             _transition,

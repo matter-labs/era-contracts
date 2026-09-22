@@ -7,13 +7,13 @@
  * manifest JSON (scripts/registry-manifests/*.json — the reviewable per-upgrade artifact) into
  * the `initialize()` argument objects ethers encodes against the contract ABIs:
  *
- *   - `CTMRelease.ReleaseManifest` — what a chain at the target release IS: facet rows naming
- *     each facet by address (routing is read from the facet's own self-description).
- *     Version- and VM-flag-independent (VM identity lives in the DiamondInit's immutable).
+ *   - `CTMRelease.ReleaseManifest` — what a chain at the target release IS, and the protocol
+ *     version that is: facet rows naming each facet by address (routing is read from the facet's
+ *     own self-description). VM-flag-independent (VM identity lives in the DiamondInit's immutable).
  *   - `CTMTransition.TransitionManifest` — how the current release becomes the target release.
- *     Carries NO facet swaps and NO hash changes: the delta is DERIVED on-chain from the
- *     `(fromRelease, newRelease)` pair at initialization. What is authored: version edge,
- *     upgrade engine, schedule, and the typed `L2UpgradePlan`.
+ *     Carries NO facet swaps, NO hash changes and NO version edge: the delta and the edge are
+ *     DERIVED on-chain from the `(fromRelease, newRelease)` pair at initialization. What is
+ *     authored: upgrade engine, schedule, and the typed `L2UpgradePlan`.
  *   - `CoreTransition.CoreTransitionManifest` — the ecosystem inventory: a fixed-length row array
  *     indexed by `L1EcosystemContract`, source-checked rows in the participating slots, zero
  *     `implNew` in the explicitly-not-upgraded ones.
@@ -141,8 +141,11 @@ export function coreInitArgs(manifest: any): any {
   return { proxyUpgrades: proxyUpgradeSlots("L1EcosystemContract", rows) };
 }
 
-/** `CTMRelease.ReleaseManifest` initialize argument from one `manifest.ctms[]` entry. */
-export function releaseInitArgs(ctm: any): any {
+/**
+ * `CTMRelease.ReleaseManifest` initialize argument from one `manifest.ctms[]` entry: the target
+ * release of the registry-driven hop, so its version is `manifest.newVersion`.
+ */
+export function releaseInitArgs(manifest: any, ctm: any): any {
   const release = ctm.release;
 
   // Routing is read from each facet's own self-description, never stored.
@@ -158,6 +161,7 @@ export function releaseInitArgs(ctm: any): any {
   }
 
   return {
+    protocolVersion: packSemVer(manifest.newVersion),
     diamondInit: release.diamondInit.address,
     verifier: release.verifier.address,
     genesisUpgrade: release.genesis.genesisUpgrade.address,
@@ -180,8 +184,8 @@ export function releaseInitArgs(ctm: any): any {
  * initialization validates it and derives the facet/hash delta from the release pair).
  */
 export function transitionInitArgs(manifest: any, ctm: any, newRelease: string, delegateComposer: string): any {
-  // Release provenance is not a manifest field: `setCurrentRelease` runs the release's own
-  // `validate()` and genesis-parameter checks, and the reviewed object's address is re-derived
+  // Release provenance is not a manifest field: the CTM runs the release's own `validate()` and
+  // genesis-parameter checks when it installs it, and the reviewed object's address is re-derived
   // off-chain from its creation code by `protocol-ops ecosystem verify-bootstrap`.
   const transition = ctm.transition;
 
@@ -195,11 +199,9 @@ export function transitionInitArgs(manifest: any, ctm: any, newRelease: string, 
     );
   }
 
+  // No version edge: the object reads it off `fromRelease` (the bootstrap edge's target release,
+  // at manifest.bootstrapVersion) and `newRelease` (at manifest.newVersion).
   return {
-    // The registry-driven hop departs from the BOOTSTRAP edge's target version (the bootstrap
-    // crossed manifest.oldVersion -> manifest.bootstrapVersion first).
-    oldProtocolVersion: packSemVer(manifest.bootstrapVersion),
-    newProtocolVersion: packSemVer(manifest.newVersion),
     fromRelease: transition.fromRelease,
     newRelease,
     upgradeEngine: transition.upgradeEngine.address,

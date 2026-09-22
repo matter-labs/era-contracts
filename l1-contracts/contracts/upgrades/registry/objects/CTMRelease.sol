@@ -77,6 +77,11 @@ contract CTMRelease is ICTMRelease {
         return abi.decode(encodedManifest, (ReleaseManifest));
     }
 
+    /// @inheritdoc ICTMRelease
+    function protocolVersion() external view returns (uint256) {
+        return getManifest().protocolVersion;
+    }
+
     function diamondInit() external view returns (address) {
         return getManifest().diamondInit;
     }

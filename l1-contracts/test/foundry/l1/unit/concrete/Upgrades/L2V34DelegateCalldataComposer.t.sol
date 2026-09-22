@@ -40,7 +40,9 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
         _setUpRegistryObjects("");
         bridgehub = makeAddr("bridgehub");
         _mockEcosystemForComposer(bridgehub, ctmDeployerStub);
-        release = new CTMRelease(_releaseManifest(FIXED_FORCE_DEPLOYMENTS_DATA, _deployedStub("verifier")));
+        release = new CTMRelease(
+            _releaseManifest(FIXED_FORCE_DEPLOYMENTS_DATA, _deployedStub("verifier"), SemVer.packSemVer(0, 34, 0))
+        );
     }
 
     // ─────────────────────────── the composed call ───────────────────────────
@@ -136,7 +138,11 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
     ///      tracker composes different arguments from the same code.
     function test_composesFromLiveInputs() public {
         CTMRelease otherRelease = new CTMRelease(
-            _releaseManifest(OTHER_FIXED_FORCE_DEPLOYMENTS_DATA, _deployedStub("otherVerifier"))
+            _releaseManifest(
+                OTHER_FIXED_FORCE_DEPLOYMENTS_DATA,
+                _deployedStub("otherVerifier"),
+                SemVer.packSemVer(0, 34, 0)
+            )
         );
         address otherBridgehub = makeAddr("otherBridgehub");
         address otherDeployer = makeAddr("otherCtmDeployer");
@@ -213,17 +219,9 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
     ///      data.
     function test_transitionNamingTheComposerComposesTheV34Call() public {
         CTMRelease fromRelease = new CTMRelease(
-            _releaseManifest(FIXED_FORCE_DEPLOYMENTS_DATA, _deployedStub("verifierV33"))
+            _releaseManifest(FIXED_FORCE_DEPLOYMENTS_DATA, _deployedStub("verifierV33"), SemVer.packSemVer(0, 33, 0))
         );
-        CTMTransition transition = _transition(
-            fromRelease,
-            release,
-            SemVer.packSemVer(0, 33, 0),
-            SemVer.packSemVer(0, 34, 0),
-            0,
-            _deployedStub("upgradeEngine"),
-            _v34Plan()
-        );
+        CTMTransition transition = _transition(fromRelease, release, 0, _deployedStub("upgradeEngine"), _v34Plan());
         transition.validate();
 
         L2UpgradePlan memory plan = transition.l2Plan();
@@ -252,16 +250,18 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
 
     // ─────────────────────────── fixtures ───────────────────────────
 
-    /// @dev A release over the shared fixture's facet and stand-ins, pinning `_fixedForceDeploymentsData`
-    ///      (the one input of the composer that differs between releases here).
+    /// @dev A release at `_protocolVersion` over the shared fixture's facet and stand-ins, pinning
+    ///      `_fixedForceDeploymentsData` (the one input of the composer that differs between releases).
     function _releaseManifest(
         bytes memory _fixedForceDeploymentsData,
-        address _verifier
+        address _verifier,
+        uint256 _protocolVersion
     ) internal view returns (ReleaseManifest memory) {
         GenesisFacet[] memory facets = new GenesisFacet[](1);
         facets[0] = GenesisFacet({facet: facetShared, isFreezable: false});
         return
             ReleaseManifest({
+                protocolVersion: _protocolVersion,
                 diamondInit: diamondInit,
                 verifier: _verifier,
                 genesisUpgrade: genesisUpgradeStub,

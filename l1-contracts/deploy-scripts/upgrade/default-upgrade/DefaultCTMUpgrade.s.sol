@@ -417,8 +417,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         address engine = committedUpgradeEngine();
         require(upgradeAddresses.upgradeTimer != address(0), "upgrade timer not deployed");
         TransitionManifest memory manifest = TransitionManifest({
-            oldProtocolVersion: getOldProtocolVersion(),
-            newProtocolVersion: getNewProtocolVersion(),
             fromRelease: fromRelease,
             newRelease: newRelease,
             upgradeEngine: engine,

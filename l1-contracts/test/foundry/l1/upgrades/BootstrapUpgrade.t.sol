@@ -41,7 +41,7 @@ contract BootstrapUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         vm.mockCall(ctmStub, abi.encodeCall(IChainTypeManager.BRIDGE_HUB, ()), abi.encode(mockBridgehub));
         // A release's `validate()` rejects a codeless verifier, so the one it installs has code.
         verifier = _deployedStub("releaseVerifier");
-        genesisRelease = _release(_arrivingFacets(), verifier);
+        genesisRelease = _release(_arrivingFacets(), verifier, protocolVersion);
         engine = new DummyBootstrapUpgrade();
         engine.setPriorityTxMaxGasLimit(1 ether);
         engine.setPriorityTxMaxPubdata(1000000);
@@ -74,7 +74,6 @@ contract BootstrapUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
                 _bootstrapManifest(
                     _release,
                     0,
-                    protocolVersion,
                     _upgradeTimestamp,
                     _engine,
                     _withL2Side ? _delegatePlan() : _emptyPlan()
@@ -134,7 +133,7 @@ contract BootstrapUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
     ///      committed migration after the CTM has moved on — the same engine deployment serves both.
     function test_upgradeFromBootstrap_installsTheReleaseTheMigrationNames() public {
         address otherVerifier = _deployedStub("otherVerifier");
-        CTMRelease otherRelease = _release(_arrivingFacets(), otherVerifier);
+        CTMRelease otherRelease = _release(_arrivingFacets(), otherVerifier, protocolVersion);
         RegistryBootstrapMigration migration = _migration(otherRelease, 0, address(engine), false);
 
         engine.upgradeFromBootstrap(address(migration));
@@ -178,7 +177,7 @@ contract BootstrapUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
     ///      ecosystem is served another transaction.
     function test_upgradeFromBootstrap_commitsTheTransactionComposedForThisChain() public {
         RegistryBootstrapMigration migration = new RegistryBootstrapMigration(
-            _bootstrapManifest(genesisRelease, 0, protocolVersion, 0, address(engine), _v34Plan())
+            _bootstrapManifest(genesisRelease, 0, 0, address(engine), _v34Plan())
         );
         L2CanonicalTransaction memory expectedTx = _expectedV34L2Tx(migration.l2Plan(), protocolVersion, ETH_CHAIN_ID);
 

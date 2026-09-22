@@ -313,11 +313,12 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
         }
     }
 
-    /// @dev Both transition edges, asserted independently:
+    /// @dev Both transition edges, asserted independently (and both re-checked inside
+    ///      `setNewVersionUpgradeFromTransition`):
     ///      - the release edge (`currentRelease == fromRelease`) rejects execution from the wrong
     ///        release, and — since the commit moves `currentRelease` — rejects replays;
     ///      - the version edge (`protocolVersion == oldProtocolVersion`) rejects the wrong
-    ///        version schedule (also re-checked inside `setNewVersionUpgradeFromTransition`).
+    ///        version schedule.
     function _requireEdges(
         ICTMTransition _transition
     ) private view returns (uint256 oldProtocolVersion, uint256 newProtocolVersion) {
@@ -344,10 +345,10 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
             BytecodesSupplier(CHAIN_TYPE_MANAGER.L1_BYTECODES_SUPPLIER()),
             _transition.l2Plan().factoryDepHashes
         );
-        // One argument, not four plus a cut: the CTM reads the version edge, the schedule and the
-        // cut from the same pinned object, so they cannot be passed inconsistently.
+        // One argument, not four plus a cut: the CTM reads the version edge, the schedule, the cut
+        // and the release it installs from the same pinned object, so they cannot be passed
+        // inconsistently.
         CHAIN_TYPE_MANAGER.setNewVersionUpgradeFromTransition(_transition);
-        CHAIN_TYPE_MANAGER.setCurrentRelease(_transition.newRelease());
         emit CTMUpgradeApplied(address(_transition), oldProtocolVersion, newProtocolVersion);
     }
 

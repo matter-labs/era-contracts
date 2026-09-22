@@ -59,7 +59,7 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         _setUpRegistryObjects("");
         _mockEcosystemForComposer(mockBridgehub, ctmDeployerStub);
         releaseVerifier = _deployedStub("genesisVerifier");
-        release = _release(_arrivingFacets(), releaseVerifier);
+        release = _release(_arrivingFacets(), releaseVerifier, protocolVersion);
         vm.mockCall(mockCtm, abi.encodeCall(IChainTypeManager.currentRelease, ()), abi.encode(address(release)));
 
         // `DiamondInit` has already installed the version and the release's verifier; genesis runs
@@ -196,10 +196,8 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
     function test_genesisAndUpgradePathsShareTheEnvelope() public {
         DummyDefaultUpgradeForGenesis upgradeEngine = new DummyDefaultUpgradeForGenesis();
         CTMTransition transition = _transition(
-            _release(_departingFacets(), _deployedStub("fromVerifier")),
+            _release(_departingFacets(), _deployedStub("fromVerifier"), 0),
             release,
-            0,
-            protocolVersion,
             0,
             address(upgradeEngine),
             _v34Plan()
@@ -240,10 +238,8 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
     function test_creatingAtAReleaseInstallsWhatUpgradingToItInstalls() public {
         DummyDefaultUpgradeForGenesis upgradeEngine = new DummyDefaultUpgradeForGenesis();
         CTMTransition transition = _transition(
-            _release(_departingFacets(), _deployedStub("fromVerifierForEquivalence")),
+            _release(_departingFacets(), _deployedStub("fromVerifierForEquivalence"), 0),
             release,
-            0,
-            protocolVersion,
             0,
             address(upgradeEngine),
             _v34Plan()

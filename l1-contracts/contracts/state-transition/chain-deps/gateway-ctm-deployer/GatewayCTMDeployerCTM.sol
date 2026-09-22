@@ -103,7 +103,6 @@ contract GatewayCTMDeployerCTM {
             owner: baseConfig.aliasedGovernanceAddress,
             validatorTimelock: _config.validatorTimelockProxy,
             currentRelease: currentRelease,
-            protocolVersion: baseConfig.protocolVersion,
             serverNotifier: _result.serverNotifierProxy
         });
 

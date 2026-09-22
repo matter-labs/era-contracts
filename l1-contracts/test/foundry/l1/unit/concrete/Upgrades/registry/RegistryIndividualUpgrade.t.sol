@@ -43,7 +43,7 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
     // keccak256("eip1967.proxy.implementation") - 1
     bytes32 internal constant EIP1967_IMPLEMENTATION_SLOT =
         0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
-    // 0.32.1: the patch edge of a same-release transition.
+    // 0.32.1: the patch edge departing the v32 release.
     uint256 internal constant V32_PATCH_1 = V32 + 1;
 
     /// @dev Everything an individual upgrade must leave alone, captured before the edge.
@@ -58,6 +58,14 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
 
     function _deployFixture() internal override {
         deploy();
+    }
+
+    function _fixtureGenesisRelease()
+        internal
+        override(ChainTypeManagerTest, RegistryDrivenUpgradeTestBase)
+        returns (address)
+    {
+        return RegistryDrivenUpgradeTestBase._fixtureGenesisRelease();
     }
 
     function _isZKsyncOSVariant() internal pure override returns (bool) {
@@ -86,8 +94,8 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
         _runHop(transitionV32);
         UnrelatedState memory before = _snapshot();
         address adminV33 = address(new AdminFacet(block.chainid, RollupDAManager(address(0))));
-        CTMRelease target = _release(adminV33, before.verifier);
-        CTMTransition facetOnly = _transition(V32, V33, transitionV32.newRelease(), address(target));
+        CTMRelease target = _release(adminV33, before.verifier, V33);
+        CTMTransition facetOnly = _transition(transitionV32.newRelease(), address(target));
         assertEq(facetOnly.l2Plan().deployments.length, 0, "an unchanged L2 table derives no L2 deployment");
 
         _runHop(facetOnly);
@@ -111,8 +119,8 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
         _runHop(transitionV32);
         UnrelatedState memory before = _snapshot();
         address verifierNext = address(new AcceptingVerifier());
-        CTMRelease target = _release(address(0), verifierNext);
-        CTMTransition verifierOnly = _transition(V32, V33, transitionV32.newRelease(), address(target));
+        CTMRelease target = _release(address(0), verifierNext, V33);
+        CTMTransition verifierOnly = _transition(transitionV32.newRelease(), address(target));
         assertEq(verifierOnly.l2Plan().deployments.length, 0, "an unchanged L2 table derives no L2 deployment");
 
         _runHop(verifierOnly);
@@ -125,10 +133,10 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
         assertEq(IGetters(chainAddress).getL2SystemContractsUpgradeTxHash(), bytes32(0), "no L2 transaction");
     }
 
-    /// @dev A ValidatorTimelock-only edge: a SemVer PATCH transition that reuses the departing
-    ///      release (so no chain state changes: empty facet delta, no L2 side) and carries ONE
-    ///      CTM-domain row — the timelock proxy's implementation swap under the executor's bound
-    ///      ProxyAdmin. Chains still cross the (empty) edge for the version bump.
+    /// @dev A ValidatorTimelock-only edge: a SemVer PATCH toward a release that differs from the
+    ///      departing one in its version alone (so no chain state changes: empty facet delta, no L2
+    ///      side) and carries ONE CTM-domain row — the timelock proxy's implementation swap under the
+    ///      executor's bound ProxyAdmin. Chains still cross the (empty) edge for the version bump.
     function test_validatorTimelockOnlyPatch_swapsOneProxyAndNothingElse() public {
         _runHop(transitionV32);
         UnrelatedState memory before = _snapshot();
@@ -138,10 +146,12 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
             address implNew,
             ProxyUpgradeRow[] memory rows
         ) = _timelockRowFixture();
-        address release = transitionV32.newRelease();
-        CTMTransition timelockOnly = _transition(V32, V32_PATCH_1, release, release);
+        // One release per version: the patch lands on a copy of the v32 release at 0.32.1.
+        CTMRelease patchRelease = _release(address(0), before.verifier, V32_PATCH_1);
+        CTMTransition timelockOnly = _transition(transitionV32.newRelease(), address(patchRelease));
         _operationWithInfrastructure(ICTMTransition(address(timelockOnly)), rows);
-        assertEq(timelockOnly.l2Plan().deployments.length, 0, "a same-release patch has no L2 side");
+        assertEq(timelockOnly.l2Plan().deployments.length, 0, "a version-only patch has no L2 side");
+        assertEq(timelockOnly.facetCuts().length, 0, "and no facet cut");
 
         _runHop(timelockOnly);
 
@@ -151,7 +161,11 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
         _assertFacetsUnchanged(before);
         assertEq(address(IGetters(chainAddress).getVerifier()), before.verifier, "the verifier is untouched");
         assertEq(vm.load(address(chainContractAddress), EIP1967_IMPLEMENTATION_SLOT), before.ctmImplementationSlot);
-        assertEq(chainContractAddress.currentRelease(), before.currentRelease, "a patch keeps the release");
+        assertEq(
+            chainContractAddress.currentRelease(),
+            address(patchRelease),
+            "the CTM lands on the release of the patch version"
+        );
         assertEq(IGetters(chainAddress).getL2SystemContractsUpgradeTxHash(), bytes32(0), "no L2 transaction");
     }
 
@@ -238,8 +252,8 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
         UnrelatedState memory before = _snapshot();
         address verifierNext = address(new AcceptingVerifier());
         assertTrue(before.verifier != verifierNext, "the fixture must actually replace the verifier");
-        CTMRelease target = _release(address(0), verifierNext);
-        CTMTransition verifierPatch = _transition(V32, V32_PATCH_1, transitionV32.newRelease(), address(target));
+        CTMRelease target = _release(address(0), verifierNext, V32_PATCH_1);
+        CTMTransition verifierPatch = _transition(transitionV32.newRelease(), address(target));
         assertEq(verifierPatch.facetCuts().length, 0, "identical routing must derive no facet cut");
         assertEq(verifierPatch.l2Plan().deployments.length, 0, "a verifier patch has no L2 side");
 
@@ -275,8 +289,8 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
         address verifierNext = address(new AcceptingVerifier());
         // A copy of the DEPARTING snapshot with the verifier replaced and nothing else — the
         // v33 release's facet routing and its L2 bytecode table carried over verbatim.
-        CTMRelease target = new CTMRelease(_releaseManifest(newAdminFacet, verifierNext));
-        CTMTransition verifierPatch = _transition(V33, V33 + 1, transitionV33.newRelease(), address(target));
+        CTMRelease target = new CTMRelease(_releaseManifest(newAdminFacet, verifierNext, V33 + 1));
+        CTMTransition verifierPatch = _transition(transitionV33.newRelease(), address(target));
         assertEq(verifierPatch.facetCuts().length, 0, "identical routing must derive no facet cut");
 
         _runHop(verifierPatch);
@@ -329,15 +343,17 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
         }
     }
 
-    /// @dev A release describing the chain's routing with the AdminFacet swapped for `_adminFacet`
-    ///      when nonzero, the given verifier, and the fixture's (empty) L2 table.
-    function _release(address _adminFacet, address _verifier) internal returns (CTMRelease) {
+    /// @dev A release at `_protocolVersion` describing the chain's routing with the AdminFacet
+    ///      swapped for `_adminFacet` when nonzero, the given verifier, and the fixture's (empty) L2
+    ///      table.
+    function _release(address _adminFacet, address _verifier, uint256 _protocolVersion) internal returns (CTMRelease) {
         return
             new CTMRelease(
                 ReleaseManifest({
+                    protocolVersion: _protocolVersion,
                     diamondInit: diamondInit,
                     verifier: _verifier,
-                    genesisUpgrade: genesisUpgradeAddr,
+                    genesisUpgrade: address(genesisUpgradeContract),
                     genesisFacets: _releaseFacets(_adminFacet),
                     genesis: ReleaseGenesisData({
                         fixedForceDeploymentsData: hex"f1f2",
@@ -354,18 +370,11 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
         return new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
     }
 
-    /// @dev An L1-only transition (no authored L2 remainder).
-    function _transition(
-        uint256 _oldVersion,
-        uint256 _newVersion,
-        address _fromRelease,
-        address _newRelease
-    ) internal returns (CTMTransition) {
+    /// @dev An L1-only transition (no authored L2 remainder); the version edge is the releases'.
+    function _transition(address _fromRelease, address _newRelease) internal returns (CTMTransition) {
         return
             new CTMTransition(
                 TransitionManifest({
-                    oldProtocolVersion: _oldVersion,
-                    newProtocolVersion: _newVersion,
                     fromRelease: _fromRelease,
                     newRelease: _newRelease,
                     upgradeEngine: defaultUpgrade,

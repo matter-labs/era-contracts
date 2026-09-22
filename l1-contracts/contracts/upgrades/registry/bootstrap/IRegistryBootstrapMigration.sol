@@ -17,6 +17,10 @@ interface IRegistryBootstrapMigration is ICommittedUpgrade {
     /// @notice The whole manifest, exactly as it was pinned.
     function getManifest() external view returns (BootstrapManifest memory);
 
+    /// @notice The version the edge moves the CTM to: its genesis release's own, read at
+    ///         construction.
+    function newProtocolVersion() external view returns (uint256);
+
     /// @notice The L2 protocol upgrade transaction the edge commits on chain `_chainId` — the FINAL
     ///         transaction, exactly as the chain stores its hash: composed from {l2Plan}, the genesis
     ///         release and the version edge for the ecosystem the CTM belongs to, by the same

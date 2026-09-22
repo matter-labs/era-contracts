@@ -139,12 +139,12 @@ export type RecurringUpgradeHop = {
   coreScriptPath: string;
   ctmScriptPath: string;
   /**
-   * Assert that the prepare REUSED the live release. Set it for a hop that changes no CTM release
-   * member: the prepare then pins an identical manifest, so the live release object must serve it
-   * and the derived facet delta must be empty — no chain sees facet churn for an upgrade that
-   * changed no facet.
+   * Assert that the prepare REUSED every live release member. Set it for a hop that changes no CTM
+   * release member: the prepare then publishes a copy of the live release one version up — one
+   * release per version — so the transition's `releaseDiff()` names nothing and the derived facet
+   * delta is empty: no chain sees facet churn for an upgrade that changed no facet.
    */
-  expectsReusedRelease?: boolean;
+  expectsReusedReleaseMembers?: boolean;
   /**
    * Assert an empty derived facet delta while allowing a NEW release. Set it for a hop that
    * replaces a non-facet release member (a verifier): the routing is identical on both edges, so
@@ -566,18 +566,20 @@ async function runRecurringHop(
     }
     // Read off the OBJECT rather than the prepare's logs: this is what governance and the chains
     // read, and it is the only evidence that unchanged contracts were not silently redeployed.
-    if (hop.expectsReusedRelease) {
+    if (hop.expectsReusedReleaseMembers) {
       const fromRelease: string = await transition.fromRelease();
-      if (fromRelease.toLowerCase() !== newRelease.toLowerCase()) {
+      const diff: Record<string, unknown> = await transition.releaseDiff();
+      const changed = Object.keys(diff).filter((key) => Number.isNaN(Number(key)) && diff[key] === true);
+      if (changed.length !== 0) {
         const difference = await describeReleaseDifference(l1Provider, fromRelease, newRelease);
         throw new Error(
-          `hop ${hop.label} changes no release member, so the prepare must reuse the live release; ` +
-            `got ${fromRelease} -> ${newRelease}. Differing members: ${difference}`
+          `hop ${hop.label} changes no release member, so the prepare must reuse every live one; ` +
+            `releaseDiff names ${changed.join(", ")}. Differing members: ${difference}`
         );
       }
-      console.log("  ✓ the prepare reused the live release: same release on both edges");
+      console.log("  ✓ the prepare reused every release member: the new release differs in its version alone");
     }
-    if (hop.expectsReusedRelease || hop.expectsEmptyFacetDelta) {
+    if (hop.expectsReusedReleaseMembers || hop.expectsEmptyFacetDelta) {
       const facetCuts: unknown[] = await transition.facetCuts();
       if (facetCuts.length !== 0) {
         throw new Error(

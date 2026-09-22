@@ -12,7 +12,6 @@ import {
 
 import {CTMUpgradeExecutorFixture} from "./CTMUpgradeExecutor.t.sol";
 import {LifecycleImplNew, LifecycleImplOld} from "./CTMUpgradeLifecycle.t.sol";
-import {Utils} from "../../Utils/Utils.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
 import {CoreTransition} from "contracts/upgrades/registry/objects/CoreTransition.sol";
@@ -65,7 +64,7 @@ contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
 
         // The second CTM: same implementation and genesis shape as the fixture's, registered on
         // the Bridgehub (the ChainAssetHandler derives pause authority from registration plus
-        // ownership), handed to its own executor and re-pointed at the same real release.
+        // ownership), handed to its own executor, and initialized on the same real release.
         ctm2 = ChainTypeManager(
             address(
                 new TransparentUpgradeableProxy(
@@ -76,8 +75,7 @@ contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
                         ChainTypeManagerInitializeData({
                             owner: governor,
                             validatorTimelock: validator,
-                            currentRelease: Utils.TEST_GENESIS_REGISTRY,
-                            protocolVersion: 0,
+                            currentRelease: address(fromRelease),
                             serverNotifier: serverNotifier
                         })
                     )
@@ -97,14 +95,6 @@ contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
         vm.prank(governor);
         ctm2.transferOwnership(address(ctmExecutor2));
         ctmExecutor2.acceptCTMOwnership();
-        Call[] memory repoint = new Call[](1);
-        repoint[0] = Call({
-            target: address(ctm2),
-            value: 0,
-            data: abi.encodeCall(IChainTypeManager.setCurrentRelease, (address(fromRelease)))
-        });
-        vm.prank(governor);
-        ctmExecutor2.forward(repoint);
         assertEq(ctm2.currentRelease(), address(fromRelease));
 
         // The shared ecosystem change: one proxy under the core executor's admin.
@@ -216,7 +206,7 @@ contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
 
     function test_ctmFailureRollsBackCoreUpgrade() public {
         bytes memory unpublished = hex"de1f";
-        CTMTransition target = _deployTransitionWithDelegate(778, address(fromRelease), 0, unpublished);
+        CTMTransition target = _deployTransitionWithDelegate(778, address(fromRelease), unpublished);
         EcosystemUpgradeOperation operation = _operationWithCore(
             ICTMTransition(address(target)),
             address(coreTransition)

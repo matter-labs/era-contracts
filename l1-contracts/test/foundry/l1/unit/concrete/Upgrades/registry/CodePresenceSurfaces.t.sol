@@ -104,7 +104,6 @@ contract CodePresenceSurfacesTest is CTMUpgradeExecutorFixture {
         TransitionManifest memory manifest = _transitionManifest(
             778,
             chainContractAddress.currentRelease(),
-            0,
             L2_DELEGATE_CODE
         );
         manifest.l2Plan.delegateComposer = address(0);

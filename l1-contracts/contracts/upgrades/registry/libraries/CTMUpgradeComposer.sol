@@ -68,7 +68,7 @@ library CTMUpgradeComposer {
             buildL2UpgradeTxFromPlan({
                 _plan: _transition.l2Plan(),
                 _newRelease: ICTMRelease(m.newRelease),
-                _newProtocolVersion: m.newProtocolVersion,
+                _newProtocolVersion: _transition.newProtocolVersion(),
                 _bridgehub: _bridgehub,
                 _chainId: _chainId
             });

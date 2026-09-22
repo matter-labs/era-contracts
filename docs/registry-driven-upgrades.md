@@ -29,21 +29,26 @@ Stage 2 verifies the applied L1 state, not completion on every L2 chain.
 
 Two objects, deliberately separate:
 
-|          | **Release**                                                                                                               | **Transition**                                        |
-| -------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| Answers  | what a chain **is**                                                                                                       | how release A **becomes** release B                   |
-| Contains | complete facet set (routing self-described by the facets), `DiamondInit`, verifier, genesis params, force-deployment data | version edge, upgrade engine, chain schedule, L2 plan |
-| Version  | none — version-independent, reusable                                                                                      | owns the `old -> new` version edge                    |
-| VM flag  | none — every release is a ZKsync OS release                                                                               | —                                                     |
+|          | **Release**                                                                                                               | **Transition**                                   |
+| -------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Answers  | what a chain **is**                                                                                                       | how release A **becomes** release B              |
+| Contains | complete facet set (routing self-described by the facets), `DiamondInit`, verifier, genesis params, force-deployment data | upgrade engine, chain schedule, L2 plan          |
+| Version  | the protocol version it IS — one release per version                                                                      | reads its `old -> new` edge off its two releases |
+| VM flag  | none — every release is a ZKsync OS release                                                                               | —                                                |
 
-A release is reusable chain state: everything a chain _runs_ belongs to it, including the verifier
-(the chain stores it as `s.verifier`). What a release does **not** carry is anything about _when_ —
-the version edge and the schedule are the transition's, and one release can serve several versions.
+A release is the chain state of ONE protocol version: everything a chain _runs_ belongs to it,
+including the verifier (the chain stores it as `s.verifier`), and so does the version number itself.
+What a release does **not** carry is anything about _when_ — the schedule is the transition's. A
+transition authors no version edge: it reads it off its two releases. The CTM moves its version and
+its `currentRelease` in one call on both version edges — `setNewVersionUpgradeFromTransition` installs
+the transition's `newRelease`, the bootstrap's cut-taking `setNewVersionUpgrade` its genesis release —
+and refuses a release of any other version, so the pointer and the version cannot come apart. A bump
+that changes no member still publishes a release, differing from its predecessor in the version alone.
 
 **A transition's facet cuts are not authored.** They are derived from its
 `(fromRelease, newRelease)` pair in the constructor and stored: a full reinstall — remove the
-departing release's routing, install the target's. Two shortcuts to an empty cut, both by value:
-the same release on both edges, and two releases whose routing is byte-identical. Governance
+departing release's routing, install the target's. One shortcut to an empty cut, by value: two
+releases whose routing is byte-identical. Governance
 reviews two releases plus the transition's own fields; the cuts are computed, not written.
 
 A transition describes one CTM's chain-version edge and nothing else. Infrastructure changes and
@@ -170,12 +175,12 @@ flowchart TB
     CO -- "upgrade / upgradeAndCall" --> PA
     CE -. "codehash-check + validate + both edges" .-> TRA
     CE -- "the operation's infrastructure rows" --> CPA
-    CE -- "setNewVersionUpgradeFromTransition ·<br/>setCurrentRelease · upgradeChainFromVersion" --> CTM
+    CE -- "setNewVersionUpgradeFromTransition ·<br/>upgradeChainFromVersion" --> CTM
     CE -- "pauseCTMMigration (begin) ·<br/>unpauseCTMMigration (complete)" --> CAH
     BOOT -- "one-time: hands over CTM + CTM-domain ProxyAdmin" --> CE
 
     TRA -. "derive cuts + L2 deployments" .-> REL
-    CTM -. "currentRelease · codehash-check on setCurrentRelease" .-> REL
+    CTM -. "currentRelease · validate + version on install" .-> REL
     DI -. "routing, verifier" .-> REL
     ENG -. "cuts, schedule, target release, L2 plan" .-> TRA
     BOOTENG -. "schedule, genesis release, L2 plan" .-> BOOT
@@ -242,7 +247,7 @@ Who can do what once the CTM domain is owned by `CTMUpgradeExecutor`. "Chain sid
 
 | CTM owner method                                                                                                                    | Through the executors                                                                           | Chain side                              |
 | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------- |
-| `setNewVersionUpgradeFromTransition`, `setCurrentRelease`                                                                           | the coordinator's `stage1` → `applyOperation` (together, from the reserved transition)          | —                                       |
+| `setNewVersionUpgradeFromTransition` (installs the target release too)                                                              | the coordinator's `stage1` → `applyOperation` (from the reserved transition)                    | —                                       |
 | `upgradeChainFromVersion`                                                                                                           | `upgradeChain`                                                                                  | —                                       |
 | lifecycle bookkeeping (pending operation, reservations)                                                                             | `abandonPendingOperation` on the coordinator — break-glass for a lifecycle that cannot complete |                                         |
 | `pauseCTMMigration` / `unpauseCTMMigration` (as CTM owner)                                                                          | `beginOperation` / `completeOperation`; `forward` to unpause after an abandonment               | —                                       |
@@ -446,8 +451,7 @@ sequenceDiagram
     X->>CO: applyL1Upgrade(coreTransition) — core leg first
     X->>E: applyOperation() — the reserved leg
     E->>C: infrastructure rows first, then the commit
-    E->>C: setNewVersionUpgradeFromTransition(transition)
-    E->>C: setCurrentRelease(newRelease)
+    E->>C: setNewVersionUpgradeFromTransition(transition) — version, cut and newRelease together
     G->>E: upgradeChain(transition, chainId)
     E->>C: upgradeChainFromVersion(chainId, oldV)
     C->>D: upgradeChainFromVersion(oldV)
@@ -531,11 +535,12 @@ bytecode hash names an auditable artifact, not a behavior.
 address (`Diamond._addOneFunction` requires uniform freezability per facet); a selector appears in at
 most one row.
 
-**Version edge.** `newProtocolVersion > oldProtocolVersion`; both majors zero; the minor delta is
-within `MAX_ALLOWED_MINOR_VERSION_DELTA`. These mirror the rules chains apply at execution, so a
+**Version edge.** Read off the two releases, then `newProtocolVersion > oldProtocolVersion` — which
+also refuses the same release on both edges; both majors zero; the minor delta is within
+`MAX_ALLOWED_MINOR_VERSION_DELTA`. These mirror the rules chains apply at execution, so a
 transition cannot construct successfully and then strand every chain.
 
-**Patches.** A patch may name a NEW release. A release is the immutable snapshot of the intended
+**Patches.** A patch names a NEW release, like every edge. A release is the immutable snapshot of the intended
 contracts, so replacing one of its L1 members — the verifier, a facet — is not by itself a change
 of chain-visible L2 state, and should not force a minor bump. What a patch may not do is carry an
 L2 upgrade: `BaseZkSyncUpgrade` refuses an L2 protocol upgrade transaction on a patch edge, and a
@@ -544,8 +549,8 @@ must survive it untouched. The transition therefore validates what a patch CONTA
 which release it names: no L2 side (derived or authored), and the target release must carry over
 the departing one's L2 description — the implementation table and shared proxy shell, the
 force-deployment blob, the genesis
-batch and the VM its `DiamondInit` selects. A same-release patch remains valid and is then
-schedule-only.
+batch and the VM its `DiamondInit` selects. A patch that changes nothing but the version names a
+copy of the departing release one patch version up, and derives nothing.
 
 A verifier rotation is therefore: deploy the verifier, publish release B copying release A except
 that member, publish the `0.34.0 -> 0.34.1` transition naming `A -> B` with no L2 side, run the

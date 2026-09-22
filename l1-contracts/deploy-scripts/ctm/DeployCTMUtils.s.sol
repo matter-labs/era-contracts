@@ -313,6 +313,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         require(generatedData.forceDeploymentsData.length != 0, "force deployments data is empty");
         require(releaseFacets.length != 0, "release facets not deployed");
         ReleaseManifest memory manifest = ReleaseManifest({
+            protocolVersion: config.contracts.chainCreationParams.latestProtocolVersion,
             diamondInit: ctmAddresses.stateTransition.facets.diamondInit,
             verifier: ctmAddresses.stateTransition.verifiers.verifier,
             genesisUpgrade: ctmAddresses.stateTransition.genesisUpgrade,
@@ -328,10 +329,10 @@ abstract contract DeployCTMUtils is DeployUtils {
             l2SystemProxyBytecodeInfo: getL2SystemProxyBytecodeInfo()
         });
 
-        // An upgrade whose release members all reused (nothing this version changes lives in the
-        // release) pins the SAME manifest, so the live release object serves it: a transition with
-        // `fromRelease == newRelease` derives an empty L1 delta, which is the point — a chain sees
-        // no facet churn for an upgrade that does not touch its facets.
+        // A run whose release members are all reused AND whose version does not move — an
+        // infrastructure-only edge — pins the SAME manifest, so the live release object serves it.
+        // Any version bump pins a release of its own (one release per version), even when every
+        // member is reused; the transition then derives an empty delta by value.
         address liveRelease = ctmAddresses.stateTransition.currentRelease;
         if (liveRelease != address(0) && liveRelease.code.length != 0) {
             if (CTMRelease(liveRelease).manifestHash() == keccak256(abi.encode(manifest))) {
@@ -442,7 +443,6 @@ abstract contract DeployCTMUtils is DeployUtils {
                 owner: getBroadcasterAddress(),
                 validatorTimelock: stateTransition.proxies.validatorTimelock,
                 currentRelease: stateTransition.currentRelease,
-                protocolVersion: config.contracts.chainCreationParams.latestProtocolVersion,
                 serverNotifier: stateTransition.proxies.serverNotifier
             });
     }

@@ -21,10 +21,10 @@
  *      initialize them (write-once) from the COMMITTED manifest
  *      scripts/registry-manifests/v34-local.json — the reviewable per-upgrade artifact:
  *      - the RELEASE describes what a chain at the target version IS (complete facet set,
- *        DiamondInit, base-system hashes, genesis params) — version-independent;
+ *        DiamondInit, base-system hashes, genesis params) and the version that state IS;
  *      - the TRANSITION describes how the CURRENT release becomes that release (facet swaps,
- *        L2 leg, schedule, verifier) and commits both edges: `fromRelease -> newRelease` and
- *        `oldProtocolVersion -> newProtocolVersion`.
+ *        L2 leg, schedule, verifier) and commits `fromRelease -> newRelease`, reading the
+ *        `oldProtocolVersion -> newProtocolVersion` edge off the two releases.
  *      Then assert `validate()` against the live deployment. This is the default CONSUME mode:
  *      the manifest is never regenerated here, so any drift between the committed data and the
  *      live/freshly-deployed addresses fails loudly. With `REGEN_REGISTRIES=1`
@@ -299,6 +299,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       ctmProxyAdmin: live.ctmProxyAdmin,
       l2BytecodeInfos: l2Inventory.rows,
       l2SystemProxyBytecodeInfo: l2Inventory.systemProxyBytecodeInfo,
+      bootstrapVersion: live.midVersion,
     });
 
     // ── 4. Regenerate (EMIT mode) or validate (CONSUME mode) the committed manifest, then
@@ -896,6 +897,8 @@ async function deployUpgradeMachinery(
     l2BytecodeInfos: string[];
     /** `ReleaseManifest.l2SystemProxyBytecodeInfo`: the one shell the table rows sit behind. */
     l2SystemProxyBytecodeInfo: string;
+    /** The bootstrap edge's target version — the version its release IS. */
+    bootstrapVersion: ethers.BigNumber;
   }
 ): Promise<DeployedMachinery> {
   const deployFrom = async (
@@ -983,6 +986,7 @@ async function deployUpgradeMachinery(
     await bootstrapReleaseManifest(
       deployer.provider,
       await liveCtm.currentRelease(),
+      params.bootstrapVersion,
       params.l2BytecodeInfos,
       params.l2SystemProxyBytecodeInfo
     ),
@@ -1005,20 +1009,22 @@ async function deployUpgradeMachinery(
 }
 
 /**
- * The bootstrap release's `ReleaseManifest`: the live release's members over `l2BytecodeInfos`
- * and its shared shell (see deployUpgradeMachinery). Read from the live object rather than from
- * the committed manifest: the table carries the build-specific bytecode hashes of the current
- * artifacts, which are not cross-machine-stable and so never committed.
+ * The bootstrap release's `ReleaseManifest`: the live release's members at `protocolVersion`, over
+ * `l2BytecodeInfos` and its shared shell (see deployUpgradeMachinery). Read from the live object
+ * rather than from the committed manifest: the table carries the build-specific bytecode hashes of
+ * the current artifacts, which are not cross-machine-stable and so never committed.
  */
 async function bootstrapReleaseManifest(
   provider: ethers.providers.Provider,
   liveRelease: string,
+  protocolVersion: ethers.BigNumber,
   l2BytecodeInfos: string[],
   l2SystemProxyBytecodeInfo: string
 ): Promise<unknown> {
   const release = new ethers.Contract(liveRelease, getAbi("CTMRelease"), provider);
   const manifest = await release.getManifest();
   return {
+    protocolVersion,
     diamondInit: manifest.diamondInit,
     verifier: manifest.verifier,
     genesisUpgrade: manifest.genesisUpgrade,
@@ -1184,7 +1190,7 @@ async function buildRegistryManifest(
         name: CTM_REGISTRY_NAME,
         isZKsyncOS: true,
         ctmProxy,
-        // What a chain at the target release IS — version-independent reusable chain state.
+        // What a chain at the target release IS, at the version that release IS.
         release: {
           diamondInit: { address: deployed.newDiamondInit },
           // The verifier is installed chain state, so it belongs to the release; both the genesis
@@ -1359,7 +1365,7 @@ async function deployUpgradeObjectsFromManifest(
     return contract.address;
   };
 
-  const release = await deployObject("CTMRelease", releaseInitArgs(ctm));
+  const release = await deployObject("CTMRelease", releaseInitArgs(manifest, ctm));
   // The OPERATION names the stage-1 timer and the core transition; the transition names neither.
   // The timer is bound to the coordinator (only it can start it); zero delays make the stage-1
   // window pass immediately in the harness, and the deployer keeps the (unused) extension right.

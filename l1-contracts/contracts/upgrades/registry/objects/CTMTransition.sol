@@ -22,7 +22,6 @@ import {
 import {
     PatchCannotCarryL2Upgrade,
     PatchChangesL2GenesisState,
-    SameReleaseTransitionHasPayload,
     TransitionDeadlineBeforeUpgrade,
     TransitionDeadlineZero,
     ZeroAddress
@@ -36,13 +35,13 @@ import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
 ///      DERIVED from the `(fromRelease, newRelease)` pair at initialization (see
 ///      {TransitionDerivationLib}) and stored. Transition and release state cannot diverge because
 ///      the delta is a pure function of the two pinned releases.
-/// @dev What IS authored: the version edge, upgrade engine, schedule and the L2 plan's authored
-///      input (the delegate's and any extra bytecode, the composer). The verifier is NOT
-///      authored here: it is part of the installed
-///      chain state and therefore lives on the release, so it converges by the same mechanism as
-///      facet routing. The final L2 plan is CONSTRUCTED from the target release's bytecode table
-///      and the authored input ({L2PlanLib.build}); the authored input is REVIEWED data
-///      (L1 cannot verify L2 execution effects), so the on-chain convergence guarantee
+/// @dev What IS authored: the upgrade engine, schedule and the L2 plan's authored input (the
+///      delegate's and any extra bytecode, the composer). The version edge is NOT: a release IS one
+///      protocol version, so the edge is the two releases' own versions. Nor is the verifier: it
+///      is part of the installed chain state and therefore lives on the release, so it converges
+///      by the same mechanism as facet routing. The final L2 plan is CONSTRUCTED from the target
+///      release's bytecode table and the authored input ({L2PlanLib.build}); the authored input is
+///      REVIEWED data (L1 cannot verify L2 execution effects), so the on-chain convergence guarantee
 ///      covers L1 state only.
 contract CTMTransition is ICTMTransition {
     /// @dev THE manifest, stored as its own ABI encoding — see {CTMRelease} for why the struct is
@@ -56,6 +55,10 @@ contract CTMTransition is ICTMTransition {
     ///      reasoning as `encodedManifest`: the legacy codegen pipeline cannot copy a struct array
     ///      with dynamic members into storage).
     bytes internal encodedL2Plan;
+    /// @dev The version edge, read off the two releases at construction and kept here so a chain's
+    ///      upgrade reads it without decoding either release.
+    uint256 internal derivedOldProtocolVersion;
+    uint256 internal derivedNewProtocolVersion;
 
     /// @notice Pins the manifest and DERIVES the delta. No state-mutating function exists on this
     ///         contract: everything is written once, at construction.
@@ -70,11 +73,16 @@ contract CTMTransition is ICTMTransition {
         ) {
             revert ZeroAddress();
         }
+        uint256 oldVersion = ICTMRelease(_manifest.fromRelease).protocolVersion();
+        uint256 newVersion = ICTMRelease(_manifest.newRelease).protocolVersion();
         // A transition only ever moves the version forward — the same rule chains enforce at
-        // execution and the CTM enforces in `setNewVersionUpgrade`.
-        if (_manifest.newProtocolVersion <= _manifest.oldProtocolVersion) {
-            revert ProtocolVersionTooSmall(_manifest.oldProtocolVersion, _manifest.newProtocolVersion);
+        // execution and the CTM enforces in `setNewVersionUpgrade`. Since the edge IS the two
+        // releases' versions, this is also what refuses the same release on both edges.
+        if (newVersion <= oldVersion) {
+            revert ProtocolVersionTooSmall(oldVersion, newVersion);
         }
+        derivedOldProtocolVersion = oldVersion;
+        derivedNewProtocolVersion = newVersion;
         // A zero deadline expires the departing version the moment the edge is committed, which
         // stops every chain still on it from committing batches before any of them can upgrade.
         // The relative check below cannot catch it: a zeroed schedule satisfies `0 >= 0`.
@@ -106,9 +114,9 @@ contract CTMTransition is ICTMTransition {
         {
             // Patch component deliberately ignored: this check is about the major.minor edge.
             // slither-disable-next-line unused-return
-            (uint32 oldMajor, uint32 oldMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(_manifest.oldProtocolVersion));
+            (uint32 oldMajor, uint32 oldMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(oldVersion));
             // slither-disable-next-line unused-return
-            (uint32 newMajor, uint32 newMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(_manifest.newProtocolVersion));
+            (uint32 newMajor, uint32 newMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(newVersion));
             // A SemVer PATCH edge. It may name a NEW release: a release is the immutable snapshot
             // of the intended contracts, and replacing a verifier or a facet in that snapshot is
             // not by itself a change of chain-visible L2 state. What a patch may not do is carry
@@ -132,9 +140,9 @@ contract CTMTransition is ICTMTransition {
                 revert ProtocolVersionMinorDeltaTooBig(MAX_ALLOWED_MINOR_VERSION_DELTA, minorDelta);
             }
         }
-        // The FINAL plan: the target release's table-derived set (empty for a same-release pair by
-        // identity), then the authored delegate and extras at their bytecode-derived addresses,
-        // with the factory dependencies of everything installed — constructed, never authored.
+        // The FINAL plan: the target release's table-derived set, then the authored delegate and
+        // extras at their bytecode-derived addresses, with the factory dependencies of everything
+        // installed — constructed, never authored.
         L2UpgradePlan memory derivedPlan = L2PlanLib.build(
             TransitionDerivationLib.deriveL2Deployments(
                 ICTMRelease(_manifest.fromRelease),
@@ -144,11 +152,6 @@ contract CTMTransition is ICTMTransition {
         );
         // A delegate is itself deployed, so a plan has an L2 side exactly when it deploys.
         bool hasL2Side = derivedPlan.deployments.length != 0;
-        // A same-release transition is schedule-only: the derived facet/deployment delta is
-        // empty by construction, and it must not carry an authored L2 payload either.
-        if (_manifest.fromRelease == _manifest.newRelease && hasL2Side) {
-            revert SameReleaseTransitionHasPayload();
-        }
         // A PATCH edge may move L1 code (the verifier, facets, CTM-domain proxy rows) but never
         // the chains' L2 side: `BaseZkSyncUpgrade._setL2SystemContractUpgrade` refuses an L2
         // protocol upgrade transaction on a patch (`PatchCantSetUpgradeTxn`), and a patch
@@ -183,12 +186,9 @@ contract CTMTransition is ICTMTransition {
     }
 
     /// @dev The L2/genesis description a patch must carry over unchanged (see the constructor).
-    ///      Compared by value, not by release identity — the point of allowing a patch to name a
-    ///      new release is that the snapshot may differ in its L1 members.
+    ///      Compared by value: a patch names a release of its own, whose snapshot may differ from
+    ///      the departing one in its L1 members only.
     function _requirePatchKeepsL2State(ICTMRelease _fromRelease, ICTMRelease _newRelease) private view {
-        if (address(_fromRelease) == address(_newRelease)) {
-            return;
-        }
         if (
             keccak256(abi.encode(_fromRelease.l2BytecodeInfos())) !=
                 keccak256(abi.encode(_newRelease.l2BytecodeInfos())) ||
@@ -209,9 +209,6 @@ contract CTMTransition is ICTMTransition {
     /// @inheritdoc ICTMTransition
     function releaseDiff() external view returns (ReleaseDiff memory diff) {
         TransitionManifest memory m = getManifest();
-        if (m.fromRelease == m.newRelease) {
-            return diff;
-        }
         ICTMRelease from = ICTMRelease(m.fromRelease);
         ICTMRelease to = ICTMRelease(m.newRelease);
         diff.diamondInit = from.diamondInit() != to.diamondInit();
@@ -243,12 +240,14 @@ contract CTMTransition is ICTMTransition {
         return abi.decode(encodedManifest, (TransitionManifest));
     }
 
+    /// @inheritdoc ICTMTransition
     function oldProtocolVersion() external view returns (uint256) {
-        return getManifest().oldProtocolVersion;
+        return derivedOldProtocolVersion;
     }
 
+    /// @inheritdoc ICTMTransition
     function newProtocolVersion() external view returns (uint256) {
-        return getManifest().newProtocolVersion;
+        return derivedNewProtocolVersion;
     }
 
     function fromRelease() external view returns (address) {
@@ -274,7 +273,7 @@ contract CTMTransition is ICTMTransition {
     /// @inheritdoc ICommittedUpgrade
     function upgradeTarget() external view returns (uint256, uint256, address) {
         TransitionManifest memory m = getManifest();
-        return (m.newProtocolVersion, m.upgradeTimestamp, m.newRelease);
+        return (derivedNewProtocolVersion, m.upgradeTimestamp, m.newRelease);
     }
 
     function facetCuts() external view returns (Diamond.FacetCut[] memory) {

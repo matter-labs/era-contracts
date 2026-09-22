@@ -234,7 +234,13 @@ contract UtilsCallMockerTest is Test {
     ///      therefore pins NO facets (empty list, so DiamondInit installs nothing further) and
     ///      only serves the verifier and genesis params DiamondInit / the CTM read at genesis.
     function mockGenesisRegistryContract() public {
-        address genesisRegistry = Utils.TEST_GENESIS_REGISTRY;
+        mockReleaseAt(Utils.TEST_GENESIS_REGISTRY, 0);
+    }
+
+    /// @notice The stand-in {mockGenesisRegistryContract} installs, at `_release` and pinning
+    ///         `_protocolVersion` — for fixtures that move the CTM to a release of another version.
+    function mockReleaseAt(address _release, uint256 _protocolVersion) public {
+        address genesisRegistry = _release;
         // The mocked release must carry CODE — a release is called, not just recorded, and a
         // call into a codeless address is rejected before the mock ever answers. The audited
         // `CTMRelease` runtime code is what gets etched (read from the artifacts, since zksolc
@@ -246,11 +252,16 @@ contract UtilsCallMockerTest is Test {
             abi.encodeWithSelector(ICTMRelease.manifestHash.selector),
             abi.encode(bytes32("mock-genesis-manifest"))
         );
+        vm.mockCall(
+            genesisRegistry,
+            abi.encodeWithSelector(ICTMRelease.protocolVersion.selector),
+            abi.encode(_protocolVersion)
+        );
         // The mocked registry's `diamondInit()` placeholder is the registry itself.
         vm.mockCall(
             genesisRegistry,
             abi.encodeWithSelector(ICTMRelease.diamondInit.selector),
-            abi.encode(Utils.TEST_GENESIS_REGISTRY)
+            abi.encode(genesisRegistry)
         );
         vm.mockCall(
             genesisRegistry,
@@ -265,7 +276,7 @@ contract UtilsCallMockerTest is Test {
             genesisRegistry,
             abi.encodeWithSelector(ICTMRelease.genesisParams.selector),
             abi.encode(
-                Utils.TEST_GENESIS_REGISTRY, // genesisUpgrade (placeholder non-zero)
+                genesisRegistry, // genesisUpgrade (placeholder non-zero)
                 bytes32(uint256(0x01)), // genesisBatchHash
                 uint64(0x01) // genesisIndexRepeatedStorageChanges
             )
@@ -282,7 +293,7 @@ contract UtilsCallMockerTest is Test {
         vm.mockCall(
             genesisRegistry,
             abi.encodeWithSelector(ICTMRelease.verifier.selector),
-            abi.encode(Utils.TEST_GENESIS_REGISTRY)
+            abi.encode(genesisRegistry)
         );
     }
 

@@ -57,15 +57,15 @@ runPipelineUpgradeScenario({
     },
     // Then an ordinary MINOR upgrade on top of the patch ("v34 -> v35"): one fresh ecosystem
     // implementation pinned in a CoreTransition and a transition naming it. Its only change is on
-    // the ecosystem side, so the CTM release is untouched and the prepare must reuse it rather
-    // than redeploy the facet set.
+    // the ecosystem side, so every CTM release member is untouched: the prepare must reuse each of
+    // them rather than redeploy the facet set, publishing a copy of the live release at v35.
     {
       label: "v35-registry-driven",
       upgradeInputTemplatePath: "test/anvil-interop/config/recurring-upgrade.toml",
       expectedProtocolVersion: "0x2300000000",
       coreScriptPath: "test/foundry/l1/integration/_EcosystemUpgradeForTests_v35.sol:CoreUpgradeForTests_v35",
       ctmScriptPath: "test/foundry/l1/integration/_EcosystemUpgradeForTests_v35.sol:CTMUpgradeForTests_v35",
-      expectsReusedRelease: true,
+      expectsReusedReleaseMembers: true,
       expectsFreshMessageRoot: true,
     },
   ],

@@ -39,7 +39,6 @@ import {
     Unauthorized,
     UpgradeNotPermissionlessYet
 } from "contracts/common/L1ContractErrors.sol";
-import {OutdatedProtocolVersion} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {
     AuthoredL2Plan,
     GenesisFacet,
@@ -75,7 +74,6 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
 
     uint256 internal newVersion;
     address internal chainAddress;
-    address internal genesisUpgradeAddr;
     address internal upgradeEngineAddr;
 
     /// @dev Dummy EVM bytecode of the L2 upgrade delegate every fixture transition carries as its
@@ -121,26 +119,13 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
         assertEq(chainContractAddress.owner(), address(ctmExecutor));
 
         newVersion = SemVer.packSemVer(0, 1, 0);
-        // The pinned genesisUpgrade / upgradeEngine stand-ins must carry real code — a release's
-        // and a transition's `validate()` reject codeless members — so etch them.
-        genesisUpgradeAddr = makeAddr("genesisUpgrade");
-        vm.etch(genesisUpgradeAddr, hex"600042");
+        // The pinned upgradeEngine stand-in must carry real code — a transition's `validate()`
+        // rejects codeless members — so etch it.
         upgradeEngineAddr = makeAddr("upgradeEngine");
         vm.etch(upgradeEngineAddr, hex"600043");
         delegateComposer = new FixedDelegateCalldataComposer(DELEGATE_CALLDATA);
-        // Transitions require real releases on BOTH edges, so the fixture CTM's mocked genesis
-        // release is replaced by a real one — through the owner-gated raw-call escape hatch, which
-        // is exactly the production route for out-of-band CTM state (the routine executor
-        // entrypoints cannot set currentRelease directly, by design).
-        fromRelease = _deployRelease(1);
-        Call[] memory repoint = new Call[](1);
-        repoint[0] = Call({
-            target: address(chainContractAddress),
-            value: 0,
-            data: abi.encodeCall(IChainTypeManager.setCurrentRelease, (address(fromRelease)))
-        });
-        vm.prank(governor);
-        ctmExecutor.forward(repoint);
+        // Transitions depart from the CTM's release, so the fixture CTM was initialized on a real
+        // one ({_fixtureGenesisRelease}) rather than the suite's mocked stand-in.
         assertEq(chainContractAddress.currentRelease(), address(fromRelease));
 
         // The delegate's bytecode is a factory dependency of every fixture transition, and
@@ -148,25 +133,38 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
         assertEq(chainContractAddress.L1_BYTECODES_SUPPLIER(), address(bytecodesSupplier));
         L2PlanFixtures.publish(bytecodesSupplier, L2PlanFixtures.codes(L2_DELEGATE_CODE));
 
-        release = _deployRelease(2);
+        release = _deployRelease(2, newVersion);
         transition = _deployTransition(777);
+    }
+
+    /// @inheritdoc ChainTypeManagerTest
+    /// @dev The departing release every fixture transition names, at the fixture CTM's version 0.
+    function _fixtureGenesisRelease() internal override returns (address) {
+        fromRelease = _deployRelease(1, 0);
+        return address(fromRelease);
     }
 
     /// @param _manifestNonce Differentiates otherwise-identical release manifests (via the
     ///        genesis batch hash — the COMMITMENT must be exactly 1 for the ZKsync OS CTM).
+    /// @param _protocolVersion The version the release IS.
     /// @dev The release describes the complete chain state after the (facet-neutral) hop this
     ///      suite drives: the fixture's full facet routing (explicit selectors, inline pins) —
-    ///      the transition derives an EMPTY delta from it.
-    function _releaseManifest(uint256 _manifestNonce) internal view returns (ReleaseManifest memory) {
+    ///      the transition derives an EMPTY delta from it. Its genesis upgrade is the fixture's real
+    ///      one, since the fixture chain is created from the first release.
+    function _releaseManifest(
+        uint256 _manifestNonce,
+        uint256 _protocolVersion
+    ) internal view returns (ReleaseManifest memory) {
         GenesisFacet[] memory genesisFacets = new GenesisFacet[](facetCuts.length);
         for (uint256 i = 0; i < facetCuts.length; ++i) {
             genesisFacets[i] = GenesisFacet({facet: facetCuts[i].facet, isFreezable: facetCuts[i].isFreezable});
         }
         return
             ReleaseManifest({
+                protocolVersion: _protocolVersion,
                 diamondInit: diamondInit,
                 verifier: address(testnetVerifier),
-                genesisUpgrade: genesisUpgradeAddr,
+                genesisUpgrade: address(genesisUpgradeContract),
                 genesisFacets: genesisFacets,
                 genesis: ReleaseGenesisData({
                     fixedForceDeploymentsData: hex"f1f2",
@@ -179,8 +177,8 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
             });
     }
 
-    function _deployRelease(uint256 _manifestNonce) internal returns (CTMRelease result) {
-        result = new CTMRelease(_releaseManifest(_manifestNonce));
+    function _deployRelease(uint256 _manifestNonce, uint256 _protocolVersion) internal returns (CTMRelease result) {
+        result = new CTMRelease(_releaseManifest(_manifestNonce, _protocolVersion));
     }
 
     /// @dev A transition's timer: bound to the coordinator (`TIMER_GOVERNANCE`, the only address
@@ -196,26 +194,20 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
     }
 
     function _deployTransition(uint256 _upgradeTimestamp) internal returns (CTMTransition result) {
-        return _deployTransitionFrom(_upgradeTimestamp, chainContractAddress.currentRelease(), 0);
+        return _deployTransitionFrom(_upgradeTimestamp, chainContractAddress.currentRelease());
     }
 
-    function _deployTransitionFrom(
-        uint256 _upgradeTimestamp,
-        address _fromRelease,
-        uint256 _oldProtocolVersion
-    ) internal returns (CTMTransition result) {
-        return _deployTransitionWithDelegate(_upgradeTimestamp, _fromRelease, _oldProtocolVersion, L2_DELEGATE_CODE);
+    /// @dev Toward the fixture's current `release`; the version edge is the two releases' own.
+    function _deployTransitionFrom(uint256 _upgradeTimestamp, address _fromRelease) internal returns (CTMTransition) {
+        return _deployTransitionWithDelegate(_upgradeTimestamp, _fromRelease, L2_DELEGATE_CODE);
     }
 
     function _deployTransitionWithDelegate(
         uint256 _upgradeTimestamp,
         address _fromRelease,
-        uint256 _oldProtocolVersion,
         bytes memory _delegateCode
     ) internal returns (CTMTransition result) {
-        result = new CTMTransition(
-            _transitionManifest(_upgradeTimestamp, _fromRelease, _oldProtocolVersion, _delegateCode)
-        );
+        result = new CTMTransition(_transitionManifest(_upgradeTimestamp, _fromRelease, _delegateCode));
     }
 
     /// @dev The default fixture manifest: the L2 side is the minimal plan (the delegate's bytecode
@@ -225,13 +217,10 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
     function _transitionManifest(
         uint256 _upgradeTimestamp,
         address _fromRelease,
-        uint256 _oldProtocolVersion,
         bytes memory _delegateCode
     ) internal view returns (TransitionManifest memory) {
         return
             TransitionManifest({
-                oldProtocolVersion: _oldProtocolVersion,
-                newProtocolVersion: newVersion,
                 // The default transition departs from whatever release the fixture CTM was
                 // genesis'd with (its current release), as the executor's release-edge pin requires.
                 fromRelease: _fromRelease,
@@ -315,7 +304,7 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
             keccak256(abi.encode(_expectedUpgradeCut(ICTMTransition(address(transition)))))
         );
         assertEq(chainContractAddress.currentRelease(), address(release));
-        assertEq(chainContractAddress.l1GenesisUpgrade(), makeAddr("genesisUpgrade"));
+        assertEq(chainContractAddress.l1GenesisUpgrade(), address(genesisUpgradeContract));
     }
 
     function test_revertWhen_stagesCalledByNonGovernance() public {
@@ -431,20 +420,22 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
         coordinator.stage0(replay);
     }
 
-    function test_revertWhen_stage0FromWrongVersion() public {
+    /// @dev A transition departing from the CTM's release cannot carry a stale version edge: the
+    ///      edge is read off the releases, and the CTM's release and version only move together.
+    ///      The executor's version assert is therefore redundant with its release assert for any
+    ///      genuine object, and stays as the second of two independent checks.
+    function test_aTransitionFromTheLiveReleaseDepartsFromTheLiveVersion() public {
         _runLifecycle(transition);
 
-        // A transition with the RIGHT release edge (departs from the now-current release, toward
-        // a fresh distinct release so it is not a patch) but a STALE version edge must trip the
-        // executor's independent version assert.
         address appliedRelease = address(release);
-        release = _deployRelease(3);
-        CTMTransition staleVersionTransition = _deployTransitionFrom(779, appliedRelease, 0);
+        uint256 appliedVersion = newVersion;
+        newVersion = SemVer.packSemVer(0, 2, 0);
+        release = _deployRelease(3, newVersion);
+        CTMTransition next = _deployTransitionFrom(779, appliedRelease);
 
-        EcosystemUpgradeOperation stale = _operationFor(staleVersionTransition);
-        vm.expectRevert(abi.encodeWithSelector(OutdatedProtocolVersion.selector, newVersion, 0));
-        vm.prank(governor);
-        coordinator.stage0(stale);
+        assertEq(next.oldProtocolVersion(), appliedVersion, "the edge departs from the applied release's version");
+        assertEq(chainContractAddress.protocolVersion(), appliedVersion, "which is the CTM's live version");
+        _stage0(next);
     }
 
     /// @dev Publication is live L1 state, so it is checked where the edge COMMITS (stage 1): a
@@ -457,7 +448,6 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
         CTMTransition unpublished = _deployTransitionWithDelegate(
             777,
             chainContractAddress.currentRelease(),
-            0,
             unpublishedDelegate
         );
         assertEq(bytecodesSupplier.evmPublishingBlock(keccak256(unpublishedDelegate)), 0, "fixture: not yet published");
@@ -657,9 +647,10 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
 
         // Second hop: departs from the now-current release and version toward a fresh release.
         address appliedRelease = address(release);
-        release = _deployRelease(4);
         newVersion = SemVer.packSemVer(0, 2, 0);
-        CTMTransition second = _deployTransitionFrom(880, appliedRelease, firstVersion);
+        release = _deployRelease(4, newVersion);
+        CTMTransition second = _deployTransitionFrom(880, appliedRelease);
+        assertEq(second.oldProtocolVersion(), firstVersion, "the second hop departs from the first's version");
         _runLifecycle(second);
         assertEq(chainContractAddress.protocolVersion(), newVersion, "second hop must move the CTM beyond");
 
@@ -672,7 +663,7 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
         // Same edges as the committed transition, but a different object. The chain executes the
         // cut its CTM committed, so naming a different transition must be refused rather than
         // silently running the committed one.
-        CTMTransition differentTransition = _deployTransitionFrom(778, transition.fromRelease(), 0);
+        CTMTransition differentTransition = _deployTransitionFrom(778, transition.fromRelease());
 
         vm.expectRevert(
             abi.encodeWithSelector(TransitionNotCommitted.selector, address(differentTransition), address(transition))

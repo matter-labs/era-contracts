@@ -144,9 +144,8 @@ export function bootstrapInitArgs(
     }),
     // The release `migrate()` installs as the CTM's `currentRelease`, named by address: no hash
     // rides the manifest, since a runtime codehash cannot establish that the audited constructor
-    // produced the object it is applied to.
+    // produced the object it is applied to. The version the edge lands on is the release's own.
     currentRelease: params.currentRelease,
-    newProtocolVersion: packSemVer(manifest.bootstrapVersion),
     oldProtocolVersionDeadline: ethers.BigNumber.from(manifest.bootstrap.oldProtocolVersionDeadline),
     upgradeEngine: manifest.bootstrap.upgradeEngine.address,
     // The L2 leg is CONSTRUCTED on-chain from the genesis release's table plus the authored

@@ -216,7 +216,6 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
             owner: address(0),
             validatorTimelock: validator,
             currentRelease: Utils.TEST_GENESIS_REGISTRY,
-            protocolVersion: 0,
             serverNotifier: serverNotifier
         });
 
@@ -230,8 +229,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
             owner: governor,
             validatorTimelock: validator,
-            currentRelease: Utils.TEST_GENESIS_REGISTRY,
-            protocolVersion: 0,
+            currentRelease: _fixtureGenesisRelease(),
             serverNotifier: serverNotifier
         });
 
@@ -252,6 +250,23 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         }
 
         rollupL1DAValidator = Utils.deployL1RollupDAValidatorBytecode();
+    }
+
+    /// @dev The release the fixture CTM is initialized with — and so the version it starts at and
+    ///      the release its first chain is created from. The mocked stand-in at version 0 by
+    ///      default ({mockGenesisRegistryContract}); a suite whose transitions depart from a REAL
+    ///      release starts its CTM on one, since a release only ever changes at a version edge.
+    ///      Called by {deploy} once the facets, `diamondInit`, the genesis upgrade and the verifier
+    ///      exist.
+    function _fixtureGenesisRelease() internal virtual returns (address) {
+        return Utils.TEST_GENESIS_REGISTRY;
+    }
+
+    /// @dev A mocked release pinning `_protocolVersion` (see {mockReleaseAt}): what a version edge
+    ///      committed through the cut-taking entrypoint names and installs.
+    function _releaseAt(uint256 _protocolVersion) internal returns (address release) {
+        release = makeAddr(string.concat("release-", vm.toString(_protocolVersion)));
+        mockReleaseAt(release, _protocolVersion);
     }
 
     function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {

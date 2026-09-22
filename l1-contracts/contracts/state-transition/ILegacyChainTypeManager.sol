@@ -34,7 +34,7 @@ struct ChainCreationParams {
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The pre-registry `setChainCreationParams` entrypoint, kept for the legacy
 ///         `default-upgrade` deploy-script pipeline that targets pre-v32 CTM deployments. The
-///         current CTM (`IChainTypeManager`) exposes `setCurrentRelease` instead.
+///         current CTM (`IChainTypeManager`) moves its release only together with its version.
 interface ILegacyChainTypeManager {
     function setChainCreationParams(ChainCreationParams calldata _chainCreationParams) external;
 }
