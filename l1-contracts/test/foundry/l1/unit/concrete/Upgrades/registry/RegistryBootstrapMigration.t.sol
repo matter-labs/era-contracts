@@ -34,6 +34,7 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
+import {BYTECODE_INFO_LENGTH} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 import {
     MAX_NEW_FACTORY_DEPS,
     PRIORITY_TX_MAX_GAS_LIMIT,
@@ -55,7 +56,9 @@ import {
     BootstrapNotYetExecuted,
     DeadlineNotYetPassed,
     L2BytecodeNotPublished,
-    MalformedL2UpgradePlan,
+    L2BytecodeInfoLength,
+    L2PlanNeedsDelegate,
+    L2PlanTooManyFactoryDeps,
     MigrationPaused,
     ProxyUpgradeRowMismatch,
     RegistryTargetHasNoCode,
@@ -1180,7 +1183,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
         BootstrapManifest memory manifest = _manifestWithL2Plan(plan);
 
-        vm.expectRevert(MalformedL2UpgradePlan.selector);
+        vm.expectRevert(L2PlanNeedsDelegate.selector);
         new RegistryBootstrapMigration(manifest);
     }
 
@@ -1191,7 +1194,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         BootstrapManifest memory manifest = _manifestWithL2Plan(_emptyL2Plan());
         manifest.currentRelease = address(tableRelease);
 
-        vm.expectRevert(MalformedL2UpgradePlan.selector);
+        vm.expectRevert(L2PlanNeedsDelegate.selector);
         new RegistryBootstrapMigration(manifest);
     }
 
@@ -1202,7 +1205,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
         BootstrapManifest memory manifest = _manifestWithL2Plan(plan);
 
-        vm.expectRevert(MalformedL2UpgradePlan.selector);
+        vm.expectRevert(L2PlanNeedsDelegate.selector);
         new RegistryBootstrapMigration(manifest);
     }
 
@@ -1218,7 +1221,9 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
         BootstrapManifest memory manifest = _manifestWithL2Plan(plan);
 
-        vm.expectRevert(MalformedL2UpgradePlan.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(L2PlanTooManyFactoryDeps.selector, MAX_NEW_FACTORY_DEPS + 1, MAX_NEW_FACTORY_DEPS)
+        );
         new RegistryBootstrapMigration(manifest);
     }
 
@@ -1229,7 +1234,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
         BootstrapManifest memory manifest = _manifestWithL2Plan(plan);
 
-        vm.expectRevert(MalformedL2UpgradePlan.selector);
+        vm.expectRevert(abi.encodeWithSelector(L2BytecodeInfoLength.selector, 2, BYTECODE_INFO_LENGTH));
         new RegistryBootstrapMigration(manifest);
     }
 

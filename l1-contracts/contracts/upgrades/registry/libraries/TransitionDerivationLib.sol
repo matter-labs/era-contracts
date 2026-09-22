@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {ICTMRelease} from "../objects/ICTMRelease.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
-import {RegistryDuplicateSelector} from "../../../common/L1ContractErrors.sol";
+import {L2BytecodeTableShrunk, RegistryDuplicateSelector} from "../../../common/L1ContractErrors.sol";
 import {GenesisFacet} from "../RegistryTypes.sol";
 import {ISelfDescribingFacet} from "../../../state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 import {IComplexUpgrader} from "../../../state-transition/l2-deps/IComplexUpgrader.sol";
@@ -143,8 +143,13 @@ library TransitionDerivationLib {
         bytes[] memory _newTable
     ) internal pure returns (bytes[] memory changed) {
         uint256 length = _newTable.length;
-        changed = new bytes[](length);
         uint256 fromLength = _fromTable.length;
+        // The enum is append-only, so the target table is never shorter than the departing one;
+        // the loop below reads `_fromTable[i]` for every `i < fromLength` and depends on it.
+        if (length < fromLength) {
+            revert L2BytecodeTableShrunk(fromLength, length);
+        }
+        changed = new bytes[](length);
         for (uint256 i = 0; i < length; ++i) {
             if (_newTable[i].length == 0) {
                 continue;

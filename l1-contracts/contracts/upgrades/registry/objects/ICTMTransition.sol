@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {ICommittedUpgrade} from "./ICommittedUpgrade.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
 import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
-import {TransitionManifest} from "../RegistryTypes.sol";
+import {TransitionManifest, ReleaseDiff} from "../RegistryTypes.sol";
 
 /// @notice Immutable description of how one CTM release becomes another: what chains upgrade
 ///         from and to, and by when. Infrastructure changes and the execution delay belong to the
@@ -47,6 +47,11 @@ interface ICTMTransition is ICommittedUpgrade {
     ///         initialization (all `Remove` cuts first, then `Add`), applied verbatim by the
     ///         chain with no re-diffing.
     function facetCuts() external view returns (Diamond.FacetCut[] memory);
+
+    /// @notice Which release members differ between `fromRelease` and `newRelease`, so a reviewer
+    ///         learns what an edge actually changes without diffing two manifests. All-false for a
+    ///         same-release (schedule-only) transition.
+    function releaseDiff() external view returns (ReleaseDiff memory);
 
     /// @notice The L2 protocol upgrade transaction this transition's engine commits on chain
     ///         `_chainId` of the ecosystem of `_bridgehub` — the single read entry point for tooling.

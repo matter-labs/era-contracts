@@ -34,8 +34,12 @@ import {
 } from "contracts/common/Config.sol";
 import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
+import {BYTECODE_INFO_LENGTH} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 import {
-    MalformedL2UpgradePlan,
+    L2BytecodeInfoLength,
+    L2BytecodeTableShrunk,
+    L2PlanNeedsDelegate,
+    L2PlanTooManyFactoryDeps,
     PatchCannotCarryL2Upgrade,
     PatchChangesL2GenesisState,
     RegistryDuplicateFacetRow,
@@ -65,6 +69,7 @@ import {
     GenesisFacet,
     L2UpgradePlan,
     ReleaseGenesisData,
+    ReleaseDiff,
     ReleaseManifest,
     TransitionManifest
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
@@ -507,6 +512,60 @@ contract StorageRegistriesTest is Test {
         new CTMTransition(manifest);
     }
 
+    // ─────────────────────────── releaseDiff ───────────────────────────
+
+    /// @dev Counts the set members of a `ReleaseDiff`, so a test can say "this flag, and only
+    ///      this flag" in two asserts.
+    function _setFlags(ReleaseDiff memory _diff) internal pure returns (uint256 count) {
+        bool[8] memory flags = [
+            _diff.diamondInit,
+            _diff.verifier,
+            _diff.genesisUpgrade,
+            _diff.genesisFacets,
+            _diff.l2BytecodeInfos,
+            _diff.l2SystemProxyBytecodeInfo,
+            _diff.fixedForceDeploymentsData,
+            _diff.genesisBatch
+        ];
+        for (uint256 i = 0; i < flags.length; ++i) {
+            if (flags[i]) {
+                ++count;
+            }
+        }
+    }
+
+    function test_releaseDiff_isEmptyForASameReleaseTransition() public {
+        CTMTransition patchTransition = new CTMTransition(_patchManifest());
+
+        assertEq(_setFlags(patchTransition.releaseDiff()), 0, "one release on both edges differs from itself nowhere");
+    }
+
+    /// @dev The fixture releases differ in the admin facet alone, so the hop's diff is exactly the
+    ///      facet flag — the same fact `facetCuts()` spells out in full.
+    function test_releaseDiff_namesOnlyTheFacetsForTheFixtureHop() public view {
+        ReleaseDiff memory diff = transition.releaseDiff();
+
+        assertTrue(diff.genesisFacets, "the hop replaces the admin facet");
+        assertEq(_setFlags(diff), 1, "and changes nothing else");
+    }
+
+    /// @dev A verifier-only patch is the reviewer's common case: one flag set and an empty
+    ///      `facetCuts()` say everything about the edge.
+    function test_releaseDiff_namesOnlyTheVerifierForAVerifierOnlyRelease() public {
+        ReleaseManifest memory releaseManifest = _newReleaseManifest();
+        releaseManifest.verifier = _deployedStub("verifierNext");
+        CTMRelease verifierRelease = new CTMRelease(releaseManifest);
+
+        TransitionManifest memory manifest = _patchManifest();
+        manifest.newRelease = address(verifierRelease);
+        CTMTransition patch = new CTMTransition(manifest);
+
+        ReleaseDiff memory diff = patch.releaseDiff();
+        assertTrue(diff.verifier, "the target release swaps the verifier");
+        assertEq(_setFlags(diff), 1, "and nothing else");
+        assertEq(patch.facetCuts().length, 0, "a verifier swap derives no facet cut");
+    }
+
     // ─────────────────────────── schedule / version guards ───────────────────────────
 
     function test_revertWhen_transitionVersionNotIncreasing() public {
@@ -570,7 +629,9 @@ contract StorageRegistriesTest is Test {
         TransitionManifest memory manifest = _transitionManifest();
         manifest.l2Plan.extraBytecodeInfos = _distinctExtraInfos(MAX_NEW_FACTORY_DEPS);
 
-        vm.expectRevert(MalformedL2UpgradePlan.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(L2PlanTooManyFactoryDeps.selector, MAX_NEW_FACTORY_DEPS + 1, MAX_NEW_FACTORY_DEPS)
+        );
         new CTMTransition(manifest);
 
         manifest.l2Plan.extraBytecodeInfos = _distinctExtraInfos(MAX_NEW_FACTORY_DEPS - 1);
@@ -722,7 +783,7 @@ contract StorageRegistriesTest is Test {
         manifest.l2Plan.extraBytecodeInfos = new bytes[](0);
         // The composer stays — code defining calldata for a delegate call that never happens.
 
-        vm.expectRevert(MalformedL2UpgradePlan.selector);
+        vm.expectRevert(L2PlanNeedsDelegate.selector);
         new CTMTransition(manifest);
     }
 
@@ -734,7 +795,7 @@ contract StorageRegistriesTest is Test {
         manifest.l2Plan.delegateBytecodeInfo = "";
         manifest.l2Plan.delegateComposer = address(0);
 
-        vm.expectRevert(MalformedL2UpgradePlan.selector);
+        vm.expectRevert(L2PlanNeedsDelegate.selector);
         new CTMTransition(manifest);
     }
 
@@ -1001,6 +1062,22 @@ contract StorageRegistriesTest is Test {
         assertEq(changed[2], hex"02", "a row past the departing table's length is a change");
     }
 
+    /// @dev External re-entry into the library so `vm.expectRevert` can observe its revert.
+    function changedL2RowsExternal(bytes[] memory _fromTable, bytes[] memory _newTable) external pure {
+        TransitionDerivationLib.changedL2Rows(_fromTable, _newTable);
+    }
+
+    /// @dev The other side of append-only: a target table shorter than the departing one is a
+    ///      release built against a truncated enum, and the diff refuses it instead of reading
+    ///      past the target's end.
+    function test_revertWhen_changedL2RowsTargetTableIsShorter() public {
+        bytes[] memory fromTable = new bytes[](2);
+        bytes[] memory newTable = new bytes[](1);
+
+        vm.expectRevert(abi.encodeWithSelector(L2BytecodeTableShrunk.selector, 2, 1));
+        this.changedL2RowsExternal(fromTable, newTable);
+    }
+
     function test_revertWhen_derivedDeploymentsWithoutDelegateTarget() public {
         // The shape rules run against the COMBINED plan: a derived-nonempty transition with no
         // delegate target is unexecutable on L2 even when the manifest authors NO extras.
@@ -1008,7 +1085,7 @@ contract StorageRegistriesTest is Test {
         manifest.newRelease = address(_tableRelease());
         manifest.l2Plan = L2PlanFixtures.emptyPlan();
 
-        vm.expectRevert(MalformedL2UpgradePlan.selector);
+        vm.expectRevert(L2PlanNeedsDelegate.selector);
         new CTMTransition(manifest);
     }
 
@@ -1066,7 +1143,7 @@ contract StorageRegistriesTest is Test {
         // Not a canonical (blake, length, keccak) tuple: no address can be derived from it.
         manifest.l2Plan.delegateBytecodeInfo = hex"aa01";
 
-        vm.expectRevert(MalformedL2UpgradePlan.selector);
+        vm.expectRevert(abi.encodeWithSelector(L2BytecodeInfoLength.selector, 2, BYTECODE_INFO_LENGTH));
         new CTMTransition(manifest);
     }
 
@@ -1074,7 +1151,7 @@ contract StorageRegistriesTest is Test {
         TransitionManifest memory manifest = _transitionManifest();
         manifest.l2Plan.extraBytecodeInfos[0] = hex"aa02";
 
-        vm.expectRevert(MalformedL2UpgradePlan.selector);
+        vm.expectRevert(abi.encodeWithSelector(L2BytecodeInfoLength.selector, 2, BYTECODE_INFO_LENGTH));
         new CTMTransition(manifest);
     }
 

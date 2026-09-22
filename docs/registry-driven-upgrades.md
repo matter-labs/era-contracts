@@ -496,6 +496,13 @@ chain-specific calldata directly, in one pass; tooling reads that same transacti
 `IRegistryBootstrapMigration.l2UpgradeTx(chainId)` for the bootstrap edge.
 There is no intermediate proposal struct, selector resolution or re-diffing at execution time.
 
+The transition's third derived read is for reviewers: `ICTMTransition.releaseDiff()` compares the two
+pinned releases member by member — `diamondInit`, `verifier`, `genesisUpgrade`, the facet set, the L2
+table, the shared L2 shell, the fixed force-deployments blob, the genesis batch — and returns a
+`ReleaseDiff` of booleans. A verifier-only patch therefore reads as exactly one flag and an empty
+`facetCuts()`: the whole edge from two calls, with no manifest diffing. Like the cuts it is derived
+from the releases on every call and never stored.
+
 ## What the derivation guarantees
 
 For any representable release pair, the L1-side guarantee is that **the facet routing and verifier

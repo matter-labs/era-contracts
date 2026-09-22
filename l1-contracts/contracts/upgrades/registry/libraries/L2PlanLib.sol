@@ -7,7 +7,12 @@ import {BytecodesSupplier} from "../../BytecodesSupplier.sol";
 import {L2GenesisForceDeploymentsHelper} from "../../../l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
 import {BYTECODE_INFO_LENGTH, ZKSyncOSBytecodeInfo} from "../../../common/libraries/ZKSyncOSBytecodeInfo.sol";
 import {MAX_NEW_FACTORY_DEPS} from "../../../common/Config.sol";
-import {L2BytecodeNotPublished, MalformedL2UpgradePlan} from "../../../common/L1ContractErrors.sol";
+import {
+    L2BytecodeNotPublished,
+    L2BytecodeInfoLength,
+    L2PlanNeedsDelegate,
+    L2PlanTooManyFactoryDeps
+} from "../../../common/L1ContractErrors.sol";
 import {AuthoredL2Plan, L2UpgradePlan} from "../RegistryTypes.sol";
 
 /// @author Matter Labs
@@ -63,10 +68,10 @@ library L2PlanLib {
         plan.factoryDepHashes = _factoryDepHashes(plan.deployments);
 
         if (!hasDelegate && (plan.deployments.length != 0 || plan.delegateComposer != address(0))) {
-            revert MalformedL2UpgradePlan();
+            revert L2PlanNeedsDelegate();
         }
         if (plan.factoryDepHashes.length > MAX_NEW_FACTORY_DEPS) {
-            revert MalformedL2UpgradePlan();
+            revert L2PlanTooManyFactoryDeps(plan.factoryDepHashes.length, MAX_NEW_FACTORY_DEPS);
         }
     }
 
@@ -90,7 +95,7 @@ library L2PlanLib {
         bytes memory _bytecodeInfo
     ) private pure returns (IComplexUpgrader.UniversalContractUpgradeInfo memory) {
         if (_bytecodeInfo.length != BYTECODE_INFO_LENGTH) {
-            revert MalformedL2UpgradePlan();
+            revert L2BytecodeInfoLength(_bytecodeInfo.length, BYTECODE_INFO_LENGTH);
         }
         return
             IComplexUpgrader.UniversalContractUpgradeInfo({
@@ -110,6 +115,10 @@ library L2PlanLib {
         uint256 deploymentsLength = _deployments.length;
         uint256[] memory collected = new uint256[](deploymentsLength * MAX_BYTECODES_PER_DEPLOYMENT);
         uint256 count = 0;
+        // Every system-proxy row carries the release's ONE shell, so its hash is computed and
+        // appended for the first row and merely recognised for the rest — the same output as
+        // deduplicating it each time, without re-hashing and re-scanning per row.
+        bytes32 seenProxyInfo;
         for (uint256 i = 0; i < deploymentsLength; ++i) {
             IComplexUpgrader.UniversalContractUpgradeInfo memory deployment = _deployments[i];
             if (deployment.upgradeType == IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade) {
@@ -118,7 +127,11 @@ library L2PlanLib {
                     (bytes, bytes)
                 );
                 count = _appendUnique(collected, count, _observableHash(implInfo));
-                count = _appendUnique(collected, count, _observableHash(proxyInfo));
+                bytes32 proxyInfoKey = keccak256(proxyInfo);
+                if (proxyInfoKey != seenProxyInfo) {
+                    count = _appendUnique(collected, count, _observableHash(proxyInfo));
+                    seenProxyInfo = proxyInfoKey;
+                }
             } else {
                 count = _appendUnique(collected, count, _observableHash(deployment.deployedBytecodeInfo));
             }

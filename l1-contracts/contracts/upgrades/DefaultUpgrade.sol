@@ -29,6 +29,9 @@ contract DefaultUpgrade is BaseZkSyncUpgrade, IDefaultUpgrade {
     function upgradeFromTransition(address _transition) external returns (bytes32) {
         _requireAllBatchesExecuted();
         ICTMTransition transition = ICTMTransition(_transition);
+        // The facet cuts MUST stay the first step. The legacy engine replaced the facets and ran
+        // the upgrade inside one diamond cut, so the upgrade always executed against the new
+        // routing; applying the derived cut first is what keeps that order.
         _applyDerivedFacetCuts(transition.facetCuts());
         _upgradeFromCommittedObject(transition);
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;

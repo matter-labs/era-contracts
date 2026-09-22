@@ -27,7 +27,7 @@ import {
     TransitionDeadlineZero,
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
-import {L2UpgradePlan, TransitionManifest} from "../RegistryTypes.sol";
+import {L2UpgradePlan, TransitionManifest, ReleaseDiff} from "../RegistryTypes.sol";
 import {IDefaultUpgrade} from "../../IDefaultUpgrade.sol";
 import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
 
@@ -79,7 +79,10 @@ contract CTMTransition is ICTMTransition {
         // stops every chain still on it from committing batches before any of them can upgrade.
         // The relative check below cannot catch it: a zeroed schedule satisfies `0 >= 0`.
         // `upgradeTimestamp` has no such lower bound — zero there legitimately means chains may
-        // upgrade as soon as the edge is committed.
+        // upgrade as soon as the edge is committed. Only the ZERO deadline is refused: any nonzero
+        // value passes, including one already in the past, which disables the departing version
+        // immediately. That is permitted — an incident may call for it — merely discouraged; zero
+        // is refused because it is far likelier a defaulted field than a decision.
         if (_manifest.oldProtocolVersionDeadline == 0) {
             revert TransitionDeadlineZero();
         }
@@ -114,6 +117,8 @@ contract CTMTransition is ICTMTransition {
             // The same version-shape rules `BaseZkSyncUpgrade._setNewProtocolVersion` applies per
             // chain. Without them a transition pins fine and `applyCTMUpgrade` bumps the CTM, after
             // which EVERY chain upgrade reverts and only break-glass can recover.
+            // Watch out: there are plans to move ZKsync OS to major 1 to distinguish it from Era.
+            // When that lands, this pair of checks and `_setNewProtocolVersion` change together.
             if (oldMajor != 0) {
                 revert PreviousProtocolMajorVersionNotZero();
             }
@@ -199,6 +204,31 @@ contract CTMTransition is ICTMTransition {
         if (fromBatchHash != newBatchHash || fromIndex != newIndex) {
             revert PatchChangesL2GenesisState();
         }
+    }
+
+    /// @inheritdoc ICTMTransition
+    function releaseDiff() external view returns (ReleaseDiff memory diff) {
+        TransitionManifest memory m = getManifest();
+        if (m.fromRelease == m.newRelease) {
+            return diff;
+        }
+        ICTMRelease from = ICTMRelease(m.fromRelease);
+        ICTMRelease to = ICTMRelease(m.newRelease);
+        diff.diamondInit = from.diamondInit() != to.diamondInit();
+        diff.verifier = from.verifier() != to.verifier();
+        {
+            (address fromGenesisUpgrade, bytes32 fromBatchHash, uint64 fromIndex) = from.genesisParams();
+            (address toGenesisUpgrade, bytes32 toBatchHash, uint64 toIndex) = to.genesisParams();
+            diff.genesisUpgrade = fromGenesisUpgrade != toGenesisUpgrade;
+            diff.genesisBatch = fromBatchHash != toBatchHash || fromIndex != toIndex;
+        }
+        diff.genesisFacets = keccak256(abi.encode(from.genesisFacets())) != keccak256(abi.encode(to.genesisFacets()));
+        diff.l2BytecodeInfos =
+            keccak256(abi.encode(from.l2BytecodeInfos())) != keccak256(abi.encode(to.l2BytecodeInfos()));
+        diff.l2SystemProxyBytecodeInfo =
+            keccak256(from.l2SystemProxyBytecodeInfo()) != keccak256(to.l2SystemProxyBytecodeInfo());
+        diff.fixedForceDeploymentsData =
+            keccak256(from.fixedForceDeploymentsData()) != keccak256(to.fixedForceDeploymentsData());
     }
 
     /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment governance compares

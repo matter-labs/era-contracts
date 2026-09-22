@@ -33,6 +33,28 @@ struct ReleaseGenesisData {
     uint64 genesisIndexRepeatedStorageChanges;
 }
 
+/// @notice Which members differ between a transition's two releases, so a reviewer reads
+///         "verifier only" off one call instead of diffing two manifests. Derived on read from
+///         the two pinned releases; never stored.
+/// @param diamondInit The `DiamondInit` new chains are created with.
+/// @param verifier The proof verifier chains route to.
+/// @param genesisUpgrade The L1 genesis upgrade contract.
+/// @param genesisFacets The facet set (any facet address or freezability).
+/// @param l2BytecodeInfos The L2 implementation table (any row).
+/// @param l2SystemProxyBytecodeInfo The shared L2 system-proxy shell.
+/// @param fixedForceDeploymentsData The fixed force-deployments blob.
+/// @param genesisBatch The genesis batch hash or its repeated-storage index.
+struct ReleaseDiff {
+    bool diamondInit;
+    bool verifier;
+    bool genesisUpgrade;
+    bool genesisFacets;
+    bool l2BytecodeInfos;
+    bool l2SystemProxyBytecodeInfo;
+    bool fixedForceDeploymentsData;
+    bool genesisBatch;
+}
+
 /// @param l2BytecodeInfos The release's L2 contract set, indexed by {L2EcosystemContract}
 ///        (length == `L2_ECOSYSTEM_CONTRACT_COUNT` at construction, same slot semantics as the
 ///        L1 inventories): per member, the ZKsync OS bytecode info of the IMPLEMENTATION this
