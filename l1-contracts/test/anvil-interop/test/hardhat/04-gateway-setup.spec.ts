@@ -3,8 +3,10 @@ import type { providers } from "ethers";
 import { Contract, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
 import { getAbi } from "../../src/core/contracts";
-import { L2_BRIDGEHUB_ADDR } from "../../src/core/const";
+import { L2_BRIDGEHUB_ADDR, ETH_TOKEN_ADDRESS } from "../../src/core/const";
 import { getChainIdByRole, getL2Chain, createProvider } from "../../src/core/utils";
+
+import { encodeNtvAssetId } from "../../src/core/data-encoding";
 
 describe("04 - Gateway Deployment Verification (read-only)", function () {
   this.timeout(0);
@@ -40,10 +42,18 @@ describe("04 - Gateway Deployment Verification (read-only)", function () {
       for (const chainConfig of state.chains!.config) {
         if (chainConfig.settlement !== "gateway") continue;
         const baseTokenAssetId = await l2Bridgehub.baseTokenAssetId(chainConfig.chainId);
-        expect(
-          baseTokenAssetId,
-          `Chain ${chainConfig.chainId} (${chainConfig.role}) should be registered on GW L2Bridgehub`
-        ).to.not.equal(ethers.constants.HashZero);
+        const baseToken =
+          chainConfig.baseToken === "custom"
+            ? state.customBaseTokens?.[chainConfig.chainId]
+            : chainConfig.baseToken || ETH_TOKEN_ADDRESS;
+        expect(baseToken, `Base token configured for chain ${chainConfig.chainId}`).to.exist;
+        expect(baseTokenAssetId, `Chain ${chainConfig.chainId} base token registration`).to.equal(
+          encodeNtvAssetId(state.chains!.l1!.chainId, baseToken!)
+        );
+        expect((await l2Bridgehub.settlementLayer(chainConfig.chainId)).toNumber()).to.equal(gwChainId);
+        const diamond = await l2Bridgehub.getZKChain(chainConfig.chainId);
+        const chain = new Contract(diamond, getAbi("IZKChain"), gwProvider);
+        expect((await chain.getChainId()).toNumber()).to.equal(chainConfig.chainId);
       }
     });
 
@@ -71,6 +81,18 @@ describe("04 - Gateway Deployment Verification (read-only)", function () {
       expect(chainAddr, `GW chain ${gwChainId} not found in chainAddresses`).to.exist;
       const code = await l1Provider.getCode(chainAddr!.diamondProxy);
       expect(code).to.not.equal("0x");
+      const bridgehub = new Contract(state.l1Addresses!.bridgehub, getAbi("L1Bridgehub"), l1Provider);
+      expect(await bridgehub.getZKChain(gwChainId)).to.equal(chainAddr!.diamondProxy);
+      expect(await bridgehub.whitelistedSettlementLayers(gwChainId), "Gateway is an allowed settlement layer").to.equal(
+        true
+      );
+      for (const config of state.chains!.config.filter((chain) => chain.role !== "l1")) {
+        const expectedSettlement = config.settlement === "gateway" ? gwChainId : state.chains!.l1!.chainId;
+        expect(
+          (await bridgehub.settlementLayer(config.chainId)).toNumber(),
+          `Chain ${config.chainId} settlement`
+        ).to.equal(expectedSettlement);
+      }
     });
   });
 });
