@@ -257,5 +257,5 @@ exception: it is an L1 proxy whose implementation has immutable references to `M
 canonical L1 asset router.
 
 The protocol requires ZKsync OS bootloader support for timestamped dependency-root import and batch
-commitments to atomic IMT roots. EraVM chains do not support this release's interop path. Atomic flows
-are L1-settlement-only, and every participating chain must support protocol version v33 or newer.
+commitments to atomic IMT roots. Atomic flows are L1-settlement-only, and every participating chain
+must support protocol version v33 or newer.

@@ -21,8 +21,8 @@ getter and recovery paths that must remain available are configured accordingly.
 3. **Execute:** finalize proven batches in order, consume the matching priority operations, store the
    resulting L2 -> L1 root, and update the settlement-layer message root.
 
-EraVM and ZKsync OS use different batch encodings and chain-batch-root construction, selected by the
-chain configuration. The shared executor rejects an encoding that does not match the configured VM.
+The executor decodes the ZKsync OS batch encoding selected by the chain configuration and rejects
+operator input that does not match that encoding.
 
 ## Priority operations and messages
 

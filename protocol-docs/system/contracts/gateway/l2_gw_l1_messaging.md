@@ -28,7 +28,10 @@ Also, note that that `address` of the settlement layer is provided by the user. 
 
 We want to maintain the security invariant that users can always withdraw their funds from rollup chains. In other words, all L2→GW→L1 logs that come from rollups should be eventually propagated to L1, and also regardless of how other chains behave an honest chain should always provide the ability for their users to withdraw.
 
-Firstly, unless the chain settles on L1, this requires a trusted settlement layer. That is, not trusted operator of the gateway, but it works properly, i.e. appends messages correctly, publishes the data that it promises to publish, etc. This is already the case for the Gateway as it is a ZK rollup fork of Era, and while the operator may censor transactions, it can not lie and is always forced to publish all state diffs.
+Firstly, unless the chain settles on L1, this requires a trusted settlement layer. The operator need not
+be trusted for safety, but the settlement layer's proof and DA systems must append messages correctly
+and publish the data to which they commit. An operator may censor transactions, but cannot finalize a
+false state transition without violating those systems.
 
 Secondly, we guarantee that all the stored `ChainIdLeaf`s are published on L1, even for Validiums. Publishing a single 32 byte value per relatively big Gateway batch has little price for Validiums, but it ensures that the settlement root of the gateway can always be constructed. And, assuming that the preimage for the chain root could be constructed, this gives an ability to ability to recover the proof for any L2→GW→L1 coming from a rollup.
 

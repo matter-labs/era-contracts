@@ -47,8 +47,7 @@ fixed 8-leaf layout of a ZKsync OS chain batch root).
 ### Genesis batch root seeding
 
 Called by the Bridgehub right after registration, inside the same `createNewChain` transaction.
-It is a one-time, Bridgehub-only entry point, and a no-op for EraVM chains
-(`IGetters.getZKsyncOS() == false`).
+It is a one-time, Bridgehub-only entry point for ZKsync OS chains.
 
 For a ZKsync OS chain it pulls the genesis root back from the chain itself
 (`l2LogsRootHash(0)`, stored by `DiamondInit`) — keeping the "chain reports its own roots"
@@ -186,9 +185,8 @@ not follow from swapping implementations are:
 - **Atomic-interop built-ins** exist on ZKsync OS chains only. New chains get them from genesis and
   pre-existing ones from this upgrade's force deployments (next section).
 
-Scope of this release's upgrade: **ZKsync OS chains that settle on L1**. Era chains are not supported —
-`CTMUpgrade_v31.deployUsedUpgradeContract` refuses to produce a per-chain upgrade for them rather than
-emitting one that redoes v31's one-time work — and neither are gateway-settled chains, whose upgrade takes
+Scope of this release's upgrade: **ZKsync OS chains that settle on L1**. Gateway-settled chains are not
+included; their upgrade takes
 the `s.settlementLayer != address(0)` path through their settlement layer instead of recording the L2
 upgrade transaction on L1.
 
@@ -199,7 +197,7 @@ proof under the old verifier would stop being provable.
 
 Address discovery has to match the ecosystem's version, because the getters it reads were introduced in
 different releases (`chainRegistrationSender` in v31, `l1InteropHandler` in v32): `AddressIntrospector`
-therefore exposes one entry point per era, and the upgrade scripts pick between them by protocol version.
+therefore exposes one entry point per protocol generation, and the upgrade scripts pick between them by protocol version.
 Autodetection reads the version of a registered chain, which lags the L1 contracts — an ecosystem whose
 core contracts are already upgraded while its chains are not (mid-upgrade, or a local fixture built from
 current code) states the answer explicitly with `pre_v32_introspection` in the upgrade input.
@@ -234,8 +232,7 @@ Pre-existing ZKsync OS chains receive the same two built-ins through the upgrade
 (`SystemContractsProcessing.getZKsyncOSOnlyContracts`), so they end up with atomic interop
 as well. Both `initL2`s therefore run on the upgrade path too, unconditionally: neither the built-ins
 nor their addresses existed in v31, so no chain can arrive at this upgrade with them already seeded,
-and the force deployments in the same transaction install their code before the `initL2`s run. Era
-chains never receive them — this release upgrades ZKsync OS chains only.
+and the force deployments in the same transaction install their code before the `initL2`s run.
 
 The same upgrade list also neutralizes the tracker this release removes
 (`SystemContractsProcessing.getRemovedTrackerNeutralizations`): v31 deployed the `GWAssetTracker` as a

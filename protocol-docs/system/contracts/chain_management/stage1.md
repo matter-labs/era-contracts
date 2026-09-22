@@ -29,7 +29,7 @@ Under normal operation, user may send signed transactions to operator RPC or req
 
 - Only chains that settle to L1 have the support for "Stage 1".
 - Actions that can only be created by executing L2 transactions and will not be possible in Priority Mode:
-  - Some Account Abstraction wallets on Era
+  - Account-abstraction wallet actions that cannot be represented as L1 → L2 transactions
   - Deployment transactions from EOA
   - Keyless transactions
 
@@ -65,9 +65,9 @@ At the same time, allowing L2 transactions complicates the process and increases
 
 Please note that when the system is fully operational in normal mode, all types of transactions are possible. If L2 transactions are not allowed in Priority Mode, the system does not behave the same way as in normal mode, and some actions that are possible with normal L2 transactions may not be possible via L1 → L2 transactions.
 
-On ZKsync OS, we added a new field `numberOfLayer2Txs` to `CommitBatchInfoZKsyncOS`. ZKsync OS maintains a counter for L2 transactions and propagates it to the batch commitment.
-
-On ZKsync Era, we reused the existing L2 → L1 log that records the number of L1 transactions executed in a batch. Previously, this log contained a single uint256 field representing the number of L1 transactions executed. Now, we use the lower half of the word to store the number of L1 transactions and the upper half to store the number of L2 transactions executed.
+ZKsync OS includes `numberOfLayer2Txs` in `CommitBatchInfoZKsyncOS`. The execution environment
+maintains the counter and propagates it to the batch commitment so the settlement contract can enforce
+that Priority Mode batches contain no L2-originated transactions.
 
 ## Back to normal mode
 

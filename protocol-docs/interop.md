@@ -6,8 +6,8 @@ This document is the single source of truth for the protocol-level behaviour of 
 
 Interop is ZKsync's mechanism for sending messages and value between chains in the ecosystem. The
 `InteropCenter` is the L2 send-side entry point for users and bridges. It is not deployed on L1. The
-contracts target ZKsync OS chains; the EraVM bootloader does not support the timestamp-carrying
-interop-root imports required by this protocol.
+contracts target ZKsync OS chains and require timestamp-carrying interop-root imports from the
+ZKsync OS bootloader.
 
 The current release supports exactly two routes:
 
@@ -186,7 +186,7 @@ the entire send revert, including its burns.
   supported by this release.
 - The imported tuple is double-checked on the settlement layer during batch execution (`ExecutorFacet._verifyDependencyInteropRoots`, against `MessageRoot.historicalRoot`), so time-sensitive proofs — e.g. the atomic-interop timeout protocol — can rely on the timestamp as much as on the root itself.
 - Zero roots and zero timestamps are rejected on import, keeping the invariant structural: a zero stored timestamp only ever means "nothing imported at this key" (the atomic timeout path relies on this). A root for a given key can be set only once (`InteropRootAlreadyExists`).
-- This logic is **not compatible with EraVM** (its bootloader does not support the timestamp-carrying import entry points); it is deployed on ZKsync OS chains only. No roots recorded under previous protocol versions exist, because interop was not activated in v31; the v31→v32 widening of the stored value from `bytes32` to a struct is storage-safe (the mapping was empty, and the struct's first member occupies the old slot).
+- This logic is deployed on ZKsync OS chains only. No roots recorded under previous protocol versions exist, because interop was not activated in v31; the v31→v32 widening of the stored value from `bytes32` to a struct is storage-safe (the mapping was empty, and the struct's first member occupies the old slot).
 
 ### Message verification (`L2MessageVerification`)
 

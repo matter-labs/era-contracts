@@ -14,7 +14,8 @@ Note, that while a chain settles on Gateway, the L1 does not have any view of th
 
 Inside the `L1ChainAssetHandler` we store the `_migrationInterval` mapping, where we store all the past settled layers where the chain has settled to.
 
-> Note, that for the vast majority of chains, it contains only one item as we currently do not support migrating to Gateway multiple times. However, for Era we also preserve the time when it settled on the old Era-based ZK Gateway historically.
+For the supported ZKsync OS chains, the mapping normally contains one item because repeated Gateway
+migrations are not supported.
 
 The mapping above is used to ensure that the settlement layers that the chain settled to in the past can not attack it in the future in case their ZK system becomes compromised after the chain migrated:
 
@@ -22,7 +23,9 @@ The mapping above is used to ensure that the settlement layers that the chain se
 
 Note, that as mentioned above, the "right side" of the range is provided by the settlement layer at the time the chain migrates back to L1, but since it is stored on L1, the malicious chain can not overwrite it.
 
-Additionally, an important note that most chains are even protected against the "completely compromised" settlement layers, since we store the batch roots of each chain (including settlement layers) inside the `L1MessageRoot` too (the `chainBatchRoots` mapping). This mapping was not stored prior to the v31 upgrade however, so the only exception is the Era chain that settled on top of Era-based ZK Gateway and has to trust its implementation to never overwrite the message root. The implementation of this settlement layer is controlled by the decentralized governance, so it can be trusted and it does not contradict the future goal of supporting untrusted settlement layers.
+Chains are also protected against a subsequently compromised settlement layer because the batch roots
+of each chain, including settlement layers, are stored in `L1MessageRoot.chainBatchRoots`. Once a root
+is recorded on L1, a former settlement layer cannot replace it.
 
 ## Chains that never settled on top of Gateway
 
@@ -30,7 +33,8 @@ Due to the `_migrationInterval` mapping mentioned above, chains that are not set
 
 ## A few final words on `_migrationInterval` mapping
 
-To reiterate, the goal of the mapping is to protect chains against "completely malicious" settlement layers that the chain does not settle to at the moment, while historical withdrawals cannot be overwritten due to the `MessageRoot` restrictions. The only exception is Era and the fact that it settled on top of Era-based ZK Gateway.
+To reiterate, the mapping protects a chain from settlement layers on which it no longer settles, while
+the `MessageRoot` restrictions prevent historical withdrawals from being overwritten.
 
 > Note, that right now, the bounds of batches that can be used to prove transactions from the chain are queried on L1 during migration to and from Gateway. This means that the chain is protected from a potentially malicious gateway only the moment it finalizes its migration to L1, not the moment the GW batch with the migration transaction settles. More can be read in the comments for the `MigrationInterval` struct.
 

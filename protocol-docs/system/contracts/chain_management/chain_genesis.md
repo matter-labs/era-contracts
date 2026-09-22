@@ -10,7 +10,7 @@ token vault reference. The genesis upgrade transaction initializes the L2 chain 
 the built-in L2 protocol contracts required by that execution environment.
 
 Bridgehub then registers the diamond and base-token asset, creates the chain's leaf in `MessageRoot`,
-and seeds batch 0 for a new ZKsync OS chain. EraVM chains do not use that synthetic batch-0 leaf.
+and seeds batch 0 for the new ZKsync OS chain.
 
 Built-in L2 protocol addresses are defined centrally in `L2ContractAddresses.sol`; they include the L2
 Bridgehub, asset router, native token vault, message-root/verification contracts, interop center and

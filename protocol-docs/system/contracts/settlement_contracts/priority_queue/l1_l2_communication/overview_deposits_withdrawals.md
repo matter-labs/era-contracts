@@ -1,15 +1,12 @@
-# Overview - Deposits and Withdrawals
+# Overview: deposits and withdrawals
 
-The zkEVM supports general message passing for L1<->L2 communication. Proofs are settled on L1, so core of this process
-is the L2->L1 message passing process. L1->L2 messages are recorded on L1 inside a priority queue, the sequencer picks
-it up from here and executes it in the zkEVM. The zkEVM sends an L2->L1 message of the L1 transactions that it
-processed, and the rollup's proof is only valid if the processed transactions were exactly right.
+L1 → L2 messages enter through Bridgehub and the target chain's mailbox, where they are recorded as
+priority operations. ZKsync OS processes those operations in order and commits their results in the
+batch output verified by the L1 settlement contracts.
 
-There is an asymmetry in the two directions however, in the L1->L2 direction we support starting message calls by having
-a special transaction type called L1 transactions. In the L2->L1 direction we only support message passing.
+L2 → L1 communication is proof-driven: after a batch is proven and executed, a caller can prove a
+message or log against the recorded chain batch root. Deposits, withdrawals, failure recovery, and
+cross-chain asset routing build on these two directions.
 
-In particular, deposits and withdrawals of ether also use the above methods. For deposits the L1->L2 transaction is sent
-with empty calldata, the recipients address and the deposited value. When withdrawing, an L2->L1 message is sent. This
-is then processed by the smart contract holding the ether on L1, which releases the funds.
-
-The current deposit and withdrawal paths are covered in {protocol-docs/bridging.md} and {protocol-docs/interop.md}.
+The current flows are specified in {protocol-docs/bridging.md}, while the root hierarchy and proof
+rules are specified in {protocol-docs/message-root.md}.

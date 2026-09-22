@@ -72,6 +72,5 @@ assert uint256(res[32:]) == BLS_MODULUS
 
 The final `blobCommitment` is calculated as the hash between the `blobVersionedHash`, `opening point` and the `claimed value`. The zero knowledge circuits will verify that the opening point and the claimed value were calculated correctly and correspond to the data that was hashed under the `blobHash`.
 
-## Structure of the pubdata
-
-Rollups maintain the same structure of pubdata and apply the same rules for compression as those that were used in the previous versions of the system. These can be read [here](./state_diff_compression_v1_spec.md).
+The exact ZKsync OS pubdata encoding is owned by the execution environment. The contracts documented
+here bind the L2 validator output to the calldata or blob evidence checked on L1.

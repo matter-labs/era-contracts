@@ -17,7 +17,7 @@ were ported from `zksync-era` and retained for the current `era-contracts` layou
   - [Data availability](./settlement_contracts/data_availability/README.md)
 - [Gateway / settlement-layer machinery](./gateway/README.md)
 - [Consensus registry](./consensus/README.md)
-- [EraVM / zkEVM execution environment](./zkevm/overview.md)
+- [ZKsync OS genesis and built-ins](../../chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins)
 
 The current interop pages live at the protocol-docs root because they cross the L1 coordination,
 settlement, and bridge domains:

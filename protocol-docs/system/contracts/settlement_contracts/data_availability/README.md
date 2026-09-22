@@ -20,14 +20,11 @@ rollup to a weaker mode is restricted by the chain administration rules.
 
 ## Detailed specifications
 
-- [Pubdata contents](./pubdata.md)
-- [Compression](./compression.md)
+- [Architecture overview](./overview.md)
 - [State reconstruction](./reconstruction.md)
 - [Rollup DA](./rollup_da.md)
 - [Validium and zkPorter](./validium_zk_porter.md)
 - [Custom DA](./custom_da.md)
-- [Standard pubdata format](./standard_pubdata_format.md)
-- [State-diff compression v1](./state_diff_compression_v1_spec.md)
 
 The standalone `da-contracts/` package contains reusable L1 validators, including calldata/blob and
 Avail-backed implementations. Chain-integrated validators live under

@@ -74,8 +74,8 @@ returns `bridgeMintData`; the destination-side handler's `bridgeMint` consumes t
   calldata is identical. The bridged amount travels inside that calldata, not as call value: the returned
   starter merely echoes the requested `interopCallValue` (always zero for an indirect call) so the
   InteropCenter's `IndirectCallValueMismatch` check passes.
-- `bridgehubDepositBaseToken` lets the Bridgehub (L1; or the Era diamond proxy for `ERA_CHAIN_ID`) /
-  `InteropCenter` (L2) acquire the destination chain's `mintValue`: it burns the base token through the
+- `bridgehubDepositBaseToken` lets the Bridgehub (L1) or `InteropCenter` (L2) acquire the destination
+  chain's `mintValue`: it burns the base token through the
   handler but records nothing, because a failed transaction refunds the base token to the L2
   `refundRecipient` rather than being claimable on L1.
 
@@ -220,8 +220,6 @@ is nothing to fold in for them, now or later).
   - On ZKsync OS the holder's initial balance is minted by `L2BaseTokenZKOS.initL2()` via a raw call to
     `MINT_BASE_TOKEN_HOOK` with the amount abi-encoded as a `uint256`; the hook credits the caller and
     only accepts calls from the L2 base-token address.
-  - On Era, all ETH transfers route through the `MsgValueSimulator` (which emits `Transfer` events), so
-    a single holder implementation works uniformly on both VMs.
 - In `NativeTokenVaultBase._getTokenAndBridgeToChain`, a base-token burn requires `amount == msg.value`.
   If the base token is bridged (always the case on L2), the value goes through
   `BaseTokenHolder.burnAndStartBridging`; the native branch (plain accounting) only occurs on L1 for ETH.

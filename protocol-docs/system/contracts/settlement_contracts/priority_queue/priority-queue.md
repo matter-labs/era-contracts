@@ -2,7 +2,7 @@
 
 ## Overview of the current implementation
 
-Priority queue is a data structure in Era contracts that is used to handle L1->L2 priority operations. It supports the following:
+The priority queue is a settlement-contract data structure used to handle L1 -> L2 priority operations. It supports the following:
 
 - inserting a new operation into the end of the queue
 - checking that an newly executed batch executed some n first priority operations from the queue (and not some other ones) in correct order

@@ -10,7 +10,8 @@ Here we describe various scenarios of standard/emergency upgrades and how will t
 
 ## General idea
 
-We do not enshrine any particular approach on the protocol level of the GW. The following is the approach used by the standard Era CTM, which also manages GW.
+We do not enshrine a particular upgrade policy at the settlement-layer protocol level. The following
+is the approach implemented by the standard CTM that manages Gateway.
 
 Upgrades will be split into two parts:
 
