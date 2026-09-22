@@ -6,9 +6,5 @@ pragma solidity ^0.8.21;
 interface IFinalizeUpgrade {
     function initChains(address bridgehub, uint256[] calldata chains) external;
 
-    function initTokens(
-        address payable l1NativeTokenVault,
-        address[] calldata tokens,
-        uint256[] calldata chains
-    ) external;
+    function initTokens(address payable l1NativeTokenVault, address[] calldata tokens) external;
 }

@@ -449,7 +449,6 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         GatewayUtils userUtils = new GatewayUtils();
         userUtils.finishMigrateChainFromGateway({
             bridgehubAddr: address(addresses.bridgehub),
-            migratingChainId: migratingChainId,
             gatewayChainId: gatewayChainId,
             l2BatchNumber: 0,
             l2MessageIndex: 0,

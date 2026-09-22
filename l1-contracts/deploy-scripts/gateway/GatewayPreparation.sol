@@ -484,7 +484,6 @@ contract GatewayPreparation is Script {
     }
 
     function finishMigrateChainFromGateway(
-        uint256 /* migratingChainId */,
         uint256 gatewayChainId,
         uint256 l2BatchNumber,
         uint256 l2MessageIndex,
@@ -513,7 +512,6 @@ contract GatewayPreparation is Script {
     function setDAValidatorPair(
         address chainAdmin,
         address accessControlRestriction,
-        uint256 /* chainId */,
         address l1DAValidator,
         L2DACommitmentScheme l2DACommitmentScheme,
         address chainDiamondProxyOnGateway,

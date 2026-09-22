@@ -31,11 +31,7 @@ contract FinalizeUpgrade is Script, IFinalizeUpgrade {
     /// (`transferFundsFromSharedBridge` / `updateChainBalancesFromSharedBridge`)
     /// was removed from `L1NativeTokenVault` once the migration completed on all
     /// envs, so this only registers the tokens that are still unknown to the NTV.
-    function initTokens(
-        address payable l1NativeTokenVault,
-        address[] calldata tokens,
-        uint256[] calldata /* chains */
-    ) external {
+    function initTokens(address payable l1NativeTokenVault, address[] calldata tokens) external {
         L1NativeTokenVault vault = L1NativeTokenVault(l1NativeTokenVault);
 
         for (uint256 i = 0; i < tokens.length; i++) {
