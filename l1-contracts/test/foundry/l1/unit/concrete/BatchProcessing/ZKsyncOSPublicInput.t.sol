@@ -24,7 +24,7 @@ contract ExecutorZKsyncOSPublicInputHarness is ExecutorFacet {
     }
 }
 
-/// @notice Pins batch public inputs to the golden vectors in ZKsync OS's `public_input.rs`.
+/// @notice Pins the batch public input for the combined ZKsync OS chain configuration.
 /// @dev See {protocol-docs/chain-config.md#proof-commitment}.
 contract ZKsyncOSPublicInputTest is Test {
     ExecutorZKsyncOSPublicInputHarness internal executor;
@@ -34,9 +34,9 @@ contract ZKsyncOSPublicInputTest is Test {
     bytes32 internal constant BATCH_OUTPUT_HASH_GOLDEN =
         0x1c24f398aa0701f9348912ecca748ba93bfb84bfe4f283c16514311419f4f658;
 
-    /// @dev Shared with ZKsync OS's `batch_public_input_hash_golden_vector` (filtering disabled).
+    /// @dev Six-word chain config with filtering and large contracts disabled.
     bytes32 internal constant PUBLIC_INPUT_HASH_GOLDEN =
-        0xdf099e94dc933cb1e302ad66826a922df76c4759542b07311d99b0c5e9eb436d;
+        0x115e07747f99e4785e3f1c91d3ff85f05eee22c99004e6a81adc37b1b21495fe;
 
     uint256 internal constant GOLDEN_CHAIN_ID = 37;
 

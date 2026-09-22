@@ -42,6 +42,10 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// @param _enabled Whether L1 transaction filtering is enabled.
     function setZKsyncOSL1TxFiltering(bool _enabled) external;
 
+    /// @notice Enables or disables the larger ZKsync OS contract size limits.
+    /// @param _enabled Whether to enable large contracts.
+    function setZKsyncOSLargeContracts(bool _enabled) external;
+
     /// @notice Change the fee params for L1->L2 transactions
     /// @param _newFeeParams The new fee params
     function changeFeeParams(FeeParams calldata _newFeeParams) external;
@@ -151,6 +155,8 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
 
     /// @notice ZKsync OS L1 transaction filtering changed.
     event NewZKsyncOSL1TxFiltering(bool oldEnabled, bool newEnabled);
+
+    event NewZKsyncOSLargeContracts(bool oldEnabled, bool newEnabled);
 
     /// @notice Fee params for L1->L2 transactions changed
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);

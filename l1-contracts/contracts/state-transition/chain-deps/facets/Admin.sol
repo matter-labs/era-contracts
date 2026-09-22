@@ -190,6 +190,15 @@ contract AdminFacet is ZKChainBase, IAdmin {
         emit NewZKsyncOSL1TxFiltering(oldEnabled, _enabled);
     }
 
+    /// @inheritdoc IAdmin
+    function setZKsyncOSLargeContracts(bool _enabled) external onlyAdmin onlySettlementLayer {
+        _enforceNoUnverifiedBatchesForChainConfigUpdate();
+
+        bool oldEnabled = s.zksyncOSLargeContractsEnabled;
+        s.zksyncOSLargeContractsEnabled = _enabled;
+        emit NewZKsyncOSLargeContracts(oldEnabled, _enabled);
+    }
+
     /// @dev See {protocol-docs/chain-config.md#configuration-updates}.
     function _enforceNoUnverifiedBatchesForChainConfigUpdate() internal view {
         if (s.totalBatchesCommitted != s.totalBatchesVerified) {

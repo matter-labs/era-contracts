@@ -182,6 +182,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
                 uint256(0),
                 maxTxGasLimit,
                 uint256(utilsFacet.util_getPubdataContent()),
+                uint256(0),
                 uint256(0)
             )
         );
