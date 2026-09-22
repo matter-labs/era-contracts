@@ -100,11 +100,15 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
     /// for the L2 transaction.
     /// The second approach is used due to its simplicity even though it gives the sender slightly more control over the call:
     /// `gasLimit`, etc.
+    /// @param _chainId the chainId of the chain
     /// @param _originalCaller the previous message sender
     /// @param _data the data of the transaction
     // slither-disable-next-line locked-ether
     function bridgehubDeposit(
-        uint256 /* _chainId */,
+        // Unused since `_registerCTMAssetOnL2Bridgehub` stopped taking it, but kept named:
+        // `IL1AssetHandler` fixes this signature and the name is part of the published ABI.
+        // solhint-disable-next-line no-unused-vars
+        uint256 _chainId,
         address _originalCaller,
         uint256,
         bytes calldata _data
