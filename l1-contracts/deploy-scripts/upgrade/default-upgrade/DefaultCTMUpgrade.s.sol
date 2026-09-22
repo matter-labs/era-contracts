@@ -89,7 +89,7 @@ struct AuthoredL2Side {
 /// @notice The CTM side of a registry-driven upgrade prepare, run after the core prepare: deploys
 ///         the new release (facets, DiamondInit, verifier, upgrade engine) and pins the edge in a
 ///         write-once `CTMTransition`, then the `EcosystemUpgradeOperation` associating that
-///         transition with the core prepare's `CoreRegistry`, over a fresh `GovernanceUpgradeTimer`
+///         transition with the core prepare's `CoreTransition`, over a fresh `GovernanceUpgradeTimer`
 ///         bound to the ecosystem's coordinator. It emits NO lifecycle call of its own: the three
 ///         governance calls are `EcosystemUpgradeExecutor.stage0/1/2(operation)`, derived by the
 ///         merge from the operation's address; anything a version script still needs governance (or
@@ -111,10 +111,10 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         address ecosystemUpgradeExecutor;
         /// @dev The core prepare's ecosystem inventory (an input, see `CTMUpgradeParams`): the
         ///      operation's ecosystem leg, and the bootstrap edge's second object.
-        address coreRegistry;
+        address coreTransition;
         /// @dev The write-once transition this prepare deploys (zero for the bootstrap edge).
         address ctmTransition;
-        /// @dev The write-once operation over `{coreRegistry, ctmTransition}` this prepare
+        /// @dev The write-once operation over `{coreTransition, ctmTransition}` this prepare
         ///      deploys — what the coordinator's three stage calls name (zero for the bootstrap
         ///      edge, which has no transition to compose over).
         address ecosystemUpgradeOperation;
@@ -197,7 +197,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             coreAddresses.bridgehub.proxies.chainRegistrationSender = _params.chainRegistrationSender;
         }
         setEcosystemUpgradeExecutor(_params.ecosystemUpgradeExecutor);
-        setCoreRegistry(_params.coreRegistry);
+        setCoreTransition(_params.coreTransition);
         prepareCTMUpgrade();
         // Declared before the governance calls are written, so the output lists the admin action.
         prepareDefaultCTMAdminCalls();
@@ -439,7 +439,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     }
 
     /// @notice Deploys the write-once `EcosystemUpgradeOperation` this upgrade's three coordinator
-    ///         calls name: the association of the core prepare's `CoreRegistry` with this
+    ///         calls name: the association of the core prepare's `CoreTransition` with this
     ///         prepare's transition. Nothing is authored — the operation IS that association, and
     ///         the stage calls are `stage0/1/2(operation)`, derivable from its address alone.
     /// @dev Rides the CREATE2 factory like every prepare deployment: the Safe bundle replays
@@ -455,10 +455,10 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         // CREATE2 factory, whose failure says only "Failed to deploy contract via create2". Refuse
         // here instead, where the message can name all three legs the version left empty.
         require(
-            upgradeAddresses.coreRegistry != address(0) ||
+            upgradeAddresses.coreTransition != address(0) ||
                 upgradeAddresses.ctmTransition != address(0) ||
                 _participatingRows(inventory) != 0,
-            "this upgrade changes nothing: no core registry, no infrastructure row and no transition"
+            "this upgrade changes nothing: no core transition, no infrastructure row and no transition"
         );
         address coordinator = upgradeAddresses.ecosystemUpgradeExecutor;
         // A call to a codeless address is a silent success, so a coordinator that is not deployed
@@ -470,7 +470,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             BytecodeUtils.readBytecodeL1("EcosystemUpgradeOperation.sol", "EcosystemUpgradeOperation"),
             abi.encode(
                 OperationManifest({
-                    coreRegistry: upgradeAddresses.coreRegistry,
+                    coreTransition: upgradeAddresses.coreTransition,
                     // The CTM-domain rows ride the OPERATION, not the transition: replacing an
                     // ecosystem singleton is not a chain-version edge.
                     ctmInfrastructure: inventory,
@@ -839,8 +839,8 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         upgradeAddresses.ecosystemUpgradeExecutor = _ecosystemUpgradeExecutor;
     }
 
-    function setCoreRegistry(address _coreRegistry) public virtual {
-        upgradeAddresses.coreRegistry = _coreRegistry;
+    function setCoreTransition(address _coreTransition) public virtual {
+        upgradeAddresses.coreTransition = _coreTransition;
     }
 
     function setNewProtocolVersion(uint256 _protocolVersion) public virtual {

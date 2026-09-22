@@ -44,7 +44,7 @@ use super::provenance::{expect_code_identity, expect_code_present, tolerate, Cod
 use super::rows::verify_rows;
 use super::views::{
     BytecodesSupplierView, CTMReleaseView, CTMTransitionView, CTMUpgradeExecutorView,
-    CommittedUpgradeView, CoreRegistryView, CoreUpgradeExecutorView, CtmView,
+    CommittedUpgradeView, CoreTransitionView, CoreUpgradeExecutorView, CtmView,
     EcosystemUpgradeExecutorView, EcosystemUpgradeOperationView, GovernanceUpgradeTimerView,
     ProxyAdminView, ProxyUpgradeRow,
 };
@@ -138,17 +138,17 @@ pub(crate) async fn verify<P: Provider>(
         }
     };
 
-    let core_registry = non_zero(manifest.coreRegistry);
+    let core_transition = non_zero(manifest.coreTransition);
     cross_check(
         result,
-        "core_registry_addr",
-        package.reported_core_registry,
-        core_registry,
-        "the core registry",
+        "core_transition_addr",
+        package.reported_core_transition,
+        core_transition,
+        "the core transition",
     );
-    let core_rows = match core_registry {
+    let core_rows = match core_transition {
         Some(address) => {
-            verify_core_registry(
+            verify_core_transition(
                 provider,
                 identity,
                 build,
@@ -161,7 +161,7 @@ pub(crate) async fn verify<P: Provider>(
         }
         None => {
             result.report_ok(
-                "the operation carries no core registry: it upgrades no shared singletons",
+                "the operation carries no core transition: it upgrades no shared singletons",
             );
             Vec::new()
         }
@@ -743,14 +743,14 @@ async fn verify_release<P: Provider>(
     Ok(())
 }
 
-/// The core registry's provenance and construction, plus the rows it pins.
+/// The core transition's provenance and construction, plus the rows it pins.
 #[allow(clippy::too_many_arguments)]
-async fn verify_core_registry<P: Provider>(
+async fn verify_core_transition<P: Provider>(
     provider: &P,
     identity: &CodeIdentity,
     build: &ReviewedBuild,
     result: &mut VerificationResult,
-    core_registry: Address,
+    core_transition: Address,
     salts: &[B256],
     reviewed: &mut BTreeMap<Address, String>,
 ) -> anyhow::Result<Vec<ProxyUpgradeRow>> {
@@ -758,17 +758,17 @@ async fn verify_core_registry<P: Provider>(
         provider,
         identity,
         result,
-        "the core registry",
-        core_registry,
-        "CoreRegistry",
+        "the core transition",
+        core_transition,
+        "CoreTransition",
     )
     .await?;
-    let view = CoreRegistryView::new(core_registry, provider);
+    let view = CoreTransitionView::new(core_transition, provider);
     let manifest = match view.getManifest().call().await {
         Ok(m) => m,
         Err(e) => {
             result.report_error(&format!(
-                "the core registry at {core_registry} does not answer `getManifest()` ({e}): its \
+                "the core transition at {core_transition} does not answer `getManifest()` ({e}): its \
                  construction cannot be verified"
             ));
             return Ok(Vec::new());
@@ -777,13 +777,13 @@ async fn verify_core_registry<P: Provider>(
     if expect_canonical_construction(
         build,
         result,
-        "the core registry",
-        core_registry,
-        "CoreRegistry",
+        "the core transition",
+        core_transition,
+        "CoreTransition",
         &manifest.abi_encode(),
         salts,
     ) {
-        reviewed.insert(core_registry, "the core registry".to_string());
+        reviewed.insert(core_transition, "the core transition".to_string());
     }
     Ok(manifest
         .proxyUpgrades
@@ -1120,7 +1120,7 @@ mod tests {
             coordinator: COORDINATOR,
             ctm_key: "zksync_os".to_string(),
             reported_transition: None,
-            reported_core_registry: None,
+            reported_core_transition: None,
             reported_ctm_executor: None,
             reported_timer: None,
             reported_ctm: None,
@@ -1335,10 +1335,10 @@ mod tests {
         let mut result = VerificationResult::default();
         cross_check(
             &mut result,
-            "core_registry_addr",
+            "core_transition_addr",
             Some(Address::repeat_byte(0x11)),
             None,
-            "the core registry",
+            "the core transition",
         );
         assert_eq!(result.errors, 1);
     }
@@ -1388,7 +1388,7 @@ mod tests {
              ctm_transition_addr = \"0x00000000000000000000000000000000000000cc\"\n\
              bootstrap_migration_addr = \"0x0000000000000000000000000000000000000000\"\n\
              [core.registry]\n\
-             core_registry_addr = \"0x00000000000000000000000000000000000000ee\"\n\
+             core_transition_addr = \"0x00000000000000000000000000000000000000ee\"\n\
              [governance_calls]\n\
              stage0_calls = \"{}\"\n\
              stage1_calls = \"{}\"\n\

@@ -6,7 +6,7 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
-import {ICoreRegistry} from "contracts/upgrades/registry/objects/ICoreRegistry.sol";
+import {ICoreTransition} from "contracts/upgrades/registry/objects/ICoreTransition.sol";
 import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {ICTMUpgradeExecutor} from "contracts/upgrades/registry/executors/ICTMUpgradeExecutor.sol";
@@ -25,7 +25,7 @@ library LegacyBootstrapSequence {
     /// @param upgradeTimer The timer the CTM prepare deployed.
     /// @param ecosystemProxyAdmin The shared ecosystem `ProxyAdmin`.
     /// @param coreUpgradeExecutor The bound ecosystem executor the core prepare deployed.
-    /// @param coreRegistry The ecosystem inventory the core prepare pinned.
+    /// @param coreTransition The ecosystem inventory the core prepare pinned.
     /// @param ctm The CTM proxy.
     /// @param ctmProxyAdmin The CTM domain's own `ProxyAdmin`.
     /// @param bootstrapMigration The write-once edge object.
@@ -37,7 +37,7 @@ library LegacyBootstrapSequence {
         address upgradeTimer;
         address ecosystemProxyAdmin;
         address coreUpgradeExecutor;
-        address coreRegistry;
+        address coreTransition;
         address ctm;
         address ctmProxyAdmin;
         address bootstrapMigration;
@@ -69,7 +69,7 @@ library LegacyBootstrapSequence {
         calls[2] = Call({
             target: _in.coreUpgradeExecutor,
             value: 0,
-            data: abi.encodeCall(CoreUpgradeExecutor.applyL1Upgrade, (ICoreRegistry(_in.coreRegistry)))
+            data: abi.encodeCall(CoreUpgradeExecutor.applyL1Upgrade, (ICoreTransition(_in.coreTransition)))
         });
         // CTM prepare.
         calls[3] = Call({
@@ -95,7 +95,7 @@ library LegacyBootstrapSequence {
         calls[0] = Call({
             target: _in.coreUpgradeExecutor,
             value: 0,
-            data: abi.encodeCall(CoreUpgradeExecutor.validateUpgradeApplied, (ICoreRegistry(_in.coreRegistry)))
+            data: abi.encodeCall(CoreUpgradeExecutor.validateUpgradeApplied, (ICoreTransition(_in.coreTransition)))
         });
         calls[1] = Call({
             target: _in.coreUpgradeExecutor,

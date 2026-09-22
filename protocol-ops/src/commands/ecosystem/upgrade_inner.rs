@@ -304,12 +304,14 @@ impl<'a> UpgradeInner<'a> {
         ));
         // Only the bootstrap edge reads it: its call sequence covers both domains, so the object
         // describing that sequence needs the ecosystem inventory alongside the edge.
-        let core_registry = read_core_registry(
+        let core_transition = read_core_transition(
             &self
                 .contracts_path
                 .join(inputs.core_output_path.trim_start_matches('/')),
         )?;
-        logger::info(format!("CoreRegistry (core prepare): {core_registry:#x}"));
+        logger::info(format!(
+            "CoreTransition (core prepare): {core_transition:#x}"
+        ));
         // Per-CTM CREATE2 salt. Each CTM prepare deploys a few contracts whose
         // constructor args are env-wide constants — notably
         // `GovernanceUpgradeTimer(initialDelay, 2 weeks, ownerAddress,
@@ -353,7 +355,7 @@ impl<'a> UpgradeInner<'a> {
                         zkTokenAssetId: inputs.zk_token_asset_id,
                         testnetVerifier: inputs.testnet_verifier,
                         ecosystemUpgradeExecutor: ecosystem_upgrade_executor,
-                        coreRegistry: core_registry,
+                        coreTransition: core_transition,
                     },
                 }
                 .abi_encode(),
@@ -418,27 +420,27 @@ fn read_chain_registration_sender_proxy(core_toml: &Path) -> anyhow::Result<Addr
     })
 }
 
-/// The `[registry].core_registry_addr` the core prepare wrote — the ecosystem leg the operation
+/// The `[registry].core_transition_addr` the core prepare wrote — the ecosystem leg the operation
 /// names. Zero when the core prepare deployed no ecosystem implementation (the upgrade then has
 /// no ecosystem leg).
-fn read_core_registry(core_toml: &Path) -> anyhow::Result<Address> {
+fn read_core_transition(core_toml: &Path) -> anyhow::Result<Address> {
     let raw =
         fs::read_to_string(core_toml).with_context(|| format!("read {}", core_toml.display()))?;
     let top: toml::Value =
         toml::from_str(&raw).with_context(|| format!("parse {}", core_toml.display()))?;
     let value = top
         .get("registry")
-        .and_then(|v| v.get("core_registry_addr"))
+        .and_then(|v| v.get("core_transition_addr"))
         .and_then(|v| v.as_str())
         .with_context(|| {
             format!(
-                "missing registry.core_registry_addr in {}",
+                "missing registry.core_transition_addr in {}",
                 core_toml.display()
             )
         })?;
     value.parse().with_context(|| {
         format!(
-            "core_registry_addr in {} is not a valid address: {}",
+            "core_transition_addr in {} is not a valid address: {}",
             core_toml.display(),
             value,
         )

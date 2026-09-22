@@ -13,7 +13,7 @@ import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
 import {L1EcosystemContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 /// @notice Core (ecosystem) side of the v34 upgrade: deploys the new shared-singleton
-///         implementation set, pins it in a write-once `CoreRegistry` (the enum-indexed
+///         implementation set, pins it in a write-once `CoreTransition` (the enum-indexed
 ///         inventory — one slot per `L1EcosystemContract` member, inert slots explicit), and
 ///         deploys the bound `CoreUpgradeExecutor` the ecosystem `ProxyAdmin` lands under
 ///         together with the lifecycle coordinator every later upgrade runs through. The
@@ -83,8 +83,8 @@ contract CoreUpgrade_v34 is DefaultCoreUpgrade {
     /// @dev All ride the CREATE2 factory: the Safe bundle replays factory transactions only, so
     ///      a plain CREATE would leave the stage-1 calls pointing at codeless addresses.
     function deployEcosystemUpgradeObjects() public virtual override {
-        deployCoreRegistry();
-        require(address(coreRegistry) != address(0), "v34 deploys every ecosystem implementation");
+        deployCoreTransition();
+        require(address(coreTransition) != address(0), "v34 deploys every ecosystem implementation");
         coreUpgradeExecutor = CoreUpgradeExecutor(
             payable(
                 deployViaCreate2AndNotify(

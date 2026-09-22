@@ -16,9 +16,9 @@ import {Call} from "contracts/governance/Common.sol";
 import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
-import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol";
+import {CoreTransition} from "contracts/upgrades/registry/objects/CoreTransition.sol";
 import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
-import {CoreRegistryManifest, ProxyUpgradeRow} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {CoreTransitionManifest, ProxyUpgradeRow} from "contracts/upgrades/registry/RegistryTypes.sol";
 import {
     L1EcosystemContract,
     L1_ECOSYSTEM_CONTRACT_COUNT
@@ -33,8 +33,8 @@ import {Utils} from "../../utils/Utils.sol";
 
 /// @notice The ecosystem (core) side of a registry-driven upgrade prepare, run before the CTM
 ///         prepare: deploys the new ecosystem implementations and pins them in a write-once
-///         `CoreRegistry`. It emits NO governance calls of its own — the transition the CTM
-///         prepare deploys names the registry, and the coordinator's stage 1 applies it through
+///         `CoreTransition`. It emits NO governance calls of its own — the transition the CTM
+///         prepare deploys names the core transition, and the coordinator's stage 1 applies it through
 ///         the `CoreUpgradeExecutor`. Anything a version script still needs governance to do is
 ///         declared as an external action and listed in the output.
 /// @dev Version scripts inherit and override; the v34 bootstrap edge overrides the object
@@ -45,7 +45,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     /// @notice The write-once inventory of this upgrade's ecosystem implementation swaps; zero
     ///         when the run deployed no ecosystem implementation.
-    CoreRegistry public coreRegistry;
+    CoreTransition public coreTransition;
 
     /// @dev The governance/admin calls this prepare emits that the upgrade objects do not
     ///      describe (see {ExternalActionsLib}).
@@ -102,10 +102,10 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         console.log("Core upgrade output saved!");
     }
 
-    /// @notice The upgrade objects of the ecosystem side. The default deploys the registry over the
+    /// @notice The upgrade objects of the ecosystem side. The default deploys the core transition over the
     ///         implementations this run deployed; the bootstrap edge also deploys the executor.
     function deployEcosystemUpgradeObjects() public virtual {
-        deployCoreRegistry();
+        deployCoreTransition();
     }
 
     /// @notice Deploys the write-once inventory of this upgrade's swaps — one source-checked row
@@ -113,7 +113,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     ///         run deployed none (a CTM-only upgrade has no ecosystem leg).
     /// @dev Rides the CREATE2 factory like every prepare deployment: the Safe bundle replays factory
     ///      transactions only.
-    function deployCoreRegistry() public virtual {
+    function deployCoreTransition() public virtual {
         ProxyUpgradeRow[] memory rows = _coreProxyUpgradeRows();
         _requireDeployedImplementationsInstalled(rows);
         uint256 participating = 0;
@@ -124,16 +124,16 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             }
         }
         if (participating == 0) {
-            console.log("No ecosystem implementation deployed: this upgrade has no CoreRegistry");
+            console.log("No ecosystem implementation deployed: this upgrade has no CoreTransition");
             return;
         }
         // From the build ARTIFACT, so a reviewer's own build of the same commit reproduces the
         // creation code this object's address is re-derived from.
-        coreRegistry = CoreRegistry(
+        coreTransition = CoreTransition(
             deployViaCreate2AndNotify(
-                BytecodeUtils.readBytecodeL1("CoreRegistry.sol", "CoreRegistry"),
-                abi.encode(CoreRegistryManifest({proxyUpgrades: rows})),
-                "CoreRegistry"
+                BytecodeUtils.readBytecodeL1("CoreTransition.sol", "CoreTransition"),
+                abi.encode(CoreTransitionManifest({proxyUpgrades: rows})),
+                "CoreTransition"
             )
         );
     }
@@ -229,7 +229,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
                     vm.toString(i),
                     " (",
                     vm.toString(deployed[i]),
-                    "): this run deployed it but the CoreRegistry does not install it. Either add its row to "
+                    "): this run deployed it but the CoreTransition does not install it. Either add its row to "
                     "`_coreProxyUpgradeRows()`, or name the slot in `uninstalledCoreDeployments()`."
                 )
             );
@@ -534,7 +534,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         string memory misc = vm.serializeAddress("misc", "deployer_addr", config.deployerAddress);
         vm.serializeString("root", "upgrade_addresses", deployedAddresses);
         // The objects the CTM prepare and reviewers take from this run.
-        vm.serializeAddress("registry", "core_registry_addr", address(coreRegistry));
+        vm.serializeAddress("registry", "core_transition_addr", address(coreTransition));
         vm.serializeAddress("registry", "core_upgrade_executor_addr", address(getCoreUpgradeExecutor()));
         string memory registry = vm.serializeAddress(
             "registry",
@@ -577,7 +577,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     }
 
     /// @notice The governance stages of the ecosystem side: nothing but the declared external
-    ///         actions of each phase. The recurring ecosystem leg — the registry applied through
+    ///         actions of each phase. The recurring ecosystem leg — the core transition applied through
     ///         the `CoreUpgradeExecutor` — is the coordinator's stage-1 job, ordered and enforced
     ///         on-chain.
     function prepareStage0GovernanceCalls() public virtual returns (Call[] memory calls) {

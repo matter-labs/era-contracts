@@ -59,13 +59,13 @@ All are storage-backed, built once from a manifest they take in the constructor,
 `manifestHash = keccak256(abi.encode(manifest))`. The struct definitions and their field docs are
 in `l1-contracts/contracts/upgrades/registry/RegistryTypes.sol`.
 
-| Contract                     | Holds                                                                                                                                                                                                                                                                                                       |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CTMRelease`                 | `diamondInit`, `verifier`, `GenesisFacet[]` (address + freezability), `fixedForceDeploymentsData`, genesis params incl. the genesis upgrade, `l2BytecodeInfos` (the `L2EcosystemContract`-indexed implementation table), one shared `l2SystemProxyBytecodeInfo` shell                                       |
-| `CTMTransition`              | version edge, `fromRelease`, `newRelease`, `upgradeEngine`, `oldProtocolVersionDeadline`, `upgradeTimestamp`, `AuthoredL2Plan`; **derived and stored:** `Diamond.FacetCut[]` and the L2 force deployments                                                                                                   |
-| `CoreRegistry`               | the `L1EcosystemContract`-indexed inventory of `(proxy, expectedOldImpl, implNew)` rows for the SHARED singletons (bridges, Bridgehub, MessageRoot, …)                                                                                                                                                      |
-| `EcosystemUpgradeOperation`  | `{coreRegistry, ctmInfrastructure, transition, timer}` — three optional changes and the mandatory execution delay. `ctmInfrastructure` is the `CTMContract`-indexed CTM-domain inventory, incl. the CTM itself. Executors are bound on the coordinator; an operation carrying no change at all is rejected. |
-| `RegistryBootstrapMigration` | one edge from a pre-registry CTM into this model — see [Bootstrap](#bootstrap)                                                                                                                                                                                                                              |
+| Contract                     | Holds                                                                                                                                                                                                                                                                                                         |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CTMRelease`                 | `diamondInit`, `verifier`, `GenesisFacet[]` (address + freezability), `fixedForceDeploymentsData`, genesis params incl. the genesis upgrade, `l2BytecodeInfos` (the `L2EcosystemContract`-indexed implementation table), one shared `l2SystemProxyBytecodeInfo` shell                                         |
+| `CTMTransition`              | version edge, `fromRelease`, `newRelease`, `upgradeEngine`, `oldProtocolVersionDeadline`, `upgradeTimestamp`, `AuthoredL2Plan`; **derived and stored:** `Diamond.FacetCut[]` and the L2 force deployments                                                                                                     |
+| `CoreTransition`             | the `L1EcosystemContract`-indexed inventory of `(proxy, expectedOldImpl, implNew)` rows for the SHARED singletons (bridges, Bridgehub, MessageRoot, …)                                                                                                                                                        |
+| `EcosystemUpgradeOperation`  | `{coreTransition, ctmInfrastructure, transition, timer}` — three optional changes and the mandatory execution delay. `ctmInfrastructure` is the `CTMContract`-indexed CTM-domain inventory, incl. the CTM itself. Executors are bound on the coordinator; an operation carrying no change at all is rejected. |
+| `RegistryBootstrapMigration` | one edge from a pre-registry CTM into this model — see [Bootstrap](#bootstrap)                                                                                                                                                                                                                                |
 
 ### Enum-indexed proxy inventories
 
@@ -74,7 +74,7 @@ array indexed by the canonical contract enum** — the SAME enum that identifies
 deployment, one enum per domain (`ContractIdentifiers.sol`) — whose length must be exactly the
 enum's member count (`L1_ECOSYSTEM_CONTRACT_COUNT` / `CTM_CONTRACT_COUNT`):
 
-- `CoreRegistryManifest.proxyUpgrades` is indexed by `L1EcosystemContract`.
+- `CoreTransitionManifest.proxyUpgrades` is indexed by `L1EcosystemContract`.
 - `OperationManifest.ctmInfrastructure` and `BootstrapManifest.proxyUpgrades` are indexed by
   `CTMContract`. Only the TUPP members can participate: those under the CTM-domain ProxyAdmin
   (ChainTypeManager, ValidatorTimelock, BytecodesSupplier, PermissionlessValidator) through the
@@ -140,8 +140,8 @@ flowchart TB
     subgraph obj["Write-once objects — manifest fixed in the constructor"]
       REL["CTMRelease"]
       TRA["CTMTransition<br/>version edge, engine, chain schedule,<br/>L2 plan + DERIVED cuts"]
-      CR["CoreRegistry<br/>ecosystem inventory"]
-      OP["EcosystemUpgradeOperation<br/>coreRegistry + CTM infrastructure<br/>+ transition + timer"]
+      CR["CoreTransition<br/>ecosystem inventory"]
+      OP["EcosystemUpgradeOperation<br/>coreTransition + CTM infrastructure<br/>+ transition + timer"]
       BOOT["RegistryBootstrapMigration<br/>pre-registry entry edge"]
       SEQ["RegistryBootstrapSequence<br/>the entry edge's governance calls, derived"]
     end
@@ -216,7 +216,7 @@ configured coordinator.
 | Executor                   | Bound to (immutable)                                                    | Entrypoints                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | -------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `EcosystemUpgradeExecutor` | `CORE_EXECUTOR`, the `EcosystemUpgradeOperation` codehash               | `stage0/1/2(operation)`, `abandonPendingOperation` (owner); `pendingOperation()`, `pendingStage()`                                                                                                                                                                                                                                                                                                                                   |
-| `CoreUpgradeExecutor`      | the ecosystem `ProxyAdmin`, the `CoreRegistry` codehash                 | `beginOperation`, `completeOperation`, `abandonOperation` (coordinator); `applyL1Upgrade` (coordinator for the reserved registry, or the owner for any — bootstrap and recovery); `validateUpgradeApplied`; `setCoordinator` (owner, refused while reserved)                                                                                                                                                                         |
+| `CoreUpgradeExecutor`      | the ecosystem `ProxyAdmin`, the `CoreTransition` codehash               | `beginOperation`, `completeOperation`, `abandonOperation` (coordinator); `applyL1Upgrade` (coordinator for the reserved registry, or the owner for any — bootstrap and recovery); `validateUpgradeApplied`; `setCoordinator` (owner, refused while reserved)                                                                                                                                                                         |
 | `CTMUpgradeExecutor`       | one `ChainTypeManager` + its `ProxyAdmin`, the `CTMTransition` codehash | `beginOperation`, `applyOperation`, `completeOperation`, `abandonOperation` (coordinator); `validateTransitionApplied`, `validateOperationApplied`; `upgradeChain`; `acceptCTMOwnership`; `setCoordinator`, `setProtocolVersionDeadline` and the routine passthroughs (`freezeChain`, `unfreezeChain`, `revertBatches`, `setValidator`, `setPriorityTxMaxGasLimit`, `deactivatePriorityMode`, `setValidatorTimelockPostV29`) (owner) |
 
 The coordinator owns no proxy administration and applies nothing itself: it orders the core and CTM changes,
@@ -268,7 +268,7 @@ manifest, hash identically to the audited object, pass `validate()`, and still r
 security-critical selectors wherever its author chose.
 
 **There are no object-type codehash anchors.** An earlier iteration pinned one per object type
-(`releaseCodehash` on the CTM; `TRANSITION_CODEHASH` / `CORE_REGISTRY_CODEHASH` /
+(`releaseCodehash` on the CTM; `TRANSITION_CODEHASH` / `CORE_TRANSITION_CODEHASH` /
 `OPERATION_CODEHASH` on the executors). They were removed — all four, together — because they make
 exactly the claim the paragraph above refutes, and three survivors would have gone on implying a
 guarantee the fourth had just been admitted not to give. Objects consequently carry no fingerprint
@@ -443,7 +443,7 @@ sequenceDiagram
     X->>T: startTimer() — the operation's timer; onlyTimerAdmin, so TIMER_GOVERNANCE must be X
     G->>X: stage1(operation)
     X->>T: checkDeadline()
-    X->>CO: applyL1Upgrade(coreRegistry) — core leg first
+    X->>CO: applyL1Upgrade(coreTransition) — core leg first
     X->>E: applyOperation() — the reserved leg
     E->>C: infrastructure rows first, then the commit
     E->>C: setNewVersionUpgradeFromTransition(transition)
@@ -570,7 +570,7 @@ and the engines take no bytecode-hash inputs.
 **Row sets.** Every participating row is a real, unique edge: all fields nonzero, one row per
 proxy. A bootstrap manifest must carry at least one row.
 
-**Operation.** At least one real change: a nonzero core registry, a nonempty CTM infrastructure row
+**Operation.** At least one real change: a nonzero core transition, a nonempty CTM infrastructure row
 set, or a nonzero transition — an all-inert inventory is not a change, so a container that upgrades
 nothing is refused. The timer is mandatory. The coordinator binds one CTM executor, and reserves it
 for every operation whether or not a transition rides along.
@@ -630,7 +630,7 @@ rows applied, the CTM domain landed under the executor, and the CTM's migrations
 
 The bootstrap edge predates the coordinator lifecycle, so its stage bundles are declared external
 actions rather than coordinator calls: the ecosystem side hands the ecosystem `ProxyAdmin` to the
-freshly deployed `CoreUpgradeExecutor`, applies the `CoreRegistry` through it and binds it to the
+freshly deployed `CoreUpgradeExecutor`, applies the `CoreTransition` through it and binds it to the
 coordinator (`setCoordinator`); the CTM side starts the timer, hands the CTM and its `ProxyAdmin`
 to the migration and runs `migrate()`. The `CTMUpgradeExecutor` is constructed answering to the
 coordinator, and the migration checks that binding, so the CTM domain needs no join call.
@@ -638,7 +638,7 @@ coordinator, and the migration checks that binding, so the CTM domain needs no j
 ### The sequence is an object too
 
 Those calls are not authored by the prepare scripts. `RegistryBootstrapSequence` is deployed over
-the two objects the edge already has — the migration and the `CoreRegistry` — and DERIVES the whole
+the two objects the edge already has — the migration and the `CoreTransition` — and DERIVES the whole
 sequence: the coordinator (named by the manifest) names the `CoreUpgradeExecutor`, that executor
 names the ecosystem `ProxyAdmin`, the manifest names the CTM, its `ProxyAdmin`, the bound CTM
 executor and the timer, and the CTM names the chain asset handler through its Bridgehub. The only

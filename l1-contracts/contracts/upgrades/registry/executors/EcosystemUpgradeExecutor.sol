@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {ICoreRegistry} from "../objects/ICoreRegistry.sol";
+import {ICoreTransition} from "../objects/ICoreTransition.sol";
 import {IEcosystemUpgradeOperation} from "../objects/IEcosystemUpgradeOperation.sol";
 import {ICTMUpgradeExecutor} from "./ICTMUpgradeExecutor.sol";
 import {IEcosystemUpgradeExecutor} from "./IEcosystemUpgradeExecutor.sol";
@@ -96,7 +96,7 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
         pendingOperation = _operation;
         pendingStage = UpgradeStage.Prepared;
 
-        if (m.coreRegistry != address(0)) {
+        if (m.coreTransition != address(0)) {
             CORE_EXECUTOR.beginOperation(_operation);
         }
         if (address(ctmExecutor) == address(0)) {
@@ -119,8 +119,8 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
         // The stage advances before the domains are driven: any leg's revert unwinds the whole
         // stage, so nothing observes `Executed` with a leg still unapplied.
         pendingStage = UpgradeStage.Executed;
-        if (m.coreRegistry != address(0)) {
-            CORE_EXECUTOR.applyL1Upgrade(ICoreRegistry(m.coreRegistry));
+        if (m.coreTransition != address(0)) {
+            CORE_EXECUTOR.applyL1Upgrade(ICoreTransition(m.coreTransition));
         }
         ctmExecutor.applyOperation();
         emit OperationExecuted(address(_operation));
@@ -138,7 +138,7 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
         OperationManifest memory m = _operation.getManifest();
         delete pendingOperation;
         pendingStage = UpgradeStage.None;
-        if (m.coreRegistry != address(0)) {
+        if (m.coreTransition != address(0)) {
             CORE_EXECUTOR.completeOperation();
         }
         ctmExecutor.completeOperation();
@@ -157,7 +157,7 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
         OperationManifest memory m = operation.getManifest();
         delete pendingOperation;
         pendingStage = UpgradeStage.None;
-        if (m.coreRegistry != address(0)) {
+        if (m.coreTransition != address(0)) {
             CORE_EXECUTOR.abandonOperation();
         }
         ctmExecutor.abandonOperation();

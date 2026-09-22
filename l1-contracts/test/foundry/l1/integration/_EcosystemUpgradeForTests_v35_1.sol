@@ -12,7 +12,7 @@ import {CTMUpgradeForTests_v35} from "./_EcosystemUpgradeForTests_v35.sol";
 /// @dev Every other release member is byte-identical, so the prepare reuses it: the only thing this
 ///      hop deploys on the CTM side is the verifier pair.
 
-/// @dev A patch has no ecosystem leg at all, so nothing is deployed here and no `CoreRegistry`
+/// @dev A patch has no ecosystem leg at all, so nothing is deployed here and no `CoreTransition`
 ///      exists for the transition to name.
 contract CoreUpgradeForTests_v35_1 is CoreUpgrade_v35 {
     function deployNewEcosystemContractsL1() public virtual override {}

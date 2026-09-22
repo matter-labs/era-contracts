@@ -307,10 +307,10 @@ mod tests {
 
     #[test]
     fn code_the_commit_produces_for_another_contract_names_it() {
-        let id = identity_from(&[("l1-contracts/CoreRegistry", HASH_A)]);
+        let id = identity_from(&[("l1-contracts/CoreTransition", HASH_A)]);
         assert_eq!(
             classify_code(&id, &HASH_A.parse().unwrap(), "CTMRelease"),
-            CodeVerdict::OtherContract("l1-contracts/CoreRegistry")
+            CodeVerdict::OtherContract("l1-contracts/CoreTransition")
         );
     }
 

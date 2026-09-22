@@ -138,7 +138,7 @@ contract CTMUpgradeOrphanedDeployment is RecurringCTMUpgradeForTests {
 }
 
 /// @notice The ecosystem side of every hop in this file: none of them changes an ecosystem
-///         singleton, so nothing is deployed and no `CoreRegistry` exists for the operation to
+///         singleton, so nothing is deployed and no `CoreTransition` exists for the operation to
 ///         name. That the CTM leg alone carries the change is the point.
 contract CoreUpgradeNoEcosystemLeg is DefaultCoreUpgrade {}
 
@@ -250,7 +250,7 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationV34Bootstra
             "nothing was deployed at the address an engine would have taken"
         );
         assertEq(hop.getChainUpgradeDiamondCutData().length, 0, "no chain crosses this edge, so there is no cut");
-        assertEq(address(core.coreRegistry()), address(0), "this hop changes no ecosystem singleton");
+        assertEq(address(core.coreTransition()), address(0), "this hop changes no ecosystem singleton");
         assertEq(
             hop.getNewProtocolVersion(),
             hop.getOldProtocolVersion(),
@@ -261,7 +261,7 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationV34Bootstra
         IEcosystemUpgradeOperation operation = IEcosystemUpgradeOperation(hop.preparedOperation());
         assertTrue(address(operation).code.length != 0, "the prepare must deploy an operation");
         assertEq(operation.transition(), address(0), "the operation names no transition");
-        assertEq(operation.coreRegistry(), address(0), "the operation names no core registry");
+        assertEq(operation.coreTransition(), address(0), "the operation names no core transition");
         assertEq(operation.timer(), hop.preparedTimer(), "the operation names this prepare's timer");
         assertTrue(operation.timer().code.length != 0, "the named timer must be deployed");
 
@@ -364,11 +364,11 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationV34Bootstra
         RecurringCTMUpgradeForTests hop = new CTMUpgradeEmpty();
         _initHop(core, hop, SAME_VERSION_INPUT, "recurring-empty");
         core.prepareEcosystemUpgrade();
-        assertEq(address(core.coreRegistry()), address(0), "the fixture must leave the ecosystem leg empty");
+        assertEq(address(core.coreTransition()), address(0), "the fixture must leave the ecosystem leg empty");
         hop.setEcosystemUpgradeExecutor(coordinator);
-        hop.setCoreRegistry(address(core.coreRegistry()));
+        hop.setCoreTransition(address(core.coreTransition()));
 
-        vm.expectRevert("this upgrade changes nothing: no core registry, no infrastructure row and no transition");
+        vm.expectRevert("this upgrade changes nothing: no core transition, no infrastructure row and no transition");
         hop.prepareCTMUpgrade();
     }
 
@@ -408,7 +408,7 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationV34Bootstra
         _initHop(core, hop, SAME_VERSION_INPUT, "recurring-orphan");
         core.prepareEcosystemUpgrade();
         hop.setEcosystemUpgradeExecutor(coordinator);
-        hop.setCoreRegistry(address(core.coreRegistry()));
+        hop.setCoreTransition(address(core.coreTransition()));
 
         // The message names the slot and the address so the operator can tell which of the two
         // fixes applies. The address is only known inside the reverted call, so the assertion runs
@@ -500,7 +500,7 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationV34Bootstra
         _initHop(_core, _hop, _input, _outName);
         _core.prepareEcosystemUpgrade();
         _hop.setEcosystemUpgradeExecutor(_core.getEcosystemUpgradeExecutor());
-        _hop.setCoreRegistry(address(_core.coreRegistry()));
+        _hop.setCoreTransition(address(_core.coreTransition()));
         _hop.prepareCTMUpgrade();
     }
 

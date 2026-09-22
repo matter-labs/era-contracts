@@ -282,11 +282,11 @@ contract UpgradeIntegrationTest_v34_Local is UpgradeIntegrationV34BootstrapFixtu
         assertEq(
             DeployScriptUtils.canonicalCreate2Address(
                 coreSalt,
-                vm.getCode("CoreRegistry.sol:CoreRegistry"),
-                abi.encode(coreUpgrade.coreRegistry().getManifest())
+                vm.getCode("CoreTransition.sol:CoreTransition"),
+                abi.encode(coreUpgrade.coreTransition().getManifest())
             ),
-            address(coreUpgrade.coreRegistry()),
-            "the core registry re-derives from the manifest it serves"
+            address(coreUpgrade.coreTransition()),
+            "the core transition re-derives from the manifest it serves"
         );
 
         // The CTM leg, under the CTM prepare's salt.
@@ -326,10 +326,10 @@ contract UpgradeIntegrationTest_v34_Local is UpgradeIntegrationV34BootstrapFixtu
             DeployScriptUtils.canonicalCreate2Address(
                 ctmSalt,
                 vm.getCode("RegistryBootstrapSequence.sol:RegistryBootstrapSequence"),
-                abi.encode(address(v34.bootstrapMigration()), address(coreUpgrade.coreRegistry()))
+                abi.encode(address(v34.bootstrapMigration()), address(coreUpgrade.coreTransition()))
             ),
             address(v34.bootstrapSequence()),
-            "the sequence re-derives from the migration and the core registry"
+            "the sequence re-derives from the migration and the core transition"
         );
     }
 

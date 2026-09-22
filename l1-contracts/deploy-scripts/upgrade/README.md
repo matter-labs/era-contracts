@@ -10,7 +10,7 @@ review from the [root README review guide](../../../README.md#reviewing-registry
 ## Layout
 
 - `default-upgrade/` — the version-independent prepare pipeline. `DefaultCoreUpgrade` (ecosystem
-  side) deploys the new ecosystem implementations and pins them in a `CoreRegistry`.
+  side) deploys the new ecosystem implementations and pins them in a `CoreTransition`.
   `DefaultCTMUpgrade` (per-CTM side) deploys the release members the version changes, a
   `GovernanceUpgradeTimer` bound to the coordinator, the `CTMTransition`, and the
   `EcosystemUpgradeOperation` associating that transition with the core prepare's registry. Neither
@@ -48,8 +48,8 @@ cargo run -p protocol_ops -- ecosystem upgrade-prepare-all \
 On one anvil fork of L1, in this order:
 
 1. `AdminFunctions.ensureCtmsAndProxyAdminsOwnedByGovernance` — the ownership precondition.
-2. The core prepare (`noGovernancePrepare`): implementations, then `CoreRegistry` (none when the
-   run deployed no ecosystem implementation). Output `[registry]`: `core_registry_addr`,
+2. The core prepare (`noGovernancePrepare`): implementations, then `CoreTransition` (none when the
+   run deployed no ecosystem implementation). Output `[registry]`: `core_transition_addr`,
    `core_upgrade_executor_addr`, `ecosystem_upgrade_executor_addr` — the executor and coordinator
    read from the live `ProxyAdmin` owner, or deployed by the v34 prepare.
 3. Each ZKsync OS CTM prepare, in input order (Era CTMs are skipped): every release member is

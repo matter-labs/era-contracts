@@ -2,13 +2,13 @@
 
 pragma solidity 0.8.28;
 
-import {ICoreRegistry} from "./ICoreRegistry.sol";
+import {ICoreTransition} from "./ICoreTransition.sol";
 import {L1_ECOSYSTEM_CONTRACT_COUNT} from "../libraries/ContractIdentifiers.sol";
 import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 import {RegistryUnknownKey} from "../../../common/L1ContractErrors.sol";
-import {CoreRegistryManifest, ProxyUpgradeRow} from "../RegistryTypes.sol";
+import {CoreTransitionManifest, ProxyUpgradeRow} from "../RegistryTypes.sol";
 
-/// @title Core (ecosystem-wide) registry — one instance per protocol upgrade.
+/// @title Core (ecosystem-wide) transition — one instance per protocol upgrade.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Storage-backed and WRITE-ONCE — see `CTMRelease` for the model: {initialize} pins
@@ -16,9 +16,9 @@ import {CoreRegistryManifest, ProxyUpgradeRow} from "../RegistryTypes.sol";
 ///         implementation is a fixed, audited-once contract, so a per-instance review is a pure
 ///         DATA check (read the getters or compare {manifestHash} against the audited manifest).
 /// @dev Rows are source-checked edges (`expectedOldImpl -> implNew`). What each `implNew`
-///      RUNS is what governance reviewed before approving this object; the registry's own job
+///      RUNS is what governance reviewed before approving this object; the object's own job
 ///      is to refuse a target that is not a deployed contract at all.
-contract CoreRegistry is ICoreRegistry {
+contract CoreTransition is ICoreTransition {
     /*//////////////////////////////////////////////////////////////
                               STORAGE
     //////////////////////////////////////////////////////////////*/
@@ -41,10 +41,10 @@ contract CoreRegistry is ICoreRegistry {
     ///        changes. A reviewer still has to check those statements against the release: the
     ///        length check cannot tell an intended "leave alone" from a row preparation never
     ///        built (see {ProxyUpgradeRowLib.toRows}).
-    constructor(CoreRegistryManifest memory _manifest) {
+    constructor(CoreTransitionManifest memory _manifest) {
         ProxyUpgradeRow[] memory rows = ProxyUpgradeRowLib.toRows(_manifest.proxyUpgrades, L1_ECOSYSTEM_CONTRACT_COUNT);
-        // Sentinel against pinning an empty manifest: a registry that upgrades nothing is not a
-        // registry, it is a mistake.
+        // Sentinel against pinning an empty manifest: a transition that upgrades nothing is not a
+        // transition, it is a mistake.
         if (rows.length == 0) {
             revert RegistryUnknownKey();
         }
@@ -60,25 +60,25 @@ contract CoreRegistry is ICoreRegistry {
     }
 
     /// @notice The whole manifest, exactly as it was pinned.
-    function getManifest() public view returns (CoreRegistryManifest memory) {
-        return abi.decode(encodedManifest, (CoreRegistryManifest));
+    function getManifest() public view returns (CoreTransitionManifest memory) {
+        return abi.decode(encodedManifest, (CoreTransitionManifest));
     }
 
     /*//////////////////////////////////////////////////////////////
-                        ICoreRegistry (lookup logic)
+                        ICoreTransition (lookup logic)
     //////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc ICoreRegistry
+    /// @inheritdoc ICoreTransition
     function ecosystemRows() external view returns (ProxyUpgradeRow[] memory) {
         return _rows();
     }
 
-    /// @inheritdoc ICoreRegistry
+    /// @inheritdoc ICoreTransition
     function validate() external view {
         ProxyUpgradeRowLib.requireRowCode(_rows());
     }
 
-    /// @dev THE enumeration of what this registry names: its participating rows. Every read and
+    /// @dev THE enumeration of what this transition names: its participating rows. Every read and
     ///      the check surface walk this one list.
     function _rows() private view returns (ProxyUpgradeRow[] memory) {
         return ProxyUpgradeRowLib.toRows(getManifest().proxyUpgrades, L1_ECOSYSTEM_CONTRACT_COUNT);

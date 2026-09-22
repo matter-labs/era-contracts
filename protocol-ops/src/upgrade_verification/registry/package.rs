@@ -90,8 +90,8 @@ pub(crate) struct OperationPackage {
     /// `[ctms.*.registry] ctm_transition_addr`, when the prepare named one: a cross-check on the
     /// transition the operation's own manifest pins.
     pub(crate) reported_transition: Option<Address>,
-    /// `[core.registry] core_registry_addr`, likewise a cross-check on the manifest's.
-    pub(crate) reported_core_registry: Option<Address>,
+    /// `[core.registry] core_transition_addr`, likewise a cross-check on the manifest's.
+    pub(crate) reported_core_transition: Option<Address>,
     /// `[ctms.*.registry] ctm_upgrade_executor_addr`, a cross-check on the executor the
     /// coordinator is actually bound to.
     pub(crate) reported_ctm_executor: Option<Address>,
@@ -143,8 +143,11 @@ impl OperationPackage {
             operation,
             coordinator,
             reported_transition: registry_address(root, &ctm_key, "ctm_transition_addr"),
-            reported_core_registry: address_at(root, &["core", "registry", "core_registry_addr"])
-                .filter(|a| !a.is_zero()),
+            reported_core_transition: address_at(
+                root,
+                &["core", "registry", "core_transition_addr"],
+            )
+            .filter(|a| !a.is_zero()),
             reported_ctm_executor: registry_address(root, &ctm_key, "ctm_upgrade_executor_addr"),
             reported_timer: registry_address(root, &ctm_key, "upgrade_timer_addr"),
             reported_ctm: ctm_address(
@@ -228,7 +231,7 @@ fn lifecycle_inputs_in(root: &toml::Value, ctm_key: &str) -> LifecycleInputs {
 #[derive(Debug)]
 pub(crate) struct BootstrapPackage {
     /// Objects the prepare names outright.
-    pub(crate) core_registry: Option<Address>,
+    pub(crate) core_transition: Option<Address>,
     pub(crate) release: Address,
     /// Absent from protocol-ops-driven prepare output today (the in-forge path emits it),
     /// so it is only ever a cross-check against the manifest's own pin.
@@ -375,12 +378,12 @@ impl BootstrapPackage {
             .context("[ctms.*.registry] ctm_release_addr missing, zero or unparsable")?;
         let upgrade_timer = registry_address(root, &ctm_key, "upgrade_timer_addr");
         // The core leg is optional: a CTM-only edge deploys no ecosystem implementations, so
-        // the prepare pins no `CoreRegistry` (an all-inert inventory is refused at construction).
-        let core_registry =
-            address_at(root, &["core", "registry", "core_registry_addr"]).filter(|a| !a.is_zero());
+        // the prepare pins no `CoreTransition` (an all-inert inventory is refused at construction).
+        let core_transition = address_at(root, &["core", "registry", "core_transition_addr"])
+            .filter(|a| !a.is_zero());
 
         Ok(Self {
-            core_registry,
+            core_transition,
             release,
             upgrade_timer,
             migration,
@@ -511,7 +514,7 @@ mod tests {
              ctm_transition_addr = \"0x00000000000000000000000000000000000000cc\"\n\
              ctm_upgrade_executor_addr = \"0x00000000000000000000000000000000000000dd\"\n\
              [core.registry]\n\
-             core_registry_addr = \"0x00000000000000000000000000000000000000ee\"\n\
+             core_transition_addr = \"0x00000000000000000000000000000000000000ee\"\n\
              [governance_calls]\n\
              stage0_calls = \"0x\"\n\
              stage1_calls = \"0x\"\n\
@@ -562,7 +565,7 @@ mod tests {
             )
         );
         assert_eq!(
-            package.reported_core_registry,
+            package.reported_core_transition,
             Some(
                 "0x00000000000000000000000000000000000000ee"
                     .parse()
@@ -622,7 +625,7 @@ mod tests {
              [ctms.zksync_os.contracts_config]\n\
              governance_upgrade_timer_initial_delay = 172800\n\
              [core.registry]\n\
-             core_registry_addr = \"0x00000000000000000000000000000000000000ee\"\n\
+             core_transition_addr = \"0x00000000000000000000000000000000000000ee\"\n\
              core_upgrade_executor_addr = \"0x00000000000000000000000000000000000000e1\"\n\
              ecosystem_upgrade_executor_addr = \"{COORDINATOR}\"\n\
              [core.upgrade_addresses.shared]\n\

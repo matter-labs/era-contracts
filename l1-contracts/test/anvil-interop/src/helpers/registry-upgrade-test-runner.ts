@@ -17,7 +17,7 @@
  *      across platforms), and the deployer key + starting nonce are fixed by the committed
  *      chain states, so all addresses AND bytecode hashes are reproducible run-to-run and
  *      machine-to-machine.
- *   3. Deploy the fixed `CTMRelease` + `CTMTransition` + `CoreRegistry` implementations and
+ *   3. Deploy the fixed `CTMRelease` + `CTMTransition` + `CoreTransition` implementations and
  *      initialize them (write-once) from the COMMITTED manifest
  *      scripts/registry-manifests/v34-local.json — the reviewable per-upgrade artifact:
  *      - the RELEASE describes what a chain at the target version IS (complete facet set,
@@ -117,7 +117,7 @@ const SEMVER_MINOR_SHIFT = 32;
 const REGISTRY_TAG = "V34";
 const CTM_REGISTRY_NAME = "ZKsyncOS";
 
-// The fixed release/transition/core-registry implementations live here; the incremental forge
+// The fixed release/CTM-transition/core-transition implementations live here; the incremental forge
 // build below keeps their artifacts current before deployment.
 // Committed manifest for the local (chain-states) environment — the reviewable per-upgrade
 // artifact the upgrade objects are initialized from. The default CONSUME mode reads it as-is;
@@ -164,7 +164,7 @@ const DETERMINISTIC_SOURCES = [
   // `forge build` invocation covers the whole set the run deploys.
   "contracts/upgrades/registry/objects/CTMRelease.sol",
   "contracts/upgrades/registry/objects/CTMTransition.sol",
-  "contracts/upgrades/registry/objects/CoreRegistry.sol",
+  "contracts/upgrades/registry/objects/CoreTransition.sol",
   "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol",
   // Bootstrap stage: the committed manifest names the fresh CTM implementation (proxy row) and
   // the bootstrap engine (`upgradeEngine`) by address, so they — and the legacy facet — are
@@ -302,7 +302,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     });
 
     // ── 4. Regenerate (EMIT mode) or validate (CONSUME mode) the committed manifest, then
-    //       deploy + initialize the release/transition/core registry from it ──
+    //       deploy + initialize the release/CTM-transition/core-transition from it ──
     const manifestPath = path.join(l1ContractsDir, REGISTRY_MANIFEST_REL);
     if (regenRegistries) {
       console.log(`\n── ${REGEN_ENV_VAR}=1: regenerating the committed registry manifest ──`);
@@ -317,18 +317,18 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     const objects = await deployUpgradeObjectsFromManifest(deployer, manifestPath, deployed);
     console.log(`  CTM release:    ${objects.release}`);
     console.log(`  CTM transition: ${objects.transition}`);
-    console.log(`  core registry:  ${objects.coreRegistry}`);
+    console.log(`  core transition:  ${objects.coreTransition}`);
 
     // validate() is the surface the executors call on the execution path: it reverts unless every
     // contract the manifest names is deployed code on this chain. Run here too, so a manifest
     // naming an address nothing was deployed to fails in this step rather than mid-upgrade.
     const releaseContract = new ethers.Contract(objects.release, getAbi("ICTMRelease"), l1Provider);
     const transitionContract = new ethers.Contract(objects.transition, getAbi("ICTMTransition"), l1Provider);
-    const coreRegistryContract = new ethers.Contract(objects.coreRegistry, getAbi("ICoreRegistry"), l1Provider);
+    const coreTransitionContract = new ethers.Contract(objects.coreTransition, getAbi("ICoreTransition"), l1Provider);
     try {
       await releaseContract.callStatic.validate();
       await transitionContract.callStatic.validate();
-      await coreRegistryContract.callStatic.validate();
+      await coreTransitionContract.callStatic.validate();
       assertEq(
         await transitionContract.fromRelease(),
         deployed.bootstrapRelease,
@@ -339,10 +339,10 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
         live.newVersion.toString(),
         "transition commits the new protocol version"
       );
-      // The core registry carries no protocol version and no proxy admin by design —
+      // The core transition carries no protocol version and no proxy admin by design —
       // version-schedule identity is owned by the transition, and the ecosystem executor is
       // BOUND to its immutable ProxyAdmin. The registry carries only source-checked rows.
-      assertTrue((await coreRegistryContract.ecosystemRows()).length > 0, "core registry has ecosystem rows");
+      assertTrue((await coreTransitionContract.ecosystemRows()).length > 0, "core transition has ecosystem rows");
     } catch (error) {
       throw regenRegistries ? error : staleRegistriesError(error);
     }
@@ -540,7 +540,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     const operationContract = await operationFactory.deploy(
       operationInitArgs(
         (manifestJson.ctms || []).find((c: { name?: string }) => c.name === CTM_REGISTRY_NAME),
-        objects.coreRegistry,
+        objects.coreTransition,
         objects.transition,
         objects.upgradeTimer
       )
@@ -1327,7 +1327,7 @@ function assertCommittedManifestMatchesLiveDeployment(
 }
 
 /**
- * Deploy the release/transition/core-registry objects from the committed manifest — the
+ * Deploy the release/CTM-transition/core-transition objects from the committed manifest — the
  * production surface, since each takes its manifest as a constructor argument. The release
  * deploys first: the transition's constructor validates its target release and derives the
  * facet/hash delta from the release pair, so the ordering is functional, not stylistic.
@@ -1338,7 +1338,7 @@ async function deployUpgradeObjectsFromManifest(
   deployer: ethers.Wallet,
   manifestPath: string,
   deployed: DeployedMachinery
-): Promise<{ release: string; transition: string; coreRegistry: string; upgradeTimer: string }> {
+): Promise<{ release: string; transition: string; coreTransition: string; upgradeTimer: string }> {
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
   const ctm = (manifest.ctms || []).find((c: { name?: string }) => c.name === CTM_REGISTRY_NAME);
   if (!ctm) {
@@ -1350,7 +1350,7 @@ async function deployUpgradeObjectsFromManifest(
   // rests on governance reviewing the exact deployed object (re-derived from its creation code by
   // `protocol-ops ecosystem verify-bootstrap`), not on any on-chain codehash pin.
   const deployObject = async (
-    name: "CTMRelease" | "CTMTransition" | "CoreRegistry",
+    name: "CTMRelease" | "CTMTransition" | "CoreTransition",
     manifestArg: unknown
   ): Promise<string> => {
     const factory = new ethers.ContractFactory(getAbi(name), getDeterministicCreationBytecode(name), deployer);
@@ -1360,10 +1360,10 @@ async function deployUpgradeObjectsFromManifest(
   };
 
   const release = await deployObject("CTMRelease", releaseInitArgs(ctm));
-  // The OPERATION names the stage-1 timer and the core registry; the transition names neither.
+  // The OPERATION names the stage-1 timer and the core transition; the transition names neither.
   // The timer is bound to the coordinator (only it can start it); zero delays make the stage-1
   // window pass immediately in the harness, and the deployer keeps the (unused) extension right.
-  const coreRegistry = await deployObject("CoreRegistry", coreInitArgs(manifest));
+  const coreTransition = await deployObject("CoreTransition", coreInitArgs(manifest));
   const timerFactory = new ethers.ContractFactory(
     getAbi("GovernanceUpgradeTimer"),
     getCreationBytecode("GovernanceUpgradeTimer"),
@@ -1377,7 +1377,7 @@ async function deployUpgradeObjectsFromManifest(
       "CTMTransition",
       transitionInitArgs(manifest, ctm, release, deployed.delegateComposer)
     ),
-    coreRegistry,
+    coreTransition,
     upgradeTimer: upgradeTimer.address,
   };
 }

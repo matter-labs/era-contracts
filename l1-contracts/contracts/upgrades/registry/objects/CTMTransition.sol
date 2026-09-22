@@ -93,7 +93,7 @@ contract CTMTransition is ICTMTransition {
         }
 
         // The engine's code existence is checked by `validate()` on the execution paths, not
-        // here — see {CoreRegistry}. Both release EDGES are validated, though: the
+        // here — see {CoreTransition}. Both release EDGES are validated, though: the
         // delta below is derived from their manifests, so a malformed edge would silently
         // produce a malformed cut.
         // WHICH releases these are is governance's decision, established by review: the
@@ -135,7 +135,7 @@ contract CTMTransition is ICTMTransition {
         // The FINAL plan: the target release's table-derived set (empty for a same-release pair by
         // identity), then the authored delegate and extras at their bytecode-derived addresses,
         // with the factory dependencies of everything installed — constructed, never authored.
-        L2UpgradePlan memory l2Plan = L2PlanLib.build(
+        L2UpgradePlan memory derivedPlan = L2PlanLib.build(
             TransitionDerivationLib.deriveL2Deployments(
                 ICTMRelease(_manifest.fromRelease),
                 ICTMRelease(_manifest.newRelease)
@@ -143,7 +143,7 @@ contract CTMTransition is ICTMTransition {
             _manifest.l2Plan
         );
         // A delegate is itself deployed, so a plan has an L2 side exactly when it deploys.
-        bool hasL2Side = l2Plan.deployments.length != 0;
+        bool hasL2Side = derivedPlan.deployments.length != 0;
         // A same-release transition is schedule-only: the derived facet/deployment delta is
         // empty by construction, and it must not carry an authored L2 payload either.
         if (_manifest.fromRelease == _manifest.newRelease && hasL2Side) {
@@ -169,7 +169,7 @@ contract CTMTransition is ICTMTransition {
         }
 
         encodedManifest = abi.encode(_manifest);
-        encodedL2Plan = abi.encode(l2Plan);
+        encodedL2Plan = abi.encode(derivedPlan);
 
         // Derive the L1 delta from the release pair and freeze it as final diamond cuts.
         Diamond.FacetCut[] memory facetCutsMemory = TransitionDerivationLib.deriveFacetCuts(

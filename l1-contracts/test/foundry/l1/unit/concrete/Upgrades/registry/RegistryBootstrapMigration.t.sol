@@ -1112,7 +1112,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
     /// @dev Two rows for one proxy would BOTH pass the source check (they compare against the same
     ///      pre-migration implementation) and the last would silently win — so the reviewed edge
-    ///      and the executed edge would differ. Same rule {CoreRegistry} enforces.
+    ///      and the executed edge would differ. Same rule {CoreTransition} enforces.
     function test_migrate_runsFixedInitializeUpgradeExactlyOnce() public {
         // A second participating slot whose new implementation must reinitialize: the row
         // carries only a BOOLEAN, and the apply invokes the fixed argument-less selector

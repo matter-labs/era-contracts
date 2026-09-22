@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
-import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol";
+import {CoreTransition} from "contracts/upgrades/registry/objects/CoreTransition.sol";
 import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol";
 import {MockSelfDescribingFacet} from "contracts/dev-contracts/test/MockSelfDescribingFacet.sol";
 import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
@@ -63,7 +63,7 @@ import {
 } from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
 import {
     AuthoredL2Plan,
-    CoreRegistryManifest,
+    CoreTransitionManifest,
     OperationManifest,
     ProxyUpgradeRow,
     GenesisFacet,
@@ -86,7 +86,7 @@ import {
 ///         explicit routing + inline mandatory pins; transitions derive their facet delta
 ///         from the `(fromRelease, newRelease)` pair at initialization.
 contract StorageRegistriesTest is Test {
-    CoreRegistry internal coreRegistry;
+    CoreTransition internal coreTransition;
     CTMRelease internal fromRelease;
     CTMRelease internal newRelease;
     CTMTransition internal transition;
@@ -151,7 +151,7 @@ contract StorageRegistriesTest is Test {
         // A real DiamondInit, the one every fixture release pins.
         diamondInit = address(new DiamondInit());
 
-        coreRegistry = new CoreRegistry(_coreManifest());
+        coreTransition = new CoreTransition(_coreManifest());
         // Releases deploy through the canonical factory: transition initialization enforces
         // factory provenance on BOTH edges.
         fromRelease = new CTMRelease(_fromReleaseManifest());
@@ -166,7 +166,7 @@ contract StorageRegistriesTest is Test {
         vm.etch(addr, bytes.concat(hex"00", bytes(_name)));
     }
 
-    function _coreManifest() internal view returns (CoreRegistryManifest memory manifest) {
+    function _coreManifest() internal view returns (CoreTransitionManifest memory manifest) {
         // One participating slot in the enum-indexed inventory — every other slot's zero
         // `implNew` is the explicit "not upgraded" statement and produces no row.
         manifest.proxyUpgrades = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
@@ -281,7 +281,7 @@ contract StorageRegistriesTest is Test {
     // ─────────────────────────── write-once + lookups ───────────────────────────
 
     function test_manifestsAreCommitted() public view {
-        assertEq(coreRegistry.manifestHash(), keccak256(abi.encode(_coreManifest())));
+        assertEq(coreTransition.manifestHash(), keccak256(abi.encode(_coreManifest())));
         assertEq(newRelease.manifestHash(), keccak256(abi.encode(_newReleaseManifest())));
         assertEq(transition.manifestHash(), keccak256(abi.encode(_transitionManifest())));
     }
@@ -737,10 +737,10 @@ contract StorageRegistriesTest is Test {
     function test_operationWithOnlyACoreChange() public {
         OperationManifest memory manifest = _operationManifest();
         manifest.transition = address(0);
-        manifest.coreRegistry = address(coreRegistry);
+        manifest.coreTransition = address(coreTransition);
 
         EcosystemUpgradeOperation operation = new EcosystemUpgradeOperation(manifest);
-        assertEq(operation.coreRegistry(), address(coreRegistry));
+        assertEq(operation.coreTransition(), address(coreTransition));
         assertEq(operation.transition(), address(0));
         assertEq(operation.ctmInfrastructureRows().length, 0, "no infrastructure row");
         assertEq(operation.manifestHash(), keccak256(abi.encode(manifest)));
@@ -752,7 +752,7 @@ contract StorageRegistriesTest is Test {
         manifest.ctmInfrastructure = _ctmInventoryWithTwoRows();
 
         EcosystemUpgradeOperation operation = new EcosystemUpgradeOperation(manifest);
-        assertEq(operation.coreRegistry(), address(0));
+        assertEq(operation.coreTransition(), address(0));
         assertEq(operation.transition(), address(0), "no chain-version edge is bought for an infrastructure change");
         assertEq(operation.ctmInfrastructureRows().length, 2, "both participating slots become rows");
         operation.validate();
@@ -760,7 +760,7 @@ contract StorageRegistriesTest is Test {
 
     function test_operationWithOnlyATransition() public {
         EcosystemUpgradeOperation operation = new EcosystemUpgradeOperation(_operationManifest());
-        assertEq(operation.coreRegistry(), address(0));
+        assertEq(operation.coreTransition(), address(0));
         assertEq(operation.transition(), address(transition));
         assertEq(operation.ctmInfrastructureRows().length, 0, "no infrastructure row");
     }
@@ -1275,7 +1275,7 @@ contract StorageRegistriesTest is Test {
     }
 
     function test_validateRejectsAMemberThatLostItsCode() public {
-        coreRegistry.validate();
+        coreTransition.validate();
         newRelease.validate();
         transition.validate();
 
@@ -1287,19 +1287,19 @@ contract StorageRegistriesTest is Test {
         vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, facetOldAdmin));
         transition.validate();
 
-        // Same for the core registry's named implementation.
+        // Same for the core transition's named implementation.
         vm.etch(coreImplNew, "");
         vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, coreImplNew));
-        coreRegistry.validate();
+        coreTransition.validate();
     }
 
-    // ─────────────────────────── core registry inventory ───────────────────────────
+    // ─────────────────────────── core transition inventory ───────────────────────────
 
     function test_revertWhen_inventoryLengthDoesNotMatchTheEnum() public {
         // The dynamic inventory must be exactly one slot per enum member, so every contract of
         // the domain HAS a slot and none can be smuggled in. Whether the slot says what the
         // upgrade meant is preparation's job, not this length check's.
-        CoreRegistryManifest memory manifest = _coreManifest();
+        CoreTransitionManifest memory manifest = _coreManifest();
         ProxyUpgradeRow[] memory tooShort = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT - 1);
         tooShort[uint256(L1EcosystemContract.L1Bridgehub)] = manifest.proxyUpgrades[
             uint256(L1EcosystemContract.L1Bridgehub)
@@ -1313,41 +1313,41 @@ contract StorageRegistriesTest is Test {
                 L1_ECOSYSTEM_CONTRACT_COUNT - 1
             )
         );
-        new CoreRegistry(manifest);
+        new CoreTransition(manifest);
     }
 
     function test_revertWhen_upgradingRowMissingSource() public {
         // A participating slot must be a full edge: known source implementation.
-        CoreRegistryManifest memory manifest = _coreManifest();
+        CoreTransitionManifest memory manifest = _coreManifest();
         manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)].expectedOldImpl = address(0);
 
         vm.expectRevert(ZeroAddress.selector);
-        new CoreRegistry(manifest);
+        new CoreTransition(manifest);
     }
 
     function test_inertSlotIsExplicitNotUpgradedAndProducesNoRow() public {
         // A slot with zero `implNew` is the inventory's explicit "not upgraded" statement:
         // it never becomes a row, even when it documents the proxy address it refers to.
-        CoreRegistryManifest memory manifest = _coreManifest();
+        CoreTransitionManifest memory manifest = _coreManifest();
         manifest.proxyUpgrades[uint256(L1EcosystemContract.L1MessageRoot)].proxy = address(0xB002);
 
-        CoreRegistry registry = new CoreRegistry(manifest);
+        CoreTransition registry = new CoreTransition(manifest);
         assertEq(registry.ecosystemRows().length, 1, "the inert slot must be dropped at the flatten boundary");
         assertEq(registry.ecosystemRows()[0].proxy, address(0xB001), "the participating slot must survive");
     }
 
     function test_revertWhen_everyInventorySlotIsInert() public {
         // A registry whose whole inventory is "not upgraded" upgrades nothing — refused.
-        CoreRegistryManifest memory manifest = _coreManifest();
+        CoreTransitionManifest memory manifest = _coreManifest();
         manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)].implNew = address(0);
 
         vm.expectRevert(RegistryUnknownKey.selector);
-        new CoreRegistry(manifest);
+        new CoreTransition(manifest);
     }
 
-    function test_revertWhen_coreRegistryHasDuplicateProxyRow() public {
+    function test_revertWhen_coreTransitionHasDuplicateProxyRow() public {
         // A proxy is routed once: two slots naming the same proxy are rejected.
-        CoreRegistryManifest memory manifest = _coreManifest();
+        CoreTransitionManifest memory manifest = _coreManifest();
         // same proxy again, in another contract's slot
         manifest.proxyUpgrades[uint256(L1EcosystemContract.L1MessageRoot)] = manifest.proxyUpgrades[
             uint256(L1EcosystemContract.L1Bridgehub)
@@ -1359,7 +1359,7 @@ contract StorageRegistriesTest is Test {
                 manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)].proxy
             )
         );
-        new CoreRegistry(manifest);
+        new CoreTransition(manifest);
     }
 
     // ─────────────────────────── CTM-domain inventory ───────────────────────────
@@ -1402,7 +1402,7 @@ contract StorageRegistriesTest is Test {
     function _operationManifest() internal view returns (OperationManifest memory) {
         return
             OperationManifest({
-                coreRegistry: address(0),
+                coreTransition: address(0),
                 ctmInfrastructure: new ProxyUpgradeRow[](CTM_CONTRACT_COUNT),
                 transition: address(transition),
                 timer: upgradeTimer

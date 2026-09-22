@@ -372,7 +372,7 @@ function decodeGovernanceCalls(hex: string): Array<{ target: string; value: ethe
  * of every upgrade after v34, driven by the real toolchain end to end:
  *
  *   1. protocol-ops `upgrade-prepare-all` runs the (trimmed) v35 prepares: the core prepare
- *      deploys one ecosystem implementation and pins it in a `CoreRegistry`; the CTM prepare
+ *      deploys one ecosystem implementation and pins it in a `CoreTransition`; the CTM prepare
  *      deploys the release and the `CTMTransition`, with its timer bound to the coordinator; the
  *      compose step then deploys the `EcosystemUpgradeOperation` naming the registry and the
  *      (executor, transition) leg and emits exactly `stage0/1/2(operation)` on the coordinator.
@@ -452,7 +452,7 @@ async function runRecurringHop(
       external_actions?: string[];
       governance_calls: { stage0_calls: string; stage1_calls: string; stage2_calls: string };
       core: {
-        registry?: { core_registry_addr?: string };
+        registry?: { core_transition_addr?: string };
         upgrade_addresses?: { bridgehub?: { message_root_implementation_addr?: string } };
       };
       ctms: {
@@ -504,11 +504,11 @@ async function runRecurringHop(
     ) {
       throw new Error("the operation transition or coordinator CTM binding differs from the prepared upgrade");
     }
-    const namedRegistry: string = await operation.coreRegistry();
-    const preparedRegistry = merged.core.registry?.core_registry_addr ?? ethers.constants.AddressZero;
-    if (namedRegistry.toLowerCase() !== preparedRegistry.toLowerCase()) {
+    const namedCoreTransition: string = await operation.coreTransition();
+    const preparedCoreTransition = merged.core.registry?.core_transition_addr ?? ethers.constants.AddressZero;
+    if (namedCoreTransition.toLowerCase() !== preparedCoreTransition.toLowerCase()) {
       throw new Error(
-        `the operation names core registry ${namedRegistry}, the core prepare pinned ${preparedRegistry}`
+        `the operation names core transition ${namedCoreTransition}, the core prepare pinned ${preparedCoreTransition}`
       );
     }
     const externalActions = merged.external_actions ?? [];

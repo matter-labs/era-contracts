@@ -12,7 +12,7 @@ not acquire their proxy administration directly.
 
 ## Operation commitment
 
-One immutable operation contains `{coreRegistry, ctmInfrastructure, transition, timer}`: an
+One immutable operation contains `{coreTransition, ctmInfrastructure, transition, timer}`: an
 optional ecosystem change, an optional set of CTM-domain proxy rows, an optional chain-version
 edge, and the mandatory delay before governance may execute. The coordinator is bound to one core
 executor and one CTM executor. The operation describes the change; it does not repeat the executor
@@ -76,7 +76,7 @@ Stage 0 reserves the optional core domain and the CTM, pauses CTM migrations, an
 operation's timer. Domains validate their own committed inputs and authorize their coordinator. The
 CTM also verifies it is the coordinator's bound executor.
 
-Stage 1 checks the timer deadline, applies the optional core registry, then the CTM leg: the
+Stage 1 checks the timer deadline, applies the optional core transition, then the CTM leg: the
 infrastructure rows first, then the transition's version commit when the operation carries one. The
 rows go first because the commit may need a setter that only the implementation this very operation
 installs has. The entire stage is atomic; no CTM callback applies core upgrades independently. The

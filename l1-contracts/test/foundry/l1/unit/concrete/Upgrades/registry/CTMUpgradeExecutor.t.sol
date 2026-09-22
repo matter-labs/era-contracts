@@ -57,7 +57,7 @@ import {
 ///         release/transition objects. See {protocol-docs/ecosystem-upgrade-coordination.md}.
 /// @dev Every fixture transition departs from the fixture's current release toward `release`.
 ///      Each rides a one-leg operation (`_operationFor`) that names NO ecosystem leg
-///      (`coreRegistry` zero), NO infrastructure rows and a fresh zero-delay timer, so stage 1 is
+///      (`coreTransition` zero), NO infrastructure rows and a fresh zero-delay timer, so stage 1 is
 ///      admissible in the same block as stage 0. Suites that need a CTM-domain row, an ecosystem
 ///      leg or a delayed timer build the operation through {OperationFixtures._deployOperation}.
 abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFixtures {

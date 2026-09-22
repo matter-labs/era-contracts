@@ -1,7 +1,7 @@
 # v32 upgrade registries
 
 v32 registries are **storage-backed, write-once contracts**, not generated Solidity. The
-registry code is the general-purpose `CTMRelease` / `CTMTransition` (and `CoreRegistry`) in the
+registry code is the general-purpose `CTMRelease` / `CTMTransition` (and `CoreTransition`) in the
 parent directory; a v32 registry is one of those contracts deployed and then `initialize`-d once
 from an audited manifest. There is no per-version generated `.sol` file and no `gen-registry.ts`.
 

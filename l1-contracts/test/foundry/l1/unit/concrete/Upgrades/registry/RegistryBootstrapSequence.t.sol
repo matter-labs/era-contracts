@@ -13,8 +13,8 @@ import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
-import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol";
-import {ICoreRegistry} from "contracts/upgrades/registry/objects/ICoreRegistry.sol";
+import {CoreTransition} from "contracts/upgrades/registry/objects/CoreTransition.sol";
+import {ICoreTransition} from "contracts/upgrades/registry/objects/ICoreTransition.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
@@ -33,7 +33,7 @@ import {
 import {
     AuthoredL2Plan,
     BootstrapManifest,
-    CoreRegistryManifest,
+    CoreTransitionManifest,
     GenesisFacet,
     ProxyUpgradeRow,
     ReleaseGenesisData,
@@ -69,7 +69,7 @@ contract SeqImplNew {
 ///         edge already deploys, and that the derivation is the same sequence the two v34 prepare
 ///         scripts used to author by hand (see {LegacyBootstrapSequence}).
 /// @dev Driven against real objects throughout — a real `ChainTypeManager`, real OpenZeppelin
-///      `ProxyAdmin`s for both domains, a real `CoreRegistry` and a real
+///      `ProxyAdmin`s for both domains, a real `CoreTransition` and a real
 ///      `RegistryBootstrapMigration` — because the property under test is the derivation, and a
 ///      mocked object would be deriving from the test's own answers. The only mock is the
 ///      ecosystem's `ChainAssetHandler` (the shared CTM fixture's, which the pause window needs);
@@ -82,7 +82,7 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
     EcosystemUpgradeExecutor internal coordinator;
     CTMRelease internal genesisRelease;
     GovernanceUpgradeTimer internal upgradeTimer;
-    ICoreRegistry internal coreRegistry;
+    ICoreTransition internal coreTransition;
 
     /// @dev Production shape: the CTM domain sits under its OWN admin, the ecosystem singletons
     ///      under the shared one. The edge hands each to a different executor.
@@ -133,9 +133,9 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
 
         _mockFacetSelfDescriptions(facetCuts);
         genesisRelease = _deployRelease();
-        coreRegistry = _deployCoreRegistry();
+        coreTransition = _deployCoreTransition();
         migration = new RegistryBootstrapMigration(_manifest());
-        sequence = new RegistryBootstrapSequence(migration, coreRegistry);
+        sequence = new RegistryBootstrapSequence(migration, coreTransition);
     }
 
     // ─────────────────────────────── fixtures ───────────────────────────────
@@ -165,8 +165,8 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
 
     /// @dev One participating ecosystem row, so the core leg is a real edge the completion gate
     ///      can find unapplied.
-    function _deployCoreRegistry() internal returns (ICoreRegistry) {
-        CoreRegistryManifest memory manifest;
+    function _deployCoreTransition() internal returns (ICoreTransition) {
+        CoreTransitionManifest memory manifest;
         manifest.proxyUpgrades = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
         manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)] = ProxyUpgradeRow({
             proxy: address(bridgehubProxy),
@@ -175,7 +175,7 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
             callInitializeUpgrade: false,
             admin: ProxyAdmin(address(0))
         });
-        return ICoreRegistry(address(new CoreRegistry(manifest)));
+        return ICoreTransition(address(new CoreTransition(manifest)));
     }
 
     function _manifest() internal view returns (BootstrapManifest memory) {
@@ -214,7 +214,7 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
                 upgradeTimer: address(upgradeTimer),
                 ecosystemProxyAdmin: address(ecosystemProxyAdmin),
                 coreUpgradeExecutor: address(coreExecutor),
-                coreRegistry: address(coreRegistry),
+                coreTransition: address(coreTransition),
                 ctm: address(chainContractAddress),
                 ctmProxyAdmin: address(ctmProxyAdmin),
                 bootstrapMigration: address(migration),
@@ -250,7 +250,7 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
     function _runCoreLeg() internal {
         ecosystemProxyAdmin.transferOwnership(address(coreExecutor));
         vm.prank(governor);
-        coreExecutor.applyL1Upgrade(coreRegistry);
+        coreExecutor.applyL1Upgrade(coreTransition);
     }
 
     /// @dev Stage 2's unpause, as the fixture's mocked handler sees it.
@@ -329,24 +329,24 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
     /// @dev Retargeted from the removed codehash anchor: the registry is the one input the edge
     ///      does not name, so the sequence still refuses to pin an address that is not deployed —
     ///      stage 1 would otherwise "apply" it against nothing.
-    function test_revertWhen_theCoreRegistryIsNotDeployed() public {
-        address codeless = makeAddr("codelessCoreRegistry");
+    function test_revertWhen_theCoreTransitionIsNotDeployed() public {
+        address codeless = makeAddr("codelessCoreTransition");
         vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, codeless));
-        new RegistryBootstrapSequence(migration, ICoreRegistry(codeless));
+        new RegistryBootstrapSequence(migration, ICoreTransition(codeless));
     }
 
     function test_revertWhen_anInputIsZero() public {
         vm.expectRevert(ZeroAddress.selector);
-        new RegistryBootstrapSequence(migration, ICoreRegistry(address(0)));
+        new RegistryBootstrapSequence(migration, ICoreTransition(address(0)));
 
         vm.expectRevert(ZeroAddress.selector);
-        new RegistryBootstrapSequence(RegistryBootstrapMigration(address(0)), coreRegistry);
+        new RegistryBootstrapSequence(RegistryBootstrapMigration(address(0)), coreTransition);
     }
 
     function test_revertWhen_theMigrationIsNotDeployed() public {
         address codeless = makeAddr("codelessMigration");
         vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, codeless));
-        new RegistryBootstrapSequence(RegistryBootstrapMigration(codeless), coreRegistry);
+        new RegistryBootstrapSequence(RegistryBootstrapMigration(codeless), coreTransition);
     }
 
     // ──────────────────── the completion gate requires BOTH domains ────────────────────

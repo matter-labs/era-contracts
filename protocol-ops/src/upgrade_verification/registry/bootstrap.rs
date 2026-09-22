@@ -40,7 +40,7 @@ use super::package::{BootstrapPackage, VALIDATE_APPLIED_SELECTOR};
 use super::provenance::{expect_code_identity, expect_code_present, tolerate, CodeIdentity};
 use super::rows::verify_rows;
 use super::views::{
-    self, BridgehubView, CTMReleaseView, CTMUpgradeExecutorView, CoreRegistryView,
+    self, BridgehubView, CTMReleaseView, CTMUpgradeExecutorView, CoreTransitionView,
     CoreUpgradeExecutorView, CtmView, EcosystemUpgradeExecutorView, GovernanceUpgradeTimerView,
     ProxyUpgradeRow, RegistryBootstrapMigrationView,
 };
@@ -176,12 +176,12 @@ pub(crate) async fn verify<P: Provider>(
         &mut reviewed,
     )
     .await;
-    if let Some(core_registry_addr) = package.core_registry {
-        verify_core_registry_construction(
+    if let Some(core_transition_addr) = package.core_transition {
+        verify_core_transition_construction(
             provider,
             build,
             result,
-            core_registry_addr,
+            core_transition_addr,
             salts,
             &mut reviewed,
         )
@@ -494,14 +494,14 @@ pub(crate) async fn verify<P: Provider>(
 
     // ── 5. The ecosystem leg ──
     result.print_info("\n== Ecosystem leg ==");
-    if let Some(core_registry_addr) = package.core_registry {
+    if let Some(core_transition_addr) = package.core_transition {
         expect_code_identity(
             provider,
             identity,
             result,
-            "the core registry",
-            core_registry_addr,
-            "CoreRegistry",
+            "the core transition",
+            core_transition_addr,
+            "CoreTransition",
         )
         .await?;
 
@@ -512,11 +512,11 @@ pub(crate) async fn verify<P: Provider>(
             );
             return Ok(());
         };
-        let registry = CoreRegistryView::new(core_registry_addr, provider);
+        let registry = CoreTransitionView::new(core_transition_addr, provider);
         let Some(rows) = tolerate(
             registry.ecosystemRows().call().await,
             result,
-            "the core registry's ecosystemRows()",
+            "the core transition's ecosystemRows()",
         ) else {
             return Ok(());
         };
@@ -526,7 +526,7 @@ pub(crate) async fn verify<P: Provider>(
             .collect();
         verify_rows(provider, result, "ecosystem row", &rows, eco_admin_addr).await?;
     } else {
-        result.report_ok("no core registry: this edge upgrades no shared singletons");
+        result.report_ok("no core transition: this edge upgrades no shared singletons");
     }
 
     // ── 6. The timer that gates the edge ──
@@ -578,7 +578,7 @@ pub(crate) async fn verify<P: Provider>(
         &bindings,
         chain_asset_handler,
         sequence,
-        package.core_registry,
+        package.core_transition,
         &reviewed,
     );
     verify_derived_sequence(provider, result, package, sequence, &authorities).await;
@@ -653,21 +653,21 @@ async fn verify_release_construction<P: Provider>(
     }
 }
 
-/// The core registry's construction, re-derived from the manifest it serves.
-async fn verify_core_registry_construction<P: Provider>(
+/// The core transition's construction, re-derived from the manifest it serves.
+async fn verify_core_transition_construction<P: Provider>(
     provider: &P,
     build: &ReviewedBuild,
     result: &mut VerificationResult,
-    core_registry: Address,
+    core_transition: Address,
     salts: &[B256],
     reviewed: &mut BTreeMap<Address, String>,
 ) {
-    let view = CoreRegistryView::new(core_registry, provider);
+    let view = CoreTransitionView::new(core_transition, provider);
     let manifest = match view.getManifest().call().await {
         Ok(m) => m,
         Err(e) => {
             result.report_error(&format!(
-                "the core registry at {core_registry} does not answer `getManifest()` ({e}): its \
+                "the core transition at {core_transition} does not answer `getManifest()` ({e}): its \
                  construction cannot be verified"
             ));
             return;
@@ -676,18 +676,18 @@ async fn verify_core_registry_construction<P: Provider>(
     if expect_canonical_construction(
         build,
         result,
-        "the core registry",
-        core_registry,
-        "CoreRegistry",
+        "the core transition",
+        core_transition,
+        "CoreTransition",
         &manifest.abi_encode(),
         salts,
     ) {
-        reviewed.insert(core_registry, "the core registry".to_string());
+        reviewed.insert(core_transition, "the core transition".to_string());
     }
 }
 
 /// The bootstrap sequence's construction, from the two objects the verifier already holds — the
-/// migration recovered from stage 1's `migrate()` and the package's core registry — so a
+/// migration recovered from stage 1's `migrate()` and the package's core transition — so a
 /// counterfeit terminating stage 2 fails BEFORE any list it derives is consulted.
 ///
 /// The sequence is recovered from the terminal `validateApplied()` call rather than read from a
@@ -718,10 +718,10 @@ async fn verify_sequence_construction<P: Provider>(
         return Ok(None);
     }
     let label = "the bootstrap sequence terminating stage 2";
-    let Some(core_registry) = package.core_registry else {
+    let Some(core_transition) = package.core_transition else {
         result.report_error(&format!(
-            "{label} at {}: the package names no core registry, but the sequence is constructed \
-             over the edge's core registry, so its construction cannot be re-derived and the \
+            "{label} at {}: the package names no core transition, but the sequence is constructed \
+             over the edge's core transition, so its construction cannot be re-derived and the \
              stage lists it derives cannot be trusted",
             last.target
         ));
@@ -736,7 +736,7 @@ async fn verify_sequence_construction<P: Provider>(
         label,
         last.target,
         "RegistryBootstrapSequence",
-        &constructor_args::registry_bootstrap_sequence(package.migration, core_registry),
+        &constructor_args::registry_bootstrap_sequence(package.migration, core_transition),
         salts,
     ) {
         reviewed.insert(last.target, label.to_string());
@@ -792,7 +792,7 @@ fn edge_authorities(
     bindings: &LifecycleBindings,
     chain_asset_handler: Option<Address>,
     sequence: Option<Address>,
-    core_registry: Option<Address>,
+    core_transition: Option<Address>,
     reviewed: &BTreeMap<Address, String>,
 ) -> BTreeMap<Address, String> {
     let mut authorities = reviewed.clone();
@@ -827,7 +827,7 @@ fn edge_authorities(
         bindings.core_proxy_admin,
         "the ecosystem ProxyAdmin the core executor names",
     );
-    note(core_registry, "the core registry");
+    note(core_transition, "the core transition");
     note(
         chain_asset_handler,
         "the ChainAssetHandler the CTM's Bridgehub names",
@@ -852,7 +852,7 @@ fn edge_authorities(
 /// function — when the bootstrap edge is behind us, it goes.
 ///
 /// `sequence` is the address whose construction [`verify_sequence_construction`] re-derived from
-/// the reviewed migration and core registry; with none, no list is consulted — an oracle the
+/// the reviewed migration and core transition; with none, no list is consulted — an oracle the
 /// package chose says nothing about the bundle until it is shown to be the reviewed object.
 async fn verify_derived_sequence<P: Provider>(
     provider: &P,
@@ -1315,7 +1315,7 @@ mod tests {
     use alloy::transports::mock::Asserter;
 
     const SALT: B256 = B256::repeat_byte(0x5A);
-    const CORE_REGISTRY: Address = Address::repeat_byte(0x08);
+    const CORE_TRANSITION: Address = Address::repeat_byte(0x08);
 
     fn sequence_code() -> Vec<u8> {
         b"reviewed creation code of RegistryBootstrapSequence".to_vec()
@@ -1331,7 +1331,7 @@ mod tests {
 
     fn package_ending_on(sequence: Address) -> BootstrapPackage {
         BootstrapPackage {
-            core_registry: Some(CORE_REGISTRY),
+            core_transition: Some(CORE_TRANSITION),
             release: Address::repeat_byte(0x09),
             upgrade_timer: None,
             migration: MIGRATION,
@@ -1351,9 +1351,9 @@ mod tests {
     }
 
     /// THE finding: the oracle the bundle is compared against was whatever address the package
-    /// chose. A counterfeit sequence answering the reviewed `MIGRATION()` and `CORE_REGISTRY()`
+    /// chose. A counterfeit sequence answering the reviewed `MIGRATION()` and `CORE_TRANSITION()`
     /// with attacker-chosen stage lists passed, and its address was accounted for as a target.
-    /// Now its construction — from the migration and core registry the verifier already holds —
+    /// Now its construction — from the migration and core transition the verifier already holds —
     /// fails first, and nothing it derives is ever read: the queued stage-list answers stay
     /// unconsumed.
     #[tokio::test]
@@ -1403,7 +1403,7 @@ mod tests {
         let genuine = canonical_create2_address(
             SALT,
             &sequence_code(),
-            &constructor_args::registry_bootstrap_sequence(MIGRATION, CORE_REGISTRY),
+            &constructor_args::registry_bootstrap_sequence(MIGRATION, CORE_TRANSITION),
         );
         let mut package = package_ending_on(genuine);
         let gate = action(
@@ -1451,12 +1451,12 @@ mod tests {
         );
     }
 
-    /// A bootstrap package without a core registry has nothing to construct the sequence over:
+    /// A bootstrap package without a core transition has nothing to construct the sequence over:
     /// an error, not a sequence taken on trust.
     #[tokio::test]
-    async fn a_sequence_without_a_core_registry_is_unverifiable() {
+    async fn a_sequence_without_a_core_transition_is_unverifiable() {
         let mut package = package_ending_on(Address::repeat_byte(0xCF));
-        package.core_registry = None;
+        package.core_transition = None;
         let provider = ProviderBuilder::new().connect_mocked_client(Asserter::new());
         let mut result = VerificationResult::default();
         let sequence = verify_sequence_construction(

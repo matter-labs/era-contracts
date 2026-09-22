@@ -56,7 +56,7 @@ runPipelineUpgradeScenario({
       expectsEmptyFacetDelta: true,
     },
     // Then an ordinary MINOR upgrade on top of the patch ("v34 -> v35"): one fresh ecosystem
-    // implementation pinned in a CoreRegistry and a transition naming it. Its only change is on
+    // implementation pinned in a CoreTransition and a transition naming it. Its only change is on
     // the ecosystem side, so the CTM release is untouched and the prepare must reuse it rather
     // than redeploy the facet set.
     {

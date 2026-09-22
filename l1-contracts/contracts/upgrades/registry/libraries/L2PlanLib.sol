@@ -80,10 +80,10 @@ library L2PlanLib {
     ///      bootstrap's migrate), not at construction: publication can legitimately happen after
     ///      the object is built, and it must hold when the edge is committed or the L2
     ///      transaction fails on every chain.
-    function requirePublished(BytecodesSupplier _supplier, uint256[] memory _factoryDepHashes) internal view {
-        uint256 length = _factoryDepHashes.length;
+    function requirePublished(BytecodesSupplier _supplier, uint256[] memory _hashes) internal view {
+        uint256 length = _hashes.length;
         for (uint256 i = 0; i < length; ++i) {
-            bytes32 hash = bytes32(_factoryDepHashes[i]);
+            bytes32 hash = bytes32(_hashes[i]);
             if (_supplier.evmPublishingBlock(hash) == 0) {
                 revert L2BytecodeNotPublished(hash);
             }

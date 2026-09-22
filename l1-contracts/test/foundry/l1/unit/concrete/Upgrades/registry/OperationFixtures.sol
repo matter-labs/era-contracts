@@ -35,18 +35,21 @@ abstract contract OperationFixtures {
 
     function _operationWithCore(
         ICTMTransition _transition,
-        address _coreRegistry
+        address _coreTransition
     ) internal returns (EcosystemUpgradeOperation operation) {
-        operation = _deployOperation(_coreRegistry, address(_transition));
+        operation = _deployOperation(_coreTransition, address(_transition));
         operationOf[address(_transition)] = operation;
     }
 
-    function _deployOperation(address _coreRegistry, address _transition) internal returns (EcosystemUpgradeOperation) {
-        return _deployOperation(_coreRegistry, _emptyInventory(), _transition, _newOperationTimer());
+    function _deployOperation(
+        address _coreTransition,
+        address _transition
+    ) internal returns (EcosystemUpgradeOperation) {
+        return _deployOperation(_coreTransition, _emptyInventory(), _transition, _newOperationTimer());
     }
 
     function _deployOperation(
-        address _coreRegistry,
+        address _coreTransition,
         ProxyUpgradeRow[] memory _ctmInfrastructure,
         address _transition,
         address _timer
@@ -54,7 +57,7 @@ abstract contract OperationFixtures {
         return
             new EcosystemUpgradeOperation(
                 OperationManifest({
-                    coreRegistry: _coreRegistry,
+                    coreTransition: _coreTransition,
                     ctmInfrastructure: _ctmInfrastructure,
                     transition: _transition,
                     timer: _timer

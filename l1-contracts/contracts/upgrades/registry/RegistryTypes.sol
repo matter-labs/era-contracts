@@ -176,15 +176,15 @@ struct ProxyUpgradeRow {
 /// @notice One ecosystem upgrade: what changes, and when governance may execute it. Each of the
 ///         three changes is OPTIONAL, but an operation that changes nothing is refused at
 ///         construction — see {protocol-docs/ecosystem-upgrade-coordination.md}.
-/// @param coreRegistry The ecosystem leg's `CoreRegistry`; zero when no shared singleton changes.
+/// @param coreTransition The ecosystem leg's `CoreTransition`; zero when no shared singleton changes.
 /// @param ctmInfrastructure The CTM-DOMAIN inventory, indexed by {CTMContract} (same slot
 ///        semantics and construction-time length check — `CTM_CONTRACT_COUNT` — as
-///        {CoreRegistryManifest}): implementation swaps for the CTM proxy itself and the per-CTM
+///        {CoreTransitionManifest}): implementation swaps for the CTM proxy itself and the per-CTM
 ///        proxies under its own ProxyAdmin. Applied by the CTM-bound executor BEFORE the version
 ///        commit, so an operation whose commit needs the new CTM implementation carries that swap
 ///        beside it. Ecosystem singletons (bridges, Bridgehub, MessageRoot) are NOT expressible
 ///        here — a CTM is one of possibly many and upgrades on its own cadence; shared contracts
-///        belong to the core registry. All slots zero when the CTM domain's implementations do
+///        belong to the core transition. All slots zero when the CTM domain's implementations do
 ///        not change.
 /// @param transition The `CTMTransition` applied to the coordinator's bound CTM; zero when the
 ///        operation moves no chain version.
@@ -195,22 +195,22 @@ struct ProxyUpgradeRow {
 // Multi-CTM extension: protocol-docs/ecosystem-upgrade-coordination.md#future-multi-ctm-extension
 // solhint-disable-next-line gas-struct-packing
 struct OperationManifest {
-    address coreRegistry;
+    address coreTransition;
     ProxyUpgradeRow[] ctmInfrastructure;
     address transition;
     address timer;
 }
 
-/// @notice Everything a core registry instance pins, set exactly once at construction.
+/// @notice Everything a core transition instance pins, set exactly once at construction.
 /// @dev Carries NO protocol version (version-schedule identity is owned by {CTMTransition})
 ///      and NO proxy admin (the `EcosystemUpgradeExecutor` is bound to its immutable
-///      `ProxyAdmin`). A core registry pins ONLY the ecosystem inventory.
+///      `ProxyAdmin`). A core transition pins ONLY the ecosystem inventory.
 /// @param proxyUpgrades The ecosystem inventory, indexed by {L1EcosystemContract}: slot
 ///        `uint256(member)` is that contract's row and a zero `implNew` is the "not upgraded"
 ///        statement. The length MUST be exactly `L1_ECOSYSTEM_CONTRACT_COUNT` (enforced at
 ///        construction), so every ecosystem contract HAS a slot — which is not the same as every
 ///        intended change having been written into one (see {ProxyUpgradeRowLib.toRows}).
-struct CoreRegistryManifest {
+struct CoreTransitionManifest {
     ProxyUpgradeRow[] proxyUpgrades;
 }
 
@@ -218,7 +218,7 @@ struct CoreRegistryManifest {
 /// @param expectedProtocolVersion The version the CTM must currently be at (the departing one).
 /// @param ctmProxyAdmin The ProxyAdmin owning every proxy in `proxyUpgrades` (and the CTM proxy).
 /// @param proxyUpgrades The CTM-domain inventory, indexed by {CTMContract} (same slot semantics
-///        as {CoreRegistryManifest}): each participating slot applies only if the proxy
+///        as {CoreTransitionManifest}): each participating slot applies only if the proxy
 ///        currently points at `expectedOldImpl`. The CTM's own implementation swap is one of
 ///        these slots. A row under a FOREIGN admin (the
 ///        ServerNotifier's) is left to that administrator: `migrate()` hands onward only

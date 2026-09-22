@@ -17,8 +17,8 @@ interface IEcosystemUpgradeOperation {
     /// @notice The whole manifest, exactly as it was pinned.
     function getManifest() external view returns (OperationManifest memory);
 
-    /// @notice The ecosystem leg's `CoreRegistry`, zero when the operation has none.
-    function coreRegistry() external view returns (address);
+    /// @notice The ecosystem leg's `CoreTransition`, zero when the operation has none.
+    function coreTransition() external view returns (address);
 
     /// @notice The PARTICIPATING CTM-domain rows, flattened from the enum-indexed inventory (the
     ///         slots explicitly marked "not upgraded" are dropped). Empty when the operation

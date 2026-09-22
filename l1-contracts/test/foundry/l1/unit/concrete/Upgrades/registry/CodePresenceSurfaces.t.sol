@@ -8,7 +8,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {CTMUpgradeExecutorFixture} from "./CTMUpgradeExecutor.t.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
-import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol";
+import {CoreTransition} from "contracts/upgrades/registry/objects/CoreTransition.sol";
 import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {
@@ -18,14 +18,14 @@ import {
 } from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {RegistryTargetHasNoCode} from "contracts/common/L1ContractErrors.sol";
 import {
-    CoreRegistryManifest,
+    CoreTransitionManifest,
     ProxyUpgradeRow,
     ReleaseManifest,
     TransitionManifest
 } from "contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @dev The check surface every write-once registry object exposes, so one helper can drive a
-///      release, a transition, a core registry and an operation alike.
+///      release, a transition, a core transition and an operation alike.
 interface IValidatable {
     function validate() external view;
 }
@@ -46,7 +46,7 @@ contract ValidateTargetNew {
 /// @notice `validate()` is the enforcement surface every write-once registry object exposes: it
 ///         refuses a manifest naming a member that is not deployed code (see "Validation" in
 ///         {docs/registry-driven-upgrades.md}). These tests enumerate every contract a release, a
-///         transition, a core registry and an operation name — the MANIFEST is the spec, not the
+///         transition, a core transition and an operation name — the MANIFEST is the spec, not the
 ///         objects' code — and check that emptying any ONE of them is refused with that member's
 ///         own diagnostic, so no named member can be left unchecked.
 /// @dev The transition under test names its optional delegate composer and the operation carries a
@@ -59,7 +59,7 @@ contract CodePresenceSurfacesTest is CTMUpgradeExecutorFixture {
 
     address internal implOld;
     address internal implNew;
-    CoreRegistry internal coreRegistry;
+    CoreTransition internal coreTransition;
     /// @dev The fixture's default transition, under an operation carrying one CTM-domain row.
     CTMTransition internal fullTransition;
     EcosystemUpgradeOperation internal operation;
@@ -76,7 +76,7 @@ contract CodePresenceSurfacesTest is CTMUpgradeExecutorFixture {
             hex""
         );
         ecosystemInventory[uint256(L1EcosystemContract.L1Bridgehub)] = _row(address(ecosystemProxy));
-        coreRegistry = new CoreRegistry(CoreRegistryManifest({proxyUpgrades: ecosystemInventory}));
+        coreTransition = new CoreTransition(CoreTransitionManifest({proxyUpgrades: ecosystemInventory}));
 
         fullTransition = _deployTransition(777);
         TransparentUpgradeableProxy ctmDomainProxy = new TransparentUpgradeableProxy(
@@ -94,7 +94,7 @@ contract CodePresenceSurfacesTest is CTMUpgradeExecutorFixture {
     function test_freshObjectsValidate() public view {
         IValidatable(address(release)).validate();
         IValidatable(address(fullTransition)).validate();
-        IValidatable(address(coreRegistry)).validate();
+        IValidatable(address(coreTransition)).validate();
         IValidatable(address(operation)).validate();
     }
 
@@ -116,7 +116,7 @@ contract CodePresenceSurfacesTest is CTMUpgradeExecutorFixture {
     ///      check, and that operation still validates.
     function test_operationWithoutInfrastructureValidates() public {
         EcosystemUpgradeOperation bare = _deployOperation(
-            address(coreRegistry),
+            address(coreTransition),
             _emptyInventory(),
             address(0),
             _newOperationTimer()
@@ -147,16 +147,16 @@ contract CodePresenceSurfacesTest is CTMUpgradeExecutorFixture {
         }
     }
 
-    function test_everyCoreRegistryRowIsRequiredToHaveCode() public {
-        ProxyUpgradeRow[] memory rows = coreRegistry.ecosystemRows();
+    function test_everyCoreTransitionRowIsRequiredToHaveCode() public {
+        ProxyUpgradeRow[] memory rows = coreTransition.ecosystemRows();
         assertEq(rows.length, 1, "one participating row");
         for (uint256 i = 0; i < rows.length; ++i) {
-            _assertCodelessMemberIsRefused(IValidatable(address(coreRegistry)), rows[i].implNew);
+            _assertCodelessMemberIsRefused(IValidatable(address(coreTransition)), rows[i].implNew);
         }
     }
 
     /// @dev What an operation names ITSELF: the timer and every participating infrastructure row's
-    ///      implementation. The core registry and the transition are objects with their own check
+    ///      implementation. The core transition and the transition are objects with their own check
     ///      surfaces, so the operation deliberately does not walk into them.
     function test_everyOperationMemberIsRequiredToHaveCode() public {
         ProxyUpgradeRow[] memory rows = operation.ctmInfrastructureRows();

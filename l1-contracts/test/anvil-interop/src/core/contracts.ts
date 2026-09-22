@@ -33,7 +33,7 @@ const ARTIFACTS = {
   ISelfDescribingFacet: "ISelfDescribingFacet.sol/ISelfDescribingFacet.json",
   ICTMRelease: "ICTMRelease.sol/ICTMRelease.json",
   ICTMTransition: "ICTMTransition.sol/ICTMTransition.json",
-  ICoreRegistry: "ICoreRegistry.sol/ICoreRegistry.json",
+  ICoreTransition: "ICoreTransition.sol/ICoreTransition.json",
   DefaultUpgrade: "DefaultUpgrade.sol/DefaultUpgrade.json",
   BootstrapUpgrade: "BootstrapUpgrade.sol/BootstrapUpgrade.json",
   DiamondInit: "DiamondInit.sol/DiamondInit.json",
@@ -41,13 +41,13 @@ const ARTIFACTS = {
   ZKsyncOSVerifierPlonk: "ZKsyncOSVerifierPlonk.sol/ZKsyncOSVerifierPlonk.json",
   ProxyAdmin: "ProxyAdmin.sol/ProxyAdmin.json",
   L1MessageRoot: "L1MessageRoot.sol/L1MessageRoot.json",
-  // Write-once release/transition/core-registry objects (contracts/upgrades/registry). Each
+  // Write-once release/CTM-transition/core-transition objects (contracts/upgrades/registry). Each
   // takes its manifest as a CONSTRUCTOR argument, so a plain deployment is the whole creation
   // step. The committed manifest they are built from regenerates via
   // `yarn regen:registry-manifest` (emit mode of the registry upgrade runner).
   CTMRelease: "CTMRelease.sol/CTMRelease.json",
   CTMTransition: "CTMTransition.sol/CTMTransition.json",
-  CoreRegistry: "CoreRegistry.sol/CoreRegistry.json",
+  CoreTransition: "CoreTransition.sol/CoreTransition.json",
   // Bootstrap stage (see bootstrap-upgrade-stage.ts): the one-time entry edge into the
   // registry-driven model, plus the legacy cut-taking entrypoint the harness installs and the
   // CTM implementation the bootstrap's proxy row swaps in.

@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
-import {ICoreRegistry} from "../objects/ICoreRegistry.sol";
+import {ICoreTransition} from "../objects/ICoreTransition.sol";
 import {IEcosystemUpgradeOperation} from "../objects/IEcosystemUpgradeOperation.sol";
 import {ICoreUpgradeExecutor} from "./ICoreUpgradeExecutor.sol";
 import {UpgradeExecutorBase} from "../../../governance/UpgradeExecutorBase.sol";
@@ -21,16 +21,16 @@ import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Domain executor BOUND to the ecosystem `ProxyAdmin`: it owns that admin and applies
-///         the shared-singleton implementation swaps pinned in write-once `CoreRegistry` objects.
+///         the shared-singleton implementation swaps pinned in write-once `CoreTransition` objects.
 ///         Inside an ecosystem upgrade it acts on the coordinator's instructions for exactly the
-///         registry it was reserved for; see {protocol-docs/ecosystem-upgrade-coordination.md}.
-/// @dev Fixed logic, no generic delegatecall. The owner may also apply a registry directly — the
+///         core transition it was reserved for; see {protocol-docs/ecosystem-upgrade-coordination.md}.
+/// @dev Fixed logic, no generic delegatecall. The owner may also apply a core transition directly — the
 ///      bootstrap edge and recovery run that way, outside any operation.
 contract CoreUpgradeExecutor is UpgradeExecutorBase, ICoreUpgradeExecutor {
     using ObjectAnchorLib for address;
 
     /// @notice The ecosystem `ProxyAdmin` — admin of every shared singleton proxy. Owned by this
-    ///         executor, so registry rows apply through the same authority that validates them.
+    ///         executor, so transition rows apply through the same authority that validates them.
     ProxyAdmin public immutable PROXY_ADMIN;
 
     /// @inheritdoc ICoreUpgradeExecutor
@@ -65,47 +65,47 @@ contract CoreUpgradeExecutor is UpgradeExecutorBase, ICoreUpgradeExecutor {
     }
 
     /// @inheritdoc ICoreUpgradeExecutor
-    /// @dev The registry is read from the operation, never passed: the operation is the one place
+    /// @dev The core transition is read from the operation, never passed: the operation is the one place
     ///      it is named.
     function beginOperation(IEcosystemUpgradeOperation _operation) external onlyCoordinator {
         if (address(activeOperation) != address(0)) {
             revert UpgradeLifecycleBusy(address(activeOperation));
         }
-        address coreRegistry = _operation.coreRegistry();
-        if (coreRegistry == address(0)) {
+        address coreTransition = _operation.coreTransition();
+        if (coreTransition == address(0)) {
             revert ZeroAddress();
         }
-        coreRegistry.requireCode();
-        ICoreRegistry(coreRegistry).validate();
+        coreTransition.requireCode();
+        ICoreTransition(coreTransition).validate();
         activeOperation = _operation;
-        emit OperationReserved(address(_operation), coreRegistry);
+        emit OperationReserved(address(_operation), coreTransition);
     }
 
     /// @inheritdoc ICoreUpgradeExecutor
-    function reservedCoreRegistry() public view returns (ICoreRegistry) {
+    function reservedCoreTransition() public view returns (ICoreTransition) {
         if (address(activeOperation) == address(0)) {
-            return ICoreRegistry(address(0));
+            return ICoreTransition(address(0));
         }
-        return ICoreRegistry(activeOperation.coreRegistry());
+        return ICoreTransition(activeOperation.coreTransition());
     }
 
     /// @inheritdoc ICoreUpgradeExecutor
-    /// @dev Callable by the coordinator for exactly the reserved registry, or by the owner for any
-    ///      registry (the bootstrap edge and recovery).
-    function applyL1Upgrade(ICoreRegistry _coreRegistry) external {
+    /// @dev Callable by the coordinator for exactly the reserved core transition, or by the owner
+    ///      for any core transition (the bootstrap edge and recovery).
+    function applyL1Upgrade(ICoreTransition _coreTransition) external {
         if (msg.sender == coordinator) {
-            ICoreRegistry reserved = reservedCoreRegistry();
-            if (address(reserved) != address(_coreRegistry)) {
-                revert LegNotReserved(address(_coreRegistry), address(reserved));
+            ICoreTransition reserved = reservedCoreTransition();
+            if (address(reserved) != address(_coreTransition)) {
+                revert LegNotReserved(address(_coreTransition), address(reserved));
             }
         } else if (msg.sender != owner()) {
             revert Unauthorized(msg.sender);
         }
-        address(_coreRegistry).requireCode();
-        _coreRegistry.validate();
-        // One call returns complete typed rows; no per-key rescans of the registry.
-        ProxyUpgradeRowLib.applyRows(PROXY_ADMIN, _coreRegistry.ecosystemRows());
-        emit L1UpgradeApplied(address(_coreRegistry));
+        address(_coreTransition).requireCode();
+        _coreTransition.validate();
+        // One call returns complete typed rows; no per-key rescans of the transition.
+        ProxyUpgradeRowLib.applyRows(PROXY_ADMIN, _coreTransition.ecosystemRows());
+        emit L1UpgradeApplied(address(_coreTransition));
     }
 
     /// @inheritdoc ICoreUpgradeExecutor
@@ -113,7 +113,7 @@ contract CoreUpgradeExecutor is UpgradeExecutorBase, ICoreUpgradeExecutor {
     ///      the verification, owned by the domain that applied the rows.
     function completeOperation() external onlyCoordinator {
         IEcosystemUpgradeOperation operation = _requireActive();
-        ProxyUpgradeRowLib.requireRowsApplied(PROXY_ADMIN, reservedCoreRegistry().ecosystemRows());
+        ProxyUpgradeRowLib.requireRowsApplied(PROXY_ADMIN, reservedCoreTransition().ecosystemRows());
         delete activeOperation;
         emit OperationCompleted(address(operation));
     }
@@ -136,8 +136,8 @@ contract CoreUpgradeExecutor is UpgradeExecutorBase, ICoreUpgradeExecutor {
     /// @inheritdoc ICoreUpgradeExecutor
     /// @dev The row check describes one edge, not a standing invariant: a later upgrade moves
     ///      proxies past these rows and this then reverts by design.
-    function validateUpgradeApplied(ICoreRegistry _coreRegistry) external view {
-        address(_coreRegistry).requireCode();
-        ProxyUpgradeRowLib.requireRowsApplied(PROXY_ADMIN, _coreRegistry.ecosystemRows());
+    function validateUpgradeApplied(ICoreTransition _coreTransition) external view {
+        address(_coreTransition).requireCode();
+        ProxyUpgradeRowLib.requireRowsApplied(PROXY_ADMIN, _coreTransition.ecosystemRows());
     }
 }

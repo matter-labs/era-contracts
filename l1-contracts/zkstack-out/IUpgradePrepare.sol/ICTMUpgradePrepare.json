@@ -59,7 +59,7 @@
             "internalType": "address"
           },
           {
-            "name": "coreRegistry",
+            "name": "coreTransition",
             "type": "address",
             "internalType": "address"
           }

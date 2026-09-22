@@ -84,7 +84,7 @@ sol! {
     #[sol(rpc)]
     contract RegistryBootstrapSequenceView {
         function MIGRATION() external view returns (address);
-        function CORE_REGISTRY() external view returns (address);
+        function CORE_TRANSITION() external view returns (address);
         function stage0Actions() external view returns (BootstrapAction[] memory);
         function stage1Actions() external view returns (BootstrapAction[] memory);
         function stage2Actions() external view returns (BootstrapAction[] memory);
@@ -125,7 +125,7 @@ sol! {
     /// an `EcosystemUpgradeOperation`, and therefore what its address commits to.
     #[derive(Debug)]
     struct OperationManifest {
-        address coreRegistry;
+        address coreTransition;
         ProxyUpgradeRow[] ctmInfrastructure;
         address transition;
         address timer;
@@ -186,17 +186,17 @@ sol! {
         function pendingOwner() external view returns (address);
     }
 
-    /// Positional mirror of `RegistryTypes.CoreRegistryManifest` — the whole constructor
-    /// argument of a `CoreRegistry`, which is what its address commits to.
+    /// Positional mirror of `RegistryTypes.CoreTransitionManifest` — the whole constructor
+    /// argument of a `CoreTransition`, which is what its address commits to.
     #[derive(Debug)]
-    struct CoreRegistryManifest {
+    struct CoreTransitionManifest {
         ProxyUpgradeRow[] proxyUpgrades;
     }
 
     #[sol(rpc)]
-    contract CoreRegistryView {
+    contract CoreTransitionView {
         function manifestHash() external view returns (bytes32);
-        function getManifest() external view returns (CoreRegistryManifest memory);
+        function getManifest() external view returns (CoreTransitionManifest memory);
         function ecosystemRows() external view returns (ProxyUpgradeRow[] memory);
         function validate() external view;
     }

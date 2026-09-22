@@ -110,7 +110,7 @@ cargo run --release --bin protocol_ops -- ecosystem verify-bootstrap \
 
 In both kinds the executing object is recovered from the CALLDATA governance will run — the
 `[operation]` section for a recurring upgrade, the stage-1 `migrate()` call for a bootstrap — and
-the prepare's summary fields (`ctm_transition_addr`, `core_registry_addr`,
+the prepare's summary fields (`ctm_transition_addr`, `core_transition_addr`,
 `ctm_upgrade_executor_addr`, `upgrade_timer_addr`, `bootstrap_migration_addr`) are cross-checks
 against it. A disagreement is an ERROR: the reviewer read one upgrade and governance would sign
 another.

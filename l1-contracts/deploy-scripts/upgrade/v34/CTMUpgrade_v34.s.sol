@@ -10,7 +10,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
-import {ICoreRegistry} from "contracts/upgrades/registry/objects/ICoreRegistry.sol";
+import {ICoreTransition} from "contracts/upgrades/registry/objects/ICoreTransition.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
 import {BootstrapAction} from "contracts/upgrades/registry/bootstrap/IRegistryBootstrapSequence.sol";
 import {RegistryBootstrapSequence} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapSequence.sol";
@@ -213,12 +213,12 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
             )
         );
 
-        address coreRegistry = upgradeAddresses.coreRegistry;
-        require(coreRegistry != address(0), "coreRegistry not set (core prepare output)");
+        address coreTransition = upgradeAddresses.coreTransition;
+        require(coreTransition != address(0), "coreTransition not set (core prepare output)");
         bootstrapSequence = RegistryBootstrapSequence(
             deployViaCreate2AndNotify(
                 type(RegistryBootstrapSequence).creationCode,
-                abi.encode(bootstrapMigration, ICoreRegistry(coreRegistry)),
+                abi.encode(bootstrapMigration, ICoreTransition(coreTransition)),
                 "RegistryBootstrapSequence"
             )
         );

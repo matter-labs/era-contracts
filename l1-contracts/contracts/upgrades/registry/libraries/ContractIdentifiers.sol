@@ -102,7 +102,7 @@ enum ZKsyncOSUpgradeType {
 
 /// @notice Canonical identifier for L1 ecosystem (core) contracts — the shared singletons of
 ///         the ecosystem domain. ONE enum for both deployment identity and upgrades: member
-///         names are the deploy artifact names, and a `CoreRegistryManifest` carries its
+///         names are the deploy artifact names, and a `CoreTransitionManifest` carries its
 ///         upgrades as a `ProxyUpgradeRow[L1_ECOSYSTEM_CONTRACT_COUNT]` fixed array indexed by
 ///         this enum — slot `uint256(member)` IS that contract's row, and a zero `implNew` in it
 ///         is the "not upgraded" statement. The fixed length guarantees every member HAS a slot;

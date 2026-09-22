@@ -109,7 +109,7 @@ impl ReviewedBuild {
             ),
             ("RegistryBootstrapSequence.sol", "RegistryBootstrapSequence"),
             ("CTMRelease.sol", "CTMRelease"),
-            ("CoreRegistry.sol", "CoreRegistry"),
+            ("CoreTransition.sol", "CoreTransition"),
             ("CTMTransition.sol", "CTMTransition"),
             ("EcosystemUpgradeOperation.sol", "EcosystemUpgradeOperation"),
             ("EcosystemUpgradeExecutor.sol", "EcosystemUpgradeExecutor"),
@@ -369,12 +369,12 @@ pub(crate) mod constructor_args {
             .abi_encode_params()
     }
 
-    /// `RegistryBootstrapSequence(RegistryBootstrapMigration _migration, ICoreRegistry _coreRegistry)`.
+    /// `RegistryBootstrapSequence(RegistryBootstrapMigration _migration, ICoreTransition _coreTransition)`.
     pub(crate) fn registry_bootstrap_sequence(
         migration: Address,
-        core_registry: Address,
+        core_transition: Address,
     ) -> Vec<u8> {
-        (migration, core_registry).abi_encode_params()
+        (migration, core_transition).abi_encode_params()
     }
 }
 
@@ -524,9 +524,9 @@ mod tests {
         assert!(!expect_canonical_construction(
             &reviewed_build(),
             &mut result,
-            "the core registry",
+            "the core transition",
             Address::repeat_byte(0x99),
-            "CoreRegistry",
+            "CoreTransition",
             &args(),
             &[SALT_A],
         ));

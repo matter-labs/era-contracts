@@ -24,7 +24,7 @@ interface IRegistryBootstrapSequence {
     function MIGRATION() external view returns (address);
 
     /// @notice The ecosystem inventory the edge's core leg applies.
-    function CORE_REGISTRY() external view returns (address);
+    function CORE_TRANSITION() external view returns (address);
 
     /// @notice The stage-0 calls, in execution order.
     function stage0Actions() external view returns (BootstrapAction[] memory);

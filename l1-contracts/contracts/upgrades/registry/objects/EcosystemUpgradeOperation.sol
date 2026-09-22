@@ -31,7 +31,7 @@ contract EcosystemUpgradeOperation is IEcosystemUpgradeOperation {
         ProxyUpgradeRowLib.validateRows(rows);
         // An all-inert inventory is not a change: the container's presence must never make an
         // operation that upgrades nothing look like one that upgrades something.
-        if (_manifest.coreRegistry == address(0) && rows.length == 0 && _manifest.transition == address(0)) {
+        if (_manifest.coreTransition == address(0) && rows.length == 0 && _manifest.transition == address(0)) {
             revert OperationChangesNothing();
         }
         encodedManifest = abi.encode(_manifest);
@@ -48,8 +48,8 @@ contract EcosystemUpgradeOperation is IEcosystemUpgradeOperation {
     }
 
     /// @inheritdoc IEcosystemUpgradeOperation
-    function coreRegistry() external view returns (address) {
-        return getManifest().coreRegistry;
+    function coreTransition() external view returns (address) {
+        return getManifest().coreTransition;
     }
 
     /// @inheritdoc IEcosystemUpgradeOperation
@@ -69,7 +69,7 @@ contract EcosystemUpgradeOperation is IEcosystemUpgradeOperation {
 
     /// @inheritdoc IEcosystemUpgradeOperation
     /// @dev THE enumeration of what this operation names ITSELF: the timer and every
-    ///      participating infrastructure row's implementation. The core registry and the
+    ///      participating infrastructure row's implementation. The core transition and the
     ///      transition are objects with check surfaces of their own, driven by the domain
     ///      executors that hold them.
     function validate() external view {

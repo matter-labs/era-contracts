@@ -15,7 +15,7 @@ import {LifecycleImplNew, LifecycleImplOld} from "./CTMUpgradeLifecycle.t.sol";
 import {Utils} from "../../Utils/Utils.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
-import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol";
+import {CoreTransition} from "contracts/upgrades/registry/objects/CoreTransition.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol";
 import {ICTMUpgradeExecutor} from "contracts/upgrades/registry/executors/ICTMUpgradeExecutor.sol";
@@ -43,7 +43,7 @@ import {
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
 import {
-    CoreRegistryManifest,
+    CoreTransitionManifest,
     ProxyUpgradeRow,
     TransitionManifest
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
@@ -58,7 +58,7 @@ contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
     address internal implOld;
     address internal implNew;
     TransparentUpgradeableProxy internal ecosystemProxy;
-    CoreRegistry internal coreRegistry;
+    CoreTransition internal coreTransition;
 
     function setUp() public override {
         super.setUp();
@@ -111,7 +111,7 @@ contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
         implOld = address(new LifecycleImplOld());
         implNew = address(new LifecycleImplNew());
         ecosystemProxy = new TransparentUpgradeableProxy(implOld, address(ecosystemProxyAdmin), hex"");
-        CoreRegistryManifest memory manifest;
+        CoreTransitionManifest memory manifest;
         manifest.proxyUpgrades = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
         manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)] = ProxyUpgradeRow({
             proxy: address(ecosystemProxy),
@@ -120,7 +120,7 @@ contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
             callInitializeUpgrade: false,
             admin: ProxyAdmin(address(0))
         });
-        coreRegistry = new CoreRegistry(manifest);
+        coreTransition = new CoreTransition(manifest);
     }
 
     function _replacement(address _coordinator) internal returns (CTMUpgradeExecutor) {
@@ -219,7 +219,7 @@ contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
         CTMTransition target = _deployTransitionWithDelegate(778, address(fromRelease), 0, unpublished);
         EcosystemUpgradeOperation operation = _operationWithCore(
             ICTMTransition(address(target)),
-            address(coreRegistry)
+            address(coreTransition)
         );
         vm.prank(governor);
         coordinator.stage0(operation);
@@ -254,7 +254,7 @@ contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
     ///      {protocol-docs/ecosystem-upgrade-coordination.md}: whether a CTM change rides along is
     ///      not something the coordinator infers a safe migration window from.
     function test_coreOnlyOperation_stillReservesTheCTMAndPausesMigrations() public {
-        EcosystemUpgradeOperation operation = _deployOperation(address(coreRegistry), address(0));
+        EcosystemUpgradeOperation operation = _deployOperation(address(coreTransition), address(0));
         uint256 ctmVersionBefore = chainContractAddress.protocolVersion();
 
         vm.prank(governor);

@@ -15,7 +15,7 @@ import {CoreUpgradeExecutor} from "../executors/CoreUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "../executors/EcosystemUpgradeExecutor.sol";
 import {ICTMUpgradeExecutor} from "../executors/ICTMUpgradeExecutor.sol";
 import {ObjectAnchorLib} from "../libraries/ObjectAnchorLib.sol";
-import {ICoreRegistry} from "../objects/ICoreRegistry.sol";
+import {ICoreTransition} from "../objects/ICoreTransition.sol";
 import {BootstrapManifest} from "../RegistryTypes.sol";
 import {BootstrapAction, IRegistryBootstrapSequence} from "./IRegistryBootstrapSequence.sol";
 import {RegistryBootstrapMigration} from "./RegistryBootstrapMigration.sol";
@@ -45,22 +45,22 @@ contract RegistryBootstrapSequence is IRegistryBootstrapSequence {
     address public immutable override MIGRATION;
 
     /// @inheritdoc IRegistryBootstrapSequence
-    address public immutable override CORE_REGISTRY;
+    address public immutable override CORE_TRANSITION;
 
     /// @param _migration The write-once edge object this sequence describes.
-    /// @param _coreRegistry The ecosystem inventory the edge's core leg applies.
-    constructor(RegistryBootstrapMigration _migration, ICoreRegistry _coreRegistry) {
-        if (address(_migration) == address(0) || address(_coreRegistry) == address(0)) {
+    /// @param _coreTransition The ecosystem inventory the edge's core leg applies.
+    constructor(RegistryBootstrapMigration _migration, ICoreTransition _coreTransition) {
+        if (address(_migration) == address(0) || address(_coreTransition) == address(0)) {
             revert ZeroAddress();
         }
         address(_migration).requireCode();
         MIGRATION = address(_migration);
-        CORE_REGISTRY = address(_coreRegistry);
-        // The registry is the one input the edge does not name, so the sequence pins it here:
+        CORE_TRANSITION = address(_coreTransition);
+        // The core transition is the one input the edge does not name, so the sequence pins it here:
         // stage 1 applies exactly this address, and a reviewer reads it off the derived calls.
-        // Which registry that is remains governance's decision, established by review — see
+        // Which transition that is remains governance's decision, established by review — see
         // "Provenance and validation" in {docs/registry-driven-upgrades.md}.
-        address(_coreRegistry).requireCode();
+        address(_coreTransition).requireCode();
     }
 
     /// @inheritdoc IRegistryBootstrapSequence
@@ -98,7 +98,7 @@ contract RegistryBootstrapSequence is IRegistryBootstrapSequence {
             call: Call({
                 target: address(coreExecutor),
                 value: 0,
-                data: abi.encodeCall(CoreUpgradeExecutor.applyL1Upgrade, (ICoreRegistry(CORE_REGISTRY)))
+                data: abi.encodeCall(CoreUpgradeExecutor.applyL1Upgrade, (ICoreTransition(CORE_TRANSITION)))
             })
         });
         actions[3] = BootstrapAction({
@@ -172,7 +172,7 @@ contract RegistryBootstrapSequence is IRegistryBootstrapSequence {
     ///      halves ride one call.
     function validateApplied() external view {
         BootstrapManifest memory m = _manifest();
-        _coreExecutor(m.coordinator).validateUpgradeApplied(ICoreRegistry(CORE_REGISTRY));
+        _coreExecutor(m.coordinator).validateUpgradeApplied(ICoreTransition(CORE_TRANSITION));
         RegistryBootstrapMigration(MIGRATION).validateApplied();
     }
 

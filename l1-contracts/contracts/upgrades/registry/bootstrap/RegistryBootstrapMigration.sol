@@ -90,7 +90,7 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
         if (rows.length == 0) {
             revert RegistryUnknownKey();
         }
-        // Same row discipline as {CoreRegistry} and {CTMTransition} (shared lib).
+        // Same row discipline as {CoreTransition} and {CTMTransition} (shared lib).
         ProxyUpgradeRowLib.validateRows(rows);
         // The L2 leg, exactly as a transition constructs it: the genesis release's table (the target
         // state, installed in full — there is no departing release to diff against) plus the

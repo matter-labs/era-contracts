@@ -12,8 +12,8 @@ import {
 import {CTMUpgradeExecutorFixture} from "./CTMUpgradeExecutor.t.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
-import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol";
-import {ICoreRegistry} from "contracts/upgrades/registry/objects/ICoreRegistry.sol";
+import {CoreTransition} from "contracts/upgrades/registry/objects/CoreTransition.sol";
+import {ICoreTransition} from "contracts/upgrades/registry/objects/ICoreTransition.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol";
 import {IEcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/IEcosystemUpgradeOperation.sol";
@@ -50,7 +50,7 @@ import {
     UpgradeStageOutOfOrder
 } from "contracts/common/L1ContractErrors.sol";
 import {
-    CoreRegistryManifest,
+    CoreTransitionManifest,
     ProxyUpgradeRow,
     TransitionManifest
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
@@ -84,7 +84,7 @@ contract LifecycleImplOther {
 ///         EcosystemUpgradeCoordination.t.sol.
 /// @dev The "full" transition adds to the fixture's default a CTM-domain row (a proxy under the
 ///      executor's `ProxyAdmin`, in the `ValidatorTimelock` slot), and its operation names an
-///      ecosystem leg (a `CoreRegistry` with one row over a proxy under the core executor's
+///      ecosystem leg (a `CoreTransition` with one row over a proxy under the core executor's
 ///      `ProxyAdmin`), so both legs of stages 1 and 2 are exercised. The chain-side crossing
 ///      (`upgradeChain`) with a real upgrade engine is RegistryDrivenUpgrade.t.sol's business; the
 ///      fixture engine is a pinned stand-in.
@@ -95,8 +95,8 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
     TransparentUpgradeableProxy internal ctmDomainProxy;
     TransparentUpgradeableProxy internal ecosystemProxy;
     TransparentUpgradeableProxy internal otherEcosystemProxy;
-    CoreRegistry internal coreRegistry;
-    CoreRegistry internal otherCoreRegistry;
+    CoreTransition internal coreTransition;
+    CoreTransition internal otherCoreTransition;
 
     function setUp() public override {
         super.setUp();
@@ -107,8 +107,8 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         ctmDomainProxy = new TransparentUpgradeableProxy(implOld, address(ctmProxyAdmin), hex"");
         ecosystemProxy = new TransparentUpgradeableProxy(implOld, address(ecosystemProxyAdmin), hex"");
         otherEcosystemProxy = new TransparentUpgradeableProxy(implOld, address(ecosystemProxyAdmin), hex"");
-        coreRegistry = _deployCoreRegistry(address(ecosystemProxy));
-        otherCoreRegistry = _deployCoreRegistry(address(otherEcosystemProxy));
+        coreTransition = _deployCoreTransition(address(ecosystemProxy));
+        otherCoreTransition = _deployCoreTransition(address(otherEcosystemProxy));
     }
 
     // ─────────────────────────────── fixtures ───────────────────────────────
@@ -130,11 +130,11 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
 
     /// @dev A registry with one real edge (`implOld -> implNew`) on `_proxy`, in the L1Bridgehub
     ///      slot (the slot is a label — the row's own proxy address is its identity).
-    function _deployCoreRegistry(address _proxy) internal returns (CoreRegistry) {
-        CoreRegistryManifest memory manifest;
+    function _deployCoreTransition(address _proxy) internal returns (CoreTransition) {
+        CoreTransitionManifest memory manifest;
         manifest.proxyUpgrades = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
         manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)] = _row(_proxy, implOld, implNew);
-        return new CoreRegistry(manifest);
+        return new CoreTransition(manifest);
     }
 
     /// @dev The CTM-domain inventory the "full" operation carries: one row over a proxy under
@@ -156,7 +156,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         address _expectedOldImpl
     ) internal returns (EcosystemUpgradeOperation operation) {
         operation = _deployOperation(
-            address(coreRegistry),
+            address(coreTransition),
             _fullInventory(_expectedOldImpl),
             address(_transition),
             _newOperationTimer()
@@ -242,7 +242,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         // Stage 0: the core leg is reserved, then the CTM leg — its migrations pause and its timer
         // starts — and the operation is recorded.
         vm.expectEmit(true, true, true, true, address(coreExecutor));
-        emit ICoreUpgradeExecutor.OperationReserved(address(operation), address(coreRegistry));
+        emit ICoreUpgradeExecutor.OperationReserved(address(operation), address(coreTransition));
         vm.expectEmit(true, true, true, true, address(chainAssetHandler));
         emit IChainAssetHandlerBase.PausedCTMMigration(address(chainContractAddress), address(ctmExecutor));
         vm.expectEmit(true, true, true, true, address(ctmExecutor));
@@ -255,7 +255,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
 
         _assertPendingAndPaused(full, IEcosystemUpgradeExecutor.UpgradeStage.Prepared);
         assertEq(address(coreExecutor.activeOperation()), address(operation), "the core executor is reserved");
-        assertEq(address(coreExecutor.reservedCoreRegistry()), address(coreRegistry), "for the named registry");
+        assertEq(address(coreExecutor.reservedCoreTransition()), address(coreTransition), "for the named registry");
         assertEq(timer.deadline(), block.timestamp, "a zero-delay timer is due in the same block");
         // Nothing moved yet.
         _assertCtmUntouched();
@@ -266,7 +266,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         vm.expectEmit(true, true, true, true, address(coreExecutor));
         emit ProxyUpgradeRowLib.ProxyImplementationUpgraded(address(ecosystemProxy), implNew);
         vm.expectEmit(true, true, true, true, address(coreExecutor));
-        emit ICoreUpgradeExecutor.L1UpgradeApplied(address(coreRegistry));
+        emit ICoreUpgradeExecutor.L1UpgradeApplied(address(coreTransition));
         vm.expectEmit(true, true, true, true, address(ctmExecutor));
         emit ProxyUpgradeRowLib.ProxyImplementationUpgraded(address(ctmDomainProxy), implNew);
         vm.expectEmit(true, true, true, true, address(chainContractAddress));
@@ -300,14 +300,14 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)), "stage 2 unpauses migrations");
         // The post-state checks keep holding on their own after completion.
         ctmExecutor.validateOperationApplied(operation);
-        coreExecutor.validateUpgradeApplied(ICoreRegistry(address(coreRegistry)));
+        coreExecutor.validateUpgradeApplied(ICoreTransition(address(coreTransition)));
     }
 
     /// @dev The operation is the reviewable, queryable record of what was prepared.
     function test_operationManifestIsQueryable() public {
         CTMTransition full = _deployFullTransition();
         EcosystemUpgradeOperation operation = _operationFor(full);
-        assertEq(operation.coreRegistry(), address(coreRegistry));
+        assertEq(operation.coreTransition(), address(coreTransition));
         assertEq(operation.transition(), address(full));
         assertEq(address(coordinator.ctmExecutor()), address(ctmExecutor));
         assertEq(operation.manifestHash(), keccak256(abi.encode(operation.getManifest())));
@@ -689,7 +689,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         // An ecosystem leg too, so the rollback below covers BOTH domains' reservations — the
         // timer is the last thing stage 0 touches.
         EcosystemUpgradeOperation operation = _deployOperation(
-            address(coreRegistry),
+            address(coreTransition),
             _emptyInventory(),
             address(mistimed),
             address(unbound)
@@ -758,9 +758,9 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
     ///      core leg is not DEPLOYED, and it refuses it where it always did — at the reservation,
     ///      before any leg is paused. Without the check a call into the codeless address would
     ///      succeed silently and the leg would report itself reserved over nothing.
-    function test_revertWhen_stage0NamesAnUndeployedCoreRegistry() public {
+    function test_revertWhen_stage0NamesAnUndeployedCoreTransition() public {
         // The operation names whatever address it is given.
-        address codeless = makeAddr("codelessCoreRegistry");
+        address codeless = makeAddr("codelessCoreTransition");
         EcosystemUpgradeOperation misnamed = _operationWithCore(ICTMTransition(address(transition)), codeless);
 
         vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, codeless));
@@ -969,9 +969,9 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
     ///      edge and recovery apply a registry directly.
     function test_ecosystemLeg_ownerStillAppliesDirectly() public {
         vm.expectEmit(true, true, true, true, address(coreExecutor));
-        emit ICoreUpgradeExecutor.L1UpgradeApplied(address(coreRegistry));
+        emit ICoreUpgradeExecutor.L1UpgradeApplied(address(coreTransition));
         vm.prank(governor);
-        coreExecutor.applyL1Upgrade(ICoreRegistry(address(coreRegistry)));
+        coreExecutor.applyL1Upgrade(ICoreTransition(address(coreTransition)));
         assertEq(_liveImpl(ecosystemProxyAdmin, ecosystemProxy), implNew);
     }
 

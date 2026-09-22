@@ -2,7 +2,7 @@
  * Registry manifest -> initialize() arguments.
  *
  * The storage-backed, write-once upgrade objects (`CTMRelease` / `CTMTransition` /
- * `CoreRegistry`, contracts/upgrades/registry) are fixed, audited-once implementations
+ * `CoreTransition`, contracts/upgrades/registry) are fixed, audited-once implementations
  * initialized exactly once with a full manifest struct. This module translates the committed
  * manifest JSON (scripts/registry-manifests/*.json — the reviewable per-upgrade artifact) into
  * the `initialize()` argument objects ethers encodes against the contract ABIs:
@@ -14,7 +14,7 @@
  *     Carries NO facet swaps and NO hash changes: the delta is DERIVED on-chain from the
  *     `(fromRelease, newRelease)` pair at initialization. What is authored: version edge,
  *     upgrade engine, schedule, and the typed `L2UpgradePlan`.
- *   - `CoreRegistry.CoreRegistryManifest` — the ecosystem inventory: a fixed-length row array
+ *   - `CoreTransition.CoreTransitionManifest` — the ecosystem inventory: a fixed-length row array
  *     indexed by `L1EcosystemContract`, source-checked rows in the participating slots, zero
  *     `implNew` in the explicitly-not-upgraded ones.
  *
@@ -120,7 +120,7 @@ export function l2BytecodeInfoSlots(rows: Record<string, string>): string[] {
 // Loose manifest typing: the JSON schema is owned by the emit side of the upgrade runner.
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-/** `CoreRegistry.CoreRegistryManifest` initialize argument from the manifest JSON. */
+/** `CoreTransition.CoreTransitionManifest` initialize argument from the manifest JSON. */
 export function coreInitArgs(manifest: any): any {
   // The JSON keys under `core.contracts` ARE `L1EcosystemContract` member names — one naming
   // scheme for deployment and upgrades alike, with unknown keys refused at encode time.
@@ -221,9 +221,9 @@ export function transitionInitArgs(manifest: any, ctm: any, newRelease: string, 
  * local hop upgrades chain state only, so the manifest carries no infrastructure slots and every
  * one encodes as the explicit zero ("not upgraded") row.
  */
-export function operationInitArgs(ctm: any, coreRegistry: string, transition: string, timer: string): any {
+export function operationInitArgs(ctm: any, coreTransition: string, transition: string, timer: string): any {
   return {
-    coreRegistry,
+    coreTransition,
     ctmInfrastructure: proxyUpgradeSlots("CTMContract", ctm.transition?.proxyUpgrades ?? {}),
     transition,
     timer,
