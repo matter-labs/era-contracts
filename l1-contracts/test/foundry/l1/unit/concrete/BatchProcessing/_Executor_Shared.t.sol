@@ -239,7 +239,6 @@ contract ExecutorTest is UtilsCallMockerTest {
             abi.encodeWithSelector(IBridgehubBase.chainTypeManager.selector),
             abi.encode(makeAddr("chainTypeManager"))
         );
-        address interopCenter = makeAddr("interopCenter");
         dummyBridgehub.setMessageRoot(address(messageRoot));
         sharedBridge = new DummyBaseTokenBridge();
         // dummyBridgehub.setChainAssetHandler(address(chainAssetHandler));

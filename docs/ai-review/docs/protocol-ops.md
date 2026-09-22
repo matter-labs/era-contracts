@@ -130,7 +130,9 @@ So the main protocol-ops commands are **simulator + bundle emitters**, not direc
 
 `ecosystem governance-toml-to-simulator` is the transaction-simulator bridge: it reads a prepared protocol-ops governance TOML, decodes `stage0_calls` / `stage1_calls` / `stage2_calls`, and emits the simulator's JSON transaction list.
 
-Sharp edge: the merged file is `<env-out>/ecosystem.toml` (the parent of the `--out` `prepare/` directory), and both `upgrade-governance --env` and `governance-toml-to-simulator --env` auto-discover it there. The clap help of `upgrade-prepare-all` / `upgrade-governance` still names `<out>/prepare/governance.toml`, which is stale; when in doubt pass `--governance-toml` explicitly.
+`upgrade-prepare-all` writes the canonical merged artifact to `<env-out>/ecosystem.toml`.
+Both `upgrade-governance --env` and `governance-toml-to-simulator --env` discover that path; use
+`--governance-toml` only to replay an explicitly selected artifact.
 
 ## High-level architecture
 

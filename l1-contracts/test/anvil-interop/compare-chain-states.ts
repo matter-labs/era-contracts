@@ -2,12 +2,13 @@
  * Compare two chain-state directories, ignoring non-deterministic Anvil fields.
  *
  * With FOUNDRY_PROFILE=anvil-interop (cbor_metadata=false), bytecode and CREATE2
- * addresses are fully deterministic. The only remaining non-deterministic fields are:
+ * addresses are fully deterministic. The remaining non-deterministic fields include:
  *   - Block-level: timestamp, basefee, prevrandao, difficulty
  *   - Account balances: minor variations from basefee-dependent gas costs
+ *   - Priority-operation timestamps and gas-sensitive priority-tree hashes
  *   - blocks/transactions arrays: contain hashes derived from the above
  *
- * This script compares everything except those known volatile fields.
+ * This script compares all accounts and the deterministic projection of chain-diamond storage.
  *
  * Usage:
  *     npx ts-node compare-chain-states.ts <committed-dir> <generated-dir>
@@ -61,31 +62,86 @@ const GAS_PAYER_BALANCE_ACCOUNTS = new Set(["0xf39fd6e51aad88f6f4ce6ab8827279cff
 // exactly these by explicit identity — NOT by value magnitude, since many real
 // slots legitimately hold small integers (0/1/2).
 
-// Accounts whose storage is a block/batch-indexed accumulator, so ~all of it legitimately drifts
-// run-to-run — skip storage compare entirely. Two sources: the fixed L2MessageRoot predeploy
-// (0x…010005; block-indexed roots, trees, batch counters), plus deployment-specific L1 contracts
-// resolved by role from addresses.json (L1 messageRoot and every chain diamond proxy — see
-// collectSkipStorageAccounts). The L1NativeTokenVault is NOT skipped wholesale; its single
-// gas-dependent `bridgedOut[ETH]` slot is handled by GAS_DEPENDENT_VALUE_SLOTS. Everything not in
-// this set is still storage-compared exactly.
+// MessageRoot storage is a block/batch-indexed accumulator, so ~all of it legitimately drifts
+// run-to-run. Chain diamonds are handled separately: their deterministic fixed-layout state and
+// facet membership are compared, while their gas-sensitive priority-tree contents are not.
 const BLOCK_INDEXED_STORAGE_ACCOUNTS = new Set(["0x0000000000000000000000000000000000010005"]);
 
-// Resolve the deployment-specific batch-indexed / fee-dependent L1 contracts by
-// role from the committed addresses.json, unioned with the fixed set above.
-function collectSkipStorageAccounts(versionDir: string): Set<string> {
+interface StorageAccountPolicies {
+  skip: Set<string>;
+  diamonds: Set<string>;
+}
+
+// Resolve deployment-specific MessageRoot and chain-diamond addresses by role. Only MessageRoot is
+// skipped wholesale; diamonds ignore only the explicitly derived volatile slots below.
+function collectStorageAccountPolicies(versionDir: string): StorageAccountPolicies {
   const skip = new Set(BLOCK_INDEXED_STORAGE_ACCOUNTS);
+  const diamonds = new Set<string>();
   const p = path.join(versionDir, "addresses.json");
-  if (!fs.existsSync(p)) return skip;
+  if (!fs.existsSync(p)) return { skip, diamonds };
   const a = JSON.parse(fs.readFileSync(p, "utf-8")) as {
     l1Addresses?: { messageRoot?: string };
     chainAddresses?: Array<{ diamondProxy?: string }>;
   };
-  const add = (v: unknown) => {
-    if (typeof v === "string" && /^0x[0-9a-fA-F]{40}$/.test(v)) skip.add(v.toLowerCase());
+  const add = (set: Set<string>, v: unknown) => {
+    if (typeof v === "string" && /^0x[0-9a-fA-F]{40}$/.test(v)) set.add(v.toLowerCase());
   };
-  add(a.l1Addresses?.messageRoot);
-  for (const c of a.chainAddresses ?? []) add(c.diamondProxy);
-  return skip;
+  add(skip, a.l1Addresses?.messageRoot);
+  for (const c of a.chainAddresses ?? []) add(diamonds, c.diamondProxy);
+  return { skip, diamonds };
+}
+
+const PRIORITY_TREE_START_INDEX_SLOT = 51n;
+const PRIORITY_TREE_NEXT_LEAF_INDEX_SLOT = 54n;
+const PRIORITY_TREE_SIDES_LENGTH_SLOT = 55n;
+const PRIORITY_OPS_REQUEST_TIMESTAMP_MAPPING_SLOT = 65n;
+const LAST_TOKEN_MULTIPLIER_UPDATE_TIMESTAMP_SLOT = 67n;
+
+function slotKey(slot: bigint): string {
+  return `0x${slot.toString(16).padStart(64, "0")}`;
+}
+
+function storageWord(storage: Record<string, string>, slot: bigint): bigint {
+  const key = `0x${slot.toString(16).padStart(64, "0")}`;
+  return BigInt(storage[key] ?? "0x0");
+}
+
+// Priority-operation timestamps and Merkle-tree sides depend on interval-mining progress and
+// gas-sensitive priority transactions. Derive only those storage locations from the fixed-layout
+// tree metadata; every other diamond slot is compared by default.
+function ignoredDiamondSlots(
+  committedStorage: Record<string, string>,
+  generatedStorage: Record<string, string>
+): Set<string> {
+  const ignored = new Set([slotKey(LAST_TOKEN_MULTIPLIER_UPDATE_TIMESTAMP_SLOT)]);
+
+  const sidesLength = [
+    storageWord(committedStorage, PRIORITY_TREE_SIDES_LENGTH_SLOT),
+    storageWord(generatedStorage, PRIORITY_TREE_SIDES_LENGTH_SLOT),
+  ].reduce((max, value) => (value > max ? value : max), 0n);
+  const sidesStart = BigInt(
+    utils.keccak256(utils.defaultAbiCoder.encode(["uint256"], [PRIORITY_TREE_SIDES_LENGTH_SLOT]))
+  );
+  for (let index = 0n; index < sidesLength; index++) {
+    ignored.add(slotKey(sidesStart + index));
+  }
+
+  for (const storage of [committedStorage, generatedStorage]) {
+    const startIndex = storageWord(storage, PRIORITY_TREE_START_INDEX_SLOT);
+    const nextLeafIndex = storageWord(storage, PRIORITY_TREE_NEXT_LEAF_INDEX_SLOT);
+    for (let index = startIndex; index < startIndex + nextLeafIndex; index++) {
+      ignored.add(
+        utils.keccak256(
+          utils.defaultAbiCoder.encode(
+            ["uint256", "uint256"],
+            [index.toString(), PRIORITY_OPS_REQUEST_TIMESTAMP_MAPPING_SLOT]
+          )
+        )
+      );
+    }
+  }
+
+  return ignored;
 }
 
 // `ChainTypeManager.upgradeCutDataBlock` and `.newChainCreationParamsBlock` (storage indices 166
@@ -163,7 +219,7 @@ function compareChainState(
   data1: ChainStateData,
   data2: ChainStateData,
   name: string,
-  skipStorageAccounts: Set<string>
+  storagePolicies: StorageAccountPolicies
 ): string[] {
   const diffs: string[] = [];
 
@@ -217,18 +273,22 @@ function compareChainState(
       }
     }
 
-    // Skip storage for batch-indexed / fee-dependent contracts (MessageRoots,
-    // chain diamonds): their state tracks the non-deterministic block count.
-    if (!skipStorageAccounts.has(addr.toLowerCase())) {
+    // MessageRoot is wholly block-indexed. Diamonds compare their deterministic projection; every
+    // other account compares all storage except the explicit global drift slots below.
+    if (!storagePolicies.skip.has(addr.toLowerCase())) {
       const s1 = a1.storage || {};
       const s2 = a2.storage || {};
       if (JSON.stringify(s1) !== JSON.stringify(s2)) {
         const allSlots = [...new Set([...Object.keys(s1), ...Object.keys(s2)])].sort();
+        const ignoredSlots = storagePolicies.diamonds.has(addr.toLowerCase())
+          ? ignoredDiamondSlots(s1, s2)
+          : new Set<string>();
         // Drop the explicitly-listed block-number slots (see above) and tolerate
         // gas-scale drift on the known gas-dependent value slots; everything else
         // must match exactly.
         const diffSlots = allSlots.filter((s) => {
           if (s1[s] === s2[s]) return false;
+          if (ignoredSlots.has(s)) return false;
           if (BLOCK_NUMBER_STORAGE_SLOTS.has(s)) return false;
           if (GAS_DEPENDENT_VALUE_SLOTS.has(s) && withinBalanceTolerance(s1[s], s2[s])) return false;
           return true;
@@ -261,7 +321,12 @@ function compareChainState(
   return diffs;
 }
 
-function compareJsonFiles(path1: string, path2: string, name: string, skipStorageAccounts: Set<string>): string[] {
+function compareJsonFiles(
+  path1: string,
+  path2: string,
+  name: string,
+  storagePolicies: StorageAccountPolicies
+): string[] {
   if (!fs.existsSync(path1)) return [`  Missing in committed: ${name}`];
   if (!fs.existsSync(path2)) return [`  Missing in generated: ${name}`];
 
@@ -284,7 +349,50 @@ function compareJsonFiles(path1: string, path2: string, name: string, skipStorag
     return [];
   }
 
-  return compareChainState(data1 as ChainStateData, data2 as ChainStateData, name, skipStorageAccounts);
+  return compareChainState(data1 as ChainStateData, data2 as ChainStateData, name, storagePolicies);
+}
+
+export function compareStateDirectories(committedDir: string, generatedDir: string): string[] {
+  const allDiffs: string[] = [];
+  const listVersionDirs = (root: string) =>
+    fs
+      .readdirSync(root)
+      .filter((entry) => fs.statSync(path.join(root, entry)).isDirectory())
+      .sort();
+  const committedVersions = listVersionDirs(committedDir);
+  const generatedVersions = listVersionDirs(generatedDir);
+  const committedVersionSet = new Set(committedVersions);
+  const generatedVersionSet = new Set(generatedVersions);
+
+  for (const versionDir of committedVersions.filter((entry) => !generatedVersionSet.has(entry))) {
+    allDiffs.push(`Missing version directory in generated: ${versionDir}`);
+  }
+  for (const versionDir of generatedVersions.filter((entry) => !committedVersionSet.has(entry))) {
+    allDiffs.push(`Missing version directory in committed: ${versionDir}`);
+  }
+
+  for (const versionDir of committedVersions.filter((entry) => generatedVersionSet.has(entry))) {
+    const committedVersion = path.join(committedDir, versionDir);
+    const generatedVersion = path.join(generatedDir, versionDir);
+
+    const storagePolicies = collectStorageAccountPolicies(committedVersion);
+
+    const isStateFile = (f: string) => f.endsWith(".json") || f.endsWith(".json.gz");
+    const allFiles = [
+      ...new Set([
+        ...fs.readdirSync(committedVersion).filter(isStateFile),
+        ...fs.readdirSync(generatedVersion).filter(isStateFile),
+      ]),
+    ].sort();
+
+    for (const filename of allFiles) {
+      const p1 = path.join(committedVersion, filename);
+      const p2 = path.join(generatedVersion, filename);
+      allDiffs.push(...compareJsonFiles(p1, p2, `${versionDir}/${filename}`, storagePolicies));
+    }
+  }
+
+  return allDiffs;
 }
 
 function main() {
@@ -302,54 +410,7 @@ function main() {
     }
   }
 
-  const allDiffs: string[] = [];
-
-  // The union, not just the committed side: a protocol bump adds a version directory that exists
-  // only in the generated tree, and iterating the committed tree alone reports "up to date" for it.
-  // Callers use this verdict to decide whether snapshots need committing, so a generated-only
-  // version has to register as a difference.
-  const isVersionDir = (root: string, name: string) => {
-    const p = path.join(root, name);
-    return fs.existsSync(p) && fs.statSync(p).isDirectory();
-  };
-  const versionDirs = [
-    ...new Set([
-      ...fs.readdirSync(committedDir).filter((d) => isVersionDir(committedDir, d)),
-      ...fs.readdirSync(generatedDir).filter((d) => isVersionDir(generatedDir, d)),
-    ]),
-  ].sort();
-
-  for (const versionDir of versionDirs) {
-    const committedVersion = path.join(committedDir, versionDir);
-    const generatedVersion = path.join(generatedDir, versionDir);
-
-    if (!isVersionDir(committedDir, versionDir)) {
-      allDiffs.push(`Missing version directory in committed: ${versionDir}`);
-      continue;
-    }
-    if (!isVersionDir(generatedDir, versionDir)) {
-      allDiffs.push(`Missing version directory in generated: ${versionDir}`);
-      continue;
-    }
-
-    // Resolve batch-indexed / fee-dependent contracts (whose storage to skip)
-    // by role from this version's committed addresses.json.
-    const skipStorageAccounts = collectSkipStorageAccounts(committedVersion);
-
-    const isStateFile = (f: string) => f.endsWith(".json") || f.endsWith(".json.gz");
-    const allFiles = [
-      ...new Set([
-        ...fs.readdirSync(committedVersion).filter(isStateFile),
-        ...fs.readdirSync(generatedVersion).filter(isStateFile),
-      ]),
-    ].sort();
-
-    for (const filename of allFiles) {
-      const p1 = path.join(committedVersion, filename);
-      const p2 = path.join(generatedVersion, filename);
-      allDiffs.push(...compareJsonFiles(p1, p2, `${versionDir}/${filename}`, skipStorageAccounts));
-    }
-  }
+  const allDiffs = compareStateDirectories(committedDir, generatedDir);
 
   if (allDiffs.length > 0) {
     console.log("Chain state differences found:");
@@ -363,4 +424,4 @@ function main() {
   }
 }
 
-main();
+if (require.main === module) main();

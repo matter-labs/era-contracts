@@ -29,7 +29,6 @@ contract UpgradeLogicTest is DiamondCutTest {
     AdminFacet private proxyAsAdmin;
     GettersFacet private proxyAsGetters;
     PermissionlessValidator private permissionlessValidator;
-    address interopCenter = makeAddr("interopCenter");
     address private admin;
     address private chainTypeManager;
     address private randomSigner;

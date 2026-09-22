@@ -15,6 +15,8 @@ error AddressHasNoCode(address);
 error AddressMismatch(address expected, address supplied);
 // 0x42573d7a
 error AddressNotZero();
+// 0x2271414b
+error AirbenderVerificationFailed();
 // 0xb577eb6c
 error AlreadyDangerousContract(address);
 // 0x2a5989a0
@@ -145,6 +147,8 @@ error EmptyAddress();
 error EmptyAssetId();
 // 0x99d8fec9
 error EmptyData();
+// 0x668fd6f3
+error EmptyProof();
 // 0x456f8f7a
 error EmptyProofLength();
 // 0x05410cbc
@@ -210,10 +214,14 @@ error InvalidChainId();
 error InvalidDAForPermanentRollup();
 // 0x4fbe5dba
 error InvalidDelay();
+// 0x1b6712bc
+error InvalidDisabledProofSystemsMask(uint8 disabledProofSystems);
 // 0x3f98a77e
 error InvalidL2DACommitmentScheme(L2DACommitmentScheme);
 // 0xa1ec1876
 error InvalidMessageRoot(bytes32 expectedMessageRoot, bytes32 providedMessageRoot);
+// 0x44addc9d
+error InvalidMockProof();
 // 0xd08a97e6
 error InvalidMockProofLength();
 // 0xde4c0b96
@@ -222,8 +230,12 @@ error InvalidNTVBurnData();
 error InvalidNumberOfBlobs(uint256 expected, uint256 numCommitments, uint256 numHashes);
 // 0x09bde339
 error InvalidProof();
+// 0x5a1c353a
+error InvalidProofFormat();
 // 0x48c5fa28
 error InvalidProofLengthForFinalNode();
+// 0xb846fbd8
+error InvalidProofSystem(uint8 proofSystem);
 // 0x5428eae7
 error InvalidProtocolVersion();
 // 0x6f1cf752
@@ -266,6 +278,8 @@ error MigrationPaused();
 error MigrationsNotPaused();
 // 0x7e472272
 error MissingBaseTokenAssetId();
+// 0x890bd607
+error MockProofTooShort();
 // 0x1508fb47
 error MockVerifierNotSupported();
 // 0x4a094431
@@ -368,6 +382,8 @@ error PriorityOperationsRollingHashMismatch();
 error PriorityOpsRequestTimestampMissing(uint256 requestId);
 // 0x1a4d284a
 error PriorityTxPubdataExceedsMaxPubDataPerBatch();
+// 0x7672156c
+error ProofTooShort();
 // 0xa461f651
 error ProtocolIdMismatch(uint256 expectedProtocolVersion, uint256 providedProtocolId);
 // 0x64f94ec2
@@ -472,6 +488,10 @@ error UnallowedImplementation(bytes32 implementationHash);
 error Unauthorized(address caller);
 // 0xe52478c7
 error UndefinedDiamondCutAction();
+// 0x8124d8ff
+error UnexpectedUpgradeSelector();
+// 0xe15dc31a
+error UnknownProofType(uint256 proofType);
 // 0xc352bb73
 error UnknownVerifierType();
 // 0xf3dd1b9c
@@ -514,6 +534,8 @@ error ZeroChainId();
 error ZeroDeploymentNonce();
 // 0x16787758
 error ZeroUpgradeTimestamp();
+// 0xfd38e2f9
+error ZiskVerificationFailed();
 // 0x601b6882
 error ZKChainLimitReached();
 // 0xb2cabab5

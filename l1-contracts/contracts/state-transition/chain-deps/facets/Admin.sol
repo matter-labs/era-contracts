@@ -6,6 +6,7 @@ import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {ISelfDescribingFacet} from "../../chain-interfaces/ISelfDescribingFacet.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {
+    ProofSystem,
     L2DACommitmentScheme,
     PubdataContent,
     MAX_GAS_PER_TRANSACTION,
@@ -38,6 +39,7 @@ import {
     DiamondNotFrozen,
     FeeParamsChangeTooLarge,
     InvalidDAForPermanentRollup,
+    InvalidProofSystem,
     InvalidL2DACommitmentScheme,
     InvalidPubdataPricingMode,
     NonFullPubdataContentForPermanentRollup,
@@ -387,6 +389,21 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
     }
 
     /// @inheritdoc IAdmin
+    function setProofSystemStatus(ProofSystem _proofSystem, bool _enabled) external onlyAdmin {
+        if (_proofSystem != ProofSystem.Zisk) {
+            revert InvalidProofSystem(uint8(_proofSystem));
+        }
+        // The emergency switch must also work while committed batches wait for a proof.
+        uint8 proofSystemMask = uint8(1 << uint8(_proofSystem));
+        uint8 oldDisabledProofSystems = s.disabledProofSystems;
+        uint8 newDisabledProofSystems = _enabled
+            ? oldDisabledProofSystems & ~proofSystemMask
+            : oldDisabledProofSystems | proofSystemMask;
+        s.disabledProofSystems = newDisabledProofSystems;
+        emit NewDisabledProofSystems(oldDisabledProofSystems, newDisabledProofSystems);
+    }
+
+    /// @inheritdoc IAdmin
     function makePermanentRollup() external onlyAdmin onlySettlementLayer {
         if (s.isPermanentRollup) {
             revert AlreadyPermanentRollup();
@@ -601,7 +618,7 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
     ///      0x03129ad9 upgradeChainFromVersion(address,uint256)
     function selectors() public pure returns (bytes4[] memory result) {
         bytes
-            memory packed = hex"03129ad90e18b681173389451b48b94a21f603d7235d9eb523b311922765d07927ae4c162f257a5c4623c91d4dd18bf560eae0e764bf8d666e762e98a9f6d941b4fcb577be6f11cfc5f1f1f5d241f618e51935f5e76db865f9afb97e";
+            memory packed = hex"03129ad90e18b681173389451b48b94a21f603d7235d9eb523b311922765d07927ae4c162f257a5c4623c91d4dd18bf560eae0e764bf8d666e762e98a9f6d941b4fcb577be6f11cfc5f1f1f5d241f618e51935f5e76db865f4560a66f9afb97e";
         uint256 count = packed.length / 4;
         result = new bytes4[](count);
         for (uint256 i = 0; i < count; ++i) {

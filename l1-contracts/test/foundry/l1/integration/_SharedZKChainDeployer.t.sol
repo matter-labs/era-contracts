@@ -123,7 +123,7 @@ contract ZKChainDeployer is L1ContractDeployer {
 
     function _processGenesisUpgrade(uint256 _chainId) internal {
         IZKChain chain = IZKChain(addresses.bridgehub.getZKChain(_chainId));
-        // Slot 34 is "l2SystemContractsUpgradeBatchNumber" in ZKChainStorage
+        // Slot 34 is "l2SystemContractsUpgradeTxHash" in ZKChainStorage
         vm.store(address(chain), bytes32(uint256(34)), bytes32(0));
     }
 
@@ -231,7 +231,6 @@ contract ZKChainDeployer is L1ContractDeployer {
         uint256 _protocolVersion,
         bytes32 _storedBatchZero,
         address _bridgehub,
-        address _interopCenter,
         address _chainTypeManager
     ) internal returns (address) {
         Diamond.DiamondCutData memory diamondCut = abi.decode(

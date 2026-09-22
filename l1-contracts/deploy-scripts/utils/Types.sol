@@ -92,11 +92,20 @@ struct CTMAdminAddresses {
     address chainTypeManagerOwner;
 }
 
+/// @notice Additional verifier addresses for a multiprover CTM deployment.
+struct MultiProofAddresses {
+    address airbenderVerifier;
+    address ziskVerifier;
+    address ziskTestnetVerifier;
+    address multiProofVerifier;
+}
+
 struct CTMDeployedAddresses {
     StateTransitionDeployedAddresses stateTransition;
     DataAvailabilityDeployedAddresses daAddresses;
     CTMAdminAddresses admin;
     address chainAdmin;
+    MultiProofAddresses multiProof;
 }
 
 struct ChainCreationParamsConfig {
