@@ -267,14 +267,11 @@ pub mod access_control_default_admin_rules {
 }
 pub use access_control_default_admin_rules::AccessControlDefaultAdminRulesAbi;
 
-// The artifact paths still spell the interfaces' former `V31` names: `zkstack-out/` is a
-// committed build product, so it only picks up the rename on the next regeneration (which also
-// has to drop the stale `IUpgradeV31.sol/` directory — `copy-to-zkstack-out` only adds).
 pub mod i_core_upgrade_prepare {
     alloy::sol!(
         #[sol(rpc)]
         ICoreUpgradePrepareAbi,
-        "../l1-contracts/zkstack-out/IUpgradeV31.sol/ICoreUpgradeV31.json"
+        "../l1-contracts/zkstack-out/IUpgradePrepare.sol/ICoreUpgradePrepare.json"
     );
 }
 pub use i_core_upgrade_prepare::ICoreUpgradePrepareAbi;
@@ -283,7 +280,7 @@ pub mod i_ctm_upgrade_prepare {
     alloy::sol!(
         #[sol(rpc)]
         ICTMUpgradePrepareAbi,
-        "../l1-contracts/zkstack-out/IUpgradeV31.sol/ICTMUpgradeV31.json"
+        "../l1-contracts/zkstack-out/IUpgradePrepare.sol/ICTMUpgradePrepare.json"
     );
 }
 pub use i_ctm_upgrade_prepare::ICTMUpgradePrepareAbi;

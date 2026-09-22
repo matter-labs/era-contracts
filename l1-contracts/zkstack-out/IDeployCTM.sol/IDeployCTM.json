@@ -160,18 +160,6 @@
             ]
           },
           {
-            "name": "l1Specific",
-            "type": "tuple",
-            "internalType": "struct L1SpecificStateTransitionAddresses",
-            "components": [
-              {
-                "name": "legacyValidatorTimelock",
-                "type": "address",
-                "internalType": "address"
-              }
-            ]
-          },
-          {
             "name": "daAddresses",
             "type": "tuple",
             "internalType": "struct DataAvailabilityDeployedAddresses",
