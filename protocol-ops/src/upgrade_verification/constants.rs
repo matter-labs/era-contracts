@@ -120,6 +120,12 @@ pub const L2_UPGRADE_GAS_PER_PUBDATA_BYTE_LIMIT: u64 = 800;
 /// AllContractsHashes file-name key consulted by the bytecode verifier.
 pub const L2_V32_UPGRADE_CONTRACT: &str = "l1-contracts/L2V32Upgrade";
 
+/// `GovernanceUpgradeTimer.MAX_ADDITIONAL_DELAY` as every upgrade prepare constructs the timer
+/// (`DefaultCTMUpgrade.getCreationCalldata`: `2 weeks`). A constant of the reviewed commit, so a
+/// timer's construction is re-derived from it rather than from the timer's own answer; the
+/// source-sync test below fails the build if the prepare's literal moves.
+pub const GOVERNANCE_UPGRADE_TIMER_MAX_ADDITIONAL_DELAY_SECONDS: u64 = 14 * 24 * 60 * 60;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -273,5 +279,24 @@ mod tests {
                 .unwrap_or_else(|| panic!("{sol_name} not found in Solidity source"));
             assert_eq!(expected, actual, "{sol_name} drift vs Solidity source");
         }
+    }
+
+    /// The timer's maximal extension is the one constructor argument no package records: the
+    /// prepare hardcodes it. The verifier re-derives every timer from this constant, so the
+    /// prepare's literal is read here and held against it.
+    #[test]
+    fn the_timer_max_additional_delay_is_the_prepares_literal() {
+        const DEFAULT_CTM_UPGRADE: &str = include_str!(
+            "../../../l1-contracts/deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol"
+        );
+        assert!(
+            DEFAULT_CTM_UPGRADE.contains("uint256 maxAdditionalDelay = 2 weeks;"),
+            "DefaultCTMUpgrade constructs the timer with a different maximal delay; update \
+             GOVERNANCE_UPGRADE_TIMER_MAX_ADDITIONAL_DELAY_SECONDS"
+        );
+        assert_eq!(
+            GOVERNANCE_UPGRADE_TIMER_MAX_ADDITIONAL_DELAY_SECONDS,
+            2 * 7 * 24 * 60 * 60
+        );
     }
 }

@@ -8,17 +8,35 @@
 //! state (a `CTMTransition`'s facet cuts, say, which every chain applies verbatim through
 //! delegatecall).
 //!
-//! The one thing creation code cannot choose is the address it lands at. Every registry object is
-//! deployed through the deterministic CREATE2 factory, so
+//! The one thing creation code cannot choose is the address it lands at. Every object a package
+//! names is deployed through the deterministic CREATE2 factory, so
 //!
 //! ```text
-//! address = keccak256(0xff ++ factory ++ salt ++ keccak256(creationCode ++ abi.encode(manifest)))[12..]
+//! address = keccak256(0xff ++ factory ++ salt ++ keccak256(creationCode ++ abi.encode(args)))[12..]
 //! ```
 //!
-//! and a reviewer holding the reviewed creation code, the reviewed manifest and the reviewed salt
-//! can recompute it. A match proves the canonical constructor ran on that manifest — which covers
-//! the object's WHOLE state, not an enumerated subset of it, and therefore keeps covering it when
-//! someone adds a derived field.
+//! and a reviewer holding the reviewed creation code, the reviewed constructor arguments and the
+//! reviewed salt can recompute it. A match proves the canonical constructor ran on those
+//! arguments — which covers the object's WHOLE state, storage and immutables alike, not an
+//! enumerated subset of it, and therefore keeps covering it when someone adds a derived field.
+//!
+//! The arguments are a manifest for the write-once objects (read off the object itself, which
+//! the match then proves it was built from) and the binding values for the lifecycle objects —
+//! the executors, the timer, the bootstrap sequence — whose constructors set immutables. Those
+//! are the objects a runtime codehash cannot identify at all (the artifact's immutable slots are
+//! zero), so construction is the ONLY identity check they get, and its arguments come from the
+//! reviewed package and manifest rather than from the object's own getters: a genuine executor
+//! deployed with an attacker's owner is a genuine executor, and only the reviewed owner tells it
+//! apart ([`constructor_args`]).
+//!
+//! # Salts
+//!
+//! A prepare run deploys under ONE salt per leg: the core prepare under the upgrade env's
+//! `[contracts] create2_factory_salt`, each CTM prepare under that CTM's
+//! `[create2_factory_salts]` entry (`DefaultCoreUpgrade.initializeConfigWithArgs`,
+//! `DefaultCTMUpgrade.initializeConfig`). The merged package records neither, so both reach
+//! this module as reviewer inputs (`--create2-salt`), every object is tried under each, and the
+//! report names the salt that reproduced it.
 //!
 //! # What this cannot cover
 //!
@@ -37,7 +55,8 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use alloy::primitives::{keccak256, Address, Bytes, B256};
+use alloy::primitives::{keccak256, Address, Bytes, B256, U256};
+use alloy::sol_types::SolValue;
 
 use crate::upgrade_verification::constants::ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR;
 use crate::upgrade_verification::paths::repo_relative_path;
@@ -79,18 +98,24 @@ pub(crate) struct ReviewedBuild {
 }
 
 impl ReviewedBuild {
-    /// Loads the creation code of every object type a registry package can name, cross-checking
-    /// each against `AllContractsHashes.json`.
+    /// Loads the creation code of every object type a registry package can name — the
+    /// write-once objects and the lifecycle objects alike — cross-checking each against
+    /// `AllContractsHashes.json`.
     pub(crate) fn load(identity: &CodeIdentity) -> Self {
         const OBJECT_TYPES: &[(&str, &str)] = &[
             (
                 "RegistryBootstrapMigration.sol",
                 "RegistryBootstrapMigration",
             ),
+            ("RegistryBootstrapSequence.sol", "RegistryBootstrapSequence"),
             ("CTMRelease.sol", "CTMRelease"),
             ("CoreRegistry.sol", "CoreRegistry"),
             ("CTMTransition.sol", "CTMTransition"),
             ("EcosystemUpgradeOperation.sol", "EcosystemUpgradeOperation"),
+            ("EcosystemUpgradeExecutor.sol", "EcosystemUpgradeExecutor"),
+            ("CoreUpgradeExecutor.sol", "CoreUpgradeExecutor"),
+            ("CTMUpgradeExecutor.sol", "CTMUpgradeExecutor"),
+            ("GovernanceUpgradeTimer.sol", "GovernanceUpgradeTimer"),
         ];
         let mut loaded = HashMap::new();
         for (file, name) in OBJECT_TYPES {
@@ -229,8 +254,8 @@ pub(crate) fn classify_construction(
     ConstructionVerdict::NotCanonical { expected }
 }
 
-/// Reports whether the object at `address` is what the reviewed creation code produces from the
-/// manifest it serves.
+/// Reports whether the object at `address` is what the reviewed creation code produces from
+/// `constructor_args` — the manifest it serves, or its reviewed binding values.
 ///
 /// Every outcome short of a match is an ERROR, including "the reviewed build could not be
 /// loaded" and "no salt was supplied": an object whose construction a reviewer cannot establish
@@ -257,8 +282,8 @@ pub(crate) fn expect_canonical_construction(
     match classify_construction(address, creation_code.code(), constructor_args, salts) {
         ConstructionVerdict::Canonical { salt } => {
             result.report_ok(&format!(
-                "{label} at {address} IS the reviewed {short_name} built from the manifest it \
-                 serves (CREATE2 salt {salt})"
+                "{label} at {address} IS the reviewed {short_name} built from its reviewed \
+                 constructor arguments (CREATE2 salt {salt})"
             ));
             true
         }
@@ -269,11 +294,12 @@ pub(crate) fn expect_canonical_construction(
                 .collect::<Vec<_>>()
                 .join("; ");
             result.report_error(&format!(
-                "{label} at {address} is NOT the reviewed {short_name} built from the manifest it \
-                 serves: the reviewed creation code ({}) run on that manifest lands at {shown}. \
-                 The object runs the right runtime code but its storage was written by something \
-                 else — exactly what a counterfeit looks like. Either the salt under review is \
-                 wrong, or this object was not produced by the audited constructor",
+                "{label} at {address} is NOT the reviewed {short_name} built from its reviewed \
+                 constructor arguments: the reviewed creation code ({}) run on those arguments \
+                 lands at {shown}. Whatever the object answers, its state was not written by the \
+                 audited constructor from the reviewed values — exactly what a counterfeit, or a \
+                 genuine object built for a different owner or binding, looks like. Either a \
+                 reviewed input (salt, argument) is wrong, or this object must not be signed for",
                 creation_code.artifact_file()
             ));
             false
@@ -287,6 +313,68 @@ pub(crate) fn expect_canonical_construction(
             ));
             false
         }
+    }
+}
+
+/// The constructor arguments of the lifecycle objects, ABI-encoded exactly as the prepare passes
+/// them (`abi.encode(...)` of the constructor's parameter list, in `CoreUpgrade_v34` /
+/// `CTMUpgrade_v34` / `DefaultCTMUpgrade.getCreationCalldata`).
+///
+/// Every value is a REVIEWED one — the manifest's, the package's or the reviewer's — never a
+/// read off the object: an object answers with whatever it was built from, so a check that took
+/// its arguments from its getters would verify every genuine executor, including one built for
+/// an attacker's owner. The immutable-bearing objects have no other identity check, which is why
+/// the argument sources matter (see the module docs).
+pub(crate) mod constructor_args {
+    use super::*;
+
+    /// `EcosystemUpgradeExecutor(address _initialOwner, CoreUpgradeExecutor _coreExecutor)`.
+    pub(crate) fn ecosystem_upgrade_executor(
+        initial_owner: Address,
+        core_executor: Address,
+    ) -> Vec<u8> {
+        (initial_owner, core_executor).abi_encode_params()
+    }
+
+    /// `CoreUpgradeExecutor(address _initialOwner, ProxyAdmin _proxyAdmin)`.
+    pub(crate) fn core_upgrade_executor(initial_owner: Address, proxy_admin: Address) -> Vec<u8> {
+        (initial_owner, proxy_admin).abi_encode_params()
+    }
+
+    /// `CTMUpgradeExecutor(address _initialOwner, IChainTypeManager _ctm, ProxyAdmin _ctmProxyAdmin,
+    /// address _coordinator)`.
+    pub(crate) fn ctm_upgrade_executor(
+        initial_owner: Address,
+        ctm: Address,
+        ctm_proxy_admin: Address,
+        coordinator: Address,
+    ) -> Vec<u8> {
+        (initial_owner, ctm, ctm_proxy_admin, coordinator).abi_encode_params()
+    }
+
+    /// `GovernanceUpgradeTimer(uint256 _initialDelay, uint256 _maxAdditionalDelay, address
+    /// _timerGovernance, address _initialOwner)`.
+    pub(crate) fn governance_upgrade_timer(
+        initial_delay: U256,
+        max_additional_delay: U256,
+        timer_governance: Address,
+        initial_owner: Address,
+    ) -> Vec<u8> {
+        (
+            initial_delay,
+            max_additional_delay,
+            timer_governance,
+            initial_owner,
+        )
+            .abi_encode_params()
+    }
+
+    /// `RegistryBootstrapSequence(RegistryBootstrapMigration _migration, ICoreRegistry _coreRegistry)`.
+    pub(crate) fn registry_bootstrap_sequence(
+        migration: Address,
+        core_registry: Address,
+    ) -> Vec<u8> {
+        (migration, core_registry).abi_encode_params()
     }
 }
 
@@ -638,5 +726,92 @@ mod tests {
         ));
         assert_eq!(result.errors, 1);
         assert!(result.ensure_success().is_err());
+    }
+
+    // ───────────────────────── the lifecycle objects' arguments ─────────────────────────
+    //
+    // An immutable-bearing object has no identity check but its construction, and the address
+    // derivation feeds these encodings in verbatim. A layout that differed from the prepare's
+    // `abi.encode(...)` by one word would reject every genuine executor and look exactly like a
+    // counterfeit finding, so the layout is pinned byte for byte: one 32-byte word per static
+    // argument, addresses right-aligned, no offset word (the argument list is static).
+
+    fn word_of_address(encoded: &[u8], index: usize) -> Address {
+        Address::from_slice(&encoded[index * 32 + 12..index * 32 + 32])
+    }
+
+    #[test]
+    fn executor_arguments_encode_as_the_prepares_abi_encode() {
+        let owner = Address::repeat_byte(0x01);
+        let core_executor = Address::repeat_byte(0x02);
+        let encoded = constructor_args::ecosystem_upgrade_executor(owner, core_executor);
+        assert_eq!(encoded.len(), 64);
+        assert_eq!(word_of_address(&encoded, 0), owner);
+        assert_eq!(word_of_address(&encoded, 1), core_executor);
+
+        let proxy_admin = Address::repeat_byte(0x03);
+        let encoded = constructor_args::core_upgrade_executor(owner, proxy_admin);
+        assert_eq!(encoded.len(), 64);
+        assert_eq!(word_of_address(&encoded, 1), proxy_admin);
+
+        let ctm = Address::repeat_byte(0x04);
+        let coordinator = Address::repeat_byte(0x05);
+        let encoded = constructor_args::ctm_upgrade_executor(owner, ctm, proxy_admin, coordinator);
+        assert_eq!(encoded.len(), 128);
+        assert_eq!(word_of_address(&encoded, 0), owner);
+        assert_eq!(word_of_address(&encoded, 1), ctm);
+        assert_eq!(word_of_address(&encoded, 2), proxy_admin);
+        assert_eq!(word_of_address(&encoded, 3), coordinator);
+
+        let migration = Address::repeat_byte(0x06);
+        let registry = Address::repeat_byte(0x07);
+        let encoded = constructor_args::registry_bootstrap_sequence(migration, registry);
+        assert_eq!(encoded.len(), 64);
+        assert_eq!(word_of_address(&encoded, 0), migration);
+        assert_eq!(word_of_address(&encoded, 1), registry);
+    }
+
+    #[test]
+    fn timer_arguments_encode_delays_as_full_words() {
+        let governance = Address::repeat_byte(0x08);
+        let owner = Address::repeat_byte(0x09);
+        let encoded = constructor_args::governance_upgrade_timer(
+            U256::from(172_800u64),
+            U256::from(1_209_600u64),
+            governance,
+            owner,
+        );
+        assert_eq!(encoded.len(), 128);
+        assert_eq!(U256::from_be_slice(&encoded[..32]), U256::from(172_800u64));
+        assert_eq!(
+            U256::from_be_slice(&encoded[32..64]),
+            U256::from(1_209_600u64)
+        );
+        assert_eq!(word_of_address(&encoded, 2), governance);
+        assert_eq!(word_of_address(&encoded, 3), owner);
+    }
+
+    /// The owner is an argument like any other: a genuine executor built for a different owner
+    /// lands at a different address, which is exactly what makes the reviewed owner — and not
+    /// the object's own `owner()` — the right source for it.
+    #[test]
+    fn an_executor_built_for_another_owner_is_a_different_object() {
+        let core_executor = Address::repeat_byte(0x02);
+        let reviewed_owner = Address::repeat_byte(0x01);
+        let attacker = Address::repeat_byte(0xBA);
+        let genuine_for_attacker = canonical_create2_address(
+            SALT_A,
+            &creation_code(),
+            &constructor_args::ecosystem_upgrade_executor(attacker, core_executor),
+        );
+        assert!(matches!(
+            classify_construction(
+                genuine_for_attacker,
+                &creation_code(),
+                &constructor_args::ecosystem_upgrade_executor(reviewed_owner, core_executor),
+                &[SALT_A],
+            ),
+            ConstructionVerdict::NotCanonical { .. }
+        ));
     }
 }

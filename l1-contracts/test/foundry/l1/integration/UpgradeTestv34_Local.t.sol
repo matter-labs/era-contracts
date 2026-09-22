@@ -41,6 +41,7 @@ import {RegistryBootstrapSequence} from "contracts/upgrades/registry/bootstrap/R
 import {IRegistryBootstrapSequence} from "contracts/upgrades/registry/bootstrap/IRegistryBootstrapSequence.sol";
 import {L2CanonicalTransactionLib} from "contracts/state-transition/libraries/L2CanonicalTransactionLib.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
+import {BootstrapManifest} from "contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice Test-only v34 CTM upgrade with the same MemoryOOG mocks as the v32 local harness
 ///         (the heavy JSON/zkout reads live on the shared base). The bootstrap flow itself —
@@ -225,6 +226,113 @@ abstract contract UpgradeIntegrationV34BootstrapFixture is
 /// @notice The bootstrap edge's own assertions over the fixture above: the version bump, the
 ///         authority handover to the bound executor, and the legacy commit shape.
 contract UpgradeIntegrationTest_v34_Local is UpgradeIntegrationV34BootstrapFixture {
+    using stdToml for string;
+
+    /// @notice Every object the bootstrap prepare deploys is reproducible from the build
+    ///         artifact's creation code and the constructor arguments the reviewed package and
+    ///         manifest record — the derivation `protocol-ops ecosystem verify-bootstrap` performs
+    ///         (`construction::constructor_args`) over the same artifacts, every argument taken
+    ///         from where the verifier takes it. Pinned in a real EVM over a real prepare run: a
+    ///         prepare that passes an argument the constructor does not take (as this one once
+    ///         did) deploys fine and is unreproducible from the constructor's own arguments.
+    function test_v34BootstrapObjectsAreReproducibleFromTheirReviewedArguments() public {
+        CTMUpgrade_v34_Test v34 = CTMUpgrade_v34_Test(address(ctmUpgrade));
+        string memory root = vm.projectRoot();
+        string memory coreOutput = vm.readFile(string.concat(root, CORE_OUTPUT));
+        string memory ctmOutput = vm.readFile(string.concat(root, CTM_OUTPUT));
+        (, bytes32 coreSalt) = coreUpgrade.getCreate2FactoryParams();
+        (, bytes32 ctmSalt) = ctmUpgrade.getCreate2FactoryParams();
+
+        BootstrapManifest memory manifest = v34.bootstrapMigration().getManifest();
+        address coreExecutor = coreOutput.readAddress("$.registry.core_upgrade_executor_addr");
+        address ecosystemProxyAdmin = coreOutput.readAddress("$.upgrade_addresses.shared.transparent_proxy_admin");
+
+        // The package summary the verifier cross-checks against the manifest.
+        assertEq(coreOutput.readAddress("$.registry.ecosystem_upgrade_executor_addr"), manifest.coordinator);
+        assertEq(ctmOutput.readAddress("$.registry.coordinator_addr"), manifest.coordinator);
+        assertEq(ctmOutput.readAddress("$.registry.ctm_upgrade_executor_addr"), manifest.ctmExecutor);
+        assertEq(ctmOutput.readAddress("$.registry.upgrade_timer_addr"), manifest.upgradeTimer);
+        assertEq(ctmOutput.readAddress("$.registry.bootstrap_migration_addr"), address(v34.bootstrapMigration()));
+        assertEq(ctmOutput.readAddress("$.state_transition.chain_type_manager_proxy"), manifest.ctm);
+        assertEq(
+            ctmOutput.readAddress("$.deployed_addresses.transparent_proxy_admin"),
+            address(manifest.ctmProxyAdmin)
+        );
+        assertEq(ctmOutput.readAddress("$.admin.timer_governance_addr"), manifest.ctmExecutorOwner);
+
+        // The core leg, under the core prepare's salt.
+        assertEq(
+            DeployScriptUtils.canonicalCreate2Address(
+                coreSalt,
+                vm.getCode("CoreUpgradeExecutor.sol:CoreUpgradeExecutor"),
+                abi.encode(manifest.ctmExecutorOwner, ecosystemProxyAdmin)
+            ),
+            coreExecutor,
+            "the core executor re-derives from the reviewed owner and the ecosystem ProxyAdmin"
+        );
+        assertEq(
+            DeployScriptUtils.canonicalCreate2Address(
+                coreSalt,
+                vm.getCode("EcosystemUpgradeExecutor.sol:EcosystemUpgradeExecutor"),
+                abi.encode(manifest.ctmExecutorOwner, coreExecutor)
+            ),
+            manifest.coordinator,
+            "the coordinator re-derives from the reviewed owner and the core executor"
+        );
+        assertEq(
+            DeployScriptUtils.canonicalCreate2Address(
+                coreSalt,
+                vm.getCode("CoreRegistry.sol:CoreRegistry"),
+                abi.encode(coreUpgrade.coreRegistry().getManifest())
+            ),
+            address(coreUpgrade.coreRegistry()),
+            "the core registry re-derives from the manifest it serves"
+        );
+
+        // The CTM leg, under the CTM prepare's salt.
+        assertEq(
+            DeployScriptUtils.canonicalCreate2Address(
+                ctmSalt,
+                vm.getCode("CTMUpgradeExecutor.sol:CTMUpgradeExecutor"),
+                abi.encode(manifest.ctmExecutorOwner, manifest.ctm, manifest.ctmProxyAdmin, manifest.coordinator)
+            ),
+            manifest.ctmExecutor,
+            "the CTM executor re-derives from the manifest's owner and bindings"
+        );
+        assertEq(
+            DeployScriptUtils.canonicalCreate2Address(
+                ctmSalt,
+                vm.getCode("GovernanceUpgradeTimer.sol:GovernanceUpgradeTimer"),
+                abi.encode(
+                    ctmOutput.readUint("$.contracts_config.governance_upgrade_timer_initial_delay"),
+                    2 weeks,
+                    manifest.ctmExecutorOwner,
+                    ctmOutput.readAddress("$.admin.ecosystem_admin_addr")
+                )
+            ),
+            manifest.upgradeTimer,
+            "the timer re-derives from the package's delay and owner, the prepare's 2 weeks and the reviewed governance"
+        );
+        assertEq(
+            DeployScriptUtils.canonicalCreate2Address(
+                ctmSalt,
+                vm.getCode("RegistryBootstrapMigration.sol:RegistryBootstrapMigration"),
+                abi.encode(manifest)
+            ),
+            address(v34.bootstrapMigration()),
+            "the migration re-derives from the manifest it serves"
+        );
+        assertEq(
+            DeployScriptUtils.canonicalCreate2Address(
+                ctmSalt,
+                vm.getCode("RegistryBootstrapSequence.sol:RegistryBootstrapSequence"),
+                abi.encode(address(v34.bootstrapMigration()), address(coreUpgrade.coreRegistry()))
+            ),
+            address(v34.bootstrapSequence()),
+            "the sequence re-derives from the migration and the core registry"
+        );
+    }
+
     function test_v34BootstrapUpgrade_Local() public {
         CTMUpgrade_v34_Test v34 = CTMUpgrade_v34_Test(address(ctmUpgrade));
         address ctm = ctmUpgrade.getCTMAddress();

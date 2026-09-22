@@ -42,34 +42,43 @@ It answers two questions and keeps them apart.
 **What does this upgrade do?** is answered by reviewing the objects, never by reconstructing them
 from calldata:
 
-- **Object provenance** — the code at each address, looked up in `AllContractsHashes.json`. Code
-  attributable to a _different_ contract is an ERROR, and so is code attributable to NO contract:
-  the reviewer cannot say what is deployed there, and an unresolved deployment must not ride along
-  with an otherwise successful review. (The usual cause is an un-regenerated hash file, which makes
-  every lookup miss at once — fixed before the review concludes, not annotated in it.)
 - **Construction.** The check that carries object trust, because a runtime codehash cannot give
   it: creation code can write any storage it likes and then return the canonical runtime
   bytecode. Every object is deployed through the deterministic CREATE2 factory, so its address is
-  re-derived from the reviewed creation code and the manifest the object serves, and compared
-  with the address the package uses. A match proves the audited constructor ran on that manifest,
-  which covers the object's whole state. The creation-code bytes come from the local build
-  (`l1-contracts/out`, so the reviewed commit must be built), held against the committed
-  `evmBytecodeHash`. The salt comes from the package when it records one and from
-  `--create2-salt` otherwise; with no salt the check cannot run, and that is an ERROR rather than
-  a silent pass.
+  re-derived from the reviewed creation code and its reviewed constructor arguments, and compared
+  with the address the package uses. For a write-once object the arguments are the manifest it
+  serves; for the lifecycle objects (the coordinator, both domain executors, the timer) and the
+  bootstrap sequence they are the reviewed governance owner and the bindings the package and
+  manifest record — never the object's own getters, since a genuine executor built for an
+  attacker's owner answers them like the reviewed one. A match proves the audited constructor ran
+  on those arguments, which covers the object's whole state, immutables included. The
+  creation-code bytes come from the local build (`l1-contracts/out`, so the reviewed commit must
+  be built), held against the committed `evmBytecodeHash`. The salts are per prepare leg and come
+  from `--create2-salt` (a package records none); with no salt the check cannot run, and that is
+  an ERROR rather than a silent pass.
+- **Object provenance** — for the objects without constructor-set immutables, the code at each
+  address, looked up in `AllContractsHashes.json`. Code attributable to a _different_ contract is
+  an ERROR, and so is code attributable to NO contract: the reviewer cannot say what is deployed
+  there, and an unresolved deployment must not ride along with an otherwise successful review.
+  (The usual cause is an un-regenerated hash file, which makes every lookup miss at once — fixed
+  before the review concludes, not annotated in it.)
 - **Constructor-set immutables.** `AllContractsHashes.json` records the ARTIFACT's deployed
   bytecode, whose immutable slots are zero, so a contract that sets immutables never hashes to its
-  own artifact once deployed. Those are identified from their immutable VALUES instead — read back
-  from the deployment, each held against a value the review fixes, each mismatch an error. Never
-  against itself: a read compared with itself always agrees and would report a check that
-  established nothing.
+  own artifact once deployed. Such an object gets NO provenance lookup and NO identity from its
+  getters: its construction above is the whole of its identity. (An earlier primitive accepted an
+  immutable-bearing object on its getters answering the reviewed values while its code stayed
+  unattributed; that admitted any counterfeit answering the same getters, and it is gone.)
 - **Named members exist.** Every contract an object names by address must be deployed code,
   which is what the objects' own `validate()` refuses on-chain.
 - **Bound authority** — the coordinator, both domain executors, the CTM and both ProxyAdmins,
-  and the governance owner the whole lifecycle answers to. That owner check is the consequential
-  one, so pass `--expected-governance-owner` for anything that will actually be signed.
+  and the governance owner the whole lifecycle answers to, with no ownership nomination
+  outstanding on any of them. The reviewed owner is also what the executors' construction is
+  re-derived from, so for a recurring package `--expected-governance-owner` is not optional: without
+  it every executor is unverifiable, which is an error.
 - **Departing state** — the version and release edge against live, and every proxy row's
-  `expectedOldImpl` against the implementation actually live behind that proxy.
+  `expectedOldImpl` against the implementation actually live behind that proxy, read through the
+  admin that administers it (the row's own, or the domain's when it names none) and accepting a
+  row its own administrator already applied.
 - **Readiness**, reported apart from anything about value: the transition's L2 factory
   dependencies published on the CTM's supplier, the timer startable, no lifecycle in flight.
 
@@ -105,7 +114,6 @@ the prepare's summary fields (`ctm_transition_addr`, `core_registry_addr`,
 `ctm_upgrade_executor_addr`, `upgrade_timer_addr`, `bootstrap_migration_addr`) are cross-checks
 against it. A disagreement is an ERROR: the reviewer read one upgrade and governance would sign
 another.
-
 
 ## What protocol-ops is
 

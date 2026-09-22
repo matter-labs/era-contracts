@@ -10,7 +10,6 @@ import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpg
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 
 import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
-import {BytecodeUtils} from "../../utils/bytecode/BytecodeUtils.s.sol";
 import {L1EcosystemContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 /// @notice Core (ecosystem) side of the v34 upgrade: deploys the new shared-singleton
@@ -90,14 +89,7 @@ contract CoreUpgrade_v34 is DefaultCoreUpgrade {
             payable(
                 deployViaCreate2AndNotify(
                     type(CoreUpgradeExecutor).creationCode,
-                    abi.encode(
-                        getOwnerAddress(),
-                        ProxyAdmin(coreAddresses.shared.transparentProxyAdmin),
-                        // The audited-object anchor for every registry this executor accepts,
-                        // taken from the artifact those registries are DEPLOYED from (see
-                        // {BytecodeUtils.getDeployedBytecodeHash}).
-                        BytecodeUtils.getDeployedBytecodeHash("CoreRegistry.sol", "CoreRegistry")
-                    ),
+                    abi.encode(getOwnerAddress(), ProxyAdmin(coreAddresses.shared.transparentProxyAdmin)),
                     "CoreUpgradeExecutor"
                 )
             )
@@ -106,15 +98,7 @@ contract CoreUpgrade_v34 is DefaultCoreUpgrade {
             payable(
                 deployViaCreate2AndNotify(
                     type(EcosystemUpgradeExecutor).creationCode,
-                    abi.encode(
-                        getOwnerAddress(),
-                        coreUpgradeExecutor,
-                        // Same anchoring for the operations the coordinator accepts.
-                        BytecodeUtils.getDeployedBytecodeHash(
-                            "EcosystemUpgradeOperation.sol",
-                            "EcosystemUpgradeOperation"
-                        )
-                    ),
+                    abi.encode(getOwnerAddress(), coreUpgradeExecutor),
                     "EcosystemUpgradeExecutor"
                 )
             )

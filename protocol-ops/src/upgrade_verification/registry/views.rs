@@ -115,6 +115,7 @@ sol! {
         function pendingOperation() external view returns (address);
         function pendingStage() external view returns (uint8);
         function owner() external view returns (address);
+        function pendingOwner() external view returns (address);
         function stage0(address _operation) external;
         function stage1(address _operation) external;
         function stage2(address _operation) external;
@@ -182,6 +183,7 @@ sol! {
         function coordinator() external view returns (address);
         function activeOperation() external view returns (address);
         function owner() external view returns (address);
+        function pendingOwner() external view returns (address);
     }
 
     /// Positional mirror of `RegistryTypes.CoreRegistryManifest` — the whole constructor
@@ -262,9 +264,15 @@ sol! {
         function upgradeTarget() external view returns (uint256, uint256, address);
     }
 
+    /// The timer's constructor-set values are read back only to NAME which argument a failed
+    /// construction check disagrees on; the check itself re-derives the timer from the reviewed
+    /// values, never from these answers.
     #[sol(rpc)]
     contract GovernanceUpgradeTimerView {
+        function INITIAL_DELAY() external view returns (uint256);
+        function MAX_ADDITIONAL_DELAY() external view returns (uint256);
         function TIMER_GOVERNANCE() external view returns (address);
+        function owner() external view returns (address);
         function deadline() external view returns (uint256);
         function checkDeadline() external view;
     }

@@ -24,7 +24,6 @@ import {
 import {AuthoredL2Side, DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {ExternalActionsLib} from "../default-upgrade/ExternalActionsLib.sol";
 import {CoreOnGatewayHelper} from "../../ecosystem/CoreOnGatewayHelper.sol";
-import {BytecodeUtils} from "../../utils/bytecode/BytecodeUtils.s.sol";
 import {UpgradeHelperLib} from "../default-upgrade/UpgradeHelperLib.sol";
 import {DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
 import {Utils} from "../../utils/Utils.sol";
@@ -199,11 +198,7 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
                         ctmProxyAdmin,
                         // The coordinator the core prepare of this upgrade deployed — the only
                         // address that will drive this executor's lifecycle callbacks.
-                        address(ecosystemUpgradeExecutor()),
-                        // The audited-object anchor for every FUTURE transition this executor
-                        // accepts, taken from the artifact those transitions are DEPLOYED from
-                        // (see {BytecodeUtils.getDeployedBytecodeHash}).
-                        BytecodeUtils.getDeployedBytecodeHash("CTMTransition.sol", "CTMTransition")
+                        address(ecosystemUpgradeExecutor())
                     ),
                     "CTMUpgradeExecutor"
                 )

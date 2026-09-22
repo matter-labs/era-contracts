@@ -65,6 +65,8 @@ error BootstrapExecutorNotBound(address executor, address expectedTarget, addres
 error BootstrapExecutorOwnerMismatch(address expectedOwner, address actualOwner);
 // 0xc819eb06
 error BootstrapExecutorOwnershipPending(address pendingOwner);
+// 0x8a593161
+error BootstrapNominationPending(address target, address pendingOwner);
 // 0x447aee1e
 error BootstrapNotYetExecuted();
 // 0x24c8e294
@@ -159,7 +161,6 @@ error FactoryDepsNotSupported();
 error FeeParamsChangeTooLarge(uint256 oldPrice, uint256 newPrice, uint256 maxAllowedPrice);
 // 0xc91cf3b1
 error GasPerPubdataMismatch();
-// 0x5ca97564
 // 0x7940c83f
 error GenesisBatchHashZero();
 // 0x3a1a8589
@@ -525,6 +526,7 @@ error ZKsyncOSMaxTxGasLimitTooLow();
 error ZKsyncOSNotForceDeployForExistingContract(address);
 // 0xb24b1ccb
 error ZKsyncOSNotForceDeployToPrecompileAddress(address);
+// 0x5ca97564
 
 enum UpgradeTxVerifyParam {
     From,

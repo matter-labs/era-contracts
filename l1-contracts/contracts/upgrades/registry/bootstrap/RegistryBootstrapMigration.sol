@@ -10,6 +10,7 @@ import {CTM_CONTRACT_COUNT} from "../libraries/ContractIdentifiers.sol";
 import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 import {IEcosystemUpgradeExecutor} from "../executors/IEcosystemUpgradeExecutor.sol";
 import {CTMUpgradeExecutor} from "../executors/CTMUpgradeExecutor.sol";
+import {EcosystemUpgradeExecutor} from "../executors/EcosystemUpgradeExecutor.sol";
 import {ICommittedUpgrade} from "../objects/ICommittedUpgrade.sol";
 import {ICTMRelease} from "../objects/ICTMRelease.sol";
 import {IChainTypeManager} from "../../../state-transition/IChainTypeManager.sol";
@@ -26,6 +27,7 @@ import {
     BootstrapExecutorNotBound,
     BootstrapExecutorOwnerMismatch,
     BootstrapExecutorOwnershipPending,
+    BootstrapNominationPending,
     BootstrapNotYetExecuted,
     BootstrapReleaseNotInstalled,
     MigrationPaused,
@@ -255,9 +257,10 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
     /// @notice Reverts unless the edge has been APPLIED end to end: `migrate()` ran, the CTM sits
     ///         at the new version with the named release and anchor installed, every proxy row
     ///         points at its `implNew`, the whole CTM domain is owned by the bound
-    ///         executor, and the CTM's chain migrations are no longer paused. The stage-2 gate
-    ///         for the bundle whose stage 1 ran `migrate()` — deeper than a bare version check,
-    ///         and readable by any tooling afterwards.
+    ///         executor with no ownership nomination outstanding on any authority the edge
+    ///         hands over or drives, and the CTM's chain migrations are no longer paused. The
+    ///         stage-2 gate for the bundle whose stage 1 ran `migrate()` — deeper than a bare
+    ///         version check, and readable by any tooling afterwards.
     /// @dev The row check describes this one edge: a later transition legitimately moves the
     ///      CTM-domain proxies (and `currentRelease`) on, after which this reverts by design.
     function validateApplied() external view {
@@ -295,6 +298,14 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
         if (boundExecutor != m.ctmExecutor) {
             revert BootstrapExecutorNotBound(m.coordinator, m.ctmExecutor, boundExecutor);
         }
+        // Every `Ownable2Step` authority the edge lands on or drives must carry no nomination: a
+        // `transferOwnership` slipped into the bundle beside the derived calls is invisible to
+        // the owner checks above and lets its nominee accept the moment this gate has passed.
+        // The two `ProxyAdmin`s are plain `Ownable` and cannot be nominated.
+        _requireNoNomination(m.ctm);
+        _requireNoNomination(m.ctmExecutor);
+        _requireNoNomination(m.coordinator);
+        _requireNoNomination(address(EcosystemUpgradeExecutor(payable(m.coordinator)).CORE_EXECUTOR()));
         // Completion lifts the operational restrictions too: the stage-0 pause must have been
         // released before this edge counts as done, so the bundle cannot forget it.
         IChainAssetHandlerBase chainAssetHandler = IChainAssetHandlerBase(
@@ -302,6 +313,14 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
         );
         if (chainAssetHandler.migrationPausedFor(m.ctm)) {
             revert MigrationPaused();
+        }
+    }
+
+    /// @param _target An `Ownable2Step` authority of the edge.
+    function _requireNoNomination(address _target) private view {
+        address pendingOwner = Ownable2Step(_target).pendingOwner();
+        if (pendingOwner != address(0)) {
+            revert BootstrapNominationPending(_target, pendingOwner);
         }
     }
 

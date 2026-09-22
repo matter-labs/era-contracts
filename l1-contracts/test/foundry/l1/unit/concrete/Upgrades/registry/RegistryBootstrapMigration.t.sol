@@ -32,6 +32,7 @@ import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgra
 import {L2CanonicalTransactionLib} from "contracts/state-transition/libraries/L2CanonicalTransactionLib.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
+import {Call} from "contracts/governance/Common.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {
     MAX_NEW_FACTORY_DEPS,
@@ -50,6 +51,7 @@ import {
     BootstrapExecutorNotBound,
     BootstrapExecutorOwnerMismatch,
     BootstrapExecutorOwnershipPending,
+    BootstrapNominationPending,
     BootstrapNotYetExecuted,
     DeadlineNotYetPassed,
     L2BytecodeNotPublished,
@@ -791,6 +793,60 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         coordinator.setCTMExecutor(ctmExecutor);
         migration.validateApplied();
         assertEq(address(coordinator.ctmExecutor()), address(ctmExecutor));
+    }
+
+    /// @dev A `transferOwnership` appended to the bundle beside the derived calls is invisible to
+    ///      the owner checks (`owner()` does not move until the nominee accepts) and lets the
+    ///      nominee take the domain the moment the gate has passed. The gate refuses a pending
+    ///      nomination on every `Ownable2Step` authority the edge lands on or drives, and reopens
+    ///      once it is withdrawn. The `ProxyAdmin`s are plain `Ownable` and cannot be nominated.
+    function test_revertWhen_validateAppliedWithANominationPendingOnAnAuthority() public {
+        _handOverAuthority();
+        migration.migrate();
+        _mockMigrationsUnpaused();
+        migration.validateApplied();
+        address attacker = makeAddr("attacker");
+
+        // The three executors are governance-owned: the nomination is governance's own call.
+        Ownable2Step[3] memory governed = [
+            Ownable2Step(address(ctmExecutor)),
+            Ownable2Step(address(coordinator)),
+            Ownable2Step(address(coreExecutor))
+        ];
+        for (uint256 i = 0; i < governed.length; ++i) {
+            vm.prank(governor);
+            governed[i].transferOwnership(attacker);
+            assertEq(governed[i].owner(), governor, "the owner has not moved, which is what hides the nomination");
+            vm.expectRevert(
+                abi.encodeWithSelector(BootstrapNominationPending.selector, address(governed[i]), attacker)
+            );
+            migration.validateApplied();
+
+            vm.prank(governor);
+            governed[i].transferOwnership(address(0));
+            migration.validateApplied();
+        }
+
+        // The CTM is the executor's after the edge, so a nomination reaches it through the
+        // executor's raw-call hatch — the one way an appended call could.
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: address(chainContractAddress),
+            value: 0,
+            data: abi.encodeCall(Ownable2Step.transferOwnership, (attacker))
+        });
+        vm.prank(governor);
+        ctmExecutor.forward(calls);
+        assertEq(chainContractAddress.owner(), address(ctmExecutor));
+        vm.expectRevert(
+            abi.encodeWithSelector(BootstrapNominationPending.selector, address(chainContractAddress), attacker)
+        );
+        migration.validateApplied();
+
+        calls[0].data = abi.encodeCall(Ownable2Step.transferOwnership, (address(0)));
+        vm.prank(governor);
+        ctmExecutor.forward(calls);
+        migration.validateApplied();
     }
 
     // ─────────────────────────── timer gating ───────────────────────────

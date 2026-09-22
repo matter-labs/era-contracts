@@ -280,20 +280,38 @@ review is a tool's output rather than an eyeball comparison of hashes. `protocol
 verify-bootstrap` answers three questions for every object a package names, and treats
 "unverifiable" as an error rather than a caveat:
 
-1. **Does it run the reviewed code?** Live `EXTCODEHASH` against `AllContractsHashes.json` for the
-   reviewed commit. Code the commit does not produce is UNKNOWN and therefore a finding.
-2. **Was it PRODUCED by that code's constructor, from the manifest it serves?** Every object is
-   deployed through the deterministic CREATE2 factory (`0x4e59…4956C`, the same address on L1 and
-   on ZKsync OS settlement layers), so
-   `address == keccak256(0xff ++ factory ++ salt ++ keccak256(creationCode ++ abi.encode(manifest)))[12:]`.
-   The verifier reads the manifest off the object, re-encodes it, and recomputes that address from
-   the reviewed creation code. A match proves the canonical constructor ran on that manifest, which
-   covers the object's WHOLE state — including derived fields, and including derived fields nobody
-   has added yet. The creation-code BYTES come from the local build (`l1-contracts/out`), which is
-   itself held against the committed `evmBytecodeHash`, so a doctored build directory cannot pass.
-3. **Do the governance calls execute those objects?** Every stage call's target must be a reviewed
-   object or a live contract the manifest itself names. An address no part of the review accounts
-   for is an error.
+1. **Was it PRODUCED by the reviewed code's constructor, from its reviewed arguments?** Every
+   object is deployed through the deterministic CREATE2 factory (`0x4e59…4956C`, the same address
+   on L1 and on ZKsync OS settlement layers), so
+   `address == keccak256(0xff ++ factory ++ salt ++ keccak256(creationCode ++ abi.encode(args)))[12:]`.
+   For a write-once object the arguments are the manifest it serves: the verifier reads it off the
+   object, re-encodes it, and recomputes that address from the reviewed creation code. For the
+   lifecycle objects — the coordinator, both domain executors, the timer — and the bootstrap
+   sequence, the arguments are the REVIEWED binding values: the governance owner (the bootstrap
+   manifest's `ctmExecutorOwner`, or the reviewer's `--expected-governance-owner`), the package's
+   record of the core executor, the ecosystem `ProxyAdmin`, the timer delay and owner, the
+   manifest's CTM, `ProxyAdmin` and coordinator, the prepare's `2 weeks`. Never the object's own
+   getters: a genuine executor built for an attacker's owner answers every getter like the reviewed
+   one, and only the reviewed owner tells them apart. A match proves the canonical constructor ran
+   on those arguments, which covers the object's WHOLE state — immutables, storage, derived fields,
+   and derived fields nobody has added yet. The creation-code BYTES come from the local build
+   (`l1-contracts/out`), which is itself held against the committed `evmBytecodeHash`, so a
+   doctored build directory cannot pass. The salt is per prepare leg (the core prepare's
+   `[contracts] create2_factory_salt`, each CTM prepare's `[create2_factory_salts]` entry); the
+   package records neither, so both are reviewer inputs and every object is tried under each.
+2. **Does it run the reviewed code?** Live `EXTCODEHASH` against `AllContractsHashes.json` for the
+   reviewed commit, for the objects without constructor-set immutables (the objects with them
+   cannot hash to any artifact; question 1 is the whole of their identity). Code the commit does
+   not produce is UNKNOWN and therefore a finding.
+3. **Do the governance calls execute those objects, and nothing else?** For a recurring upgrade
+   every stage call is `coordinator.stageN(operation)` or a declared external action. For the
+   bootstrap edge every stage carries the run the construction-verified `RegistryBootstrapSequence`
+   derives, contiguous and in order, and every other call must be a declared external action to a
+   target OUTSIDE the edge's authorities: a call to the CTM, a `ProxyAdmin`, an executor, the timer
+   or an object beyond the derived run — a `transferOwnership` nomination appended after the
+   legitimate calls, say — is an error whether the package declares it or not. On chain,
+   `RegistryBootstrapMigration.validateApplied()` refuses a pending nomination on every
+   `Ownable2Step` authority the edge lands on or drives, for the same reason.
 
 Its limits, stated so they are not mistaken for coverage: the salt is a package input, so an
 attacker free to choose both a salt and a counterfeit deployment faces the standard ~2^80 CREATE2
@@ -305,7 +323,7 @@ counterfeit from real initcode and asserts the derivation rejects it.
 
 For this to hold, manifest data must live in **storage**, never in immutables: immutables are
 patched into runtime code, which would make an object's runtime bytes depend on its manifest and
-break question 1.
+break question 2.
 
 **Members are named by address.** Everything executable an object names — facets, `DiamondInit`,
 the verifier, the genesis upgrade, the upgrade engine, the timer, the composer, each `implNew` — is

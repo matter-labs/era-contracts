@@ -21,7 +21,7 @@
 
 use std::path::Path;
 
-use alloy::primitives::{Address, B256};
+use alloy::primitives::{Address, B256, U256};
 use anyhow::Context;
 
 use crate::common::external_actions::ExternalAction;
@@ -29,7 +29,9 @@ use crate::common::governance_calls::{decode_calls, GovernanceCall};
 
 /// `RegistryBootstrapMigration.migrate()`.
 pub(crate) const MIGRATE_SELECTOR: [u8; 4] = [0x8f, 0xd3, 0xab, 0x80];
-/// `Ownable2Step.transferOwnership(address)`.
+/// `Ownable2Step.transferOwnership(address)` — the nomination a bundle would smuggle past a
+/// reviewer, which the tests append to a derived sequence.
+#[cfg(test)]
 pub(crate) const TRANSFER_OWNERSHIP_SELECTOR: [u8; 4] = [0xf2, 0xfd, 0xe3, 0x8b];
 /// `RegistryBootstrapMigration.validateApplied()` — the edge asserting its own completion.
 pub(crate) const VALIDATE_APPLIED_SELECTOR: [u8; 4] = [0xfe, 0x30, 0xc9, 0xfd];
@@ -112,6 +114,8 @@ pub(crate) struct OperationPackage {
     pub(crate) external_actions: Vec<ExternalAction>,
     /// Every CREATE2 salt the package records; see [`BootstrapPackage::create2_salts`].
     pub(crate) create2_salts: Vec<B256>,
+    /// The package's record of the lifecycle objects' binding values.
+    pub(crate) lifecycle: LifecycleInputs,
 }
 
 impl OperationPackage {
@@ -160,8 +164,64 @@ impl OperationPackage {
             stage2: calls_at(root, "stage2_calls")?,
             external_actions: external_actions_in(root)?,
             create2_salts: create2_salts_in(root, &ctm_key),
+            lifecycle: lifecycle_inputs_in(root, &ctm_key),
             ctm_key,
         })
+    }
+}
+
+/// The package's record of the values the lifecycle objects — the coordinator, the two domain
+/// executors and the timer — were constructed over. Those objects set their bindings as
+/// constructor immutables, so their construction is the only identity check they get, and it is
+/// re-derived from THESE values (plus the reviewed governance owner and the bootstrap manifest)
+/// rather than from the objects' own answers.
+///
+/// Each is optional at load so the report can name exactly which one an older package lacks;
+/// the construction check ERRORS on a missing one rather than skipping the object.
+#[derive(Debug, Default)]
+pub(crate) struct LifecycleInputs {
+    /// `[core.registry] core_upgrade_executor_addr` — the core executor the coordinator was
+    /// built over.
+    pub(crate) core_executor: Option<Address>,
+    /// `[core.upgrade_addresses.shared] transparent_proxy_admin` — the ecosystem `ProxyAdmin`
+    /// the core executor was built over.
+    pub(crate) core_proxy_admin: Option<Address>,
+    /// `[ctms.*.contracts_config] governance_upgrade_timer_initial_delay` — the timer's
+    /// `INITIAL_DELAY`.
+    pub(crate) timer_initial_delay: Option<U256>,
+    /// `[ctms.*.admin] timer_governance_addr` — the prepare's statement of who starts the timer,
+    /// a cross-check on the reviewed value the construction uses.
+    pub(crate) timer_governance: Option<Address>,
+    /// `[ctms.*.admin] ecosystem_admin_addr` — the timer's initial owner (who may extend its
+    /// deadline).
+    pub(crate) timer_owner: Option<Address>,
+}
+
+fn lifecycle_inputs_in(root: &toml::Value, ctm_key: &str) -> LifecycleInputs {
+    LifecycleInputs {
+        core_executor: address_at(root, &["core", "registry", "core_upgrade_executor_addr"])
+            .filter(|a| !a.is_zero()),
+        core_proxy_admin: address_at(
+            root,
+            &[
+                "core",
+                "upgrade_addresses",
+                "shared",
+                "transparent_proxy_admin",
+            ],
+        )
+        .filter(|a| !a.is_zero()),
+        timer_initial_delay: u256_at(
+            root,
+            &[
+                "ctms",
+                ctm_key,
+                "contracts_config",
+                "governance_upgrade_timer_initial_delay",
+            ],
+        ),
+        timer_governance: ctm_address(root, ctm_key, "admin", "timer_governance_addr"),
+        timer_owner: ctm_address(root, ctm_key, "admin", "ecosystem_admin_addr"),
     }
 }
 
@@ -178,6 +238,15 @@ pub(crate) struct BootstrapPackage {
     /// `[registry] bootstrap_migration_addr`, when the prepare named it: a cross-check on the
     /// address recovered from calldata.
     pub(crate) reported_migration: Option<Address>,
+    /// `[ctms.*.registry] coordinator_addr`, a cross-check on the manifest's coordinator.
+    pub(crate) reported_coordinator: Option<Address>,
+    /// `[ctms.*.registry] ctm_upgrade_executor_addr`, a cross-check on the manifest's executor.
+    pub(crate) reported_ctm_executor: Option<Address>,
+    /// `[ctms.*.state_transition] chain_type_manager_proxy`, a cross-check on the manifest's CTM.
+    pub(crate) reported_ctm: Option<Address>,
+    /// `[ctms.*.deployed_addresses] transparent_proxy_admin`, a cross-check on the manifest's
+    /// CTM-domain ProxyAdmin.
+    pub(crate) reported_ctm_proxy_admin: Option<Address>,
     /// The CTM key under `[ctms]` this package upgrades (e.g. `zksync_os`).
     pub(crate) ctm_key: String,
     pub(crate) stage0: Vec<GovernanceCall>,
@@ -185,6 +254,8 @@ pub(crate) struct BootstrapPackage {
     pub(crate) stage2: Vec<GovernanceCall>,
     /// The prepare's declared external actions — calls the objects do NOT describe.
     pub(crate) external_actions: Vec<ExternalAction>,
+    /// The package's record of the lifecycle objects' binding values.
+    pub(crate) lifecycle: LifecycleInputs,
     /// Every CREATE2 salt the package records, in the order they were found. A prepare deploys
     /// the core leg under the ecosystem salt and each CTM leg under that CTM's, so an object's
     /// address is re-derivable under one of them — which one is reported rather than assumed.
@@ -203,6 +274,16 @@ fn table<'a>(root: &'a toml::Value, path: &[&str]) -> Option<&'a toml::Value> {
 
 fn address_at(root: &toml::Value, path: &[&str]) -> Option<Address> {
     table(root, path)?.as_str()?.parse().ok()
+}
+
+/// A `uint256` the prepare wrote with `vm.serializeUint` (a TOML integer), or one a hand-edited
+/// package carries as a decimal or `0x` string.
+fn u256_at(root: &toml::Value, path: &[&str]) -> Option<U256> {
+    match table(root, path)? {
+        toml::Value::Integer(value) => u64::try_from(*value).ok().map(U256::from),
+        toml::Value::String(value) => value.parse().ok(),
+        _ => None,
+    }
 }
 
 /// Collects the CREATE2 salts a merged prepare output records, de-duplicated and order-stable.
@@ -304,11 +385,26 @@ impl BootstrapPackage {
             upgrade_timer,
             migration,
             reported_migration: registry_address(root, &ctm_key, "bootstrap_migration_addr"),
+            reported_coordinator: registry_address(root, &ctm_key, "coordinator_addr"),
+            reported_ctm_executor: registry_address(root, &ctm_key, "ctm_upgrade_executor_addr"),
+            reported_ctm: ctm_address(
+                root,
+                &ctm_key,
+                "state_transition",
+                "chain_type_manager_proxy",
+            ),
+            reported_ctm_proxy_admin: ctm_address(
+                root,
+                &ctm_key,
+                "deployed_addresses",
+                "transparent_proxy_admin",
+            ),
             stage0,
             stage1,
             stage2,
             external_actions: external_actions_in(root)?,
             create2_salts: create2_salts_in(root, &ctm_key),
+            lifecycle: lifecycle_inputs_in(root, &ctm_key),
             ctm_key,
         })
     }
@@ -520,8 +616,17 @@ mod tests {
              chain_type_manager_proxy = \"0x00000000000000000000000000000000000000f1\"\n\
              [ctms.zksync_os.deployed_addresses]\n\
              transparent_proxy_admin = \"0x00000000000000000000000000000000000000f2\"\n\
+             [ctms.zksync_os.admin]\n\
+             timer_governance_addr = \"{COORDINATOR}\"\n\
+             ecosystem_admin_addr = \"0x00000000000000000000000000000000000000f3\"\n\
+             [ctms.zksync_os.contracts_config]\n\
+             governance_upgrade_timer_initial_delay = 172800\n\
              [core.registry]\n\
              core_registry_addr = \"0x00000000000000000000000000000000000000ee\"\n\
+             core_upgrade_executor_addr = \"0x00000000000000000000000000000000000000e1\"\n\
+             ecosystem_upgrade_executor_addr = \"{COORDINATOR}\"\n\
+             [core.upgrade_addresses.shared]\n\
+             transparent_proxy_admin = \"0x00000000000000000000000000000000000000e2\"\n\
              [governance_calls]\n\
              stage0_calls = \"0x\"\n\
              stage1_calls = \"0x\"\n\
@@ -564,6 +669,64 @@ mod tests {
                     .unwrap()
             )
         );
+    }
+
+    /// The lifecycle objects' binding values are read from where the two prepares write them —
+    /// the core output's registry and shared-admin sections, the CTM output's admin and config
+    /// sections — because the executors' and the timer's construction is re-derived from them.
+    #[test]
+    fn the_lifecycle_inputs_are_read_from_both_prepare_outputs() {
+        let RegistryPackage::Operation(package) = load_str(&ordinary_release_toml()).unwrap()
+        else {
+            panic!("an ordinary release");
+        };
+        let lifecycle = &package.lifecycle;
+        assert_eq!(
+            lifecycle.core_executor,
+            Some(
+                "0x00000000000000000000000000000000000000e1"
+                    .parse()
+                    .unwrap()
+            )
+        );
+        assert_eq!(
+            lifecycle.core_proxy_admin,
+            Some(
+                "0x00000000000000000000000000000000000000e2"
+                    .parse()
+                    .unwrap()
+            )
+        );
+        assert_eq!(lifecycle.timer_initial_delay, Some(U256::from(172_800u64)));
+        assert_eq!(
+            lifecycle.timer_governance,
+            Some(COORDINATOR.parse::<Address>().unwrap())
+        );
+        assert_eq!(
+            lifecycle.timer_owner,
+            Some(
+                "0x00000000000000000000000000000000000000f3"
+                    .parse()
+                    .unwrap()
+            )
+        );
+    }
+
+    /// A package produced before the prepare recorded the lifecycle values loads with them
+    /// absent — the verifier then reports each construction it cannot run, rather than the
+    /// loader refusing a package it can otherwise review.
+    #[test]
+    fn a_package_without_lifecycle_inputs_loads_with_them_absent() {
+        let body = recurring_toml(&format!(
+            "[operation]\noperation_addr = \"{OPERATION}\"\ncoordinator_addr = \"{COORDINATOR}\"\n"
+        ));
+        let RegistryPackage::Operation(package) = load_str(&body).unwrap() else {
+            panic!("an ordinary release");
+        };
+        assert!(package.lifecycle.core_executor.is_none());
+        assert!(package.lifecycle.core_proxy_admin.is_none());
+        assert!(package.lifecycle.timer_initial_delay.is_none());
+        assert!(package.lifecycle.timer_owner.is_none());
     }
 
     /// The zero `bootstrap_migration_addr` a post-bootstrap release carries must not divert it

@@ -75,19 +75,29 @@ cargo run --release --bin protocol_ops -- ecosystem verify-bootstrap \
 It answers two questions and keeps them apart.
 
 **What does this upgrade do?** is answered by reviewing the objects the package names — the
-operation, the transition it may carry, the release pair, the core registry. Each is read live,
-identified against `AllContractsHashes.json`, and held against its own construction: the reviewed
-creation code, run on the manifest that object itself serves, must land at the object's address.
-That is what establishes the audited CONSTRUCTOR produced it, which a runtime codehash cannot —
-so it needs the reviewed commit built locally (`cd l1-contracts && forge build`) for the creation
-code BYTES, and the reviewed CREATE2 salts, which packages that record their own supply
-automatically.
+operation, the transition it may carry, the release pair, the core registry, and the lifecycle
+objects it runs through (the coordinator, both domain executors, the timer; for the bootstrap edge
+also the migration and the sequence its calls are derived from). Each is held against its own
+construction: the reviewed creation code, run on that object's reviewed constructor arguments,
+must land at the object's address. For a write-once object those arguments are the manifest it
+serves; for a lifecycle object they are the reviewed governance owner and the bindings the package
+records — never the object's own getters, since a genuine executor built for an attacker's owner
+answers them exactly like the reviewed one. That is what establishes the audited CONSTRUCTOR
+produced it, which a runtime codehash cannot (and the lifecycle objects set immutables, so no
+codehash identifies them at all) — so it needs the reviewed commit built locally
+(`cd l1-contracts && forge build`) for the creation code BYTES, and the reviewed CREATE2 salts:
+the core prepare's `[contracts] create2_factory_salt` and the CTM prepare's
+`[create2_factory_salts]` entry, both passed as `--create2-salt` (a package records neither).
+The immutable-free objects are additionally identified against `AllContractsHashes.json`.
 
 **Does the signed transaction invoke it?** is answered, for a recurring upgrade, by re-encoding
 `EcosystemUpgradeExecutor.stage0/1/2(operation)` on the reviewed coordinator and comparing byte
 for byte. The operation's internal calls are deliberately not re-derived — the executors derive
 them on chain from the same pinned object. Any call that is neither a lifecycle call nor a
-declared external action fails the run.
+declared external action fails the run. For the bootstrap edge each stage must carry the run the
+construction-verified sequence derives, in order, and every other call must be a declared external
+action to a target outside the edge's authorities — an extra call to the CTM, a `ProxyAdmin`, an
+executor, the timer or an object is an error whether declared or not.
 
 Around those it checks what the objects cannot answer for themselves: authority bound where the
 review says (governance, coordinator, both domain executors, the CTM and both ProxyAdmins), the

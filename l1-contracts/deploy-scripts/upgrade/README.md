@@ -92,15 +92,19 @@ bootstrap edge declares its whole one-time edge this way.
 
 ```sh
 cargo run --release --bin protocol_ops -- ecosystem verify-bootstrap \
-  --ecosystem-toml <env-out>/ecosystem.toml --l1-rpc-url <rpc> --expected-governance-owner 0x...
+  --ecosystem-toml <env-out>/ecosystem.toml --l1-rpc-url <rpc> --expected-governance-owner 0x... \
+  --create2-salt <[contracts] create2_factory_salt> --create2-salt <[create2_factory_salts] entry of the CTM>
 ```
 
 `verify-bootstrap` (alias `verify-package`, `upgrade_verification/registry/`) verifies a
 registry-driven package against live L1 and decides from the package itself which kind it is: a
-recurring upgrade driven through its coordinator, or the one-time bootstrap edge. It checks object
-provenance and construction, the bound authority and the owner the upgrade is driven by, every
-row's departing implementation, readiness, and that the calldata governance signs invokes the
-reviewed upgrade. What it checks and deliberately does not is in
+recurring upgrade driven through its coordinator, or the one-time bootstrap edge. It checks every
+object's construction (the write-once objects from their manifests, the executors, the timer and
+the bootstrap sequence from the reviewed owner and bindings — which is why both prepare legs'
+salts are inputs: a package records neither), the immutable-free objects' provenance, the bound
+authority and the owner the upgrade is driven by, every row's departing implementation, readiness,
+and that the calldata governance signs invokes the reviewed upgrade and nothing else. What it
+checks and deliberately does not is in
 [`docs/ai-review/docs/protocol-ops.md`](../../../docs/ai-review/docs/protocol-ops.md).
 
 ## 5. Deployer broadcast

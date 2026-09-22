@@ -32,9 +32,11 @@ pub struct VerifyBootstrapArgs {
     pub l1_rpc_url: String,
 
     /// The reviewed governance address the upgrade must be driven by — for a bootstrap, the
-    /// owner the CTM domain lands on permanently; for a recurring upgrade, the owner of the
-    /// whole lifecycle. Without it that owner is reported but not checked against the review,
-    /// so supply it for any package that will actually be signed.
+    /// owner the CTM domain lands on permanently (held against the manifest's); for a recurring
+    /// upgrade, the owner of the whole lifecycle, and the owner the executors' construction is
+    /// re-derived from. Without it a bootstrap's owner is reported but not checked against the
+    /// review, and a recurring package's executors are unverifiable — an error — so supply it for
+    /// any package that will actually be signed.
     #[clap(long)]
     pub expected_governance_owner: Option<Address>,
 

@@ -20,9 +20,11 @@
 //! reconstruction is exactly what the registry model set out to remove.
 //!
 //! Everything else this module does is the part the objects cannot answer for themselves: that
-//! authority is bound where the review says, that the live state the upgrade departs from is the
-//! state it claims, and that the ecosystem is READY for it (the L2 bytecodes published, the timer
-//! startable, no lifecycle already in flight).
+//! the lifecycle objects the upgrade runs through — the coordinator, both domain executors, the
+//! timer — are the reviewed ones (their construction, [`super::lifecycle`]; they set immutables,
+//! so no codehash identifies them), that authority is bound where the review says, that the live
+//! state the upgrade departs from is the state it claims, and that the ecosystem is READY for it
+//! (the L2 bytecodes published, the timer startable, no lifecycle already in flight).
 
 use std::collections::BTreeMap;
 
@@ -34,11 +36,12 @@ use crate::common::governance_calls::GovernanceCall;
 use crate::upgrade_verification::report::VerificationResult;
 
 use super::construction::{expect_canonical_construction, ReviewedBuild};
-use super::package::OperationPackage;
-use super::provenance::{
-    expect_code_identity, expect_code_present, expect_immutable_bearing_identity, tolerate,
-    CodeIdentity, ImmutableValue,
+use super::lifecycle::{
+    verify_lifecycle_construction, verify_timer_construction, LifecycleReview, TimerReview,
 };
+use super::package::OperationPackage;
+use super::provenance::{expect_code_identity, expect_code_present, tolerate, CodeIdentity};
+use super::rows::verify_rows;
 use super::views::{
     BytecodesSupplierView, CTMReleaseView, CTMTransitionView, CTMUpgradeExecutorView,
     CommittedUpgradeView, CoreRegistryView, CoreUpgradeExecutorView, CtmView,
@@ -186,23 +189,7 @@ pub(crate) async fn verify<P: Provider>(
 
     // ── 2. Authority: the coordinator, the domains it drives, and the owner they answer to ──
     result.print_info("\n== Bound authority ==");
-    expect_code_identity(
-        provider,
-        identity,
-        result,
-        "the coordinator",
-        package.coordinator,
-        "EcosystemUpgradeExecutor",
-    )
-    .await?;
     let coordinator = EcosystemUpgradeExecutorView::new(package.coordinator, provider);
-    let Some(core_executor_addr) = tolerate(
-        coordinator.CORE_EXECUTOR().call().await,
-        result,
-        "the coordinator's CORE_EXECUTOR",
-    ) else {
-        return Ok(());
-    };
     let Some(ctm_executor_addr) = tolerate(
         coordinator.ctmExecutor().call().await,
         result,
@@ -224,9 +211,54 @@ pub(crate) async fn verify<P: Provider>(
         Some(ctm_executor_addr),
         "the CTM executor",
     );
+    for (field, reported, what) in [
+        (
+            "chain_type_manager_proxy",
+            package.reported_ctm,
+            "the CTM this upgrade lands on",
+        ),
+        (
+            "transparent_proxy_admin",
+            package.reported_ctm_proxy_admin,
+            "the CTM-domain ProxyAdmin every infrastructure row applies through",
+        ),
+    ] {
+        if reported.is_none() {
+            result.report_error(&format!(
+                "the package does not name `{field}`, so {what} cannot be held against anything \
+                 the review fixes, and the CTM executor's construction cannot be re-derived"
+            ));
+        }
+    }
 
-    // The CTM executor's bindings ARE its identity: it sets them as constructor immutables, so
-    // its runtime code cannot hash to the reviewed artifact (whose immutable slots are zero).
+    // The coordinator, the core executor and the CTM executor set their bindings as constructor
+    // immutables, so their runtime code cannot hash to the reviewed artifacts and their identity
+    // is their CONSTRUCTION — from the reviewed governance owner and the bindings the package
+    // records, never from the values they answer with. A read compared with itself always
+    // agrees and would report a passing check that established nothing.
+    let bindings = verify_lifecycle_construction(
+        provider,
+        build,
+        result,
+        &LifecycleReview {
+            owner: expected_governance_owner,
+            coordinator: package.coordinator,
+            core_executor: package.lifecycle.core_executor,
+            core_proxy_admin: package.lifecycle.core_proxy_admin,
+            ctm_executor: ctm_executor_addr,
+            ctm: package.reported_ctm,
+            ctm_proxy_admin: package.reported_ctm_proxy_admin,
+        },
+        salts,
+        &mut reviewed,
+    )
+    .await?;
+    let Some(core_executor_addr) = bindings.core_executor else {
+        return Ok(());
+    };
+    let Some(core_admin_addr) = bindings.core_proxy_admin else {
+        return Ok(());
+    };
     let ctm_executor = CTMUpgradeExecutorView::new(ctm_executor_addr, provider);
     let Some(ctm_addr) = tolerate(
         ctm_executor.CHAIN_TYPE_MANAGER().call().await,
@@ -247,63 +279,7 @@ pub(crate) async fn verify<P: Provider>(
     result.report_ok(&format!(
         "the upgrade lands on CTM {ctm_addr}, under ProxyAdmin {ctm_admin_addr}"
     ));
-    // The executor sets both bindings as constructor immutables, so its runtime code cannot hash
-    // to the reviewed artifact (whose immutable slots are zero) and identity rests on those
-    // VALUES. They are held against the package's own record of which CTM this prepare ran
-    // against — NOT against themselves: a read compared with itself always agrees and would
-    // report a passing check that established nothing.
-    let mut executor_immutables = Vec::new();
-    match package.reported_ctm {
-        Some(reported) => executor_immutables.push(ImmutableValue::new(
-            "CHAIN_TYPE_MANAGER",
-            ctm_addr,
-            reported,
-        )),
-        None => result.report_error(&format!(
-            "the package does not name `chain_type_manager_proxy`, so the executor's bound CTM \
-             ({ctm_addr}) cannot be held against anything the review fixes: which CTM this \
-             upgrade lands on is unverified"
-        )),
-    }
-    match package.reported_ctm_proxy_admin {
-        Some(reported) => executor_immutables.push(ImmutableValue::new(
-            "CTM_PROXY_ADMIN",
-            ctm_admin_addr,
-            reported,
-        )),
-        None => result.report_error(&format!(
-            "the package does not name `transparent_proxy_admin`, so the executor's bound \
-             ProxyAdmin ({ctm_admin_addr}) — the authority every infrastructure row applies \
-             through — is unverified"
-        )),
-    }
-    expect_immutable_bearing_identity(
-        provider,
-        identity,
-        result,
-        "the bound CTM upgrade executor",
-        ctm_executor_addr,
-        "CTMUpgradeExecutor",
-        &executor_immutables,
-    )
-    .await?;
-    expect_code_identity(
-        provider,
-        identity,
-        result,
-        "the core executor",
-        core_executor_addr,
-        "CoreUpgradeExecutor",
-    )
-    .await?;
     let core_executor = CoreUpgradeExecutorView::new(core_executor_addr, provider);
-    let Some(core_admin_addr) = tolerate(
-        core_executor.PROXY_ADMIN().call().await,
-        result,
-        "the core executor's PROXY_ADMIN",
-    ) else {
-        return Ok(());
-    };
 
     // Both domains must already answer to THIS coordinator, or its stage callbacks revert.
     for (label, bound) in [
@@ -508,14 +484,22 @@ pub(crate) async fn verify<P: Provider>(
         Some(manifest.timer),
         "the timer",
     );
-    verify_timer(
+    verify_timer_construction(
         provider,
-        identity,
+        build,
         result,
-        manifest.timer,
-        package.coordinator,
+        &TimerReview {
+            address: manifest.timer,
+            initial_delay: package.lifecycle.timer_initial_delay,
+            governance: package.coordinator,
+            reported_governance: package.lifecycle.timer_governance,
+            owner: package.lifecycle.timer_owner,
+        },
+        salts,
+        &mut reviewed,
     )
     .await?;
+    verify_timer(provider, result, manifest.timer, package.coordinator).await?;
     if let Some(transition_addr) = transition {
         verify_bytecodes_published(provider, result, &ctm, transition_addr).await?;
     }
@@ -808,78 +792,15 @@ async fn verify_core_registry<P: Provider>(
         .collect())
 }
 
-/// Each participating row must depart from the implementation that is LIVE, read through the
-/// admin the row itself names (or the applying executor's bound admin when it names none — the
-/// same resolution `ProxyUpgradeRowLib.adminOf` performs).
+/// The timer gating stage 1, as a readiness matter (its identity is its construction, checked
+/// before this runs).
 ///
-/// A row at an unexpected implementation reverts the whole stage on chain, so a mismatch here is
-/// an upgrade that cannot execute, not a cosmetic drift.
-async fn verify_rows<P: Provider>(
-    provider: &P,
-    result: &mut VerificationResult,
-    kind: &str,
-    rows: &[ProxyUpgradeRow],
-    default_admin: Address,
-) -> anyhow::Result<()> {
-    for (i, row) in rows.iter().enumerate() {
-        let admin = if row.admin.is_zero() {
-            default_admin
-        } else {
-            row.admin
-        };
-        let label = format!("{kind} {i} ({})", row.proxy);
-        let Some(live_impl) = tolerate(
-            ProxyAdminView::new(admin, provider)
-                .getProxyImplementation(row.proxy)
-                .call()
-                .await,
-            result,
-            &format!(
-                "{label}: the live implementation of {} under {admin}",
-                row.proxy
-            ),
-        ) else {
-            continue;
-        };
-        if live_impl == row.expectedOldImpl {
-            result.report_ok(&format!("{label} departs from the live implementation"));
-        } else if live_impl == row.implNew {
-            // Idempotence, which the row semantics allow: a proxy already at `implNew` is skipped.
-            // Worth a finding anyway — it means part of this upgrade has already happened.
-            result.report_warn(&format!(
-                "{label} is ALREADY at its new implementation {}: the row is a no-op, so part of \
-                 this upgrade has already been applied",
-                row.implNew
-            ));
-        } else {
-            result.report_error(&format!(
-                "{label} expects to depart from {} but {live_impl} is live",
-                row.expectedOldImpl
-            ));
-        }
-        expect_code_present(provider, result, &format!("{label} implNew"), row.implNew).await?;
-        if row.admin != Address::ZERO {
-            result.report_warn(&format!(
-                "{label} names a FOREIGN ProxyAdmin {}: the executor applies it only if it owns \
-                 that admin, otherwise the row is left to that administrator and stage 2 still \
-                 requires it applied",
-                row.admin
-            ));
-        }
-    }
-    Ok(())
-}
-
-/// The timer gating stage 1.
-///
-/// `TIMER_GOVERNANCE` is a constructor-set immutable, so the timer's runtime code cannot hash to
-/// its artifact — which is why that value IS the timer's identity check. For a recurring upgrade
-/// it must be the COORDINATOR: `EcosystemUpgradeExecutor.stage0` starts the timer itself, and
-/// `startTimer` is `onlyTimerAdmin`. (A bootstrap's timer is governed by governance instead,
-/// because at that point no executor holds the domain yet.)
+/// For a recurring upgrade `TIMER_GOVERNANCE` must be the COORDINATOR:
+/// `EcosystemUpgradeExecutor.stage0` starts the timer itself, and `startTimer` is
+/// `onlyTimerAdmin`. (A bootstrap's timer is governed by governance instead, because at that
+/// point no executor holds the domain yet.)
 async fn verify_timer<P: Provider>(
     provider: &P,
-    identity: &CodeIdentity,
     result: &mut VerificationResult,
     timer: Address,
     coordinator: Address,
@@ -892,20 +813,6 @@ async fn verify_timer<P: Provider>(
     ) else {
         return Ok(());
     };
-    expect_immutable_bearing_identity(
-        provider,
-        identity,
-        result,
-        "the upgrade timer",
-        timer,
-        "GovernanceUpgradeTimer",
-        &[ImmutableValue::new(
-            "TIMER_GOVERNANCE",
-            timer_governance,
-            coordinator,
-        )],
-    )
-    .await?;
     if timer_governance != coordinator {
         result.report_error(&format!(
             "the timer is governed by {timer_governance}, not the coordinator {coordinator} that \
@@ -1138,7 +1045,7 @@ async fn render_facet_cuts<P: Provider>(
 /// An ERROR rather than a note: the reported field is what a human reads out of the package, and
 /// the manifest is what executes. A disagreement means the reviewer reviewed a different object
 /// from the one governance would drive.
-fn cross_check(
+pub(super) fn cross_check(
     result: &mut VerificationResult,
     field: &str,
     reported: Option<Address>,
@@ -1223,6 +1130,7 @@ mod tests {
             stage2,
             external_actions,
             create2_salts: Vec::new(),
+            lifecycle: Default::default(),
         }
     }
 
