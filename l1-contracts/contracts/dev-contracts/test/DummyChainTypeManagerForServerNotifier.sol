@@ -13,6 +13,8 @@ contract DummyChainTypeManager {
 
     mapping(uint256 protocolVersion => bytes32 cutHash) public upgradeCutHash;
 
+    mapping(uint256 oldProtocolVersion => address transition) public upgradeTransition;
+
     mapping(uint256 chainId => address zkChain) public zkChain;
 
     // solhint-disable-next-line var-name-mixedcase
@@ -26,6 +28,10 @@ contract DummyChainTypeManager {
 
     function setUpgradeCutHash(uint256 _oldProtocolVersion, bytes32 _upgradeCutHash) external {
         upgradeCutHash[_oldProtocolVersion] = _upgradeCutHash;
+    }
+
+    function setUpgradeTransition(uint256 _oldProtocolVersion, address _transition) external {
+        upgradeTransition[_oldProtocolVersion] = _transition;
     }
 
     function protocolVersionIsActive(uint256 _protocolVersion) external view returns (bool) {

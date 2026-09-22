@@ -148,24 +148,12 @@
                 "internalType": "address"
               },
               {
-                "name": "defaultUpgrade",
+                "name": "chainTypeManagerProxyAdmin",
                 "type": "address",
                 "internalType": "address"
               },
               {
-                "name": "chainTypeManagerProxyAdmin",
-                "type": "address",
-                "internalType": "address"
-              }
-            ]
-          },
-          {
-            "name": "l1Specific",
-            "type": "tuple",
-            "internalType": "struct L1SpecificStateTransitionAddresses",
-            "components": [
-              {
-                "name": "legacyValidatorTimelock",
+                "name": "currentRelease",
                 "type": "address",
                 "internalType": "address"
               }

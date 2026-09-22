@@ -8,6 +8,7 @@ pub mod ecosystem;
 pub mod env_config;
 pub mod error;
 pub mod ethereum;
+pub mod external_actions;
 pub mod files;
 pub mod forge;
 pub mod governance_calls;

@@ -5,27 +5,20 @@ import {console2 as console} from "forge-std/Script.sol";
 import {Utils} from "../utils/Utils.sol";
 import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
 import {
-    L2_ASSET_TRACKER_ADDR,
-    L2_BASE_TOKEN_HOLDER_ADDR,
-    L2_INTEROP_CENTER_ADDR,
-    L2_INTEROP_HANDLER_ADDR,
-    L2_INTEROP_ROOT_STORAGE,
-    L2_MESSAGE_VERIFICATION,
-    L2_NATIVE_TOKEN_VAULT_ADDR,
-    L2_WRAPPED_BASE_TOKEN_IMPL_ADDR
-} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
-import {
     L2_REMOVED_GW_ASSET_TRACKER_ADDR,
     L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import {CoreContract, L2SystemContract} from "../ecosystem/CoreContract.sol";
+import {L2EcosystemContract, L2SystemContract} from "../ecosystem/CoreContract.sol";
+import {L2_ECOSYSTEM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
+import {TransitionDerivationLib} from "contracts/upgrades/registry/libraries/TransitionDerivationLib.sol";
 import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";
 import {DeduplicateBytecodesCountMismatch} from "../ecosystem/DeployScriptErrors.sol";
 
 // solhint-disable no-console
 
-/// @dev Fixed-address CoreContract entries backed by l1-contracts bytecodes.
+/// @dev Fixed-address L2EcosystemContract entries backed by l1-contracts bytecodes,
+///      upgraded via universal force deployments.
 uint256 constant FIXED_ADDRESS_CORE_CONTRACTS_COUNT = 14;
 /// @dev System contracts (0x800x) with l1-contracts EVM bytecodes for proxy upgrades.
 uint256 constant SYSTEM_PROXY_UPGRADE_CONTRACTS_COUNT = 4;
@@ -71,33 +64,41 @@ library SystemContractsProcessing {
         require(included == toInclude, DeduplicateBytecodesCountMismatch());
     }
 
-    /// @notice CoreContract entries with canonical fixed L2 addresses.
-    function getFixedAddressCoreContracts() internal pure returns (CoreContract[] memory ids) {
-        ids = new CoreContract[](FIXED_ADDRESS_CORE_CONTRACTS_COUNT);
-        // L2WrappedBaseToken must retain its implementation across the upgrade.
+    /// @notice L2EcosystemContract entries with canonical fixed L2 addresses.
+    function getFixedAddressCoreContracts() internal pure returns (L2EcosystemContract[] memory ids) {
+        ids = new L2EcosystemContract[](FIXED_ADDRESS_CORE_CONTRACTS_COUNT);
+        _fillFixedAddressCoreContracts(ids);
+    }
+
+    function _fillFixedAddressCoreContracts(L2EcosystemContract[] memory ids) private pure {
+        // L2WrappedBaseToken must retain its implementation across the upgrade, so it is
+        // intentionally NOT in this list: neither force-deployed nor published as a factory dep.
         uint256 i = 0;
-        ids[i++] = CoreContract.L2Bridgehub;
-        ids[i++] = CoreContract.L2AssetRouter;
-        ids[i++] = CoreContract.L2NativeTokenVault;
-        ids[i++] = CoreContract.L2MessageRoot;
-        ids[i++] = CoreContract.L2MessageVerification;
-        ids[i++] = CoreContract.L2ChainAssetHandler;
-        ids[i++] = CoreContract.L2InteropRootStorage;
-        ids[i++] = CoreContract.BaseTokenHolder;
-        ids[i++] = CoreContract.L2AssetTracker;
-        ids[i++] = CoreContract.InteropCenter;
+        ids[i++] = L2EcosystemContract.L2Bridgehub;
+        ids[i++] = L2EcosystemContract.L2AssetRouter;
+        ids[i++] = L2EcosystemContract.L2NativeTokenVault;
+        ids[i++] = L2EcosystemContract.L2MessageRoot;
+        ids[i++] = L2EcosystemContract.L2MessageVerification;
+        ids[i++] = L2EcosystemContract.L2ChainAssetHandler;
+        ids[i++] = L2EcosystemContract.L2InteropRootStorage;
+        ids[i++] = L2EcosystemContract.BaseTokenHolder;
+        ids[i++] = L2EcosystemContract.L2AssetTracker;
+        ids[i++] = L2EcosystemContract.InteropCenter;
         // Stateless parser called by the InteropCenter on every send; must be co-deployed with it.
-        ids[i++] = CoreContract.InteropAttributeParser;
-        ids[i++] = CoreContract.L2InteropHandler;
-        ids[i++] = CoreContract.L2InteropCommitmentTree;
-        ids[i++] = CoreContract.AtomicFlowManager;
-        // Under-filling would silently leave `CoreContract(0)` entries; over-filling
+        ids[i++] = L2EcosystemContract.InteropAttributeParser;
+        ids[i++] = L2EcosystemContract.L2InteropHandler;
+        // Atomic-interop built-ins, see
+        // {protocol-docs/chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins}.
+        ids[i++] = L2EcosystemContract.L2InteropCommitmentTree;
+        ids[i++] = L2EcosystemContract.AtomicFlowManager;
+        // Under-filling would silently leave `L2EcosystemContract(0)` entries; over-filling
         // already reverts with an out-of-bounds access on the fixed-length array.
         require(i == FIXED_ADDRESS_CORE_CONTRACTS_COUNT, "fixed-address core contract count mismatch");
     }
 
     /// @notice System contracts that have l1-contracts EVM bytecodes and need proxy upgrades.
-    /// @dev Kept separate from the CoreContract lists because these use a distinct enum and artifact source.
+    /// @dev Kept separate from the L2EcosystemContract lists because these use a distinct enum and
+    ///      artifact source.
     ///      ContractDeployer (0x8006) is intentionally excluded: it's a sequencer hook dispatcher,
     ///      not a wrappable contract. Attempting to force-deploy a SystemContractProxy at 0x8006
     ///      and then calling forceInitAdmin on it hits the hook with an unknown selector and reverts.
@@ -121,7 +122,7 @@ library SystemContractsProcessing {
     }
 
     function getBaseListOfDependencies() internal view returns (bytes[] memory factoryDeps) {
-        // Baselines, none in the CoreContract enum:
+        // Baselines, none in the L2EcosystemContract enum:
         //  - `SystemContractProxy`: every `upgradeSystemContractProxy` call that needs
         //    to materialize a proxy at a previously-empty system address force-deploys
         //    this bytecode.
@@ -135,48 +136,103 @@ library SystemContractsProcessing {
             "SystemContractProxyAdmin"
         );
         // The implementation the upgrade installs behind the removed trackers' proxies (see
-        // getRemovedTrackerNeutralizations) — not a CoreContract, so published here.
+        // getRemovedTrackerNeutralizations) — not an L2EcosystemContract, so published here.
         factoryDeps[2] = BytecodeUtils.readDeployedBytecodeL1("EmptyContract.sol", "EmptyContract");
     }
 
-    /// @notice Build the base force-deployment array.
-    /// Loads bytecode info per contract instead of materializing one large shared cache for this path.
+    /// @notice Build the base force deployment array.
+    /// @dev DERIVED from the release's L2 bytecode table via the SAME function the on-chain
+    ///      transition derivation uses, so the script-composed bootstrap L2 leg and every
+    ///      registry-driven edge after it are one code path. Which contracts participate is
+    ///      encoded once, in which table rows `buildL2BytecodeInfoTable` fills.
     function getBaseForceDeployments()
         internal
         returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments)
     {
-        CoreContract[] memory fixedAddressCoreContracts = getFixedAddressCoreContracts();
-        L2SystemContract[] memory systemProxyUpgradeContracts = getSystemProxyUpgradeContracts();
+        return
+            TransitionDerivationLib.deriveL2DeploymentsFromTable(buildL2BytecodeInfoTable(), systemProxyBytecodeInfo());
+    }
 
-        // SystemContractProxyAdmin is intentionally NOT force-deployed here: it's a direct-deployed
-        // ProxyAdmin already present from genesis (owned by the ComplexUpgrader), so re-deploying it
-        // would require an unsafe overwrite. _setupProxyAdmin only reads its owner(), which is already
-        // correct. (L2WrappedBaseToken is likewise excluded — it is no longer in
-        // getFixedAddressCoreContracts.) The L2V32Upgrade delegate target remains the only legitimate
-        // unsafe force deployment (added in CTMUpgrade_v31); the PUVT guards that no other
-        // unsafe force deployment is present.
-        // The removed v31 GWAssetTracker's proxy gets its implementation swapped for EmptyContract.
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory neutralizations = getRemovedTrackerNeutralizations();
+    /// @notice The release's shared system-proxy shell descriptor
+    ///         (`ReleaseManifest.l2SystemProxyBytecodeInfo`): the ZKsync OS bytecode info of
+    ///         `SystemContractProxy`, which every table member sits behind.
+    function systemProxyBytecodeInfo() internal returns (bytes memory) {
+        return Utils.getZKOSBytecodeInfoForContract("SystemContractProxy.sol", "SystemContractProxy");
+    }
 
-        uint256 totalBase = fixedAddressCoreContracts.length +
-            systemProxyUpgradeContracts.length +
-            neutralizations.length;
+    /// @notice Builds the release manifest's enum-indexed L2 bytecode table
+    ///         (`ReleaseManifest.l2BytecodeInfos`): per force-deployed member, the ZKsync OS
+    ///         bytecode info of its IMPLEMENTATION; every other slot stays an explicit empty.
+    /// @dev Deliberately UNFILLED rows, and why:
+    ///      - SystemContractProxyAdmin: a direct-deployed ProxyAdmin already present from genesis
+    ///        (owned by the ComplexUpgrader); re-deploying it would require an unsafe overwrite.
+    ///      - L2WrappedBaseToken: upgrades must not touch the impl (since v31).
+    ///      - L2V34Upgrade: the version-specific delegate is an UNSAFE deployment at a
+    ///        bytecode-derived address — constructed from the pinned
+    ///        `AuthoredL2Plan.delegateBytecodeInfo`, never table-derived. No OTHER unsafe
+    ///        deployment can ride along, by construction rather than by review: this table's
+    ///        rows are emitted as `ZKsyncOSSystemProxyUpgrade`, and the only producer of an
+    ///        `ZKsyncOSUnsafeForceDeployment` is `L2PlanLib._unsafeDeployment`, reached solely
+    ///        from `AuthoredL2Plan.delegateBytecodeInfo` and `extraBytecodeInfos` — both pinned
+    ///        manifest fields. The plan is built, not authored, so there is no path by which an
+    ///        unsafe deployment appears without being an explicit, reviewed manifest entry.
+    function buildL2BytecodeInfoTable() internal returns (bytes[] memory rows) {
+        return buildL2BytecodeInfoTable(Utils.getZKOSBytecodeInfoForContract);
+    }
 
-        deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](totalBase);
-
-        uint256 index;
-        // Fixed-address core contracts (0x10000+)
-        for (uint256 i = 0; i < fixedAddressCoreContracts.length; i++) {
-            deployments[index++] = _buildCoreContractProxyUpgrade(fixedAddressCoreContracts[i]);
+    /// @dev Variant for deployers that precompute the expensive bytecode hashes and provide a
+    ///      cache-backed descriptor builder (artifact file + contract name -> the implementation's
+    ///      bytecode info). Keeping the table assembly here prevents the genesis and upgrade paths
+    ///      from growing separate contract inventories.
+    function buildL2BytecodeInfoTable(
+        function(string memory, string memory) internal returns (bytes memory) _buildBytecodeInfo
+    ) internal returns (bytes[] memory rows) {
+        rows = new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
+        L2EcosystemContract[] memory core = getFixedAddressCoreContracts();
+        for (uint256 i = 0; i < core.length; i++) {
+            rows[uint256(core[i])] = _implementationBytecodeInfo(core[i], _buildBytecodeInfo);
         }
-        // System contracts with l1-contracts EVM bytecodes (0x800x)
-        for (uint256 i = 0; i < systemProxyUpgradeContracts.length; i++) {
-            deployments[index++] = _buildSystemContractProxyUpgrade(systemProxyUpgradeContracts[i]);
+        // Kernel built-ins with l1-contracts EVM bytecodes (system space, 0x800x).
+        L2SystemContract[] memory sysContracts = getSystemProxyUpgradeContracts();
+        for (uint256 i = 0; i < sysContracts.length; i++) {
+            (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolveL2SystemContract(
+                sysContracts[i]
+            );
+            rows[uint256(_l2MemberForSystemContract(sysContracts[i]))] = _buildBytecodeInfo(fileName, contractName);
         }
+        // The removed v31 GWAssetTracker's proxy keeps its neutralizing EmptyContract
+        // implementation (see `getRemovedTrackerNeutralizations`).
+        rows[uint256(L2EcosystemContract.RemovedGWAssetTracker)] = _buildBytecodeInfo(
+            "EmptyContract.sol",
+            "EmptyContract"
+        );
+    }
 
-        for (uint256 i = 0; i < neutralizations.length; i++) {
-            deployments[index++] = neutralizations[i];
+    /// @dev The table row of a fixed-address `L2EcosystemContract`: its implementation's bytecode info.
+    function _implementationBytecodeInfo(
+        L2EcosystemContract _id,
+        function(string memory, string memory) internal returns (bytes memory) _buildBytecodeInfo
+    ) private returns (bytes memory) {
+        (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(_id);
+        return _buildBytecodeInfo(fileName, contractName);
+    }
+
+    /// @dev The appended `L2EcosystemContract` member a ZKsyncOS kernel built-in occupies in the
+    ///      release's L2 bytecode table.
+    function _l2MemberForSystemContract(L2SystemContract _id) private pure returns (L2EcosystemContract) {
+        if (_id == L2SystemContract.L2BaseToken) {
+            return L2EcosystemContract.L2BaseToken;
         }
+        if (_id == L2SystemContract.L1Messenger) {
+            return L2EcosystemContract.L1Messenger;
+        }
+        if (_id == L2SystemContract.SystemContext) {
+            return L2EcosystemContract.SystemContext;
+        }
+        if (_id == L2SystemContract.L2ComplexUpgrader) {
+            return L2EcosystemContract.L2ComplexUpgrader;
+        }
+        revert("L2SystemContract has no L2EcosystemContract member");
     }
 
     /// @notice Proxy upgrades that neutralize the removed v31 GWAssetTracker.
@@ -213,39 +269,5 @@ library SystemContractsProcessing {
         for (uint256 i = 0; i < _right.length; i++) {
             result[_left.length + i] = _right[i];
         }
-    }
-
-    /// @dev Build a proxy-upgrade entry for a fixed-address CoreContract.
-    function _buildCoreContractProxyUpgrade(
-        CoreContract _id
-    ) private returns (IComplexUpgrader.UniversalContractUpgradeInfo memory) {
-        (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(_id);
-
-        // L2WrappedBaseToken is excluded from the force-deployment list, so every entry built here
-        // uses the system-proxy upgrade mode.
-        bytes memory bytecodeInfo = Utils.getZKOSProxyUpgradeBytecodeInfo(fileName, contractName);
-
-        return
-            IComplexUpgrader.UniversalContractUpgradeInfo({
-                upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
-                deployedBytecodeInfo: bytecodeInfo,
-                newAddress: CoreOnGatewayHelper._resolveAddress(_id)
-            });
-    }
-
-    /// @dev Build a proxy-upgrade entry for a L2SystemContract.
-    function _buildSystemContractProxyUpgrade(
-        L2SystemContract _id
-    ) private returns (IComplexUpgrader.UniversalContractUpgradeInfo memory) {
-        address addr = CoreOnGatewayHelper._resolveL2SystemContractAddress(_id);
-        (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolveL2SystemContract(_id);
-        bytes memory bytecodeInfo = Utils.getZKOSProxyUpgradeBytecodeInfo(fileName, contractName);
-
-        return
-            IComplexUpgrader.UniversalContractUpgradeInfo({
-                upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
-                deployedBytecodeInfo: bytecodeInfo,
-                newAddress: addr
-            });
     }
 }

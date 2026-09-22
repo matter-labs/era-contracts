@@ -320,9 +320,75 @@ npx ts-node setup-and-dump-state.ts
 
    Then commit the updated `selectors` file.
 
+## Order of Work
+
+Two rules decide when to run what. The whole-repo gates run **once**, after the source is final.
+Generated artifacts are regenerated **last of all**.
+
+### While you are working
+
+Your loop is compile plus the tests covering what you touched, and nothing else:
+
+```bash
+cd l1-contracts && forge build
+```
+
+```bash
+cd l1-contracts && forge test --match-path 'test/foundry/l1/unit/concrete/Upgrades/**' --threads 1 --ffi --gas-limit 20000000000
+```
+
+Do **not** run `yarn lint:sol`, `yarn lint:ts`, `yarn prettier:fix`, `yarn errors-lint` or the full
+`yarn test:foundry` after each edit. They walk the whole repository, cost far more than the edit that
+triggered them, and rewrite files you never touched — which turns into merge conflicts on lines
+nobody changed when several branches or worktrees land on one base. To check your own formatting
+mid-flight, scope it to the files you changed:
+
+```bash
+npx prettier --write path/to/Changed.sol
+```
+
+```bash
+cd l1-contracts && npx solhint path/to/Changed.sol
+```
+
+### Once, when the source is final
+
+Each step once, in this order:
+
+1. Make the tree compile — contracts, deploy scripts, tests, TypeScript.
+2. `cd l1-contracts && yarn test:foundry` — the whole suite, green.
+3. `cd l1-contracts && yarn errors-lint --fix` — **only if** an error declaration was added or removed.
+4. `yarn lint:sol --fix --noPrompt && yarn lint:ts --fix && yarn prettier:fix` from the repository root.
+5. Commit.
+6. Only then, regenerate artifacts.
+
+Tests come before formatting, never after. Formatting cannot break a test, so a green suite stays
+green; the reverse order makes you re-run the suite after every fix-up.
+
+### Subagents and parallel branches
+
+When work is split across subagents or worktrees, the agent making the edits runs steps 1 and 2 and
+scopes any formatting to its own changed files. Whoever merges runs steps 3 and 4 once, over the
+merged tree. Three agents each formatting the whole repository produces three formatting diffs to
+reconcile and no extra safety.
+
+### Regenerate artifacts LAST — after every source change is final
+
+Every generated artifact (`AllContractsHashes.json`, `zkstack-out/`, `selectors`,
+`test/anvil-interop/chain-states/`, `scripts/registry-manifests/`, `configs/genesis/`) is a function
+of the contract sources. A one-line contract edit invalidates all of them, and a full regeneration
+takes tens of minutes. Regenerating early therefore guarantees doing it again.
+
+They also depend on each other, so the order within regeneration matters: hashes
+(`update-hashes-on-demand`, CI is its only oracle), then the ZKsync OS genesis image, then the
+anvil-interop chain states (chain creation reads the genesis root), then the registry manifests
+(they are generated against those states).
+
 ## Before Pushing Changes
 
-**ALWAYS run linting and formatting before pushing to ensure CI passes:**
+Push only from a state that has been through **Order of Work** above: the full suite green, then one
+lint and format pass, then the commit. Re-running those gates per edit does not make CI more likely
+to pass; it only makes the work slower.
 
 ### Running Linting and Formatting
 
@@ -341,10 +407,11 @@ yarn prettier:fix
 
 ### Pre-Push Checklist
 
-1. **Run linting fixes**: `yarn lint:sol --fix --noPrompt && yarn lint:ts --fix && yarn prettier:fix`
-2. **Run foundry tests**: `cd l1-contracts && yarn test:foundry`
-3. **Verify no uncommitted changes**: `git status`
-4. **Commit and push**: Only after all checks pass
+1. **Run foundry tests**: `cd l1-contracts && yarn test:foundry`
+2. **Run the errors lint**, only if an error declaration changed: `cd l1-contracts && yarn errors-lint --fix`
+3. **Run linting fixes**, one pass: `yarn lint:sol --fix --noPrompt && yarn lint:ts --fix && yarn prettier:fix`
+4. **Verify no uncommitted changes**: `git status`
+5. **Commit and push**: only after all checks pass
 
 ### Common Linting Issues
 

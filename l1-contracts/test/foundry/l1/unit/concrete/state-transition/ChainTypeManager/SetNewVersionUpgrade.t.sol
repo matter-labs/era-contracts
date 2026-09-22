@@ -17,23 +17,24 @@ contract setNewVersionUpgradeTest is ChainTypeManagerTest {
             abi.encodeWithSignature("chainAssetHandler()"),
             abi.encode(mockChainAssetHandler)
         );
-        vm.mockCall(mockChainAssetHandler, abi.encodeWithSignature("migrationPaused()"), abi.encode(true));
+        vm.mockCall(mockChainAssetHandler, abi.encodeWithSignature("migrationPausedFor(address)"), abi.encode(true));
 
         address randomDiamondInit = makeAddr("randomDiamondInit");
         Diamond.DiamondCutData memory newDiamondCutData = getDiamondCutData(address(randomDiamondInit));
         bytes32 newCutHash = keccak256(abi.encode(newDiamondCutData));
 
+        address newRelease = _releaseAt(1);
         vm.prank(governor);
-        chainContractAddress.setNewVersionUpgrade(newDiamondCutData, 0, 999999999999, 1, testnetVerifier);
+        chainContractAddress.setNewVersionUpgrade(newDiamondCutData, 0, 999999999999, newRelease);
 
         assertEq(chainContractAddress.upgradeCutHash(0), newCutHash, "Diamond cut upgrade was not successful");
         assertEq(chainContractAddress.protocolVersion(), 1, "New protocol version is not correct");
+        assertEq(chainContractAddress.currentRelease(), newRelease, "the edge installs its release");
 
         (uint32 major, uint32 minor, uint32 patch) = chainContractAddress.getSemverProtocolVersion();
 
         assertEq(major, 0);
         assertEq(minor, 0);
         assertEq(patch, 1);
-        assertEq(chainContractAddress.protocolVersionVerifier(1), testnetVerifier, "Verifier was not set correctly");
     }
 }

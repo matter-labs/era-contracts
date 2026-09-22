@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
+import {ISelfDescribingFacet} from "../../chain-interfaces/ISelfDescribingFacet.sol";
 import {IInteropCenter} from "../../../interop/IInteropCenter.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
 
@@ -45,7 +46,7 @@ import {IL1ChainAssetHandler} from "../../../core/chain-asset-handler/IL1ChainAs
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract MailboxFacet is ZKChainBase, IMailbox {
+contract MailboxFacet is ZKChainBase, IMailbox, ISelfDescribingFacet {
     using UncheckedMath for uint256;
     using PriorityTree for PriorityTree.Tree;
 
@@ -386,5 +387,28 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         uint256 totalPriorityTxs = s.priorityTree.getTotalPriorityTxs();
         uint256 newRequestId = totalPriorityTxs - 1;
         s.priorityOpsRequestTimestamp[newRequestId] = block.timestamp;
+    }
+
+    /// @inheritdoc ISelfDescribingFacet
+    /// @dev Packed list (4 bytes per selector) generated from this facet's ABI — every externally
+    ///      served function except the unregistered helper views `getName()` and `selectors()`
+    ///      (see `Utils.getAllSelectors`). Guarded against drift by FacetSelfDescription.t.sol.
+    ///      0x12f43dab bridgehubRequestL2Transaction((address,address,uint256,uint256,bytes,uint256,uint256,bytes[],address))
+    ///      0xddcc9eec bridgehubRequestL2TransactionOnGateway(bytes32,uint64)
+    ///      0x60da3e83 depositsPaused()
+    ///      0xb473318e l2TransactionBaseCost(uint256,uint256,uint256)
+    ///      0xd07b90d1 requestL2ServiceTransaction(address,bytes)
+    ///      0xd0772551 requestL2TransactionToGatewayMailbox(uint256,bytes32,uint64)
+    function selectors() public pure returns (bytes4[] memory result) {
+        bytes memory packed = hex"12f43dab60da3e83b473318ed0772551d07b90d1ddcc9eec";
+        uint256 count = packed.length / 4;
+        result = new bytes4[](count);
+        for (uint256 i = 0; i < count; ++i) {
+            bytes4 selector;
+            assembly {
+                selector := mload(add(add(packed, 0x20), mul(i, 4)))
+            }
+            result[i] = selector;
+        }
     }
 }

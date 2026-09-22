@@ -15,12 +15,15 @@ use serde_json::Value;
 use crate::common::ethereum::get_provider;
 use crate::common::{logger, PrivateKey};
 
-/// One replayed Safe tx as it lands on L1, persisted to `--out` so the
-/// PUVT (`ecosystem verify-upgrade`) can later reconstruct CREATE2 / TUPP
-/// deployments from the prepare bundles. The fields mirror the legacy
-/// `UpgradeOutput.transactions` shape but with the raw input data alongside
-/// each hash, so verifier-side parsing doesn't need an extra
-/// `eth_getTransactionByHash` round trip.
+/// One replayed Safe tx as it lands on L1, persisted to `--out` as the
+/// deployment record of a prepare run. The fields mirror the legacy
+/// `UpgradeOutput.transactions` shape but carry the raw input data alongside
+/// each hash, so a reader does not need an extra `eth_getTransactionByHash`
+/// round trip.
+///
+/// The registry verifier does NOT consume this: an object's provenance is
+/// re-derived from the reviewed creation code and its own manifest, not
+/// reconstructed from a deployment history. It remains an operational record.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecutedTx {
     pub tx_hash: String,
@@ -121,9 +124,8 @@ pub struct DevExecuteSafeArgs {
     /// Optional path to append the replayed transactions to as JSON. Use the
     /// same path across multiple bundles (the file is read on entry and
     /// rewritten on exit, so successful replays of multiple bundles
-    /// accumulate in execution order). Consumed later by
-    /// `ecosystem verify-upgrade --executed-bundles <path>` so the verifier
-    /// can reconstruct CREATE2 / TUPP deployments from the prepare output.
+    /// accumulate in execution order). An operational record of what a replay
+    /// broadcast; no verifier reads it.
     #[clap(long)]
     pub out: Option<PathBuf>,
 }

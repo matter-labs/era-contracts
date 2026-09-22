@@ -57,33 +57,56 @@ the duration of the command and stops when it exits.
 To apply the generated Safe bundles to a real chain, use `dev execute-manifest` (or any
 Safe-bundle-aware executor) with the keys from `wallets.yaml`.
 
-## Running the Protocol Upgrade Verification Tool (PUVT)
+## Verifying a registry-driven upgrade before it is signed
 
-`ecosystem verify-upgrade` re-derives and cross-checks the calldata produced by
-`ecosystem upgrade-prepare-all` for the **v31 → v32 ZKsync OS upgrade**. It is
-**read-only**: it never runs forge or spins up an Anvil fork. It reads the merged
-`ecosystem.toml`, replays the append-only `transactions.txt` deployment log against L1,
-and matches every CREATE2 deployment against `AllContractsHashes.json`. The tool is
-OS-only — an `ecosystem.toml` carrying a `[ctms.era]` section is rejected at parse time.
+`ecosystem verify-bootstrap` (alias `verify-package`) is the verifier for current packages. It
+reads the merged `ecosystem.toml`, decides from the package itself whether it drives a recurring
+upgrade or the one-time bootstrap edge, and refuses a package that is neither. It is read-only and
+needs nothing but that file and an L1 RPC.
 
 ```bash
-cargo run --release --bin protocol_ops -- ecosystem verify-upgrade \
-  --env stage \
+cargo run --release --bin protocol_ops -- ecosystem verify-bootstrap \
   --ecosystem-toml <path-to>/ecosystem.toml \
-  --gw-rpc-url <gateway-rpc-url> \
-  --zk-governance-commit <commit>
+  --l1-rpc-url <l1-rpc-url> \
+  --expected-governance-owner 0x... \
+  --create2-salt 0x...
 ```
 
-| Flag                         | Role                                                                                           |
-| ---------------------------- | ---------------------------------------------------------------------------------------------- |
-| **`--env`**                  | `stage` / `testnet` / `mainnet`; selects the permanent-values + v31 input TOMLs.               |
-| **`--ecosystem-toml`**       | Merged artifact from `upgrade-prepare-all`.                                                    |
-| **`--zk-governance-commit`** | zk-governance commit for PUH / Guardians / SecurityCouncil / EUB bytecode metadata (required). |
-| **`--contracts-commit`**     | Optional era-contracts commit; when omitted, the local checkout is the authority.              |
-| **`--transactions-log`**     | Deployment tx-hash log; defaults to the env's `output/<env>/transactions.txt`.                 |
-| **`--l1-rpc-url`**           | L1 RPC (default `http://localhost:8545`).                                                      |
-| **`--gw-rpc-url`**           | Gateway RPC (alias `--gw-rpc`) for read-only gateway-side checks.                              |
-| **`--display-upgrade-data`** | Print each stage's ABI-encoded `UpgradeProposal` and skip the rest of the verifier.            |
+It answers two questions and keeps them apart.
+
+**What does this upgrade do?** is answered by reviewing the objects the package names — the
+operation, the transition it may carry, the release pair, the core registry, and the lifecycle
+objects it runs through (the coordinator, both domain executors, the timer; for the bootstrap edge
+also the migration and the sequence its calls are derived from). Each is held against its own
+construction: the reviewed creation code, run on that object's reviewed constructor arguments,
+must land at the object's address. For a write-once object those arguments are the manifest it
+serves; for a lifecycle object they are the reviewed governance owner and the bindings the package
+records — never the object's own getters, since a genuine executor built for an attacker's owner
+answers them exactly like the reviewed one. That is what establishes the audited CONSTRUCTOR
+produced it, which a runtime codehash cannot (and the lifecycle objects set immutables, so no
+codehash identifies them at all) — so it needs the reviewed commit built locally
+(`cd l1-contracts && forge build`) for the creation code BYTES, and the reviewed CREATE2 salts:
+the core prepare's `[contracts] create2_factory_salt` and the CTM prepare's
+`[create2_factory_salts]` entry, both passed as `--create2-salt` (a package records neither).
+The immutable-free objects are additionally identified against `AllContractsHashes.json`.
+
+**Does the signed transaction invoke it?** is answered, for a recurring upgrade, by re-encoding
+`EcosystemUpgradeExecutor.stage0/1/2(operation)` on the reviewed coordinator and comparing byte
+for byte. The operation's internal calls are deliberately not re-derived — the executors derive
+them on chain from the same pinned object. Any call that is neither a lifecycle call nor a
+declared external action fails the run. For the bootstrap edge each stage must carry the run the
+construction-verified sequence derives, in order, and every other call must be a declared external
+action to a target outside the edge's authorities — an extra call to the CTM, a `ProxyAdmin`, an
+executor, the timer or an object is an error whether declared or not.
+
+Around those it checks what the objects cannot answer for themselves: authority bound where the
+review says (governance, coordinator, both domain executors, the CTM and both ProxyAdmins), the
+live state the upgrade departs from, and readiness — the L2 factory dependencies published on the
+CTM's supplier, the timer startable, no lifecycle already in flight. Readiness is reported apart
+from anything about value.
+
+Anything a reviewer could not establish is an ERROR, never a warning: warnings do not fail a run,
+so an unverifiable input reported as one reads, afterwards, exactly like a check that passed.
 
 ## Output
 

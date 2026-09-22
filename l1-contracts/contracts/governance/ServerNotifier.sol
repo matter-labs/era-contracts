@@ -113,7 +113,12 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable, IServer
             revert ZeroUpgradeTimestamp();
         }
         uint256 oldProtocolVersion = chainTypeManager.getProtocolVersion(_chainId);
-        if (chainTypeManager.upgradeCutHash(oldProtocolVersion) == bytes32(0)) {
+        // A registry-driven edge commits a transition; a legacy edge commits a cut hash. Either
+        // proves an upgrade is actually scheduled for the version the chain departs from.
+        if (
+            chainTypeManager.upgradeTransition(oldProtocolVersion) == address(0) &&
+            chainTypeManager.upgradeCutHash(oldProtocolVersion) == bytes32(0)
+        ) {
             revert CutDataForProtocolVersionNotAvailable(oldProtocolVersion);
         }
         IUpgradePreconditionChecker checker = upgradePreconditionChecker[oldProtocolVersion];

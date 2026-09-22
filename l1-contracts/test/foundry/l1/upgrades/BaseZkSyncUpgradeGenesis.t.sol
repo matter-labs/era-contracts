@@ -13,28 +13,37 @@ import {
 } from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
 import {MAX_ALLOWED_MINOR_VERSION_DELTA} from "contracts/common/Config.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
+import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
 
-contract DummyBaseZkSyncUpgradeGenesis is BaseZkSyncUpgradeGenesis, BaseUpgradeUtils {}
+contract DummyBaseZkSyncUpgradeGenesis is BaseZkSyncUpgradeGenesis, BaseUpgradeUtils {
+    /// @notice The shared storage part, exposed.
+    function upgrade(
+        uint256 _newProtocolVersion,
+        uint256 _upgradeTimestamp,
+        address _verifier,
+        L2CanonicalTransaction memory _l2ProtocolUpgradeTx
+    ) external returns (bytes32) {
+        return _upgrade(_newProtocolVersion, _upgradeTimestamp, _verifier, _l2ProtocolUpgradeTx);
+    }
+}
 
 contract BaseZkSyncUpgradeGenesisTest is BaseUpgrade {
     DummyBaseZkSyncUpgradeGenesis baseZkSyncUpgrade;
-    address mockChainTypeManager = makeAddr("mockChainTypeManager");
-    address mockVerifier = makeAddr("mockVerifier");
 
     function setUp() public {
         baseZkSyncUpgrade = new DummyBaseZkSyncUpgradeGenesis();
 
-        _prepareProposedUpgrade();
+        _prepareUpgrade();
 
         baseZkSyncUpgrade.setPriorityTxMaxGasLimit(1 ether);
         baseZkSyncUpgrade.setPriorityTxMaxPubdata(1000000);
+    }
 
-        // Set up CTM for verifier lookup
-        baseZkSyncUpgrade.setChainTypeManager(mockChainTypeManager);
-        baseZkSyncUpgrade.mockProtocolVersionVerifier(protocolVersion, mockVerifier);
+    function _upgrade() internal returns (bytes32) {
+        return baseZkSyncUpgrade.upgrade(protocolVersion, upgradeTimestamp, verifier, l2CanonicalTransaction);
     }
 
     // New protocol version is not greater than the current one
@@ -49,7 +58,7 @@ contract BaseZkSyncUpgradeGenesisTest is BaseUpgrade {
 
         baseZkSyncUpgrade.setProtocolVersion(semVerCurrentProtocolVersion);
 
-        proposedUpgrade.newProtocolVersion = semVerNewProtocolVersion;
+        protocolVersion = semVerNewProtocolVersion;
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -58,27 +67,27 @@ contract BaseZkSyncUpgradeGenesisTest is BaseUpgrade {
                 semVerNewProtocolVersion
             )
         );
-        baseZkSyncUpgrade.upgrade(proposedUpgrade);
+        _upgrade();
     }
 
     // Major version is not zero
     function test_revertWhen_MajorVersionIsNotZero() public {
         baseZkSyncUpgrade.setProtocolVersion(SemVer.packSemVer(1, 0, 0));
 
-        proposedUpgrade.newProtocolVersion = SemVer.packSemVer(1, 1, 0);
+        protocolVersion = SemVer.packSemVer(1, 1, 0);
 
         vm.expectRevert(abi.encodeWithSelector(ProtocolMajorVersionNotZero.selector));
-        baseZkSyncUpgrade.upgrade(proposedUpgrade);
+        _upgrade();
     }
 
     // New major version is not zero
     function test_revertWhen_MajorMustAlwaysBeZero(uint32 newProtocolVersion) public {
         vm.assume(newProtocolVersion > 0);
 
-        proposedUpgrade.newProtocolVersion = SemVer.packSemVer(1, newProtocolVersion, 0);
+        protocolVersion = SemVer.packSemVer(1, newProtocolVersion, 0);
 
         vm.expectRevert(abi.encodeWithSelector(ProtocolMajorVersionNotZero.selector));
-        baseZkSyncUpgrade.upgrade(proposedUpgrade);
+        _upgrade();
     }
 
     // Protocol version difference is too big
@@ -90,7 +99,7 @@ contract BaseZkSyncUpgradeGenesisTest is BaseUpgrade {
         baseZkSyncUpgrade.setProtocolVersion(SemVer.packSemVer(0, oldProtocolVersion, 0));
         uint256 semVerNewProtocolVersion = SemVer.packSemVer(0, newProtocolVersion, 0);
 
-        proposedUpgrade.newProtocolVersion = semVerNewProtocolVersion;
+        protocolVersion = semVerNewProtocolVersion;
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -99,7 +108,7 @@ contract BaseZkSyncUpgradeGenesisTest is BaseUpgrade {
                 MAX_ALLOWED_MINOR_VERSION_DELTA
             )
         );
-        baseZkSyncUpgrade.upgrade(proposedUpgrade);
+        _upgrade();
     }
 
     // Previous upgrade has not been finalized
@@ -108,7 +117,7 @@ contract BaseZkSyncUpgradeGenesisTest is BaseUpgrade {
         baseZkSyncUpgrade.setL2SystemContractsUpgradeTxHash(l2SystemContractsUpgradeTxHash);
 
         vm.expectRevert(abi.encodeWithSelector(PreviousUpgradeNotFinalized.selector, l2SystemContractsUpgradeTxHash));
-        baseZkSyncUpgrade.upgrade(proposedUpgrade);
+        _upgrade();
     }
 
     // Batch number of the previous upgrade has not been cleaned
@@ -118,12 +127,23 @@ contract BaseZkSyncUpgradeGenesisTest is BaseUpgrade {
         baseZkSyncUpgrade.setL2SystemContractsUpgradeBatchNumber(batchNumber);
 
         vm.expectRevert(abi.encodeWithSelector(PreviousUpgradeBatchNotCleared.selector));
-        baseZkSyncUpgrade.upgrade(proposedUpgrade);
+        _upgrade();
     }
 
     function test_SuccessUpgrade() public {
-        baseZkSyncUpgrade.upgrade(proposedUpgrade);
+        _upgrade();
 
-        assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
+        assertEq(baseZkSyncUpgrade.getProtocolVersion(), protocolVersion);
+    }
+
+    /// @dev The genesis difference: the version may stay the same (a new chain geneses AT the
+    ///      current version), and that is never treated as a patch — the genesis transaction is set.
+    function test_SuccessUpgrade_sameVersionStillSetsTheGenesisTransaction() public {
+        baseZkSyncUpgrade.setProtocolVersion(protocolVersion);
+
+        bytes32 txHash = _upgrade();
+
+        assertEq(txHash, keccak256(abi.encode(l2CanonicalTransaction)), "the genesis transaction is set");
+        assertEq(baseZkSyncUpgrade.getProtocolVersion(), protocolVersion);
     }
 }

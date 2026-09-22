@@ -2,34 +2,10 @@
 
 pragma solidity ^0.8.24;
 
-/// @notice Canonical identifier for core L2 contracts that participate in
-///         force-deployments and factory-dependency publishing.
-///         `CoreOnGatewayHelper.resolve` maps it to the contract and artifact name.
-enum CoreContract {
-    L2Bridgehub,
-    L2AssetRouter,
-    L2NativeTokenVault,
-    L2MessageRoot,
-    UpgradeableBeaconDeployer,
-    BaseTokenHolder,
-    L2ChainAssetHandler,
-    InteropCenter,
-    InteropAttributeParser,
-    L2InteropHandler,
-    L2AssetTracker,
-    L2WrappedBaseToken,
-    L2MessageVerification,
-    L2InteropRootStorage,
-    BeaconProxy,
-    L2V32Upgrade,
-    BridgedStandardERC20,
-    DiamondProxy,
-    ProxyAdmin,
-    TransparentUpgradeableProxy,
-    // Atomic-interop built-ins; the bootloader reads the commitment tree's storage.
-    L2InteropCommitmentTree,
-    AtomicFlowManager
-}
+// The canonical definitions of `L2EcosystemContract` and `ZKsyncOSUpgradeType` live in the production
+// contracts tree (they key the upgrade registries); they are re-exported here so that all
+// deploy-script importers keep working unchanged.
+import {L2EcosystemContract, ZKsyncOSUpgradeType} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 /// @notice Fixed-address L2 system contracts upgraded through `SystemContractProxy`.
 enum L2SystemContract {

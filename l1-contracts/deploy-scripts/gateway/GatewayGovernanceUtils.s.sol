@@ -69,7 +69,7 @@ abstract contract GatewayGovernanceUtils is Script {
         PrepareGatewayGovernanceCalls memory prepareGWGovCallsStruct
     ) internal view returns (Call[] memory calls) {
         // Whitelist the new GW on the L1 Bridgehub iff it isn't already.
-        // Mirrors GatewayPreparation.sol's idempotent check on the same setter.
+        // Idempotent check on the same setter.
         if (
             !IL1Bridgehub(_gatewayGovernanceConfig.bridgehubProxy).whitelistedSettlementLayers(
                 _gatewayGovernanceConfig.gatewayChainId

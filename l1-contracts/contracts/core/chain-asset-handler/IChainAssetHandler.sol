@@ -58,19 +58,44 @@ interface IChainAssetHandlerBase is IAssetHandler {
     /// @param pauser Address that triggered the unpause
     event UnpausedMigration(address indexed pauser);
 
+    /// @notice Emitted when a CTM's own migrations are paused by that CTM's owner.
+    event PausedCTMMigration(address indexed ctm, address indexed pauser);
+
+    /// @notice Emitted when a CTM's own migrations are unpaused by that CTM's owner.
+    event UnpausedCTMMigration(address indexed ctm, address indexed pauser);
+
     function migrationNumber(uint256 _chainId) external view returns (uint256);
 
-    /// @dev Denotes whether the migrations of chains is paused.
+    /// @notice Whether the ECOSYSTEM-wide migration pause is set.
+    /// @dev Not the whole answer for a given chain: its CTM may be paused on its own. Callers
+    ///      deciding whether a migration can proceed want {migrationPausedFor}.
     function migrationPaused() external view returns (bool);
+
+    /// @notice Whether migrations are paused for chains under `_ctm` — the ecosystem-wide pause
+    ///         OR that CTM's own.
+    function migrationPausedFor(address _ctm) external view returns (bool);
+
+    /// @notice Whether `_ctm`'s own migration pause is set.
+    function ctmMigrationPaused(address _ctm) external view returns (bool);
 
     /// @notice Whether chain migrations between settlement layers are enabled in the current release.
     /// @dev Chain migrations are explicitly disabled in the v32 release, in which all chains are
     /// required to settle on L1. See `CHAIN_MIGRATIONS_ENABLED` in `Config.sol`.
     function migrationsEnabled() external view returns (bool);
 
-    /// @notice Pauses migration functions.
+    /// @notice Pauses chain migrations ecosystem-wide, for every CTM. Owner only.
+    /// @dev Incident control. A CTM upgrading itself uses {pauseCTMMigration} so it does not stop
+    ///      chains under other CTMs, and cannot lift an incident pause.
     function pauseMigration() external;
 
-    /// @notice Unpauses migration functions.
+    /// @notice Lifts the ecosystem-wide pause. Owner only. CTM-level pauses are unaffected.
     function unpauseMigration() external;
+
+    /// @notice Pauses migrations for chains under `_ctm`. Callable only by `_ctm`'s current
+    ///         owner — during an upgrade, its bound `CTMUpgradeExecutor`.
+    function pauseCTMMigration(address _ctm) external;
+
+    /// @notice Lifts `_ctm`'s own pause. Callable only by `_ctm`'s current owner, and it cannot
+    ///         lift the ecosystem-wide pause or another CTM's.
+    function unpauseCTMMigration(address _ctm) external;
 }

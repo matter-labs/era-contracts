@@ -13,7 +13,7 @@
 //! Layout (relative to `l1-contracts/`):
 //!
 //!   upgrade-envs/permanent-values/<env>.toml      (bridgehub, ctms, create2)
-//!   upgrade-envs/v0.33.0-atomic-interop/<env>.toml      (owner, era_chain_id)
+//!   upgrade-envs/v0.34.0-registry/<env>.toml      (owner, era_chain_id)
 //!
 //! The latter contains unquoted hex literals (e.g. `old_protocol_version =
 //! 0x1d…`) which `toml-rs` chokes on, so we parse it line-by-line for the
@@ -31,16 +31,11 @@ use crate::common::paths::resolve_l1_contracts_path;
 
 /// The release's upgrade-env directory. Salts, per-env inputs and the canonical output
 /// directory all live here; it moves with each release rather than trailing an older one.
-const UPGRADE_ENV_DIR: &str = "upgrade-envs/v0.33.0-atomic-interop";
+const UPGRADE_ENV_DIR: &str = "upgrade-envs/v0.34.0-registry";
 const PERMANENT_VALUES_DIR: &str = "upgrade-envs/permanent-values";
 
 #[derive(Debug, Deserialize)]
 pub struct PermanentValues {
-    /// L1 chain id (e.g. 11155111 for Sepolia, 1 for mainnet). PUVT reads
-    /// this at startup and cross-checks `eth_chainId` against it as a basic
-    /// "right network" sanity check.
-    #[serde(default)]
-    pub l1_chain_id: Option<u64>,
     #[serde(default)]
     pub zk_token_asset_id: Option<B256>,
     pub testnet_verifier: Option<bool>,
@@ -63,34 +58,6 @@ pub struct PermanentValues {
     /// + ServerNotifier, and sets the initial interop settlement fee.
     #[serde(default)]
     pub new_gateway: Option<NewGatewayConfig>,
-    /// Historical gateway configuration for chains that settled on the legacy
-    /// Gateway before v31.
-    #[serde(default)]
-    pub legacy_gateway: Option<LegacyGatewayConfig>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct LegacyGatewayConfig {
-    pub chain_id: u64,
-    /// Per-chain historical migration intervals that PUVT cross-checks against
-    /// every `setHistoricalMigrationInterval` call in stage 2's decommission
-    /// prefix. One TOML entry per call; order is preserved.
-    #[serde(default)]
-    pub chain_intervals: Vec<ChainInterval>,
-}
-
-/// Mirrors a `[[legacy_gateway.chain_intervals]]` entry in
-/// `permanent-values/<env>.toml`. The Solidity struct
-/// `MigrationInterval` ([IChainAssetHandler.sol]) is built from these fields
-/// plus `settlementLayerChainId = legacy_gateway.chain_id` and
-/// `isActive = false` (these are historical/completed intervals).
-#[derive(Debug, Deserialize, Clone)]
-pub struct ChainInterval {
-    pub chain_id: u64,
-    pub migrate_to_sl_batch: u64,
-    pub migrate_from_sl_batch: u64,
-    pub sl_batch_lower_bound: u64,
-    pub sl_batch_upper_bound: u64,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -190,8 +157,10 @@ pub struct CtmContracts {
 #[derive(Debug, Deserialize, Clone)]
 pub struct CtmEntry {
     pub proxy: Address,
-    #[serde(default)]
-    pub bytecodes_supplier: Option<Address>,
+    /// Optional override; the prepare flow otherwise resolves it from a chain registered on the
+    /// CTM. The bytecodes supplier has no counterpart here: the prepare script reads it off the
+    /// CTM's own `L1_BYTECODES_SUPPLIER()` immutable, so a permanent-values entry for it would
+    /// name a value nothing consumes.
     #[serde(default)]
     pub rollup_da_manager: Option<Address>,
 }
@@ -203,22 +172,33 @@ pub struct PermanentContracts {
     // NOTE: `create2_factory_salt` deliberately does NOT live here. The salt
     // rotates every regen (the CREATE2 deployer would collide with previously
     // deployed addresses if reused), so it belongs in the v31 input TOML
-    // (`upgrade-envs/v0.33.0-atomic-interop/<env>.toml [contracts] create2_factory_salt`)
+    // (`upgrade-envs/v0.34.0-registry/<env>.toml [contracts] create2_factory_salt`)
     // alongside the rest of the per-regen inputs. See
-    // `EnvConfig::create2_factory_salt_for_upgrade`.
+    // `EnvConfig::upgrade_create2_factory_salt`.
 }
 
-/// Fields read from the release upgrade input TOML (best-effort regex parse —
+/// Fields read from the upgrade input TOML (best-effort regex parse —
 /// the file has unquoted hex literals that the TOML crate rejects).
 ///
-/// CREATE2 salts are *not* stored here; `EnvConfig::create2_factory_salt_for_upgrade`
-/// and `create2_factory_salt_for_upgrade_per_ctm` re-read them from
-/// `upgrade_input_path` on demand. That way the salt-keyed entries are not
+/// CREATE2 salts are *not* stored here; `EnvConfig::upgrade_create2_factory_salt`
+/// and `upgrade_create2_factory_salt_per_ctm` re-read them from
+/// `upgrade_input_toml_path` on demand. That way the salt-keyed entries are not
 /// duplicated in Rust state — the TOML is the only source of truth.
 #[derive(Debug, Default, Clone)]
 pub struct UpgradeInputs {
     pub owner_address: Option<Address>,
     pub era_chain_id: Option<u64>,
+    /// Whether THIS release replaces the ecosystem's governance set (a new
+    /// `ProtocolUpgradeHandler` implementation plus Guardians / SecurityCouncil /
+    /// EmergencyUpgradeBoard, wired in by four stage-0 calls — see
+    /// [`crate::commands::ecosystem::zk_governance`]).
+    ///
+    /// Absent (the default) means no. `governance_kind = "puh"` is NOT this statement:
+    /// it says the ecosystem HAS a PUH, which is a permanent property, true of every
+    /// release prepared for that env. The redeploy is a one-off act of a particular
+    /// release, so it is declared in that release's own env input — the directory
+    /// moves with the release, so a later one omits the key and redeploys nothing.
+    pub redeploy_zk_governance: bool,
 }
 
 /// Fully-resolved per-env config.
@@ -226,18 +206,18 @@ pub struct UpgradeInputs {
 pub struct EnvConfig {
     pub env: String,
     pub permanent_values_path: PathBuf,
-    pub upgrade_input_path: PathBuf,
+    pub upgrade_input_toml_path: PathBuf,
     pub permanent: PermanentValues,
-    pub upgrade_input: UpgradeInputs,
+    pub upgrade: UpgradeInputs,
 }
 
 impl EnvConfig {
     /// Load `<l1-contracts>/upgrade-envs/permanent-values/<env>.toml` and the
-    /// release upgrade input TOML for the same env. Both files must exist.
+    /// upgrade input TOML for the same env. Both files must exist.
     pub fn load(env: &str) -> anyhow::Result<Self> {
         let l1 = resolve_l1_contracts_path()?;
         let permanent_values_path = l1.join(PERMANENT_VALUES_DIR).join(format!("{env}.toml"));
-        let upgrade_input_path = l1.join(UPGRADE_ENV_DIR).join(format!("{env}.toml"));
+        let upgrade_input_toml_path = l1.join(UPGRADE_ENV_DIR).join(format!("{env}.toml"));
 
         let pv_content = fs::read_to_string(&permanent_values_path).with_context(|| {
             format!(
@@ -252,8 +232,8 @@ impl EnvConfig {
             )
         })?;
 
-        let upgrade_input = if upgrade_input_path.exists() {
-            parse_upgrade_input(&fs::read_to_string(&upgrade_input_path)?)
+        let upgrade = if upgrade_input_toml_path.exists() {
+            parse_upgrade_input(&fs::read_to_string(&upgrade_input_toml_path)?)
         } else {
             UpgradeInputs::default()
         };
@@ -261,9 +241,9 @@ impl EnvConfig {
         Ok(EnvConfig {
             env: env.to_string(),
             permanent_values_path,
-            upgrade_input_path,
+            upgrade_input_toml_path,
             permanent,
-            upgrade_input,
+            upgrade,
         })
     }
 
@@ -286,61 +266,65 @@ impl EnvConfig {
     }
 
     /// Per-upgrade-version CREATE2 salt from
-    /// `upgrade-envs/v0.33.0-atomic-interop/<env>.toml [contracts]
+    /// `upgrade-envs/v0.34.0-registry/<env>.toml [contracts]
     /// create2_factory_salt`. Distinct from `create2_factory_salt()` (which
     /// reads the chain-permanent salt out of `permanent-values/`); this one
     /// is the salt used to deploy *this upgrade*'s implementations, recorded
     /// alongside the rest of the v31 inputs so re-prepares are reproducible.
     /// Re-reads the TOML each call rather than caching, so editing the file
     /// between commands is reflected without restarting the CLI.
-    pub fn create2_factory_salt_for_upgrade(&self) -> anyhow::Result<Option<B256>> {
-        if !self.upgrade_input_path.exists() {
+    pub fn upgrade_create2_factory_salt(&self) -> anyhow::Result<Option<B256>> {
+        if !self.upgrade_input_toml_path.exists() {
             return Ok(None);
         }
-        let content = fs::read_to_string(&self.upgrade_input_path)
-            .with_context(|| format!("read {}", self.upgrade_input_path.display()))?;
+        let content = fs::read_to_string(&self.upgrade_input_toml_path)
+            .with_context(|| format!("read {}", self.upgrade_input_toml_path.display()))?;
         Ok(read_core_create2_salt(&content))
     }
 
     /// Per-regen salt for legacy `Governance.sol` ceremonies, read from
-    /// `upgrade-envs/v0.33.0-atomic-interop/<env>.toml [contracts] legacy_gov_salt`.
+    /// `upgrade-envs/v0.34.0-registry/<env>.toml [contracts] legacy_gov_salt`.
     /// Op ids in the legacy Gov state machine are content-addressed
     /// (`hash(targets, values, calldatas, predecessor, salt)`); rotating this
     /// salt every regen prevents the broadcaster from colliding with previously
     /// executed op ids that still sit in the on-chain `Done` map. When absent,
     /// returns `None` and the forge scripts default to `bytes32(0)`.
-    pub fn v31_legacy_gov_salt(&self) -> anyhow::Result<Option<B256>> {
-        if !self.upgrade_input_path.exists() {
+    pub fn upgrade_legacy_gov_salt(&self) -> anyhow::Result<Option<B256>> {
+        if !self.upgrade_input_toml_path.exists() {
             return Ok(None);
         }
-        let content = fs::read_to_string(&self.upgrade_input_path)
-            .with_context(|| format!("read {}", self.upgrade_input_path.display()))?;
+        let content = fs::read_to_string(&self.upgrade_input_toml_path)
+            .with_context(|| format!("read {}", self.upgrade_input_toml_path.display()))?;
         Ok(read_core_legacy_gov_salt(&content))
     }
 
     /// Per-CTM CREATE2 salts from
-    /// `upgrade-envs/v0.33.0-atomic-interop/<env>.toml [create2_factory_salts]`,
+    /// `upgrade-envs/v0.34.0-registry/<env>.toml [create2_factory_salts]`,
     /// keyed by CTM proxy. Empty if the env doesn't declare any (legacy
     /// local-fixture path — `upgrade_inner` will fall back to random
     /// salts in that case). Re-reads the TOML each call (see
-    /// `create2_factory_salt_for_upgrade`).
-    pub fn create2_factory_salt_for_upgrade_per_ctm(
-        &self,
-    ) -> anyhow::Result<HashMap<Address, B256>> {
-        if !self.upgrade_input_path.exists() {
+    /// `upgrade_create2_factory_salt`).
+    pub fn upgrade_create2_factory_salt_per_ctm(&self) -> anyhow::Result<HashMap<Address, B256>> {
+        if !self.upgrade_input_toml_path.exists() {
             return Ok(HashMap::new());
         }
-        let content = fs::read_to_string(&self.upgrade_input_path)
-            .with_context(|| format!("read {}", self.upgrade_input_path.display()))?;
+        let content = fs::read_to_string(&self.upgrade_input_toml_path)
+            .with_context(|| format!("read {}", self.upgrade_input_toml_path.display()))?;
         Ok(read_create2_salts_per_ctm(&content))
     }
 
     pub fn owner_address(&self) -> Option<Address> {
-        self.upgrade_input.owner_address
+        self.upgrade.owner_address
     }
 
     pub fn era_chain_id(&self) -> Option<u64> {
-        self.upgrade_input.era_chain_id
+        self.upgrade.era_chain_id
+    }
+
+    /// Whether this release replaces the ecosystem's governance set — see
+    /// [`UpgradeInputs::redeploy_zk_governance`].
+    pub fn redeploys_zk_governance(&self) -> bool {
+        self.upgrade.redeploy_zk_governance
     }
 
     /// Whether this is the mainnet ecosystem. Drives testnet-vs-real contract
@@ -348,22 +332,6 @@ impl EnvConfig {
     /// non-mainnet env gets the zeroed-delay `TestnetProtocolUpgradeHandler`).
     pub fn is_mainnet(&self) -> bool {
         self.env == "mainnet"
-    }
-
-    pub fn legacy_gateway_chain_id(&self) -> Option<u64> {
-        self.permanent.legacy_gateway.as_ref().map(|gw| gw.chain_id)
-    }
-
-    pub fn legacy_gateway_chain_intervals(&self) -> &[ChainInterval] {
-        self.permanent
-            .legacy_gateway
-            .as_ref()
-            .map(|gw| gw.chain_intervals.as_slice())
-            .unwrap_or(&[])
-    }
-
-    pub fn l1_chain_id(&self) -> Option<u64> {
-        self.permanent.l1_chain_id
     }
 
     pub fn ownable_proxies(&self) -> &[OwnableProxyEntry] {
@@ -391,7 +359,7 @@ impl EnvConfig {
 }
 
 /// Default output dir for an env, e.g.
-/// `upgrade-envs/v0.33.0-atomic-interop/output/<env>/`. Outputs land directly under
+/// `upgrade-envs/v0.34.0-registry/output/<env>/`. Outputs land directly under
 /// the env dir — no `protocol-ops/` subfolder — so the artifacts a reviewer
 /// expects to find for stage / mainnet are immediately visible.
 pub fn default_protocol_ops_out_dir(env: &str) -> anyhow::Result<PathBuf> {
@@ -409,6 +377,8 @@ fn parse_upgrade_input(content: &str) -> UpgradeInputs {
             out.owner_address = Some(addr);
         } else if let Some(id) = match_unquoted_uint(line, "era_chain_id") {
             out.era_chain_id = Some(id);
+        } else if let Some(flag) = match_unquoted_bool(line, "redeploy_zk_governance") {
+            out.redeploy_zk_governance = flag;
         }
     }
     out
@@ -503,6 +473,15 @@ fn match_quoted_address(line: &str, key: &str) -> Option<Address> {
     rest[..end].parse().ok()
 }
 
+fn match_unquoted_bool(line: &str, key: &str) -> Option<bool> {
+    let prefix = format!("{key} = ");
+    if !line.starts_with(&prefix) {
+        return None;
+    }
+    // Strip optional trailing comment.
+    line[prefix.len()..].split('#').next()?.trim().parse().ok()
+}
+
 fn match_unquoted_uint(line: &str, key: &str) -> Option<u64> {
     let prefix = format!("{key} = ");
     if !line.starts_with(&prefix) {
@@ -528,6 +507,31 @@ fn match_quoted_h256(line: &str, key: &str) -> Option<B256> {
 mod tests {
     use super::*;
 
+    /// The governance redeploy is a RELEASE's declaration, not a property of the env: absent means
+    /// no, whatever `governance_kind` says. Without this, every recurring preparation on a
+    /// PUH-governed env redeployed the whole governance set.
+    #[test]
+    fn zk_governance_redeploy_defaults_to_off() {
+        assert!(!parse_upgrade_input("era_chain_id = 270\n").redeploy_zk_governance);
+        assert!(!parse_upgrade_input("redeploy_zk_governance = false\n").redeploy_zk_governance);
+        assert!(parse_upgrade_input("redeploy_zk_governance = true\n").redeploy_zk_governance);
+        assert!(
+            parse_upgrade_input("redeploy_zk_governance = true # the bootstrap release\n")
+                .redeploy_zk_governance
+        );
+    }
+
+    /// The v34 release is the one that replaces the governance set, on both PUH-governed envs.
+    /// A later release's directory simply omits the key.
+    #[test]
+    fn v34_env_inputs_declare_the_governance_redeploy() {
+        for env in ["stage", "mainnet"] {
+            let cfg = EnvConfig::load(env).unwrap_or_else(|e| panic!("load {env}: {e}"));
+            assert_eq!(cfg.governance_kind(), GovernanceKind::Puh, "{env}");
+            assert!(cfg.redeploys_zk_governance(), "{env}");
+        }
+    }
+
     /// Smoke-tests that `permanent-values/stage.toml` (which is the env used
     /// for the v31 prepare-all rehearsal on Sepolia stage) deserializes into
     /// `PermanentValues` end-to-end — including the optional `[new_gateway]`
@@ -547,10 +551,6 @@ mod tests {
         let ng = pv
             .new_gateway
             .expect("permanent-values/stage.toml must carry [new_gateway]");
-        let legacy_gateway = pv
-            .legacy_gateway
-            .expect("permanent-values/stage.toml must carry [legacy_gateway]");
-        assert_eq!(legacy_gateway.chain_id, 123);
         assert_eq!(ng.chain_id, 2709);
         // GW 2708 is a ZKsync OS chain → CTM source is Atlas (witness 2702).
         assert_eq!(ng.ctm_representative_chain_id, 2702);
@@ -566,13 +566,13 @@ mod tests {
         let cfg = EnvConfig::load("stage").expect("load stage env config");
 
         let core_salt = cfg
-            .create2_factory_salt_for_upgrade()
+            .upgrade_create2_factory_salt()
             .expect("read core salt")
             .expect("stage.toml must declare [contracts] create2_factory_salt");
         assert_ne!(core_salt, B256::ZERO);
 
         let per_ctm = cfg
-            .create2_factory_salt_for_upgrade_per_ctm()
+            .upgrade_create2_factory_salt_per_ctm()
             .expect("read per-CTM salts");
         assert_eq!(per_ctm.len(), 2);
         let era: Address = "0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b"
@@ -594,13 +594,13 @@ mod tests {
         let cfg = EnvConfig::load("mainnet").expect("load mainnet env config");
 
         let core_salt = cfg
-            .create2_factory_salt_for_upgrade()
+            .upgrade_create2_factory_salt()
             .expect("read core salt")
             .expect("mainnet.toml must declare [contracts] create2_factory_salt");
         assert_ne!(core_salt, B256::ZERO);
 
         let per_ctm = cfg
-            .create2_factory_salt_for_upgrade_per_ctm()
+            .upgrade_create2_factory_salt_per_ctm()
             .expect("read per-CTM salts");
         assert_eq!(per_ctm.len(), 2);
         let era: Address = "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C"

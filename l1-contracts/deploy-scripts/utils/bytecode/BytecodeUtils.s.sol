@@ -68,6 +68,11 @@ library BytecodeUtils {
     }
 
     /// @notice Read and hash deployed bytecode (keccak256) in one call.
+    /// @dev Deploy registry objects from {readBytecodeL1} on the SAME artifact this reads. A hash
+    ///      taken here while the object is deployed from a script's own compiled copy diverges
+    ///      whenever the two compilations do (the CBOR metadata records the compilation's
+    ///      remappings, which is enough), and a review that cannot reproduce an object's creation
+    ///      code cannot re-derive its address.
     function getDeployedBytecodeHash(
         string memory _fileName,
         string memory _contractName

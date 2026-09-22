@@ -59,7 +59,7 @@ use crate::common::wallets::Wallet;
 /// its output. Lives under `script-out/` because forge's `fs_permissions` only
 /// allows writes there. The ecosystem prepare flow reads from this same path
 /// to extract `governance_calls_to_execute`.
-const VOTE_PREP_OUTPUT_REL: &str = "script-out/v31-new-gateway-vote-preparation.toml";
+const VOTE_PREP_OUTPUT_REL: &str = "script-out/new-gateway-vote-preparation.toml";
 
 /// Run `GatewayVotePreparation` for the env's configured new-gateway, returning
 /// the absolute path to the output TOML so the caller can merge its

@@ -27,12 +27,18 @@ contract MockChainTypeManager {
     }
 }
 
-/// @notice Mock ChainAssetHandler for testing
+/// @notice Mock ChainAssetHandler for testing.
+/// @dev The validator asks PER-CTM (`migrationPausedFor`), so the stub answers for any CTM; the
+///      real handler ORs the ecosystem pause with that CTM's own.
 contract MockChainAssetHandler {
     bool public migrationPaused;
 
     function setMigrationPaused(bool _paused) external {
         migrationPaused = _paused;
+    }
+
+    function migrationPausedFor(address) external view returns (bool) {
+        return migrationPaused;
     }
 }
 

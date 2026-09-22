@@ -1,0 +1,33 @@
+# Upgrade input for the bootstrap scenario (frozen departing state -> this branch's version).
+# `bridgehub_proxy_address` and `owner_address` are substituted by the harness from the loaded
+# chain states; everything else, including `[chain] chain_id`, is a literal that has to match
+# the fixture.
+#
+# NOTE on versions: the frozen `chain-states/v0.33.0` fixture LIVES at protocol version 0.32.0
+# (its states were generated while the genesis config still declared 0.32.0 — see
+# chain-states/README.md), so the departing version below is 0x2000000000. Regenerating the
+# frozen fixture from the true v33 release branch moves it to 0x2100000000.
+
+old_protocol_version = 0x2000000000
+bridgehub_proxy_address = "0x0000000000000000000000000000000000000000"
+owner_address = "0x0000000000000000000000000000000000000000"
+
+# The sections below mirror the shape of a production upgrade input so the same scripts can
+# read this file. Of them, only `contracts.new_protocol_version` is consumed by this scenario;
+# the rest are placeholders.
+[chain]
+chain_id = 10
+
+[contracts]
+
+genesis_root = "0x0000000000000000000000000000000000000000000000000000000000000000"
+genesis_rollup_leaf_index = 0
+genesis_batch_commitment = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_node_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_leaf_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_circuits_set_vks_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+bootloader_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+default_aa_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+evm_emulator_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+latest_protocol_version = 0x2200000000
+new_protocol_version = 0x2200000000

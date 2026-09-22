@@ -51,6 +51,8 @@ alloy::sol! {
             bytes32 recursionCircuitsSetVksHash;
         }
 
+        // The LEGACY cut-taking shape (pre-v34 commits): `DefaultUpgrade.upgrade(ProposedUpgrade)`.
+        // Registry-driven cuts (v34+) carry an object address instead — see the interfaces below.
         struct ProposedUpgrade {
             L2CanonicalTransaction l2ProtocolUpgradeTx;
             bytes32 bootloaderHash;
@@ -72,6 +74,28 @@ alloy::sol! {
     #[sol(rpc)]
     interface IBridgehub {
         function chainTypeManager(uint256 _chainId) external view returns (address);
+    }
+
+    // `IDefaultUpgrade.sol` — the engine of a registry-driven transition (v34+). The committed
+    // cut's init is `upgradeFromTransition(transition)`; the FINAL transaction it commits on a
+    // chain is served by `l2UpgradeTx(transition, bridgehub, chainId)` on the engine itself.
+    #[sol(rpc)]
+    interface IDefaultUpgrade {
+        function upgradeFromTransition(address _transition) external returns (bytes32);
+        function l2UpgradeTx(address _transition, address _bridgehub, uint256 _chainId) external view returns (L2CanonicalTransaction memory);
+    }
+
+    // `IBootstrapUpgrade.sol` — the engine of the v34 bootstrap edge. The committed cut's init is
+    // `upgradeFromBootstrap(migration)`; the migration object serves the per-chain transaction.
+    #[sol(rpc)]
+    interface IBootstrapUpgrade {
+        function upgradeFromBootstrap(address _migration) external returns (bytes32);
+    }
+
+    // `IRegistryBootstrapMigration.sol` — the read surface of the bootstrap object.
+    #[sol(rpc)]
+    interface IRegistryBootstrapMigration {
+        function l2UpgradeTx(uint256 _chainId) external view returns (L2CanonicalTransaction memory);
     }
 
     // The current upgrade contract at `DiamondCutData.initAddress`. Current upgrades mutate

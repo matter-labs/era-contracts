@@ -29,18 +29,6 @@ contract L2AtomicInteropSendRefundL1Test is Test, SharedL2ContractL1Deployer, L2
         super.deployL2Contracts(_l1ChainId);
     }
 
-    function getChainCreationFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {
-        return super.getChainCreationFacetCuts(stateTransition);
-    }
-
-    function getUpgradeAddedFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {
-        return super.getUpgradeAddedFacetCuts(stateTransition);
-    }
-
     function getInitializeCalldata(
         string memory contractName
     ) internal virtual override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
