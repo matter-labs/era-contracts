@@ -133,7 +133,6 @@ library GatewayCTMDeployerHelper {
         GatewayCTMDeployerConfig memory config
     )
         internal
-
         returns (
             DeployedContracts memory,
             DeployerCreate2Calldata memory,
@@ -188,7 +187,6 @@ library GatewayCTMDeployerHelper {
         bytes memory _l2SystemProxyBytecodeInfo
     )
         internal
-
         returns (
             DeployedContracts memory contracts,
             DeployerCreate2Calldata memory deployerCalldata,
