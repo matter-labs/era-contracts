@@ -266,7 +266,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 uint256(0),
                 uint256(_getZKsyncOSMaxTxGasLimit()),
                 uint256(s.pubdataContent),
-                uint256(s.zksyncOSL1TxFilteringEnabled ? 1 : 0)
+                uint256(s.zksyncOSL1TxFilteringEnabled ? 1 : 0),
+                uint256(s.zksyncOSLargeContractsEnabled ? 1 : 0)
             )
         );
         // Untruncated: the prover folds the full per-batch hashes, so PUBLIC_INPUT_SHIFT is

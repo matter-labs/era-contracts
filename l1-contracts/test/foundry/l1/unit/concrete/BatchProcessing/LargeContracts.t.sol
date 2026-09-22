@@ -11,64 +11,67 @@ import {Unauthorized, ZKsyncOSChainConfigUpdateWithUnverifiedBatches} from "cont
 
 // The shared fixture isolates DA and cryptographic verification. Batch state advances through
 // the real commit/prove/revert entry points to exercise the configuration-update boundary.
-contract L1TxFilteringTest is ExecutorTest {
+contract LargeContractsTest is ExecutorTest {
     function setUp() public {
         vm.warp(TESTNET_COMMIT_TIMESTAMP_NOT_OLDER + 1);
         newCommitBatchInfoZKsyncOS.firstBlockTimestamp = uint64(block.timestamp);
         newCommitBatchInfoZKsyncOS.lastBlockTimestamp = uint64(block.timestamp);
     }
 
-    function test_filteringDisabledByDefault() public view {
-        assertFalse(getters.getZKsyncOSL1TxFiltering());
+    function test_largeContractsDisabledByDefault() public view {
+        assertFalse(getters.getZKsyncOSLargeContracts());
     }
 
     function testFuzz_adminCanEnableDisableAndRepeat(bool _enabled) public {
-        _setFiltering(_enabled);
-        _setFiltering(_enabled);
-        _setFiltering(!_enabled);
+        _setLargeContracts(_enabled);
+        _setLargeContracts(_enabled);
+        _setLargeContracts(!_enabled);
     }
 
-    function testFuzz_nonAdminCannotChangeFiltering(address _caller, bool _enabled) public {
+    function testFuzz_nonAdminCannotChangeLargeContracts(address _caller, bool _enabled) public {
         vm.assume(_caller != getters.getAdmin());
         vm.prank(_caller);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, _caller));
-        admin.setZKsyncOSL1TxFiltering(_enabled);
+        admin.setZKsyncOSLargeContracts(_enabled);
 
-        assertFalse(getters.getZKsyncOSL1TxFiltering());
+        assertFalse(getters.getZKsyncOSLargeContracts());
     }
 
-    function test_validatorCannotEnableFiltering() public {
+    function test_validatorCannotEnableLargeContracts() public {
         vm.prank(validator);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, validator));
-        admin.setZKsyncOSL1TxFiltering(true);
+        admin.setZKsyncOSLargeContracts(true);
 
-        assertFalse(getters.getZKsyncOSL1TxFiltering());
+        assertFalse(getters.getZKsyncOSLargeContracts());
     }
 
-    function test_chainTypeManagerCannotEnableFiltering() public {
+    function test_chainTypeManagerCannotEnableLargeContracts() public {
         address chainTypeManager = getters.getChainTypeManager();
         vm.prank(chainTypeManager);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, chainTypeManager));
-        admin.setZKsyncOSL1TxFiltering(true);
+        admin.setZKsyncOSLargeContracts(true);
 
-        assertFalse(getters.getZKsyncOSL1TxFiltering());
+        assertFalse(getters.getZKsyncOSLargeContracts());
     }
 
     function testFuzz_unverifiedBatchesBlockUpdates(bool _oldEnabled, bool _newEnabled) public {
-        _setFiltering(_oldEnabled);
+        _setLargeContracts(_oldEnabled);
         _commitFirstBatch();
 
         vm.prank(getters.getAdmin());
         vm.expectRevert(abi.encodeWithSelector(ZKsyncOSChainConfigUpdateWithUnverifiedBatches.selector, 0, 1));
-        admin.setZKsyncOSL1TxFiltering(_newEnabled);
+        admin.setZKsyncOSLargeContracts(_newEnabled);
 
-        assertEq(getters.getZKsyncOSL1TxFiltering(), _oldEnabled);
+        assertEq(getters.getZKsyncOSLargeContracts(), _oldEnabled);
         assertEq(getters.getTotalBatchesCommitted(), 1);
         assertEq(getters.getTotalBatchesVerified(), 0);
     }
 
-    function testFuzz_updateAfterProving(bool _enabled) public {
-        _setFiltering(_enabled);
+    function testFuzz_updateAfterProving(bool _enabled, bool _filteringEnabled) public {
+        vm.prank(getters.getAdmin());
+        admin.setZKsyncOSL1TxFiltering(_filteringEnabled);
+        _setLargeContracts(_enabled);
+        assertEq(getters.getZKsyncOSL1TxFiltering(), _filteringEnabled);
         IExecutor.StoredBatchInfo[] memory batches = new IExecutor.StoredBatchInfo[](1);
         batches[0] = _commitFirstBatch();
         (uint256 from, uint256 to, bytes memory data) = Utils.encodeProveBatchesData(
@@ -79,7 +82,14 @@ contract L1TxFilteringTest is ExecutorTest {
 
         uint256[] memory expectedPublicInputs = new uint256[](1);
         bytes32 chainConfigHash = keccak256(
-            abi.encode(getters.getChainId(), false, ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT, uint256(0), _enabled, false)
+            abi.encode(
+                getters.getChainId(),
+                false,
+                ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
+                uint256(0),
+                _filteringEnabled,
+                _enabled
+            )
         );
         expectedPublicInputs[0] = uint256(
             keccak256(
@@ -98,11 +108,11 @@ contract L1TxFilteringTest is ExecutorTest {
 
         assertEq(getters.getTotalBatchesCommitted(), 1);
         assertEq(getters.getTotalBatchesVerified(), 1);
-        _setFiltering(!_enabled);
+        _setLargeContracts(!_enabled);
     }
 
     function testFuzz_updateAfterReverting(bool _enabled) public {
-        _setFiltering(_enabled);
+        _setLargeContracts(_enabled);
         _commitFirstBatch();
 
         vm.prank(validator);
@@ -110,11 +120,11 @@ contract L1TxFilteringTest is ExecutorTest {
 
         assertEq(getters.getTotalBatchesCommitted(), 0);
         assertEq(getters.getTotalBatchesVerified(), 0);
-        _setFiltering(!_enabled);
+        _setLargeContracts(!_enabled);
     }
 
-    function _setFiltering(bool _enabled) internal {
-        bool oldEnabled = getters.getZKsyncOSL1TxFiltering();
+    function _setLargeContracts(bool _enabled) internal {
+        bool oldEnabled = getters.getZKsyncOSLargeContracts();
         vm.expectEmit({
             checkTopic1: true,
             checkTopic2: true,
@@ -122,12 +132,12 @@ contract L1TxFilteringTest is ExecutorTest {
             checkData: true,
             emitter: address(admin)
         });
-        emit IAdmin.NewZKsyncOSL1TxFiltering(oldEnabled, _enabled);
+        emit IAdmin.NewZKsyncOSLargeContracts(oldEnabled, _enabled);
 
         vm.prank(getters.getAdmin());
-        admin.setZKsyncOSL1TxFiltering(_enabled);
+        admin.setZKsyncOSLargeContracts(_enabled);
 
-        assertEq(getters.getZKsyncOSL1TxFiltering(), _enabled);
+        assertEq(getters.getZKsyncOSLargeContracts(), _enabled);
     }
 
     function _commitFirstBatch() internal returns (IExecutor.StoredBatchInfo memory) {

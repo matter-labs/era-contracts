@@ -204,6 +204,20 @@ interface IAdminFunctions {
         bool _shouldSend
     ) external;
 
+    /// @notice Prepares or sends the admin transaction for ZKsync OS large contracts.
+    /// @param _bridgehub Bridgehub on the chain's settlement layer.
+    /// @param _accessControlRestriction Access control restriction used by the chain admin.
+    /// @param _chainId Chain to configure.
+    /// @param _enabled Whether large contracts are enabled.
+    /// @param _shouldSend Whether to broadcast the transaction.
+    function setZKsyncOSLargeContracts(
+        address _bridgehub,
+        address _accessControlRestriction,
+        uint256 _chainId,
+        bool _enabled,
+        bool _shouldSend
+    ) external;
+
     function migrateChainToGateway(
         address bridgehub,
         uint256 l1GasPrice,
