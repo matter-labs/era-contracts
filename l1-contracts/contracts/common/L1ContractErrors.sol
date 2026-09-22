@@ -488,8 +488,6 @@ error UnallowedImplementation(bytes32 implementationHash);
 error Unauthorized(address caller);
 // 0xe52478c7
 error UndefinedDiamondCutAction();
-// 0x8124d8ff
-error UnexpectedUpgradeSelector();
 // 0xe15dc31a
 error UnknownProofType(uint256 proofType);
 // 0xc352bb73

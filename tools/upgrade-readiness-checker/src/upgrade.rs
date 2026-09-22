@@ -9,8 +9,11 @@ use anyhow::{anyhow, Context};
 use tracing::{debug, info};
 
 use crate::abi::{
-    IBootstrapUpgrade, IBridgehub::IBridgehubInstance, IChainTypeManager::NewUpgradeCutData,
-    IDefaultUpgrade, ILegacySettlementLayerUpgrade::ILegacySettlementLayerUpgradeInstance,
+    IBootstrapUpgrade,
+    IBridgehub::IBridgehubInstance,
+    IChainTypeManager::NewUpgradeCutData,
+    IDefaultUpgrade,
+    ILegacySettlementLayerUpgrade::ILegacySettlementLayerUpgradeInstance,
     IRegistryBootstrapMigration,
     ISettlementLayerUpgrade::{upgradeVerifierOnlyCall, ISettlementLayerUpgradeInstance},
     L2CanonicalTransaction,

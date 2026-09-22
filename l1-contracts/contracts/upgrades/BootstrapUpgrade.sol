@@ -32,6 +32,7 @@ contract BootstrapUpgrade is DefaultUpgrade, IBootstrapUpgrade {
         // The release the reinstall installs is the one the COMMITTED migration names, not the
         // CTM's live `currentRelease()`: a chain crossing this edge after the CTM has moved on
         // still lands on the release its own cut was committed with.
+        // slither-disable-next-line unused-return
         (, , address genesisRelease) = migration.upgradeTarget();
 
         // The reinstall FIRST, mirroring `Diamond.diamondCut`'s facets-then-init order that the
