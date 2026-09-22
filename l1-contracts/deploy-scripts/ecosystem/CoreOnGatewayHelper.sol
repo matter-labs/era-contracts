@@ -31,7 +31,7 @@ library CoreOnGatewayHelper {
     /// @notice Resolve a L2EcosystemContract to its (fileName, contractName).
     function resolve(
         L2EcosystemContract _c
-    ) internal view returns (string memory fileName, string memory contractName) {
+    ) internal pure returns (string memory fileName, string memory contractName) {
         contractName = _resolveContractName(_c);
         fileName = string.concat(contractName, ".sol");
     }
@@ -56,7 +56,7 @@ library CoreOnGatewayHelper {
 
     function getFullListOfFactoryDependencies(
         L2EcosystemContract[] memory _additionalDependencyContracts
-    ) internal returns (bytes[] memory factoryDeps) {
+    ) internal view returns (bytes[] memory factoryDeps) {
         bytes[] memory basicDependencies = SystemContractsProcessing.getBaseListOfDependencies();
         bytes[] memory sharedDependencies = _getFactoryDependencyBytecodes(_getSharedFactoryDependencyContracts());
         bytes[] memory additionalDependencies = _getFactoryDependencyBytecodes(_additionalDependencyContracts);
@@ -103,7 +103,7 @@ library CoreOnGatewayHelper {
 
     function _getFactoryDependencyBytecodes(
         L2EcosystemContract[] memory _dependencyContracts
-    ) private returns (bytes[] memory dependencyBytecodes) {
+    ) private view returns (bytes[] memory dependencyBytecodes) {
         dependencyBytecodes = new bytes[](_dependencyContracts.length);
 
         for (uint256 i; i < _dependencyContracts.length; i++) {

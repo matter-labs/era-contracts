@@ -133,6 +133,7 @@ library GatewayCTMDeployerHelper {
         GatewayCTMDeployerConfig memory config
     )
         internal
+
         returns (
             DeployedContracts memory,
             DeployerCreate2Calldata memory,
@@ -187,6 +188,7 @@ library GatewayCTMDeployerHelper {
         bytes memory _l2SystemProxyBytecodeInfo
     )
         internal
+
         returns (
             DeployedContracts memory contracts,
             DeployerCreate2Calldata memory deployerCalldata,
@@ -252,7 +254,7 @@ library GatewayCTMDeployerHelper {
     function _calculateDADeployer(
         bytes32 _create2Salt,
         GatewayCTMDeployerConfig memory config
-    ) internal returns (address deployer, bytes memory data, DAContracts memory result) {
+    ) internal view returns (address deployer, bytes memory data, DAContracts memory result) {
         GatewayDADeployerConfig memory daConfig = GatewayDADeployerConfig({
             salt: config.salt,
             aliasedGovernanceAddress: config.aliasedGovernanceAddress
@@ -273,7 +275,7 @@ library GatewayCTMDeployerHelper {
     function _calculateProxyAdminDeployer(
         bytes32 _create2Salt,
         GatewayCTMDeployerConfig memory config
-    ) internal returns (address deployer, bytes memory data, GatewayProxyAdminDeployerResult memory result) {
+    ) internal view returns (address deployer, bytes memory data, GatewayProxyAdminDeployerResult memory result) {
         GatewayProxyAdminDeployerConfig memory proxyAdminConfig = GatewayProxyAdminDeployerConfig({
             salt: config.salt,
             aliasedGovernanceAddress: config.aliasedGovernanceAddress
@@ -298,7 +300,11 @@ library GatewayCTMDeployerHelper {
         bytes32 _create2Salt,
         GatewayCTMDeployerConfig memory config,
         GatewayProxyAdminDeployerResult memory proxyAdminResult
-    ) internal returns (address deployer, bytes memory data, GatewayValidatorTimelockDeployerResult memory result) {
+    )
+        internal
+        view
+        returns (address deployer, bytes memory data, GatewayValidatorTimelockDeployerResult memory result)
+    {
         GatewayValidatorTimelockDeployerConfig memory vtConfig = GatewayValidatorTimelockDeployerConfig({
             salt: config.salt,
             aliasedGovernanceAddress: config.aliasedGovernanceAddress,
@@ -323,7 +329,7 @@ library GatewayCTMDeployerHelper {
     function _calculateVerifiersDeployer(
         bytes32 _create2Salt,
         GatewayCTMDeployerConfig memory config
-    ) internal returns (address deployer, bytes memory data, Verifiers memory result) {
+    ) internal view returns (address deployer, bytes memory data, Verifiers memory result) {
         GatewayVerifiersDeployerConfig memory verifiersConfig = GatewayVerifiersDeployerConfig({
             salt: config.salt,
             aliasedGovernanceAddress: config.aliasedGovernanceAddress,
@@ -349,7 +355,7 @@ library GatewayCTMDeployerHelper {
         bytes32 _create2Salt,
         GatewayCTMDeployerConfig memory config,
         DAContracts memory daResult
-    ) internal returns (DirectDeployedAddresses memory addresses, DirectCreate2Calldata memory data) {
+    ) internal view returns (DirectDeployedAddresses memory addresses, DirectCreate2Calldata memory data) {
         addresses.genesisFacets = new GenesisFacet[](GATEWAY_FACET_COUNT);
 
         // AdminFacet
@@ -446,7 +452,7 @@ library GatewayCTMDeployerHelper {
         string memory fileName,
         string memory contractName,
         bytes memory constructorArgs
-    ) internal returns (address addr, bytes memory data) {
+    ) internal view returns (address addr, bytes memory data) {
         bytes memory bytecode = BytecodeUtils.readBytecodeL1(fileName, contractName);
         L1L2DeployPrepareResult memory result = _prepareL1L2Deployment(_create2Salt, bytecode, constructorArgs);
         addr = result.expectedAddress;
@@ -458,7 +464,7 @@ library GatewayCTMDeployerHelper {
         bytes32 _create2Salt,
         CTMContract vmContract,
         bytes memory constructorArgs
-    ) internal returns (address addr, bytes memory data) {
+    ) internal view returns (address addr, bytes memory data) {
         (string memory fileName, string memory contractName) = DeployCTML1OrGateway.resolve(vmContract);
         return _calculateCreate2AddressAndCalldata(_create2Salt, fileName, contractName, constructorArgs);
     }
@@ -472,7 +478,7 @@ library GatewayCTMDeployerHelper {
         GatewayProxyAdminDeployerResult memory proxyAdminResult,
         GatewayValidatorTimelockDeployerResult memory validatorTimelockResult,
         Verifiers memory verifiersResult
-    ) internal returns (address deployer, bytes memory data, GatewayCTMFinalResult memory result) {
+    ) internal view returns (address deployer, bytes memory data, GatewayCTMFinalResult memory result) {
         GatewayCTMFinalConfig memory ctmConfig = _buildCTMFinalConfig(
             config,
             directAddresses,
@@ -559,7 +565,7 @@ library GatewayCTMDeployerHelper {
     function _calculateDADeployerAddresses(
         address deployerAddr,
         GatewayDADeployerConfig memory config
-    ) internal returns (DAContracts memory result) {
+    ) internal view returns (DAContracts memory result) {
         InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: config.salt});
 
         result.rollupDAManager = _deployInternalEmptyParams("RollupDAManager", "RollupDAManager.sol", innerConfig);
@@ -578,7 +584,7 @@ library GatewayCTMDeployerHelper {
     function _calculateProxyAdminDeployerAddresses(
         address deployerAddr,
         GatewayProxyAdminDeployerConfig memory config
-    ) internal returns (GatewayProxyAdminDeployerResult memory result) {
+    ) internal view returns (GatewayProxyAdminDeployerResult memory result) {
         InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: config.salt});
         result.chainTypeManagerProxyAdmin = _deployInternalEmptyParams("ProxyAdmin", "ProxyAdmin.sol", innerConfig);
     }
@@ -586,7 +592,7 @@ library GatewayCTMDeployerHelper {
     function _calculateValidatorTimelockDeployerAddresses(
         address deployerAddr,
         GatewayValidatorTimelockDeployerConfig memory config
-    ) internal returns (GatewayValidatorTimelockDeployerResult memory result) {
+    ) internal view returns (GatewayValidatorTimelockDeployerResult memory result) {
         InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: config.salt});
 
         result.validatorTimelockImplementation = _deployInternalWithParams(
@@ -611,7 +617,7 @@ library GatewayCTMDeployerHelper {
     function _calculateVerifiersDeployerAddresses(
         address deployerAddr,
         GatewayVerifiersDeployerConfig memory config
-    ) internal returns (Verifiers memory result) {
+    ) internal view returns (Verifiers memory result) {
         InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: config.salt});
 
         {
@@ -633,7 +639,7 @@ library GatewayCTMDeployerHelper {
         address deployerAddr,
         GatewayCTMFinalConfig memory config,
         address predictedRelease
-    ) internal returns (GatewayCTMFinalResult memory result) {
+    ) internal view returns (GatewayCTMFinalResult memory result) {
         GatewayCTMDeployerConfig memory baseConfig = config.baseConfig;
         InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: baseConfig.salt});
 
@@ -665,13 +671,13 @@ library GatewayCTMDeployerHelper {
         );
 
         {
-            bytes memory proxyConstructorArgs = _buildCTMProxyConstructorArgs(
-                config,
-                baseConfig,
-                result.chainTypeManagerImplementation,
-                result.serverNotifierProxy,
-                predictedRelease
-            );
+            bytes memory proxyConstructorArgs = _buildCTMProxyConstructorArgs({
+                config: config,
+                baseConfig: baseConfig,
+                ctmImplementation: result.chainTypeManagerImplementation,
+                serverNotifierProxy: result.serverNotifierProxy,
+                currentRelease: predictedRelease
+            });
             result.diamondCutData = _buildDiamondCutDataEncoded(config.facets, baseConfig);
             result.chainTypeManagerProxy = _deployInternalWithParams(
                 "TransparentUpgradeableProxy",
@@ -782,7 +788,7 @@ library GatewayCTMDeployerHelper {
         string memory contractName,
         string memory fileName,
         InnerDeployConfig memory config
-    ) private returns (address) {
+    ) private view returns (address) {
         return _deployInternal(contractName, fileName, hex"", config);
     }
 
@@ -791,7 +797,7 @@ library GatewayCTMDeployerHelper {
         string memory fileName,
         bytes memory params,
         InnerDeployConfig memory config
-    ) private returns (address) {
+    ) private view returns (address) {
         return _deployInternal(contractName, fileName, params, config);
     }
 
@@ -800,7 +806,7 @@ library GatewayCTMDeployerHelper {
         string memory fileName,
         bytes memory params,
         InnerDeployConfig memory config
-    ) private returns (address addr) {
+    ) private view returns (address addr) {
         bytes memory bytecode = BytecodeUtils.readBytecodeL1(fileName, contractName);
         addr = _computeCreate2Address(config.deployerAddr, config.salt, bytecode, params);
         _logGatewayVerifyContract(addr, contractName, params);
@@ -812,7 +818,7 @@ library GatewayCTMDeployerHelper {
     /// @dev Gateway CTM deployment needs no additional factory dependencies.
     function getListOfFactoryDeps(
         GatewayCTMDeployerConfig memory // config
-    ) external returns (bytes[] memory dependencies) {
+    ) external pure returns (bytes[] memory dependencies) {
         return dependencies;
     }
 
@@ -832,7 +838,7 @@ library GatewayCTMDeployerHelper {
         bytes32 _salt,
         bytes memory _bytecode,
         bytes memory _constructorArgs
-    ) private view returns (L1L2DeployPrepareResult memory result) {
+    ) private pure returns (L1L2DeployPrepareResult memory result) {
         // ZKsyncOS gateway deploys are EVM-equivalent and go through the deterministic CREATE2 factory.
         result.targetAddress = Utils.DETERMINISTIC_CREATE2_ADDRESS;
         bytes memory initCode = abi.encodePacked(_bytecode, _constructorArgs);
@@ -850,7 +856,7 @@ library GatewayCTMDeployerHelper {
         address contractAddr,
         string memory contractName,
         bytes memory constructorArgs
-    ) internal view {
+    ) internal pure {
         string memory msgStr;
         if (constructorArgs.length == 0) {
             msgStr = string.concat("forge verify-contract ", Utils.vm.toString(contractAddr), " ", contractName);
