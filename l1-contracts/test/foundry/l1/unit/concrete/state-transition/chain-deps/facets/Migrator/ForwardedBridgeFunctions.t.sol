@@ -615,12 +615,12 @@ contract ForwardedBridgeFunctionsTest is MigratorTest {
         migratorFacet.forwardedBridgeMint(data, true);
     }
 
-    function test_forwardedBridgeMint_RevertWhen_NotMigrated_OnGateway_ContractAlreadyDeployed() public {
+    function test_forwardedBridgeMint_RevertWhen_NotMigrated_OnSettlementLayer_ContractAlreadyDeployed() public {
         _setupReceivingSettlementPausedState();
 
-        // Switch to Gateway chain (not L1)
-        uint256 gatewayChainId = 505;
-        vm.chainId(gatewayChainId);
+        // Switch to a settlement-layer chain (not L1)
+        uint256 settlementLayerChainId = 505;
+        vm.chainId(settlementLayerChainId);
 
         address ctm = utilsFacet.util_getChainTypeManager();
         uint256 currentProtocolVersion = utilsFacet.util_getProtocolVersion();
@@ -654,7 +654,7 @@ contract ForwardedBridgeFunctionsTest is MigratorTest {
 
         bytes memory data = abi.encode(commitment);
 
-        // On Gateway, with _contractAlreadyDeployed=true but settlementLayer=address(0), should revert with NotMigrated
+        // On a settlement layer, with _contractAlreadyDeployed=true but settlementLayer=address(0), should revert with NotMigrated
         vm.prank(chainAssetHandler);
         vm.expectRevert(NotMigrated.selector);
         migratorFacet.forwardedBridgeMint(data, true);

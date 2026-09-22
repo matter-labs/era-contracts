@@ -585,8 +585,8 @@ async fn verify_v31_ctm_permissionless_validator(
 ///
 /// `L1MessageRootStageSepolia` skips chain
 /// `STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID` (270) because it's still
-/// settling on the legacy stage Gateway at v31 upgrade time; PUVT applies
-/// the same skip when `is_stage` is set.
+/// settling on the legacy stage settlement layer at v31 upgrade time; PUVT
+/// applies the same skip when `is_stage` is set.
 async fn verify_v31_chain_settlement_layers(
     verifiers: &Verifiers,
     result: &mut VerificationResult,

@@ -189,7 +189,7 @@ library MessageHashing {
             l1BatchTimestamp = uint256(_proof[result.ptr]);
             ++result.ptr;
 
-            // Now, we'll have to check that the Gateway included the message.
+            // Now, we'll have to check that the settlement layer included the message.
             bytes32 localBatchLeafHash = MessageHashing.batchLeafHash(
                 batchSettlementRoot,
                 _batchNumber,

@@ -104,7 +104,7 @@ contract PauseDepositsTest is MigratorTest {
 
     function test_successfulCall_settlementLayerSet_withPriorityTxs() public {
         // Set up: settlementLayer is non-zero, totalPriorityTxs > 0
-        // This should call requestPauseDepositsForChainOnGateway (line 341)
+        // This should request the settlement-layer deposit pause on the chain asset handler
         uint256 chainId = utilsFacet.util_getChainId();
         address admin = utilsFacet.util_getAdmin();
         address settlementLayer = makeAddr("settlementLayer");

@@ -45,7 +45,7 @@ import {
     DataAvailabilityDeployedAddresses,
     L1SpecificStateTransitionAddresses
 } from "./Types.sol";
-import {DeployCTML1OrGateway} from "../ctm/DeployCTML1OrGateway.sol";
+import {DeployCTMContracts} from "../ctm/DeployCTMContracts.sol";
 
 library AddressIntrospector {
     error NoUptoDateZkChainFound();
@@ -469,6 +469,6 @@ library AddressIntrospector {
     /// @notice Get fflonk and plonk sub-verifiers from a ZKsyncOS dual verifier
     /// @param _verifier The verifier address
     function _getSubVerifiers(address _verifier) private view returns (address fflonk, address plonk) {
-        return DeployCTML1OrGateway.getSubVerifiers(_verifier);
+        return DeployCTMContracts.getSubVerifiers(_verifier);
     }
 }

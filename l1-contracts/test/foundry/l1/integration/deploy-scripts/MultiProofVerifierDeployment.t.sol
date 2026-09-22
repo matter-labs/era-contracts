@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {CTMDeployedAddresses} from "deploy-scripts/utils/Types.sol";
 import {DeployCTMScript} from "deploy-scripts/ctm/DeployCTM.s.sol";
-import {DeployCTML1OrGateway} from "deploy-scripts/ctm/DeployCTML1OrGateway.sol";
+import {DeployCTMContracts} from "deploy-scripts/ctm/DeployCTMContracts.sol";
 import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
 import {MultiProofTestnetVerifier} from "contracts/state-transition/verifiers/MultiProofTestnetVerifier.sol";
 import {ZiskTestnetVerifier} from "contracts/state-transition/verifiers/ZiskTestnetVerifier.sol";
@@ -227,7 +227,7 @@ contract MultiProofVerifierDeploymentTest is Test {
     ///      the CTM holds, so both compositions must answer.
     function test_tooling_introspectsChainVerifier() public {
         deployer.deployMultiProofLane(owner, ziskPlonk, true);
-        (, address plonk) = DeployCTML1OrGateway.getSubVerifiers(
+        (, address plonk) = DeployCTMContracts.getSubVerifiers(
             deployer.getAddresses().stateTransition.verifiers.verifier
         );
         assertEq(plonk, deployer.getAddresses().stateTransition.verifiers.verifierPlonk, "testnet lane PLONK");
@@ -236,7 +236,7 @@ contract MultiProofVerifierDeploymentTest is Test {
         );
 
         deployer.deployMultiProofLane(owner, ziskPlonk, false);
-        (, plonk) = DeployCTML1OrGateway.getSubVerifiers(deployer.getAddresses().stateTransition.verifiers.verifier);
+        (, plonk) = DeployCTMContracts.getSubVerifiers(deployer.getAddresses().stateTransition.verifiers.verifier);
         assertEq(plonk, deployer.getAddresses().stateTransition.verifiers.verifierPlonk, "prod lane PLONK");
         assertFalse(MultiProofVerifier(deployer.getAddresses().stateTransition.verifiers.verifier).isTestnetVerifier());
     }

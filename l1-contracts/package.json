@@ -47,7 +47,6 @@
     "coverage:anvil:collect": "ts-node test/anvil-interop/collect-coverage.ts",
     "coverage:merge": "ts-node scripts/merge-coverage.ts",
     "verify-contracts": "ts-node scripts/verify-contracts.ts",
-    "collect-gateway-migration-intervals": "ts-node scripts/collect-gateway-migration-intervals.ts",
     "errors-lint": "ts-node scripts/errors-lint.ts",
     "selectors": "ts-node ../scripts/selectors.ts",
     "write-factory-deps-zksync-os": "ts-node scripts/write-factory-deps-zksync-os.ts",

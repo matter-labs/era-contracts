@@ -248,54 +248,6 @@
   },
   {
     "type": "function",
-    "name": "enableValidatorViaGateway",
-    "inputs": [
-      {
-        "name": "bridgehub",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "l1GasPrice",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "l2ChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "gatewayChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "validatorAddress",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "gatewayValidatorTimelock",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "refundRecipient",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "shouldSend",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "ensureCtmsAndProxyAdminsOwnedByGovernance",
     "inputs": [
       {
@@ -469,34 +421,6 @@
   },
   {
     "type": "function",
-    "name": "grantGatewayWhitelist",
-    "inputs": [
-      {
-        "name": "bridgehub",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "grantees",
-        "type": "address[]",
-        "internalType": "address[]"
-      },
-      {
-        "name": "shouldSend",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "makePermanentRollup",
     "inputs": [
       {
@@ -515,95 +439,6 @@
   },
   {
     "type": "function",
-    "name": "migrateChainToGateway",
-    "inputs": [
-      {
-        "name": "bridgehub",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "l1GasPrice",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "l2ChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "gatewayChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "gatewayRpcUrl",
-        "type": "string",
-        "internalType": "string"
-      },
-      {
-        "name": "refundRecipient",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "shouldSend",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "notifyServerMigrationFromGateway",
-    "inputs": [
-      {
-        "name": "bridgehub",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "shouldSend",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "notifyServerMigrationToGateway",
-    "inputs": [
-      {
-        "name": "bridgehub",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "shouldSend",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "pauseDepositsBeforeInitiatingMigration",
     "inputs": [
       {
@@ -615,92 +450,6 @@
         "name": "chainId",
         "type": "uint256",
         "internalType": "uint256"
-      },
-      {
-        "name": "shouldSend",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "prepareUpgradeZKChainOnGateway",
-    "inputs": [
-      {
-        "name": "l1GasPrice",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "oldProtocolVersion",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "upgradeCutData",
-        "type": "bytes",
-        "internalType": "bytes"
-      },
-      {
-        "name": "chainDiamondProxyOnGateway",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "gatewayChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "bridgehub",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "l1AssetRouterProxy",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "refundRecipient",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "shouldSend",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "revokeGatewayWhitelist",
-    "inputs": [
-      {
-        "name": "bridgehub",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "toRevoke",
-        "type": "address",
-        "internalType": "address"
       },
       {
         "name": "shouldSend",
@@ -739,59 +488,6 @@
         "name": "l2DaCommitmentScheme",
         "type": "uint8",
         "internalType": "enum L2DACommitmentScheme"
-      },
-      {
-        "name": "shouldSend",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "setDAValidatorPairWithGateway",
-    "inputs": [
-      {
-        "name": "bridgehub",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "l1GasPrice",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "l2ChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "gatewayChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "l1DAValidator",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "l2DACommitmentScheme",
-        "type": "uint8",
-        "internalType": "enum L2DACommitmentScheme"
-      },
-      {
-        "name": "chainDiamondProxyOnGateway",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "refundRecipient",
-        "type": "address",
-        "internalType": "address"
       },
       {
         "name": "shouldSend",
@@ -909,49 +605,6 @@
         "name": "newMaxTxGasLimit",
         "type": "uint64",
         "internalType": "uint64"
-      },
-      {
-        "name": "shouldSend",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "startMigrateChainFromGateway",
-    "inputs": [
-      {
-        "name": "bridgehub",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "l1GasPrice",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "l2ChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "gatewayChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "l1DiamondCutData",
-        "type": "bytes",
-        "internalType": "bytes"
-      },
-      {
-        "name": "refundRecipient",
-        "type": "address",
-        "internalType": "address"
       },
       {
         "name": "shouldSend",

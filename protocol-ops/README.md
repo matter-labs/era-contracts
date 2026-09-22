@@ -70,7 +70,6 @@ OS-only — an `ecosystem.toml` carrying a `[ctms.era]` section is rejected at p
 cargo run --release --bin protocol_ops -- ecosystem verify-upgrade \
   --env stage \
   --ecosystem-toml <path-to>/ecosystem.toml \
-  --gw-rpc-url <gateway-rpc-url> \
   --zk-governance-commit <commit>
 ```
 
@@ -82,7 +81,6 @@ cargo run --release --bin protocol_ops -- ecosystem verify-upgrade \
 | **`--contracts-commit`**     | Optional era-contracts commit; when omitted, the local checkout is the authority.              |
 | **`--transactions-log`**     | Deployment tx-hash log; defaults to the env's `output/<env>/transactions.txt`.                 |
 | **`--l1-rpc-url`**           | L1 RPC (default `http://localhost:8545`).                                                      |
-| **`--gw-rpc-url`**           | Gateway RPC (alias `--gw-rpc`) for read-only gateway-side checks.                              |
 | **`--display-upgrade-data`** | Print each stage's ABI-encoded `UpgradeProposal` and skip the rest of the verifier.            |
 
 ## Output

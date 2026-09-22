@@ -20,8 +20,6 @@ export interface DepositETHParams {
   l1Addresses: CoreDeployedAddresses;
   amount: BigNumber;
   recipient?: string;
-  /** Required only for GW-settled chains. */
-  gwRpcUrl?: string;
 }
 
 export interface DepositETHResult {
@@ -39,8 +37,6 @@ export interface DepositERC20Params {
   tokenAddress: string;
   amount: BigNumber;
   recipient?: string;
-  /** Required only for GW-settled chains. */
-  gwRpcUrl?: string;
 }
 
 export interface DepositERC20Result {
@@ -56,9 +52,8 @@ export interface DepositERC20Result {
  *
  * For ETH-base-token chains, the base token deposit goes through the direct path
  * (TwoBridges rejects base token deposits with AssetIdNotSupported).
- * The settlement route is resolved from L1 Bridgehub:
- * direct-settled chains relay L1 -> L2, gateway-settled chains relay L1 -> GW -> L2
- * through nested NewPriorityRequest events.
+ * The emitted NewPriorityRequest is relayed L1 -> L2; the harness only supports chains that settle
+ * directly on L1 (checked against L1 Bridgehub at relay time).
  */
 export async function depositETHToL2(params: DepositETHParams): Promise<DepositETHResult> {
   const { l1RpcUrl, l2RpcUrl, chainId, l1Addresses, amount } = params;
@@ -107,7 +102,6 @@ export async function depositETHToL2(params: DepositETHParams): Promise<DepositE
       bridgehubAddr: l1Addresses.bridgehub,
       chainId,
       chainRpcUrl: l2RpcUrl,
-      gwRpcUrl: params.gwRpcUrl,
     },
     (line) => console.log(line)
   );
@@ -125,7 +119,7 @@ export async function depositETHToL2(params: DepositETHParams): Promise<DepositE
  * Deposit an L1 ERC20 token to an L2 chain via Bridgehub.requestL2TransactionTwoBridges.
  *
  * This uses L1AssetRouter as the second bridge and relays the emitted priority requests
- * to the target chain (or L1 -> GW -> L2 for GW-settled chains).
+ * to the target chain.
  *
  * Only ETH-base-token chains are supported here, since mintValue is currently paid in ETH.
  */
@@ -206,7 +200,6 @@ export async function depositERC20ToL2(params: DepositERC20Params): Promise<Depo
       bridgehubAddr: l1Addresses.bridgehub,
       chainId,
       chainRpcUrl: l2RpcUrl,
-      gwRpcUrl: params.gwRpcUrl,
     },
     (line) => console.log(line)
   );

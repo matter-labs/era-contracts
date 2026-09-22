@@ -20,7 +20,7 @@ import {
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {CoreContract, L2SystemContract} from "../ecosystem/CoreContract.sol";
-import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";
+import {CoreOnL2Helper} from "../ecosystem/CoreOnL2Helper.sol";
 import {DeduplicateBytecodesCountMismatch} from "../ecosystem/DeployScriptErrors.sol";
 
 // solhint-disable no-console
@@ -185,8 +185,8 @@ library SystemContractsProcessing {
     /// — otherwise the retired tracker code would stay callable. Chains created on v32 get the same
     /// EmptyContract-backed proxy from genesis, so fresh and upgraded chains match at the reserved
     /// address.
-    /// @dev The v31 GWAssetTracker could collect wrapped-ZK settlement fees on a live gateway, but no
-    /// gateway ever accrued any, so the swap strands nothing. It destroys no state either way: the
+    /// @dev The v31 GWAssetTracker could collect wrapped-ZK settlement fees on a settlement layer, but
+    /// none ever accrued any, so the swap strands nothing. It destroys no state either way: the
     /// proxy stays upgradable, so a later governance upgrade can always restore recovery logic.
     function getRemovedTrackerNeutralizations()
         internal
@@ -219,7 +219,7 @@ library SystemContractsProcessing {
     function _buildCoreContractProxyUpgrade(
         CoreContract _id
     ) private returns (IComplexUpgrader.UniversalContractUpgradeInfo memory) {
-        (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(_id);
+        (string memory fileName, string memory contractName) = CoreOnL2Helper.resolve(_id);
 
         // L2WrappedBaseToken is excluded from the force-deployment list, so every entry built here
         // uses the system-proxy upgrade mode.
@@ -229,7 +229,7 @@ library SystemContractsProcessing {
             IComplexUpgrader.UniversalContractUpgradeInfo({
                 upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
                 deployedBytecodeInfo: bytecodeInfo,
-                newAddress: CoreOnGatewayHelper._resolveAddress(_id)
+                newAddress: CoreOnL2Helper._resolveAddress(_id)
             });
     }
 
@@ -237,8 +237,8 @@ library SystemContractsProcessing {
     function _buildSystemContractProxyUpgrade(
         L2SystemContract _id
     ) private returns (IComplexUpgrader.UniversalContractUpgradeInfo memory) {
-        address addr = CoreOnGatewayHelper._resolveL2SystemContractAddress(_id);
-        (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolveL2SystemContract(_id);
+        address addr = CoreOnL2Helper._resolveL2SystemContractAddress(_id);
+        (string memory fileName, string memory contractName) = CoreOnL2Helper.resolveL2SystemContract(_id);
         bytes memory bytecodeInfo = Utils.getZKOSProxyUpgradeBytecodeInfo(fileName, contractName);
 
         return

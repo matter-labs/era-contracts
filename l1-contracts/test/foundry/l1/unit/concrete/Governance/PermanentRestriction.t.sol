@@ -302,7 +302,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
 
         bytes memory bridgehubData = abi.encode(
             BridgehubBurnCTMAssetData({
-                // Gateway chain id, we do not need it
+                // Settlement-layer chain id, not needed here
                 chainId: 0,
                 ctmData: abi.encode(l2Admin, hex""),
                 chainData: abi.encode(IZKChain(IBridgehubBase(bridgehub).getZKChain(chainId)).getProtocolVersion())

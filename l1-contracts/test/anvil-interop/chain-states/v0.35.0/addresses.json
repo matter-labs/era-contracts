@@ -7,40 +7,40 @@
     "governance": "0xa60F07cAaFA0aE451296c0ca5C261578A390105e",
     "transparentProxyAdmin": "0x0FA38b5c8cb180809E0C95E2EE923eC093123285",
     "messageRoot": "0x4A4554662690D48e352C304aa64F7A471381D5eb",
-    "ctmDeploymentTracker": "0x7670f46FD22a3E012EB92bcd447ff26d520448EE",
+    "ctmDeploymentTracker": "0xcdB5a4cD8926Ba1799a5b22bC754f80947C41c37",
     "chainRegistrationSender": "0x031A653CFDA8d5e8f065d12c5b653Ab0F62f6e01"
   },
   "ctmAddresses": {
-    "chainTypeManager": "0x58653c3bA4596dc7Da45508ee7EceC1d99E5847b",
+    "chainTypeManager": "0x73a9AF02443312C19D97B4e27Ae6ac423dDE1697",
     "chainAdmin": "0x16b5d0b1A5c64195453315C58671A6f847CE1aC2",
-    "verifier": "0x72a38a9930be419557939833c94701A4B26F1374",
-    "rollupL1DAValidator": "0xC533CcE441ED81782127ef99B936bFbeB62DD26B"
+    "verifier": "0x09ABd862b2B6E3B0944beA4e2aA1668632ed5E04",
+    "rollupL1DAValidator": "0xfB934Eb423BC274E2F47579bb87bC47c29CE5bDd"
   },
   "chainAddresses": [
     {
       "chainId": 10,
-      "diamondProxy": "0x0A6a705Ae42010f6e33aBb512E3A52fa92cdb07f"
+      "diamondProxy": "0xAf36e95146f3f5a5CAd5412FBCb50e316cf58F32"
     },
     {
       "chainId": 11,
-      "diamondProxy": "0x342afFE540c9B2D59713E5806E7A6d1a336e9648"
+      "diamondProxy": "0xfdaD0fdF285B0eA9436f2AF2024fb71c60dE24C1"
     },
     {
       "chainId": 12,
-      "diamondProxy": "0xB90854140D6C0FEA936e42AaD1DF392a32f92dae"
+      "diamondProxy": "0xf9EB22e3fb55226463014e29368D2E3538c45D24"
     },
     {
       "chainId": 13,
-      "diamondProxy": "0x3Cf1fd8ADc879117ba6535fB7D5AEFA84ea7EB31"
+      "diamondProxy": "0x2D0A6AeAFa8c6f519A0ABa9755742B0D068a9d38"
     },
     {
       "chainId": 14,
-      "diamondProxy": "0xb8B7f77d040Dc23b517ddaB9f5B63853d383CF44"
+      "diamondProxy": "0x7ba1Ab79C67e8F29709233b36e010cBA7881DC70"
     }
   ],
   "testTokens": {
     "10": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-    "11": "0x9A676e781A523b5d0C0e43731313A708CB607508",
+    "11": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
     "12": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
     "13": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
     "14": "0x5FbDB2315678afecb367f032d93F642f64180aa3"

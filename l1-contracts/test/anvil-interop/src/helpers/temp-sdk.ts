@@ -1,25 +1,14 @@
 import { createViemClient, createViemSdk } from "@matterlabs/zksync-js/viem";
-import { createProvider } from "../core/utils";
 import type { BytesLike, providers } from "ethers";
-import { Contract, ethers } from "ethers";
+import { ethers } from "ethers";
 import { createPublicClient, createWalletClient, http } from "viem";
 import type { Address, Chain, Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { getAbi } from "../core/contracts";
-import {
-  INTEROP_BUNDLE_TUPLE_TYPE,
-  L2_BRIDGEHUB_ADDR,
-  L2_INTEROP_ROOT_STORAGE_ADDR,
-  L2_TO_L1_MESSENGER_ADDR,
-} from "../core/const";
+import { INTEROP_BUNDLE_TUPLE_TYPE, L2_TO_L1_MESSENGER_ADDR } from "../core/const";
 import type { FinalizeWithdrawalParams } from "../core/types";
 
 const DEFAULT_LIVE_INTEROP_PROOF_TYPE = "messageRoot";
 const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
-const PROOF_METADATA_HEX_LENGTH = 66;
-const PROOF_METADATA_PREFIX_HEX_LENGTH = 10;
-const PROOF_METADATA_TRAILING_ZERO_HEX_LENGTH = 56;
-const PROOF_METADATA_VERSION = 1;
 const LIVE_CHAIN_NATIVE_CURRENCY = { name: "Ether", symbol: "ETH", decimals: 18 } as const;
 const abiCoder = ethers.utils.defaultAbiCoder;
 
@@ -43,11 +32,6 @@ export interface MessageInclusionProof {
   l2MessageIndex: number;
   message: [number, string, string];
   proof: string[];
-}
-
-interface InteropBundleData extends LiveInteropProof {
-  l1BatchNumber: number;
-  gatewayBlockNumber?: number;
 }
 
 type NumericRpcValue = number | string;
@@ -81,7 +65,6 @@ interface ZkReceipt {
 
 interface LogProof {
   batchNumber: number | string;
-  gatewayBlockNumber?: number | string;
   id: number | string;
   proof: string[];
 }
@@ -90,7 +73,6 @@ interface LiveFinalizeWithdrawalParams {
   l1BatchNumber: number;
   l2MessageIndex: number;
   l2TxNumberInBlock: number;
-  gatewayBlockNumber?: number;
   message: string;
   sender: string;
   proof: string[];
@@ -137,9 +119,7 @@ export function createLiveZksyncSdk(params: LiveZksyncSdkParams) {
 
 export async function waitForLiveInteropProof(
   sourceProvider: providers.JsonRpcProvider,
-  destProvider: providers.JsonRpcProvider,
   sourceTxHash: BytesLike,
-  sourceChainId: number,
   index = 0,
   timeoutMs = DEFAULT_TIMEOUT_MS
 ): Promise<LiveInteropProof> {
@@ -148,17 +128,7 @@ export async function waitForLiveInteropProof(
   await waitUntilBlockFinalized(sourceProvider, receipt.blockNumber, timeoutMs);
 
   const proofType = process.env.LIVE_INTEROP_PROOF_TYPE?.trim() || DEFAULT_LIVE_INTEROP_PROOF_TYPE;
-  const bundleData = await getInteropBundleData(sourceProvider, receipt, index, timeoutMs, proofType);
-  await waitUntilBatchExecutedOnGateway(sourceChainId, bundleData.l1BatchNumber, timeoutMs);
-  await waitForInteropRootNonZero(
-    destProvider,
-    bundleData.gatewayBlockNumber ?? getGWBlockNumber(bundleData.proofDecoded.proof),
-    timeoutMs
-  );
-  return {
-    rawData: bundleData.rawData,
-    proofDecoded: bundleData.proofDecoded,
-  };
+  return getInteropBundleData(sourceProvider, receipt, index, timeoutMs, proofType);
 }
 
 export async function waitForLiveFinalizeWithdrawalParams(
@@ -189,7 +159,7 @@ async function getInteropBundleData(
   index = 0,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   proofType?: string
-): Promise<InteropBundleData> {
+): Promise<LiveInteropProof> {
   const response = await getFinalizeWithdrawalParams(provider, receipt, index, timeoutMs, proofType);
   const message = normalizeHex(response.message);
   const bundlePayload = stripBundleIdentifier(message);
@@ -228,12 +198,7 @@ async function getInteropBundleData(
     proof: response.proof,
   };
 
-  return {
-    rawData,
-    l1BatchNumber: response.l1BatchNumber,
-    gatewayBlockNumber: response.gatewayBlockNumber,
-    proofDecoded,
-  };
+  return { rawData, proofDecoded };
 }
 
 async function getFinalizeWithdrawalParams(
@@ -253,7 +218,6 @@ async function getFinalizeWithdrawalParams(
     l1BatchNumber: toNumber(proof.batchNumber),
     l2MessageIndex: toNumber(proof.id),
     l2TxNumberInBlock,
-    gatewayBlockNumber: proof.gatewayBlockNumber === undefined ? undefined : toNumber(proof.gatewayBlockNumber),
     message,
     sender,
     proof: proof.proof,
@@ -405,121 +369,10 @@ async function waitUntilBlockFinalized(
   }
 }
 
-async function waitUntilBatchExecutedOnGateway(
-  sourceChainId: number,
-  batchNumber: number,
-  timeoutMs: number
-): Promise<void> {
-  const start = Date.now();
-  const gwProvider = getGatewayProvider();
-  const bridgehub = new Contract(L2_BRIDGEHUB_ADDR, getAbi("L2Bridgehub"), gwProvider);
-  const zkChainAddress = await bridgehub.getZKChain(sourceChainId);
-  const getters = new Contract(zkChainAddress, getAbi("IZKChain"), gwProvider);
-  let currentExecutedBatchNumber = 0;
-
-  while (currentExecutedBatchNumber < batchNumber) {
-    if (Date.now() - start > timeoutMs) {
-      throw new Error(
-        `waitUntilBatchExecutedOnGateway: timed out after ${(timeoutMs / 1000).toFixed(
-          0
-        )}s waiting for source chain ${sourceChainId} batch ${batchNumber} (current executed: ${currentExecutedBatchNumber})`
-      );
-    }
-
-    currentExecutedBatchNumber = toNumber(await getters.getTotalBatchesExecuted());
-    if (currentExecutedBatchNumber < batchNumber) {
-      await sleep(gwProvider.pollingInterval);
-    }
-  }
-}
-
-async function waitForInteropRootNonZero(
-  destProvider: providers.JsonRpcProvider,
-  gwBlockNumber: number,
-  timeoutMs: number
-): Promise<void> {
-  const start = Date.now();
-  const gwChainId = (await getGatewayProvider().getNetwork()).chainId;
-  const interopRootStorage = new Contract(L2_INTEROP_ROOT_STORAGE_ADDR, getAbi("L2InteropRootStorage"), destProvider);
-  let currentRoot = ethers.constants.HashZero;
-
-  while (currentRoot === ethers.constants.HashZero) {
-    if (Date.now() - start > timeoutMs) {
-      throw new Error(
-        `waitForInteropRootNonZero: timed out after ${(timeoutMs / 1000).toFixed(
-          0
-        )}s waiting for gateway block ${gwBlockNumber} root on destination chain`
-      );
-    }
-
-    const interopRootInfo = await interopRootStorage.interopRoots(gwChainId, gwBlockNumber);
-    currentRoot = interopRootInfo.root;
-    if (currentRoot === ethers.constants.HashZero) {
-      await sleep(destProvider.pollingInterval);
-    }
-  }
-}
-
-function getGWBlockNumber(proof: string[]): number {
-  const settlementLayerProof = getSettlementLayerProofData(proof);
-  if (!settlementLayerProof) {
-    throw new Error("Proof does not contain settlement-layer batch data");
-  }
-  return settlementLayerProof.batchNumber;
-}
-
-function getSettlementLayerProofData(proof: string[]): { chainId: number; batchNumber: number } | undefined {
-  if (proof.length === 0) {
-    throw new Error("Cannot parse empty proof");
-  }
-
-  const metadata = normalizeHex(proof[0]);
-  const isMetadataProof =
-    metadata.length === PROOF_METADATA_HEX_LENGTH &&
-    metadata.slice(PROOF_METADATA_PREFIX_HEX_LENGTH) === "0".repeat(PROOF_METADATA_TRAILING_ZERO_HEX_LENGTH);
-  if (!isMetadataProof) {
-    return undefined;
-  }
-
-  const metadataVersion = parseInt(metadata.slice(2, 4), 16);
-  if (metadataVersion !== PROOF_METADATA_VERSION) {
-    throw new Error(`Unsupported proof metadata version ${metadataVersion}`);
-  }
-
-  const logLeafProofLen = parseInt(metadata.slice(4, 6), 16);
-  const batchLeafProofLen = parseInt(metadata.slice(6, 8), 16);
-  const finalProofNode = parseInt(metadata.slice(8, 10), 16) !== 0;
-  if (finalProofNode) {
-    return undefined;
-  }
-
-  // Layout after the log-leaf proof: [l1Timestamp][batchLeafProofMask][batchLeafProof...][packedBatchInfo].
-  // The extra +1 accounts for the l1Timestamp word now bound into the batch leaf.
-  const packedBatchInfoIndex = 1 + logLeafProofLen + 1 + 1 + batchLeafProofLen;
-  const settlementLayerChainIdIndex = packedBatchInfoIndex + 1;
-  if (proof.length <= settlementLayerChainIdIndex) {
-    throw new Error("Proof metadata points outside the proof array");
-  }
-
-  const packedBatchInfo = normalizeHex(proof[packedBatchInfoIndex]);
-  const batchNumber = ethers.BigNumber.from(`0x${packedBatchInfo.slice(2, 34)}`).toNumber();
-  const chainId = ethers.BigNumber.from(proof[settlementLayerChainIdIndex]).toNumber();
-
-  return { chainId, batchNumber };
-}
-
 function stripBundleIdentifier(message: string): string {
   const normalized = normalizeHex(message);
   const bytesToStrip = Number(process.env.LIVE_INTEROP_BUNDLE_IDENTIFIER_BYTES || "1");
   return ethers.utils.hexDataSlice(normalized, bytesToStrip);
-}
-
-function getGatewayProvider(): providers.JsonRpcProvider {
-  const gwRpcUrl = process.env.LIVE_GW_RPC?.trim();
-  if (!gwRpcUrl) {
-    throw new Error("LIVE_GW_RPC is required when ANVIL_INTEROP_LIVE=1");
-  }
-  return createProvider(gwRpcUrl);
 }
 
 function normalizeHex(value: string): string {

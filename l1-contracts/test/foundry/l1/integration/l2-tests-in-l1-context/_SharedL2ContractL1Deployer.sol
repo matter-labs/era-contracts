@@ -22,7 +22,7 @@ import {DummyInteropRecipient} from "contracts/dev-contracts/test/DummyInteropRe
 import {L2UtilsBase} from "./L2UtilsBase.sol";
 import {DeployCTMUtils} from "deploy-scripts/ctm/DeployCTMUtils.s.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
-import {DeployCTML1OrGateway} from "deploy-scripts/ctm/DeployCTML1OrGateway.sol";
+import {DeployCTMContracts} from "deploy-scripts/ctm/DeployCTMContracts.sol";
 
 contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegrationScript {
     using stdToml for string;
@@ -63,7 +63,7 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         ctmAddresses.admin.governance = makeAddr("governance");
         ctmAddresses.chainAdmin = makeAddr("chainAdmin");
         ctmAddresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade");
-        (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(config.testnetVerifier);
+        (, string memory verifierName) = DeployCTMContracts.resolveMainVerifier(config.testnetVerifier);
         ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName);
         ctmAddresses.stateTransition.proxies.validatorTimelock = deploySimpleContract("ValidatorTimelock");
         (

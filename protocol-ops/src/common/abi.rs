@@ -118,15 +118,6 @@ pub mod i_register_zk_chain {
 }
 pub use i_register_zk_chain::IRegisterZKChainAbi;
 
-pub mod i_gateway_vote_preparation {
-    alloy::sol!(
-        #[sol(rpc)]
-        IGatewayVotePreparationAbi,
-        "../l1-contracts/zkstack-out/IGatewayVotePreparation.sol/IGatewayVotePreparation.json"
-    );
-}
-pub use i_gateway_vote_preparation::IGatewayVotePreparationAbi;
-
 pub mod admin_functions {
     alloy::sol!(
         #[sol(rpc)]
@@ -135,24 +126,6 @@ pub mod admin_functions {
     );
 }
 pub use admin_functions::AdminFunctionsAbi;
-
-pub mod deploy_gateway_transaction_filterer {
-    alloy::sol!(
-        #[sol(rpc)]
-        DeployGatewayTransactionFiltererAbi,
-        "../l1-contracts/zkstack-out/IDeployGatewayTransactionFilterer.sol/IDeployGatewayTransactionFilterer.json"
-    );
-}
-pub use deploy_gateway_transaction_filterer::DeployGatewayTransactionFiltererAbi;
-
-pub mod gateway_utils {
-    alloy::sol!(
-        #[sol(rpc)]
-        GatewayUtilsAbi,
-        "../l1-contracts/zkstack-out/IGatewayUtils.sol/IGatewayUtils.json"
-    );
-}
-pub use gateway_utils::GatewayUtilsAbi;
 
 pub mod i_deploy_ctm {
     alloy::sol!(

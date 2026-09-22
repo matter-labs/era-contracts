@@ -426,7 +426,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
     }
 
     /// @notice Test that verifyBundle works while settling on L1.
-    /// @dev Atomic interop has no gateway-settlement requirement: verification is valid regardless of
+    /// @dev Atomic interop has no settlement-layer requirement: verification is valid regardless of
     /// the chain's settlement layer, including L1-settled chains.
     function test_verifyBundleWorksWhenSettlingOnL1() public {
         InteropBundle memory interopBundle = getInteropBundle(1);
@@ -434,7 +434,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         AtomicFinalityProof memory finality;
         _mockRequireFlowFinalized();
 
-        // Simulate the chain settling directly on L1 (rather than on Gateway). This must not affect
+        // Simulate the chain settling directly on L1 (rather than on a settlement layer). This must not affect
         // atomic verification.
         vm.mockCall(
             address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
@@ -532,21 +532,21 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
     }
 
     /// @notice `verifyAtomicBundle` marks the bundle `Verified` and emits `BundleVerified`, and does so
-    /// even when the chain is in gateway mode.
+    /// even when the chain settles on a non-L1 settlement layer.
     /// @dev Atomic verification does NOT read `currentSettlementLayerChainId` (unlike the old public-interop
-    /// path), so this is a generic gateway-mode verification test rather than an accessor-access regression:
+    /// path), so this is a generic settlement-layer verification test rather than an accessor-access regression:
     /// it only asserts that `verifyAtomicBundle` succeeds and records `Verified` regardless of settlement layer.
-    function test_verifyAtomicBundle_worksInGatewayMode() public {
+    function test_verifyAtomicBundle_worksOnSettlementLayer() public {
         InteropBundle memory interopBundle = getInteropBundle(1);
         bytes memory bundle = abi.encode(interopBundle);
         AtomicFinalityProof memory finality;
         _mockRequireFlowFinalized();
 
-        // Simulate the chain settling on Gateway instead of L1 to show verification is settlement-agnostic.
+        // Simulate the chain settling on a non-L1 settlement layer to show verification is settlement-agnostic.
         vm.mockCall(
             address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
             abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
-            abi.encode(GATEWAY_CHAIN_ID)
+            abi.encode(NON_L1_SETTLEMENT_LAYER_CHAIN_ID)
         );
 
         bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundle);
@@ -563,19 +563,19 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         );
     }
 
-    /// @notice Test that executeBundle works in gateway mode.
-    /// @dev Atomic execution is valid regardless of the settlement layer; here the chain is in gateway mode.
-    function test_regression_executeBundleWorksInGatewayMode() public {
+    /// @notice Test that executeBundle works when settling on a non-L1 settlement layer.
+    /// @dev Atomic execution is valid regardless of the settlement layer.
+    function test_regression_executeBundleWorksOnSettlementLayer() public {
         InteropBundle memory interopBundle = getInteropBundle(1);
         bytes memory bundle = abi.encode(interopBundle);
         AtomicFinalityProof memory finality;
         _mockRequireFlowFinalized();
 
-        // Settlement-layer mock: gateway mode (settling on Gateway, not L1).
+        // Settlement-layer mock: settling on a non-L1 settlement layer.
         vm.mockCall(
             address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
             abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
-            abi.encode(GATEWAY_CHAIN_ID)
+            abi.encode(NON_L1_SETTLEMENT_LAYER_CHAIN_ID)
         );
 
         vm.mockCall(

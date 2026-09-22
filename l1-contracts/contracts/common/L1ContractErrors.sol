@@ -17,8 +17,6 @@ error AddressMismatch(address expected, address supplied);
 error AddressNotZero();
 // 0x2271414b
 error AirbenderVerificationFailed();
-// 0xb577eb6c
-error AlreadyDangerousContract(address);
 // 0x2a5989a0
 error AlreadyPermanentRollup();
 // 0x0bfcef28
@@ -306,8 +304,6 @@ error NotAZKChain(address addr);
 error NotCompatibleWithPriorityMode();
 // 0x5e67e793
 error NotCurrentSettlementLayer();
-// 0x2b1dc354
-error NotDangerousContract(address);
 // 0x230f9d11
 error NotEnoughSigners(uint256 provided, uint256 expected);
 // 0xdd7e3621

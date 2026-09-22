@@ -241,7 +241,7 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
 
     function test_migrationsEnabled_trueOnDevHandler() public {
         // The Dev variant re-enables migrations so the migration machinery, which is preserved
-        // for future releases, stays covered by the gateway and interop test harnesses.
+        // for future releases, stays covered by the interop test harness.
         L2ChainAssetHandlerDev devHandler = new L2ChainAssetHandlerDev();
         assertTrue(devHandler.migrationsEnabled(), "Chain migrations should be enabled on the Dev chain asset handler");
     }
@@ -499,7 +499,7 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         // Clear mocks so real functions are called
         vm.clearMockedCalls();
 
-        // Override ERA_GATEWAY_CHAIN_ID to differ from block.chainid so L1 and GW are distinguishable
+        // Override the legacy settlement-layer chain id to differ from block.chainid so L1 and SL are distinguishable
         uint256 gwChainId = 506;
         vm.mockCall(
             address(ecosystemAddresses.bridgehub.proxies.messageRoot),

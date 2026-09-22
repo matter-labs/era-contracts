@@ -30,7 +30,7 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
     /// @dev The chain asset handler contract.
     address public immutable CHAIN_ASSET_HANDLER;
 
-    /// @notice The chain id of the Gateway chain.
+    /// @notice The chain id of the legacy settlement layer Era used to settle on (0 when none).
     uint256 public immutable ERA_GATEWAY_CHAIN_ID;
 
     /// @notice The mapping storing the batch number at the moment the chain was updated to V31.

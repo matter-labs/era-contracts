@@ -158,39 +158,6 @@ pub async fn resolve_bytecodes_supplier(
     ensure_nonzero(addr, "ctm.L1_BYTECODES_SUPPLIER()")
 }
 
-/// Resolve `bridgehub.settlementLayer(chainId)` → gateway chain ID.
-///
-/// Returns the chain ID of the gateway the given chain settles on, or an error
-/// if the chain settles on L1 (i.e. `settlementLayer == L1_CHAIN_ID` or 0).
-pub async fn resolve_settlement_layer(
-    l1_rpc_url: &str,
-    bridgehub: Address,
-    chain_id: u64,
-) -> anyhow::Result<u64> {
-    let p = provider(l1_rpc_url)?;
-    let bh = BridgehubAbi::new(bridgehub, p);
-    let l1_chain_id = u64::try_from(
-        bh.L1_CHAIN_ID()
-            .call()
-            .await
-            .context("bridgehub.L1_CHAIN_ID() call failed")?,
-    )
-    .context("L1 chain ID overflow")?;
-    let sl = u64::try_from(
-        bh.settlementLayer(U256::from(chain_id))
-            .call()
-            .await
-            .context("bridgehub.settlementLayer() call failed")?,
-    )
-    .context("settlement layer chain ID overflow")?;
-    anyhow::ensure!(
-        sl != 0 && sl != l1_chain_id,
-        "chain {chain_id} settles on L1 (settlementLayer={sl}, L1_CHAIN_ID={l1_chain_id}) — \
-         not migrated to a gateway"
-    );
-    Ok(sl)
-}
-
 /// Resolve `bridgehub.owner()` → governance contract address.
 ///
 /// The bridgehub's owner is the Governance contract (set during ecosystem

@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 
 /// @notice Canonical identifier for core L2 contracts that participate in
 ///         force-deployments and factory-dependency publishing.
-///         `CoreOnGatewayHelper.resolve` maps it to the contract and artifact name.
+///         `CoreOnL2Helper.resolve` maps it to the contract and artifact name.
 enum CoreContract {
     L2Bridgehub,
     L2AssetRouter,

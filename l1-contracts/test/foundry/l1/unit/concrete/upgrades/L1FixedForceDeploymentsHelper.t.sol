@@ -56,7 +56,7 @@ contract MockERC20TokenWithMetadata {
 contract MockERC20TokenWithoutMetadata {}
 
 contract L1FixedForceDeploymentsHelperTest is Test {
-    TestL1FixedForceDeploymentsHelper testGateway;
+    TestL1FixedForceDeploymentsHelper helper;
     // Mocks for dependencies
     address bridgehubMock;
     address sharedBridgeMock;
@@ -76,13 +76,13 @@ contract L1FixedForceDeploymentsHelperTest is Test {
         sharedBridgeMock = makeAddr("sharedBridgeMock");
         nativeTokenVaultMock = makeAddr("nativeTokenVaultMock");
 
-        testGateway = new TestL1FixedForceDeploymentsHelper();
+        helper = new TestL1FixedForceDeploymentsHelper();
 
         // Initialize ZKChainStorage
-        testGateway.setChainId(chainId);
-        testGateway.setBrideghub(bridgehubMock);
+        helper.setChainId(chainId);
+        helper.setBrideghub(bridgehubMock);
         // Set base token asset ID
-        testGateway.setBaseTokenAssetId(baseTokenAssetId);
+        helper.setBaseTokenAssetId(baseTokenAssetId);
 
         vm.mockCall(bridgehubMock, abi.encodeCall(IBridgehubBase.assetRouter, ()), abi.encode(sharedBridgeMock));
         vm.mockCall(
@@ -108,7 +108,7 @@ contract L1FixedForceDeploymentsHelperTest is Test {
         address _wrappedBaseTokenStore = address(0);
 
         // Call the function
-        bytes memory data = testGateway.requestGetZKChainSpecificForceDeploymentsData(
+        bytes memory data = helper.requestGetZKChainSpecificForceDeploymentsData(
             _wrappedBaseTokenStore,
             ETH_TOKEN_ADDRESS
         );
@@ -136,7 +136,7 @@ contract L1FixedForceDeploymentsHelperTest is Test {
         address _wrappedBaseTokenStore = address(0);
 
         // Call the function
-        bytes memory data = testGateway.requestGetZKChainSpecificForceDeploymentsData(
+        bytes memory data = helper.requestGetZKChainSpecificForceDeploymentsData(
             _wrappedBaseTokenStore,
             address(token)
         );
@@ -164,7 +164,7 @@ contract L1FixedForceDeploymentsHelperTest is Test {
         address _wrappedBaseTokenStore = address(0);
 
         // Call the function
-        bytes memory data = testGateway.requestGetZKChainSpecificForceDeploymentsData(
+        bytes memory data = helper.requestGetZKChainSpecificForceDeploymentsData(
             _wrappedBaseTokenStore,
             address(token)
         );

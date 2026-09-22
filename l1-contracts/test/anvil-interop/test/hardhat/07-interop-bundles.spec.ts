@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { BigNumber, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { getChainIdsByRole, getL2Chain, createProvider } from "../../src/core/utils";
+import { getEthBaseTokenInteropChainIds, getL2Chain, createProvider } from "../../src/core/utils";
 import { encodeNtvAssetId } from "../../src/core/data-encoding";
 import {
   getInteropRecipientAddress,
@@ -63,19 +63,19 @@ const ANVIL_INTEROP_PROTOCOL_FEE = BigNumber.from(ANVIL_INTEROP_PROTOCOL_FEE_WEI
 /**
  * 07 - Interop Bundles (sendBundle / executeBundle)
  *
- * Tests atomic bundle execution across GW-settled chains for direct base-token
+ * Tests atomic bundle execution across L1-settled L2 chains for direct base-token
  * calls, indirect ERC20 transfers, and mixed bundles. Also covers bundle-level
  * guardrails such as replay protection, executionAddress enforcement, zero-call
  * bundles, and msg.value validation.
  *
- * Topology: gwSettledChainIds[0] = source, gwSettledChainIds[1] = destination
+ * Topology: interopChainIds[0] = source, interopChainIds[1] = destination (ETH-base-token chains)
  */
-describe("07 - Interop Bundles (GW-settled chains)", function () {
+describe("07 - Interop Bundles (L1-settled chains)", function () {
   this.timeout(0);
 
   const runner = new DeploymentRunner();
   let state: ReturnType<typeof runner.loadState>;
-  let gwSettledChainIds: number[];
+  let interopChainIds: number[];
 
   // Chain providers
   let sourceChainId: number;
@@ -108,23 +108,18 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
       throw new Error("Deployment state incomplete. Run setup first.");
     }
 
-    gwSettledChainIds = getChainIdsByRole(state.chains.config, "gwSettled");
-    if (gwSettledChainIds.length < 2) {
-      throw new Error("Need at least 2 GW-settled chains for interop bundle tests");
+    interopChainIds = getEthBaseTokenInteropChainIds(state.chains.config);
+    if (interopChainIds.length < 2) {
+      throw new Error("Need at least 2 ETH-base-token L1-settled chains for interop bundle tests");
     }
 
-    sourceChainId = gwSettledChainIds[0];
-    destChainId = gwSettledChainIds[1];
+    sourceChainId = interopChainIds[0];
+    destChainId = interopChainIds[1];
 
     const sourceChain = getL2Chain(state.chains!, sourceChainId);
     const destChain = getL2Chain(state.chains!, destChainId);
     sourceProvider = createProvider(sourceChain.rpcUrl);
     destProvider = createProvider(destChain.rpcUrl);
-
-    const gatewayChainIds = getChainIdsByRole(state.chains.config, "gateway");
-    if (gatewayChainIds.length !== 1) {
-      throw new Error(`Expected exactly one gateway chain in interop state, got ${gatewayChainIds.length}`);
-    }
 
     if (isLiveInteropMode()) {
       if (!process.env.LIVE_L1_RPC?.trim()) {

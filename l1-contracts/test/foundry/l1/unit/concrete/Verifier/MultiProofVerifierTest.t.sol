@@ -21,7 +21,7 @@ import {
     ZiskVerificationFailed
 } from "contracts/common/L1ContractErrors.sol";
 
-import {DeployCTML1OrGateway} from "deploy-scripts/ctm/DeployCTML1OrGateway.sol";
+import {DeployCTMContracts} from "deploy-scripts/ctm/DeployCTMContracts.sol";
 
 /// @dev Mock verifier that always returns true.
 contract MockPassVerifier is IVerifier {
@@ -380,10 +380,10 @@ contract MultiProofVerifierTest is Test {
         );
         MultiProofTestnetVerifier testnetWrapper = new MultiProofTestnetVerifier(IVerifier(address(multiProof)));
 
-        (, address readPlonk) = DeployCTML1OrGateway.getSubVerifiers(address(multiProof));
+        (, address readPlonk) = DeployCTMContracts.getSubVerifiers(address(multiProof));
         assertEq(readPlonk, plonk, "plonk through MultiProofVerifier");
 
-        (, readPlonk) = DeployCTML1OrGateway.getSubVerifiers(address(testnetWrapper));
+        (, readPlonk) = DeployCTMContracts.getSubVerifiers(address(testnetWrapper));
         assertEq(readPlonk, plonk, "plonk through MultiProofTestnetVerifier");
     }
 

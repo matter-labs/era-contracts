@@ -33,11 +33,6 @@
         "internalType": "address"
       },
       {
-        "name": "legacyGatewayChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
         "name": "contracts",
         "type": "tuple",
         "internalType": "struct ContractsConfig",
@@ -744,7 +739,7 @@
   },
   {
     "type": "function",
-    "name": "preparePauseGatewayMigrationsCall",
+    "name": "preparePauseMigrationsCall",
     "inputs": [],
     "outputs": [
       {
@@ -864,7 +859,7 @@
   },
   {
     "type": "function",
-    "name": "prepareUnpauseGatewayMigrationsCall",
+    "name": "prepareUnpauseMigrationsCall",
     "inputs": [],
     "outputs": [
       {
