@@ -105,6 +105,9 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
     /// @param _data the data of the transaction
     // slither-disable-next-line locked-ether
     function bridgehubDeposit(
+        // Unused since `_registerCTMAssetOnL2Bridgehub` stopped taking it, but kept named:
+        // `IL1AssetHandler` fixes this signature and the name is part of the published ABI.
+        // solhint-disable-next-line no-unused-vars
         uint256 _chainId,
         address _originalCaller,
         uint256,
