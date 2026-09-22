@@ -74,17 +74,17 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     }
 
     /// @dev Returns the asset ID of ETH token for internal use.
-    function _ethTokenAssetId() internal view override returns (bytes32) {
+    function _getEthTokenAssetId() internal view override returns (bytes32) {
         return ETH_TOKEN_ASSET_ID;
     }
 
     /// @dev Returns the maximum number of ZK chains for internal use.
-    function _maxNumberOfZKChains() internal view override returns (uint256) {
+    function _getMaxNumberOfZKChains() internal view override returns (uint256) {
         return MAX_NUMBER_OF_ZK_CHAINS;
     }
 
     /// @dev Returns the L1 chain ID for internal use.
-    function _l1ChainId() internal view override returns (uint256) {
+    function _getL1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
     }
 
@@ -112,6 +112,8 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         uint256 _chainId,
         address _chainTypeManager,
         bytes32 _baseTokenAssetId,
+        // The parameter is intentionally kept named: it is part of the published ABI and is used
+        // by Solidity callers with named arguments. This keeps solc's unused-parameter warning.
         // solhint-disable-next-line no-unused-vars
         uint256 _salt,
         address _admin,

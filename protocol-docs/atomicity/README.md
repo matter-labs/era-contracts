@@ -118,7 +118,7 @@ dependency roots; the genesis batch leaf is seeded by `MessageRootBase.seedGenes
 
 No further wiring is needed — every collaborator is referenced by its canonical fixed address: the
 tree's appender and the manager's tree / interop center / interop handler are constant getters, and the
-asset router recognises the manager via `_atomicFlowManagerAddr()`. For recovery the manager calls
+asset router recognises the manager via `_getAtomicFlowManagerAddr()`. For recovery the manager calls
 `IAtomicRecoverable.recoverAtomicCall` on a bundle call's **local sender** (`InteropCall.from`), and only
 when that sender is the canonical L2 asset router (`from == L2_ASSET_ROUTER_ADDR`) — the interface is not
 dispatched generically, and not to the call's target. Send-time validation makes the asset router the

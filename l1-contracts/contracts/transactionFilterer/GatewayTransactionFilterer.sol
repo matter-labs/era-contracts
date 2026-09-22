@@ -133,8 +133,8 @@ contract GatewayTransactionFilterer is ITransactionFilterer, Ownable2StepUpgrade
             bytes4 l2TxSelector = bytes4(l2Calldata[:4]);
 
             if (IL2AssetRouter.setAssetHandlerAddress.selector == l2TxSelector) {
-                (, bytes32 decodedAssetId, ) = abi.decode(l2Calldata[4:], (uint256, bytes32, address));
-                return _checkCTMAssetId(decodedAssetId);
+                (, bytes32 assetHandlerAssetId, ) = abi.decode(l2Calldata[4:], (uint256, bytes32, address));
+                return _checkCTMAssetId(assetHandlerAssetId);
             }
 
             if (AssetRouterBase.finalizeDeposit.selector != l2TxSelector) {

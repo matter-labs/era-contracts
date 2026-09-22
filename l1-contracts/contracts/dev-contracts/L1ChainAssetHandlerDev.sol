@@ -26,7 +26,7 @@ contract L1ChainAssetHandlerDev is L1ChainAssetHandler {
 
     /// @dev Re-enables chain migrations (disabled in production via `CHAIN_MIGRATIONS_ENABLED` in
     /// `Config.sol`) so tests keep exercising the migration machinery.
-    function _chainMigrationsEnabled() internal view override returns (bool) {
+    function _getChainMigrationsEnabled() internal view override returns (bool) {
         return true;
     }
 

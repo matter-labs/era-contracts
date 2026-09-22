@@ -10,10 +10,12 @@ import {ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 
 /// @notice Default L2 upgrade strategy for ZKsync OS chains.
 abstract contract DefaultL2UpgradeStrategy is CTMUpgradeBase {
-    function getUniversalForceDeployments(
-        uint256 _l1ChainId,
-        address _ownerAddress
-    ) internal virtual override returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments) {
+    function getUniversalForceDeployments()
+        internal
+        virtual
+        override
+        returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments)
+    {
         return
             SystemContractsProcessing.mergeUniversalForceDeployments(
                 SystemContractsProcessing.getBaseForceDeployments(),
@@ -29,7 +31,7 @@ abstract contract DefaultL2UpgradeStrategy is CTMUpgradeBase {
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments,
         address _delegateTo,
         bytes memory _upgradeCalldata
-    ) internal view returns (address, bytes memory) {
+    ) internal pure returns (address, bytes memory) {
         bytes memory complexUpgraderCalldata = abi.encodeCall(
             IComplexUpgrader.forceDeployAndUpgradeUniversal,
             (_deployments, _delegateTo, _upgradeCalldata)

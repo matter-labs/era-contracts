@@ -334,7 +334,7 @@ library Utils {
     /// @param salt The salt value.
     /// @param initCode The initialization code (bytecode + constructor args).
     /// @return The computed CREATE2 address.
-    function getL2AddressViaDeterministicCreate2(bytes32 salt, bytes memory initCode) internal view returns (address) {
+    function getL2AddressViaDeterministicCreate2(bytes32 salt, bytes memory initCode) internal pure returns (address) {
         return vm.computeCreate2Address(salt, keccak256(initCode), DETERMINISTIC_CREATE2_ADDRESS);
     }
 
@@ -494,9 +494,7 @@ library Utils {
 
         vm.broadcast(getBroadcasterAddress());
         vm.recordLogs();
-        bytes32 canonicalTxHash = bridgehub.requestL2TransactionDirect{value: requiredValueToDeploy}(
-            l2TransactionRequestDirect
-        );
+        bridgehub.requestL2TransactionDirect{value: requiredValueToDeploy}(l2TransactionRequestDirect);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed succeassfully! Extracting logs...");
 
@@ -1101,9 +1099,6 @@ library Utils {
         uint256 _value,
         uint256 _delay
     ) internal {
-        IGovernance governance = IGovernance(_governor);
-        IOwnable ownable = IOwnable(_governor);
-
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: _target, value: _value, data: _data});
 
@@ -1227,7 +1222,7 @@ library Utils {
         Vm.Wallet memory _governorWallet,
         IProtocolUpgradeHandler.Call[] memory _calls,
         bytes32 _salt
-    ) internal returns (bytes memory) {
+    ) internal {
         bytes32 upgradeId;
         bytes32 emergencyUpgradeBoardDigest;
         {
@@ -1474,7 +1469,7 @@ library Utils {
     string private constant GENESIS_FILENAME_ZKOS = "zksync-os/latest.json";
 
     /// @notice Absolute path to the ZKsync OS genesis / chain-creation JSON under `configs/genesis/`.
-    function genesisConfigPath() internal returns (string memory) {
+    function genesisConfigPath() internal view returns (string memory) {
         return string.concat(vm.projectRoot(), "/../configs/genesis/", GENESIS_FILENAME_ZKOS);
     }
 
