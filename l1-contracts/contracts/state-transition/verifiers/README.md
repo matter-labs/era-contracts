@@ -42,7 +42,7 @@ The current `rootCVadcopFinal` and the committed Plonk verification key match
 ZiSK [v1.3.0-alpha](https://github.com/0xPolygonHermez/zisk/releases/tag/v1.3.0-alpha)
 (`zisk-contracts/` at the tag). The program VK pins are the 1.3.0-alpha
 `cargo-zisk setup` values of the zksync-os-zisk guests, derived in
-[rotation run 35695453171](https://github.com/matter-labs/zksync-os-zisk/actions/runs/35695453171).
+[rotation runs 35695453171](https://github.com/matter-labs/zksync-os-zisk/actions/runs/35695453171) (aggregator) and [35702731860](https://github.com/matter-labs/zksync-os-zisk/actions/runs/35702731860) (inner, after the guest moved its state commitment to the blake2sf precompile).
 The real-proof fixtures were generated with the 1.2.0-alpha setup in
 [GPU run 34199276557](https://github.com/matter-labs/zksync-os-zisk/actions/runs/34199276557)
 and do not verify against the 1.3.0-alpha key.

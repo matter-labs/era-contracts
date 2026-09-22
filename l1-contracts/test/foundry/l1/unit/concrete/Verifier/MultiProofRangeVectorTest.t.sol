@@ -47,7 +47,7 @@ contract ExpectSignalPlonkVerifier is IZiskSnarkPlonkVerifier {
 contract MultiProofRangeVectorTest is Test {
     /// @dev Inner state-transition guest programVK: the first field of the
     ///      binding digest. It is NOT the aggregated proof's wire [0..32].
-    bytes32 internal constant INNER_PROGRAM_VK = 0xdfe920be07422c4556572b698c9db9e98e882f0c7d9eea85af50f8011807a43b;
+    bytes32 internal constant INNER_PROGRAM_VK = 0xf0f04fcce9192b6adad51ac756798e69ad9902537124af091fbc0de6075a6820;
     /// @dev Aggregator guest programVK: the aggregated proof's wire
     ///      public-values bytes [0..32].
     bytes32 internal constant AGGREGATOR_PROGRAM_VK =
@@ -70,7 +70,7 @@ contract MultiProofRangeVectorTest is Test {
     /// @dev keccak256(INNER_PROGRAM_VK || ROOT_C_VADCOP_FINAL || CHAINED_PI):
     ///      the aggregated proof carries it across the first eight guest-public
     ///      slots, public-values bytes [32..96].
-    bytes32 internal constant DIGEST = 0xca7ebc2fd1a8e1450f0094f8d0b6347827b820f86303f4b485004dce82fb38bf;
+    bytes32 internal constant DIGEST = 0x519f1449ebefb30f2778bb9a4c544485e8787399d695679daac3a272e8b2a43d;
 
     /// @dev BN254 scalar field modulus (must equal ZiskVerifier._RFIELD).
     uint256 internal constant RFIELD = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
