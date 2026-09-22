@@ -123,7 +123,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
         }
         (address _ctmL1Address, address _ctmL2Address) = abi.decode(_data[1:], (address, address));
 
-        request = _registerCTMAssetOnL2Bridgehub(_chainId, _ctmL1Address, _ctmL2Address);
+        request = _registerCTMAssetOnL2Bridgehub(_ctmL1Address, _ctmL2Address);
     }
 
     /// @notice The function called by the Bridgehub after the L2 transaction has been initiated.
@@ -153,9 +153,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
     }
 
     /// @notice Used to register the ctm asset in L2 Bridgehub.
-    /// @dev The first parameter is the (currently unused) chainId of the chain.
     function _registerCTMAssetOnL2Bridgehub(
-        uint256 /* _chainId */,
         address _ctmL1Address,
         address _ctmL2Address
     ) internal pure returns (L2TransactionRequestTwoBridgesInner memory request) {

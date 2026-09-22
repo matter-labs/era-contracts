@@ -551,13 +551,12 @@ library GatewayCTMDeployerHelper {
         );
 
         {
-            bytes memory proxyConstructorArgs = _buildCTMProxyConstructorArgs(
-                config,
-                baseConfig,
-                result.chainTypeManagerImplementation,
-                result.serverNotifierProxy,
-                deployerAddr
-            );
+            bytes memory proxyConstructorArgs = _buildCTMProxyConstructorArgs({
+                config: config,
+                baseConfig: baseConfig,
+                ctmImplementation: result.chainTypeManagerImplementation,
+                serverNotifierProxy: result.serverNotifierProxy
+            });
             result.diamondCutData = _buildDiamondCutDataEncoded(config.facets, baseConfig);
             result.chainTypeManagerProxy = _deployInternalWithParams(
                 "TransparentUpgradeableProxy",
@@ -621,8 +620,7 @@ library GatewayCTMDeployerHelper {
         GatewayCTMFinalConfig memory config,
         GatewayCTMDeployerConfig memory baseConfig,
         address ctmImplementation,
-        address serverNotifierProxy,
-        address /* temporaryOwner */
+        address serverNotifierProxy
     ) private pure returns (bytes memory) {
         Diamond.DiamondCutData memory diamondCut = abi.decode(
             _buildDiamondCutDataEncoded(config.facets, baseConfig),
