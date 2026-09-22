@@ -39,10 +39,11 @@ and regenerate the contract.
 a rotation of any pin rotates the hash.
 
 The current `rootCVadcopFinal` and the committed Plonk verification key match
-ZiSK 1.3.0-alpha (upstream branch `pre-develop-1.3.0-alpha`, `zisk-contracts/`).
-The program VK pins still match [guest prerelease 0.0.6-rc1](https://github.com/matter-labs/zksync-os-zisk/releases/tag/0.0.6-rc1),
-built with ZiSK 1.2.0-alpha, until the 1.3.0-alpha `cargo-zisk setup` publishes
-the new ones. The real-proof fixtures were generated with the 1.2.0-alpha setup in
+ZiSK [v1.3.0-alpha](https://github.com/0xPolygonHermez/zisk/releases/tag/v1.3.0-alpha)
+(`zisk-contracts/` at the tag). The program VK pins are the 1.3.0-alpha
+`cargo-zisk setup` values of the zksync-os-zisk guests, derived in
+[rotation run 35695453171](https://github.com/matter-labs/zksync-os-zisk/actions/runs/35695453171).
+The real-proof fixtures were generated with the 1.2.0-alpha setup in
 [GPU run 34199276557](https://github.com/matter-labs/zksync-os-zisk/actions/runs/34199276557)
 and do not verify against the 1.3.0-alpha key.
 

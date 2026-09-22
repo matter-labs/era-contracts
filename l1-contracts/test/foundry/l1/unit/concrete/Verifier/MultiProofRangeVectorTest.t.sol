@@ -42,16 +42,16 @@ contract ExpectSignalPlonkVerifier is IZiskSnarkPlonkVerifier {
 
 /// @notice Range reconstruction with the regenerated ZiSK 1.3.0-alpha pins.
 /// @dev Shares the four batch commitments with ZiskVerifierRealProofTest. DIGEST
-///      follows the 1.3.0-alpha vadcop-final root by formula until a 1.3.0-alpha
-///      GPU session re-anchors the real-proof fixtures.
+///      follows the 1.3.0-alpha pins (program VKs and vadcop-final root) by
+///      formula until a 1.3.0-alpha GPU session re-anchors the real-proof fixtures.
 contract MultiProofRangeVectorTest is Test {
     /// @dev Inner state-transition guest programVK: the first field of the
     ///      binding digest. It is NOT the aggregated proof's wire [0..32].
-    bytes32 internal constant INNER_PROGRAM_VK = 0x189d6b11c50ef1db9885fed376479ed97dde719a59574a7946d8d612e25da97a;
+    bytes32 internal constant INNER_PROGRAM_VK = 0xdfe920be07422c4556572b698c9db9e98e882f0c7d9eea85af50f8011807a43b;
     /// @dev Aggregator guest programVK: the aggregated proof's wire
     ///      public-values bytes [0..32].
     bytes32 internal constant AGGREGATOR_PROGRAM_VK =
-        0x10f0e91f54ad66e4e95713a1b4b9fda44ea3b06e51ed3430ef775ba8bef4a7c8;
+        0x27e68756ce585201b839f16f08d58eab314871d3f7fad020b41061570c7bcf2a;
     /// @dev Vadcop-final root: the second field of the binding digest, and
     ///      wire public-values bytes [544..576].
     bytes32 internal constant ROOT_C_VADCOP_FINAL = 0x05006517b6ccde5da4d890587ba62845b5af8a307c00e87d4b9d05099b16dc80;
@@ -70,7 +70,7 @@ contract MultiProofRangeVectorTest is Test {
     /// @dev keccak256(INNER_PROGRAM_VK || ROOT_C_VADCOP_FINAL || CHAINED_PI):
     ///      the aggregated proof carries it across the first eight guest-public
     ///      slots, public-values bytes [32..96].
-    bytes32 internal constant DIGEST = 0xb1ac06daa74f5e69c8a46772f392aab1ae1db40d39258dab999f3624125422ce;
+    bytes32 internal constant DIGEST = 0xca7ebc2fd1a8e1450f0094f8d0b6347827b820f86303f4b485004dce82fb38bf;
 
     /// @dev BN254 scalar field modulus (must equal ZiskVerifier._RFIELD).
     uint256 internal constant RFIELD = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
