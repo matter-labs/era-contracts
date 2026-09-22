@@ -119,10 +119,7 @@ Whenever anyone wants to do a non-zero value call, they need to call `MsgValueSi
 - Pass `value` and whether the call should be marked with `isSystem` in the first extra abi params.
 - Pass the address of the callee in the second extraAbiParam.
 
-More information on the extraAbiParams can be read
-[here](../../../guides/advanced/12_alternative_vm_intro.md#flags-for-calls).
-<<<<<<<< HEAD:docs/src/specs/contracts/l2_system_contracts/system_contracts.md
-========
+The extra ABI parameters are encoded by `SystemContractsCaller` and interpreted by the VM as call flags.
 
 ## Support for `.send/.transfer`
 
@@ -146,7 +143,6 @@ The system does not guarantee the following:
 - That callees with bytecode size larger than `100000` will work. Note, that a malicious operator can fail any call to a callee with large bytecode even if it has been decommitted before.
 
 As a conclusion, using `.send/.transfer` should be generally avoided, but when avoiding is not possible it should be used with small callees, e.g. EOAs, which implement `DefaultAccount`.
->>>>>>>> 255f6e8866a4ba25376eed9a57421d0f29bb2ee8:docs/src/specs/contracts/zkevm/system_contracts.md
 
 ## KnownCodeStorage
 
@@ -154,8 +150,8 @@ This contract is used to store whether a certain code hash is “known”, i.e.�
 the L2 stores the contract’s code _hashes_ and not the codes themselves. Therefore, it must be part of the protocol to
 ensure that no contract with unknown bytecode (i.e. hash with an unknown preimage) is ever deployed.
 
-The factory dependencies field provided by the user for each transaction contains the list of the contract’s bytecode
-hashes to be marked as known. We can not simply trust the operator to “know” these bytecodehashes as the operator might
+The factory-dependencies field provided by the user contains bytecodes whose hashes may be marked as
+[valid](https://github.com/matter-labs/era-contracts/blob/main/system-contracts/contracts/KnownCodesStorage.sol). We cannot simply trust the operator to know their preimages, because it might
 be malicious and hide the preimage. We ensure the availability of the bytecode in the following way:
 
 - If the transaction comes from L1, i.e. all its factory dependencies have already been published on L1, we can simply
@@ -168,8 +164,8 @@ be malicious and hide the preimage. We ensure the availability of the bytecode i
 It is the responsibility of the [ContractDeployer](#contractdeployer--immutablesimulator) system contract to deploy only
 those code hashes that are known.
 
-The KnownCodesStorage contract is also responsible for ensuring that all the “known” bytecode hashes are also
-[valid](../../../guides/advanced/12_alternative_vm_intro.md#bytecode-validity).
+`KnownCodesStorage` also rejects bytecode hashes that do not satisfy the EraVM bytecode-length and
+version-marker validity rules.
 
 ## ContractDeployer & ImmutableSimulator
 
@@ -227,14 +223,8 @@ returned by the constructor.
 On Ethereum, the constructor is only part of the initCode that gets executed during the deployment of the contract and
 returns the deployment code of the contract. On ZKsync, there is no separation between deployed code and constructor
 code. The constructor is always a part of the deployment code of the contract. In order to protect it from being called,
-<<<<<<<< HEAD:docs/src/specs/contracts/l2_system_contracts/system_contracts.md
-the compiler-generated contracts invoke constructor only if the `isConstructor` flag provided (it is only available for
-the system contracts). You can read more about flags
-========
 the compiler-generated contracts invoke the constructor only if the `isConstructor` flag is provided (it is only
-available for the system contracts). You can read more about flags
->>>>>>>> 255f6e8866a4ba25376eed9a57421d0f29bb2ee8:docs/src/specs/contracts/zkevm/system_contracts.md
-[here](../../../guides/advanced/12_alternative_vm_intro.md#flags-for-calls).
+available for system contracts).
 
 After execution, the constructor must return an array of:
 
@@ -255,12 +245,7 @@ address.
 
 Whenever a contract needs to access a value of some immutable, they call the
 `ImmutableSimulator.getImmutable(getCodeAddress(), index)`. Note that on ZKsync it is possible to get the current
-<<<<<<<< HEAD:docs/src/specs/contracts/l2_system_contracts/system_contracts.md
-execution address you can read more about `getCodeAddress()`
-========
-execution address. You can read more about `getCodeAddress()`
->>>>>>>> 255f6e8866a4ba25376eed9a57421d0f29bb2ee8:docs/src/specs/contracts/zkevm/system_contracts.md
-[here](../../../guides/advanced/12_alternative_vm_intro.md#zkevm-specific-opcodes).
+execution address through the VM-specific `getCodeAddress()` operation exposed by `SystemContractHelper`.
 
 ### **Return value of the deployment methods**
 
@@ -306,8 +291,8 @@ why there are two ways to set a certain nonce as “used”:
 
 - By incrementing the `minNonce` for the account (thus making all nonces that are lower than `minNonce` as used).
 - By setting some non-zero value under the nonce via `setValueUnderNonce`. This way, this key will be marked as used and
-will no longer be allowed to be used as a nonce for accounts. This way it is also rather efficient, since these 32
-bytes could be used to store some valuable information.
+  will no longer be allowed to be used as a nonce for accounts. This way it is also rather efficient, since these 32
+  bytes could be used to store some valuable information.
 
 The accounts, upon creation, can also specify which type of nonce ordering they want: Sequential (i.e. it should be
 expected that the nonces grow one by one, just like EOA) or Arbitrary, where the nonces may have any values. This ordering
@@ -331,7 +316,8 @@ compress the published pubdata in several ways:
 - We compress state diffs.
 
 This contract contains utility methods that are used to verify the correctness of either bytecode or state diff
-compression. You can read more on how we compress [state diffs](../settlement_contracts/data_availability/compression.md) and [bytecodes](../../../guides/advanced/11_compression.md).
+compression. See [state-diff compression](../settlement_contracts/data_availability/compression.md); bytecode compression is implemented by `Compressor` and the bootloader publication flow.
+
 ### Pubdata Chunk Publisher
 
 This contract is responsible for separating pubdata into chunks that each fit into a [4844 blob](../settlement_contracts/data_availability/rollup_da.md) and calculating the hash of the preimage of said blob. If a chunk's size is less than the total number of bytes for a blob, we pad it on the right with zeroes, since the circuits require the chunk to be of the exact size.
@@ -347,9 +333,9 @@ It works as follows:
 1. It accepts a versioned hash and double checks that it is marked as “known”, i.e. the operator must know the preimage for such hash.
 2. After that, it uses the `decommit` opcode, which accepts the versioned hash and the number of ergs to spend, which is proportional to the length of the preimage. If the preimage has been decommitted before, the requested cost will be refunded to the user.
 
- Note, that the decommitment process does not only happen using the `decommit` opcode, but during calls to contracts. Whenever a contract is called, its code is decommitted into a memory page dedicated to contract code. We never decommit the same preimage twice, regardless of whether it was decommitted via an explicit opcode or during a call to another contract, the previous unpacked bytecode memory page will be reused. When executing `decommit` inside the `CodeOracle` contract, the user will be first precharged with the maximum possible cost and then it will be refunded in case the bytecode has been decommitted before.
+Note, that the decommitment process does not only happen using the `decommit` opcode, but during calls to contracts. Whenever a contract is called, its code is decommitted into a memory page dedicated to contract code. We never decommit the same preimage twice, regardless of whether it was decommitted via an explicit opcode or during a call to another contract, the previous unpacked bytecode memory page will be reused. When executing `decommit` inside the `CodeOracle` contract, the user will be first precharged with the maximum possible cost and then it will be refunded in case the bytecode has been decommitted before.
 
-3. The `decommit` opcode returns a slice of the decommitted bytecode. Note, that the returned pointer always has length of 2^21 bytes, regardless of the length of the actual bytecode. So it is the job of the `CodeOracle` system contract to shrink the length of the returned data.
+1. The `decommit` opcode returns a slice of the decommitted bytecode. Note, that the returned pointer always has length of 2^21 bytes, regardless of the length of the actual bytecode. So it is the job of the `CodeOracle` system contract to shrink the length of the returned data.
 
 ### P256Verify
 
@@ -367,7 +353,7 @@ Usually an upgrade is performed by calling the `forceDeployOnAddresses` function
 
 For cases like this `ComplexUpgrader` contract has been created. The assumption is that the implementation of the upgrade is predeployed and the `ComplexUpgrader` will delegatecall to it.
 
-> Note, that while `ComplexUpgrader` existed even in the previous upgrade, it lacked the `forceDeployAndUpgrade` function. This caused some serious limitations. You can read more about how the gateway upgrade process will work [here](../../upgrade_history/gateway_upgrade/upgrade_process_no_gateway_chain.md).
+`ComplexUpgrader.forceDeployAndUpgrade` supports versioned force deployments used by L2 protocol upgrades.
 
 ### Create2Factory
 
@@ -404,4 +390,4 @@ term.
   [document](./zksync_fee_model.md)
   on the fee model.
 - We may add some kind of default implementation for the contracts in the kernel space (i.e. if called, they wouldn’t
-revert but behave like an EOA).
+  revert but behave like an EOA).

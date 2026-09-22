@@ -6,11 +6,17 @@ restating them (see the "Documentation and Comments" section of `AGENTS.md`).
 
 | Document                                   | Covers                                                                                                                                                                              |
 | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [interop.md](./interop.md)                 | Interop bundles and calls, ERC-7786/ERC-7930 usage, attributes, fee model, send flow, destination-side execution/unbundling, interop-root import, restrictions                      |
+| [system/](./system/README.md)              | Complete contracts architecture: system map, trust boundaries, Bridgehub and chain management, settlement, DA, bridges, Gateway status, consensus, and execution environments       |
+| [interop.md](./interop.md)                 | Canonical interop protocol: bundles and calls, ERC-7786/ERC-7930 usage, attributes, fees, send flow, handlers, interop-root import, and restrictions                                |
+| [interop/](./interop/README.md)            | Complete contract architecture, supported finality forms, source-page porting map, and message/asset/multi-leg examples                                                             |
 | [atomicity/](./atomicity/README.md)        | Atomic multi-leg interop flows (folder): the commitment tree, the send/finalize/timeout lifecycle, the finality & timeout proofs, refund/recovery semantics, and the security model |
 | [bridging.md](./bridging.md)               | Asset router, native token vault, L2 asset tracker, L1 nullifier, base-token handling, failed-transfer recovery, legacy compatibility                                               |
 | [message-root.md](./message-root.md)       | Message-root aggregation, chain batch root tree, batch-leaf timestamps, the Indexed Merkle Tree, interop-root import double-check, proof paths                                      |
-| [chain-lifecycle.md](./chain-lifecycle.md) | Chain creation and genesis seeding, interop registration gating, the v32 chain-migrations ban, ZKsync OS genesis force deployments                                                  |
+| [chain-lifecycle.md](./chain-lifecycle.md) | Chain creation and genesis seeding, interop registration gating, the current chain-migrations ban, ZKsync OS genesis force deployments                                              |
+
+Start with [the system architecture](./system/README.md) when reading the protocol as a
+whole. The other top-level documents are the normative descriptions of individual flows and are
+linked from that map.
 
 The `atomicity/` folder is split into a layered set of pages (start at its README):
 

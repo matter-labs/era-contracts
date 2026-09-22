@@ -2,7 +2,7 @@
 
 ## Glossary
 
-- **Batch** – a set of transactions that the bootloader processes (`commitBatches`, `proveBatches`, and `executeBatches` work on it). A batch consists of multiple transactions.  
+- **Batch** – a set of transactions that the bootloader processes (`commitBatches`, `proveBatches`, and `executeBatches` work on it). A batch consists of multiple transactions.
 - **L2 blocks** – non-intersecting subsets of consecutively executed transactions in a batch. This is the kind of block you see in the API and the one used for `block.number`/`block.timestamp`/etc.
 
 > Note that sometimes in code you can see the notion of “virtual blocks.” In the past, we returned batch information for `block.number`/`block.timestamp`. However, due to DevEx issues, we decided to move to returning these values for L2 blocks. Virtual blocks were used during migration but are not used anymore. You should consider that there is one virtual block per L2 block and it has exactly the same properties.
@@ -15,9 +15,9 @@ L2 blocks were created for fast soft confirmation in wallets and block explorers
 
 In order to get the returned value for `block.number`, `block.timestamp`, `blockhash`, our compiler used the following functions:
 
-- `getBlockNumber`  
-- `getBlockTimestamp`  
-- `getBlockHashEVM`  
+- `getBlockNumber`
+- `getBlockTimestamp`
+- `getBlockHashEVM`
 
 These return values for L2 blocks.
 
@@ -37,10 +37,10 @@ The `SystemContext` can immediately check whether the provided number is the cor
 
 Before each transaction, we call the `setL2Block` [method](https://github.com/matter-labs/era-contracts/blob/b43cf6b3b069c85aec3cd61d33dd3ae2c462c896/system-contracts/bootloader/bootloader.yul#L2884). Here, we provide data about the L2 block that the transaction belongs to:
 
-- `_l2BlockNumber` – the number of the new L2 block.  
-- `_l2BlockTimestamp` – the timestamp of the new L2 block.  
-- `_expectedPrevL2BlockHash` – the expected hash of the previous L2 block.  
-- `_isFirstInBatch` – whether this method is called for the first time in the batch.  
+- `_l2BlockNumber` – the number of the new L2 block.
+- `_l2BlockTimestamp` – the timestamp of the new L2 block.
+- `_expectedPrevL2BlockHash` – the expected hash of the previous L2 block.
+- `_isFirstInBatch` – whether this method is called for the first time in the batch.
 - `_maxVirtualBlocksToCreate` – the maximum number of virtual blocks to create with this L2 block. This is a legacy field that is always either 0 or 1.
 
 If two transactions belong to the same L2 block, only the first one may have a non-zero `_maxVirtualBlocksToCreate`. The rest of the data must be the same.
@@ -49,12 +49,12 @@ The `setL2Block` [performs](https://github.com/matter-labs/era-contracts/blob/b4
 
 #### L2 blockhash calculation and storage
 
-Unlike the L1 batch’s hash, L2 block hashes can be checked on-chain. The hash of an L2 block is computed as:  
+Unlike the L1 batch’s hash, L2 block hashes can be checked on-chain. The hash of an L2 block is computed as:
 
 The hash of an L2 block is `keccak256(abi.encode(_blockNumber, _blockTimestamp, _prevL2BlockHash, _blockTxsRollingHash))`. Where `_blockTxsRollingHash` is defined in the following way:
 
-- `_blockTxsRollingHash = 0` for an empty block.  
-- `_blockTxsRollingHash = keccak256(abi.encodePacked(0, tx1_hash))` for a block with one transaction.  
+- `_blockTxsRollingHash = 0` for an empty block.
+- `_blockTxsRollingHash = keccak256(abi.encodePacked(0, tx1_hash))` for a block with one transaction.
 - `_blockTxsRollingHash = keccak256(abi.encodePacked(keccak256(abi.encodePacked(0, tx1_hash)), tx2_hash))` for a block with two transactions, etc.
 
 To add a transaction hash to the current miniblock, we use the `appendTransactionToCurrentL2Block` function of the `SystemContext` contract.
@@ -65,7 +65,7 @@ We store only the last 257 blocks because the EVM requires only 256 previous has
 
 #### Legacy blockhash
 
-For L2 blocks that were created before we switched to the formulas above, we use the following formula for their hash:  
+For L2 blocks that were created before we switched to the formulas above, we use the following formula for their hash:
 
 `keccak256(abi.encodePacked(uint32(_blockNumber)))`
 
@@ -75,10 +75,10 @@ These are only very old blocks on ZKsync Era; other ZK chains do not have such b
 
 While the timestamp of each L2 block is provided by the operator, the system preserves these timing invariants:
 
-- For each L2 block, its timestamp should be greater than the timestamp of the previous L2 block.  
-- For each L2 block, its timestamp should be ≥ the timestamp of the batch it belongs to.  
-- Each batch must start with a new L2 block (i.e. an L2 block cannot span across batches).  
-- The timestamp of a batch must be ≥ the timestamp of the latest L2 block from the previous batch.  
+- For each L2 block, its timestamp should be greater than the timestamp of the previous L2 block.
+- For each L2 block, its timestamp should be ≥ the timestamp of the batch it belongs to.
+- Each batch must start with a new L2 block (i.e. an L2 block cannot span across batches).
+- The timestamp of a batch must be ≥ the timestamp of the latest L2 block from the previous batch.
 - The timestamp of the last miniblock in a batch cannot go too far into the future. This is enforced by publishing an L2→L1 log with the timestamp, which is then checked on L1.
 
 ### Fictive L2 block & finalizing the batch
@@ -93,7 +93,7 @@ Also, at the end of a batch, we send both the batch timestamp and the timestamp 
 
 In the past, we had to apply different formulas based on whether the migration from batch environment info to L2 block info had finished. You can find these checks [here](https://github.com/matter-labs/era-contracts/blob/b43cf6b3b069c85aec3cd61d33dd3ae2c462c896/system-contracts/contracts/SystemContext.sol#L137). But note that the migration ended quite some time ago, so only two cases remain:
 
-- When the block is out of the readable range.  
+- When the block is out of the readable range.
 - When it is a normal L2 block, and its hash must be used.
 
 The only edge case is when we ask for a miniblock block number for which the base hash is returned. This edge case will be removed in future releases.

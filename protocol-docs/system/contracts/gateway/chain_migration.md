@@ -1,5 +1,9 @@
 # Chain migration
 
+> **Release status:** this page describes retained settlement-layer machinery. New migrations are
+> disabled by `CHAIN_MIGRATIONS_ENABLED = false`. See
+> {protocol-docs/chain-lifecycle.md#settlement-layer-migration-chainassethandler} for current behavior.
+
 ## Ecosystem Setup
 
 Chain migration reuses lots of logic from standard custom asset bridging which is enabled by the AssetRouter. The easiest way to imagine is that ZKChains are NFTs that are being migrated from one chain to another. Just like in case of the NFT contract, an CTM is assumed to have an `assetId := keccak256(abi.encode(L1_CHAIN_ID, address(ctmDeployer), bytes32(uint256(uint160(_ctmAddress)))))`. I.e. these are all assets with ADT = ctmDeployer contract on L1.
@@ -81,13 +85,15 @@ Current constants set both start windows to `0`, so both conditions are immediat
 Since Stage 1 is not yet supported for chains that settle on top of Gateway, in this release the delay before pausing deposits is 0. However, the code should be ready to be able to jump bump those constants in one of the future releases.
 
 Additionally, there is a risk that the chain admin may abuse this functionality by disabling deposits to prevent users from executing any deposits, while actually not even trying to migrate to ZK Gateway. It is a known issue and will be resolved in one of the future upgrades. Right now it is considered acceptable, since:
+
 - A malicious chain admin can set `transactionFilterer` that would achieve the same goal anyway.
-- This functionality (as well as the `transactionFilterer` one) is disabled for chains that aim to support Stage 1, i.e. `s.priorityModeInfo.canBeActivated = true`. 
+- This functionality (as well as the `transactionFilterer` one) is disabled for chains that aim to support Stage 1, i.e. `s.priorityModeInfo.canBeActivated = true`.
 
 ### Conclusion
 
 If a chain uses our DiamondProxy implementation, then it is enforced that when the chain starts its migration to L1:
-- The deposits have been paused + no priority transactions are left unprocessed. 
+
+- The deposits have been paused + no priority transactions are left unprocessed.
 - The only way to enable those back is to provide the proof that the migration has either succeeded or failed.
 
 When it migrates back from GW similarly we enforce that the deposits have been paused + no priority transactions are left unprocessed. It is assumed that GW->L1 migration never fails and so the only way the deposits will be enabled is after the chain completes its migration to L1.

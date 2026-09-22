@@ -526,12 +526,12 @@ Note, that unlike EVM any unused gas from such calls will be refunded.
 The system preserves the following guarantees about `.send/.transfer`:
 
 - No more than `2300` gas will be received by the callee. Note, [that a smaller, but a close amount](https://github.com/matter-labs/era-contracts/blob/b43cf6b3b069c85aec3cd61d33dd3ae2c462c896/system-contracts/contracts/test-contracts/TransferTest.sol#L33) may be passed.
-- It is not possible to do any storage changes within this stipend. This is enforced by having cold write cost more than `2300` gas. Also, cold write cost always has to be prepaid whenever executing storage writes. More on it can be read [here](../l2_system_contracts/zksync_fee_model.md#io-pricing).
+- It is not possible to do any storage changes within this stipend. This is enforced by having cold write cost more than `2300` gas. Also, cold write cost always has to be prepaid whenever executing storage writes. See [I/O pricing](./zksync_fee_model.md#io-pricing).
 - Any callee with bytecode size of up to `100000` will work.
 
 The system does not guarantee the following:
 
-- That callees with bytecode size larger than `100000` will work. Note, that a malicious operator can fail any call to a callee with large bytecode even if it has been decommitted before. More on it can be read [here](../l2_system_contracts/zksync_fee_model.md#io-pricing).
+- That callees with bytecode size larger than `100000` will work. A malicious operator can fail any call to a callee with large bytecode even if it has been decommitted before. See [I/O pricing](./zksync_fee_model.md#io-pricing).
 
 As a conclusion, using `.send/.transfer` should be generally avoided, but when avoiding is not possible it should be used with small callees, e.g. EOAs, which implement [DefaultAccount](https://github.com/matter-labs/era-contracts/blob/b43cf6b3b069c85aec3cd61d33dd3ae2c462c896/system-contracts/contracts/DefaultAccount.sol).
 
@@ -688,7 +688,7 @@ Usually an upgrade is performed by calling the `forceDeployOnAddresses` function
 
 For cases like this `ComplexUpgrader` contract has been created. The assumption is that the implementation of the upgrade is predeployed and the `ComplexUpgrader` would delegatecall to it.
 
-> Note, that while `ComplexUpgrader` existed even in the previous upgrade, it lacked `forceDeployAndUpgrade` function. This caused some serious limitations. More on how the gateway upgrade process will look like can be read [here](../../upgrade_history/gateway_upgrade/upgrade_process_no_gateway_chain.md).
+`ComplexUpgrader.forceDeployAndUpgrade` supports versioned force deployments used by L2 protocol upgrades.
 
 ### Predeployed contracts
 

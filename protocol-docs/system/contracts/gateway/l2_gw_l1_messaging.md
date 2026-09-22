@@ -1,15 +1,20 @@
 # Nested L2→GW→L1 messages tree design for Gateway
 
+> **Release status:** this page documents the retained nested-proof design. Production chain
+> migrations are disabled in the current release. Current L1-settled message-root behavior is defined
+> in {protocol-docs/message-root.md}.
+
 ## Introduction
 
-This document assumes that the reader is already aware of how [L2→L1 logs](../settlement_contracts/priority_queue/l1_l2_communication/l2_to_l1.md) are aggregated into the [MessageRoot](../interop/message_root.md) and what the [Gateway](../gateway/overview.md) is. To reduce interactions with L1, the Gateway gathers all the `ChainBatchRoot`s from all the chains into the tree with following structure (note that this is the same `MessageRoot` contract that is used for interop):
+This document assumes that the reader is already aware of how [L2→L1 logs](../settlement_contracts/priority_queue/l1_l2_communication/l2_to_l1.md) are aggregated into the {protocol-docs/message-root.md} hierarchy and what the [settlement-layer design](./README.md) is. To reduce interactions with L1, Gateway gathers all `ChainBatchRoot`s from its settling chains into that hierarchy.
 
 ![NestedL2GWL1Messaging.png](./img/nested_l2_gw_l1_messaging.png)
 
 >
+
 ## Proving logs for chains settling on Gateway
 
-Proving these logs is almost the same as proving [interop](../interop/message_root.md) logs. For interop logs the merkle proof extends to the MessageRoot of L1. For chain settling on Gateway the `MessageRoot` of Gateway is aggregated with the `LocalLogsRoot` of GW, and the `ChainBatchRoot` is sent to L1 to the GW's diamond proxy. So compared to the interop case the merkle proof has to be extended with one more intermediate node. The only difference is that the `ChainBatchRoot` is not stored in the `MessageRoot` but in the `LocalLogsRoot`.
+Proving these logs is almost the same as proving an interop commitment. For interop, the Merkle proof extends to the L1 `MessageRoot`. For a chain settling on Gateway, Gateway's `MessageRoot` is aggregated with its `LocalLogsRoot`, and the resulting `ChainBatchRoot` is sent to L1 through Gateway's diamond. The proof therefore has one additional intermediate node.
 
 ## Trust assumptions
 
@@ -31,7 +36,7 @@ But how can one reconstruct the total chain tree for a particular rollup chain? 
 
 To understand which SL was used by a batch for finalization, one could simply brute force over all settlement layers ever used to find out where the chainBatchRoot is stored. This number is expected to be rather small.
 
-<!-- 
+<!--
 ## Legacy support
 
 In order to ease the server migration, we support legacy format of L2→L1 logs proving, i.e. just provide a proof that assumes that stored `chainBatchRoot` is identical to `LocalLogsRoot`, i.e. the hash of logs in the batch.

@@ -134,9 +134,9 @@ calculating `baseFee` and `gasPerPubdata` for a batch.
 
 These constants are to be hardcoded and can only be changed via either system contracts/bootloader or VM upgrade.
 
-`BATCH_OVERHEAD_L1_GAS` (*L*1*O*)— The L1 gas overhead for a batch (proof verification, etc).
+`BATCH_OVERHEAD_L1_GAS` (_L_1_O_)— The L1 gas overhead for a batch (proof verification, etc).
 
-`L1_GAS_PER_PUBDATA_BYTE` (*L*1*PUB*) — The number of L1 gas needed for a single pubdata byte. It is slightly higher
+`L1_GAS_PER_PUBDATA_BYTE` (_L_1_PUB_) — The number of L1 gas needed for a single pubdata byte. It is slightly higher
 than 16 gas needed for publishing a non-zero byte of pubdata on-chain (currently the value of 17 is used).
 
 `BATCH_OVERHEAD_L2_GAS` (_EO_)— The constant overhead denominated in gas. This overhead is created to cover the
@@ -172,7 +172,7 @@ $$
 
 #### Externally-provided batch parameters
 
-`L1_GAS_PRICE` (*L*1*P*) — The price for L1 gas in ETH.
+`L1_GAS_PRICE` (_L_1_P_) — The price for L1 gas in ETH.
 
 `FAIR_GAS_PRICE` (_Ef_) — The “fair” gas price in ETH, that is, the price of proving one circuit (in Ether) divided by
 the number we chose as one circuit price in gas.
@@ -209,8 +209,8 @@ publish guaranteed pubdata is too high, i.e. allowing at least _PG_ pubdata byte
 would to support _tx_._gasLimit_ greater that the maximum gas per transaction _TM_, allowing to run out of other finite
 resources.
 
-If $EP_f > EP_{Max}$, then the user needs to artificially increase the provided _Ef_ to bring the needed
-_tx_._gasPerPubdataByte_ to _EPmax_
+If $EP_f > EP_{Max}$, the user must increase the provided $E_f$ so the required
+`tx.gasPerPubdataByte` is brought within $EP_{Max}$.
 
 In this case we set the EIP1559 `baseFee` (_Base_):
 
@@ -275,23 +275,22 @@ $$
 
 Where
 
-*L*1*O*(_tx_) — the number of L1 gas overhead (in pubdata equivalent) the transaction should compensate for gas.
+_L_1_O_(_tx_) — the number of L1 gas overhead (in pubdata equivalent) the transaction should compensate for gas.
 
 _EO_(_tx_) — the number of L2 gas overhead the transaction should compensate for.
 
 Then:
 
-_overhead_\__gas_(_tx_) = *EO*(_tx_) + *tx*.*gasPerPubdata* ⋅ *L*1*O*(_tx_)
+`overhead_gas(tx) = EO(tx) + tx.gasPerPubdata * L1O(tx)`
 
 When a transaction is being estimated, the server returns the following gasLimit:
 
-_tx_.*gasLimit* = *tx*.*actualGasLimit* + *overhead*\__gas_(_tx_)
+`tx.gasLimit = tx.actualGasLimit + overhead_gas(tx)`
 
-Note, that when the operator receives the transaction, it knows only _tx_._gasLimit_. The operator could derive the
-_overhead***gas*(*tx*) and provide the bootloader with it. The bootloader will then derive
-*tx*.*actualGasLimit* = *tx*.*gasLimit* − *overhead***gas_(_tx_) and use the formulas above to derive the overhead that
-the user should’ve paid under the derived _tx_._actualGasLimit_ to ensure that the operator does not overcharge the
-user.
+When the operator receives the transaction, it knows only `tx.gasLimit`. It derives `overhead_gas(tx)`
+and provides it to the bootloader. The bootloader derives
+`tx.actualGasLimit = tx.gasLimit - overhead_gas(tx)` and uses the formulas above to ensure that the
+operator does not overcharge the user.
 
 #### Note on formulas
 

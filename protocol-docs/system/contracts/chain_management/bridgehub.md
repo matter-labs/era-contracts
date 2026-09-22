@@ -1,22 +1,34 @@
-<!--- WIP --->
-
 # Bridgehub
 
-## Introduction
+`L1Bridgehub` is the ecosystem registry and the public L1 entry point for chain creation and L1 -> L2
+transactions. It records:
 
-Bridgehub is the main chain registry contract for the ecosystem, that stores:
+- chain ID -> chain diamond and chain type manager;
+- chain ID -> base-token asset ID;
+- chain ID -> settlement-layer chain ID;
+- registered CTMs and settlement layers;
+- the canonical asset router, message root, chain asset handler, and chain registration sender.
 
-- A mapping from chainId to chains address
-- A mapping from chainId to the CTM it belongs to.
-- A mapping from chainId to its base token (i.e. the token that is used for paying fees)
-- Whitelisted settlement layers (i.e. Gateway)
+## Chain creation
 
-Note sure what CTM is? Check our the [overview](./chain_type_manager.md).
+`createNewChain` is restricted to the Bridgehub owner or admin. It validates that the chain ID is new,
+records the CTM/base-token/settlement data, asks the CTM to deploy the diamond, registers the result,
+and adds the chain to the L1 `MessageRoot`. ZKsync OS chains also seed their batch-0 chain root. The
+complete ordering and guards are in {protocol-docs/chain-lifecycle.md#chain-creation-createnewchain}.
 
-> This document will not cover how ZK Gateway works, you can check it out in [a separate doc](../gateway/overview.md). 
+## L1 -> L2 requests
 
-The Bridgehub is the contract where new chains can [register](./chain_genesis.md). The Bridgehub also serves as an AssetHandler for chains when migrating chains between settlement layers, read more about it [here](../gateway/chain_migration.md).
+- `requestL2TransactionDirect` routes a caller-funded request to the target chain's mailbox.
+- `requestL2TransactionTwoBridges` first calls the L1 asset router/handler to lock or burn an asset,
+  then submits the returned destination calldata and required mint value to the mailbox.
+- Service-transaction entry points are reserved for protocol components such as chain registration.
 
-Overall, it is the main registry for all the contracts. Note, that a clone of Bridgehub is also deployed on each L2 chain, it is used to start interop txs by checking that the chain is active. It is also used on settlement layers such as Gateway. All the in all, the architecture of the entire ecosystem can be seen below:
+The Bridgehub does not itself mint bridged assets. It authenticates the route and coordinates the
+asset router with the destination chain. See {protocol-docs/bridging.md}.
 
-![Contracts](./img/ecosystem_architecture.png)
+## L2 and settlement-layer variants
+
+A fixed-address L2 Bridgehub implements the shared registry interface needed by L2 protocol contracts.
+Generic settlement-layer relay entry points are also retained. In the current release all supported
+chains settle on L1 and new settlement-layer migrations are disabled; see
+[settlement-layer status](../gateway/README.md).

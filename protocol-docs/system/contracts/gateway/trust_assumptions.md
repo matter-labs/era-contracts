@@ -1,8 +1,12 @@
 # Trust assumptions for settlement layers
 
+> **Release status:** these assumptions become relevant if settlement-layer migrations are enabled.
+> Production migrations are disabled in the current release; supported chains settle on L1. See
+> [the settlement-layer status](./README.md).
+
 ## When settling on top of Gateway
 
-When a chain migrates on top of a settlement layer, it necessarily puts some trust into it. While the chain settles on top of Gateway, it manages the funds that the chain has given to it via [token balance migration](../bridging/asset_tracker/asset_tracker.md#migrating-and-settling-on-gateway). While ZK proofs do ensure the correctness of the state transitions of Gateway, lack of Stage 1 support means that in theory a malicious chain admin of the settlement layer could block chains from withdrawing from the ZK Gateway. 
+When a chain migrates onto a settlement layer, it necessarily adds that layer to its trust and liveness boundary. The layer relays the chain's roots and messages and participates in routing its assets. ZK proofs protect the settlement layer's state transitions, but its governance and availability can still affect a child chain's ability to settle or withdraw.
 
 Note, that while a chain settles on Gateway, the L1 does not have any view of the chain and so the chain trusts the Gateway proof system to ensure that the withdrawal messages it sends to L1 are correct. When the chain migrates back to L1, the ZK Gateway will provide data such as the last batch number of the chain at it settled on top of ZK Gateway. All-in-all, chains should be careful to ensure that they trust the settlement layers they migrate to.
 
@@ -28,13 +32,13 @@ Due to the `_migrationInterval` mapping mentioned above, chains that are not set
 
 To reiterate, the goal of the mapping is to protect chains against "completely malicious" settlement layers that the chain does not settle to at the moment, while historical withdrawals cannot be overwritten due to the `MessageRoot` restrictions. The only exception is Era and the fact that it settled on top of Era-based ZK Gateway.
 
-> Note, that right now, the bounds of batches that can be used to prove transactions from the chain are queried on L1 during migration to and from Gateway. This means that the chain is protected from a potentially malicious gateway only the moment it finalizes its migration to L1, not the moment the GW batch with the migration transaction settles. More can be read in the comments for the `MigrationInterval` struct. 
+> Note, that right now, the bounds of batches that can be used to prove transactions from the chain are queried on L1 during migration to and from Gateway. This means that the chain is protected from a potentially malicious gateway only the moment it finalizes its migration to L1, not the moment the GW batch with the migration transaction settles. More can be read in the comments for the `MigrationInterval` struct.
 
-However, it does NOT mean that the *codebase as a whole* is ready for "completely malicious" settlement layers (only to "ZK compromised" ones). There are other parts of code that still depend on the correct ZK Gateway L1 implementation.
+However, it does NOT mean that the _codebase as a whole_ is ready for "completely malicious" settlement layers (only to "ZK compromised" ones). There are other parts of code that still depend on the correct ZK Gateway L1 implementation.
 
 ## Trust assumptions that are required for Gateway itself
 
-The current system requires that if migration on top of ZK Gateway are supported, all the CTMs must be controlled by our decentralized governance. In various places inside the codebase, ZK Gateway relies that neither the chain's implementation nor the CTM's one are malicious. Note, that we are talking only about *Solidity implementation* of Diamond Proxy's facets/ChainTypeManager's implementations only. ZK Gateway must be able to account for potentially compromised ZK systems of the chains that settle on top of it. 
+The current system requires that if migration on top of ZK Gateway are supported, all the CTMs must be controlled by our decentralized governance. In various places inside the codebase, ZK Gateway relies that neither the chain's implementation nor the CTM's one are malicious. Note, that we are talking only about _Solidity implementation_ of Diamond Proxy's facets/ChainTypeManager's implementations only. ZK Gateway must be able to account for potentially compromised ZK systems of the chains that settle on top of it.
 
 Additionally, before a settlement layer is deployed, it is assumed that the following fields are provided correctly:
 

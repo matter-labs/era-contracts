@@ -128,9 +128,9 @@ pre-v31 ZKsync OS chains, whose value is backfilled during v31 before the v32 up
 
 ### v32: chain migrations are explicitly disabled
 
-In the v32 release the protocol operates under the invariant that **all chains settle on L1**, and
-chain migrations between settlement layers are explicitly disabled to remove migration-related
-risks for the time being:
+Beginning with v32 and still in this release, the protocol operates under the invariant that **all
+supported chains settle on L1**. Chain migrations between settlement layers are explicitly disabled
+to remove migration-related risks:
 
 - The switch is `CHAIN_MIGRATIONS_ENABLED = false` in `common/Config.sol`, surfaced via
   `ChainAssetHandlerBase.migrationsEnabled()` and enforced by the `whenMigrationsEnabled` modifier

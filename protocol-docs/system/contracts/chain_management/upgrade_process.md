@@ -1,52 +1,47 @@
-<!--- WIP --->
+# Protocol upgrade process
 
-# Upgrade process document
+Protocol upgrades are coordinated by the chain type manager (CTM) and executed by each chain diamond.
+An upgrade is a `DiamondCutData` value containing facet cuts plus an optional initializer delegate-call.
+The initializer may update shared diamond storage and enqueue an L2 system-upgrade transaction.
 
+## Publishing a version
 
-## Intro
+CTM governance calls `setNewVersionUpgrade` with:
 
-This document assumes that you have understanding about [the structure](../settlement_contracts/zkchain_basics.md) on individual chains' L1 contracts.
+- the expected old protocol version and its deadline;
+- the new semver protocol version;
+- the verifier for the new version;
+- the approved diamond cut and initialization calldata.
 
-Upgrading the ecosystem of ZKChains is a complicated process. ZKSync is a complex ecosystem with many chains and contracts and each upgrade is unique, but there are some steps that repeat for most upgrades. These are mostly how we interact with the CTM, the diamond facets, the L1→L2 upgrade, how we update the verification keys.
+The CTM stores the upgrade cut hash/data and verifier under the new version. A verifier-only release can
+use `createNewVerifierOnlyUpgrade`; it advances the protocol version without changing facets. Patch,
+minor, and major components are packed by `SemVer.sol`, and version activity/deadlines are enforced by
+the CTM rather than inferred from deployment time.
 
-Where each upgrade consists of two parameters:
+## Applying a version to a chain
 
-- Facet cuts - change of the internal implementation of the diamond proxy
-- Diamond Initialization - delegate call to the specified address with specified data
+1. The chain admin submits the exact CTM-approved cut through `upgradeChainFromVersion` or the CTM's
+   execution entry point.
+2. `AdminFacet` verifies the old version and cut, applies facet changes, and delegate-calls the upgrade
+   initializer.
+3. If the release changes L2 code or state, the initializer records the canonical system-upgrade
+   transaction. It is consumed in the next compatible batch.
+4. The diamond records the new protocol version. Chains that remain on an expired version cannot
+   continue normal batch processing until upgraded.
 
-The second parameter is very powerful and flexible enough to move majority of upgrade logic there.
+Upgrade implementations derive from `BaseZkSyncUpgrade`; `DefaultUpgrade` covers the common verifier,
+bootloader, system-contract, fee, and protocol-version changes. Releases with one-time migrations use a
+version-specific implementation and staged governance calls.
 
-## Preparation for the upgrade
+## Safety properties
 
-The ZKsync ecosystem has [governance smart contracts](https://github.com/zksync-association/zk-governance) that govern the protocol. Only these contracts have the permission to set upgrades in the CTM. This is done via the `setNewVersionUpgrade` function. This sets the upgrade data, the new protocol version, and the deadline by which chains have to upgrade. Chains can upgrade themselves with the same data. After the deadline is over, each non-upgraded chain is frozen, they cannot post new proofs. Frozen chains can
-unfreeze by updating.
+- A chain admin cannot install a cut the CTM did not publish.
+- The old-version argument prevents applying an upgrade from an unexpected state.
+- Upgrade deadlines keep chains sharing a CTM within the supported compatibility window.
+- Batch processing may require outstanding batches to be executed before changing verifier or batch
+  semantics.
+- Emergency freeze/revert controls limit further settlement while governance prepares remediation;
+  they do not make an invalid proof valid.
 
-## Upgrade structure
-
-Upgrade information is composed in the form of a [DiamondCutData](https://github.com/matter-labs/era-contracts/blob/8222265420f362c853da7160769620d9fed7f834/l1-contracts/contracts/state-transition/libraries/Diamond.sol#L75) struct. During the upgrade, the chain's DiamondProxy will delegateCall the `initAddress` with the provided `initCalldata`, while the facets that the `DiamondProxy` will be changed according to the `facetCuts`. This scheme is very powerful and it allows to change anything in the contract. However, we typically have a very specific set of changes that we need to do. To facilitate these, two contracts have been created:
-
-1. [BaseZkSyncUpgrade](https://github.com/matter-labs/era-contracts/blob/8222265420f362c853da7160769620d9fed7f834/l1-contracts/contracts/upgrades/BaseZkSyncUpgrade.sol) - Generic template with function that can be useful for upgrades
-2. [DefaultUpgrade](https://github.com/matter-labs/era-contracts/blob/8222265420f362c853da7160769620d9fed7f834/l1-contracts/contracts/upgrades/DefaultUpgrade.sol) - Default implementation of the `BaseZkSyncUpgrade`, contract that is most often planned to be used as diamond initialization when doing upgrades.
-
-> Note, that the Gateway upgrade (v26) was more complex than the usual ones and so a similar, but separate [process](../../upgrade_history/gateway_upgrade/upgrade_process_no_gateway_chain.md) was used for it. It also used its own custom implementation of the `BaseZkSyncUpgrade`: [GatewayUpgrade](https://github.com/matter-labs/era-contracts/blob/8222265420f362c853da7160769620d9fed7f834/l1-contracts/contracts/upgrades/GatewayUpgrade.sol).
-
-### Protocol version
-
-For tracking upgrade versions on different networks (private testnet, public testnet, mainnet) we use protocol version, which is basically just a number denoting the deployed version. The protocol version is different from Diamond Cut `proposalId`, since `protocolId` only shows how much upgrade proposal was proposed/executed, but nothing about the content of upgrades, while the protocol version is needed to understand what version is deployed.
-
-In the [BaseZkSyncUpgrade](https://github.com/matter-labs/era-contracts/blob/8222265420f362c853da7160769620d9fed7f834/l1-contracts/contracts/upgrades/BaseZkSyncUpgrade.sol) & [DefaultUpgrade](https://github.com/matter-labs/era-contracts/blob/8222265420f362c853da7160769620d9fed7f834/l1-contracts/contracts/upgrades/DefaultUpgrade.sol) we allow to arbitrarily increase the proposal version while upgrading a system, but only increase it. We are doing that since we can skip some protocol versions if for example found a bug there (but it was deployed on another network already).
-
-## Protocol upgrade transaction
-
-During upgrade, we typically need not only update the L1 contracts, but also the L2 ones. This is achieved by creating an upgrade transactions. More details on how those are processed inside the system can be read [here](../settlement_contracts/priority_queue/l1_l2_communication/l1_to_l2.md).
-
-## Whitelisting and executing upgrade
-
-Note, that due to how powerful the upgrades are, if we allowed any [chain admin](../chain_management/admin_role.md) to inact any upgrade it wants, it could allow malicious chains to potentially break some of the ecosystem invariants. Because of that, any upgrade should be firstly whitelisted by the decentralized governance through calling the `setNewVersionUpgrade` function of the [ChainTypeManager](https://github.com/matter-labs/era-contracts/blob/8222265420f362c853da7160769620d9fed7f834/l1-contracts/contracts/state-transition/ChainTypeManager.sol).
-
-In order to execute the upgrade, the chain admin would call the `upgradeChainFromVersion` function from the [Admin](https://github.com/matter-labs/era-contracts/blob/8222265420f362c853da7160769620d9fed7f834/l1-contracts/contracts/state-transition/chain-deps/facets/Admin.sol) facet.
-
-## Patch upgrades
-
-A process that allows governance to create "smaller" upgrades that only touch Verifier changes. The flow for the chain admin is the same as before, but the decentralized governance would have to call the `createNewPatchUpgrade` to register the new upgrade onchain.
-
+Release-specific state migrations and ZKsync OS force deployments are documented in
+{protocol-docs/chain-lifecycle.md#upgrading-an-existing-ecosystem-onto-this-release}.

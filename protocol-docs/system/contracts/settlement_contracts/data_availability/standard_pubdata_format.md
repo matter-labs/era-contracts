@@ -6,10 +6,10 @@ This document describes how the standard pubdata format looks. This is the forma
 
 Pubdata in ZKsync can be divided up into 4 categories:
 
-1. L2 to L1 Logs  
-2. L2 to L1 Messages  
-3. Smart Contract Bytecodes  
-4. Storage Writes  
+1. L2 to L1 Logs
+2. L2 to L1 Messages
+3. Smart Contract Bytecodes
+4. Storage Writes
 
 Using data corresponding to these 4 facets across all executed batches, we’re able to reconstruct the full state of L2. To restore the state we just need to filter all of the transactions to the L1 ZKsync contract for only the `commitBatches` transactions where the proposed block has been referenced by a corresponding `executeBatches` call (the reason for this is that a committed or even proven block can be reverted but an executed one cannot). Once we have all the committed batches that have been executed, we will then pull the transaction input and the relevant fields, applying them in order to reconstruct the current state of L2.
 
@@ -19,13 +19,13 @@ We will implement the calculation of the Merkle root of the L2→L1 messages via
 
 We will now refer to the logs that are created by users and Merklized as _user_ logs, and the logs that are emitted natively by the VM as _system_ logs. Here is a short comparison table for better understanding:
 
-| System logs                                                                                                     | User logs                                                                                                                                                                                                                           |
-| --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Emitted by VM via an opcode.                                                                                    | VM knows nothing about them.                                                                                                                                                                                                        |
+| System logs                                                                                                       | User logs                                                                                                                                                                                                                                 |
+| ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Emitted by VM via an opcode.                                                                                      | VM knows nothing about them.                                                                                                                                                                                                              |
 | Consistency and correctness are enforced by the verifier on L1 (i.e. their hash is part of the block commitment). | Consistency and correctness is enforced by the L1Messenger system contract. The correctness of the behavior of the L1Messenger is enforced implicitly by the prover in the sense that it proves the correctness of the execution overall. |
-| We don’t calculate their Merkle root.                                                                           | We calculate their Merkle root on the L1Messenger system contract.                                                                                                                                                                  |
-| There is a constant small number of these logs.                                                                 | We can have as many as possible as long as the commitBatches function on L1 remains executable (it is the job of the operator to ensure that only such transactions are selected).                                                   |
-| In EIP-4844 they will remain part of the calldata.                                                              | In EIP-4844 they will become part of the blobs.                                                                                                                                                                                     |
+| We don’t calculate their Merkle root.                                                                             | We calculate their Merkle root on the L1Messenger system contract.                                                                                                                                                                        |
+| There is a constant small number of these logs.                                                                   | We can have as many as possible as long as the commitBatches function on L1 remains executable (it is the job of the operator to ensure that only such transactions are selected).                                                        |
+| In EIP-4844 they will remain part of the calldata.                                                                | In EIP-4844 they will become part of the blobs.                                                                                                                                                                                           |
 
 ### Backwards-compatibility
 
@@ -61,6 +61,7 @@ The L1Messenger contract will maintain a rolling hash of all the L2ToL1 logs `ch
 ```
 chainedLogsHash = keccak256(chainedLogsHash, hashedLog)
 ```
+
 L2→L1 logs have the same 88-byte format as in the current version of ZKsync.
 
 Note that the user is charged for the future computation needed to calculate the final Merkle root. It is roughly 4× higher than the cost to calculate the hash of the leaf, since the eventual tree might be 4× the number of nodes. In any case, this will likely be a relatively negligible part compared to the cost of the pubdata.
@@ -87,8 +88,8 @@ The content of the L2→L1 logs by the L1Messenger will go to the blob of EIP-48
 
 The only places where the built-in L2→L1 messaging should continue to be used:
 
-- Logs by SystemContext (they are needed on commit to check the previous block hash).  
-- Logs by L1Messenger for the Merkle root of the L2→L1 tree as well as the data needed for `L1DAValidator`.  
+- Logs by SystemContext (they are needed on commit to check the previous block hash).
+- Logs by L1Messenger for the Merkle root of the L2→L1 tree as well as the data needed for `L1DAValidator`.
 - `chainedPriorityTxsHash` and `numberOfLayer1Txs` from the bootloader (read more about it below).
 
 ### Obtaining `txNumberInBlock`
@@ -109,7 +110,8 @@ Within pubdata, bytecodes are published in one of two ways:
 
 ### Uncompressed Bytecode Publishing
 
-Uncompressed bytecodes are included within the `totalPubdata` bytes and have the following format:  
+Uncompressed bytecodes are included within the `totalPubdata` bytes and have the following format:
+
 ```
 number of bytecodes || forEachBytecode (length of bytecode(n) || bytecode(n))
 ```
@@ -126,9 +128,9 @@ Each 8-byte word from the chunked bytecode is assigned a 2-byte index (constrain
 
 For bytecode to be considered valid, it must satisfy the following:
 
-1. Bytecode length must be less than 2097120 ((2^16 – 1) * 32) bytes.  
-2. Bytecode length must be a multiple of 32.  
-3. Number of 32-byte words cannot be even.  
+1. Bytecode length must be less than 2097120 ((2^16 – 1) \* 32) bytes.
+2. Bytecode length must be a multiple of 32.
+3. Number of 32-byte words cannot be even.
 
 The following is a simplified version of the algorithm:
 
@@ -192,8 +194,8 @@ We call this `H(S,A)` a _derived key_, because it is derived from the address an
 
 However, there is an optimization that can be done:
 
-- Whenever a change to a key is used for the first time, we publish a pair of `DK,V` and we assign some sequential id to this derived key. This is called an _initial write_. It happens for the first time and that’s why we must publish the full key.  
-- If this storage slot is published in some of the subsequent batches, instead of publishing the whole `DK`, we can use the sequential id instead. This is called a _repeated write_.  
+- Whenever a change to a key is used for the first time, we publish a pair of `DK,V` and we assign some sequential id to this derived key. This is called an _initial write_. It happens for the first time and that’s why we must publish the full key.
+- If this storage slot is published in some of the subsequent batches, instead of publishing the whole `DK`, we can use the sequential id instead. This is called a _repeated write_.
 
 For instance, if the slots `A`, `B` (I’ll use Latin letters instead of 32-byte hashes for readability) changed their values to `12`, `13` accordingly in the batch, they will be published in the following format:
 
@@ -217,20 +219,20 @@ Firstly, let’s define what we mean by _state diffs_. A _state diff_ is an elem
 
 Basically, it contains all the values which might interest us about the state diff:
 
-- `address` where the storage has been changed.  
-- `key` (the original key inside the address).  
-- `derived_key` — `H(key, address)` as described in the previous section.  
-  - Note: the hashing algorithm currently used here is `Blake2s`.  
-- `enumeration_index` — enumeration index as explained above. It is equal to 0 if the write is initial and contains the non-zero enumeration index if it is a repeated write (indexes start from 1).  
-- `initial_value` — the value that was present in the key at the start of the batch.  
-- `final_value` — the value that the key has changed to by the end of the batch.  
+- `address` where the storage has been changed.
+- `key` (the original key inside the address).
+- `derived_key` — `H(key, address)` as described in the previous section.
+  - Note: the hashing algorithm currently used here is `Blake2s`.
+- `enumeration_index` — enumeration index as explained above. It is equal to 0 if the write is initial and contains the non-zero enumeration index if it is a repeated write (indexes start from 1).
+- `initial_value` — the value that was present in the key at the start of the batch.
+- `final_value` — the value that the key has changed to by the end of the batch.
 
 We will consider `stateDiffs` an array of such objects, sorted by (address, key).
 
 This is the internal structure that is used by the circuits to represent the state diffs. The most basic “compression” algorithm is the one described above:
 
-- For initial writes, write the pair (`derived_key`, `final_value`).  
-- For repeated writes, write the pair (`enumeration_index`, `final_value`).  
+- For initial writes, write the pair (`derived_key`, `final_value`).
+- For repeated writes, write the pair (`enumeration_index`, `final_value`).
 
 Note that values like `initial_value`, `address`, and `key` are not used in the "simplified" algorithm above, but they will be helpful for more advanced compression algorithms in the future. The [algorithm](#state-diff-compression-format) for Boojum already utilizes the difference between the `initial_value` and `final_value` to save on pubdata.
 
@@ -238,13 +240,13 @@ Note that values like `initial_value`, `address`, and `key` are not used in the 
 
 #### **L2**
 
-1. The operator provides both full `stateDiffs` (i.e. the array of the structs above) and the compressed state diffs (i.e. the array containing the state diffs, compressed by the algorithm explained [below](#state-diff-compression-format)).  
-2. The `L2DAValidator` library must verify that the compressed version is consistent with the original stateDiffs and send the _hash_ of the `stateDiffs` to its L1 counterpart. It will also include the compressed state diffs in the totalPubdata to be published onto L1.  
+1. The operator provides both full `stateDiffs` (i.e. the array of the structs above) and the compressed state diffs (i.e. the array containing the state diffs, compressed by the algorithm explained [below](#state-diff-compression-format)).
+2. The `L2DAValidator` library must verify that the compressed version is consistent with the original stateDiffs and send the _hash_ of the `stateDiffs` to its L1 counterpart. It will also include the compressed state diffs in the totalPubdata to be published onto L1.
 
 #### **L1**
 
-1. During block commitment, the standard DA protocol follows and the `L1DAValidator` is responsible for checking that the operator has provided the preimage for the `_totalPubdata`. More on how this is checked can be seen [here](./rollup_da.md).  
-2. The block commitment [includes](https://github.com/matter-labs/era-contracts/blob/b43cf6b3b069c85aec3cd61d33dd3ae2c462c896/l1-contracts/contracts/state-transition/chain-deps/facets/Executor.sol#L550) _the hash of the `stateDiffs`_. Thus, ZKP verification will fail if the provided stateDiffs hash is not correct.  
+1. During block commitment, the standard DA protocol follows and the `L1DAValidator` is responsible for checking that the operator has provided the preimage for the `_totalPubdata`. More on how this is checked can be seen [here](./rollup_da.md).
+2. The block commitment [includes](https://github.com/matter-labs/era-contracts/blob/b43cf6b3b069c85aec3cd61d33dd3ae2c462c896/l1-contracts/contracts/state-transition/chain-deps/facets/Executor.sol#L550) _the hash of the `stateDiffs`_. Thus, ZKP verification will fail if the provided stateDiffs hash is not correct.
 
 It is a secure construction because the proof can be verified only if both the execution was correct and the hash of the `stateDiffs` is correct. This means that the `L2DAValidator` library indeed received the array of correct `stateDiffs` and, assuming the `L2DAValidator` is working correctly, double-checked that the compression is in the correct format, while L1 contracts at the commit stage double-checked that the operator provided the preimage for the compressed state diffs.
 
@@ -258,13 +260,13 @@ The following algorithm is used for the state diff compression:
 
 The `totalPubdata` has the following structure:
 
-1. First 4 bytes — the number of user L2→L1 logs in the batch.  
-2. Then, the concatenation of packed L2→L1 user logs.  
-3. Next, 4 bytes — the number of long L2→L1 messages in the batch.  
-4. Then, the concatenation of L2→L1 messages, each in the format `<4 byte length || actual_message>`.  
-5. Next, 4 bytes — the number of uncompressed bytecodes in the batch.  
-6. Then, the concatenation of uncompressed bytecodes, each in the format `<4 byte length || actual_bytecode>`.  
-7. Next, 4 bytes — the length of the compressed state diffs.  
+1. First 4 bytes — the number of user L2→L1 logs in the batch.
+2. Then, the concatenation of packed L2→L1 user logs.
+3. Next, 4 bytes — the number of long L2→L1 messages in the batch.
+4. Then, the concatenation of L2→L1 messages, each in the format `<4 byte length || actual_message>`.
+5. Next, 4 bytes — the number of uncompressed bytecodes in the batch.
+6. Then, the concatenation of uncompressed bytecodes, each in the format `<4 byte length || actual_bytecode>`.
+7. Next, 4 bytes — the length of the compressed state diffs.
 8. Then, state diffs are compressed by the spec [above](#state-diff-compression-format).
 
 The interface for committing batches is the following:

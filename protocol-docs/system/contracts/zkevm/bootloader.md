@@ -123,19 +123,8 @@ Once read, these slots can be used for temporary data.
 - `[2159..3182]` – slots for the “trusted” gas limits by the operator. The user’s transaction will have at its disposal
   `min(MAX_TX_GAS(), trustedGasLimit)`, where `MAX_TX_GAS` is a constant guaranteed by the system. Currently, it is
   equal to 80 million gas. In the future, this feature will be removed.
-- `[3183..7282]` – slots for storing L2 block info for each transaction. You can read more on the difference L2 blocks
-  and batches
-<<<<<<<< HEAD:docs/src/specs/contracts/l2_system_contracts/bootloader.md
-  [here](https://github.com/code-423n4/2023-10-zksync/blob/main/docs/Smart%20contract%20Section/Batches%20&%20L2%20blocks%20on%20zkSync.md).
-- `[7283..??]` – slots for the interop roots.
-  - `[7283]` – 1 slot for the current interop root in interop root array.
-  - `[7284..??]` – ?? slots for the interop blocks, i.e. the number of interop roots in each block.
-  - `[??..??]` – ?? slots for the interop roots.
-  - `[??..??]` – 1 slot for the interop root rolling hash.
-- `[??..??]` – 1 slot for the current settlement layer.
-========
-  [here](./batches_and_blocks_on_zksync.md).
->>>>>>>> 255f6e8866a4ba25376eed9a57421d0f29bb2ee8:docs/src/specs/contracts/zkevm/bootloader.md
+- `[3183..7282]` – slots for storing L2 block info for each transaction. See
+  [batches and L2 blocks](./batches_and_blocks_on_zksync.md).
 - `[7283..40050]` – slots used for compressed bytecodes each in the following format:
   - 32 bytecode hash
   - 32 zeroes (but then it will be modified by the bootloader to contain 28 zeroes and then the 4-byte selector of the
@@ -191,7 +180,6 @@ struct BootloaderTxDescription {
   // we should execute this transaction and possibly try to execute the next one.
   uint256 txExecutionMeta;
 }
-
 ```
 
 ### **Reserved slots for the calldata for the paymaster’s postOp operation**
@@ -308,9 +296,8 @@ L1->L2 transactions are transactions that were initiated on L1. We assume that `
 transactions. It also has its L1 pubdata price as well as ergsPrice set on L1.
 
 Most of the steps from the execution of L2 transactions are omitted and we set `tx.origin` to the `from`, and
-`ergsPrice` to the one provided by transaction. After that, we use
-[mimicCall](../../../guides/advanced/12_alternative_vm_intro.md#zkevm-specific-opcodes)
-to provide the operation itself from the name of the sender account.
+`ergsPrice` to the one provided by the transaction. After that, the bootloader uses the VM-specific
+`mimicCall` operation to execute from the sender account's identity.
 
 Note, that for L1→L2 transactions, `reserved0` field denotes the amount of ETH that should be minted on L2 as a result
 of this transaction. `reserved1` is the refund receiver address, i.e. the address that would receive the refund for the

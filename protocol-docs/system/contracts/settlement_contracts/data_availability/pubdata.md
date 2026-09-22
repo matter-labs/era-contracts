@@ -82,7 +82,6 @@ struct L2Log {
   bytes32 key;
   bytes32 value;
 }
-
 ```
 
 While the leaf will look the following way:
@@ -280,7 +279,6 @@ struct CommitBlockInfo {
   bytes[] l2ArbitraryLengthMessages;
   bytes[] factoryDeps;
 }
-
 ```
 
 These two fields would be then included into the block commitment and checked by the verifier.
@@ -442,5 +440,4 @@ struct CommitBatchInfo {
   bytes systemLogs;
   bytes totalL2ToL1Pubdata;
 }
-
 ```

@@ -1,5 +1,9 @@
 # Custom DA layers
 
+> **Release status:** this page describes DA behavior for a chain using another ZK chain as its
+> settlement layer. Production chain migrations are disabled in the current release. See
+> [the settlement-layer status](./README.md).
+
 ## Prerequisites
 
 To better understand this document, it is better to have grasp on how [custom DA handling protocol](../settlement_contracts/data_availability/custom_da.md) works.

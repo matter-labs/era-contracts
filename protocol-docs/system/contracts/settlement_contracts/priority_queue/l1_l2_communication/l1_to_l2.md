@@ -21,22 +21,24 @@ A new priority operation can be appended by calling the `requestL2TransactionDir
 
 > In the previous system, priority operations were structured in a queue. However, now they will be stored in an incremental merkle tree. The motivation for the tree structure can be read [here](../priority-queue.md).
 
-The difference between `requestL2TransactionDirect` and `requestL2TransactionTwoBridges` is that the `msg.sender` on the L2 Transaction is the second bridge in the `requestL2TransactionTwoBridges` case, while it is the `msg.sender` of the `requestL2TransactionDirect` in the first case. For more details read the [bridgehub documentation](../../../interop/interop_center/overview.md)
+The difference between `requestL2TransactionDirect` and `requestL2TransactionTwoBridges` is that the L2 transaction sender is the second bridge in the two-bridges case, while it is the direct caller in the direct case. See [Bridgehub](../../../chain_management/bridgehub.md) and {protocol-docs/bridging.md}.
 
-The struct called in the `bridgehubRequestL2Transaction` method is the following: 
+The struct called in the `bridgehubRequestL2Transaction` method is the following:
+
 ```solidity
 struct BridgehubL2TransactionRequest {
-    address sender;
-    address contractL2;
-    uint256 mintValue;
-    uint256 l2Value;
-    bytes l2Calldata;
-    uint256 l2GasLimit;
-    uint256 l2GasPerPubdataByteLimit;
-    bytes[] factoryDeps;
-    address refundRecipient;
+  address sender;
+  address contractL2;
+  uint256 mintValue;
+  uint256 l2Value;
+  bytes l2Calldata;
+  uint256 l2GasLimit;
+  uint256 l2GasPerPubdataByteLimit;
+  bytes[] factoryDeps;
+  address refundRecipient;
 }
 ```
+
 - `sender` is the address of the user that initiated the transaction. Will be used as msg.sender for the L2 transaction.
 - `contractL2` is the address of the contract on L2 to call.
 - `mintValue` is the amount of base token that should be minted on L2 as the result of this transaction. This includes msg.value + value used for gas payment.
@@ -46,7 +48,7 @@ struct BridgehubL2TransactionRequest {
 - `l2GasPerPubdataByteLimit` is the price for a single pubdata byte in L2 gas.
 - `factoryDeps` is the array of L2 bytecodes that the tx depends on.
 - `refundRecipient` is the recipient of the refund for the transaction on L2. If the transaction fails, then
-this address will receive the `l2Value`.
+  this address will receive the `l2Value`.
 
 ### Bootloader
 
@@ -89,7 +91,7 @@ During batch execution, we will check that the `priorityOperationsRollingHash` r
 
 ### Initiation
 
-Upgrade transactions can only be created during a system upgrade. It is done if the `DiamondProxy` delegatecalls to the implementation that manually puts this transaction into the storage of the DiamondProxy, this could happen on calling `upgradeChainFromVersion` function in `Admin.sol` on the State Transition contract. 
+Upgrade transactions can only be created during a system upgrade. It is done if the `DiamondProxy` delegatecalls to the implementation that manually puts this transaction into the storage of the DiamondProxy, this could happen on calling `upgradeChainFromVersion` function in `Admin.sol` on the State Transition contract.
 Note, that since it happens during the upgrade, there is no “real” checks on the structure of this transaction. We do have [some validation](https://github.com/matter-labs/era-contracts/blob/b43cf6b3b069c85aec3cd61d33dd3ae2c462c896/l1-contracts/contracts/upgrades/BaseZkSyncUpgrade.sol#L175),
 but it is purely on the side of the implementation which the `DiamondProxy` delegatecalls to and so may be lifted if they implementation is changed.
 

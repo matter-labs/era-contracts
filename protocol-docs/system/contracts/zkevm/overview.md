@@ -1,5 +1,10 @@
 # zkEVM
 
+> **Scope:** this section documents the EraVM execution environment and its bootloader/system
+> contracts. ZKsync OS uses different VM internals. Both environments integrate with the shared L1
+> chain-management, settlement, DA, bridge, message-root, and interop contracts described elsewhere in
+> `protocol-docs/`.
+
 The zkEVM is used to execute transactions. It is similar in construction to the EVM, so it executes transactions
 similarly, but it plays a fundamentally different role in the zkStack than the EVM does in Ethereum. The EVM is used to
 execute smart contracts in Ethereum's state transition function. This STF needs a client to implement and run it.

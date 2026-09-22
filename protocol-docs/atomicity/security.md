@@ -62,6 +62,7 @@ The timeout proof relies on three preconditions, each enforced on chain:
 
 1. **Every chain interop can target has at least one batch inside the settlement layer's message root.**
    Enforced at two points:
+
    - Freshly created chains report their genesis batch root right after registration, in the same
      `createNewChain` transaction: the chain's DiamondInit stores
      `ChainBatchRootTree.genesisChainBatchRoot()` (batch 0 has no logs and a freshly seeded IMT, so the

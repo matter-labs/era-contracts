@@ -2,8 +2,7 @@
 
 The L2→L1 communication is more fundamental than the L1→L2 communication, as the second relies on the first. L2→L1
 communication happens by the L1 smart contract verifying messages alongside the proofs. The only “provable” part of the
-communication from L2 to L1 are native L2→L1 logs emitted by VM. These can be emitted by the `to_l1`
-[opcode](../../../../../guides/advanced/12_alternative_vm_intro.md#only-for-kernel-space).
+communication from L2 to L1 are native L2→L1 logs emitted by the VM's kernel-only `to_l1` opcode.
 Each log consists of the following fields:
 
 ```solidity
@@ -15,7 +14,6 @@ struct L2Log {
   bytes32 key;
   bytes32 value;
 }
-
 ```
 
 Where:
@@ -23,12 +21,11 @@ Where:
 - `l2ShardId` is the id of the shard the opcode was called (it is currently always 0).
 - `isService` a boolean flag that is not used right now
 - `txNumberInBatch` the number of the transaction in the batch where the log has happened. This number is taken from the
-  internal counter which is incremented each time the `increment_tx_counter` is
-  [called](../../../../../guides/advanced/12_alternative_vm_intro.md#only-for-kernel-space).
+  internal counter incremented by the kernel-only `increment_tx_counter` opcode.
 - `sender` is the value of `this` in the frame where the L2→L1 log was emitted.
 - `key` and `value` are just two 32-byte values that could be used to carry some data with the log.
 
-The hashes of these logs are [aggregated](https://github.com/matter-labs/era-contracts/blob/b43cf6b3b069c85aec3cd61d33dd3ae2c462c896/system-contracts/contracts/L1Messenger.sol#L133) in a dynamic incremental merkle tree into the `LocalLogsRoot`. The `LocalLogsRoot` is [hashed](https://github.com/matter-labs/era-contracts/blob/b43cf6b3b069c85aec3cd61d33dd3ae2c462c896/system-contracts/contracts/L1Messenger.sol#L333) together with the chain's `MessageRoot` into the `ChainBatchRoot`. This `ChainBatchRoot` is then included into the 
+The hashes of these logs are [aggregated](https://github.com/matter-labs/era-contracts/blob/b43cf6b3b069c85aec3cd61d33dd3ae2c462c896/system-contracts/contracts/L1Messenger.sol#L133) in a dynamic incremental merkle tree into the `LocalLogsRoot`. The `LocalLogsRoot` is [hashed](https://github.com/matter-labs/era-contracts/blob/b43cf6b3b069c85aec3cd61d33dd3ae2c462c896/system-contracts/contracts/L1Messenger.sol#L333) together with the chain's `MessageRoot` into the `ChainBatchRoot`. This `ChainBatchRoot` is then included into the
 [batch commitment](https://github.com/matter-labs/era-contracts/blob/f06a58360a2b8e7129f64413998767ac169d1efd/ethereum/contracts/zksync/facets/Executor.sol#L493).
 Because of that we know that if the proof verifies, then the L2→L1 logs provided by the operator were correct, so we can
 use that fact to produce more complex structures. Before Boojum such logs were also Merklized within the circuits and so
@@ -56,14 +53,13 @@ function proveL2LeafInclusion(
 ) external view override returns (bool);
 ```
 
-To prove inclusion the `_proof` input has to be provided. The user can request the chain's server for this, or reconstruct it from L1 data. Normally the proof is the merkle proof from the log via the `LocalLogsRoot` to the `ChainBatchRoot` of the chain. 
+To prove inclusion the `_proof` input has to be provided. The user can request the chain's server for this, or reconstruct it from L1 data. Normally the proof is the merkle proof from the log via the `LocalLogsRoot` to the `ChainBatchRoot` of the chain.
 
 The second function will prove that a certain 32-byte leaf belongs to the tree. Note, that the fact that the `leaf` is 32-bytes long means that the function could work successfully for internal leaves also. Furthermore, since the `LocalLogsRoot` is extended with the `MessageRoot`, this function can be used to prove inclusion in the MessageRoot tree.
 
-This function is particularly for proving that a log was included in the `ChainBatchRoot` via the `MessageRoot`. This is used for [interop](../../../interop/message_root.md) and in [nested message inclusion](../../../gateway/l2_gw_l1_messaging.md).
+This function proves that a log was included in the `ChainBatchRoot` through the `MessageRoot`. It is used by interop and by [nested settlement-layer message inclusion](../../../gateway/l2_gw_l1_messaging.md); see {protocol-docs/message-root.md}.
 
 > Note: intermediate nodes can also be proven via the `proveL2LeafInclusion` function, it will be the callers responsibility to ensure that the preimage of the leaf is larger than 32-bytes long and/or use other ways to ensuring that the function will be called securely.
-
 
 ## Important system values
 
