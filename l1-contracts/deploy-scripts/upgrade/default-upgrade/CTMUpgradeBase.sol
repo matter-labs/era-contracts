@@ -98,8 +98,6 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     function generateUpgradeCutData(
         StateTransitionDeployedAddresses memory _stateTransition,
         ChainCreationParamsConfig memory _chainCreationParams,
-        uint256 _l1ChainId,
-        address _ownerAddress,
         PublishFactoryDepsResult memory _factoryDepsResult,
         address _registeredChainIdDiamondProxy
     ) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {

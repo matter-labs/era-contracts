@@ -377,14 +377,12 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     function generateUpgradeCutDataFromLocalConfig(
         StateTransitionDeployedAddresses memory _stateTransition
     ) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
-        upgradeCutData = generateUpgradeCutData(
-            _stateTransition,
-            config.contracts.chainCreationParams,
-            config.l1ChainId,
-            config.ownerAddress,
-            factoryDepsResult,
-            upToDateZkChain.zkChainProxy
-        );
+        upgradeCutData = generateUpgradeCutData({
+            _stateTransition: _stateTransition,
+            _chainCreationParams: config.contracts.chainCreationParams,
+            _factoryDepsResult: factoryDepsResult,
+            _registeredChainIdDiamondProxy: upToDateZkChain.zkChainProxy
+        });
     }
 
     function getOwnerAddress() public virtual returns (address) {
