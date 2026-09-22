@@ -102,17 +102,17 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Returns the asset ID of ETH token for internal use.
-    function _ethTokenAssetId() internal view override returns (bytes32) {
+    function _getEthTokenAssetId() internal view override returns (bytes32) {
         return ETH_TOKEN_ASSET_ID;
     }
 
     /// @dev Returns the maximum number of ZK chains for internal use.
-    function _maxNumberOfZKChains() internal view override returns (uint256) {
+    function _getMaxNumberOfZKChains() internal view override returns (uint256) {
         return MAX_NUMBER_OF_ZK_CHAINS;
     }
 
     /// @dev Returns the L1 chain ID for internal use.
-    function _l1ChainId() internal view override returns (uint256) {
+    function _getL1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
     }
 

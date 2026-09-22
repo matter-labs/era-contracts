@@ -127,7 +127,6 @@ contract ZKSProvider is Script {
         args[4] = "--json";
 
         bytes memory modifiedJsonBytes = vm.ffi(args);
-        string memory modifiedJson = vm.toString(modifiedJsonBytes);
         string memory json2 = string(modifiedJsonBytes);
         // console.log("Total batches executed", modifiedJson);
         // console.log("json2", json2);
@@ -206,7 +205,7 @@ contract ZKSProvider is Script {
         require(bytes(l2RpcUrl).length > 0, "L2 RPC URL not set");
 
         // Get withdrawal log and L2ToL1 log
-        (Log memory log, uint64 l1BatchTxId) = getWithdrawalLog(l2RpcUrl, withdrawalHash, index);
+        (Log memory log, ) = getWithdrawalLog(l2RpcUrl, withdrawalHash, index);
         (uint64 l2ToL1LogIndex, L2ToL1Log memory l2ToL1Log) = getWithdrawalL2ToL1Log(l2RpcUrl, withdrawalHash, index);
         if (l2ToL1Log.key == bytes32(0)) {
             return params;
@@ -309,7 +308,7 @@ contract ZKSProvider is Script {
         // This is a simplified implementation - you may need to enhance the parsing
         string memory responseStr = string(jsonResponse);
 
-        string memory modifiedJson = callParseAltLog(responseStr, "parse-transaction-receipt.sh");
+        callParseAltLog(responseStr, "parse-transaction-receipt.sh");
         string memory altTransactionReceiptJson = callParseAltLog(responseStr, "parse-alt-transaction-receipt.sh");
         // console.log(responseStr);
         // console.log(altTransactionReceiptJson);
@@ -415,8 +414,6 @@ contract ZKSProvider is Script {
 
         Log[] memory logs = new Log[](altLogs.length);
         for (uint256 i = 0; i < altLogs.length; i++) {
-            bool removed;
-            string memory trueString = "true";
             logs[i] = Log({
                 addr: address(uint160(altLogs[i].addr)),
                 // addr: address(0),
@@ -492,7 +489,7 @@ contract ZKSProvider is Script {
         }
     }
 
-    function getBashScriptPath(string memory scriptName) internal returns (string memory scriptPath) {
+    function getBashScriptPath(string memory scriptName) internal pure returns (string memory scriptPath) {
         scriptPath = string.concat("./deploy-scripts/provider/bash-scripts/", scriptName);
     }
 

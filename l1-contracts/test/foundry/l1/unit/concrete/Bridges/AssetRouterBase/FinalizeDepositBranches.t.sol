@@ -61,11 +61,11 @@ contract TestAssetRouterBase is AssetRouterBase {
         return 1;
     }
 
-    function _bridgehub() internal view override returns (IBridgehubBase) {
+    function _getBridgehub() internal view override returns (IBridgehubBase) {
         return IBridgehubBase(address(1));
     }
 
-    function _interopHandler() internal view override returns (address) {
+    function _getInteropHandler() internal view override returns (address) {
         return address(1);
     }
 
@@ -73,7 +73,7 @@ contract TestAssetRouterBase is AssetRouterBase {
         return true;
     }
 
-    function _l1ChainId() internal view returns (uint256) {
+    function _getL1ChainId() internal view returns (uint256) {
         return 1;
     }
 

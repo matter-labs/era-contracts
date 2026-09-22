@@ -105,6 +105,9 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
     /// @param _data the data of the transaction
     // slither-disable-next-line locked-ether
     function bridgehubDeposit(
+        // Unused since `_registerCTMAssetOnL2Bridgehub` stopped taking it, but kept named:
+        // `IL1AssetHandler` fixes this signature and the name is part of the published ABI.
+        // solhint-disable-next-line no-unused-vars
         uint256 _chainId,
         address _originalCaller,
         uint256,
@@ -123,7 +126,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
         }
         (address _ctmL1Address, address _ctmL2Address) = abi.decode(_data[1:], (address, address));
 
-        request = _registerCTMAssetOnL2Bridgehub(_chainId, _ctmL1Address, _ctmL2Address);
+        request = _registerCTMAssetOnL2Bridgehub(_ctmL1Address, _ctmL2Address);
     }
 
     /// @notice The function called by the Bridgehub after the L2 transaction has been initiated.
@@ -153,10 +156,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
     }
 
     /// @notice Used to register the ctm asset in L2 Bridgehub.
-    /// @param _chainId the chainId of the chain
     function _registerCTMAssetOnL2Bridgehub(
-        // solhint-disable-next-line no-unused-vars
-        uint256 _chainId,
         address _ctmL1Address,
         address _ctmL2Address
     ) internal pure returns (L2TransactionRequestTwoBridgesInner memory request) {

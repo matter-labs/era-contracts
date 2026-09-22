@@ -73,13 +73,13 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
                         GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    function _l1ChainId() internal view override returns (uint256) {
+    function _getL1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
     }
-    function _bridgehub() internal view override returns (IL1Bridgehub) {
+    function _getBridgehub() internal view override returns (IL1Bridgehub) {
         return BRIDGEHUB;
     }
-    function _messageRoot() internal view override returns (IMessageRootBase) {
+    function _getMessageRoot() internal view override returns (IMessageRootBase) {
         return messageRoot;
     }
 
@@ -93,7 +93,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         return assetRouter;
     }
 
-    function _assetRouter() internal view override returns (IAssetRouterBase) {
+    function _getAssetRouter() internal view override returns (IAssetRouterBase) {
         return assetRouter;
     }
 
@@ -135,7 +135,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         // Note: _chainId is the settlement layer chain where the migration tx was proven,
         // while bridgehubBurnData.chainId is the chain being migrated. These are intentionally different.
 
-        (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeConfirmTransferResult(
+        (address zkChain, address ctm) = IBridgehubBase(_getBridgehub()).forwardedBridgeConfirmTransferResult(
             chainId,
             _txStatus
         );
@@ -179,12 +179,12 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         bytes32 baseAssetId = BRIDGEHUB.baseTokenAssetId(_chainId);
         address zkChain = BRIDGEHUB.getZKChain(_chainId);
         require(zkChain != address(0), ZKChainNotRegistered());
-        IL1AssetRouter l1AssetRouter = IL1AssetRouter(address(_assetRouter()));
+        IL1AssetRouter l1AssetRouter = IL1AssetRouter(address(_getAssetRouter()));
         IL1NativeTokenVault nativeTokenVault = IL1NativeTokenVault(address(l1AssetRouter.nativeTokenVault()));
 
         return
             // The chain must have version higher than v31.
-            !IL1MessageRoot(address(_messageRoot())).isPreV31(_chainId) &&
+            !IL1MessageRoot(address(_getMessageRoot())).isPreV31(_chainId) &&
             // The chain's base token must be registered in the NTV, as otherwise L1->L2 base-token
             // deposits (which the destination NTV relies on) would not work.
             nativeTokenVault.tokenAddress(baseAssetId) != address(0) &&
@@ -223,7 +223,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     ) external onlyOwner {
         require(_migrationNumber == 0, MigrationNumberMismatch(0, _migrationNumber));
         require(!_interval.isActive, MigrationIntervalNotSet());
-        uint256 legacyGwChainId = IL1MessageRoot(address(_messageRoot())).ERA_GATEWAY_CHAIN_ID();
+        uint256 legacyGwChainId = IL1MessageRoot(address(_getMessageRoot())).ERA_GATEWAY_CHAIN_ID();
         require(
             _interval.settlementLayerChainId == legacyGwChainId,
             HistoricalSettlementLayerMismatch(legacyGwChainId, _interval.settlementLayerChainId)
@@ -263,7 +263,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
 
             if (_batchNumber <= interval.migrateToGWBatchNumber) {
                 // Batch is before migration to SL, so it was on L1 during this interval.
-                return _claimedSettlementLayer == _l1ChainId();
+                return _claimedSettlementLayer == _getL1ChainId();
             }
 
             if (interval.isActive) {
@@ -288,7 +288,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         }
 
         // Default: batch was on L1 (no matching SL interval found)
-        return _claimedSettlementLayer == _l1ChainId();
+        return _claimedSettlementLayer == _getL1ChainId();
     }
 
     /// @inheritdoc IL1ChainAssetHandler
@@ -305,14 +305,14 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         uint256 _batchNumber,
         uint256 _newMigrationNum
     ) internal override {
-        if (_settlementChainId == _l1ChainId()) {
+        if (_settlementChainId == _getL1ChainId()) {
             revert SettlementLayerMustNotBeL1();
         }
         require(
             _newMigrationNum == MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER,
             MigrationNumberMismatch(MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER, _newMigrationNum)
         );
-        uint256 slBatchLowerBound = _messageRoot().currentChainBatchNumber(_settlementChainId);
+        uint256 slBatchLowerBound = _getMessageRoot().currentChainBatchNumber(_settlementChainId);
         _migrationInterval[_chainId][_newMigrationNum] = MigrationInterval({
             migrateToGWBatchNumber: _batchNumber,
             migrateFromGWBatchNumber: 0,
@@ -338,7 +338,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         MigrationInterval storage interval = _migrationInterval[_chainId][MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER];
         require(interval.isActive, MigrationIntervalNotSet());
         interval.migrateFromGWBatchNumber = _batchNumber;
-        interval.settlementLayerBatchUpperBound = _messageRoot().currentChainBatchNumber(
+        interval.settlementLayerBatchUpperBound = _getMessageRoot().currentChainBatchNumber(
             interval.settlementLayerChainId
         );
         interval.isActive = false;

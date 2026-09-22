@@ -17,10 +17,10 @@ import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 
 abstract contract CTMUpgradeBase is DeployCTMScript {
     /// @notice Build the full force-deployment list in universal format.
-    function getUniversalForceDeployments(
-        uint256 _l1ChainId,
-        address _ownerAddress
-    ) internal virtual returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments);
+    function getUniversalForceDeployments()
+        internal
+        virtual
+        returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments);
 
     /// @notice Override to add version-specific force deployments in universal format.
     function getAdditionalUniversalForceDeployments()
@@ -98,8 +98,6 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     function generateUpgradeCutData(
         StateTransitionDeployedAddresses memory _stateTransition,
         ChainCreationParamsConfig memory _chainCreationParams,
-        uint256 _l1ChainId,
-        address _ownerAddress,
         PublishFactoryDepsResult memory _factoryDepsResult,
         address _registeredChainIdDiamondProxy
     ) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
@@ -109,14 +107,12 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         facetCuts = getChainCreationFacetCuts(_stateTransition);
         facetCuts = FacetCutsLib.merge(facetCutsForDeletion, facetCuts);
         uint256 nonce = UpgradeHelperLib.getProtocolUpgradeNonce(_chainCreationParams.latestProtocolVersion);
-        ProposedUpgrade memory proposedUpgrade = getProposedUpgrade(
-            _stateTransition,
-            _chainCreationParams,
-            _l1ChainId,
-            _ownerAddress,
-            _factoryDepsResult,
-            nonce
-        );
+        ProposedUpgrade memory proposedUpgrade = getProposedUpgrade({
+            _stateTransition: _stateTransition,
+            _chainCreationParams: _chainCreationParams,
+            _factoryDepsResult: _factoryDepsResult,
+            _protocolUpgradeNonce: nonce
+        });
 
         upgradeCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -134,15 +130,10 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     function getProposedUpgrade(
         StateTransitionDeployedAddresses memory _stateTransition,
         ChainCreationParamsConfig memory _chainCreationParams,
-        uint256 _l1ChainId,
-        address _ownerAddress,
         PublishFactoryDepsResult memory _factoryDepsResult,
         uint256 _protocolUpgradeNonce
     ) public virtual returns (ProposedUpgrade memory proposedUpgrade) {
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments = getUniversalForceDeployments(
-            _l1ChainId,
-            _ownerAddress
-        );
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments = getUniversalForceDeployments();
 
         proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: composeUpgradeTx(deployments, _factoryDepsResult, _protocolUpgradeNonce),

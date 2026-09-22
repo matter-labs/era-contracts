@@ -44,7 +44,7 @@ library DeployCTMContracts {
     // ======================== Name resolution ========================
 
     /// @notice Resolve a CTMContract to its (fileName, contractName).
-    function resolve(CTMContract _c) internal view returns (string memory fileName, string memory contractName) {
+    function resolve(CTMContract _c) internal pure returns (string memory fileName, string memory contractName) {
         contractName = _resolveCTMContractName(_c);
         fileName = string.concat(contractName, ".sol");
     }
@@ -52,7 +52,7 @@ library DeployCTMContracts {
     /// @notice Resolve the main verifier (dual or testnet).
     function resolveMainVerifier(
         bool _testnet
-    ) internal view returns (string memory fileName, string memory contractName) {
+    ) internal pure returns (string memory fileName, string memory contractName) {
         return resolve(_testnet ? CTMContract.TestnetVerifier : CTMContract.DualVerifier);
     }
 
@@ -62,7 +62,7 @@ library DeployCTMContracts {
     function getCreationCalldata(
         CTMCoreDeploymentConfig memory _config,
         CTMContract _contractName
-    ) internal view returns (bytes memory) {
+    ) internal pure returns (bytes memory) {
         if (_contractName == CTMContract.AdminFacet) {
             return abi.encode(_config.l1ChainId, _config.rollupDAManager);
         } else if (_contractName == CTMContract.MailboxFacet) {
@@ -102,7 +102,7 @@ library DeployCTMContracts {
 
     /// @notice Convert a resolved contract name string to the corresponding CTMContract enum value.
     // solhint-disable-next-line code-complexity
-    function getCTMContractFromName(string memory _contractName) internal view returns (CTMContract) {
+    function getCTMContractFromName(string memory _contractName) internal pure returns (CTMContract) {
         if (_compareStrings(_contractName, "AdminFacet")) {
             return CTMContract.AdminFacet;
         } else if (_compareStrings(_contractName, "ExecutorFacet")) {
@@ -147,7 +147,7 @@ library DeployCTMContracts {
 
     /// @notice Resolve a CTMContract enum to its contract name.
     // solhint-disable-next-line code-complexity
-    function _resolveCTMContractName(CTMContract _c) private view returns (string memory) {
+    function _resolveCTMContractName(CTMContract _c) private pure returns (string memory) {
         if (_c == CTMContract.ChainTypeManager) {
             return "ChainTypeManager";
         }
@@ -168,7 +168,7 @@ library DeployCTMContracts {
         revert("DeployCTMContracts: unknown CTMContract");
     }
 
-    function _compareStrings(string memory _a, string memory _b) private view returns (bool) {
+    function _compareStrings(string memory _a, string memory _b) private pure returns (bool) {
         return keccak256(abi.encodePacked(_a)) == keccak256(abi.encodePacked(_b));
     }
 }

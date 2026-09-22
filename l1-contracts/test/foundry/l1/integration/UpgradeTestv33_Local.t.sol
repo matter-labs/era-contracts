@@ -64,8 +64,6 @@ contract CTMUpgrade_v33_Test is CTMUpgrade_v33 {
     function getProposedUpgrade(
         StateTransitionDeployedAddresses memory stateTransition,
         ChainCreationParamsConfig memory chainCreationParams,
-        uint256,
-        address,
         PublishFactoryDepsResult memory _factoryDepsResult,
         uint256 protocolUpgradeNonce
     ) public override returns (ProposedUpgrade memory proposedUpgrade) {

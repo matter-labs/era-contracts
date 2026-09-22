@@ -42,7 +42,7 @@ library CoreOnL2Helper {
     // ======================== Name resolution ========================
 
     /// @notice Resolve a CoreContract to its (fileName, contractName).
-    function resolve(CoreContract _c) internal view returns (string memory fileName, string memory contractName) {
+    function resolve(CoreContract _c) internal pure returns (string memory fileName, string memory contractName) {
         contractName = _resolveContractName(_c);
         fileName = string.concat(contractName, ".sol");
     }
@@ -67,7 +67,7 @@ library CoreOnL2Helper {
 
     function getFullListOfFactoryDependencies(
         CoreContract[] memory _additionalDependencyContracts
-    ) internal returns (bytes[] memory factoryDeps) {
+    ) internal view returns (bytes[] memory factoryDeps) {
         bytes[] memory basicDependencies = SystemContractsProcessing.getBaseListOfDependencies();
         bytes[] memory sharedDependencies = _getFactoryDependencyBytecodes(_getSharedFactoryDependencyContracts());
         bytes[] memory additionalDependencies = _getFactoryDependencyBytecodes(_additionalDependencyContracts);
@@ -109,7 +109,7 @@ library CoreOnL2Helper {
 
     function _getFactoryDependencyBytecodes(
         CoreContract[] memory _dependencyContracts
-    ) private returns (bytes[] memory dependencyBytecodes) {
+    ) private view returns (bytes[] memory dependencyBytecodes) {
         dependencyBytecodes = new bytes[](_dependencyContracts.length);
 
         for (uint256 i; i < _dependencyContracts.length; i++) {

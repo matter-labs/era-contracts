@@ -36,7 +36,7 @@ contract FinalizeUpgrade is Script, IFinalizeUpgrade {
     function initTokens(
         address payable l1NativeTokenVault,
         address[] calldata tokens,
-        uint256[] calldata chains
+        uint256[] calldata /* chains */
     ) external {
         L1NativeTokenVault vault = L1NativeTokenVault(l1NativeTokenVault);
 
@@ -78,7 +78,7 @@ contract FinalizeUpgrade is Script, IFinalizeUpgrade {
         uint256 _callIndex,
         address _to,
         bytes memory _data
-    ) internal returns (uint256) {
+    ) internal pure returns (uint256) {
         _calls[_callIndex] = MulticallWithGas.Call({to: _to, gasLimit: GAS_PER_TX, data: _data});
 
         return _callIndex + 1; // increment the pointer
