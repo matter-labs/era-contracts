@@ -130,9 +130,9 @@
   {
     "contractName": "l1-contracts/CTMDeploymentTracker",
     "evmBytecodePath": "/l1-contracts/out/CTMDeploymentTracker.sol/CTMDeploymentTracker.json",
-    "evmBytecodeHash": "0x57fcd6b15b3966f514105bc5858e6ebf1e34e3702530a173b753f44e7bb07a66",
-    "evmDeployedBytecodeHash": "0x96082fb5ed13c0a6f982e1706ff8fe55975995a7ba20482713b7f7f27df43f8c",
-    "evmDeployedBytecodeBlakeHash": "0x51da084cb6ca3dc82449511831d3e056934abe02a478197c939b353d9c5ae259",
+    "evmBytecodeHash": "0xf3fa1dd8fe6323314c8c505831b4ece5558967344a38a13ec130903bad263ad3",
+    "evmDeployedBytecodeHash": "0x5396d571fab63cbbd48b7ff3b33833305851195978f46202db510701b5c05a02",
+    "evmDeployedBytecodeBlakeHash": "0x942ee3cc3c87682d481255f42f28e70767594b1c22bb658ba4d0947108735319",
     "evmDeployedBytecodeLength": 5563
   },
   {
