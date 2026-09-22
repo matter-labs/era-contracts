@@ -371,8 +371,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         upgradeCutData = generateUpgradeCutData({
             _stateTransition: _stateTransition,
             _chainCreationParams: config.contracts.chainCreationParams,
-            _l1ChainId: config.l1ChainId,
-            _ownerAddress: config.ownerAddress,
             _factoryDepsResult: factoryDepsResult,
             _registeredChainIdDiamondProxy: upToDateZkChain.zkChainProxy
         });

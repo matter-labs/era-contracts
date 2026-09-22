@@ -256,6 +256,33 @@
             "name": "chainAdmin",
             "type": "address",
             "internalType": "address"
+          },
+          {
+            "name": "multiProof",
+            "type": "tuple",
+            "internalType": "struct MultiProofAddresses",
+            "components": [
+              {
+                "name": "airbenderVerifier",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "ziskVerifier",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "ziskTestnetVerifier",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "multiProofVerifier",
+                "type": "address",
+                "internalType": "address"
+              }
+            ]
           }
         ]
       }
@@ -301,6 +328,28 @@
             "name": "testnetVerifier",
             "type": "bool",
             "internalType": "bool"
+          },
+          {
+            "name": "multiProof",
+            "type": "tuple",
+            "internalType": "struct MultiProofConfig",
+            "components": [
+              {
+                "name": "enabled",
+                "type": "bool",
+                "internalType": "bool"
+              },
+              {
+                "name": "ziskPlonkVerifierAddr",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "ziskRangeVerifierAddr",
+                "type": "address",
+                "internalType": "address"
+              }
+            ]
           },
           {
             "name": "contracts",

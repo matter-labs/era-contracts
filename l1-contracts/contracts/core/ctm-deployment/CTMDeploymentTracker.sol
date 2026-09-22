@@ -100,12 +100,11 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
     /// for the L2 transaction.
     /// The second approach is used due to its simplicity even though it gives the sender slightly more control over the call:
     /// `gasLimit`, etc.
-    /// @param _chainId the chainId of the chain
     /// @param _originalCaller the previous message sender
     /// @param _data the data of the transaction
     // slither-disable-next-line locked-ether
     function bridgehubDeposit(
-        uint256 _chainId,
+        uint256 /* _chainId */,
         address _originalCaller,
         uint256,
         bytes calldata _data
@@ -123,7 +122,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
         }
         (address _ctmL1Address, address _ctmL2Address) = abi.decode(_data[1:], (address, address));
 
-        request = _registerCTMAssetOnL2Bridgehub(_chainId, _ctmL1Address, _ctmL2Address);
+        request = _registerCTMAssetOnL2Bridgehub(_ctmL1Address, _ctmL2Address);
     }
 
     /// @notice The function called by the Bridgehub after the L2 transaction has been initiated.
@@ -153,9 +152,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
     }
 
     /// @notice Used to register the ctm asset in L2 Bridgehub.
-    /// @dev The first parameter is the (currently unused) chainId of the chain.
     function _registerCTMAssetOnL2Bridgehub(
-        uint256 /* _chainId */,
         address _ctmL1Address,
         address _ctmL2Address
     ) internal pure returns (L2TransactionRequestTwoBridgesInner memory request) {

@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.28;
 
+// solhint-disable no-console
+
 import {console2 as console} from "forge-std/Script.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
@@ -38,6 +40,8 @@ import {
     GatewayCTMFinalConfig,
     GatewayCTMFinalResult
 } from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
+
+// solhint-disable gas-custom-errors
 
 struct InnerDeployConfig {
     address deployerAddr;
@@ -549,8 +553,7 @@ library GatewayCTMDeployerHelper {
                 config: config,
                 baseConfig: baseConfig,
                 ctmImplementation: result.chainTypeManagerImplementation,
-                serverNotifierProxy: result.serverNotifierProxy,
-                temporaryOwner: deployerAddr
+                serverNotifierProxy: result.serverNotifierProxy
             });
             result.diamondCutData = _buildDiamondCutDataEncoded(config.facets, baseConfig);
             result.chainTypeManagerProxy = _deployInternalWithParams(
@@ -615,10 +618,7 @@ library GatewayCTMDeployerHelper {
         GatewayCTMFinalConfig memory config,
         GatewayCTMDeployerConfig memory baseConfig,
         address ctmImplementation,
-        address serverNotifierProxy,
-        // Unused by this builder, but named so callers can use named arguments.
-        // solhint-disable-next-line no-unused-vars
-        address temporaryOwner
+        address serverNotifierProxy
     ) private pure returns (bytes memory) {
         Diamond.DiamondCutData memory diamondCut = abi.decode(
             _buildDiamondCutDataEncoded(config.facets, baseConfig),
