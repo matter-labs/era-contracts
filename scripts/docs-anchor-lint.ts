@@ -75,7 +75,11 @@ export function anchorToSlug(anchor: string): string {
   return anchor.slice(1).replace(/\\/g, "").toLowerCase();
 }
 
-// Extracts the heading slugs of a markdown document.
+// Explicit HTML anchors (`<a id="..."></a>`) that GitHub renders as link targets. They keep an
+// anchor stable when its heading is renamed but source comments still point at the old slug.
+const EXPLICIT_ANCHOR_RE = /<a\s+(?:id|name)="([^"]+)"\s*>\s*<\/a>/g;
+
+// Extracts the heading slugs (and explicit `<a id>` anchors) of a markdown document.
 //
 // Fenced code blocks are skipped so a `#` in a code sample is not read as a heading. GFM allows both
 // backtick and tilde fences, and a fence is closed only by a fence of the SAME character that is at
@@ -108,6 +112,7 @@ export function headingSlugs(markdown: string): Set<string> {
       continue;
     }
     if (fence) continue;
+    for (const a of line.matchAll(EXPLICIT_ANCHOR_RE)) slugs.add(a[1].toLowerCase());
     const m = /^(#{1,6})\s+(.*)$/.exec(line);
     if (m) slugs.add(slugify(m[2], seen));
   }
@@ -270,6 +275,16 @@ function selftest(): number {
   // real headings around fences must still be found
   if (!hasSlug("# Real\n\n~~~\n# Fake\n~~~\n\n## After\n", "real")) failures.push("heading before fence lost");
   if (!hasSlug("# Real\n\n~~~\n# Fake\n~~~\n\n## After\n", "after")) failures.push("heading after fence lost");
+
+  // explicit HTML anchors resolve like headings, but not inside fences
+  const anchorTag = (id: string) => `<a id="${id}"></a>`;
+  if (!hasSlug(`${anchorTag("old-slug")}\n\n## New heading\n`, "old-slug")) {
+    failures.push("explicit <a id> anchor lost");
+  }
+  if (!hasSlug(`${anchorTag("old-slug")}\n\n## New heading\n`, "new-heading")) {
+    failures.push("heading after anchor lost");
+  }
+  if (hasSlug(`\`\`\`\n${anchorTag("fake")}\n\`\`\`\n`, "fake")) failures.push("explicit anchor inside fence leaked");
 
   // slug rules
   const seen = new Map<string, number>();

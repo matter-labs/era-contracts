@@ -129,6 +129,8 @@ destination's `L2NativeTokenVault.updateL2` consumes to initialize the chain's b
 on the destination), and the base token supports `totalSupply()` (true for everything except
 pre-v31 ZKsync OS chains, whose value is backfilled during v31 before the v33 upgrade).
 
+<a id="v32-chain-migrations-are-explicitly-disabled"></a>
+
 ### v33: chain migrations are explicitly disabled
 
 Beginning with v33 and still in this release, the protocol operates under the invariant that **all

@@ -44,6 +44,8 @@ protocol `sides` has length 1 and holds only the root; the array shape is reserv
 proof forms. `logId` (`interopRootLogId`) increments **at most once per block**: all emissions within
 one block share the same `logId` so the server can group them; it counts starting from v31 only.
 
+<a id="v31-vs-v32-append-flows"></a>
+
 ## v31 vs v33 append flows
 
 Two entry points exist on `MessageRootBase`, both restricted to the chain's own diamond (its `ExecutorFacet` calls them directly while settling; asset correctness across chains is guaranteed by ZK proofs):

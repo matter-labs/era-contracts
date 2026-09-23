@@ -26,15 +26,15 @@ destination handler.
 
 ### Atomic interop
 
-4. [Atomic interop overview](../atomicity/README.md) — the L2 -> L2 commitment, finality, timeout, and
+1. [Atomic interop overview](../atomicity/README.md) — the L2 -> L2 commitment, finality, timeout, and
    recovery protocol, followed by its detailed pages: [commitment tree](../atomicity/imt.md),
    [lifecycle](../atomicity/flow.md), [proofs](../atomicity/proofs.md),
    [recovery](../atomicity/recovery.md), and [security](../atomicity/security.md).
 
 ### Related subsystems
 
-5. [Message root](../message-root.md) — settlement aggregation and dependency-root import.
-6. [Bridging](../bridging.md) — asset-router, native-token-vault, and recovery integration.
+1. [Message root](../message-root.md) — settlement aggregation and dependency-root import.
+2. [Bridging](../bridging.md) — asset-router, native-token-vault, and recovery integration.
 
 The [examples](./examples/README.md) describe message, asset-transfer, and multi-leg flows without
 presenting a second source of truth for the contract behavior.
