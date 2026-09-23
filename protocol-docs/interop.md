@@ -180,13 +180,13 @@ the entire send revert, including its burns.
 
 `L2InteropRootStorage` stores the message roots of other chains on the L2, keyed by `(chainId, blockOrBatchNumber)`. Roots are imported **only by the bootloader** via `addSingleInteropRoot` / `addInteropRootsInBatch`, as full `(blockOrBatchNumber, root, timestamp)` tuples (`InteropRoot` → `StoredInteropRoot`):
 
-- `blockOrBatchNumber` is a **block number** for proof-based interop and a **batch number** for commit-based interop, reflecting the implementation requirements of each finality form.
+- `blockOrBatchNumber` is the settlement layer's **block number**.
 - `sides` currently must contain exactly one element — the root itself (`SidesLengthNotOne`). The array
   shape is reserved for possible future proof forms; pre-commit/parallel-building interop is not
   supported by this release.
 - The imported tuple is double-checked on the settlement layer during batch execution (`ExecutorFacet._verifyDependencyInteropRoots`, against `MessageRoot.historicalRoot`), so time-sensitive proofs — e.g. the atomic-interop timeout protocol — can rely on the timestamp as much as on the root itself.
 - Zero roots and zero timestamps are rejected on import, keeping the invariant structural: a zero stored timestamp only ever means "nothing imported at this key" (the atomic timeout path relies on this). A root for a given key can be set only once (`InteropRootAlreadyExists`).
-- This logic is deployed on ZKsync OS chains only. No roots recorded under previous protocol versions exist, because interop was not activated in v31; the v31→v32 widening of the stored value from `bytes32` to a struct is storage-safe (the mapping was empty, and the struct's first member occupies the old slot).
+- This logic is deployed on ZKsync OS chains only. No roots recorded under previous protocol versions exist, because interop was not activated in v31; the v31→v33 widening of the stored value from `bytes32` to a struct is storage-safe (the mapping was empty, and the struct's first member occupies the old slot).
 
 ### Message verification (`L2MessageVerification`)
 

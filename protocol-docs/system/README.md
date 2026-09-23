@@ -6,46 +6,13 @@ cross-chain messaging, consensus registry, and the ZKsync OS
 execution environment. The focused documents linked below remain the source of truth for their
 individual flows.
 
-The first commit that introduced this directory is an unedited port of the architecture sources from
-`zksync-era`'s `kl/interop-docs` branch. Later commits update and consolidate that material against the
-contracts in this release. [The porting map](./porting-map.md) accounts for the original sections,
-including documents that described designs which were never deployed or have since been replaced.
-
 ## System map
 
-```mermaid
-flowchart TB
-    G[Governance and chain admin] --> BH[L1 Bridgehub]
-    BH --> CTM[Chain Type Manager]
-    CTM --> D[Per-chain diamond]
-    D --> CO[Committer facet]
-    D --> EX[Executor facet]
-    D --> MB[Mailbox facet]
-    D --> AD[Admin, getters, and migrator facets]
-    CO --> DA[L1 DA validator]
-    EX --> V[Verifier]
-    MB --> PQ[Priority tree]
+![L1 contracts and who controls them](./contracts/img/l1_architecture.png)
 
-    BH --> AR[L1 AssetRouter]
-    AR --> NTV[L1 NativeTokenVault]
-    AR --> N[L1 Nullifier]
-    AR --> CAH[ChainAssetHandler]
-
-    D --> MR[L1 MessageRoot]
-    MR --> IR[Imported roots on L2]
-    IC[L2 InteropCenter] --> IMT[L2 interop commitment tree]
-    IMT --> D
-    IR --> IH[L2 InteropHandler]
-    IC --> L2AR[L2 AssetRouter]
-    L2AR --> L2NTV[L2 NativeTokenVault]
-
-    BL[ZKsync OS bootloader] --> SC[ZKsync OS built-ins]
-    BL --> LM[L2-to-L1 messaging and pubdata]
-    LM --> DA
-```
-
-Arrows represent control, verification, or committed-data dependencies; they are not all synchronous
-calls. A chain's diamond is the L1 settlement contract for that chain. Its facets share diamond
+L2 contracts and their interaction with L1 are shown in the
+[interop bundle flow](../interop/architecture.md) and [chain deployment](../chain-lifecycle.md)
+diagrams. A chain's diamond is the L1 settlement contract for that chain. Its facets share diamond
 storage and jointly accept priority operations, commit/prove/execute batches, expose state, and apply
 administrative changes.
 
@@ -56,8 +23,8 @@ administrative changes.
 | Ecosystem coordination  | `L1Bridgehub` is the registry and entry point for chains, chain types, settlement-layer routing, and L1 -> L2 requests. A `ChainTypeManager` creates and upgrades chain diamonds that share a verifier and protocol rules. | [Chain management](./contracts/chain_management/overview.md), [chain lifecycle](../chain-lifecycle.md)                                                       |
 | Chain settlement        | The committer validates batch data and DA; the executor verifies proofs, executes batches, and consumes priority-tree entries. Mailbox, admin, getters, and migrator facets provide the remaining chain operations.        | [Settlement contracts](./contracts/settlement_contracts/zkchain_basics.md), [priority operations](./contracts/settlement_contracts/priority_queue/README.md) |
 | Data availability       | For ZKsync OS, the committed batch carries a DA commitment that the configured L1 validator checks against operator-supplied calldata or blob-versioned hashes.                                                            | [Data availability](./contracts/settlement_contracts/data_availability/README.md)                                                                            |
-| Asset movement          | Asset routers select an asset handler by asset ID. Native token vaults implement the standard token path; custom handlers may implement other assets. The L1 nullifier records deposits and prevents withdrawal replay.    | [Bridging](../bridging.md), [ported bridge diagrams and background](./contracts/bridging/overview.md)                                                        |
-| Cross-chain messaging   | L2 -> L2 bundles use the atomic interop commitment tree, settlement roots, and destination handlers. The restricted L2 -> L1 route uses the L2-to-L1 message tree and `L1InteropHandler`.                                  | [Interop](../interop.md), [interop architecture](../interop/architecture.md), [atomicity](../atomicity/README.md), [message root](../message-root.md)        |
+| Asset movement          | Asset routers select an asset handler by asset ID. Native token vaults implement the standard token path; custom handlers may implement other assets. The L1 nullifier records deposits and prevents withdrawal replay.    | [Bridging](../bridging.md), [bridging architecture](./contracts/bridging/overview.md)                                                                        |
+| Cross-chain messaging   | L2 -> L2 bundles use the atomic interop commitment tree, settlement roots, and destination handlers. The restricted L2 -> L1 route uses the L2-to-L1 message tree and `L1InteropHandler`.                                  | [Interop](../interop/README.md), [message root](../message-root.md)                                                                                          |
 | Consensus               | `ConsensusRegistry` maintains validator and attester membership and committee snapshots for off-chain consensus consumers. It does not replace L1 proof verification.                                                      | [Consensus registry](./contracts/consensus/README.md)                                                                                                        |
 | Execution environment   | ZKsync OS initializes its protocol contracts at fixed L2 addresses and exposes the batch, priority-transaction, message-root, and interop outputs consumed by the shared L1 contracts.                                     | [System hooks](./system-hooks.md), [ZKsync OS genesis](../chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins)                   |
 | Governance and upgrades | Governance registers implementations and protocol versions through the CTM; each chain applies the version through its admin facet. Permanent restrictions and upgrade tooling constrain privileged operations.            | [Upgrade process](./contracts/chain_management/upgrade_process.md), [creating upgrades](./contracts/chain_management/creating_upgrades.md)                   |
@@ -125,9 +92,6 @@ For a contract-oriented tour, read:
 3. [Data availability](./contracts/settlement_contracts/data_availability/README.md)
 4. [Bridging](../bridging.md)
 5. [Message roots](../message-root.md)
-6. [Interop](../interop/README.md) and [atomicity](../atomicity/README.md)
+6. [Interop](../interop/README.md), including atomic interop
 7. [ZKsync OS system hooks](./system-hooks.md)
 8. [ZKsync OS genesis and built-ins](../chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins)
-
-The [source porting map](./porting-map.md) is the audit trail from the old `zksync-era` layout to
-these current pages.

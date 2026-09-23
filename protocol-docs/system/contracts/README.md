@@ -1,7 +1,7 @@
 # Contracts architecture index
 
-Start with [the complete system architecture](../README.md). This index links the detailed pages that
-were ported from `zksync-era` and retained for the current `era-contracts` layout.
+Start with [the complete system architecture](../README.md). This index links the detailed pages for
+each contract domain.
 
 - [Chain management](./chain_management/overview.md)
   - [Bridgehub](./chain_management/bridgehub.md)
@@ -26,5 +26,3 @@ settlement, and bridge domains:
 - {protocol-docs/interop/README.md}
 - {protocol-docs/atomicity/README.md}
 - {protocol-docs/message-root.md}
-
-See [the system porting map](../porting-map.md) for removed and superseded source pages.

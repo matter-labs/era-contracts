@@ -1,39 +1,16 @@
 # Interop architecture
 
-This page is the architecture-level replacement for the ported `zksync-era` interop pages. It keeps
-their complete subject area—messages, calls, bundles, execution, fees, proof transport, bridging,
-retries, cancellation, and atomicity—while describing the contracts that exist in this release. The
+This page describes the interop architecture of this release: messages, calls, bundles, execution,
+fees, proof transport, bridging, retries, cancellation, and atomicity. The
 normative field-by-field behavior remains in {protocol-docs/interop.md}; the atomic proof and recovery
 arguments remain in {protocol-docs/atomicity/README.md}.
 
 ## System map
 
-```mermaid
-flowchart LR
-    U[User or bridge] --> C[InteropCenter<br/>L2 0x1000d]
-    C --> P[InteropAttributeParser<br/>L2 0x10015]
-    C --> R[L2 AssetRouter<br/>L2 0x10003]
-    C --> F[AtomicFlowManager<br/>L2 0x10014]
-    F --> T[L2InteropCommitmentTree<br/>L2 0x10012]
-    T --> H[Commitment leaf hook<br/>0x7004]
-    T --> B[Chain batch root]
-    B --> M[MessageRoot<br/>L1]
-    M --> S[L2InteropRootStorage<br/>L2 0x10008]
-    S --> F
-    F --> L2H[L2InteropHandler<br/>L2 0x1000e]
-    C --> X[L2-to-L1 messenger]
-    X --> M
-    M --> L1H[L1InteropHandler<br/>L1 proxy]
-    L2H --> D[ERC-7786 recipients]
-    L1H --> L1R[Canonical L1 AssetRouter]
-```
-
-The arrows show protocol dependencies, not synchronous calls. Settlement and dependency-root import
-separate source-chain commitment from destination execution.
-
 ![L2 -> L2 bundle flow: send, settle on L1, import root, relay and execute](./img/interop_bundle_flow.png)
 
-The call sequence for one L2 -> L2 bundle leg, including an optional token transfer.
+The call sequence for one L2 -> L2 bundle leg, including an optional token transfer. Settlement
+and dependency-root import separate source-chain commitment from destination execution.
 
 | Component                 | Layer | Responsibility                                                                 |
 | ------------------------- | ----- | ------------------------------------------------------------------------------ |
@@ -241,7 +218,7 @@ hashes, their source chains, a deadline, the L1 settlement layer, and a version.
 proves all legs committed before the deadline. If one leg is absent after the deadline, committed
 source legs become recoverable.
 
-This replaces both ported atomicity proposals:
+In particular:
 
 - there is no L1 atomic coordinator, escrow, or freeze contract;
 - there is no DA-simulation protocol or locked-state execution mode;

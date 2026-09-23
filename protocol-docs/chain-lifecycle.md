@@ -6,7 +6,7 @@ current release). Contract doc comments reference this file instead of restating
 
 Related documents, which are the source of truth for their own topics:
 
-- {protocol-docs/message-root.md} — the `MessageRoot` tree structure, the v31 vs v32 batch-root
+- {protocol-docs/message-root.md} — the `MessageRoot` tree structure, the v31 vs v33 batch-root
   flows (`addChainBatchRoot` vs `addChainBatchRootV32`), and interop-root import/verification.
 - {protocol-docs/interop.md} — the interop message path (`InteropCenter`, `InteropHandler`,
   bundles, interop roots).
@@ -95,7 +95,7 @@ Checks performed before sending the registration:
 
 - The chain to be registered is known to the Bridgehub (its `baseTokenAssetId` is non-zero).
 - Both chains settle on the **same** settlement layer (`ChainsSettlementLayerMismatch` otherwise).
-  Both settling directly on L1 is permitted as of v32: L1 itself builds interop roots
+  Both settling directly on L1 is permitted as of v33: L1 itself builds interop roots
   (`MessageRootBase.addChainBatchRootV32`) and serves the corresponding inclusion proofs, so
   L1-settled chains participate in interop directly. (In v31 this case was rejected with
   the now-removed `ChainsSettlingOnL1` error.)
@@ -106,7 +106,7 @@ Checks performed before sending the registration:
   `sharedTree` leaf and has a batch in its chain tree.
 
 No backfill of pre-existing chains is needed for this gate: during v31 non-L1 settlement was never
-activated and registration required that a chain does **not** settle on L1, so at the start of v32
+activated and registration required that a chain does **not** settle on L1, so at the start of v33
 no chains have been registered for interop — every chain passes through this gate (and gets its
 tree populated) before interop can target it.
 
@@ -127,11 +127,11 @@ destination's `L2NativeTokenVault.updateL2` consumes to initialize the chain's b
 (per the L1 `MessageRoot`), its base token is registered in the L1 `NativeTokenVault`
 (`tokenAddress(baseAssetId) != address(0)`, otherwise L1->L2 base-token deposits would not work
 on the destination), and the base token supports `totalSupply()` (true for everything except
-pre-v31 ZKsync OS chains, whose value is backfilled during v31 before the v32 upgrade).
+pre-v31 ZKsync OS chains, whose value is backfilled during v31 before the v33 upgrade).
 
-### v32: chain migrations are explicitly disabled
+### v33: chain migrations are explicitly disabled
 
-Beginning with v32 and still in this release, the protocol operates under the invariant that **all
+Beginning with v33 and still in this release, the protocol operates under the invariant that **all
 supported chains settle on L1**. Chain migrations between settlement layers are explicitly disabled
 to remove migration-related risks:
 
@@ -200,7 +200,7 @@ installs the protocol version's verifier, and this release deploys a fresh one, 
 proof under the old verifier would stop being provable.
 
 Address discovery has to match the ecosystem's version, because the getters it reads were introduced in
-different releases (`chainRegistrationSender` in v31, `l1InteropHandler` in v32): `AddressIntrospector`
+different releases (`chainRegistrationSender` in v31, `l1InteropHandler` in v33): `AddressIntrospector`
 therefore exposes one entry point per protocol generation, and the upgrade scripts pick between them by protocol version.
 Autodetection reads the version of a registered chain, which lags the L1 contracts — an ecosystem whose
 core contracts are already upgraded while its chains are not (mid-upgrade, or a local fixture built from
@@ -241,6 +241,6 @@ and the force deployments in the same transaction install their code before the 
 The same upgrade list also neutralizes the tracker this release removes
 (`SystemContractsProcessing.getRemovedTrackerNeutralizations`): v31 deployed the `GWAssetTracker` as a
 system-proxied built-in on every ZKsync OS chain, so the upgrade swaps that proxy's implementation for
-`EmptyContract` — otherwise the retired tracker code would stay callable. Chains created on v32 receive
+`EmptyContract` — otherwise the retired tracker code would stay callable. Chains created on v33 receive
 the same EmptyContract-backed proxy from genesis, so fresh and upgraded chains match at the reserved
 address.

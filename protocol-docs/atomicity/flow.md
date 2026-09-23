@@ -52,35 +52,6 @@ the logs/multichain leaves. Full mechanics in {protocol-docs/atomicity/proofs.md
 
 ![Atomic interop success path: send and commit on Chain A, settle to L1, finalize on Chain B](./img/atomic_flow_success.png)
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant IC as InteropCenter (src)
-    participant M as AtomicFlowManager (src)
-    participant T as L2InteropCommitmentTree (src)
-    participant BL as Bootloader / MessageRoot
-    participant H as InteropHandler (dst)
-
-    Note over U,T: 1. Atomic send (once per leg, on its source chain)
-    U->>IC: sendBundle(bundle, atomicBundle attr)
-    IC->>M: append(bundleHash, lowNullifierIndex, preimage)
-    M->>M: validate preimage, recompute flowId
-    M-->>M: LegState = Committed
-    M->>T: insert(commitValue, lowNullifierIndex)
-    T-->>T: leaf -> INTEROP_COMMITMENT_LEAF_HOOK (DA log)
-
-    Note over BL: 2. Root settlement + import (every batch boundary)
-    T-->>BL: IMT root snapshot (chain batch root leaf 2/3)
-    BL-->>H: re-imported interop root
-
-    Note over U,H: 3. Finalize (destination)
-    U->>H: executeAtomicBundle(bundle, AtomicFinalityProof)
-    H->>M: requireFlowFinalized(bundleHash, finality)
-    M->>M: verifyInclusion for every leg (in time)
-    M-->>H: ok
-    H->>H: execute bundle calls (mint)
-```
-
 ### 1. Atomic send (append)
 
 The source burn flows through the normal `initiateIndirectCall` / `L2AssetRouter` path; instead of

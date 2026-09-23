@@ -15,18 +15,26 @@ destination handler.
 
 ## Reading order
 
+### Interop
+
 1. [The interop protocol](../interop.md) — bundle and call encoding, ERC-7786 attributes, fees, send
    restrictions, handlers, replay protection, and layer-specific execution.
 2. [Contract architecture](./architecture.md) — complete component map, protocol layers, source and
    destination flows, gas/retries/cancellation, proof transport, bridging, and deployment scope.
 3. [Forms of finality](./forms_of_finality.md) — the proof used by each supported route and the role
    of imported roots.
-4. [Atomic interop](../atomicity/README.md) — the L2 -> L2 commitment, finality, timeout, and recovery
-   protocol.
+
+### Atomic interop
+
+4. [Atomic interop overview](../atomicity/README.md) — the L2 -> L2 commitment, finality, timeout, and
+   recovery protocol, followed by its detailed pages: [commitment tree](../atomicity/imt.md),
+   [lifecycle](../atomicity/flow.md), [proofs](../atomicity/proofs.md),
+   [recovery](../atomicity/recovery.md), and [security](../atomicity/security.md).
+
+### Related subsystems
+
 5. [Message root](../message-root.md) — settlement aggregation and dependency-root import.
 6. [Bridging](../bridging.md) — asset-router, native-token-vault, and recovery integration.
-7. [`zksync-era` porting map](./porting-map.md) — where every source page/topic lives now and why
-   retired diagrams/components are not carried as current architecture.
 
 The [examples](./examples/README.md) describe message, asset-transfer, and multi-leg flows without
 presenting a second source of truth for the contract behavior.

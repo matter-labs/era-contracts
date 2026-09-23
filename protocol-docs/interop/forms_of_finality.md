@@ -15,8 +15,7 @@ leg. `AtomicFlowManager.requireFlowFinalized` authenticates each source-chain tr
 imported interop root and checks that every leg was committed no later than the flow deadline. See
 {protocol-docs/atomicity/proofs.md} for the proof format and its soundness argument.
 
-This is commit-based finality in the sense that it proves commitment-tree membership. It is not the
-older public-bundle design in which an L2 -> L1 message was proven separately for each L2 -> L2 call.
+The proof shows commitment-tree membership. It is not the older public-bundle design in which an L2 -> L1 message was proven separately for each L2 -> L2 call.
 
 ## Message-inclusion finality for L2 -> L1
 
@@ -39,7 +38,6 @@ may therefore rely on both the root and its timestamp.
 
 ## Unsupported historical modes
 
-The ported `zksync-era` documentation also described trigger-based automatic execution,
-AliasedAccounts, public non-atomic L2 -> L2 messages, and pre-commit/parallel-building finality. Those
-are not supported by this release. `InteropRoot.sides` retains a forward-compatible array encoding,
-but current proof- and commit-based imports require exactly one element: the root.
+Trigger-based automatic execution, AliasedAccounts, public non-atomic L2 -> L2 messages, and
+pre-commit/parallel-building finality are not supported by this release. `InteropRoot.sides` retains a forward-compatible array encoding,
+but imports currently require exactly one element: the root.
