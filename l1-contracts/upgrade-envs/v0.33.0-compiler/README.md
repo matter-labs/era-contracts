@@ -15,11 +15,18 @@ default account or EVM emulator hash, or that carry an L2 upgrade transaction.
 | Era CTM (governance) | stage 0 `ChainAssetHandler.pauseMigration()`; stage 1 `setNewVersionUpgrade(v0.32.2 → v0.33.0)` and `setChainCreationParams`; stage 2 `unpauseMigration()`                                                                                         |
 | Upgrade cut          | no facet cuts; `initAddress` = the CTM's existing `DefaultUpgrade` (`0x98845F…`, used for v0.32.2) so the storage writes are compiled against the live diamond layout; verifier unchanged                                                          |
 | `ProposedUpgrade`    | bootloader / default account / EVM emulator hashes from `configs/genesis/era/latest.json`; L2 tx type 254 from the force deployer to `ContractDeployer.forceDeployOnAddresses` with the 31 system contracts, no constructor calls; 51 factory deps |
-| New chains           | the CTM's current creation parameters with only the genesis batch values and the diamond init's three hashes replaced                                                                                                                              |
+| New chains           | the CTM's current genesis upgrade, facets and diamond init; genesis batch values and the diamond init's three hashes replaced; force-deployment data rebuilt (see below)                                                                           |
 | Per chain            | the chain admin calls `upgradeChainFromVersion(chain, v0.32.2, cut)`                                                                                                                                                                               |
 
+The force-deployment data for new chains is rebuilt rather than copied. The blob the CTM stores
+predates #2239, which removed `gatewayChainId` from `FixedForceDeploymentsData`, so a v33 genesis's
+`L2GenesisUpgrade` cannot decode it. It also names the old compile's L2 built-ins, which a v33
+genesis does not know. The rebuilt blob uses this branch's layout and bytecode, and carries every
+other value over from the stored blob after checking it against the bridgehub and CTM: L1 asset
+router, governance, chain registration sender, era chain id, chain limit and ZK token asset id.
+
 The fixed-address L2 core contracts (bridgehub, asset router, NTV, message root, …) are not
-redeployed. They hold live storage, and the NTV and chain asset handler hold constructor state that
+redeployed on existing chains. They hold live storage, and the NTV and chain asset handler hold constructor state that
 a plain force deployment would reset.
 
 ## Files

@@ -8,6 +8,9 @@ import {stdToml} from "forge-std/StdToml.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
+import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
+import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
+import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
@@ -40,11 +43,15 @@ import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 ///    state that a plain force deployment would reset; the compiler fix is in the system layer.
 ///
 /// New chains: `setChainCreationParams` re-issues the CTM's current creation parameters (same
-/// genesis upgrade, facets, diamond init and force-deployment data) with only the genesis batch
-/// values and the three base-system hashes replaced, so a chain created at v33 starts from the v33
-/// bootloader. The input carries the current parameters as the data of the CTM's last
-/// `NewChainCreationParams` event; the script checks them against the CTM's stored hashes before
-/// using them.
+/// genesis upgrade, facets and diamond init) with the genesis batch values and the three
+/// base-system hashes replaced, so a chain created at v33 starts from the v33 genesis. The
+/// force-deployment data is rebuilt: the blob stage stores predates the removal of
+/// `gatewayChainId` from `FixedForceDeploymentsData` (#2239), so the v33 genesis's
+/// `L2GenesisUpgrade` could not decode it, and it names the old compile's L2 built-ins, which a v33
+/// genesis does not know. The rebuilt blob uses this branch's layout and bytecode, and carries
+/// every non-bytecode value over from the stored blob after checking it against the bridgehub.
+/// The input carries the current parameters as the data of the CTM's last `NewChainCreationParams`
+/// event; the script checks them against the CTM's stored hashes before using them.
 ///
 /// Governance calls, all owned by the ecosystem governance (the CTM's and ChainAssetHandler's owner):
 ///  - stage 0: `ChainAssetHandler.pauseMigration()` — the CTM refuses `setNewVersionUpgrade` while
@@ -223,8 +230,46 @@ contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
             genesisIndexRepeatedStorageChanges: uint64(config.contracts.chainCreationParams.genesisRollupLeafIndex),
             genesisBatchCommitment: config.contracts.chainCreationParams.genesisBatchCommitment,
             diamondCut: initialCut,
-            forceDeploymentsData: forceDeploymentsData
+            forceDeploymentsData: _rebuildForceDeploymentsData(forceDeploymentsData)
         });
+    }
+
+    /// @dev Rebuild the new-chain force-deployment data in this branch's layout and with this
+    ///      branch's L2 bytecode, carrying the non-bytecode values over from the CTM's stored blob.
+    ///      Each carried value is checked against the live bridgehub / CTM first.
+    function _rebuildForceDeploymentsData(bytes memory _stored) internal returns (bytes memory) {
+        LegacyFixedForceDeploymentsData memory stored = abi.decode(_stored, (LegacyFixedForceDeploymentsData));
+        IChainTypeManager ctm = IChainTypeManager(v33Input.ctm);
+        IBridgehubBase bridgehub = IBridgehubBase(ctm.BRIDGE_HUB());
+
+        address governance = AddressAliasHelper.undoL1ToL2Alias(stored.aliasedL1Governance);
+        address chainRegistrationSender = AddressAliasHelper.undoL1ToL2Alias(stored.aliasedChainRegistrationSender);
+        require(stored.l1ChainId == block.chainid, "v33: stored l1ChainId mismatch");
+        require(stored.l1AssetRouter == address(bridgehub.assetRouter()), "v33: stored asset router stale");
+        require(governance == IOwnable(address(ctm)).owner(), "v33: stored governance stale");
+        require(chainRegistrationSender == bridgehub.chainRegistrationSender(), "v33: stored CRS stale");
+        // The builder hard-codes these to zero; refuse to silently drop a non-zero value.
+        require(
+            stored.l2SharedBridgeLegacyImpl == address(0) && stored.l2BridgedStandardERC20Impl == address(0),
+            "v33: stored legacy impls set"
+        );
+
+        config.eraChainId = stored.eraChainId;
+        config.contracts.maxNumberOfChains = stored.maxNumberOfZKChains;
+        config.zkTokenAssetId = stored.zkTokenAssetId;
+        coreAddresses.bridges.proxies.l1AssetRouter = stored.l1AssetRouter;
+        coreAddresses.bridgehub.proxies.chainRegistrationSender = chainRegistrationSender;
+
+        FixedForceDeploymentsData memory rebuilt = _buildForceDeploymentsData(
+            governance,
+            stored.dangerousTestOnlyForcedBeacon
+        );
+        require(rebuilt.aliasedL1Governance == stored.aliasedL1Governance, "v33: governance alias differs");
+        require(
+            rebuilt.aliasedChainRegistrationSender == stored.aliasedChainRegistrationSender,
+            "v33: CRS alias differs"
+        );
+        return abi.encode(rebuilt);
     }
 
     /// @notice v33 force-deploys the system contracts only (see the contract doc).
@@ -395,6 +440,34 @@ contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
             body[i] = _calldata[i + 4];
         }
     }
+}
+
+/// @dev `FixedForceDeploymentsData` as it was before #2239 removed `gatewayChainId`; the layout of the
+///      force-deployment data stage's Era CTM currently stores.
+// solhint-disable-next-line gas-struct-packing
+struct LegacyFixedForceDeploymentsData {
+    uint256 l1ChainId;
+    uint256 gatewayChainId;
+    uint256 eraChainId;
+    address l1AssetRouter;
+    bytes32 l2TokenProxyBytecodeHash;
+    address aliasedL1Governance;
+    uint256 maxNumberOfZKChains;
+    bytes bridgehubBytecodeInfo;
+    bytes l2AssetRouterBytecodeInfo;
+    bytes l2NtvBytecodeInfo;
+    bytes messageRootBytecodeInfo;
+    bytes chainAssetHandlerBytecodeInfo;
+    bytes interopCenterBytecodeInfo;
+    bytes interopHandlerBytecodeInfo;
+    bytes assetTrackerBytecodeInfo;
+    bytes beaconDeployerInfo;
+    bytes baseTokenHolderBytecodeInfo;
+    address l2SharedBridgeLegacyImpl;
+    address l2BridgedStandardERC20Impl;
+    address aliasedChainRegistrationSender;
+    address dangerousTestOnlyForcedBeacon;
+    bytes32 zkTokenAssetId;
 }
 
 /// @dev `initialForceDeploymentHash` is a public state variable of ChainTypeManagerBase that the

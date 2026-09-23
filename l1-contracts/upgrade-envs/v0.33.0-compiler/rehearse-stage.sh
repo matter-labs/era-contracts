@@ -113,6 +113,36 @@ chk "CTM verifier for v33" "$(cast call "$CTM" 'protocolVersionVerifier(uint256)
 chk "facets unchanged" "$(cast call "$CHAIN" 'facetAddresses()(address[])' --rpc-url "$RPC")" "$FACETS_BEFORE"
 TXH=$(cast call "$CHAIN" 'getL2SystemContractsUpgradeTxHash()(bytes32)' --rpc-url "$RPC")
 [ "$TXH" != "0x0000000000000000000000000000000000000000000000000000000000000000" ] && echo "  OK   L2 upgrade tx scheduled ($TXH)" || fail "no L2 upgrade tx scheduled"
+# New-chain force-deployment data: must decode in this branch's FixedForceDeploymentsData layout,
+# carry stage's values, and name this branch's compiled L2 built-ins (a v33 genesis knows no other).
+python3 - "$(toml_get contracts_config.new_chain_creation_params)" "$WT/../AllContractsHashes.json" <<'PYCHECK' && echo "  OK   new-chain force-deployment data (current layout, stage values, branch bytecode)" || fail "new-chain force-deployment data"
+import json, subprocess, sys
+params = json.loads(subprocess.check_output(["cast", "abi-decode", "--json", "--input",
+    "f((address,bytes32,uint64,bytes32,((address,uint8,bool,bytes4[])[],address,bytes),bytes))", sys.argv[1]]))[0]
+blob = params[5]
+layout = ("f((uint256,uint256,address,bytes32,address,uint256,bytes,bytes,bytes,bytes,bytes,bytes,bytes,bytes,"
+          "bytes,bytes,address,address,address,address,bytes32))")
+d = json.loads(subprocess.check_output(["cast", "abi-decode", "--json", "--input", layout, blob]))[0]
+known = {(e.get("zkBytecodeHash") or "").lower() for e in json.load(open(sys.argv[2]))}
+I = lambda x: int(str(x), 0)
+ok = True
+def check(name, cond):
+    global ok
+    if not cond:
+        ok = False
+        print("    mismatch:", name)
+check("l1ChainId", I(d[0]) == 11155111)
+check("eraChainId", I(d[1]) == 270)
+check("l1AssetRouter", d[2].lower() == "0xfd3130ea0e8b7dd61ac3663328a66d97eb02f84b")
+check("aliasedL1Governance", d[4].lower() == "0xa019627524aed610192132a425d6b9c32a173900")
+check("maxNumberOfZKChains", I(d[5]) == 100)
+check("aliasedChainRegistrationSender", d[18].lower() == "0xffb49e812de9264b53cbd21cea04ed69fbe08319")
+check("zkTokenAssetId", d[20].lower() == "0xd7912bfd25000ee1b3355167866f960a61787b79cd2c7e791036fe6e85a73823")
+check("l2TokenProxyBytecodeHash in branch hashes", d[3].lower() in known)
+for i in range(6, 16):
+    check(f"bytecode info #{i} in branch hashes", ("0x" + d[i][2:66]).lower() in known)
+sys.exit(0 if ok else 1)
+PYCHECK
 EXPECTED_CUT_HASH=$(toml_get contracts_config.new_initial_cut_hash)
 chk "CTM initialCutHash = v33 creation cut" "$(cast call "$CTM" 'initialCutHash()(bytes32)' --rpc-url "$RPC")" "$EXPECTED_CUT_HASH"
 
