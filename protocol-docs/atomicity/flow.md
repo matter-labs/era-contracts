@@ -50,6 +50,8 @@ the logs/multichain leaves. Full mechanics in {protocol-docs/atomicity/proofs.md
 
 ## Lifecycle
 
+![Atomic interop success path: send and commit on Chain A, settle to L1, finalize on Chain B](./img/atomic_flow_success.png)
+
 ```mermaid
 sequenceDiagram
     participant U as User

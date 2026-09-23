@@ -31,6 +31,10 @@ flowchart LR
 The arrows show protocol dependencies, not synchronous calls. Settlement and dependency-root import
 separate source-chain commitment from destination execution.
 
+![L2 -> L2 bundle flow: send, settle on L1, import root, relay and execute](./img/interop_bundle_flow.png)
+
+The call sequence for one L2 -> L2 bundle leg, including an optional token transfer.
+
 | Component                 | Layer | Responsibility                                                                 |
 | ------------------------- | ----- | ------------------------------------------------------------------------------ |
 | `InteropCenter`           | L2    | Parses sends, builds/funds bundles, emits events, and dispatches each route.   |

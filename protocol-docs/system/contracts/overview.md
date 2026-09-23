@@ -14,5 +14,7 @@ organized around four boundaries:
 4. **ZKsync OS protocol contracts** — fixed-address L2 contracts installed during genesis for
    bridging, message verification, interop, and atomic flows.
 
+![L1 contracts and who controls them](./img/l1_architecture.png)
+
 Continue with [the complete system map](../README.md) or use the [contract index](./README.md) to open
 a domain directly.

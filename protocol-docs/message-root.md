@@ -131,4 +131,6 @@ L2 log leaf
   -> (shared-tree siblings)       aggregated root == historicalRoot / imported interopRoots entry
 ```
 
+![Message root structure and inclusion proof path](./img/message_root_structure.png)
+
 The same aggregated-root anchoring, with `l1BatchTimestamp` read from the verified proof words and the chain-batch-root tree opened at IMT leaves 2/3, is how atomic interop authenticates IMT roots and settlement times — see {protocol-docs/atomicity/proofs.md}.

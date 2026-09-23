@@ -3,6 +3,8 @@
 The standard ZKsync OS rollup pair uses the `BLOBS_ZKSYNC_OS` commitment scheme with
 `BlobsL1DAValidatorZKsyncOS`.
 
+![ZKsync OS blob DA commitment flow](./img/pubdata_publishing.png)
+
 ## Batch commitment
 
 `CommitBatchInfoZKsyncOS` carries:

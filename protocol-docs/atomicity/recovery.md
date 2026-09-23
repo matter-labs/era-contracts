@@ -10,6 +10,8 @@ happens _after_ the proof checks out.
 
 ## `authorizeRefund` → `claimRefund`
 
+![Atomic interop timeout path: absence proof against Chain B's settled IMT roots, refund on Chain A](./img/atomic_flow_recovery.png)
+
 1. **`authorizeRefund(flow, missingLegIndex, absence)`** — verifies one timeout absence proof for the
    missing leg (bound to that leg's declared source chain), then flips **this chain's** `Committed` legs
    of the flow to `Revertable`, emitting `FlowRefundAuthorized` for each. Legs committed on other chains

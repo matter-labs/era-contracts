@@ -31,6 +31,10 @@ callable by the Bridgehub owner or admin). In one transaction it:
 5. Seeds the chain's genesis batch root (`messageRoot.seedGenesisRoot(_chainId)`, see below) and
    emits `NewChain`.
 
+End-to-end chain creation on L1 and the genesis upgrade on the new chain's L2:
+
+![Chain deployment and genesis (ZKsync OS)](./img/chain_deployment.png)
+
 ### Genesis chain state (`DiamondInit`)
 
 `DiamondInit` initializes the diamond's storage: verifier(s), admin, base-token asset id, protocol

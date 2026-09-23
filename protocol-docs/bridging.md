@@ -50,6 +50,8 @@ Registration flows:
   deliberately permissionless (`registerToken`, `ensureTokenIsRegistered`) so bridging native tokens never
   needs an allowlist.
 
+![Custom asset handler registration](./img/custom_asset_handler_registration.png)
+
 ## Asset routing: burn / mint
 
 All transfers follow one pattern: the source-side asset handler's `bridgeBurn` locks or burns the funds and
@@ -78,6 +80,10 @@ returns `bridgeMintData`; the destination-side handler's `bridgeMint` consumes t
   chain's `mintValue`: it burns the base token through the
   handler but records nothing, because a failed transaction refunds the base token to the L2
   `refundRecipient` rather than being claimable on L1.
+
+![Token deposit via requestL2TransactionTwoBridges](./img/deposit_two_bridges.png)
+
+![Base-token deposit via requestL2TransactionDirect](./img/deposit_direct.png)
 
 ### Refund-recipient resolution
 
