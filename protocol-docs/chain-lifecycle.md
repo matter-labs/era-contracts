@@ -6,7 +6,7 @@ current release). Contract doc comments reference this file instead of restating
 
 Related documents, which are the source of truth for their own topics:
 
-- {protocol-docs/message-root.md} — the `MessageRoot` tree structure, the v31 vs v32 batch-root
+- {protocol-docs/message-root.md} — the `MessageRoot` tree structure, the v31 vs v33 batch-root
   flows (`addChainBatchRoot` vs `addChainBatchRootV32`), and interop-root import/verification.
 - {protocol-docs/interop.md} — the interop message path (`InteropCenter`, `InteropHandler`,
   bundles, interop roots).
@@ -31,6 +31,10 @@ callable by the Bridgehub owner or admin). In one transaction it:
 5. Seeds the chain's genesis batch root (`messageRoot.seedGenesisRoot(_chainId)`, see below) and
    emits `NewChain`.
 
+End-to-end chain creation on L1 and the genesis upgrade on the new chain's L2:
+
+![Chain deployment and genesis (ZKsync OS)](./img/chain_deployment.png)
+
 ### Genesis chain state (`DiamondInit`)
 
 `DiamondInit` initializes the diamond's storage: verifier(s), admin, base-token asset id, protocol
@@ -47,8 +51,7 @@ fixed 8-leaf layout of a ZKsync OS chain batch root).
 ### Genesis batch root seeding
 
 Called by the Bridgehub right after registration, inside the same `createNewChain` transaction.
-It is a one-time, Bridgehub-only entry point, and a no-op for EraVM chains
-(`IGetters.getZKsyncOS() == false`).
+It is a one-time, Bridgehub-only entry point for ZKsync OS chains.
 
 For a ZKsync OS chain it pulls the genesis root back from the chain itself
 (`l2LogsRootHash(0)`, stored by `DiamondInit`) — keeping the "chain reports its own roots"
@@ -92,9 +95,9 @@ Checks performed before sending the registration:
 
 - The chain to be registered is known to the Bridgehub (its `baseTokenAssetId` is non-zero).
 - Both chains settle on the **same** settlement layer (`ChainsSettlementLayerMismatch` otherwise).
-  Both settling directly on L1 is permitted as of v32: L1 itself builds interop roots
+  Both settling directly on L1 is permitted as of v33: L1 itself builds interop roots
   (`MessageRootBase.addChainBatchRootV32`) and serves the corresponding inclusion proofs, so
-  L1-settled chains participate in interop without a gateway. (In v31 this case was rejected with
+  L1-settled chains participate in interop directly. (In v31 this case was rejected with
   the now-removed `ChainsSettlingOnL1` error.)
 - The chain to be registered has at least one batch leaf in this layer's message root
   (`messageRoot.chainTreeLeafCount(chainId) > 0`), else it reverts with
@@ -102,8 +105,8 @@ Checks performed before sending the registration:
   timeout precondition: interop towards a chain is only enabled once the chain both has its
   `sharedTree` leaf and has a batch in its chain tree.
 
-No backfill of pre-existing chains is needed for this gate: during v31 the ZK Gateway was never
-activated and registration required that a chain does **not** settle on L1, so at the start of v32
+No backfill of pre-existing chains is needed for this gate: during v31 non-L1 settlement was never
+activated and registration required that a chain does **not** settle on L1, so at the start of v33
 no chains have been registered for interop — every chain passes through this gate (and gets its
 tree populated) before interop can target it.
 
@@ -124,13 +127,15 @@ destination's `L2NativeTokenVault.updateL2` consumes to initialize the chain's b
 (per the L1 `MessageRoot`), its base token is registered in the L1 `NativeTokenVault`
 (`tokenAddress(baseAssetId) != address(0)`, otherwise L1->L2 base-token deposits would not work
 on the destination), and the base token supports `totalSupply()` (true for everything except
-pre-v31 ZKsync OS chains, whose value is backfilled during v31 before the v32 upgrade).
+pre-v31 ZKsync OS chains, whose value is backfilled during v31 before the v33 upgrade).
 
-### v32: chain migrations are explicitly disabled
+<a id="v32-chain-migrations-are-explicitly-disabled"></a>
 
-In the v32 release the protocol operates under the invariant that **all chains settle on L1**, and
-chain migrations between settlement layers are explicitly disabled to remove migration-related
-risks for the time being:
+### v33: chain migrations are explicitly disabled
+
+Beginning with v33 and still in this release, the protocol operates under the invariant that **all
+supported chains settle on L1**. Chain migrations between settlement layers are explicitly disabled
+to remove migration-related risks:
 
 - The switch is `CHAIN_MIGRATIONS_ENABLED = false` in `common/Config.sol`, surfaced via
   `ChainAssetHandlerBase.migrationsEnabled()` and enforced by the `whenMigrationsEnabled` modifier
@@ -142,7 +147,7 @@ risks for the time being:
   the flag, since it only ever returns a chain back to settling on L1.
 - The whole migration machinery (chain asset handlers, `Migrator` facet, migration intervals,
   migration numbers) is kept intact and covered by tests, so a future release can bring settlement
-  layers (e.g. ZK Gateway) back by flipping the constant. `_chainMigrationsEnabled()` is `virtual`
+  layers back by flipping the constant. `_chainMigrationsEnabled()` is `virtual`
   only so dev/test variants can re-enable migrations for coverage; production contracts must not
   override it.
 
@@ -186,9 +191,8 @@ not follow from swapping implementations are:
 - **Atomic-interop built-ins** exist on ZKsync OS chains only. New chains get them from genesis and
   pre-existing ones from this upgrade's force deployments (next section).
 
-Scope of this release's upgrade: **ZKsync OS chains that settle on L1**. Era chains are not supported —
-`CTMUpgrade_v31.deployUsedUpgradeContract` refuses to produce a per-chain upgrade for them rather than
-emitting one that redoes v31's one-time work — and neither are gateway-settled chains, whose upgrade takes
+Scope of this release's upgrade: **ZKsync OS chains that settle on L1**. Non-L1-settled chains are not
+included; their upgrade takes
 the `s.settlementLayer != address(0)` path through their settlement layer instead of recording the L2
 upgrade transaction on L1.
 
@@ -198,8 +202,8 @@ installs the protocol version's verifier, and this release deploys a fresh one, 
 proof under the old verifier would stop being provable.
 
 Address discovery has to match the ecosystem's version, because the getters it reads were introduced in
-different releases (`chainRegistrationSender` in v31, `l1InteropHandler` in v32): `AddressIntrospector`
-therefore exposes one entry point per era, and the upgrade scripts pick between them by protocol version.
+different releases (`chainRegistrationSender` in v31, `l1InteropHandler` in v33): `AddressIntrospector`
+therefore exposes one entry point per protocol generation, and the upgrade scripts pick between them by protocol version.
 Autodetection reads the version of a registered chain, which lags the L1 contracts — an ecosystem whose
 core contracts are already upgraded while its chains are not (mid-upgrade, or a local fixture built from
 current code) states the answer explicitly with `pre_v32_introspection` in the upgrade input.
@@ -234,12 +238,11 @@ Pre-existing ZKsync OS chains receive the same two built-ins through the upgrade
 (`SystemContractsProcessing.getZKsyncOSOnlyContracts`), so they end up with atomic interop
 as well. Both `initL2`s therefore run on the upgrade path too, unconditionally: neither the built-ins
 nor their addresses existed in v31, so no chain can arrive at this upgrade with them already seeded,
-and the force deployments in the same transaction install their code before the `initL2`s run. Era
-chains never receive them — this release upgrades ZKsync OS chains only.
+and the force deployments in the same transaction install their code before the `initL2`s run.
 
 The same upgrade list also neutralizes the tracker this release removes
 (`SystemContractsProcessing.getRemovedTrackerNeutralizations`): v31 deployed the `GWAssetTracker` as a
 system-proxied built-in on every ZKsync OS chain, so the upgrade swaps that proxy's implementation for
-`EmptyContract` — otherwise the retired tracker code would stay callable. Chains created on v32 receive
+`EmptyContract` — otherwise the retired tracker code would stay callable. Chains created on v33 receive
 the same EmptyContract-backed proxy from genesis, so fresh and upgraded chains match at the reserved
 address.

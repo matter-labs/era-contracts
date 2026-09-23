@@ -4,13 +4,31 @@ This document is the single source of truth for the protocol-level behaviour of 
 
 ## Overview
 
-Interop is ZKsync's mechanism for sending messages and value between chains in the ecosystem. The `InteropCenter` (an L2 contract) is the primary entry point for communication between chains connected to interop, facilitating interactions between end users and bridges. As of v31 the `InteropCenter` is only deployed on L2s, not on L1. Interop was **not activated in v31**; the contracts here target v32+ and are expected to run on ZKsync OS chains only (the EraVM bootloader does not support the timestamp-carrying interop-root import entry points).
+Interop is ZKsync's mechanism for sending messages and value between chains in the ecosystem. The
+`InteropCenter` is the L2 send-side entry point for users and bridges. It is not deployed on L1. The
+contracts target ZKsync OS chains and require timestamp-carrying interop-root imports from the
+ZKsync OS bootloader.
+
+The current release supports exactly two routes:
+
+- **L2 -> L2:** an atomic bundle committed to the source chain's interop commitment tree and proven on
+  the destination with an `AtomicFinalityProof`. The `atomicBundle` attribute is mandatory.
+- **L2 -> L1:** a non-atomic, single-call asset withdrawal published as an L2 -> L1 message and proven
+  to `L1InteropHandler` with a `MessageInclusionProof`.
+
+Public non-atomic L2 -> L2 bundles, triggers, aliased accounts, and automatic-execution accounts are
+not part of this version. Execution is driven by a user or relayer submitting the appropriate proof.
 
 The lifecycle of an interop interaction is:
 
-1. **Send** — on the source L2, `InteropCenter.sendMessage` (single call) or `InteropCenter.sendBundle` (multiple calls) forms an `InteropBundle` and publishes it as an L2→L1 message (or, for atomic bundles, appends its commit value to the interop IMT instead).
-2. **Root import** — the destination chain's bootloader imports interop roots from other chains into `L2InteropRootStorage`.
-3. **Receive** — on the destination chain, anyone with the right permissions calls the interop handler (`L2InteropHandler` on L2, `L1InteropHandler` on L1) to `verifyBundle` / `executeBundle` / `unbundleBundle`, proving the bundle's message inclusion against the imported roots.
+1. **Prepare** — for L2 -> L2, preview every leg's bundle hash and construct the shared atomic-flow
+   preimage. L2 -> L1 withdrawals need no atomic preimage.
+2. **Send** — `sendMessage` (one call) or `sendBundle` (one or more calls) forms an `InteropBundle`,
+   funds it, and either appends an atomic commit value or publishes the withdrawal to L1.
+3. **Settle and import** — chain batch roots enter the settlement-layer `MessageRoot`; L2 bootloaders
+   import dependency roots into `L2InteropRootStorage`, and batch execution double-checks them.
+4. **Receive** — the destination handler verifies atomic IMT finality on L2 or message inclusion on L1,
+   then executes the full bundle or marks it `Verified` for unbundling.
 
 ## Core data structures (`common/Messaging.sol`)
 
@@ -71,7 +89,7 @@ Attributes are ERC-7786 attribute byte strings (4-byte selector from `IERC7786At
 ### Bundle attributes (`BundleAttributes`)
 
 - `executionAddress(bytes)` — ERC-7930 address allowed to execute the bundle on the destination. **Empty ⇒ execution is permissionless.**
-- `unbundlerAddress(bytes)` — ERC-7930 address allowed to unbundle the bundle. Unlike `executionAddress`, it is always non-empty in the final bundle: if the sender does not set it, `InteropCenter` defaults it to `(block.chainid, msg.sender)` on the **source** chain, so unbundling stays possible (via the handler's `receiveMessage` rescue path, see below). The default deliberately pins the source chain rather than using the chain wildcard (chainId 0): a wildcard would let a same-address contract on another chain (e.g. a malicious clone) unbundle. Senders that want to unbundle directly on the destination can pass an explicit `unbundlerAddress`.
+- `unbundlerAddress(bytes)` — ERC-7930 address allowed to unbundle the bundle. Unlike `executionAddress`, it is always non-empty in the final bundle: if the sender does not set it, `InteropCenter` defaults it to `(block.chainid, msg.sender)` on the **source** chain. On L2 -> L2 this can be exercised through the handler's `receiveMessage` rescue path (see below). The default deliberately pins the source chain rather than using the chain wildcard (chainId 0): a wildcard would let a same-address contract on another chain (e.g. a malicious clone) unbundle. The default is not reachable for an L2 -> L1 withdrawal because arbitrary L2 -> L1 rescue messages are unsupported; a sender that needs L1 unbundling must provide an explicit L1 or wildcard address. See {protocol-docs/atomicity/security.md#known-issues-and-accepted-limitations}.
 - `useFixedFee(bool)` — fee mode selector, defaults to `false`. See [Fee model](#fee-model).
 - `interopBundleSalt(bytes32)` — user-provided salt; see [Replay protection](#replay-protection-and-bundle-uniqueness).
 - `atomicBundle(AtomicFlowPreimage, uint256 lowNullifierIndex)` — marks the bundle as an atomic-interop leg; see [Atomic bundles](#atomic-bundles). Its payload is deliberately **not** stored in `BundleAttributes` (i.e. not part of the cross-chain bundle): the bundle hash must not depend on the flowId preimage, because the preimage's `legBundleHashes` include this very bundle's hash — a circular dependency. It is parsed separately (`InteropAttributeParser.parseAtomicSend`) into the send-side-only `AtomicSend` struct.
@@ -86,7 +104,7 @@ Attributes are ERC-7786 attribute byte strings (4-byte selector from `IERC7786At
 Every user of interop can choose between two fee options per bundle (via `useFixedFee`; all calls in a bundle share one mode). Fees are charged per call:
 
 - **Dynamic base-token fee** (`useFixedFee = false`, default): `interopProtocolFee` (in the source chain's base token) per call, paid via `msg.value`. The fee value is fully operator-controlled — it is set by the bootloader as a system transaction (`setInteropFee`) and may be 0.
-- **Fixed ZK fee** (`useFixedFee = true`): `ZK_INTEROP_FEE` in ZK tokens per call, pulled via ERC-20 `transferFrom`; no base-token fee is charged. This provides **Stage 1 protection**: users can pay fees independent of chain-operator settings, so interop keeps working even if the operator sets arbitrary dynamic fees. The default (`DEFAULT_ZK_INTEROP_FEE = 10 ZK`) is intentionally set sufficiently higher than the intended gateway settlement fee (and thus the intended dynamic fee) to incentivize users to use the dynamic path. `ZK_INTEROP_FEE` is not changeable at runtime; it is a storage variable (not a constant) only so a protocol upgrade can change the value without redeploying.
+- **Fixed ZK fee** (`useFixedFee = true`): `ZK_INTEROP_FEE` in ZK tokens per call, pulled via ERC-20 `transferFrom`; no base-token fee is charged. This provides **Stage 1 protection**: users can pay fees independent of chain-operator settings, so interop keeps working even if the operator sets arbitrary dynamic fees. The default (`DEFAULT_ZK_INTEROP_FEE = 10 ZK`) is intentionally higher than the intended dynamic fee to incentivize users to use the dynamic path. `ZK_INTEROP_FEE` is not changeable at runtime; it is a storage variable (not a constant) only so a protocol upgrade can change the value without redeploying.
   - Requires the ZK token to already be bridged to the source chain (resolved from `ZK_TOKEN_ASSET_ID` via the NativeTokenVault and cached in `zkToken`); otherwise the send reverts with `ZKTokenNotAvailable`.
   - On chains where ZK is the base token, `useFixedFee = true` still requires wrapped ZK (ERC-20 transfer), while `useFixedFee = false` accepts native ZK via `msg.value`. This is intentional.
 - **L2→L1 bundles are free**: they are withdrawals, not interop, so neither fee is charged.
@@ -105,10 +123,16 @@ Both entry points (`sendMessage` and `sendBundle`, both `whenNotPaused nonReentr
 6. **Collects and burns value** (`_ensureCorrectTotalValue`): `msg.value` must exactly match the expected total (`MsgValueMismatch`), where the expected total is:
    - same base token on both chains: `totalBurnedCallsValue + totalIndirectCallsValue + protocolFee`; the interop-call value is burned on the source chain via `L2_BASE_TOKEN_HOLDER.burnAndStartBridging` (notifying the L2AssetTracker);
    - different base tokens: `totalIndirectCallsValue + protocolFee`; the destination-chain value is instead deposited via `AssetRouter.bridgehubDepositBaseToken`.
-7. **Dispatches the bundle** (`_dispatchBundle`): a normal bundle is ABI-encoded, prefixed with `BUNDLE_IDENTIFIER`, and sent to L1 via the `L2ToL1Messenger`; an atomic bundle is instead appended to the interop IMT via the `AtomicFlowManager` and **not** published to L1.
+7. **Dispatches the bundle** (`_dispatchBundle`): an L2 -> L1 withdrawal is ABI-encoded, prefixed with
+   `BUNDLE_IDENTIFIER`, and sent through the `L2ToL1Messenger`; an atomic L2 -> L2 bundle is appended
+   to the interop IMT via `AtomicFlowManager` and is **not** published as an L2 -> L1 message.
 8. **Emits events**: one ERC-7786 `MessageSent` per call, plus one `InteropBundleSent(l2l1MsgHash, bundleHash, bundle)`.
 
-There is intentionally **no gateway-mode requirement** on the send side: interop bundles may be sent by chains settling directly on L1. Cross-layer correctness is enforced by the message-inclusion proof on the receiving side (or by per-leg IMT inclusion proofs for atomic bundles), not by inspecting the chain's configured gateway mode at send time. (An atomic send does check the flow's declared `settlementLayerChainId` against L1 — `ManagerSettlementLayerNotL1` — but that validates the flow's own parameter, not the sending chain's settlement configuration.)
+There is intentionally **no settlement-mode requirement** on the send side. Route correctness is enforced
+by the destination proof rather than by inspecting the sending chain's settlement configuration. An
+atomic send does require the flow's declared `settlementLayerChainId` to equal L1
+(`ManagerSettlementLayerNotL1`); that validates the flow parameter, not the sender's current settlement
+configuration.
 
 ## Restrictions
 
@@ -130,7 +154,25 @@ The bundle hash commits to `interopBundleSalt = keccak256(abi.encodePacked(msg.s
 
 (Historical note: the salt used to be derived from a per-sender nonce; the deprecated `__DEPRECATED_interopBundleNonce` mapping slot is retained only to preserve the storage layout.)
 
-On the destination, replay of a bundle is prevented by the `bundleStatus` state machine: execution/unbundling flips the status before any external call (CEI), so a bundle can be fully executed or unbundled only once.
+On the destination, replay is prevented by the bundle/call status machines. Full execution marks the
+bundle and every call before external interaction and cannot be repeated. Unbundling may be invoked
+more than once, but each call can transition out of `Unprocessed` only once; an `Executed` call can
+never be cancelled or executed again.
+
+## Bundle-hash preview
+
+Atomic flow construction needs every leg's `bundleHash` before any real send, but the flow preimage
+itself contains those hashes. `previewMessageHash` and `previewBundleHash` solve that dependency by
+running the same bundle assembly as the corresponding send, including indirect-call processing, and
+then **always reverting** with `InteropPreviewHash(bundleHash)`. They must be invoked through a static
+`eth_call` / `callStatic`; the revert rolls back every intermediate state change and burn.
+
+The preview accepts the send inputs without requiring `msg.value`, does not consume the sender's salt,
+and stops before atomic append. The real send must use the same caller and every bundle-affecting input
+(recipient/call starters, payload, salt, permissions, fee mode, and values), adding the `atomicBundle`
+metadata derived from all previewed hashes. `AtomicFlowManager.append` recomputes the flow and requires
+the actual bundle hash to be one of its correctly sourced legs, so a stale or inaccurate preview makes
+the entire send revert, including its burns.
 
 ## Interop roots and message verification
 
@@ -138,36 +180,66 @@ On the destination, replay of a bundle is prevented by the `bundleStatus` state 
 
 `L2InteropRootStorage` stores the message roots of other chains on the L2, keyed by `(chainId, blockOrBatchNumber)`. Roots are imported **only by the bootloader** via `addSingleInteropRoot` / `addInteropRootsInBatch`, as full `(blockOrBatchNumber, root, timestamp)` tuples (`InteropRoot` → `StoredInteropRoot`):
 
-- `blockOrBatchNumber` is a **block number** for proof-based interop and a **batch number** for commit-based interop, reflecting the implementation requirements of each finality form.
-- `sides` currently must contain exactly one element — the root itself (`SidesLengthNotOne`). Once pre-commit interop is introduced, `sides` will include both the root and its associated tree sides.
+- `blockOrBatchNumber` is the settlement layer's **block number**.
+- `sides` currently must contain exactly one element — the root itself (`SidesLengthNotOne`). The array
+  shape is reserved for possible future proof forms; pre-commit/parallel-building interop is not
+  supported by this release.
 - The imported tuple is double-checked on the settlement layer during batch execution (`ExecutorFacet._verifyDependencyInteropRoots`, against `MessageRoot.historicalRoot`), so time-sensitive proofs — e.g. the atomic-interop timeout protocol — can rely on the timestamp as much as on the root itself.
 - Zero roots and zero timestamps are rejected on import, keeping the invariant structural: a zero stored timestamp only ever means "nothing imported at this key" (the atomic timeout path relies on this). A root for a given key can be set only once (`InteropRootAlreadyExists`).
-- This logic is **not compatible with EraVM** (its bootloader does not support the timestamp-carrying import entry points); it is deployed on ZKsync OS chains only. No roots recorded under previous protocol versions exist, because interop was not activated in v31; the v31→v32 widening of the stored value from `bytes32` to a struct is storage-safe (the mapping was empty, and the struct's first member occupies the old slot).
+- This logic is deployed on ZKsync OS chains only. No roots recorded under previous protocol versions exist, because interop was not activated in v31; the v31→v33 widening of the stored value from `bytes32` to a struct is storage-safe (the mapping was empty, and the struct's first member occupies the old slot).
 
 ### Message verification (`L2MessageVerification`)
 
-`L2MessageVerification` proves L2→L1 message inclusion **on an L2**. It reuses the shared recursive proof-verification logic (`MessageVerification` / `MessageHashing`); the terminal (`finalProofNode`) step anchors the proof to the imported L1 aggregate interop root in `L2InteropRootStorage.interopRoots` — an L2 has no per-chain batch roots, unlike L1 where `MessageRootBase` terminates at its own `chainBatchRoots`. (In this release, L1 is the settlement layer of every chain.) Recursion depth is limited to one hop. The scheme assumes all settlement layers a chain has ever settled on are trustworthy — chains in the ecosystem trust that a message for a batch that never happened will not be accepted.
+`L2MessageVerification` proves generic L2 -> L1 message inclusion **on an L2**. It reuses the shared
+recursive proof logic (`MessageVerification` / `MessageHashing`); the terminal step anchors the proof
+to an imported L1 aggregate root in `L2InteropRootStorage`. Recursion depth is limited to one hop.
+The current `L2InteropHandler` does not use this path for public bundles: all supported L2 -> L2
+interop is atomic and authenticates each leg through `AtomicFlowManager` instead. L1 withdrawals use
+`L1InteropHandler` and the L1 `MessageRoot` directly.
 
 ## Destination-side processing (interop handlers)
 
-`InteropHandlerBase` contains the shared logic for executing, verifying and unbundling bundles. `L2InteropHandler` (an L2 system contract) and `L1InteropHandler` (behind a proxy on L1) supply environment-specific hooks:
+`InteropHandlerBase` owns the proof-independent behavior: bundle decoding, destination-context checks,
+execution/unbundling permissions, status transitions, call dispatch, and the `receiveMessage` rescue
+path. The derived handlers authenticate a fresh bundle differently:
 
-| Hook                                   | L2 (`L2InteropHandler`)                                 | L1 (`L1InteropHandler`)                               |
-| -------------------------------------- | ------------------------------------------------------- | ----------------------------------------------------- |
-| `_proveInclusion`                      | `L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared` | `MESSAGE_ROOT.proveL2MessageInclusionShared`          |
-| `_handleCallValue`                     | pulls value from the `BaseTokenHolder` (`give`)         | requires zero value (`InteropWithdrawalNonZeroValue`) |
-| `_expectedDestinationBaseTokenAssetId` | NTV `BASE_TOKEN_ASSET_ID`                               | L1 ETH asset ID                                       |
-| `_ensureNotPaused`                     | no-op (L2 system contract is not pausable)              | pausable gate                                         |
+| Concern                                | L2 (`L2InteropHandler`)                           | L1 (`L1InteropHandler`)                               |
+| -------------------------------------- | ------------------------------------------------- | ----------------------------------------------------- |
+| supported route                        | atomic L2 -> L2                                   | L2 -> L1 withdrawal                                   |
+| proof entry points                     | `executeAtomicBundle` / `verifyAtomicBundle`      | `executeBundle` / `verifyBundle`                      |
+| proof                                  | `AtomicFinalityProof` through `AtomicFlowManager` | `MessageInclusionProof` through `MessageRoot`         |
+| `_handleCallValue`                     | pulls value from the `BaseTokenHolder` (`give`)   | requires zero value (`InteropWithdrawalNonZeroValue`) |
+| `_expectedDestinationBaseTokenAssetId` | NTV `BASE_TOKEN_ASSET_ID`                         | L1 ETH asset ID                                       |
+| execution pause                        | none                                              | owner-controlled pausable gate                        |
+| call target                            | bundle-selected ERC-7786 recipient                | canonical L1 asset router only                        |
 
-### Verification (`verifyBundle`)
+Before verification or execution, `_validateBundleDestinationContext` checks
+`destinationChainId == block.chainid` and the expected destination base-token asset ID. On L1 it also
+binds `sourceChainId` to the proof's chain ID. On L2, source-chain authenticity comes from the atomic
+proof's source-bound IMT paths; passing the bundle's own source ID into the common context check is
+only a self-consistency step.
 
-Proves that the message corresponding to the bundle was included on the source chain and marks the bundle `Verified`. The bundle is authenticated **solely** by message inclusion plus the message sender being the canonical `L2_INTEROP_CENTER_ADDR` (`UnauthorizedMessageSender`); asset correctness across chains is guaranteed by ZK proofs (assuming proofs are correct and chains are not malicious), so no on-chain per-chain balance reconciliation is performed. The provided proof's message data is substituted with `BUNDLE_IDENTIFIER || bundle` before verification. Verification is permissionless and intentionally not pausable — it only records inclusion and moves no assets.
+### Verification
 
-Before verification/execution, `_validateBundleDestinationContext` checks that the bundle's `sourceChainId` matches the proof's chain ID, `destinationChainId == block.chainid`, and `destinationBaseTokenAssetId` matches this chain's expected base-token asset ID.
+Verification proves a bundle without executing it, changes `Unreceived` to `Verified`, and enables
+unbundling. It is permissionless and does not move assets.
 
-### Execution (`executeBundle`)
+- `L2InteropHandler.verifyAtomicBundle` calls `AtomicFlowManager.requireFlowFinalized`, proving every
+  leg of the flow committed in its declared source-chain tree before the deadline.
+- `L1InteropHandler.verifyBundle` substitutes `BUNDLE_IDENTIFIER || bundle` into the supplied message,
+  requires its sender to be `L2_INTEROP_CENTER_ADDR`, and proves inclusion through `MessageRoot`.
 
-Executes **all** calls of a bundle atomically: if any call fails, the whole transaction reverts. Requires status `Unreceived` (verifying inline) or `Verified`; anything else reverts with `BundleAlreadyProcessed` — a whitelist approach, so any future status is explicitly rejected until explicitly allowed. If `executionAddress` is set, only that address (on this chain, or chain-agnostic via chainId 0) — or the handler itself, for the `receiveMessage` path — may execute; if empty, execution is permissionless. Following CEI, the bundle is marked `FullyExecuted` and every call `Executed` **before** any external call runs, so reentrancy hits the status check. Each call is delivered as `IERC7786Recipient.receiveMessage{value}` with the source-side base-token value handled by `_handleCallValue`, and must return the correct selector.
+### Execution
+
+`executeAtomicBundle` on L2 and `executeBundle` on L1 execute **all** calls atomically: if any call
+fails, the transaction reverts. They accept `Unreceived` (prove inline) or `Verified` (reuse the prior
+proof); any other status reverts with `BundleAlreadyProcessed`. If `executionAddress` is set, only that
+address on this chain (or a chain-wildcard address), or the handler itself on the rescue path, may
+execute. Empty means permissionless.
+
+Following CEI, the handler marks the bundle `FullyExecuted` and every call `Executed` before any
+external call. It delivers each call through `IERC7786Recipient.receiveMessage{value}` and requires the
+correct selector. L2 obtains call value from `BaseTokenHolder`; L1 rejects non-zero call value.
 
 ### Unbundling (`unbundleBundle`)
 
@@ -175,27 +247,31 @@ A more flexible processing/cancellation path: the caller provides a desired `Cal
 
 ### `receiveMessage` rescue path
 
-The handler itself implements `IERC7786Recipient.receiveMessage`, callable **only by itself** (i.e. only as a call inside an executing bundle). Its purpose is a rescue mechanism for the default-unbundler case: when the unbundler is a contract pinned to the source chain (the default), it cannot call `unbundleBundle` on the destination directly — instead it sends _another_ interop bundle whose call payload is `abi.encodeCall` of `executeBundle`, `verifyBundle`, or `unbundleBundle`. The handler validates the cross-chain sender against the bundle's `executionAddress`/`unbundlerAddress` (verify is permissionless) and then self-calls the target function, which skips its own permission check because `msg.sender == address(this)`. Legacy payload formats (selectors) must remain supported forever, otherwise previously sent messages would become unexecutable.
+The handler itself implements `IERC7786Recipient.receiveMessage`, callable **only by itself** (i.e. only as a call inside an executing bundle). Its purpose is a rescue mechanism for a contract executor/unbundler pinned to another chain: on the supported L2 -> L2 path it sends another atomic bundle whose call payload is `abi.encodeCall` of `executeAtomicBundle`, `verifyAtomicBundle`, or `unbundleBundle`. The handler validates the cross-chain sender against the bundle's `executionAddress`/`unbundlerAddress` (verification is permissionless) and then self-calls the target function, which skips its own permission check because `msg.sender == address(this)`. The L1 handler retains analogous selector dispatch for compatibility, but the current send restrictions provide no general L2 -> L1 rescue-message path. Previously supported selectors must remain stable so in-flight messages do not become unexecutable.
 
 ### L1 specifics (`L1InteropHandler`)
 
-`L1InteropHandler` executes L2→L1 bundles through the same `executeBundle` interface, symmetric to L2. For this release such a bundle is exactly one asset withdrawal resolving to the L1 asset router's `finalizeDeposit`. It is pausable so withdrawals can be halted — the `whenNotPaused` gate that previously lived on `L1Nullifier.finalizeDeposit` now lives on the handler's call-executing entry points. The zero-value rule is enforced twice by design: at send time on L2 (`NonZeroValueToL1NotSupported`) and again on receive (`InteropWithdrawalNonZeroValue`), in case a malformed bundle ever reaches L1.
+`L1InteropHandler` accepts exactly one asset-withdrawal call resolving to the canonical L1 asset
+router's `finalizeDeposit`. The router target is pinned again during execution, even though the source
+send path already enforces it. The handler is pausable so withdrawals can be halted; verification
+remains available while paused because it only records a proof. The zero-value rule is likewise
+enforced both at send (`NonZeroValueToL1NotSupported`) and receive
+(`InteropWithdrawalNonZeroValue`).
 
 ## Atomic bundles
 
 An atomic bundle is a leg of an **atomic interop flow** (L2↔L2 only), marked with the `atomicBundle` attribute. The atomic protocol itself (IMT commitments, proofs, timeout) is described in {protocol-docs/atomicity/README.md}; this section covers the interop-side integration:
 
-- **Send side**: instead of publishing to L1, `_dispatchBundle` appends the bundle's commit value to the interop IMT via `AtomicFlowManager.append` (source-side funds are still collected by the normal send machinery — `initiateIndirectCall` burns for _indirect_ asset-transfer calls, while a direct call's `interopCallValue` is collected by `_ensureCorrectTotalValue` through the `BaseTokenHolder` or the asset router; a fund-free direct call burns nothing). The `AtomicSend` metadata (`AtomicFlowPreimage` = preimage `version`, deadline, settlement-layer chain ID, leg bundle hashes, leg source chain IDs; plus `lowNullifierIndex` and `isAtomic`) travels out-of-band and never enters the bundle, keeping `bundleHash` independent of the preimage. The `AtomicFlowManager` recomputes `flowId = keccak256(abi.encode(preimage))` and requires the sent bundle's hash to be one of its legs with this chain as the declared source — so if the off-chain bundle-hash prediction (e.g. a `callStatic` preview) was wrong or went stale (e.g. an upgrade changed the bundle encoding), the whole send reverts and nothing is burned, instead of committing a leg under a `flowId` that could neither finalize nor be refunded.
+- **Send side**: instead of publishing to L1, `_dispatchBundle` appends the bundle's commit value to the interop IMT via `AtomicFlowManager.append` (source-side funds are still collected by the normal send machinery — `initiateIndirectCall` burns for _indirect_ asset-transfer calls, while a direct call's `interopCallValue` is collected by `_ensureCorrectTotalValue` through the `BaseTokenHolder` or the asset router; a fund-free direct call burns nothing). The `AtomicSend` metadata (`AtomicFlowPreimage` = preimage `version`, deadline, settlement-layer chain ID, leg bundle hashes, leg source chain IDs; plus `lowNullifierIndex` and `isAtomic`) travels out-of-band and never enters the bundle, keeping `bundleHash` independent of the preimage. The `AtomicFlowManager` recomputes `flowId = keccak256(abi.encode(preimage))` and requires the sent bundle's hash to be one of its legs with this chain as the declared source — so if the hash obtained from `previewMessageHash` / `previewBundleHash` was wrong or went stale (e.g. an upgrade changed the bundle encoding), the whole send reverts and nothing is burned, instead of committing a leg under a `flowId` that could neither finalize nor be refunded.
 - **Execution side**: `L2InteropHandler.executeAtomicBundle(bundle, AtomicFinalityProof)` mirrors `executeBundle`, but the L1-message inclusion proof is replaced by the **atomicity gate** `AtomicFlowManager.requireFlowFinalized`: proof that _every_ leg of the flow was committed in its source chain's IMT before the deadline, and that this bundle is one of the legs. Replay is prevented by marking `FullyExecuted` (CEI) before calls run. The source chain ID used for destination-context validation is the bundle's own field; the cross-chain binding comes from the IMT inclusion proofs.
 - **Atomic verification**: `verifyAtomicBundle(bundle, AtomicFinalityProof)` runs the same atomicity gate without executing the calls, marking the bundle `Verified` and enabling the verify→unbundle flow. `executeAtomicBundle` therefore accepts a bundle that is already `Verified` and **skips** the gate in that case (it was checked at verify time) — the accepted statuses are `Unreceived` and `Verified`, not `Unreceived` alone. Note this is what makes an atomic bundle partially executable: once `Verified`, individual calls can be executed or `Cancelled` via [`unbundleBundle`](#unbundling-unbundlebundle), so the atomicity gate governs whether execution is _permitted_, not that every call runs (see {protocol-docs/atomicity/security.md#guarantees}).
-- **Settlement layer**: the IMT proofs are authenticated against the imported interop root, so mechanically they carry no gateway-settlement requirement — but atomic interop is **L1-only in this release**: `AtomicFlowManager` rejects any flow whose `settlementLayerChainId` is not the L1 chain id (`ManagerSettlementLayerNotL1`) on send, finality and refund alike (see {protocol-docs/atomicity/security.md#trust-assumptions}).
-- **Timeouts**: if a flow misses its deadline, recovery is best-effort via `AtomicFlowManager._recoverBundle` / `IAtomicRecoverable.recoverAtomicCall`. This is why _indirect_ calls may not carry `interopCallValue` (see [Restrictions](#restrictions)) — recovery returns value to `InteropCall.from`, the asset router for an indirect call, never the payer; direct calls may carry value and are refunded through `bridgehubRecoverBaseToken`. L1 destinations are banned because L1 has no atomic execution, so the only outcome would be a timeout refund, but L2→L1 withdrawal accounting (`totalWithdrawalsToL1`, consumed once during the L1→GW migration) must stay append-only and never revertable.
+- **Settlement layer**: the IMT proofs are authenticated against the imported interop root, but atomic interop is **L1-only in this release**: `AtomicFlowManager` rejects any flow whose `settlementLayerChainId` is not the L1 chain id (`ManagerSettlementLayerNotL1`) on send, finality and refund alike (see {protocol-docs/atomicity/security.md#trust-assumptions}).
+- **Timeouts**: if a flow misses its deadline, recovery is best-effort via `AtomicFlowManager._recoverBundle` / `IAtomicRecoverable.recoverAtomicCall`. This is why _indirect_ calls may not carry `interopCallValue` (see [Restrictions](#restrictions)) — recovery returns value to `InteropCall.from`, the asset router for an indirect call, never the payer; direct calls may carry value and are refunded through `bridgehubRecoverBaseToken`. L1 destinations are banned because L1 has no atomic execution, so the only outcome would be a timeout refund, while L2→L1 withdrawal accounting must stay append-only and never revertable.
 
 ## Initialization and versioning notes
 
 - `InteropCenter.initL2` is a one-shot initializer called by the complex upgrader. Because the `InteropCenter` is introduced in v31, it runs for both new chains (genesis) and chains upgraded to v31; in both cases storage is fresh (the SystemProxy is freshly deployed). After v31 it must never be called again (`reentrancyGuardInitializer` + `_disableInitializers` guards). It sets `L1_CHAIN_ID`, the owner, `ZK_TOKEN_ASSET_ID` (must be non-zero; anyone updating it later must also update the cached `zkToken` address) and the default `ZK_INTEROP_FEE`.
 - `L2InteropHandler.initL2` only locks the reentrancy guard (the handler holds no configurable state); `L1InteropHandler` is initialized behind its proxy with an owner for pause control, and its implementation is locked in the constructor.
 - `L1_CHAIN_ID` always refers to the base-most L1, on whichever layer the contract is deployed.
-- `InteropCenter.forwardTransactionOnGateway` is a Gateway-relay function (callable only by `SETTLEMENT_LAYER_RELAY_SENDER`) forwarding an L1-originated transaction to a chain's mailbox; `_canonicalTxHash` is chain-provided and must not be trusted to be unique, while the other fields are populated by the Gateway's `Mailbox`. Its `_expirationTimestamp` parameter is deprecated (always 0).
 - Deprecated storage slots retained for layout compatibility: `InteropCenter.__DEPRECATED_interopBundleNonce`, `InteropHandlerBase.__DEPRECATED_L1_CHAIN_ID` (the handler now operates on `block.chainid`).
 - `InteropCenter` is pausable by its owner (`pause`/`unpause` gate both send entry points).
