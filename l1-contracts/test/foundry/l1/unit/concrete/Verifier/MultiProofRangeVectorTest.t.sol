@@ -40,19 +40,21 @@ contract ExpectSignalPlonkVerifier is IZiskSnarkPlonkVerifier {
     }
 }
 
-/// @notice Range reconstruction with the regenerated ZiSK 1.2.0-alpha pins.
-/// @dev Shares the four-batch GPU session with ZiskVerifierRealProofTest.
+/// @notice Range reconstruction with the regenerated ZiSK 1.3.0-alpha pins.
+/// @dev Shares the four batch commitments with ZiskVerifierRealProofTest. DIGEST
+///      follows the 1.3.0-alpha pins (program VKs and vadcop-final root) by
+///      formula until a 1.3.0-alpha GPU session re-anchors the real-proof fixtures.
 contract MultiProofRangeVectorTest is Test {
     /// @dev Inner state-transition guest programVK: the first field of the
     ///      binding digest. It is NOT the aggregated proof's wire [0..32].
-    bytes32 internal constant INNER_PROGRAM_VK = 0x189d6b11c50ef1db9885fed376479ed97dde719a59574a7946d8d612e25da97a;
+    bytes32 internal constant INNER_PROGRAM_VK = 0xf0f04fcce9192b6adad51ac756798e69ad9902537124af091fbc0de6075a6820;
     /// @dev Aggregator guest programVK: the aggregated proof's wire
     ///      public-values bytes [0..32].
     bytes32 internal constant AGGREGATOR_PROGRAM_VK =
-        0x10f0e91f54ad66e4e95713a1b4b9fda44ea3b06e51ed3430ef775ba8bef4a7c8;
+        0x27e68756ce585201b839f16f08d58eab314871d3f7fad020b41061570c7bcf2a;
     /// @dev Vadcop-final root: the second field of the binding digest, and
     ///      wire public-values bytes [544..576].
-    bytes32 internal constant ROOT_C_VADCOP_FINAL = 0x564c2b1bcbd5932c81cfad1fa786a98372eb3d6495257c2d944544334f84382f;
+    bytes32 internal constant ROOT_C_VADCOP_FINAL = 0x05006517b6ccde5da4d890587ba62845b5af8a307c00e87d4b9d05099b16dc80;
 
     /// @dev The four per-batch commitments (the first eight guest-public slots
     ///      of each per-batch ZiSK proof), in batch order.
@@ -68,7 +70,7 @@ contract MultiProofRangeVectorTest is Test {
     /// @dev keccak256(INNER_PROGRAM_VK || ROOT_C_VADCOP_FINAL || CHAINED_PI):
     ///      the aggregated proof carries it across the first eight guest-public
     ///      slots, public-values bytes [32..96].
-    bytes32 internal constant DIGEST = 0x77808e06c21c5f1608738e0345b0074f0bc67ef937abfc873b2499eab7953ce4;
+    bytes32 internal constant DIGEST = 0x519f1449ebefb30f2778bb9a4c544485e8787399d695679daac3a272e8b2a43d;
 
     /// @dev BN254 scalar field modulus (must equal ZiskVerifier._RFIELD).
     uint256 internal constant RFIELD = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
