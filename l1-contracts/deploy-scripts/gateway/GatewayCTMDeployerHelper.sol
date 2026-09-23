@@ -736,9 +736,7 @@ library GatewayCTMDeployerHelper {
 
     /// @notice Returns all factory dependencies for deployment.
     /// @dev Gateway CTM deployment needs no additional factory dependencies.
-    function getListOfFactoryDeps(
-        GatewayCTMDeployerConfig memory // config
-    ) external pure returns (bytes[] memory dependencies) {
+    function getListOfFactoryDeps() external pure returns (bytes[] memory dependencies) {
         return dependencies;
     }
 
@@ -781,7 +779,6 @@ library GatewayCTMDeployerHelper {
         if (constructorArgs.length == 0) {
             msgStr = string.concat("forge verify-contract ", Utils.vm.toString(contractAddr), " ", contractName);
         } else {
-            // `string.concat` is variadic, so named arguments are not possible.
             // solhint-disable-next-line func-named-parameters
             msgStr = string.concat(
                 "forge verify-contract ",

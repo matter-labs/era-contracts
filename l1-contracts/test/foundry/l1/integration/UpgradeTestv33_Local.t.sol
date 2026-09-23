@@ -15,7 +15,7 @@ import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.s
 import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
-import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../../../deploy-scripts/utils/Types.sol";
+import {ChainCreationParamsConfig} from "../../../../deploy-scripts/utils/Types.sol";
 import {PublishFactoryDepsResult} from "../../../../deploy-scripts/utils/bytecode/BytecodePublisher.s.sol";
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
@@ -61,7 +61,6 @@ contract CTMUpgradeV33Test is CTMUpgrade_v33 {
     /// The base implementation reads every force-deployment bytecode, causing MemoryOOG.
     /// We return an empty upgrade instead.
     function getProposedUpgrade(
-        StateTransitionDeployedAddresses memory stateTransition,
         ChainCreationParamsConfig memory chainCreationParams,
         PublishFactoryDepsResult memory _factoryDepsResult,
         uint256 protocolUpgradeNonce
@@ -78,7 +77,7 @@ contract CTMUpgradeV33Test is CTMUpgrade_v33 {
             verifier: address(0),
             verifierParams: ProposedUpgradeLib.emptyVerifierParams(),
             l1ContractsUpgradeCalldata: new bytes(0),
-            postUpgradeCalldata: encodePostUpgradeCalldata(stateTransition),
+            postUpgradeCalldata: encodePostUpgradeCalldata(),
             upgradeTimestamp: 0,
             newProtocolVersion: chainCreationParams.latestProtocolVersion
         });
@@ -225,7 +224,7 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationTestBase, L1ContractDe
         CHAIN_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-era.toml";
         CHAIN_OUTPUT = "/script-out/foundry-upgrade/local-gateway.toml";
         console.log("setUp: Paths configured");
-        setupUpgrade(true);
+        setupUpgrade();
         console.log("setUp: Upgrade setup complete");
         _snapshotExpectedZKsyncOSUpgradeTxHash();
 
@@ -381,7 +380,7 @@ contract UpgradeIntegrationTestLocalProductionVerifier is UpgradeIntegrationTest
         return false;
     }
 
-    function setupUpgrade(bool skipFactoryDepsCheck) public override {
+    function setupUpgrade() public override {
         // The genesis fixture registers a testnet verifier; swap in a production one via the CTM
         // owner before the upgrade scripts read it.
         ChainTypeManager ctm_ = ChainTypeManager(address(addresses.chainTypeManager));
@@ -390,6 +389,6 @@ contract UpgradeIntegrationTestLocalProductionVerifier is UpgradeIntegrationTest
         address ctmOwner = ctm_.owner();
         vm.prank(ctmOwner);
         ctm_.setProtocolVersionVerifier(currentVersion, productionVerifier);
-        super.setupUpgrade(skipFactoryDepsCheck);
+        super.setupUpgrade();
     }
 }

@@ -507,7 +507,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
 
     bool internal skipFactoryDepsCheck = false;
 
-    // The test-only marker is deliberately shouty so this cannot be mistaken for production surface.
     // solhint-disable-next-line func-name-mixedcase
     function setSkipFactoryDepsCheck_TestOnly(bool _skipFactoryDepsCheck) public virtual {
         skipFactoryDepsCheck = _skipFactoryDepsCheck;
@@ -892,7 +891,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     }
 
     /// @notice Tests that it is possible to upgrade a chain to the new version
-    // The test-only marker is deliberately shouty so this cannot be mistaken for production surface.
     // solhint-disable-next-line func-name-mixedcase
     function TESTONLY_prepareTestUpgradeChainCall() private returns (Call[] memory calls, address admin) {
         address chainDiamondProxyAddress = L1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).getZKChain(
@@ -923,7 +921,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         return ZKSYNC_OS_TEST_CREATE_CHAIN_ID;
     }
 
-    // The test-only marker is deliberately shouty so this cannot be mistaken for production surface.
     // solhint-disable-next-line func-name-mixedcase
     function TESTONLY_prepareCreateChainCall() private returns (Call[] memory calls, address admin) {
         admin = getBridgehubAdmin();
@@ -1099,7 +1096,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     }
 
     /// @dev Test-only: inject pre-computed upgrade cut data to avoid recomputing (memory optimization).
-    // The test-only marker is deliberately shouty so this cannot be mistaken for production surface.
     // solhint-disable-next-line func-name-mixedcase
     function setChainUpgradeDiamondCutData_TestOnly(bytes memory _data) public {
         newlyGeneratedData.upgradeCutData = _data;
@@ -1107,7 +1103,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     }
 
     /// @dev Test-only: inject pre-computed fixed force deployments data.
-    // The test-only marker is deliberately shouty so this cannot be mistaken for production surface.
     // solhint-disable-next-line func-name-mixedcase
     function setFixedForceDeploymentsData_TestOnly(bytes memory _data) public {
         generatedData.forceDeploymentsData = _data;

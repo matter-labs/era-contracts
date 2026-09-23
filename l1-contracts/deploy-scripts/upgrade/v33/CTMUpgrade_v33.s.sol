@@ -32,7 +32,6 @@ import {CoreContract} from "../../ecosystem/CoreContract.sol";
 ///      `L2V32Upgrade`: this release was developed as v32 and renumbered to v33 when genesis moved
 ///      to `0.33.0`. The contracts are the v33 payload; only their names lag, and renaming them
 ///      would churn the bytecode vendored by zksync-os-server.
-// The name is a forge script target hardcoded in protocol-ops; renaming it breaks that caller.
 // solhint-disable-next-line contract-name-capwords
 contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
     /// @notice Priority-op lower-bound registry, deployed alongside the per-chain upgrade contract

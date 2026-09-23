@@ -9,11 +9,9 @@ import {console2 as console} from "forge-std/Script.sol";
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {IInteropCenter, InteropCenter} from "contracts/interop/InteropCenter.sol";
-import {ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
 import {
     L2TransactionRequestDirect,
     L2TransactionRequestTwoBridgesInner,
@@ -951,13 +949,7 @@ contract ExperimentalBridgeTest is Test {
         uint256 mockL2Value,
         bytes memory mockL2Calldata,
         uint256 mockL2GasLimit,
-        // Unused in the body, but call sites pass it as a named argument.
-        // solhint-disable-next-line no-unused-vars
-        uint256 mockL2GasPerPubdataByteLimit,
-        bytes[] memory mockFactoryDeps,
-        // Unused in the body, but both call sites pass it as a named argument.
-        // solhint-disable-next-line no-unused-vars
-        address randomCaller
+        bytes[] memory mockFactoryDeps
     ) internal returns (L2TransactionRequestDirect memory l2TxnReqDirect, bytes32 canonicalHash) {
         vm.assume(mockFactoryDeps.length <= MAX_NEW_FACTORY_DEPS);
 
@@ -968,7 +960,6 @@ contract ExperimentalBridgeTest is Test {
             mockL2Value: mockL2Value,
             mockL2Calldata: mockL2Calldata,
             mockL2GasLimit: mockL2GasLimit,
-            mockL2GasPerPubdataByteLimit: mockL2GasPerPubdataByteLimit,
             mockFactoryDeps: mockFactoryDeps,
             mockRefundRecipient: address(0)
         });
@@ -1005,7 +996,6 @@ contract ExperimentalBridgeTest is Test {
         uint256 msgValue,
         bytes memory mockL2Calldata,
         uint256 mockL2GasLimit,
-        uint256 mockL2GasPerPubdataByteLimit,
         bytes[] memory mockFactoryDeps
     ) public {
         _useMockSharedBridge();
@@ -1021,9 +1011,7 @@ contract ExperimentalBridgeTest is Test {
             mockL2Value: mockL2Value,
             mockL2Calldata: mockL2Calldata,
             mockL2GasLimit: mockL2GasLimit,
-            mockL2GasPerPubdataByteLimit: mockL2GasPerPubdataByteLimit,
-            mockFactoryDeps: mockFactoryDeps,
-            randomCaller: randomCaller
+            mockFactoryDeps: mockFactoryDeps
         });
 
         vm.deal(randomCaller, msgValue);
@@ -1039,7 +1027,6 @@ contract ExperimentalBridgeTest is Test {
         uint256 mockL2Value,
         bytes memory mockL2Calldata,
         uint256 mockL2GasLimit,
-        uint256 mockL2GasPerPubdataByteLimit,
         bytes[] memory mockFactoryDeps,
         uint256 gasPrice
     ) public {
@@ -1058,9 +1045,7 @@ contract ExperimentalBridgeTest is Test {
             mockL2Value: mockL2Value,
             mockL2Calldata: mockL2Calldata,
             mockL2GasLimit: mockL2GasLimit,
-            mockL2GasPerPubdataByteLimit: mockL2GasPerPubdataByteLimit,
-            mockFactoryDeps: mockFactoryDeps,
-            randomCaller: randomCaller
+            mockFactoryDeps: mockFactoryDeps
         });
 
         vm.deal(randomCaller, l2TxnReqDirect.mintValue);
@@ -1080,7 +1065,6 @@ contract ExperimentalBridgeTest is Test {
         uint256 mockL2Value,
         bytes memory mockL2Calldata,
         uint256 mockL2GasLimit,
-        uint256 mockL2GasPerPubdataByteLimit,
         bytes[] memory mockFactoryDeps,
         uint256 gasPrice,
         uint256 randomValue
@@ -1102,7 +1086,6 @@ contract ExperimentalBridgeTest is Test {
             mockL2Value: mockL2Value,
             mockL2Calldata: mockL2Calldata,
             mockL2GasLimit: mockL2GasLimit,
-            mockL2GasPerPubdataByteLimit: mockL2GasPerPubdataByteLimit,
             mockFactoryDeps: mockFactoryDeps,
             mockRefundRecipient: randomCaller
         });
@@ -1212,7 +1195,6 @@ contract ExperimentalBridgeTest is Test {
     function test_requestL2TransactionTwoBridgesWrongBridgeAddress(
         uint256 chainId,
         uint256 mintValue,
-        uint256 /* msgValue */,
         uint256 l2Value,
         uint256 l2GasLimit,
         uint256 l2GasPerPubdataByteLimit,
@@ -1327,48 +1309,6 @@ contract ExperimentalBridgeTest is Test {
         return l2Req;
     }
 
-    function _createNewChainInitData(
-        bool isFreezable,
-        bytes4[] memory mockSelectors,
-        address, //mockInitAddress,
-        bytes memory //mockInitCalldata
-    ) internal returns (bytes memory) {
-        bytes4[] memory singleSelector = new bytes4[](1);
-        singleSelector[0] = bytes4(0xabcdef12);
-
-        Diamond.FacetCut memory facetCut;
-        Diamond.DiamondCutData memory diamondCutData;
-
-        facetCut.facet = address(this); // for a random address, it will fail the check of _facet.code.length > 0
-        facetCut.action = Diamond.Action.Add;
-        facetCut.isFreezable = isFreezable;
-        if (mockSelectors.length == 0) {
-            mockSelectors = singleSelector;
-        }
-        facetCut.selectors = mockSelectors;
-
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
-        facetCuts[0] = facetCut;
-
-        diamondCutData.facetCuts = facetCuts;
-        diamondCutData.initAddress = address(0);
-        diamondCutData.initCalldata = "";
-
-        ChainCreationParams memory params = ChainCreationParams({
-            diamondCut: diamondCutData,
-            // Just some dummy values:
-            genesisUpgrade: address(0x01),
-            genesisBatchHash: bytes32(uint256(0x01)),
-            genesisIndexRepeatedStorageChanges: uint64(0x01),
-            genesisBatchCommitment: bytes32(uint256(0x01)),
-            forceDeploymentsData: bytes("")
-        });
-
-        mockCTM.setChainCreationParams(params);
-
-        return abi.encode(abi.encode(diamondCutData), bytes(""));
-    }
-
     function _setUpZKChainForChainId(uint256 mockChainId) internal returns (uint256 mockChainIdInRange) {
         mockChainId = bound(mockChainId, 1, type(uint48).max);
         mockChainIdInRange = mockChainId;
@@ -1408,8 +1348,6 @@ contract ExperimentalBridgeTest is Test {
         uint256 mockL2Value,
         bytes memory mockL2Calldata,
         uint256 mockL2GasLimit,
-        // solhint-disable-next-line no-unused-vars
-        uint256 mockL2GasPerPubdataByteLimit,
         bytes[] memory mockFactoryDeps,
         address mockRefundRecipient
     ) internal pure returns (L2TransactionRequestDirect memory) {

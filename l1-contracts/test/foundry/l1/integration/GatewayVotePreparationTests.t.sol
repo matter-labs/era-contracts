@@ -210,7 +210,6 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
             bytes32(uint256(uint160(mockCTM))) // chainTypeManager
         );
         assertEq(diamondCut.initCalldata.length, 0, "chain-creation init tail must be empty");
-        // `string.concat` is variadic, so named arguments are not possible.
         // solhint-disable-next-line func-named-parameters
         bytes memory initData2 = bytes.concat(
             bytes32(config.protocolVersion), // protocolVersion

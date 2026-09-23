@@ -164,7 +164,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         ) = GatewayCTMDeployerHelper.calculateAddresses(gatewayCTMDeployerConfig.salt, gatewayCTMDeployerConfig);
 
         // Deploy all factory dependencies
-        bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps(gatewayCTMDeployerConfig);
+        bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps();
         for (uint256 i = 0; i < deps.length; i++) {
             bytes[] memory localDeps = new bytes[](1);
             localDeps[0] = deps[i];

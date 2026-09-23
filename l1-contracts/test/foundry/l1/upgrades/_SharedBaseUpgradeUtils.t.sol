@@ -8,7 +8,6 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 
 contract BaseUpgradeUtils is ZKChainBase {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
-    // `vm` is forge-std's cheatcode handle; the lowercase name is forge's own convention.
     // solhint-disable-next-line const-name-snakecase
     Vm internal constant vm = Vm(VM_ADDRESS);
 

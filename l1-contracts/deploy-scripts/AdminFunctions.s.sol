@@ -176,7 +176,6 @@ contract AdminFunctions is Script, IAdminFunctions {
     /// `forge script --broadcast` the impersonated sender would still have 0 ETH
     /// on chain and gas estimation would fail. `vm.rpc` propagates to the fork.
     function _anvilFund(address _addr) private {
-        // Single quotes keep the JSON payload's inner quotes unescaped.
         // solhint-disable-next-line quotes
         string memory params = string.concat('["', vm.toString(_addr), '","0x56BC75E2D63100000"]');
         vm.rpc("anvil_setBalance", params);

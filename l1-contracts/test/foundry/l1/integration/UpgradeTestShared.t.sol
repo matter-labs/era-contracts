@@ -57,7 +57,7 @@ contract UpgradeIntegrationTestBase is Test {
     Call[] internal _ctmAdminCalls;
     bool internal _ctmAdminCallsPrepared;
 
-    function setupUpgrade(bool /* skipFactoryDepsCheck */) public virtual {
+    function setupUpgrade() public virtual {
         console.log("setupUpgrade: Creating CoreUpgrade_v33 and CTMUpgrade_v33");
         coreUpgrade = createCoreUpgrade();
         ctmUpgrade = createCTMUpgrade();

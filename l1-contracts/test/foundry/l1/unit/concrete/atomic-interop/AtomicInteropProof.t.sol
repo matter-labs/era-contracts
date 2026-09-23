@@ -69,7 +69,6 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// @notice Pins the domain tag's literal value. {testFuzz_commitValue_matchesSpec} derives its
     /// expectation from the constant itself, so only this catches a change to the tag preimage.
     function test_commitValueDomainTag_isPinned() public pure {
-        // Single quotes keep the embedded double quotes unescaped.
         // solhint-disable-next-line quotes
         assertEq(ATOMIC_COMMIT_LEAF_TAG, bytes4(0x3445134c), 'keccak("AtomicInterop.commit.v1")[0:4]');
     }
