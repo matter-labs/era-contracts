@@ -873,7 +873,6 @@ contract ExperimentalBridgeTest is Test {
         vm.startPrank(deployerAddress);
         vm.mockCall(
             address(mockCTM),
-            // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
                 mockCTM.createNewChain.selector,
                 chainId,
@@ -925,7 +924,6 @@ contract ExperimentalBridgeTest is Test {
 
         vm.mockCall(
             address(mockChainContract),
-            // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
                 mockChainContract.l2TransactionBaseCost.selector,
                 mockGasPrice,

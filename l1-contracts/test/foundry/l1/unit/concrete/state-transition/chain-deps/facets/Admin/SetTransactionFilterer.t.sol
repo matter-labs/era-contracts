@@ -12,7 +12,6 @@ contract SetTransactionFiltererTest is AdminTest {
         address admin = utilsFacet.util_getAdmin();
         address transactionFilterer = makeAddr("transactionFilterer");
 
-        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(adminFacet));
         emit NewTransactionFilterer(address(0), transactionFilterer);
 
@@ -26,7 +25,6 @@ contract SetTransactionFiltererTest is AdminTest {
         address f2 = makeAddr("f2");
         utilsFacet.util_setTransactionFilterer(f1);
 
-        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(adminFacet));
         emit NewTransactionFilterer(f1, f2);
 

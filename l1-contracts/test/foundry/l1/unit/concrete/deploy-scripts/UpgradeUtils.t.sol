@@ -29,7 +29,6 @@ contract MockCTMVersion {
 
 /// @notice Mimics a pre-v34 testnet verifier, which exported the flag as a public constant.
 contract LegacyTestnetVerifierMock {
-    // solhint-disable-next-line func-name-mixedcase
     bool public constant IS_TESTNET_VERIFIER = true;
 }
 

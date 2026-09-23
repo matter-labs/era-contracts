@@ -2,8 +2,6 @@
 
 pragma solidity ^0.8.20;
 
-// solhint-disable gas-custom-errors
-
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";

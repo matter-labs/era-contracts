@@ -2,8 +2,6 @@
 
 pragma solidity ^0.8.20;
 
-// solhint-disable gas-custom-errors
-
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";

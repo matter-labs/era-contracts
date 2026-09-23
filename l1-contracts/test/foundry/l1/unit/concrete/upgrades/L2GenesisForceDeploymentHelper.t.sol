@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// solhint-disable no-console, gas-custom-errors, state-visibility, no-global-import, one-contract-per-file, gas-calldata-parameters, no-unused-vars, func-named-parameters
+// solhint-disable state-visibility, no-global-import
 
 pragma solidity 0.8.28;
 

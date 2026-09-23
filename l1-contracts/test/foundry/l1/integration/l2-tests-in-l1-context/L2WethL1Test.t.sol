@@ -2,8 +2,6 @@
 
 pragma solidity ^0.8.20;
 
-// solhint-disable gas-custom-errors
-
 import {Test} from "forge-std/Test.sol";
 import {BridgeMintNotImplemented, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";

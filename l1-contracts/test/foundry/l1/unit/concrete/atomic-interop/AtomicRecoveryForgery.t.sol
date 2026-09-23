@@ -281,7 +281,6 @@ contract AtomicRecoveryForgeryTest is Test {
 
     function _initializeRouterChainIds() internal {
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        // solhint-disable-next-line func-named-parameters
         router.updateL2(
             L1_CHAIN_ID,
             IL1AssetRouter(makeAddr("l1 asset router")),

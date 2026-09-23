@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.28;
 
-// solhint-disable no-console
-
 import {console2 as console} from "forge-std/Script.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
@@ -40,8 +38,6 @@ import {
     GatewayCTMFinalConfig,
     GatewayCTMFinalResult
 } from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
-
-// solhint-disable gas-custom-errors
 
 struct InnerDeployConfig {
     address deployerAddr;

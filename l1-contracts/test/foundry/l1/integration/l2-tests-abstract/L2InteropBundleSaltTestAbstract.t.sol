@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.20;
-// solhint-disable gas-custom-errors
 
 import {Vm} from "forge-std/Vm.sol";
 
@@ -96,7 +95,6 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bytes memory data = extractFirstBundleFromLogs(logs);
         require(data.length != 0, "InteropBundleSent event not found");
-        // solhint-disable-next-line no-unused-vars
         (, , bundle) = abi.decode(data, (bytes32, bytes32, InteropBundle));
     }
 
@@ -258,7 +256,6 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
         bytes32 userSalt = keccak256("parsed-salt");
         bytes[] memory attrs = _buildBundleAttributesWithSalt(userSalt, true);
 
-        // solhint-disable-next-line no-unused-vars
         (, BundleAttributes memory bundleAttributes) = l2InteropCenter.parseAttributes(
             attrs,
             IInteropCenter.AttributeParsingRestrictions.OnlyBundleAttributes

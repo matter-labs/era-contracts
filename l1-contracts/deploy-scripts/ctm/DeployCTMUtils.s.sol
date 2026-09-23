@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-// solhint-disable no-console, gas-custom-errors
-
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
@@ -29,7 +27,6 @@ import {CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "./DeployCTML1OrGate
 
 import {CTMDeployedAddresses} from "../utils/Types.sol";
 
-// solhint-disable-next-line gas-struct-packing
 struct Config {
     uint256 l1ChainId;
     address deployerAddress;
@@ -44,14 +41,12 @@ struct Config {
 /// @notice Deploy-time settings of the ZiSK multi-proof lane. They sit in
 ///         their own struct so that `Config` stays within the stack budget the
 ///         optimizer-free coverage build allows.
-// solhint-disable-next-line gas-struct-packing
 struct MultiProofConfig {
     bool enabled;
     address ziskPlonkVerifierAddr;
     address ziskRangeVerifierAddr;
 }
 
-// solhint-disable-next-line gas-struct-packing
 struct ContractsConfig {
     address multicall3Addr;
     uint256 validatorTimelockExecutionDelay;
@@ -64,7 +59,6 @@ struct ContractsConfig {
     ChainCreationParamsConfig chainCreationParams;
 }
 
-// solhint-disable-next-line gas-struct-packing
 struct GeneratedData {
     bytes forceDeploymentsData;
 }

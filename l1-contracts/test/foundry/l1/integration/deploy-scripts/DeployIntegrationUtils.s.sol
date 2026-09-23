@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-// solhint-disable no-console, gas-custom-errors
-
 import {Script} from "forge-std/Script.sol";
 
 import {DeployCTMUtils} from "deploy-scripts/ctm/DeployCTMUtils.s.sol";
