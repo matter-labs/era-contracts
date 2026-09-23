@@ -36,8 +36,9 @@ a plain force deployment would reset.
   that data against the CTM's stored hashes before using it.
 - `output/stage/ecosystem.toml` holds the governance calls per stage, the per-chain ChainAdmin
   calldata, the upgrade cut, the new creation parameters and the factory-dep list. Its
-  `test_calls` table holds a test-only `createNewChain` call (chain id 555, sent by the bridgehub
-  admin) that exercises the new creation parameters. It is for simulation, not for execution.
+  `[test_upgrade_calls]` table is for the transaction simulator, not for execution.
+  `test_create_chain_era` creates chain 555 from the new creation parameters as the bridgehub admin.
+  `test_upgrade_chain_era` is chain 499's upgrade call, sent by its ChainAdmin contract.
 - `rehearse-stage.sh` runs the whole flow on a Sepolia fork, creates the test chain, and asserts the
   L1 end state.
 

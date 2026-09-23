@@ -333,17 +333,22 @@ contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
     }
 
     /// @notice The ChainAdmin multicall that upgrades one chain once stage 1 has executed.
-    function getV33ChainUpgradeCall(uint256 _chainId) public view returns (address admin, bytes memory data) {
-        IChainTypeManager ctm = IChainTypeManager(v33Input.ctm);
-        address chain = ctm.getZKChain(_chainId);
-        admin = ctm.getChainAdmin(_chainId);
+    /// @notice The call a chain admin makes on the chain's diamond to move it from the old to the new version.
+    function _v33UpgradeChainCall(uint256 _chainId) internal view returns (Call memory) {
+        address chain = IChainTypeManager(v33Input.ctm).getZKChain(_chainId);
         Diamond.DiamondCutData memory upgradeCut = abi.decode(v33UpgradeCut, (Diamond.DiamondCutData));
+        return
+            Call({
+                target: chain,
+                value: 0,
+                data: abi.encodeCall(IAdmin.upgradeChainFromVersion, (chain, v33Input.oldProtocolVersion, upgradeCut))
+            });
+    }
+
+    function getV33ChainUpgradeCall(uint256 _chainId) public view returns (address admin, bytes memory data) {
+        admin = IChainTypeManager(v33Input.ctm).getChainAdmin(_chainId);
         Call[] memory calls = new Call[](1);
-        calls[0] = Call({
-            target: chain,
-            value: 0,
-            data: abi.encodeCall(IAdmin.upgradeChainFromVersion, (chain, v33Input.oldProtocolVersion, upgradeCut))
-        });
+        calls[0] = _v33UpgradeChainCall(_chainId);
         data = abi.encodeCall(IChainAdmin.multicall, (calls, true));
     }
 
@@ -424,7 +429,7 @@ contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
             chainUpgrades = vm.serializeString("chain_upgrades", key, entry);
         }
 
-        vm.serializeString("root", "test_calls", _serializeV33TestCalls());
+        vm.serializeString("root", "test_upgrade_calls", _serializeV33TestCalls());
         vm.serializeString("root", "contracts_config", contractsConfig);
         vm.serializeString("root", "chain_upgrades", chainUpgrades);
         string memory toml = vm.serializeString("root", "governance_calls", governanceCalls);
@@ -432,12 +437,26 @@ contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
         console.log("v33: output written to", _outputPath);
     }
 
+    /// @dev Test-only calls in the `[test_upgrade_calls]` layout the transaction simulator reads: each
+    /// value is an ABI-encoded `Call[]` sent by the matching `*_caller`. `test_create_chain_era` creates
+    /// a fresh chain from the new creation params; `test_upgrade_chain_era` is the first chain's upgrade
+    /// call, sent by its ChainAdmin contract directly.
     function _serializeV33TestCalls() internal returns (string memory testCalls) {
+        IChainTypeManager ctm = IChainTypeManager(v33Input.ctm);
         (address createChainCaller, bytes memory createChainData) = getV33TestCreateChainCall();
-        vm.serializeUint("test_calls", "create_chain_id", ERA_TEST_CREATE_CHAIN_ID);
-        vm.serializeAddress("test_calls", "create_chain_caller", createChainCaller);
-        vm.serializeAddress("test_calls", "create_chain_target", IChainTypeManager(v33Input.ctm).BRIDGE_HUB());
-        testCalls = vm.serializeBytes("test_calls", "create_chain_calldata", createChainData);
+        Call[] memory createChain = new Call[](1);
+        createChain[0] = Call({target: ctm.BRIDGE_HUB(), value: 0, data: createChainData});
+        Call[] memory upgradeChain = new Call[](1);
+        upgradeChain[0] = _v33UpgradeChainCall(v33Input.chainIds[0]);
+
+        vm.serializeBytes("test_upgrade_calls", "test_create_chain_era", abi.encode(createChain));
+        vm.serializeAddress("test_upgrade_calls", "test_create_chain_era_caller", createChainCaller);
+        vm.serializeBytes("test_upgrade_calls", "test_upgrade_chain_era", abi.encode(upgradeChain));
+        testCalls = vm.serializeAddress(
+            "test_upgrade_calls",
+            "test_upgrade_chain_era_caller",
+            ctm.getChainAdmin(v33Input.chainIds[0])
+        );
     }
 
     // ======================== Helpers ========================

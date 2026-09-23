@@ -100,15 +100,34 @@ else
   fail "ChainAdmin $ADMIN has no owner()"
 fi
 
-# ---------------------------------------------------------------- 3b. test chain creation
+# ---------------------------------------------------------------- 3b. test calls
+# [test_upgrade_calls] is what the transaction simulator runs. The chain-upgrade test call must be the
+# same call the real ChainAdmin multicall makes, sent by the ChainAdmin itself.
+calls_json() { cast abi-decode --json --input 'f((address,uint256,bytes)[])' "$1"; }
+TU_CALLER=$(toml_get test_upgrade_calls.test_upgrade_chain_era_caller)
+chk_eq_calls() { python3 -c "
+import json, sys
+norm = lambda calls: [(t.lower(), int(str(v), 0), d.lower()) for t, v, d in calls]
+sys.exit(0 if norm(json.loads(sys.argv[1])[0]) == norm(json.loads(sys.argv[2])[0]) else 1)" "$1" "$2"; }
+chk_eq_calls "$(calls_json "$(toml_get test_upgrade_calls.test_upgrade_chain_era)")" \
+  "$(cast calldata-decode --json 'multicall((address,uint256,bytes)[],bool)' "$ADMIN_CALLDATA")" \
+  && echo "  OK   test_upgrade_chain_era = the ChainAdmin multicall's inner call" \
+  || fail "test_upgrade_chain_era differs from chain_admin_calldata"
+[ "$(echo "$TU_CALLER" | tr A-F a-f)" = "$(echo "$ADMIN" | tr A-F a-f)" ] \
+  && echo "  OK   test_upgrade_chain_era caller = ChainAdmin" || fail "test_upgrade_chain_era caller is $TU_CALLER"
+
 # The bridgehub admin creates a fresh Era chain with the v33 creation params: proves on L1 that the
 # CTM accepts the re-issued cut and force-deployment data (hash checks in ChainTypeManagerBase).
-TC_ID=$(toml_get test_calls.create_chain_id)
-TC_CALLER=$(toml_get test_calls.create_chain_caller)
-TC_TARGET=$(toml_get test_calls.create_chain_target)
-TC_DATA=$(toml_get test_calls.create_chain_calldata)
+TC_CALLER=$(toml_get test_upgrade_calls.test_create_chain_era_caller)
+read -r TC_TARGET TC_VALUE TC_DATA < <(calls_json "$(toml_get test_upgrade_calls.test_create_chain_era)" | python3 -c "
+import json, sys
+calls = json.load(sys.stdin)[0]
+assert len(calls) == 1, calls
+target, value, data = calls[0]
+print(target, int(str(value), 0), data)")
+TC_ID=$((16#${TC_DATA:10:64}))
 cast rpc anvil_setBalance "$TC_CALLER" 0x56BC75E2D63100000 --rpc-url "$RPC" >/dev/null
-st=$(cast send --unlocked --from "$TC_CALLER" "$TC_TARGET" "$TC_DATA" --rpc-url "$RPC" --json 2>&1 | python3 -c "import json,sys; L=[l for l in sys.stdin.read().splitlines() if l.startswith('{')]; print(json.loads(L[-1])['status'] if L else 'no-receipt')")
+st=$(cast send --unlocked --from "$TC_CALLER" "$TC_TARGET" "$TC_DATA" --value "$TC_VALUE" --rpc-url "$RPC" --json 2>&1 | python3 -c "import json,sys; L=[l for l in sys.stdin.read().splitlines() if l.startswith('{')]; print(json.loads(L[-1])['status'] if L else 'no-receipt')")
 echo "test createNewChain($TC_ID) as bridgehub admin: status $st"
 [ "$st" = "0x1" ] || fail "test chain creation failed"
 NEW_CHAIN=$(cast call "$TC_TARGET" 'getZKChain(uint256)(address)' "$TC_ID" --rpc-url "$RPC")
