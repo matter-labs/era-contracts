@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// solhint-disable gas-custom-errors, reason-string
-
 import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/Script.sol";
 
@@ -25,10 +23,11 @@ struct PublishFactoryDepsResult {
 library BytecodePublisher {
     // Cheatcodes address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
+    // solhint-disable-next-line const-name-snakecase
     Vm internal constant vm = Vm(VM_ADDRESS);
 
     /// @notice Maximal size of bytecodes' batch to be published at once
-    uint256 constant MAX_BATCH_SIZE = 126_000;
+    uint256 internal constant MAX_BATCH_SIZE = 126_000;
 
     /// @notice Publishes EVM bytecodes in batches, each not exceeding `MAX_BATCH_SIZE`
     /// @param bytecodesSupplier The BytecodesSupplier contract

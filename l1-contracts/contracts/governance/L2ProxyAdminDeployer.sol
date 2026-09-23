@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.28;
 
-// solhint-disable gas-length-in-loops
-
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 /// @author Matter Labs

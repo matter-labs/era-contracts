@@ -16,7 +16,6 @@ import {
     MessageRootNotRegistered,
     OnlyChainAssetHandler,
     OnlyChain,
-    OnlyGateway,
     OnlyOnSettlementLayer,
     TotalBatchesExecutedZero
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
@@ -29,14 +28,14 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
-contract MessageRoot_Extended_Test is Test {
-    address bridgeHub;
-    uint256 L1_CHAIN_ID;
-    uint256 gatewayChainId;
-    L1MessageRoot messageRoot;
-    L2MessageRoot l2MessageRoot;
-    address assetTracker;
-    address chainAssetHandler;
+contract MessageRootExtendedTest is Test {
+    address internal bridgeHub;
+    uint256 internal L1_CHAIN_ID;
+    uint256 internal gatewayChainId;
+    L1MessageRoot internal messageRoot;
+    L2MessageRoot internal l2MessageRoot;
+    address internal assetTracker;
+    address internal chainAssetHandler;
 
     function setUp() public {
         bridgeHub = address(new L1Bridgehub(makeAddr("owner"), 10));
@@ -83,12 +82,12 @@ contract MessageRoot_Extended_Test is Test {
         l2MessageRoot.initL2(L1_CHAIN_ID);
     }
 
-    function test_ChainRegistered_CurrentChain() public {
+    function test_ChainRegistered_CurrentChain() public view {
         // Test that current chain is always registered
         assertTrue(messageRoot.chainRegistered(block.chainid));
     }
 
-    function test_ChainRegistered_UnregisteredChain() public {
+    function test_ChainRegistered_UnregisteredChain() public view {
         uint256 unregisteredChainId = 999;
         assertFalse(messageRoot.chainRegistered(unregisteredChainId));
     }
@@ -211,7 +210,7 @@ contract MessageRoot_Extended_Test is Test {
         messageRoot.setMigratingChainBatchNumber(chainId, batchNumber);
     }
 
-    function test_GetProofData() public {
+    function test_GetProofData() public view {
         uint256 chainId = 271;
         uint256 batchNumber = 1;
         uint256 leafProofMask = 1;

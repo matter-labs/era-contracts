@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.28;
 
-// solhint-disable no-console
-
 import {console2 as console} from "forge-std/Script.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
@@ -15,8 +13,6 @@ import {
     L2_CHAIN_ASSET_HANDLER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {
     ChainCreationParams,
     ChainTypeManagerInitializeData,
@@ -42,8 +38,6 @@ import {
     GatewayCTMFinalConfig,
     GatewayCTMFinalResult
 } from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
-
-// solhint-disable gas-custom-errors
 
 struct InnerDeployConfig {
     address deployerAddr;
@@ -167,23 +161,23 @@ library GatewayCTMDeployerHelper {
         (directAddresses, directCalldata) = _calculateDirectDeployments(_create2Salt, config, im.daResult);
 
         GatewayCTMFinalResult memory ctmResult;
-        (deployers.ctmDeployer, deployerCalldata.ctmCalldata, ctmResult) = _calculateCTMDeployer(
-            _create2Salt,
-            config,
-            directAddresses,
-            im.proxyAdminResult,
-            im.validatorTimelockResult,
-            im.verifiersResult
-        );
+        (deployers.ctmDeployer, deployerCalldata.ctmCalldata, ctmResult) = _calculateCTMDeployer({
+            _create2Salt: _create2Salt,
+            config: config,
+            directAddresses: directAddresses,
+            proxyAdminResult: im.proxyAdminResult,
+            validatorTimelockResult: im.validatorTimelockResult,
+            verifiersResult: im.verifiersResult
+        });
 
-        contracts = _assembleContracts(
-            im.daResult,
-            im.proxyAdminResult,
-            im.validatorTimelockResult,
-            im.verifiersResult,
-            directAddresses,
-            ctmResult
-        );
+        contracts = _assembleContracts({
+            daResult: im.daResult,
+            proxyAdminResult: im.proxyAdminResult,
+            validatorTimelockResult: im.validatorTimelockResult,
+            verifiersResult: im.verifiersResult,
+            directAddresses: directAddresses,
+            ctmResult: ctmResult
+        });
     }
 
     // ============ DA Deployer ============
@@ -408,13 +402,13 @@ library GatewayCTMDeployerHelper {
         GatewayValidatorTimelockDeployerResult memory validatorTimelockResult,
         Verifiers memory verifiersResult
     ) internal view returns (address deployer, bytes memory data, GatewayCTMFinalResult memory result) {
-        GatewayCTMFinalConfig memory ctmConfig = _buildCTMFinalConfig(
-            config,
-            directAddresses,
-            proxyAdminResult,
-            validatorTimelockResult,
-            verifiersResult
-        );
+        GatewayCTMFinalConfig memory ctmConfig = _buildCTMFinalConfig({
+            config: config,
+            directAddresses: directAddresses,
+            proxyAdminResult: proxyAdminResult,
+            validatorTimelockResult: validatorTimelockResult,
+            verifiersResult: verifiersResult
+        });
         (deployer, data) = _calculateCreate2AddressAndCalldata(
             _create2Salt,
             CTMContract.GatewayCTMDeployerCTM,
@@ -738,9 +732,7 @@ library GatewayCTMDeployerHelper {
 
     /// @notice Returns all factory dependencies for deployment.
     /// @dev Gateway CTM deployment needs no additional factory dependencies.
-    function getListOfFactoryDeps(
-        GatewayCTMDeployerConfig memory // config
-    ) external pure returns (bytes[] memory dependencies) {
+    function getListOfFactoryDeps() external pure returns (bytes[] memory dependencies) {
         return dependencies;
     }
 
@@ -783,6 +775,7 @@ library GatewayCTMDeployerHelper {
         if (constructorArgs.length == 0) {
             msgStr = string.concat("forge verify-contract ", Utils.vm.toString(contractAddr), " ", contractName);
         } else {
+            // solhint-disable-next-line func-named-parameters
             msgStr = string.concat(
                 "forge verify-contract ",
                 Utils.vm.toString(contractAddr),

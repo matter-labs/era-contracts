@@ -22,11 +22,11 @@ contract MockAssetHandler is IAssetHandler {
     }
 
     function bridgeBurn(
-        uint256 _chainId,
-        uint256 _msgValue,
-        bytes32 _assetId,
-        address _originalCaller,
-        bytes calldata _data
+        uint256 /* _chainId */,
+        uint256 /* _msgValue */,
+        bytes32 /* _assetId */,
+        address /* _originalCaller */,
+        bytes calldata /* _data */
     ) external payable override returns (bytes memory) {
         return abi.encode("mock");
     }
@@ -53,39 +53,39 @@ contract TestAssetRouterBase is AssetRouterBase {
         assetHandlerAddress[_assetId] = _handler;
     }
 
-    function BRIDGE_HUB() external view returns (IBridgehubBase) {
+    function BRIDGE_HUB() external pure returns (IBridgehubBase) {
         return IBridgehubBase(address(1));
     }
 
-    function L1_CHAIN_ID() external view returns (uint256) {
+    function L1_CHAIN_ID() external pure returns (uint256) {
         return 1;
     }
 
-    function _getBridgehub() internal view override returns (IBridgehubBase) {
+    function _getBridgehub() internal pure override returns (IBridgehubBase) {
         return IBridgehubBase(address(1));
     }
 
-    function _getInteropHandler() internal view override returns (address) {
+    function _getInteropHandler() internal pure override returns (address) {
         return address(1);
     }
 
-    function _isValidInteropSender(uint256, address) internal view override returns (bool) {
+    function _isValidInteropSender(uint256, address) internal pure override returns (bool) {
         return true;
     }
 
-    function _getL1ChainId() internal view returns (uint256) {
+    function _getL1ChainId() internal pure returns (uint256) {
         return 1;
     }
 
-    function _eraChainId() internal view returns (uint256) {
+    function _eraChainId() internal pure returns (uint256) {
         return 1;
     }
 }
 
-contract AssetRouterBase_FinalizeDepositBranches_Test is Test {
-    TestAssetRouterBase router;
-    MockAssetHandler existingHandler;
-    MockAssetHandler ntvHandler;
+contract AssetRouterBaseFinalizeDepositBranchesTest is Test {
+    TestAssetRouterBase internal router;
+    MockAssetHandler internal existingHandler;
+    MockAssetHandler internal ntvHandler;
 
     function setUp() public {
         router = new TestAssetRouterBase();

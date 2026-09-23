@@ -5,7 +5,6 @@ pragma solidity 0.8.28;
 import {MigratorTest} from "./_Migrator_Shared.t.sol";
 import {NotAZKChain, RemovingPermanentRestriction, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {
-    NotL1,
     AlreadyMigrated,
     NotChainAdmin,
     SettlementLayerCTMMismatch,
@@ -17,7 +16,6 @@ import {
     InvalidNumberOfBatchHashes,
     NotMigrated,
     NotHistoricalRoot,
-    ContractNotDeployed,
     DepositsNotPaused
 } from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {ZKChainCommitment} from "contracts/common/Config.sol";
@@ -34,8 +32,8 @@ import {
 } from "contracts/common/Config.sol";
 
 contract ForwardedBridgeFunctionsTest is MigratorTest {
-    address chainAssetHandler;
-    address admin;
+    address internal chainAssetHandler;
+    address internal admin;
 
     function setUp() public override {
         super.setUp();

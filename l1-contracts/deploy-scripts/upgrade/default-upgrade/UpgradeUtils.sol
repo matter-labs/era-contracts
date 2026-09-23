@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// It's required to disable lints to force the compiler to compile the contracts
-// solhint-disable no-unused-import
-
 import {Call} from "contracts/governance/Common.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
@@ -14,7 +11,6 @@ import {FIRST_PROTOCOL_VERSION_WITH_VERIFIER_FLAG} from "../../utils/Types.sol";
 /// @dev Getter that v32/v33 testnet verifiers exported as a public constant; pre-v34 production
 /// verifiers don't have it.
 interface ILegacyTestnetVerifier {
-    // solhint-disable-next-line func-name-mixedcase
     function IS_TESTNET_VERIFIER() external view returns (bool);
 }
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {DeployL1CoreContractsIntegrationScript} from "./deploy-scripts/DeployL1CoreContractsIntegration.s.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {DeployCTMIntegrationScript} from "./deploy-scripts/DeployCTMIntegration.s.sol";
@@ -24,9 +24,9 @@ import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 contract L1ContractDeployer is UtilsCallMockerTest {
     using stdStorage for StdStorage;
 
-    DeployL1CoreContractsIntegrationScript l1CoreContractsScript;
-    DeployCTMIntegrationScript ctmScript;
-    RegisterCTM registerCTMScript;
+    DeployL1CoreContractsIntegrationScript internal l1CoreContractsScript;
+    DeployCTMIntegrationScript internal ctmScript;
+    RegisterCTM internal registerCTMScript;
 
     struct AllAddresses {
         address bridgehubProxyAddress;
@@ -45,13 +45,13 @@ contract L1ContractDeployer is UtilsCallMockerTest {
     Config public ecosystemConfig;
 
     AllAddresses public addresses;
-    CoreDeployedAddresses ecosystemAddresses;
-    CTMDeployedAddresses ctmAddresses;
+    CoreDeployedAddresses internal ecosystemAddresses;
+    CTMDeployedAddresses internal ctmAddresses;
 
-    function deployEcosystem() public returns (CoreDeployedAddresses memory ecosystemAddresses) {
+    function deployEcosystem() public returns (CoreDeployedAddresses memory deployedEcosystem) {
         l1CoreContractsScript = new DeployL1CoreContractsIntegrationScript();
         l1CoreContractsScript.runForTest();
-        ecosystemAddresses = l1CoreContractsScript.getAddresses();
+        deployedEcosystem = l1CoreContractsScript.getAddresses();
     }
 
     function registerCTM(address bridgehub, address ctm) public {

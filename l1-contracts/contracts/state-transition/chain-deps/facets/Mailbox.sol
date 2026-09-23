@@ -380,7 +380,6 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         emit NewPriorityRequestId(_transaction.nonce, _canonicalTxHash);
     }
 
-    // solhint-disable-next-line no-unused-vars
     function _writePriorityOpHash(bytes32 _canonicalTxHash) internal {
         s.priorityTree.push(_canonicalTxHash);
         uint256 totalPriorityTxs = s.priorityTree.getTotalPriorityTxs();

@@ -19,9 +19,9 @@ import {
 } from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 contract RelayedSLDAValidatorTest is Test {
-    uint256 constant CHAIN_ID = 193;
-    address constant CHAIN_ADDRESS = address(0x1234);
-    RelayedSLDAValidator daValidator;
+    uint256 internal constant CHAIN_ID = 193;
+    address internal constant CHAIN_ADDRESS = address(0x1234);
+    RelayedSLDAValidator internal daValidator;
 
     function setUp() public {
         daValidator = new RelayedSLDAValidator();

@@ -87,14 +87,18 @@ contract PrividiumTransactionFilterer is ITransactionFilterer, Ownable2StepUpgra
     /// @param _l2Value The value sent with the L2 transaction
     /// @param _l2Calldata The calldata of the L2 transaction
     /// @return Whether the transaction is allowed
+    // As above: names mirror `ITransactionFilterer` so callers can use named arguments; the two
+    // unused ones are covered by a single disable here.
+    // solhint-disable no-unused-vars
     function isTransactionAllowed(
         address _sender,
         address _contractL2,
-        uint256,
+        uint256 _mintValue,
         uint256 _l2Value,
         bytes calldata _l2Calldata,
-        address
+        address _refundRecipient
     ) external view returns (bool) {
+        // solhint-enable no-unused-vars
         // Only whitelisted senders are allowed to perform arbitrary transactions.
         if (whitelistedSenders[_sender]) {
             return true;

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
@@ -9,7 +9,6 @@ import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {SLNotWhitelisted} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
@@ -281,7 +280,7 @@ contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeploy
         );
     }
 
-    function test_getHyperchain_returnsZKChainAddress() public {
+    function test_getHyperchain_returnsZKChainAddress() public view {
         // Test that getHyperchain is a legacy function that calls getZKChain
         // It should return the same value as getZKChain for any chainId
 
@@ -293,7 +292,7 @@ contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeploy
         assertEq(hyperchainAddress, zkChainAddress, "getHyperchain should return the same address as getZKChain");
     }
 
-    function test_getHyperchain_unregisteredChain() public {
+    function test_getHyperchain_unregisteredChain() public view {
         // Test that getHyperchain returns zero address for an unregistered chain
         uint256 unregisteredChainId = 999999;
         address zkChainAddress = addresses.bridgehub.getHyperchain(unregisteredChainId);
@@ -301,7 +300,7 @@ contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeploy
         assertEq(zkChainAddress, address(0), "Unregistered chain should return zero address");
     }
 
-    function test_sharedBridge() public {
+    function test_sharedBridge() public view {
         // Test that sharedBridge returns the asset router address
         address sharedBridgeAddress = addresses.bridgehub.sharedBridge();
 

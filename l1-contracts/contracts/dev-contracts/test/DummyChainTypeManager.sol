@@ -11,12 +11,12 @@ import {ChainTypeManager} from "../../state-transition/ChainTypeManager.sol";
 contract DummyChainTypeManager is ChainTypeManager {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
-    address zkChain;
+    address internal zkChain;
 
     /// @notice Constructor
     constructor() ChainTypeManager(address(0), address(0), address(0), address(0)) {}
 
-    function setZKChain(uint256 _chainId, address _zkChain) external {
+    function setZKChain(address _zkChain) external {
         zkChain = _zkChain;
     }
 

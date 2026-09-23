@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {
@@ -12,10 +11,6 @@ import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
-import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
-import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
-import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {SharedBridgehubWithdrawal} from "./_SharedBridgehubWithdrawal.t.sol";
 import {
     DEFAULT_L2_LOGS_TREE_ROOT_HASH,
@@ -27,11 +22,11 @@ import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
-contract BridgehubInvariantTests_1 is SharedBridgehubWithdrawal {
+contract BridgehubInvariantTests1 is SharedBridgehubWithdrawal {
     //@check Why is this file practically the same as BridgehubTests.t.sol???
-    uint256 constant TEST_USERS_COUNT = 10;
+    uint256 internal constant TEST_USERS_COUNT = 10;
 
-    bytes32 constant NEW_PRIORITY_REQUEST_HASH =
+    bytes32 internal constant NEW_PRIORITY_REQUEST_HASH =
         keccak256(
             "NewPriorityRequest(uint256,bytes32,uint64,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[4],bytes,bytes,uint256[],bytes,bytes),bytes[])"
         );
@@ -126,7 +121,7 @@ contract BridgehubInvariantTests_1 is SharedBridgehubWithdrawal {
 
     // TODO: consider what should be actually committed, do we need to simulate operator:
     // blocks -> batches -> commits or just mock it.
-    function _commitBatchInfo(uint256 _chainId) internal {
+    function _commitBatchInfo(uint256 _chainId) internal view {
         //vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
 
         GettersFacet zkChainGetters = GettersFacet(getZKChainAddress(_chainId));
@@ -163,7 +158,7 @@ contract BridgehubInvariantTests_1 is SharedBridgehubWithdrawal {
     // to deposit into mock l2 contract
     function _getDecodedDepositL2Calldata(
         bytes memory callData
-    ) internal view returns (address l1Sender, address l2Receiver, address l1Token, uint256 amount, bytes memory b) {
+    ) internal pure returns (address l1Sender, address l2Receiver, address l1Token, uint256 amount, bytes memory b) {
         // UnsafeBytes approach doesn't work, because abi is not deterministic
         bytes memory slicedData = new bytes(callData.length - 4);
 
@@ -214,7 +209,9 @@ contract BridgehubInvariantTests_1 is SharedBridgehubWithdrawal {
     }
 
     // gets event from logs
-    function _getNewPriorityQueueFromLogs(Vm.Log[] memory logs) internal returns (NewPriorityRequest memory request) {
+    function _getNewPriorityQueueFromLogs(
+        Vm.Log[] memory logs
+    ) internal pure returns (NewPriorityRequest memory request) {
         for (uint256 i = 0; i < logs.length; i++) {
             Vm.Log memory log = logs[i];
 

@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// solhint-disable no-console, gas-custom-errors
-
 import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
@@ -16,7 +14,7 @@ contract DeployCTMIntegrationScript is Script, DeployCTMScript {
     function test() internal virtual override {}
 
     function getChainCreationFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
+        StateTransitionDeployedAddresses memory /* stateTransition */
     ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
         string memory root = vm.projectRoot();
         string memory inputPath = string.concat(root, "/script-out/diamond-selectors.toml");

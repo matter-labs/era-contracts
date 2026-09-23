@@ -9,11 +9,7 @@ import {
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
     L2_BOOTLOADER_ADDRESS
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {
-    MerklePathEmpty,
-    HashedLogIsDefault,
-    InvalidProofLengthForFinalNode
-} from "contracts/common/L1ContractErrors.sol";
+import {InvalidProofLengthForFinalNode} from "contracts/common/L1ContractErrors.sol";
 import {UnsupportedProofMetadataVersion} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {SUPPORTED_PROOF_METADATA_VERSION} from "contracts/common/Config.sol";
 
@@ -142,7 +138,7 @@ contract MessageHashingTest is Test {
 
     // ============ parseProofMetadata Tests ============
 
-    function test_parseProofMetadata_newFormat() public {
+    function test_parseProofMetadata_newFormat() public view {
         // New format: first byte is version (0x01), then logLeafProofLen, batchLeafProofLen, finalProofNode
         bytes32 metadata = bytes32(
             abi.encodePacked(bytes1(uint8(SUPPORTED_PROOF_METADATA_VERSION)), bytes1(0x10), bytes1(0x00), bytes1(0x01))
@@ -159,7 +155,7 @@ contract MessageHashingTest is Test {
         assertTrue(result.finalProofNode);
     }
 
-    function test_parseProofMetadata_oldFormat() public {
+    function test_parseProofMetadata_oldFormat() public view {
         // Old format: just proof elements (no metadata prefix)
         bytes32[] memory proof = new bytes32[](10);
         proof[0] = keccak256("proof element"); // Non-zero value that doesn't look like metadata
@@ -205,7 +201,7 @@ contract MessageHashingTest is Test {
 
     // ============ extractSlice Tests ============
 
-    function test_extractSlice_basicValues() public {
+    function test_extractSlice_basicValues() public view {
         bytes32[] memory proof = new bytes32[](5);
         for (uint256 i = 0; i < 5; i++) {
             proof[i] = bytes32(i);
@@ -219,7 +215,7 @@ contract MessageHashingTest is Test {
         assertEq(slice[2], bytes32(uint256(3)));
     }
 
-    function test_extractSlice_emptySlice() public {
+    function test_extractSlice_emptySlice() public view {
         bytes32[] memory proof = new bytes32[](5);
 
         bytes32[] memory slice = this.externalExtractSlice(proof, 2, 2);
@@ -238,7 +234,7 @@ contract MessageHashingTest is Test {
 
     // ============ extractSliceUntilEnd Tests ============
 
-    function test_extractSliceUntilEnd_basicValues() public {
+    function test_extractSliceUntilEnd_basicValues() public view {
         bytes32[] memory proof = new bytes32[](5);
         for (uint256 i = 0; i < 5; i++) {
             proof[i] = bytes32(i);
@@ -301,21 +297,21 @@ contract MessageHashingTest is Test {
         uint128 _slBlock,
         uint128 _slRootMask,
         uint256 _slChainId
-    ) public {
+    ) public view {
         uint256 logLeafProofLen = bound(_logLeafProofLenSeed, 1, 32);
         uint256 batchLeafProofLen = bound(_batchLeafProofLenSeed, 0, 16);
         // `_getProofData` runs a real Merkle climb over the batch-leaf section, so the mask must
         // address a leaf inside a tree of that depth.
         uint256 batchLeafProofMask = bound(_batchLeafProofMask, 0, (1 << batchLeafProofLen) - 1);
-        bytes32[] memory proof = _buildMultiHopProof(
-            logLeafProofLen,
-            batchLeafProofLen,
-            _l1Timestamp,
-            batchLeafProofMask,
-            _slBlock,
-            _slRootMask,
-            _slChainId
-        );
+        bytes32[] memory proof = _buildMultiHopProof({
+            _logLeafProofLen: logLeafProofLen,
+            _batchLeafProofLen: batchLeafProofLen,
+            _l1Timestamp: _l1Timestamp,
+            _batchLeafProofMask: batchLeafProofMask,
+            _slBlock: _slBlock,
+            _slRootMask: _slRootMask,
+            _slChainId: _slChainId
+        });
 
         ProofData memory proofData = this.externalGetProofData(1, 1, 0, keccak256("leaf"), proof);
         MessageHashing.SettlementLayerReference memory slReference = this.externalReadSettlementLayerReference(proof);
@@ -335,18 +331,18 @@ contract MessageHashingTest is Test {
         uint8 _logLeafProofLenSeed,
         uint8 _batchLeafProofLenSeed,
         uint256 _batchLeafProofMask
-    ) public {
+    ) public view {
         uint256 logLeafProofLen = bound(_logLeafProofLenSeed, 1, 32);
         uint256 batchLeafProofLen = bound(_batchLeafProofLenSeed, 0, 16);
-        bytes32[] memory proof = _buildMultiHopProof(
-            logLeafProofLen,
-            batchLeafProofLen,
-            0,
-            _batchLeafProofMask,
-            0,
-            0,
-            0
-        );
+        bytes32[] memory proof = _buildMultiHopProof({
+            _logLeafProofLen: logLeafProofLen,
+            _batchLeafProofLen: batchLeafProofLen,
+            _l1Timestamp: 0,
+            _batchLeafProofMask: _batchLeafProofMask,
+            _slBlock: 0,
+            _slRootMask: 0,
+            _slChainId: 0
+        });
 
         MessageHashing.AggregationHopPath memory path = this.externalReadAggregationHopPath(proof);
 

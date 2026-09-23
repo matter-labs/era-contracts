@@ -2,8 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import "forge-std/console.sol";
-import {Test, Vm} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Test.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
@@ -20,7 +19,7 @@ import {DummyChainTypeManagerForValidatorTimelock as DummyCTM} from "contracts/d
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {FeeParams, PubdataPricingMode, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {TestExecutor} from "contracts/dev-contracts/test/TestExecutor.sol";
 import {TestCommitter} from "contracts/dev-contracts/test/TestCommitter.sol";
 import {UtilsFacet} from "../Utils/UtilsFacet.sol";
@@ -75,12 +74,12 @@ contract ExecutorTest is UtilsCallMockerTest {
     PermissionlessValidator internal permissionlessValidator;
     address internal rollupL1DAValidator;
     L1MessageRoot internal messageRoot;
-    DummyBridgehub dummyBridgehub;
+    DummyBridgehub internal dummyBridgehub;
     L1ChainAssetHandler internal chainAssetHandler;
     RollupDAManager internal rollupDAManager;
     bytes32 internal baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
 
-    uint256 l2ChainId;
+    uint256 internal l2ChainId;
 
     IExecutor.StoredBatchInfo internal genesisStoredBatchInfo;
     uint256[] internal proofInput;
@@ -197,7 +196,6 @@ contract ExecutorTest is UtilsCallMockerTest {
     }
 
     constructor() {
-        uint256 l1ChainID = 1;
         owner = makeAddr("owner");
         validator = makeAddr("validator");
         randomSigner = makeAddr("randomSigner");
@@ -373,7 +371,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         mailbox = MailboxFacet(address(diamondProxy));
         admin = AdminFacet(address(diamondProxy));
         utilsFacet = UtilsFacet(address(diamondProxy));
-        chainTypeManager.setZKChain(l2ChainId, address(diamondProxy));
+        chainTypeManager.setZKChain(address(diamondProxy));
 
         // Initiate the token multiplier to enable L1 -> L2 transactions.
         vm.prank(address(chainTypeManager));
@@ -409,7 +407,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             slChainId: block.chainid
         });
 
-        dummyBridgehub.setZKChain(l2ChainId, address(diamondProxy));
+        dummyBridgehub.setZKChain(address(diamondProxy));
 
         vm.prank(owner);
         validatorTimelock.addValidatorForChainId(l2ChainId, validator);

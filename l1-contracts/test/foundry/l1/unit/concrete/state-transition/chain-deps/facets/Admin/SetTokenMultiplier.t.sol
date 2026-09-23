@@ -67,7 +67,6 @@ contract SetTokenMultiplierTest is AdminTest {
         uint128 nominator = 11;
         uint128 denominator = 10;
 
-        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(adminFacet));
         emit NewBaseTokenMultiplier(oldNominator, oldDenominator, nominator, denominator);
 

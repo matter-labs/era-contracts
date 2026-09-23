@@ -10,28 +10,32 @@ contract IncrementalMerkleTestTest is Test {
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
 
-    IncrementalMerkleTest merkleTest;
-    bytes32 constant zero = 0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba;
+    IncrementalMerkleTest internal merkleTest;
+    bytes32 internal constant ZERO = 0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba;
 
     function setUp() public {
-        merkleTest = new IncrementalMerkleTest(zero);
+        merkleTest = new IncrementalMerkleTest(ZERO);
     }
 
-    function setUpMemory() public returns (DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestMemory) {
-        merkleTestMemory = DynamicIncrementalMerkleMemory.Bytes32PushTree(
-            0,
-            new bytes32[](14),
-            new bytes32[](14),
-            0,
-            0,
-            false,
-            bytes32(0)
-        );
-        merkleTestMemory.setup(zero);
+    function setUpMemory()
+        public
+        pure
+        returns (DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestMemory)
+    {
+        merkleTestMemory = DynamicIncrementalMerkleMemory.Bytes32PushTree({
+            _nextLeafIndex: 0,
+            _sides: new bytes32[](14),
+            _zeros: new bytes32[](14),
+            _sidesLengthMemory: 0,
+            _zerosLengthMemory: 0,
+            _needsRootRecalculation: false,
+            _lastLeafValue: bytes32(0)
+        });
+        merkleTestMemory.setup(ZERO);
     }
 
     /// @dev Test basic setup and initialization (storage vs memory)
-    function testSetup() public {
+    function testSetup() public view {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestMemory = setUpMemory();
 
         // Storage tree
@@ -105,7 +109,7 @@ contract IncrementalMerkleTestTest is Test {
     }
 
     /// @dev Test lazy vs regular pushes in memory (single element)
-    function testLazyVsRegularSingle() public {
+    function testLazyVsRegularSingle() public pure {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleRegular = setUpMemory();
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleLazy = setUpMemory();
 
@@ -120,7 +124,7 @@ contract IncrementalMerkleTestTest is Test {
     }
 
     /// @dev Test mixed lazy and regular operations
-    function testMixedLazyRegular() public {
+    function testMixedLazyRegular() public pure {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleRegular = setUpMemory();
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleMixed = setUpMemory();
 
@@ -165,7 +169,7 @@ contract IncrementalMerkleTestTest is Test {
     }
 
     /// @dev Test the original failing lazy push batch processing
-    function testPushLazyBatchProcessing() public {
+    function testPushLazyBatchProcessing() public pure {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestRegular = setUpMemory();
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestLazy = setUpMemory();
 
@@ -188,7 +192,7 @@ contract IncrementalMerkleTestTest is Test {
     }
 
     /// @dev Test non-sequential arbitrary values
-    function testNonSequentialOddIndex() public {
+    function testNonSequentialOddIndex() public view {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleRegular = setUpMemory();
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleLazy = setUpMemory();
 
@@ -219,8 +223,8 @@ contract IncrementalMerkleTestTest is Test {
         );
     }
 
-    /// @dev Test edge cases - zero values and extreme values
-    function testEdgeCases() public {
+    /// @dev Test edge cases - ZERO values and extreme values
+    function testEdgeCases() public pure {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleRegular = setUpMemory();
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleLazy = setUpMemory();
 
@@ -229,7 +233,7 @@ contract IncrementalMerkleTestTest is Test {
         edgeValues[0] = bytes32(0);
         edgeValues[1] = bytes32(type(uint256).max);
         edgeValues[2] = bytes32(uint256(1));
-        edgeValues[3] = zero;
+        edgeValues[3] = ZERO;
         edgeValues[4] = keccak256("edge");
 
         for (uint256 i = 0; i < edgeValues.length; i++) {
@@ -243,7 +247,7 @@ contract IncrementalMerkleTestTest is Test {
     }
 
     /// @dev Test power-of-2 boundary expansions
-    function testPowerOfTwoBoundaries() public {
+    function testPowerOfTwoBoundaries() public pure {
         // Test critical power-of-2 transitions
         uint256[] memory boundaries = new uint256[](6);
         boundaries[0] = 1; // Single element
@@ -270,7 +274,7 @@ contract IncrementalMerkleTestTest is Test {
     }
 
     /// @dev Test intermediate root calls during lazy operations
-    function testIntermediateRoots() public {
+    function testIntermediateRoots() public pure {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleRegular = setUpMemory();
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleLazy = setUpMemory();
 
@@ -307,7 +311,7 @@ contract IncrementalMerkleTestTest is Test {
     }
 
     /// @dev Test large tree with various data patterns
-    function testLargeTreeVariedPatterns() public {
+    function testLargeTreeVariedPatterns() public view {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleRegular = setUpMemory();
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleLazy = setUpMemory();
 
@@ -348,7 +352,7 @@ contract IncrementalMerkleTestTest is Test {
         assertEq(merkleTest.index(), 3);
         assertTrue(merkleTest.height() > 0);
 
-        // Reset with different zero value
+        // Reset with different ZERO value
         bytes32 newZero = keccak256("NEW_ZERO");
         merkleTest.reset(newZero);
 
@@ -357,7 +361,7 @@ contract IncrementalMerkleTestTest is Test {
         assertEq(merkleTest.index(), 0);
         assertEq(merkleTest.height(), 0);
 
-        // Verify it works with new zero value
+        // Verify it works with new ZERO value
         merkleTest.push(bytes32(uint256(42)));
         assertEq(merkleTest.root(), bytes32(uint256(42)));
     }
@@ -372,7 +376,7 @@ contract IncrementalMerkleTestTest is Test {
         assertEq(merkleTest.index(), 2);
 
         // Reset should call clear internally
-        merkleTest.reset(zero);
+        merkleTest.reset(ZERO);
 
         // Verify tree is cleared
         assertEq(merkleTest.root(), bytes32(0));
@@ -381,22 +385,22 @@ contract IncrementalMerkleTestTest is Test {
     }
 
     /// @dev Test extendUntilEnd() edge cases
-    function testExtendUntilEndEdgeCases() public {
+    function testExtendUntilEndEdgeCases() public pure {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleMemory = setUpMemory();
 
         // Test extending from empty tree (nextLeafIndex == 0)
         merkleMemory._nextLeafIndex = 0;
         merkleMemory._sides = new bytes32[](1);
         merkleMemory._zeros = new bytes32[](1);
-        merkleMemory._sides[0] = zero;
-        merkleMemory._zeros[0] = zero;
+        merkleMemory._sides[0] = ZERO;
+        merkleMemory._zeros[0] = ZERO;
         merkleMemory._sidesLengthMemory = 1;
         merkleMemory._zerosLengthMemory = 1;
 
         // Extend the tree to a larger depth
         bytes32[] memory newSides = new bytes32[](5);
         bytes32[] memory newZeros = new bytes32[](5);
-        for (uint i = 0; i < 1; i++) {
+        for (uint256 i = 0; i < 1; i++) {
             newSides[i] = merkleMemory._sides[i];
             newZeros[i] = merkleMemory._zeros[i];
         }
@@ -409,7 +413,7 @@ contract IncrementalMerkleTestTest is Test {
         // Verify extension worked
         assertEq(merkleMemory._sidesLengthMemory, 5);
         assertEq(merkleMemory._zerosLengthMemory, 5);
-        assertTrue(merkleMemory._sides[0] == zero); // Should set _sides[0] = currentZero when _nextLeafIndex == 0
+        assertTrue(merkleMemory._sides[0] == ZERO); // Should set _sides[0] = currentZero when _nextLeafIndex == 0
     }
 
     /// @dev Gas comparison test - performance validation
@@ -451,7 +455,7 @@ contract IncrementalMerkleTestTest is Test {
     }
 
     /// @dev Test createTree() function initialization
-    function testCreateTreeInitialization() public {
+    function testCreateTreeInitialization() public pure {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleMemory;
 
         // Initialize with createTree
@@ -468,7 +472,7 @@ contract IncrementalMerkleTestTest is Test {
     }
 
     /// @dev Test _recalculateRoot() with empty tree (leafCount == 0)
-    function testRecalculateRootEmptyTree() public {
+    function testRecalculateRootEmptyTree() public pure {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleMemory = setUpMemory();
 
         // Ensure tree is empty
@@ -482,7 +486,7 @@ contract IncrementalMerkleTestTest is Test {
     }
 
     /// @dev Test various extendUntilEnd() scenarios for memory tree
-    function testExtendUntilEndScenarios() public {
+    function testExtendUntilEndScenarios() public pure {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleMemory = setUpMemory();
 
         // Setup initial state with some elements
@@ -494,10 +498,10 @@ contract IncrementalMerkleTestTest is Test {
         bytes32[] memory newZeros = new bytes32[](8);
 
         // Copy existing data
-        for (uint i = 0; i < merkleMemory._sidesLengthMemory && i < newSides.length; i++) {
+        for (uint256 i = 0; i < merkleMemory._sidesLengthMemory && i < newSides.length; i++) {
             newSides[i] = merkleMemory._sides[i];
         }
-        for (uint i = 0; i < merkleMemory._zerosLengthMemory && i < newZeros.length; i++) {
+        for (uint256 i = 0; i < merkleMemory._zerosLengthMemory && i < newZeros.length; i++) {
             newZeros[i] = merkleMemory._zeros[i];
         }
 
@@ -530,7 +534,7 @@ contract IncrementalMerkleTestTest is Test {
 
         for (uint256 t = 0; t < testSizes.length; t++) {
             // Reset trees
-            merkleTest = new IncrementalMerkleTest(zero);
+            merkleTest = new IncrementalMerkleTest(ZERO);
             merkleMemory = setUpMemory();
 
             // Push same elements to both

@@ -108,7 +108,6 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         facetCuts = FacetCutsLib.merge(facetCutsForDeletion, facetCuts);
         uint256 nonce = UpgradeHelperLib.getProtocolUpgradeNonce(_chainCreationParams.latestProtocolVersion);
         ProposedUpgrade memory proposedUpgrade = getProposedUpgrade({
-            _stateTransition: _stateTransition,
             _chainCreationParams: _chainCreationParams,
             _factoryDepsResult: _factoryDepsResult,
             _protocolUpgradeNonce: nonce
@@ -128,7 +127,6 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     }
 
     function getProposedUpgrade(
-        StateTransitionDeployedAddresses memory _stateTransition,
         ChainCreationParamsConfig memory _chainCreationParams,
         PublishFactoryDepsResult memory _factoryDepsResult,
         uint256 _protocolUpgradeNonce
@@ -146,7 +144,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             verifier: address(0),
             verifierParams: ProposedUpgradeLib.emptyVerifierParams(),
             l1ContractsUpgradeCalldata: new bytes(0),
-            postUpgradeCalldata: encodePostUpgradeCalldata(_stateTransition),
+            postUpgradeCalldata: encodePostUpgradeCalldata(),
             upgradeTimestamp: 0,
             newProtocolVersion: _chainCreationParams.latestProtocolVersion
         });
@@ -154,9 +152,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
 
     /// @notice Encode calldata that will be passed to `_postUpgrade`
     /// in the on‑chain contract. Override in concrete upgrades.
-    function encodePostUpgradeCalldata(
-        StateTransitionDeployedAddresses memory
-    ) internal virtual returns (bytes memory) {
+    function encodePostUpgradeCalldata() internal virtual returns (bytes memory) {
         return new bytes(0);
     }
 

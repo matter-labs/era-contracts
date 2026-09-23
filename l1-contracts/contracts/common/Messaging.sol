@@ -123,7 +123,6 @@ struct L2CanonicalTransaction {
 /// @param factoryDeps Must be empty.
 /// @param refundRecipient The recipient of the refund for the transaction on L2. If the transaction fails, then
 /// this address will receive the `l2Value`.
-// solhint-disable-next-line gas-struct-packing
 struct BridgehubL2TransactionRequest {
     address sender;
     address contractL2;

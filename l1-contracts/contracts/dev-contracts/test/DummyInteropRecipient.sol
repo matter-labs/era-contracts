@@ -10,11 +10,15 @@ contract DummyInteropRecipient is IERC7786Recipient {
     // Allow the contract to receive ETH
     receive() external payable {}
 
+    // This contract's ABI is exported to zkstack-out, so the parameter names are part of a
+    // published interface and are kept even though the body ignores them.
+    // solhint-disable no-unused-vars
     function receiveMessage(
         bytes32 receiveId, // Unique identifier
         bytes calldata sender, // ERC-7930 address
         bytes calldata payload
     ) external payable returns (bytes4) {
+        // solhint-enable no-unused-vars
         return IERC7786Recipient.receiveMessage.selector;
     }
 

@@ -12,7 +12,7 @@ contract PushOperationsTest is PriorityQueueSharedTest {
         push_mock_entries(NUMBER_OPERATIONS);
     }
 
-    function test_front() public {
+    function test_front() public view {
         assertEq(NUMBER_OPERATIONS, priorityQueue.getSize());
         PriorityOperation memory front = priorityQueue.front();
         assertEq(keccak256(abi.encode(0)), front.canonicalTxHash);

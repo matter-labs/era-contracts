@@ -1,30 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
-import {console2 as console} from "forge-std/console2.sol";
 
-import {
-    IL1Bridgehub,
-    L2TransactionRequestDirect,
-    L2TransactionRequestTwoBridgesOuter
-} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IL1Bridgehub, L2TransactionRequestDirect} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 
-import {
-    DEFAULT_L2_LOGS_TREE_ROOT_HASH,
-    EMPTY_STRING_KECCAK,
-    ETH_TOKEN_ADDRESS,
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 
 import {BridgehubInvariantTests} from "test/foundry/l1/integration/BridgehubTests.t.sol";
 
 import {LogFinder} from "test-utils/LogFinder.sol";
 
-contract Bridgehub_7702 is BridgehubInvariantTests {
+contract Bridgehub7702 is BridgehubInvariantTests {
     using LogFinder for Vm.Log[];
 
     function setUp() public {

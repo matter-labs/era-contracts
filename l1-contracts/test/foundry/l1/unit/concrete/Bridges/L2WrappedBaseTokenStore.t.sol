@@ -6,16 +6,16 @@ import {L2WrappedBaseTokenStore} from "contracts/bridge/L2WrappedBaseTokenStore.
 import {Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 contract L2WrappedBaseTokenStoreTest is Test {
-    L2WrappedBaseTokenStore store;
+    L2WrappedBaseTokenStore internal store;
 
-    address owner;
-    address admin;
-    address other;
-    address newAdmin;
-    address newPendingAdmin;
-    uint256 chainId = 100;
-    address l2WBaseToken;
-    address newL2WBaseToken;
+    address internal owner;
+    address internal admin;
+    address internal other;
+    address internal newAdmin;
+    address internal newPendingAdmin;
+    uint256 internal chainId = 100;
+    address internal l2WBaseToken;
+    address internal newL2WBaseToken;
 
     // Events
     event NewAdmin(address indexed oldAdmin, address indexed newAdmin);
@@ -38,11 +38,11 @@ contract L2WrappedBaseTokenStoreTest is Test {
     }
 
     // Deployment Tests
-    function testInitialOwner() public {
+    function testInitialOwner() public view {
         assertEq(store.owner(), owner, "Owner should be set correctly");
     }
 
-    function testInitialAdmin() public {
+    function testInitialAdmin() public view {
         assertEq(store.admin(), admin, "Admin should be set correctly");
     }
 

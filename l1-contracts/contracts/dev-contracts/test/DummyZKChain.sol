@@ -46,12 +46,6 @@ contract DummyZKChain is MailboxFacet {
             });
     }
 
-    function genesisUpgrade(
-        address _l1GenesisUpgrade,
-        bytes calldata _forceDeploymentData,
-        bytes[] calldata _factoryDeps
-    ) external {}
-
     // add this to be excluded from coverage report
     function test() internal {}
 }

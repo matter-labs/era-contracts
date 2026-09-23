@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-// solhint-disable no-console, gas-custom-errors
-
 import {console2 as console} from "forge-std/Script.sol";
 
 import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
@@ -15,9 +13,8 @@ import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.s
 import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
-import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../../../deploy-scripts/utils/Types.sol";
+import {ChainCreationParamsConfig} from "../../../../deploy-scripts/utils/Types.sol";
 import {PublishFactoryDepsResult} from "../../../../deploy-scripts/utils/bytecode/BytecodePublisher.s.sol";
-import {Test} from "forge-std/Test.sol";
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
@@ -36,7 +33,7 @@ import {DefaultUpgradeZKsyncOS} from "contracts/upgrades/DefaultUpgradeZKsyncOS.
 import {Bytes} from "contracts/vendor/Bytes.sol";
 
 /// @notice Test-only CTM upgrade that mocks large bytecode reads to avoid MemoryOOG
-contract CTMUpgrade_v33_Test is CTMUpgrade_v33 {
+contract CTMUpgradeV33Test is CTMUpgrade_v33 {
     /// @notice Exposes the deployed PriorityOpLowerBound registry for the test's chain-upgrade precondition.
     function exposedPriorityOpLowerBound() external view returns (address) {
         return priorityOpLowerBound;
@@ -62,7 +59,6 @@ contract CTMUpgrade_v33_Test is CTMUpgrade_v33 {
     /// The base implementation reads every force-deployment bytecode, causing MemoryOOG.
     /// We return an empty upgrade instead.
     function getProposedUpgrade(
-        StateTransitionDeployedAddresses memory stateTransition,
         ChainCreationParamsConfig memory chainCreationParams,
         PublishFactoryDepsResult memory _factoryDepsResult,
         uint256 protocolUpgradeNonce
@@ -79,7 +75,7 @@ contract CTMUpgrade_v33_Test is CTMUpgrade_v33 {
             verifier: address(0),
             verifierParams: ProposedUpgradeLib.emptyVerifierParams(),
             l1ContractsUpgradeCalldata: new bytes(0),
-            postUpgradeCalldata: encodePostUpgradeCalldata(stateTransition),
+            postUpgradeCalldata: encodePostUpgradeCalldata(),
             upgradeTimestamp: 0,
             newProtocolVersion: chainCreationParams.latestProtocolVersion
         });
@@ -87,7 +83,7 @@ contract CTMUpgrade_v33_Test is CTMUpgrade_v33 {
 }
 
 /// @notice Test-only Core upgrade that skips governance calls the local fixture cannot satisfy.
-contract CoreUpgrade_v33_Test is CoreUpgrade_v33 {
+contract CoreUpgradeV33Test is CoreUpgrade_v33 {
     /// @notice Override to skip the ownership-acceptance and `setAddresses` calls, which need ownership
     ///         hand-offs the fixture does not perform.
     /// @dev The interop-handler wiring is kept: it is what makes a v31 ecosystem match a from-scratch v32
@@ -101,7 +97,7 @@ contract CoreUpgrade_v33_Test is CoreUpgrade_v33 {
 
 // Note: there is no longer a separate `EcosystemUpgrade_v31_Test` orchestrator subclass.
 // The local-fork integration test injects mocked Core and CTM upgrades by overriding
-// `createCoreUpgrade` / `createCTMUpgrade` on `UpgradeIntegrationTest_Local` directly,
+// `createCoreUpgrade` / `createCTMUpgrade` on `UpgradeIntegrationTestLocal` directly,
 // and bumps the protocol version in `setUp` after `setupUpgrade()`.
 
 // AGENTS.md mandates "NEVER override storage slots in tests" with no exceptions,
@@ -127,12 +123,7 @@ uint256 constant ZK_CHAIN_TOTAL_BATCHES_COMMITTED_SLOT = 13;
 // `Initializable(0)`, `MessageRootBase(1-12)`, `__gap[37](13-49)`, this(50).
 uint256 constant L1_MESSAGE_ROOT_V31_UPGRADE_BATCH_NUMBER_SLOT = 50;
 
-contract UpgradeIntegrationTest_Local is
-    UpgradeIntegrationTestBase,
-    L1ContractDeployer,
-    ZKChainDeployer,
-    TokenDeployer
-{
+contract UpgradeIntegrationTestLocal is UpgradeIntegrationTestBase, L1ContractDeployer, ZKChainDeployer, TokenDeployer {
     using stdToml for string;
     using Bytes for bytes;
 
@@ -143,12 +134,12 @@ contract UpgradeIntegrationTest_Local is
 
     /// @notice Override to inject the mocked Core upgrade (keeps only the interop-handler wiring in stage 1).
     function createCoreUpgrade() internal override returns (CoreUpgrade_v33) {
-        return new CoreUpgrade_v33_Test();
+        return new CoreUpgradeV33Test();
     }
 
     /// @notice Override to inject the mocked CTM upgrade (skips bytecode-heavy reads).
     function createCTMUpgrade() internal override returns (CTMUpgrade_v33) {
-        return new CTMUpgrade_v33_Test();
+        return new CTMUpgradeV33Test();
     }
 
     /// @notice Bump the CTM's protocol version from the upgrade input TOML so the local fixture
@@ -179,7 +170,7 @@ contract UpgradeIntegrationTest_Local is
 
         // v32 upgrade precondition: the chain's priority-op lower bound must be recorded before the
         // upgrade executes (permissionless; production runs RecordPriorityOpLowerBound.s.sol).
-        IPriorityOpLowerBound(CTMUpgrade_v33_Test(address(ctmUpgrade)).exposedPriorityOpLowerBound())
+        IPriorityOpLowerBound(CTMUpgradeV33Test(address(ctmUpgrade)).exposedPriorityOpLowerBound())
             .lowerBoundPriorityOp(sourceChainDiamond);
     }
 
@@ -231,7 +222,7 @@ contract UpgradeIntegrationTest_Local is
         CHAIN_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-era.toml";
         CHAIN_OUTPUT = "/script-out/foundry-upgrade/local-gateway.toml";
         console.log("setUp: Paths configured");
-        setupUpgrade(true);
+        setupUpgrade();
         console.log("setUp: Upgrade setup complete");
         _snapshotExpectedZKsyncOSUpgradeTxHash();
 
@@ -270,7 +261,7 @@ contract UpgradeIntegrationTest_Local is
         assertEq(ctmUpgrade.getCTMAddress(), ctm);
     }
 
-    function test_DefaultUpgradeZKsyncOS_Local() public {
+    function test_DefaultUpgradeZKsyncOS_Local() public view {
         // Heavy execution and event assertions live in setUp -> internalTest()
         // (RAM constraint). This body validates persisted state outcomes.
         address ctm = ctmUpgrade.getCTMAddress();
@@ -382,12 +373,12 @@ contract UpgradeIntegrationTest_Local is
 /// one: `DefaultCTMUpgrade.initializeConfig` must resolve testnetVerifier=false and the upgrade
 /// must install a production verifier for the new version. Guards against the resolution being
 /// hardcoded or ignored, which the testnet fixture alone cannot detect.
-contract UpgradeIntegrationTest_LocalProductionVerifier is UpgradeIntegrationTest_Local {
+contract UpgradeIntegrationTestLocalProductionVerifier is UpgradeIntegrationTestLocal {
     function _expectTestnetEcosystem() internal pure override returns (bool) {
         return false;
     }
 
-    function setupUpgrade(bool skipFactoryDepsCheck) public override {
+    function setupUpgrade() public override {
         // The genesis fixture registers a testnet verifier; swap in a production one via the CTM
         // owner before the upgrade scripts read it.
         ChainTypeManager ctm_ = ChainTypeManager(address(addresses.chainTypeManager));
@@ -396,6 +387,6 @@ contract UpgradeIntegrationTest_LocalProductionVerifier is UpgradeIntegrationTes
         address ctmOwner = ctm_.owner();
         vm.prank(ctmOwner);
         ctm_.setProtocolVersionVerifier(currentVersion, productionVerifier);
-        super.setupUpgrade(skipFactoryDepsCheck);
+        super.setupUpgrade();
     }
 }
