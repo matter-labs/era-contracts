@@ -16,6 +16,7 @@ were ported from `zksync-era` and retained for the current `era-contracts` layou
   - [Priority operations and L1 <-> L2 communication](./settlement_contracts/priority_queue/README.md)
   - [Data availability](./settlement_contracts/data_availability/README.md)
 - [Consensus registry](./consensus/README.md)
+- [ZKsync OS system hooks](../system-hooks.md)
 - [ZKsync OS genesis and built-ins](../../chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins)
 
 The current interop pages live at the protocol-docs root because they cross the L1 coordination,

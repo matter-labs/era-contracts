@@ -59,7 +59,7 @@ administrative changes.
 | Asset movement          | Asset routers select an asset handler by asset ID. Native token vaults implement the standard token path; custom handlers may implement other assets. The L1 nullifier records deposits and prevents withdrawal replay.    | [Bridging](../bridging.md), [ported bridge diagrams and background](./contracts/bridging/overview.md)                                                        |
 | Cross-chain messaging   | L2 -> L2 bundles use the atomic interop commitment tree, settlement roots, and destination handlers. The restricted L2 -> L1 route uses the L2-to-L1 message tree and `L1InteropHandler`.                                  | [Interop](../interop.md), [interop architecture](../interop/architecture.md), [atomicity](../atomicity/README.md), [message root](../message-root.md)        |
 | Consensus               | `ConsensusRegistry` maintains validator and attester membership and committee snapshots for off-chain consensus consumers. It does not replace L1 proof verification.                                                      | [Consensus registry](./contracts/consensus/README.md)                                                                                                        |
-| Execution environment   | ZKsync OS initializes its protocol contracts at fixed L2 addresses and exposes the batch, priority-transaction, message-root, and interop outputs consumed by the shared L1 contracts.                                     | [ZKsync OS genesis](../chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins)                                                      |
+| Execution environment   | ZKsync OS initializes its protocol contracts at fixed L2 addresses and exposes the batch, priority-transaction, message-root, and interop outputs consumed by the shared L1 contracts.                                     | [System hooks](./system-hooks.md), [ZKsync OS genesis](../chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins)                   |
 | Governance and upgrades | Governance registers implementations and protocol versions through the CTM; each chain applies the version through its admin facet. Permanent restrictions and upgrade tooling constrain privileged operations.            | [Upgrade process](./contracts/chain_management/upgrade_process.md), [creating upgrades](./contracts/chain_management/creating_upgrades.md)                   |
 
 ## Principal trust boundaries
@@ -126,7 +126,8 @@ For a contract-oriented tour, read:
 4. [Bridging](../bridging.md)
 5. [Message roots](../message-root.md)
 6. [Interop](../interop/README.md) and [atomicity](../atomicity/README.md)
-7. [ZKsync OS genesis and built-ins](../chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins)
+7. [ZKsync OS system hooks](./system-hooks.md)
+8. [ZKsync OS genesis and built-ins](../chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins)
 
 The [source porting map](./porting-map.md) is the audit trail from the old `zksync-era` layout to
 these current pages.
