@@ -89,7 +89,7 @@ contract MultisigCommitterTest is Test {
 
         vm.mockCall(chainAddress, abi.encodeCall(IGetters.getAdmin, ()), abi.encode(chainAdmin));
         vm.mockCall(chainAddress, abi.encodeCall(IGetters.getChainId, ()), abi.encode(chainId));
-        dummyBridgehub.setZKChain(chainId, chainAddress);
+        dummyBridgehub.setZKChain(chainAddress);
 
         multisigCommitter = MultisigCommitter(_deployMultisigCommitter(ecosystemOwner, executionDelay));
         committerRole = multisigCommitter.COMMITTER_ROLE();

@@ -371,7 +371,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         mailbox = MailboxFacet(address(diamondProxy));
         admin = AdminFacet(address(diamondProxy));
         utilsFacet = UtilsFacet(address(diamondProxy));
-        chainTypeManager.setZKChain(l2ChainId, address(diamondProxy));
+        chainTypeManager.setZKChain(address(diamondProxy));
 
         // Initiate the token multiplier to enable L1 -> L2 transactions.
         vm.prank(address(chainTypeManager));
@@ -407,7 +407,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             slChainId: block.chainid
         });
 
-        dummyBridgehub.setZKChain(l2ChainId, address(diamondProxy));
+        dummyBridgehub.setZKChain(address(diamondProxy));
 
         vm.prank(owner);
         validatorTimelock.addValidatorForChainId(l2ChainId, validator);

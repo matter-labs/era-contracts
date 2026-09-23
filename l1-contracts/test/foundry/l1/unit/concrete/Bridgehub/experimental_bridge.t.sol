@@ -868,7 +868,7 @@ contract ExperimentalBridgeTest is Test {
 
         // bridgehub.createNewChain => chainTypeManager.createNewChain => this function sets the stateTransition mapping
         // of `chainId`, let's emulate that using foundry cheatcodes or let's just use the extra function we introduced in our mockCTM
-        mockCTM.setZKChain(chainId, address(mockChainContract));
+        mockCTM.setZKChain(address(mockChainContract));
 
         vm.startPrank(deployerAddress);
         vm.mockCall(

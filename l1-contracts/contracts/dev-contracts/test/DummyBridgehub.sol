@@ -40,7 +40,7 @@ contract DummyBridgehub {
         messageRoot = IMessageRootBase(_messageRoot);
     }
 
-    function setZKChain(uint256, address _zkChain) external {
+    function setZKChain(address _zkChain) external {
         zkChain = _zkChain;
     }
 

@@ -77,7 +77,7 @@ contract ValidatorTimelockTest is Test {
 
         vm.mockCall(zkSync, abi.encodeCall(IGetters.getAdmin, ()), abi.encode(owner));
         vm.mockCall(zkSync, abi.encodeCall(IGetters.getChainId, ()), abi.encode(chainId));
-        dummyBridgehub.setZKChain(chainId, zkSync);
+        dummyBridgehub.setZKChain(zkSync);
 
         validator = ValidatorTimelock(_deployValidatorTimelock(owner, executionDelay));
         vm.prank(owner);
@@ -571,8 +571,8 @@ contract ValidatorTimelockTest is Test {
 
         vm.mockCall(fakeChain, abi.encodeCall(IGetters.getChainId, ()), abi.encode(fakeChainId));
         vm.mockCall(fakeChain, abi.encodeCall(IGetters.getAdmin, ()), abi.encode(owner));
-        // Make bridgehub return a different address for this chain ID (simulating NotAZKChain)
-        dummyBridgehub.setZKChain(fakeChainId, zkSync); // zkSync != fakeChain
+        // Make bridgehub return a different address (simulating NotAZKChain)
+        dummyBridgehub.setZKChain(zkSync); // zkSync != fakeChain
 
         IValidatorTimelock.ValidatorRotationParams memory params = IValidatorTimelock.ValidatorRotationParams({
             rotatePrecommitterRole: true,
