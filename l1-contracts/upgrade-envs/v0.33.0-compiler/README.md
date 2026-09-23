@@ -60,7 +60,12 @@ and the script's factory-dep check against the genesis hashes will fail on it.
    derives the same call from the CTM once stage 1 has executed.
 
 Chain 499 is on v0.32.2 and is included. Chains 6475 and 37111 are still on v0.31.0 and need the
-CTM's stored v0.31.x and v0.32.x upgrades first. After that, add them to `chain_ids` and regenerate.
+CTM's stored v0.31.x and v0.32.x upgrades first. Do not regenerate for them afterwards: `prepare`
+requires the CTM to still be on v0.32.2 and its creation cut to be the pre-v33 one, and both change
+when stage 1 executes. Once a chain reaches v0.32.2, build its call from the upgrade registered on
+the CTM with `protocol_ops chain upgrade --env stage --chain-id <id>` (it reads the v0.32.2 -> v0.33.0
+cut from the CTM's logs), or add the chain to `chain_ids` before generating, if it is already on
+v0.32.2 by then.
 
 ## Server side
 

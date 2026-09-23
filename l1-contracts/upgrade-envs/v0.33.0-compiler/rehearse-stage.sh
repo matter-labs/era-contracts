@@ -35,13 +35,19 @@ cast rpc anvil_setBalance "$DEPLOYER" 0x56BC75E2D63100000 --rpc-url "$RPC" >/dev
 
 # ---------------------------------------------------------------- 1. prepare
 mkdir -p "$(dirname "$OUT")"
+# Never assert against an output left over from an earlier run.
+rm -f "$OUT"
 cd "$WT"
 forge script deploy-scripts/upgrade/v33/CTMUpgrade_v33.s.sol:CTMUpgrade_v33 \
   --sig 'prepare(string,string)' /upgrade-envs/v0.33.0-compiler/stage.toml "$OUT_REL" \
   --rpc-url "$RPC" --broadcast --unlocked --sender "$DEPLOYER" --legacy --slow \
   > "$S/v33_prepare.log" 2>&1
-echo "prepare exit: $?"; grep -E 'v33:|Error|revert|ONCHAIN EXECUTION' "$S/v33_prepare.log" | tail -8
-[ -f "$OUT" ] || { echo "no output TOML"; exit 1; }
+PREPARE_EXIT=$?
+echo "prepare exit: $PREPARE_EXIT"; grep -E 'v33:|Error|revert|ONCHAIN EXECUTION' "$S/v33_prepare.log" | tail -8
+if [ "$PREPARE_EXIT" != "0" ] || [ ! -f "$OUT" ]; then
+  echo "REHEARSAL FAILED: prepare did not produce an output (log: $S/v33_prepare.log)"
+  exit 1
+fi
 
 toml_get() { python3 -c "import tomllib,sys; d=tomllib.load(open('$OUT','rb')); v=d
 for k in sys.argv[1].split('.'): v=v[k]
@@ -110,4 +116,10 @@ TXH=$(cast call "$CHAIN" 'getL2SystemContractsUpgradeTxHash()(bytes32)' --rpc-ur
 EXPECTED_CUT_HASH=$(toml_get contracts_config.new_initial_cut_hash)
 chk "CTM initialCutHash = v33 creation cut" "$(cast call "$CTM" 'initialCutHash()(bytes32)' --rpc-url "$RPC")" "$EXPECTED_CUT_HASH"
 
-echo; [ "$FAILED" = "0" ] && echo "REHEARSAL PASSED" || echo "REHEARSAL FAILED"
+echo
+if [ "$FAILED" = "0" ]; then
+  echo "REHEARSAL PASSED"
+else
+  echo "REHEARSAL FAILED"
+  exit 1
+fi
