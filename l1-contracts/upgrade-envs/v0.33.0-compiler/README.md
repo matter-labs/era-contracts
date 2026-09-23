@@ -35,8 +35,11 @@ a plain force deployment would reset.
   chains to upgrade, and the CTM's current chain-creation parameters as event data. The script checks
   that data against the CTM's stored hashes before using it.
 - `output/stage/ecosystem.toml` holds the governance calls per stage, the per-chain ChainAdmin
-  calldata, the upgrade cut, the new creation parameters and the factory-dep list.
-- `rehearse-stage.sh` runs the whole flow on a Sepolia fork and asserts the L1 end state.
+  calldata, the upgrade cut, the new creation parameters and the factory-dep list. Its
+  `test_calls` table holds a test-only `createNewChain` call (chain id 555, sent by the bridgehub
+  admin) that exercises the new creation parameters. It is for simulation, not for execution.
+- `rehearse-stage.sh` runs the whole flow on a Sepolia fork, creates the test chain, and asserts the
+  L1 end state.
 
 Script: `deploy-scripts/upgrade/v33/CTMUpgrade_v33.s.sol`.
 

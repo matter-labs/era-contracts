@@ -12,6 +12,7 @@ import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
@@ -346,6 +347,27 @@ contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
         data = abi.encodeCall(IChainAdmin.multicall, (calls, true));
     }
 
+    /// @notice Test-only: `createNewChain` of a fresh Era chain on the upgraded CTM, from the
+    ///         bridgehub admin, with the v33 creation params. Lets the simulator (and the fork
+    ///         rehearsal) prove on L1 that the CTM accepts the re-issued parameters.
+    function getV33TestCreateChainCall() public view returns (address caller, bytes memory data) {
+        ChainCreationParams memory newParams = abi.decode(v33NewChainCreationParams, (ChainCreationParams));
+        IBridgehubBase bridgehub = IBridgehubBase(IChainTypeManager(v33Input.ctm).BRIDGE_HUB());
+        caller = bridgehub.admin();
+        data = abi.encodeCall(
+            IL1Bridgehub.createNewChain,
+            (
+                ERA_TEST_CREATE_CHAIN_ID,
+                v33Input.ctm,
+                bridgehub.baseTokenAssetId(v33Input.chainIds[0]),
+                5,
+                caller,
+                abi.encode(abi.encode(newParams.diamondCut), newParams.forceDeploymentsData),
+                new bytes[](0)
+            )
+        );
+    }
+
     // ======================== Output ========================
 
     function _saveV33Output(string memory _outputPath) internal {
@@ -402,11 +424,20 @@ contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
             chainUpgrades = vm.serializeString("chain_upgrades", key, entry);
         }
 
+        vm.serializeString("root", "test_calls", _serializeV33TestCalls());
         vm.serializeString("root", "contracts_config", contractsConfig);
         vm.serializeString("root", "chain_upgrades", chainUpgrades);
         string memory toml = vm.serializeString("root", "governance_calls", governanceCalls);
         vm.writeToml(toml, _outputPath);
         console.log("v33: output written to", _outputPath);
+    }
+
+    function _serializeV33TestCalls() internal returns (string memory testCalls) {
+        (address createChainCaller, bytes memory createChainData) = getV33TestCreateChainCall();
+        vm.serializeUint("test_calls", "create_chain_id", ERA_TEST_CREATE_CHAIN_ID);
+        vm.serializeAddress("test_calls", "create_chain_caller", createChainCaller);
+        vm.serializeAddress("test_calls", "create_chain_target", IChainTypeManager(v33Input.ctm).BRIDGE_HUB());
+        testCalls = vm.serializeBytes("test_calls", "create_chain_calldata", createChainData);
     }
 
     // ======================== Helpers ========================

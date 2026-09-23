@@ -100,6 +100,19 @@ else
   fail "ChainAdmin $ADMIN has no owner()"
 fi
 
+# ---------------------------------------------------------------- 3b. test chain creation
+# The bridgehub admin creates a fresh Era chain with the v33 creation params: proves on L1 that the
+# CTM accepts the re-issued cut and force-deployment data (hash checks in ChainTypeManagerBase).
+TC_ID=$(toml_get test_calls.create_chain_id)
+TC_CALLER=$(toml_get test_calls.create_chain_caller)
+TC_TARGET=$(toml_get test_calls.create_chain_target)
+TC_DATA=$(toml_get test_calls.create_chain_calldata)
+cast rpc anvil_setBalance "$TC_CALLER" 0x56BC75E2D63100000 --rpc-url "$RPC" >/dev/null
+st=$(cast send --unlocked --from "$TC_CALLER" "$TC_TARGET" "$TC_DATA" --rpc-url "$RPC" --json 2>&1 | python3 -c "import json,sys; L=[l for l in sys.stdin.read().splitlines() if l.startswith('{')]; print(json.loads(L[-1])['status'] if L else 'no-receipt')")
+echo "test createNewChain($TC_ID) as bridgehub admin: status $st"
+[ "$st" = "0x1" ] || fail "test chain creation failed"
+NEW_CHAIN=$(cast call "$TC_TARGET" 'getZKChain(uint256)(address)' "$TC_ID" --rpc-url "$RPC")
+
 # ---------------------------------------------------------------- 4. assertions
 chk() { [ "$(echo "$2" | tr A-F a-f)" = "$(echo "$3" | tr A-F a-f)" ] && echo "  OK   $1" || fail "$1: expected $3, got $2"; }
 echo "== L1 state after the upgrade =="
@@ -146,6 +159,10 @@ PYCHECK
 EXPECTED_CUT_HASH=$(toml_get contracts_config.new_initial_cut_hash)
 chk "CTM initialCutHash = v33 creation cut" "$(cast call "$CTM" 'initialCutHash()(bytes32)' --rpc-url "$RPC")" "$EXPECTED_CUT_HASH"
 
+chk "new chain protocolVersion" "$(cast call "$NEW_CHAIN" 'getProtocolVersion()(uint256)' --rpc-url "$RPC" | awk '{print $1}')" "$NEW_VER"
+chk "new chain bootloader" "$(cast call "$NEW_CHAIN" 'getL2BootloaderBytecodeHash()(bytes32)' --rpc-url "$RPC")" "$NEW_BOOT"
+chk "new chain default AA" "$(cast call "$NEW_CHAIN" 'getL2DefaultAccountBytecodeHash()(bytes32)' --rpc-url "$RPC")" "$NEW_AA"
+chk "new chain EVM emulator" "$(cast call "$NEW_CHAIN" 'getL2EvmEmulatorBytecodeHash()(bytes32)' --rpc-url "$RPC")" "$NEW_EVM"
 echo
 if [ "$FAILED" = "0" ]; then
   echo "REHEARSAL PASSED"
