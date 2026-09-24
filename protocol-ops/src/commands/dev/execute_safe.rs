@@ -44,11 +44,13 @@ const GAS_ESTIMATE_BUFFER_BPS: u64 = 12_500;
 /// ~30M on a quiet chain; we cap below that so a single tx can never equal
 /// or exceed the block limit (which reth rejects with `gas limit too high`).
 const PER_TX_GAS_LIMIT_CAP: u64 = 20_000_000;
-/// Floor gas price (5 gwei). Used when the node returns `eth_gasPrice` below
-/// it (anvil/reth on a quiet local chain reports near-zero), and to keep
+/// Default floor gas price (5 gwei). Used when the node returns `eth_gasPrice`
+/// below it (anvil/reth on a quiet local chain reports near-zero), and to keep
 /// public-testnet broadcasts from sitting in the mempool when Sepolia's
-/// reported price briefly dips.
-const GAS_PRICE_FLOOR_WEI: u128 = 5_000_000_000;
+/// reported price briefly dips. `dev execute-safe --gas-price-floor-gwei`
+/// overrides it; mainnet at a ~0.1 gwei base fee wants a much lower floor,
+/// since the txs are legacy and pay the whole `gasPrice`.
+pub const GAS_PRICE_FLOOR_WEI: u128 = 5_000_000_000;
 /// Multiplier (in basis points) applied to live `eth_gasPrice` so our txs
 /// outbid the base-fee floor on a busy public chain (Sepolia / mainnet). 300%
 /// gives us ~3x headroom over chain median which is what gets txs included
@@ -63,17 +65,30 @@ const GAS_PRICE_MULTIPLIER_BPS: u128 = 30_000;
 const RECEIPT_POLL_INTERVAL_MS: u64 = 1_500;
 
 /// Returns a legacy `gasPrice` that's high enough to land within ~1-2 blocks
-/// on busy public chains, but never below `GAS_PRICE_FLOOR_WEI` so local
-/// chains (anvil/reth at 0 base fee) still get a non-zero price. We use
-/// legacy (type-0) txs throughout this binary so an EIP-1559 split isn't
-/// needed.
-async fn resolve_gas_price<P: Provider>(provider: &P) -> anyhow::Result<u128> {
+/// on busy public chains, but never below `floor_wei` so local chains
+/// (anvil/reth at 0 base fee) still get a non-zero price. We use legacy
+/// (type-0) txs throughout this binary so an EIP-1559 split isn't needed.
+async fn resolve_gas_price<P: Provider>(provider: &P, floor_wei: u128) -> anyhow::Result<u128> {
     let live = provider
         .get_gas_price()
         .await
         .context("eth_gasPrice failed")?;
     let bumped = live.saturating_mul(GAS_PRICE_MULTIPLIER_BPS) / 10_000;
-    Ok(std::cmp::max(bumped, GAS_PRICE_FLOOR_WEI))
+    Ok(std::cmp::max(bumped, floor_wei))
+}
+
+/// clap value parser for `--gas-price-floor-gwei`: an exact decimal gwei
+/// amount (e.g. `0.1`, `5`) converted to wei. Rejects negative, non-numeric
+/// and out-of-range values instead of silently truncating them.
+pub fn parse_gwei(s: &str) -> Result<u128, String> {
+    match alloy::primitives::utils::parse_units(s, "gwei").map_err(|e| e.to_string())? {
+        alloy::primitives::utils::ParseUnits::U256(v) => v
+            .try_into()
+            .map_err(|_| format!("gas price floor {s} gwei does not fit in u128 wei")),
+        alloy::primitives::utils::ParseUnits::I256(_) => {
+            Err(format!("gas price floor must not be negative, got {s}"))
+        }
+    }
 }
 
 /// Render a wei gas price as gwei for logging.
@@ -126,14 +141,21 @@ pub struct DevExecuteSafeArgs {
     /// can reconstruct CREATE2 / TUPP deployments from the prepare output.
     #[clap(long)]
     pub out: Option<PathBuf>,
+
+    /// Minimum legacy gas price in gwei. The effective price is
+    /// `max(3 x eth_gasPrice, floor)`, resolved once per bundle. Lower it on
+    /// mainnet when the base fee is far below the 5 gwei default.
+    #[clap(long = "gas-price-floor-gwei", default_value = "5", value_parser = parse_gwei)]
+    pub gas_price_floor_wei: u128,
 }
 
 pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
-    execute_one_bundle(
+    execute_one_bundle_with_gas_floor(
         &args.safe_file,
         &args.l1_rpc_url,
         args.private_key.expose(),
         args.out.as_deref(),
+        args.gas_price_floor_wei,
     )
     .await
 }
@@ -149,6 +171,26 @@ pub async fn execute_one_bundle(
     l1_rpc_url: &str,
     private_key: &str,
     out_path: Option<&Path>,
+) -> anyhow::Result<()> {
+    execute_one_bundle_with_gas_floor(
+        safe_file,
+        l1_rpc_url,
+        private_key,
+        out_path,
+        GAS_PRICE_FLOOR_WEI,
+    )
+    .await
+}
+
+/// [`execute_one_bundle`] with an explicit gas price floor (wei). The
+/// four-argument form keeps the default so external crates that link
+/// `protocol_ops` (zksync-os-integration-tests' `zk-deployer`) keep compiling.
+pub async fn execute_one_bundle_with_gas_floor(
+    safe_file: &Path,
+    l1_rpc_url: &str,
+    private_key: &str,
+    out_path: Option<&Path>,
+    gas_price_floor_wei: u128,
 ) -> anyhow::Result<()> {
     logger::step(format!("Execute Safe file: {}", safe_file.display()));
 
@@ -199,7 +241,7 @@ pub async fn execute_one_bundle(
     // so a single snapshot is fine; if Sepolia gas spikes mid-bundle we'll
     // see slow blocks rather than dropped txs (still better than the old
     // hardcoded 1-gwei sub-base-fee behaviour).
-    let gas_price = resolve_gas_price(&provider)
+    let gas_price = resolve_gas_price(&provider, gas_price_floor_wei)
         .await
         .context("resolve gas price")?;
     logger::info(format!("Using gas price {} gwei", format_gwei(gas_price)));

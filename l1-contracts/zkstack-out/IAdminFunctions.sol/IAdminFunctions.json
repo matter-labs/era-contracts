@@ -169,6 +169,24 @@
   },
   {
     "type": "function",
+    "name": "chainAdminAcceptOwner",
+    "inputs": [
+      {
+        "name": "chainAdmin",
+        "type": "address",
+        "internalType": "contract ChainAdmin"
+      },
+      {
+        "name": "target",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "chainSetTokenMultiplierSetter",
     "inputs": [
       {
