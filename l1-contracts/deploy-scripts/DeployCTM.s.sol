@@ -50,6 +50,8 @@ import {Config, DeployedAddresses, GeneratedData} from "./DeployUtils.s.sol";
 import {DeployL1HelperScript} from "./DeployL1HelperScript.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
+import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 contract DeployCTMScript is Script, DeployL1HelperScript {
     using stdToml for string;
 
@@ -187,7 +189,43 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
     function deployVerifiers() internal {
         (addresses.stateTransition.verifierFflonk) = deploySimpleContract("VerifierFflonk", false);
         (addresses.stateTransition.verifierPlonk) = deploySimpleContract("VerifierPlonk", false);
-        (addresses.stateTransition.verifier) = deploySimpleContract("Verifier", false);
+        if (config.multiProofVerifier) {
+            // Deploy MultiProofVerifier that requires BOTH Airbender and ZiSK proofs.
+            // ZiskVerifier wraps a pre-deployed standalone snarkJS Plonk
+            // verifier (see verifiers/README.md for its generation and
+            // deployment) passed in by address.
+            require(
+                config.ziskPlonkVerifierAddr != address(0),
+                "set zisk_plonk_verifier_addr to the deployed snarkJS Plonk verifier"
+            );
+            (addresses.stateTransition.ziskVerifier) = deploySimpleContract("ZiskVerifier", false);
+            (addresses.stateTransition.multiProofVerifier) = deploySimpleContract("MultiProofVerifier", false);
+
+            vm.startBroadcast(msg.sender);
+            // Single-VK lane: every proof, single batch or many, verifies
+            // through the range verifier, which reconstructs the ZiSK public
+            // values from its own pinned VKs. Default it to the ZiskVerifier
+            // just deployed; an operator may override with a separately
+            // deployed aggregator verifier via zisk_range_verifier_addr.
+            address ziskRangeVerifierAddr = config.ziskRangeVerifierAddr != address(0)
+                ? config.ziskRangeVerifierAddr
+                : addresses.stateTransition.ziskVerifier;
+            MultiProofVerifier(addresses.stateTransition.multiProofVerifier).setZiskRangeVerifier(
+                IVerifier(ziskRangeVerifierAddr)
+            );
+            MultiProofVerifier(addresses.stateTransition.multiProofVerifier).transferOwnership(config.ownerAddress);
+            vm.stopBroadcast();
+
+            if (config.testnetVerifier) {
+                // Testnet: wrap MultiProofVerifier with MultiProofTestnetVerifier for mock proof support.
+                (addresses.stateTransition.verifier) = deploySimpleContract("MultiProofTestnetVerifier", false);
+            } else {
+                // Prod: use MultiProofVerifier directly.
+                addresses.stateTransition.verifier = addresses.stateTransition.multiProofVerifier;
+            }
+        } else {
+            (addresses.stateTransition.verifier) = deploySimpleContract("Verifier", false);
+        }
     }
 
     function setChainTypeManagerInServerNotifier() internal {
@@ -311,6 +349,9 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             addresses.stateTransition.chainTypeManagerImplementation
         );
         vm.serializeAddress("state_transition", "verifier_addr", addresses.stateTransition.verifier);
+        if (addresses.stateTransition.ziskVerifier != address(0)) {
+            vm.serializeAddress("state_transition", "zisk_verifier_addr", addresses.stateTransition.ziskVerifier);
+        }
         vm.serializeAddress("state_transition", "admin_facet_addr", addresses.stateTransition.adminFacet);
         vm.serializeAddress("state_transition", "mailbox_facet_addr", addresses.stateTransition.mailboxFacet);
         vm.serializeAddress("state_transition", "executor_facet_addr", addresses.stateTransition.executorFacet);
