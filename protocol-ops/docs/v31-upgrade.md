@@ -97,6 +97,7 @@ RPC endpoints, upgrade transaction, and `raw uint256` value you provide. Once th
 total supply is set, the operation cannot be undone.
 
 After a ZKsync OS chain is upgraded to v31, provide its pre-v31 base-token total supply.
+The calculation script and the `chain set-zkos-pre-v31-total-supply` command come from #2533.
 First calculate the value from the repository root:
 
 ```
