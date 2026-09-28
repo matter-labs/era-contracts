@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 
 import {TransactionValidatorSharedTest} from "./_TransactionValidator_Shared.t.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
+import {PRIORITY_TX_MAX_GAS_LIMIT} from "contracts/common/Config.sol";
 import {PubdataGreaterThanLimit, TooMuchGas, ValidateTxnNotEnoughGas} from "contracts/common/L1ContractErrors.sol";
 
 contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
@@ -55,17 +56,26 @@ contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
         validateL1ToL2Transaction(testTx, priorityTxMaxGasLimit, 100000);
     }
 
-    function test_ShouldAllowLargeTransactions() public pure {
-        // If the governance is fine with, the user can send a transaction with a huge gas limit.
+    function test_acceptsProtocolCeilingWithHigherStoredLimit() public pure {
         L2CanonicalTransaction memory testTx = createTestTransaction();
+        testTx.gasLimit = PRIORITY_TX_MAX_GAS_LIMIT - 1;
+        validateL1ToL2Transaction(testTx, type(uint256).max, type(uint256).max);
+        testTx.gasLimit = PRIORITY_TX_MAX_GAS_LIMIT;
+        validateL1ToL2Transaction(testTx, type(uint256).max, type(uint256).max);
+    }
 
-        uint256 largeGasLimit = 2_000_000_000;
+    function test_rejectsOneGasAboveProtocolCeiling() public {
+        _assertExceedsProtocolCeiling(PRIORITY_TX_MAX_GAS_LIMIT + 1);
+    }
 
-        testTx.gasPerPubdataByteLimit = 1;
-        testTx.gasLimit = largeGasLimit;
+    function testFuzz_rejectsAboveProtocolCeiling(uint256 _gasLimit) public {
+        _assertExceedsProtocolCeiling(bound(_gasLimit, PRIORITY_TX_MAX_GAS_LIMIT + 1, type(uint256).max));
+    }
 
-        // This transaction could publish 2B bytes of pubdata & has 2B gas, which is more than would be typically
-        // allowed in the production system
-        validateL1ToL2Transaction(testTx, largeGasLimit, largeGasLimit);
+    function _assertExceedsProtocolCeiling(uint256 _gasLimit) internal {
+        L2CanonicalTransaction memory testTx = createTestTransaction();
+        testTx.gasLimit = _gasLimit;
+        vm.expectRevert(TooMuchGas.selector);
+        validateL1ToL2Transaction(testTx, type(uint256).max, type(uint256).max);
     }
 }

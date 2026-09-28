@@ -20,7 +20,7 @@ import {
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
+import {PRIORITY_TX_MAX_GAS_LIMIT, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
@@ -127,7 +127,7 @@ library Utils {
     // https://github.com/Arachnid/deterministic-deployment-proxy
     address internal constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
 
-    uint256 internal constant MAX_PRIORITY_TX_GAS = 72000000;
+    uint256 internal constant MAX_PRIORITY_TX_GAS = PRIORITY_TX_MAX_GAS_LIMIT;
 
     /**
      * @dev Returns the address that should be used for broadcasting transactions.

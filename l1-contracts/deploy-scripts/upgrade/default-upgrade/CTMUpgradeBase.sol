@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
+import {PRIORITY_TX_MAX_GAS_LIMIT, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
@@ -61,9 +62,8 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             txType: getUpgradeTxType(),
             from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
             to: uint256(uint160(target)),
-            // TODO: dont use hardcoded values
-            gasLimit: 72_000_000,
-            gasPerPubdataByteLimit: 800,
+            gasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
+            gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
             maxFeePerGas: 0,
             maxPriorityFeePerGas: 0,
             paymaster: uint256(uint160(address(0))),

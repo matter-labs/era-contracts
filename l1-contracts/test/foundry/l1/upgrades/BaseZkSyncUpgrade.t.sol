@@ -8,6 +8,7 @@ import {BaseZkSyncUpgrade, ProposedUpgrade} from "contracts/upgrades/BaseZkSyncU
 import {
     MAX_ALLOWED_MINOR_VERSION_DELTA,
     MAX_NEW_FACTORY_DEPS,
+    PRIORITY_TX_MAX_GAS_LIMIT,
     ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE
 } from "contracts/common/Config.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
@@ -22,7 +23,7 @@ import {
     ProtocolVersionMinorDeltaTooBig,
     ProtocolVersionTooSmall
 } from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
-import {TimeNotReached, TooManyFactoryDeps, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {TimeNotReached, TooManyFactoryDeps, TooMuchGas, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
@@ -46,6 +47,31 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         // Set up CTM for verifier lookup
         baseZkSyncUpgrade.setChainTypeManager(mockChainTypeManager);
         baseZkSyncUpgrade.mockProtocolVersionVerifier(protocolVersion, mockVerifier);
+    }
+
+    function test_revertWhen_UpgradeExceedsProtocolGasCeiling() public {
+        proposedUpgrade.l2ProtocolUpgradeTx.gasLimit = PRIORITY_TX_MAX_GAS_LIMIT + 1;
+        uint256 versionBefore = baseZkSyncUpgrade.getProtocolVersion();
+        address verifierBefore = baseZkSyncUpgrade.getVerifier();
+
+        vm.expectRevert(TooMuchGas.selector);
+        baseZkSyncUpgrade.upgrade(proposedUpgrade);
+
+        assertEq(baseZkSyncUpgrade.getProtocolVersion(), versionBefore);
+        assertEq(baseZkSyncUpgrade.getVerifier(), verifierBefore);
+    }
+
+    function test_UpgradeAtProtocolGasCeiling() public {
+        proposedUpgrade.l2ProtocolUpgradeTx.gasLimit = PRIORITY_TX_MAX_GAS_LIMIT;
+        bytes32 expectedTxHash = keccak256(abi.encode(proposedUpgrade.l2ProtocolUpgradeTx));
+
+        vm.expectEmit(true, true, false, true, address(baseZkSyncUpgrade));
+        emit BaseZkSyncUpgrade.UpgradeComplete(proposedUpgrade.newProtocolVersion, expectedTxHash, proposedUpgrade);
+        bytes32 txHash = baseZkSyncUpgrade.upgrade(proposedUpgrade);
+
+        assertEq(txHash, expectedTxHash);
+        assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
+        assertEq(baseZkSyncUpgrade.getVerifier(), mockVerifier);
     }
 
     // Upgrade is not ready yet

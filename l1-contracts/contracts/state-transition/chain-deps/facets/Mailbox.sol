@@ -20,6 +20,7 @@ import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    PRIORITY_TX_MAX_GAS_LIMIT,
     SERVICE_TRANSACTION_SENDER,
     SETTLEMENT_LAYER_RELAY_SENDER,
     PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
@@ -164,8 +165,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
                 contractL2: L2_INTEROP_CENTER_ADDR,
                 mintValue: 0,
                 l2Value: 0,
-                // Very large amount
-                l2GasLimit: 72_000_000,
+                l2GasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
                 l2Calldata: data,
                 l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
                 factoryDeps: new bytes[](0),
@@ -185,8 +185,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
                 contractL2: _contractL2,
                 mintValue: 0,
                 l2Value: 0,
-                // Very large amount
-                l2GasLimit: 72_000_000,
+                l2GasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
                 l2Calldata: _l2Calldata,
                 l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
                 factoryDeps: new bytes[](0),

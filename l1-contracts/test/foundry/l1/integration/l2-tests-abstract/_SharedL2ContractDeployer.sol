@@ -27,7 +27,7 @@ import {
     L2_NATIVE_TOKEN_VAULT_ADDR,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
-import {ETH_TOKEN_ADDRESS, SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS, PRIORITY_TX_MAX_GAS_LIMIT, SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
 
@@ -286,7 +286,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
                 mintValue: 1 ether,
                 l2Value: 10,
                 l2Calldata: hex"",
-                l2GasLimit: 72_000_000,
+                l2GasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
                 l2GasPerPubdataByteLimit: 800,
                 factoryDeps: deps,
                 refundRecipient: address(0)

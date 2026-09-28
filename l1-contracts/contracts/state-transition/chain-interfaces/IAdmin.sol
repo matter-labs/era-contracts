@@ -27,7 +27,7 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     function setValidator(address _validator, bool _active) external;
 
     /// @notice Change the max L2 gas limit for L1 -> L2 transactions
-    /// @param _newPriorityTxMaxGasLimit The maximum number of L2 gas that a user can request for L1 -> L2 transactions
+    /// @param _newPriorityTxMaxGasLimit The chain's gas limit, at most `PRIORITY_TX_MAX_GAS_LIMIT`.
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external;
 
     /// @notice Change the ZKsync OS single-transaction gas limit (EIP-7825).

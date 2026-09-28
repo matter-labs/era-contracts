@@ -11,7 +11,7 @@ import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.s
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 import {EmptyAssetId, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
-import {L2DACommitmentScheme} from "contracts/common/Config.sol";
+import {L2DACommitmentScheme, PRIORITY_TX_MAX_GAS_LIMIT} from "contracts/common/Config.sol";
 
 contract InitializeTest is DiamondInitTest {
     function test_revertWhen_verifierIsZeroAddress() public {
@@ -119,6 +119,7 @@ contract InitializeTest is DiamondInitTest {
         assertEq(utilsFacet.util_getChainTypeManager(), initializeData.chainTypeManager);
         assertEq(utilsFacet.util_getBaseTokenAssetId(), initializeData.baseTokenAssetId);
         assertEq(utilsFacet.util_getProtocolVersion(), initializeData.protocolVersion);
+        assertEq(utilsFacet.util_getPriorityTxMaxGasLimit(), PRIORITY_TX_MAX_GAS_LIMIT);
 
         // Verifier is now fetched from CTM
         assertEq(address(utilsFacet.util_getVerifier()), testnetVerifier);

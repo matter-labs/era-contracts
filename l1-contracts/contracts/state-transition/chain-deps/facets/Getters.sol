@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
+import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
 
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {PubdataPricingMode} from "../ZKChainStorage.sol";
@@ -15,7 +16,13 @@ import {IZKsyncOSVerifier} from "../../chain-interfaces/IZKsyncOSVerifier.sol";
 import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "../../chain-interfaces/ILegacyGetters.sol";
 import {SemVer} from "../../../common/libraries/SemVer.sol";
-import {ProofSystem, DisabledProofSystems, L2DACommitmentScheme, PubdataContent} from "../../../common/Config.sol";
+import {
+    ProofSystem,
+    DisabledProofSystems,
+    L2DACommitmentScheme,
+    PubdataContent,
+    PRIORITY_TX_MAX_GAS_LIMIT
+} from "../../../common/Config.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -213,7 +220,7 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function getPriorityTxMaxGasLimit() external view returns (uint256) {
-        return s.priorityTxMaxGasLimit;
+        return Math.min(s.priorityTxMaxGasLimit, PRIORITY_TX_MAX_GAS_LIMIT);
     }
 
     /// @inheritdoc IGetters

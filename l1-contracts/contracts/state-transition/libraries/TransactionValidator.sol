@@ -10,7 +10,8 @@ import {
     L1_TX_INTRINSIC_L2_GAS_ZKSYNC_OS,
     L1_TX_INTRINSIC_PUBDATA_ZKSYNC_OS,
     L1_TX_NATIVE_PER_GAS,
-    MAX_NATIVE_COMPUTATIONAL_ZKSYNC_OS
+    MAX_NATIVE_COMPUTATIONAL_ZKSYNC_OS,
+    PRIORITY_TX_MAX_GAS_LIMIT
 } from "../../common/Config.sol";
 import {
     InvalidUpgradeTxn,
@@ -36,8 +37,8 @@ library TransactionValidator {
         // ZKsync OS has no batch overhead, so the whole gas limit is the transaction body's.
         uint256 l2GasForTxBody = _transaction.gasLimit;
 
-        // Ensuring that the transaction is provable
-        if (l2GasForTxBody > _priorityTxMaxGasLimit) {
+        // Existing chains may still store a limit above the protocol ceiling.
+        if (l2GasForTxBody > _priorityTxMaxGasLimit || l2GasForTxBody > PRIORITY_TX_MAX_GAS_LIMIT) {
             revert TooMuchGas();
         }
         // Ensuring that the transaction cannot output more pubdata than is processable

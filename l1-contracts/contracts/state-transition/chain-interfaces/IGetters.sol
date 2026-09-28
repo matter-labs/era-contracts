@@ -123,7 +123,8 @@ interface IGetters is IZKChainBase {
     /// executed (i.e. finalized).
     function getL2SystemContractsUpgradeBatchNumber() external view returns (uint256);
 
-    /// @return The maximum number of L2 gas that a user can request for L1 -> L2 transactions
+    /// @notice Returns the effective gas limit for newly requested L1 -> L2 transactions.
+    /// @return The smaller of the chain's configured limit and the protocol ceiling.
     function getPriorityTxMaxGasLimit() external view returns (uint256);
 
     /// @return The effective ZKsync OS single-transaction gas limit (EIP-7825), with the default

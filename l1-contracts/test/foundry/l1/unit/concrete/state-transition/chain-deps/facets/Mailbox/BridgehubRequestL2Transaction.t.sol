@@ -6,12 +6,17 @@ import {Vm} from "forge-std/Vm.sol";
 
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";
 import {BridgehubL2TransactionRequest, L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
+import {PRIORITY_TX_MAX_GAS_LIMIT, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {TransactionFiltererTrue} from "contracts/dev-contracts/test/DummyTransactionFiltererTrue.sol";
 import {TransactionFiltererFalse} from "contracts/dev-contracts/test/DummyTransactionFiltererFalse.sol";
-import {FactoryDepsNotSupported, TransactionNotAllowed, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {
+    FactoryDepsNotSupported,
+    TooMuchGas,
+    TransactionNotAllowed,
+    Unauthorized
+} from "contracts/common/L1ContractErrors.sol";
 import {LogFinder} from "test-utils/LogFinder.sol";
-import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestConstants.sol";
+import {LEGACY_PRIORITY_TX_MAX_GAS_LIMIT, NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestConstants.sol";
 
 contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
     using LogFinder for Vm.Log[];
@@ -77,6 +82,56 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
         assertEq(emittedTxHash, keccak256(abi.encode(transaction)));
         assertEq(canonicalTxHash, emittedTxHash);
         assertEq(gettersFacet.getPriorityTreeRoot(), canonicalTxHash);
+    }
+
+    function test_success_atProtocolGasCeilingWithLegacyStoredLimit() public {
+        BridgehubL2TransactionRequest memory req = getBridgehubRequestL2TransactionRequest();
+        req.l2GasLimit = PRIORITY_TX_MAX_GAS_LIMIT;
+        utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
+        // Isolate admission from the admin setter to model an existing chain's pre-upgrade limit.
+        utilsFacet.util_setPriorityTxMaxGasLimit(LEGACY_PRIORITY_TX_MAX_GAS_LIMIT);
+        uint256 countBefore = gettersFacet.getTotalPriorityTxs();
+
+        vm.recordLogs();
+        vm.prank(bridgehub);
+        bytes32 canonicalTxHash = mailboxFacet.bridgehubRequestL2Transaction(req);
+
+        Vm.Log memory log = vm.getRecordedLogs().requireOneFrom(NEW_PRIORITY_REQUEST_SIGNATURE, address(mailboxFacet));
+        (uint256 txId, bytes32 emittedTxHash, , L2CanonicalTransaction memory transaction, ) = abi.decode(
+            log.data,
+            (uint256, bytes32, uint64, L2CanonicalTransaction, bytes[])
+        );
+        assertEq(txId, countBefore);
+        assertEq(transaction.gasLimit, PRIORITY_TX_MAX_GAS_LIMIT);
+        assertEq(emittedTxHash, keccak256(abi.encode(transaction)));
+        assertEq(canonicalTxHash, emittedTxHash);
+        assertEq(gettersFacet.getPriorityTreeRoot(), canonicalTxHash);
+        assertEq(gettersFacet.getTotalPriorityTxs(), countBefore + 1);
+        assertEq(gettersFacet.getPriorityTxMaxGasLimit(), PRIORITY_TX_MAX_GAS_LIMIT);
+    }
+
+    function test_revertWhen_exceedingProtocolGasCeilingWithLegacyStoredLimit() public {
+        _assertGasLimitRejected(LEGACY_PRIORITY_TX_MAX_GAS_LIMIT, PRIORITY_TX_MAX_GAS_LIMIT + 1);
+    }
+
+    function test_revertWhen_exceedingLowerChainGasLimit() public {
+        _assertGasLimitRejected(PRIORITY_TX_MAX_GAS_LIMIT - 1, PRIORITY_TX_MAX_GAS_LIMIT);
+    }
+
+    function _assertGasLimitRejected(uint256 _storedLimit, uint256 _requestedLimit) internal {
+        BridgehubL2TransactionRequest memory req = getBridgehubRequestL2TransactionRequest();
+        req.l2GasLimit = _requestedLimit;
+        utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
+        utilsFacet.util_setPriorityTxMaxGasLimit(_storedLimit);
+        bytes32 rootBefore = gettersFacet.getPriorityTreeRoot();
+        uint256 countBefore = gettersFacet.getTotalPriorityTxs();
+
+        vm.prank(bridgehub);
+        vm.expectRevert(TooMuchGas.selector);
+        mailboxFacet.bridgehubRequestL2Transaction(req);
+
+        assertEq(gettersFacet.getPriorityTreeRoot(), rootBefore);
+        assertEq(gettersFacet.getTotalPriorityTxs(), countBefore);
     }
 
     function testFuzz_revertWhen_FactoryDepsAreNotEmpty(bytes memory _bytecode) public {
