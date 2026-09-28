@@ -1,0 +1,57 @@
+{
+  "roots": ["contracts", "deploy-scripts", "scripts", "test"],
+  "allow": {
+    "contracts/dev-contracts/": [3628],
+    "test/": [3628]
+  },
+  "exceptions": [
+    {
+      "file": "contracts/common/libraries/TransientPrimitives/TransientPrimitives.sol",
+      "code": 2394,
+      "source": "tstore"
+    },
+    { "file": "contracts/core/bridgehub/L1Bridgehub.sol", "code": 5667, "source": "uint256 _salt" },
+    { "file": "contracts/core/ctm-deployment/CTMDeploymentTracker.sol", "code": 5667, "source": "uint256 _chainId" },
+    { "file": "contracts/dev-contracts/test/DummyInteropRecipient.sol", "code": 5667, "source": "bytes32 receiveId" },
+    {
+      "file": "contracts/dev-contracts/test/DummyInteropRecipient.sol",
+      "code": 5667,
+      "source": "bytes calldata sender"
+    },
+    {
+      "file": "contracts/dev-contracts/test/DummyInteropRecipient.sol",
+      "code": 5667,
+      "source": "bytes calldata payload"
+    },
+    {
+      "file": "contracts/l2-system/zksync-os/L1Messenger.sol",
+      "code": 3628,
+      "source": "contract L1Messenger is IL2ToL1Messenger {"
+    },
+    {
+      "file": "contracts/transactionFilterer/GatewayTransactionFilterer.sol",
+      "code": 5667,
+      "source": "uint256 mintValue"
+    },
+    {
+      "file": "contracts/transactionFilterer/GatewayTransactionFilterer.sol",
+      "code": 5667,
+      "source": "uint256 l2Value"
+    },
+    {
+      "file": "contracts/transactionFilterer/GatewayTransactionFilterer.sol",
+      "code": 5667,
+      "source": "address refundRecipient"
+    },
+    {
+      "file": "contracts/transactionFilterer/PrividiumTransactionFilterer.sol",
+      "code": 5667,
+      "source": "uint256 _mintValue"
+    },
+    {
+      "file": "contracts/transactionFilterer/PrividiumTransactionFilterer.sol",
+      "code": 5667,
+      "source": "address _refundRecipient"
+    }
+  ]
+}

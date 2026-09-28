@@ -27,6 +27,7 @@ fs_permissions = [
     { access = "read", path = "../configs/genesis/" },
     { access = "read", path = "../configs/" },
 ]
+# Only filters what `forge build` prints; the enforced policy is `solc-warnings.json`.
 ignored_error_codes = ["missing-receive-ether", "code-size", "init-code-size"]
 ignored_warnings_from = []
 remappings = [
