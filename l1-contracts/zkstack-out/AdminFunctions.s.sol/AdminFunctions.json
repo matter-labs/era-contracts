@@ -934,6 +934,39 @@
   },
   {
     "type": "function",
+    "name": "setZKsyncOSPreV31TotalSupply",
+    "inputs": [
+      {
+        "name": "_bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_accessControlRestriction",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_preV31TotalSupply",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_shouldSend",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "startMigrateChainFromGateway",
     "inputs": [
       {
