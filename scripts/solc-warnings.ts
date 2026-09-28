@@ -10,6 +10,9 @@ const POLICY_FILE = "solc-warnings.json";
 // solc stops reporting after this many warnings and emits 4591 instead.
 const SOLC_WARNING_CAP = 256;
 const SOLC_WARNING_CAP_CODE = 4591;
+// solc reports this once per compilation, at the first `tstore` in source order, so the check finds
+// every site itself.
+const TRANSIENT_STORAGE_CODE = 2394;
 
 export interface PolicyException {
   file: string;
@@ -56,6 +59,25 @@ export function evaluate(
     }
   }
   return { violations, stale: policy.exceptions.filter((e) => !used.has(e)) };
+}
+
+// Blanks comments out, keeping offsets, so a commented-out `tstore` is not reported.
+export function stripComments(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (comment) => comment.replace(/[^\n]/g, " "));
+}
+
+export function tstoreSites(file: string, src: string): SolcWarning[] {
+  const code = stripComments(src);
+  return [...code.matchAll(/\btstore\s*\(/g)].map((m) => {
+    const lineEnd = code.indexOf("\n", m.index);
+    const line = code.slice(0, m.index).split("\n").length;
+    return {
+      code: TRANSIENT_STORAGE_CODE,
+      file,
+      source: code.slice(m.index, lineEnd === -1 ? undefined : lineEnd).trim(),
+      formatted: `Warning (${TRANSIENT_STORAGE_CODE}): transient storage is written with tstore\n --> ${file}:${line}`,
+    };
+  });
 }
 
 function svmDataDirs(): string[] {
@@ -106,11 +128,15 @@ function collectWarnings(policy: Policy): SolcWarning[] {
     throw new Error(`solc ${version} not found in ${svmDataDirs().join(", ")}`);
   }
 
-  const files = execFileSync("git", ["ls-files", "--", ...policy.roots.map((root) => `${root}/*.sol`)], {
-    encoding: "utf8",
-  })
+  // `--others` picks up new files that are not staged yet.
+  const listed = execFileSync(
+    "git",
+    ["ls-files", "--cached", "--others", "--exclude-standard", "--", ...policy.roots.map((root) => `${root}/*.sol`)],
+    { encoding: "utf8" }
+  )
     .split("\n")
     .filter(Boolean);
+  const files = [...new Set(listed)].filter((file) => fs.existsSync(file));
   const remappings = execFileSync("forge", ["remappings"], { encoding: "utf8" }).split("\n").filter(Boolean);
   const input = {
     language: "Solidity",
@@ -144,17 +170,20 @@ function collectWarnings(policy: Policy): SolcWarning[] {
   }
 
   const contents = new Map<string, Buffer>();
-  return reported.map((d) => {
-    const loc = d.sourceLocation;
-    let source = "";
-    if (loc) {
-      if (!contents.has(loc.file)) {
-        contents.set(loc.file, fs.readFileSync(loc.file));
+  const fromSolc = reported
+    .filter((d) => Number(d.errorCode) !== TRANSIENT_STORAGE_CODE)
+    .map((d) => {
+      const loc = d.sourceLocation;
+      let source = "";
+      if (loc) {
+        if (!contents.has(loc.file)) {
+          contents.set(loc.file, fs.readFileSync(loc.file));
+        }
+        source = sourceFirstLine(contents.get(loc.file)!, loc.start, loc.end);
       }
-      source = sourceFirstLine(contents.get(loc.file)!, loc.start, loc.end);
-    }
-    return { code: Number(d.errorCode), file: loc?.file ?? "", source, formatted: d.formattedMessage };
-  });
+      return { code: Number(d.errorCode), file: loc?.file ?? "", source, formatted: d.formattedMessage };
+    });
+  return [...fromSolc, ...files.flatMap((file) => tstoreSites(file, fs.readFileSync(file, "utf8")))];
 }
 
 function check(): number {
@@ -221,6 +250,17 @@ function selftest(): number {
   const content = Buffer.from("// — \nfunction f(uint256 _salt,\n  bool b) {}\n", "utf8");
   const start = content.indexOf("uint256");
   expect("byte offsets", sourceFirstLine(content, start, content.indexOf("{")), "uint256 _salt,");
+
+  const sites = tstoreSites(
+    "contracts/T.sol",
+    "// tstore(0, 0)\n/* tstore(1, 1) */\nassembly {\n  tstore(slot, value)\n  tstore (other, 2)\n}\n"
+  );
+  expect(
+    "tstore sites",
+    sites.map((w) => w.source),
+    ["tstore(slot, value)", "tstore (other, 2)"]
+  );
+  expect("tstore site line", sites[0].formatted.endsWith("contracts/T.sol:4"), true);
 
   if (failures.length > 0) {
     console.error(`solc-warnings --selftest: ${failures.length} failure(s):`);
