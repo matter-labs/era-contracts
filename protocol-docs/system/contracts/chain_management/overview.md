@@ -26,3 +26,6 @@ complete creation, genesis, interop-registration, and upgrade-onboarding flow.
 - [Upgrade process](./upgrade_process.md)
 - [Creating an upgrade](./creating_upgrades.md)
 - [Stage 1 considerations](./stage1.md)
+
+Operational guides: [deploying an ecosystem](../../../ecosystem-deployment.md) and
+[upgrading an ecosystem](../../../ecosystem-upgrade.md).
