@@ -41,9 +41,8 @@ contract ExpectSignalPlonkVerifier is IZiskSnarkPlonkVerifier {
 }
 
 /// @notice Range reconstruction with the regenerated ZiSK 1.3.0-alpha pins.
-/// @dev Shares the four batch commitments with ZiskVerifierRealProofTest. DIGEST
-///      follows the 1.3.0-alpha pins (program VKs and vadcop-final root) by
-///      formula until a 1.3.0-alpha GPU session re-anchors the real-proof fixtures.
+/// @dev Shares the four batch commitments and the GPU-proved binding digest
+///      with ZiskVerifierRealProofTest.
 contract MultiProofRangeVectorTest is Test {
     /// @dev Inner state-transition guest programVK: the first field of the
     ///      binding digest. It is NOT the aggregated proof's wire [0..32].

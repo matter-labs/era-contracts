@@ -43,9 +43,11 @@ ZiSK [v1.3.0-alpha](https://github.com/0xPolygonHermez/zisk/releases/tag/v1.3.0-
 (`zisk-contracts/` at the tag). The program VK pins are the 1.3.0-alpha
 `cargo-zisk setup` values of the zksync-os-zisk guests, derived in
 [rotation runs 35695453171](https://github.com/matter-labs/zksync-os-zisk/actions/runs/35695453171) (aggregator) and [35702731860](https://github.com/matter-labs/zksync-os-zisk/actions/runs/35702731860) (inner, after the guest moved its state commitment to the blake2sf precompile).
-The real-proof fixtures were generated with the 1.2.0-alpha setup in
-[GPU run 34199276557](https://github.com/matter-labs/zksync-os-zisk/actions/runs/34199276557)
-and do not verify against the 1.3.0-alpha key.
+The real-proof fixtures use the same 1.3.0-alpha setup and program VKs, from
+[GPU run 36396740141](https://github.com/matter-labs/zksync-os-zisk/actions/runs/36396740141).
+The run reproduces both guest ELFs, compares all four proved batch commitments
+with native execution, and checks the aggregated binding digest before the
+fixtures are verified against the real Plonk backend in Foundry.
 
 ## Preparing the backend
 
