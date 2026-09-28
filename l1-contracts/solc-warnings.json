@@ -1,0 +1,15 @@
+{
+  "roots": ["contracts", "deploy-scripts", "scripts", "test"],
+  "exceptions": [
+    {
+      "file": "contracts/common/libraries/TransientPrimitives/TransientPrimitives.sol",
+      "code": 2394,
+      "source": "tstore"
+    },
+    {
+      "file": "contracts/l2-system/zksync-os/L1Messenger.sol",
+      "code": 3628,
+      "source": "contract L1Messenger is IL2ToL1Messenger {"
+    }
+  ]
+}
