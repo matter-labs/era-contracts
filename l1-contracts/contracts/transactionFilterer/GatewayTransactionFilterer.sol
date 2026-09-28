@@ -121,19 +121,14 @@ contract GatewayTransactionFilterer is ITransactionFilterer, Ownable2StepUpgrade
     /// @param sender The sender of the transaction
     /// @param l2Calldata The calldata of the L2 transaction
     /// @return Whether the transaction is allowed
-    // The names match `ITransactionFilterer` so callers can use named arguments; three of them
-    // are unused by this implementation, hence the single disable here rather than one at every
-    // call site.
-    // solhint-disable no-unused-vars
     function isTransactionAllowed(
         address sender,
         address contractL2,
-        uint256 mintValue,
-        uint256 l2Value,
+        uint256,
+        uint256,
         bytes calldata l2Calldata,
-        address refundRecipient
+        address
     ) external view returns (bool) {
-        // solhint-enable no-unused-vars
         if (sender == L1_ASSET_ROUTER) {
             bytes4 l2TxSelector = bytes4(l2Calldata[:4]);
 

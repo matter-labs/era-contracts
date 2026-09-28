@@ -67,6 +67,7 @@ import {
     ZeroChainId
 } from "contracts/common/L1ContractErrors.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 contract ExperimentalBridgeTest is Test {
     using stdStorage for StdStorage;
@@ -591,7 +592,7 @@ contract ExperimentalBridgeTest is Test {
 
         vm.expectRevert("Pausable: paused");
         vm.prank(deployerAddress);
-        bridgehub.createNewChain({
+        IL1Bridgehub(address(bridgehub)).createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -606,7 +607,7 @@ contract ExperimentalBridgeTest is Test {
 
         vm.expectRevert(CTMNotRegistered.selector);
         vm.prank(deployerAddress);
-        bridgehub.createNewChain({
+        IL1Bridgehub(address(bridgehub)).createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -635,7 +636,7 @@ contract ExperimentalBridgeTest is Test {
         chainId = bound(chainId, 1, type(uint48).max);
         vm.expectRevert(CTMNotRegistered.selector);
         vm.prank(deployerAddress);
-        bridgehub.createNewChain({
+        IL1Bridgehub(address(bridgehub)).createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -664,7 +665,7 @@ contract ExperimentalBridgeTest is Test {
         chainId = bound(chainId, type(uint48).max + uint256(1), type(uint256).max);
         vm.expectRevert(ChainIdTooBig.selector);
         vm.prank(deployerAddress);
-        bridgehub.createNewChain({
+        IL1Bridgehub(address(bridgehub)).createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -677,7 +678,7 @@ contract ExperimentalBridgeTest is Test {
         chainId = 0;
         vm.expectRevert(ZeroChainId.selector);
         vm.prank(deployerAddress);
-        bridgehub.createNewChain({
+        IL1Bridgehub(address(bridgehub)).createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -702,7 +703,7 @@ contract ExperimentalBridgeTest is Test {
         vm.chainId(MAINNET_CHAIN_ID);
         vm.expectRevert(ChainIdIsHardcoded.selector);
         vm.prank(deployerAddress);
-        bridgehub.createNewChain({
+        IL1Bridgehub(address(bridgehub)).createNewChain({
             _chainId: HARD_CODED_CHAIN_ID,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -727,7 +728,7 @@ contract ExperimentalBridgeTest is Test {
         vm.chainId(SEPOLIA_CHAIN_ID);
         vm.expectRevert(ChainIdIsHardcoded.selector);
         vm.prank(deployerAddress);
-        bridgehub.createNewChain({
+        IL1Bridgehub(address(bridgehub)).createNewChain({
             _chainId: HARD_CODED_CHAIN_ID,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -759,7 +760,7 @@ contract ExperimentalBridgeTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(AssetIdNotSupported.selector, tokenAssetId));
         vm.prank(deployerAddress);
-        bridgehub.createNewChain({
+        IL1Bridgehub(address(bridgehub)).createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -791,7 +792,7 @@ contract ExperimentalBridgeTest is Test {
 
         vm.expectRevert(SharedBridgeNotSet.selector);
         vm.prank(deployerAddress);
-        bridgehub.createNewChain({
+        IL1Bridgehub(address(bridgehub)).createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -819,7 +820,7 @@ contract ExperimentalBridgeTest is Test {
 
         vm.expectRevert(BridgeHubAlreadyRegistered.selector);
         vm.prank(deployerAddress);
-        bridgehub.createNewChain({
+        IL1Bridgehub(address(bridgehub)).createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -854,7 +855,7 @@ contract ExperimentalBridgeTest is Test {
 
         vm.prank(randomCaller);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomCaller));
-        bridgehub.createNewChain({
+        IL1Bridgehub(address(bridgehub)).createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -895,7 +896,7 @@ contract ExperimentalBridgeTest is Test {
         vm.expectEmit(true, true, true, true, address(bridgehub));
         emit NewChain(chainId, address(mockCTM), admin);
 
-        bridgehub.createNewChain({
+        IL1Bridgehub(address(bridgehub)).createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,

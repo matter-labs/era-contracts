@@ -528,7 +528,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, baseToken);
         mockDiamondInitInteropCenterCallsWithAddress(address(bridgehub), sharedBridge, baseTokenAssetId);
         vm.startPrank(governor);
-        bridgehub.createNewChain({
+        IL1Bridgehub(address(bridgehub)).createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(chainContractAddress),
             _baseTokenAssetId: baseTokenAssetId,

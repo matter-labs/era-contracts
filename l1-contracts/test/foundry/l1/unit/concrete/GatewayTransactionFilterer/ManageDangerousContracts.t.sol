@@ -10,6 +10,7 @@ import {
 } from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 import {ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {AlreadyDangerousContract, NotDangerousContract} from "contracts/common/L1ContractErrors.sol";
+import {ITransactionFilterer} from "contracts/state-transition/chain-interfaces/ITransactionFilterer.sol";
 
 contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
     event DangerousContractAdded(address indexed contractAddress);
@@ -117,7 +118,7 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
         vm.prank(owner);
         transactionFiltererProxy.addDangerousContract({contractAddress: dangerousAddr});
 
-        bool isAllowed = transactionFiltererProxy.isTransactionAllowed({
+        bool isAllowed = ITransactionFilterer(address(transactionFiltererProxy)).isTransactionAllowed({
             sender: randomUser,
             contractL2: dangerousAddr,
             mintValue: 0,
@@ -138,7 +139,7 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
         transactionFiltererProxy.grantWhitelist(randomUser);
         vm.stopPrank();
 
-        bool isAllowed = transactionFiltererProxy.isTransactionAllowed({
+        bool isAllowed = ITransactionFilterer(address(transactionFiltererProxy)).isTransactionAllowed({
             sender: randomUser,
             contractL2: dangerousAddr,
             mintValue: 0,
@@ -152,7 +153,7 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
 
     function test_isTransactionAllowed_blocksCreate2FactoryForNonWhitelisted() public view {
         // Deterministic Create2 factory is marked dangerous on initialization and is above MIN_ALLOWED_ADDRESS
-        bool isAllowed = transactionFiltererProxy.isTransactionAllowed({
+        bool isAllowed = ITransactionFilterer(address(transactionFiltererProxy)).isTransactionAllowed({
             sender: randomUser,
             contractL2: ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR,
             mintValue: 0,
@@ -168,7 +169,7 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
         vm.prank(owner);
         transactionFiltererProxy.grantWhitelist(randomUser);
 
-        bool isAllowed = transactionFiltererProxy.isTransactionAllowed({
+        bool isAllowed = ITransactionFilterer(address(transactionFiltererProxy)).isTransactionAllowed({
             sender: randomUser,
             contractL2: ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR,
             mintValue: 0,
@@ -184,7 +185,7 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
         // A high address that is NOT in dangerousContracts should still be freely accessible
         address highAddr = address(uint160(MIN_ALLOWED_ADDRESS) + 999);
 
-        bool isAllowed = transactionFiltererProxy.isTransactionAllowed({
+        bool isAllowed = ITransactionFilterer(address(transactionFiltererProxy)).isTransactionAllowed({
             sender: randomUser,
             contractL2: highAddr,
             mintValue: 0,
@@ -202,7 +203,7 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
         vm.prank(owner);
         transactionFiltererProxy.addDangerousContract({contractAddress: highDangerousAddr});
 
-        bool isAllowed = transactionFiltererProxy.isTransactionAllowed({
+        bool isAllowed = ITransactionFilterer(address(transactionFiltererProxy)).isTransactionAllowed({
             sender: randomUser,
             contractL2: highDangerousAddr,
             mintValue: 0,
@@ -225,7 +226,7 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
         transactionFiltererProxy.removeDangerousContract({contractAddress: highDangerousAddr});
         vm.stopPrank();
 
-        bool isAllowed = transactionFiltererProxy.isTransactionAllowed({
+        bool isAllowed = ITransactionFilterer(address(transactionFiltererProxy)).isTransactionAllowed({
             sender: randomUser,
             contractL2: highDangerousAddr,
             mintValue: 0,

@@ -4,7 +4,7 @@ import * as os from "os";
 import * as path from "path";
 
 // Checks solc's warnings for the foundry project in the cwd against its `solc-warnings.json`.
-// See AGENTS.md "solc warnings". Run with `--selftest` to exercise the policy logic.
+// See AGENTS.md "solc warnings". Run with `--selftest` to exercise the exception matching.
 
 const POLICY_FILE = "solc-warnings.json";
 // solc stops reporting after this many warnings and emits 4591 instead.
@@ -19,7 +19,6 @@ export interface PolicyException {
 
 export interface Policy {
   roots: string[];
-  allow: Record<string, number[]>;
   exceptions: PolicyException[];
 }
 
@@ -37,16 +36,6 @@ interface SolcDiagnostic {
   sourceLocation?: { file: string; start: number; end: number };
 }
 
-export function allowedCodes(policy: Policy, file: string): number[] {
-  let best: string | undefined;
-  for (const prefix of Object.keys(policy.allow)) {
-    if (file.startsWith(prefix) && (best === undefined || prefix.length > best.length)) {
-      best = prefix;
-    }
-  }
-  return best === undefined ? [] : policy.allow[best];
-}
-
 // solc reports byte offsets, which differ from string indices once a file has non-ASCII text.
 export function sourceFirstLine(content: Buffer, start: number, end: number): string {
   return content.subarray(start, end).toString("utf8").split("\n")[0].trim();
@@ -59,9 +48,6 @@ export function evaluate(
   const used = new Set<PolicyException>();
   const violations: SolcWarning[] = [];
   for (const w of warnings) {
-    if (allowedCodes(policy, w.file).includes(w.code)) {
-      continue;
-    }
     const exception = policy.exceptions.find((e) => e.file === w.file && e.code === w.code && e.source === w.source);
     if (exception) {
       used.add(exception);
@@ -186,14 +172,14 @@ function check(): number {
     console.error(`stale exception in ${POLICY_FILE}, no longer reported by solc: ${JSON.stringify(e)}`);
   }
   if (violations.length > 0 || stale.length > 0) {
-    console.error(`solc-warnings: ${violations.length} disallowed warning(s), ${stale.length} stale exception(s).`);
+    console.error(`solc-warnings: ${violations.length} new warning(s), ${stale.length} stale exception(s).`);
     return 1;
   }
-  console.log(`solc-warnings: all ${warnings.length} warnings are allowed by ${POLICY_FILE}.`);
+  console.log(`solc-warnings: ${warnings.length} warning(s), all listed in ${POLICY_FILE}.`);
   return 0;
 }
 
-// Policy tests. Run via `yarn solc-warnings:selftest`; wired into `lint:check`.
+// Exception-matching tests. Run via `yarn solc-warnings:selftest`; wired into `lint:check`.
 function selftest(): number {
   const failures: string[] = [];
   const expect = (name: string, actual: unknown, expected: unknown) => {
@@ -203,7 +189,6 @@ function selftest(): number {
   };
   const policy: Policy = {
     roots: [],
-    allow: { "test/": [3628], "test/strict/": [] },
     exceptions: [
       { file: "contracts/A.sol", code: 5667, source: "uint256 _salt," },
       { file: "contracts/B.sol", code: 5667, source: "uint256 _gone," },
@@ -211,20 +196,20 @@ function selftest(): number {
   };
   const warning = (file: string, code: number, source = "") => ({ code, file, source, formatted: `${file}:${code}` });
 
-  expect("prefix allows", allowedCodes(policy, "test/unit/X.t.sol"), [3628]);
-  expect("longest prefix wins", allowedCodes(policy, "test/strict/X.t.sol"), []);
-  expect("no prefix allows nothing", allowedCodes(policy, "contracts/C.sol"), []);
-
   const result = evaluate(policy, [
-    warning("test/unit/X.t.sol", 3628),
-    warning("test/strict/X.t.sol", 3628),
     warning("contracts/A.sol", 5667, "uint256 _salt,"),
     warning("contracts/A.sol", 5667, "uint256 _other,"),
+    warning("contracts/A.sol", 2072, "uint256 _salt,"),
+    warning("contracts/C.sol", 5667, "uint256 _salt,"),
   ]);
   expect(
     "violations",
-    result.violations.map((v) => v.formatted),
-    ["test/strict/X.t.sol:3628", "contracts/A.sol:5667"]
+    result.violations.map((v) => `${v.formatted}:${v.source}`),
+    [
+      "contracts/A.sol:5667:uint256 _other,",
+      "contracts/A.sol:2072:uint256 _salt,",
+      "contracts/C.sol:5667:uint256 _salt,",
+    ]
   );
   expect(
     "stale exceptions",

@@ -7,6 +7,7 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {InvalidSelector} from "contracts/common/L1ContractErrors.sol";
+import {ITransactionFilterer} from "contracts/state-transition/chain-interfaces/ITransactionFilterer.sol";
 
 contract CheckTransactionTest is GatewayTransactionFiltererTest {
     function test_TransactionAllowedOnlyFromWhitelistedSenderWhichIsNotAssetRouter() public {
@@ -20,7 +21,7 @@ contract CheckTransactionTest is GatewayTransactionFiltererTest {
             abi.encodeWithSelector(IBridgehubBase.ctmAssetIdToAddress.selector),
             abi.encode(address(0)) // Return any address
         );
-        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed({
+        bool isTxAllowed = ITransactionFilterer(address(transactionFiltererProxy)).isTransactionAllowed({
             sender: sender,
             contractL2: address(0),
             mintValue: 0,
@@ -32,7 +33,7 @@ contract CheckTransactionTest is GatewayTransactionFiltererTest {
         assertEq(isTxAllowed, false, "Transaction should not be allowed");
 
         transactionFiltererProxy.grantWhitelist(sender);
-        isTxAllowed = transactionFiltererProxy.isTransactionAllowed({
+        isTxAllowed = ITransactionFilterer(address(transactionFiltererProxy)).isTransactionAllowed({
             sender: sender,
             contractL2: address(0),
             mintValue: 0,
@@ -44,7 +45,7 @@ contract CheckTransactionTest is GatewayTransactionFiltererTest {
         assertEq(isTxAllowed, true, "Transaction should be allowed");
 
         transactionFiltererProxy.grantWhitelist(assetRouter);
-        isTxAllowed = transactionFiltererProxy.isTransactionAllowed({
+        isTxAllowed = ITransactionFilterer(address(transactionFiltererProxy)).isTransactionAllowed({
             sender: assetRouter,
             contractL2: address(0),
             mintValue: 0,
@@ -71,7 +72,7 @@ contract CheckTransactionTest is GatewayTransactionFiltererTest {
         );
 
         transactionFiltererProxy.grantWhitelist(assetRouter);
-        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed({
+        bool isTxAllowed = ITransactionFilterer(address(transactionFiltererProxy)).isTransactionAllowed({
             sender: assetRouter,
             contractL2: address(0),
             mintValue: 0,
@@ -94,7 +95,7 @@ contract CheckTransactionTest is GatewayTransactionFiltererTest {
         vm.expectRevert(
             abi.encodeWithSelector(InvalidSelector.selector, AssetRouterBase.setAssetHandlerAddressThisChain.selector)
         );
-        transactionFiltererProxy.isTransactionAllowed({
+        ITransactionFilterer(address(transactionFiltererProxy)).isTransactionAllowed({
             sender: assetRouter,
             contractL2: address(0),
             mintValue: 0,

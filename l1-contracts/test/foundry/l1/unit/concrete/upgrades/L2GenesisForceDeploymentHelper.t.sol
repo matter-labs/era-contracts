@@ -532,6 +532,8 @@ contract MockContract {
         return address(uint160(uint256(keccak256(abi.encodePacked(name)))));
     }
 
+    receive() external payable {}
+
     // Fallback to handle any other calls
     fallback() external payable {
         // Return success for any unmocked calls

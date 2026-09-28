@@ -43,7 +43,15 @@ contract ReenterGovernance {
         functionToCall = _functionToCall;
     }
 
+    receive() external payable {
+        _reenter();
+    }
+
     fallback() external payable {
+        _reenter();
+    }
+
+    function _reenter() internal {
         if (!alreadyReentered) {
             alreadyReentered = true;
             Call[] memory calls = new Call[](1);

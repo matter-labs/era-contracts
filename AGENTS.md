@@ -348,15 +348,13 @@ yarn l1 solc-warnings && yarn da solc-warnings
 prints, and a full `l1-contracts` build exceeds solc's cap of 256 reported warnings, so later ones are
 silently dropped. `yarn l1 solc-warnings` (`scripts/solc-warnings.ts`) is what CI enforces. It
 compiles every `.sol` under the project's `roots` without generating bytecode, which removes the
-code-size warnings (production sizes are checked by the `contract-size` CI job), and checks each
-warning against the project's `solc-warnings.json`:
+code-size warnings (production sizes are checked by the `contract-size` CI job). Every other warning
+fails the check unless the project's `solc-warnings.json` lists it under `exceptions`, keyed by file,
+code and the first line of the flagged source. The check prints the entry to paste for each new
+warning, and fails on exceptions solc no longer reports.
 
-- `allow` maps a path prefix to the codes allowed under it; the longest matching prefix wins.
-- `exceptions` accepts one warning, keyed by file, code and the first line of the flagged source.
-  The check prints the entry to paste for each disallowed warning, and fails on exceptions solc no
-  longer reports.
-
-Prefer fixing the warning over adding an exception.
+Fix the warning rather than adding an exception: an unused parameter an interface requires loses its
+name (`uint256,`), and a contract with a payable `fallback` gets a `receive` running the same logic.
 
 ### Pre-Push Checklist
 

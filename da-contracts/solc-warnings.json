@@ -1,1 +1,1 @@
-{ "roots": ["contracts", "test"], "allow": {}, "exceptions": [] }
+{ "roots": ["contracts", "test"], "exceptions": [] }
