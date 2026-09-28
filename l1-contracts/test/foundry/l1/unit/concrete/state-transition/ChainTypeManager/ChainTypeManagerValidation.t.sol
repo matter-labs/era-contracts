@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
@@ -25,7 +25,6 @@ import {
 import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {
-    ZeroAddress,
     GenesisBatchHashZero,
     GenesisBatchCommitmentIncorrect,
     GenesisUpgradeZero
@@ -34,7 +33,6 @@ import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymen
 
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 
-import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
@@ -65,12 +63,12 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
     address internal serverNotifier;
     bytes32 internal baseTokenAssetId;
     address internal newChainAdmin;
-    uint256 l1ChainId = 5;
-    uint256 chainId = 112;
+    uint256 internal l1ChainId = 5;
+    uint256 internal chainId = 112;
     address internal testnetVerifier;
     bytes internal forceDeploymentsData = hex"";
 
-    uint256 zkChainId = 9;
+    uint256 internal zkChainId = 9;
     uint256 internal constant MAX_NUMBER_OF_ZK_CHAINS = 10;
 
     Diamond.FacetCut[] internal facetCuts;

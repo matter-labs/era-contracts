@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import "./_Executor_Shared.t.sol";
+import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
 import {Utils} from "../Utils/Utils.sol";
 import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";

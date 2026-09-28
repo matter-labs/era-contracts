@@ -56,14 +56,14 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
             bytes memory executeData
         ) = _encodeSettleData(commitInfo, priorityOps);
 
-        permissionlessValidator.settleBatchesSharedBridge(
-            address(executor),
-            txFrom,
-            txTo,
-            commitData,
-            proveData,
-            executeData
-        );
+        permissionlessValidator.settleBatchesSharedBridge({
+            _chainAddress: address(executor),
+            _processBatchFrom: txFrom,
+            _processBatchTo: txTo,
+            _commitData: commitData,
+            _proveData: proveData,
+            _executeData: executeData
+        });
 
         assertEq(getters.getTotalBatchesCommitted(), 1);
         assertEq(getters.getTotalBatchesVerified(), 1);
@@ -146,7 +146,7 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
     /// @dev Replicates the stored batch info that _commitOneBatch produces for the given commit info.
     function _buildStoredBatchInfoZKsyncOS(
         CommitBatchInfoZKsyncOS memory commitInfo
-    ) internal view returns (IExecutor.StoredBatchInfo memory) {
+    ) internal pure returns (IExecutor.StoredBatchInfo memory) {
         return
             IExecutor.StoredBatchInfo({
                 batchNumber: commitInfo.batchNumber,

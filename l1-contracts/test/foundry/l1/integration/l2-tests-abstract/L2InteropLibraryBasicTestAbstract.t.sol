@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.20;
-// solhint-disable gas-custom-errors
 
 import {Vm} from "forge-std/Vm.sol";
-import {Test} from "forge-std/Test.sol";
-import "forge-std/console.sol";
 
 import {BundleExecutionResult, L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
@@ -24,15 +21,15 @@ abstract contract L2InteropLibraryBasicTestAbstract is L2InteropTestUtils {
         vm.deal(address(this), 1000 ether);
         vm.recordLogs();
 
-        InteropLibrary.sendToken(
-            destinationChainId,
-            l2TokenAddress,
-            100,
-            address(this),
-            UNBUNDLER_ADDRESS,
-            false,
-            bytes32(0)
-        );
+        InteropLibrary.sendToken({
+            destinationChainId: destinationChainId,
+            l2TokenAddress: l2TokenAddress,
+            amount: 100,
+            recipient: address(this),
+            unbundlerAddress: UNBUNDLER_ADDRESS,
+            useFixedFee: false,
+            salt: bytes32(0)
+        });
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         // Verify bundle was emitted
@@ -51,20 +48,19 @@ abstract contract L2InteropLibraryBasicTestAbstract is L2InteropTestUtils {
     }
 
     function test_requestSendCallViaLibrary() public {
-        address l2TokenAddress = initializeTokenByDeposit();
-        bytes32 l2TokenAssetId = l2NativeTokenVault.assetId(l2TokenAddress);
+        initializeTokenByDeposit();
         vm.deal(address(this), 1000 ether);
 
         vm.recordLogs();
 
-        bytes32 expectedSendId = InteropLibrary.sendDirectCall(
-            destinationChainId,
-            interopTargetContract,
-            abi.encodeWithSignature("simpleCall()"),
-            EXECUTION_ADDRESS,
-            UNBUNDLER_ADDRESS,
-            bytes32(0)
-        );
+        bytes32 expectedSendId = InteropLibrary.sendDirectCall({
+            destination: destinationChainId,
+            target: interopTargetContract,
+            data: abi.encodeWithSignature("simpleCall()"),
+            executionAddress: EXECUTION_ADDRESS,
+            unbundlerAddress: UNBUNDLER_ADDRESS,
+            salt: bytes32(0)
+        });
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         // Verify bundle was emitted

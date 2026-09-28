@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 
 import {SystemContractProxy} from "contracts/l2-upgrades/SystemContractProxy.sol";
 import {ISystemContractProxy} from "contracts/l2-upgrades/ISystemContractProxy.sol";

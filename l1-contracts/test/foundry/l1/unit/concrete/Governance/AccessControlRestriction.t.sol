@@ -3,8 +3,7 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import "@openzeppelin/contracts-v4/utils/Strings.sol";
-import "forge-std/console.sol";
+import {Strings} from "@openzeppelin/contracts-v4/utils/Strings.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
@@ -16,8 +15,8 @@ import {Call} from "contracts/governance/Common.sol";
 contract AccessRestrictionTest is Test {
     AccessControlRestriction internal restriction;
     ChainAdmin internal chainAdmin;
-    address owner;
-    address randomCaller;
+    address internal owner;
+    address internal randomCaller;
     bytes32 public constant DEFAULT_ADMIN_ROLE = 0x00;
 
     function getChainAdminSelectors() public pure returns (bytes4[] memory) {

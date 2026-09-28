@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
-contract setNewVersionUpgradeTest is ChainTypeManagerTest {
+contract SetNewVersionUpgradeTest is ChainTypeManagerTest {
     function setUp() public {
         deploy();
     }

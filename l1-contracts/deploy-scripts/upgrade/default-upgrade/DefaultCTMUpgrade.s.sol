@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// solhint-disable no-console, gas-custom-errors
-
 import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {stdToml} from "forge-std/StdToml.sol";
@@ -31,13 +29,10 @@ import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.so
 import {CTMDeployedAddresses} from "../../ctm/DeployCTMUtils.s.sol";
 
 import {BytecodePublisher, PublishFactoryDepsResult} from "../../utils/bytecode/BytecodePublisher.s.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {CoreContract} from "../../ecosystem/CoreContract.sol";
 import {CoreOnGatewayHelper} from "../../ecosystem/CoreOnGatewayHelper.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
-import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
 
@@ -61,13 +56,11 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
 
     uint256 internal constant ZKSYNC_OS_TEST_CREATE_CHAIN_ID = 556;
 
-    // solhint-disable-next-line gas-struct-packing
     struct UpgradeDeployedAddresses {
         address upgradeTimer;
         address upgradeStageValidator;
     }
 
-    // solhint-disable-next-line gas-struct-packing
     struct AdditionalConfig {
         address ctm;
         uint256 oldProtocolVersion;
@@ -77,12 +70,10 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         bool usePreV32IntrospectionOverride;
     }
 
-    // solhint-disable-next-line gas-struct-packing
     struct GatewayConfig {
         uint256 chainId;
     }
 
-    // solhint-disable-next-line gas-struct-packing
     struct NewlyGeneratedData {
         bytes diamondCutData;
         bytes upgradeCutData;
@@ -146,16 +137,16 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     ) public virtual {
         string memory root = vm.projectRoot();
         newConfigPath = string.concat(root, newConfigPath);
-        initializeConfigFromArgs(
-            ctmProxy,
-            bytecodesSupplier,
-            rollupDAManager,
-            create2FactorySalt,
-            newConfigPath,
-            governance,
-            zkTokenAssetId,
-            testnetVerifier
-        );
+        initializeConfigFromArgs({
+            ctmProxy: ctmProxy,
+            bytecodesSupplier: bytecodesSupplier,
+            rollupDAManager: rollupDAManager,
+            create2FactorySalt: create2FactorySalt,
+            newConfigPath: newConfigPath,
+            governance: governance,
+            zkTokenAssetId: zkTokenAssetId,
+            testnetVerifier: testnetVerifier
+        });
 
         console.log("Initialized config from %s", newConfigPath);
         upgradeConfig.outputPath = string.concat(root, _outputPath);
@@ -273,17 +264,17 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     ///         upgrade-prepare-all`, once per CTM proxy. Drives the whole CTM-side prepare phase
     ///         (deploy + bytecode publish + upgrade-cut generation + call serialization).
     function noGovernancePrepare(CTMUpgradeParams memory _params) public virtual {
-        initializeWithArgs(
-            _params.ctmProxy,
-            _params.bytecodesSupplier,
-            _params.rollupDAManager,
-            _params.create2FactorySalt,
-            _params.upgradeInputPath,
-            _params.outputPath,
-            _params.governance,
-            _params.zkTokenAssetId,
-            _params.testnetVerifier
-        );
+        initializeWithArgs({
+            ctmProxy: _params.ctmProxy,
+            bytecodesSupplier: _params.bytecodesSupplier,
+            rollupDAManager: _params.rollupDAManager,
+            create2FactorySalt: _params.create2FactorySalt,
+            newConfigPath: _params.upgradeInputPath,
+            _outputPath: _params.outputPath,
+            governance: _params.governance,
+            zkTokenAssetId: _params.zkTokenAssetId,
+            testnetVerifier: _params.testnetVerifier
+        });
         prepareCTMUpgrade();
         prepareDefaultGovernanceCalls();
         prepareDefaultCTMAdminCalls();
@@ -514,8 +505,9 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
 
     /////////////////////////// Blockchain interactions ////////////////////////////
 
-    bool skipFactoryDepsCheck = false;
+    bool internal skipFactoryDepsCheck = false;
 
+    // solhint-disable-next-line func-name-mixedcase
     function setSkipFactoryDepsCheck_TestOnly(bool _skipFactoryDepsCheck) public virtual {
         skipFactoryDepsCheck = _skipFactoryDepsCheck;
     }
@@ -899,6 +891,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     }
 
     /// @notice Tests that it is possible to upgrade a chain to the new version
+    // solhint-disable-next-line func-name-mixedcase
     function TESTONLY_prepareTestUpgradeChainCall() private returns (Call[] memory calls, address admin) {
         address chainDiamondProxyAddress = L1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).getZKChain(
             upToDateZkChain.chainId
@@ -928,6 +921,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         return ZKSYNC_OS_TEST_CREATE_CHAIN_ID;
     }
 
+    // solhint-disable-next-line func-name-mixedcase
     function TESTONLY_prepareCreateChainCall() private returns (Call[] memory calls, address admin) {
         admin = getBridgehubAdmin();
         calls = new Call[](1);
@@ -1102,12 +1096,14 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     }
 
     /// @dev Test-only: inject pre-computed upgrade cut data to avoid recomputing (memory optimization).
+    // solhint-disable-next-line func-name-mixedcase
     function setChainUpgradeDiamondCutData_TestOnly(bytes memory _data) public {
         newlyGeneratedData.upgradeCutData = _data;
         upgradeConfig.upgradeCutPrepared = true;
     }
 
     /// @dev Test-only: inject pre-computed fixed force deployments data.
+    // solhint-disable-next-line func-name-mixedcase
     function setFixedForceDeploymentsData_TestOnly(bytes memory _data) public {
         generatedData.forceDeploymentsData = _data;
         upgradeConfig.fixedForceDeploymentsDataGenerated = true;

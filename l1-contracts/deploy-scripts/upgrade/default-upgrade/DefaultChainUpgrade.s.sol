@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// solhint-disable no-console, gas-custom-errors
-
-import {Script, console2 as console} from "forge-std/Script.sol";
+import {Script} from "forge-std/Script.sol";
 import {Utils} from "../../utils/Utils.sol";
 
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
@@ -27,8 +25,8 @@ contract DefaultChainUpgrade is Script {
         address bridgehubProxyAddress;
     }
 
-    address currentChainAdmin;
-    ChainConfig config;
+    address internal currentChainAdmin;
+    ChainConfig internal config;
 
     function getChainConfig() public view returns (ChainConfig memory) {
         return config;
@@ -73,13 +71,13 @@ contract DefaultChainUpgrade is Script {
             );
         }
 
-        Utils.adminExecute(
-            IZKChain(config.chainDiamondProxyAddress).getAdmin(),
-            address(0),
-            config.chainDiamondProxyAddress,
-            callData,
-            0
-        );
+        Utils.adminExecute({
+            _admin: IZKChain(config.chainDiamondProxyAddress).getAdmin(),
+            _accessControlRestriction: address(0),
+            _target: config.chainDiamondProxyAddress,
+            _data: callData,
+            _value: 0
+        });
     }
 
     function setUpgradeTimestamp(uint256 timestamp) public {

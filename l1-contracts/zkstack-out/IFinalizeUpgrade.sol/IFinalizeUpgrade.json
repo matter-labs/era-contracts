@@ -30,11 +30,6 @@
         "name": "tokens",
         "type": "address[]",
         "internalType": "address[]"
-      },
-      {
-        "name": "chains",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
       }
     ],
     "outputs": [],

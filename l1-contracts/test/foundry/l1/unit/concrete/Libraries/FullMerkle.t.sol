@@ -13,7 +13,7 @@ contract FullMerkleTest is Test {
 
     FullMerkle.FullTree internal tree;
 
-    bytes32 constant ZERO = bytes32(0);
+    bytes32 internal constant ZERO = bytes32(0);
 
     // ============ setup Tests ============
 

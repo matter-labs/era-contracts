@@ -43,7 +43,7 @@ contract ApplyRefundRecipientAliasTest is AddressAliasHelperSharedTest {
 
     // ============ Fuzz Tests ============
 
-    function testFuzz_recipient_EOA(address recipient) public {
+    function testFuzz_recipient_EOA(address recipient) public view {
         vm.assume(recipient.code.length == 0);
 
         address actualRecipient = addressAliasHelper.applyRefundRecipientAlias(recipient, false);
@@ -52,7 +52,7 @@ contract ApplyRefundRecipientAliasTest is AddressAliasHelperSharedTest {
         assertEq(actualRecipient, recipient);
     }
 
-    function testFuzz_recipient_7702Account(address recipient) public {
+    function testFuzz_recipient_7702Account(address recipient) public view {
         address actualRecipient = addressAliasHelper.applyRefundRecipientAlias(recipient, true);
 
         // 7702 account recipients should not be aliased

@@ -9,16 +9,16 @@ contract ReenterGovernance {
     // add this to be excluded from coverage report
     function test() internal virtual {}
 
-    IGovernance governance;
+    IGovernance internal governance;
 
     // Store call, predecessor and salt separately,
     // because Operation struct can't be stored on storage.
-    Call call;
-    bytes32 predecessor;
-    bytes32 salt;
+    Call internal call;
+    bytes32 internal predecessor;
+    bytes32 internal salt;
 
     // Save one value to determine whether reentrancy already happen.
-    bool alreadyReentered;
+    bool internal alreadyReentered;
 
     enum FunctionToCall {
         Unset,
@@ -27,7 +27,7 @@ contract ReenterGovernance {
         Cancel
     }
 
-    FunctionToCall functionToCall;
+    FunctionToCall internal functionToCall;
 
     function initialize(
         IGovernance _governance,
@@ -43,7 +43,15 @@ contract ReenterGovernance {
         functionToCall = _functionToCall;
     }
 
+    receive() external payable {
+        _reenter();
+    }
+
     fallback() external payable {
+        _reenter();
+    }
+
+    function _reenter() internal {
         if (!alreadyReentered) {
             alreadyReentered = true;
             Call[] memory calls = new Call[](1);

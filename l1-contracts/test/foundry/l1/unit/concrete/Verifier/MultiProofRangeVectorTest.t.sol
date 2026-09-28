@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {ProofSystem, DisabledProofSystems, PUBLIC_INPUT_SHIFT} from "contracts/common/Config.sol";
 
-import "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IZiskSnarkPlonkVerifier} from "contracts/state-transition/chain-interfaces/IZiskSnarkPlonkVerifier.sol";
 import {ZiskVerifier} from "contracts/state-transition/verifiers/ZiskVerifier.sol";
@@ -23,20 +23,20 @@ contract MockPassVerifier is IVerifier {
 }
 
 /// @dev Stand-in for the snarkJS Plonk verifier that accepts iff the single
-///      public signal it is handed equals `expectedSignal`. It lets the tests
+///      public signal it is handed equals `EXPECTED_SIGNAL`. It lets the tests
 ///      assert the EXACT signal the on-chain reconstruction produces (the
 ///      digest formula, the sha256 preimage byte order and the field
 ///      reduction), and name a near-miss signal a real proof could never
 ///      carry. A wrong reconstruction hands a wrong signal and is rejected.
 contract ExpectSignalPlonkVerifier is IZiskSnarkPlonkVerifier {
-    uint256 public immutable expectedSignal;
+    uint256 public immutable EXPECTED_SIGNAL;
 
     constructor(uint256 _expectedSignal) {
-        expectedSignal = _expectedSignal;
+        EXPECTED_SIGNAL = _expectedSignal;
     }
 
     function verifyProof(uint256[24] calldata, uint256[1] calldata _pubSignals) external view returns (bool) {
-        return _pubSignals[0] == expectedSignal;
+        return _pubSignals[0] == EXPECTED_SIGNAL;
     }
 }
 

@@ -3,18 +3,13 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {
-    PriorityTree,
-    PriorityOpsBatchInfo,
-    ZERO_LEAF_HASH
-} from "contracts/state-transition/libraries/PriorityTree.sol";
+import {PriorityTree} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {PriorityTreeCommitment} from "contracts/common/Config.sol";
 import {
     InvalidCommitment,
     InvalidNextLeafIndex,
     InvalidStartIndex,
-    InvalidUnprocessedIndex,
-    NotHistoricalRoot
+    InvalidUnprocessedIndex
 } from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 /// @notice Unit tests for PriorityTree library

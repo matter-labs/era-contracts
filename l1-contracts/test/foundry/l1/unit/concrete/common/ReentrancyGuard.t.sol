@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {ReentrancyGuard} from "contracts/common/ReentrancyGuard.sol";
-import {NotInitializedReentrancyGuard, Reentrancy, SlotOccupied} from "contracts/common/L1ContractErrors.sol";
+import {NotInitializedReentrancyGuard, SlotOccupied} from "contracts/common/L1ContractErrors.sol";
 
 /// @notice Test contract that uses ReentrancyGuard
 contract ReentrancyGuardMock is ReentrancyGuard {

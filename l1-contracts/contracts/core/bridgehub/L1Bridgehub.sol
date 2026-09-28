@@ -104,7 +104,6 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     /// @param _chainId the chainId of the chain
     /// @param _chainTypeManager the state transition manager address
     /// @param _baseTokenAssetId the base token asset id of the chain
-    /// @param _salt the salt for the chainId, currently not used
     /// @param _admin the admin of the chain
     /// @param _initData the fixed initialization data for the chain
     /// @param _factoryDeps the factory dependencies for the chain's deployment
@@ -112,10 +111,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         uint256 _chainId,
         address _chainTypeManager,
         bytes32 _baseTokenAssetId,
-        // The parameter is intentionally kept named: it is part of the published ABI and is used
-        // by Solidity callers with named arguments. This keeps solc's unused-parameter warning.
-        // solhint-disable-next-line no-unused-vars
-        uint256 _salt,
+        uint256,
         address _admin,
         bytes calldata _initData,
         bytes[] calldata _factoryDeps

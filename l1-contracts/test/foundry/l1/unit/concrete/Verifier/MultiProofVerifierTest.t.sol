@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {ProofSystem, DisabledProofSystems} from "contracts/common/Config.sol";
 
-import "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
 import {MultiProofTestnetVerifier} from "contracts/state-transition/verifiers/MultiProofTestnetVerifier.sol";
@@ -47,14 +47,14 @@ contract MockFailVerifier is IVerifier {
 ///      single-element public-inputs array. Used to assert the Airbender side
 ///      receives the previous_hash-seeded chain.
 contract MockExpectArgsVerifier is IVerifier {
-    uint256 public immutable expectedArg;
+    uint256 public immutable EXPECTED_ARG;
 
     constructor(uint256 _expectedArg) {
-        expectedArg = _expectedArg;
+        EXPECTED_ARG = _expectedArg;
     }
 
     function verify(uint256[] calldata _publicInputs, uint256[] calldata) external view returns (bool) {
-        return _publicInputs.length == 1 && _publicInputs[0] == expectedArg;
+        return _publicInputs.length == 1 && _publicInputs[0] == EXPECTED_ARG;
     }
     function verificationKeyHash() external pure returns (bytes32) {
         return bytes32(uint256(4));
@@ -66,14 +66,14 @@ contract MockExpectArgsVerifier is IVerifier {
 ///      SNARK proof — i.e. exactly what the reconstructing range verifier
 ///      needs to rebuild the ZiSK public values itself.
 contract MockExpectPublicInputsVerifier is IVerifier {
-    bytes32 public immutable expectedPisHash;
+    bytes32 public immutable EXPECTED_PIS_HASH;
 
     constructor(uint256[] memory _pis) {
-        expectedPisHash = keccak256(abi.encode(_pis));
+        EXPECTED_PIS_HASH = keccak256(abi.encode(_pis));
     }
 
     function verify(uint256[] calldata _publicInputs, uint256[] calldata) external view returns (bool) {
-        return keccak256(abi.encode(_publicInputs)) == expectedPisHash;
+        return keccak256(abi.encode(_publicInputs)) == EXPECTED_PIS_HASH;
     }
 
     function verificationKeyHash() external pure returns (bytes32) {
@@ -82,14 +82,14 @@ contract MockExpectPublicInputsVerifier is IVerifier {
 }
 
 contract MockExpectZiskCallVerifier is IVerifier {
-    bytes32 public immutable expectedPisHash;
+    bytes32 public immutable EXPECTED_PIS_HASH;
 
     constructor(uint256[] memory _pis) {
-        expectedPisHash = keccak256(abi.encode(_pis));
+        EXPECTED_PIS_HASH = keccak256(abi.encode(_pis));
     }
 
     function verify(uint256[] calldata _publicInputs, uint256[] calldata _proof) external view returns (bool) {
-        return _proof.length == 24 && keccak256(abi.encode(_publicInputs)) == expectedPisHash;
+        return _proof.length == 24 && keccak256(abi.encode(_publicInputs)) == EXPECTED_PIS_HASH;
     }
     function verificationKeyHash() external pure returns (bytes32) {
         return bytes32(uint256(5));
@@ -103,10 +103,10 @@ contract MockExpectZiskCallVerifier is IVerifier {
 ///         MultiProofRangeVectorTest and ZiskVerifierRealProofTest; here the
 ///         range verifier is mocked.
 contract MultiProofVerifierTest is Test {
-    MultiProofVerifier verifier;
-    MultiProofTestnetVerifier testnetVerifier;
-    MockPassVerifier passVerifier;
-    MockFailVerifier failVerifier;
+    MultiProofVerifier internal verifier;
+    MultiProofTestnetVerifier internal testnetVerifier;
+    MockPassVerifier internal passVerifier;
+    MockFailVerifier internal failVerifier;
 
     /// @dev The verifier reads the requirement from its caller, which in
     ///      production is the chain's diamond. The test contract calls it

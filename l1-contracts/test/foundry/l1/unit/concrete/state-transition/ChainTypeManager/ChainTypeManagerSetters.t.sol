@@ -6,7 +6,7 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {AddressHasNoCode, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {AddressHasNoCode, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {MAX_ALLOWED_MINOR_VERSION_DELTA} from "contracts/common/Config.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {NotAVerifierOnlyUpgrade} from "contracts/state-transition/L1StateTransitionErrors.sol";
