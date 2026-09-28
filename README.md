@@ -11,7 +11,10 @@ This repository contains both L1 and L2 ZKsync smart contracts.
 
 ## Documentation
 
-Documentation for these contracts is maintained in the [zksync-era repository](https://github.com/matter-labs/zksync-era/blob/main/docs/src/specs/contracts).
+Documentation for these contracts lives in [`protocol-docs/`](protocol-docs/README.md): the
+[system architecture](protocol-docs/system/README.md), and the guides for
+[deploying](protocol-docs/ecosystem-deployment.md) and [upgrading](protocol-docs/ecosystem-upgrade.md)
+an ecosystem.
 
 ## Disclaimer
 
