@@ -4,7 +4,7 @@
     {
       "file": "contracts/common/libraries/TransientPrimitives/TransientPrimitives.sol",
       "code": 2394,
-      "source": "tstore"
+      "source": "tstore(slot, value)"
     },
     {
       "file": "contracts/l2-system/zksync-os/L1Messenger.sol",
