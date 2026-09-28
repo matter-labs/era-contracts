@@ -6,7 +6,7 @@ import {AssetRouterProperties} from "../properties/AssetRouterProperties.sol";
 import {UserActorHandler} from "../handlers/UserActorHandler.sol";
 import {L1AssetRouterActorHandler} from "../handlers/L1AssetRouterActorHandler.sol";
 
-abstract contract AssetRouter_ActorHandler_Deployer is AssetRouterProperties {
+abstract contract AssetRouterActorHandlerDeployer is AssetRouterProperties {
     function deployActorHandlers() internal {
         userActorHandlers.push(new UserActorHandler());
         l1AssetRouterActorHandler = new L1AssetRouterActorHandler(userActorHandlers);

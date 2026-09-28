@@ -17,7 +17,6 @@ import {L2DACommitmentScheme} from "../../common/Config.sol";
 /// @param l2LogsTreeRoot Root hash of tree that contains L2 -> L1 messages from this batch
 /// @param daCommitmentScheme commitment scheme used to generate pubdata commitment for this batch
 /// @param daCommitment commitment to the batch pubdata to validate DA in the l1 da validator
-// solhint-disable-next-line gas-struct-packing
 struct CommitBatchInfoZKsyncOS {
     uint64 batchNumber;
     bytes32 newStateCommitment;

@@ -2,7 +2,6 @@
 pragma solidity ^0.8.21;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
-import {Vm} from "forge-std/Vm.sol";
 
 import {
     IAdminFunctions,
@@ -34,10 +33,9 @@ import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayT
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
-import {BridgehubBurnCTMAssetData, IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {BridgehubBurnCTMAssetData} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {InteropLibrary} from "./InteropLibrary.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2DACommitmentScheme, PubdataContent} from "contracts/common/Config.sol";
@@ -178,6 +176,7 @@ contract AdminFunctions is Script, IAdminFunctions {
     /// `forge script --broadcast` the impersonated sender would still have 0 ETH
     /// on chain and gas estimation would fail. `vm.rpc` propagates to the fork.
     function _anvilFund(address _addr) private {
+        // solhint-disable-next-line quotes
         string memory params = string.concat('["', vm.toString(_addr), '","0x56BC75E2D63100000"]');
         vm.rpc("anvil_setBalance", params);
     }
@@ -556,13 +555,16 @@ contract AdminFunctions is Script, IAdminFunctions {
         uint256 oldProtocolVersion = IZKChain(_chainDiamondProxy).getProtocolVersion();
         Diamond.DiamondCutData memory upgradeCutData = abi.decode(_diamondCut, (Diamond.DiamondCutData));
 
-        Utils.adminExecute(
-            _adminAddr,
-            _accessControlRestriction,
-            _chainDiamondProxy,
-            abi.encodeCall(IAdmin.upgradeChainFromVersion, (_chainDiamondProxy, oldProtocolVersion, upgradeCutData)),
-            0
-        );
+        Utils.adminExecute({
+            _admin: _adminAddr,
+            _accessControlRestriction: _accessControlRestriction,
+            _target: _chainDiamondProxy,
+            _data: abi.encodeCall(
+                IAdmin.upgradeChainFromVersion,
+                (_chainDiamondProxy, oldProtocolVersion, upgradeCutData)
+            ),
+            _value: 0
+        });
     }
 
     /// @notice Upgrade a chain by reading the diamond cut directly from the CTM, together with the
@@ -693,7 +695,13 @@ contract AdminFunctions is Script, IAdminFunctions {
             data = abi.encodeCall(ValidatorTimelock.removeValidatorForChainId, (_chainId, _validatorAddress));
         }
 
-        Utils.adminExecute(_adminAddr, _accessControlRestriction, _validatorTimelock, data, 0);
+        Utils.adminExecute({
+            _admin: _adminAddr,
+            _accessControlRestriction: _accessControlRestriction,
+            _target: _validatorTimelock,
+            _data: data,
+            _value: 0
+        });
     }
 
     /// @notice Adds L2WrappedBaseToken of a chain to the store.
@@ -779,21 +787,21 @@ contract AdminFunctions is Script, IAdminFunctions {
         ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(data.bridgehub, data.chainId);
         Diamond.DiamondCutData memory upgradeCutData = abi.decode(data.upgradeCutData, (Diamond.DiamondCutData));
 
-        Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
-            data.l1GasPrice,
-            abi.encodeCall(
+        Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction({
+            gasPrice: data.l1GasPrice,
+            l2Calldata: abi.encodeCall(
                 IAdmin.upgradeChainFromVersion,
                 (data.chainDiamondProxyOnGateway, data.oldProtocolVersion, upgradeCutData)
             ),
-            Utils.MAX_PRIORITY_TX_GAS,
-            new bytes[](0),
-            data.chainDiamondProxyOnGateway,
-            0,
-            data.gatewayChainId,
-            data.bridgehub,
-            data.l1AssetRouterProxy,
-            data.refundRecipient
-        );
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: new bytes[](0),
+            dstAddress: data.chainDiamondProxyOnGateway,
+            l2Value: 0,
+            chainId: data.gatewayChainId,
+            bridgehubAddress: data.bridgehub,
+            l1SharedBridgeProxy: data.l1AssetRouterProxy,
+            refundRecipient: data.refundRecipient
+        });
 
         saveAndSendAdminTx(chainInfo.admin, calls, data.shouldSend);
     }
@@ -1051,17 +1059,17 @@ contract AdminFunctions is Script, IAdminFunctions {
             secondBridgeData = abi.encodePacked(NEW_ENCODING_VERSION, abi.encode(chainAssetId, bridgehubData));
         }
 
-        calls = Utils.prepareAdminL1L2TwoBridgesTransaction(
-            data.l1GasPrice,
-            Utils.MAX_PRIORITY_TX_GAS,
-            data.gatewayChainId,
-            data.bridgehub,
-            gatewayChainInfo.l1AssetRouterProxy,
-            gatewayChainInfo.l1AssetRouterProxy,
-            0,
-            secondBridgeData,
-            data.refundRecipient
-        );
+        calls = Utils.prepareAdminL1L2TwoBridgesTransaction({
+            l1GasPrice: data.l1GasPrice,
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            chainId: data.gatewayChainId,
+            bridgehubAddress: data.bridgehub,
+            l1SharedBridgeProxy: gatewayChainInfo.l1AssetRouterProxy,
+            secondBridgeAddress: gatewayChainInfo.l1AssetRouterProxy,
+            secondBridgeValue: 0,
+            secondBridgeCalldata: secondBridgeData,
+            refundRecipient: data.refundRecipient
+        });
 
         saveAndSendAdminTx(l2ChainInfo.admin, calls, data._shouldSend);
     }
@@ -1142,18 +1150,18 @@ contract AdminFunctions is Script, IAdminFunctions {
             IAdmin.setDAValidatorPair,
             (data.l1DAValidator, data.l2DACommitmentScheme)
         );
-        Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
-            data.l1GasPrice,
-            callData,
-            Utils.MAX_PRIORITY_TX_GAS,
-            new bytes[](0),
-            data.chainDiamondProxyOnGateway,
-            0,
-            data.gatewayChainId,
-            data.bridgehub,
-            l2ChainInfo.l1AssetRouterProxy,
-            data.refundRecipient
-        );
+        Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction({
+            gasPrice: data.l1GasPrice,
+            l2Calldata: callData,
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: new bytes[](0),
+            dstAddress: data.chainDiamondProxyOnGateway,
+            l2Value: 0,
+            chainId: data.gatewayChainId,
+            bridgehubAddress: data.bridgehub,
+            l1SharedBridgeProxy: l2ChainInfo.l1AssetRouterProxy,
+            refundRecipient: data.refundRecipient
+        });
 
         saveAndSendAdminTx(l2ChainInfo.admin, calls, data._shouldSend);
     }
@@ -1206,18 +1214,18 @@ contract AdminFunctions is Script, IAdminFunctions {
             ValidatorTimelock.addValidatorForChainId,
             (data.l2ChainId, data.validatorAddress)
         );
-        Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
-            data.l1GasPrice,
-            callData,
-            Utils.MAX_PRIORITY_TX_GAS,
-            new bytes[](0),
-            data.gatewayValidatorTimelock,
-            0,
-            data.gatewayChainId,
-            data.bridgehub,
-            l2ChainInfo.l1AssetRouterProxy,
-            data.refundRecipient
-        );
+        Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction({
+            gasPrice: data.l1GasPrice,
+            l2Calldata: callData,
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: new bytes[](0),
+            dstAddress: data.gatewayValidatorTimelock,
+            l2Value: 0,
+            chainId: data.gatewayChainId,
+            bridgehubAddress: data.bridgehub,
+            l1SharedBridgeProxy: l2ChainInfo.l1AssetRouterProxy,
+            refundRecipient: data.refundRecipient
+        });
 
         saveAndSendAdminTx(l2ChainInfo.admin, calls, data._shouldSend);
     }
@@ -1313,18 +1321,18 @@ contract AdminFunctions is Script, IAdminFunctions {
             );
         }
 
-        Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
-            data.l1GasPrice,
-            l2Calldata,
-            Utils.MAX_PRIORITY_TX_GAS,
-            new bytes[](0),
-            L2_INTEROP_CENTER_ADDR,
-            0,
-            data.gatewayChainId,
-            data.bridgehub,
-            l2ChainInfo.l1AssetRouterProxy,
-            data.refundRecipient
-        );
+        Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction({
+            gasPrice: data.l1GasPrice,
+            l2Calldata: l2Calldata,
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: new bytes[](0),
+            dstAddress: L2_INTEROP_CENTER_ADDR,
+            l2Value: 0,
+            chainId: data.gatewayChainId,
+            bridgehubAddress: data.bridgehub,
+            l1SharedBridgeProxy: l2ChainInfo.l1AssetRouterProxy,
+            refundRecipient: data.refundRecipient
+        });
 
         saveAndSendAdminTx(l2ChainInfo.admin, calls, data.shouldSend);
     }
@@ -1369,18 +1377,18 @@ contract AdminFunctions is Script, IAdminFunctions {
             params.bridgehub,
             params.chainId
         );
-        Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
-            params.l1GasPrice,
-            params.data,
-            Utils.MAX_PRIORITY_TX_GAS,
-            new bytes[](0),
-            params.to,
-            params.value,
-            params.chainId,
-            params.bridgehub,
-            l2ChainInfo.l1AssetRouterProxy,
-            params.refundRecipient
-        );
+        Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction({
+            gasPrice: params.l1GasPrice,
+            l2Calldata: params.data,
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: new bytes[](0),
+            dstAddress: params.to,
+            l2Value: params.value,
+            chainId: params.chainId,
+            bridgehubAddress: params.bridgehub,
+            l1SharedBridgeProxy: l2ChainInfo.l1AssetRouterProxy,
+            refundRecipient: params.refundRecipient
+        });
 
         saveAndSendAdminTx(l2ChainInfo.admin, calls, params._shouldSend);
     }

@@ -2,10 +2,6 @@
 
 pragma solidity ^0.8.20;
 
-// solhint-disable gas-custom-errors
-
-import "forge-std/console.sol";
-
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
@@ -71,10 +67,10 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
 
     UpgradeableBeacon internal beacon;
 
-    IL2AssetRouter l2AssetRouter = IL2AssetRouter(L2_ASSET_ROUTER_ADDR);
-    IL2Bridgehub l2Bridgehub = IL2Bridgehub(L2_BRIDGEHUB_ADDR);
-    InteropCenter l2InteropCenter = InteropCenter(L2_INTEROP_CENTER_ADDR);
-    IL2NativeTokenVault l2NativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+    IL2AssetRouter internal l2AssetRouter = IL2AssetRouter(L2_ASSET_ROUTER_ADDR);
+    IL2Bridgehub internal l2Bridgehub = IL2Bridgehub(L2_BRIDGEHUB_ADDR);
+    InteropCenter internal l2InteropCenter = InteropCenter(L2_INTEROP_CENTER_ADDR);
+    IL2NativeTokenVault internal l2NativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
     uint256 internal constant L1_CHAIN_ID = 10; // it cannot be 9, the default block.chainid
     uint256 internal ERA_CHAIN_ID = 270;
@@ -102,10 +98,10 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
 
     IChainTypeManager internal chainTypeManager;
 
-    address UNBUNDLER_ADDRESS;
-    address EXECUTION_ADDRESS;
-    address interopTargetContract;
-    uint256 originalChainId;
+    address internal UNBUNDLER_ADDRESS;
+    address internal EXECUTION_ADDRESS;
+    address internal interopTargetContract;
+    uint256 internal originalChainId;
 
     function setUp() public virtual {
         setUpInner(false);
@@ -154,7 +150,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
 
         coreAddresses.bridgehub.proxies.bridgehub = L2_BRIDGEHUB_ADDR;
 
-        L2WrappedBaseToken weth = deployL2Weth();
+        L2WrappedBaseToken l2WethToken = deployL2Weth();
         if (_skip) {
             vm.stopBroadcast();
         }
@@ -170,7 +166,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
                 contractsDeployedAlready: false,
                 l1CtmDeployer: l1CTMDeployer,
                 maxNumberOfZKChains: 100,
-                wethToken: address(weth)
+                wethToken: address(l2WethToken)
             })
         );
         if (!_skip) {
@@ -235,7 +231,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         );
     }
 
-    function getExampleChainCommitment() internal returns (bytes memory) {
+    function getExampleChainCommitment() internal {
         address chainAdmin = makeAddr("chainAdmin");
 
         vm.mockCall(
@@ -384,7 +380,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
     function getInclusionProof(
         address messageSender,
         uint256 _chainId
-    ) public view returns (MessageInclusionProof memory) {
+    ) public pure returns (MessageInclusionProof memory) {
         bytes32[] memory proof = new bytes32[](27);
         proof[0] = bytes32(0x010f050000000000000000000000000000000000000000000000000000000000);
         proof[1] = bytes32(0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba);

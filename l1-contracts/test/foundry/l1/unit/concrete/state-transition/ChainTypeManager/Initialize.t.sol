@@ -40,7 +40,7 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
         ChainTypeManager ctm = new ChainTypeManager(address(bridgehub), interopCenterAddress, address(0), address(0));
 
         vm.expectRevert(err);
-        TransparentUpgradeableProxy transparentUpgradeableProxy = new TransparentUpgradeableProxy(
+        new TransparentUpgradeableProxy(
             address(ctm),
             admin,
             abi.encodeCall(IChainTypeManager.initialize, ctmInitializeData)

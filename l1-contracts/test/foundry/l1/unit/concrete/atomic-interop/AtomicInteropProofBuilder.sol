@@ -295,16 +295,16 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
                 batchNumber: batchNumber,
                 chainImtRoot: imtEnd,
                 provesAgainstBeginRoot: false,
-                settlementProof: _realFirstPostGenesisBatchSettlementProof(
-                    _sourceChainId,
-                    batchNumber,
-                    ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX,
-                    imtBegin,
-                    imtEnd,
-                    _batchTs,
-                    previousChainRoot,
-                    slBlock
-                ),
+                settlementProof: _realFirstPostGenesisBatchSettlementProof({
+                    _sourceChainId: _sourceChainId,
+                    _batchNumber: batchNumber,
+                    _imtRootLeafIndex: ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX,
+                    _imtBegin: imtBegin,
+                    _imtEnd: imtEnd,
+                    _batchTs: _batchTs,
+                    _previousChainRoot: previousChainRoot,
+                    _slBlock: slBlock
+                }),
                 leaf: tree.leafAt(_leafIndex),
                 imtLeafIndex: _leafIndex,
                 imtProof: tree.merklePath(_leafIndex)
@@ -335,16 +335,16 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
                 batchNumber: batchNumber,
                 chainImtRoot: imtSnapshot,
                 provesAgainstBeginRoot: true,
-                settlementProof: _realFirstPostGenesisBatchSettlementProof(
-                    _sourceChainId,
-                    batchNumber,
-                    ChainBatchRootTree.IMT_BEGIN_ROOT_LEAF_INDEX,
-                    imtSnapshot,
-                    imtSnapshot,
-                    _batchTs,
-                    previousChainRoot,
-                    slBlock
-                ),
+                settlementProof: _realFirstPostGenesisBatchSettlementProof({
+                    _sourceChainId: _sourceChainId,
+                    _batchNumber: batchNumber,
+                    _imtRootLeafIndex: ChainBatchRootTree.IMT_BEGIN_ROOT_LEAF_INDEX,
+                    _imtBegin: imtSnapshot,
+                    _imtEnd: imtSnapshot,
+                    _batchTs: _batchTs,
+                    _previousChainRoot: previousChainRoot,
+                    _slBlock: slBlock
+                }),
                 leaf: tree.leafAt(lowIndex),
                 imtLeafIndex: lowIndex,
                 imtProof: tree.merklePath(lowIndex)
@@ -381,16 +381,16 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
                 batchNumber: batchNumber,
                 chainImtRoot: imtSnapshot,
                 provesAgainstBeginRoot: false,
-                settlementProof: _realFirstPostGenesisBatchSettlementProof(
-                    _sourceChainId,
-                    batchNumber,
-                    ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX,
-                    imtSnapshot,
-                    imtSnapshot,
-                    _batchTs,
-                    previousChainRoot,
-                    slBlock
-                ),
+                settlementProof: _realFirstPostGenesisBatchSettlementProof({
+                    _sourceChainId: _sourceChainId,
+                    _batchNumber: batchNumber,
+                    _imtRootLeafIndex: ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX,
+                    _imtBegin: imtSnapshot,
+                    _imtEnd: imtSnapshot,
+                    _batchTs: _batchTs,
+                    _previousChainRoot: previousChainRoot,
+                    _slBlock: slBlock
+                }),
                 leaf: tree.leafAt(lowIndex),
                 imtLeafIndex: lowIndex,
                 imtProof: tree.merklePath(lowIndex)

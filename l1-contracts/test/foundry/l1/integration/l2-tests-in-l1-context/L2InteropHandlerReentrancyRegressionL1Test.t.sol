@@ -2,10 +2,7 @@
 
 pragma solidity ^0.8.20;
 
-// solhint-disable gas-custom-errors
-
 import {Test} from "forge-std/Test.sol";
-import "forge-std/console.sol";
 
 import {SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {L2InteropHandlerReentrancyRegressionTestAbstract} from "../l2-tests-abstract/L2InteropHandlerReentrancyRegressionTestAbstract.t.sol";

@@ -21,7 +21,7 @@ import {
 contract BatchDecoderTest is Test {
     // ============ decodeAndCheckCommitData Tests ============
 
-    function test_decodeAndCheckCommitData_basicValues() public {
+    function test_decodeAndCheckCommitData_basicValues() public view {
         IExecutor.StoredBatchInfo memory lastBatch = _createStoredBatchInfo(10);
         CommitBatchInfoZKsyncOS[] memory newBatches = new CommitBatchInfoZKsyncOS[](2);
         newBatches[0] = _createCommitBatchInfoZKsyncOS(11);
@@ -41,7 +41,7 @@ contract BatchDecoderTest is Test {
         assertEq(decodedNewBatches[1].batchNumber, 12);
     }
 
-    function test_decodeAndCheckCommitData_singleBatch() public {
+    function test_decodeAndCheckCommitData_singleBatch() public view {
         IExecutor.StoredBatchInfo memory lastBatch = _createStoredBatchInfo(5);
         CommitBatchInfoZKsyncOS[] memory newBatches = new CommitBatchInfoZKsyncOS[](1);
         newBatches[0] = _createCommitBatchInfoZKsyncOS(6);
@@ -126,7 +126,7 @@ contract BatchDecoderTest is Test {
 
     // ============ decodeAndCheckProofData Tests ============
 
-    function test_decodeAndCheckProofData_basicValues() public {
+    function test_decodeAndCheckProofData_basicValues() public view {
         IExecutor.StoredBatchInfo memory prevBatch = _createStoredBatchInfo(10);
         IExecutor.StoredBatchInfo[] memory provedBatches = new IExecutor.StoredBatchInfo[](2);
         provedBatches[0] = _createStoredBatchInfo(11);
@@ -199,7 +199,7 @@ contract BatchDecoderTest is Test {
 
     // ============ decodeAndCheckExecuteData Tests ============
 
-    function test_decodeAndCheckExecuteData_basicValues() public {
+    function test_decodeAndCheckExecuteData_basicValues() public view {
         IExecutor.StoredBatchInfo[] memory executeBatches = new IExecutor.StoredBatchInfo[](2);
         executeBatches[0] = _createStoredBatchInfo(11);
         executeBatches[1] = _createStoredBatchInfo(12);

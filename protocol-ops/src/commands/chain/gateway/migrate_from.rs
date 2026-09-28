@@ -516,7 +516,6 @@ pub async fn run_phase2_finalize(args: Phase2FinalizeArgs) -> anyhow::Result<()>
     let script = runner
         .script_call(GatewayUtilsAbi::finishMigrateChainFromGatewayCall {
             bridgehubAddr: bridgehub,
-            migratingChainId: U256::from(chain_id),
             gatewayChainId: U256::from(gateway_chain_id),
             l2BatchNumber: U256::from(withdrawal.l2_batch_number),
             l2MessageIndex: U256::from(withdrawal.l2_message_index),

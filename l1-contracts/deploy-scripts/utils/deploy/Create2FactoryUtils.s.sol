@@ -195,6 +195,7 @@ abstract contract Create2FactoryUtils is Script {
                 deployedContractName
             );
         } else {
+            // solhint-disable-next-line func-named-parameters
             forgeMessage = string.concat(
                 "forge verify-contract ",
                 vm.toString(contractAddr),

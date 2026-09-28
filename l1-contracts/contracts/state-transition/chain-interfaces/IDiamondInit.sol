@@ -10,7 +10,6 @@ pragma solidity ^0.8.21;
 /// @param validatorTimelock address of the validator timelock that delays execution
 /// @param baseTokenAssetId asset id of the base token of the chain
 /// @param storedBatchZero hash of the initial genesis batch
-// solhint-disable-next-line gas-struct-packing
 struct InitializeData {
     uint256 chainId;
     address bridgehub;

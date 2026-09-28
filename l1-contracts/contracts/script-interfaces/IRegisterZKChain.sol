@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// solhint-disable-next-line gas-struct-packing
 struct RegisterZKChainConfig {
     address deployerAddress;
     address ownerAddress;

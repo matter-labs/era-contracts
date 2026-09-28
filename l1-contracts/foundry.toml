@@ -27,9 +27,9 @@ fs_permissions = [
     { access = "read", path = "../configs/genesis/" },
     { access = "read", path = "../configs/" },
 ]
-ignored_error_codes = ["missing-receive-ether", "code-size"]
-ignored_warnings_from = ["test", "contracts/dev-contracts"]
-suppressed_warnings = ["txorigin"]
+# Only filters what `forge build` prints; the enforced policy is `solc-warnings.json`.
+ignored_error_codes = ["missing-receive-ether", "code-size", "init-code-size"]
+ignored_warnings_from = []
 remappings = [
   "forge-std/=lib/forge-std/src/",
   "murky/=lib/murky/src/",

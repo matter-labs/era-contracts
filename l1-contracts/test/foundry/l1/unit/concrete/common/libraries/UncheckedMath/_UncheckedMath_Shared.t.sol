@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {UncheckedMathTest} from "contracts/dev-contracts/test/UncheckedMathTest.sol";
 
 contract UncheckedMathSharedTest is Test {
-    UncheckedMathTest uncheckedMath;
+    UncheckedMathTest internal uncheckedMath;
 
     function setUp() public {
         uncheckedMath = new UncheckedMathTest();

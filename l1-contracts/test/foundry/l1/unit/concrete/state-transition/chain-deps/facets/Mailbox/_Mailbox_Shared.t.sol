@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
-
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
@@ -23,15 +21,15 @@ contract MailboxTest is UtilsCallMockerTest {
     IMailbox internal mailboxFacet;
     UtilsFacet internal utilsFacet;
     IGetters internal gettersFacet;
-    address sender;
-    uint256 constant eraChainId = 9;
+    address internal sender;
+    uint256 internal constant ERA_CHAIN_ID = 9;
     address internal testnetVerifier = address(new ZKsyncOSTestnetVerifier(IVerifier(address(0))));
-    address diamondProxy;
-    address bridgehub;
-    address chainAssetHandler;
-    address interopCenter;
-    IEIP7702Checker eip7702Checker;
-    L1ChainAssetHandler realChainAssetHandler;
+    address internal diamondProxy;
+    address internal bridgehub;
+    address internal chainAssetHandler;
+    address internal interopCenter;
+    IEIP7702Checker internal eip7702Checker;
+    L1ChainAssetHandler internal realChainAssetHandler;
 
     function setupEcosystem() internal {
         sender = makeAddr("sender");
@@ -126,11 +124,11 @@ contract MailboxTest is UtilsCallMockerTest {
 
     function setupDiamondProxy() public {
         setupEcosystem();
-        address diamondProxy = deployDiamondProxy();
+        address proxy = deployDiamondProxy();
 
-        mailboxFacet = IMailbox(diamondProxy);
-        utilsFacet = UtilsFacet(diamondProxy);
-        gettersFacet = IGetters(diamondProxy);
+        mailboxFacet = IMailbox(proxy);
+        utilsFacet = UtilsFacet(proxy);
+        gettersFacet = IGetters(proxy);
 
         // utilsFacet.util_setBridgehub(bridgehub);
         // utilsFacet.util_setInteropCenter(interopCenter);

@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.20;
-// solhint-disable gas-custom-errors
 
 import {Vm} from "forge-std/Vm.sol";
-import {Test} from "forge-std/Test.sol";
-import "forge-std/console.sol";
 
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
@@ -18,7 +15,14 @@ abstract contract L2InteropNativeTokenSimpleTestAbstract is L2InteropTestUtils {
         vm.deal(address(this), 1000 ether);
         vm.recordLogs();
 
-        InteropLibrary.sendNative(destinationChainId, interopTargetContract, UNBUNDLER_ADDRESS, 100, false, bytes32(0));
+        InteropLibrary.sendNative({
+            destinationChainId: destinationChainId,
+            recipient: interopTargetContract,
+            unbundlerAddress: UNBUNDLER_ADDRESS,
+            amount: 100,
+            useFixedFee: false,
+            salt: bytes32(0)
+        });
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         // Verify bundle was emitted

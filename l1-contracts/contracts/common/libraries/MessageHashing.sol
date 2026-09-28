@@ -63,7 +63,6 @@ library MessageHashing {
 
     function getLeafHashFromLog(L2Log memory _log) internal pure returns (bytes32 hashedLog) {
         hashedLog = keccak256(
-            // solhint-disable-next-line func-named-parameters
             abi.encodePacked(_log.l2ShardId, _log.isService, _log.txNumberInBatch, _log.sender, _log.key, _log.value)
         );
     }

@@ -11,17 +11,14 @@ import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IZKChainBase} from "contracts/state-transition/chain-interfaces/IZKChainBase.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {IBaseTokenAssetHandler} from "contracts/bridge/interfaces/IBaseTokenAssetHandler.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
-import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {Utils} from "../utils/Utils.sol";
 import {
     L2_BRIDGEHUB_ADDR,
-    L2_ASSET_ROUTER_ADDR,
     L2_MESSAGE_ROOT_ADDR,
     L2_CHAIN_ASSET_HANDLER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -35,16 +32,13 @@ import {
     BridgehubContracts,
     ZkChainAddresses,
     StateTransitionDeployedAddresses,
-    StateTransitionContracts,
-    Verifiers,
-    Facets,
     BridgesDeployedAddresses,
     BridgeContracts,
     CTMDeployedAddresses,
     CTMAdminAddresses,
-    DataAvailabilityDeployedAddresses,
     L1SpecificStateTransitionAddresses
 } from "./Types.sol";
+import {StateTransitionContracts, Verifiers, Facets} from "contracts/common/StateTransitionTypes.sol";
 import {DeployCTML1OrGateway} from "../ctm/DeployCTML1OrGateway.sol";
 
 library AddressIntrospector {
