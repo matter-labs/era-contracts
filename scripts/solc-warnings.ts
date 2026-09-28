@@ -140,7 +140,7 @@ function collectWarnings(policy: Policy): SolcWarning[] {
   }
   const reported = diagnostics.filter((d) => d.severity !== "error");
   if (reported.length >= SOLC_WARNING_CAP || reported.some((d) => Number(d.errorCode) === SOLC_WARNING_CAP_CODE)) {
-    throw new Error(`solc hit its cap of ${SOLC_WARNING_CAP} reported warnings, so the list below it is incomplete`);
+    throw new Error(`solc hit its cap of ${SOLC_WARNING_CAP} reported warnings, so its list is incomplete`);
   }
 
   const contents = new Map<string, Buffer>();
@@ -235,7 +235,12 @@ function main(): void {
   if (process.argv.includes("--selftest")) {
     process.exit(selftest());
   }
-  process.exit(check());
+  try {
+    process.exit(check());
+  } catch (e) {
+    console.error(`solc-warnings: ${e instanceof Error ? e.message : e}`);
+    process.exit(1);
+  }
 }
 
 main();
