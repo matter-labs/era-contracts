@@ -146,7 +146,7 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
     /// @dev Replicates the stored batch info that _commitOneBatch produces for the given commit info.
     function _buildStoredBatchInfoZKsyncOS(
         CommitBatchInfoZKsyncOS memory commitInfo
-    ) internal pure returns (IExecutor.StoredBatchInfo memory) {
+    ) internal view returns (IExecutor.StoredBatchInfo memory) {
         return
             IExecutor.StoredBatchInfo({
                 batchNumber: commitInfo.batchNumber,
@@ -157,7 +157,14 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
                 l2LogsTreeRoot: commitInfo.l2LogsTreeRoot,
                 dependencyRootsRollingHash: commitInfo.dependencyRootsRollingHash,
                 timestamp: 0,
-                commitment: _batchOutputHash(commitInfo)
+                commitment: keccak256(
+                    abi.encodePacked(
+                        genesisStoredBatchInfo.batchHash,
+                        commitInfo.newStateCommitment,
+                        commitInfo.chainConfigHash,
+                        _batchOutputHash(commitInfo)
+                    )
+                )
             });
     }
 

@@ -3,13 +3,11 @@ pragma solidity 0.8.28;
 
 import {L2_DA_COMMITMENT_SCHEME, Utils} from "../../Utils/Utils.sol";
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
-import {UtilsFacet} from "../../Utils/UtilsFacet.sol";
 
 import {
     DEFAULT_L2_LOGS_TREE_ROOT_HASH,
     PUBLIC_INPUT_SHIFT,
     TESTNET_COMMIT_TIMESTAMP_NOT_OLDER,
-    ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
     ZKSYNC_OS_MOCK_PROOF_MAGIC,
     ZKSYNC_OS_MOCK_VERIFICATION_TYPE
 } from "contracts/common/Config.sol";
@@ -95,7 +93,8 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             lastBlockNumber: 2,
             chainId: chainId,
             operatorDAInput: bytes(""),
-            slChainId: block.chainid
+            slChainId: block.chainid,
+            chainConfigHash: Utils.defaultChainConfigHash(chainId)
         });
 
         bytes32 upgradeTxHash = gettersFacet.getL2SystemContractsUpgradeTxHash();
@@ -136,7 +135,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
     function _storedBatchInfo(
         CommitBatchInfoZKsyncOS memory _batch,
         bytes32 _upgradeTxHash
-    ) internal pure returns (IExecutor.StoredBatchInfo memory) {
+    ) internal view returns (IExecutor.StoredBatchInfo memory) {
         bytes32 batchOutputHash = keccak256(
             abi.encodePacked(
                 _batch.firstBlockTimestamp,
@@ -163,32 +162,22 @@ contract RevertBatchesTest is ChainTypeManagerTest {
                 l2LogsTreeRoot: _batch.l2LogsTreeRoot,
                 dependencyRootsRollingHash: _batch.dependencyRootsRollingHash,
                 timestamp: 0,
-                commitment: batchOutputHash
+                commitment: keccak256(
+                    abi.encodePacked(
+                        genesisStoredBatchInfo.batchHash,
+                        _batch.newStateCommitment,
+                        _batch.chainConfigHash,
+                        batchOutputHash
+                    )
+                )
             });
     }
 
     function _mockProof(
-        IExecutor.StoredBatchInfo memory _previousBatch,
+        IExecutor.StoredBatchInfo memory,
         IExecutor.StoredBatchInfo memory _currentBatch
-    ) internal view returns (uint256[] memory proof) {
-        UtilsFacet utilsFacet = UtilsFacet(newChainAddress);
-        uint256 maxTxGasLimit = utilsFacet.util_getZKsyncOSMaxTxGasLimit();
-        if (maxTxGasLimit == 0) {
-            maxTxGasLimit = ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT;
-        }
-        bytes32 chainConfigHash = keccak256(
-            abi.encodePacked(chainId, uint256(0), maxTxGasLimit, uint256(utilsFacet.util_getPubdataContent()))
-        );
-        uint256 publicInput = uint256(
-            keccak256(
-                abi.encodePacked(
-                    _previousBatch.batchHash,
-                    _currentBatch.batchHash,
-                    chainConfigHash,
-                    _currentBatch.commitment
-                )
-            )
-        ) >> PUBLIC_INPUT_SHIFT;
+    ) internal pure returns (uint256[] memory proof) {
+        uint256 publicInput = uint256(_currentBatch.commitment) >> PUBLIC_INPUT_SHIFT;
 
         proof = new uint256[](4);
         proof[0] = ZKSYNC_OS_MOCK_VERIFICATION_TYPE;

@@ -15,6 +15,7 @@ import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts
 
 import {
     ChainRequiresValidatorsSignaturesForCommit,
+    SignatureNotValid,
     NotEnoughSigners,
     SignerNotAuthorized,
     SignersNotSorted
@@ -301,6 +302,33 @@ contract MultisigCommitterTest is Test {
             processBatchFrom: commitBatchFrom,
             processBatchTo: commitBatchTo,
             batchData: commitData,
+            signers: signers,
+            signatures: signatures
+        });
+    }
+
+    function test_rejectsSignatureAfterChainConfigHashChanges() public {
+        (uint256 from, uint256 to, bytes memory originalData) = prepareCommit();
+        bytes32 digest = hashCommitData(from, to, originalData);
+        address[] memory signers = new address[](2);
+        signers[0] = validator1Shared;
+        signers[1] = validator2Shared;
+        bytes[] memory signatures = new bytes[](2);
+        signatures[0] = sign_digest(validator1SharedKey, digest);
+        signatures[1] = sign_digest(validator2SharedKey, digest);
+
+        IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();
+        CommitBatchInfoZKsyncOS[] memory batches = new CommitBatchInfoZKsyncOS[](1);
+        batches[0] = Utils.createCommitBatchInfoZKsyncOS();
+        batches[0].chainConfigHash = keccak256("different config");
+        (, , bytes memory changedData) = Utils.encodeCommitBatchesDataZKsyncOS(storedBatch, batches);
+        vm.expectRevert(abi.encodeWithSelector(SignatureNotValid.selector, validator1Shared));
+        vm.prank(sequencer);
+        multisigCommitter.commitBatchesMultisig({
+            chainAddress: chainAddress,
+            processBatchFrom: from,
+            processBatchTo: to,
+            batchData: changedData,
             signers: signers,
             signatures: signatures
         });
