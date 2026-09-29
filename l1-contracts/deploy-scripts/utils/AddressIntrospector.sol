@@ -512,7 +512,7 @@ library AddressIntrospector {
         return DeployCTML1OrGateway.getSubVerifiers(_verifier, _isZKsyncOS);
     }
 
-    /// @notice Whether the chain verifier is an `EraMultiProofVerifier` (Era chains from v33).
+    /// @notice Whether the chain verifier is an `EraMultiProofVerifier` (Era chains from v34).
     function _isMultiProof(address _verifier) private view returns (bool) {
         (bool ok, bytes memory data) = _verifier.staticcall(
             abi.encodeCall(IEraMultiProofVerifier.acceptedProofType, ())

@@ -8,10 +8,10 @@ import {MustBeEraChain} from "../common/L1ContractErrors.sol";
 import {NotAllBatchesExecuted} from "../state-transition/L1StateTransitionErrors.sol";
 
 /// @author Matter Labs
-/// @title EraSettlementLayerV33Upgrade
-/// @dev V33 upgrade for Era chains, which start requiring an Airbender proof for every batch.
+/// @title EraSettlementLayerV34Upgrade
+/// @dev V34 upgrade for Era chains, which start requiring an Airbender proof for every batch.
 /// @custom:security-contact security@matterlabs.dev
-contract EraSettlementLayerV33Upgrade is BaseZkSyncUpgrade {
+contract EraSettlementLayerV34Upgrade is BaseZkSyncUpgrade {
     /// @notice The main function that will be delegate-called by the chain.
     /// @param _proposedUpgrade The upgrade to be executed.
     function upgrade(ProposedUpgrade memory _proposedUpgrade) public override returns (bytes32) {
