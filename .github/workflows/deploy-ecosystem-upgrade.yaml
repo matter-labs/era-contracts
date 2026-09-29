@@ -1,0 +1,163 @@
+# v33 compiler-only stage upgrade: publish the L2 factory deps on Sepolia and verify.
+#
+# Lives at this path only on the `kl/v33-stage-deploy-runner` branch, so it can be dispatched with
+# `gh workflow run deploy-ecosystem-upgrade.yaml --ref kl/v33-stage-deploy-runner` (workflow_dispatch
+# needs a workflow of this name on the default branch; the ref's definition is what runs).
+#
+# The v33 stage upgrade deploys no L1 contract. Its only broadcast is CTMUpgrade_v33.prepare
+# publishing the 51 factory deps into stage's existing BytecodesSupplier (permissionless and
+# idempotent). Governance stages and the chain upgrade are executed separately by their owners.
+name: "v33 stage compiler upgrade: publish + verify"
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_artifacts_run_id:
+        description: "L1 contracts CI run whose build-artifacts (Linux zkout) provide the bytecode"
+        required: true
+        type: string
+      broadcast:
+        description: "Publish the factory deps on Sepolia (false = rehearsal and checks only)"
+        required: false
+        type: boolean
+        default: false
+      zksync_foundry_version:
+        description: "foundry-zksync version"
+        required: false
+        type: string
+        default: "v0.1.5"
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v33-stage-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      OUT_REL: /upgrade-envs/v0.33.0-compiler/output/stage/ecosystem.toml
+      OUT_FILE: l1-contracts/upgrade-envs/v0.33.0-compiler/output/stage/ecosystem.toml
+      BYTECODES_SUPPLIER: "0xdA709DEB3b515F0b690445bbF592757b7D517f6c"
+      SEPOLIA_CHAIN_ID: "11155111"
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install Foundry (anvil)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+
+      - name: Install foundry-zksync (forge, cast)
+        uses: ./.github/actions/install-zksync-foundry
+        with:
+          version: ${{ inputs.zksync_foundry_version }}
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Build artifacts must come from this branch's sources
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.build_artifacts_run_id }}
+        run: |
+          set -euo pipefail
+          sha=$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID" --jq .head_sha)
+          echo "build artifacts from run $RUN_ID at $sha"
+          git merge-base --is-ancestor "$sha" HEAD || { echo "::error::artifact commit $sha is not an ancestor of HEAD"; exit 1; }
+          git diff --quiet "$sha" HEAD -- system-contracts l1-contracts/contracts l1-contracts/deploy-scripts l2-contracts da-contracts configs \
+            || { echo "::error::contract sources changed since the artifact commit $sha"; exit 1; }
+
+      - name: Download CI build artifacts (Linux bytecode)
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          run-id: ${{ inputs.build_artifacts_run_id }}
+          github-token: ${{ github.token }}
+          path: .
+
+      - name: Deployer address, balance and network
+        env:
+          PK: ${{ secrets.DEPLOYER_PRIVATE_KEY_SEPOLIA }}
+          RPC: ${{ secrets.L1_RPC_URL_SEPOLIA }}
+        run: |
+          set -euo pipefail
+          [ -n "$PK" ] || { echo "::error::DEPLOYER_PRIVATE_KEY_SEPOLIA is not set"; exit 1; }
+          [ "$(cast chain-id --rpc-url "$RPC")" = "$SEPOLIA_CHAIN_ID" ] || { echo "::error::L1_RPC_URL_SEPOLIA is not Sepolia"; exit 1; }
+          addr=$(cast wallet address "$PK")
+          bal=$(cast balance "$addr" --rpc-url "$RPC")
+          echo "deployer $addr, balance $(cast from-wei "$bal") ETH"
+          echo "DEPLOYER=$addr" >> "$GITHUB_ENV"
+          python3 -c "import sys; sys.exit(0 if int('$bal') >= 5 * 10**17 else 1)" \
+            || { echo "::error::deployer balance below 0.5 ETH"; exit 1; }
+
+      - name: Rehearse on a Sepolia fork (before publishing)
+        working-directory: l1-contracts
+        env:
+          L1_FORK_URL: ${{ secrets.L1_RPC_URL_SEPOLIA }}
+        run: bash upgrade-envs/v0.33.0-compiler/rehearse-stage.sh
+
+      - name: Output equals the committed calldata
+        run: git diff --exit-code -- "$OUT_FILE"
+
+      - name: Publish the factory deps on Sepolia
+        if: ${{ inputs.broadcast }}
+        working-directory: l1-contracts
+        env:
+          PK: ${{ secrets.DEPLOYER_PRIVATE_KEY_SEPOLIA }}
+          RPC: ${{ secrets.L1_RPC_URL_SEPOLIA }}
+        run: |
+          set -euo pipefail
+          forge script deploy-scripts/upgrade/v33/CTMUpgrade_v33.s.sol:CTMUpgrade_v33 \
+            --sig 'prepare(string,string)' /upgrade-envs/v0.33.0-compiler/stage.toml "$OUT_REL" \
+            --rpc-url "$RPC" --broadcast --private-key "$PK" --legacy --slow
+          git diff --exit-code -- "upgrade-envs/v0.33.0-compiler/output/stage/ecosystem.toml"
+
+      - name: Verify every factory dep is published on Sepolia
+        if: ${{ inputs.broadcast }}
+        env:
+          RPC: ${{ secrets.L1_RPC_URL_SEPOLIA }}
+        run: |
+          set -euo pipefail
+          python3 -c "import tomllib; [print(h) for h in tomllib.load(open('$OUT_FILE','rb'))['contracts_config']['l2_upgrade_tx_factory_deps']]" > deps.txt
+          total=0; missing=0
+          while read -r h; do
+            total=$((total + 1))
+            b=$(cast call "$BYTECODES_SUPPLIER" 'publishingBlock(bytes32)(uint256)' "$h" --rpc-url "$RPC" | awk '{print $1}')
+            if [ "$b" = "0" ]; then missing=$((missing + 1)); echo "NOT published: $h"; fi
+          done < deps.txt
+          echo "published $((total - missing)) of $total factory deps"
+          [ "$missing" = "0" ]
+
+      - name: Rehearse again on a fork of the published state
+        if: ${{ inputs.broadcast }}
+        working-directory: l1-contracts
+        env:
+          L1_FORK_URL: ${{ secrets.L1_RPC_URL_SEPOLIA }}
+        run: |
+          bash upgrade-envs/v0.33.0-compiler/rehearse-stage.sh
+          git diff --exit-code -- "upgrade-envs/v0.33.0-compiler/output/stage/ecosystem.toml"
+
+      - name: Upload broadcast records
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v33-stage-publish
+          path: |
+            l1-contracts/broadcast/CTMUpgrade_v33.s.sol/
+            l1-contracts/upgrade-envs/v0.33.0-compiler/output/stage/ecosystem.toml
+          if-no-files-found: warn
