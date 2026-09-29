@@ -1,4 +1,8 @@
-name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
+name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
+
+# Generic over the `upgrade` input: `upgrade-envs/<upgrade>/upgrade.toml` says how that upgrade is
+# prepared and checked (protocol-ops/src/common/upgrade_descriptor.rs). The notes below describe
+# the default, v0.31.0-interopB (`upgrade-prepare-all` + PUVT).
 
 # ═════════════════════════════════════════════════════════════════════════════
 # RUNBOOK — from "nothing" to "this chain is upgraded"
@@ -260,8 +264,13 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 on:
   workflow_dispatch:
     inputs:
+      upgrade:
+        description: "Upgrade to generate: a directory under l1-contracts/upgrade-envs/ with an upgrade.toml. v0.31.0-interopB is the v31 prepare-all + PUVT flow; a forge-script upgrade runs its declared script and checks."
+        required: false
+        default: "v0.31.0-interopB"
+        type: string
       environment:
-        description: "Environment = basename of the config pair upgrade-envs/permanent-values/<env>.toml + upgrade-envs/v0.31.0-interopB/<env>.toml. Today: stage, testnet, mainnet, adi. The L1 to fork is chosen from that env's l1_chain_id (1 → mainnet, 11155111 → Sepolia)."
+        description: "Environment = basename of the config pair upgrade-envs/permanent-values/<env>.toml + upgrade-envs/<upgrade>/<env>.toml. Today: stage, testnet, mainnet, adi. The L1 to fork is chosen from that env's l1_chain_id (1 → mainnet, 11155111 → Sepolia)."
         required: true
         type: string
       l1_rpc_url:
@@ -297,6 +306,8 @@ jobs:
   regen:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      UPGRADE: ${{ inputs.upgrade }}
 
     steps:
       - name: Checkout the repository
@@ -385,13 +396,22 @@ jobs:
           set -euo pipefail
           # The env is just a config-pair basename; fail early and legibly if the
           # pair isn't committed, before spending a fork on it.
+          # The upgrade is a directory name under upgrade-envs/; never a path.
+          if ! printf '%s' "$UPGRADE" | grep -qE '^[A-Za-z0-9._-]+$' || [ "$UPGRADE" = "." ] || [ "$UPGRADE" = ".." ]; then
+            echo "::error::invalid upgrade '$UPGRADE': expected a directory name under upgrade-envs/"; exit 1
+          fi
           PV="l1-contracts/upgrade-envs/permanent-values/${ENVIRONMENT}.toml"
-          V31="l1-contracts/upgrade-envs/v0.31.0-interopB/${ENVIRONMENT}.toml"
-          for f in "$PV" "$V31"; do
+          UPGRADE_TOML="l1-contracts/upgrade-envs/${UPGRADE}/upgrade.toml"
+          ENV_INPUT="l1-contracts/upgrade-envs/${UPGRADE}/${ENVIRONMENT}.toml"
+          for f in "$PV" "$UPGRADE_TOML" "$ENV_INPUT"; do
             if [ ! -f "$f" ]; then
-              echo "::error::No config for env '$ENVIRONMENT' at $f — commit the config pair first."; exit 1
+              echo "::error::No config for upgrade '$UPGRADE' / env '$ENVIRONMENT' at $f — commit it first."; exit 1
             fi
           done
+          # `prepare-all` (v31) also emits the simulator JSON below; other kinds do not.
+          PREPARE_KIND="$(sed -nE 's/^[[:space:]]*prepare[[:space:]]*=[[:space:]]*"([a-z-]+)".*/\1/p' "$UPGRADE_TOML" | head -1)"
+          echo "upgrade=$UPGRADE prepare=$PREPARE_KIND"
+          echo "PREPARE_KIND=$PREPARE_KIND" >> "$GITHUB_ENV"
           # Which L1 to fork comes from the env itself, so a new ecosystem needs no
           # workflow edit. Capture the digits AFTER '=' so the '1' in the key name
           # can't match.
@@ -458,7 +478,7 @@ jobs:
           # The command forks L1_FORK_URL into a local anvil and runs prepare/PUVT
           # against localhost, so only anvil sees the real RPC; the deployer is
           # impersonated (no signing key needed).
-          args=(--env "$ENVIRONMENT" --fork-url "$L1_FORK_URL" --deployer-address "$DEPLOYER_ADDR")
+          args=(--upgrade "$UPGRADE" --env "$ENVIRONMENT" --fork-url "$L1_FORK_URL" --deployer-address "$DEPLOYER_ADDR")
           args+=(--zk-governance-commit "$ZK_GOVERNANCE_COMMIT")
           [ -z "${GW_RPC_URL:-}" ] || args+=(--gw-rpc-url "$GW_RPC_URL")
           [ -z "$FORK_BLOCK" ] || args+=(--fork-block "$FORK_BLOCK")
@@ -470,6 +490,7 @@ jobs:
       # `transaction-simulator.json`. Two `governance-toml-to-simulator` calls,
       # matching the documented mainnet flow.
       - name: Emit sim-inputs + transaction-simulator.json
+        if: ${{ env.PREPARE_KIND == 'prepare-all' }}
         env:
           ENVIRONMENT: ${{ inputs.environment }}
         run: |
@@ -501,9 +522,9 @@ jobs:
         with:
           name: ecosystem-upgrade-calldata-${{ inputs.environment }}
           path: |
-            l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}/ecosystem.toml
-            l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}/sim-inputs/
-            l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}/transaction-simulator.json
+            l1-contracts/upgrade-envs/${{ inputs.upgrade }}/output/${{ inputs.environment }}/ecosystem.toml
+            l1-contracts/upgrade-envs/${{ inputs.upgrade }}/output/${{ inputs.environment }}/sim-inputs/
+            l1-contracts/upgrade-envs/${{ inputs.upgrade }}/output/${{ inputs.environment }}/transaction-simulator.json
           if-no-files-found: warn
           retention-days: 30
 
@@ -525,7 +546,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ecosystem-upgrade-deploy-inputs-${{ inputs.environment }}
-          path: l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}/deploy-bundle/
+          path: l1-contracts/upgrade-envs/${{ inputs.upgrade }}/output/${{ inputs.environment }}/deploy-bundle/
           if-no-files-found: warn
           # 90 days, matching the deploy workflow's result artifact: this is the
           # operational record of which bytecode was deployed, and it cannot be

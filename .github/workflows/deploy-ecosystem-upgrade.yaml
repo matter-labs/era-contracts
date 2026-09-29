@@ -1,4 +1,4 @@
-name: "Ecosystem Upgrade: Deploy + Verify (v31)"
+name: "Ecosystem Upgrade: Deploy + Verify"
 
 # Step 2 of the two-step v31 ecosystem-upgrade flow. Step 1
 # (`generate-ecosystem-upgrade-calldata.yaml`) produces the calldata + the
@@ -268,6 +268,26 @@ jobs:
           ./protocol-ops/target/release/protocol_ops ecosystem verify-bundle "$DEPLOY_BUNDLE_DIR"
           echo "DEPLOY_BUNDLE_DIR=$DEPLOY_BUNDLE_DIR" >> "$GITHUB_ENV"
 
+      # The bundle names the upgrade it was generated for; that upgrade's upgrade.toml in this
+      # checkout says how its broadcast is checked (protocol-ops/src/common/upgrade_descriptor.rs).
+      - name: Resolve the bundle's upgrade
+        run: |
+          set -euo pipefail
+          UPGRADE="$(jq -r '.upgrade // empty' "$DEPLOY_BUNDLE_DIR/bundle-metadata.json")"
+          if ! printf '%s' "$UPGRADE" | grep -qE '^[A-Za-z0-9._-]+$' || [ "$UPGRADE" = "." ] || [ "$UPGRADE" = ".." ]; then
+            echo "::error::bundle names an invalid upgrade '$UPGRADE'"; exit 1
+          fi
+          DESCRIPTOR="l1-contracts/upgrade-envs/$UPGRADE/upgrade.toml"
+          if [ ! -f "$DESCRIPTOR" ]; then
+            echo "::error::this checkout has no $DESCRIPTOR for the bundle's upgrade"; exit 1
+          fi
+          KIND="$(sed -nE 's/^[[:space:]]*prepare[[:space:]]*=[[:space:]]*"([a-z-]+)".*/\1/p' "$DESCRIPTOR" | head -1)"
+          echo "Bundle upgrade: $UPGRADE (prepare = $KIND)"
+          {
+            echo "UPGRADE=$UPGRADE"
+            echo "UPGRADE_KIND=$KIND"
+          } >> "$GITHUB_ENV"
+
       # Tie the downloaded bytes back to the exact successful generation run.
       # Broadcasting is commit-agnostic, but Etherscan verification recompiles
       # from this checkout, so a different checkout is still warned separately.
@@ -448,6 +468,18 @@ jobs:
           echo "=== transactions.txt ==="
           cat "$TXLOG" || true
 
+      # A forge-script upgrade declares a read-only `verify_chain` check, run here against the
+      # real chain. v31's post-deploy check is PUVT, which stays a separate step.
+      - name: Check the broadcast on L1 (the upgrade's declared check)
+        if: ${{ !inputs.verify_only && env.UPGRADE_KIND == 'forge-script' }}
+        run: |
+          set -euo pipefail
+          ./protocol-ops/target/release/protocol_ops ecosystem replay-bundle \
+            --bundle "$DEPLOY_BUNDLE_DIR" \
+            --rpc "$L1_RPC_URL" \
+            --verify-only \
+            --transactions-log "$TXLOG"
+
       - name: Upload transactions.txt + executed log
         if: ${{ always() && !inputs.verify_only }}
         uses: actions/upload-artifact@v4
@@ -475,6 +507,9 @@ jobs:
           fi
           LOG="$DEPLOY_BUNDLE_DIR/extra-verification-logs.txt"
           if [ ! -f "$LOG" ]; then
+            if [ "${UPGRADE_KIND:-}" = "forge-script" ]; then
+              echo "The bundle logged no contract deployments to verify ($UPGRADE)."; exit 0
+            fi
             echo "::error::extra-verification-logs.txt not found"; exit 1
           fi
           # $ETHERSCAN_CHAIN was resolved from the bundle's l1.chain_id, not from

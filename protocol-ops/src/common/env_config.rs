@@ -30,6 +30,8 @@ use serde::Deserialize;
 use crate::common::paths::resolve_l1_contracts_path;
 use crate::types::L2DACommitmentScheme;
 
+/// The upgrade the generate / replay pipeline targets when none is named.
+pub const DEFAULT_UPGRADE: &str = "v0.31.0-interopB";
 const V31_UPGRADE_DIR: &str = "upgrade-envs/v0.31.0-interopB";
 const PERMANENT_VALUES_DIR: &str = "upgrade-envs/permanent-values";
 
@@ -429,6 +431,17 @@ impl EnvConfig {
 pub fn default_protocol_ops_out_dir(env: &str) -> anyhow::Result<PathBuf> {
     Ok(resolve_l1_contracts_path()?
         .join(V31_UPGRADE_DIR)
+        .join("output")
+        .join(env))
+}
+
+/// `upgrade-envs/<upgrade>/output/<env>/`: where generating `upgrade` for `env` writes.
+/// For [`DEFAULT_UPGRADE`] this is [`default_protocol_ops_out_dir`].
+pub fn protocol_ops_out_dir(upgrade: &str, env: &str) -> anyhow::Result<PathBuf> {
+    crate::common::upgrade_descriptor::validate_upgrade_name(upgrade)?;
+    Ok(resolve_l1_contracts_path()?
+        .join("upgrade-envs")
+        .join(upgrade)
         .join("output")
         .join(env))
 }
