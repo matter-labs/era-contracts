@@ -18,7 +18,9 @@
 # on the chain id, on the sender's nonce (latest and pending), on eth_call
 # succeeding right before each send, and on each receipt (same block hash,
 # status 1). Gas and fees take the higher answer of the two and are capped by
-# config.json (priority fee, max fee per gas, fee total per run, gas per tx).
+# config.json (priority fee, max fee per gas, gas per tx, and a fee total per
+# run that reserves each tx's worst case before signing and never trusts a
+# receipt's fee fields).
 # The signed tx goes to both RPCs. Disagreement, a missing answer after brief
 # retries, or a cap exceeded stops the run; a cap is checked before signing.
 #
@@ -271,7 +273,10 @@ wait_receipt() {
 
 # ---------------------------------------------------------------- loop
 expected_nonce=""
-spent=0
+# Fees reserved so far: each tx's worst case (gas limit x max fee, the values
+# about to be signed), never credited back from a receipt, so that the run
+# budget does not depend on what an RPC reports.
+reserved=0
 n=0
 # fd 3, so that nothing in the loop body can swallow the list from stdin.
 while IFS= read -r tx <&3; do
@@ -326,8 +331,8 @@ while IFS= read -r tx <&3; do
   max_fee=$((base_fee * fee_mult + priority_fee))
   [ "$max_fee" -le "$fee_cap" ] || max_fee="$fee_cap"
   worst=$((gas_limit * max_fee))
-  [ $((spent + worst)) -le "$run_budget" ] ||
-    stop "tx $i: worst-case fee $worst on top of the $spent wei spent exceeds this run's fee budget $run_budget for $network (config.json); nothing more was sent"
+  [ $((reserved + worst)) -le "$run_budget" ] ||
+    stop "tx $i: worst-case fee $worst on top of the $reserved wei already reserved exceeds this run's fee budget $run_budget for $network (config.json); nothing more was sent"
   log "tx $i: eth_call ok; nonce $nonce, gas $estimate -> limit $gas_limit, maxFee $max_fee, priority $priority_fee (base $base_fee), worst-case fee $worst"
 
   if [ "$dry_run" = true ]; then
@@ -337,6 +342,7 @@ while IFS= read -r tx <&3; do
     exit 0
   fi
 
+  reserved=$((reserved + worst))
   fee_args=(--nonce "$nonce" --gas-limit "$gas_limit" --gas-price "$max_fee" --priority-gas-price "$priority_fee" --value "$wei")
   if [ "$mode" = impersonate ]; then
     hash="$("$CAST" send --unlocked --from "$from" --async "${fee_args[@]}" "$to" "$data" --rpc-url "$rpc")" ||
@@ -359,12 +365,6 @@ while IFS= read -r tx <&3; do
   status="$(jq -r .status <<<"$receipt")"
   block="$("$CAST" to-dec "$(jq -r .blockNumber <<<"$receipt")")"
   gas_used="$("$CAST" to-dec "$(jq -r .gasUsed <<<"$receipt")")"
-  price="$("$CAST" to-dec "$(jq -r '.effectiveGasPrice // "0x0"' <<<"$receipt")")"
-  if is_uint18 "$gas_used" && is_uint18 "$price" && [ "$price" -le "$fee_cap" ]; then
-    spent=$((spent + gas_used * price))
-  else
-    spent=$((spent + worst))
-  fi
   jq -nc --argjson i "$i" --arg h "$hash" --arg st "$status" --argjson b "$block" --argjson gu "$gas_used" \
     --argjson gl "$gas_limit" --argjson nonce "$nonce" \
     '{index: $i, hash: $h, status: (if $st == "0x1" then "success" else "REVERTED" end),

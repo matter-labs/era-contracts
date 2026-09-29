@@ -332,6 +332,12 @@ cat >"$work/fakebin/cast" <<EOF
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >>"$work/cast-argv.log"
 env | grep -c '^EXECUTOR_KEYSTORE' >>"$work/cast-env.log" || true
+# FAKE_ZERO_FEE_RECEIPTS: receipts claim the tx cost nothing, as a lying RPC could.
+if [ "\$1" = receipt ] && [ -n "\${FAKE_ZERO_FEE_RECEIPTS:-}" ]; then
+  r="\$("$real_cast" "\$@")" || exit \$?
+  jq -c '.effectiveGasPrice = "0x0" | .gasUsed = "0x0"' <<<"\$r"
+  exit 0
+fi
 exec "$real_cast" "\$@"
 EOF
 chmod +x "$work/fakebin/cast"
@@ -394,8 +400,26 @@ expect_fail "a cap that could overflow is refused" "must stay below 2^62" \
   with_config "$(variant_config overflow "$net.maxFeePerGasWei = \"999999999999999999\"")" exec_key "$EXEC_KS" "$EXEC_PW" "$work/p"
 check "nothing was signed or sent over a cap" [ "$(nonce "$EXEC")" = "$before" ]
 check "the summary of a refused run says why" grep -q "fee budget" "$work/p/broadcast/results.md"
+# The budget reserves each tx's worst case before signing and never credits a
+# receipt: with receipts claiming zero fees, a budget of 1.5 worst cases still
+# stops the second tx.
+jq -n --arg e "$EXEC" --arg r6 "$R6" '[
+  {description: "b1", network: "anvil-local", from: $e, to: $r6, value: "0", data: "0x01"},
+  {description: "b2", network: "anvil-local", from: $e, to: $r6, value: "0", data: "0x02"}]' >"$work/b2.json"
+make_plan "$work/pb" "$work/b2.json" >/dev/null 2>&1
+worst0="$(exec_key "$EXEC_KS" "$EXEC_PW" "$work/pb" --dry-run | sed -n 's/.*worst-case fee \([0-9]*\)$/\1/p')"
+before="$(nonce "$EXEC")"
+check "the dry run reports the first tx's worst-case fee" [ -n "$worst0" ]
+with_zero_fee_receipts() { FAKE_ZERO_FEE_RECEIPTS=1 "$@"; }
+expect_fail "zero-fee receipts do not free the budget" "wei already reserved exceeds this run's fee budget" \
+  with_zero_fee_receipts with_config "$(variant_config budget2 "$net.maxRunFeeWei = \"$((worst0 * 3 / 2))\"")" \
+  exec_key "$EXEC_KS" "$EXEC_PW" "$work/pb"
+check "the first receipt did claim a zero fee" [ "$(jq -r '[.effectiveGasPrice, .gasUsed] | join(" ")' "$work/pb/broadcast"/tx-*.receipt.json)" = "0x0 0x0" ]
+check "only the first of the two txs was sent" \
+  [ "$(($(nonce "$EXEC") - before)):$(wc -l <"$work/pb/broadcast/results.jsonl" | tr -d ' ')" = "1:1" ]
 
 echo "== a second RPC that disagrees fails closed"
+before="$(nonce "$EXEC")"
 secondary() { variant_config "$1" "$net.secondaryRpcUrl = \"$2\""; }
 expect_fail "second RPC on another chain" "do not agree on the chain id" \
   with_config "$(secondary chain "$rpc_other_chain")" exec_key "$EXEC_KS" "$EXEC_PW" "$work/p"
@@ -430,12 +454,17 @@ check "no output holds the password or the keystore" \
   bash -c "! grep -qF -e '$EXEC_PW' -e '$EXEC_CIPHERTEXT' '$work/exec-output.log'"
 check "the key files were deleted" bash -c "[ -z \"\$(ls -A '$work/tmp')\" ]"
 
-echo "== the broadcast job (static check of the workflow)"
+echo "== the workflow (static checks)"
 wf="$EXECUTOR_ROOT/../../.github/workflows/execute-eoa-upgrade.yaml"
-# The job's lines, without comments: from "  broadcast:" to the next job or EOF.
-job="$(awk '/^  broadcast:/ {f = 1; next} f && /^  [A-Za-z0-9_-]+:/ {f = 0} f' "$wf" | grep -v '^[[:space:]]*#')"
-check "the broadcast job exists" [ -n "$job" ]
-check "the broadcast job runs no action (no uses:)" bash -c '! grep -q "uses:" <<<"$1"' _ "$job"
+# job_lines NAME: the job's lines without comments, from "  NAME:" to the next job or EOF.
+job_lines() { awk -v j="  $1:" '$0 == j {f = 1; next} f && /^  [A-Za-z0-9_-]+:/ {f = 0} f' "$wf" | grep -v '^[[:space:]]*#'; }
+no_uses() { local lines; lines="$(job_lines "$1")"; [ -n "$lines" ] && ! grep -q 'uses:' <<<"$lines"; }
+# resolve renders the approval table and the plan hash; preflight gates
+# broadcast; broadcast holds the key. None of them may run an action.
+for j in resolve preflight broadcast; do
+  check "the $j job runs no action (no uses:)" no_uses "$j"
+done
+job="$(job_lines broadcast)"
 last_step="$(grep -n '^      - name:' <<<"$job" | tail -n 1)"
 first_secret="$(grep -n 'secrets\.' <<<"$job" | head -n 1 | cut -d: -f1)"
 check "its last step is Send" [ "${last_step#*- name: }" = Send ]
