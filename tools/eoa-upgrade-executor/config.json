@@ -16,7 +16,11 @@
     "sepolia": {
       "chainId": 11155111,
       "rpcUrl": "https://ethereum-sepolia-rpc.publicnode.com",
-      "explorerTxUrl": "https://sepolia.etherscan.io/tx/"
+      "explorerTxUrl": "https://sepolia.etherscan.io/tx/",
+      "secondaryRpcUrl": "https://sepolia.gateway.tenderly.co",
+      "maxPriorityFeePerGasWei": "5000000000",
+      "maxFeePerGasWei": "100000000000",
+      "maxRunFeeWei": "500000000000000000"
     }
   },
   "foundry": {
@@ -30,6 +34,7 @@
     "maxTxGasLimit": 16777216,
     "baseFeeMultiplier": 2,
     "receiptTimeoutSeconds": 900,
-    "receiptPollSeconds": 4
+    "receiptPollSeconds": 4,
+    "rpcAgreementRetries": 5
   }
 }

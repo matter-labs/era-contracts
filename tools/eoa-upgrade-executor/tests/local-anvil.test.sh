@@ -9,11 +9,14 @@
 #   5. simulate.sh against a fork of the local anvil
 #   6. execute.sh key mode against a plain local anvil (not a fork) with
 #      throwaway keystores: key checks, dry run, the send-and-wait loop, stop on
-#      a failing pre-send check, the pending-tx guard, and that neither the
-#      keystore nor its password reaches a command line, a child's environment
-#      or the output
+#      a failing pre-send check, the pending-tx guard, fee caps, a second RPC
+#      that disagrees (other chain, unreachable, other state, withheld
+#      receipt), and that neither the keystore nor its password reaches a
+#      command line, a child's environment or the output
+#   7. the broadcast job of the workflow runs no action and reads the secrets
+#      only in its last step
 #
-# Only the anvil process started here is stopped at exit.
+# Only the anvil processes started here are stopped at exit.
 
 # shellcheck source=../scripts/lib.sh
 source "$(dirname "$0")/../scripts/lib.sh"
@@ -49,6 +52,7 @@ expect_fail() {
 }
 check() { local name="$1"; shift; if "$@"; then pass "$name"; else fail "$name"; fi; }
 jq_true() { jq -s -e "$1" "$2" >/dev/null; }
+line_after() { [ -n "$1" ] && [ "$1" -gt "$2" ]; }
 
 # ---------------------------------------------------------------- local anvil
 port="$(find_free_port "$FIRST_ANVIL_PORT")"
@@ -57,8 +61,20 @@ rpc="http://127.0.0.1:$port"
 # receipt wait actually waits.
 "$ANVIL" --port "$port" --host 127.0.0.1 --chain-id 31337 --block-time 2 >"$work/anvil.log" 2>&1 &
 anvil_pid=$!
-trap 'kill "$anvil_pid" 2>/dev/null || true; wait "$anvil_pid" 2>/dev/null || true; rm -rf "$work"' EXIT
+trap 'kill "$anvil_pid" ${anvil2_pid:+"$anvil2_pid"} ${anvil3_pid:+"$anvil3_pid"} 2>/dev/null || true; wait 2>/dev/null || true; rm -rf "$work"' EXIT
 wait_for_rpc "$rpc" "$anvil_pid"
+# Two more, as disagreeing second RPCs: same chain id but other state, and another chain.
+port2="$(find_free_port $((port + 1)))"
+rpc_other_state="http://127.0.0.1:$port2"
+"$ANVIL" --port "$port2" --host 127.0.0.1 --chain-id 31337 >"$work/anvil2.log" 2>&1 &
+anvil2_pid=$!
+wait_for_rpc "$rpc_other_state" "$anvil2_pid"
+port3="$(find_free_port $((port2 + 1)))"
+rpc_other_chain="http://127.0.0.1:$port3"
+"$ANVIL" --port "$port3" --host 127.0.0.1 --chain-id 1 >"$work/anvil3.log" 2>&1 &
+anvil3_pid=$!
+wait_for_rpc "$rpc_other_chain" "$anvil3_pid"
+rpc_unreachable="http://127.0.0.1:$(find_free_port $((port3 + 1)))"
 
 # Anvil's dev account 9 (key from its startup banner) only funds the test accounts.
 K9="$(sed -n 's/^(9) \(0x[0-9a-f]\{64\}\)$/\1/p' "$work/anvil.log")"
@@ -82,13 +98,18 @@ REVERTER="$("$CAST" send --private-key "$K9" --rpc-url "$rpc" --json \
   --create 0x6005600c60003960056000f360006000fd | jq -r .contractAddress)"
 is_address "$REVERTER" || die "reverter deployment failed"
 
-# Test config: the real one, with its networks pointed at this anvil and value
-# transfers allowed (so balances can prove what was sent).
+# Test config: the real one (fee caps included), with its networks pointed at
+# this anvil, the same anvil under a second URL as the "independent" RPC, value
+# transfers allowed (so balances can prove what was sent) and short waits.
 jq --arg rpc "$rpc" '
   .environments = {local: {network: "anvil-local", githubEnvironment: "eoa-upgrade-local"}}
-  | .networks = {"anvil-local": {chainId: 31337, rpcUrl: $rpc, explorerTxUrl: ""}}
+  | .networks = {"anvil-local": (.networks.sepolia + {chainId: 31337, rpcUrl: $rpc, secondaryRpcUrl: "\($rpc)/", explorerTxUrl: ""})}
   | .execution.allowNonZeroValue = true
-  | .execution.receiptPollSeconds = 1' "$EXECUTOR_ROOT/config.json" >"$work/config.json"
+  | .execution.receiptPollSeconds = 1
+  | .execution.receiptTimeoutSeconds = 8
+  | .execution.rpcAgreementRetries = 2' "$EXECUTOR_ROOT/config.json" >"$work/config.json"
+# variant_config NAME JQ-FILTER: a copy of the test config with one change, for with_config.
+variant_config() { jq "$2" "$work/config.json" >"$work/config-$1.json"; printf '%s\n' "$work/config-$1.json"; }
 jq '.networks["anvil-local"].chainId = 1' "$work/config.json" >"$work/config-wrong-chain.json"
 jq '.execution.allowNonZeroValue = false' "$work/config.json" >"$work/config-zero-value.json"
 export EXECUTOR_CONFIG="$work/config.json"
@@ -320,7 +341,7 @@ exec_key() {
   local ks="$1" pw="$2" dir="$3"
   shift 3
   env CAST="$work/fakebin/cast" RUNNER_TEMP="$work/tmp" EXECUTOR_KEYSTORE="$ks" EXECUTOR_KEYSTORE_PASSWORD="$pw" \
-    "$scripts/execute.sh" --plan "$dir/plan.json" --mode key --out "$dir/broadcast" --rpc-url "$rpc" "$@" 2>&1 |
+    "$scripts/execute.sh" --plan "$dir/plan.json" --mode key --out "$dir/broadcast" "$@" 2>&1 |
     tee -a "$work/exec-output.log"
   return "${PIPESTATUS[0]}"
 }
@@ -354,6 +375,52 @@ ETH_KEYSTORE="$(ls "$work/ks-exec"/*)" ETH_PASSWORD="$work/exec-pw" "$CAST" send
 expect_fail "pending tx from the sender blocks the run" "pending transaction(s)" exec_key "$EXEC_KS" "$EXEC_PW" "$work/p"
 "$CAST" rpc evm_setIntervalMining 2 --rpc-url "$rpc" >/dev/null
 
+echo "== fee caps (checked before signing)"
+# Let the tx left pending above be mined first.
+for _ in $(seq 1 20); do
+  [ "$(nonce "$EXEC")" = "$("$CAST" nonce "$EXEC" --block pending --rpc-url "$rpc")" ] && break
+  sleep 1
+done
+make_plan "$work/p" "$work/txs.json" --range 1-2 >/dev/null 2>&1
+before="$(nonce "$EXEC")"
+net='.networks["anvil-local"]'
+expect_fail "priority fee over the cap" "exceeds the cap 1 for anvil-local" \
+  with_config "$(variant_config prio "$net.maxPriorityFeePerGasWei = \"1\"")" exec_key "$EXEC_KS" "$EXEC_PW" "$work/p"
+expect_fail "max fee per gas over the cap" "exceeds the max fee cap 1000" \
+  with_config "$(variant_config maxfee "$net.maxFeePerGasWei = \"1000\"")" exec_key "$EXEC_KS" "$EXEC_PW" "$work/p"
+expect_fail "fee budget of the run exceeded" "exceeds this run's fee budget 1 " \
+  with_config "$(variant_config budget "$net.maxRunFeeWei = \"1\"")" exec_key "$EXEC_KS" "$EXEC_PW" "$work/p"
+expect_fail "a cap that could overflow is refused" "must stay below 2^62" \
+  with_config "$(variant_config overflow "$net.maxFeePerGasWei = \"999999999999999999\"")" exec_key "$EXEC_KS" "$EXEC_PW" "$work/p"
+check "nothing was signed or sent over a cap" [ "$(nonce "$EXEC")" = "$before" ]
+check "the summary of a refused run says why" grep -q "fee budget" "$work/p/broadcast/results.md"
+
+echo "== a second RPC that disagrees fails closed"
+secondary() { variant_config "$1" "$net.secondaryRpcUrl = \"$2\""; }
+expect_fail "second RPC on another chain" "do not agree on the chain id" \
+  with_config "$(secondary chain "$rpc_other_chain")" exec_key "$EXEC_KS" "$EXEC_PW" "$work/p"
+expect_fail "second RPC unreachable" "do not agree on the chain id (or one did not answer)" \
+  with_config "$(secondary down "$rpc_unreachable")" exec_key "$EXEC_KS" "$EXEC_PW" "$work/p"
+expect_fail "second RPC reports another nonce" "do not agree on the nonce of $EXEC" \
+  with_config "$(secondary state "$rpc_other_state")" exec_key "$EXEC_KS" "$EXEC_PW" "$work/p"
+check "nothing was sent while they disagreed" [ "$(nonce "$EXEC")" = "$before" ]
+# A fresh account has nonce 0 on both chains, so every pre-send check agrees;
+# it is funded only on the main anvil, so the second RPC never gets the tx.
+# That is what a primary faking a receipt for a withheld tx looks like.
+W_PW="w-$RANDOM$RANDOM"
+W="$(new_keystore "$work/ks-w" "$W_PW")"
+W_KS="$(cat "$work/ks-w"/*)"
+"$CAST" send --private-key "$K9" --rpc-url "$rpc" --value 1ether "$W" >/dev/null
+jq -n --arg w "$W" --arg r6 "$R6" '[
+  {description: "one", network: "anvil-local", from: $w, to: $r6, value: "0", data: "0x01"},
+  {description: "two", network: "anvil-local", from: $w, to: $r6, value: "0", data: "0x02"}]' >"$work/w.json"
+make_plan "$work/pw" "$work/w.json" >/dev/null 2>&1
+expect_fail "a receipt only one RPC can see stops the run" "from the secondary RPC after" \
+  with_config "$(secondary state "$rpc_other_state")" exec_key "$W_KS" "$W_PW" "$work/pw"
+check "it stopped after that tx: tx two was not sent, nothing reported as success" \
+  [ "$(nonce "$W"):$(wc -l <"$work/pw/broadcast/results.jsonl" | tr -d ' ')" = "1:0" ]
+check "the summary says why" grep -q 'no receipt' "$work/pw/broadcast/results.md"
+
 echo "== the secrets stay secret"
 check "cast ran with the keystore (mktx seen)" grep -q '^mktx ' "$work/cast-argv.log"
 check "no command line holds the password or the keystore" \
@@ -362,6 +429,18 @@ check "no cast process inherited EXECUTOR_KEYSTORE*" bash -c "! grep -qv '^0\$' 
 check "no output holds the password or the keystore" \
   bash -c "! grep -qF -e '$EXEC_PW' -e '$EXEC_CIPHERTEXT' '$work/exec-output.log'"
 check "the key files were deleted" bash -c "[ -z \"\$(ls -A '$work/tmp')\" ]"
+
+echo "== the broadcast job (static check of the workflow)"
+wf="$EXECUTOR_ROOT/../../.github/workflows/execute-eoa-upgrade.yaml"
+# The job's lines, without comments: from "  broadcast:" to the next job or EOF.
+job="$(awk '/^  broadcast:/ {f = 1; next} f && /^  [A-Za-z0-9_-]+:/ {f = 0} f' "$wf" | grep -v '^[[:space:]]*#')"
+check "the broadcast job exists" [ -n "$job" ]
+check "the broadcast job runs no action (no uses:)" bash -c '! grep -q "uses:" <<<"$1"' _ "$job"
+last_step="$(grep -n '^      - name:' <<<"$job" | tail -n 1)"
+first_secret="$(grep -n 'secrets\.' <<<"$job" | head -n 1 | cut -d: -f1)"
+check "its last step is Send" [ "${last_step#*- name: }" = Send ]
+check "secrets are read only in that last step" line_after "$first_secret" "${last_step%%:*}"
+check "no other job reads a secret" [ "$(grep -c 'secrets\.' "$wf")" = "$(grep -c 'secrets\.' <<<"$job")" ]
 
 printf '\n%s passed, %s failed\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]

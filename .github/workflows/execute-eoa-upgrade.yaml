@@ -7,8 +7,10 @@
 #   resolve   -> read the file at the pinned commit, validate it, list every tx
 #   simulate  -> send the selected txs on an anvil fork (sender impersonated)
 #   preflight -> right repo, default branch, allowed dispatcher, protected environment
-#   broadcast -> environment-gated: re-simulate at the tip, then sign and send
-#                one by one (or stop before signing when dry_run is true)
+#   broadcast -> environment-gated, no actions: fetch the executor and the file
+#                with plain git, rebuild the plan and match resolve's hash,
+#                re-simulate at the tip, then sign and send one by one (or stop
+#                before signing when dry_run is true)
 #
 # Inputs reach scripts only through env, never through ${{ }} in `run:`.
 name: Execute EOA upgrade transactions
@@ -68,6 +70,7 @@ jobs:
       contents: read
     outputs:
       plan_sha256: ${{ steps.resolve.outputs.plan_sha256 }}
+      executor_tree: ${{ steps.executor.outputs.tree }}
     steps:
       - name: Check out the executor
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -75,6 +78,13 @@ jobs:
           persist-credentials: false
           sparse-checkout: tools/eoa-upgrade-executor
           filter: blob:none
+      - name: Record the executor's git tree
+        id: executor
+        env:
+          RUN_SHA: ${{ github.sha }}
+        run: |
+          [ "$(git rev-parse HEAD)" = "$RUN_SHA" ]
+          echo "tree=$(git rev-parse HEAD:tools/eoa-upgrade-executor)" >>"$GITHUB_OUTPUT"
       - name: Validate the source inputs
         env:
           SOURCE_SHA: ${{ inputs.source_sha }}
@@ -190,12 +200,34 @@ jobs:
     environment: eoa-upgrade-${{ inputs.environment }}
     permissions:
       contents: read
+    # This job runs no action at all: every step is this repository's code,
+    # fetched with plain git at the run's commit, so nothing third-party shares
+    # the runner with the key. The tests check this.
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          sparse-checkout: tools/eoa-upgrade-executor
-          filter: blob:none
+      - name: Fetch the executor at the run's commit (plain git)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_SHA: ${{ github.sha }}
+          EXECUTOR_TREE: ${{ needs.resolve.outputs.executor_tree }}
+        run: |
+          set -euo pipefail
+          # The token reaches git through its environment, never argv, and is not stored in .git/config.
+          export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
+          GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          export GIT_CONFIG_VALUE_0
+          git init -q executor
+          git -C executor remote add origin "https://github.com/$REPO.git"
+          git -C executor sparse-checkout set tools/eoa-upgrade-executor
+          git -C executor fetch -q --depth=1 --filter=blob:none origin "$RUN_SHA"
+          git -C executor -c advice.detachedHead=false checkout -q "$RUN_SHA"
+          head="$(git -C executor rev-parse HEAD)"
+          tree="$(git -C executor rev-parse HEAD:tools/eoa-upgrade-executor)"
+          if [ "$head" != "$RUN_SHA" ] || [ "$tree" != "$EXECUTOR_TREE" ]; then
+            echo "::error::fetched $head with executor tree $tree; resolve ran $RUN_SHA with tree $EXECUTOR_TREE"
+            exit 1
+          fi
+          echo "executor tree $tree at $head"
       # Again here: re-running a failed broadcast job does not re-run preflight.
       - name: Check repository, branch and dispatcher
         env:
@@ -204,29 +236,35 @@ jobs:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           ACTOR: ${{ github.actor }}
           TRIGGERING_ACTOR: ${{ github.triggering_actor }}
-        run: tools/eoa-upgrade-executor/scripts/check-run.sh
+        run: executor/tools/eoa-upgrade-executor/scripts/check-run.sh
       - name: Install foundry (pinned by sha256)
-        run: tools/eoa-upgrade-executor/scripts/install-foundry.sh "$RUNNER_TEMP/foundry"
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: plan
-          path: plan
-      - name: Check the plan is the one resolve listed
+        run: executor/tools/eoa-upgrade-executor/scripts/install-foundry.sh "$RUNNER_TEMP/foundry"
+      # The plan is rebuilt here from the same inputs rather than downloaded,
+      # and must hash to what resolve listed and the approver saw.
+      - name: Rebuild the plan and match resolve's hash
         env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          SOURCE_PATH: ${{ inputs.path }}
+          TARGET_ENV: ${{ inputs.environment }}
+          TX_RANGE: ${{ inputs.tx_range }}
           PLAN_SHA256: ${{ needs.resolve.outputs.plan_sha256 }}
-        run: echo "$PLAN_SHA256  plan/plan.json" | sha256sum --check --strict
+        run: |
+          x=executor/tools/eoa-upgrade-executor/scripts
+          "$x/fetch.sh" --check-only "$SOURCE_SHA" "$SOURCE_PATH"
+          "$x/git-fetch.sh" "$REPO" "$SOURCE_SHA" "$SOURCE_PATH" source
+          "$x/fetch.sh" "$SOURCE_SHA" "$SOURCE_PATH" source plan
+          "$x/resolve.sh" --plan-dir plan --environment "$TARGET_ENV" --range "$TX_RANGE"
+          echo "$PLAN_SHA256  plan/plan.json" | sha256sum --check --strict
       # Approval can come hours after the simulate job: replay the whole range
-      # on a fresh fork of the tip first.
+      # on a fresh fork of the tip first. The results go to the job summary.
       - name: Re-simulate at the latest block
         run: |
           rc=0
-          tools/eoa-upgrade-executor/scripts/simulate.sh --plan-dir plan --out presend-simulation || rc=$?
+          executor/tools/eoa-upgrade-executor/scripts/simulate.sh --plan-dir plan --out presend-simulation || rc=$?
           cat presend-simulation/results.md >>"$GITHUB_STEP_SUMMARY" || true
           exit "$rc"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: presend-simulation
-          path: presend-simulation/
       # The only step that sees the key, and the last one: nothing is cached
       # or uploaded after it. Logs and the summary carry the txs and hashes.
       - name: Send
@@ -240,7 +278,7 @@ jobs:
           args=(--plan plan/plan.json --mode key --out broadcast)
           if [ "$DRY_RUN" != "false" ]; then args+=(--dry-run); fi
           rc=0
-          tools/eoa-upgrade-executor/scripts/execute.sh "${args[@]}" || rc=$?
+          executor/tools/eoa-upgrade-executor/scripts/execute.sh "${args[@]}" || rc=$?
           unset EXECUTOR_KEYSTORE EXECUTOR_KEYSTORE_PASSWORD
           cat broadcast/results.md >>"$GITHUB_STEP_SUMMARY" || true
           exit "$rc"

@@ -3,10 +3,10 @@
 #
 #   execute.sh --plan DIR/plan.json --mode impersonate|key --out DIR [--rpc-url URL] [--dry-run]
 #
-#   impersonate  for an anvil fork: each sender is impersonated (fork simulation)
+#   impersonate  for an anvil fork (--rpc-url): each sender is impersonated
 #   key          signs with the keystore in $EXECUTOR_KEYSTORE (the JSON itself)
-#                and $EXECUTOR_KEYSTORE_PASSWORD, and publishes to --rpc-url
-#                (default: the network's RPC from config.json)
+#                and $EXECUTOR_KEYSTORE_PASSWORD, against the network's two
+#                independent RPCs from config.json (rpcUrl, secondaryRpcUrl)
 #
 # The key never reaches a command line: cast has no environment variable for a
 # raw private key, so the keystore and its password are written to two 0600
@@ -14,10 +14,17 @@
 # ETH_PASSWORD (both paths) on the two commands that need them, and deleted on
 # exit. Neither value is printed.
 #
-# Right before each send: eth_call must succeed on the current state,
-# eth_estimateGas (+ buffer) gives the gas limit, and the fees are EIP-1559
-# (maxFee = baseFeeMultiplier * latest base fee + priority fee). Never legacy:
-# a legacy tx priced at eth_gasPrice can sit below the base fee forever.
+# An RPC can lie, so in key mode both RPCs must agree before anything moves on:
+# on the chain id, on the sender's nonce (latest and pending), on eth_call
+# succeeding right before each send, and on each receipt (same block hash,
+# status 1). Gas and fees take the higher answer of the two and are capped by
+# config.json (priority fee, max fee per gas, fee total per run, gas per tx).
+# The signed tx goes to both RPCs. Disagreement, a missing answer after brief
+# retries, or a cap exceeded stops the run; a cap is checked before signing.
+#
+# Fees are EIP-1559 (maxFee = baseFeeMultiplier * base fee + priority fee,
+# clamped to the cap). Never legacy: a legacy tx priced at eth_gasPrice can sit
+# below the base fee forever.
 #
 # --dry-run (key mode): runs the key check and the pre-send checks for the
 # first transaction, then stops. Nothing is signed or sent.
@@ -52,6 +59,8 @@ if [ ! -f "$plan" ] || [ -z "$out" ]; then
 fi
 case "$mode" in impersonate | key) ;; *) die "--mode must be impersonate or key" ;; esac
 if [ "$mode" = impersonate ] && [ "$dry_run" = true ]; then die "--dry-run applies to key mode only"; fi
+if [ "$mode" = impersonate ] && [ -z "$rpc" ]; then die "impersonate mode needs --rpc-url (the anvil fork)"; fi
+if [ "$mode" = key ] && [ -n "$rpc" ]; then die "key mode uses the RPCs from config.json; --rpc-url is for impersonate mode"; fi
 
 if [ "$mode" != key ]; then keystore_json="" keystore_password=""; fi
 
@@ -61,15 +70,40 @@ mkdir -p "$out"
 network="$(jq -r .network "$plan")"
 chain_id="$(jq -r .chainId "$plan")"
 [ "$chain_id" = "$(chain_id_of_network "$network")" ] || die "plan chain id $chain_id does not match config for $network"
-rpc="${rpc:-$(rpc_of_network "$network")}"
-explorer="$(cfg --arg n "$network" '.networks[$n].explorerTxUrl // ""' || true)"
+net_cfg() { jq -r --arg n "$network" ".networks[\$n].$1 // \"\"" "$CONFIG_FILE"; }
+explorer="$(net_cfg explorerTxUrl)"
 buffer_pct="$(cfg .execution.gasLimitBufferPercent)"
 max_gas="$(cfg .execution.maxTxGasLimit)"
 fee_mult="$(cfg .execution.baseFeeMultiplier)"
 receipt_timeout="$(cfg .execution.receiptTimeoutSeconds)"
 poll="$(cfg .execution.receiptPollSeconds)"
+retries="$(cfg .execution.rpcAgreementRetries)"
+priority_cap="$(net_cfg maxPriorityFeePerGasWei)"
+fee_cap="$(net_cfg maxFeePerGasWei)"
+run_budget="$(net_cfg maxRunFeeWei)"
 sender="$(jq -r '.sender // ""' "$plan")"
 count="$(jq '.transactions | length' "$plan")"
+
+# All wei amounts stay far below 2^63 so that bash arithmetic cannot wrap.
+is_uint18() { [[ "$1" =~ ^[0-9]{1,18}$ ]]; }
+for v in max_gas priority_cap fee_cap run_budget; do
+  is_uint18 "${!v}" || die "config for $network: $v must be a decimal integer below 10^18, got '${!v}'"
+done
+[ "$fee_cap" -le $((4611686018427387904 / max_gas)) ] || die "config: maxFeePerGasWei * maxTxGasLimit must stay below 2^62"
+[ "$run_budget" -le 4611686018427387904 ] || die "config: maxRunFeeWei must stay below 2^62"
+
+if [ "$mode" = key ]; then
+  rpc="$(net_cfg rpcUrl)"
+  rpc2="$(net_cfg secondaryRpcUrl)"
+  if [ -z "$rpc" ] || [ -z "$rpc2" ] || [ "$rpc" = "$rpc2" ]; then
+    die "key mode needs two different RPCs for $network in config.json (rpcUrl, secondaryRpcUrl)"
+  fi
+  rpcs=("$rpc" "$rpc2")
+else
+  rpcs=("$rpc")
+  retries=0 # one local fork: nothing to wait for
+fi
+rpc_name() { if [ "$1" = "${rpcs[0]}" ]; then echo "primary RPC"; else echo "secondary RPC"; fi; }
 
 results="$out/results.jsonl"
 : >"$results"
@@ -111,6 +145,47 @@ stop() {
   die "$@"
 }
 
+# The helpers' locals must not shadow a global the EXIT trap reads (out,
+# outcome, results, mode, ...): bash scoping is dynamic, and a stop inside a
+# helper runs the trap in the helper's scope.
+
+# consensus DESC CMD...: runs `CMD --rpc-url R` against every RPC and sets
+# $answer when all of them answer the same. Retries briefly; disagreement or a
+# missing answer then stops the run.
+consensus() {
+  local desc="$1" try=0 r resp first ok
+  shift
+  while :; do
+    first="" ok=true
+    for r in "${rpcs[@]}"; do
+      if ! resp="$("$@" --rpc-url "$r" 2>/dev/null)"; then ok=false; break; fi
+      if [ -z "$first" ]; then first="$resp"; elif [ "$resp" != "$first" ]; then ok=false; break; fi
+    done
+    if [ "$ok" = true ]; then
+      answer="$first"
+      return 0
+    fi
+    try=$((try + 1))
+    [ "$try" -le "$retries" ] || stop "the RPCs do not agree on $desc (or one did not answer); nothing more was sent"
+    sleep "$poll"
+  done
+}
+
+# max_of DESC CMD...: the highest integer answer of `CMD --rpc-url R` over the
+# RPCs (gas estimates, fees), in $answer. Every RPC must answer.
+max_of() {
+  local desc="$1" r resp best=0
+  shift
+  for r in "${rpcs[@]}"; do
+    resp="$("$@" --rpc-url "$r" 2>/dev/null)" || stop "the $(rpc_name "$r") did not answer $desc; nothing more was sent"
+    resp="$(tr -d '"' <<<"$resp")"
+    case "$resp" in 0x*) resp="$("$CAST" to-dec "$resp")" ;; esac
+    is_uint18 "$resp" || stop "the $(rpc_name "$r") answered $desc with '$resp'; nothing more was sent"
+    if [ "$resp" -gt "$best" ]; then best="$resp"; fi
+  done
+  answer="$best"
+}
+
 # ---------------------------------------------------------------- key
 if [ "$mode" = key ]; then
   if [ "$(jq -r .simulationOnly "$plan")" != false ] || [ -z "$sender" ]; then
@@ -133,35 +208,62 @@ if [ "$mode" = key ]; then
   fi
 fi
 
-require_chain_id "$rpc" "$chain_id"
+consensus "the chain id" "$CAST" chain-id
+[ "$answer" = "$chain_id" ] || stop "chain id mismatch: the RPCs serve $answer, expected $chain_id"
 
 # ---------------------------------------------------------------- helpers
 # Sets $nonce for sender $1. In key mode the loop tracks the expected nonce ($2)
-# itself: a load-balanced RPC may answer from a node that has not seen our last
-# receipt yet, so wait for it to catch up, and stop if the account moved on.
+# itself: wait until the RPCs have caught up with our last receipt, and stop if
+# the account moved on without us or has anything pending.
 next_nonce() {
-  local from="$1" expected="$2" latest pending waited=0
+  local from="$1" expected="$2" latest waited=0
   while :; do
-    latest="$("$CAST" nonce "$from" --block latest --rpc-url "$rpc")"
+    consensus "the nonce of $from" "$CAST" nonce "$from" --block latest
+    latest="$answer"
     if [ -z "$expected" ] || [ "$latest" -ge "$expected" ]; then break; fi
-    [ "$waited" -lt "$receipt_timeout" ] || stop "RPC still reports nonce $latest for $from, expected $expected"
+    [ "$waited" -lt "$receipt_timeout" ] || stop "the RPCs still report nonce $latest for $from, expected $expected"
     sleep "$poll"
     waited=$((waited + poll))
   done
   if [ -n "$expected" ] && [ "$latest" -ne "$expected" ]; then
     stop "nonce of $from is $latest, expected $expected: something else sent from this account during the run"
   fi
-  pending="$("$CAST" nonce "$from" --block pending --rpc-url "$rpc")"
-  [ "$pending" -eq "$latest" ] ||
-    stop "$from has $((pending - latest)) pending transaction(s) in the mempool; clear them before running"
+  consensus "the pending nonce of $from" "$CAST" nonce "$from" --block pending
+  [ "$answer" -eq "$latest" ] ||
+    stop "$from has $((answer - latest)) pending transaction(s) in the mempool; clear them before running"
   nonce="$latest"
 }
 
-# Sets $receipt for tx hash $1.
+# Sets $receipt for tx hash $1 once every RPC returns it with the same block
+# hash and status. Waits up to receiptTimeoutSeconds for the receipts to appear.
 wait_receipt() {
-  local hash="$1" waited=0
-  until receipt="$("$CAST" receipt --async --json "$hash" --rpc-url "$rpc" 2>/dev/null)"; do
-    [ "$waited" -lt "$receipt_timeout" ] || stop "no receipt for $hash after ${receipt_timeout}s; check it on an explorer before re-running (it may still be pending)"
+  local hash="$1" waited=0 disagreements=0 r resp fields first missing mismatch
+  while :; do
+    first="" missing="" mismatch=false
+    for r in "${rpcs[@]}"; do
+      if ! resp="$("$CAST" receipt --async --json "$hash" --rpc-url "$r" 2>/dev/null)"; then
+        missing="$(rpc_name "$r")"
+        break
+      fi
+      fields="$(jq -r '[(.transactionHash | ascii_downcase), .blockHash, .status] | join(" ")' <<<"$resp")"
+      if [ -z "$first" ]; then
+        first="$fields"
+        receipt="$resp"
+      elif [ "$fields" != "$first" ]; then
+        mismatch=true
+      fi
+    done
+    if [ -z "$missing" ] && [ "$mismatch" = false ]; then
+      [ "${first%% *}" = "$(lower "$hash")" ] || stop "the receipt returned for $hash is for another transaction"
+      return 0
+    fi
+    if [ "$mismatch" = true ]; then
+      disagreements=$((disagreements + 1))
+      [ "$disagreements" -le "$retries" ] ||
+        stop "the RPCs disagree on the receipt of $hash (block hash or status); stopping, check it on an explorer"
+    fi
+    [ "$waited" -lt "$receipt_timeout" ] ||
+      stop "no receipt for $hash from the ${missing:-other} after ${receipt_timeout}s; stopping, check it on an explorer before re-running (it may still be pending)"
     sleep "$poll"
     waited=$((waited + poll))
   done
@@ -169,6 +271,7 @@ wait_receipt() {
 
 # ---------------------------------------------------------------- loop
 expected_nonce=""
+spent=0
 n=0
 # fd 3, so that nothing in the loop body can swallow the list from stdin.
 while IFS= read -r tx <&3; do
@@ -187,24 +290,45 @@ while IFS= read -r tx <&3; do
     next_nonce "$from" "$expected_nonce"
   fi
 
-  # Simulate on the current state, right before sending.
-  if ! err="$("$CAST" call --from "$from" --value "$wei" "$to" "$data" --rpc-url "$rpc" 2>&1 >/dev/null)"; then
-    printf '%s\n' "$err" >"$out/tx-$i.failure.txt"
-    if [ "$mode" = impersonate ]; then
-      "$CAST" call --trace --from "$from" --value "$wei" "$to" "$data" --rpc-url "$rpc" >>"$out/tx-$i.failure.txt" 2>&1 || true
-    fi
-    printf '%s\n' "$err" | tail -n 3 >&2
-    stop "tx $i: eth_call reverts on the current state; nothing more was sent (details: tx-$i.failure.txt)"
-  fi
-  estimate="$("$CAST" estimate --from "$from" --value "$wei" "$to" "$data" --rpc-url "$rpc")" ||
-    stop "tx $i: eth_estimateGas failed; nothing more was sent"
-  [ "$estimate" -le "$max_gas" ] || stop "tx $i: estimated gas $estimate exceeds the per-tx cap $max_gas"
+  # Simulate on the current state of every RPC, right before sending.
+  for r in "${rpcs[@]}"; do
+    try=0
+    until err="$("$CAST" call --from "$from" --value "$wei" "$to" "$data" --rpc-url "$r" 2>&1 >/dev/null)"; do
+      try=$((try + 1))
+      if [ "$try" -gt "$retries" ]; then
+        printf '%s\n' "$err" >"$out/tx-$i.failure.txt"
+        if [ "$mode" = impersonate ]; then
+          "$CAST" call --trace --from "$from" --value "$wei" "$to" "$data" --rpc-url "$r" >>"$out/tx-$i.failure.txt" 2>&1 || true
+        fi
+        printf '%s\n' "$err" | tail -n 3 >&2
+        stop "tx $i: eth_call reverts on the current state of the $(rpc_name "$r"); nothing more was sent (details: tx-$i.failure.txt)"
+      fi
+      sleep "$poll"
+    done
+  done
+
+  max_of "eth_estimateGas" "$CAST" estimate --from "$from" --value "$wei" "$to" "$data"
+  estimate="$answer"
+  [ "$estimate" -le "$max_gas" ] || stop "tx $i: estimated gas $estimate exceeds the per-tx cap $max_gas; nothing more was sent"
   gas_limit=$((estimate * (100 + buffer_pct) / 100))
   [ "$gas_limit" -le "$max_gas" ] || gas_limit="$max_gas"
-  base_fee="$("$CAST" base-fee latest --rpc-url "$rpc")"
-  priority_fee="$("$CAST" to-dec "$("$CAST" rpc eth_maxPriorityFeePerGas --rpc-url "$rpc" | tr -d '"')")"
+  max_of "the base fee" "$CAST" base-fee latest
+  base_fee="$answer"
+  max_of "eth_maxPriorityFeePerGas" "$CAST" rpc eth_maxPriorityFeePerGas
+  priority_fee="$answer"
+
+  # Fee caps, before anything is signed.
+  [ "$priority_fee" -le "$priority_cap" ] ||
+    stop "tx $i: priority fee $priority_fee exceeds the cap $priority_cap for $network (config.json); nothing more was sent"
+  if [ "$base_fee" -gt "$fee_cap" ] || [ $((base_fee + priority_fee)) -gt "$fee_cap" ]; then
+    stop "tx $i: base fee $base_fee + priority fee $priority_fee exceeds the max fee cap $fee_cap for $network (config.json); nothing more was sent"
+  fi
   max_fee=$((base_fee * fee_mult + priority_fee))
-  log "tx $i: eth_call ok; nonce $nonce, gas $estimate -> limit $gas_limit, maxFee $max_fee, priority $priority_fee (base $base_fee)"
+  [ "$max_fee" -le "$fee_cap" ] || max_fee="$fee_cap"
+  worst=$((gas_limit * max_fee))
+  [ $((spent + worst)) -le "$run_budget" ] ||
+    stop "tx $i: worst-case fee $worst on top of the $spent wei spent exceeds this run's fee budget $run_budget for $network (config.json); nothing more was sent"
+  log "tx $i: eth_call ok; nonce $nonce, gas $estimate -> limit $gas_limit, maxFee $max_fee, priority $priority_fee (base $base_fee), worst-case fee $worst"
 
   if [ "$dry_run" = true ]; then
     log "sender balance: $("$CAST" balance --ether "$from" --rpc-url "$rpc") ETH"
@@ -219,13 +343,15 @@ while IFS= read -r tx <&3; do
       stop "tx $i: send to the fork failed"
   else
     raw="$(ETH_KEYSTORE="$key_dir/keystore.json" ETH_PASSWORD="$key_dir/password" \
-      "$CAST" mktx --chain "$chain_id" "${fee_args[@]}" "$to" "$data" --rpc-url "$rpc" 2>/dev/null)" ||
+      "$CAST" mktx --chain "$chain_id" "${fee_args[@]}" "$to" "$data" 2>/dev/null)" ||
       stop "tx $i: signing failed; nothing more was sent"
     hash="$("$CAST" keccak "$raw")"
-    log "tx $i: signed $hash; publishing"
+    log "tx $i: signed $hash; publishing to both RPCs"
     published="$("$CAST" publish --async "$raw" --rpc-url "$rpc")" ||
       stop "tx $i: publishing $hash failed; check it on an explorer before re-running"
     [ "$(lower "$published")" = "$(lower "$hash")" ] || stop "tx $i: RPC returned hash $published, signed $hash"
+    "$CAST" publish --async "$raw" --rpc-url "$rpc2" >/dev/null 2>&1 ||
+      log "tx $i: the secondary RPC did not accept it (it may already have it from the network)"
   fi
   log "tx $i: sent $hash; waiting for the receipt"
   wait_receipt "$hash"
@@ -233,6 +359,12 @@ while IFS= read -r tx <&3; do
   status="$(jq -r .status <<<"$receipt")"
   block="$("$CAST" to-dec "$(jq -r .blockNumber <<<"$receipt")")"
   gas_used="$("$CAST" to-dec "$(jq -r .gasUsed <<<"$receipt")")"
+  price="$("$CAST" to-dec "$(jq -r '.effectiveGasPrice // "0x0"' <<<"$receipt")")"
+  if is_uint18 "$gas_used" && is_uint18 "$price" && [ "$price" -le "$fee_cap" ]; then
+    spent=$((spent + gas_used * price))
+  else
+    spent=$((spent + worst))
+  fi
   jq -nc --argjson i "$i" --arg h "$hash" --arg st "$status" --argjson b "$block" --argjson gu "$gas_used" \
     --argjson gl "$gas_limit" --argjson nonce "$nonce" \
     '{index: $i, hash: $h, status: (if $st == "0x1" then "success" else "REVERTED" end),
