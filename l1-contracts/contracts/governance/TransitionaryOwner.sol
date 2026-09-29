@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.28;
 
-// solhint-disable gas-length-in-loops
-
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 /// @author Matter Labs

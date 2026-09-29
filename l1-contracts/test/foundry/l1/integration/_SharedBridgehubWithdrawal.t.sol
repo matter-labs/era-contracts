@@ -32,7 +32,7 @@ abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeploy
     address public currentUser;
     uint256 public currentChainId;
     address public currentTokenAddress = ETH_TOKEN_ADDRESS;
-    TestnetERC20Token currentToken;
+    TestnetERC20Token internal currentToken;
 
     // Total sum of withdrawn tokens, mapped by token address
     mapping(address token => uint256 deposited) public tokenSumWithdrawal;

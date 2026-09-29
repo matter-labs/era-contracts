@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {Utils} from "../Utils/Utils.sol";
 
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
@@ -15,17 +15,14 @@ import {
     NonSequentialBatch,
     PriorityOperationsRollingHashMismatch
 } from "contracts/common/L1ContractErrors.sol";
-import {PriorityOpsBatchInfo, PriorityTree} from "contracts/state-transition/libraries/PriorityTree.sol";
-import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
-import {InteropRoot} from "contracts/common/Messaging.sol";
 import {L2TransactionRequestDirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 
 contract ExecutingTest is ExecutorTest {
     using stdStorage for StdStorage;
 
-    bytes32[] priorityOpsHashes;
-    bytes32 correctRollingHash;
+    bytes32[] internal priorityOpsHashes;
+    bytes32 internal correctRollingHash;
 
     function appendPriorityOps() internal {
         for (uint256 i = 0; i < priorityOpsHashes.length; i++) {

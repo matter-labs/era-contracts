@@ -20,14 +20,14 @@ contract DummyL2AssetTracker {
     uint256 public immutable L1_CHAIN_ID = 1;
 
     /// @dev When non-zero, recording mode is active. The address to observe.
-    address public immutable recordTarget;
+    address public immutable RECORD_TARGET;
 
     enum RecordMode {
         None,
         TotalSupply,
         Balance
     }
-    RecordMode public immutable recordMode;
+    RecordMode public immutable RECORD_MODE;
 
     /// @dev Storage slot 0 — snapshot taken during handleFinalizeBaseTokenBridgingOnL2.
     uint256 public recordedValue;
@@ -42,8 +42,8 @@ contract DummyL2AssetTracker {
     uint256 public fromChainCalls;
 
     constructor(address _recordTarget, RecordMode _recordMode) {
-        recordTarget = _recordTarget;
-        recordMode = _recordMode;
+        RECORD_TARGET = _recordTarget;
+        RECORD_MODE = _recordMode;
     }
 
     function handleInitiateBaseTokenBridgingOnL2(uint256 _toChainId, uint256 _amount) external {
@@ -57,11 +57,11 @@ contract DummyL2AssetTracker {
     function handleFinalizeBaseTokenBridgingOnL2(uint256, uint256) external {
         fromChainCalls++;
 
-        if (recordTarget != address(0)) {
-            if (recordMode == RecordMode.TotalSupply) {
-                recordedValue = IERC20(recordTarget).totalSupply();
-            } else if (recordMode == RecordMode.Balance) {
-                recordedValue = recordTarget.balance;
+        if (RECORD_TARGET != address(0)) {
+            if (RECORD_MODE == RecordMode.TotalSupply) {
+                recordedValue = IERC20(RECORD_TARGET).totalSupply();
+            } else if (RECORD_MODE == RecordMode.Balance) {
+                recordedValue = RECORD_TARGET.balance;
             }
             wasCalled = true;
         }

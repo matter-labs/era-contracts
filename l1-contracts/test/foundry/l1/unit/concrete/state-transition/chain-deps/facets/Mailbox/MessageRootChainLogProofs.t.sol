@@ -3,21 +3,12 @@
 pragma solidity 0.8.28;
 
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";
-import {
-    L2CanonicalTransaction,
-    L2Log,
-    L2Message,
-    MessageInclusionProof,
-    TxStatus
-} from "contracts/common/Messaging.sol";
-import "forge-std/Test.sol";
-import {L2_TO_L1_LOG_SERIALIZE_SIZE} from "contracts/common/Config.sol";
+import {L2Log, L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {
     L2_BOOTLOADER_ADDRESS,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
-import {HashedLogIsDefault} from "contracts/common/L1ContractErrors.sol";
 
 import {MerkleTest} from "contracts/dev-contracts/test/MerkleTest.sol";
 
@@ -29,7 +20,7 @@ import {MigrationInterval} from "contracts/core/chain-asset-handler/IChainAssetH
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {L1MessageRootDev} from "contracts/dev-contracts/L1MessageRootDev.sol";
 import {MerkleTreeNoSort} from "test/foundry/l1/unit/concrete/common/libraries/Merkle/MerkleTreeNoSort.sol";
-import {MessageHashing, ProofData} from "contracts/common/libraries/MessageHashing.sol";
+import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
@@ -40,19 +31,19 @@ import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 /// settlement-layer proof with its migration-interval validation. Leaf hashing itself is covered by
 /// `Libraries/Merkle` and `Libraries/MessageHashing`, and the L2 side by `Bridgehub/L2MessageVerification`.
 contract MessageRootChainLogProofs is MailboxTest {
-    bytes32[] elements;
-    MerkleTest merkle;
-    MerkleTreeNoSort merkleTree;
-    bytes data;
-    uint256 batchNumber;
+    bytes32[] internal elements;
+    MerkleTest internal merkle;
+    MerkleTreeNoSort internal merkleTree;
+    bytes internal data;
+    uint256 internal batchNumber;
     /// @dev Cached so that proof calls made after `vm.expectRevert` do not issue an extra external call.
-    uint256 chainId;
-    bool isService;
-    uint8 shardId;
-    L1MessageRoot messageRoot;
+    uint256 internal chainId;
+    bool internal isService;
+    uint8 internal shardId;
+    L1MessageRoot internal messageRoot;
 
     /// @dev Gateway chain ID used for legacy historical migration intervals.
-    uint256 constant LEGACY_GW_CHAIN_ID = 1;
+    uint256 internal constant LEGACY_GW_CHAIN_ID = 1;
 
     function setUp() public virtual {
         setupDiamondProxy();
@@ -267,7 +258,7 @@ contract MessageRootChainLogProofs is MailboxTest {
         bytes32 secondL2TxHash = keccak256("SecondL2Transaction");
         TxStatus txStatus = TxStatus.Success;
 
-        uint256 firstLogIndex = _addHashedLogToMerkleTree({
+        _addHashedLogToMerkleTree({
             _shardId: shardId,
             _isService: isService,
             _txNumberInBatch: 0,
@@ -614,7 +605,7 @@ contract MessageRootChainLogProofs is MailboxTest {
         uint16 _l2TxNumberInBatch,
         bytes32[] memory _merkleProof,
         TxStatus _status
-    ) internal returns (bool) {
+    ) internal view returns (bool) {
         bool retOldEncoding = messageRoot.proveL1ToL2TransactionStatusShared({
             _chainId: chainId,
             _l2TxHash: _l2TxHash,
@@ -720,7 +711,7 @@ contract MessageRootChainLogProofs is MailboxTest {
     }
 
     /// @notice Appends the proof metadata to the log proof as if the proof is for a batch that settled on L1.
-    function _appendProofMetadata(bytes32[] memory logProof) internal returns (bytes32[] memory result) {
+    function _appendProofMetadata(bytes32[] memory logProof) internal pure returns (bytes32[] memory result) {
         result = new bytes32[](logProof.length + 1);
 
         result[0] = _composeMetadata(logProof.length, 0, true);
@@ -756,7 +747,7 @@ contract MessageRootChainLogProofs is MailboxTest {
 
     function _composeRecursiveProof(
         RecursiveProofInfo memory info
-    ) internal returns (bytes32[] memory proof, bytes32 chainBRoot) {
+    ) internal view returns (bytes32[] memory proof, bytes32 chainBRoot) {
         uint256 ptr;
         proof = new bytes32[](
             1 + info.logProof.length + 1 + 1 + info.batchProof.length + 2 + 1 + info.chainIdProof.length

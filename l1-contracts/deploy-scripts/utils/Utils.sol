@@ -1,14 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-// solhint-disable gas-custom-errors, reason-string
-
 import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/Script.sol";
 import {BytecodeUtils} from "./bytecode/BytecodeUtils.s.sol";
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
-import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 import {IAccessControlDefaultAdminRules} from "@openzeppelin/contracts-v4/access/IAccessControlDefaultAdminRules.sol";
 
@@ -21,8 +18,6 @@ import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
-import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {EIP712Utils} from "./EIP712Utils.sol";
 import {IProtocolUpgradeHandler} from "../interfaces/IProtocolUpgradeHandler.sol";
@@ -113,6 +108,7 @@ address constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
 library Utils {
     // Cheatcodes address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
+    // solhint-disable-next-line const-name-snakecase
     Vm internal constant vm = Vm(VM_ADDRESS);
     // Create2Factory deterministic bytecode.
     // https://github.com/Arachnid/deterministic-deployment-proxy
@@ -199,6 +195,7 @@ library Utils {
 
     function getAllSelectorsForFacet(string memory facetName) internal returns (bytes4[] memory) {
         // TODO(EVM-746): use forge to read the bytecode
+        // solhint-disable-next-line func-named-parameters
         string memory path = string.concat("/../l1-contracts/out/", facetName, ".sol/", facetName, "Facet.json");
         bytes memory bytecode = BytecodeUtils.readFoundryDeployedBytecode(path);
         return getAllSelectors(bytecode);
@@ -593,16 +590,16 @@ library Utils {
         (
             L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
             uint256 requiredValueToDeploy
-        ) = prepareL1L2TransactionTwoBridges(
-                l1GasPrice,
-                l2GasLimit,
-                chainId,
-                bridgehubAddress,
-                secondBridgeAddress,
-                secondBridgeValue,
-                secondBridgeCalldata,
-                refundRecipient
-            );
+        ) = prepareL1L2TransactionTwoBridges({
+                l1GasPrice: l1GasPrice,
+                l2GasLimit: l2GasLimit,
+                chainId: chainId,
+                bridgehubAddress: bridgehubAddress,
+                secondBridgeAddress: secondBridgeAddress,
+                secondBridgeValue: secondBridgeValue,
+                secondBridgeCalldata: secondBridgeCalldata,
+                refundRecipient: refundRecipient
+            });
 
         (uint256 ethAmountToPass, Call[] memory newCalls) = prepareApproveBaseTokenGovernanceCalls(
             IL1Bridgehub(bridgehubAddress),
@@ -718,16 +715,16 @@ library Utils {
         (
             L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
             uint256 requiredValueToDeploy
-        ) = prepareL1L2TransactionTwoBridges(
-                l1GasPrice,
-                l2GasLimit,
-                chainId,
-                bridgehubAddress,
-                secondBridgeAddress,
-                secondBridgeValue,
-                secondBridgeCalldata,
-                refundRecipient
-            );
+        ) = prepareL1L2TransactionTwoBridges({
+                l1GasPrice: l1GasPrice,
+                l2GasLimit: l2GasLimit,
+                chainId: chainId,
+                bridgehubAddress: bridgehubAddress,
+                secondBridgeAddress: secondBridgeAddress,
+                secondBridgeValue: secondBridgeValue,
+                secondBridgeCalldata: secondBridgeCalldata,
+                refundRecipient: refundRecipient
+            });
 
         // 2) Prepare approval calls if base token != ETH
         (uint256 ethAmountToPass, Call[] memory approvalCalls) = prepareApproveBaseTokenAdminCalls(
@@ -768,18 +765,18 @@ library Utils {
         address refundRecipient
     ) internal returns (bytes32 txHash) {
         // 1) Prepare the calls (no actual execution done here)
-        Call[] memory calls = prepareAdminL1L2DirectTransaction(
-            gasPrice,
-            l2Calldata,
-            l2GasLimit,
-            factoryDeps,
-            dstAddress,
-            0,
-            chainId,
-            bridgehubAddress,
-            l1SharedBridgeProxy,
-            refundRecipient
-        );
+        Call[] memory calls = prepareAdminL1L2DirectTransaction({
+            gasPrice: gasPrice,
+            l2Calldata: l2Calldata,
+            l2GasLimit: l2GasLimit,
+            factoryDeps: factoryDeps,
+            dstAddress: dstAddress,
+            l2Value: 0,
+            chainId: chainId,
+            bridgehubAddress: bridgehubAddress,
+            l1SharedBridgeProxy: l1SharedBridgeProxy,
+            refundRecipient: refundRecipient
+        });
 
         console.log("Executing transaction");
         // 2) Record logs before we do the actual execution
@@ -813,17 +810,17 @@ library Utils {
         address refundRecipient
     ) internal returns (bytes32 txHash) {
         // 1) Prepare the calls
-        Call[] memory calls = prepareAdminL1L2TwoBridgesTransaction(
-            l1GasPrice,
-            l2GasLimit,
-            chainId,
-            bridgehubAddress,
-            l1SharedBridgeProxy,
-            secondBridgeAddress,
-            secondBridgeValue,
-            secondBridgeCalldata,
-            refundRecipient
-        );
+        Call[] memory calls = prepareAdminL1L2TwoBridgesTransaction({
+            l1GasPrice: l1GasPrice,
+            l2GasLimit: l2GasLimit,
+            chainId: chainId,
+            bridgehubAddress: bridgehubAddress,
+            l1SharedBridgeProxy: l1SharedBridgeProxy,
+            secondBridgeAddress: secondBridgeAddress,
+            secondBridgeValue: secondBridgeValue,
+            secondBridgeCalldata: secondBridgeCalldata,
+            refundRecipient: refundRecipient
+        });
 
         console.log("Executing transaction");
         // 2) Record logs
@@ -873,14 +870,14 @@ library Utils {
                 })
             );
 
-        requiredValueToDeploy = approveBaseTokenGovernance(
-            IL1Bridgehub(bridgehubAddress),
-            l1SharedBridgeProxy,
-            governor,
-            salt,
-            chainId,
-            requiredValueToDeploy
-        );
+        requiredValueToDeploy = approveBaseTokenGovernance({
+            bridgehub: IL1Bridgehub(bridgehubAddress),
+            l1SharedBridgeProxy: l1SharedBridgeProxy,
+            governor: governor,
+            salt: salt,
+            chainId: chainId,
+            amountToApprove: requiredValueToDeploy
+        });
 
         bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
             IL1Bridgehub.requestL2TransactionDirect,
@@ -889,7 +886,14 @@ library Utils {
 
         console.log("Executing transaction");
         vm.recordLogs();
-        executeUpgrade(governor, salt, bridgehubAddress, l2TransactionRequestDirectCalldata, requiredValueToDeploy, 0);
+        executeUpgrade({
+            _governor: governor,
+            _salt: salt,
+            _target: bridgehubAddress,
+            _data: l2TransactionRequestDirectCalldata,
+            _value: requiredValueToDeploy,
+            _delay: 0
+        });
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed successfully! Extracting logs...");
 
@@ -916,25 +920,25 @@ library Utils {
         (
             L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
             uint256 requiredValueToDeploy
-        ) = prepareL1L2TransactionTwoBridges(
-                l1GasPrice,
-                l2GasLimit,
-                chainId,
-                bridgehubAddress,
-                secondBridgeAddress,
-                secondBridgeValue,
-                secondBridgeCalldata,
-                msg.sender
-            );
+        ) = prepareL1L2TransactionTwoBridges({
+                l1GasPrice: l1GasPrice,
+                l2GasLimit: l2GasLimit,
+                chainId: chainId,
+                bridgehubAddress: bridgehubAddress,
+                secondBridgeAddress: secondBridgeAddress,
+                secondBridgeValue: secondBridgeValue,
+                secondBridgeCalldata: secondBridgeCalldata,
+                refundRecipient: msg.sender
+            });
 
-        requiredValueToDeploy = approveBaseTokenGovernance(
-            IL1Bridgehub(bridgehubAddress),
-            l1SharedBridgeProxy,
-            governor,
-            salt,
-            chainId,
-            requiredValueToDeploy
-        );
+        requiredValueToDeploy = approveBaseTokenGovernance({
+            bridgehub: IL1Bridgehub(bridgehubAddress),
+            l1SharedBridgeProxy: l1SharedBridgeProxy,
+            governor: governor,
+            salt: salt,
+            chainId: chainId,
+            amountToApprove: requiredValueToDeploy
+        });
 
         bytes memory l2TransactionRequestCalldata = abi.encodeCall(
             IL1Bridgehub.requestL2TransactionTwoBridges,
@@ -943,7 +947,14 @@ library Utils {
 
         console.log("Executing transaction");
         vm.recordLogs();
-        executeUpgrade(governor, salt, bridgehubAddress, l2TransactionRequestCalldata, requiredValueToDeploy, 0);
+        executeUpgrade({
+            _governor: governor,
+            _salt: salt,
+            _target: bridgehubAddress,
+            _data: l2TransactionRequestCalldata,
+            _value: requiredValueToDeploy,
+            _delay: 0
+        });
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed successfully! Extracting logs...");
 
@@ -970,7 +981,14 @@ library Utils {
 
             bytes memory approvalCalldata = abi.encodeCall(baseToken.approve, (l1SharedBridgeProxy, amountToApprove));
 
-            executeUpgrade(governor, salt, address(baseToken), approvalCalldata, 0, 0);
+            executeUpgrade({
+                _governor: governor,
+                _salt: salt,
+                _target: address(baseToken),
+                _data: approvalCalldata,
+                _value: 0,
+                _delay: 0
+            });
 
             ethAmountToPass = 0;
         } else {

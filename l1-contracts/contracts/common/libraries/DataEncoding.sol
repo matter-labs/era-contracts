@@ -88,7 +88,6 @@ library DataEncoding {
         uint256 _amount,
         bytes memory _erc20Metadata
     ) internal pure returns (bytes memory) {
-        // solhint-disable-next-line func-named-parameters
         return abi.encode(_originalCaller, _remoteReceiver, _originToken, _amount, _erc20Metadata);
     }
 
@@ -218,7 +217,6 @@ library DataEncoding {
         bytes32 _assetId,
         bytes memory _transferData
     ) internal pure returns (bytes memory) {
-        // solhint-disable-next-line func-named-parameters
         return
             abi.encodePacked(
                 IAssetRouterShared.finalizeDeposit.selector,

@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "gas-calldata-parameters": "off",
+    "gas-custom-errors": "off",
+    "gas-increment-by-one": "off",
+    "gas-length-in-loops": "off",
+    "gas-struct-packing": "off",
+    "reason-string": "off"
+  }
+}

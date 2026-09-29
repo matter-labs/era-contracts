@@ -91,7 +91,6 @@ interface IAdminFunctions {
     /// {PubdataContent}) so this struct stays encodable from the generated ABI: a Solidity enum
     /// inside a struct reaches the artifact JSON as a named type that ABI-driven bindings cannot
     /// resolve. Both are cast on use, and encode identically either way.
-    // solhint-disable-next-line gas-struct-packing
     struct ChainUpgradeParams {
         address chainAddress;
         address adminAddr;

@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {UncheckedMathSharedTest} from "./_UncheckedMath_Shared.t.sol";
 
 contract UncheckedIncTest is UncheckedMathSharedTest {
-    function test_Inc() public {
+    function test_Inc() public view {
         uint256 a = 1234;
         uint256 c = uncheckedMath.uncheckedInc(a);
         assertEq(c, 1235);

@@ -2,11 +2,6 @@
 pragma solidity 0.8.28;
 
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
-import {
-    IBridgehubBase,
-    L2TransactionRequestDirect,
-    L2TransactionRequestTwoBridgesOuter
-} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 
@@ -14,13 +9,10 @@ import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,
-    L2_NATIVE_TOKEN_VAULT_ADDR,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
@@ -33,8 +25,6 @@ import {
     NotSystemContext
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 import {NotAssetRouter, MigrationPaused, ChainMigrationsDisabled} from "contracts/common/L1ContractErrors.sol";
-
-import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
@@ -58,12 +48,12 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
     using stdStorage for StdStorage;
     using LogFinder for Vm.Log[];
 
-    uint256 constant TEST_USERS_COUNT = 10;
+    uint256 internal constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
     bytes32 public l2TokenAssetId;
     address public tokenL1Address;
-    SimpleExecutor simpleExecutor;
+    SimpleExecutor internal simpleExecutor;
 
     IL2ChainAssetHandler public l2ChainAssetHandler;
 
@@ -85,7 +75,6 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
 
     function setUp() public {
         prepare();
-        bytes32 ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(eraZKChainId, ETH_TOKEN_ADDRESS);
 
         vm.mockCall(
             address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler),

@@ -31,14 +31,14 @@ contract ZKsyncOSVerifierPlonkTest is Test {
     /// itself, but as `internal constant`, so they cannot be read from here. Currently unused:
     /// they are the offsets the two reduction tests named in the TODO above apply, and are kept
     /// so restoring those tests needs only the proof fixture.
-    uint256 constant Q_MOD = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
-    uint256 constant R_MOD = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
+    uint256 internal constant Q_MOD = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+    uint256 internal constant R_MOD = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
 
     /// @dev The verification key hash recorded in the generated contract's header comment. Asserting
     /// it here ties the key the contract actually loads to the one its header claims. A rotation of
     /// the committed key is expected to fail this test: update the constant as part of that change,
     /// deliberately, rather than treating the failure as flaky.
-    bytes32 constant EXPECTED_VK_HASH = 0x29651d5f044e1671ff820f85018ed87b26f57402222eb31dd453206e2379bc9c;
+    bytes32 internal constant EXPECTED_VK_HASH = 0x29651d5f044e1671ff820f85018ed87b26f57402222eb31dd453206e2379bc9c;
 
     uint256[] public publicInputs;
     uint256[] public serializedProof;

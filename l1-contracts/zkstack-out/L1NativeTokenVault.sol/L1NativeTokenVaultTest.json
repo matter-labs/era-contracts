@@ -215,7 +215,7 @@
     "name": "test_ASSET_ROUTER",
     "inputs": [],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "view"
   },
   {
     "type": "function",

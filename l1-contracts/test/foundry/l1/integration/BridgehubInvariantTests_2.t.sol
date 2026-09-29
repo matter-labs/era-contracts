@@ -3,20 +3,12 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {console2 as console} from "forge-std/console2.sol";
+import {BridgehubInvariantTests1} from "test/foundry/l1/integration/BridgehubInvariantTests_1.t.sol";
 
-import {
-    IL1Bridgehub,
-    L2TransactionRequestDirect,
-    L2TransactionRequestTwoBridgesOuter
-} from "contracts/core/bridgehub/IL1Bridgehub.sol";
-
-import {BridgehubInvariantTests_1} from "test/foundry/l1/integration/BridgehubInvariantTests_1.t.sol";
-
-contract BoundedBridgehubInvariantTests_2 is BridgehubInvariantTests_1 {
+contract BoundedBridgehubInvariantTests2 is BridgehubInvariantTests1 {
     function depositEthSuccess(uint256 userIndexSeed, uint256 chainIndexSeed, uint256 l2Value) public {
         uint64 MAX = 2 ** 64 - 1;
-        uint256 l2Value = bound(l2Value, 0.1 ether, MAX);
+        l2Value = bound(l2Value, 0.1 ether, MAX);
 
         emit log_string("DEPOSIT ETH");
         super.depositEthToBridgeSuccess(userIndexSeed, chainIndexSeed, l2Value);
@@ -29,7 +21,7 @@ contract BoundedBridgehubInvariantTests_2 is BridgehubInvariantTests_1 {
         uint256 l2Value
     ) public {
         uint64 MAX = 2 ** 64 - 1;
-        uint256 l2Value = bound(l2Value, 0.1 ether, MAX);
+        l2Value = bound(l2Value, 0.1 ether, MAX);
 
         emit log_string("DEPOSIT ERC20");
         super.depositERC20ToBridgeSuccess(userIndexSeed, chainIndexSeed, tokenIndexSeed, l2Value);
@@ -37,7 +29,7 @@ contract BoundedBridgehubInvariantTests_2 is BridgehubInvariantTests_1 {
 
     function withdrawERC20Success(uint256 userIndexSeed, uint256 chainIndexSeed, uint256 amountToWithdraw) public {
         uint64 MAX = (2 ** 32 - 1) + 0.1 ether;
-        uint256 amountToWithdraw = bound(amountToWithdraw, 0.1 ether, MAX);
+        amountToWithdraw = bound(amountToWithdraw, 0.1 ether, MAX);
 
         emit log_string("WITHDRAW ERC20");
         super.withdrawSuccess(userIndexSeed, chainIndexSeed, amountToWithdraw);
@@ -48,10 +40,10 @@ contract BoundedBridgehubInvariantTests_2 is BridgehubInvariantTests_1 {
 }
 
 contract InvariantTesterZKChains is Test {
-    BoundedBridgehubInvariantTests_2 tests;
+    BoundedBridgehubInvariantTests2 internal tests;
 
     function setUp() public {
-        tests = new BoundedBridgehubInvariantTests_2();
+        tests = new BoundedBridgehubInvariantTests2();
         // tests.prepare();
     }
     // TODO(EVM-1391): Invariant testing currently commented out. Harness ready but unused

@@ -35,7 +35,7 @@ library ContractsBytecodesLib {
         ];
 
         uint256 DA_CONTRACT_IDENTIFIERS_LENGTH = DA_CONTRACT_IDENTIFIERS.length;
-        for (uint i = 0; i < DA_CONTRACT_IDENTIFIERS_LENGTH; i++) {
+        for (uint256 i = 0; i < DA_CONTRACT_IDENTIFIERS_LENGTH; i++) {
             if (Utils.compareStrings(DA_CONTRACT_IDENTIFIERS[i], contractIdentifier)) {
                 return Utils.readDAContractBytecode(contractIdentifier);
             }

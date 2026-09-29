@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// solhint-disable no-console, gas-custom-errors
-
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {Utils} from "../utils/Utils.sol";
 
 // Note that the `ProtocolUpgradeHandler` uses `OpenZeppeling v5`.
-interface ProxyAdminV5 {
+interface IProxyAdminV5 {
     function upgradeAndCall(address proxy, address implementation, bytes memory data) external;
 }
 
@@ -56,7 +54,7 @@ contract AppendProtocolUpgradeHandlerUpgrade is Script {
             Call({
                 target: transparentProxyAdmin,
                 data: abi.encodeCall(
-                    ProxyAdminV5.upgradeAndCall,
+                    IProxyAdminV5.upgradeAndCall,
                     (protocolUpgradeHandlerProxyAddress, protocolUpgradeHandlerImplAddress, hex"")
                 ),
                 value: 0

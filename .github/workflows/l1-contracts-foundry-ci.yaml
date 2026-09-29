@@ -44,6 +44,9 @@ jobs:
         working-directory: ./l1-contracts
         run: forge build deploy-scripts
 
+      - name: Check solc warnings
+        run: yarn l1 solc-warnings && yarn da solc-warnings
+
       - name: Create cache
         uses: actions/cache/save@v4
         with:
