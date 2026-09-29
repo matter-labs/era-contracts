@@ -4,6 +4,7 @@ use crate::{
 };
 use colored::Colorize;
 use once_cell::sync::OnceCell;
+use std::collections::BTreeMap;
 use std::fs;
 use std::process;
 use std::{
@@ -40,9 +41,13 @@ use zksync_types::{
 };
 
 mod hook;
+mod hook_sequence;
 mod test_count_tracer;
 mod tracer;
 mod transaction_generator;
+
+/// Operator address used when running the production bootloader for the hook-sequence check.
+const PRODUCTION_CHECK_OPERATOR_BYTE: u8 = 0x01;
 
 fn get_balance_key(address: Address) -> StorageKey {
     let account_id = AccountTreeId::new(L2_BASE_TOKEN_ADDRESS);
@@ -363,6 +368,7 @@ fn execute_internal_bootloader_test() {
     };
     println!(" ==== Running {} tests ====", test_count);
 
+    let fixture_tx_count = load_test_transactions().len() as u32;
     let mut tests_failed: u32 = 0;
 
     // Now we iterate over the tests.
@@ -388,6 +394,7 @@ fn execute_internal_bootloader_test() {
         let tx_failure_data_hex = Arc::new(OnceCell::default());
         let expectations = Arc::new(Mutex::new(Expectations::default()));
         let test_name = Arc::new(OnceCell::default());
+        let operator_hook_counts = Arc::new(Mutex::new(BTreeMap::new()));
 
         let custom_tracers = BootloaderTestTracer::new(
             test_result.clone(),
@@ -396,6 +403,7 @@ fn execute_internal_bootloader_test() {
             tx_failure_data_hex.clone(),
             expectations.clone(),
             test_name.clone(),
+            operator_hook_counts.clone(),
         )
         .into_tracer_pointer();
         let mut tracer_dispatcher = TracerDispatcher::from(custom_tracers);
@@ -426,6 +434,10 @@ fn execute_internal_bootloader_test() {
             .unwrap()
             .into_inner()
             .unwrap_or_default();
+        let operator_hook_counts = Arc::into_inner(operator_hook_counts)
+            .unwrap()
+            .into_inner()
+            .unwrap();
 
         // An `INT_TEST_*` runs the whole batch, so one that registers nothing passes vacuously.
         let asserted_something = requested_assert.is_some()
@@ -539,6 +551,16 @@ fn execute_internal_bootloader_test() {
             ));
         }
 
+        // Integration tests let the regular transaction flow run over all fixtures, so they double
+        // as the regression check that every operator VM hook the server relies on is emitted.
+        if test_name.starts_with("INT_TEST") && matches!(test_result, Some(Ok(()))) {
+            if let Err(error) =
+                hook_sequence::check_operator_hooks(&operator_hook_counts, fixture_tx_count)
+            {
+                test_result = Some(Err(error));
+            }
+        }
+
         match &test_result.unwrap() {
             Ok(_) => println!("{} {}", "[PASS]".green(), test_name),
             Err(error_info) => {
@@ -547,6 +569,28 @@ fn execute_internal_bootloader_test() {
             }
         }
     }
+    // The unit tests only ever execute `bootloader_test`; make sure the production bootloader
+    // emits the same hook sequence.
+    println!("\n === Checking production bootloader hooks");
+    match check_production_bootloader_hooks(
+        &repo,
+        artifacts_location,
+        chain_id,
+        &system_env,
+        &l1_batch_env,
+        fixture_tx_count,
+    ) {
+        Ok(()) => println!("{} proved_batch operator VM hooks", "[PASS]".green()),
+        Err(error) => {
+            tests_failed += 1;
+            println!(
+                "{} proved_batch operator VM hooks {}",
+                "[FAIL]".red(),
+                error
+            )
+        }
+    }
+
     if tests_failed > 0 {
         println!("{}", format!("{} tests failed.", tests_failed).red());
         process::exit(1);
@@ -567,4 +611,79 @@ fn main() {
     } else {
         execute_internal_bootloader_test();
     }
+}
+
+/// Runs the production `proved_batch` bootloader over the fixture transactions and checks the
+/// operator VM hook sequence it emits. Nothing else in the repository's CI executes the compiled
+/// production bootloader, so this is the one place that notices it silently dropping hooks.
+fn check_production_bootloader_hooks(
+    repo: &SystemContractsRepo,
+    artifacts_location: &str,
+    chain_id: L2ChainId,
+    system_env: &SystemEnv,
+    l1_batch_env: &L1BatchEnv,
+    fixture_tx_count: u32,
+) -> Result<(), String> {
+    let bytecode = repo.read_sys_contract_bytecode(
+        artifacts_location,
+        "proved_batch",
+        Some("Bootloader"),
+        ContractLanguage::Yul,
+    );
+    let hash = BytecodeHash::for_bytecode(&bytecode).value();
+    let mut system_env = system_env.clone();
+    system_env.base_system_smart_contracts.bootloader = SystemContractCode {
+        code: bytecode,
+        hash,
+    };
+    let mut l1_batch_env = l1_batch_env.clone();
+    l1_batch_env.fee_account = Address::repeat_byte(PRODUCTION_CHECK_OPERATOR_BYTE);
+
+    let storage = StorageView::new(InMemoryStorage::with_custom_system_contracts_and_chain_id(
+        chain_id,
+        get_system_smart_contracts_from_dir(env::current_dir().unwrap().join("../../")),
+    ))
+    .to_rc_ptr();
+    let mut vm: Vm<_, HistoryDisabled> = Vm::new(l1_batch_env, system_env, storage.clone());
+
+    let operator_hook_counts = Arc::new(Mutex::new(BTreeMap::new()));
+    let tracer = BootloaderTestTracer::new(
+        Arc::new(OnceCell::default()),
+        Arc::new(OnceCell::default()),
+        Arc::new(OnceCell::default()),
+        Arc::new(OnceCell::default()),
+        Arc::new(OnceCell::default()),
+        operator_hook_counts.clone(),
+    )
+    .into_tracer_pointer();
+    let mut tracer_dispatcher = TracerDispatcher::from(tracer);
+
+    for tx in load_test_transactions() {
+        storage.borrow_mut().set_value(
+            get_balance_key(tx.initiator_account()),
+            u256_to_h256(U256::MAX),
+        );
+        vm.push_transaction(tx);
+    }
+
+    let result = vm.inspect(&mut tracer_dispatcher, InspectExecutionMode::Bootloader);
+    drop(tracer_dispatcher);
+    let operator_hook_counts = Arc::into_inner(operator_hook_counts)
+        .unwrap()
+        .into_inner()
+        .unwrap();
+
+    match &result.result {
+        ExecutionResult::Success { .. } => {}
+        ExecutionResult::Revert { output } => {
+            return Err(format!(
+                "production bootloader reverted: {}",
+                output.to_user_friendly_string()
+            ))
+        }
+        ExecutionResult::Halt { reason } => {
+            return Err(format!("production bootloader halted: {reason}"))
+        }
+    }
+    hook_sequence::check_operator_hooks(&operator_hook_counts, fixture_tx_count)
 }

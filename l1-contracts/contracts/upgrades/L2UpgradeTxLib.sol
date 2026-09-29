@@ -6,6 +6,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/
 
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
+import {IL1SharedBridgeLegacy} from "../bridge/interfaces/IL1SharedBridgeLegacy.sol";
 import {INativeTokenVaultBase} from "../bridge/ntv/INativeTokenVaultBase.sol";
 import {IL2V31Upgrade} from "./IL2V31Upgrade.sol";
 import {UnexpectedUpgradeSelector} from "../common/L1ContractErrors.sol";
@@ -94,7 +95,8 @@ library L2UpgradeTxLib {
         return
             abi.encode(
                 ZKChainSpecificForceDeploymentsData({
-                    l2LegacySharedBridge: address(0),
+                    // Read from L1; the L2 side no longer stores it after the v31 code replacement.
+                    l2LegacySharedBridge: IL1SharedBridgeLegacy(assetRouter).l2BridgeAddress(_chainId),
                     predeployedL2WethAddress: address(0),
                     baseTokenL1Address: originToken,
                     baseTokenMetadata: TokenMetadata({
