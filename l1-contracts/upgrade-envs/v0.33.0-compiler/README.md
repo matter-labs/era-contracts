@@ -68,8 +68,12 @@ and the script's factory-dep check against the genesis hashes will fail on it.
 --deployer-address <deployer>` and `protocol_ops ecosystem replay-bundle --bundle <dir> --rpc
 <rpc> --key <deployer key>`.
 
-2. Execute governance stages 0, 1 and 2 from `output/stage/ecosystem.toml`. On stage they run
-   through the emergency upgrade board, as the v0.32.x upgrades did.
+2. Execute governance stages 0, 1 and 2 from `output/stage/ecosystem.toml` through the emergency
+   upgrade board, as one proposal: there is no upgrade timer between the stages, so executing them
+   atomically is equivalent. `output/stage/emergency-upgrade-board.json` lists the transactions:
+   twelve `approveHash` calls on the Guardian, Security Council and ZK Foundation Safes, sent from
+   the Safes' owner, then `executeEmergencyUpgrade`. Regenerate it read-only with
+   `forge script deploy-scripts/upgrade/EmergencyStageUpgradeCalldata.s.sol:EmergencyStageUpgradeCalldata --sig 'runV33CompilerStage()' --rpc-url "$SEPOLIA_RPC"`.
 
 3. For each chain, the chain admin's owner sends `chain_upgrades.<id>.chain_admin_calldata` to
    `chain_upgrades.<id>.chain_admin`. `protocol_ops chain upgrade --env stage --chain-id <id>`
