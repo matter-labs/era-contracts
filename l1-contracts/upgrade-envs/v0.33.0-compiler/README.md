@@ -40,7 +40,9 @@ a plain force deployment would reset.
   `test_create_chain_era` creates chain 555 from the new creation parameters as the bridgehub admin.
   `test_upgrade_chain_era` is chain 499's upgrade call, sent by its ChainAdmin contract.
 - `rehearse-stage.sh` runs the whole flow on a Sepolia fork, creates the test chain, and asserts the
-  L1 end state.
+  L1 end state. With `L1_RPC_URL` and `ECOSYSTEM_TOML` it checks a fork the bundle was already
+  replayed on; with `--published-only` it only checks publication, read-only.
+- `upgrade.toml` tells the shared generate and deploy workflows how to prepare and check this upgrade.
 
 Script: `deploy-scripts/upgrade/v33/CTMUpgrade_v33.s.sol`.
 
@@ -50,18 +52,21 @@ The bytecodes must come from the Linux CI build (`build-artifacts` of the branch
 run, placed into `{system,l1,l2}-contracts/zkout`). A macOS zksolc build produces different hashes,
 and the script's factory-dep check against the genesis hashes will fail on it.
 
-1. Publish the factory deps on Sepolia. This step is permissionless and idempotent, and it
-   regenerates the output as a side effect:
+1. Publish the factory deps on Sepolia with the shared upgrade workflows. `upgrade.toml` in this
+   directory tells them how this upgrade is prepared and checked.
+   - **Ecosystem Upgrade Calldata** with `upgrade = v0.33.0-compiler`, `environment = stage`. It runs
+     `CTMUpgrade_v33.prepare` as a dry run on a Sepolia fork, packs the deployer's publishing
+     transactions into a deploy bundle, replays the bundle on a fresh fork and runs
+     `rehearse-stage.sh` against it.
+   - **Ecosystem Upgrade: Deploy + Verify** with `generate_run_id` set to that run and
+     `run_verify = false` (nothing is deployed, so there is nothing for Etherscan). It broadcasts
+     the bundle with the Sepolia deployer, then runs `rehearse-stage.sh --published-only`, a
+     read-only check that every factory dep is published.
 
-   ```bash
-   cd l1-contracts
-   forge script deploy-scripts/upgrade/v33/CTMUpgrade_v33.s.sol:CTMUpgrade_v33 \
-     --sig 'prepare(string,string)' /upgrade-envs/v0.33.0-compiler/stage.toml \
-     /upgrade-envs/v0.33.0-compiler/output/stage/ecosystem.toml \
-     --rpc-url "$SEPOLIA_RPC" --broadcast --private-key "$DEPLOYER_KEY" --legacy --slow
-   ```
-
-   A fork run costs about 43M gas across the publishing transactions.
+   Publishing is permissionless and idempotent. It costs about 43M gas. Locally, the same steps are
+   `protocol_ops ecosystem rehearse-upgrade --upgrade v0.33.0-compiler --env stage --fork-url <rpc>
+--deployer-address <deployer>` and `protocol_ops ecosystem replay-bundle --bundle <dir> --rpc
+<rpc> --key <deployer key>`.
 
 2. Execute governance stages 0, 1 and 2 from `output/stage/ecosystem.toml`. On stage they run
    through the emergency upgrade board, as the v0.32.x upgrades did.

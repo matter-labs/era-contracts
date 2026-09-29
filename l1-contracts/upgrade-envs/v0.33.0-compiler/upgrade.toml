@@ -1,0 +1,14 @@
+# How the generate / replay / deploy pipeline handles this upgrade
+# (protocol-ops/src/common/upgrade_descriptor.rs). One forge script prepares it; its only L1
+# transactions publish the L2 factory deps into stage's BytecodesSupplier.
+prepare = "forge-script"
+script = "deploy-scripts/upgrade/v33/CTMUpgrade_v33.s.sol:CTMUpgrade_v33"
+signature = "prepare(string,string)"
+args = [
+  "/upgrade-envs/v0.33.0-compiler/{env}.toml",
+  "/upgrade-envs/v0.33.0-compiler/output/{env}/ecosystem.toml",
+]
+# On the fork the bundle was replayed on: governance stages, the chain upgrade, a test chain, L1 assertions.
+verify_fork = ["bash", "upgrade-envs/v0.33.0-compiler/rehearse-stage.sh"]
+# Read-only against the real chain: every factory dep is published.
+verify_chain = ["bash", "upgrade-envs/v0.33.0-compiler/rehearse-stage.sh", "--published-only"]

@@ -10,30 +10,46 @@
 # {system,l1,l2}-contracts/zkout (a macOS zksolc build produces different hashes).
 # Usage: L1_FORK_URL=<sepolia archive rpc> ./rehearse-stage.sh      (PORT defaults to 8633)
 # Only the anvil it starts is stopped (by PID).
+#
+# The generate / deploy pipeline (upgrade.toml in this directory) reuses it:
+#   L1_RPC_URL=<fork>  ECOSYSTEM_TOML=<bundle's toml>  — check a fork the bundle was already
+#       replayed on: no anvil is started and step 1 is skipped.
+#   ... --published-only — read-only: only check every factory dep is published, then stop.
+#       Safe against a real chain.
 set -uo pipefail
 
-: "${L1_FORK_URL:?set L1_FORK_URL to a Sepolia RPC}"
+PUBLISHED_ONLY=0
+[ "${1:-}" = "--published-only" ] && PUBLISHED_ONLY=1
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 WT=$(cd "$HERE/../.." && pwd)
 S=$(mktemp -d)
 PORT=${PORT:-8633}
-RPC=http://127.0.0.1:$PORT
-FORK="$L1_FORK_URL"
 OUT_REL=/upgrade-envs/v0.33.0-compiler/output/stage/ecosystem.toml
-OUT=$WT$OUT_REL
+OUT=${ECOSYSTEM_TOML:-$WT$OUT_REL}
 DEPLOYER=${DEPLOYER:-0x343Ee72DdD8CCD80cd43D6Adbc6c463a2DE433a7}
 CTM=0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b
 fail() { echo "FAIL: $*"; FAILED=1; }
 FAILED=0
 
-anvil --fork-url "$FORK" --port "$PORT" --auto-impersonate --silent > "$S/anvil_v33.log" 2>&1 &
-ANVIL_PID=$!
-trap 'kill $ANVIL_PID 2>/dev/null' EXIT
-for _ in $(seq 1 60); do cast block-number --rpc-url "$RPC" >/dev/null 2>&1 && break; sleep 1; done
-echo "fork block: $(cast block-number --rpc-url "$RPC")"
-cast rpc anvil_setBalance "$DEPLOYER" 0x56BC75E2D63100000 --rpc-url "$RPC" >/dev/null
+if [ -n "${L1_RPC_URL:-}" ]; then
+  RPC="$L1_RPC_URL"
+  echo "using the chain at L1_RPC_URL, block $(cast block-number --rpc-url "$RPC")"
+else
+  : "${L1_FORK_URL:?set L1_FORK_URL to a Sepolia RPC}"
+  RPC=http://127.0.0.1:$PORT
+  anvil --fork-url "$L1_FORK_URL" --port "$PORT" --auto-impersonate --silent > "$S/anvil_v33.log" 2>&1 &
+  ANVIL_PID=$!
+  trap 'kill $ANVIL_PID 2>/dev/null' EXIT
+  for _ in $(seq 1 60); do cast block-number --rpc-url "$RPC" >/dev/null 2>&1 && break; sleep 1; done
+  echo "fork block: $(cast block-number --rpc-url "$RPC")"
+fi
 
 # ---------------------------------------------------------------- 1. prepare
+if [ -n "${ECOSYSTEM_TOML:-}" ]; then
+  echo "using the prepared output at $OUT"
+  [ -f "$OUT" ] || { echo "REHEARSAL FAILED: $OUT not found"; exit 1; }
+else
+cast rpc anvil_setBalance "$DEPLOYER" 0x56BC75E2D63100000 --rpc-url "$RPC" >/dev/null
 mkdir -p "$(dirname "$OUT")"
 # Never assert against an output left over from an earlier run.
 rm -f "$OUT"
@@ -47,6 +63,7 @@ echo "prepare exit: $PREPARE_EXIT"; grep -E 'v33:|Error|revert|ONCHAIN EXECUTION
 if [ "$PREPARE_EXIT" != "0" ] || [ ! -f "$OUT" ]; then
   echo "REHEARSAL FAILED: prepare did not produce an output (log: $S/v33_prepare.log)"
   exit 1
+fi
 fi
 
 toml_get() { python3 -c "import tomllib,sys; d=tomllib.load(open('$OUT','rb')); v=d
@@ -64,8 +81,12 @@ python3 -c "import tomllib; [print(h) for h in tomllib.load(open('$OUT','rb'))['
 BS=$(toml_get contracts_config.bytecodes_supplier)
 UNPUB=0; N=0
 while read -r h; do N=$((N+1)); b=$(cast call "$BS" 'publishingBlock(bytes32)(uint256)' "$h" --rpc-url "$RPC" | awk '{print $1}'); [ "$b" = "0" ] && UNPUB=$((UNPUB+1)); done < "$S/v33_factory_deps.txt"
-echo "L2 upgrade tx factory deps: $N, unpublished after prepare: $UNPUB"
+echo "L2 upgrade tx factory deps: $N, unpublished: $UNPUB"
 [ "$UNPUB" = "0" ] || fail "factory deps not published"
+if [ "$PUBLISHED_ONLY" = "1" ]; then
+  [ "$FAILED" = "0" ] && { echo "PUBLICATION CHECK PASSED"; exit 0; }
+  echo "PUBLICATION CHECK FAILED"; exit 1
+fi
 
 # ---------------------------------------------------------------- 2. governance stage 1
 OWNER=$(cast call "$CTM" 'owner()(address)' --rpc-url "$RPC")
