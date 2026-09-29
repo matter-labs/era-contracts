@@ -18,6 +18,7 @@ import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
 import {
     BatchNumberMismatch,
+    ChainConfigHashMismatch,
     BatchTimestampGreaterThanLastL2BlockTimestamp,
     CanOnlyProcessOneBatch,
     IncorrectBatchChainId,
@@ -162,6 +163,11 @@ contract CommitterFacet is ZKChainBase, ICommitter {
             revert BatchNumberMismatch(_previousBatch.batchNumber + 1, _newBatch.batchNumber);
         }
 
+        bytes32 chainConfigHash = _getZKsyncOSChainConfigHash();
+        if (_newBatch.chainConfigHash != chainConfigHash) {
+            revert ChainConfigHashMismatch(chainConfigHash, _newBatch.chainConfigHash);
+        }
+
         // Preventing stack too deep error
         {
             // we can just ignore l1 da validator output with ZKsync OS:
@@ -225,11 +231,8 @@ contract CommitterFacet is ZKChainBase, ICommitter {
             revert SettlementLayerChainIdMismatch();
         }
 
-        // The batch proof public input can be calculated as
-        // keccak256(state_commitment_before & state_commitment_after & chain_config & batch_output_hash),
-        // where chain_config is the chain id and the runtime chain config words (see `_getBatchProofPublicInput`).
-        // batch output hash commits to information about batch that needs to be opened on l1.
-        // So below we are calculating batch output hash to later include it in the batch public input and thereby verify batch values correctness.
+        // The batch output hash commits to the batch data opened on L1. It is combined below
+        // with the previous/new state commitments and chain config hash in the proof public input.
         bytes32 batchOutputHash = keccak256(
             abi.encodePacked(
                 _newBatch.firstBlockTimestamp,
@@ -260,7 +263,12 @@ contract CommitterFacet is ZKChainBase, ICommitter {
             l2LogsTreeRoot: _newBatch.l2LogsTreeRoot,
             dependencyRootsRollingHash: _newBatch.dependencyRootsRollingHash,
             timestamp: 0,
-            commitment: batchOutputHash
+            commitment: _getBatchCommitment(
+                _previousBatch.batchHash,
+                _newBatch.newStateCommitment,
+                _newBatch.chainConfigHash,
+                batchOutputHash
+            )
         });
 
         if (L1_CHAIN_ID != block.chainid) {
@@ -285,5 +293,21 @@ contract CommitterFacet is ZKChainBase, ICommitter {
             _newBatch.firstBlockNumber,
             _newBatch.lastBlockNumber
         );
+    }
+
+    /// @notice Computes the full, untruncated batch proof public-input hash.
+    /// @param _previousState State commitment before the batch.
+    /// @param _newState State commitment after the batch.
+    /// @param _chainConfigHash Hash of the runtime configuration used to execute the batch.
+    /// @param _batchOutputHash Hash of the batch data opened on L1.
+    /// @return The commitment stored in `StoredBatchInfo` and passed to the verifier.
+    function _getBatchCommitment(
+        bytes32 _previousState,
+        bytes32 _newState,
+        bytes32 _chainConfigHash,
+        bytes32 _batchOutputHash
+    ) internal pure returns (bytes32) {
+        // `computeZKsyncOSHash` applies PUBLIC_INPUT_SHIFT once, after folding the full per-batch hashes.
+        return keccak256(abi.encodePacked(_previousState, _newState, _chainConfigHash, _batchOutputHash));
     }
 }

@@ -181,9 +181,8 @@ contract AdminFacet is ZKChainBase, IAdmin {
         emit NewZKsyncOSMaxTxGasLimit(oldMaxTxGasLimit, _newMaxTxGasLimit);
     }
 
-    /// @dev The runtime chain config is read from storage when the batch proof public input is
-    /// computed, so it must not change while committed-but-unverified batches exist: those batches
-    /// were executed by ZKsync OS under the old config and would become unprovable.
+    /// @dev Retains the verified-batch boundary for runtime configuration updates, even though
+    /// proof verification now uses each batch's stored commitment.
     function _enforceNoUnverifiedBatchesForChainConfigUpdate() internal view {
         if (s.totalBatchesCommitted != s.totalBatchesVerified) {
             revert ZKsyncOSChainConfigUpdateWithUnverifiedBatches(s.totalBatchesVerified, s.totalBatchesCommitted);

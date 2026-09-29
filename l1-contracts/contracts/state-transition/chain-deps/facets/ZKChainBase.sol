@@ -194,6 +194,15 @@ contract ZKChainBase is ReentrancyGuard {
         return ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE;
     }
 
+    // Hash layout: {protocol-docs/chain-config.md}.
+    function _getZKsyncOSChainConfigHash() internal view returns (bytes32) {
+        // `fri_proof_verification_enabled` is always disabled, hence the zero word.
+        return
+            keccak256(
+                abi.encodePacked(s.chainId, uint256(0), uint256(_getZKsyncOSMaxTxGasLimit()), uint256(s.pubdataContent))
+            );
+    }
+
     /// @notice Returns the effective ZKsync OS single-transaction gas limit (EIP-7825).
     /// @dev `0` in storage means the value was never set explicitly (chains deployed before the
     /// field was introduced) and falls back to the default cap.
