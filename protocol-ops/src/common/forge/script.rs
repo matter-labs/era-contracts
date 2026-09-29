@@ -164,10 +164,6 @@ impl ForgeScript {
         Ok(Some(balance))
     }
 
-    pub fn needs_bridgehub_skip(&self) -> bool {
-        self.script_path == Path::new("deploy-scripts/DeployCTM.s.sol")
-    }
-
     pub fn script_name(&self) -> &Path {
         &self.script_path
     }

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use xshell::{cmd, Shell};
 
-use super::script::{ForgeScript, ForgeScriptArg, ForgeScriptArgs};
+use super::script::{ForgeScript, ForgeScriptArgs};
 // Forge is defined in the parent module (mod.rs); use the full path to avoid confusion.
 use crate::common::forge::scripts::{ForgeScriptParams, ScriptCall};
 use crate::common::forge::Forge;
@@ -237,11 +237,6 @@ impl ForgeRunner {
             .as_ref()
             .map(|_| std::time::Instant::now());
         let timing_label = script.timing_label.clone();
-
-        if script.needs_bridgehub_skip() {
-            let skip_path: String = String::from("contracts/bridgehub/*");
-            script.args.add_arg(ForgeScriptArg::Skip { skip_path });
-        }
 
         let args = script.args.build();
         let pre_run_ts_ms = Utc::now().timestamp_millis();
