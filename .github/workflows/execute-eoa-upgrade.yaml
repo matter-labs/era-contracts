@@ -177,15 +177,16 @@ jobs:
           # Same name as the broadcast job's `environment:` below.
           GITHUB_ENVIRONMENT_NAME: eoa-upgrade-${{ inputs.environment }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-        run: tools/eoa-upgrade-executor/scripts/check-environment.sh >>"$GITHUB_STEP_SUMMARY"
+        run: tools/eoa-upgrade-executor/scripts/check-environment.sh
 
   broadcast:
     needs: [resolve, simulate, preflight]
     runs-on: ubuntu-24.04
     timeout-minutes: 120
-    # A required reviewer other than the person who started the run approves
-    # here. The key is an environment secret: it exists only in this job, only
-    # on the default branch, and only in the last step.
+    # A member of the approver team other than the person who started the run
+    # approves here. The key is an environment secret: it exists only in this
+    # job, only on protected branches (check-run.sh narrows that to the default
+    # branch), and only in the last step.
     environment: eoa-upgrade-${{ inputs.environment }}
     permissions:
       contents: read

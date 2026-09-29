@@ -228,51 +228,71 @@ echo "== check-environment.sh (fake gh)"
 mkdir -p "$work/fakebin" "$work/gh"
 cat >"$work/fakebin/gh" <<'EOF'
 #!/usr/bin/env bash
-# Stand-in for `gh api`: serves $FAKE_GH_DIR/env.json and policies.json.
+# Stand-in for `gh api`: serves $FAKE_GH_DIR/{env,policies,branches}.json.
 [ "$1" = api ] || exit 2
 shift
 path="" filter=""
 while [ "$#" -gt 0 ]; do
-  case "$1" in --jq) filter="$2"; shift 2 ;; -H) shift 2 ;; *) path="$1"; shift ;; esac
+  case "$1" in --jq) filter="$2"; shift 2 ;; -H) shift 2 ;; --paginate) shift ;; *) path="$1"; shift ;; esac
 done
 case "$path" in
   */deployment-branch-policies) f="$FAKE_GH_DIR/policies.json" ;;
   */environments/*) f="$FAKE_GH_DIR/env.json" ;;
+  */branches\?protected=true*) f="$FAKE_GH_DIR/branches.json" ;;
   *) exit 1 ;;
 esac
 [ -f "$f" ] || { echo "gh: Not Found (HTTP 404)" >&2; exit 1; }
 if [ -n "$filter" ]; then jq -r "$filter" "$f"; else cat "$f"; fi
 EOF
 chmod +x "$work/fakebin/gh"
+# What terraform-configurations creates: the approver team, self-review
+# prevented, no admin bypass, "protected branches" policy.
 good_env='{"name":"eoa-upgrade-local","can_admins_bypass":false,
   "protection_rules":[{"type":"required_reviewers","prevent_self_review":true,"reviewers":[
-    {"type":"User","reviewer":{"login":"kelemeno"}},{"type":"User","reviewer":{"login":"StanislavBreadless"}},
-    {"type":"User","reviewer":{"login":"vladbochok"}}]},{"type":"branch_policy"}],
-  "deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}'
+    {"type":"Team","reviewer":{"slug":"protocol-upgrade-approvers","name":"protocol-upgrade-approvers"}}]},
+    {"type":"branch_policy"}],
+  "deployment_branch_policy":{"protected_branches":true,"custom_branch_policies":false}}'
+custom_policy='.deployment_branch_policy = {protected_branches: false, custom_branch_policies: true}'
 good_policies='{"total_count":1,"branch_policies":[{"name":"draft-v31","type":"branch"}]}'
-# env_case NAME PATTERN|"" ENV-JQ POLICIES-JQ [GITHUB-ENVIRONMENT-NAME]
+good_branches='[{"name":"draft-v31","protected":true}]'
+# env_case NAME PATTERN|"" ENV-JQ POLICIES-JQ BRANCHES-JQ [GITHUB-ENVIRONMENT-NAME]
 env_case() {
-  local name="$1" pattern="$2" env_filter="$3" pol_filter="$4" gh_env="${5:-eoa-upgrade-local}"
+  local name="$1" pattern="$2" env_filter="$3" pol_filter="$4" br_filter="$5" gh_env="${6:-eoa-upgrade-local}"
   rm -f "$work/gh/"*.json
   if [ "$env_filter" != absent ]; then jq "$env_filter" <<<"$good_env" >"$work/gh/env.json"; fi
   jq "$pol_filter" <<<"$good_policies" >"$work/gh/policies.json"
-  local cmd=(env PATH="$work/fakebin:$PATH" FAKE_GH_DIR="$work/gh" REPO="$private" ENVIRONMENT=local
-    GITHUB_ENVIRONMENT_NAME="$gh_env" DEFAULT_BRANCH=draft-v31 "$scripts/check-environment.sh")
+  jq "$br_filter" <<<"$good_branches" >"$work/gh/branches.json"
+  local cmd=(env -u GITHUB_STEP_SUMMARY PATH="$work/fakebin:$PATH" FAKE_GH_DIR="$work/gh" REPO="$private"
+    ENVIRONMENT=local GITHUB_ENVIRONMENT_NAME="$gh_env" DEFAULT_BRANCH=draft-v31 "$scripts/check-environment.sh")
   if [ -z "$pattern" ]; then expect_ok "$name" "${cmd[@]}"; else expect_fail "$name" "$pattern" "${cmd[@]}"; fi
 }
-env_case "protected environment passes" "" . .
-env_case "workflow and config disagree on the name" "config.json says" . . eoa-upgrade-other
-env_case "environment missing" "does not exist" absent .
-env_case "no required reviewers" "no required reviewers" '.protection_rules |= map(select(.type != "required_reviewers"))' .
-env_case "an approver missing" "expected exactly" '.protection_rules[0].reviewers |= .[1:]' .
-env_case "an extra approver" "expected exactly" '.protection_rules[0].reviewers += [{type: "User", reviewer: {login: "octocat"}}]' .
-env_case "a team as approver" "team:era-reviewers" '.protection_rules[0].reviewers = [{type: "Team", reviewer: {slug: "era-reviewers"}}]' .
-env_case "self-review allowed" "Prevent self-review" '.protection_rules[0].prevent_self_review = false' .
-env_case "admin bypass allowed" "administrators can bypass" '.can_admins_bypass = true' .
-env_case "no branch policy" "any branch" '.deployment_branch_policy = null' .
-env_case "protected-branches policy" "custom list" '.deployment_branch_policy = {protected_branches: true, custom_branch_policies: false}' .
-env_case "extra branch in policy" "must be exactly" . '.branch_policies += [{name: "main", type: "branch"}]'
-env_case "wildcard branch policy" "must be exactly" . '.branch_policies = [{name: "*", type: "branch"}]'
+env_case "team + protected branches passes" "" . . .
+env_out="$(env -u GITHUB_STEP_SUMMARY PATH="$work/fakebin:$PATH" FAKE_GH_DIR="$work/gh" REPO="$private" ENVIRONMENT=local \
+  GITHUB_ENVIRONMENT_NAME=eoa-upgrade-local DEFAULT_BRANCH=draft-v31 "$scripts/check-environment.sh" 2>&1)"
+check "the report names the team and the policy" grep -q 'team `protocol-upgrade-approvers`.*protected branches' <<<"$env_out"
+env_case "team + custom list of only the default branch passes" "" "$custom_policy" . .
+env_case "other protected branches are reported, not refused" "" . . '. + [{name: "main", protected: true}]'
+env_out="$(env -u GITHUB_STEP_SUMMARY PATH="$work/fakebin:$PATH" FAKE_GH_DIR="$work/gh" REPO="$private" ENVIRONMENT=local \
+  GITHUB_ENVIRONMENT_NAME=eoa-upgrade-local DEFAULT_BRANCH=draft-v31 "$scripts/check-environment.sh" 2>&1)"
+check "the report lists them" grep -q 'can also deploy.*: main' <<<"$env_out"
+env_case "protected branches, default branch unprotected" "is not protected" . . '[{name: "main", protected: true}]'
+env_case "workflow and config disagree on the name" "config.json says" . . . eoa-upgrade-other
+env_case "environment missing" "does not exist" absent . .
+env_case "no required reviewers" "no required reviewers" '.protection_rules |= map(select(.type != "required_reviewers"))' . .
+env_case "a user instead of the team" "expected only [team:protocol-upgrade-approvers]" \
+  '.protection_rules[0].reviewers = [{type: "User", reviewer: {login: "kelemeno"}}]' . .
+env_case "the team plus a user" "expected only" '.protection_rules[0].reviewers += [{type: "User", reviewer: {login: "octocat"}}]' . .
+env_case "another team" "team:era-reviewers" '.protection_rules[0].reviewers = [{type: "Team", reviewer: {slug: "era-reviewers"}}]' . .
+env_case "empty reviewer list" "expected only" '.protection_rules[0].reviewers = []' . .
+env_case "self-review allowed" "Prevent self-review" '.protection_rules[0].prevent_self_review = false' . .
+env_case "admin bypass allowed" "administrators can bypass" '.can_admins_bypass = true' . .
+env_case "no branch policy" "any branch" '.deployment_branch_policy = null' . .
+env_case "protected_branches false and no custom list" "must be \"protected branches\" or a custom list" \
+  '.deployment_branch_policy = {protected_branches: false, custom_branch_policies: false}' . .
+env_case "both policy kinds at once" "must be \"protected branches\" or a custom list" \
+  '.deployment_branch_policy = {protected_branches: true, custom_branch_policies: true}' . .
+env_case "custom list with an extra branch" "must be exactly" "$custom_policy" '.branch_policies += [{name: "main", type: "branch"}]' .
+env_case "custom list with a wildcard" "must be exactly" "$custom_policy" '.branch_policies = [{name: "*", type: "branch"}]' .
 
 echo "== simulate.sh (fork of the local anvil)"
 make_plan "$work/p" "$work/txs.json" --range 0-2 >/dev/null 2>&1

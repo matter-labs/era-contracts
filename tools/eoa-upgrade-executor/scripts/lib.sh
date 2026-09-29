@@ -14,18 +14,28 @@ FIRST_ANVIL_PORT=8645
 
 log() { printf '%s\n' "$*" >&2; }
 
-# Prints the message and exits. In GitHub Actions it is also an ::error::
-# annotation, escaped so that it cannot inject workflow commands. The tests set
-# EXECUTOR_TEST to keep their expected failures out of the annotations.
-die() {
-  local msg="$*"
+# In GitHub Actions, an ::error:: or ::warning:: annotation ($1), escaped so
+# that it cannot inject workflow commands. The tests set EXECUTOR_TEST to keep
+# their expected failures out of the annotations.
+annotate() {
+  local kind="$1" msg="$2"
   if [ -n "${GITHUB_ACTIONS:-}" ] && [ -z "${EXECUTOR_TEST:-}" ]; then
     local esc="${msg//'%'/%25}"
     esc="${esc//$'\r'/%0D}"
     esc="${esc//$'\n'/%0A}"
-    printf '::error::%s\n' "$esc"
+    printf '::%s::%s\n' "$kind" "$esc"
   fi
-  printf 'ERROR: %s\n' "$msg" >&2
+}
+
+warn() {
+  annotate warning "$*"
+  printf 'WARNING: %s\n' "$*" >&2
+}
+
+# Prints the message and exits.
+die() {
+  annotate error "$*"
+  printf 'ERROR: %s\n' "$*" >&2
   exit 1
 }
 

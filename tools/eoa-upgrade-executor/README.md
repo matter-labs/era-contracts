@@ -6,9 +6,9 @@ The workflow is `.github/workflows/execute-eoa-upgrade.yaml`. It runs only in
 `matter-labs/era-contracts-private`, whose default branch mirrors `draft-v31`
 of this repository; the key lives there as a GitHub environment secret.
 
-Two of the three code owners (`kelemeno`, `StanislavBreadless`, `vladbochok`)
-are needed for every broadcast: one starts the run, a different one approves
-it.
+Two of the three code owners (`kelemeno`, `StanislavBreadless`, `vladbochok`,
+the members of the team `protocol-upgrade-approvers`) are needed for every
+broadcast: one starts the run, a different one approves it.
 
 ## How a run works
 
@@ -58,7 +58,11 @@ The jobs:
 3. **preflight** fails unless the repository is `matter-labs/era-contracts-private`,
    the run is on the default branch, whoever started it is one of the
    dispatchers in `config.json`, and the GitHub environment is protected as
-   described under [Setup](#setup-devops). A job that names a missing
+   described under [Setup](#setup-devops): the team `protocol-upgrade-approvers`
+   as its only reviewer, self-review prevented, no admin bypass, and a
+   deployment branch policy of "protected branches" (the default branch must
+   be one; any other protected branch is reported as a warning) or a custom
+   list of exactly the default branch. A job that names a missing
    environment makes GitHub create it without protection, so the broadcast
    job must not start until this passes.
 4. **broadcast** runs in the GitHub environment `eoa-upgrade-<environment>`,
@@ -95,36 +99,50 @@ its receipt may still land, so check its hash first.
 
 ## Setup (devops)
 
-Nothing below exists yet. All of it is in `matter-labs/era-contracts-private`.
+All of it is in `matter-labs/era-contracts-private`.
 
-1. **Repository access**: write access (the right to dispatch workflows) only
-   for `kelemeno`, `StanislavBreadless` and `vladbochok`. Note that
-   `StanislavBreadfulAI` is a different, bot account.
-2. **Default branch** `draft-v31` (mirrored from this repository), with a
-   ruleset: pull request required, 1 approving review from a code owner, no
-   force pushes, no deletion. The organization ruleset on `~DEFAULT_BRANCH`
-   already has these; a mirroring bot that pushes directly needs to be its
-   only bypass actor.
-3. **Environments** `eoa-upgrade-stage` and `eoa-upgrade-testnet`, each:
-   - Required reviewers: exactly `kelemeno`, `StanislavBreadless`,
-     `vladbochok` (users, not a team).
-   - Prevent self-review: on.
-   - Allow administrators to bypass configured protection rules: off.
-   - Deployment branches and tags: selected branches, only `draft-v31`.
-   - Environment secrets:
-     - `EXECUTOR_KEYSTORE`: the contents of an encrypted foundry keystore
-       for the sending EOA (stage: `0xd669494442609879b209CcA8eba2BdC904D2E69D`).
-       Create it on a trusted machine with
-       `cast wallet import eoa-upgrade-stage --interactive` (prompts for the
-       key and a password, nothing on the command line) and copy
-       `~/.foundry/keystores/eoa-upgrade-stage`.
-     - `EXECUTOR_KEYSTORE_PASSWORD`: that password.
+1. **From terraform** (`matter-labs/terraform-configurations` #6677, once
+   `matter-labs/terraform-modules` #2255 is released):
+   - write access only for the team `protocol-upgrade-approvers` (members
+     `kelemeno`, `StanislavBreadless`, `vladbochok`; `StanislavBreadfulAI` is
+     a different, bot account and must not be added);
+   - branch protection on the default branch `draft-v31` (mirrored from this
+     repository): pull request required, 1 code-owner approval; together with
+     the organization ruleset on `~DEFAULT_BRANCH`, no force pushes and no
+     deletion. A mirroring bot that pushes directly must be the only bypass
+     actor;
+   - environments `eoa-upgrade-stage` and `eoa-upgrade-testnet`, each with
+     the team as required reviewer, prevent self-review on, administrators
+     cannot bypass, and deployment branches "protected branches".
+2. **By hand**, in each environment, the only two secrets:
+   - `EXECUTOR_KEYSTORE`: the contents of an encrypted foundry keystore for
+     the sending EOA (stage: `0xd669494442609879b209CcA8eba2BdC904D2E69D`).
+     Create it on a trusted machine with
+     `cast wallet import eoa-upgrade-stage --interactive` (prompts for the key
+     and a password, nothing on the command line) and copy
+     `~/.foundry/keystores/eoa-upgrade-stage`.
+   - `EXECUTOR_KEYSTORE_PASSWORD`: that password.
 
-   Leave the secrets unset until the key should be used; dry runs work
-   without them. The preflight job checks every setting above except the
-   secrets and the repository access.
+   Leave them unset until the key should be used; dry runs work without
+   them.
 
-4. No repository-level secret is needed.
+3. **Never add a repository-level secret** to `era-contracts-private`. Every
+   workflow of the mirrored repository can read repository secrets, from any
+   branch, without an approval. `.github/workflows/execute-deployer-safe-bundles.yaml`
+   is one: it reads `DEPLOYER_PRIVATE_KEY_*` as repository secrets in a job
+   with no environment, puts inputs straight into `run:` and writes the key
+   into `$GITHUB_ENV`, so a key stored that way is readable by anyone who can
+   push a branch or dispatch a workflow.
+4. Before relying on "protected branches", check which branches are
+   protected: today `fake_default` and an old mirror branch `main` are, and
+   either could then deploy (each run still needs an approval). Preflight
+   prints them as a warning. Removing them, or switching to a custom list of
+   `draft-v31` once the module supports it, closes that.
+
+Preflight checks the environment settings above, not the secrets and not
+the team's membership: `GITHUB_TOKEN` cannot read team membership, so that
+rests on terraform. The dispatcher allow-list in `config.json` repeats the
+three logins.
 
 A second sender for an environment needs its own GitHub environment, a
 `config.json` entry and a workflow `environment` option.
@@ -147,23 +165,24 @@ exists only inside `cast`. The tests check that neither secret appears on any
 `cast` command line, in any `cast` process environment, or in the output, and
 that the files are gone afterwards.
 
-| vector                                                           | mitigation                                                                                                                                                                                                                                                                                                          |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A modified workflow or script on another branch reads the secret | Environment secrets reach only jobs on `draft-v31` (deployment branch policy), and each such job still needs an approval. Changing `draft-v31` needs a reviewed PR; `CODEOWNERS` covers this workflow and directory.                                                                                                |
-| Someone without write access starts a run                        | Only the three code owners have write access; `check-run.sh` also rejects any other `actor` / `triggering_actor`, in preflight and again in the broadcast job.                                                                                                                                                      |
-| One person sends alone                                           | Required reviewers with self-review prevented: the approver differs from the dispatcher.                                                                                                                                                                                                                            |
-| Admin bypass, or an unprotected environment                      | Admin bypass off; preflight fails unless reviewers are exactly the three, self-review is prevented, admin bypass is off and the branch policy is exactly the default branch.                                                                                                                                        |
-| Another workflow in the repository names the environment         | The environment names are specific to this tool; a workflow that names them must land on `draft-v31` through review and still waits for approval. `pull_request_target` workflows run in the default branch's context, so review any that are added.                                                                |
-| The secret printed in logs                                       | GitHub masks secret values; the scripts never echo them, `set +x` is set, nothing dumps the environment, and errors of the two `cast` commands that read the key are discarded. The summary and logs show the transactions and hashes.                                                                              |
-| The secret in an artifact or cache                               | The key step is the last step: nothing is uploaded after it, the foundry install has no cache, and the key files are deleted on exit.                                                                                                                                                                               |
-| Script injection through inputs                                  | No `${{ }}` in any `run:`: inputs reach scripts through `env:` and are validated (40-hex commit, plain file path, `N`/`A-B`, block number) before use; `environment` is a choice.                                                                                                                                   |
-| A compromised third-party action or tool                         | Only `actions/checkout`, `actions/upload-artifact` and `actions/download-artifact`, pinned by commit SHA. Foundry is the release tarball pinned by sha256 in `config.json`, not an action. An earlier step in the broadcast job could still tamper with the files the key step runs, which is why there are so few. |
-| `checkout` credentials                                           | `persist-credentials: false`; jobs get `contents: read` (preflight also `actions: read` for the environment API).                                                                                                                                                                                                   |
-| A tampered plan between jobs                                     | `plan.json`'s sha256 is a job output of resolve, checked by simulate and broadcast.                                                                                                                                                                                                                                 |
-| A malicious or wrong transaction file                            | The approver sees the source commit, per-transaction calldata hashes and both simulations before approving, and should match them against the reviewed upgrade PR. Zero-value only, one sender per run, gas limit capped.                                                                                           |
-| The RPC (public node, fork source)                               | It only ever sees calls and signed transactions, never the key. A lying RPC can make a check pass or fail, not steal the key; the chain id is checked and the signature is bound to it.                                                                                                                             |
-| Debug logging (`ACTIONS_STEP_DEBUG`)                             | Secrets stay masked; nothing in the scripts depends on it.                                                                                                                                                                                                                                                          |
-| The GitHub runner or GitHub itself                               | Out of scope: a compromised runner sees everything the job sees.                                                                                                                                                                                                                                                    |
+| vector                                                           | mitigation                                                                                                                                                                                                                                                                                                                                                                                              |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A modified workflow or script on another branch reads the secret | Environment secrets reach only jobs on protected branches (deployment branch policy), and each such job still needs an approval. Protected branches need a reviewed PR to change; `CODEOWNERS` covers this workflow and directory. The in-workflow default-branch check stops accidental runs from other protected branches, not a modified workflow on one; hence the warning and item 4 of the setup. |
+| Someone without write access starts a run                        | Only the team `protocol-upgrade-approvers` has write access (terraform); `check-run.sh` also rejects any other `actor` / `triggering_actor`, in preflight and again in the broadcast job.                                                                                                                                                                                                               |
+| One person sends alone                                           | The team is the required reviewer and self-review is prevented: the approver is a team member other than the dispatcher.                                                                                                                                                                                                                                                                                |
+| Admin bypass, or an unprotected environment                      | Admin bypass off; preflight fails unless the team is the only reviewer, self-review is prevented, admin bypass is off and the branch policy is "protected branches" (with the default branch protected) or exactly the default branch.                                                                                                                                                                  |
+| A repository-level secret                                        | None exists and none may be added (setup item 3): unlike environment secrets, any workflow on any branch reads them.                                                                                                                                                                                                                                                                                    |
+| Another workflow in the repository names the environment         | The environment names are specific to this tool; a workflow that names them must land on `draft-v31` through review and still waits for approval. `pull_request_target` workflows run in the default branch's context, so review any that are added.                                                                                                                                                    |
+| The secret printed in logs                                       | GitHub masks secret values; the scripts never echo them, `set +x` is set, nothing dumps the environment, and errors of the two `cast` commands that read the key are discarded. The summary and logs show the transactions and hashes.                                                                                                                                                                  |
+| The secret in an artifact or cache                               | The key step is the last step: nothing is uploaded after it, the foundry install has no cache, and the key files are deleted on exit.                                                                                                                                                                                                                                                                   |
+| Script injection through inputs                                  | No `${{ }}` in any `run:`: inputs reach scripts through `env:` and are validated (40-hex commit, plain file path, `N`/`A-B`, block number) before use; `environment` is a choice.                                                                                                                                                                                                                       |
+| A compromised third-party action or tool                         | Only `actions/checkout`, `actions/upload-artifact` and `actions/download-artifact`, pinned by commit SHA. Foundry is the release tarball pinned by sha256 in `config.json`, not an action. An earlier step in the broadcast job could still tamper with the files the key step runs, which is why there are so few.                                                                                     |
+| `checkout` credentials                                           | `persist-credentials: false`; jobs get `contents: read` (preflight also `actions: read` for the environment API).                                                                                                                                                                                                                                                                                       |
+| A tampered plan between jobs                                     | `plan.json`'s sha256 is a job output of resolve, checked by simulate and broadcast.                                                                                                                                                                                                                                                                                                                     |
+| A malicious or wrong transaction file                            | The approver sees the source commit, per-transaction calldata hashes and both simulations before approving, and should match them against the reviewed upgrade PR. Zero-value only, one sender per run, gas limit capped.                                                                                                                                                                               |
+| The RPC (public node, fork source)                               | It only ever sees calls and signed transactions, never the key. A lying RPC can make a check pass or fail, not steal the key; the chain id is checked and the signature is bound to it.                                                                                                                                                                                                                 |
+| Debug logging (`ACTIONS_STEP_DEBUG`)                             | Secrets stay masked; nothing in the scripts depends on it.                                                                                                                                                                                                                                                                                                                                              |
+| The GitHub runner or GitHub itself                               | Out of scope: a compromised runner sees everything the job sees.                                                                                                                                                                                                                                                                                                                                        |
 
 ## Running it on a laptop
 

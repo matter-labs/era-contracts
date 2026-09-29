@@ -1,10 +1,16 @@
 {
   "executionRepo": "matter-labs/era-contracts-private",
   "dispatchers": ["kelemeno", "StanislavBreadless", "vladbochok"],
-  "approvers": ["kelemeno", "StanislavBreadless", "vladbochok"],
+  "approverTeam": "protocol-upgrade-approvers",
   "environments": {
-    "stage": { "network": "sepolia", "githubEnvironment": "eoa-upgrade-stage" },
-    "testnet": { "network": "sepolia", "githubEnvironment": "eoa-upgrade-testnet" }
+    "stage": {
+      "network": "sepolia",
+      "githubEnvironment": "eoa-upgrade-stage"
+    },
+    "testnet": {
+      "network": "sepolia",
+      "githubEnvironment": "eoa-upgrade-testnet"
+    }
   },
   "networks": {
     "sepolia": {
