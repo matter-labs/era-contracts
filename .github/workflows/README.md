@@ -18,9 +18,9 @@ args to `protocol_ops` unless the first post-flag word is `forge`/`cast`).
 
 ## Execute workflows
 
-| Workflow                        | Purpose                                                                                                                                                                                                                                   |
-| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `execute-deployer-safe-bundles` | Apply Safe bundles whose `target` is the ecosystem deployer EOA (bundles from the chain-init workflow, the upgrade-prepare workflow, and the migrate-to/from phase-2-finalize workflows). Signs with `DEPLOYER_PRIVATE_KEY_<env>` secret. |
+| Workflow                        | Purpose                                                                                                                                                                                  |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `execute-deployer-safe-bundles` | Apply Safe bundles whose `target` is the ecosystem deployer EOA (bundles from the chain-init workflow and the upgrade-prepare workflow). Signs with `DEPLOYER_PRIVATE_KEY_<env>` secret. |
 
 ## Conventions
 
