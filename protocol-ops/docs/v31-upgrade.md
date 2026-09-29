@@ -11,7 +11,7 @@ environment and CTM flavour. PUVT enforces the same table
 | Environment                           | Era                     | ZKsync OS               |
 | ------------------------------------- | ----------------------- | ----------------------- |
 | testnet, stage (v31 already executed) | 0.31.0 = `133143986176` | 0.31.0 = `133143986176` |
-| mainnet, adi                          | 0.32.2 = `137438953474` | 0.31.2 = `133143986178` |
+| mainnet, adi                          | 0.33.0 = `141733920768` | 0.31.2 = `133143986178` |
 
 `--new-protocol-version` takes the packed form (`minor << 32 | patch`); the
 readiness checker takes `--target-minor-version` / `--target-patch-version`.

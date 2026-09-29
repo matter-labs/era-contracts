@@ -33,7 +33,7 @@ use elements::{
 /// A ceremony generated from this branch targets each flavour's genesis
 /// `protocol_semantic_version` (`configs/genesis/<flavour>/latest.json`, which
 /// `DefaultCTMUpgrade.getNewProtocolVersion()` reads through
-/// `chainCreationParams`): Era v0.32.2, ZKsync OS v0.31.2. The two genesis
+/// `chainCreationParams`): Era v0.33.0, ZKsync OS v0.31.2. The two genesis
 /// lines moved independently, so one shared target cannot describe both.
 ///
 /// The environments do not share one table either:
@@ -67,7 +67,7 @@ impl ExpectedProtocolVersions {
         self.new.contains(&version)
     }
 
-    /// The accepted targets for an error message, e.g. `0.31.0 or 0.32.2`.
+    /// The accepted targets for an error message, e.g. `0.31.0 or 0.33.0`.
     pub(crate) fn describe_new(&self) -> String {
         self.new
             .iter()
@@ -79,7 +79,9 @@ impl ExpectedProtocolVersions {
 
 /// Each flavour's genesis `protocol_semantic_version` on this branch: what a
 /// ceremony generated here targets.
-const BRANCH_GENESIS_ERA_PROTOCOL_VERSION: &str = "0.32.2";
+/// Era is v0.33.0 so mainnet lands on the same label as stage, which receives
+/// this bootloader (zksolc 1.5.17 + DSE root-frame hooks) as its own v0.33.0.
+const BRANCH_GENESIS_ERA_PROTOCOL_VERSION: &str = "0.33.0";
 const BRANCH_GENESIS_ZKSYNC_OS_PROTOCOL_VERSION: &str = "0.31.2";
 /// What Sepolia (testnet, stage) executed v31 as, from the July calldata.
 const SEPOLIA_EXECUTED_V31_PROTOCOL_VERSION: &str = "0.31.0";
