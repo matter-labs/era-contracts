@@ -38,6 +38,7 @@ contract BatchDecoderTest is Test {
         assertEq(decodedLastBatch.batchNumber, 10);
         assertEq(decodedNewBatches.length, 2);
         assertEq(decodedNewBatches[0].batchNumber, 11);
+        assertEq(decodedNewBatches[0].chainConfigHash, newBatches[0].chainConfigHash);
         assertEq(decodedNewBatches[1].batchNumber, 12);
     }
 
@@ -67,7 +68,7 @@ contract BatchDecoderTest is Test {
     }
 
     function test_decodeAndCheckCommitData_revertsOnUnsupportedVersion() public {
-        uint8 unsupportedVersion = 99;
+        uint8 unsupportedVersion = BatchDecoder.SUPPORTED_ENCODING_VERSION_COMMIT - 1;
         IExecutor.StoredBatchInfo memory lastBatch = _createStoredBatchInfo(10);
         CommitBatchInfoZKsyncOS[] memory newBatches = new CommitBatchInfoZKsyncOS[](1);
         newBatches[0] = _createCommitBatchInfoZKsyncOS(11);
@@ -360,7 +361,8 @@ contract BatchDecoderTest is Test {
                 lastBlockNumber: uint64(batchNumber) * 10 + 1,
                 chainId: 9,
                 operatorDAInput: "",
-                slChainId: 1
+                slChainId: 1,
+                chainConfigHash: keccak256("config")
             });
     }
 }

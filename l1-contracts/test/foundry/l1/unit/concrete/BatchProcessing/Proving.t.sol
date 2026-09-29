@@ -6,6 +6,7 @@ import {Utils} from "../Utils/Utils.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
 import {TESTNET_COMMIT_TIMESTAMP_NOT_OLDER} from "contracts/common/Config.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {BatchHashMismatch, VerifiedBatchesExceedsCommittedBatches} from "contracts/common/L1ContractErrors.sol";
@@ -48,7 +49,7 @@ contract ProvingTest is ExecutorTest {
 
     function test_RevertWhen_ProvingWithWrongCommittedBlock() public {
         IExecutor.StoredBatchInfo memory wrongNewStoredBatchInfo = newStoredBatchInfo;
-        wrongNewStoredBatchInfo.batchNumber = 10; // Correct is 1
+        wrongNewStoredBatchInfo.commitment = keccak256("tampered commitment");
 
         IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
         storedBatchInfoArray[0] = wrongNewStoredBatchInfo;
@@ -89,6 +90,12 @@ contract ProvingTest is ExecutorTest {
     }
 
     function test_SuccessfulProve() public {
+        uint256[] memory publicInputs = new uint256[](1);
+        publicInputs[0] = uint256(newStoredBatchInfo.commitment);
+        vm.expectCall(address(getters.getVerifier()), abi.encodeCall(IVerifier.verify, (publicInputs, proofInput)));
+        vm.expectEmit(address(executor));
+        emit IExecutor.BlocksVerification(0, 1);
+
         IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
         storedBatchInfoArray[0] = newStoredBatchInfo;
 

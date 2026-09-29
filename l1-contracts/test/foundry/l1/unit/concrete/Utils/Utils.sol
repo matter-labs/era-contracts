@@ -22,7 +22,7 @@ import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfac
 import {InteropRoot, L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
-import {L2DACommitmentScheme} from "contracts/common/Config.sol";
+import {L2DACommitmentScheme, ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT, PubdataContent} from "contracts/common/Config.sol";
 import {ContractsBytecodesLib} from "deploy-scripts/utils/bytecode/ContractsBytecodesLib.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
@@ -33,6 +33,7 @@ L2DACommitmentScheme constant L2_DA_COMMITMENT_SCHEME = L2DACommitmentScheme.PUB
 address constant TEST_ROLLUP_DA_MANAGER_OWNER = address(0x1234567890DEADBEEF);
 
 library Utils {
+    uint256 internal constant TEST_CHAIN_ID = 9;
     function randomBytes32(bytes memory seed) public view returns (bytes32) {
         return keccak256(abi.encodePacked(block.timestamp, seed));
     }
@@ -52,6 +53,18 @@ library Utils {
             });
     }
 
+    function defaultChainConfigHash(uint256 _chainId) internal pure returns (bytes32) {
+        return
+            keccak256(
+                abi.encodePacked(
+                    _chainId,
+                    uint256(0),
+                    uint256(ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT),
+                    uint256(PubdataContent.FULL_PUBDATA)
+                )
+            );
+    }
+
     function createCommitBatchInfoZKsyncOS() public view returns (CommitBatchInfoZKsyncOS memory) {
         return
             CommitBatchInfoZKsyncOS({
@@ -68,9 +81,10 @@ library Utils {
                 firstBlockNumber: 1,
                 lastBlockTimestamp: uint64(uint256(randomBytes32("timestamp")) >> 200),
                 lastBlockNumber: 2,
-                chainId: 9,
+                chainId: TEST_CHAIN_ID,
                 operatorDAInput: abi.encodePacked(uint256(0)),
-                slChainId: block.chainid
+                slChainId: block.chainid,
+                chainConfigHash: defaultChainConfigHash(TEST_CHAIN_ID)
             });
     }
 
