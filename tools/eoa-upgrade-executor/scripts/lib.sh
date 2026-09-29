@@ -76,6 +76,17 @@ validate_commit() {
     die "source commit must be a full 40-hex lowercase SHA (branch and tag names are rejected), got: '$1'"
 }
 
+validate_repo() {
+  [[ "$1" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || die "repository must be owner/name, got: '$1'"
+}
+
+# A branch name: plain characters, no '..', no leading '-' or '/'.
+validate_branch() {
+  if [[ ! "$1" =~ ^[A-Za-z0-9_][A-Za-z0-9._/-]*$ ]] || [[ "$1" == *..* ]]; then
+    die "branch must be a plain branch name, got: '$1'"
+  fi
+}
+
 # A repo-relative .json path. Every segment starts with a letter, digit or '_',
 # so there is no '.', '..', leading '/', leading '-' or glob character.
 validate_source_path() {

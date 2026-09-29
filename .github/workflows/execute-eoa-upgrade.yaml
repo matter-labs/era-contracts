@@ -1,67 +1,78 @@
-# Executes the EOA transactions of a stage/testnet protocol upgrade from a
-# transaction file in this repository, pinned by commit. Runs only in
-# matter-labs/era-contracts-private, from its default branch, and needs two of
-# the three code owners: one starts the run, another approves the broadcast.
-# See tools/eoa-upgrade-executor/README.md (setup and threat model).
+# Reusable workflow: executes the EOA transactions of a stage/testnet protocol
+# upgrade. The caller is a thin workflow on the `executor` branch of
+# matter-labs/era-contracts-private, which holds the key as an environment
+# secret; this file, the executor code and the transaction files all come from
+# this public repository. Two of the three code owners are needed: one starts
+# the run, another approves the broadcast. See
+# tools/eoa-upgrade-executor/README.md (setup, pinning and threat model).
 #
 #   resolve   -> no actions: read the file at the pinned commit, validate it,
 #                and render the table the approver reads; outputs the plan hash
-#   simulate  -> advisory: send the selected txs on an anvil fork (the only
-#                job with actions; nothing it produces is trusted)
-#   preflight -> no actions: right repo, default branch, allowed dispatcher,
+#   simulate  -> advisory: send the selected txs on an anvil fork (its only
+#                action uploads the traces; nothing it produces is trusted)
+#   preflight -> no actions: right caller, default branch, allowed dispatcher,
 #                protected environment
 #   broadcast -> no actions, environment-gated: rebuild the plan and match
 #                resolve's hash, re-simulate at the tip, then sign and send one
 #                by one (or stop before signing when dry_run is true)
 #
-# The action-free jobs fetch this repository with plain git: the executor at
-# the run's commit (its tree must match resolve's), and the transaction file
-# at source_sha. Inputs reach scripts only through env, never through ${{ }}
-# in `run:`.
+# Every job fetches the executor at executor_sha and the transaction file at
+# source_sha anonymously with plain git from UPSTREAM_REPO, after checking
+# that each commit is on the named upstream branch (a fork's "impostor"
+# commit is refused). In a called workflow the github context (repository,
+# ref, actor, token) and the environment are the caller's. Inputs reach
+# scripts only through env, never through ${{ }} in `run:`.
 name: Execute EOA upgrade transactions
 
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
+      executor_sha:
+        description: "Commit of matter-labs/era-contracts this workflow and the executor run at (the same SHA the caller pins the workflow to); must be on executor_branch"
+        required: true
+        type: string
+      executor_branch:
+        description: "Upstream branch that contains executor_sha, e.g. draft-v31"
+        required: true
+        type: string
       source_sha:
-        description: "Commit of this repository holding the file: full 40-hex SHA (branch names are rejected)"
+        description: "Commit of matter-labs/era-contracts holding the transaction file: full 40-hex SHA"
+        required: true
+        type: string
+      source_branch:
+        description: "Upstream branch that contains source_sha"
         required: true
         type: string
       path:
-        description: "Repo-relative path of the transaction file, e.g. l1-contracts/upgrade-envs/v0.33.0-compiler/output/stage/emergency-upgrade-board.json"
+        description: "Repo-relative path of the transaction file"
         required: true
         type: string
       environment:
-        description: "Environment: selects the network (Sepolia), the signing key and the approvers"
+        description: "stage or testnet: selects the network, the signing key and the approvers"
         required: true
-        type: choice
-        options:
-          - stage
-          - testnet
+        type: string
       tx_range:
         description: "Optional 0-based inclusive index range, e.g. 0-12 or 13 (default: all). One sender per run."
         required: false
         default: ""
         type: string
       fork_block:
-        description: "Optional block number for the simulate job (default: latest). Broadcast always re-simulates at latest."
+        description: "Optional block number for the simulate job (default: latest)"
         required: false
         default: ""
         type: string
       dry_run:
         description: "Dry run: run every check, then stop before signing or sending"
-        required: true
+        required: false
         default: true
         type: boolean
 
-run-name: "${{ inputs.dry_run && 'Dry run' || 'LIVE' }} ${{ inputs.environment }}: ${{ inputs.path }} [${{ inputs.tx_range || 'all' }}]"
-
 permissions: {}
 
-# One run per environment at a time: runs share the sender's nonce.
-concurrency:
-  group: execute-eoa-upgrade-${{ inputs.environment }}
-  cancel-in-progress: false
+env:
+  # Where the executor and the transaction files come from. Same as
+  # config.json's upstreamRepo (the tests check it).
+  UPSTREAM_REPO: matter-labs/era-contracts
 
 defaults:
   run:
@@ -69,8 +80,7 @@ defaults:
 
 jobs:
   # Renders the approval table and outputs the plan hash that broadcast is
-  # bound to, so it runs no action: only this repository's code, fetched with
-  # plain git. The tests check this.
+  # bound to, so it runs no action. The tests check this.
   resolve:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -81,54 +91,70 @@ jobs:
       executor_tree: ${{ steps.executor.outputs.tree }}
     steps:
       - id: executor
-        name: Fetch the executor at the run's commit (plain git)
+        name: Fetch the executor at executor_sha (plain, anonymous git)
         env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          RUN_SHA: ${{ github.sha }}
+          EXECUTOR_SHA: ${{ inputs.executor_sha }}
+          EXECUTOR_BRANCH: ${{ inputs.executor_branch }}
+          # The commit of this workflow file the caller runs; must be executor_sha.
+          CALLED_SHA: ${{ github.job_workflow_sha }}
           EXPECTED_TREE: "" # resolve records the tree; later jobs must match it
         run: |
           set -euo pipefail
-          # The token reaches git through its environment, never argv, and is not stored in .git/config.
-          export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
-          GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
-          export GIT_CONFIG_VALUE_0
+          fail() { echo "::error::$*"; exit 1; }
+          [[ "$EXECUTOR_SHA" =~ ^[0-9a-f]{40}$ ]] || fail "executor_sha must be a full 40-hex commit SHA"
+          if [[ ! "$EXECUTOR_BRANCH" =~ ^[A-Za-z0-9_][A-Za-z0-9._/-]*$ ]] || [[ "$EXECUTOR_BRANCH" == *..* ]]; then
+            fail "executor_branch must be a plain branch name"
+          fi
+          if [ -n "$CALLED_SHA" ] && [ "$CALLED_SHA" != "$EXECUTOR_SHA" ]; then
+            fail "the caller runs this workflow at $CALLED_SHA but pins executor_sha $EXECUTOR_SHA"
+          fi
+          # A fork's commit is fetchable through the parent by SHA ("impostor
+          # commit"), so the SHA must be on an upstream branch.
+          status="$(curl --fail --silent --show-error --retry 3 \
+            "https://api.github.com/repos/$UPSTREAM_REPO/compare/$EXECUTOR_BRANCH...$EXECUTOR_SHA" | jq -r .status)" ||
+            fail "cannot compare executor_sha with $UPSTREAM_REPO branch $EXECUTOR_BRANCH"
+          case "$status" in behind | identical) ;; *) fail "executor_sha is not on $UPSTREAM_REPO branch $EXECUTOR_BRANCH ($status)" ;; esac
           git init -q executor
-          git -C executor remote add origin "https://github.com/$REPO.git"
+          git -C executor remote add origin "https://github.com/$UPSTREAM_REPO.git"
           git -C executor sparse-checkout set tools/eoa-upgrade-executor
-          git -C executor fetch -q --depth=1 --filter=blob:none origin "$RUN_SHA"
-          git -C executor -c advice.detachedHead=false checkout -q "$RUN_SHA"
+          git -C executor fetch -q --depth=1 --filter=blob:none origin "$EXECUTOR_SHA"
+          git -C executor -c advice.detachedHead=false checkout -q "$EXECUTOR_SHA"
           head="$(git -C executor rev-parse HEAD)"
           tree="$(git -C executor rev-parse HEAD:tools/eoa-upgrade-executor)"
-          if [ "$head" != "$RUN_SHA" ] || { [ -n "$EXPECTED_TREE" ] && [ "$tree" != "$EXPECTED_TREE" ]; }; then
-            echo "::error::fetched $head with executor tree $tree; expected $RUN_SHA with tree ${EXPECTED_TREE:-any}"
-            exit 1
+          [ "$head" = "$EXECUTOR_SHA" ] || fail "fetched $head, expected $EXECUTOR_SHA"
+          if [ -n "$EXPECTED_TREE" ] && [ "$tree" != "$EXPECTED_TREE" ]; then
+            fail "executor tree $tree differs from the one resolve ran ($EXPECTED_TREE)"
           fi
           echo "tree=$tree" >>"$GITHUB_OUTPUT"
-          echo "executor tree $tree at $head"
+          echo "executor $UPSTREAM_REPO@$head (on $EXECUTOR_BRANCH, $status), tree $tree"
       - name: Install foundry (pinned by sha256)
         run: executor/tools/eoa-upgrade-executor/scripts/install-foundry.sh "$RUNNER_TEMP/foundry"
       - id: plan
         name: Read the file at the pinned commit and list the transactions
         env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ inputs.source_sha }}
+          SOURCE_BRANCH: ${{ inputs.source_branch }}
           SOURCE_PATH: ${{ inputs.path }}
           TARGET_ENV: ${{ inputs.environment }}
           TX_RANGE: ${{ inputs.tx_range }}
+          EXECUTOR_SHA: ${{ inputs.executor_sha }}
+          EXECUTOR_BRANCH: ${{ inputs.executor_branch }}
         run: |
           x=executor/tools/eoa-upgrade-executor/scripts
           "$x/fetch.sh" --check-only "$SOURCE_SHA" "$SOURCE_PATH"
-          "$x/git-fetch.sh" "$REPO" "$SOURCE_SHA" "$SOURCE_PATH" source
+          "$x/git-fetch.sh" "$UPSTREAM_REPO" "$SOURCE_BRANCH" "$SOURCE_SHA" "$SOURCE_PATH" source
           "$x/fetch.sh" "$SOURCE_SHA" "$SOURCE_PATH" source plan
           "$x/resolve.sh" --plan-dir plan --environment "$TARGET_ENV" --range "$TX_RANGE"
-          cat plan/summary.md >>"$GITHUB_STEP_SUMMARY"
+          {
+            cat plan/summary.md
+            echo
+            echo "Source commit on \`$UPSTREAM_REPO\` branch \`$SOURCE_BRANCH\`. Executor \`$UPSTREAM_REPO@$EXECUTOR_SHA\` on \`$EXECUTOR_BRANCH\`."
+          } >>"$GITHUB_STEP_SUMMARY"
           echo "plan_sha256=$(cat plan/plan.json.sha256)" >>"$GITHUB_OUTPUT"
 
-  # Advisory: the only job that runs actions (pinned by SHA). Nothing it
-  # produces is the approval table or is trusted by broadcast, which replays
-  # the range itself, action-free, right before signing.
+  # Advisory. Its only action uploads the traces, after the results are in
+  # the summary; nothing it produces is the approval table or is trusted by
+  # broadcast, which replays the range itself right before signing.
   simulate:
     needs: resolve
     runs-on: ubuntu-24.04
@@ -136,47 +162,66 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Check out the executor
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          sparse-checkout: tools/eoa-upgrade-executor
-          filter: blob:none
-      - name: Validate the source inputs
+      - name: Fetch the executor at executor_sha (plain, anonymous git)
         env:
-          SOURCE_SHA: ${{ inputs.source_sha }}
-          SOURCE_PATH: ${{ inputs.path }}
-        run: tools/eoa-upgrade-executor/scripts/fetch.sh --check-only "$SOURCE_SHA" "$SOURCE_PATH"
-      # Only after the check above: ref is a validated 40-hex SHA, the path a plain file path.
-      - name: Check out the source commit
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ inputs.source_sha }}
-          path: source
-          persist-credentials: false
-          sparse-checkout: ${{ inputs.path }}
-          sparse-checkout-cone-mode: false
-          filter: blob:none
+          EXECUTOR_SHA: ${{ inputs.executor_sha }}
+          EXECUTOR_BRANCH: ${{ inputs.executor_branch }}
+          # The commit of this workflow file the caller runs; must be executor_sha.
+          CALLED_SHA: ${{ github.job_workflow_sha }}
+          EXPECTED_TREE: ${{ needs.resolve.outputs.executor_tree }}
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$*"; exit 1; }
+          [[ "$EXECUTOR_SHA" =~ ^[0-9a-f]{40}$ ]] || fail "executor_sha must be a full 40-hex commit SHA"
+          if [[ ! "$EXECUTOR_BRANCH" =~ ^[A-Za-z0-9_][A-Za-z0-9._/-]*$ ]] || [[ "$EXECUTOR_BRANCH" == *..* ]]; then
+            fail "executor_branch must be a plain branch name"
+          fi
+          if [ -n "$CALLED_SHA" ] && [ "$CALLED_SHA" != "$EXECUTOR_SHA" ]; then
+            fail "the caller runs this workflow at $CALLED_SHA but pins executor_sha $EXECUTOR_SHA"
+          fi
+          # A fork's commit is fetchable through the parent by SHA ("impostor
+          # commit"), so the SHA must be on an upstream branch.
+          status="$(curl --fail --silent --show-error --retry 3 \
+            "https://api.github.com/repos/$UPSTREAM_REPO/compare/$EXECUTOR_BRANCH...$EXECUTOR_SHA" | jq -r .status)" ||
+            fail "cannot compare executor_sha with $UPSTREAM_REPO branch $EXECUTOR_BRANCH"
+          case "$status" in behind | identical) ;; *) fail "executor_sha is not on $UPSTREAM_REPO branch $EXECUTOR_BRANCH ($status)" ;; esac
+          git init -q executor
+          git -C executor remote add origin "https://github.com/$UPSTREAM_REPO.git"
+          git -C executor sparse-checkout set tools/eoa-upgrade-executor
+          git -C executor fetch -q --depth=1 --filter=blob:none origin "$EXECUTOR_SHA"
+          git -C executor -c advice.detachedHead=false checkout -q "$EXECUTOR_SHA"
+          head="$(git -C executor rev-parse HEAD)"
+          tree="$(git -C executor rev-parse HEAD:tools/eoa-upgrade-executor)"
+          [ "$head" = "$EXECUTOR_SHA" ] || fail "fetched $head, expected $EXECUTOR_SHA"
+          if [ -n "$EXPECTED_TREE" ] && [ "$tree" != "$EXPECTED_TREE" ]; then
+            fail "executor tree $tree differs from the one resolve ran ($EXPECTED_TREE)"
+          fi
+          echo "tree=$tree" >>"$GITHUB_OUTPUT"
+          echo "executor $UPSTREAM_REPO@$head (on $EXECUTOR_BRANCH, $status), tree $tree"
       - name: Install foundry (pinned by sha256)
-        run: tools/eoa-upgrade-executor/scripts/install-foundry.sh "$RUNNER_TEMP/foundry"
+        run: executor/tools/eoa-upgrade-executor/scripts/install-foundry.sh "$RUNNER_TEMP/foundry"
       - name: Rebuild the plan and match resolve's hash
         env:
           SOURCE_SHA: ${{ inputs.source_sha }}
+          SOURCE_BRANCH: ${{ inputs.source_branch }}
           SOURCE_PATH: ${{ inputs.path }}
           TARGET_ENV: ${{ inputs.environment }}
           TX_RANGE: ${{ inputs.tx_range }}
           PLAN_SHA256: ${{ needs.resolve.outputs.plan_sha256 }}
         run: |
-          tools/eoa-upgrade-executor/scripts/fetch.sh "$SOURCE_SHA" "$SOURCE_PATH" source plan
-          tools/eoa-upgrade-executor/scripts/resolve.sh --plan-dir plan --environment "$TARGET_ENV" --range "$TX_RANGE"
+          x=executor/tools/eoa-upgrade-executor/scripts
+          "$x/fetch.sh" --check-only "$SOURCE_SHA" "$SOURCE_PATH"
+          "$x/git-fetch.sh" "$UPSTREAM_REPO" "$SOURCE_BRANCH" "$SOURCE_SHA" "$SOURCE_PATH" source
+          "$x/fetch.sh" "$SOURCE_SHA" "$SOURCE_PATH" source plan
+          "$x/resolve.sh" --plan-dir plan --environment "$TARGET_ENV" --range "$TX_RANGE"
           echo "$PLAN_SHA256  plan/plan.json" | sha256sum --check --strict
       - name: Fork-simulate (advisory)
         env:
           FORK_BLOCK: ${{ inputs.fork_block }}
         run: |
           rc=0
-          tools/eoa-upgrade-executor/scripts/simulate.sh --plan-dir plan --out simulation --fork-block "$FORK_BLOCK" || rc=$?
-          { echo "_Advisory: this job runs actions. Broadcast repeats the simulation itself before signing._"; echo; cat simulation/results.md; } >>"$GITHUB_STEP_SUMMARY" || true
+          executor/tools/eoa-upgrade-executor/scripts/simulate.sh --plan-dir plan --out simulation --fork-block "$FORK_BLOCK" || rc=$?
+          { echo "_Advisory. Broadcast repeats the simulation itself before signing._"; echo; cat simulation/results.md; } >>"$GITHUB_STEP_SUMMARY" || true
           exit "$rc"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
@@ -191,33 +236,44 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
-      actions: read # read the environment's protection rules
+      actions: read # read the caller's environment protection rules
     steps:
-      - name: Fetch the executor at the run's commit (plain git)
+      - name: Fetch the executor at executor_sha (plain, anonymous git)
         env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          RUN_SHA: ${{ github.sha }}
+          EXECUTOR_SHA: ${{ inputs.executor_sha }}
+          EXECUTOR_BRANCH: ${{ inputs.executor_branch }}
+          # The commit of this workflow file the caller runs; must be executor_sha.
+          CALLED_SHA: ${{ github.job_workflow_sha }}
           EXPECTED_TREE: ${{ needs.resolve.outputs.executor_tree }}
         run: |
           set -euo pipefail
-          # The token reaches git through its environment, never argv, and is not stored in .git/config.
-          export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
-          GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
-          export GIT_CONFIG_VALUE_0
+          fail() { echo "::error::$*"; exit 1; }
+          [[ "$EXECUTOR_SHA" =~ ^[0-9a-f]{40}$ ]] || fail "executor_sha must be a full 40-hex commit SHA"
+          if [[ ! "$EXECUTOR_BRANCH" =~ ^[A-Za-z0-9_][A-Za-z0-9._/-]*$ ]] || [[ "$EXECUTOR_BRANCH" == *..* ]]; then
+            fail "executor_branch must be a plain branch name"
+          fi
+          if [ -n "$CALLED_SHA" ] && [ "$CALLED_SHA" != "$EXECUTOR_SHA" ]; then
+            fail "the caller runs this workflow at $CALLED_SHA but pins executor_sha $EXECUTOR_SHA"
+          fi
+          # A fork's commit is fetchable through the parent by SHA ("impostor
+          # commit"), so the SHA must be on an upstream branch.
+          status="$(curl --fail --silent --show-error --retry 3 \
+            "https://api.github.com/repos/$UPSTREAM_REPO/compare/$EXECUTOR_BRANCH...$EXECUTOR_SHA" | jq -r .status)" ||
+            fail "cannot compare executor_sha with $UPSTREAM_REPO branch $EXECUTOR_BRANCH"
+          case "$status" in behind | identical) ;; *) fail "executor_sha is not on $UPSTREAM_REPO branch $EXECUTOR_BRANCH ($status)" ;; esac
           git init -q executor
-          git -C executor remote add origin "https://github.com/$REPO.git"
+          git -C executor remote add origin "https://github.com/$UPSTREAM_REPO.git"
           git -C executor sparse-checkout set tools/eoa-upgrade-executor
-          git -C executor fetch -q --depth=1 --filter=blob:none origin "$RUN_SHA"
-          git -C executor -c advice.detachedHead=false checkout -q "$RUN_SHA"
+          git -C executor fetch -q --depth=1 --filter=blob:none origin "$EXECUTOR_SHA"
+          git -C executor -c advice.detachedHead=false checkout -q "$EXECUTOR_SHA"
           head="$(git -C executor rev-parse HEAD)"
           tree="$(git -C executor rev-parse HEAD:tools/eoa-upgrade-executor)"
-          if [ "$head" != "$RUN_SHA" ] || { [ -n "$EXPECTED_TREE" ] && [ "$tree" != "$EXPECTED_TREE" ]; }; then
-            echo "::error::fetched $head with executor tree $tree; expected $RUN_SHA with tree ${EXPECTED_TREE:-any}"
-            exit 1
+          [ "$head" = "$EXECUTOR_SHA" ] || fail "fetched $head, expected $EXECUTOR_SHA"
+          if [ -n "$EXPECTED_TREE" ] && [ "$tree" != "$EXPECTED_TREE" ]; then
+            fail "executor tree $tree differs from the one resolve ran ($EXPECTED_TREE)"
           fi
           echo "tree=$tree" >>"$GITHUB_OUTPUT"
-          echo "executor tree $tree at $head"
+          echo "executor $UPSTREAM_REPO@$head (on $EXECUTOR_BRANCH, $status), tree $tree"
       - name: Check repository, branch and dispatcher
         env:
           REPO: ${{ github.repository }}
@@ -241,39 +297,54 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     # A member of the approver team other than the person who started the run
-    # approves here. The key is an environment secret: it exists only in this
-    # job, only on protected branches (check-run.sh narrows that to the default
-    # branch), and only in the last step.
+    # approves here. The environment is the caller's, and so are its secrets:
+    # they exist only in this job, only on protected branches of the caller
+    # (check-run.sh narrows that to its default branch), and only in the last
+    # step. No action runs next to them; the tests check this.
     environment: eoa-upgrade-${{ inputs.environment }}
+    # One broadcast per environment at a time: runs share the sender's nonce.
+    concurrency:
+      group: execute-eoa-upgrade-${{ inputs.environment }}
+      cancel-in-progress: false
     permissions:
       contents: read
-    # No action runs next to the key. The tests check this.
     steps:
-      - name: Fetch the executor at the run's commit (plain git)
+      - name: Fetch the executor at executor_sha (plain, anonymous git)
         env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          RUN_SHA: ${{ github.sha }}
+          EXECUTOR_SHA: ${{ inputs.executor_sha }}
+          EXECUTOR_BRANCH: ${{ inputs.executor_branch }}
+          # The commit of this workflow file the caller runs; must be executor_sha.
+          CALLED_SHA: ${{ github.job_workflow_sha }}
           EXPECTED_TREE: ${{ needs.resolve.outputs.executor_tree }}
         run: |
           set -euo pipefail
-          # The token reaches git through its environment, never argv, and is not stored in .git/config.
-          export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
-          GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
-          export GIT_CONFIG_VALUE_0
+          fail() { echo "::error::$*"; exit 1; }
+          [[ "$EXECUTOR_SHA" =~ ^[0-9a-f]{40}$ ]] || fail "executor_sha must be a full 40-hex commit SHA"
+          if [[ ! "$EXECUTOR_BRANCH" =~ ^[A-Za-z0-9_][A-Za-z0-9._/-]*$ ]] || [[ "$EXECUTOR_BRANCH" == *..* ]]; then
+            fail "executor_branch must be a plain branch name"
+          fi
+          if [ -n "$CALLED_SHA" ] && [ "$CALLED_SHA" != "$EXECUTOR_SHA" ]; then
+            fail "the caller runs this workflow at $CALLED_SHA but pins executor_sha $EXECUTOR_SHA"
+          fi
+          # A fork's commit is fetchable through the parent by SHA ("impostor
+          # commit"), so the SHA must be on an upstream branch.
+          status="$(curl --fail --silent --show-error --retry 3 \
+            "https://api.github.com/repos/$UPSTREAM_REPO/compare/$EXECUTOR_BRANCH...$EXECUTOR_SHA" | jq -r .status)" ||
+            fail "cannot compare executor_sha with $UPSTREAM_REPO branch $EXECUTOR_BRANCH"
+          case "$status" in behind | identical) ;; *) fail "executor_sha is not on $UPSTREAM_REPO branch $EXECUTOR_BRANCH ($status)" ;; esac
           git init -q executor
-          git -C executor remote add origin "https://github.com/$REPO.git"
+          git -C executor remote add origin "https://github.com/$UPSTREAM_REPO.git"
           git -C executor sparse-checkout set tools/eoa-upgrade-executor
-          git -C executor fetch -q --depth=1 --filter=blob:none origin "$RUN_SHA"
-          git -C executor -c advice.detachedHead=false checkout -q "$RUN_SHA"
+          git -C executor fetch -q --depth=1 --filter=blob:none origin "$EXECUTOR_SHA"
+          git -C executor -c advice.detachedHead=false checkout -q "$EXECUTOR_SHA"
           head="$(git -C executor rev-parse HEAD)"
           tree="$(git -C executor rev-parse HEAD:tools/eoa-upgrade-executor)"
-          if [ "$head" != "$RUN_SHA" ] || { [ -n "$EXPECTED_TREE" ] && [ "$tree" != "$EXPECTED_TREE" ]; }; then
-            echo "::error::fetched $head with executor tree $tree; expected $RUN_SHA with tree ${EXPECTED_TREE:-any}"
-            exit 1
+          [ "$head" = "$EXECUTOR_SHA" ] || fail "fetched $head, expected $EXECUTOR_SHA"
+          if [ -n "$EXPECTED_TREE" ] && [ "$tree" != "$EXPECTED_TREE" ]; then
+            fail "executor tree $tree differs from the one resolve ran ($EXPECTED_TREE)"
           fi
           echo "tree=$tree" >>"$GITHUB_OUTPUT"
-          echo "executor tree $tree at $head"
+          echo "executor $UPSTREAM_REPO@$head (on $EXECUTOR_BRANCH, $status), tree $tree"
       # Again here: re-running a failed broadcast job does not re-run preflight.
       - name: Check repository, branch and dispatcher
         env:
@@ -289,9 +360,8 @@ jobs:
       # resolve listed and the approver saw.
       - name: Rebuild the plan and match resolve's hash
         env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ inputs.source_sha }}
+          SOURCE_BRANCH: ${{ inputs.source_branch }}
           SOURCE_PATH: ${{ inputs.path }}
           TARGET_ENV: ${{ inputs.environment }}
           TX_RANGE: ${{ inputs.tx_range }}
@@ -299,7 +369,7 @@ jobs:
         run: |
           x=executor/tools/eoa-upgrade-executor/scripts
           "$x/fetch.sh" --check-only "$SOURCE_SHA" "$SOURCE_PATH"
-          "$x/git-fetch.sh" "$REPO" "$SOURCE_SHA" "$SOURCE_PATH" source
+          "$x/git-fetch.sh" "$UPSTREAM_REPO" "$SOURCE_BRANCH" "$SOURCE_SHA" "$SOURCE_PATH" source
           "$x/fetch.sh" "$SOURCE_SHA" "$SOURCE_PATH" source plan
           "$x/resolve.sh" --plan-dir plan --environment "$TARGET_ENV" --range "$TX_RANGE"
           echo "$PLAN_SHA256  plan/plan.json" | sha256sum --check --strict

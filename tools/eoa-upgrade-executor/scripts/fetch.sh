@@ -40,12 +40,11 @@ git -C "$repo_dir" cat-file blob "$sha:$path" >"$out/transactions.json"
 blob="$(git -C "$repo_dir" rev-parse "$sha:$path")"
 [ "$(git hash-object "$out/transactions.json")" = "$blob" ] || die "the extracted file does not hash to blob $blob"
 
-# owner/name for the summary link: GitHub Actions knows it; locally, read origin.
-repo="${GITHUB_REPOSITORY:-}"
-if [ -z "$repo" ]; then
-  repo="$(git -C "$repo_dir" config --get remote.origin.url 2>/dev/null |
-    sed -E -e 's#^(https://|ssh://)?([^@/]*@)?github\.com[:/]##' -e 's#\.git$##' || true)"
-fi
+# owner/name for the summary link, from the checkout's origin (git-fetch.sh
+# sets it to the upstream repository; the workflow's own repository is the
+# caller's, not where the file comes from).
+repo="$(git -C "$repo_dir" config --get remote.origin.url 2>/dev/null |
+  sed -E -e 's#^(https://|ssh://)?([^@/]*@)?github\.com[:/]##' -e 's#\.git$##' || true)"
 jq -n --arg repo "${repo:-local}" --arg commit "$sha" --arg path "$path" --arg blob "$blob" \
   --arg sha256 "$(sha256_of "$out/transactions.json")" \
   '{repo: $repo, commit: $commit, path: $path, gitBlobSha: $blob, sha256: $sha256}' >"$out/source.json"

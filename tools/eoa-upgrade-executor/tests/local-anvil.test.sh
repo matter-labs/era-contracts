@@ -230,20 +230,48 @@ expect_fail "owner is not an address" "owner is not a 20-byte hex address" make_
 expect_fail "empty board" "no transactions" make_plan "$work/b" "$(variant g5 "$work/board.json" '.transactions = []')"
 expect_fail "board tx with a bad address" "not a 20-byte hex address" make_plan "$work/b" "$(variant g6 "$work/board.json" '.transactions[1].to = "0x12"')"
 
+echo "== check-on-branch.sh (fake curl)"
+# A stand-in for curl that answers the compare API with $FAKE_COMPARE (or fails
+# when it is "404"), so the upstream-branch rule is tested without GitHub.
+mkdir -p "$work/fakebin"
+cat >"$work/fakebin/curl" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"$FAKE_CURL_LOG"
+[ "$FAKE_COMPARE" != 404 ] || { echo "curl: (22) The requested URL returned error: 404" >&2; exit 22; }
+printf '{"status":"%s"}\n' "$FAKE_COMPARE"
+EOF
+chmod +x "$work/fakebin/curl"
+upstream=matter-labs/era-contracts
+on_branch() { env PATH="$work/fakebin:$PATH" FAKE_CURL_LOG="$work/curl.log" FAKE_COMPARE="$1" "$scripts/check-on-branch.sh" "${@:2}"; }
+expect_ok "commit equal to the branch tip" on_branch identical "$upstream" draft-v31 "$good_sha"
+expect_ok "commit behind the branch tip" on_branch behind "$upstream" kl/v33-stage "$good_sha"
+check "it asks compare/<branch>...<sha>" grep -q "repos/$upstream/compare/kl/v33-stage...$good_sha" "$work/curl.log"
+expect_fail "commit ahead of the branch (not merged into it)" "is not on $upstream branch draft-v31" on_branch ahead "$upstream" draft-v31 "$good_sha"
+expect_fail "diverged commit (e.g. only in a fork)" "compare says 'diverged'" on_branch diverged "$upstream" draft-v31 "$good_sha"
+expect_fail "unknown commit or branch" "cannot compare" on_branch 404 "$upstream" draft-v31 "$good_sha"
+expect_fail "branch with '..'" "plain branch name" on_branch identical "$upstream" 'a..b' "$good_sha"
+expect_fail "branch with a leading dash" "plain branch name" on_branch identical "$upstream" -x "$good_sha"
+expect_fail "short sha" "full 40-hex" on_branch identical "$upstream" draft-v31 a92ad00
+expect_fail "bad repository" "owner/name" on_branch identical 'evil/../x' draft-v31 "$good_sha"
+expect_fail "git-fetch.sh stops at the branch check, before any fetch" "is not on $upstream branch" \
+  env PATH="$work/fakebin:$PATH" FAKE_CURL_LOG="$work/curl.log" FAKE_COMPARE=diverged \
+  "$scripts/git-fetch.sh" "$upstream" draft-v31 "$good_sha" a.json "$work/gf"
+check "git-fetch.sh created nothing" [ ! -e "$work/gf" ]
+
 echo "== check-run.sh"
 run_case() {
   local name="$1" pattern="$2" repo="$3" ref="$4" actor="$5" trig="${6:-$5}"
-  local cmd=(env REPO="$repo" REF="$ref" DEFAULT_BRANCH=draft-v31 ACTOR="$actor" TRIGGERING_ACTOR="$trig" "$scripts/check-run.sh")
+  local cmd=(env REPO="$repo" REF="$ref" DEFAULT_BRANCH=executor ACTOR="$actor" TRIGGERING_ACTOR="$trig" "$scripts/check-run.sh")
   if [ -z "$pattern" ]; then expect_ok "$name" "${cmd[@]}"; else expect_fail "$name" "$pattern" "${cmd[@]}"; fi
 }
 private=matter-labs/era-contracts-private
-run_case "dispatcher on the default branch" "" "$private" refs/heads/draft-v31 kelemeno
-run_case "logins are case-insensitive" "" "$private" refs/heads/draft-v31 stanislavbreadless
-run_case "public repository" "executes only in" matter-labs/era-contracts refs/heads/draft-v31 kelemeno
+run_case "dispatcher on the default branch" "" "$private" refs/heads/executor kelemeno
+run_case "logins are case-insensitive" "" "$private" refs/heads/executor stanislavbreadless
+run_case "public repository" "executes only in" matter-labs/era-contracts refs/heads/executor kelemeno
 run_case "another branch" "only from the default branch" "$private" refs/heads/kl/x kelemeno
-run_case "someone else dispatches" "may not start" "$private" refs/heads/draft-v31 octocat
-run_case "a bot account with a similar name" "may not start" "$private" refs/heads/draft-v31 StanislavBreadfulAI
-run_case "re-run by someone else" "may not start" "$private" refs/heads/draft-v31 kelemeno octocat
+run_case "someone else dispatches" "may not start" "$private" refs/heads/executor octocat
+run_case "a bot account with a similar name" "may not start" "$private" refs/heads/executor StanislavBreadfulAI
+run_case "re-run by someone else" "may not start" "$private" refs/heads/executor kelemeno octocat
 
 echo "== check-environment.sh (fake gh)"
 mkdir -p "$work/fakebin" "$work/gh"
@@ -274,8 +302,8 @@ good_env='{"name":"eoa-upgrade-local","can_admins_bypass":false,
     {"type":"branch_policy"}],
   "deployment_branch_policy":{"protected_branches":true,"custom_branch_policies":false}}'
 custom_policy='.deployment_branch_policy = {protected_branches: false, custom_branch_policies: true}'
-good_policies='{"total_count":1,"branch_policies":[{"name":"draft-v31","type":"branch"}]}'
-good_branches='[{"name":"draft-v31","protected":true}]'
+good_policies='{"total_count":1,"branch_policies":[{"name":"executor","type":"branch"}]}'
+good_branches='[{"name":"executor","protected":true}]'
 # env_case NAME PATTERN|"" ENV-JQ POLICIES-JQ BRANCHES-JQ [GITHUB-ENVIRONMENT-NAME]
 env_case() {
   local name="$1" pattern="$2" env_filter="$3" pol_filter="$4" br_filter="$5" gh_env="${6:-eoa-upgrade-local}"
@@ -284,17 +312,17 @@ env_case() {
   jq "$pol_filter" <<<"$good_policies" >"$work/gh/policies.json"
   jq "$br_filter" <<<"$good_branches" >"$work/gh/branches.json"
   local cmd=(env -u GITHUB_STEP_SUMMARY PATH="$work/fakebin:$PATH" FAKE_GH_DIR="$work/gh" REPO="$private"
-    ENVIRONMENT=local GITHUB_ENVIRONMENT_NAME="$gh_env" DEFAULT_BRANCH=draft-v31 "$scripts/check-environment.sh")
+    ENVIRONMENT=local GITHUB_ENVIRONMENT_NAME="$gh_env" DEFAULT_BRANCH=executor "$scripts/check-environment.sh")
   if [ -z "$pattern" ]; then expect_ok "$name" "${cmd[@]}"; else expect_fail "$name" "$pattern" "${cmd[@]}"; fi
 }
 env_case "team + protected branches passes" "" . . .
 env_out="$(env -u GITHUB_STEP_SUMMARY PATH="$work/fakebin:$PATH" FAKE_GH_DIR="$work/gh" REPO="$private" ENVIRONMENT=local \
-  GITHUB_ENVIRONMENT_NAME=eoa-upgrade-local DEFAULT_BRANCH=draft-v31 "$scripts/check-environment.sh" 2>&1)"
+  GITHUB_ENVIRONMENT_NAME=eoa-upgrade-local DEFAULT_BRANCH=executor "$scripts/check-environment.sh" 2>&1)"
 check "the report names the team and the policy" grep -q 'team `protocol-upgrade-approvers`.*protected branches' <<<"$env_out"
 env_case "team + custom list of only the default branch passes" "" "$custom_policy" . .
 env_case "other protected branches are reported, not refused" "" . . '. + [{name: "main", protected: true}]'
 env_out="$(env -u GITHUB_STEP_SUMMARY PATH="$work/fakebin:$PATH" FAKE_GH_DIR="$work/gh" REPO="$private" ENVIRONMENT=local \
-  GITHUB_ENVIRONMENT_NAME=eoa-upgrade-local DEFAULT_BRANCH=draft-v31 "$scripts/check-environment.sh" 2>&1)"
+  GITHUB_ENVIRONMENT_NAME=eoa-upgrade-local DEFAULT_BRANCH=executor "$scripts/check-environment.sh" 2>&1)"
 check "the report lists them" grep -q 'can also deploy.*: main' <<<"$env_out"
 env_case "protected branches, default branch unprotected" "is not protected" . . '[{name: "main", protected: true}]'
 env_case "workflow and config disagree on the name" "config.json says" . . . eoa-upgrade-other
@@ -470,6 +498,14 @@ first_secret="$(grep -n 'secrets\.' <<<"$job" | head -n 1 | cut -d: -f1)"
 check "its last step is Send" [ "${last_step#*- name: }" = Send ]
 check "secrets are read only in that last step" line_after "$first_secret" "${last_step%%:*}"
 check "no other job reads a secret" [ "$(grep -c 'secrets\.' "$wf")" = "$(grep -c 'secrets\.' <<<"$job")" ]
+check "it is a reusable workflow (workflow_call only)" \
+  bash -c 'grep -q "^  workflow_call:" "$1" && ! grep -q "workflow_dispatch\|pull_request\|^  push:" "$1"' _ "$wf"
+check "the only action anywhere is the pinned upload of the simulate traces" \
+  [ "$(grep -v '^[[:space:]]*#' "$wf" | grep 'uses:' | sed 's/^ *- *//' | sort -u)" = "uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1" ]
+check "UPSTREAM_REPO matches config.json's upstreamRepo" \
+  [ "$(sed -n 's/^  UPSTREAM_REPO: //p' "$wf")" = "$(jq -r .upstreamRepo "$EXECUTOR_ROOT/config.json")" ]
+check "every job fetches the executor with the upstream-branch check" \
+  [ "$(grep -c 'compare/$EXECUTOR_BRANCH...$EXECUTOR_SHA' "$wf")" = 4 ]
 
 printf '\n%s passed, %s failed\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]

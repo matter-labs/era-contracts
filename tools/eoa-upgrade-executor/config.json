@@ -1,5 +1,6 @@
 {
   "executionRepo": "matter-labs/era-contracts-private",
+  "upstreamRepo": "matter-labs/era-contracts",
   "dispatchers": ["kelemeno", "StanislavBreadless", "vladbochok"],
   "approverTeam": "protocol-upgrade-approvers",
   "environments": {

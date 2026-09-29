@@ -5,6 +5,8 @@
 #
 #   - all 13 transactions (12 approveHash + executeEmergencyUpgrade) pass
 #   - the same file with one calldata byte flipped in the EXECUTE tx fails
+#   - the upstream-branch rule against the real GitHub compare API: the stage
+#     source commit is on its branch; a commit not on the branch is refused
 #
 # The fork block is before the first approveHash landed. Public nodes prune
 # old state within days, so this uses a keyless archive gateway; override
@@ -15,6 +17,7 @@ source "$(dirname "$0")/../scripts/lib.sh"
 scripts="$EXECUTOR_ROOT/scripts"
 fixture="$EXECUTOR_ROOT/tests/fixtures/v0.33.0-compiler-stage-emergency-upgrade-board.json"
 FIXTURE_COMMIT=8ad567ab6eb1f142338dd0eda2d70d2d394687ef
+FIXTURE_BRANCH=kl/v33-stage-compiler-upgrade-draft-v31
 FIXTURE_PATH=l1-contracts/upgrade-envs/v0.33.0-compiler/output/stage/emergency-upgrade-board.json
 FIXTURE_BLOB=881b72ed9f3722682b3ddc6ac153e5b3ca464b16
 # The stage owner EOA's nonce is 843 here: none of the 13 transactions has run yet.
@@ -64,6 +67,22 @@ else
   echo "FAILED tampered file failed for another reason:"
   tail -n 20 "$work/c.log"
   failed=1
+fi
+
+echo "== the upstream-branch rule (GitHub compare API)"
+upstream="$(jq -r .upstreamRepo "$EXECUTOR_ROOT/config.json")"
+if "$scripts/check-on-branch.sh" "$upstream" "$FIXTURE_BRANCH" "$FIXTURE_COMMIT"; then
+  echo "ok     the fixture commit is on $FIXTURE_BRANCH"
+else
+  echo "FAILED the fixture commit should be on $FIXTURE_BRANCH"
+  failed=1
+fi
+# The stage branch is not merged into draft-v31, so its commit is not on it.
+if "$scripts/check-on-branch.sh" "$upstream" draft-v31 "$FIXTURE_COMMIT" 2>"$work/branch.log"; then
+  echo "FAILED a commit that is not on draft-v31 was accepted"
+  failed=1
+else
+  echo "ok     a commit that is not on the branch is refused ($(tail -n 1 "$work/branch.log" | sed 's/.*compare says/compare says/'))"
 fi
 
 [ "$failed" -eq 0 ]
