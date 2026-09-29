@@ -307,7 +307,11 @@ abstract contract DeployCTMUtils is DeployUtils {
         } else if (compareStrings(contractName, "RollupDAManager")) {
             return abi.encode();
         } else if (compareStrings(contractName, "RollupL1DAValidator")) {
-            return abi.encode(ctmAddresses.daAddresses.daContracts.rollupSLDAValidator);
+            // RollupL1DAValidator declares no constructor (da-contracts/contracts/
+            // RollupL1DAValidator.sol), so canonical init code is the creation code alone.
+            // Encoding an address here appended 32 bytes the EVM ignores but CREATE2 hashes,
+            // deriving every deployment from non-canonical init code.
+            return abi.encode();
         } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
             return abi.encode();
         } else if (compareStrings(contractName, "AvailL1DAValidator")) {
