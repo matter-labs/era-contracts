@@ -87,12 +87,13 @@ require_chain_id() {
   [ "$actual" = "$expected" ] || die "chain id mismatch: RPC serves $actual, expected $expected"
 }
 
-# First port at or above $1 on which nothing listens.
+# First port at or above $1 (default FIRST_ANVIL_PORT) on which nothing listens.
 find_free_port() {
-  local p="$1" last=$(($1 + 200))
+  local start="${1:-$FIRST_ANVIL_PORT}"
+  local p="$start" last=$((start + 200))
   while (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null; do
     p=$((p + 1))
-    [ "$p" -le "$last" ] || die "no free port found near $1"
+    [ "$p" -le "$last" ] || die "no free port found near $start"
   done
   printf '%s\n' "$p"
 }
