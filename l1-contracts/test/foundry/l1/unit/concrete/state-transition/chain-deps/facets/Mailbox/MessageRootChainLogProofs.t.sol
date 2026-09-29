@@ -51,7 +51,7 @@ contract MessageRootChainLogProofs is MailboxTest {
     uint8 shardId;
     L1MessageRoot messageRoot;
 
-    /// @dev Legacy settlement-layer chain ID used for historical migration intervals.
+    /// @dev Gateway chain ID used for legacy historical migration intervals.
     uint256 constant LEGACY_GW_CHAIN_ID = 1;
 
     function setUp() public virtual {

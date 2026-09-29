@@ -2,7 +2,7 @@ import { expect } from "chai";
 import type { BigNumber } from "ethers";
 import { ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { getEthBaseTokenInteropChainIds, getL2Chain, createProvider } from "../../src/core/utils";
+import { getChainIdsByRole, getL2Chain, createProvider } from "../../src/core/utils";
 import { encodeNtvAssetId } from "../../src/core/data-encoding";
 import { getInteropRecipientAddress, getInteropSourceAddress, isLiveInteropMode } from "../../src/core/accounts";
 import {
@@ -52,14 +52,14 @@ const ANVIL_INTEROP_PROTOCOL_FEE = ethers.BigNumber.from(ANVIL_INTEROP_PROTOCOL_
  * (base token and ERC20) and verifies that executeBundle on the destination
  * chain delivers the correct balances.
  *
- * Topology: interopChainIds[0] = source, interopChainIds[1] = destination (ETH-base-token chains)
+ * Topology: gwSettledChainIds[0] = source, gwSettledChainIds[1] = destination
  */
-describe("08 - Interop Messages (L1-settled chains)", function () {
+describe("08 - Interop Messages (GW-settled chains)", function () {
   this.timeout(0);
 
   const runner = new DeploymentRunner();
   let state: ReturnType<typeof runner.loadState>;
-  let interopChainIds: number[];
+  let gwSettledChainIds: number[];
 
   // Chain providers
   let sourceProvider: ethers.providers.JsonRpcProvider;
@@ -100,13 +100,13 @@ describe("08 - Interop Messages (L1-settled chains)", function () {
     if (!state.chains || !state.l1Addresses || !state.chainAddresses || !state.testTokens) {
       throw new Error("Deployment state incomplete. Run setup first.");
     }
-    interopChainIds = getEthBaseTokenInteropChainIds(state.chains.config);
-    if (interopChainIds.length < 2) {
-      throw new Error("At least 2 ETH-base-token L1-settled chains required for interop message tests");
+    gwSettledChainIds = getChainIdsByRole(state.chains.config, "gwSettled");
+    if (gwSettledChainIds.length < 2) {
+      throw new Error("At least 2 GW-settled chains required for interop message tests");
     }
 
-    sourceChainId = interopChainIds[0];
-    destChainId = interopChainIds[1];
+    sourceChainId = gwSettledChainIds[0];
+    destChainId = gwSettledChainIds[1];
 
     const sourceChain = getL2Chain(state.chains, sourceChainId);
     const destChain = getL2Chain(state.chains, destChainId);
@@ -158,9 +158,9 @@ describe("08 - Interop Messages (L1-settled chains)", function () {
     console.log(`   Source test token: ${sourceTokenAddress} (chain ${sourceChainId})`);
     console.log(`   Source test token assetId: ${sourceAssetId}`);
 
-    // Find an L1-settled chain with a custom (non-ETH) base token for cross-base-token tests
+    // Find a GW-settled chain with a custom (non-ETH) base token for cross-base-token tests
     const customBaseTokenConfig = state.chains!.config.find(
-      (c) => c.role === "directSettled" && c.baseToken && c.baseToken !== ETH_TOKEN_ADDRESS
+      (c) => c.role === "gwSettled" && c.baseToken && c.baseToken !== ETH_TOKEN_ADDRESS
     );
     if (customBaseTokenConfig) {
       customBaseTokenChainId = customBaseTokenConfig.chainId;

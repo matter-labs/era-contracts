@@ -24,7 +24,7 @@ const CHAIN_ROLES: &[&str] = &[
     about = "Generate wallets.yaml with ecosystem and per-chain keys"
 )]
 struct Opt {
-    /// Comma-separated chain names (e.g. "chain_a,chain_b").
+    /// Comma-separated chain names (e.g. "gateway,gateway_settling_a,gateway_settling_b,l1_settling").
     #[arg(long, value_delimiter = ',')]
     chains: Vec<String>,
 

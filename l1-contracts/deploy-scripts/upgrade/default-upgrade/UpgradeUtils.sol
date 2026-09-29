@@ -18,7 +18,7 @@ interface ILegacyTestnetVerifier {
     function IS_TESTNET_VERIFIER() external view returns (bool);
 }
 
-/// @notice Helpers shared by the default upgrade scripts
+/// @notice Scripts that is responsible for preparing the chain to become a gateway
 library UpgradeUtils {
     /// @notice Resolves whether the ecosystem runs a testnet verifier by asking the verifier the
     /// given CTM reports for its current protocol version.

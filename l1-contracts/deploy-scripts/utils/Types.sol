@@ -88,7 +88,7 @@ struct DataAvailabilityDeployedAddresses {
     address l1BlobsDAValidatorZKsyncOS;
 }
 
-/// @notice L1-specific state transition addresses.
+/// @notice L1-specific state transition addresses that are not used in the Gateway context.
 struct L1SpecificStateTransitionAddresses {
     address legacyValidatorTimelock;
 }

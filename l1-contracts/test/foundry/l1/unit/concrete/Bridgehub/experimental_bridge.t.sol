@@ -111,7 +111,7 @@ contract ExperimentalBridgeTest is Test {
 
     uint256 l1ChainId;
     uint256 zkTokenOriginChainId;
-    uint256 legacySettlementLayerChainId;
+    uint256 gatewayChainId;
 
     address deployerAddress;
 
@@ -140,7 +140,7 @@ contract ExperimentalBridgeTest is Test {
     function setUp() public {
         l1ChainId = 1;
         zkTokenOriginChainId = 320;
-        legacySettlementLayerChainId = 506;
+        gatewayChainId = 506;
         deployerAddress = makeAddr("DEPLOYER_ADDRESS");
         bridgeOwner = makeAddr("BRIDGE_OWNER");
         dummyBridgehub = new DummyBridgehubSetter(bridgeOwner, type(uint256).max);
@@ -191,13 +191,7 @@ contract ExperimentalBridgeTest is Test {
         messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(
-                        new L1MessageRoot(
-                            address(bridgehub),
-                            legacySettlementLayerChainId,
-                            makeAddr("chainAssetHandler")
-                        )
-                    ),
+                    address(new L1MessageRoot(address(bridgehub), gatewayChainId, makeAddr("chainAssetHandler"))),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initialize, ())
                 )

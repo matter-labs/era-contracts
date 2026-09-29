@@ -34,11 +34,11 @@ import {
     L2_ATOMIC_FLOW_MANAGER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-/// @title CoreOnL2Helper
+/// @title CoreOnGatewayHelper
 /// @notice Resolves CoreContract enum values to ZKsyncOS artifact names
 ///         and provides bytecode / force-deployment helpers for core L2 contracts.
 ///         Delegates bytecode reading to ContractsBytecodesLib / BytecodeUtils.
-library CoreOnL2Helper {
+library CoreOnGatewayHelper {
     // ======================== Name resolution ========================
 
     /// @notice Resolve a CoreContract to its (fileName, contractName).
