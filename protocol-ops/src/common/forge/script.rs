@@ -227,12 +227,7 @@ pub enum ForgeScriptArg {
         gas_limit: u64,
     },
     Offline,
-    Silent,
     Unlocked,
-    #[strum(to_string = "skip={skip_path}")]
-    Skip {
-        skip_path: String,
-    },
 }
 
 /// ForgeScriptArgs is a set of arguments that can be passed to the forge script command.

@@ -240,7 +240,7 @@ impl ForgeRunner {
 
         let args = script.args.build();
         let pre_run_ts_ms = Utc::now().timestamp_millis();
-        let command_result = self.execute(&script, &args, false)?;
+        let command_result = self.execute(&script, &args)?;
 
         if command_result.proposal_error() {
             logger::info(
@@ -323,12 +323,7 @@ impl ForgeRunner {
             .with_rpc_url(self.rpc_url.clone())
     }
 
-    fn execute(
-        &mut self,
-        script: &ForgeScript,
-        args: &[String],
-        _for_resume: bool,
-    ) -> anyhow::Result<CmdResult<()>> {
+    fn execute(&mut self, script: &ForgeScript, args: &[String]) -> anyhow::Result<CmdResult<()>> {
         let script_path = script.script_name().as_os_str();
         let _dir_guard = self.shell.push_dir(script.base_path());
         let mut cmd = Cmd::new(cmd!(
