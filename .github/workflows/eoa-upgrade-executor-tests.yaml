@@ -1,0 +1,44 @@
+# Tests for tools/eoa-upgrade-executor. No secrets and no real keys: a local
+# anvil with throwaway keystores, plus a Sepolia fork simulation of a fixture.
+name: EOA upgrade executor tests
+
+on:
+  pull_request:
+    paths:
+      - "tools/eoa-upgrade-executor/**"
+      - ".github/workflows/execute-eoa-upgrade.yaml"
+      - ".github/workflows/eoa-upgrade-executor-tests.yaml"
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  local-anvil:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: shellcheck
+        run: shellcheck tools/eoa-upgrade-executor/scripts/*.sh tools/eoa-upgrade-executor/tests/*.sh
+      - name: Install foundry (pinned by sha256)
+        run: tools/eoa-upgrade-executor/scripts/install-foundry.sh "$RUNNER_TEMP/foundry"
+      - name: Offline tests (validation, run checks, send loop on a local anvil)
+        run: tools/eoa-upgrade-executor/tests/local-anvil.test.sh
+
+  fork-simulation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install foundry (pinned by sha256)
+        run: tools/eoa-upgrade-executor/scripts/install-foundry.sh "$RUNNER_TEMP/foundry"
+      - name: Sepolia fork simulation of the v0.33.0 stage file (passes; a tampered copy fails)
+        run: tools/eoa-upgrade-executor/tests/fork.test.sh

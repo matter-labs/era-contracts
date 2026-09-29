@@ -1,0 +1,347 @@
+#!/usr/bin/env bash
+# Offline tests for the executor. Nothing here touches a real network.
+#
+#   1. fetch.sh: input validation, and reading a file at a commit of a scratch git repo
+#   2. resolve.sh: both file formats, ranges, senders, value policy, chain id
+#   3. check-run.sh: repository, branch and dispatcher checks
+#   4. check-environment.sh against a fake `gh` (isolates the test from the
+#      GitHub API; only the policy logic is under test)
+#   5. simulate.sh against a fork of the local anvil
+#   6. execute.sh key mode against a plain local anvil (not a fork) with
+#      throwaway keystores: key checks, dry run, the send-and-wait loop, stop on
+#      a failing pre-send check, the pending-tx guard, and that neither the
+#      keystore nor its password reaches a command line, a child's environment
+#      or the output
+#
+# Only the anvil process started here is stopped at exit.
+
+# shellcheck source=../scripts/lib.sh
+source "$(dirname "$0")/../scripts/lib.sh"
+scripts="$EXECUTOR_ROOT/scripts"
+check_foundry
+require_cmd "$ANVIL" git
+export EXECUTOR_TEST=1
+
+work="$(mktemp -d "${TMPDIR:-/tmp}/eoa-executor-test.XXXXXX")"
+passed=0
+failed=0
+
+pass() { passed=$((passed + 1)); printf 'ok     %s\n' "$1"; }
+fail() { failed=$((failed + 1)); printf 'FAILED %s\n' "$1"; [ -z "${2:-}" ] || printf '%s\n' "$2" | sed 's/^/       | /' | tail -n 25; }
+
+# expect_ok NAME CMD...            the command must succeed
+# expect_fail NAME PATTERN CMD...  the command must fail with PATTERN in its output
+expect_ok() {
+  local name="$1" out
+  shift
+  if out="$("$@" 2>&1)"; then pass "$name"; else fail "$name" "$out"; fi
+}
+expect_fail() {
+  local name="$1" pattern="$2" out
+  shift 2
+  if out="$("$@" 2>&1)"; then
+    fail "$name (unexpectedly succeeded)" "$out"
+  elif grep -qF -- "$pattern" <<<"$out"; then
+    pass "$name"
+  else
+    fail "$name (expected: $pattern)" "$out"
+  fi
+}
+check() { local name="$1"; shift; if "$@"; then pass "$name"; else fail "$name"; fi; }
+jq_true() { jq -s -e "$1" "$2" >/dev/null; }
+
+# ---------------------------------------------------------------- local anvil
+port="$(find_free_port "$FIRST_ANVIL_PORT")"
+rpc="http://127.0.0.1:$port"
+# Interval mining, so that publishing and mining are separate steps and the
+# receipt wait actually waits.
+"$ANVIL" --port "$port" --host 127.0.0.1 --chain-id 31337 --block-time 2 >"$work/anvil.log" 2>&1 &
+anvil_pid=$!
+trap 'kill "$anvil_pid" 2>/dev/null || true; wait "$anvil_pid" 2>/dev/null || true; rm -rf "$work"' EXIT
+wait_for_rpc "$rpc" "$anvil_pid"
+
+# Anvil's dev account 9 (key from its startup banner) only funds the test accounts.
+K9="$(sed -n 's/^(9) \(0x[0-9a-f]\{64\}\)$/\1/p' "$work/anvil.log")"
+[ -n "$K9" ] || die "could not read dev key 9 from the anvil banner"
+
+# Throwaway keystores, created the way devops would create the real one.
+new_keystore() { mkdir -p "$1" && CAST_PASSWORD="$2" "$CAST" wallet new "$1" --json | jq -r '.[0].address'; }
+EXEC_PW="exec-$RANDOM$RANDOM"
+OTHER_PW="other-$RANDOM$RANDOM"
+EXEC="$(new_keystore "$work/ks-exec" "$EXEC_PW")"
+OTHER="$(new_keystore "$work/ks-other" "$OTHER_PW")"
+EXEC_KS="$(cat "$work/ks-exec"/*)"
+OTHER_KS="$(cat "$work/ks-other"/*)"
+EXEC_CIPHERTEXT="$(jq -r .crypto.ciphertext <<<"$EXEC_KS")"
+R5="0x00000000000000000000000000000000000000a5"
+R6="0x00000000000000000000000000000000000000a6"
+
+"$CAST" send --private-key "$K9" --rpc-url "$rpc" --value 50ether "$EXEC" >/dev/null
+# A contract whose every call reverts (runtime: PUSH1 0 PUSH1 0 REVERT).
+REVERTER="$("$CAST" send --private-key "$K9" --rpc-url "$rpc" --json \
+  --create 0x6005600c60003960056000f360006000fd | jq -r .contractAddress)"
+is_address "$REVERTER" || die "reverter deployment failed"
+
+# Test config: the real one, with its networks pointed at this anvil and value
+# transfers allowed (so balances can prove what was sent).
+jq --arg rpc "$rpc" '
+  .environments = {local: {network: "anvil-local", githubEnvironment: "eoa-upgrade-local"}}
+  | .networks = {"anvil-local": {chainId: 31337, rpcUrl: $rpc, explorerTxUrl: ""}}
+  | .execution.allowNonZeroValue = true
+  | .execution.receiptPollSeconds = 1' "$EXECUTOR_ROOT/config.json" >"$work/config.json"
+jq '.networks["anvil-local"].chainId = 1' "$work/config.json" >"$work/config-wrong-chain.json"
+jq '.execution.allowNonZeroValue = false' "$work/config.json" >"$work/config-zero-value.json"
+export EXECUTOR_CONFIG="$work/config.json"
+
+# The two formats. transaction-simulator: value in ETH, several senders allowed.
+jq -n --arg e "$EXEC" --arg o "$OTHER" --arg r5 "$R5" --arg r6 "$R6" --arg rv "$REVERTER" '[
+  {description: "value transfer", network: "anvil-local", from: $e, to: $r5, value: "0.5", data: "0x"},
+  {description: "calldata to an EOA", network: "anvil-local", from: $e, to: $r6, value: "0", data: "0xdeadbeef"},
+  {description: "value and calldata", network: "anvil-local", from: $e, to: $r5, value: "0.25", data: "0x01", valueToMint: null},
+  {description: "reverts", network: "anvil-local", from: $e, to: $rv, value: "0", data: "0x"},
+  {description: "after the revert", network: "anvil-local", from: $e, to: $r6, value: "0", data: "0x"},
+  {description: "another sender", network: "anvil-local", from: $o, to: $r5, value: "0.1", data: "0x"}
+]' >"$work/txs.json"
+# emergency-upgrade-board: value always 0, network from the environment.
+jq -n --arg e "$EXEC" --arg r6 "$R6" '{
+  _comment: "test board", emergency_upgrade_board: $r6, protocol_upgrade_handler: $r6, owner: $e,
+  transactions: [
+    {step: 1, label: "APPROVE 1", from: $e, to: $r6, data: "0xd4d9bdcd0000000000000000000000000000000000000000000000000000000000000001"},
+    {step: 2, label: "EXECUTE", from: $e, to: $r6, data: "0xc03fd44b"}
+  ]}' >"$work/board.json"
+
+# make_plan DIR JSON-FILE [resolve args...]: a plan dir as fetch.sh would leave it, then resolve.
+make_plan() {
+  local dir="$1" file="$2"
+  shift 2
+  rm -rf "$dir" && mkdir -p "$dir"
+  cp "$file" "$dir/transactions.json"
+  jq -n '{repo: "local/fixture", commit: "0000000000000000000000000000000000000000",
+          path: "test.json", gitBlobSha: "-", sha256: "-"}' >"$dir/source.json"
+  "$scripts/resolve.sh" --plan-dir "$dir" --environment local --rpc-url "$rpc" "$@"
+}
+# variant NAME FILE JQ-FILTER: a copy of FILE with one change.
+variant() { jq "$3" "$2" >"$work/$1.json"; printf '%s\n' "$work/$1.json"; }
+nonce() { "$CAST" nonce "$1" --rpc-url "$rpc"; }
+# with_config FILE CMD...: run CMD (a function too) with another config.
+with_config() {
+  local c="$1"
+  shift
+  EXECUTOR_CONFIG="$c" "$@"
+}
+
+echo "== fetch.sh"
+good_sha=a92ad0057f77adfe6a6bdb46d8b2fb60b2ef804c
+expect_ok "valid inputs pass --check-only" "$scripts/fetch.sh" --check-only "$good_sha" l1-contracts/upgrade-envs/v0.33.0-compiler/output/stage/emergency-upgrade-board.json
+expect_fail "rejects a branch name" "full 40-hex" "$scripts/fetch.sh" --check-only draft-v31 a.json
+expect_fail "rejects a short sha" "full 40-hex" "$scripts/fetch.sh" --check-only a92ad00 a.json
+expect_fail "rejects an uppercase sha" "full 40-hex" "$scripts/fetch.sh" --check-only "$(printf '%s' "$good_sha" | tr a-f A-F)" a.json
+expect_fail "rejects '..'" "repo-relative path" "$scripts/fetch.sh" --check-only "$good_sha" l1-contracts/../x.json
+expect_fail "rejects an absolute path" "repo-relative path" "$scripts/fetch.sh" --check-only "$good_sha" /etc/x.json
+expect_fail "rejects glob characters" "repo-relative path" "$scripts/fetch.sh" --check-only "$good_sha" 'l1-contracts/*.json'
+expect_fail "rejects a leading dash" "repo-relative path" "$scripts/fetch.sh" --check-only "$good_sha" -x.json
+expect_fail "rejects non-json files" "repo-relative path" "$scripts/fetch.sh" --check-only "$good_sha" README.md
+git init -q "$work/repo"
+mkdir -p "$work/repo/out/stage"
+cp "$work/board.json" "$work/repo/out/stage/board.json"
+mkdir -p "$work/repo/out/dir.json"
+echo '{}' >"$work/repo/out/dir.json/x.json"
+git -C "$work/repo" add out
+git -C "$work/repo" -c user.name=test -c user.email=test@example.invalid -c commit.gpgsign=false commit -q -m fixture
+repo_sha="$(git -C "$work/repo" rev-parse HEAD)"
+expect_ok "reads a file at a commit" "$scripts/fetch.sh" "$repo_sha" out/stage/board.json "$work/repo" "$work/f"
+check "the file is byte for byte the committed one" cmp -s "$work/board.json" "$work/f/transactions.json"
+check "source.json names commit, path and blob" \
+  [ "$(jq -c '[.commit, .path, .gitBlobSha]' "$work/f/source.json")" = "[\"$repo_sha\",\"out/stage/board.json\",\"$(git -C "$work/repo" rev-parse "$repo_sha:out/stage/board.json")\"]" ]
+expect_fail "missing path" "is not a file at commit" "$scripts/fetch.sh" "$repo_sha" out/stage/nope.json "$work/repo" "$work/f"
+expect_fail "a directory named like a file" "is not a file at commit" "$scripts/fetch.sh" "$repo_sha" out/dir.json "$work/repo" "$work/f"
+expect_fail "unknown commit" "is not in" "$scripts/fetch.sh" ffffffffffffffffffffffffffffffffffffffff out/stage/board.json "$work/repo" "$work/f"
+
+echo "== resolve.sh: transaction-simulator format"
+expect_ok "valid file, range 0-2" make_plan "$work/p" "$work/txs.json" --range 0-2
+check "plan holds 3 txs from the one sender" \
+  [ "$(jq -c '[.format, (.transactions | length), .sender, .transactions[0].valueWei, .transactions[1].selector]' "$work/p/plan.json")" = "[\"transaction-simulator\",3,\"$EXEC\",\"500000000000000000\",\"0xdeadbeef\"]" ]
+check "summary lists the txs outside the range" grep -q 'Not in this run' "$work/p/summary.md"
+check "plan sha256 file matches" [ "$(cat "$work/p/plan.json.sha256")" = "$(sha256_of "$work/p/plan.json")" ]
+expect_fail "unknown field" "unknown field(s): gasLimit" make_plan "$work/p" "$(variant f1 "$work/txs.json" '.[0].gasLimit = "1"')"
+expect_fail "missing field" "data must be a string" make_plan "$work/p" "$(variant f2 "$work/txs.json" 'del(.[1].data)')"
+expect_fail "bad address" "not a 20-byte hex address" make_plan "$work/p" "$(variant f3 "$work/txs.json" '.[2].to = "0x1234"')"
+# Upper-case the first lower-case hex letter: still mixed case, checksum now wrong.
+bad_checksum="$(printf '%s\n' "$EXEC" | awk '{ for (i = 3; i <= length($0); i++) { c = substr($0, i, 1)
+  if (c ~ /[a-f]/) { print substr($0, 1, i - 1) toupper(c) substr($0, i + 1); exit } } }')"
+expect_fail "bad EIP-55 checksum" "invalid EIP-55 checksum" make_plan "$work/p" "$(variant f4 "$work/txs.json" ".[4].from = \"$bad_checksum\"")"
+expect_fail "odd-length calldata" "even-length hex" make_plan "$work/p" "$(variant f5 "$work/txs.json" '.[1].data = "0xabc"')"
+expect_fail "value not in decimal ETH" "decimal ETH amount" make_plan "$work/p" "$(variant f6 "$work/txs.json" '.[0].value = "1e18"')"
+expect_fail "value with 19 decimals" "decimal ETH amount" make_plan "$work/p" "$(variant f7 "$work/txs.json" '.[0].value = "0.0000000000000000001"')"
+expect_fail "control characters in a description" "control characters" make_plan "$work/p" "$(variant f8 "$work/txs.json" '.[0].description = "a\nb"')"
+expect_fail "empty file" "no transactions" make_plan "$work/p" "$(variant f9 "$work/txs.json" '[]')"
+expect_fail "network mismatch" "environment expects" make_plan "$work/p" "$(variant f10 "$work/txs.json" '.[1].network = "sepolia"')" --range 0-2
+expect_ok "network mismatch outside the range is fine" make_plan "$work/p" "$(variant f11 "$work/txs.json" '.[5].network = "sepolia"')" --range 0-2
+expect_fail "testOnly in range" "testOnly" make_plan "$work/p" "$(variant f12 "$work/txs.json" '.[1].testOnly = true')" --range 0-2
+expect_ok "testOnly outside the range" make_plan "$work/p" "$(variant f13 "$work/txs.json" '.[4].testOnly = true')" --range 0-2
+expect_fail "timeIncrease in range" "timeIncrease" make_plan "$work/p" "$(variant f14 "$work/txs.json" '.[0].timeIncrease = "86400"')" --range 0
+expect_fail "emulateAllBatchesExecuted in range" "emulateAllBatchesExecuted" make_plan "$work/p" "$(variant f15 "$work/txs.json" '.[0].emulateAllBatchesExecuted = true')" --range 0
+expect_fail "value refused by the default config" "only zero-value" \
+  with_config "$work/config-zero-value.json" make_plan "$work/p" "$work/txs.json" --range 0-2
+expect_ok "zero-value txs pass the default config" \
+  with_config "$work/config-zero-value.json" make_plan "$work/p" "$work/txs.json" --range 1
+expect_fail "range syntax" "range must be" make_plan "$work/p" "$work/txs.json" --range 1..2
+expect_fail "range reversed" "is after its end" make_plan "$work/p" "$work/txs.json" --range 3-1
+expect_fail "range out of bounds" "out of bounds" make_plan "$work/p" "$work/txs.json" --range 0-6
+expect_fail "two senders in one run" "different senders" make_plan "$work/p" "$work/txs.json"
+expect_ok "two senders with --simulation-only" make_plan "$work/p-sim" "$work/txs.json" --simulation-only
+check "simulation-only plan has no sender" [ "$(jq -c '[.simulationOnly, .sender]' "$work/p-sim/plan.json")" = "[true,null]" ]
+expect_fail "unknown environment" "unknown environment" \
+  "$scripts/resolve.sh" --plan-dir "$work/p" --environment mainnet --rpc-url "$rpc"
+expect_fail "RPC chain id mismatch" "chain id mismatch" \
+  env EXECUTOR_CONFIG="$work/config-wrong-chain.json" "$scripts/resolve.sh" --plan-dir "$work/p" --environment local --range 0-2 --rpc-url "$rpc"
+expect_fail "neither format" "neither" make_plan "$work/p" "$(variant f16 "$work/txs.json" '{a: 1}')"
+
+echo "== resolve.sh: emergency-upgrade-board format"
+expect_ok "valid board" make_plan "$work/b" "$work/board.json"
+check "board txs get the environment's network, value 0 and step labels" \
+  [ "$(jq -c '[.format, .sender, (.transactions | map(.description)), (.transactions | map(.valueWei) | unique)]' "$work/b/plan.json")" = "[\"emergency-upgrade-board\",\"$EXEC\",[\"step 1: APPROVE 1\",\"step 2: EXECUTE\"],[\"0\"]]" ]
+check "summary shows the owner" grep -q "| owner | \`$EXEC\` |" "$work/b/summary.md"
+expect_fail "unknown top-level field" "unknown top-level field(s): chain" make_plan "$work/b" "$(variant g1 "$work/board.json" '.chain = 1')"
+expect_fail "unknown tx field (no value in this format)" "unknown field(s): value" make_plan "$work/b" "$(variant g2 "$work/board.json" '.transactions[0].value = "1"')"
+expect_fail "steps out of order" "steps must run" make_plan "$work/b" "$(variant g3 "$work/board.json" '.transactions |= reverse')"
+expect_fail "owner is not an address" "owner is not a 20-byte hex address" make_plan "$work/b" "$(variant g4 "$work/board.json" '.owner = "me"')"
+expect_fail "empty board" "no transactions" make_plan "$work/b" "$(variant g5 "$work/board.json" '.transactions = []')"
+expect_fail "board tx with a bad address" "not a 20-byte hex address" make_plan "$work/b" "$(variant g6 "$work/board.json" '.transactions[1].to = "0x12"')"
+
+echo "== check-run.sh"
+run_case() {
+  local name="$1" pattern="$2" repo="$3" ref="$4" actor="$5" trig="${6:-$5}"
+  local cmd=(env REPO="$repo" REF="$ref" DEFAULT_BRANCH=draft-v31 ACTOR="$actor" TRIGGERING_ACTOR="$trig" "$scripts/check-run.sh")
+  if [ -z "$pattern" ]; then expect_ok "$name" "${cmd[@]}"; else expect_fail "$name" "$pattern" "${cmd[@]}"; fi
+}
+private=matter-labs/era-contracts-private
+run_case "dispatcher on the default branch" "" "$private" refs/heads/draft-v31 kelemeno
+run_case "logins are case-insensitive" "" "$private" refs/heads/draft-v31 stanislavbreadless
+run_case "public repository" "executes only in" matter-labs/era-contracts refs/heads/draft-v31 kelemeno
+run_case "another branch" "only from the default branch" "$private" refs/heads/kl/x kelemeno
+run_case "someone else dispatches" "may not start" "$private" refs/heads/draft-v31 octocat
+run_case "a bot account with a similar name" "may not start" "$private" refs/heads/draft-v31 StanislavBreadfulAI
+run_case "re-run by someone else" "may not start" "$private" refs/heads/draft-v31 kelemeno octocat
+
+echo "== check-environment.sh (fake gh)"
+mkdir -p "$work/fakebin" "$work/gh"
+cat >"$work/fakebin/gh" <<'EOF'
+#!/usr/bin/env bash
+# Stand-in for `gh api`: serves $FAKE_GH_DIR/env.json and policies.json.
+[ "$1" = api ] || exit 2
+shift
+path="" filter=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in --jq) filter="$2"; shift 2 ;; -H) shift 2 ;; *) path="$1"; shift ;; esac
+done
+case "$path" in
+  */deployment-branch-policies) f="$FAKE_GH_DIR/policies.json" ;;
+  */environments/*) f="$FAKE_GH_DIR/env.json" ;;
+  *) exit 1 ;;
+esac
+[ -f "$f" ] || { echo "gh: Not Found (HTTP 404)" >&2; exit 1; }
+if [ -n "$filter" ]; then jq -r "$filter" "$f"; else cat "$f"; fi
+EOF
+chmod +x "$work/fakebin/gh"
+good_env='{"name":"eoa-upgrade-local","can_admins_bypass":false,
+  "protection_rules":[{"type":"required_reviewers","prevent_self_review":true,"reviewers":[
+    {"type":"User","reviewer":{"login":"kelemeno"}},{"type":"User","reviewer":{"login":"StanislavBreadless"}},
+    {"type":"User","reviewer":{"login":"vladbochok"}}]},{"type":"branch_policy"}],
+  "deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}'
+good_policies='{"total_count":1,"branch_policies":[{"name":"draft-v31","type":"branch"}]}'
+# env_case NAME PATTERN|"" ENV-JQ POLICIES-JQ [GITHUB-ENVIRONMENT-NAME]
+env_case() {
+  local name="$1" pattern="$2" env_filter="$3" pol_filter="$4" gh_env="${5:-eoa-upgrade-local}"
+  rm -f "$work/gh/"*.json
+  if [ "$env_filter" != absent ]; then jq "$env_filter" <<<"$good_env" >"$work/gh/env.json"; fi
+  jq "$pol_filter" <<<"$good_policies" >"$work/gh/policies.json"
+  local cmd=(env PATH="$work/fakebin:$PATH" FAKE_GH_DIR="$work/gh" REPO="$private" ENVIRONMENT=local
+    GITHUB_ENVIRONMENT_NAME="$gh_env" DEFAULT_BRANCH=draft-v31 "$scripts/check-environment.sh")
+  if [ -z "$pattern" ]; then expect_ok "$name" "${cmd[@]}"; else expect_fail "$name" "$pattern" "${cmd[@]}"; fi
+}
+env_case "protected environment passes" "" . .
+env_case "workflow and config disagree on the name" "config.json says" . . eoa-upgrade-other
+env_case "environment missing" "does not exist" absent .
+env_case "no required reviewers" "no required reviewers" '.protection_rules |= map(select(.type != "required_reviewers"))' .
+env_case "an approver missing" "expected exactly" '.protection_rules[0].reviewers |= .[1:]' .
+env_case "an extra approver" "expected exactly" '.protection_rules[0].reviewers += [{type: "User", reviewer: {login: "octocat"}}]' .
+env_case "a team as approver" "team:era-reviewers" '.protection_rules[0].reviewers = [{type: "Team", reviewer: {slug: "era-reviewers"}}]' .
+env_case "self-review allowed" "Prevent self-review" '.protection_rules[0].prevent_self_review = false' .
+env_case "admin bypass allowed" "administrators can bypass" '.can_admins_bypass = true' .
+env_case "no branch policy" "any branch" '.deployment_branch_policy = null' .
+env_case "protected-branches policy" "custom list" '.deployment_branch_policy = {protected_branches: true, custom_branch_policies: false}' .
+env_case "extra branch in policy" "must be exactly" . '.branch_policies += [{name: "main", type: "branch"}]'
+env_case "wildcard branch policy" "must be exactly" . '.branch_policies = [{name: "*", type: "branch"}]'
+
+echo "== simulate.sh (fork of the local anvil)"
+make_plan "$work/p" "$work/txs.json" --range 0-2 >/dev/null 2>&1
+expect_ok "simulation of 0-2 passes" env FORK_RPC_URL="$rpc" "$scripts/simulate.sh" --plan-dir "$work/p"
+make_plan "$work/p-bad" "$work/txs.json" --range 1-4 >/dev/null 2>&1
+expect_fail "simulation of 1-4 stops at the reverting tx 3" "tx 3: eth_call reverts" \
+  env FORK_RPC_URL="$rpc" "$scripts/simulate.sh" --plan-dir "$work/p-bad"
+check "failure details and a trace are kept" grep -q 'Traces:' "$work/p-bad/simulation/tx-3.failure.txt"
+check "the simulation did not touch the local chain" [ "$(nonce "$EXEC")" = 0 ]
+
+echo "== execute.sh key mode (local anvil, throwaway keystores)"
+# A cast shim that records every command line and whether the secrets are in
+# its environment, then runs the real cast.
+real_cast="$(command -v "$CAST")"
+cat >"$work/fakebin/cast" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >>"$work/cast-argv.log"
+env | grep -c '^EXECUTOR_KEYSTORE' >>"$work/cast-env.log" || true
+exec "$real_cast" "\$@"
+EOF
+chmod +x "$work/fakebin/cast"
+mkdir -p "$work/tmp"
+# exec_key KEYSTORE PASSWORD PLAN-DIR [execute args...]
+exec_key() {
+  local ks="$1" pw="$2" dir="$3"
+  shift 3
+  env CAST="$work/fakebin/cast" RUNNER_TEMP="$work/tmp" EXECUTOR_KEYSTORE="$ks" EXECUTOR_KEYSTORE_PASSWORD="$pw" \
+    "$scripts/execute.sh" --plan "$dir/plan.json" --mode key --out "$dir/broadcast" --rpc-url "$rpc" "$@" 2>&1 |
+    tee -a "$work/exec-output.log"
+  return "${PIPESTATUS[0]}"
+}
+make_plan "$work/p" "$work/txs.json" --range 0-2 >/dev/null 2>&1
+expect_fail "keystore of another account" "is for $OTHER but the plan's sender is $EXEC" exec_key "$OTHER_KS" "$OTHER_PW" "$work/p"
+expect_fail "wrong password" "cannot decrypt EXECUTOR_KEYSTORE" exec_key "$EXEC_KS" "wrong" "$work/p"
+expect_fail "keystore without password" "EXECUTOR_KEYSTORE_PASSWORD is not set" exec_key "$EXEC_KS" "" "$work/p"
+expect_fail "no keystore, live run" "EXECUTOR_KEYSTORE is not set" exec_key "" "" "$work/p"
+expect_ok "no keystore, dry run" exec_key "" "" "$work/p" --dry-run
+check "dry run without keystore reports it stopped" grep -q 'DRY RUN' "$work/p/broadcast/results.md"
+expect_ok "right keystore, dry run" exec_key "$EXEC_KS" "$EXEC_PW" "$work/p" --dry-run
+expect_fail "simulation-only plan is never signed" "simulation-only" exec_key "$EXEC_KS" "$EXEC_PW" "$work/p-sim"
+check "nothing was sent by the refused and dry runs" [ "$(nonce "$EXEC")" = 0 ]
+
+expect_ok "live run of 0-2 sends and waits for each receipt" exec_key "$EXEC_KS" "$EXEC_PW" "$work/p"
+check "3 receipts, all EIP-1559 and successful" \
+  [ "$(jq -s -c '[length, (map(.type) | unique), (map(.status) | unique)]' "$work/p/broadcast"/tx-*.receipt.json)" = '[3,["0x2"],["0x1"]]' ]
+check "one tx per block, in order (sent only after the previous receipt)" \
+  jq_true 'map(.blockNumber) | length == 3 and .[0] < .[1] and .[1] < .[2]' "$work/p/broadcast/results.jsonl"
+check "sender nonce advanced by 3" [ "$(nonce "$EXEC")" = 3 ]
+check "recipient got 0.75 ETH" [ "$("$CAST" balance "$R5" --rpc-url "$rpc")" = 750000000000000000 ]
+
+make_plan "$work/p-bad" "$work/txs.json" --range 1-4 >/dev/null 2>&1
+expect_fail "live run of 1-4 stops at the pre-send check of tx 3" "tx 3: eth_call reverts" exec_key "$EXEC_KS" "$EXEC_PW" "$work/p-bad"
+check "only txs 1 and 2 were sent; tx 4 was not" [ "$(nonce "$EXEC"):$(jq -s -c 'map(.index)' "$work/p-bad/broadcast/results.jsonl")" = "5:[1,2]" ]
+
+# A transaction stuck in the mempool must block a run: pause mining, leave one pending.
+printf '%s' "$EXEC_PW" >"$work/exec-pw"
+"$CAST" rpc evm_setIntervalMining 0 --rpc-url "$rpc" >/dev/null
+ETH_KEYSTORE="$(ls "$work/ks-exec"/*)" ETH_PASSWORD="$work/exec-pw" "$CAST" send --async --rpc-url "$rpc" "$R6" >/dev/null
+expect_fail "pending tx from the sender blocks the run" "pending transaction(s)" exec_key "$EXEC_KS" "$EXEC_PW" "$work/p"
+"$CAST" rpc evm_setIntervalMining 2 --rpc-url "$rpc" >/dev/null
+
+echo "== the secrets stay secret"
+check "cast ran with the keystore (mktx seen)" grep -q '^mktx ' "$work/cast-argv.log"
+check "no command line holds the password or the keystore" \
+  bash -c "! grep -qF -e '$EXEC_PW' -e '$EXEC_CIPHERTEXT' '$work/cast-argv.log'"
+check "no cast process inherited EXECUTOR_KEYSTORE*" bash -c "! grep -qv '^0\$' '$work/cast-env.log'"
+check "no output holds the password or the keystore" \
+  bash -c "! grep -qF -e '$EXEC_PW' -e '$EXEC_CIPHERTEXT' '$work/exec-output.log'"
+check "the key files were deleted" bash -c "[ -z \"\$(ls -A '$work/tmp')\" ]"
+
+printf '\n%s passed, %s failed\n' "$passed" "$failed"
+[ "$failed" -eq 0 ]
