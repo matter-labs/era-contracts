@@ -34,10 +34,10 @@
   {
     "contractName": "l1-contracts/AdminFacet",
     "evmBytecodePath": "/l1-contracts/out/Admin.sol/AdminFacet.json",
-    "evmBytecodeHash": "0xe725593b512a5b8bd9a18e4671dba55f19171b37498658cb9abc459bed10b1fd",
-    "evmDeployedBytecodeHash": "0xb76a0acdb71cb9bdae0468d2ca44a2212c47da8dfd3bc6e23f8850cc466e32b7",
-    "evmDeployedBytecodeBlakeHash": "0x0f632c389039a42ccc35d7167247495b644e39a43ff045457c0f1715ed574e82",
-    "evmDeployedBytecodeLength": 22034
+    "evmBytecodeHash": "0x3593ae5c5c8f60c0e303f9e7f3116e64704541bcaf4ab04e6715e69b397c4a4c",
+    "evmDeployedBytecodeHash": "0xb15e67d81756714bf0217969b269c81a0ddcfd770830f654545d3bd36c94b63a",
+    "evmDeployedBytecodeBlakeHash": "0x3a2029a680f5534a33aceaa49e715111fca232a2756fd569004d1892ce2a8fb2",
+    "evmDeployedBytecodeLength": 22180
   },
   {
     "contractName": "l1-contracts/Arrays",

@@ -13,7 +13,11 @@ import {
     L2_DA_COMMITMENT_SCHEME,
     TEST_ROLLUP_DA_MANAGER_OWNER
 } from "../Utils/Utils.sol";
-import {ETH_TOKEN_ADDRESS, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER} from "contracts/common/Config.sol";
+import {
+    ETH_TOKEN_ADDRESS,
+    TESTNET_COMMIT_TIMESTAMP_NOT_OLDER,
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+} from "contracts/common/Config.sol";
 import {DummyBaseTokenBridge} from "contracts/dev-contracts/test/DummyBaseTokenBridge.sol";
 import {IAssetRouterShared} from "contracts/bridge/asset-router/IAssetRouterShared.sol";
 import {DummyChainTypeManagerForValidatorTimelock as DummyCTM} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
@@ -43,12 +47,14 @@ import {MessageRootBase} from "contracts/core/message-root/MessageRootBase.sol";
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase, L2TransactionRequestDirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {PermissionlessValidator} from "contracts/state-transition/validators/PermissionlessValidator.sol";
+
+import {TEST_PRIORITY_TX_L2_GAS_LIMIT, TEST_PRIORITY_TX_L1_GAS_PRICE} from "foundry-test/TestConstants.sol";
 
 bytes32 constant EMPTY_PREPUBLISHED_COMMITMENT = 0x0000000000000000000000000000000000000000000000000000000000000000;
 bytes constant POINT_EVALUATION_PRECOMPILE_RESULT = hex"000000000000000000000000000000000000000000000000000000000000100073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001";
@@ -487,4 +493,30 @@ contract ExecutorTest is UtilsCallMockerTest {
 
     // add this to be excluded from coverage report
     function test() internal virtual override {}
+
+    function _requestPriorityOp() internal returns (uint256 requestTimestamp) {
+        address prioritySender = makeAddr("prioritySender");
+        uint256 l2GasLimit = TEST_PRIORITY_TX_L2_GAS_LIMIT;
+        uint256 baseCost = mailbox.l2TransactionBaseCost(
+            TEST_PRIORITY_TX_L1_GAS_PRICE,
+            l2GasLimit,
+            REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+        );
+        vm.deal(prioritySender, baseCost);
+        requestTimestamp = block.timestamp;
+        vm.prank(prioritySender);
+        dummyBridgehub.requestL2TransactionDirect{value: baseCost}(
+            L2TransactionRequestDirect({
+                chainId: l2ChainId,
+                mintValue: baseCost,
+                l2Contract: makeAddr("l2Contract"),
+                l2Value: 0,
+                l2Calldata: "",
+                l2GasLimit: l2GasLimit,
+                l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+                factoryDeps: new bytes[](0),
+                refundRecipient: prioritySender
+            })
+        );
+    }
 }

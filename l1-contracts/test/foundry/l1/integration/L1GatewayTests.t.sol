@@ -57,6 +57,7 @@ import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainA
 import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
 import {IMessageRootBase, IMessageVerification} from "contracts/core/message-root/IMessageRoot.sol";
 import {OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
+import {NotSettlementLayer} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 import {LogFinder} from "test-utils/LogFinder.sol";
 
@@ -214,6 +215,24 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         // Deposits paused on the migrating chain
         uint256 pausedDepositsTimestamp = uint256(vm.load(address(migratingChain), pausedDepositsTimestampSlot));
         assertTrue(pausedDepositsTimestamp != 0, "Deposits should be paused after initiating migration");
+    }
+
+    function testFuzz_filteringUpdateRevertsAfterMigration(bool _oldEnabled, bool _newEnabled) public {
+        _setUpGatewayWithFilterer();
+        address chainAdmin = migratingChain.getAdmin();
+        vm.prank(chainAdmin);
+        migratingChain.setZKsyncOSL1TxFiltering(_oldEnabled);
+
+        gatewayScript.migrateChainToGateway(migratingChainId);
+        assertEq(addresses.bridgehub.settlementLayer(migratingChainId), gatewayChainId);
+
+        vm.recordLogs();
+        vm.prank(chainAdmin);
+        vm.expectRevert(NotSettlementLayer.selector);
+        migratingChain.setZKsyncOSL1TxFiltering(_newEnabled);
+
+        assertEq(migratingChain.getZKsyncOSL1TxFiltering(), _oldEnabled);
+        assertEq(vm.getRecordedLogs().length, 0);
     }
 
     function test_l2Registration() public {

@@ -30,6 +30,18 @@ Upgrade transactions are never filtered. ZKsync OS records the operator decision
 and replays it during proving; committing the flag prevents this discretion from
 being used for chains that have not opted in.
 
+### Priority Mode compatibility
+
+L1 transaction filtering cannot coexist with permanently allowed Priority Mode.
+The admin must disable filtering before calling `permanentlyAllowPriorityMode`,
+and cannot enable it once `canBeActivated` is set, even before Priority Mode is
+activated. Setting filtering to disabled remains permitted.
+
+Priority Mode activation depends on the oldest unprocessed priority request
+expiring. Filtered transactions still advance the priority queue when their
+batches are executed on the settlement layer, so an operator could otherwise
+reject recovery calls while keeping that activation condition from being met.
+
 ## Configuration updates
 
 The filtering and maximum-transaction-gas setters require the chain admin on the
@@ -43,3 +55,15 @@ under which they were executed. Operators must drain the committed batch queue a
 coordinate the runtime's configuration with the admin transaction before committing
 new batches. A successful filtering update emits `NewZKsyncOSL1TxFiltering` with the
 old and new values.
+
+### Pending priority requests
+
+Filtering follows the configuration used to prove a batch, not the configuration
+at the time a priority request was admitted on L1. Enabling filtering does not
+require an empty priority queue and does not preserve the previous policy for
+requests already in that queue. Such requests may be rejected with the full gas
+charge described above, even if filtering was disabled when they were submitted.
+
+Changing the flag does not alter already-verified batch results. However, verified
+but unexecuted batches may be reverted and their transactions subsequently
+recommitted and reproved with filtering enabled. Executed batches cannot be reverted.

@@ -13,8 +13,7 @@ import {
     PriorityOpsRequestTimestampMissing,
     Unauthorized
 } from "contracts/common/L1ContractErrors.sol";
-import {PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
-import {L2TransactionRequestDirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {PRIORITY_EXPIRATION} from "contracts/common/Config.sol";
 
 contract PriorityModeExecutorTest is ExecutorTest {
     function test_revertWhen_activatePriorityMode_notAllowed() public {
@@ -118,27 +117,5 @@ contract PriorityModeExecutorTest is ExecutorTest {
         admin.permanentlyAllowPriorityMode();
         vm.warp(block.timestamp + PRIORITY_EXPIRATION + 1);
         admin.activatePriorityMode();
-    }
-
-    function _requestPriorityOp() internal returns (uint256 requestTimestamp) {
-        address prioritySender = makeAddr("prioritySender");
-        uint256 l2GasLimit = 1_000_000;
-        uint256 baseCost = mailbox.l2TransactionBaseCost(10_000_000, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
-        vm.deal(prioritySender, baseCost);
-        requestTimestamp = block.timestamp;
-        vm.prank(prioritySender);
-        dummyBridgehub.requestL2TransactionDirect{value: baseCost}(
-            L2TransactionRequestDirect({
-                chainId: l2ChainId,
-                mintValue: baseCost,
-                l2Contract: makeAddr("l2Contract"),
-                l2Value: 0,
-                l2Calldata: "",
-                l2GasLimit: l2GasLimit,
-                l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-                factoryDeps: new bytes[](0),
-                refundRecipient: prioritySender
-            })
-        );
     }
 }

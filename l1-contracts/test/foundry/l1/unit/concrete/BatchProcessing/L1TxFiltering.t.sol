@@ -3,11 +3,19 @@ pragma solidity 0.8.28;
 
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 import {Utils} from "../Utils/Utils.sol";
-import {TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT} from "contracts/common/Config.sol";
+import {
+    PRIORITY_EXPIRATION,
+    TESTNET_COMMIT_TIMESTAMP_NOT_OLDER,
+    ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT
+} from "contracts/common/Config.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {Unauthorized, ZKsyncOSChainConfigUpdateWithUnverifiedBatches} from "contracts/common/L1ContractErrors.sol";
+import {
+    NotCompatibleWithPriorityMode,
+    Unauthorized,
+    ZKsyncOSChainConfigUpdateWithUnverifiedBatches
+} from "contracts/common/L1ContractErrors.sol";
 
 // The shared fixture isolates DA and cryptographic verification. Batch state advances through
 // the real commit/prove/revert entry points to exercise the configuration-update boundary.
@@ -52,6 +60,75 @@ contract L1TxFilteringTest is ExecutorTest {
         admin.setZKsyncOSL1TxFiltering(true);
 
         assertFalse(getters.getZKsyncOSL1TxFiltering());
+    }
+
+    function test_filteringCannotBeEnabledAfterPriorityModeAllowed() public {
+        _requestPriorityOp();
+        _allowPriorityMode();
+
+        vm.prank(getters.getAdmin());
+        vm.expectRevert(NotCompatibleWithPriorityMode.selector);
+        admin.setZKsyncOSL1TxFiltering(true);
+
+        assertFalse(getters.getZKsyncOSL1TxFiltering());
+        assertTrue(utilsFacet.util_getPriorityModeCanBeActivated());
+        assertFalse(utilsFacet.util_getPriorityModeActivated());
+        _setFiltering(false);
+    }
+
+    function test_filteringCannotBeEnabledInActivePriorityMode() public {
+        vm.prank(getters.getAdmin());
+        admin.makePermanentRollup();
+        uint256 requestTimestamp = _requestPriorityOp();
+        _allowPriorityMode();
+
+        vm.warp(requestTimestamp + PRIORITY_EXPIRATION);
+        vm.expectEmit(true, true, true, true, address(admin));
+        emit IAdmin.PriorityModeActivated();
+        admin.activatePriorityMode();
+
+        vm.prank(getters.getAdmin());
+        vm.expectRevert(NotCompatibleWithPriorityMode.selector);
+        admin.setZKsyncOSL1TxFiltering(true);
+
+        assertFalse(getters.getZKsyncOSL1TxFiltering());
+        assertTrue(utilsFacet.util_getPriorityModeCanBeActivated());
+        assertTrue(utilsFacet.util_getPriorityModeActivated());
+        _setFiltering(false);
+    }
+
+    function test_priorityModeCannotBeAllowedWhileFilteringEnabled() public {
+        _setFiltering(true);
+        _requestPriorityOp();
+
+        vm.prank(getters.getAdmin());
+        vm.expectRevert(NotCompatibleWithPriorityMode.selector);
+        admin.permanentlyAllowPriorityMode();
+
+        assertTrue(getters.getZKsyncOSL1TxFiltering());
+        assertFalse(utilsFacet.util_getPriorityModeCanBeActivated());
+        assertFalse(utilsFacet.util_getPriorityModeActivated());
+    }
+
+    function test_priorityModeCanBeAllowedAfterDisablingFiltering() public {
+        _setFiltering(true);
+        _requestPriorityOp();
+        _setFiltering(false);
+        _allowPriorityMode();
+
+        assertFalse(getters.getZKsyncOSL1TxFiltering());
+        assertFalse(utilsFacet.util_getPriorityModeActivated());
+    }
+
+    function test_filteringCanBeEnabledWithPendingPriorityRequest() public {
+        _requestPriorityOp();
+        uint256 firstUnprocessed = getters.getFirstUnprocessedPriorityTx();
+        assertEq(getters.getPriorityQueueSize(), 1);
+
+        _setFiltering(true);
+
+        assertEq(getters.getFirstUnprocessedPriorityTx(), firstUnprocessed);
+        assertEq(getters.getPriorityQueueSize(), 1);
     }
 
     function testFuzz_unverifiedBatchesBlockUpdates(bool _oldEnabled, bool _newEnabled) public {
@@ -111,6 +188,15 @@ contract L1TxFilteringTest is ExecutorTest {
         assertEq(getters.getTotalBatchesCommitted(), 0);
         assertEq(getters.getTotalBatchesVerified(), 0);
         _setFiltering(!_enabled);
+    }
+
+    function _allowPriorityMode() internal {
+        vm.expectEmit(true, true, true, true, address(admin));
+        emit IAdmin.PriorityModeAllowed();
+        vm.prank(getters.getAdmin());
+        admin.permanentlyAllowPriorityMode();
+
+        assertTrue(utilsFacet.util_getPriorityModeCanBeActivated());
     }
 
     function _setFiltering(bool _enabled) internal {
