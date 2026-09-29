@@ -17,6 +17,7 @@ import {L2DACommitmentScheme} from "../../common/Config.sol";
 /// @param l2LogsTreeRoot Root hash of tree that contains L2 -> L1 messages from this batch
 /// @param daCommitmentScheme commitment scheme used to generate pubdata commitment for this batch
 /// @param daCommitment commitment to the batch pubdata to validate DA in the l1 da validator
+/// @param chainConfigHash Hash of the runtime configuration used to execute the batch
 struct CommitBatchInfoZKsyncOS {
     uint64 batchNumber;
     bytes32 newStateCommitment;
@@ -34,6 +35,7 @@ struct CommitBatchInfoZKsyncOS {
     uint256 chainId;
     bytes operatorDAInput;
     uint256 slChainId;
+    bytes32 chainConfigHash;
 }
 
 /// @title The interface of the ZKsync Committer contract responsible for batch commitment operations.

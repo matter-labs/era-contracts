@@ -32,3 +32,5 @@ error ProtocolVersionTooSmall(uint256 _previousProtocolVersion, uint256 _newProt
 error SettlementLayerUpgradeMustPrecedeChainUpgrade();
 // 0xccf3f08a
 error UnexpectedZKsyncOSFlag(bool expected, bool actual);
+// 0x3987bc97
+error UnverifiedBatchesAtCommitmentUpgrade(uint256 batchesVerified, uint256 batchesCommitted);
