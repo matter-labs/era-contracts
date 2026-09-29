@@ -228,7 +228,7 @@ library DeployCTML1OrGateway {
     }
 
     /// @notice Retrieve sub-verifier addresses from a deployed dual verifier.
-    /// @dev For Era this reads the pre-v33 `EraDualVerifier`; v33 chains run `EraMultiProofVerifier`.
+    /// @dev For Era this reads the pre-v34 `EraDualVerifier`; v34 chains run `EraMultiProofVerifier`.
     /// @return fflonk The Boojum FFLONK sub-verifier.
     /// @return plonk The Boojum PLONK sub-verifier.
     function getSubVerifiers(

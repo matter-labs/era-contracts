@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {EraSettlementLayerV33Upgrade} from "contracts/upgrades/EraSettlementLayerV33Upgrade.sol";
+import {EraSettlementLayerV34Upgrade} from "contracts/upgrades/EraSettlementLayerV34Upgrade.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {MustBeEraChain} from "contracts/common/L1ContractErrors.sol";
 import {NotAllBatchesExecuted} from "contracts/state-transition/L1StateTransitionErrors.sol";
@@ -10,7 +10,7 @@ import {AIRBENDER_PROOF_SYSTEM_MASK} from "contracts/common/Config.sol";
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
 
-contract DummyEraSettlementLayerV33Upgrade is EraSettlementLayerV33Upgrade, BaseUpgradeUtils {
+contract DummyEraSettlementLayerV34Upgrade is EraSettlementLayerV34Upgrade, BaseUpgradeUtils {
     function setZKsyncOS(bool _zksyncOS) public {
         s.zksyncOS = _zksyncOS;
     }
@@ -32,13 +32,13 @@ contract DummyEraSettlementLayerV33Upgrade is EraSettlementLayerV33Upgrade, Base
     }
 }
 
-contract EraSettlementLayerV33UpgradeTest is BaseUpgrade {
-    DummyEraSettlementLayerV33Upgrade internal upgradeContract;
+contract EraSettlementLayerV34UpgradeTest is BaseUpgrade {
+    DummyEraSettlementLayerV34Upgrade internal upgradeContract;
     address internal mockChainTypeManager = makeAddr("mockChainTypeManager");
     address internal mockVerifier = makeAddr("mockVerifier");
 
     function setUp() public {
-        upgradeContract = new DummyEraSettlementLayerV33Upgrade();
+        upgradeContract = new DummyEraSettlementLayerV34Upgrade();
 
         _prepareProposedUpgrade();
 

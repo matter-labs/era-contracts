@@ -98,7 +98,7 @@ interface IExecutor is IZKChainBase {
         bytes32 airbenderCommitment;
     }
 
-    /// @notice `StoredBatchInfo` before v33 added `airbenderCommitment`.
+    /// @notice `StoredBatchInfo` before v34 added `airbenderCommitment`.
     // solhint-disable-next-line gas-struct-packing
     struct PreAirbenderStoredBatchInfo {
         uint64 batchNumber;
