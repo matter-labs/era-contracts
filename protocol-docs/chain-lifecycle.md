@@ -217,8 +217,10 @@ Two new L2 built-ins support atomic interop (protocol details in
 
 They are predeployed **only** in the ZKsync OS genesis (registered in the genesis gen tool,
 `tools/zksync-os-genesis-gen`); they have no constructors, so one-time setup happens in `initL2`
-calls made by `L2GenesisForceDeploymentsHelper._initializeV32Contracts` for every ZKsync OS chain, on both
-the genesis and the upgrade path:
+calls made by `L2GenesisForceDeploymentsHelper._initializeV32ContractsIfNeeded` for every ZKsync OS chain, on
+both the genesis and the upgrade path. Each call is skipped once the contract is initialized (the tree holds
+its sentinel leaf, the manager a non-zero L1 chain id), so the release-agnostic `L2DefaultUpgrade` seeds them
+on a chain upgrading from v31 and leaves them alone on every later upgrade:
 
 - `L2InteropCommitmentTree.initL2()` seeds the IMT with its `{0,0,0}` sentinel head leaf (reverts
   if already seeded).

@@ -868,7 +868,7 @@ async function prepareAndRelayL2Upgrade(
   await deployL2Contracts(l2Provider, forceDeployEntries, delegateTo);
 
   // Send the original upgrade calldata to ComplexUpgrader. The outer force deployments no-op
-  // through MockContractDeployer, then upgrade() delegatecalls to L2V32Upgrade for initialization.
+  // through MockContractDeployer, then upgrade() delegatecalls to L2DefaultUpgrade for initialization.
   const txHash = await impersonateAndRun(l2Provider, L2_FORCE_DEPLOYER_ADDR, async (signer) => {
     const tx = await signer.sendTransaction({
       to: L2_COMPLEX_UPGRADER_ADDR,
@@ -931,7 +931,7 @@ async function deployL2Contracts(
   const contractMap = buildAddressToContract();
   for (const entry of forceDeployEntries) {
     // ZKsyncOSUnsafeForceDeployment entries are direct deployments (e.g. the SystemContractProxyAdmin
-    // at L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, and L2V32Upgrade at a random delegate address).
+    // at L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, and L2DefaultUpgrade at a random delegate address).
     // Both are already set up above (anvil_setCode for the proxy admin, and the delegateTo code
     // is set separately below), so we skip them here.
     if (entry.upgradeType === UPGRADE_TYPE_ZKOS_UNSAFE_FORCE_DEPLOY) {
@@ -953,8 +953,8 @@ async function deployL2Contracts(
     }
   }
 
-  // Deploy the delegateTo target (L2V32Upgrade).
-  await l2Provider.send("anvil_setCode", [delegateTo, getBytecode("L2V32Upgrade")]);
+  // Deploy the delegateTo target (L2DefaultUpgrade).
+  await l2Provider.send("anvil_setCode", [delegateTo, getBytecode("L2DefaultUpgrade")]);
 
   // L2BaseToken is in the force deployment list as ZKsyncOSSystemProxyUpgrade, handled above.
 

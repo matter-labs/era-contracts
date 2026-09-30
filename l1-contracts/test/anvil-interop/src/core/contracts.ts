@@ -74,7 +74,7 @@ const ARTIFACTS = {
   IAtomicFlowManager: "IAtomicFlowManager.sol/IAtomicFlowManager.json",
   L2MessageVerification: "L2MessageVerification.sol/L2MessageVerification.json",
   L2InteropRootStorage: "L2InteropRootStorage.sol/L2InteropRootStorage.json",
-  L2V32Upgrade: "L2V32Upgrade.sol/L2V32Upgrade.json",
+  L2DefaultUpgrade: "L2DefaultUpgrade.sol/L2DefaultUpgrade.json",
   UpgradeableBeaconDeployer: "UpgradeableBeaconDeployer.sol/UpgradeableBeaconDeployer.json",
 } as const;
 

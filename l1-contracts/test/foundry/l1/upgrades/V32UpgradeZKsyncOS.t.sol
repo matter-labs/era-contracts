@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {V32UpgradeZKsyncOS} from "contracts/upgrades/V32UpgradeZKsyncOS.sol";
-import {IL2V32Upgrade} from "contracts/upgrades/IL2V32Upgrade.sol";
+import {IL2DefaultUpgrade} from "contracts/upgrades/IL2DefaultUpgrade.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
@@ -221,7 +221,7 @@ contract V32UpgradeZKsyncOSTest is BaseUpgrade {
 
     function _placeholderUpgradeTxData() internal view returns (bytes memory) {
         bytes memory innerCalldata = abi.encodeCall(
-            IL2V32Upgrade.upgrade,
+            IL2DefaultUpgrade.upgrade,
             (ctmDeployer, FIXED_FORCE_DEPLOYMENTS_DATA, hex"00")
         );
         return

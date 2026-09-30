@@ -21,10 +21,10 @@ import {
     L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2ComplexUpgrader} from "contracts/l2-upgrades/L2ComplexUpgrader.sol";
-import {L2V32Upgrade} from "contracts/l2-upgrades/L2V32Upgrade.sol";
+import {L2DefaultUpgrade} from "contracts/l2-upgrades/L2DefaultUpgrade.sol";
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
-import {IL2V32Upgrade} from "contracts/upgrades/IL2V32Upgrade.sol";
+import {IL2DefaultUpgrade} from "contracts/upgrades/IL2DefaultUpgrade.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {TokenBridgingData, TokenMetadata} from "contracts/common/Messaging.sol";
 import {
@@ -44,7 +44,7 @@ contract MockAcceptAll {
 }
 
 /// @dev Mock NTV that records updateL2 calls for verification.
-contract MockV32UpgradeNativeTokenVault {
+contract MockL2DefaultUpgradeNativeTokenVault {
     bytes32 public immutable BASE_TOKEN_ASSET_ID;
     uint256 public immutable L1_CHAIN_ID;
     address public immutable WETH_TOKEN;
@@ -109,7 +109,7 @@ contract MockV32UpgradeNativeTokenVault {
 }
 
 /// @dev Mock AssetTracker that records initL2 calls.
-contract MockV32UpgradeAssetTracker {
+contract MockL2DefaultUpgradeAssetTracker {
     uint256 public L1_CHAIN_ID;
     bytes32 public BASE_TOKEN_ASSET_ID;
 
@@ -127,7 +127,7 @@ contract MockV32UpgradeAssetTracker {
 }
 
 /// @dev Mock BaseToken that records initL2 calls.
-contract MockV32UpgradeBaseToken {
+contract MockL2DefaultUpgradeBaseToken {
     uint256 public initCalls;
     uint256 public lastInitializedL1ChainId;
 
@@ -141,7 +141,7 @@ contract MockV32UpgradeBaseToken {
     }
 }
 
-contract L2V32UpgradeUnitTest is Test {
+contract L2DefaultUpgradeUnitTest is Test {
     bytes32 internal constant BASE_TOKEN_ASSET_ID = keccak256("base-token");
     uint256 internal constant L1_CHAIN_ID = 9;
     uint256 internal constant GATEWAY_CHAIN_ID = 0;
@@ -155,7 +155,7 @@ contract L2V32UpgradeUnitTest is Test {
     address internal constant CTM_DEPLOYER = address(0xAA04);
     address internal constant PREDEPLOYED_WETH = address(0xdead);
 
-    L2V32Upgrade internal testUpgrade;
+    L2DefaultUpgrade internal testUpgrade;
 
     function setUp() public {
         // Deploy ComplexUpgrader
@@ -180,12 +180,16 @@ contract L2V32UpgradeUnitTest is Test {
         // Specific mocks for contracts we verify
         _etchCode(
             L2_NATIVE_TOKEN_VAULT_ADDR,
-            address(new MockV32UpgradeNativeTokenVault(BASE_TOKEN_ASSET_ID, L1_CHAIN_ID, PREDEPLOYED_WETH))
+            address(new MockL2DefaultUpgradeNativeTokenVault(BASE_TOKEN_ASSET_ID, L1_CHAIN_ID, PREDEPLOYED_WETH))
         );
-        _etchCode(L2_ASSET_TRACKER_ADDR, address(new MockV32UpgradeAssetTracker()));
-        _etchCode(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(new MockV32UpgradeBaseToken()));
+        _etchCode(L2_ASSET_TRACKER_ADDR, address(new MockL2DefaultUpgradeAssetTracker()));
+        _etchCode(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(new MockL2DefaultUpgradeBaseToken()));
 
-        testUpgrade = new L2V32Upgrade();
+        // The atomic-interop built-ins get their real code, so their initialization is observable.
+        vm.etch(L2_INTEROP_COMMITMENT_TREE_ADDR, address(new L2InteropCommitmentTree()).code);
+        vm.etch(L2_ATOMIC_FLOW_MANAGER_ADDR, address(new AtomicFlowManager()).code);
+
+        testUpgrade = new L2DefaultUpgrade();
     }
 
     /// @dev The contracts introduced in v31 are initialized on the genesis path only: their `initL2`s are
@@ -193,49 +197,30 @@ contract L2V32UpgradeUnitTest is Test {
     /// This upgrade therefore leaves the asset tracker and the base token alone; what it does run for them
     /// is covered by `L2GenesisForceDeploymentHelper.t.sol`.
     function test_UpgradeViaComplexUpgrader_LeavesPreV32ContractsAlone() public {
-        // The upgrade always initializes the atomic-interop built-ins, so they need real code here.
-        vm.etch(L2_INTEROP_COMMITMENT_TREE_ADDR, address(new L2InteropCommitmentTree()).code);
-        vm.etch(L2_ATOMIC_FLOW_MANAGER_ADDR, address(new AtomicFlowManager()).code);
-
-        bytes memory fixedData = abi.encode(_buildFixedForceDeploymentsData());
-        bytes memory additionalData = abi.encode(_buildZKChainSpecificData());
-
-        vm.prank(L2_FORCE_DEPLOYER_ADDR);
-        L2ComplexUpgrader(L2_COMPLEX_UPGRADER_ADDR).upgrade(
-            address(testUpgrade),
-            abi.encodeCall(IL2V32Upgrade.upgrade, (CTM_DEPLOYER, fixedData, additionalData))
-        );
+        _runUpgrade();
 
         // AssetTracker: not re-initialized.
-        MockV32UpgradeAssetTracker assetTracker = MockV32UpgradeAssetTracker(L2_ASSET_TRACKER_ADDR);
+        MockL2DefaultUpgradeAssetTracker assetTracker = MockL2DefaultUpgradeAssetTracker(L2_ASSET_TRACKER_ADDR);
         assertEq(assetTracker.initCalls(), 0, "asset tracker must not be re-initialized on an upgrade");
 
         // Verify NTV: updateL2 called with correct data
-        MockV32UpgradeNativeTokenVault nativeTokenVault = MockV32UpgradeNativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+        MockL2DefaultUpgradeNativeTokenVault nativeTokenVault = MockL2DefaultUpgradeNativeTokenVault(
+            L2_NATIVE_TOKEN_VAULT_ADDR
+        );
         assertEq(nativeTokenVault.updateCalls(), 1, "native token vault should be updated exactly once");
         assertEq(nativeTokenVault.lastOriginChainId(), BASE_TOKEN_ORIGIN_CHAIN_ID, "origin chain id mismatch");
         assertEq(nativeTokenVault.BASE_TOKEN_ORIGIN_TOKEN(), BASE_TOKEN_ORIGIN_ADDRESS, "origin token mismatch");
 
         // BaseToken: its `initL2` is a genesis-path call as well.
-        MockV32UpgradeBaseToken baseToken = MockV32UpgradeBaseToken(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+        MockL2DefaultUpgradeBaseToken baseToken = MockL2DefaultUpgradeBaseToken(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
         assertEq(baseToken.initCalls(), 0, "base token must not be re-initialized on an upgrade");
     }
 
-    /// @dev The atomic-interop built-ins arrive with the upgrade's force deployments and are
-    /// initialized here for the first time (the tree gets its sentinel leaf, the flow manager the
+    /// @dev On a chain upgrading from v31 the atomic-interop built-ins arrive with the upgrade's force
+    /// deployments and are initialized here for the first time (the tree gets its sentinel leaf, the flow manager the
     /// L1 chain id).
     function test_UpgradeViaComplexUpgrader_InitializesAtomicInteropBuiltIns() public {
-        vm.etch(L2_INTEROP_COMMITMENT_TREE_ADDR, address(new L2InteropCommitmentTree()).code);
-        vm.etch(L2_ATOMIC_FLOW_MANAGER_ADDR, address(new AtomicFlowManager()).code);
-
-        bytes memory fixedData = abi.encode(_buildFixedForceDeploymentsData());
-        bytes memory additionalData = abi.encode(_buildZKChainSpecificData());
-
-        vm.prank(L2_FORCE_DEPLOYER_ADDR);
-        L2ComplexUpgrader(L2_COMPLEX_UPGRADER_ADDR).upgrade(
-            address(testUpgrade),
-            abi.encodeCall(IL2V32Upgrade.upgrade, (CTM_DEPLOYER, fixedData, additionalData))
-        );
+        _runUpgrade();
 
         assertEq(
             L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafCount(),
@@ -249,8 +234,55 @@ contract L2V32UpgradeUnitTest is Test {
         );
 
         // Pre-v32 contracts stay untouched on the ZKsync OS path too.
-        MockV32UpgradeBaseToken baseToken = MockV32UpgradeBaseToken(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+        MockL2DefaultUpgradeBaseToken baseToken = MockL2DefaultUpgradeBaseToken(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
         assertEq(baseToken.initCalls(), 0, "base token must not be re-initialized on an upgrade");
+    }
+
+    /// @dev A chain already on v32 or later runs the built-ins initialized, and their `initL2`s are one-shot
+    /// (`IMTAlreadyInitialized` / `ManagerAlreadyInitialized`), so the same upgrade must be repeatable: every
+    /// later release reuses it. The second run skips them and still updates the rest.
+    function test_UpgradeViaComplexUpgrader_IsRepeatable() public {
+        _runUpgrade();
+        _runUpgrade();
+
+        assertEq(
+            L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafCount(),
+            1,
+            "the commitment tree must not be re-seeded"
+        );
+        assertEq(AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).L1_CHAIN_ID(), L1_CHAIN_ID, "l1 chain id changed");
+        assertEq(
+            MockL2DefaultUpgradeNativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).updateCalls(),
+            2,
+            "the native token vault must be updated on every upgrade"
+        );
+    }
+
+    /// @dev Each built-in is gated on its own marker: an already-seeded tree does not stop an uninitialized
+    /// flow manager from being initialized.
+    function test_UpgradeViaComplexUpgrader_InitializesOnlyUninitializedBuiltIns() public {
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initL2();
+
+        _runUpgrade();
+
+        assertEq(L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafCount(), 1, "tree re-seeded");
+        assertEq(
+            AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).L1_CHAIN_ID(),
+            L1_CHAIN_ID,
+            "the flow manager must receive the L1 chain id"
+        );
+    }
+
+    function _runUpgrade() private {
+        bytes memory fixedData = abi.encode(_buildFixedForceDeploymentsData());
+        bytes memory additionalData = abi.encode(_buildZKChainSpecificData());
+
+        vm.prank(L2_FORCE_DEPLOYER_ADDR);
+        L2ComplexUpgrader(L2_COMPLEX_UPGRADER_ADDR).upgrade(
+            address(testUpgrade),
+            abi.encodeCall(IL2DefaultUpgrade.upgrade, (CTM_DEPLOYER, fixedData, additionalData))
+        );
     }
 
     function _buildFixedForceDeploymentsData() private pure returns (FixedForceDeploymentsData memory) {

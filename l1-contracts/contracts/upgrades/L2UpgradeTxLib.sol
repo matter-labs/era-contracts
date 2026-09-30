@@ -7,7 +7,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVaultBase} from "../bridge/ntv/INativeTokenVaultBase.sol";
-import {IL2V32Upgrade} from "./IL2V32Upgrade.sol";
+import {IL2DefaultUpgrade} from "./IL2DefaultUpgrade.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 import {UnexpectedUpgradeSelector} from "../common/L1ContractErrors.sol";
 import {ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
@@ -26,12 +26,12 @@ library L2UpgradeTxLib {
     using Bytes for bytes;
 
     /// @notice Replace the placeholder inner calldata with real per-chain data.
-    /// @dev The inner calldata is IL2V32Upgrade.upgrade() — we decode the placeholder to
+    /// @dev The inner calldata is IL2DefaultUpgrade.upgrade() — we decode the placeholder to
     /// extract ecosystem-wide fields, then re-encode with per-chain additionalForceDeploymentsData.
     /// @param _bridgehub The address of the bridgehub.
     /// @param _chainId The chain ID to build the upgrade data for.
-    /// @param _existingUpgradeCalldata The placeholder L2V32Upgrade.upgrade() calldata.
-    function buildL2V32UpgradeCalldata(
+    /// @param _existingUpgradeCalldata The placeholder L2DefaultUpgrade.upgrade() calldata.
+    function buildL2DefaultUpgradeCalldata(
         address _bridgehub,
         uint256 _chainId,
         bytes memory _existingUpgradeCalldata
@@ -49,15 +49,15 @@ library L2UpgradeTxLib {
 
         return
             abi.encodeCall(
-                IL2V32Upgrade.upgrade,
+                IL2DefaultUpgrade.upgrade,
                 (ctmDeployer, fixedForceDeploymentsData, additionalForceDeploymentsData)
             );
     }
 
     /// @notice Rewrite a chain's L2 upgrade transaction data with its per-chain data.
-    /// @dev The ecosystem-wide transaction wraps `IL2V32Upgrade.upgrade` in
+    /// @dev The ecosystem-wide transaction wraps `IL2DefaultUpgrade.upgrade` in
     /// `IComplexUpgrader.forceDeployAndUpgradeUniversal`; only the innermost per-chain field changes, so the
-    /// wrapper is unwrapped, `buildL2V32UpgradeCalldata` substitutes the data, and the wrapper is rebuilt.
+    /// wrapper is unwrapped, `buildL2DefaultUpgradeCalldata` substitutes the data, and the wrapper is rebuilt.
     /// @param _bridgehub The address of the bridgehub.
     /// @param _chainId The chain ID to build the upgrade data for.
     /// @param _existingTxData The L2 upgrade tx data the CTM upgrade produced.
@@ -75,7 +75,7 @@ library L2UpgradeTxLib {
         ) = abi.decode(_existingTxData.slice(4), (IComplexUpgrader.UniversalContractUpgradeInfo[], address, bytes));
 
         validateWrappedUpgrade(existingUpgradeCalldata);
-        bytes memory l2UpgradeCalldata = buildL2V32UpgradeCalldata(_bridgehub, _chainId, existingUpgradeCalldata);
+        bytes memory l2UpgradeCalldata = buildL2DefaultUpgradeCalldata(_bridgehub, _chainId, existingUpgradeCalldata);
 
         return
             abi.encodeCall(
@@ -134,9 +134,9 @@ library L2UpgradeTxLib {
             );
     }
 
-    /// @notice Validate that the inner calldata targets L2V32Upgrade.
+    /// @notice Validate that the inner calldata targets L2DefaultUpgrade.
     function validateWrappedUpgrade(bytes memory _existingUpgradeCalldata) internal pure {
-        if (bytes4(_existingUpgradeCalldata) != IL2V32Upgrade.upgrade.selector) {
+        if (bytes4(_existingUpgradeCalldata) != IL2DefaultUpgrade.upgrade.selector) {
             revert UnexpectedUpgradeSelector();
         }
     }
