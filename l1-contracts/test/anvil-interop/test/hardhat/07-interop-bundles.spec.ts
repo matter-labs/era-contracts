@@ -213,9 +213,6 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
 
     const balAfter = await captureBalance(sourceProvider);
 
-    expect(sendResult.txHash, "single direct call: tx hash should exist").to.not.be.null;
-    expect(sendResult.interopBundle, "single direct call: interopBundle should exist").to.not.be.null;
-
     expectNativeSpend(balBefore, balAfter, msgValue, sendResult.receipt, "single direct call");
     if (protocolFeesBefore) {
       await expectAccumulatedProtocolFeeDelta(
@@ -324,9 +321,6 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
 
     const balAfter = await captureBalance(sourceProvider, sourceTokenAddress);
 
-    expect(sendResult.txHash, "single indirect call: tx hash should exist").to.not.be.null;
-    expect(sendResult.interopBundle, "single indirect call: interopBundle should exist").to.not.be.null;
-
     expectNativeSpend(balBefore, balAfter, msgValue, sendResult.receipt, "single indirect call");
 
     // Token balance should decrease by exactly tokenAmount
@@ -387,9 +381,6 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
 
     const balAfter = await captureBalance(sourceProvider);
 
-    expect(sendResult.txHash, "two direct calls: tx hash should exist").to.not.be.null;
-    expect(sendResult.interopBundle, "two direct calls: interopBundle should exist").to.not.be.null;
-
     expectNativeSpend(balBefore, balAfter, msgValue, sendResult.receipt, "two direct calls");
 
     console.log("   [send] Two direct calls bundle sent");
@@ -442,9 +433,6 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     });
 
     const balAfter = await captureBalance(sourceProvider, sourceTokenAddress);
-
-    expect(sendResult.txHash, "two indirect calls: tx hash should exist").to.not.be.null;
-    expect(sendResult.interopBundle, "two indirect calls: interopBundle should exist").to.not.be.null;
 
     expectNativeSpend(balBefore, balAfter, msgValue, sendResult.receipt, "two indirect calls");
 
@@ -526,9 +514,6 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     });
 
     const balAfter = await captureBalance(sourceProvider, sourceTokenAddress);
-
-    expect(sendResult.txHash, "mixed bundle: tx hash should exist").to.not.be.null;
-    expect(sendResult.interopBundle, "mixed bundle: interopBundle should exist").to.not.be.null;
 
     expectNativeSpend(balBefore, balAfter, msgValue, sendResult.receipt, "mixed bundle");
 
@@ -644,8 +629,6 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
       bundleAttributes,
       value: ethers.BigNumber.from(0),
     });
-
-    expect(sendResult.txHash).to.not.be.null;
 
     const receipt = await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
     expect(receipt.status).to.equal(1);

@@ -17,6 +17,7 @@ import {
   CallStatus,
   DEFAULT_TX_GAS_LIMIT,
   FAILING_CALL_CALLDATA,
+  FAILING_INTEROP_CALL_REASON,
   L2_ASSET_ROUTER_ADDR,
   L2_INTEROP_HANDLER_ADDR,
 } from "../../src/core/const";
@@ -46,6 +47,8 @@ import {
 } from "../../src/helpers/interop-helpers";
 import type { CallStarter, InteropSendResult } from "../../src/helpers/interop-helpers";
 import {
+  captureBalance,
+  expectNativeSpend,
   getNativeBalance,
   getTokenBalance,
   approveTokenForNtv,
@@ -204,6 +207,7 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     }
 
     const protocolFeesBefore = !isLiveInteropMode() ? await snapshotAccumulatedProtocolFees(sourceProvider) : undefined;
+    const senderBefore = await captureBalance(sourceProvider, sourceTokenAddress);
     const result = await sendInteropBundle({
       sourceProvider,
       destinationChainId: destChainId,
@@ -211,6 +215,10 @@ describe("09 - Interop Unbundle (failing calls)", function () {
       bundleAttributes,
       value: valuePerBundle,
     });
+
+    const senderAfter = await captureBalance(sourceProvider, sourceTokenAddress);
+    expectNativeSpend(senderBefore, senderAfter, valuePerBundle, result.receipt, "failing bundle sender");
+    expectBalanceDelta(senderBefore.token!, senderAfter.token!, tokenAmount.mul(-1), "failing bundle sender token");
 
     if (protocolFeesBefore) {
       await expectAccumulatedProtocolFeeDelta(
@@ -271,7 +279,12 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     const { sendResult, bundleData, bundleHash } = await sendAndPrepareBundle({ withUnbundlerAddress: true });
 
     // First, simulate atomic executeBundle - should revert because call 1 will fail.
-    await expectRevert(() => executeOrSimulateFailingBundle(sendResult), "executeBundle with failing call");
+    await expectRevert(
+      () => executeOrSimulateFailingBundle(sendResult),
+      "executeBundle with failing call",
+      FAILING_INTEROP_CALL_REASON,
+      destProvider
+    );
 
     // Now call verifyBundle - should succeed
     const verifyReceipt = await verifyBundle(destProvider, bundleData, sourceChainId);
@@ -310,7 +323,9 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     const callStatuses = [CallStatus.Unprocessed, CallStatus.Executed, CallStatus.Unprocessed];
     await expectRevert(
       () => unbundleBundle(destProvider, bundleData, callStatuses, getInteropUnbundlerPrivateKey()),
-      "execute a failing call"
+      "execute a failing call",
+      FAILING_INTEROP_CALL_REASON,
+      destProvider
     );
   });
 
@@ -440,7 +455,12 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     const { sendResult, bundleHash, baseAmount, tokenAmount } = await sendAndPrepareBundle({});
 
     // Simulate atomic executeBundle first - should revert (failing call).
-    await expectRevert(() => executeOrSimulateFailingBundle(sendResult), "executeBundle with failing call");
+    await expectRevert(
+      () => executeOrSimulateFailingBundle(sendResult),
+      "executeBundle with failing call",
+      FAILING_INTEROP_CALL_REASON,
+      destProvider
+    );
 
     // Build the final call statuses: execute calls 0 and 2, cancel call 1
     const finalCallStatuses = [CallStatus.Executed, CallStatus.Cancelled, CallStatus.Executed];

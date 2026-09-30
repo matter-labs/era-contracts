@@ -192,9 +192,6 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
       value: msgValue,
     });
 
-    expect(result.txHash).to.be.a("string").and.not.equal("");
-    expect(result.interopBundle).to.not.be.null;
-
     const balAfter = await captureBalance(sourceProvider);
     expectNativeSpend(balBefore, balAfter, msgValue, result.receipt, "base token message");
     if (protocolFeesBefore) {
@@ -285,9 +282,6 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
       value: msgValue,
     });
 
-    expect(result.txHash).to.be.a("string").and.not.equal("");
-    expect(result.interopBundle).to.not.be.null;
-
     const balAfter = await captureBalance(sourceProvider, sourceTokenAddress);
 
     // Token balance should decrease by exactly erc20Amount
@@ -346,9 +340,6 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
       attributes,
       value: msgValue,
     });
-
-    expect(result.txHash).to.be.a("string").and.not.equal("");
-    expect(result.interopBundle).to.not.be.null;
 
     const balAfter = await captureBalance(sourceProvider);
     expectNativeSpend(balBefore, balAfter, msgValue, result.receipt, "cross-base-token message");
@@ -411,6 +402,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     const attributes = [indirectCallAttr(amount)];
     const msgValue = customChainInteropFee.add(amount);
 
+    const senderBefore = await captureBalance(customBaseTokenProvider);
     const result = await sendInteropMessage({
       sourceProvider: customBaseTokenProvider,
       recipient,
@@ -419,8 +411,8 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
       value: msgValue,
     });
 
-    expect(result.txHash).to.be.a("string").and.not.equal("");
-    expect(result.interopBundle).to.not.be.null;
+    const senderAfter = await captureBalance(customBaseTokenProvider);
+    expectNativeSpend(senderBefore, senderAfter, msgValue, result.receipt, "custom→era sender");
 
     console.log(`   Custom→ETH message sent: ${result.txHash}`);
 
@@ -497,9 +489,6 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
       attributes,
       value: msgValue,
     });
-
-    expect(result.txHash).to.be.a("string").and.not.equal("");
-    expect(result.interopBundle).to.not.be.null;
 
     const balAfter = await getTokenBalance(sourceProvider, bridgedTokenOnSource, getInteropSourceAddress());
     expect(
