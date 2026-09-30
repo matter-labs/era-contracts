@@ -27,7 +27,7 @@ contract L1TxFilteringTest is ExecutorTest {
     }
 
     function test_filteringDisabledByDefault() public view {
-        assertFalse(getters.getZKsyncOSL1TxFiltering());
+        assertFalse(getters.isZKsyncOSL1TxFilteringEnabled());
     }
 
     function testFuzz_adminCanEnableDisableAndRepeat(bool _enabled) public {
@@ -42,7 +42,7 @@ contract L1TxFilteringTest is ExecutorTest {
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, _caller));
         admin.setZKsyncOSL1TxFiltering(_enabled);
 
-        assertFalse(getters.getZKsyncOSL1TxFiltering());
+        assertFalse(getters.isZKsyncOSL1TxFilteringEnabled());
     }
 
     function test_validatorCannotEnableFiltering() public {
@@ -50,7 +50,7 @@ contract L1TxFilteringTest is ExecutorTest {
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, validator));
         admin.setZKsyncOSL1TxFiltering(true);
 
-        assertFalse(getters.getZKsyncOSL1TxFiltering());
+        assertFalse(getters.isZKsyncOSL1TxFilteringEnabled());
     }
 
     function test_chainTypeManagerCannotEnableFiltering() public {
@@ -59,7 +59,7 @@ contract L1TxFilteringTest is ExecutorTest {
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, chainTypeManager));
         admin.setZKsyncOSL1TxFiltering(true);
 
-        assertFalse(getters.getZKsyncOSL1TxFiltering());
+        assertFalse(getters.isZKsyncOSL1TxFilteringEnabled());
     }
 
     function test_filteringCannotBeEnabledAfterPriorityModeAllowed() public {
@@ -70,7 +70,7 @@ contract L1TxFilteringTest is ExecutorTest {
         vm.expectRevert(NotCompatibleWithPriorityMode.selector);
         admin.setZKsyncOSL1TxFiltering(true);
 
-        assertFalse(getters.getZKsyncOSL1TxFiltering());
+        assertFalse(getters.isZKsyncOSL1TxFilteringEnabled());
         assertTrue(utilsFacet.util_getPriorityModeCanBeActivated());
         assertFalse(utilsFacet.util_getPriorityModeActivated());
         _setFiltering(false);
@@ -91,7 +91,7 @@ contract L1TxFilteringTest is ExecutorTest {
         vm.expectRevert(NotCompatibleWithPriorityMode.selector);
         admin.setZKsyncOSL1TxFiltering(true);
 
-        assertFalse(getters.getZKsyncOSL1TxFiltering());
+        assertFalse(getters.isZKsyncOSL1TxFilteringEnabled());
         assertTrue(utilsFacet.util_getPriorityModeCanBeActivated());
         assertTrue(utilsFacet.util_getPriorityModeActivated());
         _setFiltering(false);
@@ -105,7 +105,7 @@ contract L1TxFilteringTest is ExecutorTest {
         vm.expectRevert(NotCompatibleWithPriorityMode.selector);
         admin.permanentlyAllowPriorityMode();
 
-        assertTrue(getters.getZKsyncOSL1TxFiltering());
+        assertTrue(getters.isZKsyncOSL1TxFilteringEnabled());
         assertFalse(utilsFacet.util_getPriorityModeCanBeActivated());
         assertFalse(utilsFacet.util_getPriorityModeActivated());
     }
@@ -116,7 +116,7 @@ contract L1TxFilteringTest is ExecutorTest {
         _setFiltering(false);
         _allowPriorityMode();
 
-        assertFalse(getters.getZKsyncOSL1TxFiltering());
+        assertFalse(getters.isZKsyncOSL1TxFilteringEnabled());
         assertFalse(utilsFacet.util_getPriorityModeActivated());
     }
 
@@ -139,7 +139,7 @@ contract L1TxFilteringTest is ExecutorTest {
         vm.expectRevert(abi.encodeWithSelector(ZKsyncOSChainConfigUpdateWithUnverifiedBatches.selector, 0, 1));
         admin.setZKsyncOSL1TxFiltering(_newEnabled);
 
-        assertEq(getters.getZKsyncOSL1TxFiltering(), _oldEnabled);
+        assertEq(getters.isZKsyncOSL1TxFilteringEnabled(), _oldEnabled);
         assertEq(getters.getTotalBatchesCommitted(), 1);
         assertEq(getters.getTotalBatchesVerified(), 0);
     }
@@ -201,7 +201,7 @@ contract L1TxFilteringTest is ExecutorTest {
     }
 
     function _setFiltering(bool _enabled) internal {
-        bool oldEnabled = getters.getZKsyncOSL1TxFiltering();
+        bool oldEnabled = getters.isZKsyncOSL1TxFilteringEnabled();
         vm.expectEmit({
             checkTopic1: true,
             checkTopic2: true,
@@ -214,7 +214,7 @@ contract L1TxFilteringTest is ExecutorTest {
         vm.prank(getters.getAdmin());
         admin.setZKsyncOSL1TxFiltering(_enabled);
 
-        assertEq(getters.getZKsyncOSL1TxFiltering(), _enabled);
+        assertEq(getters.isZKsyncOSL1TxFilteringEnabled(), _enabled);
     }
 
     function _commitFirstBatch() internal returns (IExecutor.StoredBatchInfo memory) {
@@ -224,7 +224,7 @@ contract L1TxFilteringTest is ExecutorTest {
                 false,
                 ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
                 uint256(0),
-                getters.getZKsyncOSL1TxFiltering()
+                getters.isZKsyncOSL1TxFilteringEnabled()
             )
         );
         return _commitOSBatchGetStored(genesisStoredBatchInfo, newCommitBatchInfoZKsyncOS);
