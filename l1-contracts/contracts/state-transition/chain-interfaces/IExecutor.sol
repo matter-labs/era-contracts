@@ -23,7 +23,8 @@ interface IExecutor is IZKChainBase {
     /// @param priorityOperationsHash Hash of all priority operations from this batch
     /// @param l2LogsTreeRoot Root hash of tree that contains L2 -> L1 messages from this batch
     /// @param timestamp Rollup batch timestamp, have the same format as Ethereum batch constant. For ZKsync OS not used, always set to 0
-    /// @param commitment Verified input for the ZKsync circuit. For ZKsync OS batches this is the full, untruncated batch public-input hash
+    /// @param commitment For ZKsync OS batches from v34, the full, untruncated batch public-input hash;
+    /// earlier ZKsync OS batches store the batch-output hash.
     // solhint-disable-next-line gas-struct-packing
     struct StoredBatchInfo {
         uint64 batchNumber;
@@ -34,7 +35,7 @@ interface IExecutor is IZKChainBase {
         bytes32 dependencyRootsRollingHash;
         bytes32 l2LogsTreeRoot;
         uint256 timestamp; // For ZKsync OS not used, always set to 0
-        bytes32 commitment; // For ZKsync OS, the full, untruncated batch public-input hash.
+        bytes32 commitment; // ZKsync OS: full public-input hash from v34; batch-output hash before v34.
     }
 
     /// @notice Legacy StoredBatchInfo struct

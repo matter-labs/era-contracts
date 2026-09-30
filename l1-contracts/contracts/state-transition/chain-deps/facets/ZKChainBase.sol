@@ -23,6 +23,7 @@ import {
     ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE,
     ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE,
     ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
+    ZKSYNC_OS_FRI_PROOF_VERIFICATION_DISABLED,
     L2DACommitmentScheme
 } from "../../../common/Config.sol";
 import {CantRevertExecutedBatch, RevertedBatchNotAfterNewLastBatch} from "../../../common/L1ContractErrors.sol";
@@ -194,12 +195,16 @@ contract ZKChainBase is ReentrancyGuard {
         return ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE;
     }
 
-    // Hash layout: {protocol-docs/chain-config.md}.
+    /// @notice Returns the current runtime configuration hash. See {protocol-docs/chain-config.md}.
     function _getZKsyncOSChainConfigHash() internal view returns (bytes32) {
-        // `fri_proof_verification_enabled` is always disabled, hence the zero word.
         return
             keccak256(
-                abi.encodePacked(s.chainId, uint256(0), uint256(_getZKsyncOSMaxTxGasLimit()), uint256(s.pubdataContent))
+                abi.encodePacked(
+                    s.chainId,
+                    ZKSYNC_OS_FRI_PROOF_VERIFICATION_DISABLED,
+                    uint256(_getZKsyncOSMaxTxGasLimit()),
+                    uint256(s.pubdataContent)
+                )
             );
     }
 

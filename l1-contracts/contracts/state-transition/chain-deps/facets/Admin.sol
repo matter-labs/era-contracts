@@ -181,8 +181,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         emit NewZKsyncOSMaxTxGasLimit(oldMaxTxGasLimit, _newMaxTxGasLimit);
     }
 
-    /// @dev Retains the verified-batch boundary for runtime configuration updates, even though
-    /// proof verification now uses each batch's stored commitment.
+    /// @notice Enforces the configuration-update boundary described in {protocol-docs/chain-config.md}.
     function _enforceNoUnverifiedBatchesForChainConfigUpdate() internal view {
         if (s.totalBatchesCommitted != s.totalBatchesVerified) {
             revert ZKsyncOSChainConfigUpdateWithUnverifiedBatches(s.totalBatchesVerified, s.totalBatchesCommitted);

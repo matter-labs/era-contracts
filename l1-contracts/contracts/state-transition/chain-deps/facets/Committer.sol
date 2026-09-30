@@ -18,18 +18,18 @@ import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
 import {
     BatchNumberMismatch,
-    ChainConfigHashMismatch,
     BatchTimestampGreaterThanLastL2BlockTimestamp,
     CanOnlyProcessOneBatch,
+    ChainConfigHashMismatch,
     IncorrectBatchChainId,
+    InvalidBlockRange,
     InvalidNumberOfBlobs,
     InvalidProtocolVersion,
+    InvalidTxCountInPriorityMode,
     L2TimestampTooBig,
-    TimeNotReached,
-    UpgradeBatchNumberIsNotZero,
     NonZeroBlobToVerifyZKsyncOS,
-    InvalidBlockRange,
-    InvalidTxCountInPriorityMode
+    TimeNotReached,
+    UpgradeBatchNumberIsNotZero
 } from "../../../common/L1ContractErrors.sol";
 import {MismatchL2DACommitmentScheme, SettlementLayerChainIdMismatch} from "../../L1StateTransitionErrors.sol";
 
