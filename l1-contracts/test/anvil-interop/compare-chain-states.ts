@@ -85,10 +85,21 @@ function collectSkipStorageAccounts(versionDir: string): Set<string> {
 // instead, including the full current OS version so patch releases are covered too.
 const CTM_VERSION_KEYED_BLOCK_SLOT_INDICES = [166, 167];
 
-function ctmVersionKeyedBlockSlots(): string[] {
-  const genesisPath = path.resolve(__dirname, "../../../configs/genesis/zksync-os/latest.json");
-  const { major, minor, patch } = JSON.parse(fs.readFileSync(genesisPath, "utf-8")).protocol_semantic_version;
+export interface ProtocolSemanticVersion {
+  major: number;
+  minor: number;
+  patch: number;
+}
 
+function currentGenesisProtocolVersion(): ProtocolSemanticVersion {
+  const genesisPath = path.resolve(__dirname, "../../../configs/genesis/zksync-os/latest.json");
+  return JSON.parse(fs.readFileSync(genesisPath, "utf-8")).protocol_semantic_version;
+}
+
+/** `[upgradeCutDataBlock, newChainCreationParamsBlock]` slots for `version`. */
+export function ctmVersionKeyedBlockSlots(
+  { major, minor, patch }: ProtocolSemanticVersion = currentGenesisProtocolVersion()
+): string[] {
   const packedProtocolVersion = (BigInt(major) << 64n) | (BigInt(minor) << 32n) | BigInt(patch);
 
   return CTM_VERSION_KEYED_BLOCK_SLOT_INDICES.map((slotIndex) =>
