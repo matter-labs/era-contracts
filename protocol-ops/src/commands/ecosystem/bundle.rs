@@ -1,4 +1,4 @@
-//! The v31 **deploy bundle**: the deployer calls a generation run computed on a fork,
+//! The **deploy bundle**: the deployer calls a generation run computed on a fork,
 //! packed with the provenance needed to broadcast and re-verify them elsewhere.
 //!
 //! Solidity output is not byte-stable across build environments, so the CREATE2 init
@@ -8,8 +8,10 @@
 //! where it came from and the SHA-256 of every other file, so a consumer can check it.
 //!
 //! Three commands:
-//! - `rehearse-upgrade` (GENERATE): fork L1, `upgrade-prepare-all`, pack the bundle,
-//!   replay every bundle under impersonation and run PUVT.
+//! - `rehearse-upgrade` (GENERATE): fork L1, prepare the upgrade, pack the bundle, replay
+//!   every bundle under impersonation and run the upgrade's checks. What "prepare" and
+//!   "checks" mean comes from `upgrade-envs/<upgrade>/upgrade.toml`: v31 is
+//!   `upgrade-prepare-all` + PUVT, a `forge-script` upgrade runs one script and its own checks.
 //! - `replay-bundle` (CONSUME): rehearse a packed bundle on a fresh fork, broadcast the
 //!   deployer's bundles for real, or only run PUVT against an already-upgraded chain.
 //! - `verify-bundle`: the integrity check on its own.
@@ -31,15 +33,17 @@ use crate::commands::ecosystem::broadcast::{self, UpgradeBroadcastArgs};
 use crate::commands::ecosystem::upgrade::{self, UpgradePrepareAllArgs};
 use crate::commands::ecosystem::verify_upgrade::{self, VerifyUpgradeArgs};
 use crate::common::anvil::{send_impersonated_tx, set_balance};
-use crate::common::env_config::{default_protocol_ops_out_dir, EnvConfig};
+use crate::common::env_config::{
+    default_protocol_ops_out_dir, protocol_ops_out_dir, EnvConfig, DEFAULT_UPGRADE,
+};
 use crate::common::ethereum::get_provider;
 use crate::common::private_key::pk_to_address;
+use crate::common::upgrade_descriptor::UpgradeDescriptor;
 use crate::common::{logger, paths};
 
 // ─── Constants ───────────────────────────────────────────────────────────────────
 
 pub const DEPLOY_BUNDLE_SCHEMA: &str = "zksync-ecosystem-upgrade-deploy-bundle/1";
-const V31_UPGRADE_NAME: &str = "v0.31.0-interopB";
 pub const BUNDLE_METADATA_FILE: &str = "bundle-metadata.json";
 const MANIFEST_FILE: &str = "prepare/manifest.json";
 /// Generation outputs a bundle must carry, besides the `prepare/*.safe.json` files the manifest names.
@@ -71,7 +75,7 @@ const FUNDING_TX_GAS_LIMIT: u64 = 500_000;
 /// Tracked paths whose modification changes the bytecode or calldata a generation run
 /// produces. `contracts_worktree_dirty` is scoped to these, so the generated files the run
 /// itself rewrites (`output/<env>/`, `zkstack-out/`) do not count.
-const CONTRACT_SOURCE_PATHSPECS: [&str; 12] = [
+const CONTRACT_SOURCE_PATHSPECS: [&str; 11] = [
     "*/foundry.toml",
     "AllContractsHashes.json",
     "SystemConfig.json",
@@ -80,13 +84,22 @@ const CONTRACT_SOURCE_PATHSPECS: [&str; 12] = [
     "l1-contracts/contracts",
     "l1-contracts/deploy-scripts",
     "l1-contracts/upgrade-envs/permanent-values",
-    // Git's default wildcard can cross directory separators. Use glob magic
-    // so generated output/<env>/ecosystem.toml is not mistaken for an input.
-    ":(glob)l1-contracts/upgrade-envs/v0.31.0-interopB/*.toml",
     "l2-contracts/contracts",
     "protocol-ops/src",
     "system-contracts/contracts",
 ];
+
+/// [`CONTRACT_SOURCE_PATHSPECS`] plus the upgrade's own input TOMLs.
+fn contract_source_pathspecs(upgrade: &str) -> Vec<String> {
+    let mut pathspecs: Vec<String> = CONTRACT_SOURCE_PATHSPECS
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    // Git's default wildcard can cross directory separators. Use glob magic
+    // so generated output/<env>/ecosystem.toml is not mistaken for an input.
+    pathspecs.push(format!(":(glob)l1-contracts/upgrade-envs/{upgrade}/*.toml"));
+    pathspecs
+}
 
 alloy::sol! {
     #[sol(rpc)]
@@ -244,6 +257,7 @@ fn list_files(directory: &Path, prefix: &str, out: &mut Vec<String>) -> anyhow::
 /// `output_dir` into `bundle_dir` and write `bundle-metadata.json` next to them.
 pub fn pack_deploy_bundle(
     env_cfg: &EnvConfig,
+    upgrade: &str,
     output_dir: &Path,
     bundle_dir: &Path,
     repository_root: &Path,
@@ -292,15 +306,12 @@ pub fn pack_deploy_bundle(
         .map(|relative| Ok((relative.clone(), sha256_file(&bundle_dir.join(relative))?)))
         .collect::<anyhow::Result<BTreeMap<_, _>>>()?;
 
-    let source_status = try_capture(
-        "git",
-        &[
-            &["status", "--porcelain", "--"][..],
-            &CONTRACT_SOURCE_PATHSPECS[..],
-        ]
-        .concat(),
-        repository_root,
-    );
+    let pathspecs = contract_source_pathspecs(upgrade);
+    let git_status_args: Vec<&str> = ["status", "--porcelain", "--"]
+        .into_iter()
+        .chain(pathspecs.iter().map(String::as_str))
+        .collect();
+    let source_status = try_capture("git", &git_status_args, repository_root);
     match source_status.as_deref() {
         Some("") => {}
         Some(dirty) => logger::warn(format!(
@@ -311,7 +322,7 @@ pub fn pack_deploy_bundle(
     }
     let metadata = DeployBundleMetadata {
         schema: DEPLOY_BUNDLE_SCHEMA.to_string(),
-        upgrade: V31_UPGRADE_NAME.to_string(),
+        upgrade: upgrade.to_string(),
         env: env_cfg.env.clone(),
         contracts_commit: try_capture("git", &["rev-parse", "HEAD"], repository_root)
             .unwrap_or_else(|| "unknown".to_string()),
@@ -706,6 +717,112 @@ async fn verify_upgrade(
     verify_upgrade::run(VerifyUpgradeArgs::try_parse_from(args)?).await
 }
 
+/// Fund the bundle's signers on a fork. v31 also mints ZK and registers the legacy token
+/// ([`fund_bundle_targets`]); a `forge-script` upgrade's signers only need ETH.
+async fn fund_signers(
+    descriptor: &UpgradeDescriptor,
+    rpc_url: &str,
+    env_cfg: &EnvConfig,
+    deployer: Address,
+    paths: &BundlePaths,
+) -> anyhow::Result<()> {
+    logger::step("fund every bundle signer");
+    match descriptor {
+        UpgradeDescriptor::PrepareAll {} => {
+            fund_bundle_targets(
+                rpc_url,
+                env_cfg,
+                deployer,
+                &paths.manifest,
+                &paths.ecosystem_toml,
+            )
+            .await
+        }
+        UpgradeDescriptor::ForgeScript(_) => {
+            let manifest = read_manifest(&paths.manifest)?;
+            let targets: BTreeSet<Address> = manifest
+                .bundles
+                .iter()
+                .map(|bundle| bundle.target)
+                .chain([deployer])
+                .collect();
+            for target in targets {
+                set_balance(rpc_url, target).await?;
+            }
+            Ok(())
+        }
+    }
+}
+
+/// Where a bundle's effects are checked: a fork it was replayed on (may send impersonated
+/// transactions) or a real chain it was broadcast to (read-only).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CheckTarget {
+    Fork,
+    Chain,
+}
+
+/// Check the upgrade's effects: PUVT for v31, the upgrade's declared command otherwise.
+#[allow(clippy::too_many_arguments)]
+async fn check_upgrade(
+    descriptor: &UpgradeDescriptor,
+    target: CheckTarget,
+    env_cfg: &EnvConfig,
+    rpc_url: &str,
+    gateway_rpc_url: Option<&str>,
+    zk_governance_commit: &str,
+    paths: &BundlePaths,
+    transactions_log_override: Option<&Path>,
+) -> anyhow::Result<()> {
+    match descriptor {
+        UpgradeDescriptor::PrepareAll {} => {
+            verify_upgrade(
+                env_cfg,
+                rpc_url,
+                gateway_rpc_url,
+                zk_governance_commit,
+                paths,
+                transactions_log_override,
+            )
+            .await
+        }
+        UpgradeDescriptor::ForgeScript(upgrade) => {
+            let command = match target {
+                CheckTarget::Fork => &upgrade.verify_fork,
+                CheckTarget::Chain => &upgrade.verify_chain,
+            };
+            run_upgrade_check(command, &env_cfg.env, rpc_url, &paths.ecosystem_toml)
+        }
+    }
+}
+
+/// Run a `forge-script` upgrade's check command from `l1-contracts/`.
+fn run_upgrade_check(
+    command: &[String],
+    env: &str,
+    rpc_url: &str,
+    ecosystem_toml: &Path,
+) -> anyhow::Result<()> {
+    let (program, args) = command
+        .split_first()
+        .ok_or_else(|| anyhow::anyhow!("empty upgrade check command"))?;
+    logger::step(format!("upgrade check: {}", command.join(" ")));
+    let status = std::process::Command::new(program)
+        .args(args)
+        .current_dir(crate::common::paths::resolve_l1_contracts_path()?)
+        .env("L1_RPC_URL", rpc_url)
+        .env("ECOSYSTEM_TOML", ecosystem_toml)
+        .env("UPGRADE_ENV", env)
+        .status()
+        .with_context(|| format!("failed to start {program}"))?;
+    anyhow::ensure!(
+        status.success(),
+        "upgrade check failed ({status}): {}",
+        command.join(" ")
+    );
+    Ok(())
+}
+
 // ─── rehearse-upgrade ────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Parser)]
@@ -713,6 +830,9 @@ pub struct RehearseUpgradeArgs {
     /// Environment: basename of the config pair `permanent-values/<env>.toml` + `v0.31.0-interopB/<env>.toml`.
     #[clap(long)]
     pub env: String,
+    /// The upgrade to generate: a directory under `upgrade-envs/` with an `upgrade.toml`.
+    #[clap(long, default_value = DEFAULT_UPGRADE)]
+    pub upgrade: String,
     /// L1 RPC to fork. Nothing is signed and nothing touches this chain.
     #[clap(long)]
     pub fork_url: String,
@@ -739,9 +859,16 @@ pub struct RehearseUpgradeArgs {
 /// Fork L1, prepare the upgrade, pack the deploy bundle, replay it and run PUVT.
 pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<()> {
     let env_cfg = EnvConfig::load(&args.env)?;
-    let output_dir = default_protocol_ops_out_dir(&env_cfg.env)?;
+    let descriptor = UpgradeDescriptor::load(&args.upgrade)?;
+    anyhow::ensure!(
+        !matches!(descriptor, UpgradeDescriptor::PrepareAll {}) || args.upgrade == DEFAULT_UPGRADE,
+        "`prepare-all` is the {DEFAULT_UPGRADE} flow; {} cannot use it",
+        args.upgrade
+    );
+    let output_dir = protocol_ops_out_dir(&args.upgrade, &env_cfg.env)?;
     logger::info(format!(
-        "Env {} | bridgehub {:#x} | gateway {} | deployer {:#x} (impersonated)",
+        "Upgrade {} | env {} | bridgehub {:#x} | gateway {} | deployer {:#x} (impersonated)",
+        args.upgrade,
         env_cfg.env,
         env_cfg.bridgehub(),
         if env_cfg.new_gateway().is_some() {
@@ -779,24 +906,47 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
         .context("eth_blockNumber")?;
     logger::info(format!("Forked L1 at block {forked_at_block} on {rpc_url}"));
 
-    logger::step("upgrade-prepare-all (this takes ~12 min)");
-    let prepare_args = [
-        "upgrade-prepare-all".to_string(),
-        "--env".into(),
-        env_cfg.env.clone(),
-        "--l1-rpc-url".into(),
-        rpc_url.clone(),
-        "--deployer-address".into(),
-        format!("{:#x}", args.deployer_address),
-        "--out".into(),
-        output_dir.join("prepare").display().to_string(),
-        FORGE_MEMORY_LIMIT.into(),
-    ];
-    upgrade::run_upgrade_prepare_all(UpgradePrepareAllArgs::try_parse_from(prepare_args)?).await?;
+    match &descriptor {
+        UpgradeDescriptor::PrepareAll {} => {
+            logger::step("upgrade-prepare-all (this takes ~12 min)");
+            let prepare_args = [
+                "upgrade-prepare-all".to_string(),
+                "--env".into(),
+                env_cfg.env.clone(),
+                "--l1-rpc-url".into(),
+                rpc_url.clone(),
+                "--deployer-address".into(),
+                format!("{:#x}", args.deployer_address),
+                "--out".into(),
+                output_dir.join("prepare").display().to_string(),
+                FORGE_MEMORY_LIMIT.into(),
+            ];
+            upgrade::run_upgrade_prepare_all(UpgradePrepareAllArgs::try_parse_from(prepare_args)?)
+                .await?;
+        }
+        UpgradeDescriptor::ForgeScript(upgrade) => {
+            upgrade::run_forge_script_prepare(
+                &args.upgrade,
+                upgrade,
+                &env_cfg.env,
+                &rpc_url,
+                args.deployer_address,
+                &output_dir.join("prepare"),
+            )
+            .await?;
+            anyhow::ensure!(
+                paths.ecosystem_toml.is_file(),
+                "{} did not write {}",
+                upgrade.script,
+                paths.ecosystem_toml.display()
+            );
+        }
+    }
 
     logger::step("pack the deploy bundle");
     pack_deploy_bundle(
         &env_cfg,
+        &args.upgrade,
         &output_dir,
         &output_dir.join("deploy-bundle"),
         &paths::contracts_root(),
@@ -808,17 +958,18 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
         },
     )?;
 
-    logger::step("fund every bundle signer");
-    fund_bundle_targets(
+    fund_signers(
+        &descriptor,
         &rpc_url,
         &env_cfg,
         args.deployer_address,
-        &paths.manifest,
-        &paths.ecosystem_toml,
+        &paths,
     )
     .await?;
     broadcast_impersonated(&rpc_url, &paths).await?;
-    verify_upgrade(
+    check_upgrade(
+        &descriptor,
+        CheckTarget::Fork,
         &env_cfg,
         &rpc_url,
         args.gw_rpc_url.as_deref(),
@@ -842,7 +993,7 @@ pub struct ReplayBundleArgs {
     /// Rehearse: fork this L1 RPC at the bundle's recorded height and replay every bundle under impersonation.
     #[clap(long, conflicts_with_all = ["rpc", "key", "verify_only"])]
     pub fork_url: Option<String>,
-    /// Use this chain as-is: with `--key` broadcast the deployer's bundles for real, with `--verify-only` just run PUVT.
+    /// Use this chain as-is: with `--key` broadcast the deployer's bundles for real, with `--verify-only` just run the upgrade's checks (PUVT for v31).
     #[clap(long, requires = "rpc_mode")]
     pub rpc: Option<String>,
     /// Deployer private key for a real broadcast; only its bundles are sent (`--skip-unkeyed`).
@@ -903,6 +1054,8 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
         .with_context(|| format!("deploy bundle not found: {}", args.bundle.display()))?;
     let metadata = verify_bundle_integrity(&bundle_dir)?;
     let env_cfg = EnvConfig::load(&metadata.env)?;
+    // The bundle names the upgrade it was generated for; its descriptor says how to check it.
+    let descriptor = UpgradeDescriptor::load(&metadata.upgrade)?;
     let deployer = metadata
         .deployer_address
         .ok_or_else(|| anyhow::anyhow!("bundle metadata has no deployer_address"))?;
@@ -932,7 +1085,7 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
     let paths = BundlePaths {
         manifest: bundle_dir.join(MANIFEST_FILE),
         ecosystem_toml: bundle_dir.join("ecosystem.toml"),
-        work_dir: default_protocol_ops_out_dir(&env_cfg.env)?.join("replay"),
+        work_dir: protocol_ops_out_dir(&metadata.upgrade, &env_cfg.env)?.join("replay"),
     };
     logger::info(format!(
         "Env {} | bundle {} | deployer {deployer:#x}",
@@ -967,17 +1120,11 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
                 metadata.l1.forked_at_block,
             )?;
             let rpc_url = anvil.endpoint();
-            logger::step("fund every bundle signer");
-            fund_bundle_targets(
-                &rpc_url,
-                &env_cfg,
-                deployer,
-                &paths.manifest,
-                &paths.ecosystem_toml,
-            )
-            .await?;
+            fund_signers(&descriptor, &rpc_url, &env_cfg, deployer, &paths).await?;
             broadcast_impersonated(&rpc_url, &paths).await?;
-            verify_upgrade(
+            check_upgrade(
+                &descriptor,
+                CheckTarget::Fork,
                 &env_cfg,
                 &rpc_url,
                 args.gw_rpc_url.as_deref(),
@@ -1004,7 +1151,9 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
                 paths.work_dir.join("executed.json").display().to_string(),
             ];
             broadcast::run(UpgradeBroadcastArgs::try_parse_from(broadcast_args)?).await?;
-            verify_upgrade(
+            check_upgrade(
+                &descriptor,
+                CheckTarget::Chain,
                 &env_cfg,
                 &rpc_url,
                 args.gw_rpc_url.as_deref(),
@@ -1015,7 +1164,9 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
             .await?;
         }
         ReplayMode::Verify { rpc_url } => {
-            verify_upgrade(
+            check_upgrade(
+                &descriptor,
+                CheckTarget::Chain,
                 &env_cfg,
                 &rpc_url,
                 args.gw_rpc_url.as_deref(),
@@ -1075,16 +1226,12 @@ mod tests {
         )
         .is_some());
         let status = || {
-            try_capture(
-                "git",
-                &[
-                    &["status", "--porcelain", "--"][..],
-                    &CONTRACT_SOURCE_PATHSPECS[..],
-                ]
-                .concat(),
-                repo.path(),
-            )
-            .unwrap()
+            let pathspecs = contract_source_pathspecs(DEFAULT_UPGRADE);
+            let args: Vec<&str> = ["status", "--porcelain", "--"]
+                .into_iter()
+                .chain(pathspecs.iter().map(String::as_str))
+                .collect();
+            try_capture("git", &args, repo.path()).unwrap()
         };
         assert!(status().is_empty());
         write(&repo.path().join(output), "regenerated\n");
@@ -1114,7 +1261,7 @@ mod tests {
     fn write_metadata(bundle: &Path, files: &[&str]) -> DeployBundleMetadata {
         let metadata = DeployBundleMetadata {
             schema: DEPLOY_BUNDLE_SCHEMA.to_string(),
-            upgrade: V31_UPGRADE_NAME.to_string(),
+            upgrade: DEFAULT_UPGRADE.to_string(),
             env: "stage".to_string(),
             contracts_commit: "test".to_string(),
             contracts_worktree_dirty: false,
@@ -1268,7 +1415,15 @@ mod tests {
             ..BundleProvenance::default()
         };
         let bundle = dir.path().join("packed");
-        let metadata = pack_deploy_bundle(&env_cfg, &output, &bundle, &repo, &provenance).unwrap();
+        let metadata = pack_deploy_bundle(
+            &env_cfg,
+            DEFAULT_UPGRADE,
+            &output,
+            &bundle,
+            &repo,
+            &provenance,
+        )
+        .unwrap();
 
         let files: Vec<_> = metadata.files.keys().cloned().collect();
         assert_eq!(

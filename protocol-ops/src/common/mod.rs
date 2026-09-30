@@ -18,6 +18,7 @@ pub mod paths;
 pub mod preflight;
 pub mod private_key;
 pub mod traits;
+pub mod upgrade_descriptor;
 pub mod wallets;
 
 pub use args::SharedRunArgs;

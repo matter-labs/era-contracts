@@ -156,6 +156,38 @@ These versions require `stdarch_x86_avx512` (stabilized in Rust 1.89) and fail o
 
 Known-good versions: `crc-fast 1.3.0`, `zerocopy 0.8.27`
 
+## Protocol Versions That Ship Out of Order (Server Side)
+
+Sometimes an environment needs a version that the server's `dev` line already uses for something else. Example (2026-09):
+stage got v33 = compiler only (zksolc 1.5.17 + DSE bootloader, from `draft-v31`), while server `dev` already treated v33
+as the undeployed force-fail/Airbender release. The server uses contracts in two ways:
+
+1. **Prebuilt** bootloaders per VM in `etc/multivm_bootloaders/<vm>/`, used for `eth_call` and fee estimation and chosen
+   per protocol version in `core/lib/vm_executor/src/oneshot/contracts.rs`.
+2. The **checked-out** `contracts` submodule, used only for init (genesis, ecosystem init, CI).
+
+So:
+
+- **Server:** put the version that is deployed on L1 into the prebuilt folder. Build it from the CI Linux artifacts of
+  its era-contracts branch (macOS zksolc output differs) and record the source commit in the folder's `commit` file.
+  Map that protocol version to its VM and those prebuilts.
+- **Server, undeployed line:** keep the checked-out contracts on the latest undeployed line and renumber it upward.
+  Move every version gate of that line (grep `VersionNN`: state keeper, consensus conversion, tests) and the oneshot
+  mapping. Keep `latest()` equal to the checked-out genesis version and `next()` above it, because the upgrade
+  integration test targets genesis + 1.
+- **Prover:** `PROVER_PROTOCOL_VERSION` must equal the checked-out genesis minor for the prover e2e. A prover proves
+  exactly one protocol version, so the deployed version's prover must come from a build before that bump.
+- **Contracts:** merge the inserted version's branch under the undeployed line (e.g. `draft-v31` into
+  `draft-v33-era-only`), then:
+  - relabel `configs/genesis/era/latest.{json,toml}`;
+  - set `l1-contracts/upgrade-envs/v0.31.0-interopB/foundry-upgrade.toml` to genesis → genesis + 1;
+  - regenerate `AllContractsHashes.json` (CI), the genesis (from CI Linux artifacts), then the anvil chain states.
+- **Base the server PR on `dev`,** whose checkout is the latest line. CI initialises chains from the checked-out
+  contracts, so only that PR can be fully green. A PR on an older server base can validate the inserted version, but
+  jobs that need the newer contracts (e.g. the Airbender e2e) cannot pass there.
+- **Deploy** the inserted version from its own era-contracts branch, the one its calldata was generated from.
+- A bootloader change needs a minor bump: patch upgrades cannot set the bootloader.
+
 ## Testing Guidelines
 
 All PRs that include feature work, bug fixes, or behavioral changes **MUST** follow these testing requirements.

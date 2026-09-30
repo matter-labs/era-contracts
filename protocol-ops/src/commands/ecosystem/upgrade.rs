@@ -1438,3 +1438,58 @@ fn load_ctm_config(path: &Path) -> anyhow::Result<(Vec<CtmInputs>, Option<bool>)
 
     Ok((ctms, core_is_zk_sync_os))
 }
+
+// ─── forge-script upgrades ───────────────────────────────────────────────────────
+
+/// Prepare a `forge-script` upgrade (see `upgrade_descriptor`): run its entry point on
+/// `l1_rpc_url` as `deployer` and write the deployer's transactions as Safe bundles plus
+/// `manifest.json` under `out` — the packaging `upgrade-prepare-all` uses, so the deploy
+/// bundle, its replay and its broadcast are shared with v31.
+///
+/// The script runs as a dry run: forge records the transactions without sending them, so
+/// the fork stays at its pre-upgrade state and the caller can replay the packed bundle on it.
+pub async fn run_forge_script_prepare(
+    upgrade_name: &str,
+    upgrade: &crate::common::upgrade_descriptor::ForgeScriptUpgrade,
+    env: &str,
+    l1_rpc_url: &str,
+    deployer: Address,
+    out: &Path,
+) -> anyhow::Result<()> {
+    let shared = crate::common::SharedRunArgs {
+        l1_rpc_url: l1_rpc_url.to_string(),
+        out: Some(out.to_path_buf()),
+        subdir: None,
+        forge_args: Default::default(),
+    };
+    let mut runner = ForgeRunner::new(&shared)?;
+    let wallet = runner.prepare_sender(deployer).await?;
+    let script = runner
+        .script_path_from_root(
+            &crate::common::paths::resolve_l1_contracts_path()?,
+            upgrade.script_path(),
+        )
+        .with_calldata(&Bytes::from(upgrade.calldata(env)?))
+        .with_ffi()
+        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
+        .with_disable_labels()
+        .with_wallet(&wallet);
+    logger::step(format!("Running {} for {env} (dry run)", upgrade.script));
+    runner
+        .run(script)
+        .with_context(|| format!("failed to execute {}", upgrade.script))?;
+    crate::common::output::write_output_if_requested(
+        &format!("ecosystem.prepare.{upgrade_name}"),
+        &shared,
+        &runner,
+        &serde_json::json!({
+            "upgrade": upgrade_name,
+            "env": env,
+            "script": upgrade.script,
+            "signature": upgrade.signature,
+            "args": upgrade.args_for(env),
+        }),
+        &serde_json::json!({}),
+    )
+    .await
+}

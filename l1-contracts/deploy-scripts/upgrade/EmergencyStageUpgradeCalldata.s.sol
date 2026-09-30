@@ -40,6 +40,8 @@ contract EmergencyStageUpgradeCalldata is Script {
 
     IProtocolUpgradeHandler constant PUH = IProtocolUpgradeHandler(0x8f08627524aeD610192132A425D6b9C32a1727EF);
     string constant TOML = "upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml";
+    /// @notice The v0.33.0 compiler-only stage upgrade (`upgrade-envs/v0.33.0-compiler/`).
+    string constant V33_COMPILER_TOML = "upgrade-envs/v0.33.0-compiler/output/stage/ecosystem.toml";
     bytes32 constant SALT = bytes32(0);
 
     function runStage0() external view {
@@ -52,6 +54,36 @@ contract EmergencyStageUpgradeCalldata is Script {
 
     function runStage2() external view {
         _emit(2);
+    }
+
+    /// @notice The v0.33.0 compiler-only stage upgrade as ONE emergency proposal: stages 0, 1 and 2
+    /// in order (pauseMigration; setNewVersionUpgrade + setChainCreationParams; unpauseMigration).
+    /// It has no upgrade timer between stages, so executing them atomically is equivalent and needs
+    /// one round of approvals instead of three.
+    function runV33CompilerStage() external view {
+        IProtocolUpgradeHandler.Call[] memory stage0 = _loadCallsFrom(V33_COMPILER_TOML, 0);
+        IProtocolUpgradeHandler.Call[] memory stage1 = _loadCallsFrom(V33_COMPILER_TOML, 1);
+        IProtocolUpgradeHandler.Call[] memory stage2 = _loadCallsFrom(V33_COMPILER_TOML, 2);
+        IProtocolUpgradeHandler.Call[] memory calls = new IProtocolUpgradeHandler.Call[](
+            stage0.length + stage1.length + stage2.length
+        );
+        uint256 n = _appendCalls(calls, 0, stage0);
+        n = _appendCalls(calls, n, stage1);
+        _appendCalls(calls, n, stage2);
+        _emitForCalls(calls, "V0.33.0 COMPILER (STAGES 0-2)");
+    }
+
+    /// @dev Copies `_from` into `_into` starting at `_at`; returns the next free index.
+    function _appendCalls(
+        IProtocolUpgradeHandler.Call[] memory _into,
+        uint256 _at,
+        IProtocolUpgradeHandler.Call[] memory _from
+    ) internal pure returns (uint256) {
+        uint256 count = _from.length;
+        for (uint256 i = 0; i < count; ++i) {
+            _into[_at + i] = _from[i];
+        }
+        return _at + count;
     }
 
     function _emit(uint256 _stage) internal view {
@@ -107,7 +139,14 @@ contract EmergencyStageUpgradeCalldata is Script {
     }
 
     function _loadCalls(uint256 _stage) internal view returns (IProtocolUpgradeHandler.Call[] memory) {
-        string memory toml = vm.readFile(TOML);
+        return _loadCallsFrom(TOML, _stage);
+    }
+
+    function _loadCallsFrom(
+        string memory _tomlPath,
+        uint256 _stage
+    ) internal view returns (IProtocolUpgradeHandler.Call[] memory) {
+        string memory toml = vm.readFile(_tomlPath);
         bytes memory encodedCalls = toml.readBytes(
             string.concat(".governance_calls.stage", vm.toString(_stage), "_calls")
         );
