@@ -158,72 +158,87 @@ Known-good versions: `crc-fast 1.3.0`, `zerocopy 0.8.27`
 
 ## Protocol Versions That Ship Out of Order (Server Side)
 
-Sometimes an environment needs a version that the server's `dev` line already uses for something else. Example (2026-09):
-stage got v33 = compiler only (zksolc 1.5.17 + DSE bootloader, from `draft-v31`), while server `dev` already treated v33
-as the undeployed force-fail/Airbender release. The server uses contracts in two ways:
+Sometimes an environment needs a protocol version that server `dev` already uses for something else. Example (2026-09):
+stage's Era chains got v0.33.0 = compiler only (zksolc 1.5.17 + DSE bootloader, from `draft-v31`), while server `dev`
+used Version33 for the undeployed force-fail/Airbender release. Terms used below:
 
-1. **Prebuilt** bootloaders per VM in `etc/multivm_bootloaders/<vm>/`, used for `eth_call` and fee estimation and chosen
-   per protocol version in `core/lib/vm_executor/src/oneshot/contracts.rs`.
-2. The **checked-out** `contracts` submodule, used only for init (genesis, ecosystem init, CI).
+- **Deployment candidate:** the exact era-contracts commit going to the environment (here `draft-v31` at v0.33.0).
+- **Dev integration:** the contracts commit server `dev` checks out after the change: `dev`'s current `contracts` pin
+  with the deployment candidate merged in, renumbered to the next minor.
 
-So:
+The server uses contracts in two ways: **prebuilt** bootloaders per VM in `etc/multivm_bootloaders/<vm>/`, used for
+`eth_call` and fee estimation and chosen per protocol version in `core/lib/vm_executor/src/oneshot/contracts.rs`; and the
+**checked-out** `contracts` submodule, used only for init (genesis, ecosystem init, CI).
 
-- **Server:** put the version that is deployed on L1 into the prebuilt folder. Build it from the CI Linux artifacts of
-  its era-contracts branch (macOS zksolc output differs) and record the source commit in the folder's `commit` file.
-  Map that protocol version to its VM and those prebuilts.
-- **Server, undeployed line:** keep the checked-out contracts on the latest undeployed line and renumber it upward.
-  Move every version gate of that line (grep `VersionNN`: state keeper, consensus conversion, tests) and the oneshot
-  mapping. Keep `latest()` equal to the checked-out genesis version and `next()` above it, because the upgrade
-  integration test targets genesis + 1. That line's prebuilt bootloaders (e.g. `etc/multivm_bootloaders/vm_force_fail`)
-  must be refreshed from the checked-out branch's CI Linux artifacts whenever its bootloader changes; their
-  `proved_batch` hash must equal the checked-out genesis `bootloader_hash`.
-- **Prover:** `PROVER_PROTOCOL_VERSION` must equal the checked-out genesis minor for the prover e2e. A prover proves
-  exactly one protocol version, so the deployed version's prover is built from its `era-validated/<version>` tag (see
-  the test PR below), not from `dev`.
-- **Contracts:** the `dev` checkout is built from **`dev`'s current contracts pin plus the inserted version**: merge
-  the inserted version's branch into that pin (e.g. `draft-v31` into the commit `dev` checks out) and relabel it to the
-  next version. The server already runs that pin, so the merge PR needs nothing that isn't in `dev`. Whoever builds it:
-  - relabels `configs/genesis/era/latest.{json,toml}`;
-  - sets `l1-contracts/upgrade-envs/v0.31.0-interopB/foundry-upgrade.toml` to genesis → genesis + 1;
-  - regenerates `AllContractsHashes.json` (CI), the genesis (from CI Linux artifacts), then the anvil chain states.
-
-  Feature branches of the undeployed line (e.g. `draft-v34-era-only` with the Airbender changes) are rebased by their
-  owners and become the `dev` checkout through their own server PR, when that PR lands.
-
-- **Two server PRs per upgrade.** Server CI only tests the checked-out contracts, and `dev` checks out the next
-  (undeployed) line, so the deployed contracts need their own test PR:
-  - **Test PR (validation).** Cut a base branch from the last `era-validated/<version>` tag (a PR base must be a
-    branch, not a tag). Re-pin `contracts` to the newly deployed commit, add any server changes it needs, and open the PR
-    against that base branch. Airbender e2e stays red until the deployed contracts have the Airbender verifier. When the
-    rest is green, tag the head `era-validated/<version>`, close the PR and delete the base branch. The tag is the
-    starting point for the next upgrade and the commit an environment's server/prover release can be cut from. Example:
-    v0.33.0 was validated by zksync-era-private #138 at `4b4bdcaa2`, on a base cut from `3c96bae48`.
-  - **Merge PR (to `dev`).** Add the deployed version as prebuilts and renumber the checked-out line, pinned to the
-    checkout built as above. Don't stack it on unmerged server PRs, and don't pin a newer feature branch the server
-    doesn't support yet. In 2026-09, pinning `draft-v34-era-only` made #151 depend on server #108 (#2451 "require both
-    Boojum and Airbender proofs"); building from `dev`'s pin avoids that. Until the merge PR lands, `dev` still maps the
-    version to its old meaning, so don't cut an environment's node release from `dev` for it before then.
-- **Deploy** the inserted version from its own era-contracts branch, the one its calldata was generated from.
+- **Contracts (dev integration).** Record server `dev`'s `contracts` submodule SHA, create an era-contracts branch from
+  it, merge the deployment candidate in, and renumber it to the next minor. Don't substitute a newer feature branch
+  (e.g. `draft-v34-era-only`): features the server doesn't support yet make the server PR depend on unmerged server work.
+  Then:
+  - relabel `configs/genesis/era/latest.{json,toml}`;
+  - in `l1-contracts/upgrade-envs/v0.31.0-interopB/foundry-upgrade.toml`, set `old_protocol_version` to the new genesis
+    version and `[contracts].new_protocol_version` and `latest_protocol_version` to the next minor;
+  - regenerate `AllContractsHashes.json` (CI), then the Era genesis from the CI Linux build artifacts with the server
+    repo's `genesis_generator` (no workflow does this step), then the anvil chain states. On merge conflicts in derived
+    files, regenerate them instead of picking either side.
+- **Server mapping.** Write down the intended protocol → VM → prebuilt mapping and check it in tests.
+  - Add the deployment candidate's bootloaders as a new prebuilt folder built from its CI Linux artifacts (macOS zksolc
+    output differs), with the source commit in the folder's `commit` file. Never change a folder older versions use.
+  - Move the old meaning up one version by reviewing each gate of the old version by what it does (state keeper,
+    consensus conversion, oneshot mapping, tests), not by search-and-replace: a blanket rename would also move the new
+    mapping. In 2026-09: V33 → V32 VM + DSE prebuilts; force-fail/Airbender → V34.
+  - Keep `latest()` equal to the dev integration's genesis version and `next()` above it.
+  - Refresh the checkout line's prebuilts (e.g. `vm_force_fail`) from the dev integration's CI Linux artifacts; their
+    `proved_batch` hash must equal its genesis `bootloader_hash`.
+- **Prover.** `PROVER_PROTOCOL_VERSION` equals the dev integration's genesis minor (the prover e2e needs that). A prover
+  proves one protocol version, so the deployment candidate's prover is never built from `dev`.
+- **Server PRs** (for out-of-order releases; neither is stacked on another open server PR):
+  - **Validation PR.** In zksync-era-private, create a base branch from the last validated server commit (the previous
+    `era-validated/<version>` tag; a PR base must be a branch) and a candidate branch from it. Pin `contracts` to the
+    deployment candidate, add any server changes it needs, and open the PR. Validate before the upgrade is activated.
+    The only accepted failure is the Airbender e2e's missing-verifier failure when the candidate has no Airbender
+    verifier; investigate anything else. When green, push `era-validated/<version>` at the PR head, then close the PR
+    and delete both branches. The environment's prover, and its node until the dev PR is released, are cut from that
+    tag.
+  - **Dev PR.** Adds the new prebuilts and mapping and pins the dev integration; it must pass CI for its own pin. Cut the
+    environment's node from `dev` only after it lands: before that, `dev` maps the version to its old meaning.
+- **Feature lines.** Owners of feature branches (e.g. `draft-v34-era-only`) merge the dev integration into their branch
+  (no force-push) and regenerate derived files. The feature becomes the checkout through its own server PR, which adds
+  the server support, refreshes the prebuilts and moves the pin together.
+- **Example (2026-09).** zksync-era-private #138 validated v0.33.0 at `4b4bdcaa2` (base cut from `3c96bae48`); the first
+  `era-validated` tag has not been created yet. #151 pinned `draft-v34-era-only` and therefore depended on server #108
+  (contracts #2451 "require both Boojum and Airbender proofs"), which is what the rules above avoid.
 - A bootloader change needs a minor bump: patch upgrades cannot set the bootloader.
 
 ## Executing Stage and Testnet Upgrades
 
-- **Runbook.** Every upgrade gets a generated `EXECUTE.md` next to its outputs, with the sender, order, targets, decoded
-  calls and full calldata of each tx. The generate pipeline writes it, and so do the chain commands (`chain upgrade`,
-  `chain set-upgrade-timestamp`) into their `--out`. To render one by hand, run `protocol_ops dev execution-runbook`;
-  `--check-fork-url` replays every tx on a fork first. Don't hand-assemble transactions.
-- **Sending.** Send each tx from the owning EOA in MetaMask, with the key taken from a restricted 1Password vault; never
-  paste keys into a terminal. Wait for each receipt before the next tx, then verify the resulting state on chain (e.g.
-  the CTM's `protocolVersion()`).
-- **Owners** (checked 2026-09):
+- **Order.** Use the exact reviewed contracts commit and its generated outputs:
+  1. the deployments and factory-dependency publication, verified on chain;
+  2. the ecosystem governance transactions;
+  3. each chain's upgrade (and its timestamp operation where needed), once the environment runs a node and prover for
+     the new version.
+
+  The upgrade's own README lists its prerequisites.
+
+- **Runbook.** Have a generated `EXECUTE.md` for each phase before sending anything, and check that it exists and matches
+  the intended transactions. The generate pipeline writes it for prepare-all upgrades and for forge-script upgrades that
+  configure `[execution]` in `upgrade.toml`; the chain commands (`chain upgrade`, `chain set-upgrade-timestamp`) write it
+  into `--out`, but only warn if rendering fails. By hand:
+  `protocol_ops dev execution-runbook --input <tx list or manifest> --env <env> --check-fork-url <l1-rpc>`; the fork
+  must already contain the prerequisite deployments. Don't hand-assemble transactions.
+- **Sending.** Send from the owning EOA in MetaMask, with the key from a restricted 1Password vault; never paste keys
+  into a terminal. Before signing, check the network and that the runbook's sender still holds the authority on chain.
+  Require a successful receipt before the next tx. Afterwards verify the ecosystem state (e.g. the CTM's
+  `protocolVersion()`), each chain's protocol version after its upgrade, and that batches keep being produced and proven.
+- **Owners** (reference values from 2026-09; check before use):
   - stage: `0xd669494442609879b209CcA8eba2BdC904D2E69D`, owner of the 12 member Safes behind the Emergency Upgrade Board
     (`approveHash` on each, then `executeEmergencyUpgrade`);
   - testnet2 (the customer ZKsync OS testnets): `0xD64e136566a9E04eb05B30184fF577F52682D182`, same emergency path;
   - testnet3 (EraVM) and stage3: `0xeC6A5c568A59C0858ed6680A6862d64aA2DA8D4b` and
     `0xd2d5391421f98A0086F4143D2EA0337a31Ca89E5`, through a legacy `Governance` (`scheduleTransparent` + `execute`);
   - chain upgrades are a ChainAdmin `multicall` from that ChainAdmin's owner.
-- **GitHub executor.** A two-person-approval executor that keeps keys in GitHub secrets exists but is parked
-  (era-contracts #2540, Linear EVM-1731). Security vetoed GitHub-held keys for customer testnets.
+- **Parked.** A two-person-approval executor for these governance/owner transactions, keeping keys in GitHub secrets,
+  exists but is parked (era-contracts #2540, Linear EVM-1731): security vetoed GitHub-held keys for customer testnets.
+  The deployer workflow (`deploy-ecosystem-upgrade.yaml`) is separate and still used.
 
 ## Testing Guidelines
 
