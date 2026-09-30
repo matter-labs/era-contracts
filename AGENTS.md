@@ -177,16 +177,41 @@ So:
   integration test targets genesis + 1.
 - **Prover:** `PROVER_PROTOCOL_VERSION` must equal the checked-out genesis minor for the prover e2e. A prover proves
   exactly one protocol version, so the deployed version's prover must come from a build before that bump.
-- **Contracts:** merge the inserted version's branch under the undeployed line (e.g. `draft-v31` into
-  `draft-v33-era-only`), then:
-  - relabel `configs/genesis/era/latest.{json,toml}`;
-  - set `l1-contracts/upgrade-envs/v0.31.0-interopB/foundry-upgrade.toml` to genesis → genesis + 1;
-  - regenerate `AllContractsHashes.json` (CI), the genesis (from CI Linux artifacts), then the anvil chain states.
-- **Base the server PR on `dev`,** whose checkout is the latest line. CI initialises chains from the checked-out
-  contracts, so only that PR can be fully green. A PR on an older server base can validate the inserted version, but
-  jobs that need the newer contracts (e.g. the Airbender e2e) cannot pass there.
+- **Contracts:** the undeployed line is rebased onto the inserted version as a new versioned branch by its owner (e.g.
+  `draft-v34-era-only` on top of `draft-v31`, era-contracts #2542). This worked better than a merge branch under the old
+  one (#2539, closed). Whoever does it:
+  - relabels `configs/genesis/era/latest.{json,toml}`;
+  - sets `l1-contracts/upgrade-envs/v0.31.0-interopB/foundry-upgrade.toml` to genesis → genesis + 1;
+  - regenerates `AllContractsHashes.json` (CI), the genesis (from CI Linux artifacts), then the anvil chain states.
+- **Two server PRs.**
+  - **Release line:** a PR on the last server commit before the undeployed line (e.g. zksync-era-private #138 on
+    `codex/v32-server-base`), used to cut the deployed environment's server and prover release. It can go green except
+    for jobs that need the newer contracts (e.g. the Airbender e2e).
+  - **`dev`:** a PR that adds the deployed version as prebuilts and renumbers the checked-out line, pinned to the rebased
+    contracts branch. CI initialises chains from the checked-out contracts, so only this PR can be fully green. Stack it
+    on any open server PR those contracts need (e.g. #108 for Airbender settlement) and target `dev`; its diff shrinks to
+    your changes once that PR merges.
 - **Deploy** the inserted version from its own era-contracts branch, the one its calldata was generated from.
 - A bootloader change needs a minor bump: patch upgrades cannot set the bootloader.
+
+## Executing Stage and Testnet Upgrades
+
+- **Runbook.** Every upgrade gets a generated `EXECUTE.md` next to its outputs, with the sender, order, targets, decoded
+  calls and full calldata of each tx. The generate pipeline writes it, and so do the chain commands (`chain upgrade`,
+  `chain set-upgrade-timestamp`) into their `--out`. To render one by hand, run `protocol_ops dev execution-runbook`;
+  `--check-fork-url` replays every tx on a fork first. Don't hand-assemble transactions.
+- **Sending.** Send each tx from the owning EOA in MetaMask, with the key taken from a restricted 1Password vault; never
+  paste keys into a terminal. Wait for each receipt before the next tx, then verify the resulting state on chain (e.g.
+  the CTM's `protocolVersion()`).
+- **Owners** (checked 2026-09):
+  - stage: `0xd669494442609879b209CcA8eba2BdC904D2E69D`, owner of the 12 member Safes behind the Emergency Upgrade Board
+    (`approveHash` on each, then `executeEmergencyUpgrade`);
+  - testnet2 (the customer ZKsync OS testnets): `0xD64e136566a9E04eb05B30184fF577F52682D182`, same emergency path;
+  - testnet3 (EraVM) and stage3: `0xeC6A5c568A59C0858ed6680A6862d64aA2DA8D4b` and
+    `0xd2d5391421f98A0086F4143D2EA0337a31Ca89E5`, through a legacy `Governance` (`scheduleTransparent` + `execute`);
+  - chain upgrades are a ChainAdmin `multicall` from that ChainAdmin's owner.
+- **GitHub executor.** A two-person-approval executor that keeps keys in GitHub secrets exists but is parked
+  (era-contracts #2540, Linear EVM-1731). Security vetoed GitHub-held keys for customer testnets.
 
 ## Testing Guidelines
 
