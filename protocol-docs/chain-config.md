@@ -89,7 +89,7 @@ historical bytes are not part of the current-contract artifact regeneration.
 
 Filtering is disabled by default, including for chains deployed before the storage
 field existed. The chain admin can opt in with `setZKsyncOSL1TxFiltering`; the current
-value is exposed by `getZKsyncOSL1TxFiltering`.
+value is exposed by `isZKsyncOSL1TxFilteringEnabled`.
 
 When enabled, the operator's transaction validator applies its begin/finish hooks
 to priority transactions. A rejected transaction must still be processed and
