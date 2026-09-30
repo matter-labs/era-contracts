@@ -42,6 +42,12 @@ This precondition belongs only to the v34 upgrade contract. `BaseZkSyncUpgrade` 
 batch check, and the v34 contract must not replace the CTM's reusable default upgrade implementation.
 Later upgrades select their own initializer and preconditions.
 
+`DefaultUpgradeZKsyncOS` requires all committed batches to be executed by default, keeping outstanding
+batches away from a replacement verifier. The v34 initializer inherits it and specializes the batch
+check to the verified boundary above. It also returns the L2 upgrade calldata unchanged through both
+`getL2UpgradeTxData` overloads: v34's force-deployment payload has no chain-specific migration data to
+substitute. The inherited v33 migration rewrite must not run on that payload.
+
 `deploy-scripts/upgrade/v34/CTMUpgrade_v34.s.sol` prepares this cut and keeps the generic
 `DefaultUpgrade` as the CTM default. Select it with `--ctm-script-path` when preparing v34 through
 protocol-ops. It uses the default L2 force-deployment payload, without replaying v33 migration work.
