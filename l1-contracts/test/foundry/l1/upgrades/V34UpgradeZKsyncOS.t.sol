@@ -2,9 +2,8 @@
 pragma solidity 0.8.28;
 
 import {BaseZkSyncUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
-import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {V34UpgradeZKsyncOS} from "contracts/upgrades/V34UpgradeZKsyncOS.sol";
-import {V34UpgradeWithUnverifiedBatches} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
+import {NotAllBatchesExecuted} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
@@ -26,18 +25,12 @@ contract V34UpgradeTestUtils is BaseUpgradeUtils {
         return (s.totalBatchesCommitted, s.totalBatchesVerified, s.totalBatchesExecuted);
     }
 
-    function setSettlementLayer(address _settlementLayer) external {
-        s.settlementLayer = _settlementLayer;
-    }
-
     function getUpgradeTxHash() external view returns (bytes32) {
         return s.l2SystemContractsUpgradeTxHash;
     }
 }
 
 contract DummyV34Upgrade is V34UpgradeZKsyncOS, V34UpgradeTestUtils {}
-
-contract DummyGenericUpgrade is DefaultUpgrade, V34UpgradeTestUtils {}
 
 contract V34UpgradeZKsyncOSTest is BaseUpgrade {
     DummyV34Upgrade internal upgrade;
@@ -55,45 +48,42 @@ contract V34UpgradeZKsyncOSTest is BaseUpgrade {
         upgrade.mockProtocolVersionVerifier(protocolVersion, mockVerifier);
     }
 
-    function test_RevertsWithUnverifiedBatches(uint64 _committed, uint64 _verified) public {
+    // v34 inherits the default all-executed boundary: proved-but-unexecuted batches block the upgrade too.
+    function testFuzz_RevertsWithUnexecutedBatches(uint64 _committed, uint64 _verified, uint64 _executed) public {
         uint256 committed = bound(_committed, 1, type(uint64).max);
-        uint256 verified = bound(_verified, 0, committed - 1);
-        upgrade.setBatchCounters(committed, verified, 0);
+        uint256 verified = bound(_verified, 0, committed);
+        uint256 executed = bound(_executed, 0, verified == committed ? committed - 1 : verified);
+        upgrade.setBatchCounters(committed, verified, executed);
 
         vm.recordLogs();
-        vm.expectRevert(abi.encodeWithSelector(V34UpgradeWithUnverifiedBatches.selector, verified, committed));
+        vm.expectRevert(NotAllBatchesExecuted.selector);
         upgrade.upgrade(proposedUpgrade);
 
         assertEq(vm.getRecordedLogs().length, 0);
         assertEq(upgrade.getProtocolVersion(), previousVersion);
         assertEq(upgrade.getVerifier(), address(0));
-        _assertCounters(committed, verified, 0);
+        _assertCounters(committed, verified, executed);
     }
 
-    function test_UpgradesWithVerifiedBatches(uint64 _committed, uint64 _executed) public {
-        uint256 executed = bound(_executed, 0, _committed);
-        upgrade.setBatchCounters(_committed, _committed, executed);
+    function test_RevertsWithVerifiedButUnexecutedBatch() public {
+        upgrade.setBatchCounters(1, 1, 0);
+
+        vm.expectRevert(NotAllBatchesExecuted.selector);
+        upgrade.upgrade(proposedUpgrade);
+
+        assertEq(upgrade.getProtocolVersion(), previousVersion);
+        _assertCounters(1, 1, 0);
+    }
+
+    function testFuzz_UpgradesWithExecutedBatches(uint64 _batches) public {
+        upgrade.setBatchCounters(_batches, _batches, _batches);
         _upgradeSuccessfully();
-        _assertCounters(_committed, _committed, executed);
+        _assertCounters(_batches, _batches, _batches);
     }
 
     function test_UpgradesWithoutBatches() public {
         _upgradeSuccessfully();
         _assertCounters(0, 0, 0);
-    }
-
-    function test_SettlementLayerDoesNotBypassBatchBoundary() public {
-        upgrade.setSettlementLayer(makeAddr("settlementLayer"));
-        upgrade.setBatchCounters(1, 0, 0);
-
-        vm.recordLogs();
-        vm.expectRevert(abi.encodeWithSelector(V34UpgradeWithUnverifiedBatches.selector, 0, 1));
-        upgrade.upgrade(proposedUpgrade);
-
-        assertEq(vm.getRecordedLogs().length, 0);
-        assertEq(upgrade.getProtocolVersion(), previousVersion);
-        assertEq(upgrade.getVerifier(), address(0));
-        _assertCounters(1, 0, 0);
     }
 
     function test_PreservesL2UpgradeTransaction() public {
@@ -108,30 +98,11 @@ contract V34UpgradeZKsyncOSTest is BaseUpgrade {
         );
         upgrade.setPriorityTxMaxGasLimit(PRIORITY_TX_MAX_GAS_LIMIT);
         upgrade.setPriorityTxMaxPubdata(DEFAULT_PRIORITY_TX_MAX_PUBDATA);
-        upgrade.setBatchCounters(1, 1, 0);
+        upgrade.setBatchCounters(1, 1, 1);
 
         _upgradeSuccessfully();
         assertEq(upgrade.getUpgradeTxHash(), keccak256(abi.encode(proposedUpgrade.l2ProtocolUpgradeTx)));
-        _assertCounters(1, 1, 0);
-    }
-
-    function test_GenericLaterUpgradeHasNoV34Gate() public {
-        DummyGenericUpgrade genericUpgrade = new DummyGenericUpgrade();
-        genericUpgrade.setProtocolVersion(protocolVersion);
-        genericUpgrade.setBatchCounters(1, 0, 0);
-        genericUpgrade.setChainTypeManager(makeAddr("ctm"));
-        uint256 patchVersion = SemVer.packSemVer(0, TEST_CHAIN_CONFIG_UPGRADE_VERSION, 1);
-        genericUpgrade.mockProtocolVersionVerifier(patchVersion, mockVerifier);
-
-        vm.expectEmit(true, true, false, true, address(genericUpgrade));
-        emit BaseZkSyncUpgrade.NewProtocolVersion(protocolVersion, patchVersion);
-        assertEq(genericUpgrade.upgradeVerifierOnly(patchVersion), Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
-        assertEq(genericUpgrade.getProtocolVersion(), patchVersion);
-        assertEq(genericUpgrade.getVerifier(), mockVerifier);
-        (uint256 committed, uint256 verified, uint256 executed) = genericUpgrade.getBatchCounters();
-        assertEq(committed, 1);
-        assertEq(verified, 0);
-        assertEq(executed, 0);
+        _assertCounters(1, 1, 1);
     }
 
     function _upgradeSuccessfully() internal {
