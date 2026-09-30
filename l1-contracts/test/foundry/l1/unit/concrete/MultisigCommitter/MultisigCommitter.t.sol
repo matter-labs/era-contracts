@@ -307,6 +307,7 @@ contract MultisigCommitterTest is Test {
         });
     }
 
+    // Covers binding the encoded field to the signature; EN replay validation is off-chain.
     function test_rejectsSignatureAfterChainConfigHashChanges() public {
         (uint256 from, uint256 to, bytes memory originalData) = prepareCommit();
         bytes32 digest = hashCommitData(from, to, originalData);

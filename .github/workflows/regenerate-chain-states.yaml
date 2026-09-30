@@ -6,12 +6,25 @@ on:
       pr_number:
         description: "Pull Request number to update"
         required: true
+      push_changes:
+        description: "Push generated changes; disable to download a patch for signing"
+        type: boolean
+        default: true
   workflow_call:
     inputs:
       pr_number:
         description: "Pull Request number to update"
         required: true
         type: string
+      push_changes:
+        description: "Push generated changes; disable to download a patch for signing"
+        type: boolean
+        default: true
+
+      apply_generated_patch:
+        description: "Apply the preceding hash job output before generating chain states"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -86,6 +99,20 @@ jobs:
           test -f .github/actions/build-anvil-interop-artifacts/action.yaml
           test -f .github/foundry-versions.env
 
+      - name: Download preceding generated artifacts
+        if: inputs.apply_generated_patch
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-artifacts-patch
+          path: ${{ runner.temp }}/generated-artifacts
+
+      - name: Apply preceding generated artifacts
+        if: inputs.apply_generated_patch
+        run: |
+          test "$(git rev-parse HEAD)" = "$(cat "$RUNNER_TEMP/generated-artifacts/generated-artifacts-patch.base")"
+          patch="$RUNNER_TEMP/generated-artifacts/generated-artifacts-patch.patch"
+          if [ -s "$patch" ]; then git apply "$patch"; fi
+
       - name: Build anvil-interop artifacts
         uses: ./.github/actions/build-anvil-interop-artifacts
 
@@ -109,7 +136,24 @@ jobs:
       # redundant commit is the cheaper mistake. Narrowing those exclusions to the
       # genuinely volatile slots would let this be smarter, and would also close the
       # matching blind spot in state-generation-check.
+      - name: Export changes for a signed commit
+        if: ${{ !inputs.push_changes }}
+        run: |
+          git add -A l1-contracts/test/anvil-interop/chain-states/
+          git diff --cached --binary > "$RUNNER_TEMP/chain-states-patch.patch"
+          git rev-parse HEAD > "$RUNNER_TEMP/chain-states-patch.base"
+
+      - name: Upload generated patch
+        if: ${{ !inputs.push_changes }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: chain-states-patch
+          path: |
+            ${{ runner.temp }}/chain-states-patch.patch
+            ${{ runner.temp }}/chain-states-patch.base
+
       - name: Commit and push updated chain states
+        if: ${{ inputs.push_changes }}
         run: |
           set -euo pipefail
           git config user.name "zksync[bot]"

@@ -41,9 +41,7 @@ contract CommittingTest is ExecutorTest {
         uint64 newGasLimit = ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT + 1;
         vm.prank(owner);
         admin.setZKsyncOSMaxTxGasLimit(newGasLimit);
-        bytes32 newConfigHash = keccak256(
-            abi.encodePacked(l2ChainId, uint256(0), uint256(newGasLimit), uint256(PubdataContent.FULL_PUBDATA))
-        );
+        bytes32 newConfigHash = Utils.chainConfigHash(l2ChainId, newGasLimit, PubdataContent.FULL_PUBDATA);
         CommitBatchInfoZKsyncOS[] memory batches = new CommitBatchInfoZKsyncOS[](1);
         batches[0] = newCommitBatchInfoZKsyncOS;
         (uint256 from, uint256 to, bytes memory data) = Utils.encodeCommitBatchesDataZKsyncOS(

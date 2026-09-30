@@ -17,7 +17,7 @@ contract CommitterZKsyncOSPublicInputHarness is TestCommitter {
     function getBatchProofPublicInput(
         bytes32 _prevBatchStateCommitment,
         bytes32 _currentBatchStateCommitment,
-        bytes32 _currentBatchCommitment
+        bytes32 _batchOutputHash
     ) external view returns (uint256) {
         return
             uint256(
@@ -25,7 +25,7 @@ contract CommitterZKsyncOSPublicInputHarness is TestCommitter {
                     _prevBatchStateCommitment,
                     _currentBatchStateCommitment,
                     _getZKsyncOSChainConfigHash(),
-                    _currentBatchCommitment
+                    _batchOutputHash
                 )
             );
     }

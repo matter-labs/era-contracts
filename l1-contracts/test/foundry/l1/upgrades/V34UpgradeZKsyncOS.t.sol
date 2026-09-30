@@ -3,8 +3,8 @@ pragma solidity 0.8.28;
 
 import {BaseZkSyncUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
-import {ZKsyncOSSettlementLayerV34Upgrade} from "contracts/upgrades/ZKsyncOSSettlementLayerV34Upgrade.sol";
-import {UnverifiedBatchesAtCommitmentUpgrade} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
+import {V34UpgradeZKsyncOS} from "contracts/upgrades/V34UpgradeZKsyncOS.sol";
+import {V34UpgradeWithUnverifiedBatches} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
@@ -36,11 +36,11 @@ contract V34UpgradeTestUtils is BaseUpgradeUtils {
     }
 }
 
-contract DummyV34Upgrade is ZKsyncOSSettlementLayerV34Upgrade, V34UpgradeTestUtils {}
+contract DummyV34Upgrade is V34UpgradeZKsyncOS, V34UpgradeTestUtils {}
 
 contract DummyGenericUpgrade is DefaultUpgrade, V34UpgradeTestUtils {}
 
-contract ZKsyncOSSettlementLayerV34UpgradeTest is BaseUpgrade {
+contract V34UpgradeZKsyncOSTest is BaseUpgrade {
     DummyV34Upgrade internal upgrade;
     address internal mockVerifier = makeAddr("verifier");
     uint256 internal previousVersion;
@@ -62,7 +62,7 @@ contract ZKsyncOSSettlementLayerV34UpgradeTest is BaseUpgrade {
         upgrade.setBatchCounters(committed, verified, 0);
 
         vm.recordLogs();
-        vm.expectRevert(abi.encodeWithSelector(UnverifiedBatchesAtCommitmentUpgrade.selector, verified, committed));
+        vm.expectRevert(abi.encodeWithSelector(V34UpgradeWithUnverifiedBatches.selector, verified, committed));
         upgrade.upgrade(proposedUpgrade);
 
         assertEq(vm.getRecordedLogs().length, 0);

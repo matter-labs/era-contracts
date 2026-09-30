@@ -11,6 +11,10 @@ on:
       pr_number:
         description: "Pull Request number to update"
         required: true
+      push_changes:
+        description: "Push generated changes; disable to download patches for signed commits"
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -22,6 +26,7 @@ jobs:
     uses: ./.github/workflows/update-hashes-on-demand.yaml
     with:
       pr_number: ${{ github.event.inputs.pr_number }}
+      push_changes: ${{ inputs.push_changes }}
     secrets: inherit
 
   regenerate-chain-states:
@@ -30,4 +35,6 @@ jobs:
     uses: ./.github/workflows/regenerate-chain-states.yaml
     with:
       pr_number: ${{ github.event.inputs.pr_number }}
+      push_changes: ${{ inputs.push_changes }}
+      apply_generated_patch: ${{ !inputs.push_changes }}
     secrets: inherit

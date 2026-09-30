@@ -424,7 +424,7 @@ async function executeSafeBundles(outDir: string, rpcUrl: string): Promise<void>
  * and `--l1-rpc-url` (the forked anvil instance).
  *
  * Uses the production CoreUpgrade_v33 / CTMUpgrade_v33 forge scripts via
- * protocol-ops defaults. Returns the dir the prepare phase wrote to.
+ * explicit overrides. Returns the dir the prepare phase wrote to.
  */
 export async function runEcosystemUpgradeScriptsForEnv(params: {
   envName: string;
@@ -439,6 +439,12 @@ export async function runEcosystemUpgradeScriptsForEnv(params: {
   runProtocolOps([
     "ecosystem",
     "upgrade-prepare-all",
+    "--core-script-path",
+    "deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol",
+    "--ctm-script-path",
+    "deploy-scripts/upgrade/v33/CTMUpgrade_v33.s.sol",
+    "--upgrade-input-path",
+    `/upgrade-envs/v0.33.0-atomic-interop/${params.envName}.toml`,
     "--env",
     params.envName,
     "--bridgehub",
