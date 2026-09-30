@@ -174,7 +174,9 @@ So:
 - **Server, undeployed line:** keep the checked-out contracts on the latest undeployed line and renumber it upward.
   Move every version gate of that line (grep `VersionNN`: state keeper, consensus conversion, tests) and the oneshot
   mapping. Keep `latest()` equal to the checked-out genesis version and `next()` above it, because the upgrade
-  integration test targets genesis + 1.
+  integration test targets genesis + 1. That line's prebuilt bootloaders (e.g. `etc/multivm_bootloaders/vm_force_fail`)
+  must be refreshed from the checked-out branch's CI Linux artifacts whenever its bootloader changes; their
+  `proved_batch` hash must equal the checked-out genesis `bootloader_hash`.
 - **Prover:** `PROVER_PROTOCOL_VERSION` must equal the checked-out genesis minor for the prover e2e. A prover proves
   exactly one protocol version, so the deployed version's prover must come from a build before that bump.
 - **Contracts:** the undeployed line is rebased onto the inserted version as a new versioned branch by its owner (e.g.
