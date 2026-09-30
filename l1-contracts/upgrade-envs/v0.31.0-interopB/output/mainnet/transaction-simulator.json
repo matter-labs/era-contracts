@@ -218,7 +218,7 @@
     "tag": "stage1"
   },
   {
-    "description": "Mainnet PUH stage 1: NTV.setAssetTracker(L1AssetTracker 0x8ef17384…) — wires NTV to push balance updates to the L1AT.",
+    "description": "Mainnet PUH stage 1: NTV.setAssetTracker(L1AssetTracker 0x7fd8B995…) — wires NTV to push balance updates to the L1AT.",
     "network": "mainnet",
     "from": "0xe30dca3047b37dc7d88849de4a4dc07937ad5ab3",
     "to": "0xbed1eb542f9a5aa6419ff3deb921a372681111f6",
@@ -227,7 +227,7 @@
     "tag": "stage1"
   },
   {
-    "description": "Mainnet PUH stage 1: Bridgehub.setAddressesV31(ChainRegistrationSender 0x7f60f575…) — wires Bridgehub to the v31 ChainRegistrationSender.",
+    "description": "Mainnet PUH stage 1: Bridgehub.setAddressesV31(ChainRegistrationSender 0x419A453e…) — wires Bridgehub to the v31 ChainRegistrationSender.",
     "network": "mainnet",
     "from": "0xe30dca3047b37dc7d88849de4a4dc07937ad5ab3",
     "to": "0x303a465b659cbb0ab36ee643ea362c509eeb5213",

@@ -1014,12 +1014,12 @@ desc = "Mainnet PUH stage 1: Atlas CTM ProxyAdmin.upgrade(Atlas ValidatorTimeloc
 [[entries]]
 target = "mn_ntv"
 selector = "0xe26daa7e"  # setAssetTracker(address)
-desc = "Mainnet PUH stage 1: NTV.setAssetTracker(L1AssetTracker 0x8ef17384…) — wires NTV to push balance updates to the L1AT."
+desc = "Mainnet PUH stage 1: NTV.setAssetTracker(L1AssetTracker 0x7fd8B995…) — wires NTV to push balance updates to the L1AT."
 
 [[entries]]
 target = "mn_bridgehub"
 selector = "0xa17223b0"  # setAddressesV31(address)
-desc = "Mainnet PUH stage 1: Bridgehub.setAddressesV31(ChainRegistrationSender 0x7f60f575…) — wires Bridgehub to the v31 ChainRegistrationSender."
+desc = "Mainnet PUH stage 1: Bridgehub.setAddressesV31(ChainRegistrationSender 0x419A453e…) — wires Bridgehub to the v31 ChainRegistrationSender."
 
 [[entries]]
 target = "mn_chain_asset_handler"
