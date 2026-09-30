@@ -217,7 +217,7 @@ Two new L2 built-ins support atomic interop (protocol details in
 
 They are predeployed **only** in the ZKsync OS genesis (registered in the genesis gen tool,
 `tools/zksync-os-genesis-gen`); they have no constructors, so one-time setup happens in `initL2`
-calls made by `L2GenesisForceDeploymentsHelper._initializeV32Contracts`, on the genesis path only. The
+calls made by `L2GenesisForceDeploymentsHelper._initContractsAfterWiring`, on the genesis path only. The
 release-agnostic `L2DefaultUpgrade` never runs them: every chain it applies to (v32 or later) already runs
 the built-ins initialized, and the `initL2`s are one-shot:
 
