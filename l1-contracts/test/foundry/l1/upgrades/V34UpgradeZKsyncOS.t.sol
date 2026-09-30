@@ -7,7 +7,6 @@ import {V34UpgradeZKsyncOS} from "contracts/upgrades/V34UpgradeZKsyncOS.sol";
 import {V34UpgradeWithUnverifiedBatches} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {DEFAULT_PRIORITY_TX_MAX_PUBDATA, PRIORITY_TX_MAX_GAS_LIMIT} from "contracts/common/Config.sol";
 import {L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -83,12 +82,17 @@ contract V34UpgradeZKsyncOSTest is BaseUpgrade {
         _assertCounters(0, 0, 0);
     }
 
-    function test_InactiveChainDoesNotGateOnBatchCounters() public {
-        address settlementLayer = makeAddr("settlementLayer");
-        upgrade.setSettlementLayer(settlementLayer);
+    function test_SettlementLayerDoesNotBypassBatchBoundary() public {
+        upgrade.setSettlementLayer(makeAddr("settlementLayer"));
         upgrade.setBatchCounters(1, 0, 0);
-        vm.mockCall(settlementLayer, abi.encodeCall(IGetters.getProtocolVersion, ()), abi.encode(protocolVersion));
-        _upgradeSuccessfully();
+
+        vm.recordLogs();
+        vm.expectRevert(abi.encodeWithSelector(V34UpgradeWithUnverifiedBatches.selector, 0, 1));
+        upgrade.upgrade(proposedUpgrade);
+
+        assertEq(vm.getRecordedLogs().length, 0);
+        assertEq(upgrade.getProtocolVersion(), previousVersion);
+        assertEq(upgrade.getVerifier(), address(0));
         _assertCounters(1, 0, 0);
     }
 
