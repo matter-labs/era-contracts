@@ -12,6 +12,8 @@
 //!   every bundle under impersonation and run the upgrade's checks. What "prepare" and
 //!   "checks" mean comes from `upgrade-envs/<upgrade>/upgrade.toml`: v31 is
 //!   `upgrade-prepare-all` + PUVT, a `forge-script` upgrade runs one script and its own checks.
+//!   A `forge-script` upgrade with an `[execution]` script also gets `EXECUTE.md`, the
+//!   runbook of the txs whoever executes sends by hand, checked on the same fork.
 //! - `replay-bundle` (CONSUME): rehearse a packed bundle on a fresh fork, broadcast the
 //!   deployer's bundles for real, or only run PUVT against an already-upgraded chain.
 //! - `verify-bundle`: the integrity check on its own.
@@ -37,8 +39,9 @@ use crate::common::env_config::{
     default_protocol_ops_out_dir, protocol_ops_out_dir, EnvConfig, DEFAULT_UPGRADE,
 };
 use crate::common::ethereum::get_provider;
+use crate::common::execution_runbook;
 use crate::common::private_key::pk_to_address;
-use crate::common::upgrade_descriptor::UpgradeDescriptor;
+use crate::common::upgrade_descriptor::{ExecutionScript, ForgeScriptUpgrade, UpgradeDescriptor};
 use crate::common::{logger, paths};
 
 // ─── Constants ───────────────────────────────────────────────────────────────────
@@ -967,6 +970,21 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
     )
     .await?;
     broadcast_impersonated(&rpc_url, &paths).await?;
+    if let UpgradeDescriptor::ForgeScript(ForgeScriptUpgrade {
+        execution: Some(execution),
+        ..
+    }) = &descriptor
+    {
+        write_execution_runbook(
+            &args.upgrade,
+            execution,
+            &env_cfg,
+            &rpc_url,
+            &output_dir,
+            forked_at_block,
+        )
+        .await?;
+    }
     check_upgrade(
         &descriptor,
         CheckTarget::Fork,
@@ -980,6 +998,50 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
     .await?;
     drop(anvil);
     logger::success("Done");
+    Ok(())
+}
+
+/// Run the upgrade's `[execution]` script on the fork, where the deploy bundle was just
+/// replayed; replay the transactions it wrote, each from its sender (the fork is restored
+/// afterwards, so the upgrade's own checks still start from the pre-governance state); and
+/// write `EXECUTE.md` next to them with what the replay measured.
+async fn write_execution_runbook(
+    upgrade_name: &str,
+    execution: &ExecutionScript,
+    env_cfg: &EnvConfig,
+    rpc_url: &str,
+    output_dir: &Path,
+    forked_at_block: u64,
+) -> anyhow::Result<()> {
+    logger::step("execution runbook");
+    upgrade::run_execution_script(execution, &env_cfg.env, rpc_url)?;
+    let source = output_dir.join(&execution.output);
+    anyhow::ensure!(
+        source.is_file(),
+        "{} did not write {}",
+        execution.script,
+        source.display()
+    );
+    let path = output_dir.join(execution_runbook::RUNBOOK_FILE);
+    let options = execution_runbook::LoadOptions {
+        chain_id: env_cfg.l1_chain_id(),
+        upgrade: Some(upgrade_name.to_string()),
+        env: Some(env_cfg.env.clone()),
+        names: execution_runbook::env_names(env_cfg),
+        ..Default::default()
+    };
+    let mut runbook = execution_runbook::load(&source, &path, &options)?;
+    runbook.facts = Some(
+        execution_runbook::check_on_fork(
+            rpc_url,
+            &runbook,
+            forked_at_block,
+            Some("the deploy bundle"),
+        )
+        .await?,
+    );
+    execution_runbook::write(&runbook, &path)?;
+    logger::success(format!("Execution runbook: {}", path.display()));
     Ok(())
 }
 

@@ -50,7 +50,12 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 #
 #   ecosystem-upgrade-calldata-<env>      the review set: ecosystem.toml (addresses
 #                                         + governance stage 0/1/2 calldata),
-#                                         sim-inputs/, transaction-simulator.json
+#                                         sim-inputs/, transaction-simulator.json,
+#                                         and EXECUTE.md: the txs whoever executes
+#                                         sends by hand, one copy-into-MetaMask table
+#                                         per sender, next to the list it is rendered
+#                                         from (sim-inputs/ for v31, the `[execution]`
+#                                         script's output for a forge-script upgrade)
 #   ecosystem-upgrade-deploy-inputs-<env> the DEPLOY BUNDLE (see below): the
 #                                         deployer calls + provenance
 #
@@ -172,7 +177,8 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 #   then emit the git-portable `sim-inputs/` handoff set AND the ready-to-paste
 #   `transaction-simulator.json` (the full mainnet calldata artifact set, i.e.
 #   the same deliverables PR #2268 committed).
-# Artifacts uploaded: `ecosystem.toml` + `sim-inputs/` + `transaction-simulator.json`.
+# Artifacts uploaded: `ecosystem.toml` + `sim-inputs/` + `transaction-simulator.json` +
+# `EXECUTE.md` (written by the sim-inputs emit).
 #
 # ─── WHY THE DEPLOY BUNDLE IS THE POINT ───
 # Solidity output is not byte-stable across build environments (the default
@@ -501,7 +507,8 @@ jobs:
           # are dropped from the sim-inputs: they're broadcast to the real chain,
           # so the simulator's fork inherits their effects from chain tip and
           # replaying them would revert.
-          # 1) Normalized manifest + Camp-B `*.safe.json` sim-input bundles.
+          # 1) Normalized manifest + Camp-B `*.safe.json` sim-input bundles, and
+          #    `$OUT/EXECUTE.md`, the runbook of those bundles.
           "$BIN" ecosystem governance-toml-to-simulator \
             --env "$ENVIRONMENT" \
             --include-manifest "$OUT/prepare/manifest.json" \
@@ -525,6 +532,8 @@ jobs:
             l1-contracts/upgrade-envs/${{ inputs.upgrade }}/output/${{ inputs.environment }}/ecosystem.toml
             l1-contracts/upgrade-envs/${{ inputs.upgrade }}/output/${{ inputs.environment }}/sim-inputs/
             l1-contracts/upgrade-envs/${{ inputs.upgrade }}/output/${{ inputs.environment }}/transaction-simulator.json
+            l1-contracts/upgrade-envs/${{ inputs.upgrade }}/output/${{ inputs.environment }}/EXECUTE.md
+            l1-contracts/upgrade-envs/${{ inputs.upgrade }}/output/${{ inputs.environment }}/emergency-upgrade-board.json
           if-no-files-found: warn
           retention-days: 30
 

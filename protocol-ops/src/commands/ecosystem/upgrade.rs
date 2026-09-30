@@ -1493,3 +1493,33 @@ pub async fn run_forge_script_prepare(
     )
     .await
 }
+
+/// Run a `forge-script` upgrade's `[execution]` script for `env` on `l1_rpc_url` (read-only: a
+/// simulation without a sender), which writes `output/<env>/<execution.output>`.
+pub fn run_execution_script(
+    execution: &crate::common::upgrade_descriptor::ExecutionScript,
+    env: &str,
+    l1_rpc_url: &str,
+) -> anyhow::Result<()> {
+    let shared = crate::common::SharedRunArgs {
+        l1_rpc_url: l1_rpc_url.to_string(),
+        out: None,
+        subdir: None,
+        forge_args: Default::default(),
+    };
+    let mut runner = ForgeRunner::new(&shared)?;
+    let script = runner
+        .script_path_from_root(
+            &crate::common::paths::resolve_l1_contracts_path()?,
+            execution.script_path(),
+        )
+        .with_calldata(&Bytes::from(execution.calldata(env)?))
+        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT);
+    logger::step(format!(
+        "Running {} for {env} (read-only)",
+        execution.script
+    ));
+    runner
+        .run(script)
+        .with_context(|| format!("failed to execute {}", execution.script))
+}

@@ -43,6 +43,11 @@ a plain force deployment would reset.
   L1 end state. With `L1_RPC_URL` and `ECOSYSTEM_TOML` it checks a fork the bundle was already
   replayed on; with `--published-only` it only checks publication, read-only.
 - `upgrade.toml` tells the shared generate and deploy workflows how to prepare and check this upgrade.
+  Its `[execution]` table names the script that writes `output/<env>/emergency-upgrade-board.json`;
+  the generate workflow replays those transactions on its fork and renders `output/<env>/EXECUTE.md`.
+- `output/stage/EXECUTE.md` is the execution runbook: the emergency proposal's transactions, one
+  copy-into-MetaMask row each, with the calldata decoded. `output/stage/chain-upgrades/499/` holds
+  chain 499's ChainAdmin upgrade as a Safe bundle plus its own `EXECUTE.md`.
 
 Script: `deploy-scripts/upgrade/v33/CTMUpgrade_v33.s.sol`.
 
@@ -72,12 +77,22 @@ and the script's factory-dep check against the genesis hashes will fail on it.
    upgrade board, as one proposal: there is no upgrade timer between the stages, so executing them
    atomically is equivalent. `output/stage/emergency-upgrade-board.json` lists the transactions:
    twelve `approveHash` calls on the Guardian, Security Council and ZK Foundation Safes, sent from
-   the Safes' owner, then `executeEmergencyUpgrade`. Regenerate it read-only with
-   `forge script deploy-scripts/upgrade/EmergencyStageUpgradeCalldata.s.sol:EmergencyStageUpgradeCalldata --sig 'runV33CompilerStage()' --rpc-url "$SEPOLIA_RPC"`.
+   the Safes' owner, then `executeEmergencyUpgrade`. `output/stage/EXECUTE.md` is the same list to
+   send by hand. The script derives the board, the approving member Safes and their owner on-chain
+   from the env's bridgehub, so it works for any env governed by a ProtocolUpgradeHandler; write the
+   list read-only with
+   `forge script deploy-scripts/upgrade/EmergencyStageUpgradeCalldata.s.sol:EmergencyStageUpgradeCalldata --sig 'emergencyUpgradeAllStages(string,string,string)' /upgrade-envs/permanent-values/<env>.toml /upgrade-envs/v0.33.0-compiler/output/<env>/ecosystem.toml <out.json> --rpc-url "$SEPOLIA_RPC"`
+   and render the runbook with
+   `protocol_ops dev execution-runbook --input <out.json> --env <env> --check-fork-url "$SEPOLIA_RPC"`.
+   `--sig 'printEmergencyBoard(string)' /upgrade-envs/permanent-values/<env>.toml` only prints who
+   approves.
 
 3. For each chain, the chain admin's owner sends `chain_upgrades.<id>.chain_admin_calldata` to
    `chain_upgrades.<id>.chain_admin`. `protocol_ops chain upgrade --env stage --chain-id <id>`
-   derives the same call from the CTM once stage 1 has executed.
+   derives the same call from the CTM once stage 1 has executed, and writes the Safe bundle with an
+   `EXECUTE.md` into its `--out` directory. `output/stage/chain-upgrades/499/` was generated that
+   way, read-only against Sepolia after stage 1, and its call equals chain 499's
+   `chain_admin_calldata`.
 
 Chain 499 is on v0.32.2 and is included. Chains 6475 and 37111 are still on v0.31.0 and need the
 CTM's stored v0.31.x and v0.32.x upgrades first. Do not regenerate for them afterwards: `prepare`

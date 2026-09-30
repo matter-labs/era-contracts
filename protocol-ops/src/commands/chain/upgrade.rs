@@ -20,8 +20,13 @@ struct DaValidatorPair {
 
 #[derive(Serialize)]
 struct ChainUpgradeOutput {
+    chain_id: u64,
     chain_address: Address,
     admin_address: Address,
+    /// The ChainAdmin's owner, who sends the bundle; absent when an AccessControlRestriction
+    /// admin sends it instead.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    chain_admin_owner: Option<Address>,
     access_control_restriction: Address,
     /// Present only when the upgrade atomically set the DA validator pair.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -244,8 +249,11 @@ async fn run_one(
         &runner,
         &serde_json::json!({}),
         &ChainUpgradeOutput {
+            chain_id,
             chain_address,
             admin_address,
+            chain_admin_owner: (access_control_restriction == Address::ZERO)
+                .then_some(sender.address),
             access_control_restriction,
             l1_da_validator: da_validator_pair.map(|p| p.l1_da_validator),
             l2_da_commitment_scheme: da_validator_pair.map(|p| p.l2_da_commitment_scheme),

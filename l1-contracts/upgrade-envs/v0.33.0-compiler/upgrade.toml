@@ -12,3 +12,16 @@ args = [
 verify_fork = ["bash", "upgrade-envs/v0.33.0-compiler/rehearse-stage.sh"]
 # Read-only against the real chain: every factory dep is published.
 verify_chain = ["bash", "upgrade-envs/v0.33.0-compiler/rehearse-stage.sh", "--published-only"]
+
+# How whoever executes sends the governance stages: one emergency proposal through the env's
+# Emergency Upgrade Board, from the owner of its member Safes. Run read-only on the generation fork
+# after the deploy bundle; the pipeline replays the txs there and renders EXECUTE.md from them.
+[execution]
+script = "deploy-scripts/upgrade/EmergencyStageUpgradeCalldata.s.sol:EmergencyStageUpgradeCalldata"
+signature = "emergencyUpgradeAllStages(string,string,string)"
+args = [
+  "/upgrade-envs/permanent-values/{env}.toml",
+  "/upgrade-envs/v0.33.0-compiler/output/{env}/ecosystem.toml",
+  "/upgrade-envs/v0.33.0-compiler/output/{env}/emergency-upgrade-board.json",
+]
+output = "emergency-upgrade-board.json"

@@ -5,7 +5,9 @@
 //! - `prepare = "prepare-all"`: the v31 flow, `upgrade-prepare-all` plus PUVT.
 //! - `prepare = "forge-script"`: one forge script, run on a fork as the deployer. Its
 //!   broadcasts become the deployer's bundle, packed exactly like `upgrade-prepare-all`'s.
-//!   The upgrade supplies its own checks, since PUVT only knows v31.
+//!   The upgrade supplies its own checks, since PUVT only knows v31. An optional
+//!   `[execution]` script writes the transactions whoever executes sends by hand; the
+//!   pipeline replays them on the fork and renders `EXECUTE.md` from them.
 
 use std::path::{Path, PathBuf};
 
@@ -47,6 +49,26 @@ pub struct ForgeScriptUpgrade {
     /// Read-only checks against a real chain the bundle was broadcast to. Same environment
     /// as `verify_fork`; must never send a transaction.
     pub verify_chain: Vec<String>,
+    /// How the upgrade is executed by hand, if the pipeline should write its runbook. Boxed:
+    /// the variant carrying it would otherwise dwarf `PrepareAll`.
+    #[serde(default)]
+    pub execution: Option<Box<ExecutionScript>>,
+}
+
+/// A read-only forge script that writes the transactions whoever executes the upgrade sends
+/// (a format `common::execution_runbook` reads), run on the generation fork after the deploy
+/// bundle was replayed there.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExecutionScript {
+    /// `path/To.s.sol:Contract`, relative to `l1-contracts/`.
+    pub script: String,
+    /// Solidity signature of the entry point.
+    pub signature: String,
+    /// Entry-point arguments, coerced to the signature's types; `{env}` becomes the env name.
+    pub args: Vec<String>,
+    /// The file the script writes, a bare name under `output/<env>/`.
+    pub output: String,
 }
 
 /// An upgrade name is a directory under `upgrade-envs/`; it arrives from workflow inputs
@@ -90,46 +112,81 @@ impl UpgradeDescriptor {
             );
             // Fail on a malformed signature or argument list when loading, not mid-run.
             upgrade.calldata("env")?;
+            if let Some(execution) = &upgrade.execution {
+                execution.calldata("env")?;
+                anyhow::ensure!(
+                    Path::new(&execution.output).file_name() == Some(execution.output.as_ref())
+                        && execution.output != ".."
+                        && execution.output != ".",
+                    "execution.output {:?} must be a file name under output/<env>/",
+                    execution.output
+                );
+            }
         }
         Ok(descriptor)
+    }
+}
+
+/// `args` with `{env}` substituted.
+fn substitute_env(args: &[String], env: &str) -> Vec<String> {
+    args.iter()
+        .map(|arg| arg.replace(ENV_PLACEHOLDER, env))
+        .collect()
+}
+
+/// ABI-encoded call of `signature` with `args`, each coerced to its parameter type.
+fn encode_entry_point(signature: &str, args: &[String]) -> anyhow::Result<Vec<u8>> {
+    let function =
+        Function::parse(signature).with_context(|| format!("parse signature {signature:?}"))?;
+    anyhow::ensure!(
+        args.len() == function.inputs.len(),
+        "{} takes {} argument(s), the descriptor gives {}",
+        signature,
+        function.inputs.len(),
+        args.len()
+    );
+    let values = function
+        .inputs
+        .iter()
+        .zip(args)
+        .map(|(param, arg)| {
+            let ty: DynSolType = param
+                .ty
+                .parse()
+                .with_context(|| format!("type {}", param.ty))?;
+            ty.coerce_str(arg)
+                .with_context(|| format!("argument {arg:?} as {}", param.ty))
+        })
+        .collect::<anyhow::Result<Vec<DynSolValue>>>()?;
+    Ok(function.abi_encode_input(&values)?)
+}
+
+impl ExecutionScript {
+    /// `args` with `{env}` substituted.
+    pub fn args_for(&self, env: &str) -> Vec<String> {
+        substitute_env(&self.args, env)
+    }
+
+    /// ABI-encoded call of the entry point for `env`.
+    pub fn calldata(&self, env: &str) -> anyhow::Result<Vec<u8>> {
+        encode_entry_point(&self.signature, &self.args_for(env))
+    }
+
+    /// The script path forge takes, relative to `l1-contracts/`.
+    pub fn script_path(&self) -> &Path {
+        Path::new(&self.script)
     }
 }
 
 impl ForgeScriptUpgrade {
     /// `args` with `{env}` substituted.
     pub fn args_for(&self, env: &str) -> Vec<String> {
-        self.args
-            .iter()
-            .map(|arg| arg.replace(ENV_PLACEHOLDER, env))
-            .collect()
+        substitute_env(&self.args, env)
     }
 
     /// ABI-encoded call of the entry point for `env`.
     pub fn calldata(&self, env: &str) -> anyhow::Result<Vec<u8>> {
-        let function = Function::parse(&self.signature)
-            .with_context(|| format!("parse signature {:?}", self.signature))?;
-        let args = self.args_for(env);
-        anyhow::ensure!(
-            args.len() == function.inputs.len(),
-            "{} takes {} argument(s), the descriptor gives {}",
-            self.signature,
-            function.inputs.len(),
-            args.len()
-        );
-        let values = function
-            .inputs
-            .iter()
-            .zip(&args)
-            .map(|(param, arg)| {
-                let ty: DynSolType = param
-                    .ty
-                    .parse()
-                    .with_context(|| format!("type {}", param.ty))?;
-                ty.coerce_str(arg)
-                    .with_context(|| format!("argument {arg:?} as {}", param.ty))
-            })
-            .collect::<anyhow::Result<Vec<DynSolValue>>>()?;
-        Ok(function.abi_encode_input(&values)?)
+        encode_entry_point(&self.signature, &self.args_for(env))
     }
 
     /// The script path forge takes, relative to `l1-contracts/`.
@@ -186,6 +243,52 @@ verify_chain = ["bash", "upgrade-envs/v0.33.0-compiler/rehearse-stage.sh", "--pu
         );
     }
 
+    const EXECUTION: &str = r#"
+[execution]
+script = "deploy-scripts/upgrade/EmergencyStageUpgradeCalldata.s.sol:EmergencyStageUpgradeCalldata"
+signature = "emergencyUpgradeAllStages(string,string,string)"
+args = ["/upgrade-envs/permanent-values/{env}.toml", "/upgrade-envs/v0.33.0-compiler/output/{env}/ecosystem.toml", "/upgrade-envs/v0.33.0-compiler/output/{env}/emergency-upgrade-board.json"]
+output = "emergency-upgrade-board.json"
+"#;
+
+    #[test]
+    fn parses_an_execution_script() {
+        let UpgradeDescriptor::ForgeScript(upgrade) =
+            UpgradeDescriptor::parse(&format!("{FORGE_SCRIPT}{EXECUTION}")).unwrap()
+        else {
+            panic!("expected a forge-script upgrade");
+        };
+        let execution = upgrade.execution.expect("execution parsed");
+        assert_eq!(execution.output, "emergency-upgrade-board.json");
+        assert_eq!(
+            execution.args_for("testnet")[0],
+            "/upgrade-envs/permanent-values/testnet.toml"
+        );
+        let calldata = execution.calldata("testnet").unwrap();
+        let selector =
+            &alloy::primitives::keccak256("emergencyUpgradeAllStages(string,string,string)")[..4];
+        assert_eq!(&calldata[..4], selector);
+        // Without the table the upgrade has no runbook.
+        let UpgradeDescriptor::ForgeScript(plain) = UpgradeDescriptor::parse(FORGE_SCRIPT).unwrap()
+        else {
+            panic!("expected a forge-script upgrade");
+        };
+        assert_eq!(plain.execution, None);
+    }
+
+    #[test]
+    fn rejects_an_execution_output_outside_the_env_dir_and_unknown_keys() {
+        for bad in ["../x.json", "a/b.json", ".."] {
+            let raw = format!("{FORGE_SCRIPT}{EXECUTION}").replace(
+                "output = \"emergency-upgrade-board.json\"",
+                &format!("output = {bad:?}"),
+            );
+            assert!(UpgradeDescriptor::parse(&raw).is_err(), "{bad:?} accepted");
+        }
+        let raw = format!("{FORGE_SCRIPT}{EXECUTION}extra = 1\n");
+        assert!(UpgradeDescriptor::parse(&raw).is_err());
+    }
+
     #[test]
     fn rejects_a_wrong_argument_count() {
         let raw = FORGE_SCRIPT.replace(
@@ -202,6 +305,25 @@ verify_chain = ["bash", "upgrade-envs/v0.33.0-compiler/rehearse-stage.sh", "--pu
                 .is_err()
         );
         assert!(UpgradeDescriptor::parse("prepare = \"prepare-all\"\nextra = 1\n").is_err());
+    }
+
+    /// Every committed `upgrade-envs/<upgrade>/upgrade.toml` parses.
+    #[test]
+    fn every_committed_descriptor_loads() {
+        let Ok(root) = paths::resolve_l1_contracts_path() else {
+            return; // no checkout around the test binary
+        };
+        let mut loaded = 0;
+        for entry in std::fs::read_dir(root.join("upgrade-envs")).unwrap() {
+            let dir = entry.unwrap().path();
+            if dir.join(UPGRADE_DESCRIPTOR_FILE).is_file() {
+                let upgrade = dir.file_name().unwrap().to_str().unwrap().to_string();
+                UpgradeDescriptor::load(&upgrade)
+                    .unwrap_or_else(|error| panic!("{upgrade}: {error:#}"));
+                loaded += 1;
+            }
+        }
+        assert!(loaded > 0, "no upgrade.toml found");
     }
 
     #[test]
