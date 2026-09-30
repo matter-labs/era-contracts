@@ -152,6 +152,9 @@ abstract contract DeployCTMUtils is DeployUtils {
         config.contracts.validatorTimelockExecutionDelay = toml.readUint(
             "$.contracts.validator_timelock_execution_delay"
         );
+        // Ends up as MAX_NUMBER_OF_ZK_CHAINS on every chain's L2 Bridgehub via the force deployments.
+        config.contracts.maxNumberOfChains = toml.readUint("$.contracts.max_number_of_chains");
+        require(config.contracts.maxNumberOfChains > 0, "max_number_of_chains must be non-zero in config");
         config.contracts.chainCreationParams = getChainCreationParamsConfig(Utils.genesisConfigPath(config.isZKsyncOS));
 
         if (vm.keyExistsToml(toml, "$.contracts.avail_l1_da_validator")) {

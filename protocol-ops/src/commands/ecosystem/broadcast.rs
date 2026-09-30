@@ -23,7 +23,9 @@ use anyhow::Context;
 use clap::Parser;
 use serde::Deserialize;
 
-use crate::commands::dev::execute_safe::{execute_one_bundle, execute_one_bundle_unlocked};
+use crate::commands::dev::execute_safe::{
+    execute_one_bundle_unlocked, execute_one_bundle_with_gas_floor, parse_gwei,
+};
 use crate::common::logger;
 
 #[derive(Debug, Clone, Parser)]
@@ -57,6 +59,13 @@ pub struct UpgradeBroadcastArgs {
     /// safety net to avoid accidental impersonation attempts on real prod.
     #[clap(long)]
     pub unlocked: bool,
+
+    /// Minimum legacy gas price in gwei for the signed (non-`--unlocked`)
+    /// path. The effective price is `max(3 x eth_gasPrice, floor)`, resolved
+    /// once per bundle. Lower it on mainnet when the base fee is far below the
+    /// 5 gwei default.
+    #[clap(long = "gas-price-floor-gwei", default_value = "5", value_parser = parse_gwei)]
+    pub gas_price_floor_wei: u128,
 
     /// Optional path to accumulate executed-tx logs across every bundle in the
     /// manifest. Same shape `dev execute-safe --out` produces. Consumed by
@@ -159,9 +168,15 @@ pub async fn run(args: UpgradeBroadcastArgs) -> anyhow::Result<()> {
                 .with_context(|| format!("bundle #{} ({})", bundle.index, bundle.file))?;
         } else {
             let key = &key_map[&bundle.target];
-            execute_one_bundle(&bundle_path, &args.l1_rpc_url, key, out_path)
-                .await
-                .with_context(|| format!("bundle #{} ({})", bundle.index, bundle.file))?;
+            execute_one_bundle_with_gas_floor(
+                &bundle_path,
+                &args.l1_rpc_url,
+                key,
+                out_path,
+                args.gas_price_floor_wei,
+            )
+            .await
+            .with_context(|| format!("bundle #{} ({})", bundle.index, bundle.file))?;
         }
     }
 
