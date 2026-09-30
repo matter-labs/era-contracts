@@ -13,6 +13,7 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
+import {DefaultUpgradeZKsyncOS} from "contracts/upgrades/DefaultUpgradeZKsyncOS.sol";
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {Call} from "contracts/governance/Common.sol";
@@ -108,6 +109,16 @@ contract V34UpgradeScriptsTest is Test {
                 IComplexUpgrader.forceDeployAndUpgradeUniversal,
                 (new IComplexUpgrader.UniversalContractUpgradeInfo[](0), address(0), bytes(""))
             )
+        );
+
+        DefaultUpgradeZKsyncOS initializer = DefaultUpgradeZKsyncOS(cut.initAddress);
+        assertEq(
+            initializer.getL2UpgradeTxData(address(0), block.chainid, proposal.l2ProtocolUpgradeTx.data),
+            proposal.l2ProtocolUpgradeTx.data
+        );
+        assertEq(
+            initializer.getL2UpgradeTxData(address(0), block.chainid, true, proposal.l2ProtocolUpgradeTx.data),
+            proposal.l2ProtocolUpgradeTx.data
         );
     }
 

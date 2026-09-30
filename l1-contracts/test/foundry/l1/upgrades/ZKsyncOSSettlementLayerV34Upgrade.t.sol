@@ -8,7 +8,9 @@ import {UnverifiedBatchesAtCommitmentUpgrade} from "contracts/upgrades/ZkSyncUpg
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {DEFAULT_PRIORITY_TX_MAX_PUBDATA, PRIORITY_TX_MAX_GAS_LIMIT} from "contracts/common/Config.sol";
+import {L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {TEST_CHAIN_CONFIG_UPGRADE_VERSION} from "../../TestConstants.sol";
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
@@ -95,6 +97,11 @@ contract ZKsyncOSSettlementLayerV34UpgradeTest is BaseUpgrade {
         protocolVersion = SemVer.packSemVer(0, TEST_CHAIN_CONFIG_UPGRADE_VERSION, 0);
         proposedUpgrade.newProtocolVersion = protocolVersion;
         proposedUpgrade.l2ProtocolUpgradeTx.nonce = TEST_CHAIN_CONFIG_UPGRADE_VERSION;
+        proposedUpgrade.l2ProtocolUpgradeTx.to = uint256(uint160(L2_COMPLEX_UPGRADER_ADDR));
+        proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
+            IComplexUpgrader.forceDeployAndUpgradeUniversal,
+            (new IComplexUpgrader.UniversalContractUpgradeInfo[](0), address(0), bytes(""))
+        );
         upgrade.setPriorityTxMaxGasLimit(PRIORITY_TX_MAX_GAS_LIMIT);
         upgrade.setPriorityTxMaxPubdata(DEFAULT_PRIORITY_TX_MAX_PUBDATA);
         upgrade.setBatchCounters(1, 1, 0);
