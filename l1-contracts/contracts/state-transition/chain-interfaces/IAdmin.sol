@@ -31,9 +31,8 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external;
 
     /// @notice Change the ZKsync OS single-transaction gas limit (EIP-7825).
-    /// @dev Only for ZKsync OS chains, callable on the active settlement layer instance. The limit is
-    /// part of the runtime chain config committed into each batch proof public input, so it can only
-    /// change when all committed batches are verified.
+    /// @dev Callable on the active settlement layer instance after all committed batches are verified.
+    /// See {protocol-docs/chain-config.md} for the configuration-update policy.
     /// @param _newMaxTxGasLimit The new single-transaction gas limit; must not be below
     /// `ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT`
     function setZKsyncOSMaxTxGasLimit(uint64 _newMaxTxGasLimit) external;
