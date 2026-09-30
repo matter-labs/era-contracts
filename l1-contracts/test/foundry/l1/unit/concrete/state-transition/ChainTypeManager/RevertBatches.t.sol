@@ -98,7 +98,11 @@ contract RevertBatchesTest is ChainTypeManagerTest {
         });
 
         bytes32 upgradeTxHash = gettersFacet.getL2SystemContractsUpgradeTxHash();
-        IExecutor.StoredBatchInfo memory storedBatchInfo = _storedBatchInfo(newBatch, upgradeTxHash);
+        IExecutor.StoredBatchInfo memory storedBatchInfo = _storedBatchInfo(
+            genesisStoredBatchInfo,
+            newBatch,
+            upgradeTxHash
+        );
 
         CommitBatchInfoZKsyncOS[] memory batches = new CommitBatchInfoZKsyncOS[](1);
         batches[0] = newBatch;
@@ -112,7 +116,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
 
         IExecutor.StoredBatchInfo[] memory storedBatches = new IExecutor.StoredBatchInfo[](1);
         storedBatches[0] = storedBatchInfo;
-        uint256[] memory proof = _mockProof(genesisStoredBatchInfo, storedBatchInfo);
+        uint256[] memory proof = _mockProof(storedBatchInfo);
         (uint256 proveFrom, uint256 proveTo, bytes memory proveData) = Utils.encodeProveBatchesData(
             genesisStoredBatchInfo,
             storedBatches,
@@ -133,9 +137,10 @@ contract RevertBatchesTest is ChainTypeManagerTest {
     }
 
     function _storedBatchInfo(
+        IExecutor.StoredBatchInfo memory _previousBatch,
         CommitBatchInfoZKsyncOS memory _batch,
         bytes32 _upgradeTxHash
-    ) internal view returns (IExecutor.StoredBatchInfo memory) {
+    ) internal pure returns (IExecutor.StoredBatchInfo memory) {
         bytes32 batchOutputHash = keccak256(
             abi.encodePacked(
                 _batch.firstBlockTimestamp,
@@ -164,7 +169,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
                 timestamp: 0,
                 commitment: keccak256(
                     abi.encodePacked(
-                        genesisStoredBatchInfo.batchHash,
+                        _previousBatch.batchHash,
                         _batch.newStateCommitment,
                         _batch.chainConfigHash,
                         batchOutputHash
@@ -173,10 +178,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             });
     }
 
-    function _mockProof(
-        IExecutor.StoredBatchInfo memory,
-        IExecutor.StoredBatchInfo memory _currentBatch
-    ) internal pure returns (uint256[] memory proof) {
+    function _mockProof(IExecutor.StoredBatchInfo memory _currentBatch) internal pure returns (uint256[] memory proof) {
         uint256 publicInput = uint256(_currentBatch.commitment) >> PUBLIC_INPUT_SHIFT;
 
         proof = new uint256[](4);

@@ -22,6 +22,11 @@ pub const FINALIZE_CHAIN_INIT_SCRIPT_PATH: &str = "deploy-scripts/chain/Finalize
 /// `deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol`.
 pub const CORE_UPGRADE_V33_SCRIPT_PATH: &str = "deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol";
 pub const CTM_UPGRADE_V33_SCRIPT_PATH: &str = "deploy-scripts/upgrade/v33/CTMUpgrade_v33.s.sol";
+pub const CORE_UPGRADE_V34_SCRIPT_PATH: &str = "deploy-scripts/upgrade/v34/CoreUpgrade_v34.s.sol";
+pub const CTM_UPGRADE_V34_SCRIPT_PATH: &str = "deploy-scripts/upgrade/v34/CTMUpgrade_v34.s.sol";
+pub const UPGRADE_V34_ENV_DIR: &str = "/upgrade-envs/v0.34.0-chain-config";
+pub const UPGRADE_V34_LOCAL_INPUT_PATH: &str = "/upgrade-envs/v0.34.0-chain-config/local.toml";
+pub const UPGRADE_V34_CORE_OUTPUT_PATH: &str = "/script-out/v34-upgrade-core.toml";
 pub const UPGRADE_V33_ENV_DIR: &str = "/upgrade-envs/v0.33.0-atomic-interop";
 pub const UPGRADE_V33_LOCAL_INPUT_PATH: &str = "/upgrade-envs/v0.33.0-atomic-interop/local.toml";
 pub const UPGRADE_V33_CORE_OUTPUT_PATH: &str = "/script-out/v33-upgrade-core.toml";

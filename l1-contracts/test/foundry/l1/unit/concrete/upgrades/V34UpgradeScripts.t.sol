@@ -2,6 +2,9 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {CTMUpgradeV34Harness} from "foundry-test/l1/integration/utils/CTMUpgradeV34Harness.sol";
+import {CoreUpgrade_v34} from "deploy-scripts/upgrade/v34/CoreUpgrade_v34.s.sol";
+import {UpgradeHelperLib} from "deploy-scripts/upgrade/default-upgrade/UpgradeHelperLib.sol";
 import {CTMUpgrade_v34} from "deploy-scripts/upgrade/v34/CTMUpgrade_v34.s.sol";
 import {CTMUpgradeParams} from "deploy-scripts/upgrade/default-upgrade/UpgradeParams.sol";
 import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "deploy-scripts/utils/Types.sol";
@@ -20,38 +23,12 @@ import {Call} from "contracts/governance/Common.sol";
 import {L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {TEST_CHAIN_CONFIG_UPGRADE_VERSION} from "../../../../TestConstants.sol";
 
-// Isolate the release initializer selection from facet discovery and L2 bytecode publication.
-contract CTMUpgradeV34Harness is CTMUpgrade_v34 {
-    function deployDefaultUpgrade(address _ctm) external returns (address) {
-        ctmAddresses.stateTransition.proxies.chainTypeManager = _ctm;
-        ctmAddresses.stateTransition.defaultUpgrade = deployUsedUpgradeContract();
-        return ctmAddresses.stateTransition.defaultUpgrade;
-    }
-
-    function getChainCreationFacetCuts(
-        StateTransitionDeployedAddresses memory
-    ) internal pure override returns (Diamond.FacetCut[] memory) {
-        return new Diamond.FacetCut[](0);
-    }
-
-    function getUniversalForceDeployments()
-        internal
-        pure
-        override
-        returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory)
-    {
-        return new IComplexUpgrader.UniversalContractUpgradeInfo[](0);
-    }
-
-    function deployViaCreate2(bytes memory _bytecode) internal override returns (address deployed) {
-        assembly {
-            deployed := create2(0, add(_bytecode, 0x20), mload(_bytecode), 0)
-        }
-        require(deployed != address(0), "CREATE2 failed");
-    }
-}
-
 contract V34UpgradeScriptsTest is Test {
+    function test_CoreUsesGenericV34Preparation() public {
+        CoreUpgrade_v34 core = new CoreUpgrade_v34();
+        assertEq(core.prepareVersionSpecificStage1GovernanceCallsL1().length, 0);
+    }
+
     function test_CutUsesV34InitializerAndKeepsGenericDefault() public {
         CTMUpgradeV34Harness script = new CTMUpgradeV34Harness();
         address ctm = makeAddr("ctm");
@@ -79,10 +56,7 @@ contract V34UpgradeScriptsTest is Test {
         // Scripts load artifacts from disk; coverage compiles inline runtimeCode with different settings.
         assertEq(
             cut.initAddress.code,
-            BytecodeUtils.readDeployedBytecodeL1(
-                "ZKsyncOSSettlementLayerV34Upgrade.sol",
-                "ZKsyncOSSettlementLayerV34Upgrade"
-            )
+            BytecodeUtils.readDeployedBytecodeL1("V34UpgradeZKsyncOS.sol", "V34UpgradeZKsyncOS")
         );
         assertEq(
             stateTransition.defaultUpgrade.code,
@@ -99,8 +73,18 @@ contract V34UpgradeScriptsTest is Test {
         ProposedUpgrade memory proposal = script.getProposedUpgrade(
             chainCreationParams,
             factoryDeps,
-            TEST_CHAIN_CONFIG_UPGRADE_VERSION
+            UpgradeHelperLib.getProtocolUpgradeNonce(version)
         );
+        assertEq(proposal.l2ProtocolUpgradeTx.nonce, uint256(TEST_CHAIN_CONFIG_UPGRADE_VERSION));
+        assertEq(vm.parseJsonAddress(script.serializedStateTransition(), ".v34_upgrade_addr"), cut.initAddress);
+        Diamond.DiamondCutData memory repeatedCut = script.generateUpgradeCutData(
+            stateTransition,
+            chainCreationParams,
+            factoryDeps,
+            chain
+        );
+        assertEq(repeatedCut.initAddress, cut.initAddress);
+        assertEq(repeatedCut.initCalldata, cut.initCalldata);
         assertEq(cut.initCalldata, abi.encodeCall(DefaultUpgrade.upgrade, (proposal)));
         assertEq(proposal.l2ProtocolUpgradeTx.to, uint256(uint160(L2_COMPLEX_UPGRADER_ADDR)));
         assertEq(

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {TEST_CHAIN_ID} from "foundry-test/TestConstants.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
@@ -67,8 +68,9 @@ contract BatchDecoderTest is Test {
         this.externalDecodeAndCheckCommitData(emptyData, 1, 1);
     }
 
-    function test_decodeAndCheckCommitData_revertsOnUnsupportedVersion() public {
-        uint8 unsupportedVersion = BatchDecoder.SUPPORTED_ENCODING_VERSION_COMMIT - 1;
+    function testFuzz_decodeAndCheckCommitData_revertsOnUnsupportedVersion(uint8 _unsupportedVersion) public {
+        vm.assume(_unsupportedVersion != BatchDecoder.SUPPORTED_ENCODING_VERSION_COMMIT);
+        uint8 unsupportedVersion = _unsupportedVersion;
         IExecutor.StoredBatchInfo memory lastBatch = _createStoredBatchInfo(10);
         CommitBatchInfoZKsyncOS[] memory newBatches = new CommitBatchInfoZKsyncOS[](1);
         newBatches[0] = _createCommitBatchInfoZKsyncOS(11);
@@ -77,6 +79,12 @@ contract BatchDecoderTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(UnsupportedCommitBatchEncoding.selector, unsupportedVersion));
         this.externalDecodeAndCheckCommitData(encodedData, 11, 11);
+    }
+
+    function test_decodeAndCheckCommitData_revertsOnPreviousVersion() public {
+        testFuzz_decodeAndCheckCommitData_revertsOnUnsupportedVersion(
+            BatchDecoder.SUPPORTED_ENCODING_VERSION_COMMIT - 1
+        );
     }
 
     /// @notice The retired EraVM commit encoding byte must stay rejected, never silently decoded.
@@ -359,7 +367,7 @@ contract BatchDecoderTest is Test {
                 firstBlockNumber: uint64(batchNumber) * 10,
                 lastBlockTimestamp: uint64(batchNumber) * 100 + 1,
                 lastBlockNumber: uint64(batchNumber) * 10 + 1,
-                chainId: 9,
+                chainId: TEST_CHAIN_ID,
                 operatorDAInput: "",
                 slChainId: 1,
                 chainConfigHash: keccak256("config")

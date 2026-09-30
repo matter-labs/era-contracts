@@ -49,6 +49,30 @@ contract ProvingTest is ExecutorTest {
 
     function test_RevertWhen_ProvingWithWrongCommittedBlock() public {
         IExecutor.StoredBatchInfo memory wrongNewStoredBatchInfo = newStoredBatchInfo;
+        wrongNewStoredBatchInfo.batchNumber += 1;
+
+        IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
+        storedBatchInfoArray[0] = wrongNewStoredBatchInfo;
+
+        vm.prank(validator);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                BatchHashMismatch.selector,
+                keccak256(abi.encode(newStoredBatchInfo)),
+                keccak256(abi.encode(wrongNewStoredBatchInfo))
+            )
+        );
+        (uint256 proveBatchFrom, uint256 proveBatchTo, bytes memory proveData) = Utils.encodeProveBatchesData(
+            genesisStoredBatchInfo,
+            storedBatchInfoArray,
+            proofInput
+        );
+        executor.proveBatchesSharedBridge(address(0), proveBatchFrom, proveBatchTo, proveData);
+    }
+
+    function test_RevertWhen_ProvingWithTamperedCommitment() public {
+        IExecutor.StoredBatchInfo memory wrongNewStoredBatchInfo = newStoredBatchInfo;
         wrongNewStoredBatchInfo.commitment = keccak256("tampered commitment");
 
         IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
