@@ -178,7 +178,8 @@ So:
   must be refreshed from the checked-out branch's CI Linux artifacts whenever its bootloader changes; their
   `proved_batch` hash must equal the checked-out genesis `bootloader_hash`.
 - **Prover:** `PROVER_PROTOCOL_VERSION` must equal the checked-out genesis minor for the prover e2e. A prover proves
-  exactly one protocol version, so the deployed version's prover must come from a build before that bump.
+  exactly one protocol version, so the deployed version's prover is built from its `era-validated/<version>` tag (see
+  the test PR below), not from `dev`.
 - **Contracts:** the undeployed line is rebased onto the inserted version as a new versioned branch by its owner (e.g.
   `draft-v34-era-only` on top of `draft-v31`, era-contracts #2542). This worked better than a merge branch under the old
   one (#2539, closed). Whoever does it:
@@ -194,8 +195,15 @@ So:
     starting point for the next upgrade and the commit an environment's server/prover release can be cut from. Example:
     v0.33.0 was validated by zksync-era-private #138 at `4b4bdcaa2`, on a base cut from `3c96bae48`.
   - **Merge PR (to `dev`).** Add the deployed version as prebuilts and renumber the checked-out line, pinned to the
-    rebased contracts branch (e.g. #151). Stack it on any open server PR those contracts need (e.g. #108 for Airbender
-    settlement); its diff shrinks to your changes once that PR merges.
+    rebased contracts branch (e.g. #151).
+    - The checkout must be something the server can run. If the rebased line carries contract features that `dev`
+      doesn't support yet (in 2026-09, #2451 "require both Boojum and Airbender proofs" needed server #108), stack the
+      merge PR on that server PR and land them together: merge the lower PR with a merge commit first (never squash
+      while the upper one is open), or merge the upper PR alone and close the lower one.
+    - To avoid that dependency, build the checkout from `dev`'s current pin plus the inserted version instead of the
+      newer branch.
+    - Until the merge PR lands, `dev` still maps the version to the old meaning, so don't cut an environment's node
+      release from `dev` for it before then.
 - **Deploy** the inserted version from its own era-contracts branch, the one its calldata was generated from.
 - A bootloader change needs a minor bump: patch upgrades cannot set the bootloader.
 
