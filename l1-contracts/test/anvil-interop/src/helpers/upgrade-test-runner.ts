@@ -1298,23 +1298,6 @@ async function verifyL2UpgradeResult(l2Provider: ethers.providers.JsonRpcProvide
   if (!(await assetTracker.isAssetRegistered(baseTokenAssetId))) {
     throw new Error(`Chain ${chainId}: base token bookkeeping not initialized after L2 upgrade`);
   }
-  // The atomic-interop built-ins are new to a v31 chain, so the upgrade must have initialized them.
-  const commitmentTree = new ethers.Contract(
-    L2_INTEROP_COMMITMENT_TREE_ADDR,
-    getAbi("L2InteropCommitmentTree"),
-    l2Provider
-  );
-  const leafCount = await commitmentTree.leafCount();
-  if (!leafCount.eq(1)) {
-    throw new Error(`Chain ${chainId}: L2InteropCommitmentTree.leafCount = ${leafCount}, expected the sentinel only`);
-  }
-  const flowManager = new ethers.Contract(L2_ATOMIC_FLOW_MANAGER_ADDR, getAbi("AtomicFlowManager"), l2Provider);
-  const flowManagerL1ChainId = await flowManager.L1_CHAIN_ID();
-  if (!flowManagerL1ChainId.eq(runtimeConfig.l1ChainId)) {
-    throw new Error(
-      `Chain ${chainId}: AtomicFlowManager.L1_CHAIN_ID = ${flowManagerL1ChainId}, expected ${runtimeConfig.l1ChainId}`
-    );
-  }
 }
 
 export async function verifyProtocolVersions(

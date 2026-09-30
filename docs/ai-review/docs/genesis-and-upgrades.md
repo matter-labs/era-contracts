@@ -44,8 +44,7 @@ supported). Its per-chain upgrade contract is:
 And the corresponding L2 upgrade contract that should be used is the release-agnostic:
 
 - L2DefaultUpgrade.sol (wired in by `DefaultL2UpgradeStrategy`; it must stay safe to re-run on a chain
-  at any supported version, so one-shot `initL2`s it reaches are guarded by the contract's own
-  "initialized" marker)
+  at any version from v32 on, so it never reaches a one-shot `initL2` — those run at genesis only)
 
 The only assumption the upgrade logic can use is that the ComplexUpgrader contract is present
 and force deployment via the ZKsync OS hook works

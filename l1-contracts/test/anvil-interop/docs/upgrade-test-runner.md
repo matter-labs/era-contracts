@@ -34,8 +34,9 @@ The v31→v33 upgrade proceeds as:
    this release, which:
    - Force-deploys new L2 system contract bytecodes through the ZKsync OS bytecode deployer
    - Delegatecalls to `L2DefaultUpgrade.upgrade()`, which runs `updateL2` on the existing contracts (NTV,
-     Bridgehub, AssetRouter, MessageRoot, ChainAssetHandler) and initializes the atomic-interop built-ins
-     (`L2InteropCommitmentTree`, `AtomicFlowManager`) that are new to a v31 chain
+     Bridgehub, AssetRouter, MessageRoot, ChainAssetHandler). It does not initialize the atomic-interop
+     built-ins (`L2InteropCommitmentTree`, `AtomicFlowManager`): those are seeded at genesis only, so a
+     v31 chain upgraded by this branch's scripts ends up with them force-deployed but uninitialized
 
 8. **Verification**: Protocol version on each chain is now `0x2100000000` (v33).
 

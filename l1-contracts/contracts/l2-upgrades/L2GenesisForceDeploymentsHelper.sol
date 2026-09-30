@@ -39,7 +39,7 @@ import {L2AssetTracker} from "../bridge/asset-tracker/L2AssetTracker.sol";
 import {L2ChainAssetHandler} from "../core/chain-asset-handler/L2ChainAssetHandler.sol";
 import {L2InteropHandler} from "../interop/interop-handler/L2InteropHandler.sol";
 import {L2InteropCommitmentTree} from "../atomic-interop/L2InteropCommitmentTree.sol";
-import {AtomicFlowManager} from "../atomic-interop/AtomicFlowManager.sol";
+import {IAtomicFlowManager} from "../atomic-interop/IAtomicFlowManager.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {
     DeployFailed,
@@ -230,9 +230,8 @@ library L2GenesisForceDeploymentsHelper {
 
         if (_isGenesisUpgrade) {
             _initPreV32Contracts(fixedForceDeploymentsData, additionalForceDeploymentsData);
+            _initializeV32Contracts(fixedForceDeploymentsData);
         }
-
-        _initializeV32ContractsIfNeeded(fixedForceDeploymentsData);
 
         emit ForceDeployedContractsInitialized(_isGenesisUpgrade);
     }
@@ -372,20 +371,14 @@ library L2GenesisForceDeploymentsHelper {
         IL2BaseToken(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
     }
 
-    /// @notice Initializes the contracts introduced in v32, unless they already are.
+    /// @notice Initializes the contracts introduced in v32.
     /// @dev Only the atomic-interop built-ins are new in v32 (see
     /// {protocol-docs/chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins}).
-    /// A chain receives them uninitialized exactly once — from its genesis when it is new, from the upgrade's
-    /// force deployments when it predates v32 — while every later upgrade finds them initialized, and their
-    /// `initL2`s are one-shot. Each is therefore initialized only when its own "initialized" marker is unset:
-    /// the seeded sentinel leaf for the tree, the non-zero L1 chain ID for the flow manager.
-    function _initializeV32ContractsIfNeeded(FixedForceDeploymentsData memory _fixedForceDeploymentsData) private {
-        if (L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafCount() == 0) {
-            L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initL2();
-        }
-        if (AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).L1_CHAIN_ID() == 0) {
-            AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
-        }
+    /// Genesis only: their `initL2`s are one-shot, and every chain an upgrade from this release applies to
+    /// already runs them initialized.
+    function _initializeV32Contracts(FixedForceDeploymentsData memory _fixedForceDeploymentsData) private {
+        L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initL2();
+        IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
     }
 
     /// @notice Constructs the initialization calldata for the L2WrappedBaseToken.

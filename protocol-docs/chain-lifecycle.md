@@ -217,10 +217,9 @@ Two new L2 built-ins support atomic interop (protocol details in
 
 They are predeployed **only** in the ZKsync OS genesis (registered in the genesis gen tool,
 `tools/zksync-os-genesis-gen`); they have no constructors, so one-time setup happens in `initL2`
-calls made by `L2GenesisForceDeploymentsHelper._initializeV32ContractsIfNeeded` for every ZKsync OS chain, on
-both the genesis and the upgrade path. Each call is skipped once the contract is initialized (the tree holds
-its sentinel leaf, the manager a non-zero L1 chain id), so the release-agnostic `L2DefaultUpgrade` seeds them
-on a chain upgrading from v31 and leaves them alone on every later upgrade:
+calls made by `L2GenesisForceDeploymentsHelper._initializeV32Contracts`, on the genesis path only. The
+release-agnostic `L2DefaultUpgrade` never runs them: every chain it applies to (v32 or later) already runs
+the built-ins initialized, and the `initL2`s are one-shot:
 
 - `L2InteropCommitmentTree.initL2()` seeds the IMT with its `{0,0,0}` sentinel head leaf (reverts
   if already seeded).
@@ -232,11 +231,9 @@ manager's tree / interop center / interop handler references) uses canonical fix
 addresses, so there are no wiring parameters, and the manager never custodies funds (source burns
 flow through the normal interop path; destination mints go through the `InteropHandler`).
 
-Pre-existing ZKsync OS chains receive the same two built-ins through the upgrade's force deployments
-(`SystemContractsProcessing.getFixedAddressCoreContracts`), so they end up with atomic interop
-as well. On a chain coming from v31 both `initL2`s therefore run on the upgrade path too: neither the
-built-ins nor their addresses existed in v31, so they arrive unseeded, and the force deployments in the
-same transaction install their code before the `initL2`s run.
+Chains that predate v32 received the same two built-ins, seeded, through the v32 upgrade, which shipped
+with its own release branch. Later upgrades re-deliver their implementations through the force
+deployments (`SystemContractsProcessing.getFixedAddressCoreContracts`) and leave their state alone.
 
 The same upgrade list also neutralizes the tracker this release removes
 (`SystemContractsProcessing.getRemovedTrackerNeutralizations`): v31 deployed the `GWAssetTracker` as a

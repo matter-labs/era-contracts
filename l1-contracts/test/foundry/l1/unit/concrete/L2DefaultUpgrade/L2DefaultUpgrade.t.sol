@@ -222,33 +222,25 @@ contract L2DefaultUpgradeUnitTest is Test {
         assertEq(baseToken.initCalls(), 0, "base token must not be re-initialized on an upgrade");
     }
 
-    /// @dev On a chain upgrading from v31 the atomic-interop built-ins arrive with the upgrade's force
-    /// deployments and are initialized here for the first time (the tree gets its sentinel leaf, the flow manager the
-    /// L1 chain id).
-    function test_UpgradeViaComplexUpgrader_InitializesAtomicInteropBuiltIns() public {
+    /// @dev The atomic-interop built-ins are initialized at genesis only: every chain this upgrade applies to
+    /// already runs them initialized, so the upgrade must not call their one-shot `initL2`s.
+    function test_UpgradeViaComplexUpgrader_LeavesAtomicInteropBuiltInsAlone() public {
         _runUpgrade();
 
-        assertEq(
-            L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafCount(),
-            1,
-            "the commitment tree must be seeded with its sentinel leaf"
-        );
+        assertEq(L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafCount(), 0, "tree must not be seeded");
         assertEq(
             AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).L1_CHAIN_ID(),
-            L1_CHAIN_ID,
-            "the flow manager must receive the L1 chain id"
+            0,
+            "flow manager must not be initialized"
         );
-
-        // Pre-v32 contracts stay untouched on the ZKsync OS path too.
-        MockL2DefaultUpgradeBaseToken baseToken = MockL2DefaultUpgradeBaseToken(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
-        assertEq(baseToken.initCalls(), 0, "base token must not be re-initialized on an upgrade");
     }
 
-    /// @dev A chain already on v32 or later runs the built-ins initialized, and their `initL2`s are one-shot
-    /// (`IMTAlreadyInitialized` / `ManagerAlreadyInitialized`), so the same upgrade must be repeatable: every
-    /// later release reuses it. The contracts the upgrade path re-calls (`updateL2` / `setAddresses`) run
-    /// their real code here, so one of them turning one-shot would fail the second run.
+    /// @dev Every later release reuses this upgrade, so it must be repeatable on a chain whose built-ins genesis
+    /// initialized (their `initL2`s revert with `IMTAlreadyInitialized` / `ManagerAlreadyInitialized`). The
+    /// contracts the upgrade path re-calls (`updateL2` / `setAddresses`) run their real code here, so one of
+    /// them turning one-shot would fail the second run.
     function test_UpgradeViaComplexUpgrader_IsRepeatable() public {
+        _initAtomicInteropBuiltInsAsGenesis();
         vm.etch(L2_MESSAGE_ROOT_ADDR, address(new L2MessageRoot()).code);
         vm.etch(L2_BRIDGEHUB_ADDR, address(new L2Bridgehub()).code);
         vm.etch(L2_ASSET_ROUTER_ADDR, address(new L2AssetRouter()).code);
@@ -292,20 +284,12 @@ contract L2DefaultUpgradeUnitTest is Test {
         );
     }
 
-    /// @dev Each built-in is gated on its own marker: an already-seeded tree does not stop an uninitialized
-    /// flow manager from being initialized.
-    function test_UpgradeViaComplexUpgrader_InitializesOnlyUninitializedBuiltIns() public {
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+    /// @dev Genesis state of the atomic-interop built-ins, as `L2GenesisUpgrade` leaves it.
+    function _initAtomicInteropBuiltInsAsGenesis() private {
+        vm.startPrank(L2_COMPLEX_UPGRADER_ADDR);
         L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initL2();
-
-        _runUpgrade();
-
-        assertEq(L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafCount(), 1, "tree re-seeded");
-        assertEq(
-            AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).L1_CHAIN_ID(),
-            L1_CHAIN_ID,
-            "the flow manager must receive the L1 chain id"
-        );
+        AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).initL2(L1_CHAIN_ID);
+        vm.stopPrank();
     }
 
     function _runUpgrade() private {

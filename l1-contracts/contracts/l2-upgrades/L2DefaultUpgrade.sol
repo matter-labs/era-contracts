@@ -8,7 +8,7 @@ import {L2GenesisForceDeploymentsHelper} from "./L2GenesisForceDeploymentsHelper
 /// @author Matter Labs
 /// @title L2DefaultUpgrade, the L2 side of a regular (non-genesis) protocol upgrade.
 /// @dev Not tied to a single release: it re-runs the upgrade path of the force-deployed contracts'
-/// initialization, which is safe to repeat on a chain at any protocol version from v31 on.
+/// initialization, which is safe to repeat on a chain at any protocol version from v32 on.
 /// @dev This contract is neither predeployed nor a system contract. It resides in this folder to facilitate code reuse.
 /// @dev This contract is called during the forceDeployAndUpgradeUniversal function of the ComplexUpgrader system contract.
 contract L2DefaultUpgrade is IL2DefaultUpgrade {
