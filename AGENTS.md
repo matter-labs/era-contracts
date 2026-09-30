@@ -180,12 +180,16 @@ So:
 - **Prover:** `PROVER_PROTOCOL_VERSION` must equal the checked-out genesis minor for the prover e2e. A prover proves
   exactly one protocol version, so the deployed version's prover is built from its `era-validated/<version>` tag (see
   the test PR below), not from `dev`.
-- **Contracts:** the undeployed line is rebased onto the inserted version as a new versioned branch by its owner (e.g.
-  `draft-v34-era-only` on top of `draft-v31`, era-contracts #2542). This worked better than a merge branch under the old
-  one (#2539, closed). Whoever does it:
+- **Contracts:** the `dev` checkout is built from **`dev`'s current contracts pin plus the inserted version**: merge
+  the inserted version's branch into that pin (e.g. `draft-v31` into the commit `dev` checks out) and relabel it to the
+  next version. The server already runs that pin, so the merge PR needs nothing that isn't in `dev`. Whoever builds it:
   - relabels `configs/genesis/era/latest.{json,toml}`;
   - sets `l1-contracts/upgrade-envs/v0.31.0-interopB/foundry-upgrade.toml` to genesis → genesis + 1;
   - regenerates `AllContractsHashes.json` (CI), the genesis (from CI Linux artifacts), then the anvil chain states.
+
+  Feature branches of the undeployed line (e.g. `draft-v34-era-only` with the Airbender changes) are rebased by their
+  owners and become the `dev` checkout through their own server PR, when that PR lands.
+
 - **Two server PRs per upgrade.** Server CI only tests the checked-out contracts, and `dev` checks out the next
   (undeployed) line, so the deployed contracts need their own test PR:
   - **Test PR (validation).** Cut a base branch from the last `era-validated/<version>` tag (a PR base must be a
@@ -195,15 +199,10 @@ So:
     starting point for the next upgrade and the commit an environment's server/prover release can be cut from. Example:
     v0.33.0 was validated by zksync-era-private #138 at `4b4bdcaa2`, on a base cut from `3c96bae48`.
   - **Merge PR (to `dev`).** Add the deployed version as prebuilts and renumber the checked-out line, pinned to the
-    rebased contracts branch (e.g. #151).
-    - The checkout must be something the server can run. If the rebased line carries contract features that `dev`
-      doesn't support yet (in 2026-09, #2451 "require both Boojum and Airbender proofs" needed server #108), stack the
-      merge PR on that server PR and land them together: merge the lower PR with a merge commit first (never squash
-      while the upper one is open), or merge the upper PR alone and close the lower one.
-    - To avoid that dependency, build the checkout from `dev`'s current pin plus the inserted version instead of the
-      newer branch.
-    - Until the merge PR lands, `dev` still maps the version to the old meaning, so don't cut an environment's node
-      release from `dev` for it before then.
+    checkout built as above. Don't stack it on unmerged server PRs, and don't pin a newer feature branch the server
+    doesn't support yet. In 2026-09, pinning `draft-v34-era-only` made #151 depend on server #108 (#2451 "require both
+    Boojum and Airbender proofs"); building from `dev`'s pin avoids that. Until the merge PR lands, `dev` still maps the
+    version to its old meaning, so don't cut an environment's node release from `dev` for it before then.
 - **Deploy** the inserted version from its own era-contracts branch, the one its calldata was generated from.
 - A bootloader change needs a minor bump: patch upgrades cannot set the bootloader.
 
