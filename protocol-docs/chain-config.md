@@ -31,22 +31,13 @@ Commit encoding version 5 appends the config hash; the new decoder rejects earli
 The server and external nodes must switch formats at protocol v34. Historical v33 and earlier data
 must still be decoded using their original formats.
 
-Before upgrading across the v34 boundary, all committed batches must be proved or reverted.
-The v34 upgrade cut must use `V34UpgradeZKsyncOS` as its initializer. It checks this
-before running the generic upgrade, preventing the new executor from
-treating legacy batch-output hashes as full public-input hashes. Already-proved batches can remain
-unexecuted: execution uses the unchanged stored-batch layout. V34 has no Gateway, so this check has
-no exemption based on the settlement-layer address.
-
-This precondition belongs only to the v34 upgrade contract. `BaseZkSyncUpgrade` contains no release-specific
-batch check, and the v34 contract must not replace the CTM's reusable default upgrade implementation.
-Later upgrades select their own initializer and preconditions.
-
-`DefaultUpgradeZKsyncOS` requires all committed batches to be executed by default, keeping outstanding
-batches away from a replacement verifier. The v34 initializer inherits it and specializes the batch
-check to the verified boundary above. It also returns the L2 upgrade calldata unchanged through both
-`getL2UpgradeTxData` overloads: v34's force-deployment payload has no chain-specific migration data to
-substitute. The inherited v33 migration rewrite must not run on that payload.
+Before upgrading across the v34 boundary, all committed batches must be executed or reverted. This
+keeps the new executor from treating legacy batch-output hashes as full public-input hashes. The v34
+upgrade cut uses `V34UpgradeZKsyncOS` as its initializer, which inherits the all-executed check from
+`DefaultUpgradeZKsyncOS` unchanged. It only overrides `getL2UpgradeTxData`, so both overloads return
+the L2 upgrade calldata unchanged: v34's force-deployment payload has no chain-specific migration data
+to substitute, and the inherited v33 migration rewrite must not run on it. The v34 contract must not
+replace the CTM's reusable default upgrade implementation.
 
 `deploy-scripts/upgrade/v34/CTMUpgrade_v34.s.sol` prepares this cut and keeps the generic
 `DefaultUpgrade` as the CTM default. Protocol-ops defaults to this script and
@@ -74,9 +65,9 @@ are unchanged.
 
 The v34 diamond-transition test deploys frozen pre-v34 Committer and Executor bytecode from
 `7b398269a03e531fefa013d14a16f15c5fdfd16c`. It commits version-4 data, proves the legacy batch,
-applies the script-generated v34 cut, and commits/proves/executes version-5 data while the legacy
-batch remains pending execution. A second path checks that an unverified legacy batch prevents the
-cut and leaves both facets and stored batch data intact.
+executes it, applies the script-generated v34 cut, and commits/proves/executes version-5 data. Two
+more paths check that an unverified or a proved-but-unexecuted legacy batch prevents the cut and
+leaves both facets and stored batch data intact.
 
 The fixture records its source revision and compiler/toolchain settings. Regenerate it only when
 intentionally changing the historical baseline: export that revision, build the two facets with the

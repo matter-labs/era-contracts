@@ -22,7 +22,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ProposedUpgradeLib, ProposedUpgrade} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {BaseZkSyncUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
-import {V34UpgradeWithUnverifiedBatches} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
+import {NotAllBatchesExecuted} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
@@ -124,27 +124,13 @@ contract UpgradeTestV34 is ExecutorTest {
         newCommitBatchInfoZKsyncOS.dependencyRootsRollingHash = bytes32(0);
     }
 
-    function test_LegacyVerifiedBatchRemainsExecutableAcrossV34Cut() public {
+    function test_LegacyBatchExecutedBeforeV34Cut() public {
         Diamond.DiamondCutData memory v34Cut = abi.decode(encodedV34Cut, (Diamond.DiamondCutData));
-        IExecutor.StoredBatchInfo memory legacyBatch = _commitLegacyBatch();
-        uint256 legacyPublicInput = uint256(
-            keccak256(
-                abi.encodePacked(
-                    genesisStoredBatchInfo.batchHash,
-                    legacyBatch.batchHash,
-                    Utils.defaultChainConfigHash(l2ChainId),
-                    legacyBatch.commitment
-                )
-            )
-        );
-        _proveBatch(genesisStoredBatchInfo, legacyBatch, legacyPublicInput);
-        assertEq(getters.getTotalBatchesExecuted(), 0);
+        IExecutor.StoredBatchInfo memory legacyBatch = _commitAndProveLegacyBatch();
+        _executeBatch(legacyBatch);
+        assertEq(getters.getTotalBatchesExecuted(), legacyBatch.batchNumber);
 
-        vm.mockCall(
-            getters.getChainTypeManager(),
-            abi.encodeCall(IChainTypeManager.protocolVersion, ()),
-            abi.encode(nextVersion)
-        );
+        _mockCTMProtocolVersion(nextVersion);
         vm.expectEmit(address(admin));
         emit BaseZkSyncUpgrade.NewProtocolVersion(previousVersion, nextVersion);
         vm.expectEmit(address(admin));
@@ -154,10 +140,6 @@ contract UpgradeTestV34 is ExecutorTest {
         assertEq(getters.getProtocolVersion(), nextVersion);
         assertNotEq(getters.facetAddress(ICommitter.commitBatchesSharedBridge.selector), legacyCommitter);
         assertNotEq(getters.facetAddress(IExecutor.proveBatchesSharedBridge.selector), legacyExecutor);
-        assertEq(getters.storedBatchHash(legacyBatch.batchNumber), keccak256(abi.encode(legacyBatch)));
-        assertEq(getters.getTotalBatchesCommitted(), 1);
-        assertEq(getters.getTotalBatchesVerified(), 1);
-        assertEq(getters.getTotalBatchesExecuted(), 0);
         assertEq(getters.getL2SystemContractsUpgradeTxHash(), upgradeTxHash);
 
         CommitBatchInfoZKsyncOS memory nextBatch = newCommitBatchInfoZKsyncOS;
@@ -180,9 +162,64 @@ contract UpgradeTestV34 is ExecutorTest {
         _proveBatch(legacyBatch, stored, uint256(stored.commitment));
         assertEq(getters.getL2SystemContractsUpgradeBatchNumber(), stored.batchNumber);
 
-        IExecutor.StoredBatchInfo[] memory batches = new IExecutor.StoredBatchInfo[](2);
-        batches[0] = legacyBatch;
-        batches[1] = stored;
+        _executeBatch(stored);
+        assertEq(getters.getTotalBatchesCommitted(), stored.batchNumber);
+        assertEq(getters.getTotalBatchesVerified(), stored.batchNumber);
+        assertEq(getters.getTotalBatchesExecuted(), stored.batchNumber);
+        assertEq(getters.getL2SystemContractsUpgradeTxHash(), bytes32(0));
+        assertEq(getters.getL2SystemContractsUpgradeBatchNumber(), 0);
+    }
+
+    function test_UnverifiedLegacyBatchRevertsTheEntireV34Cut() public {
+        IExecutor.StoredBatchInfo memory legacyBatch = _commitLegacyBatch();
+        _assertV34CutRejected(legacyBatch, 0);
+    }
+
+    // The v34 cut uses the default all-executed boundary, so a proved legacy batch must also be executed first.
+    function test_UnexecutedLegacyBatchRevertsTheEntireV34Cut() public {
+        IExecutor.StoredBatchInfo memory legacyBatch = _commitAndProveLegacyBatch();
+        _assertV34CutRejected(legacyBatch, 1);
+    }
+
+    function _assertV34CutRejected(IExecutor.StoredBatchInfo memory _legacyBatch, uint256 _verified) internal {
+        Diamond.DiamondCutData memory v34Cut = abi.decode(encodedV34Cut, (Diamond.DiamondCutData));
+        bytes32 facetsBefore = keccak256(abi.encode(getters.facets()));
+        address verifierBefore = address(getters.getVerifier());
+        _mockCTMProtocolVersion(nextVersion);
+        vm.recordLogs();
+        vm.expectRevert(NotAllBatchesExecuted.selector);
+        vm.prank(owner);
+        admin.upgradeChainFromVersion(address(0), previousVersion, v34Cut);
+        assertEq(vm.getRecordedLogs().length, 0);
+        assertEq(keccak256(abi.encode(getters.facets())), facetsBefore);
+        assertEq(getters.getProtocolVersion(), previousVersion);
+        assertEq(address(getters.getVerifier()), verifierBefore);
+        assertEq(getters.storedBatchHash(_legacyBatch.batchNumber), keccak256(abi.encode(_legacyBatch)));
+        assertEq(getters.getTotalBatchesCommitted(), 1);
+        assertEq(getters.getTotalBatchesVerified(), _verified);
+        assertEq(getters.getTotalBatchesExecuted(), 0);
+        assertEq(getters.getL2SystemContractsUpgradeTxHash(), bytes32(0));
+    }
+
+    function _commitAndProveLegacyBatch() internal returns (IExecutor.StoredBatchInfo memory legacyBatch) {
+        legacyBatch = _commitLegacyBatch();
+        uint256 legacyPublicInput = uint256(
+            keccak256(
+                abi.encodePacked(
+                    genesisStoredBatchInfo.batchHash,
+                    legacyBatch.batchHash,
+                    Utils.defaultChainConfigHash(l2ChainId),
+                    legacyBatch.commitment
+                )
+            )
+        );
+        _proveBatch(genesisStoredBatchInfo, legacyBatch, legacyPublicInput);
+        assertEq(getters.getTotalBatchesExecuted(), 0);
+    }
+
+    function _executeBatch(IExecutor.StoredBatchInfo memory _batch) internal {
+        IExecutor.StoredBatchInfo[] memory batches = new IExecutor.StoredBatchInfo[](1);
+        batches[0] = _batch;
         (uint256 from, uint256 to, bytes memory executeData) = Utils.encodeExecuteBatchesData(
             batches,
             Utils.generatePriorityOps(batches.length, 0)
@@ -193,41 +230,17 @@ contract UpgradeTestV34 is ExecutorTest {
             bytes("")
         );
         vm.expectEmit(address(executor));
-        emit IExecutor.BlockExecution(legacyBatch.batchNumber, legacyBatch.batchHash, legacyBatch.commitment);
-        vm.expectEmit(address(executor));
-        emit IExecutor.BlockExecution(stored.batchNumber, stored.batchHash, stored.commitment);
+        emit IExecutor.BlockExecution(_batch.batchNumber, _batch.batchHash, _batch.commitment);
         vm.prank(validator);
         executor.executeBatchesSharedBridge(address(0), from, to, executeData);
-        assertEq(getters.getTotalBatchesCommitted(), stored.batchNumber);
-        assertEq(getters.getTotalBatchesVerified(), stored.batchNumber);
-        assertEq(getters.getTotalBatchesExecuted(), stored.batchNumber);
-        assertEq(getters.getL2SystemContractsUpgradeTxHash(), bytes32(0));
-        assertEq(getters.getL2SystemContractsUpgradeBatchNumber(), 0);
     }
 
-    function test_UnverifiedLegacyBatchRevertsTheEntireV34Cut() public {
-        Diamond.DiamondCutData memory v34Cut = abi.decode(encodedV34Cut, (Diamond.DiamondCutData));
-        IExecutor.StoredBatchInfo memory legacyBatch = _commitLegacyBatch();
-        bytes32 facetsBefore = keccak256(abi.encode(getters.facets()));
-        address verifierBefore = address(getters.getVerifier());
+    function _mockCTMProtocolVersion(uint256 _version) internal {
         vm.mockCall(
             getters.getChainTypeManager(),
             abi.encodeCall(IChainTypeManager.protocolVersion, ()),
-            abi.encode(nextVersion)
+            abi.encode(_version)
         );
-        vm.recordLogs();
-        vm.expectRevert(abi.encodeWithSelector(V34UpgradeWithUnverifiedBatches.selector, 0, 1));
-        vm.prank(owner);
-        admin.upgradeChainFromVersion(address(0), previousVersion, v34Cut);
-        assertEq(vm.getRecordedLogs().length, 0);
-        assertEq(keccak256(abi.encode(getters.facets())), facetsBefore);
-        assertEq(getters.getProtocolVersion(), previousVersion);
-        assertEq(address(getters.getVerifier()), verifierBefore);
-        assertEq(getters.storedBatchHash(legacyBatch.batchNumber), keccak256(abi.encode(legacyBatch)));
-        assertEq(getters.getTotalBatchesCommitted(), 1);
-        assertEq(getters.getTotalBatchesVerified(), 0);
-        assertEq(getters.getTotalBatchesExecuted(), 0);
-        assertEq(getters.getL2SystemContractsUpgradeTxHash(), bytes32(0));
     }
 
     function _commitLegacyBatch() internal returns (IExecutor.StoredBatchInfo memory stored) {
