@@ -17,15 +17,16 @@ import {NotAllBatchesExecuted} from "../state-transition/L1StateTransitionErrors
 /// `IL2DefaultUpgrade.upgrade` calldata carries a placeholder for the chain-specific force-deployments data.
 /// Substituting the real data can only happen per chain, which is what this contract adds.
 contract DefaultUpgradeZKsyncOS is DefaultUpgrade {
-    /// @inheritdoc DefaultUpgrade
-    function upgrade(ProposedUpgrade memory _proposedUpgrade) public virtual override returns (bytes32) {
-        // This is a generic upgrade implementation, so as good practice it requires every outstanding batch
-        // to have been processed before proceeding. It is not an invariant: the upgrade sees only the state
-        // of the block it lands in. It does catch the case that matters in practice — the new protocol
-        // version's verifier is installed here (see `_setVerifier`), and this release deploys a fresh one, so
-        // batches still awaiting proof under the old verifier would stop being provable.
+    /// @notice Validate the batch boundary required by this upgrade.
+    modifier validBatchBoundary() virtual {
         require(s.totalBatchesCommitted == s.totalBatchesExecuted, NotAllBatchesExecuted());
+        _;
+    }
 
+    /// @inheritdoc DefaultUpgrade
+    function upgrade(
+        ProposedUpgrade memory _proposedUpgrade
+    ) public virtual override validBatchBoundary returns (bytes32) {
         // Upgrades that carry no L2 upgrade transaction, e.g. the verifier-only ones created by
         // {ChainTypeManager.createNewVerifierOnlyUpgrade}, have nothing to substitute.
         if (_proposedUpgrade.l2ProtocolUpgradeTx.txType != 0) {
@@ -48,7 +49,7 @@ contract DefaultUpgradeZKsyncOS is DefaultUpgrade {
         address _bridgehub,
         uint256 _chainId,
         bytes memory _existingTxData
-    ) public view returns (bytes memory) {
+    ) public view virtual returns (bytes memory) {
         return L2UpgradeTxLib.rewriteUpgradeTxData(_bridgehub, _chainId, _existingTxData);
     }
 
