@@ -33,10 +33,10 @@ must still be decoded using their original formats.
 
 Before upgrading across the v34 boundary, all committed batches must be proved or reverted.
 The v34 upgrade cut must use `V34UpgradeZKsyncOS` as its initializer. It checks this
-on the active settlement layer before running the generic upgrade, preventing the new executor from
+before running the generic upgrade, preventing the new executor from
 treating legacy batch-output hashes as full public-input hashes. Already-proved batches can remain
-unexecuted: execution uses the unchanged stored-batch layout. The inactive chain copy is not gated by
-its batch counters.
+unexecuted: execution uses the unchanged stored-batch layout. V34 has no Gateway, so this check has
+no exemption based on the settlement-layer address.
 
 This precondition belongs only to the v34 upgrade contract. `BaseZkSyncUpgrade` contains no release-specific
 batch check, and the v34 contract must not replace the CTM's reusable default upgrade implementation.
