@@ -4,7 +4,7 @@
 //! `DefaultUpgrade.upgrade(ProposedUpgrade)` and validates the entire
 //! `ProposedUpgrade` payload — static fields, the L1→L2 upgrade tx, the
 //! `forceDeployAndUpgradeUniversal` inner call, factory deps, and the
-//! `IL2V32Upgrade.upgrade` arguments.
+//! `IL2DefaultUpgrade.upgrade` arguments.
 //!
 //! The [`zksync_os`] submodule owns expected force-deployments, deployed-bytecode-info
 //! decoding, the factory-dep set, and the `forceDeployAndUpgradeUniversal` orchestrator.
@@ -142,7 +142,7 @@ sol! {
         ) external payable;
     }
 
-    interface IL2V32Upgrade {
+    interface IL2DefaultUpgrade {
         function upgrade(
             address _ctmDeployer,
             bytes calldata _fixedForceDeploymentsData,
@@ -460,7 +460,7 @@ async fn verify_factory_deps(
     }
 }
 
-/// Decodes the `IL2V32Upgrade.upgrade(...)` inner calldata from the
+/// Decodes the `IL2DefaultUpgrade.upgrade(...)` inner calldata from the
 /// `forceDeployAndUpgradeUniversal` `_calldata` argument and validates each
 /// field.
 pub(super) async fn verify_l2_v31_upgrade_inner_calldata(
@@ -470,8 +470,8 @@ pub(super) async fn verify_l2_v31_upgrade_inner_calldata(
     expected_fixed_force_deployments_data: &str,
 ) -> anyhow::Result<()> {
     use anyhow::Context;
-    let decoded = IL2V32Upgrade::upgradeCall::abi_decode(calldata)
-        .context("decoding IL2V32Upgrade.upgrade inner calldata")?;
+    let decoded = IL2DefaultUpgrade::upgradeCall::abi_decode(calldata)
+        .context("decoding IL2DefaultUpgrade.upgrade inner calldata")?;
 
     result.expect_address(
         verifiers,
@@ -486,11 +486,11 @@ pub(super) async fn verify_l2_v31_upgrade_inner_calldata(
         let actual = hex::encode(&decoded._fixedForceDeploymentsData);
         if !actual.eq_ignore_ascii_case(expected) {
             result.report_error(&format!(
-                "IL2V32Upgrade.upgrade fixedForceDeploymentsData mismatch. Expected: 0x{}\nReceived: 0x{}",
+                "IL2DefaultUpgrade.upgrade fixedForceDeploymentsData mismatch. Expected: 0x{}\nReceived: 0x{}",
                 expected, actual
             ));
         } else {
-            result.report_ok("IL2V32Upgrade.upgrade fixedForceDeploymentsData matches TOML");
+            result.report_ok("IL2DefaultUpgrade.upgrade fixedForceDeploymentsData matches TOML");
         }
     }
 
@@ -500,16 +500,18 @@ pub(super) async fn verify_l2_v31_upgrade_inner_calldata(
     match FixedForceDeploymentsData::abi_decode(&decoded._fixedForceDeploymentsData) {
         Ok(fixed_data) => fixed_data.verify(verifiers, result).await?,
         Err(err) => result.report_error(&format!(
-            "Failed to decode IL2V32Upgrade.upgrade fixedForceDeploymentsData: {err}"
+            "Failed to decode IL2DefaultUpgrade.upgrade fixedForceDeploymentsData: {err}"
         )),
     }
 
     if !decoded._additionalForceDeploymentsData.is_empty() {
         result.report_error(
-            "IL2V32Upgrade.upgrade additionalForceDeploymentsData template must be empty",
+            "IL2DefaultUpgrade.upgrade additionalForceDeploymentsData template must be empty",
         );
     } else {
-        result.report_ok("IL2V32Upgrade.upgrade additionalForceDeploymentsData template is empty");
+        result.report_ok(
+            "IL2DefaultUpgrade.upgrade additionalForceDeploymentsData template is empty",
+        );
     }
 
     Ok(())

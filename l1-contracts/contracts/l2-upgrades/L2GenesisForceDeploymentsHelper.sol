@@ -229,12 +229,8 @@ library L2GenesisForceDeploymentsHelper {
         _finalizeDeployments(_ctmDeployer, fixedForceDeploymentsData);
 
         if (_isGenesisUpgrade) {
-            _initPreV32Contracts(fixedForceDeploymentsData, additionalForceDeploymentsData);
+            _initContractsAfterWiring(fixedForceDeploymentsData, additionalForceDeploymentsData);
         }
-
-        // Contracts introduced in this release are initialized on both paths: they are uninitialized on a
-        // new chain and on an upgraded one alike.
-        _initializeV32Contracts(fixedForceDeploymentsData);
 
         emit ForceDeployedContractsInitialized(_isGenesisUpgrade);
     }
@@ -249,7 +245,7 @@ library L2GenesisForceDeploymentsHelper {
     }
 
     /// @notice Calls initL2() on the contracts that have to be initialized before the bridgehub wiring in
-    /// `_finalizeDeployments`. Used during genesis only; see `_initPreV32Contracts` for the rest.
+    /// `_finalizeDeployments`. Used during genesis only; see `_initContractsAfterWiring` for the rest.
     function _initContractsBeforeWiring(
         FixedForceDeploymentsData memory _fixedForceDeploymentsData,
         ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData,
@@ -346,13 +342,13 @@ library L2GenesisForceDeploymentsHelper {
         });
     }
 
-    /// @notice Initializes the contracts that already existed in v31.
-    /// @dev Genesis only: these contracts existed in v31 and their `initL2`s are one-shot, so a chain
-    /// upgraded from v31 has already run them — the storage each one writes at genesis is unchanged by this
-    /// release, even where the signature is not (`L2AssetTracker.initL2` lost its backfill argument). Kept
-    /// at the position v31 called them from, after `_finalizeDeployments`, so the genesis sequence is
-    /// unchanged; none of them reads the bridgehub wiring that step establishes.
-    function _initPreV32Contracts(
+    /// @notice Calls initL2() on the contracts initialized after the bridgehub wiring in `_finalizeDeployments`.
+    /// @dev Genesis only: every chain an upgrade from this release applies to (v32 or later) already runs them
+    /// initialized, and their `initL2`s are one-shot. The v31 contracts keep the position v31 called them from,
+    /// so the genesis sequence is unchanged; none of them reads the wiring. The atomic-interop built-ins are the
+    /// v32 additions (see
+    /// {protocol-docs/chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins}).
+    function _initContractsAfterWiring(
         FixedForceDeploymentsData memory _fixedForceDeploymentsData,
         ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData
     ) private {
@@ -372,14 +368,7 @@ library L2GenesisForceDeploymentsHelper {
         L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).registerBaseTokenIfNeeded();
 
         IL2BaseToken(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
-    }
 
-    /// @notice Initializes the contracts introduced in this release.
-    /// @dev Only the atomic-interop built-ins are new here (see
-    /// {protocol-docs/chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins}).
-    /// Neither they nor their addresses existed in v31, so a chain always receives them here for the first
-    /// time — from its genesis when it is new, from this upgrade's force deployments when it predates them.
-    function _initializeV32Contracts(FixedForceDeploymentsData memory _fixedForceDeploymentsData) private {
         L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initL2();
         IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
     }
