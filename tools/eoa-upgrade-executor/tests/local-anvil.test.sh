@@ -504,6 +504,8 @@ check "the only action anywhere is the pinned upload of the simulate traces" \
   [ "$(grep -v '^[[:space:]]*#' "$wf" | grep 'uses:' | sed 's/^ *- *//' | sort -u)" = "uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1" ]
 check "UPSTREAM_REPO matches config.json's upstreamRepo" \
   [ "$(sed -n 's/^  UPSTREAM_REPO: //p' "$wf")" = "$(jq -r .upstreamRepo "$EXECUTOR_ROOT/config.json")" ]
+check "resolve checks that the workflow runs at executor_sha (the caller's referenced_workflows)" \
+  bash -c 'job_lines() { awk -v j="  $1:" '"'"'$0 == j {f = 1; next} f && /^  [A-Za-z0-9_-]+:/ {f = 0} f'"'"' "$2"; }; job_lines resolve "$1" | grep -q referenced_workflows' _ "$wf"
 check "every job fetches the executor with the upstream-branch check" \
   [ "$(grep -c 'compare/$EXECUTOR_BRANCH...$EXECUTOR_SHA' "$wf")" = 4 ]
 

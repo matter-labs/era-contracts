@@ -86,6 +86,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+      actions: read # read the caller's run: which commit of this workflow it runs
     outputs:
       plan_sha256: ${{ steps.plan.outputs.plan_sha256 }}
       executor_tree: ${{ steps.executor.outputs.tree }}
@@ -95,9 +96,10 @@ jobs:
         env:
           EXECUTOR_SHA: ${{ inputs.executor_sha }}
           EXECUTOR_BRANCH: ${{ inputs.executor_branch }}
-          # The commit of this workflow file the caller runs; must be executor_sha.
-          CALLED_SHA: ${{ github.job_workflow_sha }}
           EXPECTED_TREE: "" # resolve records the tree; later jobs must match it
+          # The caller's run lists the commit this workflow file runs at.
+          GH_TOKEN: ${{ github.token }}
+          RUN_API: repos/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
           fail() { echo "::error::$*"; exit 1; }
@@ -105,9 +107,10 @@ jobs:
           if [[ ! "$EXECUTOR_BRANCH" =~ ^[A-Za-z0-9_][A-Za-z0-9._/-]*$ ]] || [[ "$EXECUTOR_BRANCH" == *..* ]]; then
             fail "executor_branch must be a plain branch name"
           fi
-          if [ -n "$CALLED_SHA" ] && [ "$CALLED_SHA" != "$EXECUTOR_SHA" ]; then
-            fail "the caller runs this workflow at $CALLED_SHA but pins executor_sha $EXECUTOR_SHA"
-          fi
+          # The scripts must come from the commit this workflow file runs at.
+          called="$(gh api "$RUN_API" --jq "[.referenced_workflows[] | select(.path | startswith(\"$UPSTREAM_REPO/.github/workflows/execute-eoa-upgrade.yaml@\")) | .sha] | unique | join(\" \")")" ||
+            fail "cannot read which commit of this workflow the caller runs"
+          [ "$called" = "$EXECUTOR_SHA" ] || fail "the caller runs this workflow at '$called' but passes executor_sha $EXECUTOR_SHA"
           # A fork's commit is fetchable through the parent by SHA ("impostor
           # commit"), so the SHA must be on an upstream branch.
           status="$(curl --fail --silent --show-error --retry 3 \
@@ -166,8 +169,6 @@ jobs:
         env:
           EXECUTOR_SHA: ${{ inputs.executor_sha }}
           EXECUTOR_BRANCH: ${{ inputs.executor_branch }}
-          # The commit of this workflow file the caller runs; must be executor_sha.
-          CALLED_SHA: ${{ github.job_workflow_sha }}
           EXPECTED_TREE: ${{ needs.resolve.outputs.executor_tree }}
         run: |
           set -euo pipefail
@@ -175,9 +176,6 @@ jobs:
           [[ "$EXECUTOR_SHA" =~ ^[0-9a-f]{40}$ ]] || fail "executor_sha must be a full 40-hex commit SHA"
           if [[ ! "$EXECUTOR_BRANCH" =~ ^[A-Za-z0-9_][A-Za-z0-9._/-]*$ ]] || [[ "$EXECUTOR_BRANCH" == *..* ]]; then
             fail "executor_branch must be a plain branch name"
-          fi
-          if [ -n "$CALLED_SHA" ] && [ "$CALLED_SHA" != "$EXECUTOR_SHA" ]; then
-            fail "the caller runs this workflow at $CALLED_SHA but pins executor_sha $EXECUTOR_SHA"
           fi
           # A fork's commit is fetchable through the parent by SHA ("impostor
           # commit"), so the SHA must be on an upstream branch.
@@ -242,8 +240,6 @@ jobs:
         env:
           EXECUTOR_SHA: ${{ inputs.executor_sha }}
           EXECUTOR_BRANCH: ${{ inputs.executor_branch }}
-          # The commit of this workflow file the caller runs; must be executor_sha.
-          CALLED_SHA: ${{ github.job_workflow_sha }}
           EXPECTED_TREE: ${{ needs.resolve.outputs.executor_tree }}
         run: |
           set -euo pipefail
@@ -251,9 +247,6 @@ jobs:
           [[ "$EXECUTOR_SHA" =~ ^[0-9a-f]{40}$ ]] || fail "executor_sha must be a full 40-hex commit SHA"
           if [[ ! "$EXECUTOR_BRANCH" =~ ^[A-Za-z0-9_][A-Za-z0-9._/-]*$ ]] || [[ "$EXECUTOR_BRANCH" == *..* ]]; then
             fail "executor_branch must be a plain branch name"
-          fi
-          if [ -n "$CALLED_SHA" ] && [ "$CALLED_SHA" != "$EXECUTOR_SHA" ]; then
-            fail "the caller runs this workflow at $CALLED_SHA but pins executor_sha $EXECUTOR_SHA"
           fi
           # A fork's commit is fetchable through the parent by SHA ("impostor
           # commit"), so the SHA must be on an upstream branch.
@@ -313,8 +306,6 @@ jobs:
         env:
           EXECUTOR_SHA: ${{ inputs.executor_sha }}
           EXECUTOR_BRANCH: ${{ inputs.executor_branch }}
-          # The commit of this workflow file the caller runs; must be executor_sha.
-          CALLED_SHA: ${{ github.job_workflow_sha }}
           EXPECTED_TREE: ${{ needs.resolve.outputs.executor_tree }}
         run: |
           set -euo pipefail
@@ -322,9 +313,6 @@ jobs:
           [[ "$EXECUTOR_SHA" =~ ^[0-9a-f]{40}$ ]] || fail "executor_sha must be a full 40-hex commit SHA"
           if [[ ! "$EXECUTOR_BRANCH" =~ ^[A-Za-z0-9_][A-Za-z0-9._/-]*$ ]] || [[ "$EXECUTOR_BRANCH" == *..* ]]; then
             fail "executor_branch must be a plain branch name"
-          fi
-          if [ -n "$CALLED_SHA" ] && [ "$CALLED_SHA" != "$EXECUTOR_SHA" ]; then
-            fail "the caller runs this workflow at $CALLED_SHA but pins executor_sha $EXECUTOR_SHA"
           fi
           # A fork's commit is fetchable through the parent by SHA ("impostor
           # commit"), so the SHA must be on an upstream branch.

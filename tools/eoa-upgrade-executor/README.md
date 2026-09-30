@@ -45,12 +45,13 @@ Two file formats are read:
   (`description`, `network`, `from`, `to`, `value` in ETH, `data`, ...).
 
 Every job starts the same way, without any action: it checks that
-`executor_sha` is on `executor_branch` of `matter-labs/era-contracts` and
-equals the commit the caller runs the workflow at (`github.job_workflow_sha`),
-fetches the executor there anonymously with plain git, and checks its git tree
-against the one resolve ran. The transaction file is fetched the same way,
-after the same branch check for `source_sha` on `source_branch`. In a called
-workflow the `github` context (repository, ref, actor, token) and the
+`executor_sha` is on `executor_branch` of `matter-labs/era-contracts`,
+fetches the executor there anonymously with plain git, and checks its git
+tree against the one resolve ran. resolve also reads the caller's run to
+check that this workflow file runs at `executor_sha`, so the workflow and
+the scripts come from one commit. The transaction file is fetched the same
+way, after the same branch check for `source_sha` on `source_branch`. In a
+called workflow the `github` context (repository, ref, actor, token) and the
 environment are the caller's, so every repository, branch and actor check
 below is about `era-contracts-private`.
 
@@ -129,19 +130,21 @@ its receipt may still land, so check its hash first.
 
 ## Pinning the executor
 
-The caller in `era-contracts-private` names the reusable workflow by commit:
+The caller in `era-contracts-private` names the reusable workflow by commit,
+once:
 
 ```yaml
 jobs:
+  pin: # checks the commit in `uses:` below is on EXECUTOR_BRANCH upstream
+    env:
+      EXECUTOR_BRANCH: draft-v31
   execute:
+    needs: pin
     uses: matter-labs/era-contracts/.github/workflows/execute-eoa-upgrade.yaml@<sha>
     with:
-      executor_sha: <the same sha>
-      executor_branch: draft-v31
+      executor_sha: ${{ needs.pin.outputs.executor_sha }}
+      executor_branch: ${{ needs.pin.outputs.executor_branch }}
 ```
-
-The executor refuses to run when `executor_sha` differs from the commit the
-workflow file runs at, or when it is not on `executor_branch` here.
 
 **Why the branch check.** GitHub serves every commit of a fork network
 through the parent repository: `git fetch https://github.com/matter-labs/era-contracts <sha>`
@@ -149,12 +152,21 @@ and `uses: matter-labs/era-contracts/...@<sha>` both accept a SHA that exists
 only in someone's fork ("impostor commits"). A pin alone therefore does not
 prove the code was reviewed here. The public compare API does:
 `compare/<branch>...<sha>` is `behind` or `identical` only when the commit is
-on that branch. The same rule applies to `source_sha` on `source_branch`.
+on that branch.
+
+**Who checks what.** A workflow file cannot vouch for itself: code at an
+impostor commit would simply skip its own checks. So the caller's `pin` job,
+code reviewed in `era-contracts-private` that runs before anything from this
+repository, reads which commit its run references for this workflow (the
+run's `referenced_workflows`), checks that commit is on `EXECUTOR_BRANCH`,
+and passes it on as `executor_sha`. This workflow then checks, for any
+caller, that `executor_sha` is on `executor_branch` and is the commit it runs
+at, and applies the same branch rule to `source_sha` on `source_branch`.
 
 **Bumping the pin.** Land the executor change on its branch here (normally
 `draft-v31`, through a reviewed PR), then open a PR in `era-contracts-private`
-that changes both SHAs (and `executor_branch` if needed). Its `CODEOWNERS`
-require a code-owner approval.
+that changes the SHA in `uses:` (and `EXECUTOR_BRANCH` if needed). Its
+`CODEOWNERS` require a code-owner approval.
 
 ## Setup (devops)
 
@@ -228,7 +240,7 @@ that the files are gone afterwards.
 
 | vector                                                                                          | mitigation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unreviewed executor or transaction code (an impostor commit from a fork, or an unmerged commit) | Both SHAs must be on the named branch of `matter-labs/era-contracts` (public compare API), and `executor_sha` must equal the commit the caller runs the workflow at. The pin itself changes only through a reviewed PR in `era-contracts-private`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Unreviewed executor or transaction code (an impostor commit from a fork, or an unmerged commit) | The caller's `pin` job checks that the commit its `uses:` references is on the upstream branch before this workflow runs; this workflow checks that `executor_sha` is that commit and on its branch, and that `source_sha` is on `source_branch` (public compare API). The pin changes only through a reviewed PR in `era-contracts-private`.                                                                                                                                                                                                                                                                                                                                                                                          |
 | A modified caller or workflow on another branch of `era-contracts-private` reads the secret     | Environment secrets reach only jobs on protected branches (deployment branch policy), and each such job still needs an approval. Protected branches need a reviewed PR to change; `CODEOWNERS` covers everything. The in-workflow default-branch check stops accidental runs from other protected branches, not a modified caller on one; hence the warning and setup item 4.                                                                                                                                                                                                                                                                                                                                                          |
 | Someone without write access starts a run                                                       | Only the team `protocol-upgrade-approvers` has write access (terraform); `check-run.sh` also rejects any other `actor` / `triggering_actor`, in preflight and again in the broadcast job.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | One person sends alone                                                                          | The team is the required reviewer and self-review is prevented: the approver is a team member other than the dispatcher.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
