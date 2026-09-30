@@ -136,7 +136,7 @@ interface IGetters is IZKChainBase {
 
     /// @notice Returns whether operator filtering of priority transactions is enabled.
     /// @return Whether L1 transaction filtering is enabled.
-    function getZKsyncOSL1TxFiltering() external view returns (bool);
+    function isZKsyncOSL1TxFilteringEnabled() external view returns (bool);
 
     /// @return Whether a withdrawal has been finalized.
     /// @param _l2BatchNumber The L2 batch number within which the withdrawal happened.
