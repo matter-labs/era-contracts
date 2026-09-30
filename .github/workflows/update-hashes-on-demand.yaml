@@ -6,20 +6,12 @@ on:
       pr_number:
         description: "Pull Request number to update"
         required: true
-      push_changes:
-        description: "Push generated changes; disable to download a patch for signing"
-        type: boolean
-        default: true
   workflow_call:
     inputs:
       pr_number:
         description: "Pull Request number to update"
         required: true
         type: string
-      push_changes:
-        description: "Push generated changes; disable to download a patch for signing"
-        type: boolean
-        default: true
 
 permissions:
   contents: read
@@ -106,24 +98,7 @@ jobs:
           cargo run --locked --release --bin zksync-os-genesis-gen -- \
             --output-file ../../configs/genesis/zksync-os/latest.json
 
-      - name: Export changes for a signed commit
-        if: ${{ !inputs.push_changes }}
-        run: |
-          git add -A AllContractsHashes.json configs/genesis/zksync-os/latest.json l1-contracts/zkstack-out l1-contracts/selectors
-          git diff --cached --binary > "$RUNNER_TEMP/generated-artifacts-patch.patch"
-          git rev-parse HEAD > "$RUNNER_TEMP/generated-artifacts-patch.base"
-
-      - name: Upload generated patch
-        if: ${{ !inputs.push_changes }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: generated-artifacts-patch
-          path: |
-            ${{ runner.temp }}/generated-artifacts-patch.patch
-            ${{ runner.temp }}/generated-artifacts-patch.base
-
       - name: Commit and push changes
-        if: ${{ inputs.push_changes }}
         run: |
           set -euo pipefail
           git config user.name "zksync[bot]"
