@@ -1251,12 +1251,12 @@
   },
   {
     "contractName": "l1-contracts/GatewayCTMDeployerVerifiersZKsyncOS",
-    "zkBytecodeHash": "0x01000075f62bd03f8a568746d24a227a098b7c68b95de4d3b6c70d0186a1d1e1",
+    "zkBytecodeHash": "0x01000075f6fec9084f2773f3b4bb8a2e3e05caf9480dc0a41483abcdd385b6d2",
     "zkBytecodePath": "/l1-contracts/zkout/GatewayCTMDeployerVerifiersZKsyncOS.sol/GatewayCTMDeployerVerifiersZKsyncOS.json",
-    "evmBytecodeHash": "0xfff890ce1c3d0b4ada2f09462b1d1818a8d98e3e7358f2565e02570b02fb4de7",
+    "evmBytecodeHash": "0x10737f7fd79ffb04e3f17c002551810df6fdc2bc622490adfa43ab16acf6055a",
     "evmBytecodePath": "/l1-contracts/out/GatewayCTMDeployerVerifiersZKsyncOS.sol/GatewayCTMDeployerVerifiersZKsyncOS.json",
-    "evmDeployedBytecodeHash": "0x3836be54a7068bc76453430144a029569dbd00e75bd24d9e1bf1a4a140d1eb0e",
-    "evmDeployedBytecodeBlakeHash": "0x428baaefde97badfebbc3784ff0dba67b637665e8c6d466acb384f88dbff10cc",
+    "evmDeployedBytecodeHash": "0x866d376d9de56de7c640609db863ef6c015e90fcb950e7a4b8440250a77dab21",
+    "evmDeployedBytecodeBlakeHash": "0x37bf5c97ca64c557e382c9fe9b2bcc65c33a2f96db9d39a0bb74534e59983157",
     "evmDeployedBytecodeLength": 256
   },
   {
@@ -2291,13 +2291,13 @@
   },
   {
     "contractName": "l1-contracts/ZKsyncOSVerifierPlonk",
-    "zkBytecodeHash": "0x01000dbdfda79b247c11d0dc73c8495cfab1f6b6b5ea52815c684f98dcf03b0d",
+    "zkBytecodeHash": "0x01000dbb4fd8f3425ba944ad356eab1339d18ce2ba723bfbba898498996b120e",
     "zkBytecodePath": "/l1-contracts/zkout/ZKsyncOSVerifierPlonk.sol/ZKsyncOSVerifierPlonk.json",
-    "evmBytecodeHash": "0x39ebf61637469d20185080378deed31fd6b415452acd3d8036c0931df0533c3e",
+    "evmBytecodeHash": "0x6c4b7e8c32b3b6f492e6a9737142b23c6c8ef9655b3e98c67a394c50b2595b03",
     "evmBytecodePath": "/l1-contracts/out/ZKsyncOSVerifierPlonk.sol/ZKsyncOSVerifierPlonk.json",
-    "evmDeployedBytecodeHash": "0x1fc4cdfb19f7ec3b2c6ff7d8c2691c3d59238b053ddfdba47673d0e4a9799938",
-    "evmDeployedBytecodeBlakeHash": "0xa2b2e22a5387c7e4a20647a2e15913cde7a3b86153cd1f1f1552c876fcc4f51a",
-    "evmDeployedBytecodeLength": 17229
+    "evmDeployedBytecodeHash": "0xbee6c14a2ae25e570d9abc224d98f0dcd5b7b5d27612cdad8116936eb4a6fe97",
+    "evmDeployedBytecodeBlakeHash": "0x2c7fd7eaea1d3b3b6b86119380a8f8b629654c9b549b891708d9caac6bd1a92c",
+    "evmDeployedBytecodeLength": 17225
   },
   {
     "contractName": "l1-contracts/console",
