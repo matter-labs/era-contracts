@@ -155,7 +155,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         selectors[i++] = getters.getVerifierParams.selector;
         selectors[i++] = getters.isDiamondStorageFrozen.selector;
         selectors[i++] = getters.getPriorityTxMaxGasLimit.selector;
-        selectors[i++] = getters.getZKsyncOSL1TxFiltering.selector;
+        selectors[i++] = getters.isZKsyncOSL1TxFilteringEnabled.selector;
         selectors[i++] = getters.isEthWithdrawalFinalized.selector;
         selectors[i++] = getters.facets.selector;
         selectors[i++] = getters.facetFunctionSelectors.selector;

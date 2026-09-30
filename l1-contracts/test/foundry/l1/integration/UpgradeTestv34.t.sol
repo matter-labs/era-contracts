@@ -335,26 +335,4 @@ contract UpgradeTestV34 is ExecutorTest {
         }
         require(deployed != address(0), "Historical facet deployment failed");
     }
-
-    function _batchOutputHash(
-        CommitBatchInfoZKsyncOS memory _batch,
-        bytes32 _upgradeTxHash
-    ) internal pure returns (bytes32) {
-        return
-            keccak256(
-                abi.encodePacked(
-                    _batch.firstBlockTimestamp,
-                    _batch.lastBlockTimestamp,
-                    uint256(_batch.daCommitmentScheme),
-                    _batch.daCommitment,
-                    _batch.numberOfLayer1Txs,
-                    _batch.numberOfLayer2Txs,
-                    _batch.priorityOperationsHash,
-                    _batch.l2LogsTreeRoot,
-                    _upgradeTxHash,
-                    _batch.dependencyRootsRollingHash,
-                    _batch.slChainId
-                )
-            );
-    }
 }

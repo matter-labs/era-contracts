@@ -221,7 +221,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         vm.expectRevert(NotSettlementLayer.selector);
         migratingChain.setZKsyncOSL1TxFiltering(_newEnabled);
 
-        assertEq(migratingChain.getZKsyncOSL1TxFiltering(), _oldEnabled);
+        assertEq(migratingChain.isZKsyncOSL1TxFilteringEnabled(), _oldEnabled);
         assertEq(vm.getRecordedLogs().length, 0);
     }
 
