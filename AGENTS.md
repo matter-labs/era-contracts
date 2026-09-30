@@ -185,14 +185,17 @@ So:
   - relabels `configs/genesis/era/latest.{json,toml}`;
   - sets `l1-contracts/upgrade-envs/v0.31.0-interopB/foundry-upgrade.toml` to genesis → genesis + 1;
   - regenerates `AllContractsHashes.json` (CI), the genesis (from CI Linux artifacts), then the anvil chain states.
-- **Two server PRs.**
-  - **Release line:** a PR on the last server commit before the undeployed line (e.g. zksync-era-private #138 on
-    `codex/v32-server-base`), used to cut the deployed environment's server and prover release. It can go green except
-    for jobs that need the newer contracts (e.g. the Airbender e2e).
-  - **`dev`:** a PR that adds the deployed version as prebuilts and renumbers the checked-out line, pinned to the rebased
-    contracts branch. CI initialises chains from the checked-out contracts, so only this PR can be fully green. Stack it
-    on any open server PR those contracts need (e.g. #108 for Airbender settlement) and target `dev`; its diff shrinks to
-    your changes once that PR merges.
+- **Two server PRs per upgrade.** Server CI only tests the checked-out contracts, and `dev` checks out the next
+  (undeployed) line, so the deployed contracts need their own test PR:
+  - **Test PR (validation).** Cut a base branch from the last `era-validated/<version>` tag (a PR base must be a
+    branch, not a tag). Re-pin `contracts` to the newly deployed commit, add any server changes it needs, and open the PR
+    against that base branch. Airbender e2e stays red until the deployed contracts have the Airbender verifier. When the
+    rest is green, tag the head `era-validated/<version>`, close the PR and delete the base branch. The tag is the
+    starting point for the next upgrade and the commit an environment's server/prover release can be cut from. Example:
+    v0.33.0 was validated by zksync-era-private #138 at `4b4bdcaa2`, on a base cut from `3c96bae48`.
+  - **Merge PR (to `dev`).** Add the deployed version as prebuilts and renumber the checked-out line, pinned to the
+    rebased contracts branch (e.g. #151). Stack it on any open server PR those contracts need (e.g. #108 for Airbender
+    settlement); its diff shrinks to your changes once that PR merges.
 - **Deploy** the inserted version from its own era-contracts branch, the one its calldata was generated from.
 - A bootloader change needs a minor bump: patch upgrades cannot set the bootloader.
 
