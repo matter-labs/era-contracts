@@ -37,17 +37,15 @@ abstract contract DefaultL2UpgradeStrategy is CTMUpgradeBase {
             );
     }
 
-    /// @inheritdoc CTMUpgradeBase
-    /// @dev `L2DefaultUpgrade` is force-deployed by every upgrade, so its bytecode must always be published.
-    /// Overrides adding release-specific contracts must keep it in the list.
-    function getAdditionalFactoryDependencyContracts()
-        internal
-        virtual
-        override
-        returns (CoreContract[] memory additionalDependencyContracts)
-    {
-        additionalDependencyContracts = new CoreContract[](1);
-        additionalDependencyContracts[0] = CoreContract.L2DefaultUpgrade;
+    /// @notice The bytecodes the upgrade publishes as factory deps: `L2DefaultUpgrade`, which every upgrade
+    /// force-deploys, followed by the release-specific {getAdditionalFactoryDependencyContracts}.
+    function getFactoryDependencyContracts() internal returns (CoreContract[] memory dependencyContracts) {
+        CoreContract[] memory additional = getAdditionalFactoryDependencyContracts();
+        dependencyContracts = new CoreContract[](additional.length + 1);
+        dependencyContracts[0] = CoreContract.L2DefaultUpgrade;
+        for (uint256 i = 0; i < additional.length; ++i) {
+            dependencyContracts[i + 1] = additional[i];
+        }
     }
 
     function getUpgradeTxType() internal virtual override returns (uint256) {

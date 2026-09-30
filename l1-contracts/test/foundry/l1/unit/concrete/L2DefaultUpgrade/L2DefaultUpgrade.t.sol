@@ -21,6 +21,10 @@ import {
     L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2ComplexUpgrader} from "contracts/l2-upgrades/L2ComplexUpgrader.sol";
+import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
+import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
+import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
 import {L2DefaultUpgrade} from "contracts/l2-upgrades/L2DefaultUpgrade.sol";
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
@@ -240,8 +244,14 @@ contract L2DefaultUpgradeUnitTest is Test {
 
     /// @dev A chain already on v32 or later runs the built-ins initialized, and their `initL2`s are one-shot
     /// (`IMTAlreadyInitialized` / `ManagerAlreadyInitialized`), so the same upgrade must be repeatable: every
-    /// later release reuses it. The second run skips them and still updates the rest.
+    /// later release reuses it. The contracts the upgrade path re-calls (`updateL2` / `setAddresses`) run
+    /// their real code here, so one of them turning one-shot would fail the second run.
     function test_UpgradeViaComplexUpgrader_IsRepeatable() public {
+        vm.etch(L2_MESSAGE_ROOT_ADDR, address(new L2MessageRoot()).code);
+        vm.etch(L2_BRIDGEHUB_ADDR, address(new L2Bridgehub()).code);
+        vm.etch(L2_ASSET_ROUTER_ADDR, address(new L2AssetRouter()).code);
+        vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, address(new L2ChainAssetHandler()).code);
+
         _runUpgrade();
         _runUpgrade();
 
@@ -255,6 +265,22 @@ contract L2DefaultUpgradeUnitTest is Test {
             MockL2DefaultUpgradeNativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).updateCalls(),
             2,
             "the native token vault must be updated on every upgrade"
+        );
+
+        assertEq(L2MessageRoot(L2_MESSAGE_ROOT_ADDR).L1_CHAIN_ID(), L1_CHAIN_ID, "message root l1 chain id");
+        L2Bridgehub bridgehub = L2Bridgehub(L2_BRIDGEHUB_ADDR);
+        assertEq(bridgehub.L1_CHAIN_ID(), L1_CHAIN_ID, "bridgehub l1 chain id");
+        assertEq(bridgehub.owner(), ALIASED_L1_GOVERNANCE, "bridgehub owner");
+        assertEq(address(bridgehub.assetRouter()), L2_ASSET_ROUTER_ADDR, "bridgehub asset router");
+        assertEq(address(bridgehub.l1CtmDeployer()), CTM_DEPLOYER, "bridgehub ctm deployer");
+        L2AssetRouter assetRouter = L2AssetRouter(L2_ASSET_ROUTER_ADDR);
+        assertEq(address(assetRouter.L1_ASSET_ROUTER()), L1_ASSET_ROUTER, "asset router l1 counterpart");
+        assertEq(assetRouter.BASE_TOKEN_ASSET_ID(), BASE_TOKEN_ASSET_ID, "asset router base token");
+        assertEq(assetRouter.owner(), ALIASED_L1_GOVERNANCE, "asset router owner");
+        assertEq(
+            L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).owner(),
+            ALIASED_L1_GOVERNANCE,
+            "chain asset handler owner"
         );
     }
 

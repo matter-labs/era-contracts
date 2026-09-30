@@ -516,9 +516,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     }
 
     function publishBytecodes() public virtual {
-        bytes[] memory allDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(
-            getAdditionalFactoryDependencyContracts()
-        );
+        bytes[] memory allDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(getFactoryDependencyContracts());
         BytecodesSupplier supplier = BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier);
 
         PublishFactoryDepsResult memory result = BytecodePublisher.publishAndProcessFactoryDeps(supplier, allDeps);

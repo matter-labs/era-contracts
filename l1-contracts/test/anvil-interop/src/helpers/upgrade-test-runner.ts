@@ -930,10 +930,8 @@ async function deployL2Contracts(
   // For ZKsyncOS SystemProxyUpgrade entries, deploy behind a real SystemContractProxy.
   const contractMap = buildAddressToContract();
   for (const entry of forceDeployEntries) {
-    // ZKsyncOSUnsafeForceDeployment entries are direct deployments (e.g. the SystemContractProxyAdmin
-    // at L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, and L2DefaultUpgrade at a random delegate address).
-    // Both are already set up above (anvil_setCode for the proxy admin, and the delegateTo code
-    // is set separately below), so we skip them here.
+    // The only ZKsyncOSUnsafeForceDeployment entry is L2DefaultUpgrade at its derived delegate
+    // address; its code is set (and the entry checked) separately below.
     if (entry.upgradeType === UPGRADE_TYPE_ZKOS_UNSAFE_FORCE_DEPLOY) {
       continue;
     }
@@ -953,8 +951,11 @@ async function deployL2Contracts(
     }
   }
 
-  // Deploy the delegateTo target (L2DefaultUpgrade).
-  await l2Provider.send("anvil_setCode", [delegateTo, getBytecode("L2DefaultUpgrade")]);
+  // Deploy the delegateTo target (L2DefaultUpgrade), but only after checking that the upgrade itself
+  // force-deploys it there: exactly one unsafe entry, at `delegateTo`, carrying this bytecode.
+  const l2DefaultUpgradeBytecode = getBytecode("L2DefaultUpgrade");
+  assertDelegateDeployment(forceDeployEntries, delegateTo, l2DefaultUpgradeBytecode);
+  await l2Provider.send("anvil_setCode", [delegateTo, l2DefaultUpgradeBytecode]);
 
   // L2BaseToken is in the force deployment list as ZKsyncOSSystemProxyUpgrade, handled above.
 
@@ -1004,6 +1005,28 @@ async function deployL2Contracts(
  * (setup-and-dump-state.ts) so that the pre-generated states already have proper
  * SystemContractProxy layout at 0x800x addresses, matching production ZKsyncOS genesis.
  */
+function assertDelegateDeployment(
+  forceDeployEntries: ForceDeployEntry[],
+  delegateTo: string,
+  expectedBytecode: string
+): void {
+  const unsafeEntries = forceDeployEntries.filter((e) => e.upgradeType === UPGRADE_TYPE_ZKOS_UNSAFE_FORCE_DEPLOY);
+  if (unsafeEntries.length !== 1 || unsafeEntries[0].address.toLowerCase() !== delegateTo.toLowerCase()) {
+    throw new Error(
+      `Expected exactly one unsafe force deployment, at the delegate target ${delegateTo}; got ` +
+        JSON.stringify(unsafeEntries.map((e) => e.address))
+    );
+  }
+  // ZKsync OS bytecode info: abi.encode(bytecodeHash, bytecodeLength, observableBytecodeHash).
+  const [, , observableHash] = ethers.utils.defaultAbiCoder.decode(
+    ["bytes32", "uint32", "bytes32"],
+    unsafeEntries[0].deployedBytecodeInfo ?? "0x"
+  );
+  if (observableHash !== ethers.utils.keccak256(expectedBytecode)) {
+    throw new Error(`Delegate target ${delegateTo} is not force-deployed with the L2DefaultUpgrade bytecode`);
+  }
+}
+
 async function deployBehindSystemProxy(
   provider: ethers.providers.JsonRpcProvider,
   systemAddress: string,
@@ -1270,6 +1293,23 @@ async function verifyL2UpgradeResult(l2Provider: ethers.providers.JsonRpcProvide
   const baseTokenAssetId = await assetTracker.BASE_TOKEN_ASSET_ID();
   if (!(await assetTracker.isAssetRegistered(baseTokenAssetId))) {
     throw new Error(`Chain ${chainId}: base token bookkeeping not initialized after L2 upgrade`);
+  }
+  // The atomic-interop built-ins are new to a v31 chain, so the upgrade must have initialized them.
+  const commitmentTree = new ethers.Contract(
+    L2_INTEROP_COMMITMENT_TREE_ADDR,
+    getAbi("L2InteropCommitmentTree"),
+    l2Provider
+  );
+  const leafCount = await commitmentTree.leafCount();
+  if (!leafCount.eq(1)) {
+    throw new Error(`Chain ${chainId}: L2InteropCommitmentTree.leafCount = ${leafCount}, expected the sentinel only`);
+  }
+  const flowManager = new ethers.Contract(L2_ATOMIC_FLOW_MANAGER_ADDR, getAbi("AtomicFlowManager"), l2Provider);
+  const flowManagerL1ChainId = await flowManager.L1_CHAIN_ID();
+  if (!flowManagerL1ChainId.eq(runtimeConfig.l1ChainId)) {
+    throw new Error(
+      `Chain ${chainId}: AtomicFlowManager.L1_CHAIN_ID = ${flowManagerL1ChainId}, expected ${runtimeConfig.l1ChainId}`
+    );
   }
 }
 

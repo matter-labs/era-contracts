@@ -51,8 +51,8 @@ pub const L2_CREATE2_FACTORY_ADDR: Address = l2_addr(0x00);
 pub const ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR: Address =
     address!("0x4e59b44847b379578588920ca78fbf26c0b4956c");
 /// Alias of `L2_GENESIS_UPGRADE_ADDR` in Solidity — same on-chain address
-/// (`BUILT_IN_CONTRACTS_OFFSET + 0x01`), exposed under the version-specific
-/// name because v31 force-deploys `L2DefaultUpgrade` there.
+/// (`BUILT_IN_CONTRACTS_OFFSET + 0x01`). `L2DefaultUpgrade` is not deployed
+/// here but at an address derived from its bytecode info.
 pub const L2_VERSION_SPECIFIC_UPGRADER_ADDR: Address = l2_addr(0x01);
 pub const L2_BRIDGEHUB_ADDR: Address = l2_addr(0x02);
 pub const L2_ASSET_ROUTER_ADDR: Address = l2_addr(0x03);
