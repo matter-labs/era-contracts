@@ -53,14 +53,10 @@ abstract contract DefaultL2UpgradeStrategy is CTMUpgradeBase {
     }
 
     /// @notice The force deployment of the `L2DefaultUpgrade` delegate target.
-    /// @dev `L2DefaultUpgrade` is a standalone contract at an address derived from its bytecode (not the
-    /// constant `L2_VERSION_SPECIFIC_UPGRADER_ADDR`, so no existing bytecode is overwritten), hence
-    /// `ZKsyncOSUnsafeForceDeployment` rather than `ZKsyncOSSystemProxyUpgrade`.
-    function getL2DefaultUpgradeDeployment()
-        internal
-        virtual
-        returns (IComplexUpgrader.UniversalContractUpgradeInfo memory)
-    {
+    /// @dev `L2DefaultUpgrade` is a standalone contract at an address derived from its bytecode, hence
+    /// `ZKsyncOSUnsafeForceDeployment` rather than `ZKsyncOSSystemProxyUpgrade`. A release that leaves its
+    /// bytecode unchanged re-sets the same code at the same address, which the unsafe deployment allows.
+    function getL2DefaultUpgradeDeployment() internal returns (IComplexUpgrader.UniversalContractUpgradeInfo memory) {
         bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract("L2DefaultUpgrade.sol", "L2DefaultUpgrade");
         return
             IComplexUpgrader.UniversalContractUpgradeInfo({

@@ -16,6 +16,7 @@ import {
     L2_FORCE_DEPLOYER_ADDR,
     L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_HANDLER_ADDR,
+    INTEROP_COMMITMENT_LEAF_HOOK,
     L2_MESSAGE_ROOT_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR,
     L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
@@ -158,6 +159,7 @@ contract L2DefaultUpgradeUnitTest is Test {
     address internal constant ALIASED_CHAIN_REGISTRATION_SENDER = address(0xAA03);
     address internal constant CTM_DEPLOYER = address(0xAA04);
     address internal constant PREDEPLOYED_WETH = address(0xdead);
+    uint256 internal constant COMMITTED_VALUE = 42;
 
     L2DefaultUpgrade internal testUpgrade;
 
@@ -253,13 +255,19 @@ contract L2DefaultUpgradeUnitTest is Test {
         vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, address(new L2ChainAssetHandler()).code);
 
         _runUpgrade();
+
+        // Real activity between the upgrades: the tree holds more than its sentinel leaf.
+        vm.etch(INTEROP_COMMITMENT_LEAF_HOOK, address(new MockAcceptAll()).code);
+        L2InteropCommitmentTree tree = L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR);
+        vm.prank(tree.appender());
+        tree.insert(COMMITTED_VALUE, 0);
+        bytes32 rootBefore = tree.root();
+
         _runUpgrade();
 
-        assertEq(
-            L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafCount(),
-            1,
-            "the commitment tree must not be re-seeded"
-        );
+        assertEq(tree.leafCount(), 2, "the commitment tree must not be re-seeded");
+        assertEq(tree.root(), rootBefore, "the commitment tree root must be preserved");
+        assertEq(tree.leafAt(1).value, COMMITTED_VALUE, "the inserted leaf must be preserved");
         assertEq(AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).L1_CHAIN_ID(), L1_CHAIN_ID, "l1 chain id changed");
         assertEq(
             MockL2DefaultUpgradeNativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).updateCalls(),

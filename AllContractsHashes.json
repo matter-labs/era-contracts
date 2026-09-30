@@ -626,9 +626,9 @@
   {
     "contractName": "l1-contracts/L2DefaultUpgrade",
     "evmBytecodePath": "/l1-contracts/out/L2DefaultUpgrade.sol/L2DefaultUpgrade.json",
-    "evmBytecodeHash": "0xa306b4b2808923038604a583d2f6ae63ca0f0378442714e1baa6aa70422717df",
-    "evmDeployedBytecodeHash": "0xa7ef06f36aca5fd9f8cf1f7e1c7505f2383bdf9be3688af8cad619bbebd62a21",
-    "evmDeployedBytecodeBlakeHash": "0xa946b9468b60623bd08439c80be4b67ba10194e6f9e41aa2a547b1e6ac4c61ff",
+    "evmBytecodeHash": "0x96887d8af3b56c131e8e49303cf26288900c55c1c09edabdf3b5e0971941a13a",
+    "evmDeployedBytecodeHash": "0xb2e45e433768ef8d00fce2708fdfe2218aa7c95f09f7f9ab46d7f61b3673fac7",
+    "evmDeployedBytecodeBlakeHash": "0xd9f5fe7d84072367d302bbf09c4088cfb40668ef0748f085f809280975c67e31",
     "evmDeployedBytecodeLength": 11216
   },
   {

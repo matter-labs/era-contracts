@@ -1018,11 +1018,15 @@ function assertDelegateDeployment(
     );
   }
   // ZKsync OS bytecode info: abi.encode(bytecodeHash, bytecodeLength, observableBytecodeHash).
-  const [, , observableHash] = ethers.utils.defaultAbiCoder.decode(
+  // The Blake hash is left to the protocol-ops upgrade verifier, which checks the whole tuple.
+  const [, bytecodeLength, observableHash] = ethers.utils.defaultAbiCoder.decode(
     ["bytes32", "uint32", "bytes32"],
     unsafeEntries[0].deployedBytecodeInfo ?? "0x"
   );
-  if (observableHash !== ethers.utils.keccak256(expectedBytecode)) {
+  if (
+    observableHash !== ethers.utils.keccak256(expectedBytecode) ||
+    bytecodeLength !== ethers.utils.hexDataLength(expectedBytecode)
+  ) {
     throw new Error(`Delegate target ${delegateTo} is not force-deployed with the L2DefaultUpgrade bytecode`);
   }
 }

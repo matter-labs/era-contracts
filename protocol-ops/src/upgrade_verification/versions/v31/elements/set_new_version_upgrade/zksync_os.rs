@@ -432,27 +432,14 @@ fn verify_zksync_os_l2_v31_deployment(
         ));
     }
 
-    match zksync_os_bytecode_info_hashes(&deployment.deployedBytecodeInfo) {
-        Some((first_hash, observable_hash)) => {
-            if evm_deployed_bytecode_hash_matches_file(
-                verifiers,
-                &observable_hash,
-                L2_DEFAULT_UPGRADE_CONTRACT,
-            ) {
-                result
-                    .report_ok("ZKsync OS delegate deployment uses L2DefaultUpgrade bytecode info");
-            } else {
-                result.report_error(&format!(
-                    "ZKsync OS delegate bytecode info does not map to {}: blake={}, observable={}",
-                    L2_DEFAULT_UPGRADE_CONTRACT, first_hash, observable_hash
-                ));
-            }
-        }
-        None => result.report_error(&format!(
-            "ZKsync OS L2DefaultUpgrade bytecode info must be 96 bytes, got {}",
-            deployment.deployedBytecodeInfo.len()
-        )),
-    }
+    verify_zksync_os_deployed_bytecode_info(
+        verifiers,
+        result,
+        &deployment.deployedBytecodeInfo,
+        L2_DEFAULT_UPGRADE_CONTRACT,
+        &format!("{delegate_to} (delegate target)"),
+        ZksyncOSUpgradeType::UnsafeForceDeployment,
+    );
 }
 
 fn generate_zksync_os_random_address(bytecode_info: &[u8]) -> Address {
