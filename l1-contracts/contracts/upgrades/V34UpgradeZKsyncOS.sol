@@ -11,7 +11,7 @@ import {V34UpgradeWithUnverifiedBatches} from "./ZkSyncUpgradeErrors.sol";
 contract V34UpgradeZKsyncOS is DefaultUpgradeZKsyncOS {
     /// @inheritdoc DefaultUpgradeZKsyncOS
     modifier validBatchBoundary() override {
-        if (s.settlementLayer == address(0) && s.totalBatchesCommitted != s.totalBatchesVerified) {
+        if (s.totalBatchesCommitted != s.totalBatchesVerified) {
             revert V34UpgradeWithUnverifiedBatches(s.totalBatchesVerified, s.totalBatchesCommitted);
         }
         _;
