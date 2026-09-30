@@ -1,13 +1,10 @@
 use std::path::{Path, PathBuf};
 
-use alloy::primitives::{Address, Bytes, B256, U256};
-use alloy::providers::Provider;
-use alloy::signers::local::PrivateKeySigner;
+use alloy::primitives::Bytes;
 use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 use strum::Display;
 
-use crate::common::ethereum::get_provider;
 use crate::common::wallets::Wallet;
 
 /// ForgeScript is a wrapper around the forge script command.
@@ -98,39 +95,6 @@ impl ForgeScript {
             .with_unlocked()
     }
 
-    /// Adds the private key of the deployer account.
-    pub fn with_private_key(mut self, private_key: B256) -> Self {
-        self.args.add_arg(ForgeScriptArg::PrivateKey {
-            private_key: alloy::hex::encode(private_key),
-        });
-        self
-    }
-
-    // Do not start the script if balance is not enough
-    pub fn private_key(&self) -> anyhow::Result<Option<PrivateKeySigner>> {
-        for a in &self.args.args {
-            if let ForgeScriptArg::PrivateKey { private_key } = a {
-                let key: B256 = private_key
-                    .parse()
-                    .map_err(|e| anyhow::anyhow!("invalid private key hex: {e}"))?;
-                let signer = PrivateKeySigner::from_bytes(&key)
-                    .map_err(|e| anyhow::anyhow!("invalid private key: {e}"))?;
-                return Ok(Some(signer));
-            }
-        }
-        Ok(None)
-    }
-
-    pub fn rpc_url(&self) -> Option<String> {
-        self.args.args.iter().find_map(|a| {
-            if let ForgeScriptArg::RpcUrl { url } = a {
-                Some(url.clone())
-            } else {
-                None
-            }
-        })
-    }
-
     pub fn sig(&self) -> Option<String> {
         self.args.args.iter().find_map(|a| {
             if let ForgeScriptArg::Sig { sig } = a {
@@ -146,22 +110,6 @@ impl ForgeScript {
             .args
             .iter()
             .any(|a| matches!(a, ForgeScriptArg::Broadcast))
-    }
-
-    pub fn address(&self) -> anyhow::Result<Option<Address>> {
-        Ok(self.private_key()?.map(|k| k.address()))
-    }
-
-    pub async fn get_the_balance(&self) -> anyhow::Result<Option<U256>> {
-        let Some(rpc_url) = self.rpc_url() else {
-            return Ok(None);
-        };
-        let Some(signer) = self.private_key()? else {
-            return Ok(None);
-        };
-        let provider = get_provider(&rpc_url)?;
-        let balance = provider.get_balance(signer.address()).await?;
-        Ok(Some(balance))
     }
 
     pub fn script_name(&self) -> &Path {
@@ -196,10 +144,6 @@ pub enum ForgeScriptArg {
         api_key: String,
     },
     Ffi,
-    #[strum(to_string = "private-key={private_key}")]
-    PrivateKey {
-        private_key: String,
-    },
     #[strum(to_string = "rpc-url={url}")]
     RpcUrl {
         url: String,
