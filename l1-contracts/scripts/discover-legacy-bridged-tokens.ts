@@ -69,47 +69,35 @@ const V31_UPGRADE_DIR = path.join(__dirname, "../upgrade-envs/v0.31.0-interopB")
 /** Conservative default — covers most public RPCs without log-size pushback. */
 const DEFAULT_BLOCK_STEP = 10_000;
 
-// Minimal inline ABIs only for the bridgehub getter we need before any
-// foundry-output ABI is loaded. Once we have the bridgehub we read the
-// fuller ABIs from foundry-output JSON.
-const BRIDGEHUB_GETTER_ABI = [
-  "function assetRouter() view returns (address)",
-  "function getAllZKChainChainIDs() view returns (uint256[])",
-  "function baseTokenAssetId(uint256 chainId) view returns (bytes32)",
-];
-const ASSET_ROUTER_GETTER_ABI = [
-  "function nativeTokenVault() view returns (address)",
-  "function legacyBridge() view returns (address)",
-];
-
-// Event topics we scan. We don't need the full contract ABI — each
-// `Interface` only needs to know the event signature so it can compute the
-// topic hash and decode the log. Decoupling these from the foundry ABIs
-// keeps the script working even when only some out/ folders are present.
-const ASSET_ROUTER_EVENTS_ABI = [
-  "event LegacyDepositInitiated(uint256 indexed chainId, bytes32 indexed l2DepositTxHash, address indexed from, address to, address l1Token, uint256 amount)",
-  "event BridgehubDepositInitiated(uint256 indexed chainId, bytes32 indexed txDataHash, address indexed from, bytes32 assetId, bytes bridgeMintCalldata)",
-];
-const ERC20_BRIDGE_EVENTS_ABI = [
-  "event DepositInitiated(bytes32 indexed l2DepositTxHash, address indexed from, address indexed to, address l1Token, uint256 amount)",
-];
-// IAssetHandler events emitted by the NTV on every finalized transfer in
-// either direction. Signatures must match
-// `contracts/bridge/interfaces/IAssetHandler.sol`.
-const NTV_EVENTS_ABI = [
-  "event BridgeMint(uint256 indexed chainId, bytes32 indexed assetId, address receiver, uint256 amount)",
-  "event BridgeBurn(uint256 indexed chainId, bytes32 indexed assetId, address indexed sender, address receiver, uint256 amount)",
-];
-
-// Lazy-loaded only because `tokenAddress(bytes32)` for asset-id resolution
-// is the one call we genuinely need full NTV ABI for.
-const NTV_TOKEN_ADDRESS_ABI = ["function tokenAddress(bytes32) view returns (address)"];
-
 // `address(1)` is the ETH sentinel in `contracts/common/Config.sol`
 // (`ETH_TOKEN_ADDRESS`). stage3's `registerBridgedTokensInNTV` always
 // prepends ETH to the registration list, so we drop it from the discovered
 // set to avoid the redundant entry.
 const ETH_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000001";
+
+// ─── ABIs (read from Foundry output, lazily) ─────────────────────────────
+
+interface Abis {
+  bridgehub: ethers.ContractInterface;
+  /** Getters plus the LegacyDepositInitiated / BridgehubDepositInitiated events. */
+  assetRouter: ethers.ContractInterface;
+  /** DepositInitiated event. */
+  erc20Bridge: ethers.ContractInterface;
+  /** BridgeMint / BridgeBurn, emitted by the NTV on every finalized transfer. */
+  assetHandler: ethers.ContractInterface;
+  /** `tokenAddress(assetId)` for asset-id resolution. */
+  nativeTokenVault: ethers.ContractInterface;
+}
+
+function loadAbis(): Abis {
+  return {
+    bridgehub: loadAbiFromFoundryOutput("../out/IBridgehubBase.sol/IBridgehubBase.json"),
+    assetRouter: loadAbiFromFoundryOutput("../out/IL1AssetRouter.sol/IL1AssetRouter.json"),
+    erc20Bridge: loadAbiFromFoundryOutput("../out/IL1ERC20Bridge.sol/IL1ERC20Bridge.json"),
+    assetHandler: loadAbiFromFoundryOutput("../out/IAssetHandler.sol/IAssetHandler.json"),
+    nativeTokenVault: loadAbiFromFoundryOutput("../out/IL1NativeTokenVault.sol/IL1NativeTokenVault.json"),
+  };
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -143,14 +131,18 @@ interface DiscoveryResult {
 
 // ─── Resolution ───────────────────────────────────────────────────────────
 
-async function resolveAddresses(provider: ethers.providers.Provider, bridgehub: string): Promise<ResolvedAddresses> {
-  const bh = new ethers.Contract(bridgehub, BRIDGEHUB_GETTER_ABI, provider);
+async function resolveAddresses(
+  provider: ethers.providers.Provider,
+  bridgehub: string,
+  abis: Abis
+): Promise<ResolvedAddresses> {
+  const bh = new ethers.Contract(bridgehub, abis.bridgehub, provider);
   const assetRouter: string = await bh.assetRouter();
   if (assetRouter === ethers.constants.AddressZero) {
     throw new Error(`Bridgehub ${bridgehub} returned zero address for assetRouter()`);
   }
 
-  const ar = new ethers.Contract(assetRouter, ASSET_ROUTER_GETTER_ABI, provider);
+  const ar = new ethers.Contract(assetRouter, abis.assetRouter, provider);
   const nativeTokenVault: string = await ar.nativeTokenVault();
   if (nativeTokenVault === ethers.constants.AddressZero) {
     throw new Error(`AssetRouter ${assetRouter} returned zero address for nativeTokenVault()`);
@@ -246,7 +238,8 @@ async function discover({
   blockStep: number;
 }): Promise<{ result: DiscoveryResult; resolved: ResolvedAddresses }> {
   const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
-  const resolved = await resolveAddresses(provider, bridgehub);
+  const abis = loadAbis();
+  const resolved = await resolveAddresses(provider, bridgehub, abis);
 
   const latest = await provider.getBlockNumber();
   const fromBlock = fromBlockArg ?? 0;
@@ -265,11 +258,11 @@ async function discover({
   console.log(`  Block range:        [${fromBlock}, ${toBlock}] (latest=${latest})`);
   console.log(`  Initial block step: ${blockStep}`);
 
-  const arIface = new ethers.utils.Interface(ASSET_ROUTER_EVENTS_ABI);
-  const erc20Iface = new ethers.utils.Interface(ERC20_BRIDGE_EVENTS_ABI);
-  const ntvIface = new ethers.utils.Interface(NTV_EVENTS_ABI);
-  const ntv = new ethers.Contract(resolved.nativeTokenVault, NTV_TOKEN_ADDRESS_ABI, provider);
-  const bh = new ethers.Contract(resolved.bridgehub, BRIDGEHUB_GETTER_ABI, provider);
+  const arIface = ethers.Contract.getInterface(abis.assetRouter);
+  const erc20Iface = ethers.Contract.getInterface(abis.erc20Bridge);
+  const ntvIface = ethers.Contract.getInterface(abis.assetHandler);
+  const ntv = new ethers.Contract(resolved.nativeTokenVault, abis.nativeTokenVault, provider);
+  const bh = new ethers.Contract(resolved.bridgehub, abis.bridgehub, provider);
 
   const tokens = new Set<string>();
   const counts = {
@@ -436,12 +429,6 @@ async function discover({
   console.log(
     `  chains: ${chainIds.length}, resolved: ${counts.baseTokensResolved} base tokens, skipped ${counts.baseTokensSkipped}; unique tokens so far: ${tokens.size}`
   );
-
-  // Make sure the foundry-output ABI is at least present so callers know
-  // the script was run against a current build (it isn't used at runtime,
-  // but loading lazily here gives a clear error if `forge build` was
-  // skipped before invoking this script against a real RPC).
-  loadAbiFromFoundryOutput("../out/IL1NativeTokenVault.sol/IL1NativeTokenVault.json");
 
   // Drop ETH_TOKEN_ADDRESS — stage3 registers ETH unconditionally before
   // walking the configured list, so leaving address(1) in here would just
