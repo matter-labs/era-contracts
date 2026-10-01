@@ -190,15 +190,15 @@ VERIFICATION_URL=https://explorer.sepolia.era.zksync.dev/contract_verification y
 
 Yul verification uses Foundry-exported Standard JSON, preserving all settings,
 including `llvmOptions`, rather than the single-file API that omits extra options.
-The zksolc version and expected LLVM options come from the current Foundry config.
-The zkVM-solc release comes from the build: zksolc records it in the metadata of
-each Solidity artifact (`zksolc:1.5.17;solc:0.8.28;llvm:1.0.2` is
-`zkVM-0.8.28-1.0.2`). Foundry picks this patch release implicitly and patch
-releases produce different bytecode, so the script does not guess it from the
-Solidity version. Build and verify from the same commit/configuration; this does not verify a new
-candidate against contracts deployed from an older bundle. Yul requests drop
-`settings.remappings`: solc rejects the field for Yul, and it does not change the
-bytecode.
+Only `settings.remappings` is dropped: solc rejects the field for Yul, and it does
+not change the bytecode. The zksolc version and expected LLVM options come from
+the current Foundry config. The zkVM-solc release comes from the build: zksolc
+records it in the metadata of each Solidity artifact
+(`zksolc:1.5.17;solc:0.8.28;llvm:1.0.2` is `zkVM-0.8.28-1.0.2`). Foundry picks
+this patch release implicitly and patch releases produce different bytecode, so
+the script does not guess it from the Solidity version. Build and verify from the
+same commit/configuration; this does not verify a new candidate against contracts
+deployed from an older bundle.
 
 Known limitation: the ZKsync contract verifier (`core/lib/contract_verifier` in
 zksync-era, checked at `ff5f519b`) compiles every Standard JSON request with
