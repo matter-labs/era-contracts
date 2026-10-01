@@ -100,15 +100,16 @@ async function verifyYul(contractInfo: YulContractDescription, compilers: YulCom
     return;
   }
 
-  try {
-    const requestId = await query("POST", VERIFICATION_URL, undefined, requestBody);
-    await waitForVerificationResult(requestId);
-    console.log("Verification was successful.");
-  } catch (e) {
-    // query() throws a plain { error, status } object when the response is not JSON.
-    const detail = e instanceof Error ? e.message : JSON.stringify(e);
-    throw new Error(`Failed to verify ${contractInfo.codeName}: ${detail}`);
-  }
+  const requestId = await query("POST", VERIFICATION_URL, undefined, requestBody);
+  await waitForVerificationResult(requestId);
+  console.log("Verification was successful.");
+}
+
+// spawn() rejects with a string, and query() throws a plain { error, status } object when the
+// response is not JSON.
+function errorDetail(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  return typeof e == "string" ? e : JSON.stringify(e);
 }
 
 async function main() {
@@ -121,6 +122,9 @@ async function main() {
     .name("verify on explorer")
     .description("Verify system contracts source code on block explorer");
 
+  // Attempt every contract and report all failures at the end, so one failure does not hide the rest.
+  const succeeded: string[] = [];
+  const failed: string[] = [];
   for (const contractName in SYSTEM_CONTRACTS) {
     const contractInfo = SYSTEM_CONTRACTS[contractName];
 
@@ -130,18 +134,29 @@ async function main() {
     }
 
     console.log(`Verifying ${contractInfo.codeName} on ${contractInfo.address} address..`);
-    if (contractInfo.lang == "solidity") {
-      if (contractInfo.location == SourceLocation.L1Contracts) {
-        continue;
-      }
+    try {
+      if (contractInfo.lang == "solidity") {
+        if (contractInfo.location == SourceLocation.L1Contracts) {
+          continue;
+        }
 
-      await verifySolFoundry(contractInfo);
-    } else if (contractInfo.lang == "yul") {
-      await verifyYul(contractInfo, compilers);
-    } else {
-      throw new Error("Unknown source code language!");
+        await verifySolFoundry(contractInfo);
+      } else if (contractInfo.lang == "yul") {
+        await verifyYul(contractInfo, compilers);
+      } else {
+        throw new Error("Unknown source code language!");
+      }
+      succeeded.push(contractInfo.codeName);
+    } catch (e) {
+      failed.push(`${contractInfo.codeName}: ${errorDetail(e)}`);
     }
   }
+
+  // In input-export mode nothing is submitted: Yul requests are exported and Solidity ones skipped.
+  const done = VERIFICATION_INPUT_DIR ? "Exported or skipped" : "Verified";
+  console.log(`\n${done} (${succeeded.length}): ${succeeded.join(", ")}`);
+  console.log(`Failed (${failed.length}):${failed.map((failure) => `\n  ${failure}`).join("")}`);
+  if (failed.length > 0) throw new Error(`${failed.length} contract(s) failed`);
 
   await program.parseAsync(process.argv);
 }
