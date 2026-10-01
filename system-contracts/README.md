@@ -193,7 +193,17 @@ Yul verification uses Foundry-exported Standard JSON, preserving all settings,
 including `llvmOptions`, rather than the single-file API that omits extra options.
 The zksolc version and expected LLVM options come from the current Foundry config.
 Build and verify from the same commit/configuration; this does not verify a new
-candidate against contracts deployed from an older bundle.
+candidate against contracts deployed from an older bundle. Yul requests drop
+`settings.remappings`: solc rejects the field for Yul, and it does not change the
+bytecode.
+
+Known limitation: the ZKsync contract verifier (`core/lib/contract_verifier` in
+zksync-era, checked at `ff5f519b`) compiles every Standard JSON request with
+`zksolc --solc`, while Foundry builds these Yul contracts without `--solc`. Through
+solc, `EcAdd`, `EcMul`, `EcPairing` and `Modexp` do not compile (solc rejects their
+unused `precompileCall(0, gas())` result, which zksolc accepts). The other Yul
+contracts compile to the same code with different metadata, which the verifier
+accepts only as a partial match. Exact Yul verification needs a verifier-side change.
 
 To inspect Yul verification requests without submitting anything:
 

@@ -6,10 +6,17 @@ const llvmOptions = ["-dse-memoryssa-scanlimit=0", "-dse-memoryssa-walklimit=0"]
 const sourcePath = "contracts-preprocessed/Example.yul";
 const codeName = "Example";
 const name = `${sourcePath}:Example`;
+const remappings = ["@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/"];
+const buildSettings = {
+  llvmOptions,
+  optimizer: { mode: "3" },
+  metadata: { hashType: "keccak256" },
+  enableEraVMExtensions: true,
+};
 const input = {
   language: "Solidity",
   sources: { [sourcePath]: { content: `object "${codeName}" { code { } }` } },
-  settings: { llvmOptions, optimizer: { mode: "3" }, metadata: { hashType: "keccak256" }, enableEraVMExtensions: true },
+  settings: { ...buildSettings, remappings },
 };
 const request = (value: CompilerInput = input, options = llvmOptions, solc = "zkVM-0.8.28-1.0.1") =>
   yulVerificationRequest(value, "0x0000000000000000000000000000000000008001", name, "v1.5.17", solc, options);
@@ -17,7 +24,9 @@ assert.deepStrictEqual(parseForgeCompilerInput(`Compiler info\n${JSON.stringify(
 assert.throws(() => parseForgeCompilerInput("No JSON"), /did not return/);
 assert.strictEqual(request().sourceCode.language, "Yul");
 assert.strictEqual(input.language, "Solidity", "Must not mutate original build input");
-assert.deepStrictEqual(request().sourceCode.settings, input.settings);
+// solc rejects remappings for Yul; every other setting must be kept.
+assert.deepStrictEqual(request().sourceCode.settings, buildSettings);
+assert.deepStrictEqual(input.settings.remappings, remappings, "Must not mutate original build input");
 assert.deepStrictEqual(request().sourceCode.sources, input.sources);
 assert.strictEqual(request().codeFormat, "solidity-standard-json-input");
 assert.throws(() => request({ ...input, settings: { ...input.settings, llvmOptions: [] } }), /Verification lost LLVM/);

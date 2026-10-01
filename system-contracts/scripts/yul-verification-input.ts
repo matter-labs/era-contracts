@@ -3,7 +3,7 @@ import assert from "assert";
 export interface CompilerInput {
   language: string;
   sources: Record<string, { content: string }>;
-  settings: { llvmOptions?: string[]; [key: string]: unknown };
+  settings: { llvmOptions?: string[]; remappings?: string[]; [key: string]: unknown };
 }
 
 export function parseForgeCompilerInput(output: string): CompilerInput {
@@ -36,12 +36,16 @@ export function yulVerificationRequest(
   ) {
     throw new Error("Exact released zksolc and zkVM-solc versions are required");
   }
+  // solc rejects `settings.remappings` in Yul input. Yul has no imports and zksolc leaves the
+  // field out of the bytecode and its metadata, so dropping it keeps the build's bytecode.
+  const settings = { ...input.settings };
+  delete settings.remappings;
   return {
     contractAddress: address,
     contractName,
     // Foundry v0.1.5 labels --show-standard-json-input as Solidity even for Yul.
-    // Correct the language; preserve every setting, source path and source byte.
-    sourceCode: { ...input, language: "Yul" },
+    // Correct the language; preserve every other setting, source path and source byte.
+    sourceCode: { ...input, language: "Yul", settings },
     codeFormat: "solidity-standard-json-input",
     compilerZksolcVersion,
     compilerSolcVersion,
