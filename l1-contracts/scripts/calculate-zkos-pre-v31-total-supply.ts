@@ -66,14 +66,14 @@
  * Fetched logs and receipts are cached under script-out/ (git-ignored), keyed by L1 chain id, chain id,
  * diamond and block range. Use --cache-dir to move the cache or --no-cache to disable it.
  *
- * Example for stage chain 2702:
+ * Example for testnet chain 579029, whose result matches the value set on chain
+ * (`$L1_RPC_URL` must be a Sepolia archive node):
  *
  *   yarn ts-node scripts/calculate-zkos-pre-v31-total-supply.ts \
- *     --chain-id 2702 \
- *     --bridgehub 0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE \
+ *     --chain-id 579029 \
+ *     --bridgehub 0xc4FD2580C3487bba18D63f50301020132342fdbD \
  *     --l1-rpc "$L1_RPC_URL" \
- *     --l2-rpc https://atlas-stage.zksync-os.matterhosted.dev/ \
- *     --upgrade-l1-tx 0xfc13268826342bd6f82baf7ade63ef6dc8cd6b4dc221744d6dc23d09d1089c0c
+ *     --l2-rpc https://zksync-os-testnet-xsolla.zksync.dev
  */
 
 import { ethers } from "ethers";
