@@ -1,8 +1,17 @@
 {
   "bundles": [
     {
-      "file": "01_chain.upgrade_0x1454c35737130eb8700e5d0e7a6c44e8ae00ab10.safe.json",
+      "file": "01_chain.set-upgrade-timestamp_0x1454c35737130eb8700e5d0e7a6c44e8ae00ab10.safe.json",
       "index": 1,
+      "steps": [
+        "chain.set-upgrade-timestamp"
+      ],
+      "target": "0x1454c35737130eb8700e5d0e7a6c44e8ae00ab10",
+      "tx_count": 2
+    },
+    {
+      "file": "02_chain.upgrade_0x1454c35737130eb8700e5d0e7a6c44e8ae00ab10.safe.json",
+      "index": 2,
       "steps": [
         "chain.upgrade"
       ],
@@ -11,6 +20,19 @@
     }
   ],
   "metadata": [
+    {
+      "command": "chain.set-upgrade-timestamp",
+      "input": {},
+      "output": {
+        "access_control_restriction": "0x0000000000000000000000000000000000000000",
+        "admin_address": "0x3543055b186b5fc8b214397955e850c712d831ad",
+        "bridgehub": "0x236d1c3ff32bd0ca26b72af287e895627c0478ce",
+        "chain_admin_owner": "0x1454c35737130eb8700e5d0e7a6c44e8ae00ab10",
+        "chain_id": 499,
+        "new_protocol_version": "141733920768",
+        "upgrade_timestamp": "1"
+      }
+    },
     {
       "command": "chain.upgrade",
       "input": {},

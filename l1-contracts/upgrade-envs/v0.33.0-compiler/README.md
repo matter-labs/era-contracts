@@ -87,12 +87,15 @@ and the script's factory-dep check against the genesis hashes will fail on it.
    `--sig 'printEmergencyBoard(string)' /upgrade-envs/permanent-values/<env>.toml` only prints who
    approves.
 
-3. For each chain, the chain admin's owner sends `chain_upgrades.<id>.chain_admin_calldata` to
-   `chain_upgrades.<id>.chain_admin`. `protocol_ops chain upgrade --env stage --chain-id <id>`
-   derives the same call from the CTM once stage 1 has executed, and writes the Safe bundle with an
-   `EXECUTE.md` into its `--out` directory. `output/stage/chain-upgrades/499/` was generated that
-   way, read-only against Sepolia after stage 1, and its call equals chain 499's
-   `chain_admin_calldata`.
+3. For each chain, once stage runs a v33-aware server, the chain admin's owner first sets the
+   upgrade timestamp, which is how the server learns about the upgrade:
+   `protocol_ops chain set-upgrade-timestamp --env stage --chain-id <id> --new-protocol-version 141733920768 --upgrade-timestamp 1`
+   (v0.33.0; timestamp 1 means as soon as the server sees it, as in the v0.32.2 upgrade of chain
+   499). It then sends `chain_upgrades.<id>.chain_admin_calldata` to `chain_upgrades.<id>.chain_admin`.
+   `protocol_ops chain upgrade --env stage --chain-id <id>` derives the same call from the CTM once
+   stage 1 has executed. Both commands write their Safe bundle and an `EXECUTE.md` into `--out`.
+   `output/stage/chain-upgrades/499/` was generated that way, read-only against Sepolia after
+   stage 1: two timestamp txs, then the upgrade, whose call equals chain 499's `chain_admin_calldata`.
 
 Chain 499 is on v0.32.2 and is included. Chains 6475 and 37111 are still on v0.31.0 and need the
 CTM's stored v0.31.x and v0.32.x upgrades first. Do not regenerate for them afterwards: `prepare`

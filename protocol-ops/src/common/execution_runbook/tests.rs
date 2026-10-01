@@ -31,8 +31,8 @@ const V33_STAGE_CHAIN_499: &str =
 
 /// The bullet the committed stage runbook carries beyond what the proposal says.
 pub(super) const V33_STAGE_NOTE: &str = "No running chain changes version: chains upgrade later \
-     through their own ChainAdmin. Chain 499's upgrade is [`chain-upgrades/499/EXECUTE.md`](./chain-upgrades/499/EXECUTE.md), \
-     sent from its ChainAdmin owner once stage runs a v33-aware server (tx 14 in transaction-simulator#369).";
+     through their own ChainAdmin. Chain 499's upgrade is [`chain-upgrades/499/EXECUTE.md`](./chain-upgrades/499/EXECUTE.md) \
+     (set the upgrade timestamp, then upgrade), sent from its ChainAdmin owner once stage runs a v33-aware server.";
 
 const STAGE_OWNER: Address = address!("d669494442609879b209CcA8eba2BdC904D2E69D");
 const OWNER_A: Address = address!("1111111111111111111111111111111111111111");
@@ -211,7 +211,7 @@ fn stage_runbook_decodes_the_proposal() {
 // ─── chain 499 (`protocol_ops chain upgrade`) ────────────────────────────────────
 
 #[test]
-fn committed_chain_499_runbook_is_the_ecosystem_toml_chain_admin_call() {
+fn committed_chain_499_runbook_schedules_then_sends_the_ecosystem_toml_call() {
     let dir = repo_path(V33_STAGE_CHAIN_499);
     let Ok(markdown) = fs::read_to_string(dir.join(RUNBOOK_FILE)) else {
         return;
@@ -222,14 +222,26 @@ fn committed_chain_499_runbook_is_the_ecosystem_toml_chain_admin_call() {
     let expected_to: Address = upgrade["chain_admin"].as_str().unwrap().parse().unwrap();
     let expected_data = upgrade["chain_admin_calldata"].as_str().unwrap();
     let rendered = read_back(&markdown);
-    assert_eq!(rendered.len(), 1);
+    assert_eq!(rendered.len(), 3);
+    // Txs 1 and 2 (`protocol_ops chain set-upgrade-timestamp`) tell the ChainAdmin and the
+    // server about the upgrade, timestamp 1 meaning "as soon as the server sees it"; tx 3 is the
+    // upgrade itself.
+    let schedule = setUpgradeTimestampCall {
+        _protocolVersion: U256::from(141_733_920_768u64),
+        _upgradeTimestamp: U256::from(1u8),
+    }
+    .abi_encode();
     assert_eq!(rendered[0].to, expected_to);
-    assert_eq!(hex_of(&rendered[0].data), expected_data.to_lowercase());
+    assert_eq!(rendered[0].data, schedule);
+    assert_eq!(rendered[1].to, expected_to);
+    assert_eq!(rendered[2].to, expected_to);
+    assert_eq!(hex_of(&rendered[2].data), expected_data.to_lowercase());
     // Re-rendering the committed bundle reproduces the committed page.
     let mut runbook = load(&dir, &dir.join(RUNBOOK_FILE), &LoadOptions::default()).unwrap();
     runbook.facts = chain_499_facts(&markdown);
     assert_eq!(render(&runbook), markdown);
     assert!(markdown.contains("(ChainAdmin)"));
+    assert!(markdown.contains("`setUpgradeTimestamp(uint256,uint256)` (chain 499 at timestamp 1)"));
     assert!(markdown.contains("`upgradeChainFromVersion(...)` (from v0.32.2) on ZK chain"));
 }
 
@@ -258,7 +270,7 @@ fn chain_499_facts(markdown: &str) -> Option<CheckFacts> {
         .ok()?;
     let sender: Address = markdown
         .lines()
-        .find(|line| line.starts_with("- **Sender:**"))?
+        .find(|line| line.starts_with("- **Sender"))?
         .split('`')
         .nth(1)?
         .parse()
@@ -654,6 +666,29 @@ fn protocol_versions_unpack() {
     assert_eq!(protocol_version(U256::from(141_733_920_768u64)), "v0.33.0");
     assert_eq!(protocol_version(U256::from(1u128 << 64)), "v1.0.0");
     assert_eq!(protocol_version(U256::MAX), U256::MAX.to_string());
+}
+
+#[test]
+fn upgrade_timestamps_name_a_version_or_a_chain() {
+    let chain_admin = setUpgradeTimestampCall {
+        _protocolVersion: U256::from(141_733_920_768u64),
+        _upgradeTimestamp: U256::from(1u8),
+    }
+    .abi_encode();
+    assert_eq!(
+        decode::annotation(&chain_admin).as_deref(),
+        Some("v0.33.0 at timestamp 1")
+    );
+    // ServerNotifier.setUpgradeTimestamp(chainId, ts) has the same selector, chain id first.
+    let server_notifier = setUpgradeTimestampCall {
+        _protocolVersion: U256::from(499u16),
+        _upgradeTimestamp: U256::from(1u8),
+    }
+    .abi_encode();
+    assert_eq!(
+        decode::annotation(&server_notifier).as_deref(),
+        Some("chain 499 at timestamp 1")
+    );
 }
 
 #[test]

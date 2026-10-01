@@ -138,11 +138,18 @@ pub(super) fn annotation(data: &[u8]) -> Option<String> {
             let old = if args.len() == 3 { uint(1)? } else { uint(0)? };
             Some(format!("from {}", protocol_version(old)))
         }
-        "setUpgradeTimestamp" => Some(format!(
-            "{} at timestamp {}",
-            protocol_version(uint(0)?),
-            uint(1)?
-        )),
+        // ChainAdmin's `setUpgradeTimestamp(protocolVersion, ts)` and ServerNotifier's
+        // `setUpgradeTimestamp(chainId, ts)` share a selector. A packed protocol version always
+        // has a nonzero minor (bits 32 and up); a chain id never does.
+        "setUpgradeTimestamp" => {
+            let first = uint(0)?;
+            let subject = if first >> SEMVER_MINOR_OFFSET == U256::ZERO {
+                format!("chain {first}")
+            } else {
+                protocol_version(first)
+            };
+            Some(format!("{subject} at timestamp {}", uint(1)?))
+        }
         "scheduleTransparent" => Some(format!("delay {} s", uint(1)?)),
         "transferOwnership" | "setPendingAdmin" => Some(format!(
             "to `{}`",
