@@ -18,12 +18,28 @@ struct SetZkosPreV31TotalSupplyOutput {
     pre_v31_total_supply: String,
 }
 
+/// Printed at the end of the `chain set-zkos-pre-v31-total-supply` help.
+pub const ORDERING_HELP: &str = "\
+Ordering, ideally with no gap between the steps:
+  1. The chain is upgraded to v31 on L1.
+  2. The L2 upgrade tx is executed on L2.
+  3. Compute the value with l1-contracts/scripts/calculate-zkos-pre-v31-total-supply.ts.
+     It needs the receipt of the L2 upgrade tx.
+  4. Run this command and execute the bundle.
+
+Until step 4 is executed on L2, L2BaseTokenZKOS.totalSupply() reverts and
+L2AssetTracker.initiateL1ToGatewayMigrationOnL2 reverts for every asset, so no token
+balance can migrate to Gateway. The value can be set only once.";
+
 /// Set the ZKsync OS pre-v31 base-token total supply.
 ///
 /// Drives `AdminFunctions.s.sol::setZKsyncOSPreV31TotalSupply(...)` against a
 /// forked anvil, emits a Gnosis Safe Transaction Builder JSON bundle via
 /// `--out`, and never broadcasts to the real chain. Apply the bundle via
 /// `protocol-ops dev execute-safe` or Safe UI.
+///
+/// The value comes from `l1-contracts/scripts/calculate-zkos-pre-v31-total-supply.ts`,
+/// run between the chain's v31 upgrade and this command; see [`ORDERING_HELP`].
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct ChainSetZkosPreV31TotalSupplyArgs {
     #[clap(flatten)]
@@ -35,7 +51,8 @@ pub struct ChainSetZkosPreV31TotalSupplyArgs {
     #[clap(long, default_value = ZERO_ADDRESS)]
     pub access_control_restriction: Address,
 
-    /// Pre-v31 base-token total supply. Decimal or 0x-prefixed uint256.
+    /// Pre-v31 base-token total supply. Decimal or 0x-prefixed uint256, as
+    /// printed by `calculate-zkos-pre-v31-total-supply.ts` (`raw uint256`).
     #[clap(long)]
     pub pre_v31_total_supply: String,
 
