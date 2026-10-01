@@ -24,6 +24,15 @@
  *   - L1ERC20Bridge.DepositInitiated(l2DepositTxHash, from, to, l1Token,
  *       amount) — pre-AssetRouter deposits straight against the old shared
  *       bridge.
+ *   - Pre-v26 L1SharedBridge.BridgehubDepositInitiated(chainId, txDataHash,
+ *       from, to, l1Token, amount) — two-bridges deposits into any chain
+ *     before v26, when the shared bridge held the funds itself. v26 upgraded
+ *     that proxy in place into the L1Nullifier, so these logs are read from
+ *     `L1AssetRouter.L1_NULLIFIER()` (an env deployed at v26 or later has
+ *     none). A token deposited only in that era and not moved through the
+ *     NTV since appears in no other source. Tokens without an NTV entry are
+ *     skipped: there is no NTV state to migrate, and stage3's
+ *     `registerBridgedTokensInNTV` reverts on them.
  *   - L1NativeTokenVault.BridgeMint/BridgeBurn(chainId, assetId, ...) — every
  *     asset that ever moved through the vault in either direction. This is
  *     what catches L2-native tokens that were only ever *withdrawn* to L1
@@ -42,9 +51,9 @@
  *
  *     Reads `core_contracts.bridgehub_proxy_addr` from
  *     `upgrade-envs/permanent-values/<env>.toml`, resolves AssetRouter,
- *     NativeTokenVault and L1ERC20Bridge on-chain, scans logs over the
- *     supplied (or full-history) block range, and writes the deduped,
- *     EIP-55-checksummed token list to `--out` (default
+ *     NativeTokenVault, L1ERC20Bridge and L1Nullifier on-chain, scans logs
+ *     over the supplied (or full-history) block range, and writes the
+ *     deduped, EIP-55-checksummed token list to `--out` (default
  *     `upgrade-envs/v0.31.0-interopB/<env>-bridged-tokens.toml`).
  *
  * Output schema mirrors what `TokenMigrationUtils._readConfiguredBridgedTokens`
@@ -60,6 +69,10 @@ import * as path from "path";
 import { ethers } from "ethers";
 import { Command } from "commander";
 import { getBridgehubAddress, loadAbiFromFoundryOutput } from "./upgrade-script-utils";
+// The pre-v26 L1SharedBridge is no longer in this repo's sources, so its
+// events are committed: every event of the verified ABI of its last mainnet
+// implementation (0xF5A14DCdde1143443f06033200D345c2a2828A99, v25).
+import preV26SharedBridgeEvents = require("./abi/L1SharedBridgePreV26Events.json");
 
 // ─── Paths / constants ────────────────────────────────────────────────────
 
@@ -85,8 +98,10 @@ interface Abis {
   erc20Bridge: ethers.ContractInterface;
   /** BridgeMint / BridgeBurn, emitted by the NTV on every finalized transfer. */
   assetHandler: ethers.ContractInterface;
-  /** `tokenAddress(assetId)` for asset-id resolution. */
+  /** `tokenAddress(assetId)` / `assetId(token)` for resolution. */
   nativeTokenVault: ethers.ContractInterface;
+  /** The pre-v26 L1SharedBridge's BridgehubDepositInitiated (`l1Token` variant). */
+  preV26SharedBridge: ethers.ContractInterface;
 }
 
 function loadAbis(): Abis {
@@ -96,6 +111,7 @@ function loadAbis(): Abis {
     erc20Bridge: loadAbiFromFoundryOutput("../out/IL1ERC20Bridge.sol/IL1ERC20Bridge.json"),
     assetHandler: loadAbiFromFoundryOutput("../out/IAssetHandler.sol/IAssetHandler.json"),
     nativeTokenVault: loadAbiFromFoundryOutput("../out/IL1NativeTokenVault.sol/IL1NativeTokenVault.json"),
+    preV26SharedBridge: preV26SharedBridgeEvents.abi,
   };
 }
 
@@ -106,6 +122,8 @@ interface ResolvedAddresses {
   assetRouter: string;
   nativeTokenVault: string;
   legacyErc20Bridge: string | null; // null if AR.legacyBridge() returns 0
+  /** The pre-v26 L1SharedBridge proxy on envs that predate v26. */
+  l1Nullifier: string;
 }
 
 interface DiscoveryResult {
@@ -119,6 +137,9 @@ interface DiscoveryResult {
     legacyDepositInitiated: number;
     bridgehubDepositInitiated: number;
     erc20BridgeDepositInitiated: number;
+    preV26SharedBridgeDepositInitiated: number;
+    preV26SharedBridgeTokensResolved: number;
+    preV26SharedBridgeTokensSkipped: number;
     assetIdsResolved: number;
     assetIdsSkippedNonL1Native: number;
     ntvTransferLogs: number;
@@ -156,11 +177,17 @@ async function resolveAddresses(
     legacyBridge = null;
   }
 
+  const l1Nullifier: string = await ar.L1_NULLIFIER();
+  if (l1Nullifier === ethers.constants.AddressZero) {
+    throw new Error(`AssetRouter ${assetRouter} returned zero address for L1_NULLIFIER()`);
+  }
+
   return {
     bridgehub: ethers.utils.getAddress(bridgehub),
     assetRouter: ethers.utils.getAddress(assetRouter),
     nativeTokenVault: ethers.utils.getAddress(nativeTokenVault),
     legacyErc20Bridge: legacyBridge ? ethers.utils.getAddress(legacyBridge) : null,
+    l1Nullifier: ethers.utils.getAddress(l1Nullifier),
   };
 }
 
@@ -255,6 +282,7 @@ async function discover({
   console.log(`  AssetRouter:        ${resolved.assetRouter}`);
   console.log(`  NativeTokenVault:   ${resolved.nativeTokenVault}`);
   console.log(`  L1ERC20Bridge:      ${resolved.legacyErc20Bridge ?? "<none>"}`);
+  console.log(`  L1Nullifier:        ${resolved.l1Nullifier}`);
   console.log(`  Block range:        [${fromBlock}, ${toBlock}] (latest=${latest})`);
   console.log(`  Initial block step: ${blockStep}`);
 
@@ -269,6 +297,9 @@ async function discover({
     legacyDepositInitiated: 0,
     bridgehubDepositInitiated: 0,
     erc20BridgeDepositInitiated: 0,
+    preV26SharedBridgeDepositInitiated: 0,
+    preV26SharedBridgeTokensResolved: 0,
+    preV26SharedBridgeTokensSkipped: 0,
     assetIdsResolved: 0,
     assetIdsSkippedNonL1Native: 0,
     ntvTransferLogs: 0,
@@ -292,7 +323,7 @@ async function discover({
 
   // ── 1. AssetRouter.LegacyDepositInitiated ────────────────────────────
   const legacyDepositTopic = arIface.getEventTopic("LegacyDepositInitiated");
-  console.log("\n[1/5] AssetRouter.LegacyDepositInitiated...");
+  console.log("\n[1/6] AssetRouter.LegacyDepositInitiated...");
   const legacyDepositLogs = await getLogsPaginated({
     provider,
     fromBlock,
@@ -310,7 +341,7 @@ async function discover({
 
   // ── 2. AssetRouter.BridgehubDepositInitiated (resolve assetIds via NTV)
   const bridgehubDepositTopic = arIface.getEventTopic("BridgehubDepositInitiated");
-  console.log("\n[2/5] AssetRouter.BridgehubDepositInitiated...");
+  console.log("\n[2/6] AssetRouter.BridgehubDepositInitiated...");
   const bridgehubDepositLogs = await getLogsPaginated({
     provider,
     fromBlock,
@@ -347,7 +378,7 @@ async function discover({
   );
 
   // ── 3. L1ERC20Bridge.DepositInitiated (if a legacy bridge exists) ────
-  console.log("\n[3/5] L1ERC20Bridge.DepositInitiated...");
+  console.log("\n[3/6] L1ERC20Bridge.DepositInitiated...");
   if (resolved.legacyErc20Bridge) {
     const erc20DepositTopic = erc20Iface.getEventTopic("DepositInitiated");
     const erc20DepositLogs = await getLogsPaginated({
@@ -368,11 +399,51 @@ async function discover({
     console.log("  skipped: no L1ERC20Bridge wired on this env");
   }
 
-  // ── 4. NTV BridgeMint/BridgeBurn — every asset that ever moved through
+  // ── 4. Pre-v26 L1SharedBridge.BridgehubDepositInitiated ──────────────
+  // Before v26 the shared bridge took every chain's two-bridges deposits
+  // itself; v26 upgraded that proxy in place into the L1Nullifier, so its
+  // old logs sit at the nullifier address. The v26 funds migration gave
+  // those tokens NTV entries, but one that has not moved through the NTV
+  // since shows up in none of the other passes.
+  console.log("\n[4/6] Pre-v26 L1SharedBridge.BridgehubDepositInitiated (at the L1Nullifier)...");
+  const preV26Iface = ethers.Contract.getInterface(abis.preV26SharedBridge);
+  const preV26DepositLogs = await getLogsPaginated({
+    provider,
+    fromBlock,
+    toBlock,
+    blockStep,
+    address: resolved.l1Nullifier,
+    topics: [preV26Iface.getEventTopic("BridgehubDepositInitiated")],
+  });
+  counts.preV26SharedBridgeDepositInitiated = preV26DepositLogs.length;
+
+  const preV26Tokens = new Set<string>();
+  for (const log of preV26DepositLogs) {
+    preV26Tokens.add(ethers.utils.getAddress(preV26Iface.parseLog(log).args.l1Token));
+  }
+  console.log(`  scanned: ${preV26DepositLogs.length} logs, unique l1Tokens: ${preV26Tokens.size}`);
+
+  for (const token of preV26Tokens) {
+    // A token the v26 migration never registered has no NTV entry, so there
+    // is nothing to migrate; stage3's `registerBridgedTokensInNTV` would
+    // revert on it, so it stays out of the list.
+    const assetId: string = await ntv.assetId(token);
+    if (assetId === ethers.constants.HashZero) {
+      counts.preV26SharedBridgeTokensSkipped += 1;
+      continue;
+    }
+    tokens.add(token);
+    counts.preV26SharedBridgeTokensResolved += 1;
+  }
+  console.log(
+    `  resolved: ${counts.preV26SharedBridgeTokensResolved} with an NTV entry, skipped ${counts.preV26SharedBridgeTokensSkipped} without; unique tokens so far: ${tokens.size}`
+  );
+
+  // ── 5. NTV BridgeMint/BridgeBurn — every asset that ever moved through
   // the vault. Deposit-only scans miss L2-native tokens whose only L1
   // activity was a withdrawal (BridgeMint on L1); those still have an NTV
   // entry and fail `AssetNotMigratedFromNTV` post-v31 if left out.
-  console.log("\n[4/5] L1NativeTokenVault.BridgeMint/BridgeBurn...");
+  console.log("\n[5/6] L1NativeTokenVault.BridgeMint/BridgeBurn...");
   const ntvAssetIds = new Set<string>();
   for (const eventName of ["BridgeMint", "BridgeBurn"] as const) {
     const logs = await getLogsPaginated({
@@ -402,12 +473,12 @@ async function discover({
     `  resolved: ${counts.ntvAssetIdsResolved} addresses, skipped ${counts.ntvAssetIdsSkipped} without L1 representation; unique tokens so far: ${tokens.size}`
   );
 
-  // ── 5. Base tokens of all registered chains. Base-token bridging goes
+  // ── 6. Base tokens of all registered chains. Base-token bridging goes
   // through `requestL2Transaction`, so it emits none of the deposit events
   // above; a pre-v31 custom base token (bridged before the NTV emitted
   // BridgeMint/BridgeBurn for it) would otherwise be missed and brick the
   // chain's withdrawals with `AssetIdNotRegistered`.
-  console.log("\n[5/5] Bridgehub base tokens...");
+  console.log("\n[6/6] Bridgehub base tokens...");
   const chainIds: ethers.BigNumber[] = await bh.getAllZKChainChainIDs();
   for (const chainId of chainIds) {
     const assetId: string = await bh.baseTokenAssetId(chainId);
@@ -461,11 +532,13 @@ function writeTomlOutput(filePath: string, env: string, result: DiscoveryResult,
     `# AssetRouter:       ${resolved.assetRouter}`,
     `# NativeTokenVault:  ${resolved.nativeTokenVault}`,
     `# L1ERC20Bridge:     ${resolved.legacyErc20Bridge ?? "<none>"}`,
+    `# L1Nullifier:       ${resolved.l1Nullifier}`,
     `# Block range:       [${result.fromBlock}, ${result.toBlock}]`,
     "# Sources:",
     `#   AssetRouter.LegacyDepositInitiated:     ${result.counts.legacyDepositInitiated}`,
     `#   AssetRouter.BridgehubDepositInitiated:  ${result.counts.bridgehubDepositInitiated} logs => ${result.counts.assetIdsResolved} L1-native (${result.counts.assetIdsSkippedNonL1Native} non-L1-native skipped)`,
     `#   L1ERC20Bridge.DepositInitiated:         ${result.counts.erc20BridgeDepositInitiated}`,
+    `#   Pre-v26 L1SharedBridge deposits:        ${result.counts.preV26SharedBridgeDepositInitiated} logs => ${result.counts.preV26SharedBridgeTokensResolved} with an NTV entry (${result.counts.preV26SharedBridgeTokensSkipped} without skipped)`,
     `#   NTV.BridgeMint/BridgeBurn:              ${result.counts.ntvTransferLogs} logs => ${result.counts.ntvAssetIdsResolved} resolved (${result.counts.ntvAssetIdsSkipped} without L1 representation skipped)`,
     `#   Bridgehub base tokens:                  ${result.counts.baseTokensResolved} resolved (${result.counts.baseTokensSkipped} skipped)`,
     `# Unique tokens with legacy NTV entries: ${result.tokens.length}`,
