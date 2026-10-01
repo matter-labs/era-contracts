@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
 use colored::Colorize;
@@ -15,7 +16,10 @@ use zksync_state::interface::{StoragePtr, WriteStorage};
 
 use zksync_types::U256;
 
-use crate::hook::TestVmHook;
+use crate::hook::{
+    TestVmHook, HOOK_ASK_OPERATOR_FOR_REFUND, HOOK_EXECUTION_RESULT, HOOK_NOTIFY_ABOUT_REFUND,
+    HOOK_TX_HAS_ENDED, HOOK_VALIDATION_STEP_ENDED, ROOT_HOOK_FRAME_DEPTH,
+};
 
 /// What the runner verifies once the batch is done; test bodies run before the transaction loop.
 #[derive(Default)]
@@ -57,6 +61,8 @@ pub struct BootloaderTestTracer {
     expectations: Arc<Mutex<Expectations>>,
 
     test_name: Arc<OnceCell<String>>,
+    /// How many times each operator VM hook id was emitted during the run.
+    operator_hook_counts: Arc<Mutex<BTreeMap<u32, u32>>>,
 }
 
 impl BootloaderTestTracer {
@@ -67,6 +73,7 @@ impl BootloaderTestTracer {
         tx_failure_data_hex: Arc<OnceCell<String>>,
         expectations: Arc<Mutex<Expectations>>,
         test_name: Arc<OnceCell<String>>,
+        operator_hook_counts: Arc<Mutex<BTreeMap<u32, u32>>>,
     ) -> Self {
         BootloaderTestTracer {
             test_result,
@@ -75,7 +82,17 @@ impl BootloaderTestTracer {
             tx_failure_data_hex,
             expectations,
             test_name,
+            operator_hook_counts,
         }
+    }
+
+    fn count_operator_hook(&self, hook_id: u32) {
+        *self
+            .operator_hook_counts
+            .lock()
+            .unwrap()
+            .entry(hook_id)
+            .or_insert(0) += 1;
     }
 }
 
@@ -88,6 +105,24 @@ impl<S, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for BootloaderTestTracer {
         _storage: StoragePtr<S>,
     ) {
         let hook = TestVmHook::from_opcode_memory(&state, &data, memory);
+
+        // These hooks must remain in the root frame; a NoInline store helper breaks
+        // server tracers even when the existing hook-count checks still pass.
+        if matches!(
+            &hook,
+            TestVmHook::TxExecutionResult { .. }
+                | TestVmHook::OperatorHook(
+                    HOOK_VALIDATION_STEP_ENDED
+                        | HOOK_TX_HAS_ENDED
+                        | HOOK_ASK_OPERATOR_FOR_REFUND
+                        | HOOK_NOTIFY_ABOUT_REFUND
+                )
+        ) {
+            assert_eq!(
+                state.vm_local_state.callstack.inner.len(),
+                ROOT_HOOK_FRAME_DEPTH
+            );
+        }
 
         if let TestVmHook::TestLog(msg, data_str) = &hook {
             println!("{} {} {}", "Test log".bold(), msg, data_str);
@@ -103,11 +138,15 @@ impl<S, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for BootloaderTestTracer {
         if let TestVmHook::RequestedTxFailure(expected_revert_data) = &hook {
             let _ = self.requested_tx_failure.set(expected_revert_data.clone());
         }
+        if let TestVmHook::OperatorHook(hook_id) = &hook {
+            self.count_operator_hook(*hook_id);
+        }
         if let TestVmHook::TxExecutionResult {
             success,
             revert_data_hex,
         } = &hook
         {
+            self.count_operator_hook(HOOK_EXECUTION_RESULT);
             if !success {
                 if let Some(data_hex) = revert_data_hex {
                     let _ = self.tx_failure_data_hex.set(data_hex.clone());
