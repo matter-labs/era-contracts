@@ -179,20 +179,23 @@ yarn build:foundry
 and run the verification script afterward:
 
 ```
-COMPILER_SOLC_VERSION=<exact-zkVM-solc-release> VERIFICATION_URL=<explorer-verification-url> yarn verify-on-explorer
+VERIFICATION_URL=<explorer-verification-url> yarn verify-on-explorer
 ```
 
 For example, for zksync Era testnet environment it would look the following way:
 
 ```
-COMPILER_SOLC_VERSION=zkVM-0.8.28-1.0.1 VERIFICATION_URL=https://explorer.sepolia.era.zksync.dev/contract_verification yarn verify-on-explorer
+VERIFICATION_URL=https://explorer.sepolia.era.zksync.dev/contract_verification yarn verify-on-explorer
 ```
 
-Use the exact zkVM-solc release from your build, not necessarily the example above.
 Yul verification uses Foundry-exported Standard JSON, preserving all settings,
 including `llvmOptions`, rather than the single-file API that omits extra options.
 The zksolc version and expected LLVM options come from the current Foundry config.
-Build and verify from the same commit/configuration; this does not verify a new
+The zkVM-solc release comes from the build: zksolc records it in the metadata of
+each Solidity artifact (`zksolc:1.5.17;solc:0.8.28;llvm:1.0.2` is
+`zkVM-0.8.28-1.0.2`). Foundry picks this patch release implicitly and patch
+releases produce different bytecode, so the script does not guess it from the
+Solidity version. Build and verify from the same commit/configuration; this does not verify a new
 candidate against contracts deployed from an older bundle. Yul requests drop
 `settings.remappings`: solc rejects the field for Yul, and it does not change the
 bytecode.
@@ -208,7 +211,7 @@ accepts only as a partial match. Exact Yul verification needs a verifier-side ch
 To inspect Yul verification requests without submitting anything:
 
 ```sh
-COMPILER_SOLC_VERSION=zkVM-0.8.28-1.0.1 VERIFICATION_INPUT_DIR=/tmp/yul-verification-inputs yarn verify-on-explorer
+VERIFICATION_INPUT_DIR=/tmp/yul-verification-inputs yarn verify-on-explorer
 ```
 
 This exports Yul requests and skips Solidity submissions. It does not deploy or

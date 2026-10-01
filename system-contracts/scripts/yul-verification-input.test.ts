@@ -3,7 +3,11 @@ import { execFileSync } from "child_process";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { parseForgeCompilerInput, yulVerificationRequest } from "./yul-verification-input";
+import {
+  compilerVersionsFromBytecode,
+  parseForgeCompilerInput,
+  yulVerificationRequest,
+} from "./yul-verification-input";
 import type { CompilerInput } from "./yul-verification-input";
 
 // What `forge verify-contract --zksync --show-standard-json-input` (foundry-zksync v0.1.5) printed
@@ -18,6 +22,9 @@ const ZKSOLC_VERSION = "v1.5.17";
 const SOLC_RELEASE = "zkVM-0.8.28-1.0.2";
 const LLVM_OPTIONS = ["-dse-memoryssa-scanlimit=0", "-dse-memoryssa-walklimit=0"];
 const EXPECTED_HASH = "0100000df4f976ae6ad4baa58e28b7246da7269ca435d7d2b491c7814a0bc2c8";
+// The CBOR metadata that ends zkout/NonceHolder.sol/NonceHolder.json in the same build.
+const NONCE_HOLDER_METADATA =
+  "0xa2646970667358221220aff031398d3de8aa67d01d8b7913e3809b05d1a0bdf85c31f1c5601aba5fea5d64736f6c6378247a6b736f6c633a312e352e31373b736f6c633a302e382e32383b6c6c766d3a312e302e320055";
 // foundry-zksync and scripts/install-zksolc.sh keep zksolc here as zksolc-<os>-<arch>[-musl]-<version>.
 const ZKSOLC_DIR = path.join(os.homedir(), ".zksync");
 
@@ -77,4 +84,14 @@ assert.deepStrictEqual(
   []
 );
 assert.strictEqual(output.contracts[SOURCE_PATH][CODE_NAME].hash, EXPECTED_HASH);
+
+// The script reads the zkVM-solc release from a Solidity artifact; Yul bytecode records only zksolc.
+assert.deepStrictEqual(compilerVersionsFromBytecode(NONCE_HOLDER_METADATA), {
+  zksolc: ZKSOLC_VERSION,
+  solc: SOLC_RELEASE,
+});
+assert.throws(
+  () => compilerVersionsFromBytecode(output.contracts[SOURCE_PATH][CODE_NAME].evm.bytecode.object),
+  /does not record/
+);
 console.log("Yul verification input regression checks passed");

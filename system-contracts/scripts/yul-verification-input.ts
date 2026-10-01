@@ -1,5 +1,11 @@
 import assert from "assert";
 
+// zksolc ends every bytecode with its CBOR metadata followed by the metadata length.
+const CBOR_LENGTH_BYTES = 2;
+// In a Solidity build the CBOR `solc` entry names zksolc, solc and the zkVM-solc revision (`llvm`);
+// the explorer verifier reads it back as zkVM-<solc>-<revision>.
+const SOLIDITY_BUILD_COMPILERS = /zksolc:(\d+\.\d+\.\d+);solc:(\d+\.\d+\.\d+);llvm:(\d+\.\d+\.\d+)/;
+
 export interface CompilerInput {
   language: string;
   sources: Record<string, { content: string }>;
@@ -12,6 +18,17 @@ export function parseForgeCompilerInput(output: string): CompilerInput {
   const start = lines.findIndex((line) => line.trimStart().startsWith("{"));
   if (start < 0) throw new Error("Foundry did not return Standard JSON input");
   return JSON.parse(lines.slice(start).join("\n"));
+}
+
+// The compiler versions a Solidity artifact was built with, as a verification request names them.
+export function compilerVersionsFromBytecode(bytecode: string) {
+  const code = Buffer.from(bytecode.replace(/^0x/, ""), "hex");
+  const metadataEnd = code.length - CBOR_LENGTH_BYTES;
+  const metadataStart = metadataEnd - code.readUInt16BE(metadataEnd);
+  const match =
+    metadataStart >= 0 && SOLIDITY_BUILD_COMPILERS.exec(code.subarray(metadataStart, metadataEnd).toString("latin1"));
+  if (!match) throw new Error("Bytecode metadata does not record the zksolc and zkVM-solc versions");
+  return { zksolc: `v${match[1]}`, solc: `zkVM-${match[2]}-${match[3]}` };
 }
 
 export function yulVerificationRequest(

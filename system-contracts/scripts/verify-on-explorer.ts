@@ -8,13 +8,22 @@ import * as fs from "fs";
 import { sleep } from "zksync-ethers/build/utils";
 import { execFileSync } from "child_process";
 import * as path from "path";
-import { parseForgeCompilerInput, yulVerificationRequest } from "./yul-verification-input";
+import {
+  compilerVersionsFromBytecode,
+  parseForgeCompilerInput,
+  yulVerificationRequest,
+} from "./yul-verification-input";
 
 const VERIFICATION_URL = process.env.VERIFICATION_URL!;
-// Require the exact fork release rather than guessing it from Solidity's semver.
-// Different zkVM-solc patch releases can produce different bytecode.
-const COMPILER_SOLC_VERSION = process.env.COMPILER_SOLC_VERSION;
 const VERIFICATION_INPUT_DIR = process.env.VERIFICATION_INPUT_DIR;
+// Every Solidity artifact records the compilers of its build; SystemContext is always built.
+const SOLIDITY_ARTIFACT = path.join(__dirname, "..", "zkout", "SystemContext.sol", "SystemContext.json");
+
+interface YulCompilers {
+  zksolc: string;
+  solc: string;
+  llvmOptions: string[];
+}
 
 async function waitForVerificationResult(requestId: number) {
   let retries = 0;
@@ -51,12 +60,21 @@ async function verifySolFoundry(contractInfo: SolidityContractDescription) {
   );
 }
 
-async function verifyYul(contractInfo: YulContractDescription) {
-  if (!COMPILER_SOLC_VERSION) throw new Error("Set COMPILER_SOLC_VERSION to the exact zkVM-solc release used to build");
+// zksolc and the LLVM options come from the Foundry config. The zkVM-solc release is read from the
+// build rather than guessed: Foundry picks the patch release implicitly, and patch releases produce
+// different bytecode.
+function yulCompilers(): YulCompilers {
+  const config = JSON.parse(execFileSync("forge", ["config", "--json"], { encoding: "utf8" }));
+  const configured = String(config.zksync.zksolc);
+  const zksolc = configured.startsWith("v") ? configured : `v${configured}`;
+  const built = compilerVersionsFromBytecode(JSON.parse(fs.readFileSync(SOLIDITY_ARTIFACT, "utf8")).bytecode.object);
+  if (built.zksolc != zksolc) throw new Error(`zkout was built with zksolc ${built.zksolc}, the config pins ${zksolc}`);
+  return { zksolc, solc: built.solc, llvmOptions: config.zksync.llvm_options ?? [] };
+}
+
+async function verifyYul(contractInfo: YulContractDescription, compilers: YulCompilers) {
   const sourceCodePath = path.posix.join("contracts-preprocessed", contractInfo.path, `${contractInfo.codeName}.yul`);
   const contractName = `${sourceCodePath}:${contractInfo.codeName}`;
-  const config = JSON.parse(execFileSync("forge", ["config", "--json"], { encoding: "utf8" }));
-  const compilerVersion = String(config.zksync.zksolc);
   const input = parseForgeCompilerInput(
     execFileSync(
       "forge",
@@ -68,9 +86,9 @@ async function verifyYul(contractInfo: YulContractDescription) {
     input,
     contractInfo.address,
     contractName,
-    compilerVersion.startsWith("v") ? compilerVersion : `v${compilerVersion}`,
-    COMPILER_SOLC_VERSION,
-    config.zksync.llvm_options ?? []
+    compilers.zksolc,
+    compilers.solc,
+    compilers.llvmOptions
   );
   if (VERIFICATION_INPUT_DIR) {
     await fs.promises.mkdir(VERIFICATION_INPUT_DIR, { recursive: true });
@@ -93,9 +111,7 @@ async function verifyYul(contractInfo: YulContractDescription) {
 
 async function main() {
   if (!VERIFICATION_INPUT_DIR && !VERIFICATION_URL) throw new Error("VERIFICATION_URL is required for submission");
-  if (!COMPILER_SOLC_VERSION || !/^zkVM-\d+\.\d+\.\d+-\d+\.\d+\.\d+$/.test(COMPILER_SOLC_VERSION)) {
-    throw new Error("Set COMPILER_SOLC_VERSION to the exact zkVM-solc release used to build before verification");
-  }
+  const compilers = yulCompilers();
   const program = new Command();
 
   program
@@ -119,7 +135,7 @@ async function main() {
 
       await verifySolFoundry(contractInfo);
     } else if (contractInfo.lang == "yul") {
-      await verifyYul(contractInfo);
+      await verifyYul(contractInfo, compilers);
     } else {
       throw new Error("Unknown source code language!");
     }
