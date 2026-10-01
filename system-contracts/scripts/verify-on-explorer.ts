@@ -105,7 +105,9 @@ async function verifyYul(contractInfo: YulContractDescription, compilers: YulCom
     await waitForVerificationResult(requestId);
     console.log("Verification was successful.");
   } catch (e) {
-    throw new Error(`Failed to verify ${contractInfo.codeName}: ${String(e)}`);
+    // query() throws a plain { error, status } object when the response is not JSON.
+    const detail = e instanceof Error ? e.message : JSON.stringify(e);
+    throw new Error(`Failed to verify ${contractInfo.codeName}: ${detail}`);
   }
 }
 
