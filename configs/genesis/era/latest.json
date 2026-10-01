@@ -1,15 +1,15 @@
 {
   "protocol_semantic_version": {
     "major": 0,
-    "minor": 33,
+    "minor": 34,
     "patch": 0
   },
-  "genesis_root": "0x7215ec515902cfc4f54b70e3bea583acccc1d18c58ea6d6c96fdcf9ed1ed5530",
+  "genesis_root": "0xc366da7f29f3f8987634552ddff4248d1f47b9d16f013f68485d9ea97679175a",
   "genesis_rollup_leaf_index": 102,
-  "genesis_batch_commitment": "0x76bb2112f21dd697a2ca5cb09531689fc7c8d4874018eba5939e10d529457ac2",
-  "bootloader_hash": "0x010009c36c15b4b33782ce7d1ae0f926e3dddead62df16d8e1284074965c0bc8",
-  "default_aa_hash": "0x010005f9d84c1863bf21a9393f2fd1631af92aab68f12c35dba580c8d7a06146",
-  "evm_emulator_hash": "0x01000d8bae37b82f311186426184866498b357f41d7a02ced11f3e3fbfbacd63",
+  "genesis_batch_commitment": "0xc8951044097f18cf24c1477f155a8c3f4ea09b7e79eefda6536c53d7d031dc1e",
+  "bootloader_hash": "0x0100096be30981efe8ab8479c61a23b49903d09efbf005924811a6c39f415ebe",
+  "default_aa_hash": "0x010005d9ae0fb8ab4bc73a1b9934c344139a2ea02894394fe79633cdd0463f29",
+  "evm_emulator_hash": "0x01000c07b3db6af3a645759f181ee49ddba1a89e501796de176dde6b980d2a60",
   "prover": {
     "recursion_scheduler_level_vk_hash": "0xbaaa46d644f7034d609eea327e818bd9a93a3c0fdd60e887d233da8a35c4f8ae",
     "fflonk_snark_wrapper_vk_hash": "0xd89b62ac599b15d9dc47860c8ebca5964c99e7b177e9b8ea38a0c13714dc32bb",

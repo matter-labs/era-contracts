@@ -4609,16 +4609,24 @@ object "Bootloader" {
                 ret := 12
             }
 
-            // Need to prevent the compiler from optimizing out similar operations,
-            // which may have different meaning for the offline debugging
+            // The pinned compiler configuration limits MemorySSA dead-store elimination.
+            // Hook and parameter writes are observable by the VM tracer, not by Yul reads.
+            // NoInline alone does NOT prevent elimination of the surrounding hook stores.
+            // Keep the stores in their caller: moving them into a near-call helper changes
+            // the frame observed by server tracers.
             function $llvm_NoInline_llvm$_unoptimized(val) -> ret {
                 ret := add(val, callvalue())
+            }
+
+            // Inline the store itself; only the value helper may create a frame.
+            function $llvm_AlwaysInline_llvm$_storeVmHookMemory(_offset, _value) {
+                mstore(_offset, $llvm_NoInline_llvm$_unoptimized(_value))
             }
 
             /// @notice Triggers a VM hook.
             /// The server will recognize it and output corresponding logs.
             function setHook(hook) {
-                mstore(VM_HOOK_PTR(), $llvm_NoInline_llvm$_unoptimized(hook))
+                $llvm_AlwaysInline_llvm$_storeVmHookMemory(VM_HOOK_PTR(), hook)
             }
 
             /// @notice Sets a value to a param of the vm hook.
@@ -4629,7 +4637,7 @@ object "Bootloader" {
             /// paramId smaller than the VM_HOOK_PARAMS()
             function storeVmHookParam(paramId, value) {
                 let offset := add(VM_HOOK_PARAMS_OFFSET(), mul(32, paramId))
-                mstore(offset, $llvm_NoInline_llvm$_unoptimized(value))
+                $llvm_AlwaysInline_llvm$_storeVmHookMemory(offset, value)
             }
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum

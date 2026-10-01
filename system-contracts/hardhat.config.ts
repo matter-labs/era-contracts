@@ -7,9 +7,10 @@ import "hardhat-typechain";
 
 export default {
   zksolc: {
-    version: "1.5.11",
+    version: "1.5.17",
     compilerSource: "binary",
     settings: {
+      llvmOptions: ["-dse-memoryssa-scanlimit=0", "-dse-memoryssa-walklimit=0"],
       enableEraVMExtensions: true,
       suppressedErrors: ["sendtransfer"],
     },

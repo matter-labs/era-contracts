@@ -495,56 +495,30 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
 
         IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
     }
-    /// @notice Test pause functionality in InteropCenter
-    function test_interopCenter_pause() public {
-        address interopCenterOwner = InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
+    /// @notice L2 chain freezing replaces InteropCenter's former owner-operated pause controls.
+    function testFuzz_interopCenter_removedPauseControls(address _caller, bool _unpause) public {
+        InteropCenter center = InteropCenter(L2_INTEROP_CENTER_ADDR);
+        address originalOwner = center.owner();
+        assertFalse(center.paused(), "InteropCenter should start unpaused");
 
-        vm.prank(interopCenterOwner);
-        InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
-
-        assertTrue(InteropCenter(L2_INTEROP_CENTER_ADDR).paused(), "InteropCenter should be paused");
-
-        bytes memory recipient = abi.encodePacked(uint256(271), address(0x123));
-        bytes memory payload = abi.encode("test");
-        bytes[] memory attributes = new bytes[](0);
-
-        vm.expectRevert("Pausable: paused");
-        InteropCenter(L2_INTEROP_CENTER_ADDR).sendMessage(recipient, payload, attributes);
+        // Call the removed entry points through the deployed proxy to verify that
+        // neither arbitrary callers nor the owner can change pause state.
+        bytes memory data = _unpause ? abi.encodeWithSignature("unpause()") : abi.encodeWithSignature("pause()");
+        vm.recordLogs();
+        vm.prank(_caller);
+        (bool success, ) = L2_INTEROP_CENTER_ADDR.call(data);
+        assertFalse(success, "Removed pause controls should revert");
+        assertEq(vm.getRecordedLogs().length, 0, "Rejected calls should not emit events");
+        assertFalse(center.paused(), "Pause state must remain unchanged");
+        assertEq(center.owner(), originalOwner, "Owner must remain unchanged");
     }
 
-    /// @notice Test unpause functionality in InteropCenter
-    function test_interopCenter_unpause() public {
-        address interopCenterOwner = InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
-
-        vm.prank(interopCenterOwner);
-        InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
-        assertTrue(InteropCenter(L2_INTEROP_CENTER_ADDR).paused(), "InteropCenter should be paused");
-
-        vm.prank(interopCenterOwner);
-        InteropCenter(L2_INTEROP_CENTER_ADDR).unpause();
-
-        assertFalse(InteropCenter(L2_INTEROP_CENTER_ADDR).paused(), "InteropCenter should be unpaused");
+    function test_interopCenter_ownerCannotPause() public {
+        testFuzz_interopCenter_removedPauseControls(InteropCenter(L2_INTEROP_CENTER_ADDR).owner(), false);
     }
 
-    /// @notice Test that only owner can pause InteropCenter
-    function test_interopCenter_pause_onlyOwner() public {
-        address nonOwner = makeAddr("nonOwner");
-
-        vm.prank(nonOwner);
-        vm.expectRevert("Ownable: caller is not the owner");
-        InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
-    }
-
-    /// @notice Test that only owner can unpause InteropCenter
-    function test_interopCenter_unpause_onlyOwner() public {
-        address interopCenterOwner = InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
-        vm.prank(interopCenterOwner);
-        InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
-
-        address nonOwner = makeAddr("nonOwner");
-        vm.prank(nonOwner);
-        vm.expectRevert("Ownable: caller is not the owner");
-        InteropCenter(L2_INTEROP_CENTER_ADDR).unpause();
+    function test_interopCenter_ownerCannotUnpause() public {
+        testFuzz_interopCenter_removedPauseControls(InteropCenter(L2_INTEROP_CENTER_ADDR).owner(), true);
     }
 
     function test_regression_verifyBundleCanAccessCurrentSettlementLayerChainId() public {
