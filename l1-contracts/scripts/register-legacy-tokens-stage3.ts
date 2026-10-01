@@ -7,6 +7,16 @@
  * in NTV's bridgedTokens list, then calls L1AssetTracker.registerLegacyToken
  * only when the asset is not already registered.
  *
+ * Unlike the generic pre-scan, which skips assets whose NTV chainBalance is
+ * zero on every chain, this registers every listed token that has an NTV
+ * entry, zero-balance ones included. That costs one extra transaction per
+ * such token and is harmless: the asset ends up as a newly bridged token
+ * would, and it stays depositable (a legacy asset left unregistered fails
+ * deposits with `AssetIdNotRegistered` until someone registers it).
+ *
+ * A token missing from the list stays unregistered, so regenerate the list
+ * with `scripts/discover-legacy-bridged-tokens.ts` right before stage 3.
+ *
  * It ends with a completeness check: every chain's base token must be
  * registered in the AssetTracker afterwards. Base tokens are bridged via
  * `requestL2Transaction*`, so a stale token list can miss them, and an
