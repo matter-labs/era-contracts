@@ -7,6 +7,13 @@
  * in NTV's bridgedTokens list, then calls L1AssetTracker.registerLegacyToken
  * only when the asset is not already registered.
  *
+ * It ends with a completeness check: every chain's base token must be
+ * registered in the AssetTracker afterwards. Base tokens are bridged via
+ * `requestL2Transaction*`, so a stale token list can miss them, and an
+ * unregistered one fails all of that chain's deposits and withdrawals with
+ * `AssetIdNotRegistered`. A real run exits non-zero listing them; `--dry-run`
+ * only prints the base tokens the run would leave unregistered.
+ *
  * Prerequisite:
  *   Run `forge build` in l1-contracts/ so `out/**.json` ABI files exist.
  */
@@ -137,6 +144,8 @@ async function main(): Promise<void> {
   let addedToBridgedList = 0;
   let registered = 0;
   let skippedMissingAssetId = 0;
+  // Dry-run only: assets this run would register, for the base-token check.
+  const plannedRegistrations = new Set<string>();
 
   for (let index = 0; index < tokens.length; ++index) {
     const token = tokens[index];
@@ -173,6 +182,7 @@ async function main(): Promise<void> {
 
     if (opts.dryRun) {
       console.log("  AssetTracker: would call registerLegacyToken");
+      plannedRegistrations.add(assetId);
       continue;
     }
 
@@ -187,6 +197,27 @@ async function main(): Promise<void> {
   console.log(`  Added to NTV bridged list: ${addedToBridgedList}`);
   console.log(`  Registered in AT:         ${registered}`);
   console.log(`  Missing NTV assetId:      ${skippedMissingAssetId}`);
+
+  const chainIds: ethers.BigNumber[] = await bridgehub.getAllZKChainChainIDs();
+  console.log(`\nBase-token check (${chainIds.length} chains):`);
+  const unregisteredBaseTokens: string[] = [];
+  for (const chainId of chainIds) {
+    const baseTokenAssetId: string = await bridgehub.baseTokenAssetId(chainId);
+    if (plannedRegistrations.has(baseTokenAssetId) || (await assetTrackerBase.isAssetRegistered(baseTokenAssetId))) {
+      continue;
+    }
+    const baseToken: string = await ntv.tokenAddress(baseTokenAssetId);
+    unregisteredBaseTokens.push(`chain ${chainId.toString()}: ${baseToken} (assetId ${baseTokenAssetId})`);
+  }
+  if (unregisteredBaseTokens.length === 0) {
+    console.log(`  every base token is registered${opts.dryRun ? " or would be by this run" : ""}`);
+  } else if (opts.dryRun) {
+    console.log(`  this run would leave base tokens unregistered: ${unregisteredBaseTokens.join("; ")}`);
+  } else {
+    throw new Error(
+      `Base tokens not registered in AssetTracker: ${unregisteredBaseTokens.join("; ")}. Add them to ${tokensFile} and rerun.`
+    );
+  }
 }
 
 main().catch((err) => {
