@@ -6,7 +6,13 @@ import {AccessControlEnumerablePerChainAddressUpgradeable} from "../AccessContro
 import {LibMap} from "../libraries/LibMap.sol";
 import {Diamond} from "../libraries/Diamond.sol";
 import {IZKChain} from "../chain-interfaces/IZKChain.sol";
-import {NotAZKChain, TimeNotReached} from "../../common/L1ContractErrors.sol";
+import {
+    ExecutionDelayNotIncreased,
+    ExecutionDelayTooLarge,
+    NotAZKChain,
+    TimeNotReached
+} from "../../common/L1ContractErrors.sol";
+import {MAX_VALIDATOR_TIMELOCK_EXECUTION_DELAY} from "../../common/Config.sol";
 import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
 import {IValidatorTimelock} from "./interfaces/IValidatorTimelock.sol";
 import {IChainUpgrader} from "../chain-interfaces/IChainUpgrader.sol";
@@ -22,6 +28,8 @@ import {IChainUpgrader} from "../chain-interfaces/IChainUpgrader.sol";
 /// @dev The contract overloads all of the 5 methods, that are used in state transition. When the batch is committed,
 /// the timestamp is stored for it. Later, when the owner calls the batch execution, the contract checks that batch
 /// was committed not earlier than X time ago.
+/// @dev The enforced delay is `max(executionDelay, chainExecutionDelay[chain])`, see `getExecutionDelay`.
+/// A chain admin can only raise its own delay; only the owner can lower it again.
 /// @dev Expected to be deployed as a TransparentUpgradeableProxy.
 contract ValidatorTimelock is
     IValidatorTimelock,
@@ -71,16 +79,22 @@ contract ValidatorTimelock is
     bytes32 public constant override OPTIONAL_UPGRADER_ADMIN_ROLE = keccak256("OPTIONAL_UPGRADER_ADMIN_ROLE");
 
     /// @inheritdoc IValidatorTimelock
+    uint32 public constant override MAX_EXECUTION_DELAY = MAX_VALIDATOR_TIMELOCK_EXECUTION_DELAY;
+
+    /// @inheritdoc IValidatorTimelock
     IL1Bridgehub public immutable override BRIDGE_HUB;
 
     /// @dev The mapping of ZK chain address => batch number => timestamp when it was committed.
     mapping(address chainAddress => LibMap.Uint32Map batchNumberToTimestampMapping) internal committedBatchTimestamp;
 
-    /// @inheritdoc IValidatorTimelock
-    uint32 public override executionDelay;
+    /// @dev Backing storage of `executionDelay`. Not public so that heirs can override the getter.
+    uint32 internal _executionDelay;
+
+    /// @dev Backing storage of `chainExecutionDelay`. Not public so that heirs can override the getter.
+    mapping(address chainAddress => uint32 delay) internal _chainExecutionDelay;
 
     /// @dev Reserved storage space to allow for layout changes in future upgrades.
-    uint256[48] private __gap;
+    uint256[47] private __gap;
 
     constructor(address _bridgehubAddr) {
         BRIDGE_HUB = IL1Bridgehub(_bridgehubAddr);
@@ -95,13 +109,63 @@ contract ValidatorTimelock is
 
     function _validatorTimelockInit(address _initialOwner, uint32 _initialExecutionDelay) internal onlyInitializing {
         _transferOwnership(_initialOwner);
-        executionDelay = _initialExecutionDelay;
+        _checkExecutionDelayWithinBounds(_initialExecutionDelay);
+        _executionDelay = _initialExecutionDelay;
     }
 
     /// @inheritdoc IValidatorTimelock
-    function setExecutionDelay(uint32 _executionDelay) external onlyOwner {
-        executionDelay = _executionDelay;
-        emit NewExecutionDelay(_executionDelay);
+    function executionDelay() public view virtual override returns (uint32) {
+        return _executionDelay;
+    }
+
+    /// @inheritdoc IValidatorTimelock
+    function chainExecutionDelay(address _chainAddress) public view virtual override returns (uint32) {
+        return _chainExecutionDelay[_chainAddress];
+    }
+
+    /// @inheritdoc IValidatorTimelock
+    function setExecutionDelay(uint32 _newExecutionDelay) external virtual onlyOwner {
+        _checkExecutionDelayWithinBounds(_newExecutionDelay);
+        _executionDelay = _newExecutionDelay;
+        emit NewExecutionDelay(_newExecutionDelay);
+    }
+
+    /// @inheritdoc IValidatorTimelock
+    function increaseChainExecutionDelay(
+        address _chainAddress,
+        uint32 _newExecutionDelay
+    ) external virtual onlyRole(_chainAddress, DEFAULT_ADMIN_ROLE) {
+        _checkExecutionDelayWithinBounds(_newExecutionDelay);
+
+        // Compared against the enforced delay, not the stored one, so the admin can never lower it.
+        uint32 currentDelay = getExecutionDelay(_chainAddress);
+        if (_newExecutionDelay <= currentDelay) {
+            revert ExecutionDelayNotIncreased(currentDelay, _newExecutionDelay);
+        }
+
+        _chainExecutionDelay[_chainAddress] = _newExecutionDelay;
+        emit NewChainExecutionDelay(_chainAddress, _newExecutionDelay);
+    }
+
+    /// @inheritdoc IValidatorTimelock
+    function setChainExecutionDelay(address _chainAddress, uint32 _newExecutionDelay) external virtual onlyOwner {
+        _checkExecutionDelayWithinBounds(_newExecutionDelay);
+        _chainExecutionDelay[_chainAddress] = _newExecutionDelay;
+        emit NewChainExecutionDelay(_chainAddress, _newExecutionDelay);
+    }
+
+    /// @inheritdoc IValidatorTimelock
+    function getExecutionDelay(address _chainAddress) public view virtual override returns (uint32) {
+        uint32 ecosystemDelay = executionDelay();
+        uint32 chainDelay = chainExecutionDelay(_chainAddress);
+        return chainDelay > ecosystemDelay ? chainDelay : ecosystemDelay;
+    }
+
+    /// @dev Reverts if the delay exceeds `MAX_EXECUTION_DELAY`.
+    function _checkExecutionDelayWithinBounds(uint32 _executionDelay) internal pure {
+        if (_executionDelay > MAX_EXECUTION_DELAY) {
+            revert ExecutionDelayTooLarge(_executionDelay, MAX_EXECUTION_DELAY);
+        }
     }
 
     /// @inheritdoc IValidatorTimelock
@@ -270,7 +334,7 @@ contract ValidatorTimelock is
         uint256 _processBatchTo,
         bytes calldata // _batchData (unused in this specific implementation)
     ) public virtual onlyRole(_chainAddress, EXECUTOR_ROLE) {
-        uint256 delay = executionDelay; // uint32
+        uint256 delay = getExecutionDelay(_chainAddress); // uint32
         unchecked {
             for (uint256 i = _processBatchFrom; i <= _processBatchTo; ++i) {
                 uint256 commitBatchTimestamp = committedBatchTimestamp[_chainAddress].get(i);

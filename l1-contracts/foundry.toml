@@ -69,7 +69,7 @@ bytecode_hash = "none"
 
 [profile.default.zksync]
 enable_eravm_extensions = true
-zksolc = "1.5.11"
+zksolc = "1.5.17"
 
 [profile.invariant_tests_l1context]
 test = "test"
