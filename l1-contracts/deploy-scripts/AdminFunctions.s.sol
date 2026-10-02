@@ -40,6 +40,7 @@ import {InteropLibrary} from "./InteropLibrary.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2DACommitmentScheme, PubdataContent} from "contracts/common/Config.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
 
@@ -101,7 +102,8 @@ contract AdminFunctions is Script, IAdminFunctions {
     }
 
     /// Walk every Bridgehub-discoverable ecosystem ownable (bridgehub itself,
-    /// asset router, l1 nullifier, ctm deployer, chain asset handler) and
+    /// asset router, l1 nullifier, native token vault, l1 interop handler,
+    /// ctm deployer, chain asset handler, chain registration sender) and
     /// accept the pending ownership transfer where one is targeted at
     /// `_governor`. Idempotent — running against an already-correct ecosystem
     /// is a no-op.
@@ -109,9 +111,12 @@ contract AdminFunctions is Script, IAdminFunctions {
         address assetRouter = address(IL1Bridgehub(_bridgehub).assetRouter());
         address chainAssetHandler = address(IL1Bridgehub(_bridgehub).chainAssetHandler());
         address ctmDeploymentTracker = address(IL1Bridgehub(_bridgehub).l1CtmDeployer());
+        address chainRegistrationSender = IL1Bridgehub(_bridgehub).chainRegistrationSender();
 
         IL1AssetRouter assetRouterContract = IL1AssetRouter(assetRouter);
         address l1Nullifier = address(assetRouterContract.L1_NULLIFIER());
+        address l1NativeTokenVault = address(assetRouterContract.nativeTokenVault());
+        address l1InteropHandler = IL1Nullifier(l1Nullifier).l1InteropHandler();
 
         if (Ownable2Step(_bridgehub).pendingOwner() == _governor) {
             governanceAcceptOwner(_governor, _bridgehub);
@@ -122,11 +127,20 @@ contract AdminFunctions is Script, IAdminFunctions {
         if (Ownable2Step(l1Nullifier).pendingOwner() == _governor) {
             governanceAcceptOwner(_governor, l1Nullifier);
         }
+        if (Ownable2Step(l1NativeTokenVault).pendingOwner() == _governor) {
+            governanceAcceptOwner(_governor, l1NativeTokenVault);
+        }
+        if (Ownable2Step(l1InteropHandler).pendingOwner() == _governor) {
+            governanceAcceptOwner(_governor, l1InteropHandler);
+        }
         if (Ownable2Step(ctmDeploymentTracker).pendingOwner() == _governor) {
             governanceAcceptOwner(_governor, ctmDeploymentTracker);
         }
         if (Ownable2Step(chainAssetHandler).pendingOwner() == _governor) {
             governanceAcceptOwner(_governor, chainAssetHandler);
+        }
+        if (Ownable2Step(chainRegistrationSender).pendingOwner() == _governor) {
+            governanceAcceptOwner(_governor, chainRegistrationSender);
         }
     }
 
@@ -457,6 +471,19 @@ contract AdminFunctions is Script, IAdminFunctions {
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: _target, value: 0, data: abi.encodeCall(adminContract.acceptAdmin, ())});
+
+        vm.startBroadcast();
+        _chainAdmin.multicall(calls, true);
+        vm.stopBroadcast();
+    }
+
+    /// Accept a pending `Ownable2Step` transfer to `_chainAdmin` (e.g. the
+    /// CTM's ServerNotifier) through the ChainAdmin's multicall. Broadcasts as
+    /// the script's `--sender`, which must be allowed to call `multicall`
+    /// (the ChainAdmin owner).
+    function chainAdminAcceptOwner(ChainAdmin _chainAdmin, address _target) public {
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: _target, value: 0, data: abi.encodeCall(Ownable2Step.acceptOwnership, ())});
 
         vm.startBroadcast();
         _chainAdmin.multicall(calls, true);

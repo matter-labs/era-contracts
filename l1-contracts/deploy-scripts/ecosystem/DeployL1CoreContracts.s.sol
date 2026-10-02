@@ -182,10 +182,12 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         IL1AssetRouter sharedBridge = IL1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
         IOwnable(address(sharedBridge)).transferOwnership(coreAddresses.shared.governance);
 
+        // The vault's owner can pause/unpause bridging, so it goes to governance like the rest of the
+        // ecosystem (on mainnet `L1NativeTokenVault.owner()` is the Bridgehub owner).
         L1NativeTokenVault l1NativeTokenVault = L1NativeTokenVault(
             payable(coreAddresses.bridges.proxies.l1NativeTokenVault)
         );
-        l1NativeTokenVault.transferOwnership(config.ownerAddress);
+        l1NativeTokenVault.transferOwnership(coreAddresses.shared.governance);
 
         IL1Nullifier l1Nullifier = IL1Nullifier(coreAddresses.bridges.proxies.l1Nullifier);
         IOwnable(address(l1Nullifier)).transferOwnership(coreAddresses.shared.governance);
@@ -199,6 +201,12 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         IOwnable(address(ctmDeploymentTracker)).transferOwnership(coreAddresses.shared.governance);
 
         IOwnable(coreAddresses.bridgehub.proxies.chainAssetHandler).transferOwnership(coreAddresses.shared.governance);
+
+        // Initialized to the deployer (see `DeployL1CoreUtils.getInitializeCalldata`), so it is handed
+        // off here like every other ecosystem contract.
+        IOwnable(coreAddresses.bridgehub.proxies.chainRegistrationSender).transferOwnership(
+            coreAddresses.shared.governance
+        );
 
         vm.stopBroadcast();
         console.log("Owners updated");
