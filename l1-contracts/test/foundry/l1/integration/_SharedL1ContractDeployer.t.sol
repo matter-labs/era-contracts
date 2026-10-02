@@ -60,6 +60,16 @@ contract L1ContractDeployer is UtilsCallMockerTest {
     }
 
     function _deployL1Contracts() internal {
+        _deployL1ContractsWithoutAcceptingOwnership();
+        _acceptOwnershipCore();
+        _acceptOwnershipCTM();
+
+        addresses.bridgehubOwnerAddress = addresses.bridgehub.owner();
+    }
+
+    /// @dev Runs the deploy scripts and leaves every ownership hand-off pending, so a test can drive
+    /// the acceptance through the same AdminFunctions calls protocol-ops uses.
+    function _deployL1ContractsWithoutAcceptingOwnership() internal {
         vm.setEnv("L1_CONFIG", "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-l1.toml");
         vm.setEnv("L1_OUTPUT", "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-l1.toml");
         vm.setEnv("CTM_CONFIG", "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-ctm.toml");
@@ -104,10 +114,6 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         addresses.chainRegistrationSender = ChainRegistrationSender(
             ecosystemAddresses.bridgehub.proxies.chainRegistrationSender
         );
-        _acceptOwnershipCore();
-        _acceptOwnershipCTM();
-
-        addresses.bridgehubOwnerAddress = addresses.bridgehub.owner();
     }
 
     function _acceptOwnershipCore() private {
