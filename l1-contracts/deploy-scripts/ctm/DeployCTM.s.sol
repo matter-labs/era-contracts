@@ -308,9 +308,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             getRollupL2DACommitmentScheme(),
             true
         );
+        // `BlobsL1DAValidatorZKsyncOS` only checks blob-delivered ZKsync OS pubdata, so it is paired with
+        // the ZKsync OS blobs scheme rather than the calldata/blobs scheme `RollupL1DAValidator` uses.
         rollupDAManager.updateDAPair(
             ctmAddresses.daAddresses.l1BlobsDAValidatorZKsyncOS,
-            getRollupL2DACommitmentScheme(),
+            getZKsyncOSBlobsL2DACommitmentScheme(),
             true
         );
         vm.stopBroadcast();

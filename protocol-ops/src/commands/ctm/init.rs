@@ -8,7 +8,9 @@ use crate::commands::hub::register_ctm::{register_ctm, RegisterCtmInput};
 
 use crate::common::abi::AdminFunctionsAbi;
 use crate::common::env_config::EnvConfig;
-use crate::common::forge::scripts::deploy_ctm::DeployCTMOutput;
+use crate::common::forge::scripts::deploy_ctm::{
+    DeployCTMDeployedAddressesOutput, DeployCTMOutput,
+};
 use crate::common::output::write_output_if_requested;
 use crate::common::SharedRunArgs;
 use crate::common::{forge::ForgeRunner, logger, wallets::Wallet};
@@ -172,22 +174,55 @@ pub async fn ctm_init(
     let deployed = &deploy_output.deployed_addresses;
     let ctm_proxy = deployed.state_transition.state_transition_proxy_addr;
     logger::step("Accepting ownership of CTM contracts...");
-    let accept_scripts = [
-        runner
-            .script_call(AdminFunctionsAbi::governanceAcceptOwnerCall {
-                _governor: deployed.governance_addr,
-                _target: ctm_proxy,
-            })
-            .with_wallet(owner)
-            .with_timing_label("ctm.accept_owner"),
-        runner
-            .script_call(AdminFunctionsAbi::chainAdminAcceptAdminCall {
-                _chainAdmin: deployed.chain_admin,
-                _target: ctm_proxy,
-            })
-            .with_wallet(owner)
-            .with_timing_label("ctm.accept_admin"),
-    ];
+    // `chainAdminAccept*` broadcast as the forge `--sender`, which must be the
+    // ChainAdmin's owner (ChainAdminOwnable.multicall is onlyOwner) — not the
+    // ChainAdmin contract itself, which is what `admin` is for standalone
+    // `ctm init`. Resolve it from the freshly deployed state instead.
+    let chain_admin_owner_addr =
+        crate::common::l1_contracts::resolve_ownable_owner(&runner.rpc_url, deployed.chain_admin)
+            .await
+            .context("resolving ChainAdmin.owner() for the CTM ownership hand-off")?;
+    let chain_admin_owner = runner.prepare_sender(chain_admin_owner_addr).await?;
+    // DeployCTM hands ValidatorTimelock to `config.ownerAddress` directly.
+    let ctm_owner = runner.prepare_sender(input.owner).await?;
+
+    let accept_scripts: Vec<_> = ctm_ownership_acceptances(deployed, input.owner)
+        .into_iter()
+        .map(|acceptance| match acceptance {
+            CtmAcceptance::GovernanceAcceptOwner { target, label } => runner
+                .script_call(AdminFunctionsAbi::governanceAcceptOwnerCall {
+                    _governor: deployed.governance_addr,
+                    _target: target,
+                })
+                .with_wallet(owner)
+                .with_timing_label(label),
+            CtmAcceptance::ChainAdminAcceptAdmin { target, label } => runner
+                .script_call(AdminFunctionsAbi::chainAdminAcceptAdminCall {
+                    _chainAdmin: deployed.chain_admin,
+                    _target: target,
+                })
+                .with_wallet(&chain_admin_owner)
+                .with_timing_label(label),
+            CtmAcceptance::ChainAdminAcceptOwner { target, label } => runner
+                .script_call(AdminFunctionsAbi::chainAdminAcceptOwnerCall {
+                    _chainAdmin: deployed.chain_admin,
+                    _target: target,
+                })
+                .with_wallet(&chain_admin_owner)
+                .with_timing_label(label),
+            CtmAcceptance::OwnerAcceptOwner {
+                target,
+                owner: pending_owner,
+                label,
+            } => runner
+                .script_call(AdminFunctionsAbi::governanceAcceptOwnerConditionalCall {
+                    _governor: pending_owner,
+                    _target: target,
+                })
+                .with_wallet(&ctm_owner)
+                .with_timing_label(label),
+        })
+        .collect();
     runner.run_scripts(accept_scripts)?;
 
     logger::step("Registering CTM on Bridgehub...");
@@ -200,6 +235,72 @@ pub async fn ctm_init(
     logger::info(format!("[timing] ctm.register: {:.2?}", t.elapsed()));
 
     Ok(deploy_output)
+}
+
+// ── Ownership hand-off ──────────────────────────────────────────────────────
+
+/// One pending ownership/adminship transfer left by `DeployCTM.updateOwners()`
+/// and the AdminFunctions call that accepts it on behalf of the right party.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CtmAcceptance {
+    /// `Ownable2Step` pending to the CTM's Governance contract; accepted via a
+    /// Governance operation (the script broadcasts as `Governance.owner()`).
+    GovernanceAcceptOwner {
+        target: Address,
+        label: &'static str,
+    },
+    /// Diamond-style `setPendingAdmin` to the ChainAdmin; accepted via the
+    /// ChainAdmin multicall, sent by the ChainAdmin owner.
+    ChainAdminAcceptAdmin {
+        target: Address,
+        label: &'static str,
+    },
+    /// `Ownable2Step` pending to the ChainAdmin; accepted via the ChainAdmin
+    /// multicall, sent by the ChainAdmin owner.
+    ChainAdminAcceptOwner {
+        target: Address,
+        label: &'static str,
+    },
+    /// `Ownable2Step` pending to the owner EOA, which accepts it directly.
+    OwnerAcceptOwner {
+        target: Address,
+        owner: Address,
+        label: &'static str,
+    },
+}
+
+/// Every transfer `DeployCTM.updateOwners()` starts, paired with its acceptor:
+/// CTM owner + RollupDAManager → governance, CTM admin + ServerNotifier →
+/// ChainAdmin, ValidatorTimelock → `config.ownerAddress`. Accepting all of
+/// them leaves the deployer owning nothing.
+pub fn ctm_ownership_acceptances(
+    deployed: &DeployCTMDeployedAddressesOutput,
+    owner: Address,
+) -> Vec<CtmAcceptance> {
+    let ctm_proxy = deployed.state_transition.state_transition_proxy_addr;
+    vec![
+        CtmAcceptance::GovernanceAcceptOwner {
+            target: ctm_proxy,
+            label: "ctm.accept_owner",
+        },
+        CtmAcceptance::ChainAdminAcceptAdmin {
+            target: ctm_proxy,
+            label: "ctm.accept_admin",
+        },
+        CtmAcceptance::GovernanceAcceptOwner {
+            target: deployed.l1_rollup_da_manager,
+            label: "ctm.accept_rollup_da_manager_owner",
+        },
+        CtmAcceptance::ChainAdminAcceptOwner {
+            target: deployed.server_notifier_proxy_addr,
+            label: "ctm.accept_server_notifier_owner",
+        },
+        CtmAcceptance::OwnerAcceptOwner {
+            target: deployed.validator_timelock_addr,
+            owner,
+            label: "ctm.accept_validator_timelock_owner",
+        },
+    ]
 }
 
 // ── Internal structs ────────────────────────────────────────────────────────
@@ -216,4 +317,94 @@ pub struct CtmInitInput {
     pub zisk_range_verifier_addr: Option<Address>,
     pub zk_token_asset_id: Option<B256>,
     pub create2_factory_salt: Option<B256>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::common::forge::scripts::deploy_ctm::L1StateTransitionOutput;
+
+    fn addr(byte: u8) -> Address {
+        Address::repeat_byte(byte)
+    }
+
+    fn deployed() -> DeployCTMDeployedAddressesOutput {
+        DeployCTMDeployedAddressesOutput {
+            governance_addr: addr(0x01),
+            transparent_proxy_admin_addr: addr(0x02),
+            validator_timelock_addr: addr(0x03),
+            chain_admin: addr(0x04),
+            state_transition: L1StateTransitionOutput {
+                state_transition_proxy_addr: addr(0x05),
+                verifier_addr: addr(0x06),
+                airbender_verifier_addr: None,
+                zisk_verifier_addr: None,
+                zisk_testnet_verifier_addr: None,
+                multi_proof_verifier_addr: None,
+                genesis_upgrade_addr: addr(0x07),
+                default_upgrade_addr: addr(0x08),
+                bytecodes_supplier_addr: addr(0x09),
+            },
+            rollup_l1_da_validator_addr: addr(0x0a),
+            no_da_validium_l1_validator_addr: addr(0x0b),
+            avail_l1_da_validator_addr: addr(0x0c),
+            l1_rollup_da_manager: addr(0x0d),
+            blobs_zksync_os_l1_da_validator_addr: Some(addr(0x0e)),
+            server_notifier_proxy_addr: addr(0x0f),
+        }
+    }
+
+    /// Mirrors `DeployCTM.updateOwners()`: each transfer it starts is accepted
+    /// exactly once, by the party it was handed to.
+    #[test]
+    fn every_ctm_hand_off_is_accepted_by_its_recipient() {
+        let owner = addr(0x42);
+        let d = deployed();
+        let acceptances = ctm_ownership_acceptances(&d, owner);
+
+        let strip = |a: &CtmAcceptance| match *a {
+            CtmAcceptance::GovernanceAcceptOwner { target, .. } => {
+                ("governance-owner", target, None)
+            }
+            CtmAcceptance::ChainAdminAcceptAdmin { target, .. } => {
+                ("chain-admin-admin", target, None)
+            }
+            CtmAcceptance::ChainAdminAcceptOwner { target, .. } => {
+                ("chain-admin-owner", target, None)
+            }
+            CtmAcceptance::OwnerAcceptOwner { target, owner, .. } => {
+                ("eoa-owner", target, Some(owner))
+            }
+        };
+        let got: Vec<_> = acceptances.iter().map(strip).collect();
+        let ctm = d.state_transition.state_transition_proxy_addr;
+        let expected = vec![
+            ("governance-owner", ctm, None),
+            ("chain-admin-admin", ctm, None),
+            ("governance-owner", d.l1_rollup_da_manager, None),
+            ("chain-admin-owner", d.server_notifier_proxy_addr, None),
+            ("eoa-owner", d.validator_timelock_addr, Some(owner)),
+        ];
+        assert_eq!(got, expected);
+    }
+
+    /// Timing labels are how the per-step forge invocations show up in logs;
+    /// keep them distinct so a failing step is identifiable.
+    #[test]
+    fn ctm_acceptance_labels_are_unique() {
+        let acceptances = ctm_ownership_acceptances(&deployed(), addr(0x42));
+        let mut labels: Vec<_> = acceptances
+            .iter()
+            .map(|a| match *a {
+                CtmAcceptance::GovernanceAcceptOwner { label, .. }
+                | CtmAcceptance::ChainAdminAcceptAdmin { label, .. }
+                | CtmAcceptance::ChainAdminAcceptOwner { label, .. }
+                | CtmAcceptance::OwnerAcceptOwner { label, .. } => label,
+            })
+            .collect();
+        let total = labels.len();
+        labels.sort();
+        labels.dedup();
+        assert_eq!(labels.len(), total);
+    }
 }
