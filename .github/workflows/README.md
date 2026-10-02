@@ -27,9 +27,10 @@ args to `protocol_ops` unless the first post-flag word is `forge`/`cast`).
 
 ## Execute workflows
 
-| Workflow                        | Purpose                                                                                                                                                                                                                                   |
-| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `execute-deployer-safe-bundles` | Apply Safe bundles whose `target` is the ecosystem deployer EOA (bundles from the chain-init workflow, the upgrade-prepare workflow, and the migrate-to/from phase-2-finalize workflows). Signs with `DEPLOYER_PRIVATE_KEY_<env>` secret. |
+| Workflow                        | Purpose                                                                                                                                                                                                                                                                                                          |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `execute-deployer-safe-bundles` | Apply Safe bundles whose `target` is the ecosystem deployer EOA (bundles from the chain-init workflow, the upgrade-prepare workflow, and the migrate-to/from phase-2-finalize workflows). Signs with `DEPLOYER_PRIVATE_KEY_<env>` secret.                                                                        |
+| `execute-eoa-upgrade`           | Reusable workflow (`workflow_call`) that sends the EOA transactions of a stage/testnet upgrade from a file in this repo pinned by commit, after a fork simulation, with a second code owner approving. Called from the `executor` branch of `era-contracts-private`; see `tools/eoa-upgrade-executor/README.md`. |
 
 ## Conventions
 
