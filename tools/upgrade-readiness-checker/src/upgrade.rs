@@ -27,8 +27,7 @@ const PACKED_SEMVER_MINOR_OFFSET: usize = 32;
 const FIRST_PER_CHAIN_REWRITE_PROTOCOL_MINOR: u64 = 31;
 
 /// Resolve the chain's ChainTypeManager by calling `Bridgehub.chainTypeManager(chainId)`
-/// on whatever layer the bridgehub lives on (L1 for direct chains, gateway for
-/// gateway-settling chains).
+/// on the layer the bridgehub lives on.
 pub async fn resolve_ctm(
     bridgehub_provider: &DynProvider,
     bridgehub_address: Address,

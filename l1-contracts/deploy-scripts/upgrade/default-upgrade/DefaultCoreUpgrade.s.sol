@@ -404,7 +404,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
         console.log("prepareStage1GovernanceCalls: prepareUpgradeProxiesCalls");
         allCalls[1] = prepareUpgradeProxiesCalls();
         allCalls[2] = provideSetNewVersionUpgradeCall();
-        console.log("prepareStage1GovernanceCalls: prepareGatewaySpecificStage1GovernanceCalls");
+        console.log("prepareStage1GovernanceCalls: prepareVersionSpecificStage1GovernanceCallsL1");
         allCalls[3] = prepareVersionSpecificStage1GovernanceCallsL1();
 
         calls = UpgradeUtils.mergeCallsArray(allCalls);

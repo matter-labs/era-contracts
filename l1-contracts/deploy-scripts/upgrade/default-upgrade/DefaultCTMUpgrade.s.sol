@@ -635,7 +635,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         allCalls[5] = provideSetNewVersionUpgradeCall();
         console.log("prepareStage1GovernanceCalls: prepareDAValidatorCall");
         allCalls[6] = prepareDAValidatorCall();
-        console.log("prepareStage1GovernanceCalls: prepareGatewaySpecificStage1GovernanceCalls");
+        console.log("prepareStage1GovernanceCalls: prepareVersionSpecificStage1GovernanceCallsL1");
         allCalls[7] = prepareVersionSpecificStage1GovernanceCallsL1();
         calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
