@@ -11,7 +11,6 @@ import {
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 // import {IInteropCenter} from "contracts/interop/InteropCenter.sol";
-import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {AtomicFlowPreimage, ATOMIC_FLOW_PREIMAGE_VERSION} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
@@ -274,30 +273,6 @@ library InteropLibrary {
     function buildWithdrawalBundleAttributes(bytes32 _salt) internal pure returns (bytes[] memory attributes) {
         attributes = new bytes[](1);
         attributes[0] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (_salt));
-    }
-
-    /// @notice ABI-encode the `InteropCenter.sendBundle` calldata for an L2->L1 withdrawal of a single
-    /// registered (non-base-token) asset. Used where the call is wrapped into an admin L1->L2 transaction /
-    /// ChainAdmin multicall rather than sent directly.
-    /// @param _l1ChainId Destination L1 chain id.
-    /// @param _assetId The withdrawn asset id (an ERC20 or the CTM/ZK asset — NOT a base-token asset).
-    /// @param _transferData Bridgehub-burn transfer data for the asset.
-    /// @param _salt User salt for `interopBundleSalt`; see {buildBundleAttributes}.
-    function encodeWithdrawalSendBundleCalldata(
-        uint256 _l1ChainId,
-        bytes32 _assetId,
-        bytes memory _transferData,
-        bytes32 _salt
-    ) internal pure returns (bytes memory) {
-        return
-            abi.encodeCall(
-                InteropCenter.sendBundle,
-                (
-                    InteroperableAddress.formatEvmV1(_l1ChainId),
-                    DataEncoding.encodeInteropWithdrawalCallStarters(_assetId, _transferData),
-                    buildWithdrawalBundleAttributes(_salt)
-                )
-            );
     }
 
     /// @notice Send an L2->L1 withdrawal bundle for a single registered (non-base-token) asset directly through
