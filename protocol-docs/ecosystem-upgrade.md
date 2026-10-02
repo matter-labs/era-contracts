@@ -9,8 +9,16 @@ migrations of the current release are listed in
 {protocol-docs/chain-lifecycle.md#upgrading-an-existing-ecosystem-onto-this-release}. Deploying an
 ecosystem from scratch is covered by {protocol-docs/ecosystem-deployment.md}.
 
-Every ecosystem is upgraded the same way, whichever organization runs it: the public ecosystems
-differ from a private one only in who the governance signer is.
+The pipeline is the same whichever organization runs the ecosystem, but today the tooling does not
+yet cover a private ecosystem end to end:
+
+- `ecosystem verify-upgrade --env` accepts only `stage`, `testnet` and `mainnet`, so the
+  verification tool cannot run for a private environment;
+- the `protocol_ops` commands that resolve the L1 network from its chain id (`ctm init`,
+  `ecosystem init`, and `upgrade-prepare-all` without `--env`) refuse any L1 other than mainnet,
+  Sepolia, Holesky or a local Anvil;
+- the governance stages are executed differently by a legacy `Governance` and by a
+  `ProtocolUpgradeHandler` (see "The governance ceremony").
 
 ## What a release changes
 
@@ -37,7 +45,8 @@ genesis-versus-upgrade consistency rules are spelled out in
 
 | Role                 | Who                                                                                                                                           | Signs                                                                                      |
 | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Deployer             | any funded EOA                                                                                                                                | the CREATE2 deployments, bytecode publication, and post-governance steps such as `stage3`  |
+| Deployer             | any funded EOA                                                                                                                                | the CREATE2 deployments and bytecode publication                                           |
+| Post-governance      | any funded EOA (not necessarily the deployer)                                                                                                 | release-specific post-governance steps such as `stage3`                                    |
 | Ecosystem governance | the owner of the core proxies, the CTMs and the `ProxyAdmin` (`ProtocolUpgradeHandler` on the public ecosystems, `Governance` on a fresh one) | governance stages 0, 1 and 2                                                               |
 | CTM admin            | the CTM's `ChainAdmin`                                                                                                                        | operational CTM-side calls emitted by the prepare (for example the `ServerNotifier` proxy) |
 | Chain admin          | each chain's `ChainAdmin`                                                                                                                     | the chain's upgrade timestamp and diamond cut                                              |
@@ -50,22 +59,24 @@ calldata.
 
 ## Artifacts and inputs
 
-| Path                                                              | Role                                                                                                                                                                    |
-| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| the release branch's build artifacts                              | built with the default Foundry profile (`yarn da build:foundry && yarn sc build:foundry && yarn l1 build:foundry`); the deployed bytecode                               |
-| `AllContractsHashes.json`, `SystemConfig.json`                    | the registry of every contract's bytecode hashes; verification identifies deployments by it, so it must be regenerated with the release                                 |
-| `configs/genesis/<vm>/latest.json`                                | the target protocol version and the chain creation parameters (genesis root, initial contracts) of the release                                                          |
-| `l1-contracts/upgrade-envs/permanent-values/<env>.toml`           | the environment's fact sheet: L1 chain id, Bridgehub, CTMs (with VM type), governance kind, legacy gateway history; independent of the release                          |
-| `l1-contracts/upgrade-envs/<release>/<env>.toml`                  | the release × environment input: old protocol version, owner, CREATE2 salts, governance timer delay, testnet-verifier flag; `protocol_ops --env <env>` reads both files |
-| `l1-contracts/upgrade-envs/<release>/output/<env>/ecosystem.toml` | **the artifact**: every new address plus the hex-encoded governance calls of stages 0, 1 and 2; what reviewers diff and what every downstream tool reads                |
-| `…/output/<env>/transactions.txt`                                 | the L1 transaction hashes of the deployer's broadcast, appended on every run; verification reconstructs the deployment provenance from it                               |
-| `…/output/<env>/extra-verification-logs.txt`                      | one `forge verify-contract` line per deployed contract, constructor arguments included                                                                                  |
-| `…/output/<env>/sim-inputs/`, `…/simulator/`                      | the transaction-simulator inputs and scenarios                                                                                                                          |
-| `…/output/<env>/chain-upgrades/<chain-id>/`                       | the per-chain bundles                                                                                                                                                   |
-| `…/output/<env>/prepare/`                                         | git-ignored: the per-run Safe bundles and `manifest.json` the prepare emits                                                                                             |
+| Path                                                              | Role                                                                                                                                                                                           |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| the release branch's build artifacts                              | built with the default Foundry profile (`yarn da build:foundry && yarn sc build:foundry && yarn l1 build:foundry`); the deployed bytecode                                                      |
+| `AllContractsHashes.json`                                         | the registry of every contract's bytecode hashes; verification identifies deployments by it, so it must be regenerated with the release                                                        |
+| `SystemConfig.json`                                               | the system and fee constants (batch overhead, pubdata and L1 transaction gas parameters) the scripts read                                                                                      |
+| `configs/genesis/<vm>/latest.json`                                | the target protocol version and the chain creation parameters (genesis root, initial contracts) of the release                                                                                 |
+| `l1-contracts/upgrade-envs/permanent-values/<env>.toml`           | the environment's fact sheet: L1 chain id, Bridgehub, CTMs (with VM type), governance kind, testnet-verifier flag, ZK token asset id, legacy gateway history; independent of the release       |
+| `l1-contracts/upgrade-envs/<release>/<env>.toml`                  | the release × environment input: owner, Era chain id, governance timer delay, `[legacy_gateway] chain_id`, `pre_v32_introspection`, CREATE2 salts; `protocol_ops --env <env>` reads both files |
+| `l1-contracts/upgrade-envs/<release>/output/<env>/ecosystem.toml` | **the artifact**: every new address plus the hex-encoded governance calls of stages 0, 1 and 2; what reviewers diff and what every downstream tool reads                                       |
+| `…/output/<env>/transactions.txt`                                 | the L1 transaction hashes of the deployer's broadcast, appended on every run; verification reconstructs the deployment provenance from it                                                      |
+| `…/output/<env>/extra-verification-logs.txt`                      | one `forge verify-contract` line per deployed contract, constructor arguments included                                                                                                         |
+| `…/output/<env>/sim-inputs/`, `…/simulator/`                      | the transaction-simulator inputs and scenarios                                                                                                                                                 |
+| `…/output/<env>/chain-upgrades/<chain-id>/`                       | the per-chain bundles                                                                                                                                                                          |
+| `…/output/<env>/prepare/`                                         | git-ignored: the per-run Safe bundles and `manifest.json` the prepare emits                                                                                                                    |
 
-Everything else (CTM addresses, bytecodes supplier, DA manager, chain admins, verifier) is read
-from L1 at run time rather than configured; `docs/ai-review/docs/protocol-ops.md` explains why the
+Everything else (CTM addresses, bytecodes supplier, DA manager, chain admins, verifier, and the old
+protocol version, which the CTM script reads from the CTM) is read from L1 at run time rather than
+configured; `docs/ai-review/docs/protocol-ops.md` explains why the
 tooling is built that way.
 
 ## The pipeline
@@ -81,30 +92,35 @@ flowchart LR
   G --> H["7. Close-out<br/>expire the old version"]
 ```
 
-| Phase              | `protocol_ops` command (CI workflow)                                                                                                | Signer               | Touches the real L1 |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------- | ------------------- |
-| 1. Prepare         | `ecosystem upgrade-prepare-all` (`generate-upgrade-calldata-prepare`)                                                               | none (fork)          | no                  |
-| 2. Deploy          | `ecosystem upgrade-broadcast` (`execute-deployer-safe-bundles`)                                                                     | deployer, CTM admin  | yes                 |
-| 3. Verify          | `ecosystem verify-upgrade`, `ecosystem governance-toml-to-simulator`, `ecosystem manifest-to-simulator`                             | none                 | no                  |
-| 4. Governance      | `ecosystem upgrade-governance` (`generate-upgrade-calldata-governance`) or the governance's own proposal flow                       | ecosystem governance | yes                 |
-| 5. Post-governance | release-specific, e.g. `ecosystem stage3`                                                                                           | any EOA              | yes                 |
-| 6. Per chain       | `chain set-upgrade-timestamp`, `chain upgrade` (`generate-chain-set-upgrade-timestamp-calldata`, `generate-chain-upgrade-calldata`) | each chain admin     | yes                 |
-| 7. Close-out       | a governance call                                                                                                                   | ecosystem governance | yes                 |
+| Phase              | `protocol_ops` command                                                                                  | Signer               | Touches the real L1 |
+| ------------------ | ------------------------------------------------------------------------------------------------------- | -------------------- | ------------------- |
+| 1. Prepare         | `ecosystem upgrade-prepare-all`                                                                         | none (fork)          | no                  |
+| 2. Deploy          | `ecosystem upgrade-broadcast`                                                                           | deployer, CTM admin  | yes                 |
+| 3. Verify          | `ecosystem verify-upgrade`, `ecosystem governance-toml-to-simulator`, `ecosystem manifest-to-simulator` | none                 | no                  |
+| 4. Governance      | `ecosystem upgrade-governance` or the governance's own proposal flow                                    | ecosystem governance | yes                 |
+| 5. Post-governance | release-specific, e.g. `ecosystem stage3`                                                               | any EOA              | yes                 |
+| 6. Per chain       | `chain set-upgrade-timestamp`, `chain upgrade`                                                          | each chain admin     | yes                 |
+| 7. Close-out       | `ChainTypeManager.setProtocolVersionDeadline`                                                           | ecosystem governance | yes                 |
+
+The `generate-upgrade-calldata-*`, `execute-deployer-safe-bundles` and `generate-chain-*-calldata`
+workflows under `.github/workflows/` still drive the previous `protocol_ops` CLI (`--ecosystem`,
+`--chain <name>`, `--governance-toml-out`, `--new-protocol-version`, none of which exist any more)
+and have to be updated before they can run these phases; until then the commands are run by hand.
 
 `l1-contracts/test/anvil-interop/regen-upgrade-calldata.sh <env>` chains phases 1 and 3 (prepare,
 rehearse the bundles on the fork, run the verifier) into one command; the
 `regenerate-upgrade-calldata` skill under `.claude/skills/` is the step-by-step runbook, and
 `l1-contracts/upgrade-envs/v0.33.0-atomic-interop/output/testnet/README.md` is a complete worked
-example of one environment's rollout. On `main`, `generate-ecosystem-upgrade-calldata.yaml` and
-`deploy-ecosystem-upgrade.yaml` wrap phases 1 to 3 as a generate-then-deploy pair with a
-self-contained bundle handed from one to the other.
+example of one environment's rollout.
 
 ### 1. Prepare
 
-`protocol_ops ecosystem upgrade-prepare-all --env <env> --deployer-address <EOA> --out <dir>` forks
-the environment's L1 and runs, on that fork, the release's core script once
-(`CoreUpgrade_v<N>.noGovernancePrepare`) and its CTM script once per CTM
-(`CTMUpgrade_v<N>.noGovernancePrepare`). Together they:
+`protocol_ops ecosystem upgrade-prepare-all --env <env> --l1-rpc-url <l1> --deployer-address <EOA>`
+forks `<l1>` (without `--l1-rpc-url` it forks `http://localhost:8545`; `--env` does not fill it)
+and runs, on that fork, the release's core script once (`CoreUpgrade_v<N>.noGovernancePrepare`)
+and its CTM script once per ZKsync OS CTM (`CTMUpgrade_v<N>.noGovernancePrepare`; v33 skips EraVM
+CTMs). The bundles and `manifest.json` go to `output/<env>/prepare/` (override with `--out`, which
+names the bundle directory itself; `ecosystem.toml` is written to its parent). Together they:
 
 1. deploy every new implementation through CREATE2, using the salts of the release input;
 2. publish the new L2 bytecodes to the `BytecodesSupplier`, and build the L2 upgrade transaction
@@ -113,8 +129,8 @@ the environment's L1 and runs, on that fork, the release's core script once
 3. compute the new chain creation parameters from the genesis config;
 4. serialize the governance calls of the three stages, per script, and merge them into
    `ecosystem.toml`;
-5. record every broadcast into one Safe bundle per signer, with `manifest.json` listing them in
-   execution order.
+5. record every broadcast into Safe bundles, one per consecutive run of transactions by the same
+   signer, with `manifest.json` listing them in execution order.
 
 Two properties of the prepare decide whether the rest of the pipeline can work:
 
@@ -126,23 +142,34 @@ Two properties of the prepare decide whether the rest of the pipeline can work:
   transactions in `transactions.txt`, never by diffing addresses against one's own run.
 - **Salts and the deployer are part of the result.** CREATE2 returns the previously deployed
   contract for a repeated `(salt, init code)` pair, so the salts in the release input are rotated
-  before every regeneration. The deployer address sits in the init code of the contracts it
-  initializes, so the prepare is run with the EOA that will broadcast.
+  before every regeneration. The deployer address is the `from` of the bundles it signs (and part
+  of their file names), so the prepare is run with the EOA that will broadcast; it does not appear
+  in any deployed contract's init code.
 
-An ecosystem whose upgrade already executed cannot be re-prepared at the chain tip (the deployer
-no longer owns anything); pin the fork to a block before the ceremony instead.
+An ecosystem whose upgrade already executed cannot be re-prepared at the chain tip: the CTM script
+refuses a CTM that is already on the new protocol version, the governance timer is already armed,
+and the CREATE2 targets are occupied. Pin the fork to a block before the ceremony instead.
+`upgrade-prepare-all` has no fork-block flag: pin it with `FORK_BLOCK` in
+`regen-upgrade-calldata.sh`, or pass an Anvil fork already pinned to that block as `--l1-rpc-url`.
 
 ### 2. Deploy
 
-`protocol_ops ecosystem upgrade-broadcast --manifest <dir>/prepare/manifest.json --key
-<deployer>=<key> --skip-unkeyed --l1-rpc-url <l1>` sends the deployer's bundles to the real L1,
-one transaction at a time, confirming each; it appends every mined hash to `transactions.txt` and
-is idempotent, so an interrupted run is resumed by running it again. Bundles whose signer is not
-the deployer (the CTM admin's operational calls, the governance stages) are skipped and handed to
-their signers.
+`protocol_ops ecosystem upgrade-broadcast --manifest <out>/prepare/manifest-deployer-only.json
+--key <deployer>=<key> --l1-rpc-url <l1> --out <out>/sepolia-deploy-executed.json`, with `<out>`
+the release's `output/<env>/` directory, sends the deployer's bundles to the real L1, one transaction at a time, confirming each, and appends every
+mined hash to `<out>/transactions.txt` (only when `--out` is given; without it `verify-upgrade`
+finds no deployments). It needs a `--key` for every signer in the manifest and refuses to send
+anything otherwise, so the manifest is first filtered down to the deployer's bundles; the CTM
+admin's bundle is handed to its signer, and the governance stages are calldata in
+`ecosystem.toml`, not bundles. The testnet README shows the filtering step.
 
-Then the deployed contracts are source-verified on the explorer by replaying the
-`forge verify-contract` lines of `extra-verification-logs.txt` verbatim.
+A re-run is not fully idempotent: it skips CREATE2 deployments whose target already has code and
+transactions that revert with one of a few known "already done" selectors, and the hashes are
+written per bundle, so a bundle interrupted half-way loses the hashes of the transactions it had
+already mined. Recover those from the explorer before re-running.
+
+Then the deployed contracts are source-verified on the explorer with the `forge verify-contract`
+lines of `extra-verification-logs.txt`, adding the `--chain` and explorer API key they leave out.
 
 ### 3. Verify
 
@@ -176,8 +203,9 @@ The calls the scripts assemble, with the release-specific hooks marked:
   (for example `setL1InteropHandler` on the nullifier and asset router in v33); then per CTM:
   `GovernanceUpgradeTimer.checkDeadline()`, `UpgradeStageValidator.checkMigrationsPaused()`, the
   four CTM-side proxy upgrades, `ChainTypeManager.setDefaultUpgrade`, `setChainCreationParams`,
-  `setNewVersionUpgrade(cut, oldVersion, oldVersionDeadline, newVersion, verifier)`, the
-  whitelisting of any new DA validators, and the release's CTM-side additions.
+  `setNewVersionUpgrade(cut, oldVersion, oldVersionDeadline, newVersion, verifier)` and the
+  release's CTM-side additions (the DA-validator whitelisting hook, `prepareDAValidatorCall`, is
+  currently empty).
 - **Stage 2.** The release's stage-2 additions; `unpauseMigration()`; per CTM,
   `UpgradeStageValidator.checkProtocolUpgradePresence()` and `checkMigrationsUnpaused()`.
 
@@ -199,7 +227,8 @@ How the calls are executed depends on the governance:
   emergency calldata for the stage environment.
 
 `setNewVersionUpgrade` is the call that changes the protocol: from then on every chain of the CTM
-may take the cut, and every chain created afterwards starts on the new version.
+that is on exactly the old version may take the cut (a chain on any other version cannot), and
+every chain created afterwards starts on the new version.
 
 ### 5. Release-specific post-governance steps
 
@@ -212,39 +241,53 @@ covered by the verifier.
 
 ### 6. Per chain
 
-Each chain takes the cut through its own `ChainAdmin`, in two bundles whose order matters:
+Each chain takes the cut through its own `ChainAdmin`. The order below is the ZKsync OS one (v33
+upgrades ZKsync OS chains only), and it matters because scheduling the upgrade is the point of no
+return for the node:
 
-1. `protocol_ops chain set-upgrade-timestamp --env <env> --chain-id <id> --upgrade-timestamp <ts>`
-   calls `ServerNotifier.setUpgradeTimestamp`, keyed on the chain's current version. The node
-   watches this event to learn that a cut is coming and when it is meant to apply; `1` means
-   "immediately". Run after the cut, the timestamp lands under the wrong version and the node
-   never sees it.
-2. `protocol_ops chain upgrade --env <env> --chain-id <id>` emits a single `ChainAdmin.multicall`
-   with `upgradeChainFromVersion(oldVersion, cut)` and, when `--da-mode` is given, the DA validator
-   pair and pubdata content the chain runs after the upgrade, in the same transaction so that the
-   chain never commits a batch under a DA setup its new version does not settle.
+1. **Check the cut's preconditions first.** The cut reverts unless they hold on the chain: the
+   chain is on exactly the old version, every committed batch has been executed (the release
+   installs a new verifier, and batches awaiting proof under the old one would stop being
+   provable; this is the one step 3 waits for), the previous upgrade transaction has been
+   consumed, and whatever the release adds. For v33, `V32UpgradeZKsyncOS` checks three things: the
+   base-token total supply backfill of v31 has happened (`baseTokenHasTotalSupply`), a priority-op
+   lower bound has been recorded
+   (`protocol_ops chain record-priority-op-lower-bound`, in its own earlier transaction), and the
+   priority queue has been drained past that bound.
+2. `protocol_ops chain set-upgrade-timestamp --env <env> --chain-id <id> --upgrade-timestamp <ts>`
+   calls `ServerNotifier.setUpgradeTimestamp`, keyed on the chain's current version; `1` means
+   "immediately" (0 is rejected). On this event the node injects the L2 upgrade transaction into
+   its next block (block N) and holds every later batch until the chain's L1 version moves, so the
+   cut's preconditions must already hold: if the cut then reverts, the chain is stuck. Run after
+   the cut, the call reverts (`CutDataForProtocolVersionNotAvailable`), since no cut is published
+   from the new version.
+3. `tools/upgrade-readiness-checker` waits until the node has the upgrade transaction in block N
+   and block N-1 is finalized, that is, every batch before the upgrade has been executed on L1. This
+   is the signal that the L1 cut can be sent now, not that the upgrade is done.
+4. `protocol_ops chain upgrade --env <env> --chain-id <id>` emits a single `ChainAdmin.multicall`
+   with `upgradeChainFromVersion(chainAddress, oldVersion, cut)` and, when `--da-mode` is given,
+   the DA validator pair and pubdata content the chain runs after the upgrade, in the same
+   transaction so that the chain never commits a batch under a DA setup its new version does not
+   settle.
+5. The batch carrying the upgrade transaction is committed and executed under the new version: the
+   built-ins are force-deployed and the L2 upgrade contract initializes them. The chain is on the
+   new version for good once that batch has been executed on L1.
 
-The cut reverts unless its preconditions hold on the chain: the chain is on exactly the old
-version, every committed batch has been executed (the release installs a new verifier, and
-batches awaiting proof under the old one would stop being provable), the previous upgrade
-transaction has been consumed, and whatever the release adds (v33 requires a recorded priority-op
-lower bound, `protocol_ops chain record-priority-op-lower-bound`, in its own earlier transaction).
-The scripts refuse to prepare a bundle that would fail them rather than emit one that reverts.
-
-Once the cut lands, the diamond records the L2 upgrade transaction and the node includes it as the
-first transaction of the next batch: the built-ins are force-deployed and the L2 upgrade contract
-initializes them. The chain is on the new version for good once the batch carrying that
-transaction has been executed on L1; `tools/upgrade-readiness-checker` polls for exactly that
-condition. The per-chain preconditions and the DA choices are worked through in
+`protocol_ops` checks only two of the preconditions explicitly: `chain set-upgrade-timestamp`
+refuses a v31 chain whose priority-op lower bound has not been recorded and drained, and `chain
+upgrade` refuses to leave a validium-priced chain in an unrecommended DA state. Everything else is
+covered only by the fork replay when the bundle is prepared, which reflects the chain's state at
+that moment. The per-chain preconditions and the DA choices are worked through in
 `l1-contracts/upgrade-envs/v0.33.0-atomic-interop/output/testnet/chain-upgrades/README.md`.
 
 ### 7. Close-out
 
 The cut is published with no deadline on the old version. Once every chain has upgraded,
-governance can expire the old version (the deadline argument of `setNewVersionUpgrade`), after
-which a chain still on it cannot commit batches until it upgrades. The committed artifacts
-(`ecosystem.toml`, `transactions.txt`, the scenarios, the per-chain bundles) stay in the release's
-`output/<env>/` directory as the record of the rollout, and `permanent-values/<env>.toml` is
+governance can expire the old version with `ChainTypeManager.setProtocolVersionDeadline(oldVersion,
+timestamp)` (calling `setNewVersionUpgrade` again reverts with `OutdatedProtocolVersion`, since the
+CTM is no longer on the old version), after which a chain still on it cannot commit batches until
+it upgrades. The committed artifacts (`ecosystem.toml`, `transactions.txt`, the scenarios, the
+per-chain bundles) stay in the release's `output/<env>/` directory as the record of the rollout, and `permanent-values/<env>.toml` is
 updated with any address the release moved.
 
 ## Authoring a release
@@ -261,8 +304,11 @@ and what one release adds:
   builds the force deployments, the L2 upgrade transaction and the diamond cut, and assembles the
   CTM stages. A release overrides `deployUsedUpgradeContract` (its per-chain upgrade contract),
   `getAdditionalUniversalForceDeployments` and `getAdditionalFactoryDependencyContracts` (its new
-  L2 built-ins), `encodePostUpgradeCalldata`, and the version-specific stage hooks.
-- `default-upgrade/DefaultChainUpgrade.s.sol` and `AdminFunctions.s.sol` drive the per-chain cut.
+  L2 built-ins), `getZKsyncOSL2UpgradeTargetAndData` (its L2 upgrade contract and calldata), and,
+  where it needs them, `encodePostUpgradeCalldata` and the CTM stage hooks (`CTMUpgrade_v33`
+  overrides neither).
+- `AdminFunctions.s.sol` drives the per-chain cut in `protocol_ops`;
+  `default-upgrade/DefaultChainUpgrade.s.sol` is only used by tests.
 - `v<N>/CoreUpgrade_v<N>.s.sol` and `v<N>/CTMUpgrade_v<N>.s.sol` are the release's overrides, plus
   any one-off script the release needs (`v33/RecordPriorityOpLowerBound.s.sol`).
 - `SystemContractsProcessing.s.sol` is the list of L2 built-ins a release force-deploys or
@@ -270,26 +316,37 @@ and what one release adds:
 
 The on-chain side of a release lives in `l1-contracts/contracts/upgrades/` (the per-chain upgrade
 contracts: `DefaultUpgrade` and `DefaultUpgradeZKsyncOS` for releases without one-time work, a
-one-shot `V<N>Upgrade…` otherwise, all on `BaseZkSyncUpgrade`) and
-`l1-contracts/contracts/l2-upgrades/` (`L2ComplexUpgrader`, which executes the L2 upgrade
-transaction, and the release's `L2V<N>Upgrade`). The CTM keeps the generic contract as its
-`defaultUpgrade` even when the release ships a one-shot one, because verifier-only upgrades reuse
-it later and a one-shot contract's preconditions only hold while a chain crosses that one release.
+one-shot contract otherwise, all on `BaseZkSyncUpgrade`) and `l1-contracts/contracts/l2-upgrades/`
+(`L2ComplexUpgrader`, which executes the L2 upgrade transaction, and the release's L2 upgrade
+contract). The one-shot contracts are named after the version they were introduced for, not the
+release number: v33 uses `V32UpgradeZKsyncOS` and `L2V32Upgrade`.
 
-A release also adds: its `upgrade-envs/<release>/` directory (inputs per environment, the
-`UPGRADE_ENV_DIR` constant in `protocol-ops/src/common/env_config.rs` moves to it), the verifier
-expectations under `protocol-ops/src/upgrade_verification/versions/v<N>/`, a regenerated genesis
-config and `AllContractsHashes.json`, and its entry in the anvil-interop upgrade test
-(`l1-contracts/test/anvil-interop/docs/upgrade-test-runner.md`), which runs the production
-scripts end to end against the previous release's chain-state snapshots on every CI run.
+The CTM should keep the generic contract as its `defaultUpgrade` even when the release ships a
+one-shot one, because verifier-only upgrades reuse it later and a one-shot contract's
+preconditions only hold while a chain crosses that one release. This is not automatic: by default
+the CTM stores whatever `deployUsedUpgradeContract` returns, so a release with a one-shot contract
+must also deploy a generic one and assign it to `ctmStoredDefaultUpgrade`, as `CTMUpgrade_v33`
+does.
+
+A release also adds: its `upgrade-envs/<release>/` directory (inputs per environment; the
+`UPGRADE_ENV_DIR` constant in `protocol-ops/src/common/env_config.rs` and the release's script
+paths and env directory in `protocol-ops/src/common/forge/scripts/mod.rs` move to it), the
+verifier expectations under `protocol-ops/src/upgrade_verification/versions/v<N>/`, a regenerated
+genesis config and `AllContractsHashes.json`, and its entry in the anvil-interop upgrade test
+(`l1-contracts/test/anvil-interop/docs/upgrade-test-runner.md`), which runs the release's scripts
+(through `*ForTests` subclasses) end to end against the previous release's chain-state snapshots
+on pull requests that touch the relevant paths.
 
 ## Emergency and verifier-only upgrades
 
 - **Verifier-only.** `ChainTypeManager.createNewVerifierOnlyUpgrade` publishes a version that
   changes no facets: the cut runs the stored `defaultUpgrade`, which picks the new verifier up
-  from the CTM. No prepare is needed beyond deploying the verifier; chains still apply it with the
-  per-chain steps above.
+  from the CTM. Beyond deploying the verifier, the governance call must run with migrations paused
+  (`pauseMigration` before, `unpauseMigration` after) and from the CTM's current version (same
+  major version, minor delta within the allowed limit, non-zero `defaultUpgrade`); chains still
+  apply it with the per-chain steps above.
 - **Emergency.** Governance can freeze a chain (`freezeChain`, `unfreezeChain`) and execute a cut
-  outside the normal proposal path; the one-off scripts in `l1-contracts/deploy-scripts/upgrade/`
-  (`EmergencyValidatorTimelockRestore.s.sol`, `VerifyStage1Pause.s.sol`,
-  `VerifyEmergencyApproveHash.s.sol`) are examples of preparing and fork-verifying such a call.
+  for it outside the normal proposal path (`ChainTypeManager.executeUpgrade(chainId, cut)`). The
+  one-off scripts in `l1-contracts/deploy-scripts/upgrade/` (`EmergencyValidatorTimelockRestore.s.sol`,
+  `VerifyStage1Pause.s.sol`, `VerifyEmergencyApproveHash.s.sol`) are examples of a different kind:
+  emergency-upgrade-board proposals for the stage `ProtocolUpgradeHandler` and their fork checks.
