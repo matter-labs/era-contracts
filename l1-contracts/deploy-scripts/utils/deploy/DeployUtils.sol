@@ -31,7 +31,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
     }
 
     /// @notice Creation code for `contractName`, read from `l1-contracts/out/`. Deployers that
-    /// read from elsewhere (e.g. the Gateway upgrade, which resolves GW artifacts) override this.
+    /// read from elsewhere override this.
     function getCreationCode(string memory contractName) internal view virtual returns (bytes memory) {
         return ContractsBytecodesLib.getCreationCodeEVM(contractName);
     }

@@ -17,15 +17,8 @@ pub const LOCAL_ZK_TOKEN_ADDRESS: &str = "0x8207187d1682B3ebaF2e1bdE471aC9d5B886
 pub const LOCAL_ZK_TOKEN_ASSET_ID: &str =
     "0x50c8daa176d24869d010ad74c2d374427601375ca2264e94f73784e299d572d4";
 
-/// Placeholder ZK token asset ID used by gateway vote-preparation input templates.
-pub const DEFAULT_ZK_TOKEN_ASSET_ID: &str =
-    "0x0000000000000000000000000000000000000000000000000000000000000001";
-
 /// Default CREATE2 salt used by generated script config templates.
 pub const ZERO_BYTES32: &str = "0x0000000000000000000000000000000000000000000000000000000000000000";
-
-/// L2 system address of the Bridgehub on the gateway chain.
-pub const GATEWAY_L2_BRIDGEHUB: &str = "0x0000000000000000000000000000000000010002";
 
 /// L2 system address of the bootloader.
 pub const L2_BOOTLOADER: &str = "0x0000000000000000000000000000000000008001";

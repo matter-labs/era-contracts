@@ -5,6 +5,9 @@
 > `l2TokenProxyBytecodeHash`, `IComplexUpgrader.forceDeployAndUpgrade`, `L2NativeTokenVaultZKOS`,
 > `[ctms.era]` and the router's `ERA_CHAIN_ID` referenced below no longer exist. Use it only to
 > re-review v31-era packages; for current packages follow `protocol-ops verify-upgrade` output.
+> The Gateway sections below (legacy-Gateway decommission, new-Gateway bring-up, `[new_gateway]`)
+> are historical too: v33 deploys no Gateway, and the Gateway ceremony tooling and PUVT checks were
+> removed (EVM-1689).
 
 ## Relevant files
 

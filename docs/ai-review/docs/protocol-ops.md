@@ -8,7 +8,7 @@
 - `protocol-ops/src/commands/ecosystem/v31_upgrade_full.rs` — `V31UpgradeFull` = Inner + ecosystem precondition (`ensureCtmsAndProxyAdminsOwnedByGovernance`).
 - `protocol-ops/src/commands/ecosystem/upgrade.rs` — CLI handlers (`run_upgrade_prepare_all`, `run_upgrade_governance`, `run_list_ctms`) and the free `replay_governance_stages` helper.
 - `protocol-ops/src/commands/ecosystem/simulator.rs` — converts prepared governance TOMLs into transaction-simulator JSON.
-- `protocol-ops/src/commands/chain/` — per-chain commands (`chain upgrade`, `chain gateway convert`, `chain gateway migrate-to`, …).
+- `protocol-ops/src/commands/chain/` — per-chain commands (`chain init`, `chain upgrade`, `chain set-da-validator-pair`, …).
 - `protocol-ops/src/commands/dev/execute_safe.rs` — executes a Gnosis Safe Transaction Builder JSON bundle by signing each tx with a supplied private key and sending raw transactions to the given RPC URL.
 - `protocol-ops/src/common/forge/runner.rs` — `ForgeRunner`: owns the anvil fork lifecycle and records every broadcast tx into `runner.runs()` for per-sender Safe-bundle emission.
 - `protocol-ops/src/common/l1_contracts.rs` — auto-resolution helpers (CTM, governance, bytecodes supplier, validator timelock, etc.) — read live state directly from L1.
@@ -18,7 +18,7 @@
 
 ## What protocol-ops is
 
-protocol-ops is a Rust CLI that drives privileged ecosystem operations (upgrades, gateway migrations, validator changes, …) by:
+protocol-ops is a Rust CLI that drives privileged ecosystem operations (upgrades, chain bring-up, validator changes, …) by:
 
 1. Spinning up a local **anvil fork** of L1 (the `ForgeRunner` owns this).
 2. Running production forge-script commands against the fork, with permissioned senders **impersonated** via anvil auto-impersonation (`--sender --unlocked`).

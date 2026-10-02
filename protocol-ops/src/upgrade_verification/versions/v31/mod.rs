@@ -1,5 +1,6 @@
-// TODO: drop once the scaffolding kept for S2d
-// (`check_gw_create2_deploy`) is resolved.
+// The v31 verifier still carries helpers and artifact mirrors nothing reads on this branch, and
+// `Verifiers` / `VerificationResult` are `pub(crate)` but flow through `pub` element methods;
+// both are a separate cleanup.
 #![allow(dead_code, private_interfaces)]
 
 use std::str::FromStr;
@@ -8,7 +9,6 @@ use alloy::primitives::{Address, FixedBytes};
 
 use crate::{
     commands::ecosystem::verify_upgrade::VerifyUpgradeEnv,
-    common::env_config::ChainInterval,
     upgrade_verification::{
         artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
         verifiers::{VerificationResult, Verifiers},
@@ -28,7 +28,6 @@ use elements::{
 pub(crate) const EXPECTED_NEW_PROTOCOL_VERSION_STR: &str = "0.32.0";
 pub(crate) const EXPECTED_ZKSYNC_OS_OLD_PROTOCOL_VERSION_STR: &str = "0.31.0";
 pub(crate) const MAX_NUMBER_OF_ZK_CHAINS: u32 = 100;
-pub(crate) const MAX_PRIORITY_TX_GAS_LIMIT: u32 = 72_000_000;
 
 /// Stage Sepolia's Era chain (270) is the single registered chain still
 /// settling on the legacy stage Gateway at v31 upgrade time.
@@ -75,8 +74,7 @@ pub(crate) fn expected_old_protocol_version_label(flavor: CtmFlavor) -> &'static
 ///   3. RPC state checks — chain ids, Create2Factory bytecode, proxy admins,
 ///      live core wiring, validator timelocks, settlement layer.
 ///      Subsumes legacy's early chain-id sanity (legacy steps 2–3).
-///   4. Deployment provenance — every named v31 deploy + the new-GW CTM
-///      provenance flow (legacy step 4).
+///   4. Deployment provenance — every named v31 deploy (legacy step 4).
 ///   5. Per-chain protocol-version sweep — was bundled inside legacy
 ///      `deployed_addresses.verify`; sits next to provenance for the same
 ///      reason.
@@ -86,14 +84,9 @@ pub(crate) async fn verify(
     env: VerifyUpgradeEnv,
     artifact: &EcosystemUpgradeArtifact,
     l1_rpc_url: &str,
-    gw_rpc_url: &str,
     contracts_commit: Option<&str>,
     zk_governance_commit: &str,
     era_chain_id: u64,
-    legacy_gateway_chain_id: u64,
-    legacy_gateway_chain_intervals: &[ChainInterval],
-    new_gateway_chain_id: u64,
-    new_gateway_representative_chain_id: u64,
     l1_chain_id: u64,
     tx_hashes: &[FixedBytes<32>],
     create2_factory: Address,
@@ -106,14 +99,9 @@ pub(crate) async fn verify(
         env,
         artifact,
         l1_rpc_url,
-        gw_rpc_url,
         contracts_commit,
         zk_governance_commit,
         era_chain_id,
-        legacy_gateway_chain_id,
-        legacy_gateway_chain_intervals,
-        new_gateway_chain_id,
-        new_gateway_representative_chain_id,
         l1_chain_id,
         zk_token_asset_id,
     )
@@ -121,10 +109,6 @@ pub(crate) async fn verify(
     result.report_ok(&format!(
         "v31 verifier context loaded with {} named addresses",
         verifiers.address_verifier.name_to_address.len()
-    ));
-    result.report_ok(&format!(
-        "Gateway RPC chain ID: {}",
-        verifiers.network_verifier.get_gateway_chain_id()
     ));
 
     // Populate the create2 maps so deployment provenance can match
@@ -134,7 +118,6 @@ pub(crate) async fn verify(
     // address-book lookup in `expect_create2_params` hard-errors only if a
     // load-bearing deployment is missing.
     let count = {
-        let bridgehub_address = verifiers.bridgehub_address;
         let Verifiers {
             bytecode_verifier,
             network_verifier,
@@ -144,7 +127,6 @@ pub(crate) async fn verify(
             .populate_create2_from_transactions_log(
                 tx_hashes,
                 &create2_factory,
-                &bridgehub_address,
                 expected_salts,
                 bytecode_verifier,
                 result,
@@ -159,7 +141,7 @@ pub(crate) async fn verify(
 
     verify_v31_artifact_state(artifact, &verifiers, create2_factory, result).await?;
 
-    verify_v31_provenance(artifact, &verifiers, legacy_gateway_chain_id, result).await?;
+    verify_v31_provenance(artifact, &verifiers, result).await?;
 
     verify_per_chain_protocol_versions(artifact, &verifiers, result).await?;
 
