@@ -48,7 +48,7 @@ contract DefaultUpgradeZKsyncOS is DefaultUpgrade {
         address _bridgehub,
         uint256 _chainId,
         bytes memory _existingTxData
-    ) public view virtual returns (bytes memory) {
+    ) public view returns (bytes memory) {
         return L2UpgradeTxLib.rewriteUpgradeTxData(_bridgehub, _chainId, _existingTxData);
     }
 
