@@ -31,6 +31,7 @@ jobs:
         working-directory: system-contracts
         run: |
           yarn install
+          yarn test:verification-input
           yarn build
           yarn build:foundry
 

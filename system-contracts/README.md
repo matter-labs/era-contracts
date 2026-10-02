@@ -188,6 +188,36 @@ For example, for zksync Era testnet environment it would look the following way:
 VERIFICATION_URL=https://explorer.sepolia.era.zksync.dev/contract_verification yarn verify-on-explorer
 ```
 
+Yul verification uses Foundry-exported Standard JSON, preserving all settings,
+including `llvmOptions`, rather than the single-file API that omits extra options.
+Only `settings.remappings` is dropped: solc rejects the field for Yul, and it does
+not change the bytecode. The zksolc version and expected LLVM options come from
+the current Foundry config. The zkVM-solc release comes from the build: zksolc
+records it in the metadata of each Solidity artifact
+(`zksolc:1.5.17;solc:0.8.28;llvm:1.0.2` is `zkVM-0.8.28-1.0.2`). Foundry picks
+this patch release implicitly and patch releases produce different bytecode, so
+the script does not guess it from the Solidity version. Build and verify from the
+same commit/configuration; this does not verify a new candidate against contracts
+deployed from an older bundle.
+
+Known limitation: the ZKsync contract verifier (`core/lib/contract_verifier` in
+zksync-era, checked at `ff5f519b`) compiles every Standard JSON request with
+`zksolc --solc`, while Foundry builds these Yul contracts without `--solc`. Through
+solc, `EcAdd`, `EcMul`, `EcPairing` and `Modexp` do not compile (solc rejects their
+unused `precompileCall(0, gas())` result, which zksolc accepts). The other Yul
+contracts compile to the same code with different metadata, which the verifier
+accepts only as a partial match. Exact Yul verification needs a verifier-side change.
+
+To inspect Yul verification requests without submitting anything:
+
+```sh
+VERIFICATION_INPUT_DIR=/tmp/yul-verification-inputs yarn verify-on-explorer
+```
+
+This exports Yul requests and skips Solidity submissions. It does not deploy or
+verify contracts on the live service. Solidity contracts continue to use Foundry's
+normal verification path. A live explorer verification remains a separate check.
+
 ## Official Links
 
 - [Website](https://zksync.io/)
