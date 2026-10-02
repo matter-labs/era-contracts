@@ -225,6 +225,24 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         assertEq(vm.getRecordedLogs().length, 0);
     }
 
+    function testFuzz_largeContractsUpdateRevertsAfterMigration(bool _oldEnabled, bool _newEnabled) public {
+        _setUpGatewayWithFilterer();
+        address chainAdmin = migratingChain.getAdmin();
+        vm.prank(chainAdmin);
+        migratingChain.setZKsyncOSLargeContractsEnabled(_oldEnabled);
+
+        gatewayScript.migrateChainToGateway(migratingChainId);
+        assertEq(addresses.bridgehub.settlementLayer(migratingChainId), gatewayChainId);
+
+        vm.recordLogs();
+        vm.prank(chainAdmin);
+        vm.expectRevert(NotSettlementLayer.selector);
+        migratingChain.setZKsyncOSLargeContractsEnabled(_newEnabled);
+
+        assertEq(migratingChain.isZKsyncOSLargeContractsEnabled(), _oldEnabled);
+        assertEq(vm.getRecordedLogs().length, 0);
+    }
+
     function test_l2Registration() public {
         _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(migratingChainId);
