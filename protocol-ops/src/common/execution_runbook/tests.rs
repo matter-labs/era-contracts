@@ -517,8 +517,13 @@ fn simulator_lists_keep_their_descriptions_and_drop_excluded_tags() {
 
 // ─── errors ──────────────────────────────────────────────────────────────────────
 
+/// The emergency-upgrade-board list of the v0.33.0 stage upgrade, kept as test data so these
+/// checks run on branches that do not carry that upgrade's directory.
+const EMERGENCY_BOARD_FIXTURE: &str =
+    "src/common/execution_runbook/testdata/emergency-upgrade-board.json";
+
 fn emergency_fixture(dir: &Path, edit: impl FnOnce(&mut serde_json::Value)) -> PathBuf {
-    let source = repo_path(V33_STAGE).join("emergency-upgrade-board.json");
+    let source = repo_path(EMERGENCY_BOARD_FIXTURE);
     let mut json: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(source).unwrap()).unwrap();
     edit(&mut json);
@@ -534,9 +539,6 @@ fn load_error(path: &Path, options: &LoadOptions) -> String {
 
 #[test]
 fn emergency_lists_reject_value_and_malformed_proposals() {
-    if !repo_path(V33_STAGE).is_dir() {
-        return;
-    }
     let sepolia = LoadOptions {
         chain_id: Some(11_155_111),
         ..Default::default()
