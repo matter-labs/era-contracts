@@ -159,17 +159,11 @@ jobs:
       - name: Restore this commit's artifacts
         uses: ./.github/actions/restore-ci-artifacts
 
-      - name: Checkout backend tooling
-        uses: actions/checkout@v4
-        with:
-          repository: matter-labs/zksync-os-integration-tests
-          ref: d1be31737c3d68346cf36495ec0991cefd5233e3 # ZiSK backend preparation
-          path: .external/zk-deployer
-          persist-credentials: false
-          sparse-checkout: bin/zk-deployer/tools/zisk-backend
-
-      - name: Run tests with external ZiSK backend
-        run: node .external/zk-deployer/bin/zk-deployer/tools/zisk-backend/zisk-backend.js test "$GITHUB_WORKSPACE"
+      # The real-pairing ZiSK suite needs the GPL-3 PLONK backend, which this
+      # repository does not ship; it skips here and runs in zksync-os-integration-tests.
+      - name: Run tests
+        working-directory: ./l1-contracts
+        run: yarn test:foundry
 
       - name: Run DA tests
         working-directory: ./da-contracts
