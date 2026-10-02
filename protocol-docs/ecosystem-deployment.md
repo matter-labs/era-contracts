@@ -33,10 +33,12 @@ side effect of creating a chain.
 
 A deployment has three layers, each with its own Forge script and its own `protocol_ops`
 subcommand. `protocol_ops` never broadcasts to the target L1 itself: it runs the scripts on a
-temporary Anvil fork of `--l1-rpc-url`, records every transaction, and writes one Safe Transaction
-Builder bundle per signer plus a `manifest.json` into `--out`. The bundles are then applied to the
-real L1 with `protocol_ops dev execute-manifest` (or any Safe-bundle-aware executor); see
-`protocol-ops/README.md` for the execution model.
+temporary Anvil fork of `--l1-rpc-url`, records every transaction, and writes Safe Transaction
+Builder bundles (one per consecutive run of transactions by the same signer) plus a `manifest.json`
+into `--out`. The bundles are then applied to the real L1 with `protocol_ops ecosystem
+upgrade-broadcast --manifest <out>/manifest.json` (which needs a `--key` for every signer in the
+manifest), with `protocol_ops dev execute-safe` per bundle, or with any Safe-bundle-aware
+executor; see `protocol-ops/README.md` for the execution model.
 
 | Layer | `protocol_ops` command                                     | Forge scripts                                                | Signers                                                       |
 | ----- | ---------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------- |
@@ -68,23 +70,38 @@ tracker, message root, chain asset handler and chain registration sender. Finall
 ownership hand-off: the Bridgehub, asset router, nullifier, interop handler, CTM deployment tracker
 and chain asset handler are transferred (two-step) to `Governance`, the native token vault to the
 configured owner, and `ChainAdminOwnable` is set as the Bridgehub's pending admin.
+`ChainRegistrationSender` is initialized with the deployer as its owner and is not transferred.
 
-`hub init` completes the hand-off as the owner: `AdminFunctions.chainAdminAcceptAdmin` accepts the
-Bridgehub admin role and `AdminFunctions.governanceAcceptOwnerAggregated` accepts the pending
-ownership of the Bridgehub, asset router, nullifier, CTM deployment tracker and chain asset
-handler on behalf of `Governance`.
+`hub init` accepts part of the hand-off as the owner: `AdminFunctions.chainAdminAcceptAdmin`
+accepts the Bridgehub admin role and `AdminFunctions.governanceAcceptOwnerAggregated` accepts the
+pending ownership of the Bridgehub, asset router, nullifier, CTM deployment tracker and chain
+asset handler on behalf of `Governance`. It does not complete the rest, so after `hub init` the
+deployer EOA still owns three core contracts:
+
+| Contract                  | State after `hub init`                          | Deployer can still                      | Manual step to complete the hand-off                                                                                                     |
+| ------------------------- | ----------------------------------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `L1InteropHandler`        | owner: deployer, pending owner: `Governance`    | `pause()` withdrawal finalization       | `Governance` calls `acceptOwnership()` (signed by `owner_address`: `AdminFunctions.governanceAcceptOwner(governance, l1InteropHandler)`) |
+| `L1NativeTokenVault`      | owner: deployer, pending owner: `owner_address` | `pause()` the vault                     | `owner_address` calls `acceptOwnership()` on the vault directly                                                                          |
+| `ChainRegistrationSender` | owner: deployer, no pending owner               | nothing today (no owner-gated function) | the deployer calls `transferOwnership(governance)`, then `owner_address` runs `AdminFunctions.governanceAcceptOwner(governance, sender)` |
+
+Until these are done the ownership table below does not hold. Making `hub init` perform them
+itself is an open tooling follow-up.
 
 Two inputs are immutable once deployed and therefore must be right the first time: the L1 WETH
 address (baked into the asset router and vault implementations; resolved from the L1 chain id when
-omitted, set it explicitly on any other network) and the Era chain id (default `270`).
+omitted, so `hub init` needs `--token-weth-address` on any other network) and the Era chain id
+(default `270`). Note that `ctm init` and `ecosystem init` currently resolve the L1 network from
+its chain id unconditionally and refuse to run on any L1 other than mainnet, Sepolia, Holesky or a
+local Anvil (`L1Network::from_l1_rpc`); a private L1 needs a tooling change first.
 
 ## CTM: the chain type manager
 
 `DeployCTM.s.sol` discovers the core addresses from the Bridgehub (`AddressIntrospector`) and
 deploys one CTM for one VM type (`--vm-type zksyncos|eravm`):
 
-- **Governance.** With `--reuse-gov-and-admin` (what `ecosystem init` does) the hub's
-  `Governance`, `ChainAdminOwnable` and `ProxyAdmin` are reused; otherwise the CTM gets its own set.
+- **Governance.** By default (`--reuse-gov-and-admin`, on for both `ctm init` and `ecosystem init`)
+  the hub's `Governance`, `ChainAdminOwnable` and `ProxyAdmin` are reused; with
+  `--reuse-gov-and-admin false` the CTM gets its own set.
 - **`ChainTypeManager`** (proxy) and the diamond it will clone for every chain: the `Admin`,
   `Getters`, `Mailbox`, `Executor`, `Committer` and `Migrator` facets and `DiamondInit`.
 - **Verifiers.** The PLONK verifier and the main verifier for the VM; with `testnet_verifier` the
@@ -100,7 +117,10 @@ deploys one CTM for one VM type (`--vm-type zksyncos|eravm`):
   `RollupL1DAValidator`, `BlobsL1DAValidatorZKsyncOS` (ZKsync OS only), `ValidiumL1DAValidator`,
   and an Avail validator (a real one when `avail_l1_da_validator` is configured, a dummy
   otherwise). The rollup pairs are whitelisted in the DA manager, which is what
-  `makePermanentRollup` later restricts a chain to.
+  `makePermanentRollup` later restricts a chain to. They are whitelisted with the
+  `BLOBS_AND_PUBDATA_KECCAK256` commitment scheme only, also on ZKsync OS, while a ZKsync OS chain
+  in rollup mode commits with `BlobsZKSyncOS`. A ZKsync OS chain created with the default flags
+  therefore cannot become a permanent rollup (see "Chain" below).
 
 The chain creation parameters the CTM stores (`setChainCreationParams`: genesis upgrade, genesis
 root, initial diamond cut, force deployment data) are built from `configs/genesis/<vm>/latest.json`
@@ -108,15 +128,28 @@ and from the compiled L2 built-ins. The genesis file is produced by `tools/zksyn
 and is what the operator's node must be started with; deploying a CTM from a build whose bytecodes
 do not match it produces chains whose genesis the node cannot reproduce.
 
-`ctm init` then accepts ownership as the owner (`governanceAcceptOwner` on the CTM,
+`DeployCTM.s.sol` ends by starting five two-step ownership transfers: the CTM to `Governance`
+(and `ChainAdminOwnable` as its pending admin), `ValidatorTimelock` to `owner_address`,
+`ServerNotifier` to `ChainAdminOwnable`, and `RollupDAManager` to `Governance`.
+
+`ctm init` then accepts two of them as the owner (`governanceAcceptOwner` on the CTM,
 `chainAdminAcceptAdmin` for the CTM admin) and registers the CTM on the Bridgehub with
 `RegisterCTM.s.sol`, a `Governance` operation of three calls: `L1Bridgehub.addChainTypeManager`,
 `L1AssetRouter.setAssetDeploymentTracker` for the CTM's asset id, and
-`CTMDeploymentTracker.registerCTMAssetOnL1`.
+`CTMDeploymentTracker.registerCTMAssetOnL1`. The other three stay with the deployer EOA until they
+are accepted by hand:
+
+| Contract            | Pending owner       | Deployer can still                                                         | Manual step                                                                              |
+| ------------------- | ------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `ValidatorTimelock` | `owner_address`     | `setExecutionDelay`                                                        | `owner_address` calls `acceptOwnership()`                                                |
+| `ServerNotifier`    | `ChainAdminOwnable` | `setChainTypeManager`                                                      | `owner_address` has the `ChainAdminOwnable` call `acceptOwnership()` on it (`multicall`) |
+| `RollupDAManager`   | `Governance`        | `updateDAPair`, i.e. whitelist DA pairs that `makePermanentRollup` accepts | `owner_address` runs `AdminFunctions.governanceAcceptOwner(governance, rollupDAManager)` |
+
+As with the hub, making `ctm init` perform these itself is a tooling follow-up.
 
 The ZK token asset id (`--zk-token-asset-id`, or `zk_token_asset_id` of the env preset) must be
 non-zero: it is passed to `InteropCenter.initL2` during every chain's genesis, which reverts on
-zero and would abort chain creation later rather than CTM deployment now.
+zero, so the CTM deployment script rejects a zero id up front.
 
 ## Chain: registering and initializing a chain
 
@@ -144,7 +177,10 @@ role and configures what only the chain admin can set: it unpauses deposits (unl
 validator pair (`--l1-da-validator`, one of the validators the CTM deployed, plus the L2
 commitment scheme derived from `--da-mode`), sets the pubdata content when the mode implies a
 non-default one, and optionally makes the chain a permanent rollup (`--make-permanent-rollup`,
-irreversible; incompatible with logs-only pubdata). See
+irreversible; incompatible with logs-only pubdata). On ZKsync OS, `--make-permanent-rollup` with
+the default `--da-mode rollup` currently reverts with `InvalidDAForPermanentRollup`: the chain
+commits with `BlobsZKSyncOS`, a scheme the CTM's `RollupDAManager` has not whitelisted (see "CTM"
+above). See
 {protocol-docs/system/contracts/settlement_contracts/data_availability/README.md} for what the
 DA choices mean and {protocol-docs/system/contracts/chain_management/admin_role.md} for the
 admin role.
@@ -164,15 +200,27 @@ are described in {protocol-docs/chain-lifecycle.md#interop-registration-chainreg
 
 ## Inputs and where they come from
 
-| Input                                    | Source                                                                                                                     |
-| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| L1 RPC, deployer EOA                     | `--l1-rpc-url`, `--deployer-address` (the bundle's signer; no key is given to the simulation)                              |
-| Owner, Era chain id, ZK token asset id   | flags, or `--env <name>` reading `l1-contracts/upgrade-envs/permanent-values/<name>.toml`                                  |
-| Bridgehub (for `ctm init`, `chain init`) | flag, or the env preset; `chain init` discovers the CTM from the Bridgehub except for the first chain of a fresh ecosystem |
-| VM type, testnet verifier                | `--vm-type`, `--with-testnet-verifier` (defaults to true; pass `false` for a production ecosystem)                         |
-| CREATE2 salt                             | `--create2-factory-salt` (random by default; the same salt and init code return the existing contract, never a new one)    |
-| Genesis and L2 bytecodes                 | `configs/genesis/<vm>/latest.json` and the built artifacts; both are checked into the release branch                       |
-| Chain parameters                         | chain id, owner, operators, base token and price ratio, `--da-mode`, `--l1-da-validator`, pubdata delivery overrides       |
+| Input                                    | Source                                                                                                                  |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| L1 RPC, deployer EOA                     | `--l1-rpc-url`, `--deployer-address` (the bundle's signer; no key is given to the simulation)                           |
+| Owner, Era chain id, ZK token asset id   | flags; `ecosystem init` and `ctm init` also take `--env <name>` (see below)                                             |
+| Bridgehub (for `ctm init`, `chain init`) | `--bridgehub` (required by `chain init`), or the env preset for `ctm init`                                              |
+| CTM (for `chain init`)                   | `--ctm-proxy`; pass it explicitly (see below)                                                                           |
+| VM type, testnet verifier                | `--vm-type`, `--with-testnet-verifier` (defaults to true; pass `false` for a production ecosystem)                      |
+| CREATE2 salt                             | `--create2-factory-salt` (random by default; the same salt and init code return the existing contract, never a new one) |
+| Genesis and L2 bytecodes                 | `configs/genesis/{era,zksync-os}/latest.json` (committed) and the locally built artifacts (not committed)               |
+| Chain parameters                         | chain id, owner, operators, base token and price ratio, `--da-mode`, `--l1-da-validator`, pubdata delivery overrides    |
+
+`--env <name>` exists only on `ecosystem init` and `ctm init`; `hub init` and `chain init` take
+flags only. It reads two files: the owner and the Era chain id come from the release input
+`l1-contracts/upgrade-envs/<release>/<name>.toml`, the ZK token asset id from
+`l1-contracts/upgrade-envs/permanent-values/<name>.toml`. Since `permanent-values` requires
+`bridgehub_proxy_addr`, `--env` cannot be used for an ecosystem that does not exist yet; a fresh
+ecosystem is deployed with flags.
+
+When `--ctm-proxy` is omitted, `chain init` takes the CTM of the first chain registered on the
+Bridgehub, which is silently wrong in an ecosystem with several CTMs, and on a Bridgehub without
+chains it scans `ChainTypeManagerAdded` from block 0, which hosted RPCs may refuse.
 
 `upgrade-envs/permanent-values/<env>.toml` is the per-environment fact sheet (L1 chain id,
 Bridgehub, CTMs, governance kind); a new ecosystem gets a new file there once its addresses exist,
@@ -211,13 +259,20 @@ the start: every power in the table above flows from it.
   fed with the `forge verify-contract` lines the scripts log.
 - Check ownership: `owner()` of the core proxies and the CTM must be the governance contract and
   no `pendingOwner()` may be left dangling; the Bridgehub's `admin()` must be the
-  `ChainAdminOwnable`.
+  `ChainAdminOwnable`. After `hub init` and `ctm init` alone this check fails until the manual
+  steps listed under "Hub" and "CTM" have been executed; check `L1InteropHandler`,
+  `L1NativeTokenVault`, `ChainRegistrationSender`, `ValidatorTimelock`, `ServerNotifier` and
+  `RollupDAManager` explicitly.
 
 ## Local and test deployments
 
-The anvil-interop fixture (`l1-contracts/test/anvil-interop/`) deploys a complete ecosystem with
-the same scripts: L1 core contracts and CTM, then the registration and initialization of every
-chain, then interop registration. `yarn setup-and-dump` runs it from scratch and snapshots the
-Anvil states that CI and the interop tests load. It is the quickest way to see the whole sequence
-executed end to end, and the deployment runner in `src/deployment-runner.ts` is the reference
-ordering when scripting a deployment by hand.
+The anvil-interop fixture (`l1-contracts/test/anvil-interop/`) deploys a complete ecosystem for
+tests: L1 core contracts and CTM, then the registration and initialization of every chain, then
+interop registration, plus a Gateway. `yarn setup-and-dump` runs it from scratch and snapshots the
+Anvil states that CI and the interop tests load. It is the quickest way to see a deployment run
+end to end, but it is not a production reference: it uses the test entry points (`runForAnvil`
+with `DummyL1MessageRoot`, `runForAnvilTest` without governance reuse, `RegisterCTM.runForTest`
+calling the Bridgehub directly as the deployer, so `Governance` never takes ownership), skips
+`FinalizeChainInit` (deposits are unpaused directly) and registers interop with direct
+`registerChain` calls instead of `RegisterOnAllChains`. For a production deployment follow
+`ecosystem init` and `chain init` as described above.
