@@ -67,6 +67,16 @@ library Utils {
         uint64 _maxTxGasLimit,
         PubdataContent _pubdataContent
     ) internal pure returns (bytes32) {
+        return chainConfigHash(_chainId, _maxTxGasLimit, _pubdataContent, false, false);
+    }
+
+    function chainConfigHash(
+        uint256 _chainId,
+        uint64 _maxTxGasLimit,
+        PubdataContent _pubdataContent,
+        bool _filteringEnabled,
+        bool _largeContractsEnabled
+    ) internal pure returns (bytes32) {
         return
             keccak256(
                 abi.encodePacked(
@@ -74,7 +84,8 @@ library Utils {
                     ZKSYNC_OS_FRI_PROOF_VERIFICATION_DISABLED,
                     uint256(_maxTxGasLimit),
                     uint256(_pubdataContent),
-                    uint256(0)
+                    uint256(_filteringEnabled ? 1 : 0),
+                    uint256(_largeContractsEnabled ? 1 : 0)
                 )
             );
     }

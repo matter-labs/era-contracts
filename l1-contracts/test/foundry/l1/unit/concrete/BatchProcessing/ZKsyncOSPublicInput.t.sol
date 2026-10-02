@@ -2,6 +2,14 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {
+    GOLDEN_CHAIN_ID,
+    BATCH_OUTPUT_HASH_GOLDEN,
+    PUBLIC_INPUT_HASH_GOLDEN,
+    PUBLIC_INPUT_HASH_GOLDEN_FILTERING_ONLY,
+    PUBLIC_INPUT_HASH_GOLDEN_LARGE_CONTRACTS_ONLY,
+    PUBLIC_INPUT_HASH_GOLDEN_BOTH_FLAGS
+} from "foundry-test/TestConstants.sol";
 
 import {TestCommitter} from "contracts/dev-contracts/test/TestCommitter.sol";
 import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
@@ -12,6 +20,11 @@ contract CommitterZKsyncOSPublicInputHarness is TestCommitter {
     function util_setZKsyncOSChainConfig(uint256 _chainId, uint64 _maxTxGasLimit) external {
         s.chainId = _chainId;
         s.zksyncOSMaxTxGasLimit = _maxTxGasLimit;
+    }
+
+    function util_setZKsyncOSChainConfigFlags(bool _filteringEnabled, bool _largeContractsEnabled) external {
+        s.zksyncOSL1TxFilteringEnabled = _filteringEnabled;
+        s.zksyncOSLargeContractsEnabled = _largeContractsEnabled;
     }
 
     function getBatchProofPublicInput(
@@ -31,21 +44,11 @@ contract CommitterZKsyncOSPublicInputHarness is TestCommitter {
     }
 }
 
-/// @notice Pins batch public inputs to the golden vectors in ZKsync OS's `public_input.rs`.
+/// @notice Pins the batch public input for the combined ZKsync OS chain configuration.
 /// @dev See {protocol-docs/chain-config.md#proof-commitment}.
 contract ZKsyncOSPublicInputTest is Test {
     CommitterZKsyncOSPublicInputHarness internal committer;
     ZKsyncOSVerifier internal verifier;
-
-    /// @dev `BatchOutput::hash()` golden vector from zksync-os (`batch_output_hash_golden_vector`).
-    bytes32 internal constant BATCH_OUTPUT_HASH_GOLDEN =
-        0x1c24f398aa0701f9348912ecca748ba93bfb84bfe4f283c16514311419f4f658;
-
-    /// @dev Shared with ZKsync OS's `batch_public_input_hash_golden_vector` (filtering disabled).
-    bytes32 internal constant PUBLIC_INPUT_HASH_GOLDEN =
-        0xdf099e94dc933cb1e302ad66826a922df76c4759542b07311d99b0c5e9eb436d;
-
-    uint256 internal constant GOLDEN_CHAIN_ID = 37;
 
     function setUp() public {
         committer = new CommitterZKsyncOSPublicInputHarness();
@@ -58,6 +61,26 @@ contract ZKsyncOSPublicInputTest is Test {
         uint256 publicInput = committer.getBatchProofPublicInput(bytes32(0), bytes32(0), BATCH_OUTPUT_HASH_GOLDEN);
 
         assertEq(publicInput, uint256(PUBLIC_INPUT_HASH_GOLDEN));
+    }
+
+    function test_publicInput_matchesZKsyncOSFlagGoldenVectors() public {
+        committer.util_setZKsyncOSChainConfigFlags(true, false);
+        assertEq(
+            committer.getBatchProofPublicInput(bytes32(0), bytes32(0), BATCH_OUTPUT_HASH_GOLDEN),
+            uint256(PUBLIC_INPUT_HASH_GOLDEN_FILTERING_ONLY)
+        );
+
+        committer.util_setZKsyncOSChainConfigFlags(false, true);
+        assertEq(
+            committer.getBatchProofPublicInput(bytes32(0), bytes32(0), BATCH_OUTPUT_HASH_GOLDEN),
+            uint256(PUBLIC_INPUT_HASH_GOLDEN_LARGE_CONTRACTS_ONLY)
+        );
+
+        committer.util_setZKsyncOSChainConfigFlags(true, true);
+        assertEq(
+            committer.getBatchProofPublicInput(bytes32(0), bytes32(0), BATCH_OUTPUT_HASH_GOLDEN),
+            uint256(PUBLIC_INPUT_HASH_GOLDEN_BOTH_FLAGS)
+        );
     }
 
     function test_publicInput_unsetMaxTxGasLimitFallsBackToDefault() public {

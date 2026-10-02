@@ -291,4 +291,7 @@ struct ZKChainStorage {
     /// @dev See {protocol-docs/chain-config.md#l1-transaction-filtering}.
     /// @dev STORAGE SLOT: 68 (packed after disabledProofSystems)
     bool zksyncOSL1TxFilteringEnabled;
+    /// @dev See {protocol-docs/chain-config.md#large-contracts}.
+    /// @dev STORAGE SLOT: 68 (packed after zksyncOSL1TxFilteringEnabled)
+    bool zksyncOSLargeContractsEnabled;
 }
