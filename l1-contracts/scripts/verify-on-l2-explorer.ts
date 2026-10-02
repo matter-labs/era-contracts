@@ -44,6 +44,11 @@ const L2_CONTRACTS: { [key: string]: ContractDescription } = {
     codeName: "L2WrappedBaseToken",
     path: "contracts/bridge/L2WrappedBaseToken.sol",
   },
+  L2BaseToken: {
+    address: "0x000000000000000000000000000000000000800a",
+    codeName: "L2BaseTokenEra",
+    path: "contracts/l2-system/era/L2BaseTokenEra.sol",
+  },
 };
 
 async function verifyContract(contractInfo: ContractDescription) {
