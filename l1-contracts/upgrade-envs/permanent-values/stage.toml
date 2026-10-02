@@ -119,3 +119,6 @@ chain_id = 2709
 settlement_fee = "0x2C68AF0BB140000"
 # Atlas (ZKsyncOS) witness chain — resolves to the Atlas CTM.
 ctm_representative_chain_id = 2702
+# Gateway RPC for PUVT's read-only GW-side checks. `--gw-rpc-url` (workflows:
+# GW_RPC_URL) overrides it; without either, PUVT refuses to run for this env.
+rpc_url = "https://zksync-os-stage-gateway.zksync.dev"
