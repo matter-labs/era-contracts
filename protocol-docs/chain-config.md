@@ -32,21 +32,19 @@ The server and external nodes must switch formats at protocol v34. Historical v3
 must still be decoded using their original formats.
 
 Before upgrading across the v34 boundary, all committed batches must be executed or reverted. This
-keeps the new executor from treating legacy batch-output hashes as full public-input hashes. The v34
-upgrade cut uses `V34UpgradeZKsyncOS` as its initializer, which inherits the all-executed check from
-`DefaultUpgradeZKsyncOS` unchanged. It only overrides `getL2UpgradeTxData`, so both overloads return
-the L2 upgrade calldata unchanged: v34's force-deployment payload has no chain-specific migration data
-to substitute, and the inherited v33 migration rewrite must not run on it. The v34 contract must not
-replace the CTM's reusable default upgrade implementation.
+keeps the new executor from treating legacy batch-output hashes as full public-input hashes.
 
-`deploy-scripts/upgrade/v34/CTMUpgrade_v34.s.sol` prepares this cut and keeps the generic
-`DefaultUpgrade` as the CTM default. Protocol-ops defaults to this script and
-`CoreUpgrade_v34.s.sol`, with a v33-to-v34 local input under
+v34 is a default upgrade: `DefaultCTMUpgrade` prepares it, with no release-specific script or
+per-chain initializer. The cut runs the CTM's default `DefaultUpgradeZKsyncOS`, whose all-executed check
+enforces the boundary above. The L2 transaction force-deploys `L2DefaultUpgrade` and delegates to it,
+with the chain's `ZKChainSpecificForceDeploymentsData` substituted on L1 by
+`DefaultUpgradeZKsyncOS.getL2UpgradeTxData`.
+
+Protocol-ops defaults to the default upgrade scripts with a v33-to-v34 local input under
 `upgrade-envs/v0.34.0-chain-config/local.toml`. The visible `--ctm-script-path`,
 `--core-script-path`, and `--upgrade-input-path` flags select historical or environment-specific
 preparations. A named environment must supply its v34 input; missing inputs fail rather than falling
 back to v33 or local parameters. The historical v31-to-v33 runner explicitly selects v33 scripts.
-The initializer is deployed during preparation and exported as `state_transition.v34_upgrade_addr`. It uses the default L2 force-deployment payload, without replaying v33 migration work.
 
 Config setters retain their existing guard against updates with unproved committed batches to keep
 this commitment-format upgrade from also changing the existing administrative update policy. This

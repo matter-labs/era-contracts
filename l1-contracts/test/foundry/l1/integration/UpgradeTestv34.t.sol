@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {ExecutorTest} from "foundry-test/l1/unit/concrete/BatchProcessing/_Executor_Shared.t.sol";
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
-import {CTMUpgradeV34Harness} from "foundry-test/l1/integration/utils/CTMUpgradeV34Harness.sol";
+import {CTMUpgradeHarness} from "foundry-test/l1/integration/utils/CTMUpgradeHarness.sol";
 import {
     TEST_CHAIN_CONFIG_UPGRADE_VERSION,
     LEGACY_V33_COMMIT_ENCODING_VERSION,
@@ -22,6 +22,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ProposedUpgradeLib, ProposedUpgrade} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {BaseZkSyncUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
+import {DefaultUpgradeZKsyncOS} from "contracts/upgrades/DefaultUpgradeZKsyncOS.sol";
 import {NotAllBatchesExecuted} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
@@ -73,7 +74,7 @@ contract UpgradeTestV34 is ExecutorTest {
         );
         vm.mockCall(ctm, abi.encodeCall(IChainTypeManager.protocolVersion, ()), abi.encode(previousVersion));
 
-        CTMUpgradeV34Harness script = new CTMUpgradeV34Harness();
+        CTMUpgradeHarness script = new CTMUpgradeHarness();
         script.setReplacementFacets(getters.facets());
         StateTransitionDeployedAddresses memory stateTransition;
         stateTransition.defaultUpgrade = script.deployDefaultUpgrade(ctm);
@@ -114,6 +115,13 @@ contract UpgradeTestV34 is ExecutorTest {
             creationParams,
             factoryDeps,
             UpgradeHelperLib.getProtocolUpgradeNonce(nextVersion)
+        );
+        // The diamond records the tx after the inherited per-chain rewrite of the placeholder payload.
+        Diamond.DiamondCutData memory v34Cut = abi.decode(encodedV34Cut, (Diamond.DiamondCutData));
+        proposal.l2ProtocolUpgradeTx.data = DefaultUpgradeZKsyncOS(v34Cut.initAddress).getL2UpgradeTxData(
+            address(dummyBridgehub),
+            l2ChainId,
+            proposal.l2ProtocolUpgradeTx.data
         );
         upgradeTxHash = keccak256(abi.encode(proposal.l2ProtocolUpgradeTx));
         vm.mockCall(

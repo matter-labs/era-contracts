@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {CTMUpgrade_v34} from "deploy-scripts/upgrade/v34/CTMUpgrade_v34.s.sol";
+import {DefaultCTMUpgrade} from "deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
 import {StateTransitionDeployedAddresses} from "deploy-scripts/utils/Types.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
-// Isolate the release initializer selection from facet discovery and L2 bytecode publication.
-contract CTMUpgradeV34Harness is CTMUpgrade_v34 {
+// Isolate the upgrade cut and L2 transaction from facet discovery, the shared L2 force-deployment list and
+// L2 bytecode publication.
+contract CTMUpgradeHarness is DefaultCTMUpgrade {
     Diamond.FacetCut[] internal replacementFacets;
 
     function setReplacementFacets(IZKChain.Facet[] memory _facets) external {
@@ -30,24 +31,28 @@ contract CTMUpgradeV34Harness is CTMUpgrade_v34 {
         return ctmAddresses.stateTransition.defaultUpgrade;
     }
 
-    function serializedStateTransition() external returns (string memory) {
-        serializeVersionSpecificStateTransition();
-        return vm.serializeString("state_transition", "test_marker", "v34");
-    }
-
     function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory
     ) internal view override returns (Diamond.FacetCut[] memory) {
         return replacementFacets;
     }
 
+    // Only the L2DefaultUpgrade delegate entry: the shared base list is covered by the SystemContractsProcessing tests.
     function getUniversalForceDeployments()
         internal
-        pure
         override
-        returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory)
+        returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments)
     {
-        return new IComplexUpgrader.UniversalContractUpgradeInfo[](0);
+        deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
+        deployments[0] = getL2DefaultUpgradeDeployment();
+    }
+
+    function setForceDeploymentsInputs(
+        address _ctmDeploymentTracker,
+        bytes memory _fixedForceDeploymentsData
+    ) external {
+        coreAddresses.bridgehub.proxies.ctmDeploymentTracker = _ctmDeploymentTracker;
+        generatedData.forceDeploymentsData = _fixedForceDeploymentsData;
     }
 
     function deployViaCreate2(bytes memory _bytecode) internal override returns (address deployed) {
