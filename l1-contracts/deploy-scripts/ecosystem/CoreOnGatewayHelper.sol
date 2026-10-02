@@ -28,7 +28,6 @@ import {
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,
-    L2_VERSION_SPECIFIC_UPGRADER_ADDR,
     L2_INTEROP_ATTRIBUTE_PARSER_ADDR,
     L2_INTEROP_COMMITMENT_TREE_ADDR,
     L2_ATOMIC_FLOW_MANAGER_ADDR
@@ -152,7 +151,7 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.L2MessageVerification) return "L2MessageVerification";
         if (_c == CoreContract.L2InteropRootStorage) return "L2InteropRootStorage";
         if (_c == CoreContract.BeaconProxy) return "BeaconProxy";
-        if (_c == CoreContract.L2V32Upgrade) return "L2V32Upgrade";
+        if (_c == CoreContract.L2DefaultUpgrade) return "L2DefaultUpgrade";
         if (_c == CoreContract.BridgedStandardERC20) return "BridgedStandardERC20";
         if (_c == CoreContract.DiamondProxy) return "DiamondProxy";
         if (_c == CoreContract.ProxyAdmin) return "ProxyAdmin";
@@ -164,9 +163,6 @@ library CoreOnGatewayHelper {
     /// @notice Resolve a CoreContract enum to its canonical L2 address.
     /// @dev Only covers contracts with well-known constant addresses.
     function _resolveAddress(CoreContract _c) internal pure returns (address) {
-        if (_c == CoreContract.L2V32Upgrade) {
-            return L2_VERSION_SPECIFIC_UPGRADER_ADDR;
-        }
         if (_c == CoreContract.L2Bridgehub) return L2_BRIDGEHUB_ADDR;
         if (_c == CoreContract.L2AssetRouter) return L2_ASSET_ROUTER_ADDR;
         if (_c == CoreContract.L2NativeTokenVault) return L2_NATIVE_TOKEN_VAULT_ADDR;

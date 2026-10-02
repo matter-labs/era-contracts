@@ -247,8 +247,11 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         console.log("Upgrade data generated!");
     }
 
+    /// @notice Deploy the per-chain upgrade contract.
+    /// @dev `DefaultUpgradeZKsyncOS` substitutes each chain's data into the `L2DefaultUpgrade` placeholder that
+    ///      {getL2UpgradeTargetAndData} emits, so it is the only valid default here.
     function deployUsedUpgradeContract() internal virtual returns (address) {
-        return deploySimpleContract("DefaultUpgrade");
+        return deploySimpleContract("DefaultUpgradeZKsyncOS");
     }
 
     function deployGovernanceUpgradeTimer() internal virtual {
@@ -504,9 +507,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     }
 
     function publishBytecodes() public virtual {
-        bytes[] memory allDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(
-            getAdditionalFactoryDependencyContracts()
-        );
+        bytes[] memory allDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(getFactoryDependencyContracts());
         BytecodesSupplier supplier = BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier);
 
         PublishFactoryDepsResult memory result = BytecodePublisher.publishAndProcessFactoryDeps(supplier, allDeps);

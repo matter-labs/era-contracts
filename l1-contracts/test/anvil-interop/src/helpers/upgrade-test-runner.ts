@@ -752,7 +752,7 @@ async function prepareAndRelayL2Upgrade(
   await deployL2Contracts(l2Provider, forceDeployEntries, delegateTo);
 
   // Send the original upgrade calldata to ComplexUpgrader. The outer force deployments no-op
-  // through MockContractDeployer, then upgrade() delegatecalls to L2V32Upgrade for initialization.
+  // through MockContractDeployer, then upgrade() delegatecalls to L2DefaultUpgrade for initialization.
   const txHash = await impersonateAndRun(l2Provider, L2_FORCE_DEPLOYER_ADDR, async (signer) => {
     const tx = await signer.sendTransaction({
       to: L2_COMPLEX_UPGRADER_ADDR,
@@ -814,10 +814,8 @@ async function deployL2Contracts(
   // For ZKsyncOS SystemProxyUpgrade entries, deploy behind a real SystemContractProxy.
   const contractMap = buildAddressToContract();
   for (const entry of forceDeployEntries) {
-    // ZKsyncOSUnsafeForceDeployment entries are direct deployments (e.g. the SystemContractProxyAdmin
-    // at L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, and L2V32Upgrade at a random delegate address).
-    // Both are already set up above (anvil_setCode for the proxy admin, and the delegateTo code
-    // is set separately below), so we skip them here.
+    // The only ZKsyncOSUnsafeForceDeployment entry is L2DefaultUpgrade at its derived delegate
+    // address; its code is set (and the entry checked) separately below.
     if (entry.upgradeType === UPGRADE_TYPE_ZKOS_UNSAFE_FORCE_DEPLOY) {
       continue;
     }
@@ -837,8 +835,11 @@ async function deployL2Contracts(
     }
   }
 
-  // Deploy the delegateTo target (L2V32Upgrade).
-  await l2Provider.send("anvil_setCode", [delegateTo, getBytecode("L2V32Upgrade")]);
+  // Deploy the delegateTo target (L2DefaultUpgrade), but only after checking that the upgrade itself
+  // force-deploys it there: exactly one unsafe entry, at `delegateTo`, carrying this bytecode.
+  const l2DefaultUpgradeBytecode = getBytecode("L2DefaultUpgrade");
+  assertDelegateDeployment(forceDeployEntries, delegateTo, l2DefaultUpgradeBytecode);
+  await l2Provider.send("anvil_setCode", [delegateTo, l2DefaultUpgradeBytecode]);
 
   // L2BaseToken is in the force deployment list as ZKsyncOSSystemProxyUpgrade, handled above.
 
@@ -888,6 +889,32 @@ async function deployL2Contracts(
  * (setup-and-dump-state.ts) so that the pre-generated states already have proper
  * SystemContractProxy layout at 0x800x addresses, matching production ZKsyncOS genesis.
  */
+function assertDelegateDeployment(
+  forceDeployEntries: ForceDeployEntry[],
+  delegateTo: string,
+  expectedBytecode: string
+): void {
+  const unsafeEntries = forceDeployEntries.filter((e) => e.upgradeType === UPGRADE_TYPE_ZKOS_UNSAFE_FORCE_DEPLOY);
+  if (unsafeEntries.length !== 1 || unsafeEntries[0].address.toLowerCase() !== delegateTo.toLowerCase()) {
+    throw new Error(
+      `Expected exactly one unsafe force deployment, at the delegate target ${delegateTo}; got ` +
+        JSON.stringify(unsafeEntries.map((e) => e.address))
+    );
+  }
+  // ZKsync OS bytecode info: abi.encode(bytecodeHash, bytecodeLength, observableBytecodeHash).
+  // The Blake hash is left to the protocol-ops upgrade verifier, which checks the whole tuple.
+  const [, bytecodeLength, observableHash] = ethers.utils.defaultAbiCoder.decode(
+    ["bytes32", "uint32", "bytes32"],
+    unsafeEntries[0].deployedBytecodeInfo ?? "0x"
+  );
+  if (
+    observableHash !== ethers.utils.keccak256(expectedBytecode) ||
+    bytecodeLength !== ethers.utils.hexDataLength(expectedBytecode)
+  ) {
+    throw new Error(`Delegate target ${delegateTo} is not force-deployed with the L2DefaultUpgrade bytecode`);
+  }
+}
+
 async function deployBehindSystemProxy(
   provider: ethers.providers.JsonRpcProvider,
   systemAddress: string,

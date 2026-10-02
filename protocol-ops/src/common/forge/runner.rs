@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use xshell::{cmd, Shell};
 
-use super::script::{ForgeScript, ForgeScriptArg, ForgeScriptArgs};
+use super::script::{ForgeScript, ForgeScriptArgs};
 // Forge is defined in the parent module (mod.rs); use the full path to avoid confusion.
 use crate::common::forge::scripts::{ForgeScriptParams, ScriptCall};
 use crate::common::forge::Forge;
@@ -236,14 +236,9 @@ impl ForgeRunner {
             .map(|_| std::time::Instant::now());
         let timing_label = script.timing_label.clone();
 
-        if script.needs_bridgehub_skip() {
-            let skip_path: String = String::from("contracts/bridgehub/*");
-            script.args.add_arg(ForgeScriptArg::Skip { skip_path });
-        }
-
         let args = script.args.build();
         let pre_run_ts_ms = Utc::now().timestamp_millis();
-        let command_result = self.execute(&script, &args, false)?;
+        let command_result = self.execute(&script, &args)?;
 
         if command_result.proposal_error() {
             logger::info(
@@ -326,12 +321,7 @@ impl ForgeRunner {
             .with_rpc_url(self.rpc_url.clone())
     }
 
-    fn execute(
-        &mut self,
-        script: &ForgeScript,
-        args: &[String],
-        _for_resume: bool,
-    ) -> anyhow::Result<CmdResult<()>> {
+    fn execute(&mut self, script: &ForgeScript, args: &[String]) -> anyhow::Result<CmdResult<()>> {
         let script_path = script.script_name().as_os_str();
         let _dir_guard = self.shell.push_dir(script.base_path());
         let mut cmd = Cmd::new(cmd!(

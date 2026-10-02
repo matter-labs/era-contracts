@@ -150,8 +150,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         _deployMockContract(L2_INTEROP_CENTER_ADDR);
         _deployMockContract(L2_INTEROP_HANDLER_ADDR);
         _deployMockContract(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
-        // The atomic-interop built-ins arrive with the upgrade's force deployments on a pre-existing chain;
-        // etch their real code so the helper initializing them is observable.
+        // Real built-in code, so that the upgrade leaving them alone is observable.
         _etchAtomicInteropBuiltIns();
 
         vm.mockCall(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, abi.encodeWithSignature("owner()"), abi.encode(address(this)));
@@ -180,14 +179,16 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         );
         assertEq(etchedProxyAdmin.upgradeCallCount(), 0);
 
-        // The upgrade path initializes the atomic-interop built-ins, so an upgraded chain ends up with the
-        // same state a fresh one gets from genesis.
-        _assertAtomicInteropInitialized();
+        // The atomic-interop built-ins are seeded at genesis only; the upgrade path never calls their
+        // one-shot `initL2`s.
+        assertEq(L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafCount(), 0, "tree seeded on upgrade");
+        assertEq(
+            AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).L1_CHAIN_ID(),
+            0,
+            "flow manager initialized on upgrade"
+        );
 
         _assertAssetRouterInitialized({_viaInitL2: false});
-
-        // Note: no ZKsync OS chain can arrive here with the built-ins already seeded — neither they nor
-        // their addresses existed in v31 — so the initialization is unconditional and one-shot.
     }
 
     // Helper functions
@@ -319,7 +320,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
     }
 
     /// @dev The atomic-interop built-ins are etched with their real code, not the generic mock, so that
-    ///      `_initializeV32Contracts` initializing them is observable (`leafCount` / `L1_CHAIN_ID`).
+    ///      `_initContractsAfterWiring` initializing them is observable (`leafCount` / `L1_CHAIN_ID`).
     function _etchAtomicInteropBuiltIns() internal {
         if (L2_INTEROP_COMMITMENT_TREE_ADDR.code.length == 0) {
             vm.etch(L2_INTEROP_COMMITMENT_TREE_ADDR, address(new L2InteropCommitmentTree()).code);
