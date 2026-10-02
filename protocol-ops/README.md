@@ -55,8 +55,9 @@ Every command that generates Safe bundles runs **exclusively against a temporary
 of `--l1-rpc-url`. The real L1 is **never modified** by the CLI. The fork exists only for
 the duration of the command and stops when it exits.
 
-To apply the generated Safe bundles to a real chain, use `dev execute-manifest` (or any
-Safe-bundle-aware executor) with the keys from `wallets.yaml`.
+To apply the generated Safe bundles to a real chain, use `ecosystem upgrade-broadcast --manifest
+<out>/manifest.json` (one `--key` per signer in the manifest), `dev execute-safe` per bundle, or
+any Safe-bundle-aware executor.
 
 ## Output
 

@@ -45,3 +45,5 @@ version-specific implementation and staged governance calls.
 
 Release-specific state migrations and ZKsync OS force deployments are documented in
 {protocol-docs/chain-lifecycle.md#upgrading-an-existing-ecosystem-onto-this-release}.
+The operational pipeline that prepares, verifies and rolls out a release across an ecosystem is
+described in {protocol-docs/ecosystem-upgrade.md}.

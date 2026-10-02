@@ -24,9 +24,15 @@ Both are `ChainAdmin.multicall` (`0x69340beb`), signed by that ChainAdmin's owne
 ### The order is load-bearing
 
 `setUpgradeTimestamp` keys the timestamp on `chainTypeManager.getProtocolVersion(chainId)` — the
-chain's version **at the time of that call**. Run the cut first and the chain is already on v33, so
-the timestamp lands under the wrong version and the server never sees one for the upgrade it just
-took.
+chain's version **at the time of that call**, and requires a published cut from that version. Run
+the cut first and the chain is already on v33, from which no cut exists, so the call reverts with
+`CutDataForProtocolVersionNotAvailable`.
+
+The timestamp is also the point of no return for the server: on the `UpgradeTimestampUpdated`
+event it injects the L2 upgrade transaction and holds every later batch until the chain's L1
+version moves. If the cut then reverts on a precondition, the chain is stuck, so the preconditions
+below must hold **before** the timestamp is set. The L1 cut itself is sent once
+`tools/upgrade-readiness-checker` reports the block before the upgrade transaction as finalized.
 
 ### Why the timestamp is 1, not 0
 
