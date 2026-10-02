@@ -9,6 +9,7 @@ import {
   yulVerificationRequest,
 } from "./yul-verification-input";
 import type { CompilerInput } from "./yul-verification-input";
+import { Language, SourceLocation, SYSTEM_CONTRACTS } from "./constants";
 
 // What `forge verify-contract --zksync --show-standard-json-input` (foundry-zksync v0.1.5) printed
 // for EcAdd in a full checkout, remappings included, and EcAdd's AllContractsHashes.json entry for
@@ -94,4 +95,31 @@ assert.throws(
   () => compilerVersionsFromBytecode(output.contracts[SOURCE_PATH][CODE_NAME].evm.bytecode.object),
   /does not record/
 );
+
+// verify-on-explorer submits a system-contracts Solidity entry as contracts-preprocessed/<codeName>.sol,
+// the preprocessed copy of contracts/<codeName>.sol, and skips SourceLocation.L1Contracts entries,
+// which l1-contracts' verify-on-l2-explorer verifies instead. Every Solidity entry must therefore
+// name a contract that its project builds: a stale or mistyped codeName, or a contract that moved
+// to l1-contracts (L2BaseToken is now L2BaseTokenEra) without its location changing, fails here.
+const BUILT_CONTRACTS = new Set(
+  (
+    JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "AllContractsHashes.json"), "utf8")) as {
+      contractName: string;
+    }[]
+  ).map(({ contractName }) => contractName)
+);
+const PROJECT_DIRS = {
+  [SourceLocation.SystemContracts]: "system-contracts",
+  [SourceLocation.L1Contracts]: "l1-contracts",
+};
+for (const description of Object.values(SYSTEM_CONTRACTS)) {
+  if (description.lang == Language.Solidity) {
+    const contractName = `${PROJECT_DIRS[description.location]}/${description.codeName}`;
+    assert.ok(BUILT_CONTRACTS.has(contractName), `${contractName} is not in AllContractsHashes.json`);
+  }
+  if (description.lang == Language.Solidity && description.location == SourceLocation.SystemContracts) {
+    const source = path.join(__dirname, "..", "contracts", `${description.codeName}.sol`);
+    assert.ok(fs.existsSync(source), `${description.codeName} has no source in system-contracts/contracts`);
+  }
+}
 console.log("Yul verification input regression checks passed");
