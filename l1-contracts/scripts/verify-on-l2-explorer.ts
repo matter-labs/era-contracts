@@ -51,6 +51,9 @@ const L2_CONTRACTS: { [key: string]: ContractDescription } = {
   },
 };
 
+// forge verify-contract submits the compiler settings of the local build. Build with CI's toolchain
+// (zksolc and zkVM-solc as pinned in foundry.toml) first, or the explorer will not reproduce the
+// deployed bytecode.
 async function verifyContract(contractInfo: ContractDescription) {
   const codeNameWithPath = `${contractInfo.path}:${contractInfo.codeName}`;
   console.log(`Verifying ${contractInfo.codeName} on ${contractInfo.address} address..`);
