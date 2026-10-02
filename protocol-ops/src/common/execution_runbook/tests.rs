@@ -121,6 +121,10 @@ fn assert_round_trips(runbook: &Runbook, markdown: &str) {
 /// check `dev execution-runbook --check-fork-url <sepolia> --check-fork-block 11813648` measured.
 fn v33_stage_runbook() -> Option<Runbook> {
     let dir = repo_path(V33_STAGE);
+    // The v0.33.0 compiler upgrade only exists on the Era line.
+    if !dir.is_dir() {
+        return None;
+    }
     let env_cfg = EnvConfig::load("stage").ok()?;
     let options = LoadOptions {
         env: Some("stage".to_string()),
