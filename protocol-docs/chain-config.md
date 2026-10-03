@@ -34,13 +34,14 @@ must still be decoded using their original formats.
 Before upgrading across the v34 boundary, all committed batches must be executed or reverted. This
 keeps the new executor from treating legacy batch-output hashes as full public-input hashes.
 
-v34 is a default upgrade: `DefaultCTMUpgrade` prepares it, with no release-specific script or
-per-chain initializer. The cut runs the CTM's default `DefaultUpgradeZKsyncOS`, whose all-executed check
-enforces the boundary above. The L2 transaction force-deploys `L2DefaultUpgrade` and delegates to it,
-with the chain's `ZKChainSpecificForceDeploymentsData` substituted on L1 by
-`DefaultUpgradeZKsyncOS.getL2UpgradeTxData`.
+v34 is prepared by `CTMUpgrade_v34`, the default CTM upgrade with one change: the cut runs
+`V34UpgradeZKsyncOS`, which adds the priority gas-limit clamp described in
+{protocol-docs/l1-transaction-gas-limit.md} to `DefaultUpgradeZKsyncOS`. The CTM default stays
+`DefaultUpgradeZKsyncOS`. Its all-executed check enforces the boundary above. The L2 transaction
+force-deploys `L2DefaultUpgrade` and delegates to it, with the chain's
+`ZKChainSpecificForceDeploymentsData` substituted on L1 by `DefaultUpgradeZKsyncOS.getL2UpgradeTxData`.
 
-Protocol-ops defaults to the default upgrade scripts with a v33-to-v34 local input under
+Protocol-ops defaults to `DefaultCoreUpgrade` and `CTMUpgrade_v34`, with a v33-to-v34 local input under
 `upgrade-envs/v0.34.0-chain-config/local.toml`. The visible `--ctm-script-path`,
 `--core-script-path`, and `--upgrade-input-path` flags select historical or environment-specific
 preparations. A named environment must supply its v34 input; missing inputs fail rather than falling

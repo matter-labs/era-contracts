@@ -19,7 +19,7 @@ import {
     PubdataPricingMode,
     L2DACommitmentScheme
 } from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {MAX_GAS_PER_TRANSACTION} from "contracts/common/Config.sol";
+import {PRIORITY_TX_MAX_GAS_LIMIT} from "contracts/common/Config.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
@@ -57,7 +57,7 @@ contract AdminExtendedTest is AdminTest {
 
         vm.prank(address(this));
         vm.expectRevert(TooMuchGas.selector);
-        adminFacet.setPriorityTxMaxGasLimit(MAX_GAS_PER_TRANSACTION + 1);
+        adminFacet.setPriorityTxMaxGasLimit(PRIORITY_TX_MAX_GAS_LIMIT + 1);
     }
 
     function test_ChangeFeeParams_PubdataExceedsMax() public {
