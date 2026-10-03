@@ -14,9 +14,18 @@ import {L2DACommitmentScheme} from "../../common/Config.sol";
 /// @param numberOfLayer1Txs Number of priority operations to be processed
 /// @param numberOfLayer2Txs Number of L2 transactions executed in the batch
 /// @param priorityOperationsHash Hash of all priority operations from this batch
+/// @param dependencyRootsRollingHash Rolling hash of the batch's interop dependency roots
 /// @param l2LogsTreeRoot Root hash of tree that contains L2 -> L1 messages from this batch
 /// @param daCommitmentScheme commitment scheme used to generate pubdata commitment for this batch
 /// @param daCommitment commitment to the batch pubdata to validate DA in the l1 da validator
+/// @param firstBlockTimestamp Timestamp of the first block in the batch
+/// @param firstBlockNumber Number of the first block in the batch
+/// @param lastBlockTimestamp Timestamp of the last block in the batch
+/// @param lastBlockNumber Number of the last block in the batch
+/// @param chainId Chain that executed the batch
+/// @param operatorDAInput Input to the L1 data-availability validator
+/// @param slChainId Settlement-layer chain ID used during execution
+/// @param chainConfigHash Hash of the runtime configuration used to execute the batch
 struct CommitBatchInfoZKsyncOS {
     uint64 batchNumber;
     bytes32 newStateCommitment;
@@ -34,6 +43,7 @@ struct CommitBatchInfoZKsyncOS {
     uint256 chainId;
     bytes operatorDAInput;
     uint256 slChainId;
+    bytes32 chainConfigHash;
 }
 
 /// @title The interface of the ZKsync Committer contract responsible for batch commitment operations.

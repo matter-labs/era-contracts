@@ -127,8 +127,11 @@ node bin/zk-deployer/tools/zisk-backend/zisk-backend.js test /path/to/era-contra
 Additional test flags may follow `--`, for example
 `-- --match-contract ZiskVerifierRealProofTest`. The helper sets
 `ZISK_PLONK_BYTECODE` from the prepared artifact and requires the real-proof
-suite's prerequisite. CI checks out a pinned zk-deployer revision and uses the
-same command without uploading the backend between jobs.
+suite's prerequisite.
+
+This repository's CI does not depend on zk-deployer, so its `yarn test:foundry`
+run skips the real-proof suite. The suite runs in zk-deployer's CI against a
+pinned era-contracts revision.
 
 Ordinary `yarn test:foundry` runs skip the real-proof suite when
 `ZISK_PLONK_BYTECODE` is unset. Invalid supplied bytecode fails setup.

@@ -967,6 +967,19 @@
   },
   {
     "type": "function",
+    "name": "getZKsyncOSChainConfigHash",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getZKsyncOSMaxTxGasLimit",
     "inputs": [],
     "outputs": [

@@ -3,7 +3,7 @@
 //! Two top-level commands:
 //!
 //!   `upgrade-prepare-all` deploys new ecosystem contracts (deployer EOA signs)
-//!                         by running `CoreUpgrade_v33` once + `CTMUpgrade_v33`
+//!                         by running `DefaultCoreUpgrade` once + `DefaultCTMUpgrade`
 //!                         once for the target `--ctm-proxy` on a single anvil fork, then
 //!                         executes operational CTM-admin calls such as
 //!                         ServerNotifier ProxyAdmin upgrades. Emits per-script
@@ -34,8 +34,8 @@ use crate::commands::ecosystem::upgrade_full::UpgradeFull;
 use crate::commands::ecosystem::upgrade_inner::{CtmInputs, PrepareInputs, UpgradeInner};
 use crate::common::abi::AdminFunctionsAbi;
 use crate::common::forge::scripts::{
-    ADMIN_FUNCTIONS_INVOCATION, CORE_UPGRADE_V33_SCRIPT_PATH, CTM_UPGRADE_V33_SCRIPT_PATH,
-    UPGRADE_V33_CORE_OUTPUT_PATH, UPGRADE_V33_ENV_DIR, UPGRADE_V33_LOCAL_INPUT_PATH,
+    ADMIN_FUNCTIONS_INVOCATION, DEFAULT_CORE_UPGRADE_SCRIPT_PATH, DEFAULT_CTM_UPGRADE_SCRIPT_PATH,
+    UPGRADE_V34_CORE_OUTPUT_PATH, UPGRADE_V34_ENV_DIR, UPGRADE_V34_LOCAL_INPUT_PATH,
 };
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
@@ -351,20 +351,21 @@ pub struct UpgradePrepareAllArgs {
 
     #[clap(
         long,
-        default_value = UPGRADE_V33_LOCAL_INPUT_PATH,
-        hide = true
+        default_value = UPGRADE_V34_LOCAL_INPUT_PATH
     )]
     pub upgrade_input_path: String,
 
     /// Override the core-prepare output TOML path (relative to l1-contracts
-    /// root). Defaults to the canonical `script-out/v33-upgrade-core.toml`.
-    #[clap(long, default_value = UPGRADE_V33_CORE_OUTPUT_PATH, hide = true)]
+    /// root). Defaults to the canonical `script-out/v34-upgrade-core.toml`.
+    #[clap(long, default_value = UPGRADE_V34_CORE_OUTPUT_PATH, hide = true)]
     pub core_output_path: String,
 
-    #[clap(long, default_value = CORE_UPGRADE_V33_SCRIPT_PATH, hide = true)]
+    /// Core upgrade script; historical releases must select their own script and input.
+    #[clap(long, default_value = DEFAULT_CORE_UPGRADE_SCRIPT_PATH)]
     pub core_script_path: String,
 
-    #[clap(long, default_value = CTM_UPGRADE_V33_SCRIPT_PATH, hide = true)]
+    /// CTM upgrade script; historical releases must select their own script and input.
+    #[clap(long, default_value = DEFAULT_CTM_UPGRADE_SCRIPT_PATH)]
     pub ctm_script_path: String,
 
     /// Path to a TOML file describing the CTM inputs (proxy + optional
@@ -507,7 +508,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     // ── env preset auto-fills ────────────────────────────────────────
     let env_cfg = args.topology.env_config()?;
     if let Some(ref cfg) = env_cfg {
-        // Default --out to upgrade-envs/v0.33.0-atomic-interop/output/<env>/protocol-ops/prepare/
+        // Default --out to the environment preset's protocol-ops preparation directory.
         if args.shared.out.is_none() {
             args.shared.out = Some(
                 crate::common::env_config::default_protocol_ops_out_dir(&cfg.env)?.join("prepare"),
@@ -531,8 +532,8 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         // `governance_upgrade_timer_initial_delay`, and the gateway chain id that is baked into
         // `L1MessageRoot` as `ERA_GATEWAY_CHAIN_ID`. Losing that last one would redeploy the message
         // root with 0. Failing here also catches a mistyped `--env`.
-        if args.upgrade_input_path == UPGRADE_V33_LOCAL_INPUT_PATH {
-            let per_env_rel = format!("{UPGRADE_V33_ENV_DIR}/{}.toml", cfg.env);
+        if args.upgrade_input_path == UPGRADE_V34_LOCAL_INPUT_PATH {
+            let per_env_rel = format!("{UPGRADE_V34_ENV_DIR}/{}.toml", cfg.env);
             let per_env_abs = paths::contracts_root()
                 .join("l1-contracts")
                 .join(per_env_rel.trim_start_matches('/'));
@@ -550,7 +551,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         }
     }
     // Auto-fill the CREATE2 salt from the per-version upgrade input
-    // (`upgrade-envs/v0.33.0-atomic-interop/<env>.toml [contracts]
+    // (`upgrade-envs/v0.34.0-chain-config/<env>.toml [contracts]
     // create2_factory_salt`). Recording the salt in version control makes
     // re-prepares reproducible (same addresses every run regardless of who
     // runs it), so deployer-bundle broadcasts can land at addresses that
@@ -1193,4 +1194,43 @@ fn load_ctm_config(path: &Path) -> anyhow::Result<Vec<CtmInputs>> {
         .collect();
 
     Ok(ctms)
+}
+
+#[cfg(test)]
+mod release_script_tests {
+    use super::*;
+    use crate::common::forge::scripts::{
+        CORE_UPGRADE_V33_SCRIPT_PATH, CTM_UPGRADE_V33_SCRIPT_PATH, UPGRADE_V33_LOCAL_INPUT_PATH,
+    };
+    use clap::CommandFactory;
+
+    #[test]
+    fn prepare_defaults_to_default_scripts_and_v34_input() {
+        let args = UpgradePrepareAllArgs::try_parse_from(["prepare"]).unwrap();
+        assert_eq!(args.ctm_script_path, DEFAULT_CTM_UPGRADE_SCRIPT_PATH);
+        assert_eq!(args.core_script_path, DEFAULT_CORE_UPGRADE_SCRIPT_PATH);
+        assert_eq!(args.upgrade_input_path, UPGRADE_V34_LOCAL_INPUT_PATH);
+        let help = UpgradePrepareAllArgs::command()
+            .render_long_help()
+            .to_string();
+        assert!(help.contains("--ctm-script-path"));
+        assert!(help.contains("--upgrade-input-path"));
+    }
+
+    #[test]
+    fn historical_prepare_can_select_v33() {
+        let args = UpgradePrepareAllArgs::try_parse_from([
+            "prepare",
+            "--ctm-script-path",
+            CTM_UPGRADE_V33_SCRIPT_PATH,
+            "--core-script-path",
+            CORE_UPGRADE_V33_SCRIPT_PATH,
+            "--upgrade-input-path",
+            UPGRADE_V33_LOCAL_INPUT_PATH,
+        ])
+        .unwrap();
+        assert_eq!(args.ctm_script_path, CTM_UPGRADE_V33_SCRIPT_PATH);
+        assert_eq!(args.core_script_path, CORE_UPGRADE_V33_SCRIPT_PATH);
+        assert_eq!(args.upgrade_input_path, UPGRADE_V33_LOCAL_INPUT_PATH);
+    }
 }

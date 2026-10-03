@@ -266,7 +266,10 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     /// @notice Single-call entry point invoked by the protocol-ops CLI's `ecosystem
     ///         upgrade-prepare-all`, once per CTM proxy. Drives the whole CTM-side prepare phase
     ///         (deploy + bytecode publish + upgrade-cut generation + call serialization).
+    /// @dev Rejects an EraVM CTM before reading the input TOML: the default per-chain upgrade is
+    ///      `DefaultUpgradeZKsyncOS`, which only applies to ZKsync OS chains.
     function noGovernancePrepare(CTMUpgradeParams memory _params) public virtual {
+        require(IChainTypeManager(_params.ctmProxy).isZKsyncOS(), "ZKsync OS CTM required");
         initializeWithArgs({
             ctmProxy: _params.ctmProxy,
             bytecodesSupplier: _params.bytecodesSupplier,
