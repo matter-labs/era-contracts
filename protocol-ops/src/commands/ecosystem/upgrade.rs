@@ -3,7 +3,7 @@
 //! Two top-level commands:
 //!
 //!   `upgrade-prepare-all` deploys new ecosystem contracts (deployer EOA signs)
-//!                         by running `DefaultCoreUpgrade` once + `DefaultCTMUpgrade`
+//!                         by running `DefaultCoreUpgrade` once + `CTMUpgrade_v34`
 //!                         once for the target `--ctm-proxy` on a single anvil fork, then
 //!                         executes operational CTM-admin calls such as
 //!                         ServerNotifier ProxyAdmin upgrades. Emits per-script
@@ -34,7 +34,7 @@ use crate::commands::ecosystem::upgrade_full::UpgradeFull;
 use crate::commands::ecosystem::upgrade_inner::{CtmInputs, PrepareInputs, UpgradeInner};
 use crate::common::abi::AdminFunctionsAbi;
 use crate::common::forge::scripts::{
-    ADMIN_FUNCTIONS_INVOCATION, DEFAULT_CORE_UPGRADE_SCRIPT_PATH, DEFAULT_CTM_UPGRADE_SCRIPT_PATH,
+    ADMIN_FUNCTIONS_INVOCATION, CTM_UPGRADE_V34_SCRIPT_PATH, DEFAULT_CORE_UPGRADE_SCRIPT_PATH,
     UPGRADE_V34_CORE_OUTPUT_PATH, UPGRADE_V34_ENV_DIR, UPGRADE_V34_LOCAL_INPUT_PATH,
 };
 use crate::common::forge::ForgeRunner;
@@ -365,7 +365,7 @@ pub struct UpgradePrepareAllArgs {
     pub core_script_path: String,
 
     /// CTM upgrade script; historical releases must select their own script and input.
-    #[clap(long, default_value = DEFAULT_CTM_UPGRADE_SCRIPT_PATH)]
+    #[clap(long, default_value = CTM_UPGRADE_V34_SCRIPT_PATH)]
     pub ctm_script_path: String,
 
     /// Path to a TOML file describing the CTM inputs (proxy + optional
@@ -1205,9 +1205,9 @@ mod release_script_tests {
     use clap::CommandFactory;
 
     #[test]
-    fn prepare_defaults_to_default_scripts_and_v34_input() {
+    fn prepare_defaults_to_v34() {
         let args = UpgradePrepareAllArgs::try_parse_from(["prepare"]).unwrap();
-        assert_eq!(args.ctm_script_path, DEFAULT_CTM_UPGRADE_SCRIPT_PATH);
+        assert_eq!(args.ctm_script_path, CTM_UPGRADE_V34_SCRIPT_PATH);
         assert_eq!(args.core_script_path, DEFAULT_CORE_UPGRADE_SCRIPT_PATH);
         assert_eq!(args.upgrade_input_path, UPGRADE_V34_LOCAL_INPUT_PATH);
         let help = UpgradePrepareAllArgs::command()

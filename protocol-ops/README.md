@@ -50,8 +50,8 @@ Most subcommands flatten **`SharedRunArgs`** from `common/args.rs`:
 
 ## Preparing protocol v34
 
-`ecosystem upgrade-prepare-all` defaults to the default upgrade scripts (`DefaultCoreUpgrade` and
-`DefaultCTMUpgrade`), using `upgrade-envs/v0.34.0-chain-config/local.toml` for a local v33-to-v34 upgrade.
+`ecosystem upgrade-prepare-all` defaults to `DefaultCoreUpgrade` and `CTMUpgrade_v34` (the default CTM
+upgrade with the v34 per-chain upgrade, `V34UpgradeZKsyncOS`), using `upgrade-envs/v0.34.0-chain-config/local.toml` for a local v33-to-v34 upgrade.
 For a named environment, provide its v34 TOML through `--upgrade-input-path` or place it under the v34
 input directory; missing inputs fail before deployment. Environment addresses and salts must match the
 target environment.
