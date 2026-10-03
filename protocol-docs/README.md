@@ -11,7 +11,7 @@ restating them (see the "Documentation and Comments" section of `AGENTS.md`).
 | [bridging.md](./bridging.md)                     | Asset router, native token vault, L2 asset tracker, L1 nullifier, base-token handling, failed-transfer recovery, legacy compatibility                                               |
 | [message-root.md](./message-root.md)             | Message-root aggregation, chain batch root tree, batch-leaf timestamps, the Indexed Merkle Tree, interop-root import double-check, proof paths                                      |
 | [chain-lifecycle.md](./chain-lifecycle.md)       | Chain creation and genesis seeding, interop registration gating, the v32 chain-migrations ban, ZKsync OS genesis force deployments                                                  |
-| [chain-config.md](./chain-config.md)             | Commit-time configuration binding, external-node signatures, v34 activation, upgrade tooling, and transition tests                                                                  |
+| [chain-config.md](./chain-config.md)             | Commit-time configuration binding, external-node signatures, L1 transaction filtering, v34 activation, and upgrade tooling                                                          |
 | [upgrade-scheduling.md](./upgrade-scheduling.md) | `ServerNotifier` scheduling, optional per-version precondition checkers, registration and execution-time guarantees                                                                 |
 
 The `atomicity/` folder is split into a layered set of pages (start at its README):

@@ -163,32 +163,10 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
                         _previousBatch.batchHash,
                         _commitInfo.newStateCommitment,
                         _commitInfo.chainConfigHash,
-                        _batchOutputHash(_commitInfo)
+                        _batchOutputHash(_commitInfo, bytes32(0))
                     )
                 )
             });
-    }
-
-    /// @dev Mirror the batchOutputHash formula from Committer._commitOneBatch.
-    /// Note: the chain id is not part of the batch output; it is committed via the chain config
-    /// section of the batch proof public input instead.
-    function _batchOutputHash(CommitBatchInfoZKsyncOS memory c) internal pure returns (bytes32) {
-        return
-            keccak256(
-                abi.encodePacked(
-                    c.firstBlockTimestamp,
-                    c.lastBlockTimestamp,
-                    uint256(c.daCommitmentScheme),
-                    c.daCommitment,
-                    c.numberOfLayer1Txs,
-                    c.numberOfLayer2Txs,
-                    c.priorityOperationsHash,
-                    c.l2LogsTreeRoot,
-                    bytes32(0), // no system-contract upgrade tx
-                    c.dependencyRootsRollingHash,
-                    c.slChainId
-                )
-            );
     }
 
     function _rollingHash(bytes32[] memory hashes) internal pure returns (bytes32) {
