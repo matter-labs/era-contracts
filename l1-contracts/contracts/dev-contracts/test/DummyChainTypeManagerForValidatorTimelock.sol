@@ -28,7 +28,7 @@ contract DummyChainTypeManagerForValidatorTimelock {
         return getZKChain(_chainId);
     }
 
-    function setZKChain(uint256, address _zkChain) external {
+    function setZKChain(address _zkChain) external {
         zkChainAddress = _zkChain;
     }
 }

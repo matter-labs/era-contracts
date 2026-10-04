@@ -47,7 +47,7 @@ library DeployCTML1OrGateway {
     // ======================== Name resolution ========================
 
     /// @notice Resolve a CTMContract to its (fileName, contractName).
-    function resolve(CTMContract _c) internal view returns (string memory fileName, string memory contractName) {
+    function resolve(CTMContract _c) internal pure returns (string memory fileName, string memory contractName) {
         contractName = _resolveCTMContractName(_c);
         fileName = string.concat(contractName, ".sol");
     }
@@ -55,17 +55,16 @@ library DeployCTML1OrGateway {
     /// @notice Resolve the main verifier (dual or testnet).
     function resolveMainVerifier(
         bool _testnet
-    ) internal view returns (string memory fileName, string memory contractName) {
+    ) internal pure returns (string memory fileName, string memory contractName) {
         return resolve(_testnet ? CTMContract.TestnetVerifier : CTMContract.DualVerifier);
     }
 
     // ======================== Creation calldata ========================
 
-    // solhint-disable-next-line code-complexity
     function getCreationCalldata(
         CTMCoreDeploymentConfig memory _config,
         CTMContract _contractName
-    ) internal view returns (bytes memory) {
+    ) internal pure returns (bytes memory) {
         if (_contractName == CTMContract.AdminFacet) {
             return abi.encode(_config.l1ChainId, _config.rollupDAManager);
         } else if (_contractName == CTMContract.MailboxFacet) {
@@ -85,10 +84,7 @@ library DeployCTML1OrGateway {
         } else if (_contractName == CTMContract.CommitterFacet) {
             return abi.encode(_config.l1ChainId);
         } else if (_contractName == CTMContract.DiamondInit) {
-            // `DiamondInit(bool _isZKOS)` — always ZKsync OS.
-            // TODO: drop the `_isZKOS` constructor input in the next release; it cannot change here
-            // without re-auditing the frozen contract.
-            return abi.encode(true);
+            return abi.encode();
         } else if (_contractName == CTMContract.DualVerifier || _contractName == CTMContract.TestnetVerifier) {
             return abi.encode(_config.verifierPlonk);
         } else if (_contractName == CTMContract.ChainTypeManager) {
@@ -107,8 +103,7 @@ library DeployCTML1OrGateway {
     }
 
     /// @notice Convert a resolved contract name string to the corresponding CTMContract enum value.
-    // solhint-disable-next-line code-complexity
-    function getCTMContractFromName(string memory _contractName) internal view returns (CTMContract) {
+    function getCTMContractFromName(string memory _contractName) internal pure returns (CTMContract) {
         if (_compareStrings(_contractName, "AdminFacet")) {
             return CTMContract.AdminFacet;
         } else if (_compareStrings(_contractName, "ExecutorFacet")) {
@@ -123,7 +118,7 @@ library DeployCTML1OrGateway {
             return CTMContract.CommitterFacet;
         } else if (_compareStrings(_contractName, "ValidatorTimelock")) {
             return CTMContract.ValidatorTimelock;
-        } else if (_compareStrings(_contractName, "ZKsyncOSChainTypeManager")) {
+        } else if (_compareStrings(_contractName, "ChainTypeManager")) {
             return CTMContract.ChainTypeManager;
         } else if (_compareStrings(_contractName, "BlobsL1DAValidatorZKsyncOS")) {
             return CTMContract.BlobsL1DAValidatorZKsyncOS;
@@ -152,15 +147,20 @@ library DeployCTML1OrGateway {
     // ======================== Private helpers ========================
 
     /// @notice Resolve a CTMContract enum to its contract name.
-    // solhint-disable-next-line code-complexity
-    function _resolveCTMContractName(CTMContract _c) private view returns (string memory) {
-        if (_c == CTMContract.ChainTypeManager) return "ZKsyncOSChainTypeManager";
+    function _resolveCTMContractName(CTMContract _c) private pure returns (string memory) {
+        if (_c == CTMContract.ChainTypeManager) {
+            return "ChainTypeManager";
+        }
         if (_c == CTMContract.DefaultUpgrade) return "DefaultUpgradeZKsyncOS";
         if (_c == CTMContract.VerifierPlonk) return "ZKsyncOSVerifierPlonk";
         if (_c == CTMContract.DualVerifier) return "ZKsyncOSVerifier";
         if (_c == CTMContract.TestnetVerifier) return "ZKsyncOSTestnetVerifier";
-        if (_c == CTMContract.GatewayCTMDeployerCTM) return "GatewayCTMDeployerCTMZKsyncOS";
-        if (_c == CTMContract.GatewayCTMDeployerVerifiers) return "GatewayCTMDeployerVerifiersZKsyncOS";
+        if (_c == CTMContract.GatewayCTMDeployerCTM) {
+            return "GatewayCTMDeployerCTM";
+        }
+        if (_c == CTMContract.GatewayCTMDeployerVerifiers) {
+            return "GatewayCTMDeployerVerifiers";
+        }
 
         if (_c == CTMContract.AdminFacet) return "AdminFacet";
         if (_c == CTMContract.MailboxFacet) return "MailboxFacet";
@@ -174,7 +174,7 @@ library DeployCTML1OrGateway {
         revert("DeployCTML1OrGateway: unknown CTMContract");
     }
 
-    function _compareStrings(string memory _a, string memory _b) private view returns (bool) {
+    function _compareStrings(string memory _a, string memory _b) private pure returns (bool) {
         return keccak256(abi.encodePacked(_a)) == keccak256(abi.encodePacked(_b));
     }
 }

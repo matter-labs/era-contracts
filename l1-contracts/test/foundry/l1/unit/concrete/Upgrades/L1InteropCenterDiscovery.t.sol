@@ -185,16 +185,17 @@ contract L1InteropCenterDiscoveryTest is Test {
         vm.expectRevert("Set has_l1_interop_center explicitly");
         coreScript.initializeConfigWithArgs(address(0), bytes32(0), path);
         vm.expectRevert("Set has_l1_interop_center explicitly");
-        script.initializeWithArgs(
-            address(0),
-            address(0),
-            address(0),
-            bytes32(0),
-            string.concat("/", path),
-            "",
-            address(0),
-            bytes32(0)
-        );
+        script.initializeWithArgs({
+            ctmProxy: address(0),
+            bytecodesSupplier: address(0),
+            rollupDAManager: address(0),
+            create2FactorySalt: bytes32(0),
+            newConfigPath: string.concat("/", path),
+            _outputPath: "",
+            governance: address(0),
+            zkTokenAssetId: bytes32(0),
+            testnetVerifier: false
+        });
         vm.removeFile(path);
     }
 }

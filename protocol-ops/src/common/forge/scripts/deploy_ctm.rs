@@ -13,9 +13,21 @@ pub struct DeployCTMConfig {
     pub testnet_verifier: bool,
     pub contracts: ContractsDeployCTMConfig,
     pub zk_token_asset_id: B256,
+    pub multi_proof_verifier: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub zisk_plonk_verifier_addr: Option<Address>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub zisk_range_verifier_addr: Option<Address>,
 }
 
 impl FileConfigTrait for DeployCTMConfig {}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct MultiProofDeployCTMConfig {
+    pub enabled: bool,
+    pub zisk_plonk_verifier_addr: Option<Address>,
+    pub zisk_range_verifier_addr: Option<Address>,
+}
 
 impl DeployCTMConfig {
     pub fn new(
@@ -23,11 +35,15 @@ impl DeployCTMConfig {
         initial_deployment_config: &InitialDeploymentConfig,
         testnet_verifier: bool,
         zk_token_asset_id: B256,
+        multi_proof: MultiProofDeployCTMConfig,
     ) -> Self {
         Self {
             testnet_verifier,
             owner_address,
             zk_token_asset_id,
+            multi_proof_verifier: multi_proof.enabled,
+            zisk_plonk_verifier_addr: multi_proof.zisk_plonk_verifier_addr,
+            zisk_range_verifier_addr: multi_proof.zisk_range_verifier_addr,
             contracts: ContractsDeployCTMConfig {
                 create2_factory_addr: initial_deployment_config.create2_factory_addr,
                 create2_factory_salt: initial_deployment_config.create2_factory_salt,
@@ -86,7 +102,56 @@ pub struct DeployCTMContractsConfigOutput {
 pub struct L1StateTransitionOutput {
     pub state_transition_proxy_addr: Address,
     pub verifier_addr: Address,
+    pub airbender_verifier_addr: Option<Address>,
+    pub zisk_verifier_addr: Option<Address>,
+    pub zisk_testnet_verifier_addr: Option<Address>,
+    pub multi_proof_verifier_addr: Option<Address>,
     pub genesis_upgrade_addr: Address,
     pub default_upgrade_addr: Address,
     pub bytecodes_supplier_addr: Address,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn multiprover_fields_are_serialized_for_the_solidity_script() {
+        let plonk = Address::repeat_byte(0x11);
+        let range = Address::repeat_byte(0x22);
+        let config = DeployCTMConfig::new(
+            Address::repeat_byte(0x33),
+            &InitialDeploymentConfig::default(),
+            true,
+            B256::repeat_byte(0x44),
+            MultiProofDeployCTMConfig {
+                enabled: true,
+                zisk_plonk_verifier_addr: Some(plonk),
+                zisk_range_verifier_addr: Some(range),
+            },
+        );
+
+        let serialized = toml::to_string(&config).unwrap();
+
+        assert!(serialized.contains("multi_proof_verifier = true"));
+        assert!(serialized.contains(&format!("zisk_plonk_verifier_addr = \"{plonk}\"")));
+        assert!(serialized.contains(&format!("zisk_range_verifier_addr = \"{range}\"")));
+    }
+
+    #[test]
+    fn optional_multiprover_addresses_are_omitted() {
+        let config = DeployCTMConfig::new(
+            Address::repeat_byte(0x33),
+            &InitialDeploymentConfig::default(),
+            true,
+            B256::repeat_byte(0x44),
+            MultiProofDeployCTMConfig::default(),
+        );
+
+        let serialized = toml::to_string(&config).unwrap();
+
+        assert!(serialized.contains("multi_proof_verifier = false"));
+        assert!(!serialized.contains("zisk_plonk_verifier_addr"));
+        assert!(!serialized.contains("zisk_range_verifier_addr"));
+    }
 }

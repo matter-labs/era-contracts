@@ -3,15 +3,21 @@
 pragma solidity 0.8.28;
 
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {Vm} from "forge-std/Vm.sol";
+
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";
-import {BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
+import {BridgehubL2TransactionRequest, L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {TransactionFiltererTrue} from "contracts/dev-contracts/test/DummyTransactionFiltererTrue.sol";
 import {TransactionFiltererFalse} from "contracts/dev-contracts/test/DummyTransactionFiltererFalse.sol";
-import {TransactionNotAllowed, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {FactoryDepsNotSupported, TransactionNotAllowed, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {LogFinder} from "test-utils/LogFinder.sol";
+import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestConstants.sol";
 
 contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
-    address l1InteropCenter = makeAddr("l1InteropCenter");
+    using LogFinder for Vm.Log[];
+
+    address internal l1InteropCenter = makeAddr("l1InteropCenter");
     function setUp() public virtual {
         setupDiamondProxy();
     }
@@ -48,6 +54,50 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
         vm.prank(l1InteropCenter);
         bytes32 canonicalTxHash = mailboxFacet.bridgehubRequestL2Transaction(req);
         assertTrue(canonicalTxHash != bytes32(0), "canonicalTxHash should not be 0");
+    }
+
+    function test_success_serializesEmptyFactoryDeps() public {
+        BridgehubL2TransactionRequest memory req = getBridgehubRequestL2TransactionRequest();
+        utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
+        utilsFacet.util_setPriorityTxMaxGasLimit(req.l2GasLimit);
+
+        vm.recordLogs();
+        vm.prank(bridgehub);
+        bytes32 canonicalTxHash = mailboxFacet.bridgehubRequestL2Transaction(req);
+
+        Vm.Log memory log = vm.getRecordedLogs().requireOneFrom(NEW_PRIORITY_REQUEST_SIGNATURE, address(mailboxFacet));
+        (
+            uint256 txId,
+            bytes32 emittedTxHash,
+            uint64 expirationTimestamp,
+            L2CanonicalTransaction memory transaction,
+            bytes[] memory emittedFactoryDeps
+        ) = abi.decode(log.data, (uint256, bytes32, uint64, L2CanonicalTransaction, bytes[]));
+
+        assertEq(txId, 0);
+        assertEq(expirationTimestamp, 0);
+        assertEq(emittedFactoryDeps.length, 0);
+        assertEq(transaction.factoryDeps.length, 0);
+        assertEq(emittedTxHash, keccak256(abi.encode(transaction)));
+        assertEq(canonicalTxHash, emittedTxHash);
+        assertEq(gettersFacet.getPriorityTreeRoot(), canonicalTxHash);
+    }
+
+    function testFuzz_revertWhen_FactoryDepsAreNotEmpty(bytes memory _bytecode) public {
+        BridgehubL2TransactionRequest memory req = getBridgehubRequestL2TransactionRequest();
+        utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
+        utilsFacet.util_setPriorityTxMaxGasLimit(req.l2GasLimit);
+        req.factoryDeps = new bytes[](1);
+        req.factoryDeps[0] = _bytecode;
+        bytes32 rootBefore = gettersFacet.getPriorityTreeRoot();
+        uint256 countBefore = gettersFacet.getTotalPriorityTxs();
+
+        vm.prank(bridgehub);
+        vm.expectRevert(FactoryDepsNotSupported.selector);
+        mailboxFacet.bridgehubRequestL2Transaction(req);
+
+        assertEq(gettersFacet.getPriorityTreeRoot(), rootBefore);
+        assertEq(gettersFacet.getTotalPriorityTxs(), countBefore);
     }
 
     function test_revertWhen_FalseFilterer() public {
@@ -92,9 +142,6 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
     }
 
     function getBridgehubRequestL2TransactionRequest() private returns (BridgehubL2TransactionRequest memory req) {
-        bytes[] memory factoryDeps = new bytes[](1);
-        factoryDeps[0] = "11111111111111111111111111111111";
-
         req = BridgehubL2TransactionRequest({
             sender: sender,
             contractL2: makeAddr("contractL2"),
@@ -103,7 +150,7 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
             l2Calldata: "",
             l2GasLimit: 10000000,
             l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            factoryDeps: factoryDeps,
+            factoryDeps: new bytes[](0),
             refundRecipient: sender
         });
     }

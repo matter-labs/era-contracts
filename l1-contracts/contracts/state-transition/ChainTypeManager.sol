@@ -1,0 +1,794 @@
+// SPDX-License-Identifier: MIT
+
+pragma solidity 0.8.28;
+
+import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
+import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
+
+import {Diamond} from "./libraries/Diamond.sol";
+import {DiamondProxy} from "./chain-deps/DiamondProxy.sol";
+import {IAdmin} from "./chain-interfaces/IAdmin.sol";
+import {IMigrator} from "./chain-interfaces/IMigrator.sol";
+import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
+import {IExecutor} from "./chain-interfaces/IExecutor.sol";
+import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "./IChainTypeManager.sol";
+import {IZKChain} from "./chain-interfaces/IZKChain.sol";
+import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+import {
+    DEFAULT_L2_LOGS_TREE_ROOT_HASH,
+    EMPTY_STRING_KECCAK,
+    GENESIS_BATCH_COMMITMENT,
+    L2_TO_L1_LOG_SERIALIZE_SIZE,
+    MAX_ALLOWED_MINOR_VERSION_DELTA
+} from "../common/Config.sol";
+import {
+    AdminZero,
+    InitialForceDeploymentMismatch,
+    NotAVerifierOnlyUpgrade,
+    OutdatedProtocolVersion
+} from "./L1StateTransitionErrors.sol";
+import {
+    AddressHasNoCode,
+    ChainAlreadyLive,
+    GenesisBatchCommitmentIncorrect,
+    GenesisBatchHashZero,
+    GenesisUpgradeZero,
+    HashMismatch,
+    MigrationsNotPaused,
+    Unauthorized,
+    ZeroAddress
+} from "../common/L1ContractErrors.sol";
+import {SemVer} from "../common/libraries/SemVer.sol";
+import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
+import {IChainAssetHandlerBase} from "../core/chain-asset-handler/IChainAssetHandler.sol";
+
+import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
+import {TxStatus} from "../common/Messaging.sol";
+
+import {IDefaultUpgrade} from "../upgrades/IDefaultUpgrade.sol";
+
+/// @title Chain Type Manager contract
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
+contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpgradeable {
+    using EnumerableMap for EnumerableMap.UintToAddressMap;
+
+    /// @notice Address of the bridgehub
+    address public immutable BRIDGE_HUB;
+
+    /// @notice Address of the interop center
+    address public immutable INTEROP_CENTER;
+
+    /// @notice Address of the L1 bytecodes supplier used for upgrades
+    address public immutable L1_BYTECODES_SUPPLIER;
+
+    /// @notice Address of the permissionless validator used in Priority Mode
+    address public immutable PERMISSIONLESS_VALIDATOR;
+
+    /// @notice The map from chainId => zkChain contract
+    EnumerableMap.UintToAddressMap internal __DEPRECATED_zkChainMap;
+
+    /// @dev The batch zero hash, calculated at initialization
+    bytes32 public storedBatchZero;
+
+    /// @dev The stored cutData for diamond cut
+    bytes32 public initialCutHash;
+
+    /// @dev The l1GenesisUpgrade contract address, used to set chainId
+    address public l1GenesisUpgrade;
+
+    /// @dev The current packed protocolVersion. To access human-readable version, use `getSemverProtocolVersion` function.
+    uint256 public protocolVersion;
+
+    /// @dev The timestamp when protocolVersion can be last used
+    mapping(uint256 _protocolVersion => uint256) public protocolVersionDeadline;
+
+    /// @dev The validatorTimelock contract address.
+    /// @dev Note, that address contains validator timelock for pre-v29 protocol versions. It is deprecated and will be removed in the future.
+    address internal __DEPRECATED_validatorTimelock;
+
+    /// @dev The stored cutData for upgrade diamond cut. protocolVersion => cutHash
+    mapping(uint256 protocolVersion => bytes32 cutHash) public upgradeCutHash;
+
+    /// @dev The address used to manage non critical updates
+    address public admin;
+
+    /// @dev The address to accept the admin role
+    address private pendingAdmin;
+
+    /// @dev The initial force deployment hash
+    bytes32 public initialForceDeploymentHash;
+
+    /// @dev The contract, that notifies server about l1 changes
+    address public serverNotifierAddress;
+
+    /// @dev The address of the post-V29 upgradeable validatorTimelock.
+    /// @dev Both validatorTimelock and validatorTimelockPostV29 getters are available for backward compatibility of nodes that rely on the validatorTimelock address being available.
+    address public validatorTimelockPostV29;
+
+    /// @dev The block number when upgradeCutHash was saved for some protocolVersion.
+    /// @dev It's used for easier tracking the upgrade cutData off-chain.
+    mapping(uint256 protocolVersion => uint256) public upgradeCutDataBlock;
+
+    /// @dev The block number when newChainCreationParams was saved for some protocolVersion.
+    /// @dev It's used for easier tracking the upgrade cutData off-chain.
+    /// @dev Populated starting from v31 and only when chain creation params change.
+    mapping(uint256 protocolVersion => uint256) public newChainCreationParamsBlock;
+
+    /// @dev The verifier address per protocol version.
+    /// @dev Populated starting from v31.
+    /// @dev Updating this mapping only affects CTM storage; it does NOT update already deployed chains.
+    /// @dev Emergency verifier changes still require a chain upgrade (diamond cut).
+    mapping(uint256 protocolVersion => address) public protocolVersionVerifier;
+
+    /// @dev The upgrade contract used for upgrades that need no custom upgrade logic.
+    /// @dev Populated starting from v32.
+    address public defaultUpgrade;
+
+    /// @dev Contract is expected to be used as proxy implementation.
+    /// @dev Initialize the implementation to prevent Parity hack.
+    /// @dev Note, that while the contract does not use `nonReentrant` modifier, we still keep the `reentrancyGuardInitializer`
+    /// here for two reasons:
+    /// - It prevents the function from being called twice (including in the proxy impl).
+    /// - It makes the local version consistent with the one in production, which already had the reentrancy guard
+    /// initialized.
+    constructor(
+        address _bridgehub,
+        address _interopCenter,
+        address _l1BytecodesSupplier,
+        address _permissionlessValidator
+    ) reentrancyGuardInitializer {
+        BRIDGE_HUB = _bridgehub;
+        INTEROP_CENTER = _interopCenter;
+        L1_BYTECODES_SUPPLIER = _l1BytecodesSupplier;
+        PERMISSIONLESS_VALIDATOR = _permissionlessValidator;
+
+        // While this does not provide a protection in the production, it is needed for local testing
+        // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
+        assert(L2_TO_L1_LOG_SERIALIZE_SIZE != 2 * 32);
+
+        _disableInitializers();
+    }
+
+    /// @notice only the bridgehub can call
+    modifier onlyBridgehub() {
+        if (msg.sender != BRIDGE_HUB) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    /// @notice the admin can call, for non-critical updates
+    modifier onlyOwnerOrAdmin() {
+        if (msg.sender != admin && msg.sender != owner()) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    /// @notice only the chain asset handler can call
+    modifier onlyChainAssetHandler() {
+        if (msg.sender != IL1Bridgehub(BRIDGE_HUB).chainAssetHandler()) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    /// @inheritdoc IChainTypeManager
+    function isZKsyncOS() external pure returns (bool) {
+        return true;
+    }
+
+    /// @return The tuple of (major, minor, patch) protocol version.
+    function getSemverProtocolVersion() external view returns (uint32, uint32, uint32) {
+        // slither-disable-next-line unused-return
+        return SemVer.unpackSemVer(SafeCast.toUint96(protocolVersion));
+    }
+
+    /// @notice return the chain contract address for a chainId
+    function getZKChain(uint256 _chainId) public view returns (address) {
+        return IL1Bridgehub(BRIDGE_HUB).getZKChain(_chainId);
+    }
+
+    /// @notice return the chain contract address for a chainId
+    /// @notice Do not use! use getZKChain instead. This will be removed.
+    function getZKChainLegacy(uint256 _chainId) public view returns (address chainAddress) {
+        // slither-disable-next-line unused-return
+        (, chainAddress) = __DEPRECATED_zkChainMap.tryGet(_chainId);
+    }
+
+    /// @notice Returns the address of the ZK chain admin with the corresponding chainID.
+    /// @notice Not related to the CTM, but it is here for legacy reasons.
+    /// @param _chainId the chainId of the chain
+    function getChainAdmin(uint256 _chainId) external view override returns (address) {
+        return IZKChain(getZKChain(_chainId)).getAdmin();
+    }
+
+    /// @dev initialize
+    /// @dev Note, that while the contract does not use `nonReentrant` modifier, we still keep the `reentrancyGuardInitializer`
+    /// here for two reasons:
+    /// - It prevents the function from being called twice (including in the proxy impl).
+    /// - It makes the local version consistent with the one in production, which already had the reentrancy guard
+    /// initialized.
+    function initialize(ChainTypeManagerInitializeData calldata _initializeData) external reentrancyGuardInitializer {
+        if (_initializeData.owner == address(0)) {
+            revert ZeroAddress();
+        }
+        if (_initializeData.validatorTimelock == address(0)) {
+            revert ZeroAddress();
+        }
+        if (_initializeData.serverNotifier == address(0)) {
+            revert ZeroAddress();
+        }
+        _transferOwnership(_initializeData.owner);
+
+        protocolVersion = _initializeData.protocolVersion;
+        _setProtocolVersionDeadline(_initializeData.protocolVersion, type(uint256).max);
+        _setProtocolVersionVerifier(_initializeData.protocolVersion, _initializeData.verifier);
+        validatorTimelockPostV29 = _initializeData.validatorTimelock;
+        serverNotifierAddress = _initializeData.serverNotifier;
+
+        _setChainCreationParams(_initializeData.chainCreationParams);
+    }
+
+    /// @notice Updates the parameters with which a new chain is created
+    /// @param _chainCreationParams The new chain creation parameters
+    function _setChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal {
+        if (_chainCreationParams.genesisUpgrade == address(0)) {
+            revert GenesisUpgradeZero();
+        }
+        if (_chainCreationParams.genesisBatchHash == bytes32(0)) {
+            revert GenesisBatchHashZero();
+        }
+        if (_chainCreationParams.genesisBatchCommitment != GENESIS_BATCH_COMMITMENT) {
+            revert GenesisBatchCommitmentIncorrect();
+        }
+
+        l1GenesisUpgrade = _chainCreationParams.genesisUpgrade;
+
+        // We need to initialize the state hash because it is used in the commitment of the next batch
+        IExecutor.StoredBatchInfo memory batchZero = IExecutor.StoredBatchInfo({
+            batchNumber: 0,
+            batchHash: _chainCreationParams.genesisBatchHash,
+            indexRepeatedStorageChanges: _chainCreationParams.genesisIndexRepeatedStorageChanges,
+            numberOfLayer1Txs: 0,
+            priorityOperationsHash: EMPTY_STRING_KECCAK,
+            l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
+            dependencyRootsRollingHash: bytes32(0),
+            timestamp: 0,
+            commitment: _chainCreationParams.genesisBatchCommitment
+        });
+        storedBatchZero = keccak256(abi.encode(batchZero));
+        bytes32 newInitialCutHash = keccak256(abi.encode(_chainCreationParams.diamondCut));
+        initialCutHash = newInitialCutHash;
+        bytes32 forceDeploymentHash = keccak256(abi.encode(_chainCreationParams.forceDeploymentsData));
+        initialForceDeploymentHash = forceDeploymentHash;
+        newChainCreationParamsBlock[protocolVersion] = block.number;
+
+        emit NewChainCreationParams({
+            genesisUpgrade: _chainCreationParams.genesisUpgrade,
+            genesisBatchHash: _chainCreationParams.genesisBatchHash,
+            genesisIndexRepeatedStorageChanges: _chainCreationParams.genesisIndexRepeatedStorageChanges,
+            genesisBatchCommitment: _chainCreationParams.genesisBatchCommitment,
+            newInitialCut: _chainCreationParams.diamondCut,
+            newInitialCutHash: newInitialCutHash,
+            forceDeploymentsData: _chainCreationParams.forceDeploymentsData,
+            forceDeploymentHash: forceDeploymentHash
+        });
+    }
+
+    /// @notice Updates the parameters with which a new chain is created
+    /// @param _chainCreationParams The new chain creation parameters
+    function setChainCreationParams(ChainCreationParams calldata _chainCreationParams) external onlyOwner {
+        _setChainCreationParams(_chainCreationParams);
+    }
+
+    /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
+    /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
+    /// @param _newPendingAdmin Address of the new admin
+    /// @dev Please note, if the owner wants to enforce the admin change it must execute both `setPendingAdmin` and
+    /// `acceptAdmin` atomically. Otherwise `admin` can set different pending admin and so fail to accept the admin rights.
+    function setPendingAdmin(address _newPendingAdmin) external onlyOwnerOrAdmin {
+        // Save previous value into the stack to put it into the event later
+        address oldPendingAdmin = pendingAdmin;
+        // Change pending admin
+        pendingAdmin = _newPendingAdmin;
+        emit NewPendingAdmin(oldPendingAdmin, _newPendingAdmin);
+    }
+
+    /// @notice Accepts transfer of admin rights. Only pending admin can accept the role.
+    function acceptAdmin() external {
+        // Only proposed by current admin address can claim the admin rights
+        if (msg.sender != pendingAdmin) {
+            revert Unauthorized(msg.sender);
+        }
+
+        address previousAdmin = admin;
+        admin = msg.sender;
+        delete pendingAdmin;
+
+        emit NewPendingAdmin(msg.sender, address(0));
+        emit NewAdmin(previousAdmin, msg.sender);
+    }
+
+    /// @dev Used to set legacy validatorTimelock.
+    /// @dev Note, that the validator timelock that this function sets is only used for pre-v29 protocol versions.
+    /// It is kept only for convenience.
+    /// @param _validatorTimelock the new validatorTimelock address
+    function setLegacyValidatorTimelock(address _validatorTimelock) external onlyOwner {
+        address oldValidatorTimelock = __DEPRECATED_validatorTimelock;
+        __DEPRECATED_validatorTimelock = _validatorTimelock;
+        emit NewValidatorTimelock(oldValidatorTimelock, _validatorTimelock);
+    }
+
+    /// @dev Used to set post-V29 validator timelock. Cannot do it during initialization, as validatorTimelockPostV29 is deployed after CTM.
+    /// @param _validatorTimelockPostV29 the new post-V29 upgradeable validatorTimelock address
+    function setValidatorTimelockPostV29(address _validatorTimelockPostV29) external onlyOwner {
+        address oldValidatorTimelockPostV29 = validatorTimelockPostV29;
+        validatorTimelockPostV29 = _validatorTimelockPostV29;
+        emit NewValidatorTimelockPostV29(oldValidatorTimelockPostV29, _validatorTimelockPostV29);
+    }
+
+    /// @dev set ServerNotifier.
+    /// @param _serverNotifier the new serverNotifier address
+    function setServerNotifier(address _serverNotifier) external onlyOwnerOrAdmin {
+        address oldServerNotifier = serverNotifierAddress;
+        serverNotifierAddress = _serverNotifier;
+        emit NewServerNotifier(oldServerNotifier, _serverNotifier);
+    }
+
+    /// @notice Sets verifier address for a protocol version
+    /// @param _protocolVersion The protocol version
+    /// @param _verifier The verifier address
+    function setProtocolVersionVerifier(uint256 _protocolVersion, address _verifier) external onlyOwner {
+        _setProtocolVersionVerifier(_protocolVersion, _verifier);
+    }
+
+    /// @notice Sets the upgrade contract used by upgrades that need no custom upgrade logic, e.g. verifier-only ones
+    /// @param _defaultUpgrade The new default upgrade contract address
+    function setDefaultUpgrade(address _defaultUpgrade) external onlyOwner {
+        // The address is delegatecalled by every chain that runs the upgrade, so a codeless one would make
+        // the upgrade a silent no-op. This also covers the zero address.
+        if (_defaultUpgrade.code.length == 0) {
+            revert AddressHasNoCode(_defaultUpgrade);
+        }
+        address oldDefaultUpgrade = defaultUpgrade;
+        defaultUpgrade = _defaultUpgrade;
+        emit NewDefaultUpgrade(oldDefaultUpgrade, _defaultUpgrade);
+    }
+
+    /// @dev Internal function to set verifier address for a protocol version
+    /// @param _protocolVersion The protocol version
+    /// @param _verifier The verifier address
+    function _setProtocolVersionVerifier(uint256 _protocolVersion, address _verifier) internal {
+        if (_verifier == address(0)) {
+            revert ZeroAddress();
+        }
+        protocolVersionVerifier[_protocolVersion] = _verifier;
+        emit NewProtocolVersionVerifier(_protocolVersion, _verifier);
+    }
+
+    /// @dev set New Version with upgrade from old version
+    /// @param _cutData the new diamond cut data
+    /// @param _oldProtocolVersion the old protocol version
+    /// @param _oldProtocolVersionDeadline the deadline for the old protocol version
+    /// @param _newProtocolVersion the new protocol version
+    /// @param _verifier the verifier address for the new protocol version
+    function setNewVersionUpgrade(
+        Diamond.DiamondCutData calldata _cutData,
+        uint256 _oldProtocolVersion,
+        uint256 _oldProtocolVersionDeadline,
+        uint256 _newProtocolVersion,
+        address _verifier
+    ) external onlyOwner {
+        _setNewVersionUpgrade({
+            _cutData: _cutData,
+            _oldProtocolVersion: _oldProtocolVersion,
+            _oldProtocolVersionDeadline: _oldProtocolVersionDeadline,
+            _newProtocolVersion: _newProtocolVersion,
+            _verifier: _verifier
+        });
+    }
+
+    /// @notice Creates a verifier-only upgrade (no facet changes) to a new minor or patch version
+    /// @dev This function creates a DiamondCutData with empty facet cuts that runs the stored `defaultUpgrade`
+    /// contract, which picks the new verifier up from `protocolVersionVerifier`.
+    /// @dev ChainCreationParams remain unchanged - only the upgrade cut hash is set.
+    /// @param _oldProtocolVersion the old protocol version
+    /// @param _oldProtocolVersionDeadline the deadline for the old protocol version
+    /// @param _newProtocolVersion the new protocol version
+    /// @param _verifier the verifier address for the new protocol version
+    function createNewVerifierOnlyUpgrade(
+        uint256 _oldProtocolVersion,
+        uint256 _oldProtocolVersionDeadline,
+        uint256 _newProtocolVersion,
+        address _verifier
+    ) external onlyOwner {
+        address upgradeContract = defaultUpgrade;
+        if (upgradeContract == address(0)) {
+            revert ZeroAddress();
+        }
+        // slither-disable-next-line unused-return
+        (uint32 oldMajor, uint32 oldMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(_oldProtocolVersion));
+        // slither-disable-next-line unused-return
+        (uint32 newMajor, uint32 newMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(_newProtocolVersion));
+        // The version must grow, the major part must stay the same, and the minor jump must respect the same
+        // limit the per-chain upgrade enforces, so that an upgrade accepted here cannot fail on the chain level.
+        // The minor versions are compared unpacked, just like `BaseZkSyncUpgrade` does, since the packed
+        // versions also carry the patch part and their difference would mix the two deltas.
+        // Note: Non-sequential minor/patch jumps are allowed (e.g., 0.25.1 -> 0.25.4) to support
+        // skipping intermediate versions when needed.
+        if (
+            _newProtocolVersion <= _oldProtocolVersion ||
+            newMajor != oldMajor ||
+            newMinor > oldMinor + MAX_ALLOWED_MINOR_VERSION_DELTA
+        ) {
+            revert NotAVerifierOnlyUpgrade(_oldProtocolVersion, _newProtocolVersion);
+        }
+
+        // Create diamond cut data with empty facet cuts but with upgrade contract
+        Diamond.FacetCut[] memory emptyFacetCuts = new Diamond.FacetCut[](0);
+        Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
+            facetCuts: emptyFacetCuts,
+            initAddress: upgradeContract,
+            initCalldata: abi.encodeCall(IDefaultUpgrade.upgradeVerifierOnly, (_newProtocolVersion))
+        });
+
+        // For verifier-only upgrades, chain creation params don't change — carry forward from the old version.
+        newChainCreationParamsBlock[_newProtocolVersion] = newChainCreationParamsBlock[_oldProtocolVersion];
+
+        _setNewVersionUpgrade({
+            _cutData: diamondCut,
+            _oldProtocolVersion: _oldProtocolVersion,
+            _oldProtocolVersionDeadline: _oldProtocolVersionDeadline,
+            _newProtocolVersion: _newProtocolVersion,
+            _verifier: _verifier
+        });
+    }
+
+    /// @dev Common logic for setting new version upgrade
+    /// @param _cutData the new diamond cut data
+    /// @param _oldProtocolVersion the old protocol version
+    /// @param _oldProtocolVersionDeadline the deadline for the old protocol version
+    /// @param _newProtocolVersion the new protocol version
+    /// @param _verifier the verifier address for the new protocol version
+    /// @dev Note: non-sequential protocol versions are allowed (e.g., minor/patch jumps).
+    function _setNewVersionUpgrade(
+        Diamond.DiamondCutData memory _cutData,
+        uint256 _oldProtocolVersion,
+        uint256 _oldProtocolVersionDeadline,
+        uint256 _newProtocolVersion,
+        address _verifier
+    ) internal {
+        // Migrations must be paused before setting new version upgrades
+        if (!IChainAssetHandlerBase(IL1Bridgehub(BRIDGE_HUB).chainAssetHandler()).migrationPaused()) {
+            revert MigrationsNotPaused();
+        }
+        uint256 previousProtocolVersion = protocolVersion;
+        // Explicitly verify that _oldProtocolVersion matches the current one.
+        if (previousProtocolVersion != _oldProtocolVersion) {
+            revert OutdatedProtocolVersion(previousProtocolVersion, _oldProtocolVersion);
+        }
+        _setProtocolVersionDeadline(_oldProtocolVersion, _oldProtocolVersionDeadline);
+        _setProtocolVersionDeadline(_newProtocolVersion, type(uint256).max);
+        protocolVersion = _newProtocolVersion;
+        emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
+        setUpgradeDiamondCutInner(_cutData, _oldProtocolVersion);
+        _setProtocolVersionVerifier(_newProtocolVersion, _verifier);
+        // Emit event with backward compatible hack.
+        emit NewUpgradeCutData(_newProtocolVersion, _cutData);
+    }
+
+    /// @dev check that the protocolVersion is active
+    /// @param _protocolVersion the protocol version to check
+    function protocolVersionIsActive(uint256 _protocolVersion) external view override returns (bool) {
+        return block.timestamp <= protocolVersionDeadline[_protocolVersion];
+    }
+
+    /// @notice Set the protocol version deadline
+    /// @param _protocolVersion the protocol version
+    /// @param _timestamp the timestamp is the deadline
+    function setProtocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) external onlyOwner {
+        _setProtocolVersionDeadline(_protocolVersion, _timestamp);
+    }
+
+    /// @dev set upgrade for some protocolVersion
+    /// @param _cutData the new diamond cut data
+    /// @param _oldProtocolVersion the old protocol version
+    function setUpgradeDiamondCut(
+        Diamond.DiamondCutData calldata _cutData,
+        uint256 _oldProtocolVersion
+    ) external onlyOwner {
+        setUpgradeDiamondCutInner(_cutData, _oldProtocolVersion);
+    }
+
+    /// @dev set upgrade for some protocolVersion
+    /// @param _cutData the new diamond cut data
+    /// @param _oldProtocolVersion the old protocol version
+    function setUpgradeDiamondCutInner(Diamond.DiamondCutData memory _cutData, uint256 _oldProtocolVersion) internal {
+        bytes32 newCutHash = keccak256(abi.encode(_cutData));
+        upgradeCutHash[_oldProtocolVersion] = newCutHash;
+        upgradeCutDataBlock[_oldProtocolVersion] = block.number;
+        emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);
+        emit NewUpgradeCutData(_oldProtocolVersion, _cutData);
+    }
+
+    /// @dev freezes the specified chain
+    /// @param _chainId the chainId of the chain
+    function freezeChain(uint256 _chainId) external onlyOwner {
+        IZKChain(getZKChain(_chainId)).freezeDiamond();
+    }
+
+    /// @dev unfreezes the specified chain
+    /// @param _chainId the chainId of the chain
+    function unfreezeChain(uint256 _chainId) external onlyOwner {
+        IZKChain(getZKChain(_chainId)).unfreezeDiamond();
+    }
+
+    /// @dev reverts batches on the specified chain
+    /// @param _chainId the chainId of the chain
+    /// @param _newLastBatch the new last batch
+    function revertBatches(uint256 _chainId, uint256 _newLastBatch) external onlyOwner {
+        address zkChainAddr = getZKChain(_chainId);
+        IZKChain(zkChainAddr).revertBatchesSharedBridge(zkChainAddr, _newLastBatch);
+    }
+
+    /// @dev execute predefined upgrade
+    /// @param _chainId the chainId of the chain
+    /// @param _oldProtocolVersion the old protocol version
+    /// @param _diamondCut the diamond cut data
+    function upgradeChainFromVersion(
+        uint256 _chainId,
+        uint256 _oldProtocolVersion,
+        Diamond.DiamondCutData calldata _diamondCut
+    ) external onlyOwner {
+        address chainAddress = getZKChain(_chainId);
+        IZKChain(chainAddress).upgradeChainFromVersion(chainAddress, _oldProtocolVersion, _diamondCut);
+    }
+
+    /// @dev executes upgrade on chain
+    /// @param _chainId the chainId of the chain
+    /// @param _diamondCut the diamond cut data
+    function executeUpgrade(uint256 _chainId, Diamond.DiamondCutData calldata _diamondCut) external onlyOwner {
+        IZKChain(getZKChain(_chainId)).executeUpgrade(_diamondCut);
+    }
+
+    /// @dev setPriorityTxMaxGasLimit for the specified chain
+    /// @param _chainId the chainId of the chain
+    /// @param _maxGasLimit the new max gas limit
+    function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external onlyOwner {
+        IZKChain(getZKChain(_chainId)).setPriorityTxMaxGasLimit(_maxGasLimit);
+    }
+
+    /// @dev setTokenMultiplier for the specified chain
+    /// @param _chainId the chainId of the chain
+    /// @param _nominator the new nominator of the token multiplier
+    /// @param _denominator the new denominator of the token multiplier
+    function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external onlyOwner {
+        IZKChain(getZKChain(_chainId)).setTokenMultiplier(_nominator, _denominator);
+    }
+
+    /// @dev changeFeeParams for the specified chain
+    /// @param _chainId the chainId of the chain
+    /// @param _newFeeParams the new fee params
+    function changeFeeParams(uint256 _chainId, FeeParams calldata _newFeeParams) external onlyOwner {
+        IZKChain(getZKChain(_chainId)).changeFeeParams(_newFeeParams);
+    }
+
+    /// @dev setValidator for the specified chain
+    /// @param _chainId the chainId of the chain
+    /// @param _validator the new validator
+    /// @param _active whether the validator is active
+    function setValidator(uint256 _chainId, address _validator, bool _active) external onlyOwner {
+        IZKChain(getZKChain(_chainId)).setValidator(_validator, _active);
+    }
+
+    /// @notice Deactivates Priority Mode for the specified chain.
+    /// The chain will return to normal operation with whitelisted validators.
+    /// @param _chainId the chainId of the chain
+    function deactivatePriorityMode(uint256 _chainId) external onlyOwner {
+        IZKChain(getZKChain(_chainId)).deactivatePriorityMode();
+    }
+
+    /// @notice deploys a full set of chains contracts
+    /// @param _chainId the chain's id
+    /// @param _baseTokenAssetId the base token asset id used to pay for gas fees
+    /// @param _admin the chain's admin address
+    /// @param _diamondCut the diamond cut data that initializes the chains Diamond Proxy
+    function _deployNewChain(
+        uint256 _chainId,
+        bytes32 _baseTokenAssetId,
+        address _admin,
+        bytes memory _diamondCut
+    ) internal returns (address zkChainAddress) {
+        if (getZKChain(_chainId) != address(0)) {
+            // ZKChain already registered
+            revert ChainAlreadyLive();
+        }
+
+        Diamond.DiamondCutData memory diamondCut = abi.decode(_diamondCut, (Diamond.DiamondCutData));
+
+        {
+            // check input
+            bytes32 cutHashInput = keccak256(_diamondCut);
+            if (cutHashInput != initialCutHash) {
+                revert HashMismatch(initialCutHash, cutHashInput);
+            }
+        }
+
+        // construct init data
+        bytes memory initData;
+        /// all together 4+8*32=260 bytes for the selector + mandatory data
+        // solhint-disable-next-line func-named-parameters
+        initData = bytes.concat(
+            IDiamondInit.initialize.selector,
+            bytes32(_chainId),
+            bytes32(uint256(uint160(BRIDGE_HUB))),
+            bytes32(uint256(uint160(address(this)))),
+            bytes32(protocolVersion),
+            bytes32(uint256(uint160(_admin))),
+            bytes32(uint256(uint160(validatorTimelockPostV29))),
+            _baseTokenAssetId,
+            storedBatchZero,
+            diamondCut.initCalldata
+        );
+
+        diamondCut.initCalldata = initData;
+        // deploy zkChainContract
+        // slither-disable-next-line reentrancy-no-eth
+        DiamondProxy zkChainContract = new DiamondProxy{salt: bytes32(0)}(block.chainid, diamondCut);
+        // save data
+        zkChainAddress = address(zkChainContract);
+        emit NewZKChain(_chainId, zkChainAddress);
+    }
+
+    /// @notice called by Bridgehub when a chain registers
+    /// @param _chainId the chain's id
+    /// @param _baseTokenAssetId the base token asset id used to pay for gas fees
+    /// @param _admin the chain's admin address
+    /// @param _initData the diamond cut data, force deployments and factoryDeps encoded
+    /// @param _factoryDeps the factory dependencies used for the genesis upgrade
+    /// that initializes the chains Diamond Proxy
+    function createNewChain(
+        uint256 _chainId,
+        bytes32 _baseTokenAssetId,
+        address _admin,
+        bytes calldata _initData,
+        bytes[] calldata _factoryDeps
+    ) external onlyBridgehub returns (address zkChainAddress) {
+        (bytes memory _diamondCut, bytes memory _forceDeploymentData) = abi.decode(_initData, (bytes, bytes));
+
+        // solhint-disable-next-line func-named-parameters
+        zkChainAddress = _deployNewChain(_chainId, _baseTokenAssetId, _admin, _diamondCut);
+
+        {
+            // check input
+            bytes32 forceDeploymentHash = keccak256(abi.encode(_forceDeploymentData));
+            if (forceDeploymentHash != initialForceDeploymentHash) {
+                revert InitialForceDeploymentMismatch(forceDeploymentHash, initialForceDeploymentHash);
+            }
+        }
+        // genesis upgrade, deploys some contracts, sets chainId
+        IAdmin(zkChainAddress).genesisUpgrade(
+            l1GenesisUpgrade,
+            address(IL1Bridgehub(BRIDGE_HUB).l1CtmDeployer()),
+            _forceDeploymentData,
+            _factoryDeps
+        );
+        // Deposits start paused by default to allow immediate Gateway migration.
+        // Otherwise, any deposit would trigger the PAUSE_DEPOSITS_TIME_WINDOW_START delay.
+        IMigrator(zkChainAddress).pauseDepositsBeforeInitiatingMigration();
+    }
+
+    /// @param _chainId the chainId of the chain
+    function getProtocolVersion(uint256 _chainId) public view returns (uint256) {
+        return IZKChain(getZKChain(_chainId)).getProtocolVersion();
+    }
+
+    /// @notice Called by the bridgehub during the migration of a chain to another settlement layer.
+    /// @param _chainId The chain id of the chain to be migrated.
+    /// @param _data The data needed to perform the migration.
+    function forwardedBridgeBurn(
+        uint256 _chainId,
+        bytes calldata _data
+    ) external view override onlyChainAssetHandler returns (bytes memory ctmForwardedBridgeMintData) {
+        // Note that the `_diamondCut` here is not for the current chain, for the chain where the migration
+        // happens. The correctness of it will be checked on the CTM on the new settlement layer.
+        (address _newSettlementLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
+        if (_newSettlementLayerAdmin == address(0)) {
+            revert AdminZero();
+        }
+
+        // We ensure that the chain has the latest protocol version to avoid edge cases
+        // related to different protocol version support.
+        uint256 chainProtocolVersion = IZKChain(getZKChain(_chainId)).getProtocolVersion();
+        if (chainProtocolVersion != protocolVersion) {
+            revert OutdatedProtocolVersion(protocolVersion, chainProtocolVersion);
+        }
+
+        return
+            abi.encode(
+                IL1Bridgehub(BRIDGE_HUB).baseTokenAssetId(_chainId),
+                _newSettlementLayerAdmin,
+                protocolVersion,
+                _diamondCut
+            );
+    }
+
+    /// @notice Called by the bridgehub during the migration of a chain to the current settlement layer.
+    /// @param _chainId The chain id of the chain to be migrated.
+    /// @param _ctmData The data returned from `forwardedBridgeBurn` for the chain.
+    function forwardedBridgeMint(
+        uint256 _chainId,
+        bytes calldata _ctmData
+    ) external override onlyChainAssetHandler returns (address chainAddress) {
+        (bytes32 _baseTokenAssetId, address _admin, uint256 _protocolVersion, bytes memory _diamondCut) = abi.decode(
+            _ctmData,
+            (bytes32, address, uint256, bytes)
+        );
+
+        // We ensure that the chain has the latest protocol version to avoid edge cases
+        // related to different protocol version support.
+        if (_protocolVersion != protocolVersion) {
+            revert OutdatedProtocolVersion(protocolVersion, _protocolVersion);
+        }
+        chainAddress = _deployNewChain({
+            _chainId: _chainId,
+            _baseTokenAssetId: _baseTokenAssetId,
+            _admin: _admin,
+            _diamondCut: _diamondCut
+        });
+    }
+
+    /// @notice Called by the bridgehub during the failed migration of a chain.
+    /// param _chainId the chainId of the chain
+    /// param _assetInfo the assetInfo of the chain
+    /// param _depositSender the address of that sent the deposit
+    /// param _ctmData the data of the migration
+    function forwardedBridgeConfirmTransferResult(
+        uint256, // _chainId
+        TxStatus, // _txStatus
+        bytes32, // _assetInfo
+        address, // _depositSender
+        bytes calldata // _ctmData
+    ) external onlyChainAssetHandler {
+        // Function is empty due to the fact that when calling `forwardedBridgeBurn` there are no
+        // state updates that occur.
+    }
+
+    /// @notice Set the protocol version deadline
+    /// @param _protocolVersion the protocol version
+    /// @param _timestamp the timestamp is the deadline
+    function _setProtocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) internal {
+        protocolVersionDeadline[_protocolVersion] = _timestamp;
+        emit UpdateProtocolVersionDeadline(_protocolVersion, _timestamp);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            Legacy functions
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice return the chain contract address for a chainId
+    function getHyperchain(uint256 _chainId) public view returns (address) {
+        // During upgrade, there will be a period when the zkChains mapping on
+        // bridgehub will not be filled yet, while the ValidatorTimelock
+        // will still query the address to obtain the chain id.
+        //
+        // To cover this case, we firstly use the existing storage and only then
+        // we use the bridgehub if the former was not present.
+        // This logic should be deleted in one of the future upgrades.
+        address legacyAddress = getZKChainLegacy(_chainId);
+        if (legacyAddress != address(0)) {
+            return legacyAddress;
+        }
+        return getZKChain(_chainId);
+    }
+
+    /// @notice Returns the legacy validator timelock address.
+    /// @dev This function is used to return the validator timelock address for pre-v29 protocol versions.
+    /// @dev This function is deprecated and will be removed in the future.
+    function validatorTimelock() external view returns (address) {
+        return __DEPRECATED_validatorTimelock;
+    }
+}

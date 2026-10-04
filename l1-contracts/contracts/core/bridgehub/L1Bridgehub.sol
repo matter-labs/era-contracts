@@ -61,17 +61,17 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     }
 
     /// @dev Returns the asset ID of ETH token for internal use.
-    function _ethTokenAssetId() internal view override returns (bytes32) {
+    function _getEthTokenAssetId() internal view override returns (bytes32) {
         return ETH_TOKEN_ASSET_ID;
     }
 
     /// @dev Returns the maximum number of ZK chains for internal use.
-    function _maxNumberOfZKChains() internal view override returns (uint256) {
+    function _getMaxNumberOfZKChains() internal view override returns (uint256) {
         return MAX_NUMBER_OF_ZK_CHAINS;
     }
 
     /// @dev Returns the L1 chain ID for internal use.
-    function _l1ChainId() internal view override returns (uint256) {
+    function _getL1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
     }
 
@@ -91,7 +91,6 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     /// @param _chainId the chainId of the chain
     /// @param _chainTypeManager the state transition manager address
     /// @param _baseTokenAssetId the base token asset id of the chain
-    /// @param _salt the salt for the chainId, currently not used
     /// @param _admin the admin of the chain
     /// @param _initData the fixed initialization data for the chain
     /// @param _factoryDeps the factory dependencies for the chain's deployment
@@ -99,8 +98,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         uint256 _chainId,
         address _chainTypeManager,
         bytes32 _baseTokenAssetId,
-        // solhint-disable-next-line no-unused-vars
-        uint256 _salt,
+        uint256,
         address _admin,
         bytes calldata _initData,
         bytes[] calldata _factoryDeps

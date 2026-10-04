@@ -3,14 +3,11 @@
 //! Decodes `setNewVersionUpgrade(diamondCut, …).diamondCut.initCalldata` as
 //! `DefaultUpgrade.upgrade(ProposedUpgrade)` and validates the entire
 //! `ProposedUpgrade` payload — static fields, the L1→L2 upgrade tx, the
-//! `forceDeployAndUpgrade(Universal)` inner call, factory deps, and the
-//! `IL2V32Upgrade.upgrade` arguments.
+//! `forceDeployAndUpgradeUniversal` inner call, factory deps, and the
+//! `IL2DefaultUpgrade.upgrade` arguments.
 //!
-//! The flavor-specific logic lives in the [`zksync_os`] submodule — expected
-//! force-deployments, deployed-bytecode-info decoding, the ZKsync OS
-//! factory-dep set, and the `forceDeployAndUpgradeUniversal` orchestrator.
-//! (The Era-VM arm was removed together with the rest of the Era CTM
-//! verification in the OS-only build.)
+//! The [`zksync_os`] submodule owns expected force-deployments, deployed-bytecode-info
+//! decoding, the factory-dep set, and the `forceDeployAndUpgradeUniversal` orchestrator.
 //!
 //! This module owns the shared `sol!` types (re-exported under the module
 //! path for external consumers like `governance_stage_calls`), the
@@ -132,26 +129,11 @@ sol! {
         }
 
         #[derive(Debug)]
-        struct ForceDeployment {
-            bytes32 bytecodeHash;
-            address newAddress;
-            bool callConstructor;
-            uint256 value;
-            bytes input;
-        }
-
-        #[derive(Debug)]
         struct UniversalContractUpgradeInfo {
             ContractUpgradeType upgradeType;
             bytes deployedBytecodeInfo;
             address newAddress;
         }
-
-        function forceDeployAndUpgrade(
-            ForceDeployment[] calldata _forceDeployments,
-            address _delegateTo,
-            bytes calldata _calldata
-        ) external payable;
 
         function forceDeployAndUpgradeUniversal(
             UniversalContractUpgradeInfo[] calldata _forceDeployments,
@@ -160,9 +142,8 @@ sol! {
         ) external payable;
     }
 
-    interface IL2V32Upgrade {
+    interface IL2DefaultUpgrade {
         function upgrade(
-            bool _isZKsyncOS,
             address _ctmDeployer,
             bytes calldata _fixedForceDeploymentsData,
             bytes calldata _additionalForceDeploymentsData
@@ -171,7 +152,6 @@ sol! {
 
     #[sol(rpc)]
     contract BytecodesSupplier {
-        mapping(bytes32 bytecodeHash => uint256 blockNumber) public publishingBlock;
         mapping(bytes32 bytecodeHash => uint256 blockNumber) public evmPublishingBlock;
     }
 }
@@ -179,7 +159,7 @@ sol! {
 impl ProposedUpgrade {
     /// Top-level entry: dispatches `verify_static_fields` (bytecode hashes
     /// per flavor + empty-field invariants) and `verify_l2_protocol_upgrade_tx`
-    /// (canonical L2 tx shape + inner `forceDeployAndUpgrade(Universal)` walk).
+    /// (canonical L2 tx shape + inner `forceDeployAndUpgradeUniversal` walk).
     pub async fn verify_v31_template(
         &self,
         verifiers: &Verifiers,
@@ -444,11 +424,8 @@ async fn verify_factory_deps(
         ));
     }
 
-    // Re-add the legacy PUVT `BytecodesSupplier.publishingBlock(hash) != 0`
-    // check for every factoryDep when an RPC + supplier address are
-    // available. This is intentionally a post-calldata check: it requires
-    // reading on-chain state from a live L1 RPC with the v31 prepare bundles
-    // already replayed.
+    // `BytecodesSupplier.evmPublishingBlock` must be queried after the prepare
+    // bundles have been replayed on the L1 RPC.
     if let Some(supplier_addr) = bytecodes_supplier_addr {
         let supplier =
             BytecodesSupplier::new(supplier_addr, verifiers.network_verifier.get_l1_provider());
@@ -483,26 +460,19 @@ async fn verify_factory_deps(
     }
 }
 
-/// Decodes the `IL2V32Upgrade.upgrade(...)` inner calldata from the
+/// Decodes the `IL2DefaultUpgrade.upgrade(...)` inner calldata from the
 /// `forceDeployAndUpgradeUniversal` `_calldata` argument and validates each
 /// field.
 pub(super) async fn verify_l2_v31_upgrade_inner_calldata(
     verifiers: &Verifiers,
     result: &mut VerificationResult,
     calldata: &[u8],
-    expected_is_zksync_os: bool,
     expected_fixed_force_deployments_data: &str,
 ) -> anyhow::Result<()> {
     use anyhow::Context;
-    let decoded = IL2V32Upgrade::upgradeCall::abi_decode(calldata)
-        .context("decoding IL2V32Upgrade.upgrade inner calldata")?;
+    let decoded = IL2DefaultUpgrade::upgradeCall::abi_decode(calldata)
+        .context("decoding IL2DefaultUpgrade.upgrade inner calldata")?;
 
-    if decoded._isZKsyncOS != expected_is_zksync_os {
-        result.report_error(&format!(
-            "IL2V32Upgrade.upgrade _isZKsyncOS mismatch: expected {}, got {}",
-            expected_is_zksync_os, decoded._isZKsyncOS
-        ));
-    }
     result.expect_address(
         verifiers,
         &decoded._ctmDeployer,
@@ -516,11 +486,11 @@ pub(super) async fn verify_l2_v31_upgrade_inner_calldata(
         let actual = hex::encode(&decoded._fixedForceDeploymentsData);
         if !actual.eq_ignore_ascii_case(expected) {
             result.report_error(&format!(
-                "IL2V32Upgrade.upgrade fixedForceDeploymentsData mismatch. Expected: 0x{}\nReceived: 0x{}",
+                "IL2DefaultUpgrade.upgrade fixedForceDeploymentsData mismatch. Expected: 0x{}\nReceived: 0x{}",
                 expected, actual
             ));
         } else {
-            result.report_ok("IL2V32Upgrade.upgrade fixedForceDeploymentsData matches TOML");
+            result.report_ok("IL2DefaultUpgrade.upgrade fixedForceDeploymentsData matches TOML");
         }
     }
 
@@ -530,16 +500,18 @@ pub(super) async fn verify_l2_v31_upgrade_inner_calldata(
     match FixedForceDeploymentsData::abi_decode(&decoded._fixedForceDeploymentsData) {
         Ok(fixed_data) => fixed_data.verify(verifiers, result).await?,
         Err(err) => result.report_error(&format!(
-            "Failed to decode IL2V32Upgrade.upgrade fixedForceDeploymentsData: {err}"
+            "Failed to decode IL2DefaultUpgrade.upgrade fixedForceDeploymentsData: {err}"
         )),
     }
 
     if !decoded._additionalForceDeploymentsData.is_empty() {
         result.report_error(
-            "IL2V32Upgrade.upgrade additionalForceDeploymentsData template must be empty",
+            "IL2DefaultUpgrade.upgrade additionalForceDeploymentsData template must be empty",
         );
     } else {
-        result.report_ok("IL2V32Upgrade.upgrade additionalForceDeploymentsData template is empty");
+        result.report_ok(
+            "IL2DefaultUpgrade.upgrade additionalForceDeploymentsData template is empty",
+        );
     }
 
     Ok(())

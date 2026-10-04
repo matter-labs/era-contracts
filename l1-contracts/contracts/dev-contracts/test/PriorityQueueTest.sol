@@ -8,7 +8,7 @@ contract PriorityQueueTest {
     // add this to be excluded from coverage report
     function test() internal virtual {}
 
-    PriorityQueue.Queue priorityQueue;
+    PriorityQueue.Queue internal priorityQueue;
 
     function getFirstUnprocessedPriorityTx() external view returns (uint256) {
         return PriorityQueue.getFirstUnprocessedPriorityTx(priorityQueue);

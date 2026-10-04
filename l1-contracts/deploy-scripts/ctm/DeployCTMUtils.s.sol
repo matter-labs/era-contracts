@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-// solhint-disable no-console, gas-custom-errors
-
 import {stdToml} from "forge-std/StdToml.sol";
-import {console2 as console} from "forge-std/Script.sol";
 
 import {ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -14,53 +11,22 @@ import {Utils} from "../utils/Utils.sol";
 
 import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
 
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {Governance} from "contracts/governance/Governance.sol";
-import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
-
-import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
-import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-
-import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
-import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
-import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
-
-import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
-import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {MultisigCommitter} from "contracts/state-transition/validators/MultisigCommitter.sol";
 import {PermissionlessValidator} from "contracts/state-transition/validators/PermissionlessValidator.sol";
-import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
-import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
-import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
-import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
-import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
-import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
-import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
-import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 
-import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
-import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
-import {CTMContract} from "./DeployCTML1OrGateway.sol";
 import {ChainCreationParamsLib} from "./ChainCreationParamsLib.sol";
 
-import {
-    StateTransitionDeployedAddresses,
-    DataAvailabilityDeployedAddresses,
-    ChainCreationParamsConfig,
-    BridgehubAddresses,
-    CoreDeployedAddresses
-} from "../utils/Types.sol";
-import {CTMContract, CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "./DeployCTML1OrGateway.sol";
+import {StateTransitionDeployedAddresses, ChainCreationParamsConfig, CoreDeployedAddresses} from "../utils/Types.sol";
+import {CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "./DeployCTML1OrGateway.sol";
 
 import {CTMDeployedAddresses} from "../utils/Types.sol";
 
-// solhint-disable-next-line gas-struct-packing
 struct Config {
     uint256 l1ChainId;
     address deployerAddress;
@@ -68,10 +34,19 @@ struct Config {
     address ownerAddress;
     bytes32 zkTokenAssetId;
     bool testnetVerifier;
+    MultiProofConfig multiProof;
     ContractsConfig contracts;
 }
 
-// solhint-disable-next-line gas-struct-packing
+/// @notice Deploy-time settings of the ZiSK multi-proof lane. They sit in
+///         their own struct so that `Config` stays within the stack budget the
+///         optimizer-free coverage build allows.
+struct MultiProofConfig {
+    bool enabled;
+    address ziskPlonkVerifierAddr;
+    address ziskRangeVerifierAddr;
+}
+
 struct ContractsConfig {
     address multicall3Addr;
     uint256 validatorTimelockExecutionDelay;
@@ -84,7 +59,6 @@ struct ContractsConfig {
     ChainCreationParamsConfig chainCreationParams;
 }
 
-// solhint-disable-next-line gas-struct-packing
 struct GeneratedData {
     bytes forceDeploymentsData;
 }
@@ -115,7 +89,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         ctmAddresses.stateTransition.facets.diamondInit = deploySimpleContract("DiamondInit");
     }
 
-    function initializeConfig(string memory configPath, address bridgehub) internal virtual {
+    function initializeConfig(string memory configPath) internal virtual {
         string memory toml = vm.readFile(configPath);
 
         config.l1ChainId = block.chainid;
@@ -127,6 +101,16 @@ abstract contract DeployCTMUtils is DeployUtils {
         config.ownerAddress = toml.readAddress("$.owner_address");
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
 
+        if (toml.keyExists("$.multi_proof_verifier")) {
+            config.multiProof.enabled = toml.readBool("$.multi_proof_verifier");
+        }
+        if (toml.keyExists("$.zisk_plonk_verifier_addr")) {
+            config.multiProof.ziskPlonkVerifierAddr = toml.readAddress("$.zisk_plonk_verifier_addr");
+        }
+        // When set, deploy uses this verifier instead of deploying the default ZiskVerifier.
+        if (toml.keyExists("$.zisk_range_verifier_addr")) {
+            config.multiProof.ziskRangeVerifierAddr = toml.readAddress("$.zisk_range_verifier_addr");
+        }
         if (toml.keyExists("$.zk_token_asset_id")) {
             config.zkTokenAssetId = toml.readBytes32("$.zk_token_asset_id");
         }
@@ -248,7 +232,7 @@ abstract contract DeployCTMUtils is DeployUtils {
 
     ////////////////////////////// Contract deployment modes /////////////////////////////////
 
-    function getRollupL2DACommitmentScheme() internal returns (L2DACommitmentScheme) {
+    function getRollupL2DACommitmentScheme() internal pure returns (L2DACommitmentScheme) {
         return ROLLUP_L2_DA_COMMITMENT_SCHEME;
     }
 
@@ -269,6 +253,25 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "ZKsyncOSVerifierPlonk")) {
             return abi.encode();
+        } else if (compareStrings(contractName, "ZiskVerifier")) {
+            // The standalone snarkJS Plonk verifier this wraps; deployed
+            // beforehand (see verifiers/README.md) and passed by address.
+            return abi.encode(config.multiProof.ziskPlonkVerifierAddr);
+        } else if (compareStrings(contractName, "ZiskTestnetVerifier")) {
+            address ziskRangeVerifier = ctmAddresses.multiProof.ziskVerifier;
+            return abi.encode(ziskRangeVerifier);
+        } else if (compareStrings(contractName, "MultiProofVerifier")) {
+            // The Airbender side is the ZKsync OS dual verifier, so the
+            // sub-verifier registry has one home.
+            // An operator may supply a range verifier of their own; otherwise
+            // the one deployed alongside this wrapper is used.
+            address ziskRangeVerifier = ctmAddresses.multiProof.ziskVerifier;
+            if (config.testnetVerifier) {
+                ziskRangeVerifier = ctmAddresses.multiProof.ziskTestnetVerifier;
+            }
+            return abi.encode(ctmAddresses.multiProof.airbenderVerifier, ziskRangeVerifier);
+        } else if (compareStrings(contractName, "MultiProofTestnetVerifier")) {
+            return abi.encode(ctmAddresses.multiProof.multiProofVerifier);
         } else if (compareStrings(contractName, "DefaultUpgrade")) {
             return abi.encode();
         } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
@@ -336,10 +339,10 @@ abstract contract DeployCTMUtils is DeployUtils {
     }
 
     function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory) {
-        if (compareStrings(contractName, "ZKsyncOSChainTypeManager")) {
+        if (compareStrings(contractName, "ChainTypeManager")) {
             return
                 abi.encodeCall(
-                    ChainTypeManagerBase.initialize,
+                    ChainTypeManager.initialize,
                     getChainTypeManagerInitializeData(ctmAddresses.stateTransition)
                 );
         } else if (compareStrings(contractName, "ServerNotifier")) {

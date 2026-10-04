@@ -124,7 +124,7 @@ contract InteroperableAddressTest is Test {
         // Format a valid address first
         bytes memory formatted = InteroperableAddress.formatEvmV1(uint256(1), address(0x1234));
 
-        (bytes2 chainType, bytes memory chainReference, bytes memory addr) = formatted.parseV1();
+        (bytes2 chainType, , ) = formatted.parseV1();
 
         assertEq(chainType, bytes2(0x0000)); // EVM chain type
     }
@@ -153,7 +153,7 @@ contract InteroperableAddressTest is Test {
     function test_tryParseV1_validInput() public pure {
         bytes memory formatted = InteroperableAddress.formatEvmV1(uint256(1), address(0x1234));
 
-        (bool success, bytes2 chainType, bytes memory chainReference, bytes memory addr) = formatted.tryParseV1();
+        (bool success, bytes2 chainType, , ) = formatted.tryParseV1();
 
         assertTrue(success);
         assertEq(chainType, bytes2(0x0000));
@@ -186,7 +186,7 @@ contract InteroperableAddressTest is Test {
     function test_parseV1Calldata_validInput() public view {
         bytes memory formatted = InteroperableAddress.formatEvmV1(uint256(1), address(0x1234));
 
-        (bytes2 chainType, bytes memory chainReference, bytes memory addr) = helper.parseV1Calldata(formatted);
+        (bytes2 chainType, , ) = helper.parseV1Calldata(formatted);
 
         assertEq(chainType, bytes2(0x0000));
     }

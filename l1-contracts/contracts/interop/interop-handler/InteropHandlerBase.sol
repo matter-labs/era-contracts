@@ -72,7 +72,7 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
     function _handleCallValue(uint256 _value, uint256 _sourceChainId) internal virtual;
 
     /// @notice The base-token asset ID expected as the bundle's destination base token on this layer.
-    function _expectedDestinationBaseTokenAssetId() internal view virtual returns (bytes32);
+    function _getExpectedDestinationBaseTokenAssetId() internal view virtual returns (bytes32);
 
     /// @notice Guard invoked by the call-executing entry points (`executeBundle` and `unbundleBundle`).
     /// @dev On L1 this enforces the pausable check, so withdrawals can be halted; on L2 it is a no-op (the L2
@@ -88,10 +88,10 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
 
     /// @notice The selector of the derived contract's `executeBundle`, used by `receiveMessage` dispatch.
     /// @dev It differs per layer because the proof type in the signature differs.
-    function _executeBundleSelector() internal view virtual returns (bytes4);
+    function _getExecuteBundleSelector() internal view virtual returns (bytes4);
 
     /// @notice The selector of the derived contract's `verifyBundle`, used by `receiveMessage` dispatch.
-    function _verifyBundleSelector() internal view virtual returns (bytes4);
+    function _getVerifyBundleSelector() internal view virtual returns (bytes4);
 
     /// @notice Proof-specific `receiveMessage` handler for the `executeBundle` selector. The derived contract
     /// decodes its own proof type, re-checks execution permission for `sender`, and re-enters `executeBundle`.
@@ -199,9 +199,9 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
 
         (uint256 senderChainId, address senderAddress) = InteroperableAddress.parseEvmV1Calldata(sender);
 
-        if (selector == _executeBundleSelector()) {
+        if (selector == _getExecuteBundleSelector()) {
             _receiveExecuteBundle(payload, senderChainId, senderAddress, sender);
-        } else if (selector == _verifyBundleSelector()) {
+        } else if (selector == _getVerifyBundleSelector()) {
             _receiveVerifyBundle(payload);
         } else if (selector == this.unbundleBundle.selector) {
             _handleUnbundleBundle(payload, senderChainId, senderAddress, sender);
@@ -402,7 +402,7 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
             WrongDestinationChainId(bundleHash, interopBundle.destinationChainId, block.chainid)
         );
 
-        bytes32 baseTokenAssetId = _expectedDestinationBaseTokenAssetId();
+        bytes32 baseTokenAssetId = _getExpectedDestinationBaseTokenAssetId();
         require(
             interopBundle.destinationBaseTokenAssetId == baseTokenAssetId,
             WrongDestinationBaseTokenAssetId(bundleHash, baseTokenAssetId, interopBundle.destinationBaseTokenAssetId)

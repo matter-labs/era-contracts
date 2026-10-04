@@ -114,12 +114,12 @@ contract L1InteropHandler is InteropHandlerBase, Ownable2StepUpgradeable, Pausab
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc InteropHandlerBase
-    function _executeBundleSelector() internal view override returns (bytes4) {
+    function _getExecuteBundleSelector() internal pure override returns (bytes4) {
         return this.executeBundle.selector;
     }
 
     /// @inheritdoc InteropHandlerBase
-    function _verifyBundleSelector() internal view override returns (bytes4) {
+    function _getVerifyBundleSelector() internal pure override returns (bytes4) {
         return this.verifyBundle.selector;
     }
 
@@ -178,7 +178,7 @@ contract L1InteropHandler is InteropHandlerBase, Ownable2StepUpgradeable, Pausab
 
     /// @inheritdoc InteropHandlerBase
     /// @dev On L1 the base token is ETH; bundles destined for L1 carry L1's ETH asset ID.
-    function _expectedDestinationBaseTokenAssetId() internal view override returns (bytes32) {
+    function _getExpectedDestinationBaseTokenAssetId() internal view override returns (bytes32) {
         return DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
     }
 

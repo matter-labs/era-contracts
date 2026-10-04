@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.28;
+
 import {IL1InteropCenter} from "contracts/interop/IL1InteropCenter.sol";
 import {L1InteropRequests} from "../../../../deploy-scripts/utils/L1InteropRequests.sol";
 import {stdToml} from "forge-std/StdToml.sol";
@@ -137,15 +140,15 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         // revert if we tried to derive the diamond-cut data on the fly.
         // `initializeConfig` preloads `gatewayDiamondCutData` from TOML, so we
         // pass the cached value directly to `migrateChainToGatewayWithCutData`.
-        adminScript.migrateChainToGatewayWithCutData(
-            _gatewayGovernanceConfig.bridgehubProxy,
-            _getL1GasPrice(),
-            migratingChainId,
-            _gatewayGovernanceConfig.gatewayChainId,
-            gatewayDiamondCutData,
-            msg.sender,
-            true
-        );
+        adminScript.migrateChainToGatewayWithCutData({
+            _bridgehub: _gatewayGovernanceConfig.bridgehubProxy,
+            _l1GasPrice: _getL1GasPrice(),
+            _l2ChainId: migratingChainId,
+            _gatewayChainId: _gatewayGovernanceConfig.gatewayChainId,
+            _gatewayDiamondCutData: gatewayDiamondCutData,
+            _refundRecipient: msg.sender,
+            _shouldSend: true
+        });
     }
 
     function fullGatewayRegistration() public {
@@ -284,7 +287,7 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         initializeConfig();
     }
 
-    function _getL1GasPrice() internal view returns (uint256) {
+    function _getL1GasPrice() internal pure returns (uint256) {
         return 10;
     }
 

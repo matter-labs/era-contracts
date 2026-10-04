@@ -7,7 +7,7 @@ import {
     ITransparentUpgradeableProxy
 } from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {CoreUpgrade_v31} from "deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
+import {CoreUpgrade_v33} from "deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {L1InteropCenter} from "contracts/interop/interop-center/L1InteropCenter.sol";
@@ -15,7 +15,7 @@ import {InteropCenterNotPaused} from "contracts/core/bridgehub/L1BridgehubErrors
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
-contract L1InteropCenterWiringHarness is CoreUpgrade_v31 {
+contract L1InteropCenterWiringHarness is CoreUpgrade_v33 {
     function configure(
         address _bridgehub,
         address _center,
@@ -43,6 +43,8 @@ contract L1InteropCenterWiringHarness is CoreUpgrade_v31 {
         coreAddresses.bridgehub.implementations.ctmDeploymentTracker = _implementation;
         coreAddresses.bridgehub.proxies.chainAssetHandler = _proxy;
         coreAddresses.bridgehub.implementations.chainAssetHandler = _implementation;
+        coreAddresses.bridgehub.proxies.chainRegistrationSender = _proxy;
+        coreAddresses.bridgehub.implementations.chainRegistrationSender = _implementation;
     }
     function wiring() external returns (Call[] memory) {
         return _buildL1InteropCenterWiringCalls();

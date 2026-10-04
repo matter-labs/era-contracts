@@ -33,11 +33,6 @@ on:
         description: "Chain ID of an existing chain under this CTM (for config introspection)"
         required: true
         type: string
-      gateway_settlement_fee:
-        description: "Settlement fee charged by the gateway (wei)"
-        required: false
-        type: string
-        default: "1000000000"
 
 permissions:
   contents: read
@@ -64,7 +59,6 @@ jobs:
             --chain                       "${{ inputs.chain_name }}" \
             --gateway-deployer            "${{ inputs.gateway_deployer }}" \
             --ctm-representative-chain-id "${{ inputs.ctm_representative_chain_id }}" \
-            --gateway-settlement-fee      "${{ inputs.gateway_settlement_fee }}" \
             --out       /contracts/work/session/safe
 
       - name: Upload Safe bundles

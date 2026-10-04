@@ -1,0 +1,20 @@
+# Upgrade input for the frozen local chain committed in zksync-os-integration-tests
+# (`tests/local-chains/`, currently v31.0 / chain 506), used by its v31 -> v33 upgrade test.
+#
+# Same content as `local.toml` in this directory — it is the same kind of freshly deployed anvil
+# ecosystem — under its own basename so the fixture is addressable as
+# `--env zksync-os-integration-test`, which also picks
+# `permanent-values/zksync-os-integration-test.toml`.
+
+era_chain_id = 6565
+testnet_verifier = true
+governance_upgrade_timer_initial_delay = 0
+support_l2_legacy_shared_bridge_test = false
+old_protocol_version = 0x1f00000000  # v31.0.0
+
+[contracts]
+governance_min_delay = 0
+max_number_of_chains = 100
+create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+validator_timelock_execution_delay = 0
+latest_protocol_version = 0x2100000000  # v33.0.0

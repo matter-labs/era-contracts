@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
-
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
@@ -50,7 +48,7 @@ contract MigratorTest is UtilsCallMockerTest {
         dummyBridgehub = new DummyBridgehub();
         mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), bytes32(0));
         mockChainTypeManagerVerifier(testnetVerifier);
-        address diamondProxy = Utils.makeZKsyncOSDiamondProxy(facetCuts, address(dummyBridgehub));
+        address diamondProxy = Utils.makeDiamondProxy(facetCuts, address(dummyBridgehub));
         migratorFacet = IMigrator(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);
     }

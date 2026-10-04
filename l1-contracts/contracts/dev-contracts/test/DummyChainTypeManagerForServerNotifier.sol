@@ -5,13 +5,15 @@ pragma solidity 0.8.28;
 /// @title DummyChainTypeManagerForServerNotifier
 /// @notice A test smart contract implementing the subset of ChainTypeManager functionality for testing purposes.
 contract DummyChainTypeManager {
-    mapping(uint256 chainId => address chainAdmin) chainAdmin;
+    mapping(uint256 chainId => address chainAdmin) internal chainAdmin;
 
     mapping(uint256 chainId => uint256 protocolVersion) public protocolVersion;
 
     mapping(uint256 _protocolVersion => uint256) public protocolVersionDeadline;
 
     mapping(uint256 protocolVersion => bytes32 cutHash) public upgradeCutHash;
+
+    mapping(uint256 chainId => address zkChain) public zkChain;
 
     // solhint-disable-next-line var-name-mixedcase
     address public BRIDGE_HUB;
@@ -36,6 +38,14 @@ contract DummyChainTypeManager {
 
     function getProtocolVersion(uint256 _chainId) public view returns (uint256) {
         return protocolVersion[_chainId];
+    }
+
+    function getZKChain(uint256 _chainId) external view returns (address) {
+        return zkChain[_chainId];
+    }
+
+    function setZKChain(uint256 _chainId, address _zkChain) external {
+        zkChain[_chainId] = _zkChain;
     }
 
     function setChainAdmin(uint256 _chainId, address _chainAdmin) external {

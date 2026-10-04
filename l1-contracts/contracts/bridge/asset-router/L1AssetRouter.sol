@@ -29,12 +29,10 @@ import {
 import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
-import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
-import {IndirectCallRequest} from "../../common/Messaging.sol";
 
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
-import {TxStatus} from "../../common/Messaging.sol";
+import {IndirectCallRequest, TxStatus} from "../../common/Messaging.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -47,17 +45,11 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @notice The L1 registry used to resolve chains and the authorized Interop Center.
     IL1Bridgehub public immutable BRIDGE_HUB;
 
-    /// @dev Chain ID of Era for legacy reasons
-    uint256 public immutable ERA_CHAIN_ID;
-
     /// @dev The address of the WETH token on L1.
     address public immutable L1_WETH_TOKEN;
 
     /// @dev The assetId of the ETH.
     bytes32 public immutable ETH_TOKEN_ASSET_ID;
-
-    /// @dev The address of ZKsync Era diamond proxy contract.
-    IZKChain public immutable ERA_DIAMOND_PROXY;
 
     /// @dev Address of nullifier.
     IL1Nullifier public immutable L1_NULLIFIER;
@@ -92,24 +84,16 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         _;
     }
 
-    function _bridgehub() internal view virtual override returns (IBridgehubBase) {
+    function _getBridgehub() internal view virtual override returns (IBridgehubBase) {
         return IBridgehubBase(BRIDGE_HUB);
     }
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(
-        address _l1WethToken,
-        address _bridgehub,
-        address _l1Nullifier,
-        uint256 _eraChainId,
-        address _eraDiamondProxy
-    ) reentrancyGuardInitializer {
+    constructor(address _l1WethToken, address _bridgehub, address _l1Nullifier) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGE_HUB = IL1Bridgehub(_bridgehub);
-        ERA_CHAIN_ID = _eraChainId;
         L1_WETH_TOKEN = _l1WethToken;
-        ERA_DIAMOND_PROXY = IZKChain(_eraDiamondProxy);
         L1_NULLIFIER = IL1Nullifier(_l1Nullifier);
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
     }
@@ -254,7 +238,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
     /// @inheritdoc AssetRouterBase
     /// @dev Withdrawal bundles are executed by the configured L1 interop handler.
-    function _interopHandler() internal view override returns (address) {
+    function _getInteropHandler() internal view override returns (address) {
         return l1InteropHandler;
     }
 

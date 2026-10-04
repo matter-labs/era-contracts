@@ -3,9 +3,8 @@
 pragma solidity 0.8.28;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable-v4/proxy/utils/Initializable.sol";
-import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {ZKSyncOSBytecodeInfo} from "../common/libraries/ZKSyncOSBytecodeInfo.sol";
-import {EVMBytecodeAlreadyPublished, EraBytecodeAlreadyPublished} from "../common/L1ContractErrors.sol";
+import {EVMBytecodeAlreadyPublished} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -14,16 +13,14 @@ import {EVMBytecodeAlreadyPublished, EraBytecodeAlreadyPublished} from "../commo
 /// will be submitted to.
 /// @dev The contract has no access control as anyone is allowed to publish any bytecode.
 contract BytecodesSupplier is Initializable {
-    /// @notice Event emitted when an Era bytecode is published.
-    /// @dev Named `BytecodePublished` (not `EraBytecodePublished`) for backwards compatibility.
-    event BytecodePublished(bytes32 indexed bytecodeHash, bytes bytecode);
-
     /// @notice Event emitted when an EVM bytecode is published.
     event EVMBytecodePublished(bytes32 indexed bytecodeHash, bytes bytecode);
 
-    /// @notice Mapping of Era bytecode hashes to the block number when they were published.
-    /// @dev Named `publishingBlock` (not `eraPublishingBlock`) for backwards compatibility.
-    mapping(bytes32 bytecodeHash => uint256 blockNumber) public publishingBlock;
+    /// @dev Deprecated slot, retained to preserve the upgradeable storage layout. Formerly
+    /// `publishingBlock`, the EraVM bytecode-hash publication registry; the Era publication
+    /// path is retired and nothing reads or writes this mapping.
+    // slither-disable-next-line uninitialized-state
+    mapping(bytes32 bytecodeHash => uint256 blockNumber) private __DEPRECATED_publishingBlock;
 
     /// @notice Mapping of EVM bytecode hashes to the block number when they were published.
     mapping(bytes32 bytecodeHash => uint256 blockNumber) public evmPublishingBlock;
@@ -34,29 +31,6 @@ contract BytecodesSupplier is Initializable {
 
     /// @notice Initializes the contract.
     function initialize() external initializer {}
-
-    /// @notice Publishes an Era bytecode hash and the bytecode itself.
-    /// @param _bytecode Bytecode to be published.
-    function publishEraBytecode(bytes calldata _bytecode) public {
-        bytes32 bytecodeHash = L2ContractHelper.hashL2BytecodeCalldata(_bytecode);
-
-        if (publishingBlock[bytecodeHash] != 0) {
-            revert EraBytecodeAlreadyPublished(bytecodeHash);
-        }
-
-        publishingBlock[bytecodeHash] = block.number;
-
-        emit BytecodePublished(bytecodeHash, _bytecode);
-    }
-
-    /// @notice Publishes multiple Era bytecodes.
-    /// @param _bytecodes Array of bytecodes to be published.
-    function publishEraBytecodes(bytes[] calldata _bytecodes) external {
-        // solhint-disable-next-line gas-length-in-loops
-        for (uint256 i = 0; i < _bytecodes.length; ++i) {
-            publishEraBytecode(_bytecodes[i]);
-        }
-    }
 
     /// @notice Publishes an EVM bytecode hash and the bytecode itself.
     /// @param _bytecode Bytecode to be published.

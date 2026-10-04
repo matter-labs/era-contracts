@@ -6,15 +6,15 @@ import {L1L2MessageParams, L1L2IndirectMessageParams} from "../../../../deploy-s
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 
 contract L2TxMocker is Test {
-    address mockRefundRecipient;
-    address mockL2Contract;
-    address mockL2SharedBridge;
+    address internal mockRefundRecipient;
+    address internal mockL2Contract;
+    address internal mockL2SharedBridge;
 
-    uint256 mockL2GasLimit = 10000000;
-    uint256 mockL2GasPerPubdataByteLimit = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
+    uint256 internal mockL2GasLimit = 10000000;
+    uint256 internal mockL2GasPerPubdataByteLimit = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
 
-    bytes mockL2Calldata;
-    bytes[] mockFactoryDeps;
+    bytes internal mockL2Calldata;
+    bytes[] internal mockFactoryDeps;
 
     mapping(uint256 chainId => address l2MockContract) public chainContracts;
 
@@ -24,8 +24,7 @@ contract L2TxMocker is Test {
         mockL2SharedBridge = makeAddr("mockl2sharedbridge");
 
         mockL2Calldata = "";
-        mockFactoryDeps = new bytes[](1);
-        mockFactoryDeps[0] = "11111111111111111111111111111111";
+        mockFactoryDeps = new bytes[](0);
     }
 
     function _addL2ChainContract(uint256 _chainId, address _chainContract) internal {

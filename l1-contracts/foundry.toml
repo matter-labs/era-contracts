@@ -27,20 +27,16 @@ fs_permissions = [
     { access = "read", path = "../configs/genesis/" },
     { access = "read", path = "../configs/" },
 ]
-ignored_error_codes = ["missing-receive-ether", "code-size"]
-ignored_warnings_from = ["test", "contracts/dev-contracts"]
-suppressed_warnings = ["txorigin"]
+# Only filters what `forge build` prints; the enforced policy is `solc-warnings.json`.
+ignored_error_codes = ["missing-receive-ether", "code-size", "init-code-size"]
+ignored_warnings_from = []
 remappings = [
   "forge-std/=lib/forge-std/src/",
   "murky/=lib/murky/src/",
   "foundry-test/=test/foundry/",
-  # The audited L1 sources import the frozen system constants by their historical
-  # `system-contracts/...` path; the workspace is gone, the file lives in-tree.
-  "system-contracts/contracts/Constants.sol=frozen-system-constants/Constants.sol",
   "@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/",
   "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
-  # Both OpenZeppelin submodules contain this dependency; pin the CI resolution
-  # so filesystem traversal order cannot change compiler metadata hashes.
+  # Pin the duplicate vendored alias so remapping detection is deterministic across platforms.
   "erc4626-tests/=lib/openzeppelin-contracts-upgradeable-v4/lib/erc4626-tests/",
   "test-utils/=test/foundry/l1/integration/utils/",
 ]

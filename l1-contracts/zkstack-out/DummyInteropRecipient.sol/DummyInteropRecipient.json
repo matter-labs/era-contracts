@@ -15,17 +15,17 @@
     "name": "receiveMessage",
     "inputs": [
       {
-        "name": "receiveId",
+        "name": "",
         "type": "bytes32",
         "internalType": "bytes32"
       },
       {
-        "name": "sender",
+        "name": "",
         "type": "bytes",
         "internalType": "bytes"
       },
       {
-        "name": "payload",
+        "name": "",
         "type": "bytes",
         "internalType": "bytes"
       }

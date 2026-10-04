@@ -492,7 +492,6 @@ contract L2InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgrade
             // Store original attributes for MessageSent event emission.
             originalCallAttributes[i] = _callStarters[i].callAttributes;
 
-            // solhint-disable-next-line no-unused-vars
             (CallAttributes memory callAttributes, ) = parseAttributes(
                 _callStarters[i].callAttributes,
                 AttributeParsingRestrictions.OnlyCallAttributes
@@ -504,7 +503,6 @@ contract L2InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgrade
             });
         }
 
-        // solhint-disable-next-line no-unused-vars
         (, bundleAttributes) = parseAttributes(_bundleAttributes, AttributeParsingRestrictions.OnlyBundleAttributes);
 
         // If the unbundler was not set for a bundle, we set the unbundler to be equal to the original sender, so
@@ -681,7 +679,7 @@ contract L2InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     /// @notice Hashes an assembled {InteropBundle} into its canonical `bundleHash`.
-    function _hashBundle(InteropBundle memory _bundle) internal view returns (bytes32) {
+    function _hashBundle(InteropBundle memory _bundle) internal pure returns (bytes32) {
         return InteropDataEncoding.encodeInteropBundleHash(abi.encode(_bundle));
     }
 
@@ -774,7 +772,6 @@ contract L2InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgrade
             InteropCallStarter memory actualCallStarter = IL2CrossChainSender(recipientAddress).initiateIndirectCall{
                 value: _callStarter.callAttributes.indirectCallMessageValue
             }(_destinationChainId, msg.sender, _callStarter.callAttributes.interopCallValue, _callStarter.data);
-            // solhint-disable-next-line no-unused-vars
             // slither-disable-next-line unused-return
             (CallAttributes memory indirectCallAttributes, ) = _parser().parseAttributes(
                 actualCallStarter.callAttributes,

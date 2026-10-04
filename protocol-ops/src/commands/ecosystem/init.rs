@@ -20,8 +20,8 @@ use crate::common::{forge::ForgeRunner, logger, wallets::Wallet};
 pub struct EcosystemInitArgs {
     /// Per-env preset (`stage` / `testnet` / `mainnet` / `local`). Loads
     /// `upgrade-envs/permanent-values/<env>.toml` and supplies defaults for
-    /// `--zk-token-asset-id`, `--era-chain-id`, and `--owner` when those flags
-    /// are omitted. Explicit flags still win.
+    /// `--zk-token-asset-id` and `--owner` when those flags are omitted.
+    /// Explicit flags still win.
     #[clap(long, help_heading = "Topology")]
     pub env: Option<String>,
 
@@ -45,6 +45,15 @@ pub struct EcosystemInitArgs {
     /// Use testnet verifier (default: true)
     #[clap(long, default_value_t = true, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub with_testnet_verifier: bool,
+    /// Deploy the Airbender + ZiSK multi-proof verifier lane.
+    #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
+    pub multi_proof_verifier: bool,
+    /// Pre-deployed snarkJS Plonk verifier used by the ZiSK verifier.
+    #[clap(long, help_heading = "Advanced input")]
+    pub zisk_plonk_verifier_addr: Option<Address>,
+    /// Optional pre-deployed ZiSK range verifier override.
+    #[clap(long, help_heading = "Advanced input")]
+    pub zisk_range_verifier_addr: Option<Address>,
     /// ZK token asset ID (defaults from env's `zk_token_asset_id` when
     /// `--env` is set).
     #[clap(long, help_heading = "Advanced input")]
@@ -52,6 +61,10 @@ pub struct EcosystemInitArgs {
     /// CREATE2 factory salt (random by default).
     #[clap(long, help_heading = "Advanced input")]
     pub create2_factory_salt: Option<B256>,
+    /// L1 WETH token address (default: mainnet WETH). Set this on any other
+    /// L1, since it is immutable in the deployed bridge contracts.
+    #[clap(long, help_heading = "Advanced input")]
+    pub token_weth_address: Option<Address>,
 }
 
 // ── run() ───────────────────────────────────────────────────────────────────
@@ -77,8 +90,12 @@ pub async fn run(args: EcosystemInitArgs) -> anyhow::Result<()> {
         sender: sender.address,
         owner: owner.address,
         with_testnet_verifier: args.with_testnet_verifier,
+        multi_proof_verifier: args.multi_proof_verifier,
+        zisk_plonk_verifier_addr: args.zisk_plonk_verifier_addr,
+        zisk_range_verifier_addr: args.zisk_range_verifier_addr,
         zk_token_asset_id,
         create2_factory_salt: args.create2_factory_salt,
+        token_weth_address: args.token_weth_address,
     };
     let output = ecosystem_init(&mut runner, &sender, &owner, &input).await?;
 
@@ -114,6 +131,7 @@ pub async fn ecosystem_init(
     let hub_input = HubInitInput {
         owner: owner.address,
         create2_factory_salt: input.create2_factory_salt,
+        token_weth_address: input.token_weth_address,
     };
     let hub_output = hub_init(runner, sender, owner, &hub_input).await?;
     let bridgehub_addr = hub_output.deployed_addresses.bridgehub.bridgehub_proxy_addr;
@@ -124,6 +142,9 @@ pub async fn ecosystem_init(
         owner: owner.address,
         reuse_gov_and_admin: true,
         with_testnet_verifier: input.with_testnet_verifier,
+        multi_proof_verifier: input.multi_proof_verifier,
+        zisk_plonk_verifier_addr: input.zisk_plonk_verifier_addr,
+        zisk_range_verifier_addr: input.zisk_range_verifier_addr,
         zk_token_asset_id: input.zk_token_asset_id,
         create2_factory_salt: input.create2_factory_salt,
     };
@@ -142,8 +163,12 @@ pub struct EcosystemInitInput {
     pub sender: Address,
     pub owner: Address,
     pub with_testnet_verifier: bool,
+    pub multi_proof_verifier: bool,
+    pub zisk_plonk_verifier_addr: Option<Address>,
+    pub zisk_range_verifier_addr: Option<Address>,
     pub zk_token_asset_id: Option<B256>,
     pub create2_factory_salt: Option<B256>,
+    pub token_weth_address: Option<Address>,
 }
 
 #[derive(Serialize)]

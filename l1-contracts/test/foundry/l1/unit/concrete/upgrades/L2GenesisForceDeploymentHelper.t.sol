@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// solhint-disable no-console, gas-custom-errors, state-visibility, no-global-import, one-contract-per-file, gas-calldata-parameters, no-unused-vars, func-named-parameters
+// solhint-disable state-visibility, no-global-import
 
 pragma solidity 0.8.28;
 
@@ -19,7 +19,7 @@ import "contracts/core/bridgehub/L2Bridgehub.sol";
 import "contracts/core/message-root/L2MessageRoot.sol";
 import "contracts/bridge/asset-router/L2AssetRouter.sol";
 import "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
-import "contracts/bridge/ntv/L2NativeTokenVaultZKOS.sol";
+import "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import "contracts/bridge/interfaces/IL2WrappedBaseToken.sol";
 import "contracts/bridge/UpgradeableBeaconDeployer.sol";
 import "contracts/l2-upgrades/SystemContractProxyAdmin.sol";
@@ -32,18 +32,18 @@ import {InvalidChainId} from "contracts/common/L1ContractErrors.sol";
 
 /**
  * @title L2GenesisForceDeploymentsHelperTest
- * @notice Tests for the L2GenesisForceDeploymentsHelper library covering both ZKsyncOS and Era deployment scenarios
+ * @notice Tests for the L2GenesisForceDeploymentsHelper library's genesis and upgrade paths.
  */
 contract L2GenesisForceDeploymentsHelperTest is Test {
     using L2GenesisForceDeploymentsHelper for *;
 
     bytes32 internal constant CONTRACT_UPGRADED_SIG = keccak256("ContractUpgraded(uint8,address)");
     bytes32 internal constant FORCE_DEPLOYED_CONTRACTS_INITIALIZED_SIG =
-        keccak256("ForceDeployedContractsInitialized(bool,bool)");
+        keccak256("ForceDeployedContractsInitialized(bool)");
 
     // Test constants
     uint256 constant L1_CHAIN_ID = 1;
-    uint256 constant ERA_CHAIN_ID = 270;
+    uint256 constant TEST_CHAIN_ID = 270;
     uint256 constant MAX_ZK_CHAINS = 100;
 
     // Test addresses
@@ -53,7 +53,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
     address baseTokenL1Address;
 
     // Mock contracts
-    MockZKOSContractDeployer mockDeployer;
+    MockL2ContractDeployer mockDeployer;
     MockSystemContractProxyAdmin mockProxyAdmin;
 
     function setUp() public {
@@ -64,7 +64,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         baseTokenL1Address = makeAddr("baseTokenL1Address");
 
         // Deploy and etch mock ZKsyncOS contract deployer
-        mockDeployer = new MockZKOSContractDeployer();
+        mockDeployer = new MockL2ContractDeployer();
         vm.etch(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, address(mockDeployer).code);
 
         // Deploy and etch mock SystemContractProxyAdmin
@@ -98,7 +98,6 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         // Execute the deployment
         vm.startPrank(L2_COMPLEX_UPGRADER_ADDR);
         L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
-            true, // _isZKsyncOS
             ctmDeployerAddress,
             fixedEncoded,
             additionalEncoded,
@@ -113,7 +112,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         _assertAtomicInteropInitialized();
 
         // Verify deployments occurred - use the etched contract at the system address
-        MockZKOSContractDeployer etchedDeployer = MockZKOSContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR);
+        MockL2ContractDeployer etchedDeployer = MockL2ContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR);
         assertEq(etchedDeployer.deploymentCount(L2_MESSAGE_ROOT_ADDR), 0); // proxy only
         assertEq(etchedDeployer.deploymentCount(L2_BRIDGEHUB_ADDR), 0);
         assertEq(etchedDeployer.deploymentCount(L2_ASSET_ROUTER_ADDR), 0);
@@ -151,15 +150,13 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         _deployMockContract(L2_INTEROP_CENTER_ADDR);
         _deployMockContract(L2_INTEROP_HANDLER_ADDR);
         _deployMockContract(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
-        // The atomic-interop built-ins arrive with the upgrade's force deployments on a pre-existing chain;
-        // etch their real code so the helper initializing them is observable.
+        // Real built-in code, so that the upgrade leaving them alone is observable.
         _etchAtomicInteropBuiltIns();
 
         vm.mockCall(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, abi.encodeWithSignature("owner()"), abi.encode(address(this)));
 
         vm.startPrank(L2_COMPLEX_UPGRADER_ADDR);
         L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
-            true, // _isZKsyncOS
             ctmDeployerAddress,
             fixedEncoded,
             additionalEncoded,
@@ -169,7 +166,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
 
         // For non-genesis, existing contracts should only get implementation updates
         // No new deployments to the target addresses since proxies already exist
-        MockZKOSContractDeployer etchedDeployer = MockZKOSContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR);
+        MockL2ContractDeployer etchedDeployer = MockL2ContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR);
         assertEq(etchedDeployer.deploymentCount(L2_MESSAGE_ROOT_ADDR), 0); // no new deployment
         assertEq(etchedDeployer.deploymentCount(L2_BRIDGEHUB_ADDR), 0);
         assertEq(etchedDeployer.deploymentCount(L2_ASSET_ROUTER_ADDR), 0);
@@ -182,65 +179,16 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         );
         assertEq(etchedProxyAdmin.upgradeCallCount(), 0);
 
-        // The upgrade path initializes the atomic-interop built-ins, so an upgraded chain ends up with the
-        // same state a fresh one gets from genesis.
-        _assertAtomicInteropInitialized();
+        // The atomic-interop built-ins are seeded at genesis only; the upgrade path never calls their
+        // one-shot `initL2`s.
+        assertEq(L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafCount(), 0, "tree seeded on upgrade");
+        assertEq(
+            AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).L1_CHAIN_ID(),
+            0,
+            "flow manager initialized on upgrade"
+        );
 
         _assertAssetRouterInitialized({_viaInitL2: false});
-
-        // Note: no ZKsync OS chain can arrive here with the built-ins already seeded — neither they nor
-        // their addresses existed in v31 — so the initialization is unconditional and one-shot.
-    }
-
-    function testEraForceDeployment() public {
-        FixedForceDeploymentsData memory fixedData = _createEraFixedForceDeploymentsData();
-        ZKChainSpecificForceDeploymentsData memory additionalData = _createAdditionalForceDeploymentsData();
-
-        bytes memory fixedEncoded = abi.encode(fixedData);
-        bytes memory additionalEncoded = abi.encode(additionalData);
-
-        // Pre-deploy some mock contracts to simulate existing deployments
-        _etchAllDeferredContracts();
-
-        // Proxy admin setup runs for consistency, but Era still does not use
-        // proxy-admin-managed system contract upgrades.
-        vm.mockCall(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, abi.encodeWithSignature("owner()"), abi.encode(address(this)));
-        vm.startPrank(L2_COMPLEX_UPGRADER_ADDR);
-        L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
-            false, // _isZKsyncOS
-            ctmDeployerAddress,
-            fixedEncoded,
-            additionalEncoded,
-            true // _isGenesisUpgrade
-        );
-        vm.stopPrank();
-
-        // Era deployments should use direct force deployment (single deployment per address)
-        MockZKOSContractDeployer etchedDeployer = MockZKOSContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR);
-        assertEq(etchedDeployer.deploymentCount(L2_MESSAGE_ROOT_ADDR), 0);
-        assertEq(etchedDeployer.deploymentCount(L2_BRIDGEHUB_ADDR), 0);
-        assertEq(etchedDeployer.deploymentCount(L2_ASSET_ROUTER_ADDR), 0);
-        assertEq(etchedDeployer.deploymentCount(L2_NATIVE_TOKEN_VAULT_ADDR), 0);
-        assertEq(etchedDeployer.deploymentCount(L2_CHAIN_ASSET_HANDLER_ADDR), 0);
-        assertEq(etchedDeployer.deploymentCount(L2_NTV_BEACON_DEPLOYER_ADDR), 0);
-        assertEq(etchedDeployer.deploymentCount(L2_BASE_TOKEN_HOLDER_ADDR), 0);
-
-        // No proxy upgrades for Era
-        MockSystemContractProxyAdmin etchedProxyAdmin = MockSystemContractProxyAdmin(
-            L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
-        );
-        assertEq(etchedProxyAdmin.upgradeCallCount(), 0);
-
-        // The atomic-interop built-ins are ZKsync-OS-only and must be left untouched, even though
-        // `_etchAllDeferredContracts` gave them real code here: on a real Era chain those addresses are
-        // empty and initializing them would revert the whole upgrade transaction.
-        _assertAtomicInteropUninitialized();
-    }
-
-    /// @dev Neither built-in seeded: the tree has no leaves and the manager no L1 chain id.
-    function _assertAtomicInteropUninitialized() internal view {
-        assertEq(L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafCount(), 0, "tree was seeded");
-        assertEq(AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).L1_CHAIN_ID(), 0, "flow manager was seeded");
     }
 
     // Helper functions
@@ -308,30 +256,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
             data.beaconDeployerInfo = "";
         }
 
-        data.zkTokenAssetId = DataEncoding.encodeNTVAssetId(ERA_CHAIN_ID, makeAddr("zkToken"));
-
-        return data;
-    }
-
-    function _createEraFixedForceDeploymentsData() internal returns (FixedForceDeploymentsData memory) {
-        FixedForceDeploymentsData memory data;
-        data.l1ChainId = L1_CHAIN_ID;
-        data.aliasedL1Governance = aliasedL1GovernanceAddress;
-        data.maxNumberOfZKChains = MAX_ZK_CHAINS;
-        data.l1AssetRouter = l1AssetRouterAddress;
-
-        // For Era, bytecode info is just a single bytecode hash
-        data.messageRootBytecodeInfo = abi.encode(keccak256("messageroot"));
-        data.bridgehubBytecodeInfo = abi.encode(keccak256("bridgehub"));
-        data.l2AssetRouterBytecodeInfo = abi.encode(keccak256("assetRouter"));
-        data.l2NtvBytecodeInfo = abi.encode(keccak256("ntv"));
-        data.chainAssetHandlerBytecodeInfo = abi.encode(keccak256("chainHandler"));
-        data.interopCenterBytecodeInfo = abi.encode(keccak256("interopCenter"));
-        data.interopHandlerBytecodeInfo = abi.encode(keccak256("interopHandler"));
-        data.assetTrackerBytecodeInfo = abi.encode(keccak256("assetTracker"));
-        data.beaconDeployerInfo = abi.encode(keccak256("beaconDeployer"));
-        data.baseTokenHolderBytecodeInfo = abi.encode(keccak256("baseTokenHolder"));
-        data.zkTokenAssetId = DataEncoding.encodeNTVAssetId(ERA_CHAIN_ID, makeAddr("zkToken"));
+        data.zkTokenAssetId = DataEncoding.encodeNTVAssetId(TEST_CHAIN_ID, makeAddr("zkToken"));
 
         return data;
     }
@@ -395,7 +320,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
     }
 
     /// @dev The atomic-interop built-ins are etched with their real code, not the generic mock, so that
-    ///      `_initializeV32Contracts` initializing them is observable (`leafCount` / `L1_CHAIN_ID`).
+    ///      `_initContractsAfterWiring` initializing them is observable (`leafCount` / `L1_CHAIN_ID`).
     function _etchAtomicInteropBuiltIns() internal {
         if (L2_INTEROP_COMMITMENT_TREE_ADDR.code.length == 0) {
             vm.etch(L2_INTEROP_COMMITMENT_TREE_ADDR, address(new L2InteropCommitmentTree()).code);
@@ -407,7 +332,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
 
     /// @dev Both built-ins seeded exactly once: the tree holds its sentinel leaf and the manager the L1
     ///      chain id. `initL2` reverts on a second call, so reaching this state twice is impossible.
-    function _assertAtomicInteropInitialized() internal {
+    function _assertAtomicInteropInitialized() internal view {
         assertEq(L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafCount(), 1, "tree not seeded");
         assertEq(
             AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).L1_CHAIN_ID(),
@@ -424,8 +349,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
 
         bytes memory genesisUpgradeCalldata = abi.encodeWithSelector(
             IL2GenesisUpgrade.genesisUpgrade.selector,
-            true, // _isZKsyncOS
-            ERA_CHAIN_ID,
+            TEST_CHAIN_ID,
             ctmDeployerAddress,
             abi.encode(_createFixedForceDeploymentsData(true)),
             abi.encode(_createAdditionalForceDeploymentsData())
@@ -433,7 +357,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
 
         // The genesis upgrade is delegatecalled, so it emits from the complex upgrader's address.
         vm.expectEmit(true, false, false, true, L2_COMPLEX_UPGRADER_ADDR);
-        emit IL2GenesisUpgrade.UpgradeComplete(ERA_CHAIN_ID);
+        emit IL2GenesisUpgrade.UpgradeComplete(TEST_CHAIN_ID);
 
         vm.recordLogs();
         vm.prank(L2_FORCE_DEPLOYER_ADDR);
@@ -450,7 +374,6 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
 
         bytes memory genesisUpgradeCalldata = abi.encodeWithSelector(
             IL2GenesisUpgrade.genesisUpgrade.selector,
-            true, // _isZKsyncOS
             uint256(0),
             ctmDeployerAddress,
             abi.encode(_createFixedForceDeploymentsData(true)),
@@ -479,7 +402,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
 
 // Mock contracts
 
-contract MockZKOSContractDeployer {
+contract MockL2ContractDeployer {
     mapping(address => uint256) public deploymentCount;
     mapping(address => bytes32) public lastBytecodeHash;
     mapping(address => bool) private _deferredEtchAddresses;
@@ -489,8 +412,8 @@ contract MockZKOSContractDeployer {
     function setBytecodeDetailsEVM(
         address _addr,
         bytes32 _bytecodeHash,
-        uint32 _bytecodeLength,
-        bytes32 _observableBytecodeHash
+        uint32 /* _bytecodeLength */,
+        bytes32 /* _observableBytecodeHash */
     ) external {
         deploymentCount[_addr]++;
         lastBytecodeHash[_addr] = _bytecodeHash;
@@ -502,21 +425,6 @@ contract MockZKOSContractDeployer {
             MockContract mock = new MockContract();
             Vm vm = Vm(address(bytes20(uint160(uint256(keccak256("hevm cheat code"))))));
             vm.etch(_addr, address(mock).code);
-        }
-    }
-
-    function forceDeployOnAddresses(IL2ContractDeployer.ForceDeployment[] calldata _deployments) external {
-        for (uint256 i = 0; i < _deployments.length; i++) {
-            deploymentCount[_deployments[i].newAddress]++;
-            lastBytecodeHash[_deployments[i].newAddress] = _deployments[i].bytecodeHash;
-            emit MockDeploy(_deployments[i].newAddress, _deployments[i].bytecodeHash);
-
-            // Etch immediately for Era deployments (no proxy logic)
-            if (_deployments[i].newAddress.code.length == 0) {
-                MockContract mock = new MockContract();
-                Vm vm = Vm(address(bytes20(uint160(uint256(keccak256("hevm cheat code"))))));
-                vm.etch(_deployments[i].newAddress, address(mock).code);
-            }
         }
     }
 }
@@ -601,14 +509,7 @@ contract MockContract {
     }
 
     // L2NativeTokenVault.updateL2
-    function updateL2(
-        uint256,
-        address,
-        bytes32,
-        address,
-        TokenBridgingData calldata,
-        TokenMetadata calldata
-    ) external {}
+    function updateL2(uint256, address, address, TokenBridgingData calldata, TokenMetadata calldata) external {}
 
     // L2ChainAssetHandler.updateL2
     function updateL2(uint256, address) external {}
@@ -616,18 +517,14 @@ contract MockContract {
     // L2Bridgehub.updateL2
     function updateL2(uint256, address, uint256) external {}
 
-    function deployUpgradeableBeacon(address) external returns (address) {
+    function deployUpgradeableBeacon(address) external pure returns (address) {
         return makeAddr("upgradeableBeacon");
     }
 
     function setAddresses(address, address, address, address) external {}
 
-    function WETH_TOKEN() external view returns (address) {
+    function WETH_TOKEN() external pure returns (address) {
         return makeAddr("wethToken");
-    }
-
-    function L2_TOKEN_PROXY_BYTECODE_HASH() external view returns (bytes32) {
-        return bytes32(0);
     }
 
     function initializeV3(string memory, string memory, address, address, bytes32) external {}
@@ -635,6 +532,8 @@ contract MockContract {
     function makeAddr(string memory name) internal pure returns (address) {
         return address(uint160(uint256(keccak256(abi.encodePacked(name)))));
     }
+
+    receive() external payable {}
 
     // Fallback to handle any other calls
     fallback() external payable {

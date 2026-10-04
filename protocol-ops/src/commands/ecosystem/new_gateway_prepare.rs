@@ -1,7 +1,7 @@
 //! New-Gateway prepare step for the v31 ecosystem flow.
 //!
 //! When the env's `permanent-values/<env>.toml` carries a `[new_gateway]`
-//! block, `V31UpgradeFull::prepare` invokes this step on the same anvil fork
+//! block, `UpgradeFull::prepare` invokes this step on the same anvil fork
 //! as Core+CTM prepares. It wraps the existing
 //! `chain::gateway::convert::stage_vote_prepare` (which itself drives
 //! `deploy-scripts/gateway/GatewayVotePreparation.s.sol`) so we get the
@@ -40,7 +40,7 @@ use anyhow::Context;
 use serde::Deserialize;
 
 use crate::commands::chain::gateway::convert::{stage_vote_prepare, VotePrepareInputs};
-use crate::commands::ecosystem::v31_upgrade_inner::CtmPrepareEntry;
+use crate::commands::ecosystem::upgrade_inner::CtmPrepareEntry;
 use crate::common::abi::{
     BridgehubAbi, IL1AssetRouterAbi, IL1NativeTokenVaultAbi, TestnetERC20TokenAbi,
 };
@@ -139,8 +139,7 @@ pub async fn prepare_new_gateway(
     // ── Snapshot + apply gov stages 0+1 on the prepare fork ────────────
     // GatewayVotePreparation has a hard
     //   `require(ctm.protocolVersion() == latestProtocolVersion)`
-    // in `setAddressesBasedOnBridgehub`, plus several v31+ getter reads
-    // (`isZKsyncOS()`, `protocolVersionVerifier()`, `newChainCreationParamsBlock()`).
+    // in `setAddressesBasedOnBridgehub`, plus its current CTM address discovery.
     // The source CTM is still on the pre-v31 impl on the fork at this point.
     //
     // To get the script past those checks WITHOUT polluting the deployer's
@@ -151,8 +150,8 @@ pub async fn prepare_new_gateway(
     //      TOMLs as raw `eth_sendTransaction` from the impersonated
     //      governance address. Direct RPC bypasses forge entirely so
     //      these txs don't land in any broadcast log.
-    //   3. Run GatewayVotePreparation — the source CTM is now v31 on the
-    //      fork, so the require + on-chain reads succeed. Its broadcast
+    //   3. Run GatewayVotePreparation — the source CTM is now at the target version on the
+    //      fork, so the version check + on-chain reads succeed. Its broadcast
     //      log captures the GW CTM deploys for the deployer bundle.
     //   4. Capture the GW deploy txs from forge's broadcast log so we can
     //      re-apply them after the revert.
@@ -220,7 +219,7 @@ pub async fn prepare_new_gateway(
     // harness's* anvil (this nested fork dies when `ForgeRunner` drops).
     // Note also: no need to re-fund anything on this fork post-revert —
     // the harness-owned anvil is where bundle replay happens; funding for
-    // that lives in `v31-upgrade-test-runner.ts:fundDeployerZkForBundleReplay`.
+    // that lives in `upgrade-test-runner.ts:fundDeployerZkForBundleReplay`.
     evm_revert(&runner.rpc_url, &snap_id)
         .await
         .context("evm_revert after GW prep")?;
@@ -357,7 +356,7 @@ async fn replay_gov_stages_0_and_1(
 }
 
 /// Time bump (in seconds) between stage 0 and stage 1. Stage 0 starts the
-/// `GovernanceUpgradeTimer` with a delay set in the v31 upgrade input
+/// `GovernanceUpgradeTimer` with a delay set in the release upgrade input
 /// (1200s on stage). 24h is enough headroom for any reasonable delay
 /// without making block.timestamp wildly diverge from real wall time.
 const GOV_DEADLINE_BUMP_SECONDS: u64 = 24 * 60 * 60;

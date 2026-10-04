@@ -3,21 +3,6 @@ pragma solidity 0.8.28;
 
 import {TokenBridgingData, TokenMetadata} from "../../common/Messaging.sol";
 
-/// @notice A struct that describes a forced deployment on an address
-struct ForceDeployment {
-    // The bytecode hash to put on an address
-    bytes32 bytecodeHash;
-    // The address on which to deploy the bytecodehash to
-    address newAddress;
-    // Whether to run the constructor on the force deployment
-    bool callConstructor;
-    // The value with which to initialize a contract
-    uint256 value;
-    // The constructor calldata
-    bytes input;
-}
-
-// solhint-disable-next-line gas-struct-packing
 struct ZKChainSpecificForceDeploymentsData {
     address l2LegacySharedBridge;
     /// @dev Deprecated: always address(0). Kept to avoid breaking the ABI encoding
@@ -33,11 +18,9 @@ struct ZKChainSpecificForceDeploymentsData {
 /// @notice The structure that describes force deployments that are the same for each chain.
 /// @dev Note, that for simplicity, the same struct is used both for upgrading to the
 /// Gateway version and for the Genesis. Some fields may not be used in either of those.
-// solhint-disable-next-line gas-struct-packing
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
     address l1AssetRouter;
-    bytes32 l2TokenProxyBytecodeHash;
     address aliasedL1Governance;
     uint256 maxNumberOfZKChains;
     bytes bridgehubBytecodeInfo;
@@ -66,7 +49,6 @@ interface IL2GenesisUpgrade {
     event UpgradeComplete(uint256 _chainId);
 
     function genesisUpgrade(
-        bool _isZKsyncOS,
         uint256 _chainId,
         address _ctmDeployer,
         bytes calldata _fixedForceDeploymentsData,

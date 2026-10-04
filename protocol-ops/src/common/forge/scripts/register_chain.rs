@@ -36,7 +36,6 @@ impl RegisterChainL1Config {
         chain_params: &NewChainParams,
         create2_factory_addr: Address,
         create2_factory_salt: Option<B256>,
-        evm_emulator: bool,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             chain: ChainL1Config {
@@ -50,13 +49,15 @@ impl RegisterChainL1Config {
                 governance_security_council_address: Default::default(),
                 governance_min_delay: 0,
                 bridgehub_create_new_chain_salt: 0,
+                // Pubdata *pricing*: whether users are charged for pubdata. A fee-policy choice,
+                // independent of the DA mechanism — a logs-only validium publishes (little) pubdata
+                // through blobs and may still price as a validium.
                 validium_mode: chain_params.da_mode != DAValidatorType::Rollup,
                 // TODO fix script to assign roles correctly
                 validator_sender_operator_eth: chain_params.prove_operator,
                 validator_sender_operator_blobs_eth: chain_params.commit_operator,
                 validator_sender_operator_prove: chain_params.prove_operator,
                 validator_sender_operator_execute: chain_params.execute_operator,
-                allow_evm_emulator: evm_emulator,
             },
             owner_address: chain_params.owner,
             contracts: Create2Addresses {
@@ -82,7 +83,6 @@ pub struct ChainL1Config {
     pub base_token_gas_price_multiplier_denominator: u64,
     pub governance_security_council_address: Address,
     pub governance_min_delay: u64,
-    pub allow_evm_emulator: bool,
 }
 
 // ── Output types ─────────────────────────────────────────────────────────────

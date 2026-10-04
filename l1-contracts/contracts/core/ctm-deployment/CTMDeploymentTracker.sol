@@ -95,7 +95,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
     // Payable for interface compatibility; every nonzero msg.value reverts below.
     // slither-disable-next-line locked-ether
     function initiateIndirectCall(
-        uint256 _chainId,
+        uint256,
         address _originalCaller,
         uint256,
         bytes calldata _data
@@ -113,7 +113,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
         }
         (address _ctmL1Address, address _ctmL2Address) = abi.decode(_data[1:], (address, address));
 
-        request = _registerCTMAssetOnL2Bridgehub(_chainId, _ctmL1Address, _ctmL2Address);
+        request = _registerCTMAssetOnL2Bridgehub(_ctmL1Address, _ctmL2Address);
     }
 
     /// @inheritdoc IL1CrossChainSender
@@ -143,10 +143,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
     }
 
     /// @notice Used to register the ctm asset in L2 Bridgehub.
-    /// @param _chainId the chainId of the chain
     function _registerCTMAssetOnL2Bridgehub(
-        // solhint-disable-next-line no-unused-vars
-        uint256 _chainId,
         address _ctmL1Address,
         address _ctmL2Address
     ) internal pure returns (IndirectCallRequest memory request) {

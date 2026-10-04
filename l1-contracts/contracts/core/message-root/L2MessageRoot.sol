@@ -33,11 +33,11 @@ contract L2MessageRoot is MessageRootBase {
                         IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    function _bridgehub() internal pure override returns (address) {
+    function _getBridgehub() internal pure override returns (address) {
         return L2_BRIDGEHUB_ADDR;
     }
 
-    function _chainAssetHandler() internal view override returns (address) {
+    function _getChainAssetHandler() internal pure override returns (address) {
         return L2_CHAIN_ASSET_HANDLER_ADDR;
     }
 

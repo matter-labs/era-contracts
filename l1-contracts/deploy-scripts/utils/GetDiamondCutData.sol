@@ -2,7 +2,7 @@
 pragma solidity ^0.8.10;
 
 import {Vm} from "forge-std/Vm.sol";
-import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
@@ -10,6 +10,7 @@ import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses
 
 library GetDiamondCutData {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
+    // solhint-disable-next-line const-name-snakecase
     Vm internal constant vm = Vm(VM_ADDRESS);
 
     error NoLogsFound(bytes32 selector);
@@ -48,7 +49,7 @@ library GetDiamondCutData {
         address ctm,
         uint256 protocolVersion
     ) external returns (Diamond.DiamondCutData memory diamondCutData) {
-        ChainTypeManagerBase chainTypeManager = ChainTypeManagerBase(ctm);
+        ChainTypeManager chainTypeManager = ChainTypeManager(ctm);
         uint256 blockWithData = chainTypeManager.upgradeCutDataBlock(protocolVersion);
         Vm.EthGetLogs[] memory logs = _fetchLogsFromBlock(
             blockWithData,
@@ -110,7 +111,7 @@ library GetDiamondCutData {
     function _getDiamondCutAndForceDeployment(
         address ctm
     ) internal returns (bytes memory diamondCutData, bytes memory forceDeploymentsData) {
-        ChainTypeManagerBase chainTypeManager = ChainTypeManagerBase(ctm);
+        ChainTypeManager chainTypeManager = ChainTypeManager(ctm);
         uint256 protocolVersion = chainTypeManager.protocolVersion();
         uint256 blockWithData = chainTypeManager.newChainCreationParamsBlock(protocolVersion);
         Vm.EthGetLogs[] memory logs = _fetchLogsFromBlock(

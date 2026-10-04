@@ -2,24 +2,7 @@
 pragma solidity ^0.8.10;
 
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
-import {
-    Facets,
-    Verifiers,
-    StateTransitionContracts,
-    StateTransitionDeployedAddresses,
-    DAContracts
-} from "contracts/common/StateTransitionTypes.sol";
-
-/// @dev Value passed for the `eraChainId` constructor parameter that the audited legacy-bridging
-/// `L1AssetRouter` still carries. Nothing this release deploys has an Era chain, and `Bridgehub`
-/// rejects chain id 0 (`ZeroChainId`), so every Era-legacy branch keyed off it is unreachable —
-/// whereas a made-up non-zero id would unlock those branches for whichever chain happened to
-/// hold it.
-uint256 constant ERA_CHAIN_ID_UNUSED = 0;
-
-/// @dev Companion to {ERA_CHAIN_ID_UNUSED} for the `eraDiamondProxy` constructor parameter: with no
-/// Era chain there is no Era diamond, and `msg.sender` can never be `address(0)`.
-address constant ERA_DIAMOND_PROXY_UNUSED = address(0);
+import {StateTransitionDeployedAddresses, DAContracts} from "contracts/common/StateTransitionTypes.sol";
 
 /// @dev First protocol version whose production verifier exports the testnet-verifier flag
 /// (`isTestnetVerifier()`). Earlier production verifiers export no flag; v31/v32/v33 testnet
@@ -67,7 +50,6 @@ struct BridgeContracts {
     address l1InteropHandler;
 }
 
-// solhint-disable-next-line gas-struct-packing
 struct BridgesDeployedAddresses {
     BridgeContracts proxies;
     BridgeContracts implementations;
@@ -85,7 +67,6 @@ struct L1CoreAdminAddresses {
     address create2Factory;
 }
 
-// solhint-disable-next-line gas-struct-packing
 struct CoreDeployedAddresses {
     BridgehubAddresses bridgehub;
     BridgesDeployedAddresses bridges;
@@ -114,12 +95,21 @@ struct CTMAdminAddresses {
     address chainTypeManagerOwner;
 }
 
+/// @notice Additional verifier addresses for a multiprover CTM deployment.
+struct MultiProofAddresses {
+    address airbenderVerifier;
+    address ziskVerifier;
+    address ziskTestnetVerifier;
+    address multiProofVerifier;
+}
+
 struct CTMDeployedAddresses {
     StateTransitionDeployedAddresses stateTransition;
     L1SpecificStateTransitionAddresses l1Specific;
     DataAvailabilityDeployedAddresses daAddresses;
     CTMAdminAddresses admin;
     address chainAdmin;
+    MultiProofAddresses multiProof;
 }
 
 struct ChainCreationParamsConfig {

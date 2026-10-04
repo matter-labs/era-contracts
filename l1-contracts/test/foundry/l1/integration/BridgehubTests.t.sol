@@ -6,7 +6,6 @@ import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddres
 import {L1InteropRequests} from "../../../../deploy-scripts/utils/L1InteropRequests.sol";
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
-import {console2 as console} from "forge-std/console2.sol";
 
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {L1L2MessageParams, L1L2IndirectMessageParams} from "../../../../deploy-scripts/utils/L1InteropRequests.sol";
@@ -15,10 +14,6 @@ import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
-import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
-import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
-import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {SharedBridgehubWithdrawal} from "./_SharedBridgehubWithdrawal.t.sol";
 import {
     DEFAULT_L2_LOGS_TREE_ROOT_HASH,
@@ -37,7 +32,7 @@ import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestConstants.sol";
 contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
     using LogFinder for Vm.Log[];
 
-    uint256 constant TEST_USERS_COUNT = 10;
+    uint256 internal constant TEST_USERS_COUNT = 10;
 
     enum RequestType {
         DIRECT,
@@ -56,7 +51,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
     address[] public l2ContractAddresses;
     address[] public addressesToExclude;
     address public currentChainAddress;
-    SimpleExecutor simpleExecutor;
+    SimpleExecutor internal simpleExecutor;
 
     // Amounts deposited by each user, mapped by user address and token address
     mapping(address user => mapping(address token => uint256 deposited)) public depositsUsers;
@@ -130,7 +125,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
 
     // TODO: consider what should be actually committed, do we need to simulate operator:
     // blocks -> batches -> commits or just mock it.
-    function _commitBatchInfo(uint256 _chainId) internal {
+    function _commitBatchInfo(uint256 _chainId) internal view {
         //vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
 
         GettersFacet zkChainGetters = GettersFacet(getZKChainAddress(_chainId));
@@ -167,7 +162,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
     // to deposit into mock l2 contract
     function _getDecodedDepositL2Calldata(
         bytes memory callData
-    ) internal view returns (address l1Sender, address l2Receiver, address l1Token, uint256 amount, bytes memory b) {
+    ) internal pure returns (address l1Sender, address l2Receiver, address l1Token, uint256 amount, bytes memory b) {
         // UnsafeBytes approach doesn't work, because abi is not deterministic
         bytes memory slicedData = new bytes(callData.length - 4);
 

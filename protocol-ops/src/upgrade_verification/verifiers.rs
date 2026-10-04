@@ -39,6 +39,10 @@ pub(crate) struct Verifiers {
     pub bytecode_verifier: BytecodeVerifier,
     pub network_verifier: NetworkVerifier,
     pub zksync_os_genesis_config: GenesisConfig,
+    /// Era chain id from the env's upgrade input TOML. Consumed only by the
+    /// PUH/Guardians checks (`ERA_CHAIN_ID` constructor arg and getter — the
+    /// real ABI of the external zk-governance contracts). The L1AssetRouter no
+    /// longer exposes an Era chain id, so no router wiring check reads this.
     pub era_chain_id: u64,
     pub legacy_gateway_chain_id: u64,
     pub legacy_gateway_chain_intervals: Vec<ChainInterval>,
@@ -105,8 +109,7 @@ impl Verifiers {
         )?;
         let bytecode_verifier =
             BytecodeVerifier::init_v31(contracts_commit, zk_governance_commit).await?;
-        let network_verifier =
-            NetworkVerifier::new_v31(l1_rpc.into(), gw_rpc.into(), era_chain_id).await?;
+        let network_verifier = NetworkVerifier::new_v31(l1_rpc.into(), gw_rpc.into()).await?;
         anyhow::ensure!(
             network_verifier.get_gateway_chain_id() == new_gateway_chain_id,
             "gateway RPC chain id {} does not match env [new_gateway].chain_id {}",
@@ -137,7 +140,7 @@ impl Verifiers {
         // (e.g., a legacy env where the gateway used salt 0).
         let gateway_ctm_create2_salt = {
             let per_ctm = EnvConfig::load(env.as_str())
-                .and_then(|cfg| cfg.v31_create2_factory_salt_per_ctm())
+                .and_then(|cfg| cfg.create2_factory_salt_for_upgrade_per_ctm())
                 .unwrap_or_default();
             per_ctm
                 .get(&new_gateway_representative_ctm)

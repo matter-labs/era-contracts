@@ -9,4 +9,9 @@ pragma solidity 0.8.28;
 // `ITransparentUpgradeableProxy` ABI to drive the real proxy-admin upgrade
 // when installing `L1ChainAssetHandlerDev`.
 // See `test/anvil-interop/build-dev-artifacts.sh`.
-import "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+// solhint-disable no-unused-import
+import {
+    ITransparentUpgradeableProxy,
+    TransparentUpgradeableProxy
+} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+// solhint-enable no-unused-import

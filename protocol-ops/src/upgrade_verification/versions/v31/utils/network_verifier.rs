@@ -55,7 +55,6 @@ sol! {
         function legacyBridge() public view returns (address);
         function L1_WETH_TOKEN() public view returns (address);
         function L1_NULLIFIER() public view returns (address);
-        function ERA_CHAIN_ID() public view returns (uint256);
 
         function nativeTokenVault() public view returns (address);
     }
@@ -65,7 +64,6 @@ sol! {
         function getHyperchain(uint256 _chainId) public view returns (address);
         address public validatorTimelockPostV29;
         function protocolVersion() external view returns (uint256);
-        function isZKsyncOS() external view returns (bool);
         function owner() external view returns (address);
         function PERMISSIONLESS_VALIDATOR() external view returns (address);
     }
@@ -112,7 +110,6 @@ sol! {
 
 pub struct NetworkVerifier {
     pub l1_provider: RootProvider,
-    pub era_chain_id: u64,
     pub l1_chain_id: u64,
     pub gateway_chain_id: u64,
     pub gw_provider: RootProvider,
@@ -130,11 +127,7 @@ struct ParsedCreate2Deployment {
 }
 
 impl NetworkVerifier {
-    pub async fn new_v31(
-        l1_rpc: String,
-        gw_rpc: String,
-        era_chain_id: u64,
-    ) -> anyhow::Result<Self> {
+    pub async fn new_v31(l1_rpc: String, gw_rpc: String) -> anyhow::Result<Self> {
         let l1_provider = RootProvider::new_http(l1_rpc.parse().context("invalid L1 RPC URL")?);
         let l1_chain_id = l1_provider
             .get_chain_id()
@@ -149,7 +142,6 @@ impl NetworkVerifier {
 
         Ok(Self {
             l1_provider,
-            era_chain_id,
             l1_chain_id,
             gateway_chain_id,
             gw_provider,
@@ -425,14 +417,6 @@ impl NetworkVerifier {
             .call()
             .await
             .context("failed to fetch ZK chain protocolVersion")
-    }
-
-    pub async fn try_get_ctm_is_zksync_os(&self, ctm_addr: Address) -> anyhow::Result<bool> {
-        let ctm = ChainTypeManager::new(ctm_addr, self.l1_provider.clone());
-        ctm.isZKsyncOS()
-            .call()
-            .await
-            .context("failed to fetch CTM isZKsyncOS")
     }
 
     pub async fn try_get_chain_diamond_from_bridgehub(

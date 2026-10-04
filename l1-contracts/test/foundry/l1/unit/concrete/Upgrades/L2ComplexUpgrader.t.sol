@@ -5,9 +5,10 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {L2ComplexUpgrader} from "contracts/l2-upgrades/L2ComplexUpgrader.sol";
+import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {MockContract} from "contracts/dev-contracts/MockContract.sol";
 import {L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {AddressHasNoCode, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {AddressHasNoCode, Unauthorized, UnsupportedUpgradeType} from "contracts/common/L1ContractErrors.sol";
 
 /// @dev `L2ComplexUpgrader` gates on `msg.sender` only and never inspects its own address, so it is
 /// exercised as a plain unit test rather than through an L2 harness. The force-deployment paths that
@@ -24,6 +25,37 @@ contract L2ComplexUpgraderTest is Test {
     function test_RevertWhen_NonForceDeployerCallsUpgrade() public {
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
         upgrader.upgrade(address(dummyUpgrade), hex"deadbeef");
+    }
+
+    function test_RevertWhen_NonForceDeployerCallsForceDeployAndUpgradeUniversal() public {
+        IComplexUpgrader.UniversalContractUpgradeInfo[]
+            memory deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](0);
+
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
+        upgrader.forceDeployAndUpgradeUniversal(deployments, address(dummyUpgrade), hex"deadbeef");
+    }
+
+    /// @dev Wire-format guard: the ordinals of {IComplexUpgrader.ContractUpgradeType} are consumed
+    /// by off-chain upgrade tooling and recorded in historical upgrade calldata, so they must
+    /// never be renumbered. Ordinal 0 is the retired EraVM member kept only as a reservation.
+    function test_ContractUpgradeTypeOrdinalsArePinned() public pure {
+        assertEq(uint8(IComplexUpgrader.ContractUpgradeType.__DEPRECATED_EraForceDeployment), 0);
+        assertEq(uint8(IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade), 1);
+        assertEq(uint8(IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment), 2);
+    }
+
+    function test_RevertWhen_DeprecatedEraForceDeploymentOrdinalIsSupplied() public {
+        IComplexUpgrader.UniversalContractUpgradeInfo[]
+            memory deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
+        deployments[0] = IComplexUpgrader.UniversalContractUpgradeInfo({
+            upgradeType: IComplexUpgrader.ContractUpgradeType.__DEPRECATED_EraForceDeployment,
+            deployedBytecodeInfo: abi.encode(bytes32(0), uint32(0), bytes32(0)),
+            newAddress: makeAddr("eraForceDeployTarget")
+        });
+
+        vm.expectRevert(UnsupportedUpgradeType.selector);
+        vm.prank(L2_FORCE_DEPLOYER_ADDR);
+        upgrader.forceDeployAndUpgradeUniversal(deployments, address(dummyUpgrade), hex"deadbeef");
     }
 
     function test_RevertWhen_TargetHasNoCode() public {

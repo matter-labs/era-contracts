@@ -1,8 +1,14 @@
 # Manual review procedure for v31 calldata
 
-This guide describes historical artifacts. The full verifier rejects artifacts for
-the [L1 Interop Center migration](../../../protocol-docs/l1-interop-center.md#deployment-and-migration);
-`--display-upgrade-data` can print their calldata without validating it.
+> **Historical (v31 ceremony).** This procedure describes the v31 calldata and its dual-CTM
+> (EraVM + ZKsync OS) shape. The current release is ZKsync OS only: `_isZKsyncOS`,
+> `l2TokenProxyBytecodeHash`, `IComplexUpgrader.forceDeployAndUpgrade`, `L2NativeTokenVaultZKOS`,
+> `[ctms.era]` and the router's `ERA_CHAIN_ID` referenced below no longer exist. Use it only to
+> re-review v31-era packages; for current packages follow `protocol-ops verify-upgrade` output.
+>
+> The full verifier rejects artifacts for the
+> [L1 Interop Center migration](../../../protocol-docs/l1-interop-center.md#deployment-and-migration);
+> `--display-upgrade-data` can print their calldata without validating it.
 
 ## Relevant files
 

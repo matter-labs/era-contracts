@@ -20,7 +20,6 @@ sol! {
     struct FixedForceDeploymentsData {
         uint256 l1ChainId;
         address l1AssetRouter;
-        bytes32 l2TokenProxyBytecodeHash;
         address aliasedL1Governance;
         uint256 maxNumberOfZKChains;
         bytes bridgehubBytecodeInfo;
@@ -151,29 +150,6 @@ impl FixedForceDeploymentsData {
 
         result.expect_address(verifiers, &self.l1AssetRouter, "l1_asset_router_proxy");
 
-        // l2TokenProxyBytecodeHash is an EVM deployed bytecode hash on ZKsyncOS.
-        let beacon_proxy_file = "l1-contracts/BeaconProxy";
-        match verifiers
-            .bytecode_verifier
-            .evm_deployed_bytecode_hash_to_file(&self.l2TokenProxyBytecodeHash)
-        {
-            Some(file) if file == beacon_proxy_file => {
-                // ok
-            }
-            Some(_) => {
-                result.report_error(&format!(
-                    "l2TokenProxyBytecodeHash maps to wrong contract (expected {})",
-                    beacon_proxy_file
-                ));
-            }
-            None => {
-                result.report_error(&format!(
-                    "l2TokenProxyBytecodeHash cannot be verified: {} not in AllContractsHashes",
-                    self.l2TokenProxyBytecodeHash
-                ));
-            }
-        }
-
         // aliasedL1Governance = applyL1ToL2Alias(Bridgehub.owner()), registered
         // in the address book at `Verifiers::new_v31`.
         let expected_aliased_governance = verifiers
@@ -209,7 +185,7 @@ impl FixedForceDeploymentsData {
             result,
             verifiers,
             &self.l2NtvBytecodeInfo,
-            "l1-contracts/L2NativeTokenVaultZKOS",
+            "l1-contracts/L2NativeTokenVault",
         );
         expect_bytecode_info(
             result,
@@ -311,7 +287,6 @@ mod tests {
         struct SolidityFixedForceDeploymentsData {
             uint256 l1ChainId;
             address l1AssetRouter;
-            bytes32 l2TokenProxyBytecodeHash;
             address aliasedL1Governance;
             uint256 maxNumberOfZKChains;
             bytes bridgehubBytecodeInfo;
@@ -354,7 +329,6 @@ mod tests {
             [
                 "uint256 l1ChainId;",
                 "address l1AssetRouter;",
-                "bytes32 l2TokenProxyBytecodeHash;",
                 "address aliasedL1Governance;",
                 "uint256 maxNumberOfZKChains;",
                 "bytes bridgehubBytecodeInfo;",
@@ -379,7 +353,6 @@ mod tests {
         let expected = SolidityFixedForceDeploymentsData {
             l1ChainId: U256::from(1),
             l1AssetRouter: Address::from([3; 20]),
-            l2TokenProxyBytecodeHash: FixedBytes::from([4; 32]),
             aliasedL1Governance: Address::from([5; 20]),
             maxNumberOfZKChains: U256::from(6),
             bridgehubBytecodeInfo: Bytes::from(vec![7]),
@@ -415,7 +388,6 @@ mod tests {
         assert_fields!(actual, expected;
             l1ChainId,
             l1AssetRouter,
-            l2TokenProxyBytecodeHash,
             aliasedL1Governance,
             maxNumberOfZKChains,
             bridgehubBytecodeInfo,

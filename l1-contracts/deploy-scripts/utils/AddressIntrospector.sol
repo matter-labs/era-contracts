@@ -8,20 +8,17 @@ import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
-import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IZKChainBase} from "contracts/state-transition/chain-interfaces/IZKChainBase.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {IBaseTokenAssetHandler} from "contracts/bridge/interfaces/IBaseTokenAssetHandler.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
-import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {Utils} from "../utils/Utils.sol";
 import {
     L2_BRIDGEHUB_ADDR,
-    L2_ASSET_ROUTER_ADDR,
     L2_MESSAGE_ROOT_ADDR,
     L2_CHAIN_ASSET_HANDLER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -35,16 +32,13 @@ import {
     BridgehubContracts,
     ZkChainAddresses,
     StateTransitionDeployedAddresses,
-    StateTransitionContracts,
-    Verifiers,
-    Facets,
     BridgesDeployedAddresses,
     BridgeContracts,
     CTMDeployedAddresses,
     CTMAdminAddresses,
-    DataAvailabilityDeployedAddresses,
     L1SpecificStateTransitionAddresses
 } from "./Types.sol";
+import {StateTransitionContracts, Verifiers, Facets} from "contracts/common/StateTransitionTypes.sol";
 import {DeployCTML1OrGateway} from "../ctm/DeployCTML1OrGateway.sol";
 
 library AddressIntrospector {
@@ -216,7 +210,7 @@ library AddressIntrospector {
 
     // ============ CTM Addresses ============
 
-    function getCTMAddresses(ChainTypeManagerBase _ctm) public view returns (CTMDeployedAddresses memory info) {
+    function getCTMAddresses(ChainTypeManager _ctm) public view returns (CTMDeployedAddresses memory info) {
         return _getCTMAddressesInternal(address(_ctm), false);
     }
 
@@ -236,7 +230,7 @@ library AddressIntrospector {
         address _ctmAddr,
         bool _isPreV32
     ) private view returns (CTMDeployedAddresses memory info) {
-        ChainTypeManagerBase ctm = ChainTypeManagerBase(_ctmAddr);
+        ChainTypeManager ctm = ChainTypeManager(_ctmAddr);
 
         address validatorTimelock = ctm.validatorTimelockPostV29();
 
@@ -412,7 +406,7 @@ library AddressIntrospector {
         bh = getBridgehubAddresses(_bridgehub);
 
         address ctmAddr = _bridgehub.chainTypeManager(_chainId);
-        ctm = getCTMAddresses(ChainTypeManagerBase(ctmAddr)).stateTransition;
+        ctm = getCTMAddresses(ChainTypeManager(ctmAddr)).stateTransition;
 
         address zkAddr = _bridgehub.getZKChain(_chainId);
         zk = getZkChainAddresses(IZKChain(zkAddr), _bridgehub);
@@ -424,7 +418,7 @@ library AddressIntrospector {
 
     // ============ Private Helpers ============
 
-    function _getUptoDateZkChainAddress(ChainTypeManagerBase _ctm) internal view returns (address) {
+    function _getUptoDateZkChainAddress(ChainTypeManager _ctm) internal view returns (address) {
         IBridgehubBase bridgehub = IBridgehubBase(_ctm.BRIDGE_HUB());
         uint256 protocolVersion = _ctm.protocolVersion();
         address[] memory zkChains = bridgehub.getAllZKChains();
@@ -445,7 +439,7 @@ library AddressIntrospector {
         return address(0);
     }
 
-    function _getVerifierFromUptoDateZkChain(ChainTypeManagerBase _ctm) private view returns (address) {
+    function _getVerifierFromUptoDateZkChain(ChainTypeManager _ctm) private view returns (address) {
         address zkChainAddr = _getUptoDateZkChainAddress(_ctm);
         if (zkChainAddr == address(0)) {
             return address(0);
@@ -453,7 +447,7 @@ library AddressIntrospector {
         return address(IZKChain(zkChainAddr).getVerifier());
     }
 
-    function _getFacetsFromUptoDateZkChain(ChainTypeManagerBase _ctm) private view returns (Facets memory facets) {
+    function _getFacetsFromUptoDateZkChain(ChainTypeManager _ctm) private view returns (Facets memory facets) {
         address zkChainAddr = _getUptoDateZkChainAddress(_ctm);
         if (zkChainAddr == address(0)) {
             return facets;
@@ -480,14 +474,6 @@ library AddressIntrospector {
                 facets.committerFacet = facetAddr;
             }
         }
-    }
-
-    function _tryAddress(address _target, string memory _sig) private view returns (address) {
-        (bool ok, bytes memory data) = _target.staticcall(abi.encodeWithSignature(_sig));
-        if (ok && data.length >= 32) {
-            return abi.decode(data, (address));
-        }
-        return address(0);
     }
 
     /// @notice Get fflonk and plonk sub-verifiers from a ZKsyncOS dual verifier

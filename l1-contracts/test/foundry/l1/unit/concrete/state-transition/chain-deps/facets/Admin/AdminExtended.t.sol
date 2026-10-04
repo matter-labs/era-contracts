@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import "./_Admin_Shared.t.sol";
+import {AdminTest} from "./_Admin_Shared.t.sol";
 import {
     Unauthorized,
     DiamondNotFrozen,
@@ -179,21 +179,6 @@ contract AdminExtendedTest is AdminTest {
         adminFacet.setValidator(validator, false);
 
         assertFalse(utilsFacet.util_getValidator(validator));
-    }
-
-    function test_SetPorterAvailability() public {
-        vm.prank(address(dummyBridgehub));
-        utilsFacet.util_setChainTypeManager(address(this));
-
-        vm.prank(address(this));
-        adminFacet.setPorterAvailability(true);
-
-        assertTrue(utilsFacet.util_getZkPorterAvailability());
-
-        vm.prank(address(this));
-        adminFacet.setPorterAvailability(false);
-
-        assertFalse(utilsFacet.util_getZkPorterAvailability());
     }
 
     function test_SetPubdataPricingMode() public {

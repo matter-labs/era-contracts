@@ -4,12 +4,11 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {V32UpgradeZKsyncOS} from "contracts/upgrades/V32UpgradeZKsyncOS.sol";
-import {IL2V32Upgrade} from "contracts/upgrades/IL2V32Upgrade.sol";
+import {IL2DefaultUpgrade} from "contracts/upgrades/IL2DefaultUpgrade.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 import {ETH_TOKEN_ADDRESS, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 import {
     BaseTokenPreV31TotalSupplyNotSet,
@@ -33,10 +32,6 @@ contract DummyV32UpgradeZKsyncOS is V32UpgradeZKsyncOS, BaseUpgradeUtils {
 
     function setChainId(uint256 _chainId) public {
         s.chainId = _chainId;
-    }
-
-    function setZKsyncOS(bool _zksyncOS) public {
-        s.zksyncOS = _zksyncOS;
     }
 
     function setBatchCounters(uint256 _committed, uint256 _executed) public {
@@ -91,7 +86,6 @@ contract V32UpgradeZKsyncOSTest is BaseUpgrade {
 
         upgradeContract.setBridgehub(mockBridgehub);
         upgradeContract.setChainId(CHAIN_ID);
-        upgradeContract.setZKsyncOS(true);
         // The default shape: every committed batch processed, backfill prerequisite satisfied
         // (flag set on v31, bound recorded, priority ops processed through it).
         upgradeContract.setBatchCounters(7, 7);
@@ -182,7 +176,6 @@ contract V32UpgradeZKsyncOSTest is BaseUpgrade {
         upgradeContract.mockProtocolVersionVerifier(protocolVersion, mockVerifier);
         upgradeContract.setBridgehub(mockBridgehub);
         upgradeContract.setChainId(CHAIN_ID);
-        upgradeContract.setZKsyncOS(true);
         upgradeContract.setBatchCounters(7, 7);
         upgradeContract.setBaseTokenHasTotalSupply(true);
 
@@ -228,8 +221,8 @@ contract V32UpgradeZKsyncOSTest is BaseUpgrade {
 
     function _placeholderUpgradeTxData() internal view returns (bytes memory) {
         bytes memory innerCalldata = abi.encodeCall(
-            IL2V32Upgrade.upgrade,
-            (true, ctmDeployer, FIXED_FORCE_DEPLOYMENTS_DATA, hex"00")
+            IL2DefaultUpgrade.upgrade,
+            (ctmDeployer, FIXED_FORCE_DEPLOYMENTS_DATA, hex"00")
         );
         return
             abi.encodeCall(

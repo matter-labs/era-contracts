@@ -11,11 +11,9 @@ import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
-import {ILegacyL1AssetTracker} from "contracts/bridge/asset-tracker/ILegacyL1AssetTracker.sol";
 import {MockLegacyL1AssetTracker} from "../_shared/MockLegacyL1AssetTracker.sol";
 import {MAX_TOKEN_BALANCE} from "contracts/common/Config.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
@@ -92,11 +90,9 @@ contract BridgedOutPopulationLibTest is Test {
         owner = makeAddr("owner");
         bridgehub = makeAddr("bridgehub");
         address proxyAdmin = makeAddr("proxyAdmin");
-        address eraDiamondProxy = makeAddr("eraDiamondProxy");
         address weth = makeAddr("weth");
         address tokenBeacon = makeAddr("tokenBeacon");
         address chainAssetHandler = makeAddr("chainAssetHandler");
-        uint256 eraChainId = 9;
 
         L1NullifierDev nullifierImpl = new L1NullifierDev({
             _bridgehub: IL1Bridgehub(bridgehub),
@@ -115,9 +111,7 @@ contract BridgedOutPopulationLibTest is Test {
         L1AssetRouter assetRouterImpl = new L1AssetRouter({
             _l1WethToken: weth,
             _bridgehub: bridgehub,
-            _l1Nullifier: address(l1Nullifier),
-            _eraChainId: eraChainId,
-            _eraDiamondProxy: eraDiamondProxy
+            _l1Nullifier: address(l1Nullifier)
         });
         assetRouter = L1AssetRouter(
             payable(

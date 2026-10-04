@@ -40,20 +40,9 @@ contract TransactionValidatorSharedTest is Test {
     function validateL1ToL2Transaction(
         L2CanonicalTransaction memory _transaction,
         uint256 _priorityTxMaxGasLimit,
-        uint256 _priorityTxMaxPubdata,
-        bool zksyncOS
+        uint256 _priorityTxMaxPubdata
     ) public pure {
-        TransactionValidator.validateL1ToL2Transaction(
-            _transaction,
-            abi.encode(_transaction),
-            _priorityTxMaxGasLimit,
-            _priorityTxMaxPubdata,
-            zksyncOS
-        );
-    }
-
-    function getOverheadForTransaction(uint256 _encodingLength) public pure returns (uint256) {
-        return TransactionValidator.getOverheadForTransaction(_encodingLength);
+        TransactionValidator.validateL1ToL2Transaction(_transaction, _priorityTxMaxGasLimit, _priorityTxMaxPubdata);
     }
 
     // add this to be excluded from coverage report

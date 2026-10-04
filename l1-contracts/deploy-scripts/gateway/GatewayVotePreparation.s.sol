@@ -1,43 +1,28 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// solhint-disable no-console, gas-custom-errors, reason-string
-
 import {console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-// It's required to disable lints to force the compiler to compile the contracts
-// solhint-disable no-unused-import
-
-import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
+import {CHAIN_MIGRATIONS_ENABLED} from "contracts/common/Config.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 import {Utils} from "../utils/Utils.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
-import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 
 import {CTMDeployedAddresses, StateTransitionDeployedAddresses} from "../utils/Types.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 
-import {
-    GatewayCTMDeployerHelper,
-    DirectCreate2Calldata,
-    DeployerCreate2Calldata,
-    DeployerAddresses,
-    DirectDeployedAddresses
-} from "./GatewayCTMDeployerHelper.sol";
+import {GatewayCTMDeployerHelper, DirectCreate2Calldata, DeployerCreate2Calldata} from "./GatewayCTMDeployerHelper.sol";
 import {
     DeployedContracts,
     GatewayCTMDeployerConfig
@@ -65,25 +50,25 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
 
     GatewayCTMOutput internal output;
 
-    uint256 constant EXPECTED_MAX_L1_GAS_PRICE = 50 gwei;
+    uint256 internal constant EXPECTED_MAX_L1_GAS_PRICE = 50 gwei;
 
     /// Packed protocol version of v31.0.0 — anything `>=` this exposes the
     /// `serverNotifierAddress()` getter directly. Pre-v31 CTMs predate the
     /// getter, so we fall back to a raw storage load. Temporary shim: once
     /// every active CTM is upgraded past v31 this branch can be deleted.
-    uint256 constant MIN_V31_PROTOCOL_VERSION = 0x1F00000000;
-    /// Storage slot of `ChainTypeManagerBase.serverNotifierAddress`. Confirmed
-    /// via `forge inspect ChainTypeManagerBase storage-layout`. Stays at the
+    uint256 internal constant MIN_V31_PROTOCOL_VERSION = 0x1F00000000;
+    /// Storage slot of `ChainTypeManager.serverNotifierAddress`. Confirmed
+    /// via `forge inspect ChainTypeManager storage-layout`. Stays at the
     /// same slot across v30 → v31 (verified by reading the slot on both Atlas
     /// (v30.1) and Era (older) CTM on Sepolia). Drop with the version branch.
-    bytes32 constant SERVER_NOTIFIER_ADDRESS_SLOT = bytes32(uint256(164));
+    bytes32 internal constant SERVER_NOTIFIER_ADDRESS_SLOT = bytes32(uint256(164));
 
     uint256 internal gatewayChainId;
     bytes internal forceDeploymentsData;
 
     address internal serverNotifier;
     address internal refundRecipient;
-    address ctm;
+    address internal ctm;
 
     GatewayCTMDeployerConfig internal gatewayCTMDeployerConfig;
 
@@ -92,7 +77,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         address bridgehubProxy,
         uint256 ctmRepresentativeChainId
     ) internal virtual {
-        super.initializeConfig(configPath, bridgehubProxy);
+        super.initializeConfig(configPath);
         string memory toml = vm.readFile(configPath);
 
         refundRecipient = toml.readAddress("$.refund_recipient");
@@ -103,17 +88,11 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         setAddressesBasedOnBridgehub(ctmRepresentativeChainId, bridgehubProxy);
 
         address aliasedGovernor = AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress);
-        // TODO: drop `isZKsyncOS` from `GatewayCTMDeployerConfig` in the next release — this
-        // OS-only line no longer needs the flag, but the deployed gateway deployers still assert
-        // it (`GatewayCTMDeployerVerifiersZKsyncOS` / `GatewayCTMDeployerCTMZKsyncOS`), so
-        // removing it means touching those contracts.
         gatewayCTMDeployerConfig = GatewayCTMDeployerConfig({
             aliasedGovernanceAddress: aliasedGovernor,
             salt: toml.readBytes32("$.contracts.create2_factory_salt"),
             l1ChainId: config.l1ChainId,
             testnetVerifier: config.testnetVerifier,
-            // Only ZKsync-OS-based gateway CTMs are supported on this release.
-            isZKsyncOS: true,
             adminSelectors: Utils.getAllSelectorsForFacet("Admin"),
             executorSelectors: Utils.getAllSelectorsForFacet("Executor"),
             mailboxSelectors: Utils.getAllSelectorsForFacet("Mailbox"),
@@ -142,12 +121,40 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             "CTM protocol version mismatch"
         );
         // Get full CTM addresses including stateTransition info
-        addresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
+        addresses = AddressIntrospector.getCTMAddresses(ChainTypeManager(ctm));
         // Override chainAdmin with the bridgehub admin (ecosystem admin)
         addresses.chainAdmin = L1Bridgehub(bridgehubProxy).admin();
     }
 
-    function deployGatewayCTM() internal {
+    /// @notice Brings up a brand-new gateway: CREATE2-deploys the whole gateway CTM contract set
+    ///         through L1->L2 transactions.
+    /// @dev DISABLED IN v33. No gateway is deployed in this release: chain migrations are switched off
+    ///      ecosystem-wide (`CHAIN_MIGRATIONS_ENABLED == false` in `Config.sol`, see
+    ///      {protocol-docs/chain-lifecycle.md#v32-chain-migrations-are-explicitly-disabled}), so no chain
+    ///      can ever settle on a gateway created here, and the release's gateway-side pieces are
+    ///      consequently untested. Rather than emit a governance bundle that deploys an unusable — and
+    ///      unverified — CTM onto an L2, this reverts.
+    /// @dev The address-calculation half of this script (`GatewayCTMDeployerHelper.calculateAddresses`)
+    ///      stays reachable and is still covered by `GatewayVotePreparationTests`.
+    /// @dev When gateway support returns, re-enabling this is not enough: the deployed gateway CTM never
+    ///      receives a `setDefaultUpgrade` call, so `createNewVerifierOnlyUpgrade` on it would revert with
+    ///      `ZeroAddress`. `DefaultGatewayUpgrade` used to solve this on the upgrade path
+    ///      (`deployUsedUpgradeContractGW` + `prepareSetDefaultUpgradeCallForGateway`) but was removed in
+    ///      #2499, so whoever brings gateways back needs to build it here: a per-VM default upgrade among
+    ///      the direct CREATE2 deployments plus an L1->L2 `IChainTypeManager.setDefaultUpgrade` in
+    ///      `GatewayGovernanceUtils`.
+    /// @dev `virtual` for the anvil-interop harness alone, which brings a gateway up to keep exercising
+    ///      the machinery this release keeps but does not deploy — see `_GatewayVotePreparationForTests`.
+    function deployGatewayCTM() internal virtual {
+        require(
+            CHAIN_MIGRATIONS_ENABLED,
+            "GatewayVotePreparation: v33 deploys no gateway; see the note on deployGatewayCTM"
+        );
+    }
+
+    /// @notice The gateway CTM deployment itself, kept intact for the harness and for the release that
+    ///         brings gateways back; unreachable in production through `deployGatewayCTM` above.
+    function _deployGatewayCTM() internal {
         (
             DeployedContracts memory expectedGatewayContracts,
             DeployerCreate2Calldata memory deployerCalldata,
@@ -157,10 +164,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         ) = GatewayCTMDeployerHelper.calculateAddresses(gatewayCTMDeployerConfig.salt, gatewayCTMDeployerConfig);
 
         // Deploy all factory dependencies
-        bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps(gatewayCTMDeployerConfig);
-        address l1AssetRouter = address(IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).assetRouter());
-
-        for (uint i = 0; i < deps.length; i++) {
+        bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps();
+        for (uint256 i = 0; i < deps.length; i++) {
             bytes[] memory localDeps = new bytes[](1);
             localDeps[0] = deps[i];
             runGatewayL1L2TransactionWithFactoryDeps(address(0), hex"", localDeps);
@@ -309,7 +314,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             ecosystemAdminCalls[0] = Call({
                 target: addresses.stateTransition.proxies.chainTypeManager,
                 value: 0,
-                data: abi.encodeCall(ChainTypeManagerBase.setServerNotifier, (serverNotifier))
+                data: abi.encodeCall(ChainTypeManager.setServerNotifier, (serverNotifier))
             });
             ecosystemAdminCalls[1] = Call({
                 target: serverNotifier,

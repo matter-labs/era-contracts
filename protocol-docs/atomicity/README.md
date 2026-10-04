@@ -109,16 +109,16 @@ dependency roots; the genesis batch leaf is seeded by `MessageRootBase.seedGenes
 - registered in the genesis-gen tool (`tools/zksync-os-genesis-gen`) at `0x10012`
   (`L2InteropCommitmentTree`) and `0x10014` (`AtomicFlowManager`) — constants in
   `l1-contracts/contracts/common/l2-helpers/L2ContractAddresses.sol`;
-- seeded in `l1-contracts/contracts/l2-upgrades/L2GenesisForceDeploymentsHelper._initializeV32Contracts`
-  for every ZKsync OS chain, on the genesis and the upgrade path alike: neither the built-ins nor their
-  addresses existed in v31, so a chain always receives them here for the first time — from its genesis when
-  it is new, from this release's force deployments when it predates them. The commitment tree's `initL2`
+- seeded in `l1-contracts/contracts/l2-upgrades/L2GenesisForceDeploymentsHelper._initContractsAfterWiring`
+  on the genesis path only: every chain an upgrade from this release applies to (v32 or later) already
+  runs them initialized. The v31→v32 edge, which seeded them on upgrading chains, shipped with its own
+  release branch. The commitment tree's `initL2`
   seeds the IMT; the manager's `initL2(l1ChainId)` records the L1 chain id every flow's settlement layer is
   checked against.
 
 No further wiring is needed — every collaborator is referenced by its canonical fixed address: the
 tree's appender and the manager's tree / interop center / interop handler are constant getters, and the
-asset router recognises the manager via `_atomicFlowManagerAddr()`. For recovery the manager calls
+asset router recognises the manager via `_getAtomicFlowManagerAddr()`. For recovery the manager calls
 `IAtomicRecoverable.recoverAtomicCall` on a bundle call's **local sender** (`InteropCall.from`), and only
 when that sender is the canonical L2 asset router (`from == L2_ASSET_ROUTER_ADDR`) — the interface is not
 dispatched generically, and not to the call's target. Send-time validation makes the asset router the

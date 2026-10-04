@@ -5,8 +5,8 @@ pragma solidity 0.8.28;
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-
-import "forge-std/console.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
 
 import {L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -31,8 +31,9 @@ import {
 import {ExperimentalBridgeTestBase} from "./_ExperimentalBridge_Shared.t.sol";
 
 contract ExperimentalBridgeTest is ExperimentalBridgeTestBase {
-    uint256 newChainId;
-    address admin;
+    uint256 internal newChainId;
+    address internal admin;
+
     function test_newPendingAdminReplacesPrevious(address randomDeployer, address otherRandomDeployer) public {
         vm.assume(randomDeployer != address(0));
         vm.assume(otherRandomDeployer != address(0));
@@ -322,7 +323,7 @@ contract ExperimentalBridgeTest is ExperimentalBridgeTestBase {
 
         vm.expectRevert("Pausable: paused");
         vm.prank(deployerAddress);
-        bridgehub.createNewChain({
+        IL1Bridgehub(address(bridgehub)).createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -337,7 +338,7 @@ contract ExperimentalBridgeTest is ExperimentalBridgeTestBase {
 
         vm.expectRevert(CTMNotRegistered.selector);
         vm.prank(deployerAddress);
-        bridgehub.createNewChain({
+        IL1Bridgehub(address(bridgehub)).createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -366,7 +367,7 @@ contract ExperimentalBridgeTest is ExperimentalBridgeTestBase {
         chainId = bound(chainId, 1, type(uint48).max);
         vm.expectRevert(CTMNotRegistered.selector);
         vm.prank(deployerAddress);
-        bridgehub.createNewChain({
+        IL1Bridgehub(address(bridgehub)).createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -395,7 +396,7 @@ contract ExperimentalBridgeTest is ExperimentalBridgeTestBase {
         chainId = bound(chainId, type(uint48).max + uint256(1), type(uint256).max);
         vm.expectRevert(ChainIdTooBig.selector);
         vm.prank(deployerAddress);
-        bridgehub.createNewChain({
+        IL1Bridgehub(address(bridgehub)).createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -408,7 +409,7 @@ contract ExperimentalBridgeTest is ExperimentalBridgeTestBase {
         chainId = 0;
         vm.expectRevert(ZeroChainId.selector);
         vm.prank(deployerAddress);
-        bridgehub.createNewChain({
+        IL1Bridgehub(address(bridgehub)).createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -433,7 +434,7 @@ contract ExperimentalBridgeTest is ExperimentalBridgeTestBase {
         vm.chainId(MAINNET_CHAIN_ID);
         vm.expectRevert(ChainIdIsHardcoded.selector);
         vm.prank(deployerAddress);
-        bridgehub.createNewChain({
+        IL1Bridgehub(address(bridgehub)).createNewChain({
             _chainId: HARD_CODED_CHAIN_ID,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -458,7 +459,7 @@ contract ExperimentalBridgeTest is ExperimentalBridgeTestBase {
         vm.chainId(SEPOLIA_CHAIN_ID);
         vm.expectRevert(ChainIdIsHardcoded.selector);
         vm.prank(deployerAddress);
-        bridgehub.createNewChain({
+        IL1Bridgehub(address(bridgehub)).createNewChain({
             _chainId: HARD_CODED_CHAIN_ID,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -490,7 +491,7 @@ contract ExperimentalBridgeTest is ExperimentalBridgeTestBase {
 
         vm.expectRevert(abi.encodeWithSelector(AssetIdNotSupported.selector, tokenAssetId));
         vm.prank(deployerAddress);
-        bridgehub.createNewChain({
+        IL1Bridgehub(address(bridgehub)).createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -522,7 +523,7 @@ contract ExperimentalBridgeTest is ExperimentalBridgeTestBase {
 
         vm.expectRevert(SharedBridgeNotSet.selector);
         vm.prank(deployerAddress);
-        bridgehub.createNewChain({
+        IL1Bridgehub(address(bridgehub)).createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -548,7 +549,7 @@ contract ExperimentalBridgeTest is ExperimentalBridgeTestBase {
 
         vm.expectRevert(BridgeHubAlreadyRegistered.selector);
         vm.prank(deployerAddress);
-        bridgehub.createNewChain({
+        IL1Bridgehub(address(bridgehub)).createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -573,18 +574,17 @@ contract ExperimentalBridgeTest is ExperimentalBridgeTestBase {
         vm.assume(chainId != block.chainid);
         vm.assume(randomCaller != deployerAddress && randomCaller != bridgeOwner);
         // `newChainAddress` gets a vm.mockCall below, and forge's own addresses cannot be mocked:
-        // with newChainAddress = address(vm), the Bridgehub's getZKsyncOS() call is intercepted as a
-        // cheatcode instead of returning the mocked `false`, so it takes the ZKsyncOS branch and
-        // emits NewInteropRoot before NewChain — failing the expectEmit with
-        // "NewInteropRoot != expected NewChain". Precompiles cannot be mocked usefully either.
-        // Excluding them keeps this about the Bridgehub rather than about what the fuzzer picked.
+        // with newChainAddress = address(vm), the Bridgehub's genesis-root getter call is
+        // intercepted as a cheatcode instead of returning the mocked root, derailing the seeding
+        // flow. Precompiles cannot be mocked usefully either. Excluding them keeps this about the
+        // Bridgehub rather than about what the fuzzer picked.
         assumeAddressIsNot(newChainAddress, AddressType.ZeroAddress, AddressType.Precompile, AddressType.ForgeAddress);
 
         _initializeBridgehub();
 
         vm.prank(randomCaller);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomCaller));
-        bridgehub.createNewChain({
+        IL1Bridgehub(address(bridgehub)).createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -598,12 +598,11 @@ contract ExperimentalBridgeTest is ExperimentalBridgeTestBase {
 
         // bridgehub.createNewChain => chainTypeManager.createNewChain => this function sets the stateTransition mapping
         // of `chainId`, let's emulate that using foundry cheatcodes or let's just use the extra function we introduced in our mockCTM
-        mockCTM.setZKChain(chainId, address(mockChainContract));
+        mockCTM.setZKChain(address(mockChainContract));
 
         vm.startPrank(deployerAddress);
         vm.mockCall(
             address(mockCTM),
-            // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
                 mockCTM.createNewChain.selector,
                 chainId,
@@ -615,14 +614,18 @@ contract ExperimentalBridgeTest is ExperimentalBridgeTestBase {
             abi.encode(newChainAddress)
         );
         // The Bridgehub seeds the fresh chain's genesis root right after registration by pulling
-        // from the chain's getters; `newChainAddress` is a fuzzed address, so mock the VM flag to
-        // the EraVM no-op branch.
-        vm.mockCall(newChainAddress, abi.encodeWithSelector(IGetters.getZKsyncOS.selector), abi.encode(false));
+        // from the chain's getters; `newChainAddress` is a fuzzed address, so mock the genesis
+        // batch root it would report.
+        vm.mockCall(
+            newChainAddress,
+            abi.encodeWithSelector(IGetters.l2LogsRootHash.selector, uint256(0)),
+            abi.encode(ChainBatchRootTree.genesisChainBatchRoot())
+        );
 
         vm.expectEmit(true, true, true, true, address(bridgehub));
         emit NewChain(chainId, address(mockCTM), admin);
 
-        bridgehub.createNewChain({
+        IL1Bridgehub(address(bridgehub)).createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -653,7 +656,6 @@ contract ExperimentalBridgeTest is ExperimentalBridgeTestBase {
 
         vm.mockCall(
             address(mockChainContract),
-            // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
                 mockChainContract.l2TransactionBaseCost.selector,
                 mockGasPrice,

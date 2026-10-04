@@ -11,10 +11,11 @@ import {Diamond} from "../../libraries/Diamond.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
 import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
+import {IZKsyncOSVerifier} from "../../chain-interfaces/IZKsyncOSVerifier.sol";
 import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "../../chain-interfaces/ILegacyGetters.sol";
 import {SemVer} from "../../../common/libraries/SemVer.sol";
-import {L2DACommitmentScheme, PubdataContent} from "../../../common/Config.sol";
+import {ProofSystem, DisabledProofSystems, L2DACommitmentScheme, PubdataContent} from "../../../common/Config.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -102,6 +103,22 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     /// @inheritdoc IGetters
     function getTransactionFilterer() external view returns (address) {
         return s.transactionFilterer;
+    }
+
+    /// @inheritdoc IGetters
+    function getProofMode() external view returns (uint256) {
+        return IZKsyncOSVerifier(address(s.verifier)).getProofMode(s.disabledProofSystems);
+    }
+
+    /// @inheritdoc IGetters
+    function disabledProofSystems() external view returns (DisabledProofSystems memory) {
+        uint8 mask = s.disabledProofSystems;
+        return
+            DisabledProofSystems({
+                boojum: mask & uint8(1 << uint8(ProofSystem.Boojum)) != 0,
+                airbender: mask & uint8(1 << uint8(ProofSystem.Airbender)) != 0,
+                zisk: mask & uint8(1 << uint8(ProofSystem.Zisk)) != 0
+            });
     }
 
     /// @inheritdoc IGetters

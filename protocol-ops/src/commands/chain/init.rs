@@ -18,7 +18,7 @@ use crate::common::{
     traits::{ReadConfig, SaveConfig},
     wallets::Wallet,
 };
-use crate::types::{DAValidatorType, L2ChainId, L2DACommitmentScheme};
+use crate::types::{DAValidatorType, L2ChainId, L2DACommitmentScheme, PubdataContent};
 
 // ── CLI args ────────────────────────────────────────────────────────────────
 
@@ -44,6 +44,13 @@ pub struct ChainInitArgs {
     /// Bridgehub proxy address
     #[clap(long, help_heading = "Input")]
     pub bridgehub: Address,
+
+    /// CTM proxy address. Optional: discovered from L1 when omitted. Pass it for
+    /// the first chain on a fresh ecosystem, where discovery has to fall back to
+    /// scanning `ChainTypeManagerAdded` from block 0 and hosted RPCs cap the
+    /// `eth_getLogs` range.
+    #[clap(long, help_heading = "Input")]
+    pub ctm_proxy: Option<Address>,
 
     /// Owner address for the chain (default: sender)
     #[clap(long, help_heading = "Signers")]
@@ -78,19 +85,19 @@ pub struct ChainInitArgs {
     /// e.g. "4000/1" means: 1 ETH = 4000 base tokens
     #[clap(long, default_value = "1/1", help_heading = "Advanced input")]
     pub base_token_price_ratio: String,
-    /// Data availability mode
+    /// What kind of chain this is, as far as its pubdata is concerned: it fixes the pricing mode
+    /// and the pubdata content, and defaults the delivery to blobs. Use
+    /// `--l2-da-commitment-scheme` to deliver it another way.
     #[clap(long, value_enum, default_value_t = DAValidatorType::Rollup, help_heading = "Advanced input")]
     pub da_mode: DAValidatorType,
-    /// Override L2 DA commitment scheme (default: Rollup + ZKsync OS VM uses BlobsZKSyncOS, etc.)
+    /// How the chain's committed pubdata reaches L1, when it is not the blobs every `--da-mode`
+    /// defaults to on ZKsync OS: `blobs-and-pubdata-keccak256` for commit-tx calldata, or
+    /// `discouraged-empty-no-da` for a chain that delivers nothing.
     #[clap(long, value_enum, help_heading = "Advanced input")]
     pub l2_da_commitment_scheme: Option<L2DACommitmentScheme>,
     /// Keep deposits paused after init
     #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub pause_deposits: bool,
-    /// Enable EVM emulator on the chain (forwarded to the register-chain
-    /// script config as `allow_evm_emulator`)
-    #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
-    pub evm_emulator: bool,
     /// Make the chain a permanent rollup (irreversible)
     #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub make_permanent_rollup: bool,
@@ -111,22 +118,17 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
 
     let owner = Wallet::resolve(args.owner, None, &deployer)?;
 
-    // Discover CTM proxy from L1.
-    let ctm_proxy =
-        crate::common::l1_contracts::discover_ctm_proxy(&runner.rpc_url, args.bridgehub)
+    let ctm_proxy = match args.ctm_proxy {
+        Some(ctm) => ctm,
+        None => crate::common::l1_contracts::discover_ctm_proxy(&runner.rpc_url, args.bridgehub)
             .await
-            .context("Failed to discover CTM proxy from L1")?;
+            .context("Failed to discover CTM proxy from L1")?,
+    };
     logger::info(format!("CTM proxy (from L1): {:#x}", ctm_proxy));
 
-    // This tooling only provisions ZKsync OS chains — refuse EraVM CTMs.
-    let is_zksync_os =
-        crate::common::l1_contracts::resolve_is_zksync_os(&runner.rpc_url, ctm_proxy)
-            .await
-            .context("Failed to resolve isZKsyncOS from CTM")?;
-    anyhow::ensure!(
-        is_zksync_os,
-        "CTM {ctm_proxy:#x} is not a ZKsync OS CTM; this tooling only supports ZKsync OS chains"
-    );
+    crate::common::l1_contracts::ensure_supported_os_ctm(&runner.rpc_url, ctm_proxy)
+        .await
+        .context("Failed to verify the CTM is a supported ZKsync OS CTM")?;
 
     let chain_params = NewChainParams {
         chain_id: L2ChainId::new(args.chain_id)
@@ -151,7 +153,6 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
         register_for_interop: args.register_for_interop,
         create2_factory_salt: None,
         pause_deposits: args.pause_deposits,
-        evm_emulator: args.evm_emulator,
         make_permanent_rollup: args.make_permanent_rollup,
     };
     let output = chain_init(&mut runner, &deployer, &owner, &input).await?;
@@ -213,6 +214,20 @@ pub async fn chain_init(
         .l2_da_commitment_scheme
         .unwrap_or_else(|| L2DACommitmentScheme::from_da_type(input.chain_params.da_mode));
 
+    // The pubdata content is part of every batch's public input (via the ZKsync OS chain config hash),
+    // so it is set here, at creation, before the chain commits its first batch.
+    // Follows from the kind of chain this is: there is no separate knob for it, so the value on
+    // L1 cannot drift from what `--da-mode` says the chain is.
+    let pubdata_content = PubdataContent::from_da_type(input.chain_params.da_mode);
+    anyhow::ensure!(
+        !(input.make_permanent_rollup && pubdata_content == PubdataContent::LogsOnly),
+        "a permanent rollup must publish the full pubdata, so it cannot be created with \
+         pubdata content LogsOnly (chain {})",
+        input.chain_params.chain_id.as_u64()
+    );
+    // A fresh chain starts at `FullPubdata`, so only a differing value needs a transaction.
+    let should_set_pubdata_content = pubdata_content != PubdataContent::FullPubdata;
+
     logger::step("Finalizing chain admin operations...");
     runner.run(
         runner
@@ -226,8 +241,10 @@ pub async fn chain_init(
                     l1DaValidator: input.l1_da_validator,
                     tokenMultiplierSetter: token_multiplier_setter,
                     l2DaCommitmentScheme: commitment_scheme as u8,
+                    pubdataContent: pubdata_content.to_u8(),
                     shouldUnpauseDeposits: should_unpause_deposits,
                     shouldSetDaValidatorPair: should_set_da_validator_pair,
+                    shouldSetPubdataContent: should_set_pubdata_content,
                     shouldMakePermanentRollup: input.make_permanent_rollup,
                 },
             })
@@ -265,12 +282,7 @@ pub fn register_chain(
     // script hardcodes `Utils.DETERMINISTIC_CREATE2_ADDRESS` and ignores
     // this config field. Passing zero to make that dead-code nature
     // explicit.
-    let deploy_config = RegisterChainL1Config::new(
-        &input.chain_params,
-        Address::ZERO,
-        Some(salt),
-        input.evm_emulator,
-    )?;
+    let deploy_config = RegisterChainL1Config::new(&input.chain_params, Address::ZERO, Some(salt))?;
 
     let input_path = runner.input_path(&REGISTER_CHAIN_INVOCATION)?;
     deploy_config.save(input_path)?;
@@ -353,7 +365,6 @@ pub struct ChainInitInput {
     pub register_for_interop: bool,
     pub create2_factory_salt: Option<B256>,
     pub pause_deposits: bool,
-    pub evm_emulator: bool,
     pub make_permanent_rollup: bool,
 }
 

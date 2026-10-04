@@ -9,313 +9,202 @@ import {
     InvalidUpgradeTxn,
     PubdataGreaterThanLimit,
     TooMuchGas,
-    TxnBodyGasLimitNotEnoughGas,
     UpgradeTxVerifyParam,
     ValidateTxnNotEnoughGas
 } from "contracts/common/L1ContractErrors.sol";
-import {MEMORY_OVERHEAD_GAS, TX_SLOT_OVERHEAD_L2_GAS} from "contracts/common/Config.sol";
+import {
+    L1_TX_CALLDATA_FLOOR_PRICE_L2_GAS_ZKSYNC_OS,
+    L1_TX_INTRINSIC_L2_GAS_ZKSYNC_OS,
+    ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE,
+    ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE
+} from "contracts/common/Config.sol";
 
 /// @notice Unit tests for TransactionValidator library
 contract TransactionValidatorTest is Test {
-    // ============ getOverheadForTransaction Tests ============
-
-    function test_getOverheadForTransaction_basicValues() public pure {
-        uint256 overhead = TransactionValidator.getOverheadForTransaction(100);
-
-        // Should be at least TX_SLOT_OVERHEAD_L2_GAS
-        assertTrue(overhead >= TX_SLOT_OVERHEAD_L2_GAS);
-    }
-
-    function test_getOverheadForTransaction_zeroLength() public pure {
-        uint256 overhead = TransactionValidator.getOverheadForTransaction(0);
-
-        // With zero length, overhead should be TX_SLOT_OVERHEAD_L2_GAS
-        assertEq(overhead, TX_SLOT_OVERHEAD_L2_GAS);
-    }
-
-    function test_getOverheadForTransaction_largeEncoding() public pure {
-        // Large encoding should result in memory overhead being dominant
-        uint256 largeLength = 10000;
-        uint256 overhead = TransactionValidator.getOverheadForTransaction(largeLength);
-
-        uint256 expectedMemoryOverhead = MEMORY_OVERHEAD_GAS * largeLength;
-
-        // Should be the max of slot overhead and memory overhead
-        if (expectedMemoryOverhead > TX_SLOT_OVERHEAD_L2_GAS) {
-            assertEq(overhead, expectedMemoryOverhead);
-        } else {
-            assertEq(overhead, TX_SLOT_OVERHEAD_L2_GAS);
-        }
-    }
-
-    function testFuzz_getOverheadForTransaction(uint256 encodingLength) public pure {
-        vm.assume(encodingLength < type(uint128).max);
-
-        uint256 overhead = TransactionValidator.getOverheadForTransaction(encodingLength);
-
-        // Should always be at least TX_SLOT_OVERHEAD_L2_GAS
-        assertTrue(overhead >= TX_SLOT_OVERHEAD_L2_GAS);
-
-        uint256 memoryOverhead = MEMORY_OVERHEAD_GAS * encodingLength;
-        if (memoryOverhead > TX_SLOT_OVERHEAD_L2_GAS) {
-            assertEq(overhead, memoryOverhead);
-        }
-    }
-
-    // ============ getTransactionBodyGasLimit Tests ============
-
-    function test_getTransactionBodyGasLimit_basicValues() public pure {
-        uint256 totalGas = 1_000_000;
-        uint256 encodingLength = 100;
-
-        uint256 bodyGas = TransactionValidator.getTransactionBodyGasLimit(totalGas, encodingLength, false);
-
-        uint256 expectedOverhead = TransactionValidator.getOverheadForTransaction(encodingLength);
-        assertEq(bodyGas, totalGas - expectedOverhead);
-    }
-
-    function test_getTransactionBodyGasLimit_zkSyncOS() public pure {
-        uint256 totalGas = 1_000_000;
-        uint256 encodingLength = 100;
-
-        // With zkSyncOS, there's no overhead
-        uint256 bodyGas = TransactionValidator.getTransactionBodyGasLimit(totalGas, encodingLength, true);
-
-        assertEq(bodyGas, totalGas);
-    }
-
-    function test_getTransactionBodyGasLimit_revertsIfNotEnoughGas() public {
-        uint256 encodingLength = 100;
-        uint256 overhead = TransactionValidator.getOverheadForTransaction(encodingLength);
-
-        // Gas limit less than overhead
-        uint256 insufficientGas = overhead - 1;
-
-        vm.expectRevert(TxnBodyGasLimitNotEnoughGas.selector);
-        TransactionValidator.getTransactionBodyGasLimit(insufficientGas, encodingLength, false);
-    }
-
-    function test_getTransactionBodyGasLimit_exactOverhead() public pure {
-        uint256 encodingLength = 100;
-        uint256 overhead = TransactionValidator.getOverheadForTransaction(encodingLength);
-
-        // Gas limit exactly at overhead should result in 0 body gas
-        uint256 bodyGas = TransactionValidator.getTransactionBodyGasLimit(overhead, encodingLength, false);
-
-        assertEq(bodyGas, 0);
-    }
-
     // ============ getMinimalPriorityTransactionGasLimit Tests ============
 
-    function test_getMinimalPriorityTransactionGasLimit_basicValues() public pure {
-        uint256 minGas = TransactionValidator.getMinimalPriorityTransactionGasLimit(
-            1000, // encoding length
-            500, // calldata length
-            2, // factory deps
-            800, // gas per pubdata
-            false // not zkSyncOS
-        );
-
-        assertTrue(minGas > 0);
+    function test_getMinimalPriorityTransactionGasLimit_zeroCalldata() public pure {
+        uint256 minGas = TransactionValidator.getMinimalPriorityTransactionGasLimit(0, 800);
+        // The intrinsic native (pubdata-driven) term dominates the plain intrinsic gas here.
+        assertGt(minGas, L1_TX_INTRINSIC_L2_GAS_ZKSYNC_OS);
     }
 
-    function test_getMinimalPriorityTransactionGasLimit_zkSyncOS() public pure {
-        uint256 minGas = TransactionValidator.getMinimalPriorityTransactionGasLimit(
-            1000, // encoding length
-            500, // calldata length
-            2, // factory deps
-            800, // gas per pubdata
-            true // zkSyncOS
-        );
-
-        assertTrue(minGas > 0);
+    function test_getMinimalPriorityTransactionGasLimit_calldataFloor() public pure {
+        // At the minimum pubdata price, calldata cost determines the gas limit.
+        uint256 baseGas = TransactionValidator.getMinimalPriorityTransactionGasLimit(0, 1);
+        uint256 minGas = TransactionValidator.getMinimalPriorityTransactionGasLimit(100_000, 1);
+        assertEq(minGas - baseGas, L1_TX_CALLDATA_FLOOR_PRICE_L2_GAS_ZKSYNC_OS * 100_000);
     }
 
-    function test_getMinimalPriorityTransactionGasLimit_withFactoryDeps() public pure {
-        uint256 minGasWithoutDeps = TransactionValidator.getMinimalPriorityTransactionGasLimit(
-            1000,
-            500,
-            0, // no factory deps
-            800,
-            false
+    function testFuzz_getMinimalPriorityTransactionGasLimit_monotonic(
+        uint32 calldataLength,
+        uint32 delta,
+        uint32 gasPerPubdata
+    ) public pure {
+        vm.assume(gasPerPubdata > 0);
+        uint256 shorter = TransactionValidator.getMinimalPriorityTransactionGasLimit(calldataLength, gasPerPubdata);
+        uint256 longer = TransactionValidator.getMinimalPriorityTransactionGasLimit(
+            uint256(calldataLength) + delta,
+            gasPerPubdata
         );
-
-        uint256 minGasWithDeps = TransactionValidator.getMinimalPriorityTransactionGasLimit(
-            1000,
-            500,
-            5, // 5 factory deps
-            800,
-            false
-        );
-
-        // More factory deps should require more gas
-        assertTrue(minGasWithDeps > minGasWithoutDeps);
-    }
-
-    function test_getMinimalPriorityTransactionGasLimit_longerEncoding() public pure {
-        uint256 minGasShort = TransactionValidator.getMinimalPriorityTransactionGasLimit(
-            100, // short encoding
-            50,
-            0,
-            800,
-            false
-        );
-
-        uint256 minGasLong = TransactionValidator.getMinimalPriorityTransactionGasLimit(
-            10000, // long encoding
-            5000,
-            0,
-            800,
-            false
-        );
-
-        // Longer encoding should require more gas
-        assertTrue(minGasLong > minGasShort);
+        // Longer calldata can never lower the minimal gas limit.
+        assertTrue(longer >= shorter);
     }
 
     // ============ validateUpgradeTransaction Tests ============
 
     function test_validateUpgradeTransaction_validTransaction() public pure {
-        L2CanonicalTransaction memory tx = _createValidUpgradeTransaction();
+        L2CanonicalTransaction memory transaction = _createValidUpgradeTransaction();
 
         // Should not revert
-        TransactionValidator.validateUpgradeTransaction(tx);
+        TransactionValidator.validateUpgradeTransaction(transaction);
     }
 
     function test_validateUpgradeTransaction_revertsIfFromTooLarge() public {
-        L2CanonicalTransaction memory tx = _createValidUpgradeTransaction();
-        tx.from = uint256(type(uint16).max) + 1;
+        L2CanonicalTransaction memory transaction = _createValidUpgradeTransaction();
+        transaction.from = uint256(type(uint16).max) + 1;
 
         vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.From));
-        TransactionValidator.validateUpgradeTransaction(tx);
+        TransactionValidator.validateUpgradeTransaction(transaction);
     }
 
     function test_validateUpgradeTransaction_revertsIfToTooLarge() public {
-        L2CanonicalTransaction memory tx = _createValidUpgradeTransaction();
-        tx.to = uint256(type(uint160).max) + 1;
+        L2CanonicalTransaction memory transaction = _createValidUpgradeTransaction();
+        transaction.to = uint256(type(uint160).max) + 1;
 
         vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.To));
-        TransactionValidator.validateUpgradeTransaction(tx);
+        TransactionValidator.validateUpgradeTransaction(transaction);
     }
 
     function test_validateUpgradeTransaction_revertsIfPaymasterNotZero() public {
-        L2CanonicalTransaction memory tx = _createValidUpgradeTransaction();
-        tx.paymaster = 1;
+        L2CanonicalTransaction memory transaction = _createValidUpgradeTransaction();
+        transaction.paymaster = 1;
 
         vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.Paymaster));
-        TransactionValidator.validateUpgradeTransaction(tx);
+        TransactionValidator.validateUpgradeTransaction(transaction);
     }
 
     function test_validateUpgradeTransaction_revertsIfValueNotZero() public {
-        L2CanonicalTransaction memory tx = _createValidUpgradeTransaction();
-        tx.value = 1;
+        L2CanonicalTransaction memory transaction = _createValidUpgradeTransaction();
+        transaction.value = 1;
 
         vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.Value));
-        TransactionValidator.validateUpgradeTransaction(tx);
+        TransactionValidator.validateUpgradeTransaction(transaction);
     }
 
     function test_validateUpgradeTransaction_revertsIfMaxFeeNotZero() public {
-        L2CanonicalTransaction memory tx = _createValidUpgradeTransaction();
-        tx.maxFeePerGas = 1;
+        L2CanonicalTransaction memory transaction = _createValidUpgradeTransaction();
+        transaction.maxFeePerGas = 1;
 
         vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.MaxFeePerGas));
-        TransactionValidator.validateUpgradeTransaction(tx);
+        TransactionValidator.validateUpgradeTransaction(transaction);
     }
 
     function test_validateUpgradeTransaction_revertsIfMaxPriorityFeeNotZero() public {
-        L2CanonicalTransaction memory tx = _createValidUpgradeTransaction();
-        tx.maxPriorityFeePerGas = 1;
+        L2CanonicalTransaction memory transaction = _createValidUpgradeTransaction();
+        transaction.maxPriorityFeePerGas = 1;
 
         vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.MaxPriorityFeePerGas));
-        TransactionValidator.validateUpgradeTransaction(tx);
+        TransactionValidator.validateUpgradeTransaction(transaction);
     }
 
     function test_validateUpgradeTransaction_revertsIfReserved0NotZero() public {
-        L2CanonicalTransaction memory tx = _createValidUpgradeTransaction();
-        tx.reserved[0] = 1;
+        L2CanonicalTransaction memory transaction = _createValidUpgradeTransaction();
+        transaction.reserved[0] = 1;
 
         vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.Reserved0));
-        TransactionValidator.validateUpgradeTransaction(tx);
+        TransactionValidator.validateUpgradeTransaction(transaction);
     }
 
     function test_validateUpgradeTransaction_revertsIfReserved1TooLarge() public {
-        L2CanonicalTransaction memory tx = _createValidUpgradeTransaction();
-        tx.reserved[1] = uint256(type(uint160).max) + 1;
+        L2CanonicalTransaction memory transaction = _createValidUpgradeTransaction();
+        transaction.reserved[1] = uint256(type(uint160).max) + 1;
 
         vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.Reserved1));
-        TransactionValidator.validateUpgradeTransaction(tx);
+        TransactionValidator.validateUpgradeTransaction(transaction);
     }
 
     function test_validateUpgradeTransaction_revertsIfReserved2NotZero() public {
-        L2CanonicalTransaction memory tx = _createValidUpgradeTransaction();
-        tx.reserved[2] = 1;
+        L2CanonicalTransaction memory transaction = _createValidUpgradeTransaction();
+        transaction.reserved[2] = 1;
 
         vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.Reserved2));
-        TransactionValidator.validateUpgradeTransaction(tx);
+        TransactionValidator.validateUpgradeTransaction(transaction);
     }
 
     function test_validateUpgradeTransaction_revertsIfReserved3NotZero() public {
-        L2CanonicalTransaction memory tx = _createValidUpgradeTransaction();
-        tx.reserved[3] = 1;
+        L2CanonicalTransaction memory transaction = _createValidUpgradeTransaction();
+        transaction.reserved[3] = 1;
 
         vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.Reserved3));
-        TransactionValidator.validateUpgradeTransaction(tx);
+        TransactionValidator.validateUpgradeTransaction(transaction);
     }
 
     function test_validateUpgradeTransaction_revertsIfSignatureNotEmpty() public {
-        L2CanonicalTransaction memory tx = _createValidUpgradeTransaction();
-        tx.signature = hex"1234";
+        L2CanonicalTransaction memory transaction = _createValidUpgradeTransaction();
+        transaction.signature = hex"1234";
 
         vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.Signature));
-        TransactionValidator.validateUpgradeTransaction(tx);
+        TransactionValidator.validateUpgradeTransaction(transaction);
     }
 
     function test_validateUpgradeTransaction_revertsIfPaymasterInputNotEmpty() public {
-        L2CanonicalTransaction memory tx = _createValidUpgradeTransaction();
-        tx.paymasterInput = hex"1234";
+        L2CanonicalTransaction memory transaction = _createValidUpgradeTransaction();
+        transaction.paymasterInput = hex"1234";
 
         vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.PaymasterInput));
-        TransactionValidator.validateUpgradeTransaction(tx);
+        TransactionValidator.validateUpgradeTransaction(transaction);
     }
 
     function test_validateUpgradeTransaction_revertsIfReservedDynamicNotEmpty() public {
-        L2CanonicalTransaction memory tx = _createValidUpgradeTransaction();
-        tx.reservedDynamic = hex"1234";
+        L2CanonicalTransaction memory transaction = _createValidUpgradeTransaction();
+        transaction.reservedDynamic = hex"1234";
 
         vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.ReservedDynamic));
-        TransactionValidator.validateUpgradeTransaction(tx);
+        TransactionValidator.validateUpgradeTransaction(transaction);
     }
 
     // ============ validateL1ToL2Transaction Tests ============
 
-    function test_validateL1ToL2Transaction_revertsIfTooMuchGas() public {
-        L2CanonicalTransaction memory tx = _createBasicL2Transaction();
-        tx.gasLimit = 100_000_000_000; // Very high gas limit
+    function test_validateL1ToL2Transaction_success() public pure {
+        L2CanonicalTransaction memory transaction = _createBasicL2Transaction();
+        transaction.gasLimit = 10_000_000;
 
-        bytes memory encoded = abi.encode(tx);
+        // Should not revert.
+        TransactionValidator.validateL1ToL2Transaction(transaction, 100_000_000, 100_000);
+    }
+
+    function test_validateL1ToL2Transaction_revertsIfTooMuchGas() public {
+        L2CanonicalTransaction memory transaction = _createBasicL2Transaction();
+        transaction.gasLimit = 100_000_000_000; // Very high gas limit
 
         vm.expectRevert(TooMuchGas.selector);
         TransactionValidator.validateL1ToL2Transaction(
-            tx,
-            encoded,
-            1_000_000, // priority tx max gas limit (much lower)
-            1_000_000, // priority tx max pubdata
-            false
+            transaction,
+            1_000_000, // priority transaction max gas limit (much lower)
+            1_000_000 // priority transaction max pubdata
         );
     }
 
     function test_validateL1ToL2Transaction_revertsIfPubdataTooHigh() public {
-        L2CanonicalTransaction memory tx = _createBasicL2Transaction();
-        tx.gasLimit = 10_000_000;
-        tx.gasPerPubdataByteLimit = 1; // Very low pubdata price = high pubdata amount
+        L2CanonicalTransaction memory transaction = _createBasicL2Transaction();
+        transaction.gasLimit = 10_000_000;
+        transaction.gasPerPubdataByteLimit = 1; // Very low pubdata price = high pubdata amount
 
-        bytes memory encoded = abi.encode(tx);
-        uint256 overhead = TransactionValidator.getOverheadForTransaction(encoded.length);
-        uint256 bodyGas = tx.gasLimit - overhead;
-        uint256 expectedPubdata = bodyGas / tx.gasPerPubdataByteLimit;
+        // ZKsync OS has no batch overhead: the whole gas limit counts towards pubdata.
+        uint256 expectedPubdata = transaction.gasLimit / transaction.gasPerPubdataByteLimit;
 
         vm.expectRevert(abi.encodeWithSelector(PubdataGreaterThanLimit.selector, 1000, expectedPubdata));
-        TransactionValidator.validateL1ToL2Transaction(tx, encoded, 100_000_000, 1000, false);
+        TransactionValidator.validateL1ToL2Transaction(transaction, 100_000_000, 1000);
+    }
+
+    function test_validateL1ToL2Transaction_revertsIfBelowIntrinsicGas() public {
+        L2CanonicalTransaction memory transaction = _createBasicL2Transaction();
+        // Below even the plain intrinsic gas cost, whatever the native term evaluates to.
+        transaction.gasLimit = L1_TX_INTRINSIC_L2_GAS_ZKSYNC_OS - 1;
+
+        vm.expectRevert(ValidateTxnNotEnoughGas.selector);
+        TransactionValidator.validateL1ToL2Transaction(transaction, 100_000_000, 100_000);
     }
 
     // ============ Helper Functions ============
@@ -330,7 +219,7 @@ contract TransactionValidatorTest is Test {
 
         return
             L2CanonicalTransaction({
-                txType: 254, // Protocol upgrade type
+                txType: ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE,
                 from: 0x8001, // Within system contract range
                 to: uint160(0xABCD), // Valid address
                 gasLimit: 1_000_000,
@@ -355,7 +244,7 @@ contract TransactionValidatorTest is Test {
 
         return
             L2CanonicalTransaction({
-                txType: 255,
+                txType: ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE,
                 from: uint256(uint160(address(0x1234))),
                 to: uint256(uint160(address(0x5678))),
                 gasLimit: 1_000_000,

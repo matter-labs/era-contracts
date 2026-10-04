@@ -21,7 +21,12 @@ interface IL2NativeTokenVault is INativeTokenVaultBase {
         uint256 amount
     );
 
-    event L2TokenBeaconUpdated(address indexed l2TokenBeacon, bytes32 indexed l2TokenProxyBytecodeHash);
+    /// @notice Emitted when the bridged-token beacon is set.
+    /// @param l2TokenBeacon The beacon every bridged-token proxy points to.
+    /// @param beaconProxyRuntimeCodeHash `keccak256(type(BeaconProxy).runtimeCode)` of the proxy the vault
+    /// deploys via CREATE2. Before the OS-only cut this field carried a governance-supplied EraVM bytecode
+    /// hash under the name `l2TokenProxyBytecodeHash`; the topic layout is unchanged.
+    event L2TokenBeaconUpdated(address indexed l2TokenBeacon, bytes32 indexed beaconProxyRuntimeCodeHash);
 
     function l2TokenAddress(address _l1Token) external view returns (address);
 

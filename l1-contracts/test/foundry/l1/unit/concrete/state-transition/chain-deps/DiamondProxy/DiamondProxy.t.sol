@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
-
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
@@ -64,7 +62,7 @@ contract DiamondProxyTest is UtilsCallMockerTest {
     function test_revertWhen_chainIdDiffersFromBlockChainId() public {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(true)),
+            initAddress: address(new DiamondInit()),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -75,7 +73,7 @@ contract DiamondProxyTest is UtilsCallMockerTest {
     function test_revertWhen_calledWithEmptyMsgData() public {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(true)),
+            initAddress: address(new DiamondInit()),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -84,13 +82,17 @@ contract DiamondProxyTest is UtilsCallMockerTest {
         // Empty call (length 0) is allowed but fails because no facet for selector 0x00000000
         // Expected error: "F" (facet not found)
         vm.expectRevert(bytes("F"));
-        address(diamondProxy).call("");
+        (bool success, ) = address(diamondProxy).call("");
+        // `vm.expectRevert` above validates the revert AND absorbs it, so the low-level call
+        // itself reports success. Asserting that is what keeps solc's unused-return-value
+        // warning quiet without inventing a claim about the proxy.
+        assertTrue(success);
     }
 
     function test_revertWhen_calledWithFullSelectorInMsgData() public {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(true)),
+            initAddress: address(new DiamondInit()),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -99,13 +101,17 @@ contract DiamondProxyTest is UtilsCallMockerTest {
         // Call with unknown 4-byte selector fails because no facet registered
         // Expected error: "F" (facet not found)
         vm.expectRevert(bytes("F"));
-        address(diamondProxy).call(bytes.concat(bytes4(0xdeadbeef)));
+        (bool success, ) = address(diamondProxy).call(bytes.concat(bytes4(0xdeadbeef)));
+        // `vm.expectRevert` above validates the revert AND absorbs it, so the low-level call
+        // itself reports success. Asserting that is what keeps solc's unused-return-value
+        // warning quiet without inventing a claim about the proxy.
+        assertTrue(success);
     }
 
     function test_revertWhen_calledWithPartialSelector() public {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(true)),
+            initAddress: address(new DiamondInit()),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -113,19 +119,31 @@ contract DiamondProxyTest is UtilsCallMockerTest {
 
         // Call with 1-3 bytes should trigger "Ut" error (incomplete selector)
         vm.expectRevert(bytes("Ut"));
-        address(diamondProxy).call(hex"aa"); // 1 byte
+        (bool success1, ) = address(diamondProxy).call(hex"aa"); // 1 byte
+        // `vm.expectRevert` above validates the revert AND absorbs it, so the low-level call
+        // itself reports success. Asserting that is what keeps solc's unused-return-value
+        // warning quiet without inventing a claim about the proxy.
+        assertTrue(success1);
 
         vm.expectRevert(bytes("Ut"));
-        address(diamondProxy).call(hex"aabb"); // 2 bytes
+        (bool success2, ) = address(diamondProxy).call(hex"aabb"); // 2 bytes
+        // `vm.expectRevert` above validates the revert AND absorbs it, so the low-level call
+        // itself reports success. Asserting that is what keeps solc's unused-return-value
+        // warning quiet without inventing a claim about the proxy.
+        assertTrue(success2);
 
         vm.expectRevert(bytes("Ut"));
-        address(diamondProxy).call(hex"aabbcc"); // 3 bytes
+        (bool success3, ) = address(diamondProxy).call(hex"aabbcc"); // 3 bytes
+        // `vm.expectRevert` above validates the revert AND absorbs it, so the low-level call
+        // itself reports success. Asserting that is what keeps solc's unused-return-value
+        // warning quiet without inventing a claim about the proxy.
+        assertTrue(success3);
     }
 
     function test_revertWhen_proxyHasNoFacetForSelector() public {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
-            initAddress: address(new DiamondInit(true)),
+            initAddress: address(new DiamondInit()),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -139,7 +157,7 @@ contract DiamondProxyTest is UtilsCallMockerTest {
     function test_revertWhenFacetIsFrozen() public {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(true)),
+            initAddress: address(new DiamondInit()),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -156,7 +174,7 @@ contract DiamondProxyTest is UtilsCallMockerTest {
     function test_successfulExecution() public {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(true)),
+            initAddress: address(new DiamondInit()),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -179,7 +197,7 @@ contract DiamondProxyTest is UtilsCallMockerTest {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: cuts,
-            initAddress: address(new DiamondInit(true)),
+            initAddress: address(new DiamondInit()),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 

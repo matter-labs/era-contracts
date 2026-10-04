@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.20;
-// solhint-disable gas-custom-errors
 
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
-import "forge-std/console.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "contracts/common/Config.sol";
@@ -16,8 +14,8 @@ import {
     L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+    L2_BRIDGEHUB_ADDR,
     L2_CHAIN_ASSET_HANDLER_ADDR,
-    L2_COMPLEX_UPGRADER_ADDR,
     L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_HANDLER_ADDR,
     L2_INTEROP_HANDLER,
@@ -28,7 +26,6 @@ import {
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {Transaction} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
 import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
@@ -53,14 +50,12 @@ import {
     INTEROP_CALL_VERSION,
     InteropBundle,
     InteropCall,
-    InteropCallStarter,
     L2Message,
     MessageInclusionProof
 } from "contracts/common/Messaging.sol";
 
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
-import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 
 abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
@@ -103,7 +98,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         assertTrue(result, "Message verification should succeed");
     }
 
-    function test_l2MessageInclusion() public {
+    function test_l2MessageInclusion() public pure {
         // Real proof captured for chainId 271, L1 batch 26, message index 0.
         // Encoded as abi.encode of proveL2MessageInclusionShared's argument tuple:
         // (uint256 chainId, uint256 l1BatchNumber, uint256 l2MessageIndex, L2Message message, bytes32[] proof).
@@ -127,11 +122,6 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         bytes memory bundle = abi.encode(interopBundle);
         AtomicFinalityProof memory finality;
         _mockRequireFlowFinalized();
-        vm.mockCall(
-            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.mint.selector),
-            abi.encode(bytes(""))
-        );
         vm.mockCall(
             L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
@@ -183,11 +173,6 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             "finality gate must be skipped once Verified"
         );
         vm.mockCall(
-            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.mint.selector),
-            abi.encode(bytes(""))
-        );
-        vm.mockCall(
             L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
             abi.encode(bytes32(0))
@@ -207,11 +192,6 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         bytes memory bundle = abi.encode(interopBundle);
         AtomicFinalityProof memory finality;
         _mockRequireFlowFinalized();
-        vm.mockCall(
-            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.mint.selector),
-            abi.encode(bytes(""))
-        );
         vm.mockCall(
             L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
@@ -549,11 +529,6 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             abi.encode(GATEWAY_CHAIN_ID)
         );
 
-        vm.mockCall(
-            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.mint.selector),
-            abi.encode(bytes(""))
-        );
         vm.mockCall(
             L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),

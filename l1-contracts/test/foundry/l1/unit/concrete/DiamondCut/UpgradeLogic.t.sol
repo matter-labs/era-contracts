@@ -6,7 +6,6 @@ import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
 import {DiamondCutTestContract} from "contracts/dev-contracts/test/DiamondCutTestContract.sol";
 import {DiamondInit, InitializeData} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {FeeParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
@@ -28,19 +27,17 @@ contract UpgradeLogicTest is DiamondCutTest {
     AdminFacet private proxyAsAdmin;
     GettersFacet private proxyAsGetters;
     PermissionlessValidator private permissionlessValidator;
-    address interopCenter = makeAddr("interopCenter");
     address private admin;
     address private chainTypeManager;
     address private randomSigner;
-    bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(1, (makeAddr("baseToken")));
+    bytes32 internal baseTokenAssetId = DataEncoding.encodeNTVAssetId(1, (makeAddr("baseToken")));
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](11);
+        bytes4[] memory selectors = new bytes4[](10);
         uint256 i = 0;
         selectors[i++] = adminFacet.setPendingAdmin.selector;
         selectors[i++] = adminFacet.acceptAdmin.selector;
         selectors[i++] = adminFacet.setValidator.selector;
-        selectors[i++] = adminFacet.setPorterAvailability.selector;
         selectors[i++] = adminFacet.setPriorityTxMaxGasLimit.selector;
         selectors[i++] = adminFacet.changeFeeParams.selector;
         selectors[i++] = adminFacet.setTokenMultiplier.selector;
@@ -58,7 +55,7 @@ contract UpgradeLogicTest is DiamondCutTest {
         DummyBridgehub dummyBridgehub = new DummyBridgehub();
 
         diamondCutTestContract = new DiamondCutTestContract();
-        diamondInit = new DiamondInit(true);
+        diamondInit = new DiamondInit();
         adminFacet = new AdminFacet(block.chainid, RollupDAManager(address(0)));
         gettersFacet = new GettersFacet();
         permissionlessValidator = new PermissionlessValidator();
@@ -90,7 +87,6 @@ contract UpgradeLogicTest is DiamondCutTest {
             chainId: 1,
             bridgehub: address(dummyBridgehub),
             chainTypeManager: chainTypeManager,
-            interopCenter: interopCenter,
             protocolVersion: 0,
             admin: admin,
             validatorTimelock: makeAddr("validatorTimelock"),

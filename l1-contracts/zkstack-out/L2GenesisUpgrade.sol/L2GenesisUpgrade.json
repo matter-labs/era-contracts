@@ -4,11 +4,6 @@
     "name": "genesisUpgrade",
     "inputs": [
       {
-        "name": "_isZKsyncOS",
-        "type": "bool",
-        "internalType": "bool"
-      },
-      {
         "name": "_chainId",
         "type": "uint256",
         "internalType": "uint256"
@@ -36,12 +31,6 @@
     "type": "event",
     "name": "ForceDeployedContractsInitialized",
     "inputs": [
-      {
-        "name": "isZKsyncOS",
-        "type": "bool",
-        "indexed": false,
-        "internalType": "bool"
-      },
       {
         "name": "isGenesisUpgrade",
         "type": "bool",

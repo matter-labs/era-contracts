@@ -1,0 +1,372 @@
+# Checks that validate committed generated artifacts (AllContractsHashes.json,
+# l1-contracts/selectors, l1-contracts/zkstack-out, configs/genesis/zksync-os,
+# anvil-interop chain-state snapshots). Any bytecode change invalidates them and the fix is a regen +
+# commit, so they skip on draft PRs and run once the PR is ready for review.
+# Flow: see "CI tiers" in docs/ai-review/docs/ci-green.md.
+#
+# `pre-merge-verified` is the job to add to the base branch's required checks:
+# it always runs and fails unless every check below either passed or was
+# legitimately skipped. Requiring the individual checks would not work —
+# GitHub counts a skipped required check as satisfied, so a failed producer
+# would silently let a PR merge unverified. Require `pre-merge-verified` and
+# nothing else from this workflow; the build job is deliberately named
+# `build-artifacts` so its check (`build-artifacts / build`) is distinguishable
+# from l1-contracts-ci's `build / build`.
+name: Pre-merge checks
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  # Inert today: the repo has no merge queue. Kept so enabling one needs no
+  # workflow change — a queued merge must re-verify the artifacts.
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Every check here derives from compiled bytecode, so a PR that touches none of
+  # its inputs cannot invalidate the artifacts. Skipping those PRs keeps a 9-minute
+  # state regeneration off documentation changes. Exclusion-based on purpose: an
+  # unrecognized path counts as relevant, so a new directory runs the checks rather
+  # than silently bypassing them. Only paths that cannot reach a compiler or a
+  # generator belong in the list below — code that *writes* a committed artifact
+  # qualifies whatever language it is in, which is why protocol-ops and tools/ are
+  # not excluded even though today they only read contract output.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      contracts: ${{ steps.filter.outputs.contracts }}
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Decide whether the artifacts can be affected
+        id: filter
+        run: |
+          set -euo pipefail
+
+          # merge_group / workflow_dispatch have no PR diff to inspect: verify everything.
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "contracts=true" >> "$GITHUB_OUTPUT"
+            echo "Event ${{ github.event_name }}: running the full pre-merge tier."
+            exit 0
+          fi
+
+          # HEAD is the PR's merge commit, so HEAD^1 is the base tip.
+          changed=$(git diff --name-only HEAD^1 HEAD)
+          echo "Changed files:"
+          echo "$changed"
+
+          relevant=$(printf '%s\n' "$changed" | grep -vE \
+            -e '^docs/' \
+            -e '^\.vscode/' \
+            -e '^\.github/(ISSUE_TEMPLATE|PULL_REQUEST_TEMPLATE)' \
+            -e '\.md$' \
+            -e '^(LICENSE|_typos\.toml|\.codespellrc|\.gitignore|CODEOWNERS)$' \
+            || true)
+
+          if [ -z "$relevant" ]; then
+            echo "contracts=false" >> "$GITHUB_OUTPUT"
+            echo "No artifact-affecting paths changed: skipping the pre-merge tier."
+          else
+            echo "contracts=true" >> "$GITHUB_OUTPUT"
+            echo "Artifact-affecting paths changed:"
+            echo "$relevant"
+          fi
+
+  # Saves under a key scoped to this run, so no other workflow can be mid-upload on
+  # it when the checks below restore it. `reuse-key` is the cheap path: on the
+  # ready_for_review transition, where this workflow runs alone, l1-contracts-ci has
+  # already built this commit, so the build collapses to a cache download.
+  build-artifacts:
+    needs: [changes]
+    if: needs.changes.outputs.contracts == 'true' && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
+    uses: ./.github/workflows/build-contract-artifacts.yaml
+    with:
+      cache-key: artifacts-l1-pre-merge-${{ github.sha }}-${{ github.run_id }}
+      reuse-key: artifacts-l1-ci-${{ github.sha }}
+
+  check-hashes:
+    needs: [build-artifacts]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+      - name: Install dependencies
+        run: yarn
+
+      - name: Restore this commit's artifacts
+        uses: ./.github/actions/restore-ci-artifacts
+        with:
+          key: ${{ needs.build-artifacts.outputs.cache-key }}
+
+      - name: Check hashes
+        run: yarn calculate-hashes:check
+
+  check-selectors:
+    needs: [build-artifacts]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+      - name: Install dependencies
+        run: yarn
+
+      - name: Restore this commit's artifacts
+        uses: ./.github/actions/restore-ci-artifacts
+        with:
+          key: ${{ needs.build-artifacts.outputs.cache-key }}
+
+      - name: Install Foundry
+        uses: ./.github/actions/install-foundry
+
+      - name: Check selectors
+        run: yarn l1 selectors --check
+
+  # Reuses `build-artifacts`'s output so the zkstack-out rebuild is incremental
+  # instead of a full compile from cold.
+  check-zkstack-out:
+    needs: [build-artifacts]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: ./.github/actions/install-foundry
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Restore this commit's artifacts
+        uses: ./.github/actions/restore-ci-artifacts
+        with:
+          key: ${{ needs.build-artifacts.outputs.cache-key }}
+
+      - name: Build and check zkstack-out
+        working-directory: l1-contracts
+        run: |
+          rm -rf zkstack-out
+          yarn build:foundry
+
+          # Fail if regenerated zkstack-out differs from what was committed
+          if [ -n "$(git status --porcelain -- zkstack-out)" ]; then
+            echo "::error::l1-contracts/zkstack-out is out of date. Run 'cd l1-contracts && yarn build:foundry' and commit the changes."
+            git --no-pager status --porcelain -- zkstack-out
+            git --no-pager diff -- zkstack-out || true
+            exit 1
+          fi
+
+  # The production OS genesis embeds deployed bytecode from the Forge artifacts. Regenerate it
+  # from this commit's build so contract changes cannot leave the committed genesis image stale.
+  check-zksync-os-genesis:
+    needs: [build-artifacts]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        working-directory: tools/zksync-os-genesis-gen
+        run: rustup toolchain install
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: tools/zksync-os-genesis-gen
+
+      - name: Restore this commit's artifacts
+        uses: ./.github/actions/restore-ci-artifacts
+        with:
+          key: ${{ needs.build-artifacts.outputs.cache-key }}
+
+      - name: Regenerate ZKsync OS genesis
+        working-directory: tools/zksync-os-genesis-gen
+        run: |
+          cargo run --locked --release --bin zksync-os-genesis-gen -- \
+            --output-file ../../configs/genesis/zksync-os/latest.json
+
+      - name: Check ZKsync OS genesis
+        run: |
+          if [ -n "$(git status --porcelain -- configs/genesis/zksync-os/latest.json)" ]; then
+            echo "::error::configs/genesis/zksync-os/latest.json is out of date. From Linux, rebuild with the pinned default Foundry profile, then run the ZKsync OS genesis generator."
+            git --no-pager status --porcelain -- configs/genesis/zksync-os/latest.json
+            git --no-pager diff --stat -- configs/genesis/zksync-os/latest.json
+            exit 1
+          fi
+
+  # Mandatory determinism gate for the current protocol version's chain state:
+  # rebuilds the state from scratch and verifies it matches the committed
+  # snapshots. If a contract change alters genesis state, this fails —
+  # regenerate via the 'Regenerate Anvil Interop Chain States' workflow and push.
+  #
+  # Interval mining makes block progress and some gas-sensitive priority-tree
+  # state wall-clock-dependent. compare-chain-states ignores that documented
+  # drift while still comparing code, addresses, fixed chain configuration and
+  # facet membership.
+  state-generation-check:
+    needs: [changes]
+    if: needs.changes.outputs.contracts == 'true' && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Build anvil-interop artifacts
+        uses: ./.github/actions/build-anvil-interop-artifacts
+
+      - name: Save committed chain states
+        working-directory: l1-contracts/test/anvil-interop
+        run: cp -r chain-states chain-states-committed
+
+      - name: Generate chain state
+        working-directory: l1-contracts/test/anvil-interop
+        run: |
+          echo "Generating chain state from scratch..."
+          yarn ts-node setup-and-dump-state.ts
+
+      - name: Verify committed state matches generated state
+        working-directory: l1-contracts/test/anvil-interop
+        run: |
+          echo "Comparing generated state against committed chain-states..."
+          if yarn ts-node compare-chain-states.ts chain-states-committed chain-states; then
+            echo "Committed chain states are up to date"
+          else
+            echo ""
+            echo "Committed chain-states differ from freshly generated state (beyond block-number drift)."
+            echo "Run the 'Regenerate Anvil Interop Chain States' workflow from the Actions tab to update them."
+            exit 1
+          fi
+
+      - name: Cleanup
+        if: always()
+        working-directory: l1-contracts/test/anvil-interop
+        run: |
+          bash cleanup.sh
+
+  # THE required check. It always reports, so it cannot be bypassed by a run that
+  # never happened, and it distinguishes the two reasons a check can be skipped:
+  # deliberately (draft PR, or no artifact-affecting paths) versus because its
+  # producer failed — the case a per-check requirement would wave through.
+  pre-merge-verified:
+    needs:
+      [
+        changes,
+        build-artifacts,
+        check-hashes,
+        check-selectors,
+        check-zkstack-out,
+        check-zksync-os-genesis,
+        state-generation-check,
+      ]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # To re-read the PR's draft state; see below.
+      pull-requests: read
+
+    steps:
+      # Draft state is read live rather than from github.event, because a re-run replays the
+      # original event payload: re-running a draft-era run after the PR was marked ready would
+      # otherwise skip every validator and still report this gate — the required check — as a
+      # successful verification of the current head.
+      - name: Verify every pre-merge check ran or was legitimately skipped
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          CONTRACTS: ${{ needs.changes.outputs.contracts }}
+          CHANGES: ${{ needs.changes.result }}
+          BUILD: ${{ needs.build-artifacts.result }}
+          HASHES: ${{ needs.check-hashes.result }}
+          SELECTORS: ${{ needs.check-selectors.result }}
+          ZKSTACK_OUT: ${{ needs.check-zkstack-out.result }}
+          OS_GENESIS: ${{ needs.check-zksync-os-genesis.result }}
+          STATE_GENERATION: ${{ needs.state-generation-check.result }}
+        run: |
+          set -uo pipefail
+
+          if [ "$CHANGES" != "success" ]; then
+            echo "::error::the changed-files gate did not succeed ($CHANGES), so no verdict is possible."
+            exit 1
+          fi
+
+          # Fail closed: if the PR's current state cannot be read, demand real results.
+          draft_now=false
+          if [ -n "${PR_NUMBER:-}" ]; then
+            if ! draft_now=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .draft); then
+              echo "::warning::could not read the PR's draft state; requiring real results."
+              draft_now=false
+            fi
+          fi
+          echo "Draft right now: $draft_now (payload said ${{ github.event.pull_request.draft }})"
+
+          if [ "$draft_now" = "true" ] || [ "$CONTRACTS" != "true" ]; then
+            EXPECTED_SKIP=true
+            echo "Draft PR or no artifact-affecting changes: the artifact checks are expected to skip."
+          else
+            EXPECTED_SKIP=false
+          fi
+
+          status=0
+          for check in BUILD HASHES SELECTORS ZKSTACK_OUT OS_GENESIS STATE_GENERATION; do
+            result="${!check}"
+            case "$result" in
+              success)
+                echo "$check: success"
+                ;;
+              skipped)
+                if [ "$EXPECTED_SKIP" = "true" ]; then
+                  echo "$check: skipped (expected)"
+                else
+                  echo "::error::$check was skipped on a PR that must be verified — its producer probably failed."
+                  status=1
+                fi
+                ;;
+              *)
+                echo "::error::$check reported '$result'."
+                status=1
+                ;;
+            esac
+          done
+
+          if [ "$status" -ne 0 ]; then
+            echo "::error::pre-merge verification incomplete. Dispatch 'Update All Generated Artifacts' for this PR if the artifacts are simply stale."
+          else
+            echo "Pre-merge verification complete."
+          fi
+          exit "$status"

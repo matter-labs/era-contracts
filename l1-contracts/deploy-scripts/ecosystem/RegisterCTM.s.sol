@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-// solhint-disable no-console, gas-custom-errors
-
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
@@ -44,8 +42,6 @@ contract RegisterCTM is Script, IRegisterCTM {
         address chainTypeManagerProxy,
         bool shouldSend
     ) public {
-        string memory root = vm.projectRoot();
-
         registerChainTypeManager(outputPath, bridgehub, chainTypeManagerProxy, shouldSend);
     }
 

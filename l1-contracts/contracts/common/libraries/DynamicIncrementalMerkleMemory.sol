@@ -146,7 +146,10 @@ library DynamicIncrementalMerkleMemory {
      * Hashing the leaf before calling this function is recommended as a protection against
      * second pre-image attacks.
      */
-    function push(Bytes32PushTree memory self, bytes32 leaf) internal pure returns (uint256 index, bytes32 newRoot) {
+    function push(
+        Bytes32PushTree memory self,
+        bytes32 leaf
+    ) internal pure returns (uint256 leafIndex, bytes32 newRoot) {
         return _pushInner(self, leaf, false);
     }
 
@@ -158,8 +161,8 @@ library DynamicIncrementalMerkleMemory {
      * Hashing the leaf before calling this function is recommended as a protection against
      * second pre-image attacks.
      */
-    function pushLazy(Bytes32PushTree memory self, bytes32 leaf) internal pure returns (uint256 index) {
-        (index, ) = _pushInner(self, leaf, true);
+    function pushLazy(Bytes32PushTree memory self, bytes32 leaf) internal pure returns (uint256 leafIndex) {
+        (leafIndex, ) = _pushInner(self, leaf, true);
     }
 
     /**

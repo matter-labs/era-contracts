@@ -79,8 +79,7 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
 
     /// @inheritdoc IBridgedStandardToken
     /// @dev Always reverts: the wrapper cannot be bridge-minted; use `deposit`/`depositTo` instead.
-    // solhint-disable-next-line no-unused-vars
-    function bridgeMint(address _to, uint256 _amount) external view override onlyBridge {
+    function bridgeMint(address /* _to */, uint256 /* _amount */) external view override onlyBridge {
         revert BridgeMintNotImplemented();
     }
 

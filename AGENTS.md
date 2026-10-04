@@ -14,7 +14,8 @@ Instead, use the `cleanup.sh` script in the anvil-interop directory, which targe
 2. All constants should be placed in the dedicated file (e.g. `common/Config.sol` in `l1-contracts`). if you do not know where to put the constant to, please closely analyze the corresponding project. If this file can not be found, please create one.
 3. Function parameters must be prefixed with `_` (e.g. `_value`, `_owner`). This convention applies to all functions across all contracts.
 4. Always use `{ }` for `if` blocks — never inline the body (`if (cond) revert X();` is forbidden; write `if (cond) { revert X(); }`). The same applies to `for`/`while` bodies.
-5. Never write doc comments (`///` natspec) for custom errors — error files contain only the `// 0x<selector>` lines maintained by the errors lint. Put any rationale at the revert site instead. When a new file with errors is added, it MUST be registered in the errors lint (`CONTRACTS_DIRECTORIES` in `l1-contracts/scripts/errors-lint.ts`) and `yarn errors-lint --fix` must be run.
+5. Declare custom errors in the dedicated error file for the component, never inside contracts or interfaces.
+6. Never write doc comments (`///` natspec) for custom errors — error files contain only the `// 0x<selector>` lines maintained by the errors lint. Put any rationale at the revert site instead. When a new file with errors is added, it MUST be registered in the errors lint (`CONTRACTS_DIRECTORIES` in `l1-contracts/scripts/errors-lint.ts`) and `yarn errors-lint --fix` must be run.
 
 ## ⚠️ CRITICAL SOLIDITY CODE RULES ⚠️
 
@@ -336,14 +337,32 @@ yarn lint:ts --fix
 
 # Fix formatting issues
 yarn prettier:fix
+
+# Check solc warnings (needs forge; ~5s each)
+yarn l1 solc-warnings && yarn da solc-warnings
 ```
+
+### solc warnings
+
+`forge build` is not the warning gate: `ignored_error_codes` in `foundry.toml` only filters what it
+prints, and a full `l1-contracts` build exceeds solc's cap of 256 reported warnings, so later ones are
+silently dropped. `yarn l1 solc-warnings` (`scripts/solc-warnings.ts`) is what CI enforces. It
+compiles every `.sol` under the project's `roots` without generating bytecode, which removes the
+code-size warnings (production sizes are checked by the `contract-size` CI job). Every other warning
+fails the check unless the project's `solc-warnings.json` lists it under `exceptions`, keyed by file,
+code and the first line of the flagged source. The check prints the entry to paste for each new
+warning, and fails on exceptions solc no longer reports.
+
+Fix the warning rather than adding an exception: an unused parameter an interface requires loses its
+name (`uint256,`), and a contract with a payable `fallback` gets a `receive` running the same logic.
 
 ### Pre-Push Checklist
 
 1. **Run linting fixes**: `yarn lint:sol --fix --noPrompt && yarn lint:ts --fix && yarn prettier:fix`
-2. **Run foundry tests**: `cd l1-contracts && yarn test:foundry`
-3. **Verify no uncommitted changes**: `git status`
-4. **Commit and push**: Only after all checks pass
+2. **Check solc warnings**: `yarn l1 solc-warnings && yarn da solc-warnings`
+3. **Run foundry tests**: `cd l1-contracts && yarn test:foundry`
+4. **Verify no uncommitted changes**: `git status`
+5. **Commit and push**: Only after all checks pass
 
 ### Common Linting Issues
 

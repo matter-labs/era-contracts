@@ -6,8 +6,8 @@ import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {SystemContractsProcessing} from "../upgrade/SystemContractsProcessing.s.sol";
 
-import {CoreContract, ZkSyncOsSystemContract, ZKsyncOSUpgradeType} from "./CoreContract.sol";
-import {UnknownCoreContract, UnknownZkSyncOsSystemContract} from "./DeployScriptErrors.sol";
+import {CoreContract, L2SystemContract} from "./CoreContract.sol";
+import {UnknownCoreContract, UnknownL2SystemContract} from "./DeployScriptErrors.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_ASSET_TRACKER_ADDR,
@@ -27,8 +27,7 @@ import {
     L2_NTV_BEACON_DEPLOYER_ADDR,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
-    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
-    L2_VERSION_SPECIFIC_UPGRADER_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR,
     L2_INTEROP_ATTRIBUTE_PARSER_ADDR,
     L2_INTEROP_COMMITMENT_TREE_ADDR,
     L2_ATOMIC_FLOW_MANAGER_ADDR
@@ -42,7 +41,7 @@ library CoreOnGatewayHelper {
     // ======================== Name resolution ========================
 
     /// @notice Resolve a CoreContract to its (fileName, contractName).
-    function resolve(CoreContract _c) internal view returns (string memory fileName, string memory contractName) {
+    function resolve(CoreContract _c) internal pure returns (string memory fileName, string memory contractName) {
         contractName = _resolveContractName(_c);
         fileName = string.concat(contractName, ".sol");
     }
@@ -67,7 +66,7 @@ library CoreOnGatewayHelper {
 
     function getFullListOfFactoryDependencies(
         CoreContract[] memory _additionalDependencyContracts
-    ) internal returns (bytes[] memory factoryDeps) {
+    ) internal view returns (bytes[] memory factoryDeps) {
         bytes[] memory basicDependencies = SystemContractsProcessing.getBaseListOfDependencies();
         bytes[] memory sharedDependencies = _getFactoryDependencyBytecodes(_getSharedFactoryDependencyContracts());
         bytes[] memory additionalDependencies = _getFactoryDependencyBytecodes(_additionalDependencyContracts);
@@ -75,11 +74,11 @@ library CoreOnGatewayHelper {
         factoryDeps = SystemContractsProcessing.mergeBytesArrays(basicDependencies, sharedDependencies);
         factoryDeps = SystemContractsProcessing.mergeBytesArrays(factoryDeps, additionalDependencies);
 
-        // The ZkSyncOsSystemContract list (L2BaseTokenZKOS, L1MessengerZKOS, SystemContext,
-        // ZKOSContractDeployer) is force-deployed by buildZKsyncOSForceDeployments at upgrade
+        // The L2SystemContract list (L2BaseToken, L1Messenger, SystemContext,
+        // L2ComplexUpgrader) is force-deployed by the base deployment builder at upgrade
         // time but lives in a separate enum — without this merge their preimages never land
         // in the sequencer's oracle and the VM panics on the first SLOAD of their code.
-        factoryDeps = SystemContractsProcessing.mergeBytesArrays(factoryDeps, _getZKsyncOSExtraBytecodes());
+        factoryDeps = SystemContractsProcessing.mergeBytesArrays(factoryDeps, _getSystemProxyUpgradeBytecodes());
 
         factoryDeps = SystemContractsProcessing.deduplicateBytecodes(factoryDeps);
     }
@@ -88,7 +87,7 @@ library CoreOnGatewayHelper {
 
     function _getSharedFactoryDependencyContracts() private pure returns (CoreContract[] memory dependencyContracts) {
         // Reuse the canonical fixed-address core contract list - the same contract
-        // IDs `getBaseZKsyncOSForceDeployments` upgrades on L2 at upgrade
+        // IDs `getBaseForceDeployments` upgrades on L2 at upgrade
         // time. Every bytecode hash the upgrade tx's force-deploy path
         // queries must appear in the tx's `factory_deps`, otherwise the
         // server has no way to know which `EVMBytecodePublished` events
@@ -99,23 +98,17 @@ library CoreOnGatewayHelper {
         // `FixedForceDeploymentsData.beaconDeployerInfo` references but
         // which is not one of the fixed-address core contracts.
         CoreContract[] memory fixedAddressCoreContracts = SystemContractsProcessing.getFixedAddressCoreContracts();
-        // The ZKsync-OS-only contracts are force-deployed by `getBaseZKsyncOSForceDeployments` from a
-        // separate list, so their preimages have to be merged in here as well.
-        CoreContract[] memory zksyncOSOnlyContracts = SystemContractsProcessing.getZKsyncOSOnlyContracts();
-        dependencyContracts = new CoreContract[](fixedAddressCoreContracts.length + zksyncOSOnlyContracts.length + 1);
+        dependencyContracts = new CoreContract[](fixedAddressCoreContracts.length + 1);
         uint256 index;
         for (uint256 i = 0; i < fixedAddressCoreContracts.length; i++) {
             dependencyContracts[index++] = fixedAddressCoreContracts[i];
-        }
-        for (uint256 i = 0; i < zksyncOSOnlyContracts.length; i++) {
-            dependencyContracts[index++] = zksyncOSOnlyContracts[i];
         }
         dependencyContracts[index] = CoreContract.UpgradeableBeaconDeployer;
     }
 
     function _getFactoryDependencyBytecodes(
         CoreContract[] memory _dependencyContracts
-    ) private returns (bytes[] memory dependencyBytecodes) {
+    ) private view returns (bytes[] memory dependencyBytecodes) {
         dependencyBytecodes = new bytes[](_dependencyContracts.length);
 
         for (uint256 i; i < _dependencyContracts.length; i++) {
@@ -124,21 +117,23 @@ library CoreOnGatewayHelper {
         }
     }
 
-    /// @notice EVM deployed bytecodes for the ZkSyncOsSystemContract enum (L2BaseTokenZKOS,
-    ///         L1MessengerZKOS, SystemContext, ZKOSContractDeployer). Parallel loop to
+    /// @notice EVM deployed bytecodes for the L2SystemContract upgrade list (L2BaseToken,
+    ///         L1Messenger, SystemContext, L2ComplexUpgrader). Parallel loop to
     ///         `_getFactoryDependencyBytecodes` because the enums aren't interchangeable.
-    function _getZKsyncOSExtraBytecodes() private view returns (bytes[] memory out) {
-        ZkSyncOsSystemContract[] memory ids = SystemContractsProcessing.getZKsyncOSExtraSystemContracts();
+    function _getSystemProxyUpgradeBytecodes() private view returns (bytes[] memory out) {
+        L2SystemContract[] memory ids = SystemContractsProcessing.getSystemProxyUpgradeContracts();
         out = new bytes[](ids.length);
         for (uint256 i = 0; i < ids.length; i++) {
-            string memory contractName = _resolveZkOsSystemContractName(ids[i]);
+            string memory contractName = _resolveL2SystemContractName(ids[i]);
             out[i] = ContractsBytecodesLib.getL2DeployedBytecode(contractName);
         }
     }
 
     /// @notice Resolve a CoreContract enum to its contract name.
     function _resolveContractName(CoreContract _c) internal pure returns (string memory) {
-        if (_c == CoreContract.L2NativeTokenVault) return "L2NativeTokenVaultZKOS";
+        if (_c == CoreContract.L2NativeTokenVault) {
+            return "L2NativeTokenVault";
+        }
 
         if (_c == CoreContract.L2Bridgehub) return "L2Bridgehub";
         if (_c == CoreContract.L2AssetRouter) return "L2AssetRouter";
@@ -156,7 +151,7 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.L2MessageVerification) return "L2MessageVerification";
         if (_c == CoreContract.L2InteropRootStorage) return "L2InteropRootStorage";
         if (_c == CoreContract.BeaconProxy) return "BeaconProxy";
-        if (_c == CoreContract.L2V32Upgrade) return "L2V32Upgrade";
+        if (_c == CoreContract.L2DefaultUpgrade) return "L2DefaultUpgrade";
         if (_c == CoreContract.BridgedStandardERC20) return "BridgedStandardERC20";
         if (_c == CoreContract.DiamondProxy) return "DiamondProxy";
         if (_c == CoreContract.ProxyAdmin) return "ProxyAdmin";
@@ -165,40 +160,9 @@ library CoreOnGatewayHelper {
         revert UnknownCoreContract();
     }
 
-    /// @notice Resolve a CoreContract enum to its ZKsyncOS upgrade type.
-    /// @dev Explicit per-contract mapping — no default fallback, so adding a new
-    ///      contract forces the developer to decide the upgrade type here.
-    function _resolveUpgradeType(CoreContract _c) internal pure returns (ZKsyncOSUpgradeType) {
-        if (_c == CoreContract.L2Bridgehub) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.L2AssetRouter) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.L2NativeTokenVault) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.L2MessageRoot) return ZKsyncOSUpgradeType.SystemProxy;
-        // Sits at L2_WRAPPED_BASE_TOKEN_IMPL_ADDR directly as the impl (not a proxy);
-        // user-space WETH proxies reference this address. Upgrade via bytecode replacement.
-        if (_c == CoreContract.L2WrappedBaseToken) return ZKsyncOSUpgradeType.Unsafe;
-        if (_c == CoreContract.L2MessageVerification) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.L2ChainAssetHandler) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.L2InteropRootStorage) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.BaseTokenHolder) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.L2AssetTracker) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.L2InteropCenter) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.InteropAttributeParser) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.L2InteropHandler) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.L2InteropCommitmentTree) {
-            return ZKsyncOSUpgradeType.SystemProxy;
-        }
-        if (_c == CoreContract.AtomicFlowManager) {
-            return ZKsyncOSUpgradeType.SystemProxy;
-        }
-        revert UnknownCoreContract();
-    }
-
     /// @notice Resolve a CoreContract enum to its canonical L2 address.
     /// @dev Only covers contracts with well-known constant addresses.
     function _resolveAddress(CoreContract _c) internal pure returns (address) {
-        if (_c == CoreContract.L2V32Upgrade) {
-            return L2_VERSION_SPECIFIC_UPGRADER_ADDR;
-        }
         if (_c == CoreContract.L2Bridgehub) return L2_BRIDGEHUB_ADDR;
         if (_c == CoreContract.L2AssetRouter) return L2_ASSET_ROUTER_ADDR;
         if (_c == CoreContract.L2NativeTokenVault) return L2_NATIVE_TOKEN_VAULT_ADDR;
@@ -218,31 +182,47 @@ library CoreOnGatewayHelper {
         revert UnknownCoreContract();
     }
 
-    // ======================== ZkSyncOsSystemContract resolvers ========================
+    // ======================== L2SystemContract resolvers ========================
 
-    /// @notice Resolve a ZkSyncOsSystemContract to its (fileName, contractName) pair.
-    function resolveZkOsSystemContract(
-        ZkSyncOsSystemContract _c
+    /// @notice Resolve an L2SystemContract to its (fileName, contractName) pair.
+    function resolveL2SystemContract(
+        L2SystemContract _c
     ) internal pure returns (string memory fileName, string memory contractName) {
-        contractName = _resolveZkOsSystemContractName(_c);
+        contractName = _resolveL2SystemContractName(_c);
         fileName = string.concat(contractName, ".sol");
     }
 
-    /// @notice Resolve a ZkSyncOsSystemContract to its ZKsyncOS contract name.
-    function _resolveZkOsSystemContractName(ZkSyncOsSystemContract _c) internal pure returns (string memory) {
-        if (_c == ZkSyncOsSystemContract.L2BaseToken) return "L2BaseTokenZKOS";
-        if (_c == ZkSyncOsSystemContract.L1Messenger) return "L1MessengerZKOS";
-        if (_c == ZkSyncOsSystemContract.SystemContext) return "SystemContext";
-        if (_c == ZkSyncOsSystemContract.ContractDeployer) return "ZKOSContractDeployer";
-        revert UnknownZkSyncOsSystemContract();
+    /// @notice Resolve an L2SystemContract to its canonical contract name.
+    function _resolveL2SystemContractName(L2SystemContract _c) internal pure returns (string memory) {
+        if (_c == L2SystemContract.L2BaseToken) {
+            return "L2BaseToken";
+        }
+        if (_c == L2SystemContract.L1Messenger) {
+            return "L1Messenger";
+        }
+        if (_c == L2SystemContract.SystemContext) {
+            return "SystemContext";
+        }
+        if (_c == L2SystemContract.L2ComplexUpgrader) {
+            return "L2ComplexUpgrader";
+        }
+        revert UnknownL2SystemContract();
     }
 
-    /// @notice Resolve a ZkSyncOsSystemContract to its canonical L2 address.
-    function _resolveZkOsSystemContractAddress(ZkSyncOsSystemContract _c) internal pure returns (address) {
-        if (_c == ZkSyncOsSystemContract.L2BaseToken) return L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR;
-        if (_c == ZkSyncOsSystemContract.L1Messenger) return L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR;
-        if (_c == ZkSyncOsSystemContract.SystemContext) return L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR;
-        if (_c == ZkSyncOsSystemContract.ContractDeployer) return L2_DEPLOYER_SYSTEM_CONTRACT_ADDR;
-        revert UnknownZkSyncOsSystemContract();
+    /// @notice Resolve an L2SystemContract to its canonical L2 address.
+    function _resolveL2SystemContractAddress(L2SystemContract _c) internal pure returns (address) {
+        if (_c == L2SystemContract.L2BaseToken) {
+            return L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR;
+        }
+        if (_c == L2SystemContract.L1Messenger) {
+            return L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR;
+        }
+        if (_c == L2SystemContract.SystemContext) {
+            return L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR;
+        }
+        if (_c == L2SystemContract.L2ComplexUpgrader) {
+            return L2_COMPLEX_UPGRADER_ADDR;
+        }
+        revert UnknownL2SystemContract();
     }
 }

@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-// solhint-disable no-console, gas-custom-errors
-
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
@@ -15,21 +13,13 @@ import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
-import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IRollupDAManager} from "../interfaces/IRollupDAManager.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";
 
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-
-import {Governance} from "contracts/governance/Governance.sol";
-import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
-import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
@@ -37,9 +27,6 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
 import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
-import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
-import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
-import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {CTMDeployedAddresses, Config, DeployCTMUtils} from "./DeployCTMUtils.s.sol";
@@ -70,29 +57,33 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     function runWithBridgehub(address bridgehub, bool reuseGovAndAdmin) public {
         console.log("Deploying CTM related contracts");
-        runInner(
-            "/script-config/config-deploy-ctm.toml",
-            "/script-out/output-deploy-ctm.toml",
-            bridgehub,
-            reuseGovAndAdmin,
-            false
-        );
+        runInner({
+            inputPath: "/script-config/config-deploy-ctm.toml",
+            outputPath: "/script-out/output-deploy-ctm.toml",
+            bridgehub: bridgehub,
+            reuseGovAndAdmin: reuseGovAndAdmin
+        });
     }
 
-    function runForTest(address bridgehub, bool skipL1Deployments) public {
-        _runConfiguredTest(bridgehub, skipL1Deployments, true);
+    function runForTest(address bridgehub) public {
+        _runConfiguredTest(bridgehub, true);
     }
 
     /// @notice Like runForTest but skips saveDiamondSelectors().
-    function runForAnvilTest(address bridgehub, bool skipL1Deployments) public {
-        _runConfiguredTest(bridgehub, skipL1Deployments, false);
+    function runForAnvilTest(address bridgehub) public {
+        _runConfiguredTest(bridgehub, false);
     }
 
-    function _runConfiguredTest(address bridgehub, bool skipL1Deployments, bool shouldSaveSelectors) internal {
+    function _runConfiguredTest(address bridgehub, bool shouldSaveSelectors) internal {
         if (shouldSaveSelectors) {
             saveDiamondSelectors();
         }
-        runInner(vm.envString("CTM_CONFIG"), vm.envString("CTM_OUTPUT"), bridgehub, false, skipL1Deployments);
+        runInner({
+            inputPath: vm.envString("CTM_CONFIG"),
+            outputPath: vm.envString("CTM_OUTPUT"),
+            bridgehub: bridgehub,
+            reuseGovAndAdmin: false
+        });
     }
 
     function getAddresses() public view virtual returns (CTMDeployedAddresses memory) {
@@ -112,8 +103,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         string memory inputPath,
         string memory outputPath,
         address bridgehub,
-        bool reuseGovAndAdmin,
-        bool skipL1Deployments
+        bool reuseGovAndAdmin
     ) public {
         string memory root = vm.projectRoot();
         inputPath = string.concat(root, inputPath);
@@ -123,7 +113,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         // clobber each other's batches.
         _blakeBatchTmpFile = string.concat(outputPath, ".blake-batch.txt");
 
-        initializeConfig(inputPath, bridgehub);
+        initializeConfig(inputPath);
 
         console.log("Initializing core contracts from BH");
         // Populate discovered addresses via inspector
@@ -214,10 +204,64 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     function deployVerifiers() internal {
         (, string memory plonkName) = DeployCTML1OrGateway.resolve(CTMContract.VerifierPlonk);
-        (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(config.testnetVerifier);
 
         ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract(plonkName);
-        ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName);
+
+        delete ctmAddresses.multiProof;
+        (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(config.testnetVerifier);
+        address airbenderVerifier = deploySimpleContract(verifierName);
+        if (config.multiProof.enabled) {
+            deployMultiProofVerifiers(airbenderVerifier);
+        } else {
+            ctmAddresses.stateTransition.verifiers.verifier = airbenderVerifier;
+        }
+    }
+
+    /// @notice Deploys the multiproof verifier and its ZiSK components.
+    /// @param _airbenderVerifier Deployed Airbender component.
+    function deployMultiProofVerifiers(address _airbenderVerifier) internal {
+        // ZiskVerifier wraps a pre-deployed standalone snarkJS Plonk verifier
+        // (see verifiers/README.md for its generation and deployment) passed
+        // in by address.
+        require(
+            config.multiProof.ziskPlonkVerifierAddr != address(0),
+            "set zisk_plonk_verifier_addr to the deployed snarkJS Plonk verifier"
+        );
+        // Deploying it is a manual step outside this script, so the address it
+        // leaves behind is checked here rather than at the first settlement.
+        require(
+            config.multiProof.ziskPlonkVerifierAddr.code.length > 0,
+            "zisk_plonk_verifier_addr holds no code: deploy the snarkJS Plonk verifier first"
+        );
+        // Single-VK lane: every proof, single batch or many, verifies through
+        // the range verifier, which reconstructs the ZiSK public values from
+        // its own pinned VKs. It defaults to the ZiskVerifier deployed below;
+        // an operator may override it with a separately deployed aggregator
+        // verifier through zisk_range_verifier_addr, which must already hold
+        // code as well.
+        if (config.multiProof.ziskRangeVerifierAddr != address(0)) {
+            require(
+                config.multiProof.ziskRangeVerifierAddr.code.length > 0,
+                "zisk_range_verifier_addr holds no code: deploy the range verifier first"
+            );
+        }
+        ctmAddresses.multiProof.airbenderVerifier = _airbenderVerifier;
+        ctmAddresses.multiProof.ziskVerifier = config.multiProof.ziskRangeVerifierAddr;
+        if (ctmAddresses.multiProof.ziskVerifier == address(0)) {
+            ctmAddresses.multiProof.ziskVerifier = deploySimpleContract("ZiskVerifier");
+        }
+        if (config.testnetVerifier) {
+            ctmAddresses.multiProof.ziskTestnetVerifier = deploySimpleContract("ZiskTestnetVerifier");
+        }
+        ctmAddresses.multiProof.multiProofVerifier = deploySimpleContract("MultiProofVerifier");
+
+        if (config.testnetVerifier) {
+            // Testnet: wrap MultiProofVerifier with MultiProofTestnetVerifier for mock proof support.
+            ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract("MultiProofTestnetVerifier");
+        } else {
+            // Prod: use MultiProofVerifier directly.
+            ctmAddresses.stateTransition.verifiers.verifier = ctmAddresses.multiProof.multiProofVerifier;
+        }
     }
 
     function setChainTypeManagerInServerNotifier() internal {
@@ -303,11 +347,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function saveOutput(string memory outputPath) internal virtual {
-        string memory bridgehub = vm.serializeAddress(
-            "bridgehub",
-            "bridgehub_proxy_addr",
-            coreAddresses.bridgehub.proxies.bridgehub
-        );
+        vm.serializeAddress("bridgehub", "bridgehub_proxy_addr", coreAddresses.bridgehub.proxies.bridgehub);
         vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", coreAddresses.bridges.proxies.l1Nullifier);
         string memory bridges = vm.serializeAddress(
             "bridges",
@@ -321,6 +361,30 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             ctmAddresses.stateTransition.proxies.chainTypeManager
         );
         vm.serializeAddress("state_transition", "verifier_addr", ctmAddresses.stateTransition.verifiers.verifier);
+        if (ctmAddresses.multiProof.airbenderVerifier != address(0)) {
+            vm.serializeAddress(
+                "state_transition",
+                "airbender_verifier_addr",
+                ctmAddresses.multiProof.airbenderVerifier
+            );
+        }
+        if (ctmAddresses.multiProof.ziskVerifier != address(0)) {
+            vm.serializeAddress("state_transition", "zisk_verifier_addr", ctmAddresses.multiProof.ziskVerifier);
+        }
+        if (ctmAddresses.multiProof.ziskTestnetVerifier != address(0)) {
+            vm.serializeAddress(
+                "state_transition",
+                "zisk_testnet_verifier_addr",
+                ctmAddresses.multiProof.ziskTestnetVerifier
+            );
+        }
+        if (ctmAddresses.multiProof.multiProofVerifier != address(0)) {
+            vm.serializeAddress(
+                "state_transition",
+                "multi_proof_verifier_addr",
+                ctmAddresses.multiProof.multiProofVerifier
+            );
+        }
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", ctmAddresses.stateTransition.genesisUpgrade);
         vm.serializeAddress("state_transition", "default_upgrade_addr", ctmAddresses.stateTransition.defaultUpgrade);
         vm.serializeAddress("state_transition", "priority_op_lower_bound_addr", priorityOpLowerBound);
@@ -506,7 +570,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     function _getProxyUpgradeBytecodeInfo(
         string memory _fileName,
         string memory _contractName
-    ) private returns (bytes memory) {
+    ) private view returns (bytes memory) {
         bytes memory implBytecode = BytecodeUtils.readDeployedBytecodeL1(_fileName, _contractName);
         bytes memory proxyBytecode = BytecodeUtils.readDeployedBytecodeL1(
             "SystemContractProxy.sol",
@@ -529,7 +593,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
             l1AssetRouter: coreAddresses.bridges.proxies.l1AssetRouter,
-            l2TokenProxyBytecodeHash: CoreOnGatewayHelper.getDeployedBytecodeHash(CoreContract.BeaconProxy),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(_governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
             bridgehubBytecodeInfo: _getBytecodeInfo(CoreContract.L2Bridgehub),

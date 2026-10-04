@@ -1,11 +1,13 @@
-# Permanent values for the v31 -> v32 upgrade scenario. `bridgehub_proxy_addr`, `ctm_proxy_addr`
-# and `is_zk_sync_os` are substituted by the harness from the loaded chain states.
-
-is_zk_sync_os = true
+# Permanent values for the v31 -> v32 upgrade scenario. `bridgehub_proxy_addr` and
+# `ctm_proxy_addr` are substituted by the harness from the loaded chain states.
 
 # Dummy ZK token asset ID for test fixtures. On mainnet this would be
 # DataEncoding.encodeNTVAssetId(l1ChainId, zkTokenL1Address).
 zk_token_asset_id = "0x0000000000000000000000000000000000000000000000000000000000000001"
+
+# Whether this environment's CTM verifier is the testnet one. Env-wide, not per-CTM.
+# Anvil fixtures run `ZKsyncOSTestnetVerifier`, which accepts unproven batches.
+testnet_verifier = true
 
 [core_contracts]
 bridgehub_proxy_addr = "0x0000000000000000000000000000000000000000"

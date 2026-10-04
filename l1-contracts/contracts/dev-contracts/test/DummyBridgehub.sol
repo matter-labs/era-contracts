@@ -6,8 +6,6 @@ import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {IMessageRootBase} from "../../core/message-root/IMessageRoot.sol";
 
-import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
-
 /// @title DummyBridgehub
 /// @notice A test smart contract that allows to set State Transition Manager for a given chain
 contract DummyBridgehub {
@@ -44,7 +42,7 @@ contract DummyBridgehub {
         messageRoot = IMessageRootBase(_messageRoot);
     }
 
-    function setZKChain(uint256, address _zkChain) external {
+    function setZKChain(address _zkChain) external {
         zkChain = _zkChain;
     }
 
@@ -52,7 +50,7 @@ contract DummyBridgehub {
         return zkChain;
     }
 
-    function getAllZKChainChainIDs() external view returns (uint256[] memory) {
+    function getAllZKChainChainIDs() external pure returns (uint256[] memory) {
         uint256[] memory allZKChainChainIDs = new uint256[](0);
         // allZKChainChainIDs[0] = 271;
         return allZKChainChainIDs;
@@ -70,7 +68,7 @@ contract DummyBridgehub {
         return sharedBridge;
     }
 
-    function settlementLayer(uint256) external view returns (uint256) {
+    function settlementLayer(uint256) external pure returns (uint256) {
         return 0;
     }
 }

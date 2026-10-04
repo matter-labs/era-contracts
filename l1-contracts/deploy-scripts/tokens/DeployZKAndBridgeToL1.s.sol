@@ -1,15 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// solhint-disable no-console
-
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-// It's required to disable lints to force the compiler to compile the contracts
-// solhint-disable no-unused-import
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
-// solhint-disable no-unused-import
 
 import {
     L2_ASSET_ROUTER_ADDR,
@@ -162,19 +157,19 @@ contract DeployZKScript is Script {
     }
 
     /// TODO(EVM-748): make that function support non-ETH based chains
-    function supplyEraWallet(address _bridgehub, uint256 _chainId, address addr, uint256 amount) public {
+    function supplyWallet(address _bridgehub, uint256 _chainId, address _recipient, uint256 _amount) public {
         initializeConfig(_bridgehub, _chainId);
 
-        Utils.runL1L2Message(
-            hex"",
-            Utils.MAX_PRIORITY_TX_GAS,
-            amount,
-            new bytes[](0),
-            addr,
-            config.chainId,
-            config.bridgehub,
-            msg.sender
-        );
+        Utils.runL1L2Message({
+            l2Calldata: hex"",
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            l2Value: _amount,
+            factoryDeps: new bytes[](0),
+            dstAddress: _recipient,
+            chainId: config.chainId,
+            bridgehubAddress: config.bridgehub,
+            refundRecipient: msg.sender
+        });
     }
 
     function finalizeZkTokenWithdrawal(

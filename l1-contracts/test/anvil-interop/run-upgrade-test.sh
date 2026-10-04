@@ -8,7 +8,7 @@ done
 sleep 1
 
 cd "$(dirname "$0")"
-npx ts-node run-v31-to-v32-upgrade-test.ts > /tmp/upgrade-test-output.txt 2>&1
+npx ts-node run-upgrade-test.ts > /tmp/upgrade-test-output.txt 2>&1
 EXIT_CODE=$?
 echo "EXIT CODE: $EXIT_CODE"
 tail -30 /tmp/upgrade-test-output.txt

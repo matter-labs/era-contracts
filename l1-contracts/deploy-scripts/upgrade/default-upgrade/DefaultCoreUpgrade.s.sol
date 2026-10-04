@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// solhint-disable no-console, gas-custom-errors
-
 import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {stdToml} from "forge-std/StdToml.sol";
@@ -27,10 +25,14 @@ import {UpgradeUtils} from "./UpgradeUtils.sol";
 import {Utils} from "../../utils/Utils.sol";
 
 import {ChainCreationParamsLib} from "../../ctm/ChainCreationParamsLib.sol";
+import {CoreUpgradeParams} from "./UpgradeParams.sol";
+import {ICoreUpgrade} from "contracts/script-interfaces/ICoreUpgrade.sol";
 
 /// @notice Script used for default ecosystem upgrade flow should be run as a first for the upgrade.
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
-contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
+contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
+    /// @dev Set by the release that creates the `L1InteropCenter` proxy, so stage 1 does not also
+    ///      upgrade a proxy that was just deployed with the current implementation.
     bool internal deployedL1InteropCenter;
 
     using stdToml for string;
@@ -74,10 +76,47 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         console.log("Core upgrade output saved!");
     }
 
-    /// @notice Deploy everything that should be deployed
-    function deployNewEcosystemContractsL1() public virtual {
-        coreAddresses.bridgehub.implementations.interopCenter = deploySimpleContract("L1InteropCenter");
+    /// @notice Single-call entry point invoked by the protocol-ops CLI's `ecosystem
+    ///         upgrade-prepare-all`. Runs the ecosystem-wide core deploys; CTM deploys are handled
+    ///         by the matching CTM upgrade script.
+    function noGovernancePrepare(CoreUpgradeParams memory _params) public virtual {
+        initializeWithArgs(
+            _params.bridgehubProxyAddress,
+            _params.create2FactorySalt,
+            _params.upgradeInputPath,
+            _params.outputPath
+        );
+        prepareEcosystemUpgrade();
+        prepareDefaultGovernanceCalls();
     }
+
+    /// @notice Deploy the L1 core implementations behind the proxies {prepareUpgradeProxiesCalls}
+    ///         upgrades. Every release refreshes all of them, so this lives here rather than being
+    ///         restated per version; a release adds only what is new to it (a new proxy, say) by
+    ///         overriding {deployVersionSpecificEcosystemContractsL1}.
+    /// @dev Includes the interop handler's implementation even though its *proxy* first appears in
+    ///      v33: the implementation is refreshed like any other core contract from then on, and the
+    ///      release that introduces the proxy reuses this deploy rather than repeating it.
+    function deployNewEcosystemContractsL1() public virtual {
+        coreAddresses.bridgehub.implementations.bridgehub = deploySimpleContract("L1Bridgehub");
+        coreAddresses.bridgehub.implementations.messageRoot = deploySimpleContract("L1MessageRoot");
+        coreAddresses.bridges.implementations.l1Nullifier = deploySimpleContract("L1Nullifier");
+        coreAddresses.bridges.implementations.l1AssetRouter = deploySimpleContract("L1AssetRouter");
+        coreAddresses.bridges.implementations.l1NativeTokenVault = deploySimpleContract("L1NativeTokenVault");
+        coreAddresses.bridgehub.implementations.ctmDeploymentTracker = deploySimpleContract("CTMDeploymentTracker");
+        coreAddresses.bridgehub.implementations.chainAssetHandler = deploySimpleContract("L1ChainAssetHandler");
+        coreAddresses.bridgehub.implementations.chainRegistrationSender = deploySimpleContract(
+            "ChainRegistrationSender"
+        );
+        coreAddresses.bridges.implementations.l1InteropHandler = deploySimpleContract("L1InteropHandler");
+        coreAddresses.bridgehub.implementations.interopCenter = deploySimpleContract("L1InteropCenter");
+
+        deployVersionSpecificEcosystemContractsL1();
+    }
+
+    /// @notice Hook for deploys that only one release needs — typically a proxy that did not exist
+    ///         before it. Implementation refreshes belong in {deployNewEcosystemContractsL1}.
+    function deployVersionSpecificEcosystemContractsL1() public virtual {}
 
     function getOwnerAddress() public virtual returns (address) {
         return config.ownerAddress;
@@ -284,6 +323,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             coreAddresses.bridges.implementations.l1InteropHandler
         );
         vm.serializeAddress("bridges", "l1_interop_handler_proxy_addr", coreAddresses.bridges.proxies.l1InteropHandler);
+
         string memory bridgesSerialized = vm.serializeAddress(
             "bridges",
             "bridged_token_beacon",
@@ -440,7 +480,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     function prepareUpgradeProxiesCalls() public virtual returns (Call[] memory calls) {
         address center = coreAddresses.bridgehub.proxies.interopCenter;
         require(center != address(0), "L1InteropCenter proxy not deployed");
-        calls = new Call[](deployedL1InteropCenter ? 7 : 8);
+        calls = new Call[](deployedL1InteropCenter ? 8 : 9);
 
         calls[0] = _buildCallProxyUpgrade(
             coreAddresses.bridgehub.proxies.bridgehub,
@@ -480,8 +520,13 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             coreAddresses.bridgehub.implementations.chainAssetHandler
         );
 
+        calls[7] = _buildCallProxyUpgrade(
+            coreAddresses.bridgehub.proxies.chainRegistrationSender,
+            coreAddresses.bridgehub.implementations.chainRegistrationSender
+        );
+
         if (!deployedL1InteropCenter) {
-            calls[7] = _buildCallProxyUpgrade(center, coreAddresses.bridgehub.implementations.interopCenter);
+            calls[8] = _buildCallProxyUpgrade(center, coreAddresses.bridgehub.implementations.interopCenter);
         }
     }
 

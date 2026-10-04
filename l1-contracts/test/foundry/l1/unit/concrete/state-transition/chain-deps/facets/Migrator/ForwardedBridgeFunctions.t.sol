@@ -5,10 +5,9 @@ pragma solidity 0.8.28;
 import {MigratorTest} from "./_Migrator_Shared.t.sol";
 import {NotAZKChain, RemovingPermanentRestriction, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {
-    NotL1,
     AlreadyMigrated,
     NotChainAdmin,
-    NotEraChain,
+    SettlementLayerCTMMismatch,
     NotAllBatchesExecuted,
     ProtocolVersionNotUpToDate,
     OutdatedProtocolVersion,
@@ -17,7 +16,6 @@ import {
     InvalidNumberOfBatchHashes,
     NotMigrated,
     NotHistoricalRoot,
-    ContractNotDeployed,
     DepositsNotPaused
 } from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {ZKChainCommitment} from "contracts/common/Config.sol";
@@ -34,8 +32,8 @@ import {
 } from "contracts/common/Config.sol";
 
 contract ForwardedBridgeFunctionsTest is MigratorTest {
-    address chainAssetHandler;
-    address admin;
+    address internal chainAssetHandler;
+    address internal admin;
 
     function setUp() public override {
         super.setUp();
@@ -124,7 +122,7 @@ contract ForwardedBridgeFunctionsTest is MigratorTest {
         migratorFacet.forwardedBridgeBurn(fakeSettlementLayer, admin, data);
     }
 
-    function test_forwardedBridgeBurn_RevertWhen_NotEraChain() public {
+    function test_forwardedBridgeBurn_RevertWhen_SettlementLayerCTMMismatch() public {
         _setupPausedDepositsState();
 
         // Create a settlement layer that is a valid ZKChain but with different CTM
@@ -156,7 +154,7 @@ contract ForwardedBridgeFunctionsTest is MigratorTest {
         bytes memory data = abi.encode(utilsFacet.util_getProtocolVersion());
 
         vm.prank(chainAssetHandler);
-        vm.expectRevert(NotEraChain.selector);
+        vm.expectRevert(SettlementLayerCTMMismatch.selector);
         migratorFacet.forwardedBridgeBurn(settlementLayer, admin, data);
     }
 
@@ -419,6 +417,44 @@ contract ForwardedBridgeFunctionsTest is MigratorTest {
         vm.prank(chainAssetHandler);
         vm.expectRevert(RemovingPermanentRestriction.selector);
         migratorFacet.forwardedBridgeMint(abi.encode(nonPermanentCommitment), false);
+    }
+
+    function test_forwardedBridgeMint_IgnoresDeprecatedPrecommitmentWithoutClearingSlot() public {
+        _setupReceivingSettlementPausedState();
+        vm.chainId(505);
+
+        address ctm = utilsFacet.util_getChainTypeManager();
+        uint256 currentProtocolVersion = utilsFacet.util_getProtocolVersion();
+        vm.mockCall(
+            ctm,
+            abi.encodeWithSelector(IChainTypeManager.protocolVersion.selector),
+            abi.encode(currentProtocolVersion)
+        );
+
+        bytes32 historicalSentinel = bytes32(uint256(1));
+        utilsFacet.util_setDeprecatedPrecommitmentForTheLatestBatch(historicalSentinel);
+
+        ZKChainCommitment memory commitment = ZKChainCommitment({
+            totalBatchesExecuted: 0,
+            totalBatchesVerified: 0,
+            totalBatchesCommitted: 0,
+            l2SystemContractsUpgradeTxHash: bytes32(0),
+            l2SystemContractsUpgradeBatchNumber: 0,
+            batchHashes: new bytes32[](1),
+            priorityTree: PriorityTreeCommitment({
+                nextLeafIndex: 0,
+                startIndex: 0,
+                unprocessedIndex: 0,
+                sides: new bytes32[](1)
+            }),
+            isPermanentRollup: false,
+            precommitmentForTheLatestBatch: keccak256("ignored incoming precommitment")
+        });
+
+        vm.prank(chainAssetHandler);
+        migratorFacet.forwardedBridgeMint(abi.encode(commitment), false);
+
+        assertEq(vm.load(address(migratorFacet), bytes32(uint256(59))), historicalSentinel);
     }
 
     /*//////////////////////////////////////////////////////////////
