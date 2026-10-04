@@ -391,7 +391,7 @@ library Utils {
     }
 
     function getGettersSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](35);
+        bytes4[] memory selectors = new bytes4[](36);
         uint256 i = 0;
         selectors[i++] = GettersFacet.getVerifier.selector;
         selectors[i++] = GettersFacet.disabledProofSystems.selector;
@@ -413,6 +413,7 @@ library Utils {
         selectors[i++] = GettersFacet.getVerifierParams.selector;
         selectors[i++] = GettersFacet.isDiamondStorageFrozen.selector;
         selectors[i++] = GettersFacet.getPriorityTxMaxGasLimit.selector;
+        selectors[i++] = GettersFacet.getUserPriorityTxMaxGasLimit.selector;
         selectors[i++] = GettersFacet.isEthWithdrawalFinalized.selector;
         selectors[i++] = GettersFacet.facets.selector;
         selectors[i++] = GettersFacet.facetFunctionSelectors.selector;
@@ -643,8 +644,7 @@ library Utils {
         return keccak256(abi.encode(passThroughDataHash, _metadataHash, auxiliaryOutputHash));
     }
 
-    /// @dev The Airbender commitment of a batch committed with one blob; the commit event carries only the
-    /// Boojum one.
+    /// @dev The Airbender commitment of a batch committed with one blob.
     function airbenderCommitmentForSingleBlob(
         CommitBatchInfo calldata _batch,
         bytes32 _stateDiffHash,

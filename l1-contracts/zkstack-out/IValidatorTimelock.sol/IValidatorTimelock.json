@@ -736,6 +736,25 @@
   },
   {
     "type": "event",
+    "name": "BatchAirbenderCommitment",
+    "inputs": [
+      {
+        "name": "batchNumber",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "airbenderCommitment",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "BatchPrecommitmentSet",
     "inputs": [
       {

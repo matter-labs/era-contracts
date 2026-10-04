@@ -928,6 +928,10 @@ object "Bootloader" {
                     assertionError("getL1ChainId failed")
                 }
 
+                if iszero(eq(returndatasize(), 32)) {
+                    assertionError("getL1ChainId: returndata invalid")
+                }
+
                 ret := mload(0)
             }
 

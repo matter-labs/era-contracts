@@ -138,8 +138,15 @@ contract CommittingTest is ExecutorTest {
 
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
             .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+        vm.recordLogs();
         vm.prank(validator);
         committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+
+        // ZKsync OS batches carry no Airbender commitment, so only Era commits emit it.
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+        for (uint256 i = 0; i < entries.length; ++i) {
+            assertTrue(entries[i].topics[0] != keccak256("BatchAirbenderCommitment(uint256,bytes32)"));
+        }
     }
 
     function test_SuccessfullyCommitBatchWithBlobs() public {

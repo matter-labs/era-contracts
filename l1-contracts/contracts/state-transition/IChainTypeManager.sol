@@ -85,6 +85,9 @@ interface IChainTypeManager {
         bytes32 forceDeploymentHash
     );
 
+    /// @notice Emitted alongside `NewChainCreationParams` with the genesis Airbender batch commitment.
+    event NewGenesisAirbenderBatchCommitment(bytes32 genesisAirbenderBatchCommitment);
+
     /// @notice New UpgradeCutHash
     event NewUpgradeCutHash(uint256 indexed protocolVersion, bytes32 indexed upgradeCutHash);
 

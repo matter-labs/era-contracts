@@ -268,6 +268,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
             forceDeploymentsData: _chainCreationParams.forceDeploymentsData,
             forceDeploymentHash: forceDeploymentHash
         });
+        emit NewGenesisAirbenderBatchCommitment(_chainCreationParams.genesisAirbenderBatchCommitment);
     }
 
     /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
