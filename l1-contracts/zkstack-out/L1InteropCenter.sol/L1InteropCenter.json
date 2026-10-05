@@ -140,16 +140,6 @@
             "name": "indirectCall",
             "type": "bool",
             "internalType": "bool"
-          },
-          {
-            "name": "factoryDepsProvided",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
-            "name": "factoryDeps",
-            "type": "bytes[]",
-            "internalType": "bytes[]"
           }
         ]
       }
@@ -483,11 +473,6 @@
         "internalType": "address"
       }
     ]
-  },
-  {
-    "type": "error",
-    "name": "FactoryDepsNotAllowedForIndirectCall",
-    "inputs": []
   },
   {
     "type": "error",

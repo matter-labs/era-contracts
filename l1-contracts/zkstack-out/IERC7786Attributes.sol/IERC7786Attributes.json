@@ -59,19 +59,6 @@
   },
   {
     "type": "function",
-    "name": "factoryDeps",
-    "inputs": [
-      {
-        "name": "_factoryDeps",
-        "type": "bytes[]",
-        "internalType": "bytes[]"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "pure"
-  },
-  {
-    "type": "function",
     "name": "indirectCall",
     "inputs": [
       {
