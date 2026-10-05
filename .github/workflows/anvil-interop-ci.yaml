@@ -85,12 +85,10 @@ jobs:
         run: |
           bash cleanup.sh
 
-  # V31 → V33 upgrade test: loads v31 chain states, runs this release's ecosystem upgrade,
-  # executes governance calls, and verifies protocol version is updated. Replaces the former
-  # v29 → v31 and v30 → v31 jobs: this release initializes the contracts introduced in v31 on
-  # the genesis path only, and its address discovery expects the v31 ABI, so a pre-v31
-  # ecosystem can no longer be upgraded straight onto it.
-  v31-to-v33-upgrade-test:
+  # Latest upgrade test: boots the previous release's chain states (`upgradeSourceStateVersion` in
+  # config/anvil-config.json), prepares the upgrade with protocol-ops' default scripts and input, executes
+  # the governance calls and per-chain upgrades, and checks every chain reached the genesis protocol version.
+  upgrade-test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -100,7 +98,7 @@ jobs:
         with:
           submodules: true
 
-      # The committed v31 state uses the newer Anvil trace schema, while the
+      # The committed chain states need a state-compatible Anvil, while the
       # release bytecode is reproduced with the `build` Forge pin.
       - name: Install Anvil toolchain (state-compatible with committed states)
         uses: ./.github/actions/install-foundry
@@ -136,12 +134,11 @@ jobs:
         working-directory: l1-contracts/test/anvil-interop
         run: yarn install
 
-      - name: Run V31 to V33 upgrade test
+      - name: Run the latest upgrade test
         working-directory: l1-contracts/test/anvil-interop
         env:
           ANVIL_BIN: ${{ runner.temp }}/anvil-pinned
         run: |
-          echo "Running V31 -> V33 upgrade test..."
           yarn ts-node run-upgrade-test.ts
 
       - name: Cleanup

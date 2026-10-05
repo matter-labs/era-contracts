@@ -30,6 +30,8 @@ pub const DEFAULT_CTM_UPGRADE_SCRIPT_PATH: &str =
 pub const UPGRADE_V34_ENV_DIR: &str = "/upgrade-envs/v0.34.0-chain-config";
 pub const UPGRADE_V34_LOCAL_INPUT_PATH: &str = "/upgrade-envs/v0.34.0-chain-config/local.toml";
 pub const UPGRADE_V34_CORE_OUTPUT_PATH: &str = "/script-out/v34-upgrade-core.toml";
+/// Per-CTM prepare output, `<prefix><ctm proxy>.toml` (lowercase hex). Read by the anvil upgrade harness.
+pub const UPGRADE_CTM_OUTPUT_PATH_PREFIX: &str = "/script-out/upgrade-ctm-";
 pub const UPGRADE_V33_ENV_DIR: &str = "/upgrade-envs/v0.33.0-atomic-interop";
 pub const UPGRADE_V33_LOCAL_INPUT_PATH: &str = "/upgrade-envs/v0.33.0-atomic-interop/local.toml";
 pub const UPGRADE_V33_CORE_OUTPUT_PATH: &str = "/script-out/v33-upgrade-core.toml";

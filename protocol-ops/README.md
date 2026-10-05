@@ -57,8 +57,9 @@ input directory; missing inputs fail before deployment. Environment addresses an
 target environment.
 
 `--ctm-script-path`, `--core-script-path`, and `--upgrade-input-path` are visible in `--help`.
-Historical preparations must select the matching scripts and input explicitly. The v31-to-v33
-integration runner does this rather than inheriting the current-release defaults. See
+Historical preparations must select the matching scripts and input explicitly. The anvil upgrade test
+(`l1-contracts/test/anvil-interop/run-upgrade-test.ts`) uses the defaults with no overrides, so it always
+covers the current release's upgrade. See
 [the activation requirements](../protocol-docs/chain-config.md#activation).
 
 ## Execution model

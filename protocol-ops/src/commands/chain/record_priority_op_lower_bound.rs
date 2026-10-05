@@ -30,7 +30,7 @@ struct RecordPriorityOpLowerBoundOutput {
 /// bound, and only then run `chain upgrade`.
 ///
 /// The registry address is the CTM prepare output's `state_transition.priority_op_lower_bound_addr`
-/// (`script-out/v33-upgrade-ctm-<ctm>.toml`, written by `ecosystem upgrade-prepare-all`).
+/// (`script-out/upgrade-ctm-<ctm>.toml`, written by `ecosystem upgrade-prepare-all`).
 ///
 /// Idempotent: the script no-ops when a bound is already recorded for the chain.
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]

@@ -159,3 +159,7 @@ export enum CallStatus {
 
 // Selector for a non-existent function: someVeryUnfortunateCall()
 export const FAILING_CALL_CALLDATA = "0x00056d83";
+
+// From SemVer.sol: bit offsets of the minor and major components in a packed protocol version.
+export const SEMVER_MINOR_OFFSET = 32;
+export const SEMVER_MAJOR_OFFSET = 64;

@@ -1,5 +1,6 @@
 {
   "stateVersion": "v0.34.0",
+  "upgradeSourceStateVersion": "v0.33.0",
   "chains": [
     {
       "chainId": 31337,
