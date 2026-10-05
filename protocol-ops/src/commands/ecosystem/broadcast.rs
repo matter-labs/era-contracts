@@ -76,10 +76,16 @@ pub struct UpgradeBroadcastArgs {
     #[clap(long)]
     pub skip_unkeyed: bool,
 
-    /// Gas-price ceiling (gwei) for the stuck-tx bump loop, forwarded to the
-    /// per-bundle sender.
-    #[clap(long, default_value_t = crate::commands::dev::execute_safe::DEFAULT_MAX_GAS_PRICE_GWEI)]
-    pub max_gas_price_gwei: u128,
+    /// Gas-price ceiling (gwei, decimals allowed: `0.5`) for the stuck-tx bump
+    /// loop, forwarded to the per-bundle sender. The cap also applies to the
+    /// first broadcast, so a cap below the 1 gwei floor is the price every tx pays.
+    #[clap(
+        long = "max-gas-price-gwei",
+        value_name = "GWEI",
+        value_parser = crate::commands::dev::execute_safe::parse_gwei,
+        default_value = crate::commands::dev::execute_safe::DEFAULT_MAX_GAS_PRICE_GWEI
+    )]
+    pub max_gas_price_wei: u128,
 }
 
 #[derive(Debug, Deserialize)]
@@ -165,8 +171,7 @@ pub async fn run(args: UpgradeBroadcastArgs) -> anyhow::Result<()> {
     // receipts, and a claim made while executing one bundle must hold for the
     // next (see `ResumeJournal`).
     let mut journal = ResumeJournal::load(args.out.as_deref())?;
-    let max_gas_price_wei =
-        crate::commands::dev::execute_safe::gwei_to_wei(args.max_gas_price_gwei);
+    let max_gas_price_wei = args.max_gas_price_wei;
     let mut broadcast = 0usize;
     let mut skipped = 0usize;
     for bundle in &manifest.bundles {

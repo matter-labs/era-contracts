@@ -176,9 +176,10 @@ pub async fn apply_manifest_from(
             l1_rpc_url,
             key,
             &mut journal,
-            crate::commands::dev::execute_safe::gwei_to_wei(
+            crate::commands::dev::execute_safe::parse_gwei(
                 crate::commands::dev::execute_safe::DEFAULT_MAX_GAS_PRICE_GWEI,
-            ),
+            )
+            .map_err(anyhow::Error::msg)?,
         )
         .await?;
     }

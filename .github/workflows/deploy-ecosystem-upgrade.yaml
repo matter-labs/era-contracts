@@ -68,7 +68,7 @@ on:
         default: false
         type: boolean
       max_gas_price_gwei:
-        description: "Gas-price ceiling (gwei) for the stuck-tx bump loop"
+        description: "Gas-price ceiling in gwei, decimals allowed (e.g. 0.5). It caps the stuck-tx bump loop and the first broadcast, so a value below the 1 gwei floor is the price every tx pays."
         required: false
         default: "500"
         type: string

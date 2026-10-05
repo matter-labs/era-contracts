@@ -190,8 +190,11 @@ const CONFIRM_POLL_MS: u64 = 4_000;
 /// tx can't hang a deploy forever.
 const MAX_TX_WAIT_MS: u128 = 1_200_000; // 20 min
 /// Default gas-price ceiling (gwei) for the bump loop, overridable per command
-/// via `--max-gas-price-gwei`.
-pub const DEFAULT_MAX_GAS_PRICE_GWEI: u128 = 500;
+/// via `--max-gas-price-gwei`. A string so it goes through the same parser as the flag.
+pub const DEFAULT_MAX_GAS_PRICE_GWEI: &str = "500";
+/// Wei per gwei; a gwei amount therefore has at most this many decimal places.
+const WEI_PER_GWEI: u128 = 1_000_000_000;
+const GWEI_DECIMALS: usize = 9;
 
 /// Receipt polling interval. Alloy's default is tuned for public chains;
 /// tighten it so per-tx receipt polling doesn't dominate bundle latency on
@@ -457,10 +460,17 @@ pub struct DevExecuteSafeArgs {
     #[clap(long)]
     pub out: Option<PathBuf>,
 
-    /// Gas-price ceiling (gwei) for the stuck-tx bump loop. A tx that doesn't
-    /// mine promptly is re-broadcast at a higher gas price up to this cap.
-    #[clap(long, default_value_t = DEFAULT_MAX_GAS_PRICE_GWEI)]
-    pub max_gas_price_gwei: u128,
+    /// Gas-price ceiling (gwei, decimals allowed: `0.5`) for the stuck-tx bump
+    /// loop. A tx that doesn't mine promptly is re-broadcast at a higher gas
+    /// price up to this cap. The cap also applies to the first broadcast, so a
+    /// cap below the 1 gwei floor is the price every tx pays.
+    #[clap(
+        long = "max-gas-price-gwei",
+        value_name = "GWEI",
+        value_parser = parse_gwei,
+        default_value = DEFAULT_MAX_GAS_PRICE_GWEI
+    )]
+    pub max_gas_price_wei: u128,
 }
 
 pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
@@ -470,14 +480,50 @@ pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
         &args.l1_rpc_url,
         args.private_key.expose(),
         &mut journal,
-        gwei_to_wei(args.max_gas_price_gwei),
+        args.max_gas_price_wei,
     )
     .await
 }
 
 /// Convert a gwei ceiling to wei for the sender.
 pub fn gwei_to_wei(gwei: u128) -> u128 {
-    gwei.saturating_mul(1_000_000_000)
+    gwei.saturating_mul(WEI_PER_GWEI)
+}
+
+/// Parse a gwei amount, decimals allowed (`500`, `0.5`, `.25`), into wei. Exact
+/// (no floating point); rejects zero, more than 9 decimal places, signs,
+/// exponents and anything else that is not a plain decimal number.
+pub fn parse_gwei(value: &str) -> Result<u128, String> {
+    let invalid = || format!("expected a gwei amount like 500 or 0.5, got {value:?}");
+    let (whole, frac) = value.split_once('.').unwrap_or((value, ""));
+    let digits = |s: &str| s.bytes().all(|b| b.is_ascii_digit());
+    if (whole.is_empty() && frac.is_empty()) || !digits(whole) || !digits(frac) {
+        return Err(invalid());
+    }
+    if frac.len() > GWEI_DECIMALS {
+        return Err(format!(
+            "{value:?} has more than {GWEI_DECIMALS} decimal places (1 wei is 1e-9 gwei)"
+        ));
+    }
+    let whole_wei = match whole {
+        "" => 0,
+        w => w
+            .parse::<u128>()
+            .map_err(|_| invalid())?
+            .checked_mul(WEI_PER_GWEI)
+            .ok_or_else(invalid)?,
+    };
+    let frac_wei = match frac {
+        "" => 0,
+        f => format!("{f:0<width$}", width = GWEI_DECIMALS)
+            .parse::<u128>()
+            .map_err(|_| invalid())?,
+    };
+    match whole_wei.checked_add(frac_wei) {
+        Some(0) => Err("the gas-price ceiling must be above zero".to_string()),
+        Some(wei) => Ok(wei),
+        None => Err(invalid()),
+    }
 }
 
 /// Replay a single Safe bundle file under one signer. Despite the file
@@ -1376,9 +1422,59 @@ mod tests {
     use tempfile::tempdir;
 
     use super::{
-        bump_gas, gwei_to_wei, load_executed_bundle, record_executed_tx, ExecutedBundle,
-        ExecutedTx, GAS_BUMP_BPS,
+        bump_gas, gwei_to_wei, load_executed_bundle, parse_gwei, record_executed_tx,
+        ExecutedBundle, ExecutedTx, GAS_BUMP_BPS,
     };
+
+    #[test]
+    fn gas_price_ceilings_parse_exactly_with_decimals() {
+        assert_eq!(parse_gwei("500"), Ok(gwei_to_wei(500)));
+        assert_eq!(parse_gwei("0.5"), Ok(500_000_000));
+        assert_eq!(parse_gwei(".25"), Ok(250_000_000));
+        assert_eq!(parse_gwei("2."), Ok(gwei_to_wei(2)));
+        assert_eq!(parse_gwei("1.000000001"), Ok(1_000_000_001));
+        assert_eq!(parse_gwei("0.000000001"), Ok(1));
+        for bad in [
+            "",
+            ".",
+            "0",
+            "0.0",
+            "-1",
+            "+1",
+            "1e9",
+            " 0.5",
+            "0.5 ",
+            "1.0000000001",
+            "1,5",
+            "abc",
+        ] {
+            assert!(parse_gwei(bad).is_err(), "{bad:?} should be rejected");
+        }
+    }
+
+    #[test]
+    fn the_cli_takes_a_fractional_ceiling() {
+        use clap::Parser;
+        let parse = |extra: &[&str]| {
+            let mut argv = vec![
+                "execute-safe",
+                "--safe-file",
+                "b.json",
+                "--private-key",
+                "0x01",
+            ];
+            argv.extend_from_slice(extra);
+            super::DevExecuteSafeArgs::try_parse_from(argv)
+        };
+        assert_eq!(
+            parse(&["--max-gas-price-gwei", "0.5"])
+                .unwrap()
+                .max_gas_price_wei,
+            500_000_000
+        );
+        assert_eq!(parse(&[]).unwrap().max_gas_price_wei, gwei_to_wei(500));
+        assert!(parse(&["--max-gas-price-gwei", "0"]).is_err());
+    }
 
     #[test]
     fn bump_gas_increases_by_at_least_the_replacement_threshold() {
