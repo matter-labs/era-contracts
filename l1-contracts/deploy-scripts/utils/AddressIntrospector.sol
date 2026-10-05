@@ -176,6 +176,16 @@ library AddressIntrospector {
         coreAddresses.shared.governance = IOwnable(_bridgehubProxy).owner();
     }
 
+    /// @notice The Bridgehub's registered L1 Interop Center, or zero when none is registered or the Bridgehub
+    ///         predates the center and has no `interopCenter` getter.
+    /// @dev Read from live state rather than an upgrade input, so the core upgrade cannot mistake an
+    ///      ecosystem with a center for one without and deploy a replacement.
+    function getRegisteredInteropCenter(address _bridgehubProxy) public view returns (address center) {
+        try IL1Bridgehub(_bridgehubProxy).interopCenter() returns (address registered) {
+            center = registered;
+        } catch {}
+    }
+
     /// @notice Discovers a v32+ ecosystem without reading the Bridgehub's `interopCenter` getter, which
     ///         Bridgehubs that predate the L1 Interop Center lack; the center's addresses stay zero.
     function getCoreDeployedAddressesWithoutInteropCenter(

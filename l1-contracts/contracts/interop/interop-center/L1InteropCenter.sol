@@ -9,12 +9,11 @@ import {
     INDIRECT_CALL_MAGIC_VALUE
 } from "../../common/Config.sol";
 import {ChainIdNotRegistered, MsgValueMismatch, WrongMagicValue, ZeroAddress} from "../../common/L1ContractErrors.sol";
-import {BridgehubL2TransactionRequest, InteropCallStarter} from "../../common/Messaging.sol";
+import {BridgehubL2TransactionRequest, IndirectCallRequest, InteropCallStarter} from "../../common/Messaging.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
 
-import {IndirectCallRequest} from "../../common/Messaging.sol";
 import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
 import {IAssetRouterShared} from "../../bridge/asset-router/IAssetRouterShared.sol";
 import {IL1CrossChainSender} from "../../bridge/interfaces/IL1CrossChainSender.sol";
@@ -368,10 +367,10 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
 
     /// @inheritdoc IERC7786GatewaySource
     function supportsAttribute(bytes4 _attributeSelector) external pure override returns (bool) {
-        bytes4[SUPPORTED_L1_INTEROP_ATTRIBUTES] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
-        uint256 attributeSelectorsLength = ATTRIBUTE_SELECTORS.length;
+        bytes4[SUPPORTED_L1_INTEROP_ATTRIBUTES] memory attributeSelectors = _getERC7786AttributeSelectors();
+        uint256 attributeSelectorsLength = attributeSelectors.length;
         for (uint256 i = 0; i < attributeSelectorsLength; ++i) {
-            if (_attributeSelector == ATTRIBUTE_SELECTORS[i]) {
+            if (_attributeSelector == attributeSelectors[i]) {
                 return true;
             }
         }

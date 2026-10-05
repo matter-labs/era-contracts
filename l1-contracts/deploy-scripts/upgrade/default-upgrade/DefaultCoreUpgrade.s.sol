@@ -47,7 +47,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
         uint256 newProtocolVersion;
         bool hasPreV32IntrospectionOverride;
         bool usePreV32IntrospectionOverride;
-        bool hasL1InteropCenter;
     }
     AdditionalConfigParams internal additionalConfig;
 
@@ -156,8 +155,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
         string memory upgradeInputPath
     ) public virtual {
         string memory upgradeToml = vm.readFile(upgradeInputPath);
-        require(upgradeToml.keyExists("$.has_l1_interop_center"), "Set has_l1_interop_center explicitly");
-        additionalConfig.hasL1InteropCenter = upgradeToml.readBool("$.has_l1_interop_center");
 
         // Only override the salt when explicitly provided (non-zero).
         // When zero, the script falls back to the CREATE2_FACTORY_SALT env var or built-in default.
@@ -203,7 +200,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
     function setAddressesBasedOnBridgehub() internal virtual {
         address bridgehubProxy = coreAddresses.bridgehub.proxies.bridgehub;
 
-        if (additionalConfig.hasL1InteropCenter) {
+        if (AddressIntrospector.getRegisteredInteropCenter(bridgehubProxy) != address(0)) {
             coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubProxy);
             return;
         }

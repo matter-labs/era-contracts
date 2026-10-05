@@ -77,7 +77,7 @@ ownership-acceptance step completes the pending transfer.
 
 The core upgrade deploys the proxy when absent. Stage 1 upgrades Bridgehub, accepts
 the center's ownership and sets the registry before stage 2 submits priority
-requests. If Bridgehub is paused when the center is first registered, registration
+requests. If Bridgehub is paused when the center is registered, registration
 requires the center to be paused too. Pause the new center before stage 1 in this case;
 its owner must explicitly unpause it to resume sends. This check runs at activation,
 so a pause imposed after preparation cannot silently be lost.
@@ -86,12 +86,12 @@ are unavailable between the ecosystem upgrade and that chain's Mailbox upgrade.
 The current upgrade CLI supports ZKsync OS chains; retained Era chains require a
 separately supported Mailbox migration.
 
-Core upgrade inputs must explicitly set `has_l1_interop_center`: use `true` when the
-core already has a center, even if its chains have not upgraded yet, and `false` for
-historical Bridgehubs without the getter. Discovery retains an existing proxy, and stage
-1 upgrades its implementation; `false` on an ecosystem that already has a center would
-deploy and register a replacement. The CTM upgrade does not use the center and never
-reads the getter.
+The core upgrade reads the center from the live Bridgehub. A Bridgehub without the
+`interopCenter()` getter, or with no center registered, gets a new proxy; an existing
+center is retained, and stage 1 upgrades its implementation. `setInteropCenter` is
+one-shot and accepts only a contract whose `BRIDGE_HUB()` is that Bridgehub, so a
+registered center is upgraded through its proxy, never replaced. The CTM upgrade does
+not use the center and never reads the getter.
 
 Deployment and upgrade output records `bridgehub.l1_interop_center_{implementation,proxy}_addr`.
 Rust request decoding and the governance simulator recognize `sendMessage`.

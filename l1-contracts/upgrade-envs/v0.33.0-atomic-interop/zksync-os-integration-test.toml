@@ -10,8 +10,6 @@ era_chain_id = 6565
 testnet_verifier = true
 governance_upgrade_timer_initial_delay = 0
 old_protocol_version = 0x1f00000000  # v31.0.0
-# The ecosystem predates the L1 Interop Center, so the upgrade deploys and registers it.
-has_l1_interop_center = false
 
 [contracts]
 governance_min_delay = 0

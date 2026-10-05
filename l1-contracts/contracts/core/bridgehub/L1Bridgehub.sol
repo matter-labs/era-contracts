@@ -15,8 +15,11 @@ import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
 import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
+import {IL1InteropCenter} from "../../interop/IL1InteropCenter.sol";
 import {SettlementLayersMustSettleOnL1} from "../../common/L1ContractErrors.sol";
 import {
+    AddressAlreadySet,
+    AddressHasNoCode,
     ChainIdAlreadyExists,
     ChainIdMismatch,
     IncorrectBridgeHubAddress,
@@ -132,9 +135,15 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     }
 
     /// @inheritdoc IL1Bridgehub
+    /// @dev One-shot, like the interop handler setters: the center is upgraded through its proxy, never
+    ///      replaced, so a registered center keeps its owner and pause state.
     function setInteropCenter(address _interopCenter) external override onlyOwnerOrUpgrader {
+        require(interopCenter == address(0), AddressAlreadySet(interopCenter));
         require(_interopCenter != address(0), ZeroAddress());
-        if (interopCenter == address(0) && paused()) {
+        require(_interopCenter.code.length != 0, AddressHasNoCode(_interopCenter));
+        address centerBridgehub = address(IL1InteropCenter(_interopCenter).BRIDGE_HUB());
+        require(centerBridgehub == address(this), IncorrectBridgeHubAddress(centerBridgehub));
+        if (paused()) {
             require(PausableUpgradeable(_interopCenter).paused(), InteropCenterNotPaused());
         }
         interopCenter = _interopCenter;

@@ -38,9 +38,6 @@ owner_address = "0x8f08627524aeD610192132A425D6b9C32a1727EF"
 # v31 -> v33.
 old_protocol_version = 0x1f00000000
 
-# The ecosystem predates the L1 Interop Center, so the upgrade deploys and registers it.
-has_l1_interop_center = false
-
 
 [contracts]
 governance_min_delay = 0

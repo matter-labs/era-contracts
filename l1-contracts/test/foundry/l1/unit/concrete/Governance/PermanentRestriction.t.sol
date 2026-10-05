@@ -12,6 +12,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {BridgehubBurnCTMAssetData, IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {L1L2IndirectMessageParams} from "../../../../../../deploy-scripts/utils/L1InteropRequests.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {L1InteropCenter} from "contracts/interop/interop-center/L1InteropCenter.sol";
 
 import {PermanentRestriction} from "contracts/governance/PermanentRestriction.sol";
 import {IPermanentRestriction} from "contracts/governance/IPermanentRestriction.sol";
@@ -63,7 +64,7 @@ contract TestPermanentRestriction is PermanentRestriction {
 
 contract PermanentRestrictionTest is ChainTypeManagerTest {
     uint256 internal L1_CHAIN_ID;
-    address internal l1InteropCenter = makeAddr("l1InteropCenter");
+    address internal l1InteropCenter;
     ChainAdmin internal chainAdmin;
     AccessControlRestriction internal restriction;
     TestPermanentRestriction internal permRestriction;
@@ -489,6 +490,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
             address(chainAssetHandler),
             address(0)
         ); // kl todo maybe address(1)
+        l1InteropCenter = address(new L1InteropCenter(bridgehub));
         bridgehub.setInteropCenter(l1InteropCenter);
         vm.stopPrank();
 

@@ -66,16 +66,17 @@ contract DiscoveryFixtureCurrent is DiscoveryFixturePreCenter {
     }
 }
 
+contract DiscoveryFixtureUnregisteredCenter is DiscoveryFixturePreCenter {
+    function interopCenter() external pure returns (address) {
+        return address(0);
+    }
+}
+
 contract CoreInteropDiscoveryHarness is DefaultCoreUpgrade {
-    function discover(
-        address _bridgehub,
-        bool _preV32,
-        bool _hasCenter
-    ) external returns (CoreDeployedAddresses memory) {
+    function discover(address _bridgehub, bool _preV32) external returns (CoreDeployedAddresses memory) {
         coreAddresses.bridgehub.proxies.bridgehub = _bridgehub;
         additionalConfig.hasPreV32IntrospectionOverride = true;
         additionalConfig.usePreV32IntrospectionOverride = _preV32;
-        additionalConfig.hasL1InteropCenter = _hasCenter;
         setAddressesBasedOnBridgehub();
         return coreAddresses;
     }
@@ -92,9 +93,9 @@ contract L1InteropCenterDiscoveryTest is Test {
         return address(new TransparentUpgradeableProxy(_implementation, makeAddr("proxyAdmin"), ""));
     }
 
-    function test_v31_discoveryDoesNotCallEitherNewGetter() public {
+    function test_v31_discoveryReportsNeitherHandlerNorCenter() public {
         address bridgehub = _proxy(address(new DiscoveryFixtureV31()));
-        CoreDeployedAddresses memory addresses = coreScript.discover(bridgehub, true, false);
+        CoreDeployedAddresses memory addresses = coreScript.discover(bridgehub, true);
         assertEq(addresses.bridgehub.proxies.bridgehub, bridgehub);
         assertEq(addresses.bridgehub.proxies.interopCenter, address(0));
         assertEq(addresses.bridges.proxies.l1InteropHandler, address(0));
@@ -102,16 +103,25 @@ contract L1InteropCenterDiscoveryTest is Test {
 
     function test_v32AndV33_discoveryRetainsHandlerWithoutCenterGetter() public {
         address bridgehub = _proxy(address(new DiscoveryFixturePreCenter()));
-        CoreDeployedAddresses memory addresses = coreScript.discover(bridgehub, false, false);
+        CoreDeployedAddresses memory addresses = coreScript.discover(bridgehub, false);
         assertEq(addresses.bridgehub.proxies.bridgehub, bridgehub);
         assertEq(addresses.bridgehub.proxies.interopCenter, address(0));
+        assertEq(addresses.bridges.proxies.l1InteropHandler, bridgehub);
+    }
+
+    /// @dev A Bridgehub that has the getter but no registered center gets a new one, like a historical one.
+    function test_unregisteredCenter_discoveryReportsNoCenter() public {
+        address bridgehub = _proxy(address(new DiscoveryFixtureUnregisteredCenter()));
+        CoreDeployedAddresses memory addresses = coreScript.discover(bridgehub, false);
+        assertEq(addresses.bridgehub.proxies.interopCenter, address(0));
+        assertEq(addresses.bridgehub.implementations.interopCenter, address(0));
         assertEq(addresses.bridges.proxies.l1InteropHandler, bridgehub);
     }
 
     function test_current_discoveryRetainsExistingCenter() public {
         address implementation = address(new DiscoveryFixtureCurrent());
         address bridgehub = _proxy(implementation);
-        CoreDeployedAddresses memory addresses = coreScript.discover(bridgehub, false, true);
+        CoreDeployedAddresses memory addresses = coreScript.discover(bridgehub, false);
         assertEq(addresses.bridgehub.proxies.interopCenter, bridgehub);
         assertEq(addresses.bridgehub.implementations.interopCenter, implementation);
         assertEq(addresses.bridges.proxies.l1InteropHandler, bridgehub);
@@ -131,14 +141,8 @@ contract L1InteropCenterDiscoveryTest is Test {
         assertEq(currentAddresses.bridges.proxies.l1InteropHandler, current);
     }
 
-    function test_currentFlagOnHistoricalSource_revertsOnMissingGetter() public {
-        address bridgehub = _proxy(address(new DiscoveryFixturePreCenter()));
-        // The proxy delegates to an implementation without `interopCenter()`, which reverts without data.
-        vm.expectRevert(bytes(""));
-        coreScript.discover(bridgehub, false, true);
-    }
-
-    function test_currentFlagRetainsRealCenterWithPreV32Introspection() public {
+    /// @dev A registered center wins over the pre-v32 override: the Bridgehub already has every new getter.
+    function test_registeredCenterIsRetainedDespitePreV32Override() public {
         L1Bridgehub bridgehub = L1Bridgehub(
             address(
                 new TransparentUpgradeableProxy(
@@ -172,7 +176,7 @@ contract L1InteropCenterDiscoveryTest is Test {
         address pendingOwner = makeAddr("pendingOwner");
         center.transferOwnership(pendingOwner);
 
-        CoreDeployedAddresses memory coreAddresses = coreScript.discover(address(bridgehub), true, true);
+        CoreDeployedAddresses memory coreAddresses = coreScript.discover(address(bridgehub), true);
         assertEq(coreAddresses.bridgehub.proxies.interopCenter, address(center));
         assertEq(coreAddresses.bridgehub.implementations.interopCenter, address(implementation));
         assertEq(coreAddresses.bridges.proxies.l1InteropHandler, other);
@@ -180,13 +184,5 @@ contract L1InteropCenterDiscoveryTest is Test {
         assertEq(center.pendingOwner(), pendingOwner);
         assertTrue(center.paused());
         assertEq(bridgehub.interopCenter(), address(center));
-    }
-
-    function test_upgradeInputsRequireExplicitCenterFlag() public {
-        string memory path = "script-out/l1-interop-center-missing-flag-test.toml";
-        vm.writeFile(path, "pre_v32_introspection = false\n");
-        vm.expectRevert("Set has_l1_interop_center explicitly");
-        coreScript.initializeConfigWithArgs(address(0), bytes32(0), path);
-        vm.removeFile(path);
     }
 }

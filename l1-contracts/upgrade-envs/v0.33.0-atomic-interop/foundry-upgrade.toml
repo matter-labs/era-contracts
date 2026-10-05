@@ -7,11 +7,8 @@
 #     it is `$.contracts.new_protocol_version`, not a top-level key.
 #   - `pre_v32_introspection` — read by `DefaultCTMUpgrade` to pin the introspection path instead of
 #     auto-detecting it on a synthetic fixture.
-#   - `has_l1_interop_center` — read by `DefaultCoreUpgrade`; the fixture is deployed from current
-#     contracts, so it already has the L1 Interop Center.
 
 pre_v32_introspection = false
-has_l1_interop_center = true
 
 [contracts]
 new_protocol_version = 0x2200000000  # v34.0.0 — one minor past the v33 genesis this suite builds on

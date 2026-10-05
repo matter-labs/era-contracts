@@ -5,6 +5,9 @@ pragma solidity 0.8.28;
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
+import {DummyBridgehubSetter} from "contracts/dev-contracts/test/DummyBridgehubSetter.sol";
+import {L1InteropCenter} from "contracts/interop/interop-center/L1InteropCenter.sol";
 import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
 
 import {L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -15,6 +18,8 @@ import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {ETH_TOKEN_ADDRESS, HARD_CODED_CHAIN_ID, MAINNET_CHAIN_ID, SEPOLIA_CHAIN_ID} from "contracts/common/Config.sol";
 
 import {
+    AddressAlreadySet,
+    AddressHasNoCode,
     AssetIdAlreadyRegistered,
     AssetIdNotSupported,
     BridgeHubAlreadyRegistered,
@@ -22,6 +27,7 @@ import {
     CTMNotRegistered,
     ChainIdIsHardcoded,
     ChainIdTooBig,
+    IncorrectBridgeHubAddress,
     SharedBridgeNotSet,
     Unauthorized,
     ZeroChainId
@@ -671,41 +677,57 @@ contract ExperimentalBridgeTest is ExperimentalBridgeTestBase {
         vm.clearMockedCalls();
     }
 
+    function _unregisteredBridgehubAndCenter() private returns (L1Bridgehub freshBridgehub, address center) {
+        freshBridgehub = new DummyBridgehubSetter(bridgeOwner, type(uint256).max);
+        center = address(new L1InteropCenter(IL1Bridgehub(address(freshBridgehub))));
+    }
+
     function test_setInteropCenter_ownerAndUpgrader() public {
-        address center = makeAddr("replacementCenter");
-        vm.expectEmit(true, false, false, true, address(bridgehub));
+        (L1Bridgehub freshBridgehub, address center) = _unregisteredBridgehubAndCenter();
+        vm.expectEmit(true, false, false, true, address(freshBridgehub));
         emit IL1Bridgehub.InteropCenterSet(center);
         vm.prank(bridgeOwner);
-        bridgehub.setInteropCenter(center);
-        assertEq(bridgehub.interopCenter(), center);
+        freshBridgehub.setInteropCenter(center);
+        assertEq(freshBridgehub.interopCenter(), center);
+
+        (freshBridgehub, center) = _unregisteredBridgehubAndCenter();
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        bridgehub.setInteropCenter(address(l1InteropCenter));
-        assertEq(bridgehub.interopCenter(), address(l1InteropCenter));
+        freshBridgehub.setInteropCenter(center);
+        assertEq(freshBridgehub.interopCenter(), center);
     }
 
-    function test_setInteropCenter_rejectsUnauthorizedAndZeroAddress() public {
+    function test_setInteropCenter_rejectsUnauthorized() public {
+        (L1Bridgehub freshBridgehub, address center) = _unregisteredBridgehubAndCenter();
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
-        bridgehub.setInteropCenter(address(l1InteropCenter));
-        vm.expectRevert(ZeroAddress.selector);
-        vm.prank(bridgeOwner);
-        bridgehub.setInteropCenter(address(0));
-        assertEq(bridgehub.interopCenter(), address(l1InteropCenter));
+        freshBridgehub.setInteropCenter(center);
     }
 
-    /// @dev Only the first registration inherits a Bridgehub pause; a replacement is an explicit governance
-    ///      decision, and the replaced center loses its authority immediately.
-    function test_setInteropCenter_replacementWhilePausedRevokesThePreviousCenter() public {
-        address replacement = makeAddr("replacementCenter");
+    /// @dev The center is upgraded through its proxy, so a registered center is never replaced, paused or not.
+    function test_setInteropCenter_rejectsReplacement() public {
+        address replacement = address(new L1InteropCenter(IL1Bridgehub(address(bridgehub))));
         vm.startPrank(bridgeOwner);
         bridgehub.pause();
+        vm.expectRevert(abi.encodeWithSelector(AddressAlreadySet.selector, address(l1InteropCenter)));
         bridgehub.setInteropCenter(replacement);
         vm.stopPrank();
-        assertTrue(bridgehub.paused());
-        assertFalse(l1InteropCenter.paused());
-        assertEq(bridgehub.interopCenter(), replacement);
+        assertEq(bridgehub.interopCenter(), address(l1InteropCenter));
+    }
 
-        vm.prank(address(l1InteropCenter));
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(l1InteropCenter)));
-        sharedBridge.bridgehubDepositBaseToken(1, ETH_TOKEN_ASSET_ID, address(this), 1);
+    function test_setInteropCenter_rejectsAnythingButACenterOfThisBridgehub() public {
+        (L1Bridgehub freshBridgehub, ) = _unregisteredBridgehubAndCenter();
+        address eoa = makeAddr("eoa");
+        vm.startPrank(bridgeOwner);
+        vm.expectRevert(ZeroAddress.selector);
+        freshBridgehub.setInteropCenter(address(0));
+        vm.expectRevert(abi.encodeWithSelector(AddressHasNoCode.selector, eoa));
+        freshBridgehub.setInteropCenter(eoa);
+        // `l1InteropCenter` is bound to the shared `bridgehub`.
+        vm.expectRevert(abi.encodeWithSelector(IncorrectBridgeHubAddress.selector, address(bridgehub)));
+        freshBridgehub.setInteropCenter(address(l1InteropCenter));
+        // A contract without `BRIDGE_HUB()`.
+        vm.expectRevert(bytes(""));
+        freshBridgehub.setInteropCenter(address(testToken));
+        vm.stopPrank();
+        assertEq(freshBridgehub.interopCenter(), address(0));
     }
 }
