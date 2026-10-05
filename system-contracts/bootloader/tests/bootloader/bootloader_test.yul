@@ -347,7 +347,8 @@ function INT_TEST_forceFailL1TxFee() {
         L1_TX_INTRINSIC_L2_GAS(),
         L1_TX_INTRINSIC_PUBDATA()
     )
-    // The least the operator is paid: everything outside that budget, plus the marker log's pubdata.
+    // The least the operator is paid: everything outside that budget, plus the marker log's pubdata
+    // (one L2->L1 log, the same size as the status log the intrinsic pubdata covers).
     let minChargedGas := add(
         sub(getGasLimit(innerTxDataOffset), add(gasLimitForTx, reservedGas)),
         mul(L1_TX_INTRINSIC_PUBDATA(), gasPerPubdata)
