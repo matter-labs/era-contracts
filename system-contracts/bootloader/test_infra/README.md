@@ -72,8 +72,6 @@ registered as an expectation and checked by the runner once the batch is done:
 - `testing_expectNoBootloaderLog(key, value)` — it sent no such log, for a key another log owns.
 - `testing_expectSystemLog(key, value)` — it sent this system log (priority-queue accounting).
 - `testing_expectBalance(account, balance)` — exact base token balance at the end of the batch.
-- `testing_expectBalanceInRange(account, min, max)` — balance within inclusive bounds, for amounts
-  that depend on gas measured at runtime.
 
 Expectations fail closed: a test that registers them and also expects the batch to fail is an
 error (they could never be checked), and an `INT_TEST_*` that registers no assertion at all fails

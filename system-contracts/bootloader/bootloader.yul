@@ -769,9 +769,10 @@ object "Bootloader" {
                 forceFail
             ) {
                 // Force-fail is supported only for batches settling on L1.
-                // The sender is not checked: service transactions (`SERVICE_TRANSACTION_SENDER`) can be force-failed
-                // on any chain, and so can relay wrappers (`SETTLEMENT_LAYER_RELAY_SENDER`) on a settlement layer.
-                // Those senders have to be rejected here before a settlement layer runs this bootloader.
+                // The sender is not checked, so protocol-authored transactions can be force-failed too: service
+                // transactions (`SERVICE_TRANSACTION_SENDER`) and, on a settlement layer, relay wrappers
+                // (`SETTLEMENT_LAYER_RELAY_SENDER`). Those senders must be rejected here before a settlement
+                // layer runs this bootloader.
                 if forceFail {
                     if iszero(eq(getSettlementLayerChainId(), getL1ChainId())) {
                         assertionError("forceFail off L1 settlement")
@@ -1222,12 +1223,6 @@ object "Bootloader" {
                         forceFail
                     )
 
-                    // The force-fail marker is sent after the execution result is reported, so it does not become the
-                    // transaction's returndata, and before the fee is measured, so its pubdata is charged to it.
-                    if forceFail {
-                        sendL2LogUsingL1Messenger(true, forceFailedL1TxLogKey(), canonicalL1TxHash)
-                    }
-
                     let ergsSpentOnPubdata := getErgsSpentForPubdata(
                         basePubdataSpent,
                         gasPerPubdata
@@ -1296,9 +1291,8 @@ object "Bootloader" {
                     // Sending the L2->L1 log so users will be able to prove transaction execution result on L1.
                     sendL2LogUsingL1Messenger(true, canonicalL1TxHash, success)
 
-                    // Records the operator's choice, which a revert is otherwise indistinguishable from. Sent above
-                    // unless the transaction could not afford execution.
-                    if and(forceFail, iszero(gt(gasLimitForTx, gasUsedOnPreparation))) {
+                    // Records the operator's choice, which a revert is otherwise indistinguishable from.
+                    if forceFail {
                         sendL2LogUsingL1Messenger(true, forceFailedL1TxLogKey(), canonicalL1TxHash)
                     }
 
@@ -1350,10 +1344,6 @@ object "Bootloader" {
                 )
                 notifyExecutionResult(success)
                 gasSpentOnExecution := sub(gasBeforeExecution, gas())
-                // The force-fail panic burns the frame's gas without doing any work, so none of it is charged.
-                if forceFail {
-                    gasSpentOnExecution := 0
-                }
             }
 
             /// @dev The function responsible for doing all the pre-execution operations for L1->L2 transactions.

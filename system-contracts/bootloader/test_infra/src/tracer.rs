@@ -27,8 +27,6 @@ pub struct Expectations {
     pub tx_failures_no_returndata: Vec<usize>,
     pub bootloader_logs: Vec<(U256, U256)>,
     pub balances: Vec<(U256, U256)>,
-    /// `(account, min, max)`, inclusive.
-    pub balance_ranges: Vec<(U256, U256, U256)>,
     pub forbidden_log_keys: Vec<U256>,
     /// Pairs that must not appear; unlike `forbidden_log_keys`, the key may be shared.
     pub forbidden_logs: Vec<(U256, U256)>,
@@ -45,7 +43,6 @@ impl Expectations {
             || !self.forbidden_logs.is_empty()
             || !self.system_logs.is_empty()
             || !self.balances.is_empty()
-            || !self.balance_ranges.is_empty()
     }
 }
 
@@ -183,13 +180,6 @@ impl<S, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for BootloaderTestTracer {
                     .unwrap()
                     .balances
                     .push((*account, *balance));
-            }
-            TestVmHook::ExpectBalanceInRange(account, min, max) => {
-                self.expectations
-                    .lock()
-                    .unwrap()
-                    .balance_ranges
-                    .push((*account, *min, *max));
             }
             TestVmHook::ExpectNoBootloaderLogKey(key) => {
                 self.expectations

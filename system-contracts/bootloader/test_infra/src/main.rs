@@ -222,17 +222,6 @@ fn check_expectations(
         }
     }
 
-    for (account, min, max) in &expectations.balance_ranges {
-        let account = u256_to_address(account);
-        let actual = h256_to_u256(storage.borrow_mut().read_value(&get_balance_key(account)));
-        if actual < *min || actual > *max {
-            return Err(format!(
-                "Balance of {:?} is {}, expected within [{}, {}].",
-                account, actual, min, max
-            ));
-        }
-    }
-
     Ok(())
 }
 
