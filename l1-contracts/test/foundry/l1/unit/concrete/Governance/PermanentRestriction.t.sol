@@ -335,7 +335,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         assertInvalidMigrationCall(call);
     }
 
-    function test_tryGetNewAdminFromMigrationRevertWhenNotBridgehub() public view {
+    function test_tryGetNewAdminFromMigrationRevertWhenNotInteropCenter() public view {
         Call memory call = _encodeMigraationCall({
             correctTarget: true,
             correctSelector: false,
@@ -671,7 +671,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         vm.mockCall(
             address(sharedBridge),
             abi.encodeWithSelector(IAssetRouterBase.assetHandlerAddress.selector, chainAssetId),
-            abi.encode(wrongHandler) // Not bridgehub
+            abi.encode(wrongHandler) // Not the chain asset handler
         );
 
         Call memory call = _encodeMigraationCall({
@@ -799,5 +799,57 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         attributes[2] = abi.encodePacked(IERC7786Attributes.indirectCall.selector);
         call.data = abi.encodeCall(IERC7786GatewaySource.sendMessage, (recipient, payload, attributes));
         assertInvalidMigrationCall(call);
+    }
+
+    function test_multiCallBundleIsNotMigration() public {
+        Call memory call = _migrationBundle(makeAddr("newAdmin"), true);
+        (bytes memory destination, InteropCallStarter[] memory calls, bytes[] memory bundleAttributes) = abi.decode(
+            _stripSelector(call.data),
+            (bytes, InteropCallStarter[], bytes[])
+        );
+        InteropCallStarter[] memory twoCalls = new InteropCallStarter[](2);
+        twoCalls[0] = calls[0];
+        twoCalls[1] = calls[0];
+        call.data = abi.encodeCall(IInteropCenterBase.sendBundle, (destination, twoCalls, bundleAttributes));
+        assertInvalidMigrationCall(call);
+    }
+
+    /// @dev Chain assets are handled by the chain asset handler; a migration claiming the Bridgehub as its
+    ///      handler is not one.
+    function test_bridgehubAsAssetHandlerIsNotMigration() public {
+        bytes32 chainAssetId = bridgehub.ctmAssetIdFromChainId(chainId);
+        vm.mockCall(
+            address(sharedBridge),
+            abi.encodeWithSelector(IAssetRouterBase.assetHandlerAddress.selector, chainAssetId),
+            abi.encode(address(bridgehub))
+        );
+        Call memory call = _encodeMigraationCall({
+            correctTarget: true,
+            correctSelector: true,
+            correctCrossChainSender: true,
+            correctEncodingVersion: true,
+            correctAssetId: true,
+            l2Admin: makeAddr("newAdmin")
+        });
+        assertInvalidMigrationCall(call);
+    }
+
+    /// @dev Calls other than interop sends must not consult the registry, so a Bridgehub without the
+    ///      `interopCenter` getter keeps every other chain-admin call valid.
+    function test_nonInteropCallDoesNotReadTheRegistry() public {
+        vm.mockCallRevert(address(bridgehub), abi.encodeCall(IL1Bridgehub.interopCenter, ()), "no getter");
+        Call memory call = Call({
+            target: makeAddr("chain"),
+            value: 0,
+            data: abi.encodeCall(IAdmin.setPendingAdmin, (makeAddr("newAdmin")))
+        });
+        assertInvalidMigrationCall(call);
+    }
+
+    function _stripSelector(bytes memory _data) private pure returns (bytes memory stripped) {
+        stripped = new bytes(_data.length - 4);
+        for (uint256 i = 0; i < stripped.length; ++i) {
+            stripped[i] = _data[i + 4];
+        }
     }
 }

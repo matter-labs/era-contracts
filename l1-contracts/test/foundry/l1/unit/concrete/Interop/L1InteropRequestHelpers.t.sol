@@ -19,7 +19,7 @@ contract L1InteropRequestHelpersTest is Test {
         address router = makeAddr("router");
         address vault = makeAddr("nativeTokenVault");
         // Isolate call construction from the on-chain registry and fee formula.
-        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.interopCenter, ()), abi.encode(center));
+        vm.mockCall(bridgehub, abi.encodeCall(IL1Bridgehub.interopCenter, ()), abi.encode(center));
         vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.assetRouter, ()), abi.encode(router));
         vm.mockCall(
             bridgehub,

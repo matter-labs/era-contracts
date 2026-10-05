@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 /// @notice Only the registered L1 Interop Center can submit deposits to the L1 asset router.
@@ -19,7 +19,8 @@ contract L1AssetRouterAuthTest is Test {
 
     function setUp() public {
         router = new L1AssetRouter(makeAddr("weth"), bridgehub, makeAddr("nullifier"));
-        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.interopCenter, ()), abi.encode(interopCenter));
+        // Only the registry lookup is needed from the Bridgehub, so it is mocked rather than deployed.
+        vm.mockCall(bridgehub, abi.encodeCall(IL1Bridgehub.interopCenter, ()), abi.encode(interopCenter));
     }
 
     function test_RevertWhen_BridgehubCallsBridgehubDepositBaseToken() public {

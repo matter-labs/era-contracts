@@ -9,7 +9,6 @@ import {
     INDIRECT_CALL_MAGIC_VALUE
 } from "../../common/Config.sol";
 import {ChainIdNotRegistered, MsgValueMismatch, WrongMagicValue, ZeroAddress} from "../../common/L1ContractErrors.sol";
-import {CrossChainSenderAddressTooLow} from "../../core/bridgehub/L1BridgehubErrors.sol";
 import {BridgehubL2TransactionRequest, InteropCallStarter} from "../../common/Messaging.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
@@ -35,6 +34,7 @@ import {
     InteroperableAddressNotEmpty,
     AttributeAlreadySet,
     AttributeViolatesRestriction,
+    CrossChainSenderAddressTooLow,
     L1ToL2TransactionParamsMissing,
     SingleCallBundleRequired
 } from "../InteropErrors.sol";
@@ -152,6 +152,8 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
                 _attributes: _attributes
             });
         } else {
+            // As on L2, a direct call needs a recipient: value sent to the zero address would be lost.
+            require(_recipientAddress != address(0), ZeroAddress());
             actualRecipient = _recipientAddress;
             sendId = _sendDirect({
                 _destinationChainId: _destinationChainId,
@@ -162,8 +164,7 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
             });
         }
 
-        // For indirect calls the actual recipient is the destination-side contract constructed by the
-        // cross-chain sender, consistent with the `MessageSent` semantics of the L2InteropCenter.
+        // For an indirect call, `recipient` is the destination contract chosen by the cross-chain sender.
         emit MessageSent({
             sendId: sendId,
             sender: InteroperableAddress.formatEvmV1(block.chainid, msg.sender),
@@ -404,7 +405,7 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
             _interoperableAddress.length >= ERC7930_V1_MIN_LENGTH,
             InteroperableAddress.InteroperableAddressParsingError(_interoperableAddress)
         );
-        uint8 chainReferenceLength = uint8(_interoperableAddress[0x04]);
+        uint256 chainReferenceLength = uint8(_interoperableAddress[0x04]);
         require(
             _interoperableAddress.length >= ERC7930_V1_MIN_LENGTH + chainReferenceLength,
             InteroperableAddress.InteroperableAddressParsingError(_interoperableAddress)

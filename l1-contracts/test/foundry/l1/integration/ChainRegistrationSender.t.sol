@@ -158,7 +158,7 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
 
         uint256 userEthBefore = currentUser.balance;
 
-        bytes memory secondBridgeCallData = bytes.concat(
+        bytes memory indirectCallData = bytes.concat(
             CHAIN_REGISTRATION_SENDER_ENCODING_VERSION,
             abi.encode(currentChainId)
         );
@@ -170,7 +170,7 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
             _l2Value: 0,
             _l2GasLimit: l2GasLimit,
             _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            _indirectCallData: secondBridgeCallData
+            _indirectCallData: indirectCallData
         });
 
         vm.recordLogs();
@@ -200,10 +200,10 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
         );
         assertEq(uint256(baseTokenLog.topics[1]), zkChainIds[0], "Base token deposit event chainId mismatch");
 
-        // The TwoBridges path through ChainRegistrationSender does NOT update chainRegisteredOnChain.
+        // The indirect path through ChainRegistrationSender does NOT update chainRegisteredOnChain.
         assertFalse(
             addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]),
-            "chainRegisteredOnChain should remain false after TwoBridges deposit"
+            "chainRegisteredOnChain should remain false after an indirect send"
         );
     }
 

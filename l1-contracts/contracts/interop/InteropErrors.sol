@@ -17,6 +17,8 @@ error CallNotExecutable(bytes32 bundleHash, uint256 callIndex);
 error CannotInitiateInteropOnL1();
 // 0xf729f26d
 error CanNotUnbundle(bytes32 bundleHash);
+// 0xd7c176e8
+error CrossChainSenderAddressTooLow(address crossChainSender, address minCrossChainSender);
 // 0x2d159f39
 error DestinationChainNotRegistered(uint256 destinationChainId);
 // 0x43f0659c

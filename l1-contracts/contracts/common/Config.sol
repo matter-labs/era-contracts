@@ -187,8 +187,9 @@ uint256 constant PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
 /// @dev the address used to identify eth as the base token for chains.
 address constant ETH_TOKEN_ADDRESS = address(1);
 
-/// @dev Original indirect-call handshake marker; retained across the interface migration.
-bytes32 constant INDIRECT_CALL_MAGIC_VALUE = 0xa175e001c0e5684bc26302c2f9a55aec9f3936fe2aef558034003ef4da7fc77d;
+/// @dev The value an L1 cross-chain sender returns from `initiateIndirectCall`; it keeps the value of the
+/// original two-bridges handshake.
+bytes32 constant INDIRECT_CALL_MAGIC_VALUE = bytes32(uint256(keccak256("TWO_BRIDGES_MAGIC_VALUE")) - 1);
 
 /// @dev https://eips.ethereum.org/EIPS/eip-1352
 address constant MIN_CROSS_CHAIN_SENDER_ADDRESS = address(uint160(type(uint16).max));

@@ -26,7 +26,8 @@ There is no factory-dependencies attribute: priority transactions cannot carry t
 (see {protocol-docs/bridging.md#priority-transaction-factory-dependencies}). L1-only
 attributes are unsupported by the L2 parser, and L2-only attributes are unsupported on L1.
 
-Direct sends fund the base token and submit the destination call. For indirect sends,
+Direct sends fund the base token and submit the destination call; as on L2, they need a
+non-zero recipient. For indirect sends,
 the recipient identifies an L1 cross-chain sender. The center funds the base token,
 calls `initiateIndirectCall` to construct the destination call, submits it to the
 Mailbox, then calls `confirmL2Transaction` with the canonical hash. The priority
@@ -49,18 +50,20 @@ caller for approval and message submission.
 The L1 center is a transparent upgradeable proxy owned by ecosystem governance.
 Sends are permissionless, pausable by the owner and protected against reentry.
 The implementation is locked against initialization and initialization rejects a
-zero owner.
+zero owner. Pausing the Bridgehub no longer stops priority requests: pause the center
+(or the L1 asset router) to halt sends.
 
-Bridgehub stores `interopCenter` in the first slot of its reserved gap. Mailbox and
-the L1 senders resolve authorization through this registry. The extra lookup avoids
-duplicating configuration in every chain's diamond storage. Existing live storage
-fields retain their positions.
+`L1Bridgehub` stores `interopCenter` after the shared Bridgehub storage, so the L2
+Bridgehub is unchanged. Mailbox and the L1 senders resolve authorization through this
+registry. The extra lookup avoids duplicating configuration in every chain's diamond
+storage. Existing live storage fields retain their positions.
 
 PermanentRestriction recognizes chain migrations through indirect `sendMessage`
 and one-call `sendBundle`, validates the registered chain asset handler and enforces
 the migration-admin restriction. A direct message to the asset router is not a
-migration. Existing chain-admin restrictions must use this implementation before
-chain migrations are re-enabled.
+migration. The restriction consults the registry only for interop sends, so it can be
+upgraded before or after the Bridgehub; existing chain-admin restrictions must use this
+implementation before chain migrations are re-enabled.
 
 The L2 built-in is renamed to `interop-center/L2InteropCenter`. Its storage-bearing
 inheritance and executable runtime are unchanged. L1 and L2 share the send interface;
@@ -86,21 +89,23 @@ A center-introducing upgrade cannot combine `[new_gateway]` preparation: complet
 the ecosystem and gateway-chain upgrades, then run
 `protocol-ops chain gateway convert` separately.
 
-Core and CTM upgrade inputs must explicitly set `has_l1_interop_center`: use `true` when
-the core already has a center, even if its chains have not upgraded yet, and `false`
-for historical Bridgehubs without the getter. Discovery retains an existing proxy,
-and stage 1 upgrades its implementation.
+Core upgrade inputs must explicitly set `has_l1_interop_center`: use `true` when the
+core already has a center, even if its chains have not upgraded yet, and `false` for
+historical Bridgehubs without the getter. Discovery retains an existing proxy, and stage
+1 upgrades its implementation; `false` on an ecosystem that already has a center would
+deploy and register a replacement. The CTM upgrade does not use the center and never
+reads the getter.
 
 Deployment and upgrade output records
 `bridgehub.l1_interop_center_{implementation,proxy}_addr`; upgrade output also records
 `bridgehub.l1_interop_center_new_proxy` to identify an upgrade that introduces the
-center. Rust request decoding and simulation recognize the current send format.
+center. Rust request decoding and the governance simulator recognize `sendMessage`.
 
-The full `ecosystem verify-upgrade` CLI remains scoped to the historical combined
-v31 gateway ceremony. It rejects center-bearing artifacts before loading gateway
-configuration or contacting RPCs; `--display-upgrade-data` can still print their
-calldata without validating it. End-to-end verification of the center migration
-requires a separately supported ceremony and is not provided by that legacy CLI.
+`ecosystem verify-upgrade` only verifies ceremonies prepared before the center. Every
+upgrade prepared from this release on records the center outputs, and the verifier
+rejects such an artifact before loading gateway configuration or contacting RPCs;
+`--display-upgrade-data` can still print its calldata without validating it. Verifying
+the center's deployment and stage-1 calls needs verifier support that does not exist yet.
 
 This migration intentionally breaks the old Bridgehub request and cross-chain sender
 APIs. Integrators must discover `interopCenter()` and encode the attributes above;

@@ -25,11 +25,6 @@ struct BridgehubBurnCTMAssetData {
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IBridgehubBase {
-    /// @notice Authorized L1 priority-transaction entry point.
-    function interopCenter() external view returns (address);
-
-    event InteropCenterSet(address indexed interopCenter);
-
     /// @notice pendingAdmin is changed
     /// @dev Also emitted when new admin is accepted and in this case, `newPendingAdmin` would be zero address
     event NewPendingAdmin(address indexed oldPendingAdmin, address indexed newPendingAdmin);

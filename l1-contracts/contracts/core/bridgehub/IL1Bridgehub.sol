@@ -8,6 +8,12 @@ import {IBridgehubBase} from "./IBridgehubBase.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Interface for L1-specific Bridgehub functionality
 interface IL1Bridgehub is IBridgehubBase {
+    /// @notice Emitted when the L1 Interop Center is registered or replaced.
+    event InteropCenterSet(address indexed interopCenter);
+
+    /// @notice The L1 Interop Center authorized to submit priority transactions.
+    function interopCenter() external view returns (address);
+
     /// @notice Sets the authorized L1 Interop Center; owner or protocol upgrader only.
     /// @param _interopCenter The new L1 Interop Center.
     function setInteropCenter(address _interopCenter) external;

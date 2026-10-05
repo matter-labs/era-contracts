@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.28;
 
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
@@ -675,7 +674,7 @@ contract ExperimentalBridgeTest is ExperimentalBridgeTestBase {
     function test_setInteropCenter_ownerAndUpgrader() public {
         address center = makeAddr("replacementCenter");
         vm.expectEmit(true, false, false, true, address(bridgehub));
-        emit IBridgehubBase.InteropCenterSet(center);
+        emit IL1Bridgehub.InteropCenterSet(center);
         vm.prank(bridgeOwner);
         bridgehub.setInteropCenter(center);
         assertEq(bridgehub.interopCenter(), center);
@@ -691,5 +690,22 @@ contract ExperimentalBridgeTest is ExperimentalBridgeTestBase {
         vm.prank(bridgeOwner);
         bridgehub.setInteropCenter(address(0));
         assertEq(bridgehub.interopCenter(), address(l1InteropCenter));
+    }
+
+    /// @dev Only the first registration inherits a Bridgehub pause; a replacement is an explicit governance
+    ///      decision, and the replaced center loses its authority immediately.
+    function test_setInteropCenter_replacementWhilePausedRevokesThePreviousCenter() public {
+        address replacement = makeAddr("replacementCenter");
+        vm.startPrank(bridgeOwner);
+        bridgehub.pause();
+        bridgehub.setInteropCenter(replacement);
+        vm.stopPrank();
+        assertTrue(bridgehub.paused());
+        assertFalse(l1InteropCenter.paused());
+        assertEq(bridgehub.interopCenter(), replacement);
+
+        vm.prank(address(l1InteropCenter));
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(l1InteropCenter)));
+        sharedBridge.bridgehubDepositBaseToken(1, ETH_TOKEN_ASSET_ID, address(this), 1);
     }
 }

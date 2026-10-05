@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";
@@ -21,13 +21,15 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
 
     function setUp() public virtual {
         setupDiamondProxy();
+        // The Mailbox resolves its authorized caller through the Bridgehub registry; the registry
+        // itself is out of scope here, so it is mocked to name `l1InteropCenter`.
+        vm.mockCall(bridgehub, abi.encodeCall(IL1Bridgehub.interopCenter, ()), abi.encode(l1InteropCenter));
     }
 
     function test_success_withoutFilterer() public {
         address bridgehub = makeAddr("bridgehub");
 
         utilsFacet.util_setBridgehub(bridgehub);
-        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.interopCenter, ()), abi.encode(l1InteropCenter));
         utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
         utilsFacet.util_setPriorityTxMaxGasLimit(100000000);
 
@@ -44,7 +46,6 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
         TransactionFiltererTrue tf = new TransactionFiltererTrue();
 
         utilsFacet.util_setBridgehub(bridgehub);
-        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.interopCenter, ()), abi.encode(l1InteropCenter));
         utilsFacet.util_setTransactionFilterer(address(tf));
         utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
         utilsFacet.util_setPriorityTxMaxGasLimit(100000000);
@@ -61,7 +62,6 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
         BridgehubL2TransactionRequest memory req = getBridgehubRequestL2TransactionRequest();
         utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
         utilsFacet.util_setPriorityTxMaxGasLimit(req.l2GasLimit);
-        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.interopCenter, ()), abi.encode(l1InteropCenter));
 
         vm.recordLogs();
         vm.prank(l1InteropCenter);
@@ -93,7 +93,6 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
         req.factoryDeps[0] = _bytecode;
         bytes32 rootBefore = gettersFacet.getPriorityTreeRoot();
         uint256 countBefore = gettersFacet.getTotalPriorityTxs();
-        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.interopCenter, ()), abi.encode(l1InteropCenter));
 
         vm.prank(l1InteropCenter);
         vm.expectRevert(FactoryDepsNotSupported.selector);
@@ -108,7 +107,6 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
         TransactionFiltererFalse tf = new TransactionFiltererFalse();
 
         utilsFacet.util_setBridgehub(bridgehub);
-        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.interopCenter, ()), abi.encode(l1InteropCenter));
         utilsFacet.util_setTransactionFilterer(address(tf));
         utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
         utilsFacet.util_setPriorityTxMaxGasLimit(100000000);
@@ -124,7 +122,6 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
     function test_revertWhen_notL1InteropCenter() public {
         address bridgehub = makeAddr("bridgehub");
         utilsFacet.util_setBridgehub(bridgehub);
-        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.interopCenter, ()), abi.encode(l1InteropCenter));
         BridgehubL2TransactionRequest memory req = getBridgehubRequestL2TransactionRequest();
         vm.deal(bridgehub, 100 ether);
         vm.prank(address(sender));
@@ -135,7 +132,6 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
     function test_revertWhen_calledByL2InteropCenter() public {
         address bridgehub = makeAddr("bridgehub");
         utilsFacet.util_setBridgehub(bridgehub);
-        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.interopCenter, ()), abi.encode(l1InteropCenter));
 
         BridgehubL2TransactionRequest memory req = getBridgehubRequestL2TransactionRequest();
 
@@ -162,18 +158,15 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
         bytes32 oldRootHash = gettersFacet.getPriorityTreeRoot();
         assertEq(oldRootHash, bytes32(0), "root hash should be 0");
 
-        address oldBridgehub = address(bridgehub);
         address bridgehub = makeAddr("bridgehub");
 
         utilsFacet.util_setBridgehub(bridgehub);
-        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.interopCenter, ()), abi.encode(l1InteropCenter));
         utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
         utilsFacet.util_setPriorityTxMaxGasLimit(100000000);
 
         BridgehubL2TransactionRequest memory req = getBridgehubRequestL2TransactionRequest();
 
         vm.deal(interopCenter, 100 ether);
-        vm.mockCall(address(oldBridgehub), abi.encodeWithSignature("interopCenter()"), abi.encode(l1InteropCenter));
         vm.prank(l1InteropCenter);
         bytes32 canonicalTxHash = mailboxFacet.bridgehubRequestL2Transaction(req);
         assertTrue(canonicalTxHash != bytes32(0), "canonicalTxHash should not be 0");
@@ -185,7 +178,6 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
     function test_revertWhen_calledByBridgehub() public {
         address bridgehub = makeAddr("bridgehub");
         utilsFacet.util_setBridgehub(bridgehub);
-        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.interopCenter, ()), abi.encode(l1InteropCenter));
         BridgehubL2TransactionRequest memory request = getBridgehubRequestL2TransactionRequest();
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, bridgehub));
         vm.prank(bridgehub);

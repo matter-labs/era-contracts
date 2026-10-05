@@ -380,6 +380,12 @@ struct TokenBridgingData {
     address originToken;
 }
 
+/// @notice Destination call that an L1 cross-chain sender returns from `initiateIndirectCall`.
+/// @param magicValue Must equal `INDIRECT_CALL_MAGIC_VALUE`.
+/// @param l2Contract The destination contract.
+/// @param l2Calldata The destination calldata.
+/// @param factoryDeps Must be empty.
+/// @param txDataHash Commitment passed back to the sender in `confirmL2Transaction`.
 struct IndirectCallRequest {
     bytes32 magicValue;
     address l2Contract;

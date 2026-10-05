@@ -302,17 +302,26 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     /// @dev If any other error is returned, it is assumed to be out of gas or some other unexpected
     /// error that should be bubbled up by the caller.
     function _getNewAdminFromMigration(Call calldata _call) internal view returns (address, bool) {
-        if (_call.target != BRIDGE_HUB.interopCenter() || _call.data.length < 4) {
+        if (_call.data.length < 4) {
+            return (address(0), false);
+        }
+        bytes4 selector = bytes4(_call.data[:4]);
+        bool isSendMessage = selector == IERC7786GatewaySource.sendMessage.selector;
+        // The registry is consulted only for interop sends, so other calls stay valid while the
+        // Bridgehub does not expose the L1 Interop Center yet.
+        if (!isSendMessage && selector != IInteropCenterBase.sendBundle.selector) {
+            return (address(0), false);
+        }
+        if (_call.target != BRIDGE_HUB.interopCenter()) {
             return (address(0), false);
         }
 
         bytes memory recipient;
         bytes memory indirectCallData;
         bytes[] memory attributes;
-        bytes4 selector = bytes4(_call.data[:4]);
-        if (selector == IERC7786GatewaySource.sendMessage.selector) {
+        if (isSendMessage) {
             (recipient, indirectCallData, attributes) = abi.decode(_call.data[4:], (bytes, bytes, bytes[]));
-        } else if (selector == IInteropCenterBase.sendBundle.selector) {
+        } else {
             (, InteropCallStarter[] memory calls, ) = abi.decode(
                 _call.data[4:],
                 (bytes, InteropCallStarter[], bytes[])
@@ -323,8 +332,6 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
             recipient = calls[0].to;
             indirectCallData = calls[0].data;
             attributes = calls[0].callAttributes;
-        } else {
-            return (address(0), false);
         }
         if (!_hasIndirectCallAttribute(attributes)) {
             return (address(0), false);
@@ -375,6 +382,10 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
 
         return (l2Admin, true);
     }
+
+    /// @notice Whether the attributes select an indirect call, i.e. route the message through a cross-chain sender.
+    /// @param _attributes The call attributes of an L1 Interop Center send.
+    /// @return True if one of the attributes is a well-formed `indirectCall`.
     function _hasIndirectCallAttribute(bytes[] memory _attributes) private pure returns (bool) {
         uint256 attributesLength = _attributes.length;
         for (uint256 i = 0; i < attributesLength; ++i) {

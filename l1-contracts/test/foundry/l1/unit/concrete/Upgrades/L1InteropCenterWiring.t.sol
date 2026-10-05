@@ -12,7 +12,6 @@ import {Call} from "contracts/governance/Common.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {L1InteropCenter} from "contracts/interop/interop-center/L1InteropCenter.sol";
 import {InteropCenterNotPaused} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 contract L1InteropCenterWiringHarness is CoreUpgrade_v33 {
@@ -140,7 +139,7 @@ contract L1InteropCenterWiringTest is Test {
         vm.expectEmit(true, true, false, true, address(center));
         emit OwnershipTransferred(makeAddr("deployer"), address(this));
         vm.expectEmit(true, false, false, true, address(bridgehub));
-        emit IBridgehubBase.InteropCenterSet(address(center));
+        emit IL1Bridgehub.InteropCenterSet(address(center));
         this.executeCalls(calls);
         assertEq(center.owner(), address(this));
         assertEq(bridgehub.interopCenter(), address(center));

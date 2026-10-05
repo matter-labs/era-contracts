@@ -5,6 +5,7 @@ pragma solidity 0.8.28;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
 import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
 import {IndirectCallRequest} from "../../common/Messaging.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IL1CrossChainSender} from "../../bridge/interfaces/IL1CrossChainSender.sol";
@@ -37,8 +38,9 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
 
     /// @notice Checks that the caller is the registered L1 Interop Center.
     modifier onlyL1InteropCenter() {
-        if (msg.sender != BRIDGE_HUB.interopCenter()) {
-            revert OnlyL1InteropCenter(msg.sender, BRIDGE_HUB.interopCenter());
+        address interopCenter = IL1Bridgehub(address(BRIDGE_HUB)).interopCenter();
+        if (msg.sender != interopCenter) {
+            revert OnlyL1InteropCenter(msg.sender, interopCenter);
         }
         _;
     }
@@ -92,7 +94,6 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
     }
 
     /// @inheritdoc IL1CrossChainSender
-    // Payable for interface compatibility; every nonzero msg.value reverts below.
     // slither-disable-next-line locked-ether
     function initiateIndirectCall(
         uint256,

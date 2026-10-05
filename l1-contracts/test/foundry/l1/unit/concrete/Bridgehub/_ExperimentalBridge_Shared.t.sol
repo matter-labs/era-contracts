@@ -7,13 +7,10 @@ import {console2 as console} from "forge-std/Script.sol";
 
 import {Test} from "forge-std/Test.sol";
 
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {L1InteropCenter} from "contracts/interop/interop-center/L1InteropCenter.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
-import {IInteropCenter, L2InteropCenter} from "contracts/interop/interop-center/L2InteropCenter.sol";
-import {ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
 import {
     L1L2MessageParams,
     L1L2IndirectMessageParams
@@ -27,11 +24,7 @@ import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 
-import {BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
-import {
-    L2_COMPLEX_UPGRADER_ADDR,
-    L2_NATIVE_TOKEN_VAULT_ADDR
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
 import {Utils} from "../Utils/Utils.sol";
@@ -54,7 +47,6 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 abstract contract ExperimentalBridgeTestBase is Test {
     address internal weth;
     L1Bridgehub internal bridgehub;
-    IInteropCenter internal interopCenter;
     L1InteropCenter internal l1InteropCenter;
     DummyBridgehubSetter internal dummyBridgehub;
     address public bridgeOwner;
@@ -69,7 +61,7 @@ abstract contract ExperimentalBridgeTestBase is Test {
     address internal sharedBridgeAddress;
     address internal crossChainSender;
     address internal l1NullifierAddress;
-    L1AssetRouter internal secondBridge;
+    L1AssetRouter internal crossChainSenderRouter;
     TestnetERC20Token internal testToken;
     L1NativeTokenVault internal ntv;
     IMessageRootBase internal messageRoot;
@@ -87,8 +79,6 @@ abstract contract ExperimentalBridgeTestBase is Test {
 
     address internal mockL2Contract;
 
-    uint256 internal l1ChainId;
-    uint256 internal zkTokenOriginChainId;
     uint256 internal gatewayChainId;
 
     address internal deployerAddress;
@@ -115,8 +105,6 @@ abstract contract ExperimentalBridgeTestBase is Test {
     }
 
     function setUp() public {
-        l1ChainId = 1;
-        zkTokenOriginChainId = 320;
         gatewayChainId = 506;
         deployerAddress = makeAddr("DEPLOYER_ADDRESS");
         bridgeOwner = makeAddr("BRIDGE_OWNER");
@@ -133,13 +121,6 @@ abstract contract ExperimentalBridgeTestBase is Test {
         );
         vm.prank(bridgeOwner);
         bridgehub.setInteropCenter(address(l1InteropCenter));
-        interopCenter = new L2InteropCenter();
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        interopCenter.initL2(
-            l1ChainId,
-            bridgeOwner,
-            DataEncoding.encodeNTVAssetId(zkTokenOriginChainId, makeAddr("zkToken"))
-        );
         messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
@@ -187,10 +168,10 @@ abstract contract ExperimentalBridgeTestBase is Test {
         );
 
         sharedBridge = _deployAssetRouter(mockL1WethAddress);
-        secondBridge = _deployAssetRouter(mockL1WethAddress);
+        crossChainSenderRouter = _deployAssetRouter(mockL1WethAddress);
 
         sharedBridgeAddress = address(sharedBridge);
-        crossChainSender = address(secondBridge);
+        crossChainSender = address(crossChainSenderRouter);
         testToken18 = new TestnetERC20Token("ZKSTT", "ZkSync Test Token", 18);
         testToken6 = new TestnetERC20Token("USDC", "USD Coin", 6);
         testToken8 = new TestnetERC20Token("WBTC", "Wrapped Bitcoin", 8);
@@ -292,6 +273,8 @@ abstract contract ExperimentalBridgeTestBase is Test {
         bytes memory mockL2Calldata,
         uint256 mockL2GasLimit
     ) internal returns (L1L2MessageParams memory l2TxnReqDirect, bytes32 canonicalHash) {
+        // The L1 Interop Center rejects direct calls without a recipient.
+        vm.assume(_mockL2Contract != address(0));
         l2TxnReqDirect = _createMockL2TransactionRequestDirect({
             mockChainId: mockChainId,
             mockMintValue: mockMintValue,
@@ -353,48 +336,6 @@ abstract contract ExperimentalBridgeTestBase is Test {
         return l2Req;
     }
 
-    function _createNewChainInitData(
-        bool isFreezable,
-        bytes4[] memory mockSelectors,
-        address, //mockInitAddress,
-        bytes memory //mockInitCalldata
-    ) internal returns (bytes memory) {
-        bytes4[] memory singleSelector = new bytes4[](1);
-        singleSelector[0] = bytes4(0xabcdef12);
-
-        Diamond.FacetCut memory facetCut;
-        Diamond.DiamondCutData memory diamondCutData;
-
-        facetCut.facet = address(this); // for a random address, it will fail the check of _facet.code.length > 0
-        facetCut.action = Diamond.Action.Add;
-        facetCut.isFreezable = isFreezable;
-        if (mockSelectors.length == 0) {
-            mockSelectors = singleSelector;
-        }
-        facetCut.selectors = mockSelectors;
-
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
-        facetCuts[0] = facetCut;
-
-        diamondCutData.facetCuts = facetCuts;
-        diamondCutData.initAddress = address(0);
-        diamondCutData.initCalldata = "";
-
-        ChainCreationParams memory params = ChainCreationParams({
-            diamondCut: diamondCutData,
-            // Just some dummy values:
-            genesisUpgrade: address(0x01),
-            genesisBatchHash: bytes32(uint256(0x01)),
-            genesisIndexRepeatedStorageChanges: uint64(0x01),
-            genesisBatchCommitment: bytes32(uint256(0x01)),
-            forceDeploymentsData: bytes("")
-        });
-
-        mockCTM.setChainCreationParams(params);
-
-        return abi.encode(abi.encode(diamondCutData), bytes(""));
-    }
-
     function _setUpZKChainForChainId(uint256 _chainId, address _baseToken) internal returns (uint256 chainId) {
         chainId = bound(_chainId, 1, type(uint48).max);
         vm.assume(chainId != block.chainid);
@@ -454,33 +395,5 @@ abstract contract ExperimentalBridgeTestBase is Test {
         l2TxnReqDirect.refundRecipient = mockRefundRecipient;
 
         return l2TxnReqDirect;
-    }
-
-    function _createBhL2TxnRequest(
-        bytes[] memory mockFactoryDepsBH
-    ) internal returns (BridgehubL2TransactionRequest memory) {
-        BridgehubL2TransactionRequest memory bhL2TxnRequest;
-
-        bhL2TxnRequest.sender = makeAddr("BH_L2_REQUEST_SENDER");
-        bhL2TxnRequest.contractL2 = makeAddr("BH_L2_REQUEST_CONTRACT");
-        bhL2TxnRequest.mintValue = block.timestamp;
-        bhL2TxnRequest.l2Value = block.timestamp * 2;
-        bhL2TxnRequest.l2Calldata = abi.encode("mock L2 Calldata");
-        bhL2TxnRequest.l2GasLimit = block.timestamp * 3;
-        bhL2TxnRequest.l2GasPerPubdataByteLimit = block.timestamp * 4;
-        bhL2TxnRequest.factoryDeps = mockFactoryDepsBH;
-        bhL2TxnRequest.refundRecipient = makeAddr("BH_L2_REQUEST_REFUND_RECIPIENT");
-
-        return bhL2TxnRequest;
-    }
-
-    function _restrictArraySize(bytes[] memory longArray, uint256 newSize) internal pure returns (bytes[] memory) {
-        bytes[] memory shortArray = new bytes[](newSize);
-
-        for (uint256 i; i < newSize; i++) {
-            shortArray[i] = longArray[i];
-        }
-
-        return shortArray;
     }
 }

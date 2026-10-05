@@ -9,6 +9,7 @@ import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {IL1CrossChainSender} from "../../bridge/interfaces/IL1CrossChainSender.sol";
 
 import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
 import {IndirectCallRequest} from "../../common/Messaging.sol";
 import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 
@@ -45,7 +46,7 @@ contract ChainRegistrationSender is
 
     /// @notice Checks that the caller is the registered L1 Interop Center.
     modifier onlyL1InteropCenter() {
-        if (msg.sender != BRIDGE_HUB.interopCenter()) {
+        if (msg.sender != IL1Bridgehub(address(BRIDGE_HUB)).interopCenter()) {
             revert Unauthorized(msg.sender);
         }
         _;

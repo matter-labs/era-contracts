@@ -151,7 +151,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
     /// @param _assetId The encoding of asset ID.
     /// @param _assetHandlerAddressOnCounterpart The address of the asset handler, which will hold the token of interest.
-    /// @return request The tx request sent to the Bridgehub
+    /// @return request The destination call returned to the L1 Interop Center.
     function _setAssetHandlerAddressOnCounterpart(
         uint256 _chainId,
         address _originalCaller,

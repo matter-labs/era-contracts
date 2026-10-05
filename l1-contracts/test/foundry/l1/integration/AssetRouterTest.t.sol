@@ -408,7 +408,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         assertEq(IERC20(tokenL1Address).allowance(randomCaller, address(addresses.l1NativeTokenVault)), 100);
 
         {
-            L1L2IndirectMessageParams memory l2TxnReqTwoBridges = L1L2IndirectMessageParams({
+            L1L2IndirectMessageParams memory indirectRequest = L1L2IndirectMessageParams({
                 chainId: eraZKChainId,
                 mintValue: 250000000000100,
                 l2Value: 0,
@@ -420,7 +420,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
                 indirectCallData: indirectCallData
             });
 
-            bytes memory calldataForExecutor = L1InteropRequests.encodeIndirectCalldata(l2TxnReqTwoBridges);
+            bytes memory calldataForExecutor = L1InteropRequests.encodeIndirectCalldata(indirectRequest);
 
             vm.signAndAttachDelegation(address(simpleExecutor), randomCallerPk);
 

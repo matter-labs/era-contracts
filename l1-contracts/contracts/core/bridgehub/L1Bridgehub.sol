@@ -22,6 +22,7 @@ import {
     IncorrectBridgeHubAddress,
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Registry for chains, state transition managers, base tokens and the L1 Interop Center.
@@ -38,15 +39,15 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     /// This is a temporary security measure.
     uint256 public immutable MAX_NUMBER_OF_ZK_CHAINS;
 
+    /// @inheritdoc IL1Bridgehub
+    address public override interopCenter;
+
     /// @notice to avoid parity hack
     constructor(address _owner, uint256 _maxNumberOfZKChains) reentrancyGuardInitializer {
         L1_CHAIN_ID = block.chainid;
         _disableInitializers();
         MAX_NUMBER_OF_ZK_CHAINS = _maxNumberOfZKChains;
 
-        // Note that this assumes that the bridgehub only accepts transactions on chains with ETH base token only.
-        // This is indeed true, since the only methods where this immutable is used are the ones on L1Bridgehub.
-        // We will change this with interop.
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         _transferOwnership(_owner);
         _initializeInner();

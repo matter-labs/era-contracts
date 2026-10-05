@@ -187,9 +187,8 @@ contract BridgehubInvariantTests1 is SharedBridgehubWithdrawal {
             contractAddress = receiver;
         } else {
             (tokenAddress, toSend, receiver) = abi.decode(request.transaction.data, (address, uint256, address));
+            assertEq(contractAddress, receiver);
         }
-
-        assertEq(contractAddress, receiver);
 
         if (tokenAddress == ETH_TOKEN_ADDRESS) {
             uint256 balanceBefore = contractAddress.balance;

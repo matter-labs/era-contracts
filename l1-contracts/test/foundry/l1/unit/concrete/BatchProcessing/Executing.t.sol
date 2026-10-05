@@ -240,7 +240,7 @@ contract ExecutingTest is ExecutorTest {
             L1L2MessageParams({
                 chainId: l2ChainId,
                 mintValue: totalCost,
-                l2Contract: address(0),
+                l2Contract: makeAddr("l2Contract"),
                 l2Value: l2Value,
                 l2Calldata: bytes(""),
                 l2GasLimit: l2GasLimit,

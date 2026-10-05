@@ -20,6 +20,9 @@ import {L1InteropCenter} from "contracts/interop/interop-center/L1InteropCenter.
 import {
     AttributeAlreadySet,
     AttributeViolatesRestriction,
+    CrossChainSenderAddressTooLow,
+    InteroperableAddressChainReferenceNotEmpty,
+    InteroperableAddressNotEmpty,
     L1ToL2TransactionParamsMissing,
     SingleCallBundleRequired
 } from "contracts/interop/InteropErrors.sol";
@@ -31,12 +34,12 @@ import {
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     INDIRECT_CALL_MAGIC_VALUE
 } from "contracts/common/Config.sol";
-import {CrossChainSenderAddressTooLow} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 import {
     ChainIdNotRegistered,
     MsgValueMismatch,
     Unauthorized,
-    WrongMagicValue
+    WrongMagicValue,
+    ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
 import {BridgehubL2TransactionRequest, InteropCallStarter} from "contracts/common/Messaging.sol";
 import {IAssetRouterShared} from "contracts/bridge/asset-router/IAssetRouterShared.sol";
@@ -180,7 +183,7 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
         assertEq(ntv.bridgedOut(tokenAssetId), mintValue);
     }
 
-    function test_requestTransactionIndirectChecksMagicValue(
+    function test_sendMessage_indirectChecksMagicValue(
         uint256 chainId,
         uint256 mintValue,
         uint256 l2Value,
@@ -228,6 +231,7 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
             txDataHash: bytes32(0)
         });
 
+        // A misbehaving cross-chain sender is simulated by mocking the real one's reply.
         vm.mockCall(
             crossChainSender,
             abi.encodeWithSelector(IL1CrossChainSender.initiateIndirectCall.selector),
@@ -261,7 +265,7 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
             magicValue: INDIRECT_CALL_MAGIC_VALUE,
             l2Contract: makeAddr("L2_CONTRACT"),
             l2Calldata: abi.encodeCall(SimpleExecutor.execute, (makeAddr("TARGET"), 0, hex"1234")),
-            factoryDeps: _singleFactoryDependency(),
+            factoryDeps: new bytes[](0),
             txDataHash: keccak256("TX_DATA")
         });
         bytes32 canonicalHash = keccak256("CANONICAL_TX_HASH");
@@ -324,11 +328,13 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
             magicValue: INDIRECT_CALL_MAGIC_VALUE,
             l2Contract: makeAddr("L2_CONTRACT"),
             l2Calldata: abi.encodeCall(SimpleExecutor.execute, (makeAddr("TARGET"), 0, hex"1234")),
-            factoryDeps: _singleFactoryDependency(),
+            factoryDeps: new bytes[](0),
             txDataHash: keccak256("TX_DATA")
         });
         bytes32 canonicalHash = keccak256("CANONICAL_TX_HASH");
 
+        // As in the `sendMessage` variant, the sender and Mailbox are mocked to isolate the center's routing;
+        // their exact calls are asserted by `_expectIndirectCalls`.
         vm.mockCall(
             crossChainSender,
             abi.encodeWithSelector(IL1CrossChainSender.initiateIndirectCall.selector),
@@ -376,11 +382,6 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
             _canonicalHash: canonicalHash,
             _attributes: callAttributes
         });
-    }
-
-    function _singleFactoryDependency() private pure returns (bytes[] memory factoryDeps) {
-        factoryDeps = new bytes[](1);
-        factoryDeps[0] = hex"010203";
     }
 
     function _assertMessageSent(
@@ -498,38 +499,8 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
         address randomCaller = makeAddr("RANDOM_CALLER");
         vm.deal(randomCaller, callerMsgValue);
 
-        mockChainContract.setBridgeHubAddress(address(bridgehub));
-
-        bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
-
-        vm.mockCall(
-            address(mockChainContract),
-            abi.encodeWithSelector(mockChainContract.bridgehubRequestL2Transaction.selector),
-            abi.encode(canonicalHash)
-        );
-
-        IndirectCallRequest memory outputRequest = IndirectCallRequest({
-            magicValue: INDIRECT_CALL_MAGIC_VALUE,
-            l2Contract: address(0),
-            l2Calldata: abi.encode(""),
-            factoryDeps: new bytes[](0),
-            txDataHash: bytes32("")
-        });
         crossChainSenderValue = uint160(bound(uint256(crossChainSenderValue), 0, uint256(type(uint16).max)));
         address crossChainSender = address(crossChainSenderValue);
-
-        vm.mockCall(
-            address(crossChainSenderValue),
-            l2TxnReq2BridgeOut.indirectCallValue,
-            abi.encodeWithSelector(
-                IL1CrossChainSender.initiateIndirectCall.selector,
-                l2TxnReq2BridgeOut.chainId,
-                randomCaller,
-                l2TxnReq2BridgeOut.l2Value,
-                l2TxnReq2BridgeOut.indirectCallData
-            ),
-            abi.encode(outputRequest)
-        );
 
         l2TxnReq2BridgeOut.crossChainSender = address(crossChainSenderValue);
         uint256 sentValue = randomCaller.balance;
@@ -781,22 +752,91 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
         );
     }
 
-    function test_pause_blocksSendMessageUntilOwnerUnpauses() public {
+    function test_pause_blocksSendsUntilOwnerUnpauses() public {
         _useMockSharedBridge();
         _initializeBridgehub();
+
+        address caller = makeAddr("PAUSED_CALLER");
+        (L1L2MessageParams memory request, bytes32 canonicalHash) = _prepareETHL2TransactionDirectRequest({
+            mockChainId: 501,
+            mockMintValue: 1 ether,
+            _mockL2Contract: makeAddr("L2_CONTRACT"),
+            mockL2Value: 0,
+            mockL2Calldata: hex"",
+            mockL2GasLimit: 1_000_000
+        });
+        (bytes memory recipient, bytes memory payload, bytes[] memory attributes) = L1InteropRequests.encodeDirect(
+            request
+        );
+        vm.deal(caller, request.mintValue);
 
         vm.prank(bridgeOwner);
         l1InteropCenter.pause();
         assertTrue(l1InteropCenter.paused());
 
+        vm.prank(caller);
         vm.expectRevert("Pausable: paused");
-        l1InteropCenter.sendMessage(hex"", hex"", new bytes[](0));
+        l1InteropCenter.sendMessage{value: request.mintValue}(recipient, payload, attributes);
         vm.expectRevert("Pausable: paused");
         l1InteropCenter.sendBundle(hex"", new InteropCallStarter[](0), new bytes[](0));
 
         vm.prank(bridgeOwner);
         l1InteropCenter.unpause();
         assertFalse(l1InteropCenter.paused());
+
+        vm.prank(caller);
+        assertEq(l1InteropCenter.sendMessage{value: request.mintValue}(recipient, payload, attributes), canonicalHash);
+    }
+
+    function test_pauseAndUnpause_RevertWhen_notOwner() public {
+        address notOwner = makeAddr("NOT_OWNER");
+        vm.prank(notOwner);
+        vm.expectRevert("Ownable: caller is not the owner");
+        l1InteropCenter.pause();
+        vm.prank(notOwner);
+        vm.expectRevert("Ownable: caller is not the owner");
+        l1InteropCenter.unpause();
+    }
+
+    function test_sendMessage_RevertWhen_directRecipientIsEmpty() public {
+        _useMockSharedBridge();
+        _initializeBridgehub();
+        uint256 chainId = _setUpZKChainForChainId(501, ETH_TOKEN_ADDRESS);
+        bytes[] memory attributes = new bytes[](1);
+        attributes[0] = abi.encodeCall(IERC7786Attributes.l1ToL2TransactionParams, (1, 1_000_000, 800, address(0)));
+
+        // Both an absent address and an explicit zero address would leave the value unclaimable on L2.
+        vm.expectRevert(ZeroAddress.selector);
+        l1InteropCenter.sendMessage{value: 1}(InteroperableAddress.formatEvmV1(chainId), hex"", attributes);
+        vm.expectRevert(ZeroAddress.selector);
+        l1InteropCenter.sendMessage{value: 1}(InteroperableAddress.formatEvmV1(chainId, address(0)), hex"", attributes);
+    }
+
+    function test_sendMessage_RevertWhen_recipientIsNotAnEvmAddress() public {
+        bytes[] memory attributes = new bytes[](1);
+        attributes[0] = abi.encodeCall(IERC7786Attributes.l1ToL2TransactionParams, (0, 0, 0, address(0)));
+        // A truncated ERC-7930 header.
+        bytes memory recipient = hex"00010000";
+
+        vm.expectRevert(
+            abi.encodeWithSelector(InteroperableAddress.InteroperableAddressParsingError.selector, recipient)
+        );
+        l1InteropCenter.sendMessage(recipient, hex"", attributes);
+    }
+
+    function test_sendBundle_RevertWhen_destinationHasAnAddress() public {
+        bytes memory destination = InteroperableAddress.formatEvmV1(DESTINATION_CHAIN_ID, makeAddr("RECIPIENT"));
+
+        vm.expectRevert(abi.encodeWithSelector(InteroperableAddressNotEmpty.selector, destination));
+        l1InteropCenter.sendBundle(destination, _emptyBundleCall(), new bytes[](0));
+    }
+
+    function test_sendBundle_RevertWhen_callTargetHasAChainReference() public {
+        InteropCallStarter[] memory calls = _emptyBundleCall();
+        calls[0].to = InteroperableAddress.formatEvmV1(DESTINATION_CHAIN_ID, makeAddr("RECIPIENT"));
+
+        vm.expectRevert(abi.encodeWithSelector(InteroperableAddressChainReferenceNotEmpty.selector, calls[0].to));
+        l1InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(DESTINATION_CHAIN_ID), calls, new bytes[](0));
     }
 
     function test_sendMessage_direct_emitsMessageSent(

@@ -7,7 +7,6 @@ import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/Enumerable
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
-import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {IBridgehubBase} from "./IBridgehubBase.sol";
 
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
@@ -17,6 +16,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 
 import {TokenBridgingData, TxStatus} from "../../common/Messaging.sol";
+import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
 import {AlreadyCurrentSL, NotChainAssetHandler, SLNotWhitelisted} from "./L1BridgehubErrors.sol";
@@ -128,11 +128,12 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
     /// @dev If the Bridgehub is on L2 the address is aliased.
     address public chainRegistrationSender;
 
-    /// @notice Authorized L1 priority-transaction entry point.
-    address public override interopCenter;
-
-    // One slot from the original 36-slot gap stores the L1 Interop Center.
-    uint256[35] private __gap;
+    /**
+     * @dev This empty reserved space is put in place to allow future versions to add new
+     * variables without shifting down storage in the inheritance chain.
+     * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
+     */
+    uint256[36] private __gap;
 
     modifier onlyOwnerOrAdmin() {
         if (msg.sender != admin && msg.sender != owner()) {

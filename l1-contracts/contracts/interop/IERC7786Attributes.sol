@@ -6,7 +6,7 @@ import {AtomicFlowPreimage} from "../atomic-interop/IAtomicInterop.sol";
 
 /// @title IERC7786Attributes
 /// @notice Interface for the ERC7786 gateway source
-/// @dev When adding/removing a function here the InteropCenter must be updated to reflect the changes.
+/// @dev When adding/removing a function here the L1InteropCenter and L2InteropCenter must be updated to reflect the changes.
 /// https://github.com/ethereum/ERCs/blob/023a7d657666308568d3d1391c578d5972636093/ERCS/erc-7786.md
 interface IERC7786Attributes {
     /// @notice Supplies the priority-transaction parameters for an L1 send.

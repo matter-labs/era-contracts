@@ -9,6 +9,7 @@ import {
     CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION
 } from "contracts/core/ctm-deployment/CTMDeploymentTracker.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IndirectCallRequest} from "contracts/common/Messaging.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -35,9 +36,11 @@ contract CTMDeploymentTrackerExtendedTest is Test {
         owner = makeAddr("owner");
         proxyAdmin = makeAddr("proxyAdmin");
         bridgehub = makeAddr("bridgehub");
+        // The tracker authorizes the L1 Interop Center through the Bridgehub registry, which this unit
+        // suite does not deploy.
         vm.mockCall(
             bridgehub,
-            abi.encodeWithSelector(IBridgehubBase.interopCenter.selector),
+            abi.encodeWithSelector(IL1Bridgehub.interopCenter.selector),
             abi.encode(makeAddr("l1InteropCenter"))
         );
         assetRouter = makeAddr("assetRouter");
@@ -66,17 +69,17 @@ contract CTMDeploymentTrackerExtendedTest is Test {
         assertEq(address(ctmDeploymentTracker.L1_ASSET_ROUTER()), assetRouter);
     }
 
-    function test_OnlyL1InteropCenter_RevertWhen_NotBridgehub() public {
-        address notBridgehub = makeAddr("notBridgehub");
+    function test_OnlyL1InteropCenter_RevertWhen_NotInteropCenter() public {
+        address notInteropCenter = makeAddr("notInteropCenter");
         uint256 chainId = 123;
         bytes memory data = abi.encodePacked(
             CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION,
             abi.encode(address(0), address(0))
         );
 
-        vm.prank(notBridgehub);
+        vm.prank(notInteropCenter);
         vm.expectRevert(
-            abi.encodeWithSelector(OnlyL1InteropCenter.selector, notBridgehub, makeAddr("l1InteropCenter"))
+            abi.encodeWithSelector(OnlyL1InteropCenter.selector, notInteropCenter, makeAddr("l1InteropCenter"))
         );
         ctmDeploymentTracker.initiateIndirectCall(chainId, owner, 0, data);
     }
@@ -142,15 +145,15 @@ contract CTMDeploymentTrackerExtendedTest is Test {
         ctmDeploymentTracker.confirmL2Transaction(chainId, txDataHash, txHash);
     }
 
-    function test_ConfirmL2Transaction_RevertWhen_NotBridgehub() public {
-        address notBridgehub = makeAddr("notBridgehub");
+    function test_ConfirmL2Transaction_RevertWhen_NotInteropCenter() public {
+        address notInteropCenter = makeAddr("notInteropCenter");
         uint256 chainId = 123;
         bytes32 txDataHash = keccak256("txDataHash");
         bytes32 txHash = keccak256("txHash");
 
-        vm.prank(notBridgehub);
+        vm.prank(notInteropCenter);
         vm.expectRevert(
-            abi.encodeWithSelector(OnlyL1InteropCenter.selector, notBridgehub, makeAddr("l1InteropCenter"))
+            abi.encodeWithSelector(OnlyL1InteropCenter.selector, notInteropCenter, makeAddr("l1InteropCenter"))
         );
         ctmDeploymentTracker.confirmL2Transaction(chainId, txDataHash, txHash);
     }
