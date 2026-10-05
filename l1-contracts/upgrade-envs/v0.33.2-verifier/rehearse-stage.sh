@@ -4,8 +4,8 @@
 #   1. the CREATE2 deployments from `[deploy_calls]`, sent by `[deploy_calls].deployer`
 #   2. governance stages 0/1/2 as the Governance owner's `scheduleTransparent` + `execute`
 #      (`[governance_operations]`), impersonated
-#   3. per chain: `ServerNotifier.setUpgradeTimestamp`, then `[chain_upgrades.<id>].chain_admin_calldata`,
-#      both through the chain's ChainAdmin. A chain with committed-but-unexecuted batches at the fork
+#   3. per chain, the committed bundles in output/stage/chain-upgrades/<id>/: 01 (`setUpgradeTimestamp`)
+#      then 02 (the cut), both through the chain's ChainAdmin. A chain with committed-but-unexecuted batches at the fork
 #      block must refuse the cut (`NotAllBatchesExecuted`); every other chain must upgrade
 #   4. `[test_upgrade_calls].test_create_chain_zkos` as the bridgehub admin
 #   5. assertions: versions, verifiers, VK, stored cut hash, facets and creation params unchanged,
@@ -112,8 +112,8 @@ chk "creation params carried to the new version" "$(call "$CTM" 'newChainCreatio
 chk "migrations unpaused again" "$(call "$CAH" 'migrationPaused()(bool)')" "false"
 
 # ---------------------------------------------------------------- 3. chains
-SERVER_NOTIFIER=$(call "$CTM" 'serverNotifierAddress()(address)')
-NOW=$(cast block --rpc-url "$RPC" -f timestamp)
+# The single transaction of a Safe bundle: "<to> <data>".
+bundle_tx() { python3 -c "import glob,json,sys; t=json.load(open(glob.glob(sys.argv[1])[0]))['transactions']; assert len(t)==1, t; print(t[0]['to'], t[0]['data'])" "$1"; }
 UPGRADED=0
 for CHAIN_ID in $(python3 -c "import tomllib; print(' '.join(tomllib.load(open('$OUT','rb'))['chain_upgrades']))"); do
   CHAIN=$(toml_get chain_upgrades.$CHAIN_ID.chain)
@@ -122,10 +122,12 @@ for CHAIN_ID in $(python3 -c "import tomllib; print(' '.join(tomllib.load(open('
   FACETS_BEFORE=$(cast call "$CHAIN" 'facetAddresses()(address[])' --rpc-url "$RPC")
   COMMITTED=$(call "$CHAIN" 'getTotalBatchesCommitted()(uint256)')
   EXECUTED=$(call "$CHAIN" 'getTotalBatchesExecuted()(uint256)')
-  TS_CALLDATA=$(cast calldata 'multicall((address,uint256,bytes)[],bool)' \
-    "[($SERVER_NOTIFIER,0,$(cast calldata 'setUpgradeTimestamp(uint256,uint256)' "$CHAIN_ID" "$NOW"))]" true)
-  st=$(send "$OWNER" "$ADMIN" "$TS_CALLDATA"); [ "$st" = "0x1" ] || fail "chain $CHAIN_ID setUpgradeTimestamp failed"
-  st=$(send "$OWNER" "$ADMIN" "$(toml_get chain_upgrades.$CHAIN_ID.chain_admin_calldata)")
+  read -r TS_TO TS_DATA < <(bundle_tx "$HERE/output/stage/chain-upgrades/$CHAIN_ID/01_*.safe.json")
+  read -r CUT_TO CUT_DATA < <(bundle_tx "$HERE/output/stage/chain-upgrades/$CHAIN_ID/02_*.safe.json")
+  chk "chain $CHAIN_ID bundles go to its ChainAdmin" "$TS_TO $CUT_TO" "$ADMIN $ADMIN"
+  chk "chain $CHAIN_ID cut bundle = chain_admin_calldata" "$CUT_DATA" "$(toml_get chain_upgrades.$CHAIN_ID.chain_admin_calldata)"
+  st=$(send "$OWNER" "$ADMIN" "$TS_DATA"); [ "$st" = "0x1" ] || fail "chain $CHAIN_ID setUpgradeTimestamp failed"
+  st=$(send "$OWNER" "$ADMIN" "$CUT_DATA")
   if [ "$COMMITTED" = "$EXECUTED" ]; then
     echo "chain $CHAIN_ID (batches $EXECUTED/$COMMITTED executed): upgrade status $st"
     [ "$st" = "0x1" ] || fail "chain $CHAIN_ID upgrade failed"
@@ -135,7 +137,7 @@ for CHAIN_ID in $(python3 -c "import tomllib; print(' '.join(tomllib.load(open('
     UPGRADED=$((UPGRADED + 1))
   else
     echo "chain $CHAIN_ID (batches $EXECUTED/$COMMITTED executed): upgrade status $st, must wait for its batches"
-    REVERT=$(cast call --from "$OWNER" "$ADMIN" "$(toml_get chain_upgrades.$CHAIN_ID.chain_admin_calldata)" --rpc-url "$RPC" 2>&1)
+    REVERT=$(cast call --from "$OWNER" "$ADMIN" "$CUT_DATA" --rpc-url "$RPC" 2>&1)
     # NotAllBatchesExecuted() = 0xf9ba09d6
     [ "$st" != "0x1" ] && echo "$REVERT" | grep -q 0xf9ba09d6 \
       && echo "  OK   chain $CHAIN_ID refuses the cut with NotAllBatchesExecuted" \

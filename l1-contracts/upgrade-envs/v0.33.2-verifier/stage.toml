@@ -38,3 +38,8 @@ deployer = "0xd2d5391421f98A0086F4143D2EA0337a31Ca89E5"
 
 # Every chain registered on the CTM, all on v0.33.0. 2727 has never committed a batch.
 chain_ids = [2727, 2728, 2729, 27271, 27272, 27273]
+
+# Validium-priced chains that already commit FullPubdata with the EmptyNoDA scheme, which is not the
+# recommended DA state. This upgrade keeps their DA as it is; generate-chain-upgrades-stage.sh passes
+# `--acknowledge-unrecommended-noda` for them so protocol-ops prepares the cut without a DA move.
+keep_unrecommended_da_chain_ids = [2729, 27272]

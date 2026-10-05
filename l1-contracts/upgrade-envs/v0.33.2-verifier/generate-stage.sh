@@ -16,7 +16,7 @@ REPO=$(cd "$L1/.." && pwd)
 OUT_REL=/upgrade-envs/v0.33.2-verifier/output/stage/ecosystem.toml
 OUT=$L1$OUT_REL
 DATE=${1:-$(date -u +%Y-%m-%d)}
-SCENARIO=$HERE/output/stage/simulator/$DATE-v0.33.2-verifier-stage.json
+SCENARIO=$HERE/output/stage/simulator/$DATE-v0.33.2-verifier-stage-1-ecosystem.json
 PROTOCOL_OPS=${PROTOCOL_OPS:-$REPO/protocol-ops/target/release/protocol_ops}
 
 mkdir -p "$(dirname "$OUT")" "$(dirname "$SCENARIO")"
@@ -34,6 +34,7 @@ print(v)" "$1"; }
   --from "$(cast call "$(toml_get state_transition.chain_type_manager_proxy)" 'owner()(address)' --rpc-url "$L1_RPC")" \
   --network sepolia \
   --descriptions "$HERE/sim-descriptions.toml" \
+  --ack test_upgrade_chain_zkos \
   --out "$SCENARIO"
 
 # The deployments go first: the governance calls name the contracts they create.

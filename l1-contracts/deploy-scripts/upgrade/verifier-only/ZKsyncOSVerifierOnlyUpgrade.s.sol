@@ -181,13 +181,11 @@ contract ZKsyncOSVerifierOnlyUpgrade is Script, DefaultCTMUpgrade {
     }
 
     /// @inheritdoc DefaultCTMUpgrade
-    /// @dev Emitted under the ZKsync OS flavour keys protocol-ops gives them when it merges per-CTM outputs,
-    /// which is what the transaction-simulator expects.
+    /// @dev Only `test_create_chain`, under the ZKsync OS flavour keys protocol-ops gives it when it merges
+    /// per-CTM outputs. The per-chain upgrade is covered by the `protocol_ops chain upgrade` bundles, which
+    /// also set the upgrade timestamp first; the simulator scenario acknowledges the absence (as for v33).
     function prepareDefaultTestUpgradeCalls() public override {
-        address chain = bridgehub.getZKChain(upToDateZkChain.chainId);
         string memory o = "test_upgrade_calls";
-        vm.serializeAddress(o, "test_upgrade_chain_zkos_caller", IGetters(chain).getAdmin());
-        vm.serializeBytes(o, "test_upgrade_chain_zkos", abi.encode(_upgradeChainCalls(chain)));
         vm.serializeAddress(o, "test_create_chain_zkos_caller", getBridgehubAdmin());
         string memory serialized = vm.serializeBytes(
             o,

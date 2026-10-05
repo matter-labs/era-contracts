@@ -419,6 +419,39 @@ pub async fn resolve_l2_da_commitment_scheme(
         .map_err(|e| anyhow::anyhow!("chain reports an unknown L2 DA commitment scheme: {e}"))
 }
 
+/// Resolve `chain.getPubdataContent()` — what the chain's batches commit to today. Only present on
+/// diamonds from v33 on; check the chain's version first.
+pub async fn resolve_pubdata_content(
+    l1_rpc_url: &str,
+    chain_address: Address,
+) -> anyhow::Result<crate::types::PubdataContent> {
+    use crate::common::abi::ZkChainAbi;
+
+    let content = ZkChainAbi::new(chain_address, provider(l1_rpc_url)?)
+        .getPubdataContent()
+        .call()
+        .await
+        .context("chain.getPubdataContent() call failed")?;
+    crate::types::PubdataContent::try_from(content)
+        .map_err(|e| anyhow::anyhow!("chain reports an unknown pubdata content: {e}"))
+}
+
+/// Resolve the minor component of `chain.getProtocolVersion()` — the version the chain runs today.
+pub async fn resolve_chain_minor_protocol_version(
+    l1_rpc_url: &str,
+    chain_address: Address,
+) -> anyhow::Result<u64> {
+    use crate::common::abi::ZkChainAbi;
+
+    let version = ZkChainAbi::new(chain_address, provider(l1_rpc_url)?)
+        .getProtocolVersion()
+        .call()
+        .await
+        .context("chain.getProtocolVersion() call failed")?;
+    let minor: alloy::primitives::U256 = (version >> 32) & alloy::primitives::U256::from(u32::MAX);
+    Ok(minor.to::<u64>())
+}
+
 /// Resolve the minor component of `ctm.protocolVersion()` — the version chains upgrading from this
 /// CTM land on. The version is packed as `major << 64 | minor << 32 | patch`.
 pub async fn resolve_ctm_minor_protocol_version(
