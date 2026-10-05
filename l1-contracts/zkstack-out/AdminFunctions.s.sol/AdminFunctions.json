@@ -739,11 +739,6 @@
         "internalType": "address"
       },
       {
-        "name": "_l1AssetRouterProxy",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
         "name": "_refundRecipient",
         "type": "address",
         "internalType": "address"

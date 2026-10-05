@@ -665,11 +665,6 @@
         "internalType": "address"
       },
       {
-        "name": "l1AssetRouterProxy",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
         "name": "refundRecipient",
         "type": "address",
         "internalType": "address"
