@@ -228,13 +228,9 @@ pub async fn resolve_chain_admin_owner(
     ensure_nonzero(eoa, "ChainAdmin.owner()")
 }
 
-/// Resolve `Ownable(target).owner()` for any OZ-Ownable contract (ChainAdmin,
-/// Governance, ...).
+/// Resolve `Ownable(target).owner()` for any OZ `Ownable` (`BridgehubAbi` carries the shared `owner()` selector).
 pub async fn resolve_ownable_owner(l1_rpc_url: &str, target: Address) -> anyhow::Result<Address> {
-    // Reuse `BridgehubAbi.owner()` — selector 0x8da5cb5b is OZ Ownable
-    // standard, shared by every Ownable contract.
-    let ownable = BridgehubAbi::new(target, provider(l1_rpc_url)?);
-    let owner = ownable
+    let owner = BridgehubAbi::new(target, provider(l1_rpc_url)?)
         .owner()
         .call()
         .await

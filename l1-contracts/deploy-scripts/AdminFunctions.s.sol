@@ -102,8 +102,7 @@ contract AdminFunctions is Script, IAdminFunctions {
     }
 
     /// Walk every Bridgehub-discoverable ecosystem ownable (bridgehub itself,
-    /// asset router, l1 nullifier, native token vault, l1 interop handler,
-    /// ctm deployer, chain asset handler, chain registration sender) and
+    /// asset router, l1 nullifier, ctm deployer, chain asset handler) and
     /// accept the pending ownership transfer where one is targeted at
     /// `_governor`. Idempotent — running against an already-correct ecosystem
     /// is a no-op.
@@ -477,10 +476,10 @@ contract AdminFunctions is Script, IAdminFunctions {
         vm.stopBroadcast();
     }
 
-    /// Accept a pending `Ownable2Step` transfer to `_chainAdmin` (e.g. the
-    /// CTM's ServerNotifier) through the ChainAdmin's multicall. Broadcasts as
-    /// the script's `--sender`, which must be allowed to call `multicall`
-    /// (the ChainAdmin owner).
+    /// @notice Accepts an `Ownable2Step` transfer pending to `_chainAdmin`. Broadcasts as `--sender`, which must
+    /// be allowed to call `_chainAdmin.multicall` (the ChainAdmin owner).
+    /// @param _chainAdmin The pending owner.
+    /// @param _target The `Ownable2Step` contract.
     function chainAdminAcceptOwner(ChainAdmin _chainAdmin, address _target) public {
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: _target, value: 0, data: abi.encodeCall(Ownable2Step.acceptOwnership, ())});

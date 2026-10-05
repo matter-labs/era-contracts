@@ -38,6 +38,7 @@ import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2G
 import {IDeployCTM} from "contracts/script-interfaces/IDeployCTM.sol";
 import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
 import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     using stdToml for string;
@@ -308,11 +309,9 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             getRollupL2DACommitmentScheme(),
             true
         );
-        // `BlobsL1DAValidatorZKsyncOS` only checks blob-delivered ZKsync OS pubdata, so it is paired with
-        // the ZKsync OS blobs scheme rather than the calldata/blobs scheme `RollupL1DAValidator` uses.
         rollupDAManager.updateDAPair(
             ctmAddresses.daAddresses.l1BlobsDAValidatorZKsyncOS,
-            getZKsyncOSBlobsL2DACommitmentScheme(),
+            L2DACommitmentScheme.BLOBS_ZKSYNC_OS,
             true
         );
         vm.stopBroadcast();

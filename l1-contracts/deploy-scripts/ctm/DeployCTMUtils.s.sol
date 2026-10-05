@@ -236,16 +236,6 @@ abstract contract DeployCTMUtils is DeployUtils {
         return ROLLUP_L2_DA_COMMITMENT_SCHEME;
     }
 
-    /// @notice The L2 DA commitment scheme a ZKsync OS rollup settling directly on L1 commits with:
-    /// blobs checked by `BlobsL1DAValidatorZKsyncOS`. protocol-ops derives the same scheme for an L1-settling
-    /// rollup (`L2DACommitmentScheme::from_da_type`), so this pair must be whitelisted on the L1
-    /// `RollupDAManager` for `makePermanentRollup` / `setDAValidatorPair` to accept it on a permanent rollup.
-    /// @dev Gateway-settling chains commit with `ROLLUP_L2_DA_COMMITMENT_SCHEME` against the gateway's own
-    /// `RollupDAManager` (whitelisted by `GatewayCTMDeployerDA`), so they need no entry on the L1 manager.
-    function getZKsyncOSBlobsL2DACommitmentScheme() internal pure returns (L2DACommitmentScheme) {
-        return L2DACommitmentScheme.BLOBS_ZKSYNC_OS;
-    }
-
     function getCreationCalldata(string memory contractName) internal view virtual override returns (bytes memory) {
         if (compareStrings(contractName, "BridgedStandardERC20")) {
             return abi.encode();
