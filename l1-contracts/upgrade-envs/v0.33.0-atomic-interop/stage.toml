@@ -23,13 +23,17 @@
 # `diamond_init_*`, `v28_protocol_version`, the priority-tx gas knobs) are gone — v33 is
 # ZKsync OS-only and nothing on this path reads them. Chain-creation params come from
 # `configs/genesis/zksync-os/latest.json`.
+#
+# Also dropped (EVM-1689): `support_l2_legacy_shared_bridge_test`. Its only readers were the
+# from-scratch deploy scripts (`DeployL1CoreUtils` / `DeployCTMUtils`), which never see this file,
+# and #2400 removed them. And `[legacy_gateway] chain_id`: the v33 flow has no Gateway step —
+# `DefaultCoreUpgrade` no longer reads a legacy-Gateway chain id, so the redeployed
+# `L1MessageRoot` gets `ERA_GATEWAY_CHAIN_ID = 0` (the live stage one reports 123).
 
 era_chain_id = 270
 testnet_verifier = true
 governance_upgrade_timer_initial_delay = 1200
 owner_address = "0x8f08627524aeD610192132A425D6b9C32a1727EF"
-
-support_l2_legacy_shared_bridge_test = false
 
 # v31 -> v33.
 old_protocol_version = 0x1f00000000
@@ -53,12 +57,6 @@ protocol_upgrade_handler_proxy_address = "0x8f08627524aeD610192132A425D6b9C32a17
 
 [tokens]
 token_weth_address = "0x7b79995e5f793a07bc00c21412e50ecae098e7f9"
-
-# Kept deliberately: read into `config.legacyGatewayChainId`, which is baked into the redeployed
-# `L1MessageRoot` as its `ERA_GATEWAY_CHAIN_ID` immutable — dropping it would redeploy that
-# implementation with 0. (mainnet spells the same value `[gateway] chain_id`; both keys are read.)
-[legacy_gateway]
-chain_id = 123
 
 [state_transition]
 diamond_init_addr = "0x721035F2420fEc7EF12229ceF4A55DC0C7CB19EA"

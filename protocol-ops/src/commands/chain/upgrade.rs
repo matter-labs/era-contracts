@@ -84,8 +84,6 @@ pub struct ChainUpgradeArgs {
     /// What kind of chain this should be after the upgrade, as far as its pubdata is concerned.
     /// The delivery scheme and the pubdata content default from it, and either
     /// can be named explicitly with the two flags below. Requires `--l1-da-validator`.
-    ///
-    /// For chains that settle on a gateway use `chain gateway migrate-to`: the schemes differ.
     #[clap(long, value_enum, requires = "l1_da_validator", help_heading = "DA")]
     pub da_mode: Option<DAValidatorType>,
 

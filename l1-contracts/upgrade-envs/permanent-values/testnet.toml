@@ -36,13 +36,3 @@ rollup_da_manager = "0xC90E4E4897421E9380d734b72221f5485C3fd116"
 proxy = "0x54D55e74De9c6003E7a68a1fE70E633f05761eb5"
 bytecodes_supplier = "0x3ad11E8BAAa24708086EEdaEE28722B8c1489e3b"
 rollup_da_manager = "0xC90E4E4897421E9380d734b72221f5485C3fd116"
-
-# Legacy Gateway configuration for settlement layer validation
-# This section contains historical data about chains that settled on the legacy Gateway
-[legacy_gateway]
-# The chain ID of the legacy Gateway (9075 for mainnet)
-# TODO(EVM-1200): The new ZKsync OS testnet does NOT have a legacy Gateway, so just a random valid chain id
-# is provided here. 
-chain_id = 531050204
-
-chain_intervals = []

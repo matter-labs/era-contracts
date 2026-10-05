@@ -129,31 +129,12 @@ interface IAdminFunctions {
 
     function setPubdataPricingMode(ChainAdmin chainAdmin, address target, PubdataPricingMode pricingMode) external;
 
-    function notifyServerMigrationToGateway(address bridgehub, uint256 chainId, bool shouldSend) external;
-
-    function notifyServerMigrationFromGateway(address bridgehub, uint256 chainId, bool shouldSend) external;
-
-    function prepareUpgradeZKChainOnGateway(
-        uint256 l1GasPrice,
-        uint256 oldProtocolVersion,
-        bytes calldata upgradeCutData,
-        address chainDiamondProxyOnGateway,
-        uint256 gatewayChainId,
-        uint256 chainId,
-        address bridgehub,
-        address l1AssetRouterProxy,
-        address refundRecipient,
-        bool shouldSend
-    ) external;
-
     function grantGatewayWhitelist(
         address bridgehub,
         uint256 chainId,
         address[] calldata grantees,
         bool shouldSend
     ) external;
-
-    function revokeGatewayWhitelist(address bridgehub, uint256 chainId, address toRevoke, bool shouldSend) external;
 
     function setTransactionFilterer(
         address bridgehub,
@@ -191,54 +172,11 @@ interface IAdminFunctions {
         bool shouldSend
     ) external;
 
-    function migrateChainToGateway(
-        address bridgehub,
-        uint256 l1GasPrice,
-        uint256 l2ChainId,
-        uint256 gatewayChainId,
-        string calldata gatewayRpcUrl,
-        address refundRecipient,
-        bool shouldSend
-    ) external;
-
-    function setDAValidatorPairWithGateway(
-        address bridgehub,
-        uint256 l1GasPrice,
-        uint256 l2ChainId,
-        uint256 gatewayChainId,
-        address l1DAValidator,
-        L2DACommitmentScheme l2DACommitmentScheme,
-        address chainDiamondProxyOnGateway,
-        address refundRecipient,
-        bool shouldSend
-    ) external;
-
-    function enableValidatorViaGateway(
-        address bridgehub,
-        uint256 l1GasPrice,
-        uint256 l2ChainId,
-        uint256 gatewayChainId,
-        address validatorAddress,
-        address gatewayValidatorTimelock,
-        address refundRecipient,
-        bool shouldSend
-    ) external;
-
     function enableValidator(
         address bridgehub,
         uint256 l2ChainId,
         address validatorAddress,
         address validatorTimelock,
-        bool shouldSend
-    ) external;
-
-    function startMigrateChainFromGateway(
-        address bridgehub,
-        uint256 l1GasPrice,
-        uint256 l2ChainId,
-        uint256 gatewayChainId,
-        bytes calldata l1DiamondCutData,
-        address refundRecipient,
         bool shouldSend
     ) external;
 

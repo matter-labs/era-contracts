@@ -70,10 +70,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         bool usePreV32IntrospectionOverride;
     }
 
-    struct GatewayConfig {
-        uint256 chainId;
-    }
-
     struct NewlyGeneratedData {
         bytes diamondCutData;
         bytes upgradeCutData;
@@ -115,7 +111,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
 
     // Input for the script
     AdditionalConfig internal newConfig;
-    GatewayConfig internal gatewayConfig;
 
     // Discovered addresses
     ZkChainAddresses internal discoveredRepresentativeZkChain;
@@ -399,10 +394,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         return coreAddresses.shared.bridgehubAdmin;
     }
 
-    function getGatewayConfig() public virtual returns (GatewayConfig memory) {
-        return gatewayConfig;
-    }
-
     function getGovernanceUpgradeTimerInitialDelay() public view virtual returns (uint256) {
         return newConfig.governanceUpgradeTimerInitialDelay;
     }
@@ -645,7 +636,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         allCalls[5] = provideSetNewVersionUpgradeCall();
         console.log("prepareStage1GovernanceCalls: prepareDAValidatorCall");
         allCalls[6] = prepareDAValidatorCall();
-        console.log("prepareStage1GovernanceCalls: prepareGatewaySpecificStage1GovernanceCalls");
+        console.log("prepareStage1GovernanceCalls: prepareVersionSpecificStage1GovernanceCallsL1");
         allCalls[7] = prepareVersionSpecificStage1GovernanceCallsL1();
         calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
