@@ -1154,6 +1154,35 @@ mod release_script_tests {
         assert!(help.contains("--upgrade-input-path"));
     }
 
+    /// The Foundry full-flow upgrade test (`UpgradeTest_Local`) must run the scripts this command prepares
+    /// with by default: its CTM test subclass extends the default CTM script, and the shared base constructs
+    /// the default core script. A release that changes a default here fails this until that test is moved
+    /// onto the new script too.
+    #[test]
+    fn prepare_defaults_match_the_foundry_full_flow_test() {
+        let contract_name = |script_path: &str| -> String {
+            let file = script_path.rsplit('/').next().unwrap();
+            file.trim_end_matches(".s.sol").to_string()
+        };
+        let read = |relative: &str| {
+            std::fs::read_to_string(crate::common::paths::path_from_root(relative)).unwrap()
+        };
+        let args = UpgradePrepareAllArgs::try_parse_from(["prepare"]).unwrap();
+
+        let local_test = read("l1-contracts/test/foundry/l1/integration/UpgradeTest_Local.t.sol");
+        let ctm = contract_name(&args.ctm_script_path);
+        assert!(
+            local_test.contains(&format!(" is {ctm} {{")),
+            "UpgradeTest_Local's CTM test subclass must extend the default CTM script {ctm}"
+        );
+        let shared_base = read("l1-contracts/test/foundry/l1/integration/UpgradeTestShared.t.sol");
+        let core = contract_name(&args.core_script_path);
+        assert!(
+            shared_base.contains(&format!("new {core}()")),
+            "UpgradeTestShared must construct the default core script {core}"
+        );
+    }
+
     #[test]
     fn historical_prepare_can_select_v33() {
         let args = UpgradePrepareAllArgs::try_parse_from([
