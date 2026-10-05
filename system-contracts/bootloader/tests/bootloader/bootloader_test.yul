@@ -330,31 +330,48 @@ function INT_TEST_forceFailL1Tx() {
 }
 
 function INT_TEST_forceFailL1TxFee() {
-    // Checks the refund with a non-zero gas price.
+    // With a non-zero gas price the operator's fee is visible. A force-failed transaction does no work, so it
+    // pays for overhead, intrinsic costs, preparation and the marker log, but none of its execution budget.
     let txDataOffset := testing_txDataOffset(3)
     let innerTxDataOffset := add(txDataOffset, 0x20)
     testing_assertEq(getTxType(innerTxDataOffset), 255, "tx(3) must be a priority op")
 
     mstore(testing_txDescriptionPtr(3), 0x0101)
 
-    let billedToUser := safeMul(
-        getMaxFeePerGas(innerTxDataOffset),
-        getGasLimit(innerTxDataOffset),
-        "fee overflow"
+    let gasPerPubdata := getGasPerPubdataByteLimit(innerTxDataOffset)
+    // The budget `processL1Tx` starts from, before preparation.
+    let gasLimitForTx, reservedGas := getGasLimitForTx(
+        innerTxDataOffset,
+        3,
+        gasPerPubdata,
+        L1_TX_INTRINSIC_L2_GAS(),
+        L1_TX_INTRINSIC_PUBDATA()
     )
+    // The least the operator is paid: everything outside that budget, plus the marker log's pubdata.
+    let minChargedGas := add(
+        sub(getGasLimit(innerTxDataOffset), add(gasLimitForTx, reservedGas)),
+        mul(L1_TX_INTRINSIC_PUBDATA(), gasPerPubdata)
+    )
+    // Preparation is charged on top and fits in the intrinsic L2 gas allowance; the execution budget does not.
+    let maxChargedGas := add(minChargedGas, L1_TX_INTRINSIC_L2_GAS())
+
+    let gasPrice := getMaxFeePerGas(innerTxDataOffset)
+    let deposited := getReserved0(innerTxDataOffset)
     testing_expectTxFailureNoReturndata(3)
     testing_expectBootloaderLog(getCanonicalL1TxHash(txDataOffset), 0)
     testing_expectBalance(getFrom(innerTxDataOffset), 0)
     testing_expectBalance(getTo(innerTxDataOffset), 0)
-    testing_expectBalance(
+    testing_expectBalanceInRange(
         getReserved1(innerTxDataOffset),
-        safeSub(getReserved0(innerTxDataOffset), billedToUser, "fee underflow")
+        sub(deposited, mul(gasPrice, maxChargedGas)),
+        sub(deposited, mul(gasPrice, minChargedGas))
     )
 }
 
 function INT_TEST_l1TxRevertBaseline() {
-    // The claim force-fail rests on: a priority op that reverts on its first instruction leaves the
-    // same balances and logs, minus the marker. tx(4) calls a system contract with no such selector.
+    // The claim force-fail rests on: at zero gas price, a priority op that reverts on its first instruction
+    // leaves the same balances and logs, minus the marker. With a non-zero price a force-failed tx is charged
+    // less, as its execution budget is refunded. tx(4) calls a system contract with no such selector.
     let txDataOffset := testing_txDataOffset(4)
     let innerTxDataOffset := add(txDataOffset, 0x20)
     testing_assertEq(getTxType(innerTxDataOffset), 255, "tx(4) must be a priority op")

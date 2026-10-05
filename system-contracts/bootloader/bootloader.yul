@@ -769,6 +769,9 @@ object "Bootloader" {
                 forceFail
             ) {
                 // Force-fail is supported only for batches settling on L1.
+                // The sender is not checked, so on a chain that is itself a settlement layer the operator could
+                // force-fail the relay (`SETTLEMENT_LAYER_RELAY_SENDER`) and service transactions it must deliver.
+                // Those senders have to be rejected here before such a chain is whitelisted as a settlement layer.
                 if forceFail {
                     if iszero(eq(getSettlementLayerChainId(), getL1ChainId())) {
                         assertionError("forceFail off L1 settlement")
@@ -1223,6 +1226,15 @@ object "Bootloader" {
                         basePubdataSpent,
                         gasPerPubdata
                     )
+                    // The force-fail marker log is sent after the fee is settled, so it is charged here, at the
+                    // intrinsic price of the status log it mirrors.
+                    if forceFail {
+                        ergsSpentOnPubdata := safeAdd(
+                            ergsSpentOnPubdata,
+                            safeMul(L1_TX_INTRINSIC_PUBDATA(), gasPerPubdata, "mul: forceFail marker pubdata"),
+                            "add: forceFail marker pubdata"
+                        )
+                    }
 
                     // It is assumed that `isNotEnoughGasForPubdata` ensured that the user did not publish too much pubdata.
                     let potentialRefund := saturatingSub(
@@ -1340,6 +1352,10 @@ object "Bootloader" {
                 )
                 notifyExecutionResult(success)
                 gasSpentOnExecution := sub(gasBeforeExecution, gas())
+                // The force-fail panic burns the frame's gas without doing any work, so none of it is charged.
+                if forceFail {
+                    gasSpentOnExecution := 0
+                }
             }
 
             /// @dev The function responsible for doing all the pre-execution operations for L1->L2 transactions.

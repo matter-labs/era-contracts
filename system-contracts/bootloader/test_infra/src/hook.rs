@@ -39,6 +39,7 @@ pub(crate) enum TestVmHook {
     ExpectTxFailureNoReturndata(usize),
     ExpectBootloaderLog(U256, U256),
     ExpectBalance(U256, U256),
+    ExpectBalanceInRange(U256, U256, U256),
     ExpectNoBootloaderLogKey(U256),
     ExpectNoBootloaderLog(U256, U256),
     ExpectSystemLog(U256, U256),
@@ -199,6 +200,11 @@ impl TestVmHook {
                     109 => Self::ExpectNoBootloaderLogKey(vm_hook_params[0]),
                     110 => Self::ExpectNoBootloaderLog(vm_hook_params[0], vm_hook_params[1]),
                     111 => Self::ExpectSystemLog(vm_hook_params[0], vm_hook_params[1]),
+                    112 => Self::ExpectBalanceInRange(
+                        vm_hook_params[0],
+                        vm_hook_params[1],
+                        vm_hook_params[2],
+                    ),
                     _ => Self::NoHook,
                 }
             }

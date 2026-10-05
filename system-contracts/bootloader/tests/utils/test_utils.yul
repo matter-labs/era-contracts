@@ -90,6 +90,14 @@ function testing_expectBalance(account, balance) {
     setTestHook(108)
 }
 
+// `account` holds between `minBalance` and `maxBalance` base token (inclusive) when the batch ends.
+function testing_expectBalanceInRange(account, minBalance, maxBalance) {
+    storeTestHookParam(0, $llvm_NoInline_llvm$_unoptimized(account))
+    storeTestHookParam(1, $llvm_NoInline_llvm$_unoptimized(minBalance))
+    storeTestHookParam(2, $llvm_NoInline_llvm$_unoptimized(maxBalance))
+    setTestHook(112)
+}
+
 function testing_totalTests(tests) {
     storeTestHookParam(0, $llvm_NoInline_llvm$_unoptimized(tests))
     setTestHook(103)
