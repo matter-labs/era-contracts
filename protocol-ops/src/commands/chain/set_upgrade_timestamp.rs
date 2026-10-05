@@ -170,6 +170,18 @@ fn immediately_due_warning(upgrade_timestamp: U256, now: u64) -> Option<String> 
     })
 }
 
+/// Rejects an upgrade timestamp the server can't read.
+///
+/// `ServerNotifier` accepts any non-zero `uint256`, but the server reads the scheduled timestamp as
+/// a `u64` and its L1 watcher panics on a wider one, on every restart, since the event stays on L1.
+fn ensure_server_readable(upgrade_timestamp: U256) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        upgrade_timestamp <= U256::from(u64::MAX),
+        "upgrade timestamp {upgrade_timestamp} does not fit in a u64, which the server requires"
+    );
+    Ok(())
+}
+
 pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
     let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
@@ -177,6 +189,7 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
         .upgrade_timestamp
         .parse::<U256>()
         .context("invalid upgrade_timestamp: expected decimal or hex uint256")?;
+    ensure_server_readable(upgrade_timestamp)?;
 
     let provider: RootProvider<Ethereum> =
         ProviderBuilder::default().connect_http(args.shared.l1_rpc_url.parse()?);
@@ -282,5 +295,15 @@ mod tests {
     #[test]
     fn accepts_future_timestamp() {
         assert!(immediately_due_warning(U256::from(NOW + 1), NOW).is_none());
+    }
+
+    #[test]
+    fn accepts_u64_max_timestamp() {
+        assert!(ensure_server_readable(U256::from(u64::MAX)).is_ok());
+    }
+
+    #[test]
+    fn rejects_timestamp_wider_than_u64() {
+        assert!(ensure_server_readable(U256::from(u64::MAX) + U256::from(1)).is_err());
     }
 }
