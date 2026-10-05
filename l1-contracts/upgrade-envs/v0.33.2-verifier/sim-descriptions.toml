@@ -1,0 +1,35 @@
+# Human-readable descriptions for this upgrade's transaction-simulator scenario, read by
+# `protocol_ops ecosystem governance-toml-to-simulator --descriptions` (see generate-stage.sh).
+# Each `[[entries]]` block matches a tx by `(target, selector)`; an unmatched tx fails the emit.
+
+[labels]
+# --- stage (Sepolia) atomic-interop ecosystem, all pre-existing ---
+bridgehub           = "0xb9415d43C7753cCeBaa1ac05c8BabA36159ab13F"
+chain_asset_handler = "0x33388639Ba3f30AD47fc6e6769CEe89e53a09991"
+zkos_ctm            = "0x94d8784d719181EA00f58ab4a85333959FFA5a79"
+chain_27271         = "0x0C5B983957D349d11aC33A00dc0c41BE9a545dcD"
+
+[[entries]]
+target = "chain_asset_handler"
+selector = "0xac700e63"
+desc = "Stage 0: pause chain migrations (ChainAssetHandler.pauseMigration) — the CTM refuses a new version otherwise"
+
+[[entries]]
+target = "zkos_ctm"
+selector = "0xca4ea357"
+desc = "Stage 1: register v0.33.2 as a verifier-only upgrade of v0.33.0 with the new ZKsyncOSTestnetVerifier (CTM.createNewVerifierOnlyUpgrade)"
+
+[[entries]]
+target = "chain_asset_handler"
+selector = "0xf7c7eb92"
+desc = "Stage 2: unpause chain migrations (ChainAssetHandler.unpauseMigration)"
+
+[[entries]]
+target = "bridgehub"
+selector = "0xf113c88b"
+desc = "test: create chain 556 on v0.33.2 from the unchanged chain creation params (Bridgehub.createNewChain)"
+
+[[entries]]
+target = "chain_27271"
+selector = "0x3b6d7534"
+desc = "test: upgrade chain 27271 from v0.33.0 to v0.33.2 as its ChainAdmin (upgradeChainFromVersion)"
