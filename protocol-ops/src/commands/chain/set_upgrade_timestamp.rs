@@ -3,8 +3,9 @@ use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
+use alloy::eips::BlockNumberOrTag;
 use alloy::network::Ethereum;
-use alloy::providers::{ProviderBuilder, RootProvider};
+use alloy::providers::{Provider, ProviderBuilder, RootProvider};
 
 use crate::common::abi::{AdminFunctionsAbi, IChainTypeManagerAbi, ZkChainAbi};
 use crate::common::addresses::ZERO_ADDRESS;
@@ -155,6 +156,20 @@ async fn ensure_priority_op_bound_ready(
     Ok(())
 }
 
+/// Warning for an upgrade timestamp that is already due at `now`, if it is.
+///
+/// The server switches versions once `timestamp <= now`, so such a schedule is acted on as soon as
+/// `UpgradeTimestampUpdated` is seen. Only a warning: a deliberately immediate schedule stays possible.
+fn immediately_due_warning(upgrade_timestamp: U256, now: u64) -> Option<String> {
+    (upgrade_timestamp <= U256::from(now)).then(|| {
+        format!(
+            "upgrade timestamp {upgrade_timestamp} is not after the latest L1 block timestamp {now}: \
+             the chain upgrade is immediately due, and the server gets no window to observe \
+             `UpgradeTimestampUpdated` before acting on it"
+        )
+    })
+}
+
 pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
     let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
@@ -162,6 +177,19 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
         .upgrade_timestamp
         .parse::<U256>()
         .context("invalid upgrade_timestamp: expected decimal or hex uint256")?;
+
+    let provider: RootProvider<Ethereum> =
+        ProviderBuilder::default().connect_http(args.shared.l1_rpc_url.parse()?);
+    let l1_now = provider
+        .get_block_by_number(BlockNumberOrTag::Latest)
+        .await
+        .context("read latest L1 block")?
+        .context("L1 RPC returned no latest block")?
+        .header
+        .timestamp;
+    if let Some(warning) = immediately_due_warning(upgrade_timestamp, l1_now) {
+        logger::warn(warning);
+    }
 
     // Checked against the real chain, not the fork: this is a precondition of the upgrade the
     // scheduled timestamp commits the server to.
@@ -225,4 +253,34 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
 
     logger::success("Set upgrade timestamp prepared");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const NOW: u64 = 1_800_000_000;
+
+    #[test]
+    fn warns_on_zero_timestamp() {
+        assert!(immediately_due_warning(U256::ZERO, NOW).is_some());
+    }
+
+    #[test]
+    fn warns_on_past_timestamp() {
+        let warning = immediately_due_warning(U256::from(NOW - 1), NOW).unwrap();
+
+        assert!(warning.contains(&(NOW - 1).to_string()));
+        assert!(warning.contains(&NOW.to_string()));
+    }
+
+    #[test]
+    fn warns_on_timestamp_equal_to_now() {
+        assert!(immediately_due_warning(U256::from(NOW), NOW).is_some());
+    }
+
+    #[test]
+    fn accepts_future_timestamp() {
+        assert!(immediately_due_warning(U256::from(NOW + 1), NOW).is_none());
+    }
 }
