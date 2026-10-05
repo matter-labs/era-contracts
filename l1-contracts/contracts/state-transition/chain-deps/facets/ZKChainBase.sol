@@ -203,7 +203,8 @@ contract ZKChainBase is ReentrancyGuard {
                     s.chainId,
                     ZKSYNC_OS_FRI_PROOF_VERIFICATION_DISABLED,
                     uint256(_getZKsyncOSMaxTxGasLimit()),
-                    uint256(s.pubdataContent)
+                    uint256(s.pubdataContent),
+                    uint256(s.zksyncOSL1TxFilteringEnabled ? 1 : 0)
                 )
             );
     }

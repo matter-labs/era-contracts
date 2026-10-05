@@ -181,6 +181,18 @@ contract AdminFacet is ZKChainBase, IAdmin {
         emit NewZKsyncOSMaxTxGasLimit(oldMaxTxGasLimit, _newMaxTxGasLimit);
     }
 
+    /// @inheritdoc IAdmin
+    function setZKsyncOSL1TxFiltering(bool _enabled) external onlyAdmin onlySettlementLayer {
+        if (_enabled && s.priorityModeInfo.canBeActivated) {
+            revert NotCompatibleWithPriorityMode();
+        }
+        _enforceNoUnverifiedBatchesForChainConfigUpdate();
+
+        bool oldEnabled = s.zksyncOSL1TxFilteringEnabled;
+        s.zksyncOSL1TxFilteringEnabled = _enabled;
+        emit NewZKsyncOSL1TxFiltering(oldEnabled, _enabled);
+    }
+
     /// @notice Enforces the configuration-update boundary described in {protocol-docs/chain-config.md}.
     function _enforceNoUnverifiedBatchesForChainConfigUpdate() internal view {
         if (s.totalBatchesCommitted != s.totalBatchesVerified) {
@@ -438,6 +450,9 @@ contract AdminFacet is ZKChainBase, IAdmin {
     function permanentlyAllowPriorityMode() external onlyAdmin onlySettlementLayer onlyL1 {
         if (s.priorityModeInfo.canBeActivated) {
             revert PriorityModeAlreadyAllowed();
+        }
+        if (s.zksyncOSL1TxFilteringEnabled) {
+            revert NotCompatibleWithPriorityMode();
         }
         // Ensure that there is at least one priority tx with a non-zero request timestamp.
         // This guarantees that activatePriorityMode can actually function, since it relies on
