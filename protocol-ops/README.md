@@ -87,15 +87,16 @@ cargo run --release --bin protocol_ops -- ecosystem verify-upgrade \
   --zk-governance-commit <commit>
 ```
 
-| Flag                         | Role                                                                                           |
-| ---------------------------- | ---------------------------------------------------------------------------------------------- |
-| **`--env`**                  | `stage` / `testnet` / `mainnet`; selects the permanent-values + current-release input TOMLs.   |
-| **`--ecosystem-toml`**       | Merged artifact from `upgrade-prepare-all`.                                                    |
-| **`--zk-governance-commit`** | zk-governance commit for PUH / Guardians / SecurityCouncil / EUB bytecode metadata (required). |
-| **`--contracts-commit`**     | Optional era-contracts commit; when omitted, the local checkout is the authority.              |
-| **`--transactions-log`**     | Deployment tx-hash log; defaults to the env's `output/<env>/transactions.txt`.                 |
-| **`--l1-rpc-url`**           | L1 RPC (default `http://localhost:8545`).                                                      |
-| **`--display-upgrade-data`** | Print each stage's ABI-encoded `UpgradeProposal` and skip the rest of the verifier.            |
+| Flag                         | Role                                                                                                                                             |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **`--env`**                  | `stage` / `testnet` / `mainnet`; selects the permanent-values + current-release input TOMLs.                                                     |
+| **`--ecosystem-toml`**       | Merged artifact from `upgrade-prepare-all`.                                                                                                      |
+| **`--zk-governance-commit`** | zk-governance commit for PUH / Guardians / SecurityCouncil / EUB bytecode metadata (required).                                                   |
+| **`--contracts-commit`**     | Optional era-contracts commit; when omitted, the local checkout is the authority.                                                                |
+| **`--transactions-log`**     | Deployment tx-hash log; defaults to the env's `output/<env>/transactions.txt`.                                                                   |
+| **`--upgrade-env-dir`**      | Release dir for the env input and log (e.g. `upgrade-envs/v0.33.0-atomic-interop` to verify a v33 preparation); defaults to the current release. |
+| **`--l1-rpc-url`**           | L1 RPC (default `http://localhost:8545`).                                                                                                        |
+| **`--display-upgrade-data`** | Print each stage's ABI-encoded `UpgradeProposal` and skip the rest of the verifier.                                                              |
 
 ## Output
 
