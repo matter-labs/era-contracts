@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {ExecutorTest} from "foundry-test/l1/unit/concrete/BatchProcessing/_Executor_Shared.t.sol";
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
-import {CTMUpgradeHarness} from "foundry-test/l1/integration/utils/CTMUpgradeHarness.sol";
+import {CTMUpgradeV34Harness} from "foundry-test/l1/integration/utils/CTMUpgradeV34Harness.sol";
 import {
     TEST_CHAIN_CONFIG_UPGRADE_VERSION,
     LEGACY_V33_COMMIT_ENCODING_VERSION,
@@ -79,7 +79,7 @@ contract UpgradeTestV34 is ExecutorTest {
         );
         vm.mockCall(ctm, abi.encodeCall(IChainTypeManager.protocolVersion, ()), abi.encode(previousVersion));
 
-        CTMUpgradeHarness script = new CTMUpgradeHarness();
+        CTMUpgradeV34Harness script = new CTMUpgradeV34Harness();
         script.setReplacementFacets(getters.facets());
         StateTransitionDeployedAddresses memory stateTransition;
         stateTransition.defaultUpgrade = script.deployDefaultUpgrade(ctm);

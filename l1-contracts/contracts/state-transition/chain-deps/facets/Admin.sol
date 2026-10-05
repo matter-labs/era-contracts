@@ -8,7 +8,7 @@ import {
     ProofSystem,
     L2DACommitmentScheme,
     PubdataContent,
-    MAX_GAS_PER_TRANSACTION,
+    PRIORITY_TX_MAX_GAS_LIMIT,
     MAX_PRICE_CHANGE_DENOMINATOR,
     MAX_PRICE_CHANGE_NUMERATOR,
     PRICE_REFERENCE_L1_GAS,
@@ -155,7 +155,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external onlyChainTypeManager onlyL1 {
-        if (_newPriorityTxMaxGasLimit > MAX_GAS_PER_TRANSACTION) {
+        if (_newPriorityTxMaxGasLimit > PRIORITY_TX_MAX_GAS_LIMIT) {
             revert TooMuchGas();
         }
 
