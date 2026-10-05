@@ -1391,19 +1391,6 @@
   },
   {
     "type": "event",
-    "name": "NewGenesisAirbenderBatchCommitment",
-    "inputs": [
-      {
-        "name": "genesisAirbenderBatchCommitment",
-        "type": "bytes32",
-        "indexed": false,
-        "internalType": "bytes32"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "NewPendingAdmin",
     "inputs": [
       {
