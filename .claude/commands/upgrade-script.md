@@ -27,8 +27,8 @@ these defaults, so they always cover the release being built.
 3. Ask the user what the release changes. Only if it needs release-specific preparation (extra contracts, a
    custom per-chain initializer, one-off governance calls):
    - Read the base classes: `DefaultCoreUpgrade.s.sol`, `DefaultCTMUpgrade.s.sol`, `CTMUpgradeBase.sol`.
-   - Add thin subclasses under `l1-contracts/deploy-scripts/upgrade/v{N}/` (e.g. `CTMUpgrade_v{N} is
-DefaultCTMUpgrade`) overriding only what the release needs.
+   - Add thin subclasses of the `Default*` scripts under `l1-contracts/deploy-scripts/upgrade/v{N}/` (e.g.
+     `CTMUpgrade_v{N}`), overriding only what the release needs.
    - Point protocol-ops' `upgrade-prepare-all` `--core-script-path` / `--ctm-script-path` defaults at them, so the
      upgrade tests pick them up.
 
