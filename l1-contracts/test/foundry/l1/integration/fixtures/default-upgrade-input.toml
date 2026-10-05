@@ -1,0 +1,11 @@
+# Upgrade input for the Foundry local upgrade harness (`UpgradeTest_Local.t.sol`), which runs the
+# current default upgrade scripts (`DefaultCoreUpgrade` + `DefaultCTMUpgrade`) against a freshly
+# deployed ecosystem.
+#
+# Deliberately version-free: the target protocol version is derived in the test from the genesis
+# config (genesis minor + 1), so nothing here needs editing on a release bump.
+#
+# Both scripts require an input file but every key in it is optional. The only key set here pins the
+# introspection path so the harness does not depend on the pre-v32 autodetection heuristic; every
+# ecosystem this harness deploys is built from current contracts, so it is never pre-v32.
+pre_v32_introspection = false
