@@ -73,7 +73,8 @@ library Utils {
                     _chainId,
                     ZKSYNC_OS_FRI_PROOF_VERIFICATION_DISABLED,
                     uint256(_maxTxGasLimit),
-                    uint256(_pubdataContent)
+                    uint256(_pubdataContent),
+                    uint256(0)
                 )
             );
     }
