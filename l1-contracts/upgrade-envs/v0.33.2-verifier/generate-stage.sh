@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Regenerate the v0.33.2 verifier-only upgrade artifacts for the ZKsync OS stage ecosystem:
 #   1. ZKsyncOSVerifierOnlyUpgrade.prepare -> output/stage/ecosystem.toml (simulation only, never broadcasts)
-#   2. protocol_ops governance-toml-to-simulator -> the transaction-simulator scenario, with the two
-#      CREATE2 verifier deployments prepended (tag `deploy_verifier`, sent by `[deploy_calls].deployer`)
+#   2. protocol_ops governance-toml-to-simulator -> the transaction-simulator scenario, with the
+#      CREATE2 deployments prepended (tag `deploy`, sent by `[deploy_calls].deployer`)
 #
 # Needs: foundry-zksync v0.1.5 (the CI pin) on PATH, python3, and a release build of protocol-ops
 # (`cd protocol-ops && cargo build --release`).
@@ -31,31 +31,29 @@ print(v)" "$1"; }
 
 "$PROTOCOL_OPS" ecosystem governance-toml-to-simulator \
   --governance-toml "$OUT" \
-  --from "$(toml_get contracts_config.governance)" \
+  --from "$(cast call "$(toml_get state_transition.chain_type_manager_proxy)" 'owner()(address)' --rpc-url "$L1_RPC")" \
   --network sepolia \
   --descriptions "$HERE/sim-descriptions.toml" \
   --out "$SCENARIO"
 
-# The deployments go first: stage 1 names the verifier they create.
+# The deployments go first: the governance calls name the contracts they create.
 DEPLOY_JSON=$(cast abi-decode --json --input 'f((address,uint256,bytes)[])' "$(toml_get deploy_calls.calls)")
-python3 - "$SCENARIO" "$(toml_get deploy_calls.deployer)" "$(toml_get contracts_config.verifier_plonk)" \
-  "$(toml_get contracts_config.verifier)" "$DEPLOY_JSON" <<'PY'
-import json, sys
-path, deployer, plonk, verifier, calls = sys.argv[1:]
-calls = json.loads(calls)[0]
-assert len(calls) == 2, calls
-names = [
-    f"Deploy ZKsyncOSVerifierPlonk (v0.33.2 VK) to {plonk} via the CREATE2 factory",
-    f"Deploy ZKsyncOSTestnetVerifier wrapping it to {verifier} via the CREATE2 factory",
-]
+python3 - "$SCENARIO" "$OUT" "$DEPLOY_JSON" <<'PY'
+import json, sys, tomllib
+path, toml_path, calls = sys.argv[1:]
+d = tomllib.load(open(toml_path, "rb"))["deploy_calls"]
+calls = json.loads(calls)
+calls = calls["data"] if isinstance(calls, dict) else calls
+calls = calls[0]
+assert len(calls) == len(d["contracts"]), (calls, d["contracts"])
 deploys = []
-for i, ((target, value, data), desc) in enumerate(zip(calls, names)):
+for i, ((target, value, data), name) in enumerate(zip(calls, d["contracts"])):
     assert int(str(value), 0) == 0
-    tx = {"description": desc, "network": "sepolia", "from": deployer.lower(), "to": target.lower(),
-          "data": data, "value": "0"}
+    tx = {"description": f"Deploy {name} via the CREATE2 factory", "network": "sepolia",
+          "from": d["deployer"].lower(), "to": target.lower(), "data": data, "value": "0"}
     if i == 0:
         tx["valueToMint"] = "1"
-    tx["tag"] = "deploy_verifier"
+    tx["tag"] = "deploy"
     deploys.append(tx)
 scenario = json.load(open(path))
 json.dump(deploys + scenario, open(path, "w"), indent=2)

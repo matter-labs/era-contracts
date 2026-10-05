@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Rehearse the v0.33.2 verifier-only stage upgrade on a Sepolia fork, along the path it really takes,
 # and assert the resulting L1 state:
-#   1. the two CREATE2 deployments from `[deploy_calls]`, sent by `[deploy_calls].deployer`
+#   1. the CREATE2 deployments from `[deploy_calls]`, sent by `[deploy_calls].deployer`
 #   2. governance stages 0/1/2 as the Governance owner's `scheduleTransparent` + `execute`
 #      (`[governance_operations]`), impersonated
 #   3. per chain: `ServerNotifier.setUpgradeTimestamp`, then `[chain_upgrades.<id>].chain_admin_calldata`,
@@ -48,14 +48,14 @@ trap 'kill $ANVIL_PID 2>/dev/null' EXIT
 for _ in $(seq 1 60); do cast block-number --rpc-url "$RPC" >/dev/null 2>&1 && break; sleep 1; done
 echo "fork block: $(cast block-number --rpc-url "$RPC")"
 
-CTM=$(toml_get contracts_config.chain_type_manager)
-BH=$(toml_get contracts_config.bridgehub)
-CAH=$(toml_get contracts_config.chain_asset_handler)
-GOV=$(toml_get contracts_config.governance)
+CTM=$(toml_get state_transition.chain_type_manager_proxy)
+BH=$(call "$CTM" 'BRIDGE_HUB()(address)')
+CAH=$(call "$BH" 'chainAssetHandler()(address)')
+GOV=$(call "$CTM" 'owner()(address)')
 OLD=$(toml_get contracts_config.old_protocol_version)
 NEW=$(toml_get contracts_config.new_protocol_version)
-VERIFIER=$(toml_get contracts_config.verifier)
-VK=$(toml_get contracts_config.vk_hash)
+VERIFIER=$(toml_get state_transition.verifier_addr)
+VK=$(toml_get verification_key.new_vk_hash)
 INITIAL_CUT_HASH=$(call "$CTM" 'initialCutHash()(bytes32)')
 FORCE_DEPLOYMENT_HASH=$(call "$CTM" 'initialForceDeploymentHash()(bytes32)')
 
@@ -70,8 +70,10 @@ while read -r target data; do
   [ "$st" = "0x1" ] || fail "deployment failed"
 done < "$S/deploy_calls.txt"
 chk "verifier VK" "$(call "$VERIFIER" 'verificationKeyHash()(bytes32)')" "$VK"
-chk "verifier wraps verifier_plonk" "$(call "$VERIFIER" 'PLONK_VERIFIER()(address)')" "$(toml_get contracts_config.verifier_plonk)"
+chk "verifier wraps verifier_plonk" "$(call "$VERIFIER" 'PLONK_VERIFIER()(address)')" "$(toml_get state_transition.verifier_plonk_addr)"
 chk "verifier is the testnet flavour" "$(call "$VERIFIER" 'IS_TESTNET_VERIFIER()(bool)')" "true"
+
+chk "CTM stored default upgrade unchanged" "$(call "$CTM" 'defaultUpgrade()(address)')" "$(toml_get state_transition.ctm_stored_default_upgrade_addr)"
 
 # ---------------------------------------------------------------- 2. governance
 GOV_OWNER=$(toml_get governance_operations.governance_owner)
@@ -99,9 +101,10 @@ for stage in range(3):
         sys.exit(1)
 PYCHECK
 
+chk "upgrade timer started" "$([ "$(call "$(toml_get deployed_addresses.l1_governance_upgrade_timer)" 'deadline()(uint256)')" != "0" ] && echo yes)" "yes"
 chk "CTM protocolVersion" "$(call "$CTM" 'protocolVersion()(uint256)')" "$NEW"
 chk "CTM verifier for the new version" "$(call "$CTM" 'protocolVersionVerifier(uint256)(address)' "$NEW")" "$VERIFIER"
-chk "CTM stored cut = upgrade_cut_data" "$(call "$CTM" 'upgradeCutHash(uint256)(bytes32)' "$OLD")" "$(cast keccak "$(toml_get contracts_config.upgrade_cut_data)")"
+chk "CTM stored cut = upgrade_cut_data" "$(call "$CTM" 'upgradeCutHash(uint256)(bytes32)' "$OLD")" "$(cast keccak "$(toml_get chain_upgrade_diamond_cut)")"
 chk "old version still active" "$(call "$CTM" 'protocolVersionIsActive(uint256)(bool)' "$OLD")" "true"
 chk "creation cut unchanged" "$(call "$CTM" 'initialCutHash()(bytes32)')" "$INITIAL_CUT_HASH"
 chk "force deployments unchanged" "$(call "$CTM" 'initialForceDeploymentHash()(bytes32)')" "$FORCE_DEPLOYMENT_HASH"
