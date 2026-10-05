@@ -41,8 +41,15 @@ contract CoreUpgradeParityHarness is CoreUpgrade_v33 {
         config.ownerAddress = _owner;
     }
 
-    function buildInteropHandlerWiringCalls() external returns (Call[] memory) {
-        return prepareVersionSpecificStage1GovernanceCallsL1();
+    function buildInteropHandlerWiringCalls() external view returns (Call[] memory) {
+        return _buildL1InteropHandlerWiringCalls();
+    }
+
+    /// @dev Places an already-registered L1 Interop Center, so the deploy step leaves it alone and these
+    ///      tests stay about the interop handler; the center's own wiring is covered by
+    ///      `L1InteropCenterWiring.t.sol`.
+    function setDiscoveredInteropCenter(address _interopCenter) external {
+        coreAddresses.bridgehub.proxies.interopCenter = _interopCenter;
     }
 
     /// @dev The state the deploy step leaves behind on a v31 ecosystem: the proxy it just created, plus
@@ -188,6 +195,7 @@ contract PreV32ParityCallsTest is Test {
     ///      no-op apart from refreshing the implementation behind the existing proxy.
     function test_refreshesImplementationWhenHandlerAlreadyExists() public {
         upgradeScript.setDiscoveredAddresses(address(l1Nullifier), address(assetRouter), address(interopHandler));
+        upgradeScript.setDiscoveredInteropCenter(makeAddr("interopCenter"));
 
         upgradeScript.deployVersionSpecific();
 

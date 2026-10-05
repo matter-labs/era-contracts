@@ -18,6 +18,7 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
     using LogFinder for Vm.Log[];
 
     address internal l1InteropCenter = makeAddr("l1InteropCenter");
+
     function setUp() public virtual {
         setupDiamondProxy();
     }
@@ -60,9 +61,10 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
         BridgehubL2TransactionRequest memory req = getBridgehubRequestL2TransactionRequest();
         utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
         utilsFacet.util_setPriorityTxMaxGasLimit(req.l2GasLimit);
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.interopCenter, ()), abi.encode(l1InteropCenter));
 
         vm.recordLogs();
-        vm.prank(bridgehub);
+        vm.prank(l1InteropCenter);
         bytes32 canonicalTxHash = mailboxFacet.bridgehubRequestL2Transaction(req);
 
         Vm.Log memory log = vm.getRecordedLogs().requireOneFrom(NEW_PRIORITY_REQUEST_SIGNATURE, address(mailboxFacet));
@@ -91,8 +93,9 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
         req.factoryDeps[0] = _bytecode;
         bytes32 rootBefore = gettersFacet.getPriorityTreeRoot();
         uint256 countBefore = gettersFacet.getTotalPriorityTxs();
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.interopCenter, ()), abi.encode(l1InteropCenter));
 
-        vm.prank(bridgehub);
+        vm.prank(l1InteropCenter);
         vm.expectRevert(FactoryDepsNotSupported.selector);
         mailboxFacet.bridgehubRequestL2Transaction(req);
 
@@ -178,6 +181,7 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
         bytes32 newRootHash = gettersFacet.getPriorityTreeRoot();
         assertEq(canonicalTxHash, newRootHash, "root hash should have changed");
     }
+
     function test_revertWhen_calledByBridgehub() public {
         address bridgehub = makeAddr("bridgehub");
         utilsFacet.util_setBridgehub(bridgehub);
