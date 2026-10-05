@@ -63,7 +63,8 @@ Each governance stage is one `Governance` operation: the owner sends `scheduleTr
 **Per chain, the cut needs every committed batch executed.** `DefaultUpgradeZKsyncOS.upgrade` reverts
 with `NotAllBatchesExecuted()` otherwise. At the rehearsal's fork block, only 2727 and 2728 were idle.
 Chains 2729, 27271, 27272 and 27273 had batches in flight, so their operators must drain the queue
-first.
+first. The cut sets no DA: every chain keeps its validator pair and pubdata content (see
+`output/stage/chain-upgrades/README.md`).
 
 ## Files
 
@@ -71,14 +72,20 @@ first.
   timer delay, the CREATE2 salt and the chain list. The script checks it against the live state.
 - `output/stage/ecosystem.toml` is the artifact. On top of the standard `DefaultCTMUpgrade` output
   (`[state_transition]`, `[deployed_addresses]`, `[contracts_config]`, `chain_upgrade_diamond_cut`,
-  `[governance_calls]`, `[test_upgrade_calls]`), it carries:
+  `[governance_calls]`, `[test_upgrade_calls]` with `test_create_chain_zkos`), it carries:
   - `[verification_key]`: the old and new VK hashes;
   - `[deploy_calls]`: the four CREATE2 factory calls and the contract names;
   - `[governance_operations]`: the Governance `scheduleTransparent` / `execute` calldata;
   - `[chain_upgrades.<id>]`: each ChainAdmin's `multicall` calldata.
-- `output/stage/simulator/2026-10-05-v0.33.2-verifier-stage.json` is the transaction-simulator
-  scenario.
-- `generate-stage.sh` regenerates both.
+- `output/stage/chain-upgrades/<id>/` holds the per-chain bundles, made by `protocol_ops chain
+set-upgrade-timestamp` and `chain upgrade` as for the v33 testnet chains. Each has
+  `01_chain.set-upgrade-timestamp_*.safe.json`, `02_chain.upgrade_*.safe.json` and `manifest.json`;
+  see the README there.
+- `output/stage/simulator/` holds the transaction-simulator scenarios: `…-stage-1-ecosystem.json`, and
+  one `…-stage-2-chain-<id>.json` per chain.
+- `generate-stage.sh` regenerates `ecosystem.toml` and the ecosystem scenario.
+- `generate-chain-upgrades-stage.sh` regenerates the per-chain bundles and their scenarios, on a fork
+  where `apply-ecosystem-upgrade-to-fork.sh` has applied the ecosystem upgrade.
 - `rehearse-stage.sh` replays the real execution path on a Sepolia fork and asserts the end state.
 - `sim-descriptions.toml` holds the scenario's human-readable descriptions.
 
@@ -95,6 +102,7 @@ verifier contracts, so the CREATE2 addresses are reproducible.
 cd protocol-ops && cargo build --release && cd ..
 cd l1-contracts && forge build
 L1_RPC=<sepolia rpc> ./upgrade-envs/v0.33.2-verifier/generate-stage.sh 2026-10-05
+L1_FORK_URL=<sepolia rpc> ./upgrade-envs/v0.33.2-verifier/generate-chain-upgrades-stage.sh 2026-10-05
 L1_FORK_URL=<sepolia rpc> ./upgrade-envs/v0.33.2-verifier/rehearse-stage.sh
 ```
 
@@ -105,19 +113,18 @@ L1_FORK_URL=<sepolia rpc> ./upgrade-envs/v0.33.2-verifier/rehearse-stage.sh
 2. As the Governance owner, send `stageN_schedule_calldata` then `stageN_execute_calldata` to the
    Governance for N = 0, 1, 2. They can go back to back, since `minDelay` and the timer delay are 0.
 3. Per chain, once the v0.33.2 prover is live and the chain has no unexecuted batches, the
-   ChainAdmin's owner:
-   - sends `multicall([ServerNotifier.setUpgradeTimestamp(chainId, ts)], true)` to the ChainAdmin
-     (ServerNotifier `0x2A20E03d1E15556fDce96dA891FF454D67172d6E`);
-   - then sends `[chain_upgrades.<id>].chain_admin_calldata` to it.
+   ChainAdmin's owner executes `output/stage/chain-upgrades/<id>/01_*` (`setUpgradeTimestamp`), then
+   `02_*` (the cut).
 
 ## Validation
 
-| check                                                                    | result                                                                                                                                                                                                                      |
-| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| creation bytecode of the verifier contracts vs `AllContractsHashes.json` | identical                                                                                                                                                                                                                   |
-| deployed VK vs `zksync-os/latest.json` (asserted by the script)          | `0xec24ed29…`                                                                                                                                                                                                               |
-| `rehearse-stage.sh` on a Sepolia fork (block 11850096)                   | `REHEARSAL PASSED`: CTM on v0.33.2 with the new verifier and stored cut, creation params unchanged, migrations unpaused, 2727 / 2728 upgraded, the others refuse with `NotAllBatchesExecuted`, chain 556 created on v0.33.2 |
-| transaction-simulator `yarn simulate` on the scenario                    | `✅ All simulations succeed!` (14 txs), chain 556 created on v0.33.2, chain 2727 upgraded to v0.33.2                                                                                                                        |
+| check                                                                       | result                                                                                                                                                                                                                                                 |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| creation bytecode of the verifier contracts vs `AllContractsHashes.json`    | identical                                                                                                                                                                                                                                              |
+| deployed VK vs `zksync-os/latest.json` (asserted by the script)             | `0xec24ed29…`                                                                                                                                                                                                                                          |
+| `rehearse-stage.sh` on a Sepolia fork (block 11850895)                      | `REHEARSAL PASSED`: CTM on v0.33.2 with the new verifier and stored cut, creation params unchanged, migrations unpaused; the committed chain bundles upgrade 2727 / 2728, the others refuse with `NotAllBatchesExecuted`; chain 556 created on v0.33.2 |
+| per-chain cut bundles vs `[chain_upgrades.<id>].chain_admin_calldata`       | byte-identical, all six                                                                                                                                                                                                                                |
+| transaction-simulator `yarn simulate --ci` on all seven scenarios, one fork | `✅ All simulations succeed!` for each: the ecosystem file, then all six chains taking the timestamp and the cut                                                                                                                                       |
 
 ## Transaction-simulator notes
 
@@ -127,4 +134,7 @@ L1_FORK_URL=<sepolia rpc> ./upgrade-envs/v0.33.2-verifier/rehearse-stage.sh
   this file in `era-contracts-provenance.json` also needs this ecosystem's Governance added there.
 - The four `deploy` entries are part of the scenario because nothing is deployed yet. Once they are
   broadcast, mark them `alreadyExecuted: true`. Replaying a CREATE2 deployment reverts.
-- `test_upgrade_chain_zkos` carries `emulateAllBatchesExecuted`, for the reason above.
+- Like the v33 testnet artifact, the ecosystem scenario carries an `ack_test_upgrade_chain_zkos` marker
+  instead of a generated test upgrade, since the per-chain scenarios are the real coverage. The chain
+  scenarios use `emulateAllBatchesExecutedFor`. Both need the transaction-simulator branch
+  `sb/v33-atomic-interop-testnet`, the same one the v33 testnet scenarios need.

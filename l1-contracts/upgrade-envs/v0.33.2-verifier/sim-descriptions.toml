@@ -7,7 +7,14 @@
 bridgehub           = "0xb9415d43C7753cCeBaa1ac05c8BabA36159ab13F"
 chain_asset_handler = "0x33388639Ba3f30AD47fc6e6769CEe89e53a09991"
 zkos_ctm            = "0x94d8784d719181EA00f58ab4a85333959FFA5a79"
-chain_2727          = "0xA9a82F284AB58964E9dA89B9865FF0e704507579"
+
+# --- per-chain ChainAdmins (pre-existing; each chain takes the cut itself) ---
+chain_admin_2727  = "0x77ec7B16E9063b5eEE0D26A69bFD7047E398b65F"
+chain_admin_2728  = "0x81cd6071ea6da05dE4b8b1D3D745B84e106B86d5"
+chain_admin_2729  = "0x2B32B8172593AE425723D6FEd51e41E4428594cd"
+chain_admin_27271 = "0x36E6eBC9f445FE19b1abA6DFc384DAfb9d7ae7E8"
+chain_admin_27272 = "0x79bE7e3240bfE25aaA7c7EB743cECc1D8ceaC64E"
+chain_admin_27273 = "0xE088729c25bc626381eeaE9853112774A76f11a6"
 
 # --- deployed by this upgrade (rotate with the CREATE2 salt) ---
 gov_upgrade_timer       = "0xa1FAdE7c8863D9f6ebF59B25b0C693b291ecd9d4"
@@ -58,7 +65,78 @@ target = "bridgehub"
 selector = "0xf113c88b"
 desc = "test: create chain 556 on v0.33.2 from the unchanged chain creation params (Bridgehub.createNewChain)"
 
+# --- per-chain bundles (chain-upgrades/<id>/), both `ChainAdmin.multicall`, told apart by the inner selector:
+#   0xe2a9d554 = ServerNotifier.setUpgradeTimestamp
+#   0x3b6d7534 = upgradeChainFromVersion
+
 [[entries]]
-target = "chain_2727"
-selector = "0x3b6d7534"
-desc = "test: upgrade chain 2727 from v0.33.0 to v0.33.2 as its ChainAdmin (upgradeChainFromVersion)"
+target = "chain_admin_2727"
+selector = "0x69340beb"
+inner_selector = "0xe2a9d554"
+desc = "ChainAdmin.multicall: ServerNotifier.setUpgradeTimestamp(2727, 1) — 1 means no waiting, and 0 is rejected as the unset sentinel. Requires stage 1 to have registered the v0.33.2 cut, which is why this file must run after the ecosystem scenario."
+
+[[entries]]
+target = "chain_admin_2727"
+selector = "0x69340beb"
+inner_selector = "0x3b6d7534"
+desc = "ChainAdmin.multicall: upgradeChainFromVersion(chain 2727, 0x2100000000 -> 0x2100000002) — the per-chain diamond cut: no facets, new verifier, DA unchanged."
+
+[[entries]]
+target = "chain_admin_2728"
+selector = "0x69340beb"
+inner_selector = "0xe2a9d554"
+desc = "ChainAdmin.multicall: ServerNotifier.setUpgradeTimestamp(2728, 1) — 1 means no waiting, and 0 is rejected as the unset sentinel. Requires stage 1 to have registered the v0.33.2 cut, which is why this file must run after the ecosystem scenario."
+
+[[entries]]
+target = "chain_admin_2728"
+selector = "0x69340beb"
+inner_selector = "0x3b6d7534"
+desc = "ChainAdmin.multicall: upgradeChainFromVersion(chain 2728, 0x2100000000 -> 0x2100000002) — the per-chain diamond cut: no facets, new verifier, DA unchanged."
+
+[[entries]]
+target = "chain_admin_2729"
+selector = "0x69340beb"
+inner_selector = "0xe2a9d554"
+desc = "ChainAdmin.multicall: ServerNotifier.setUpgradeTimestamp(2729, 1) — 1 means no waiting, and 0 is rejected as the unset sentinel. Requires stage 1 to have registered the v0.33.2 cut, which is why this file must run after the ecosystem scenario."
+
+[[entries]]
+target = "chain_admin_2729"
+selector = "0x69340beb"
+inner_selector = "0x3b6d7534"
+desc = "ChainAdmin.multicall: upgradeChainFromVersion(chain 2729, 0x2100000000 -> 0x2100000002) — the per-chain diamond cut: no facets, new verifier, DA unchanged."
+
+[[entries]]
+target = "chain_admin_27271"
+selector = "0x69340beb"
+inner_selector = "0xe2a9d554"
+desc = "ChainAdmin.multicall: ServerNotifier.setUpgradeTimestamp(27271, 1) — 1 means no waiting, and 0 is rejected as the unset sentinel. Requires stage 1 to have registered the v0.33.2 cut, which is why this file must run after the ecosystem scenario."
+
+[[entries]]
+target = "chain_admin_27271"
+selector = "0x69340beb"
+inner_selector = "0x3b6d7534"
+desc = "ChainAdmin.multicall: upgradeChainFromVersion(chain 27271, 0x2100000000 -> 0x2100000002) — the per-chain diamond cut: no facets, new verifier, DA unchanged."
+
+[[entries]]
+target = "chain_admin_27272"
+selector = "0x69340beb"
+inner_selector = "0xe2a9d554"
+desc = "ChainAdmin.multicall: ServerNotifier.setUpgradeTimestamp(27272, 1) — 1 means no waiting, and 0 is rejected as the unset sentinel. Requires stage 1 to have registered the v0.33.2 cut, which is why this file must run after the ecosystem scenario."
+
+[[entries]]
+target = "chain_admin_27272"
+selector = "0x69340beb"
+inner_selector = "0x3b6d7534"
+desc = "ChainAdmin.multicall: upgradeChainFromVersion(chain 27272, 0x2100000000 -> 0x2100000002) — the per-chain diamond cut: no facets, new verifier, DA unchanged."
+
+[[entries]]
+target = "chain_admin_27273"
+selector = "0x69340beb"
+inner_selector = "0xe2a9d554"
+desc = "ChainAdmin.multicall: ServerNotifier.setUpgradeTimestamp(27273, 1) — 1 means no waiting, and 0 is rejected as the unset sentinel. Requires stage 1 to have registered the v0.33.2 cut, which is why this file must run after the ecosystem scenario."
+
+[[entries]]
+target = "chain_admin_27273"
+selector = "0x69340beb"
+inner_selector = "0x3b6d7534"
+desc = "ChainAdmin.multicall: upgradeChainFromVersion(chain 27273, 0x2100000000 -> 0x2100000002) — the per-chain diamond cut: no facets, new verifier, DA unchanged."

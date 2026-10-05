@@ -102,7 +102,8 @@ pub struct ChainUpgradeArgs {
 
     /// Take a validium-priced chain to v33 or beyond in a state that is not the recommended one:
     /// logs-only pubdata that the chain actually delivers. Without this, such an upgrade is
-    /// refused rather than prepared.
+    /// refused rather than prepared. For a chain already past v33 whose upgrade sets no DA, this
+    /// accepts the setup it runs today, whatever it is.
     #[clap(long, default_value_t = false, help_heading = "DA")]
     pub acknowledge_unrecommended_noda: bool,
 
@@ -321,7 +322,8 @@ async fn resolve_da_move(
 ///   committed can be read back from L1, its interop commitment tree leaves included.
 ///
 /// Both are refused unless the caller acknowledges the second one with
-/// `--acknowledge-unrecommended-noda`.
+/// `--acknowledge-unrecommended-noda`. A chain already past that version whose upgrade sets no DA
+/// keeps the setup it runs today; the same flag acknowledges that setup, whichever of the two it is.
 async fn guard_unrecommended_validium_state(
     l1_rpc_url: &str,
     ctm: Address,
@@ -344,7 +346,7 @@ async fn guard_unrecommended_validium_state(
 
     // What the chain runs once this upgrade lands: what the bundle sets, or what it already has
     // where the bundle sets nothing. A chain arriving at the version that introduces the pubdata
-    // content gets that version's default, `FULL_PUBDATA`.
+    // content gets that version's default, `FULL_PUBDATA`; one already past it keeps its own.
     let scheme = match da_move.pair {
         Some(pair) => pair.l2_da_commitment_scheme,
         None => {
@@ -352,15 +354,43 @@ async fn guard_unrecommended_validium_state(
                 .await?
         }
     };
-    let content = da_move
-        .pubdata_content
-        .unwrap_or(PubdataContent::FullPubdata);
+    // A chain already past the version that introduces the pubdata content runs whatever DA setup
+    // it has; an upgrade that sets none of it leaves that setup exactly as it found it.
+    let already_past = crate::common::l1_contracts::resolve_chain_minor_protocol_version(
+        l1_rpc_url,
+        chain_address,
+    )
+    .await?
+        >= MIN_MINOR_VERSION_WITH_VALIDIUM_DA;
+    let leaves_da_unchanged =
+        already_past && da_move.pair.is_none() && da_move.pubdata_content.is_none();
+    let content = match da_move.pubdata_content {
+        Some(content) => content,
+        None if already_past => {
+            crate::common::l1_contracts::resolve_pubdata_content(l1_rpc_url, chain_address).await?
+        }
+        None => PubdataContent::FullPubdata,
+    };
     let delivers = !matches!(
         scheme,
         L2DACommitmentScheme::EmptyNoDA | L2DACommitmentScheme::None
     );
 
     if content == PubdataContent::LogsOnly && delivers {
+        return Ok(());
+    }
+    if leaves_da_unchanged {
+        anyhow::ensure!(
+            args.acknowledge_unrecommended_noda,
+            "chain {chain_id} already commits {content} with DA scheme {scheme}, which is not the \
+             recommended state, and this upgrade leaves it so. Pass `--da-mode logs-only-validium \
+             --l1-da-validator <address>` to move it, or `--acknowledge-unrecommended-noda` to \
+             prepare the upgrade without touching its DA"
+        );
+        logger::warn(format!(
+            "Chain {chain_id} keeps its DA setup ({content}, {scheme}): acknowledged as not the \
+             recommended state"
+        ));
         return Ok(());
     }
     anyhow::ensure!(
