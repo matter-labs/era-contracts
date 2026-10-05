@@ -7,17 +7,22 @@ The committer checks it against the current on-chain runtime configuration befor
 
 The batch proof public input commits to the runtime configuration through
 `chain_config_hash`. Solidity's `ZKChainBase._getZKsyncOSChainConfigHash()` and ZKsync OS's `ChainConfig::hash`
-hash the following five 32-byte big-endian words, in order:
+hash the following six 32-byte big-endian words, in order:
 
 1. Chain ID.
 2. FRI proof verification enabled (always zero on the settlement layer).
 3. Maximum transaction gas limit (the default applies when storage contains zero).
 4. Pubdata content (`FULL_PUBDATA = 0`, `LOGS_ONLY = 1`).
 5. L1 transaction filtering enabled (`false = 0`, `true = 1`).
+6. Large contracts enabled (`false = 0`, `true = 1`).
 
-The fifth word is included even when filtering is disabled. This changes the hash
-from the previous four-word encoding, so the contracts and ZKsync OS runtime must
-be upgraded together. The Solidity public-input tests pin the shared golden vector.
+Both boolean words are included even when disabled. The sixth word changes the
+hash from the previous five-word encoding, so the contracts and ZKsync OS runtime
+must be upgraded together with this field order. The Solidity public-input tests
+pin the shared default and flag-combination vectors from ZKsync OS's
+[`public_input.rs`](https://github.com/matter-labs/zksync-os-private/blob/ca730149b70ceb296dd2c4158823e152c90ae92b/basic_bootloader/src/bootloader/block_flow/zk/post_tx_op/public_input.rs).
+The vectors with exactly one flag enabled detect swaps of the boolean words.
+Batch-proving tests explicitly cover all four combinations.
 
 The stored batch commitment is the full, untruncated public-input hash:
 
@@ -112,17 +117,38 @@ expiring. Filtered transactions still advance the priority queue when their
 batches are executed on the settlement layer, so an operator could otherwise
 reject recovery calls while keeping that activation condition from being met.
 
+## Large contracts
+
+Large contracts are disabled by default, including for existing chains. The chain
+admin can opt in with `setZKsyncOSLargeContractsEnabled`; the current value is
+exposed by `isZKsyncOSLargeContractsEnabled`.
+`AdminFunctions.setZKsyncOSLargeContractsEnabled` prepares or sends the
+corresponding admin call.
+
+| Enabled | Maximum deployed code | Maximum initcode |
+| ------- | --------------------- | ---------------- |
+| `false` | 24 KiB                | 48 KiB           |
+| `true`  | 64 KiB                | 128 KiB          |
+
+The runtime enforces these limits; its
+[`ChainConfig`](https://github.com/matter-labs/zksync-os-private/blob/ca730149b70ceb296dd2c4158823e152c90ae92b/zk_ee/src/system/metadata/chain_config.rs)
+defines both sizes. See the runtime's
+[code-size documentation](https://github.com/matter-labs/zksync-os-private/blob/ca730149b70ceb296dd2c4158823e152c90ae92b/docs/system/large_contracts.md)
+for the unchanged gas pricing and resource budgets. Disabling the option restricts
+subsequent deployments; already deployed large contracts remain callable.
+
 ## Configuration updates
 
-The filtering and maximum-transaction-gas setters require the chain admin on the
-active settlement layer. Validators and the chain type manager do not have direct
-permission to call them unless they are also the chain admin.
+The filtering, large-contracts, and maximum-transaction-gas setters require the
+chain admin on the active settlement layer. Validators and the chain type manager
+do not have direct permission to call them unless they are also the chain admin.
 
 All committed batches must be verified before a runtime configuration update.
 This existing admin guard is retained even though proof verification now uses the stored
 batch commitment. Operators must drain the committed batch queue and
 coordinate the runtime's configuration with the admin transaction before committing
-new batches. A successful filtering update emits `NewZKsyncOSL1TxFiltering` with the
+new batches. Successful updates emit `NewZKsyncOSL1TxFiltering`,
+`NewZKsyncOSLargeContracts`, or `NewZKsyncOSMaxTxGasLimit`, respectively, with the
 old and new values.
 
 ### Pending priority requests
