@@ -33,18 +33,29 @@ like every other chain.
 
 ## What the upgrade does
 
-| step                    | sender                                 | call                                                                                                                    |
-| ----------------------- | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| deploy (permissionless) | any EOA                                | CREATE2 factory: `ZKsyncOSVerifierPlonk` → `0xA24d08A1…4874`, then `ZKsyncOSTestnetVerifier(plonk)` → `0x6951368f…3A9C` |
-| stage 0                 | Governance                             | `ChainAssetHandler.pauseMigration()`                                                                                    |
-| stage 1                 | Governance                             | `CTM.createNewVerifierOnlyUpgrade(0x2100000000, type(uint256).max, 0x2100000002, 0x6951368f…3A9C)`                      |
-| stage 2                 | Governance                             | `ChainAssetHandler.unpauseMigration()`                                                                                  |
-| per chain               | the chain's ChainAdmin, from its owner | `ServerNotifier.setUpgradeTimestamp(chainId, ts)`, then `upgradeChainFromVersion(chain, 0x2100000000, cut)`             |
+The script extends `DefaultCTMUpgrade` and keeps its flow: configuration from
+`configs/genesis/zksync-os/latest.json`, address discovery from the CTM, `deployVerifiers`, the
+`UpgradeStageValidator` / `GovernanceUpgradeTimer` pair, the stage 0/1/2 scaffold, the test calls and the
+standard output. Stage 1 differs: it registers the new version with `createNewVerifierOnlyUpgrade`, and
+skips the proxy upgrades, `setDefaultUpgrade`, `setChainCreationParams` and `setNewVersionUpgrade`.
+
+| step                    | sender                                 | calls                                                                                                                                       |
+| ----------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| deploy (permissionless) | any EOA                                | CREATE2 factory: `ZKsyncOSVerifierPlonk`, `ZKsyncOSTestnetVerifier(plonk)`, `UpgradeStageValidator(ctm, v0.33.2)`, `GovernanceUpgradeTimer` |
+| stage 0                 | Governance                             | `ChainAssetHandler.pauseMigration()`, `GovernanceUpgradeTimer.startTimer()`                                                                 |
+| stage 1                 | Governance                             | `checkDeadline()`, `checkMigrationsPaused()`, `CTM.createNewVerifierOnlyUpgrade(0x2100000000, type(uint256).max, 0x2100000002, verifier)`   |
+| stage 2                 | Governance                             | `checkProtocolUpgradePresence()`, `ChainAssetHandler.unpauseMigration()`, `checkMigrationsUnpaused()`                                       |
+| per chain               | the chain's ChainAdmin, from its owner | `ServerNotifier.setUpgradeTimestamp(chainId, ts)`, then `upgradeChainFromVersion(chain, 0x2100000000, cut)`                                 |
+
+The addresses of the new contracts are in `[state_transition]` (`verifier_addr`, `verifier_plonk_addr`) and
+`[deployed_addresses]` (`upgrade_stage_validator`, `l1_governance_upgrade_timer`) of the output. The timer's
+initial delay is 0, as in the v29.5 VK patch: nothing on L2 changes, so stage 1 may follow stage 0
+immediately.
 
 `createNewVerifierOnlyUpgrade` builds the cut itself: no facet cuts, `initAddress` = the stored
 `defaultUpgrade`, `initCalldata` = `upgradeVerifierOnly(0x2100000002)`. It also carries the chain
-creation params over to the new version. The old version keeps a `type(uint256).max` deadline, as the
-v29.3 stage VK patch did, so nothing forces a chain over before its prover is ready.
+creation params over to the new version. The old version keeps a `type(uint256).max` deadline
+(`UpgradeHelperLib.getOldProtocolDeadline`), so nothing forces a chain over before its prover is ready.
 
 Each governance stage is one `Governance` operation: the owner sends `scheduleTransparent(op, 0)` then
 `execute(op)`. `[governance_operations]` in the output has both calldatas per stage.
@@ -57,30 +68,28 @@ first.
 ## Files
 
 - `stage.toml` is the input: bridgehub, CTM, the expected current version, the verifier flavour, the
-  CREATE2 salt and the chain list. The script checks all of it against the live state before emitting
-  anything.
-- `output/stage/ecosystem.toml` is the artifact:
-  - `[contracts_config]` has the addresses, versions, old and new VK, and the cut the CTM will store.
-  - `[deploy_calls]` holds the two CREATE2 factory calls.
-  - `[governance_calls]` holds stages 0/1/2 as `Call[]`.
-  - `[governance_operations]` holds the Governance `scheduleTransparent` / `execute` calldata.
-  - `[chain_upgrades.<id>]` holds each ChainAdmin's `multicall` calldata.
-  - `[test_upgrade_calls]` holds the simulator's smoke tests.
+  timer delay, the CREATE2 salt and the chain list. The script checks it against the live state.
+- `output/stage/ecosystem.toml` is the artifact. On top of the standard `DefaultCTMUpgrade` output
+  (`[state_transition]`, `[deployed_addresses]`, `[contracts_config]`, `chain_upgrade_diamond_cut`,
+  `[governance_calls]`, `[test_upgrade_calls]`), it carries:
+  - `[verification_key]`: the old and new VK hashes;
+  - `[deploy_calls]`: the four CREATE2 factory calls and the contract names;
+  - `[governance_operations]`: the Governance `scheduleTransparent` / `execute` calldata;
+  - `[chain_upgrades.<id>]`: each ChainAdmin's `multicall` calldata.
 - `output/stage/simulator/2026-10-05-v0.33.2-verifier-stage.json` is the transaction-simulator
   scenario.
 - `generate-stage.sh` regenerates both.
 - `rehearse-stage.sh` replays the real execution path on a Sepolia fork and asserts the end state.
 - `sim-descriptions.toml` holds the scenario's human-readable descriptions.
 
-Script: `deploy-scripts/upgrade/verifier-only/ZKsyncOSVerifierOnlyUpgrade.s.sol`. It never
-broadcasts. It deploys the verifiers on the local fork only, to check that the deployed VK equals
-`configs/genesis/zksync-os/latest.json`.
+Script: `deploy-scripts/upgrade/verifier-only/ZKsyncOSVerifierOnlyUpgrade.s.sol`. It is run without
+`--broadcast`: the deployments only happen on the local fork, which is where the script checks that the
+deployed VK equals `configs/genesis/zksync-os/latest.json`.
 
 ## Running it
 
-Build with foundry-zksync v0.1.5, the CI pin. That build reproduces `AllContractsHashes.json` for
-`ZKsyncOSVerifierPlonk`, `ZKsyncOSTestnetVerifier` and `ZKsyncOSVerifier`, so the CREATE2 addresses
-above are reproducible.
+Build with foundry-zksync v0.1.5, the CI pin. That build reproduces `AllContractsHashes.json` for the
+verifier contracts, so the CREATE2 addresses are reproducible.
 
 ```bash
 cd protocol-ops && cargo build --release && cd ..
@@ -91,10 +100,10 @@ L1_FORK_URL=<sepolia rpc> ./upgrade-envs/v0.33.2-verifier/rehearse-stage.sh
 
 ## Executing it
 
-1. Send the two `[deploy_calls]` to the CREATE2 factory from any funded EOA. Check that
-   `verificationKeyHash()` on `0x6951368f…3A9C` is `0xec24ed29…`.
+1. Send the four `[deploy_calls]` to the CREATE2 factory from any funded EOA. Check that
+   `verificationKeyHash()` on `verifier_addr` is `0xec24ed29…`.
 2. As the Governance owner, send `stageN_schedule_calldata` then `stageN_execute_calldata` to the
-   Governance for N = 0, 1, 2. They can go back to back, since `minDelay` is 0.
+   Governance for N = 0, 1, 2. They can go back to back, since `minDelay` and the timer delay are 0.
 3. Per chain, once the v0.33.2 prover is live and the chain has no unexecuted batches, the
    ChainAdmin's owner:
    - sends `multicall([ServerNotifier.setUpgradeTimestamp(chainId, ts)], true)` to the ChainAdmin
@@ -103,12 +112,12 @@ L1_FORK_URL=<sepolia rpc> ./upgrade-envs/v0.33.2-verifier/rehearse-stage.sh
 
 ## Validation
 
-| check                                                                          | result                                                                                                                                                                                                                      |
-| ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| creation bytecode of the three verifier contracts vs `AllContractsHashes.json` | identical                                                                                                                                                                                                                   |
-| deployed VK vs `zksync-os/latest.json` (asserted by the script)                | `0xec24ed29…`                                                                                                                                                                                                               |
-| `rehearse-stage.sh` on a Sepolia fork (block 11850015)                         | `REHEARSAL PASSED`: CTM on v0.33.2 with the new verifier and stored cut, creation params unchanged, migrations unpaused, 2727 / 2728 upgraded, the others refuse with `NotAllBatchesExecuted`, chain 556 created on v0.33.2 |
-| transaction-simulator `yarn simulate` on the scenario                          | `✅ All simulations succeed!` (7 txs), chain 556 created on v0.33.2, chain 27271 upgraded to v0.33.2                                                                                                                        |
+| check                                                                    | result                                                                                                                                                                                                                      |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| creation bytecode of the verifier contracts vs `AllContractsHashes.json` | identical                                                                                                                                                                                                                   |
+| deployed VK vs `zksync-os/latest.json` (asserted by the script)          | `0xec24ed29…`                                                                                                                                                                                                               |
+| `rehearse-stage.sh` on a Sepolia fork (block 11850096)                   | `REHEARSAL PASSED`: CTM on v0.33.2 with the new verifier and stored cut, creation params unchanged, migrations unpaused, 2727 / 2728 upgraded, the others refuse with `NotAllBatchesExecuted`, chain 556 created on v0.33.2 |
+| transaction-simulator `yarn simulate` on the scenario                    | `✅ All simulations succeed!` (14 txs), chain 556 created on v0.33.2, chain 2727 upgraded to v0.33.2                                                                                                                        |
 
 ## Transaction-simulator notes
 
@@ -116,6 +125,6 @@ L1_FORK_URL=<sepolia rpc> ./upgrade-envs/v0.33.2-verifier/rehearse-stage.sh
   shape the simulator's era-contracts copy-paste check derives from `ecosystem.toml`. That check
   currently hardcodes stage's owner as the old ProtocolUpgradeHandler `0x8f086275…`, so registering
   this file in `era-contracts-provenance.json` also needs this ecosystem's Governance added there.
-- The two `deploy_verifier` entries are part of the scenario because nothing is deployed yet. Once
-  they are broadcast, mark them `alreadyExecuted: true`. Replaying a CREATE2 deployment reverts.
+- The four `deploy` entries are part of the scenario because nothing is deployed yet. Once they are
+  broadcast, mark them `alreadyExecuted: true`. Replaying a CREATE2 deployment reverts.
 - `test_upgrade_chain_zkos` carries `emulateAllBatchesExecuted`, for the reason above.
