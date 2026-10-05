@@ -4,8 +4,6 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {CTMUpgradeHarness} from "foundry-test/l1/integration/utils/CTMUpgradeHarness.sol";
 import {UpgradeHelperLib} from "deploy-scripts/upgrade/default-upgrade/UpgradeHelperLib.sol";
-import {DefaultCTMUpgrade} from "deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
-import {CTMUpgradeParams} from "deploy-scripts/upgrade/default-upgrade/UpgradeParams.sol";
 import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "deploy-scripts/utils/Types.sol";
 import {PublishFactoryDepsResult} from "deploy-scripts/utils/bytecode/BytecodePublisher.s.sol";
 import {BytecodeUtils} from "deploy-scripts/utils/bytecode/BytecodeUtils.s.sol";
@@ -111,14 +109,5 @@ contract DefaultCTMUpgradeScriptTest is Test {
                 )
             )
         );
-    }
-
-    function test_RejectsEraCTMBeforePreparation() public {
-        DefaultCTMUpgrade script = new DefaultCTMUpgrade();
-        CTMUpgradeParams memory params;
-        params.ctmProxy = makeAddr("eraCtm");
-        vm.mockCall(params.ctmProxy, abi.encodeCall(IChainTypeManager.isZKsyncOS, ()), abi.encode(false));
-        vm.expectRevert(bytes("ZKsync OS CTM required"));
-        script.noGovernancePrepare(params);
     }
 }

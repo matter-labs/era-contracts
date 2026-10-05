@@ -3,6 +3,8 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {CTMUpgradeV34Harness} from "foundry-test/l1/integration/utils/CTMUpgradeV34Harness.sol";
+import {CTMUpgrade_v34} from "deploy-scripts/upgrade/v34/CTMUpgrade_v34.s.sol";
+import {CTMUpgradeParams} from "deploy-scripts/upgrade/default-upgrade/UpgradeParams.sol";
 import {UpgradeHelperLib} from "deploy-scripts/upgrade/default-upgrade/UpgradeHelperLib.sol";
 import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "deploy-scripts/utils/Types.sol";
 import {PublishFactoryDepsResult} from "deploy-scripts/utils/bytecode/BytecodePublisher.s.sol";
@@ -67,5 +69,20 @@ contract V34UpgradeScriptTest is Test {
             UpgradeHelperLib.getProtocolUpgradeNonce(version)
         );
         assertEq(cut.initCalldata, abi.encodeCall(DefaultUpgrade.upgrade, (proposal)));
+
+        // The cut's initializer is listed in the prepare output next to the CTM default.
+        assertEq(
+            vm.parseJsonAddress(script.serializedVersionSpecificStateTransition(), ".v34_upgrade_addr"),
+            cut.initAddress
+        );
+    }
+
+    function test_RejectsEraCTMBeforePreparation() public {
+        CTMUpgrade_v34 script = new CTMUpgrade_v34();
+        CTMUpgradeParams memory params;
+        params.ctmProxy = makeAddr("eraCtm");
+        vm.mockCall(params.ctmProxy, abi.encodeCall(IChainTypeManager.isZKsyncOS, ()), abi.encode(false));
+        vm.expectRevert(bytes("v34 requires a ZKsync OS CTM"));
+        script.noGovernancePrepare(params);
     }
 }

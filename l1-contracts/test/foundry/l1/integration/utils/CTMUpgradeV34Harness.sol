@@ -47,6 +47,11 @@ contract CTMUpgradeV34Harness is CTMUpgrade_v34 {
         deployments[0] = getL2DefaultUpgradeDeployment();
     }
 
+    function serializedVersionSpecificStateTransition() external returns (string memory) {
+        serializeVersionSpecificStateTransition();
+        return vm.serializeString("state_transition", "test_marker", "v34");
+    }
+
     function setForceDeploymentsInputs(
         address _ctmDeploymentTracker,
         bytes memory _fixedForceDeploymentsData
