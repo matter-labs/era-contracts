@@ -45,7 +45,6 @@ import {
   prepareUpgradeHarnessInputs,
   readEcosystemOutput,
   readGenesisProtocolVersion,
-  readSettlementLayerUpgradeAddr,
   runChainUpgradesAndRelayL2,
   runChainUpgradesPerCtm,
   runEcosystemUpgradeScripts,
@@ -321,12 +320,10 @@ async function main(): Promise<void> {
           skipL2Relay: skipL2,
         });
       } else {
-        const settlementLayerUpgradeAddr = readSettlementLayerUpgradeAddr(chainTypeManager);
         await runChainUpgradesAndRelayL2({
           l1Provider,
           anvilManager,
           bridgehubAddr: cfg.bridgehubAddress,
-          settlementLayerUpgradeAddr,
           ctmAddr: chainTypeManager,
           upgradeChainAddresses,
           protocolOpsOutDir: chainsOutDir,

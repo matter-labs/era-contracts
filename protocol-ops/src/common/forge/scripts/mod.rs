@@ -22,11 +22,11 @@ pub const FINALIZE_CHAIN_INIT_SCRIPT_PATH: &str = "deploy-scripts/chain/Finalize
 /// `deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol`.
 pub const CORE_UPGRADE_V33_SCRIPT_PATH: &str = "deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol";
 pub const CTM_UPGRADE_V33_SCRIPT_PATH: &str = "deploy-scripts/upgrade/v33/CTMUpgrade_v33.s.sol";
-/// The default upgrade scripts, used by every release without release-specific preparation (v34 on).
+/// The default core upgrade script, used by releases without release-specific ecosystem preparation.
 pub const DEFAULT_CORE_UPGRADE_SCRIPT_PATH: &str =
     "deploy-scripts/upgrade/default-upgrade/DefaultCoreUpgrade.s.sol";
-pub const DEFAULT_CTM_UPGRADE_SCRIPT_PATH: &str =
-    "deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
+/// The v34 CTM upgrade: the default upgrade with `V34UpgradeZKsyncOS` as the cut's per-chain initializer.
+pub const CTM_UPGRADE_V34_SCRIPT_PATH: &str = "deploy-scripts/upgrade/v34/CTMUpgrade_v34.s.sol";
 /// The current release's upgrade-env directory, relative to `l1-contracts/`. It is the only place the
 /// current release is named: the prepare defaults below and `--env` resolution (`EnvConfig`) derive from
 /// it. `scripts/new-release.ts` moves it on a release bump.
@@ -40,7 +40,7 @@ pub const CURRENT_UPGRADE_LOCAL_INPUT_PATH: &str =
     concat!("/", current_upgrade_env_dir!(), "/local.toml");
 /// Core prepare output. Version-free: every release's prepare writes it.
 pub const UPGRADE_CORE_OUTPUT_PATH: &str = "/script-out/upgrade-core.toml";
-/// Per-CTM prepare output, `<prefix><ctm proxy>.toml` (lowercase hex). Read by the anvil upgrade harness.
+/// Per-CTM prepare output, `<prefix><ctm proxy>.toml` (lowercase hex). Version-free, like the core output.
 pub const UPGRADE_CTM_OUTPUT_PATH_PREFIX: &str = "/script-out/upgrade-ctm-";
 pub const UPGRADE_V33_ENV_DIR: &str = "/upgrade-envs/v0.33.0-atomic-interop";
 pub const UPGRADE_V33_LOCAL_INPUT_PATH: &str = "/upgrade-envs/v0.33.0-atomic-interop/local.toml";

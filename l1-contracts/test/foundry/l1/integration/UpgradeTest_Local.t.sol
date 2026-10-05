@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {console2 as console} from "forge-std/Script.sol";
 
 import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
+import {CTMUpgrade_v34} from "../../../../deploy-scripts/upgrade/v34/CTMUpgrade_v34.s.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {IZKsyncOSVerifier} from "contracts/state-transition/chain-interfaces/IZKsyncOSVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
@@ -28,10 +29,13 @@ import {DefaultUpgradeZKsyncOS} from "contracts/upgrades/DefaultUpgradeZKsyncOS.
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {Bytes} from "contracts/vendor/Bytes.sol";
 
-/// @notice Test-only default CTM upgrade that skips the bytecode-heavy steps to avoid MemoryOOG.
-/// @dev Only the two memory-trimming overrides below differ from {DefaultCTMUpgrade}; everything else
-///      (deploys, governance calls, per-chain cut, `DefaultUpgradeZKsyncOS`) is the production default.
-contract DefaultCTMUpgradeForLocalTest is DefaultCTMUpgrade {
+/// @notice Test-only variant of the CTM script protocol-ops prepares with by default, skipping the
+///         bytecode-heavy steps to avoid MemoryOOG.
+/// @dev Only the two memory-trimming overrides below differ from {CTMUpgrade_v34}; everything else (deploys,
+///      governance calls, per-chain cut and its initializer) is the production script. protocol-ops'
+///      `prepare_defaults_match_the_foundry_full_flow_test` fails if this stops extending the default
+///      `--ctm-script-path` script.
+contract CTMUpgradeForLocalTest is CTMUpgrade_v34 {
     /// @notice Override to skip bytecode publishing which reads large JSON files.
     function publishBytecodes() public override {
         console.log("Test mode: Skipping bytecode publishing to avoid MemoryOOG");
@@ -75,10 +79,10 @@ contract DefaultCTMUpgradeForLocalTest is DefaultCTMUpgrade {
     }
 }
 
-/// @notice End-to-end run of the CURRENT DEFAULT upgrade scripts (`DefaultCoreUpgrade` +
-///         `DefaultCTMUpgrade`) against an ecosystem freshly deployed at the genesis version.
-/// @dev Release-agnostic by design: the target version is derived from genesis (minor + 1), and no
-///      release-specific script is used, so this file does not need editing on a release bump.
+/// @notice End-to-end run of the upgrade scripts protocol-ops prepares with by default (`DefaultCoreUpgrade`
+///         + the default CTM script) against an ecosystem freshly deployed at the genesis version.
+/// @dev The target version is derived from genesis (minor + 1). The only release-specific name is the CTM
+///      script {CTMUpgradeForLocalTest} extends, which protocol-ops pins to its default.
 ///      The upgrade from the previous release's real chain states is covered by the anvil upgrade test.
 contract UpgradeIntegrationTestLocal is UpgradeIntegrationTestBase, L1ContractDeployer, ZKChainDeployer, TokenDeployer {
     using Bytes for bytes;
@@ -88,10 +92,10 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationTestBase, L1ContractDe
     address private _expectedServerNotifierProxyAdminOwner;
     bytes32 private _expectedRewrittenUpgradeTxHash;
 
-    /// @notice Override to inject the memory-trimmed default CTM upgrade (skips bytecode-heavy reads).
+    /// @notice Override to inject the memory-trimmed default CTM script (skips bytecode-heavy reads).
     /// @dev The core side needs no test subclass: the plain {DefaultCoreUpgrade} from the base is used.
     function createCTMUpgrade() internal override returns (DefaultCTMUpgrade) {
-        return new DefaultCTMUpgradeForLocalTest();
+        return new CTMUpgradeForLocalTest();
     }
 
     /// @notice Target one minor above the genesis version the fixture was deployed at.
@@ -116,8 +120,9 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationTestBase, L1ContractDe
             ctmUpgrade.getChainUpgradeDiamondCutData(),
             (Diamond.DiamondCutData)
         );
-        address defaultUpgrade = ctmUpgrade.getAddresses().stateTransition.defaultUpgrade;
-        assertEq(cut.initAddress, defaultUpgrade, "Wrong per-chain upgrade implementation");
+        // The cut's initializer may be a release-specific subclass of the CTM default (`DefaultUpgradeZKsyncOS`),
+        // so it is checked by what it does: it must be deployed and record the rewritten transaction below.
+        assertGt(cut.initAddress.code.length, 0, "Per-chain upgrade initializer not deployed");
 
         ProposedUpgrade memory proposedUpgrade = abi.decode(cut.initCalldata.slice(4), (ProposedUpgrade));
         bytes32 placeholderHash = keccak256(abi.encode(proposedUpgrade.l2ProtocolUpgradeTx));

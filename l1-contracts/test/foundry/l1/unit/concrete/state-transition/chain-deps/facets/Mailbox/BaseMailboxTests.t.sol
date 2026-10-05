@@ -3,13 +3,26 @@
 pragma solidity 0.8.28;
 
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";
+import {Vm} from "forge-std/Vm.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
+import {
+    PRIORITY_TX_MAX_GAS_LIMIT,
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    SERVICE_TRANSACTION_SENDER,
+    SETTLEMENT_LAYER_RELAY_SENDER
+} from "contracts/common/Config.sol";
+import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
+import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {BaseTokenGasPriceDenominatorNotSet, ValueMismatch} from "contracts/common/L1ContractErrors.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {LogFinder} from "test-utils/LogFinder.sol";
+import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestConstants.sol";
 
 contract MailboxBaseTests is MailboxTest {
+    using LogFinder for Vm.Log[];
+
     function setUp() public virtual {
         setupDiamondProxy();
         utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
@@ -94,5 +107,59 @@ contract MailboxBaseTests is MailboxTest {
         vm.prank(sender);
         vm.expectRevert(abi.encodeWithSelector(ValueMismatch.selector, 0, 1));
         IMailbox(address(mailboxFacet)).requestL2TransactionToGatewayMailbox(chainId, bytes32(0), 1);
+    }
+
+    function test_serviceTransactionUsesProtocolGasCeiling() public {
+        // Isolate mailbox admission from Bridgehub's service-sender configuration.
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.chainRegistrationSender, ()), abi.encode(address(this)));
+        address target = makeAddr("serviceTarget");
+        bytes memory data = hex"12345678";
+
+        vm.recordLogs();
+        bytes32 txHash = mailboxFacet.requestL2ServiceTransaction(target, data);
+
+        L2CanonicalTransaction memory transaction = _assertFreePriorityRequest(txHash);
+        assertEq(transaction.from, uint256(uint160(SERVICE_TRANSACTION_SENDER)));
+        assertEq(transaction.to, uint256(uint160(target)));
+        assertEq(transaction.data, data);
+    }
+
+    function test_gatewayRelayUsesProtocolGasCeiling() public {
+        // Isolate wrapper construction from Bridgehub's chain registration and eligibility checks.
+        vm.mockCall(
+            bridgehub,
+            abi.encodeCall(IBridgehubBase.whitelistedSettlementLayers, (gettersFacet.getChainId())),
+            abi.encode(true)
+        );
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.getZKChain, (ERA_CHAIN_ID)), abi.encode(sender));
+        bytes32 relayedTxHash = keccak256("relayed priority transaction");
+
+        vm.recordLogs();
+        vm.prank(sender);
+        bytes32 txHash = mailboxFacet.requestL2TransactionToGatewayMailbox(ERA_CHAIN_ID, relayedTxHash, 0);
+
+        L2CanonicalTransaction memory transaction = _assertFreePriorityRequest(txHash);
+        assertEq(transaction.from, uint256(uint160(SETTLEMENT_LAYER_RELAY_SENDER)));
+        assertEq(transaction.to, uint256(uint160(L2_INTEROP_CENTER_ADDR)));
+        assertEq(
+            transaction.data,
+            abi.encodeCall(IInteropCenter.forwardTransactionOnGateway, (ERA_CHAIN_ID, relayedTxHash, 0))
+        );
+    }
+
+    function _assertFreePriorityRequest(bytes32 _txHash) internal returns (L2CanonicalTransaction memory transaction) {
+        Vm.Log memory log = vm.getRecordedLogs().requireOneFrom(NEW_PRIORITY_REQUEST_SIGNATURE, address(mailboxFacet));
+        (uint256 txId, bytes32 emittedTxHash, , L2CanonicalTransaction memory emittedTx, ) = abi.decode(
+            log.data,
+            (uint256, bytes32, uint64, L2CanonicalTransaction, bytes[])
+        );
+        assertEq(txId, 0);
+        assertEq(emittedTx.gasLimit, PRIORITY_TX_MAX_GAS_LIMIT);
+        assertEq(emittedTx.maxFeePerGas, 0);
+        assertEq(emittedTxHash, keccak256(abi.encode(emittedTx)));
+        assertEq(_txHash, emittedTxHash);
+        assertEq(gettersFacet.getPriorityTreeRoot(), _txHash);
+        assertEq(gettersFacet.getTotalPriorityTxs(), 1);
+        return emittedTx;
     }
 }

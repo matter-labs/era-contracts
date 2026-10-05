@@ -179,12 +179,10 @@ export async function runUpgradeScenario(scenario: UpgradeScenario): Promise<voi
       await clearGenesisUpgradeTxHash(l1Provider, upgradeChainAddresses);
     }
     // ── Run per-chain upgrades (L1) and relay to L2 ──
-    const settlementLayerUpgradeAddr = readSettlementLayerUpgradeAddr(upgradeHarnessInputs.ctmProxyAddress);
     await runChainUpgradesAndRelayL2({
       l1Provider,
       anvilManager,
       bridgehubAddr: l1Addresses.bridgehub,
-      settlementLayerUpgradeAddr,
       ctmAddr: ctmAddresses.chainTypeManager,
       upgradeChainAddresses,
       protocolOpsOutDir: path.join(upgradeHarnessInputs.protocolOpsOutDir, "chains"),
@@ -505,25 +503,11 @@ export async function runChainUpgradesAndRelayL2(params: {
   l1Provider: ethers.providers.JsonRpcProvider;
   anvilManager: AnvilManager;
   bridgehubAddr: string;
-  settlementLayerUpgradeAddr: string;
   ctmAddr: string;
   upgradeChainAddresses: Array<{ chainId: number; diamondProxy: string }>;
   protocolOpsOutDir: string;
 }): Promise<void> {
-  const {
-    l1Provider,
-    anvilManager,
-    bridgehubAddr,
-    settlementLayerUpgradeAddr,
-    upgradeChainAddresses,
-    protocolOpsOutDir,
-  } = params;
-
-  const settlementLayerUpgrade = new ethers.Contract(
-    settlementLayerUpgradeAddr,
-    getAbi("DefaultUpgradeZKsyncOS"),
-    l1Provider
-  );
+  const { l1Provider, anvilManager, bridgehubAddr, upgradeChainAddresses, protocolOpsOutDir } = params;
   const l1Chain = anvilManager.getL1Chain()!;
 
   for (const chain of upgradeChainAddresses) {
@@ -556,12 +540,18 @@ export async function runChainUpgradesAndRelayL2(params: {
 
     await executeSafeBundles(chainOutDir, l1Chain.rpcUrl);
 
-    // Decode the L2 upgrade tx from the protocol-ops Safe bundle.
-    const { tx: originalUpgradeTx, paramType: upgradeTxParamType } = decodeLatestL2UpgradeTx(safeBundles[0].file);
+    // Decode the L2 upgrade tx and the cut's initializer from the protocol-ops Safe bundle.
+    const {
+      tx: originalUpgradeTx,
+      paramType: upgradeTxParamType,
+      initAddress,
+    } = decodeLatestL2UpgradeTx(safeBundles[0].file);
     const originalUpgradeTxData = originalUpgradeTx.data as string;
 
-    // Rewrite the L2 upgrade tx with per-chain data, the same way the per-chain upgrade contract does.
-    const rewrittenUpgradeTxData = await settlementLayerUpgrade["getL2UpgradeTxData(address,uint256,bytes)"](
+    // Rewrite the L2 upgrade tx with per-chain data through the cut's own initializer: the
+    // `DefaultUpgradeZKsyncOS` the CTM defaults to, or a release-specific subclass of it.
+    const perChainUpgrade = new ethers.Contract(initAddress, getAbi("DefaultUpgradeZKsyncOS"), l1Provider);
+    const rewrittenUpgradeTxData = await perChainUpgrade["getL2UpgradeTxData(address,uint256,bytes)"](
       bridgehubAddr,
       chain.chainId,
       originalUpgradeTxData
@@ -600,9 +590,8 @@ export async function runChainUpgradesAndRelayL2(params: {
  * fork tests where target chains can belong to different CTMs. This release
  * produces per-chain upgrades only for ZKsync OS CTMs.
  *
- * Groups chains by their on-chain CTM, reads the per-CTM prepare output
- * (`readSettlementLayerUpgradeAddr`) to get the settlement-layer-upgrade
- * address, then delegates to `runChainUpgradesAndRelayL2` per group.
+ * Groups chains by their on-chain CTM, then delegates to
+ * `runChainUpgradesAndRelayL2` per group.
  *
  * Pass `skipL2Relay: true` to exercise the L1 chain-upgrade Safe bundle
  * without spinning up L2 forks (useful for L1-only smoke tests).
@@ -637,8 +626,7 @@ export async function runChainUpgradesPerCtm(params: {
     console.log(`\n── CTM ${ctmAddr}: running chain-upgrades for ${chains.length} chain(s) ──`);
 
     if (skipL2Relay) {
-      // L1-only path: just emit + execute the per-chain Safe bundle. No
-      // settlement-layer-upgrade lookup, no L2 relay.
+      // L1-only path: just emit + execute the per-chain Safe bundle. No L2 relay.
       const l1Chain = anvilManager.getL1Chain()!;
       for (const chain of chains) {
         const chainOutDir = path.join(protocolOpsOutDir, `chain-${chain.chainId}`);
@@ -662,14 +650,10 @@ export async function runChainUpgradesPerCtm(params: {
       continue;
     }
 
-    // Full path: read the per-CTM settlement-layer-upgrade address, then delegate to the single-CTM helper.
-    const settlementLayerUpgradeAddr = readSettlementLayerUpgradeAddr(ctmAddr);
-
     await runChainUpgradesAndRelayL2({
       l1Provider,
       anvilManager,
       bridgehubAddr,
-      settlementLayerUpgradeAddr,
       ctmAddr,
       upgradeChainAddresses: chains,
       protocolOpsOutDir,
@@ -952,6 +936,7 @@ function decodeUpgradeTxData(upgradeTxData: string): {
 function decodeLatestL2UpgradeTx(broadcastPath: string): {
   tx: Record<string, unknown>;
   paramType: ethers.utils.ParamType;
+  initAddress: string;
 } {
   const broadcast = JSON.parse(fs.readFileSync(broadcastPath, "utf8")) as {
     transactions?: Array<Record<string, unknown>>;
@@ -985,15 +970,15 @@ function decodeLatestL2UpgradeTx(broadcastPath: string): {
       }
 
       // Try current ABI (3-param) then legacy (2-param).
-      // The DiamondCutData tuple is (facetCuts[], initAddress, initCalldata) — initCalldata is at index 2.
-      let initCalldata: string;
+      // The DiamondCutData tuple is (facetCuts[], initAddress, initCalldata).
+      let diamondCut: ethers.utils.Result;
       try {
-        const diamondCut = adminIface.decodeFunctionData("upgradeChainFromVersion", calls[0].data)[2];
-        initCalldata = diamondCut.initCalldata ?? diamondCut[2];
+        diamondCut = adminIface.decodeFunctionData("upgradeChainFromVersion", calls[0].data)[2];
       } catch {
-        const diamondCut = legacyAdminIface.decodeFunctionData("upgradeChainFromVersion", calls[0].data)[1];
-        initCalldata = diamondCut.initCalldata ?? diamondCut[2];
+        diamondCut = legacyAdminIface.decodeFunctionData("upgradeChainFromVersion", calls[0].data)[1];
       }
+      const initAddress: string = diamondCut.initAddress ?? diamondCut[1];
+      const initCalldata: string = diamondCut.initCalldata ?? diamondCut[2];
 
       const [proposedUpgrade] = settlementLayerIface.decodeFunctionData("upgrade", initCalldata);
       const proposedUpgradeType = settlementLayerIface.getFunction("upgrade").inputs[0];
@@ -1001,7 +986,7 @@ function decodeLatestL2UpgradeTx(broadcastPath: string): {
       if (!txParamType) {
         throw new Error("ProposedUpgrade ABI has no l2ProtocolUpgradeTx component");
       }
-      return { tx: proposedUpgrade.l2ProtocolUpgradeTx, paramType: txParamType };
+      return { tx: proposedUpgrade.l2ProtocolUpgradeTx, paramType: txParamType, initAddress };
     } catch (e) {
       errors.push(`tx decode failed: ${e instanceof Error ? e.message.slice(0, 120) : String(e)}`);
       continue;
@@ -1237,22 +1222,6 @@ export function prepareUpgradeHarnessInputs(
   };
 }
 
-/**
- * Per-chain upgrade contract the CTM prepare deployed, from the per-CTM output TOML that `upgrade-prepare-all`
- * has forge write under `script-out/` (`upgrade-ctm-<ctm>.toml`, see protocol-ops' `UPGRADE_CTM_OUTPUT_PATH_PREFIX`).
- */
-export function readSettlementLayerUpgradeAddr(ctmProxyAddress: string): string {
-  const ctmTomlPath = path.join(l1ContractsDir, "script-out", `upgrade-ctm-${ctmProxyAddress.toLowerCase()}.toml`);
-  if (!fs.existsSync(ctmTomlPath)) {
-    throw new Error(`Missing per-CTM prepare output ${ctmTomlPath}. Did upgrade-prepare-all run for this CTM?`);
-  }
-  return readNestedString(
-    readEcosystemOutput(ctmTomlPath),
-    ["state_transition", "default_upgrade_addr"],
-    "per-chain upgrade contract address"
-  );
-}
-
 // ── Misc helpers ─────────────────────────────────────────────────────
 
 /** Build the address→contract map for the given VM type. */
@@ -1298,20 +1267,6 @@ function selectUpgradeChains(
     if (!role) throw new Error(`Missing chain role for chain ${chain.chainId}`);
     return targetRoles.includes(role);
   });
-}
-
-export function readNestedString(obj: Record<string, unknown>, path: string[], label: string): string {
-  let current: unknown = obj;
-  for (const key of path) {
-    if (!current || typeof current !== "object" || !(key in current)) {
-      throw new Error(`Missing ${label} at ${path.join(".")}`);
-    }
-    current = (current as Record<string, unknown>)[key];
-  }
-  if (typeof current !== "string" || current.length === 0) {
-    throw new Error(`Invalid ${label} at ${path.join(".")}`);
-  }
-  return current;
 }
 
 export function readEcosystemOutput(outputPath: string): Record<string, unknown> {

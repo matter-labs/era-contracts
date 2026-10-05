@@ -2,6 +2,14 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {
+    GOLDEN_CHAIN_ID,
+    BATCH_OUTPUT_HASH_GOLDEN,
+    PUBLIC_INPUT_HASH_GOLDEN,
+    PUBLIC_INPUT_HASH_GOLDEN_FILTERING_ONLY,
+    PUBLIC_INPUT_HASH_GOLDEN_LARGE_CONTRACTS_ONLY,
+    PUBLIC_INPUT_HASH_GOLDEN_BOTH_FLAGS
+} from "foundry-test/TestConstants.sol";
 
 import {TestCommitter} from "contracts/dev-contracts/test/TestCommitter.sol";
 import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
@@ -12,6 +20,11 @@ contract CommitterZKsyncOSPublicInputHarness is TestCommitter {
     function util_setZKsyncOSChainConfig(uint256 _chainId, uint64 _maxTxGasLimit) external {
         s.chainId = _chainId;
         s.zksyncOSMaxTxGasLimit = _maxTxGasLimit;
+    }
+
+    function util_setZKsyncOSChainConfigFlags(bool _filteringEnabled, bool _largeContractsEnabled) external {
+        s.zksyncOSL1TxFilteringEnabled = _filteringEnabled;
+        s.zksyncOSLargeContractsEnabled = _largeContractsEnabled;
     }
 
     function getBatchProofPublicInput(
@@ -31,32 +44,11 @@ contract CommitterZKsyncOSPublicInputHarness is TestCommitter {
     }
 }
 
-/// @notice Pins the ZKsync OS batch proof public input encoding to golden vectors shared with the
-/// ZKsync OS implementation (`public_input.rs` / `chain_config.rs` in the zksync-os repository):
-/// changing the encoding on either side must update both.
-/// @dev `_getBatchCommitment` returns the hash UNTRUNCATED; `PUBLIC_INPUT_SHIFT` is
-/// applied once by `computeZKsyncOSHash` after the multi-batch fold.
-/// @dev The public input is `keccak256(state_before, state_after, chain_config_hash, batch_output)`,
-/// where `chain_config_hash = keccak256(chain_id, fri_proof_verification_enabled, max_tx_gas_limit,
-/// pubdata_content)` as four 32-byte big-endian words. FRI proof verification is always disabled from the
-/// settlement layer, so its word is always zero; `pubdata_content` is `FULL_PUBDATA` (0) / `LOGS_ONLY` (1).
+/// @notice Pins the batch public input for the combined ZKsync OS chain configuration.
+/// @dev See {protocol-docs/chain-config.md#proof-commitment}.
 contract ZKsyncOSPublicInputTest is Test {
     CommitterZKsyncOSPublicInputHarness internal committer;
     ZKsyncOSVerifier internal verifier;
-
-    /// @dev `BatchOutput::hash()` golden vector from zksync-os (`batch_output_hash_golden_vector`).
-    bytes32 internal constant BATCH_OUTPUT_HASH_GOLDEN =
-        0x1c24f398aa0701f9348912ecca748ba93bfb84bfe4f283c16514311419f4f658;
-
-    /// @dev `BatchPublicInput::hash()` for zero state commitments, `chain_config_hash` of chain id 37
-    /// with FRI proof verification disabled, the default max tx gas limit and pubdata content `FULL_PUBDATA` (matching
-    /// zksync-os `ChainConfig::new(37, false, DEFAULT_MAX_TX_GAS_LIMIT).hash()`, which defaults to
-    /// `PubdataContent::FullPubdata`), and `BATCH_OUTPUT_HASH_GOLDEN`. Shared with zksync-os
-    /// `batch_public_input_hash_golden_vector`.
-    bytes32 internal constant PUBLIC_INPUT_HASH_GOLDEN =
-        0x0a5143e28ed3fc1728ef4d96319f2306bb5a81bfccd908154e44029988ef9e7c;
-
-    uint256 internal constant GOLDEN_CHAIN_ID = 37;
 
     function setUp() public {
         committer = new CommitterZKsyncOSPublicInputHarness();
@@ -69,6 +61,26 @@ contract ZKsyncOSPublicInputTest is Test {
         uint256 publicInput = committer.getBatchProofPublicInput(bytes32(0), bytes32(0), BATCH_OUTPUT_HASH_GOLDEN);
 
         assertEq(publicInput, uint256(PUBLIC_INPUT_HASH_GOLDEN));
+    }
+
+    function test_publicInput_matchesZKsyncOSFlagGoldenVectors() public {
+        committer.util_setZKsyncOSChainConfigFlags(true, false);
+        assertEq(
+            committer.getBatchProofPublicInput(bytes32(0), bytes32(0), BATCH_OUTPUT_HASH_GOLDEN),
+            uint256(PUBLIC_INPUT_HASH_GOLDEN_FILTERING_ONLY)
+        );
+
+        committer.util_setZKsyncOSChainConfigFlags(false, true);
+        assertEq(
+            committer.getBatchProofPublicInput(bytes32(0), bytes32(0), BATCH_OUTPUT_HASH_GOLDEN),
+            uint256(PUBLIC_INPUT_HASH_GOLDEN_LARGE_CONTRACTS_ONLY)
+        );
+
+        committer.util_setZKsyncOSChainConfigFlags(true, true);
+        assertEq(
+            committer.getBatchProofPublicInput(bytes32(0), bytes32(0), BATCH_OUTPUT_HASH_GOLDEN),
+            uint256(PUBLIC_INPUT_HASH_GOLDEN_BOTH_FLAGS)
+        );
     }
 
     function test_publicInput_unsetMaxTxGasLimitFallsBackToDefault() public {

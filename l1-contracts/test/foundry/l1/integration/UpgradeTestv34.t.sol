@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {ExecutorTest} from "foundry-test/l1/unit/concrete/BatchProcessing/_Executor_Shared.t.sol";
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
-import {CTMUpgradeHarness} from "foundry-test/l1/integration/utils/CTMUpgradeHarness.sol";
+import {CTMUpgradeV34Harness} from "foundry-test/l1/integration/utils/CTMUpgradeV34Harness.sol";
 import {
     TEST_CHAIN_CONFIG_UPGRADE_VERSION,
     LEGACY_V33_COMMIT_ENCODING_VERSION,
@@ -24,7 +24,12 @@ import {BaseZkSyncUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {DefaultUpgradeZKsyncOS} from "contracts/upgrades/DefaultUpgradeZKsyncOS.sol";
 import {NotAllBatchesExecuted} from "contracts/state-transition/L1StateTransitionErrors.sol";
-import {L2DACommitmentScheme} from "contracts/common/Config.sol";
+import {
+    L2DACommitmentScheme,
+    PubdataContent,
+    ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
+    ZKSYNC_OS_FRI_PROOF_VERIFICATION_DISABLED
+} from "contracts/common/Config.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
 struct LegacyV33CommitBatchInfo {
@@ -74,7 +79,7 @@ contract UpgradeTestV34 is ExecutorTest {
         );
         vm.mockCall(ctm, abi.encodeCall(IChainTypeManager.protocolVersion, ()), abi.encode(previousVersion));
 
-        CTMUpgradeHarness script = new CTMUpgradeHarness();
+        CTMUpgradeV34Harness script = new CTMUpgradeV34Harness();
         script.setReplacementFacets(getters.facets());
         StateTransitionDeployedAddresses memory stateTransition;
         stateTransition.defaultUpgrade = script.deployDefaultUpgrade(ctm);
@@ -211,12 +216,21 @@ contract UpgradeTestV34 is ExecutorTest {
 
     function _commitAndProveLegacyBatch() internal returns (IExecutor.StoredBatchInfo memory legacyBatch) {
         legacyBatch = _commitLegacyBatch();
+        // The frozen v33 executor uses the four-word config preceding L1 transaction filtering.
+        bytes32 legacyConfigHash = keccak256(
+            abi.encode(
+                l2ChainId,
+                ZKSYNC_OS_FRI_PROOF_VERIFICATION_DISABLED,
+                uint256(ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT),
+                uint256(PubdataContent.FULL_PUBDATA)
+            )
+        );
         uint256 legacyPublicInput = uint256(
             keccak256(
                 abi.encodePacked(
                     genesisStoredBatchInfo.batchHash,
                     legacyBatch.batchHash,
-                    Utils.defaultChainConfigHash(l2ChainId),
+                    legacyConfigHash,
                     legacyBatch.commitment
                 )
             )
@@ -320,27 +334,5 @@ contract UpgradeTestV34 is ExecutorTest {
             deployed := create(0, add(_creationCode, 0x20), mload(_creationCode))
         }
         require(deployed != address(0), "Historical facet deployment failed");
-    }
-
-    function _batchOutputHash(
-        CommitBatchInfoZKsyncOS memory _batch,
-        bytes32 _upgradeTxHash
-    ) internal pure returns (bytes32) {
-        return
-            keccak256(
-                abi.encodePacked(
-                    _batch.firstBlockTimestamp,
-                    _batch.lastBlockTimestamp,
-                    uint256(_batch.daCommitmentScheme),
-                    _batch.daCommitment,
-                    _batch.numberOfLayer1Txs,
-                    _batch.numberOfLayer2Txs,
-                    _batch.priorityOperationsHash,
-                    _batch.l2LogsTreeRoot,
-                    _upgradeTxHash,
-                    _batch.dependencyRootsRollingHash,
-                    _batch.slChainId
-                )
-            );
     }
 }
