@@ -13,7 +13,7 @@
 //! Layout (relative to `l1-contracts/`):
 //!
 //!   upgrade-envs/permanent-values/<env>.toml      (bridgehub, ctms, create2)
-//!   upgrade-envs/v0.33.0-atomic-interop/<env>.toml      (owner, era_chain_id)
+//!   <current upgrade-env dir>/<env>.toml          (owner, era_chain_id)
 //!
 //! The latter contains unquoted hex literals (e.g. `old_protocol_version =
 //! 0x1d…`) which `toml-rs` chokes on, so we parse it line-by-line for the
@@ -27,11 +27,15 @@ use alloy::primitives::{Address, B256};
 use anyhow::Context;
 use serde::Deserialize;
 
+use crate::common::forge::scripts::CURRENT_UPGRADE_ENV_DIR;
 use crate::common::paths::resolve_l1_contracts_path;
 
 /// The release's upgrade-env directory. Salts, per-env inputs and the canonical output
-/// directory all live here; it moves with each release rather than trailing an older one.
-const UPGRADE_ENV_DIR: &str = "upgrade-envs/v0.33.0-atomic-interop";
+/// directory all live here. It is the same directory the prepare defaults use, so it moves with each
+/// release rather than trailing an older one.
+fn upgrade_env_dir() -> &'static str {
+    CURRENT_UPGRADE_ENV_DIR.trim_start_matches('/')
+}
 const PERMANENT_VALUES_DIR: &str = "upgrade-envs/permanent-values";
 
 #[derive(Debug, Deserialize)]
@@ -140,7 +144,7 @@ pub struct PermanentContracts {
     // NOTE: `create2_factory_salt` deliberately does NOT live here. The salt
     // rotates every regen (the CREATE2 deployer would collide with previously
     // deployed addresses if reused), so it belongs in the v31 input TOML
-    // (`upgrade-envs/v0.33.0-atomic-interop/<env>.toml [contracts] create2_factory_salt`)
+    // (`<current upgrade-env dir>/<env>.toml [contracts] create2_factory_salt`)
     // alongside the rest of the per-regen inputs. See
     // `EnvConfig::create2_factory_salt_for_upgrade`.
 }
@@ -172,9 +176,15 @@ impl EnvConfig {
     /// Load `<l1-contracts>/upgrade-envs/permanent-values/<env>.toml` and the
     /// release upgrade input TOML for the same env. Both files must exist.
     pub fn load(env: &str) -> anyhow::Result<Self> {
+        Self::load_from_upgrade_env_dir(env, upgrade_env_dir())
+    }
+
+    /// `load` against an explicit upgrade-env directory (relative to `l1-contracts/`) instead of the
+    /// current release's.
+    fn load_from_upgrade_env_dir(env: &str, upgrade_env_dir: &str) -> anyhow::Result<Self> {
         let l1 = resolve_l1_contracts_path()?;
         let permanent_values_path = l1.join(PERMANENT_VALUES_DIR).join(format!("{env}.toml"));
-        let upgrade_input_path = l1.join(UPGRADE_ENV_DIR).join(format!("{env}.toml"));
+        let upgrade_input_path = l1.join(upgrade_env_dir).join(format!("{env}.toml"));
 
         let pv_content = fs::read_to_string(&permanent_values_path).with_context(|| {
             format!(
@@ -223,7 +233,7 @@ impl EnvConfig {
     }
 
     /// Per-upgrade-version CREATE2 salt from
-    /// `upgrade-envs/v0.33.0-atomic-interop/<env>.toml [contracts]
+    /// `<current upgrade-env dir>/<env>.toml [contracts]
     /// create2_factory_salt`. Distinct from `create2_factory_salt()` (which
     /// reads the chain-permanent salt out of `permanent-values/`); this one
     /// is the salt used to deploy *this upgrade*'s implementations, recorded
@@ -240,7 +250,7 @@ impl EnvConfig {
     }
 
     /// Per-regen salt for legacy `Governance.sol` ceremonies, read from
-    /// `upgrade-envs/v0.33.0-atomic-interop/<env>.toml [contracts] legacy_gov_salt`.
+    /// `<current upgrade-env dir>/<env>.toml [contracts] legacy_gov_salt`.
     /// Op ids in the legacy Gov state machine are content-addressed
     /// (`hash(targets, values, calldatas, predecessor, salt)`); rotating this
     /// salt every regen prevents the broadcaster from colliding with previously
@@ -256,7 +266,7 @@ impl EnvConfig {
     }
 
     /// Per-CTM CREATE2 salts from
-    /// `upgrade-envs/v0.33.0-atomic-interop/<env>.toml [create2_factory_salts]`,
+    /// `<current upgrade-env dir>/<env>.toml [create2_factory_salts]`,
     /// keyed by CTM proxy. Empty if the env doesn't declare any (legacy
     /// local-fixture path — `upgrade_inner` will fall back to random
     /// salts in that case). Re-reads the TOML each call (see
@@ -312,12 +322,12 @@ impl EnvConfig {
 }
 
 /// Default output dir for an env, e.g.
-/// `upgrade-envs/v0.33.0-atomic-interop/output/<env>/`. Outputs land directly under
+/// `<current upgrade-env dir>/output/<env>/`. Outputs land directly under
 /// the env dir — no `protocol-ops/` subfolder — so the artifacts a reviewer
 /// expects to find for stage / mainnet are immediately visible.
 pub fn default_protocol_ops_out_dir(env: &str) -> anyhow::Result<PathBuf> {
     Ok(resolve_l1_contracts_path()?
-        .join(UPGRADE_ENV_DIR)
+        .join(upgrade_env_dir())
         .join("output")
         .join(env))
 }
@@ -448,6 +458,7 @@ fn match_quoted_h256(line: &str, key: &str) -> Option<B256> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::forge::scripts::UPGRADE_V33_ENV_DIR;
 
     /// Smoke-tests that `permanent-values/stage.toml` deserializes into `PermanentValues`
     /// end-to-end. Catches any future TOML drift before it shows up as a runtime parse error
@@ -470,6 +481,13 @@ mod tests {
         assert_eq!(pv.l1_chain_id, Some(11155111));
     }
 
+    /// The salt readers are exercised on the v33 inputs, which carry real stage / mainnet salts; the
+    /// current release's directory only gains them once that release is prepared for those environments.
+    fn load_v33(env: &str) -> EnvConfig {
+        EnvConfig::load_from_upgrade_env_dir(env, UPGRADE_V33_ENV_DIR.trim_start_matches('/'))
+            .expect("load v33 env config")
+    }
+
     /// Confirms `EnvConfig`'s on-demand readers pick up the
     /// `[create2_factory_salts]` table and `[contracts] create2_factory_salt`
     /// — gov-replay relies on distinct per-CTM salts to keep
@@ -477,7 +495,7 @@ mod tests {
     /// across Era and ZKsyncOS CTMs.
     #[test]
     fn stage_env_config_reads_create2_salts() {
-        let cfg = EnvConfig::load("stage").expect("load stage env config");
+        let cfg = load_v33("stage");
 
         let core_salt = cfg
             .create2_factory_salt_for_upgrade()
@@ -505,7 +523,7 @@ mod tests {
     /// the regen stops being reproducible.
     #[test]
     fn mainnet_env_config_reads_create2_salts() {
-        let cfg = EnvConfig::load("mainnet").expect("load mainnet env config");
+        let cfg = load_v33("mainnet");
 
         let core_salt = cfg
             .create2_factory_salt_for_upgrade()

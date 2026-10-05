@@ -34,8 +34,8 @@ use crate::commands::ecosystem::upgrade_full::UpgradeFull;
 use crate::commands::ecosystem::upgrade_inner::{CtmInputs, PrepareInputs, UpgradeInner};
 use crate::common::abi::AdminFunctionsAbi;
 use crate::common::forge::scripts::{
-    ADMIN_FUNCTIONS_INVOCATION, DEFAULT_CORE_UPGRADE_SCRIPT_PATH, DEFAULT_CTM_UPGRADE_SCRIPT_PATH,
-    UPGRADE_V34_CORE_OUTPUT_PATH, UPGRADE_V34_ENV_DIR, UPGRADE_V34_LOCAL_INPUT_PATH,
+    ADMIN_FUNCTIONS_INVOCATION, CURRENT_UPGRADE_ENV_DIR, CURRENT_UPGRADE_LOCAL_INPUT_PATH,
+    DEFAULT_CORE_UPGRADE_SCRIPT_PATH, DEFAULT_CTM_UPGRADE_SCRIPT_PATH, UPGRADE_CORE_OUTPUT_PATH,
 };
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
@@ -351,13 +351,13 @@ pub struct UpgradePrepareAllArgs {
 
     #[clap(
         long,
-        default_value = UPGRADE_V34_LOCAL_INPUT_PATH
+        default_value = CURRENT_UPGRADE_LOCAL_INPUT_PATH
     )]
     pub upgrade_input_path: String,
 
     /// Override the core-prepare output TOML path (relative to l1-contracts
-    /// root). Defaults to the canonical `script-out/v34-upgrade-core.toml`.
-    #[clap(long, default_value = UPGRADE_V34_CORE_OUTPUT_PATH, hide = true)]
+    /// root). Defaults to the canonical `script-out/upgrade-core.toml`.
+    #[clap(long, default_value = UPGRADE_CORE_OUTPUT_PATH, hide = true)]
     pub core_output_path: String,
 
     /// Core upgrade script; historical releases must select their own script and input.
@@ -530,8 +530,8 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         // *local* input, so a silent fallback would hand a real environment local's values for the
         // keys the input does supply — `era_chain_id`, `pre_v32_introspection` and
         // `governance_upgrade_timer_initial_delay`. Failing here also catches a mistyped `--env`.
-        if args.upgrade_input_path == UPGRADE_V34_LOCAL_INPUT_PATH {
-            let per_env_rel = format!("{UPGRADE_V34_ENV_DIR}/{}.toml", cfg.env);
+        if args.upgrade_input_path == CURRENT_UPGRADE_LOCAL_INPUT_PATH {
+            let per_env_rel = format!("{CURRENT_UPGRADE_ENV_DIR}/{}.toml", cfg.env);
             let per_env_abs = paths::contracts_root()
                 .join("l1-contracts")
                 .join(per_env_rel.trim_start_matches('/'));
@@ -549,7 +549,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         }
     }
     // Auto-fill the CREATE2 salt from the per-version upgrade input
-    // (`upgrade-envs/v0.34.0-chain-config/<env>.toml [contracts]
+    // (`<current upgrade-env dir>/<env>.toml [contracts]
     // create2_factory_salt`). Recording the salt in version control makes
     // re-prepares reproducible (same addresses every run regardless of who
     // runs it), so deployer-bundle broadcasts can land at addresses that
@@ -1142,11 +1142,11 @@ mod release_script_tests {
     use clap::CommandFactory;
 
     #[test]
-    fn prepare_defaults_to_default_scripts_and_v34_input() {
+    fn prepare_defaults_to_default_scripts_and_current_input() {
         let args = UpgradePrepareAllArgs::try_parse_from(["prepare"]).unwrap();
         assert_eq!(args.ctm_script_path, DEFAULT_CTM_UPGRADE_SCRIPT_PATH);
         assert_eq!(args.core_script_path, DEFAULT_CORE_UPGRADE_SCRIPT_PATH);
-        assert_eq!(args.upgrade_input_path, UPGRADE_V34_LOCAL_INPUT_PATH);
+        assert_eq!(args.upgrade_input_path, CURRENT_UPGRADE_LOCAL_INPUT_PATH);
         let help = UpgradePrepareAllArgs::command()
             .render_long_help()
             .to_string();

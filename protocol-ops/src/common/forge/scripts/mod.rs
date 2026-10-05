@@ -27,9 +27,19 @@ pub const DEFAULT_CORE_UPGRADE_SCRIPT_PATH: &str =
     "deploy-scripts/upgrade/default-upgrade/DefaultCoreUpgrade.s.sol";
 pub const DEFAULT_CTM_UPGRADE_SCRIPT_PATH: &str =
     "deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
-pub const UPGRADE_V34_ENV_DIR: &str = "/upgrade-envs/v0.34.0-chain-config";
-pub const UPGRADE_V34_LOCAL_INPUT_PATH: &str = "/upgrade-envs/v0.34.0-chain-config/local.toml";
-pub const UPGRADE_V34_CORE_OUTPUT_PATH: &str = "/script-out/v34-upgrade-core.toml";
+/// The current release's upgrade-env directory, relative to `l1-contracts/`. It is the only place the
+/// current release is named: the prepare defaults below and `--env` resolution (`EnvConfig`) derive from
+/// it. `scripts/new-release.ts` moves it on a release bump.
+macro_rules! current_upgrade_env_dir {
+    () => {
+        "upgrade-envs/v0.34.0-chain-config"
+    };
+}
+pub const CURRENT_UPGRADE_ENV_DIR: &str = concat!("/", current_upgrade_env_dir!());
+pub const CURRENT_UPGRADE_LOCAL_INPUT_PATH: &str =
+    concat!("/", current_upgrade_env_dir!(), "/local.toml");
+/// Core prepare output. Version-free: every release's prepare writes it.
+pub const UPGRADE_CORE_OUTPUT_PATH: &str = "/script-out/upgrade-core.toml";
 /// Per-CTM prepare output, `<prefix><ctm proxy>.toml` (lowercase hex). Read by the anvil upgrade harness.
 pub const UPGRADE_CTM_OUTPUT_PATH_PREFIX: &str = "/script-out/upgrade-ctm-";
 pub const UPGRADE_V33_ENV_DIR: &str = "/upgrade-envs/v0.33.0-atomic-interop";
