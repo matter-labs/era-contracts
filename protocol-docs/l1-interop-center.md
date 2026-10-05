@@ -85,9 +85,6 @@ The per-chain upgrade installs the new Mailbox facet. Sends to an existing chain
 are unavailable between the ecosystem upgrade and that chain's Mailbox upgrade.
 The current upgrade CLI supports ZKsync OS chains; retained Era chains require a
 separately supported Mailbox migration.
-A center-introducing upgrade cannot combine `[new_gateway]` preparation: complete
-the ecosystem and gateway-chain upgrades, then run
-`protocol-ops chain gateway convert` separately.
 
 Core upgrade inputs must explicitly set `has_l1_interop_center`: use `true` when the
 core already has a center, even if its chains have not upgraded yet, and `false` for
@@ -96,14 +93,12 @@ historical Bridgehubs without the getter. Discovery retains an existing proxy, a
 deploy and register a replacement. The CTM upgrade does not use the center and never
 reads the getter.
 
-Deployment and upgrade output records
-`bridgehub.l1_interop_center_{implementation,proxy}_addr`; upgrade output also records
-`bridgehub.l1_interop_center_new_proxy` to identify an upgrade that introduces the
-center. Rust request decoding and the governance simulator recognize `sendMessage`.
+Deployment and upgrade output records `bridgehub.l1_interop_center_{implementation,proxy}_addr`.
+Rust request decoding and the governance simulator recognize `sendMessage`.
 
 `ecosystem verify-upgrade` only verifies ceremonies prepared before the center. Every
 upgrade prepared from this release on records the center outputs, and the verifier
-rejects such an artifact before loading gateway configuration or contacting RPCs;
+rejects such an artifact before loading the environment configuration or contacting RPCs;
 `--display-upgrade-data` can still print its calldata without validating it. Verifying
 the center's deployment and stage-1 calls needs verifier support that does not exist yet.
 

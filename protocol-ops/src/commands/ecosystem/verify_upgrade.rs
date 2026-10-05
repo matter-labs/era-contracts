@@ -32,10 +32,6 @@ pub struct VerifyUpgradeArgs {
     #[clap(long, default_value = "http://localhost:8545")]
     pub l1_rpc_url: String,
 
-    /// Gateway RPC URL used by read-only gateway-side checks.
-    #[clap(long, alias = "gw-rpc")]
-    pub gw_rpc_url: String,
-
     /// Path to the v31 ecosystem upgrade TOML produced by `upgrade-prepare`.
     #[clap(long)]
     pub ecosystem_toml: PathBuf,
@@ -134,13 +130,6 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
             env_cfg.upgrade_input_path.display()
         )
     })?;
-    let legacy_gateway_chain_id = env_cfg.legacy_gateway_chain_id().ok_or_else(|| {
-        anyhow::anyhow!(
-            "{} is missing `[legacy_gateway] chain_id`",
-            env_cfg.permanent_values_path.display()
-        )
-    })?;
-    let legacy_gateway_chain_intervals = env_cfg.legacy_gateway_chain_intervals().to_vec();
     let l1_chain_id = env_cfg.l1_chain_id().ok_or_else(|| {
         anyhow::anyhow!(
             "{} is missing top-level `l1_chain_id`",
@@ -159,15 +148,6 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
             env_cfg.permanent_values_path.display()
         )
     })?;
-    let new_gateway = env_cfg.new_gateway().ok_or_else(|| {
-        anyhow::anyhow!(
-            "{} is missing required `[new_gateway]` config for v31 verification",
-            env_cfg.permanent_values_path.display()
-        )
-    })?;
-    let new_gateway_chain_id = new_gateway.chain_id;
-    let new_gateway_representative_chain_id = new_gateway.ctm_representative_chain_id;
-
     // Collect every pinned CREATE2 salt declared in the env config — the Core
     // salt from `[contracts] create2_factory_salt` plus the per-CTM salts under
     // `[create2_factory_salts]`. PUVT hard-errors per deploy whose salt isn't
@@ -208,7 +188,6 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         transactions_log_path.display()
     ));
     logger::info(format!("L1 RPC URL: {}", args.l1_rpc_url));
-    logger::info(format!("Gateway RPC URL: {}", args.gw_rpc_url));
     if let Some(contracts_commit) = &args.contracts_commit {
         logger::info(format!("Contracts commit: {contracts_commit}"));
     } else {
@@ -220,13 +199,6 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     ));
     logger::info(format!(
         "Era chain ID (v31-ceremony input; feeds the PUH ERA_CHAIN_ID constructor check): {era_chain_id}"
-    ));
-    logger::info(format!(
-        "Legacy Gateway chain ID: {legacy_gateway_chain_id}"
-    ));
-    logger::info(format!("New Gateway chain ID: {new_gateway_chain_id}"));
-    logger::info(format!(
-        "New Gateway representative chain ID: {new_gateway_representative_chain_id}"
     ));
     logger::info(format!("L1 chain ID (expected): {l1_chain_id}"));
     logger::info(format!("CREATE2 factory: {create2_factory}"));
@@ -245,14 +217,9 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         args.env,
         &artifact,
         &args.l1_rpc_url,
-        &args.gw_rpc_url,
         args.contracts_commit.as_deref(),
         args.zk_governance_commit.as_str(),
         era_chain_id,
-        legacy_gateway_chain_id,
-        &legacy_gateway_chain_intervals,
-        new_gateway_chain_id,
-        new_gateway_representative_chain_id,
         l1_chain_id,
         &tx_hashes,
         create2_factory,
@@ -295,9 +262,7 @@ fn contains_center_output(value: &toml::Value) -> bool {
         toml::Value::Table(table) => table.iter().any(|(key, value)| {
             matches!(
                 key.as_str(),
-                "l1_interop_center_proxy_addr"
-                    | "l1_interop_center_implementation_addr"
-                    | "l1_interop_center_new_proxy"
+                "l1_interop_center_proxy_addr" | "l1_interop_center_implementation_addr"
             ) || contains_center_output(value)
         }),
         toml::Value::Array(values) => values.iter().any(contains_center_output),
@@ -338,7 +303,6 @@ mod tests {
         for field in [
             "l1_interop_center_proxy_addr",
             "l1_interop_center_implementation_addr",
-            "l1_interop_center_new_proxy",
         ] {
             for value in [
                 toml::Value::String(String::new()),
@@ -363,7 +327,7 @@ mod tests {
 
         let calls = alloy::hex::encode(CallList { elems: vec![] }.abi_encode_sequence());
         let input = format!(
-            "[core.upgrade_addresses.bridgehub]\nl1_interop_center_new_proxy = true\n\
+            "[core.upgrade_addresses.bridgehub]\nl1_interop_center_proxy_addr = '0x0000000000000000000000000000000000000001'\n\
              [governance_calls]\nstage0_calls = '0x{calls}'\nstage1_calls = '0x{calls}'\nstage2_calls = '0x{calls}'"
         );
         let dir = tempfile::tempdir().unwrap();
@@ -372,7 +336,6 @@ mod tests {
         let args = |display_upgrade_data| VerifyUpgradeArgs {
             env: VerifyUpgradeEnv::Stage,
             l1_rpc_url: "invalid RPC URL".into(),
-            gw_rpc_url: "invalid RPC URL".into(),
             ecosystem_toml: path.clone(),
             contracts_commit: None,
             zk_governance_commit: String::new(),

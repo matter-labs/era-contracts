@@ -8,6 +8,16 @@ Never run `pkill -f anvil`, `killall anvil`, or any blanket kill command for Anv
 
 Instead, use the `cleanup.sh` script in the anvil-interop directory, which targets only processes on known ports.
 
+## Gateway is softly deprecated
+
+v33 onwards deploys no Gateway, and its ceremony tooling is gone. The Gateway contracts, the scripts that stand one up in tests, the foundry Gateway suites and the anvil-interop Gateway specs (04–06) remain only so the Gateway could be brought back in a working state; removing them is tracked in EVM-1729. Beyond keeping those tests passing, nothing depends on the Gateway.
+
+Unless the user explicitly asks about the Gateway:
+
+- Don't reason about the Gateway, Gateway-settled chains or chain migration while designing, implementing or reviewing a change, and don't add Gateway cases to new tests or docs.
+- Don't extend, refactor or rename Gateway code. Gateway-named identifiers in the core contracts (`ERA_GATEWAY_CHAIN_ID`, `migrateToGateway`, …) are ABI and stay as they are.
+- If a change breaks an existing Gateway test, the smallest fix that keeps it passing is enough.
+
 ## Code style requirements
 
 1. Avoid using magic numbers. Most constant numbers especially for system params / well known chain ids must be represented as a constant.

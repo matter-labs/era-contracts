@@ -8,7 +8,7 @@
 //! Per-stage logic lives in submodules:
 //! - [`stage0`] — Stage 0 orchestrator + PUH-immutables verification.
 //! - [`stage1`] — Stage 1 orchestrator + the 6 per-call payload verifiers.
-//! - [`stage2`] — Stage 2 orchestrator + new-Gateway bring-up walker.
+//! - [`stage2`] — Stage 2 orchestrator.
 //!
 //! Cross-cutting machinery:
 //! - [`helpers`] — call-shape primitives (`verify_call_by_*`), address-book
@@ -61,44 +61,8 @@ sol! {
     function updateGuardians(address _newGuardians);
     function updateEmergencyUpgradeBoard(address _newEmergencyUpgradeBoard);
 
-    // L2-side selectors carried as `l2Calldata` inside the new-Gateway
-    // bring-up priority txs. Decoded by `verify_gateway_bring_up_calls` to
-    // cross-check each priority tx targets the right contract on L2.
-    function addChainTypeManager(address _chainTypeManager);
+    // Decoded by stage 0 to spot the PUH `acceptOwnership` hand-over.
     function acceptOwnership();
-    function setAssetHandlerAddress(uint256 _originChainId, bytes32 _assetId, address _assetHandlerAddress);
-    function setCTMAssetAddress(bytes32 _additionalData, address _assetAddress);
-
-    // Outer `requestL2TransactionDirect((...))` priority-tx struct. Layout
-    // matches `L2TransactionRequestDirect` in `IBridgehubBase.sol`.
-    struct L2TransactionRequestDirect {
-        uint256 chainId;
-        uint256 mintValue;
-        address l2Contract;
-        uint256 l2Value;
-        bytes l2Calldata;
-        uint256 l2GasLimit;
-        uint256 l2GasPerPubdataByteLimit;
-        bytes[] factoryDeps;
-        address refundRecipient;
-    }
-    function requestL2TransactionDirect(L2TransactionRequestDirect _request);
-
-    // Outer `requestL2TransactionTwoBridges((...))` priority-tx struct.
-    // Layout matches `L2TransactionRequestTwoBridgesOuter` in
-    // `IBridgehubBase.sol`.
-    struct L2TransactionRequestTwoBridgesOuter {
-        uint256 chainId;
-        uint256 mintValue;
-        uint256 l2Value;
-        uint256 l2GasLimit;
-        uint256 l2GasPerPubdataByteLimit;
-        address refundRecipient;
-        address secondBridgeAddress;
-        uint256 secondBridgeValue;
-        bytes secondBridgeCalldata;
-    }
-    function requestL2TransactionTwoBridges(L2TransactionRequestTwoBridgesOuter _request);
 
     #[sol(rpc)]
     contract BridgehubOwnerView {

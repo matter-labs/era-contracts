@@ -40,16 +40,3 @@ rollup_da_manager = "0x3F54A35a979Fe576159002B05bE2eDf9b455FAAA"
 proxy = "0x1adf137f59949c9081157d5dE1e002D1c992071F"
 bytecodes_supplier = "0xC9F20FC268Fc3e0e597660550033Bf2C24218fd8"
 rollup_da_manager = "0x3F54A35a979Fe576159002B05bE2eDf9b455FAAA"
-
-# Legacy Gateway configuration for settlement layer validation
-# This section contains historical data about chains that settled on the legacy Gateway
-[legacy_gateway]
-# The chain ID of the legacy Gateway (9075 for mainnet)
-chain_id = 9075
-
-[[legacy_gateway.chain_intervals]]
-chain_id = 324
-migrate_to_sl_batch = 501260
-migrate_from_sl_batch = 505960
-sl_batch_lower_bound = 440
-sl_batch_upper_bound = 2746

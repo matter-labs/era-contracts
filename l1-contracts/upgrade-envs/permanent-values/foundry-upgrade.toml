@@ -16,7 +16,3 @@ l1_bytecodes_supplier_addr = "0x9f3f32ea83c8a1c8e993fd9035d1d077545467ac"
 [permanent_contracts]
 create2_factory_addr = "0x4e59b44847b379578588920ca78fbf26c0b4956c"
 create2_factory_salt = "0xcfc937107789faff5acefe20604c1919be02564aad194eb94dc5a89f2c5726b4"
-
-# [legacy_gateway] is intentionally omitted: the local fixture never registers
-# any legacy GW chain as a settlement layer, so emitting
-# `setSettlementLayerStatus(_, false)` would revert during stage-2 multicall.

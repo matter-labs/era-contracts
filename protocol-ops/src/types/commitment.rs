@@ -74,8 +74,8 @@ impl PubdataContent {
 ///
 /// Callers normally never name a variant: [`Self::from_da_type`] derives blobs for every
 /// [`DAValidatorType`] on ZKsync OS. Naming one is how a chain gets a different delivery than its
-/// kind implies: commit-tx calldata (`blobs-and-pubdata-keccak256`), nothing at all
-/// (`discouraged-empty-no-da`), or the scheme a gateway-settling chain needs.
+/// kind implies: commit-tx calldata (`blobs-and-pubdata-keccak256`) or nothing at all
+/// (`discouraged-empty-no-da`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display, ValueEnum)]
 #[repr(u8)]
 pub enum L2DACommitmentScheme {
@@ -97,17 +97,7 @@ pub enum L2DACommitmentScheme {
 }
 
 impl L2DACommitmentScheme {
-    /// Resolve the L2 DA commitment scheme for a ZKsync OS chain that settles
-    /// **directly on L1**.
-    ///
-    /// Do NOT use this for gateway-settling chains — use
-    /// [`Self::for_gateway_settling`] instead.  Gateway-settling chains relay
-    /// their pubdata through the gateway and the server encodes them with
-    /// `pubdata_mode = RelayedL2Calldata`, which maps to
-    /// `BlobsAndPubdataKeccak256` (scheme 3).  Passing
-    /// `BlobsZKSyncOS` (scheme 4) from this function into
-    /// `set_da_validator_pair` causes `MismatchL2DACommitmentScheme` errors on
-    /// every batch commit.
+    /// Resolve the L2 DA commitment scheme for a ZKsync OS chain settling on L1.
     pub fn from_da_type(da_type: DAValidatorType) -> Self {
         match da_type {
             DAValidatorType::Rollup => L2DACommitmentScheme::BlobsZKSyncOS,
@@ -118,24 +108,6 @@ impl L2DACommitmentScheme {
             // interop commitment tree leaves in it — reaches L1 through the same blobs a rollup
             // uses, unless the caller names another scheme.
             DAValidatorType::LogsOnlyValidium => L2DACommitmentScheme::BlobsZKSyncOS,
-        }
-    }
-
-    /// Resolve the L2 DA commitment scheme for a chain that settles **on a
-    /// gateway** (gateway-settling chain).
-    ///
-    /// Gateway-settling chains relay their pubdata through the gateway L2.
-    /// The ZKsync OS server uses `pubdata_mode = RelayedL2Calldata` for these
-    /// chains, which maps to `BlobsAndPubdataKeccak256` (scheme 3).
-    /// [`Self::from_da_type`] would return `BlobsZKSyncOS` (scheme 4),
-    /// which is incorrect for this case.
-    pub fn for_gateway_settling(da_type: DAValidatorType) -> Self {
-        match da_type {
-            DAValidatorType::Rollup => L2DACommitmentScheme::BlobsAndPubdataKeccak256,
-            DAValidatorType::Avail | DAValidatorType::Eigen => {
-                L2DACommitmentScheme::PubdataKeccak256
-            }
-            DAValidatorType::LogsOnlyValidium => L2DACommitmentScheme::EmptyNoDA,
         }
     }
 }

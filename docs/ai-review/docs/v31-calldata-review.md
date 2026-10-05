@@ -6,6 +6,10 @@
 > `[ctms.era]` and the router's `ERA_CHAIN_ID` referenced below no longer exist. Use it only to
 > re-review v31-era packages; for current packages follow `protocol-ops verify-upgrade` output.
 >
+> The Gateway sections below (legacy-Gateway decommission, new-Gateway bring-up, `[new_gateway]`)
+> are historical too: v33 deploys no Gateway, and the Gateway ceremony tooling and PUVT checks were
+> removed (EVM-1689).
+>
 > The full verifier rejects artifacts for the
 > [L1 Interop Center migration](../../../protocol-docs/l1-interop-center.md#deployment-and-migration);
 > `--display-upgrade-data` can print their calldata without validating it.

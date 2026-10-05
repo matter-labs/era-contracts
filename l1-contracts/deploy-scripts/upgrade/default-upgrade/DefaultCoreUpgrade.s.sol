@@ -179,13 +179,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
         // Protocol version comes from genesis config
         additionalConfig.newProtocolVersion = loadProtocolVersionFromGenesis();
 
-        // Legacy Era gateway chain ID — baked into L1MessageRoot as immutable
-        // ERA_GATEWAY_CHAIN_ID. Read from the upgrade input TOML ([legacy_gateway] section)
-        // so the constructor gets the right value. Optional: absent on fresh/local.
-        if (upgradeToml.keyExists("$.legacy_gateway.chain_id")) {
-            config.legacyGatewayChainId = upgradeToml.readUint("$.legacy_gateway.chain_id");
-        }
-
         coreAddresses.bridgehub.proxies.bridgehub = bridgehubProxyAddress;
         require(coreAddresses.bridgehub.proxies.bridgehub != address(0), "bridgehub_proxy_addr is zero");
         setAddressesBasedOnBridgehub();
@@ -285,7 +278,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
             coreAddresses.bridgehub.implementations.interopCenter
         );
         vm.serializeAddress("bridgehub", "l1_interop_center_proxy_addr", coreAddresses.bridgehub.proxies.interopCenter);
-        vm.serializeBool("bridgehub", "l1_interop_center_new_proxy", deployedL1InteropCenter);
         vm.serializeAddress("bridgehub", "message_root_proxy_addr", coreAddresses.bridgehub.proxies.messageRoot);
         string memory bridgehubSerialized = vm.serializeAddress(
             "bridgehub",
@@ -432,7 +424,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
         console.log("prepareStage1GovernanceCalls: prepareUpgradeProxiesCalls");
         allCalls[1] = prepareUpgradeProxiesCalls();
         allCalls[2] = provideSetNewVersionUpgradeCall();
-        console.log("prepareStage1GovernanceCalls: prepareGatewaySpecificStage1GovernanceCalls");
+        console.log("prepareStage1GovernanceCalls: prepareVersionSpecificStage1GovernanceCallsL1");
         allCalls[3] = prepareVersionSpecificStage1GovernanceCallsL1();
 
         calls = UpgradeUtils.mergeCallsArray(allCalls);
