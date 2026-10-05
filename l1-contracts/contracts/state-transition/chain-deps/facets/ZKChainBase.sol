@@ -23,6 +23,7 @@ import {
     ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE,
     ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE,
     ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
+    ZKSYNC_OS_FRI_PROOF_VERIFICATION_DISABLED,
     L2DACommitmentScheme
 } from "../../../common/Config.sol";
 import {CantRevertExecutedBatch, RevertedBatchNotAfterNewLastBatch} from "../../../common/L1ContractErrors.sol";
@@ -192,6 +193,19 @@ contract ZKChainBase is ReentrancyGuard {
 
     function _getUpgradeTxType() internal pure returns (uint256) {
         return ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE;
+    }
+
+    /// @notice Returns the current runtime configuration hash. See {protocol-docs/chain-config.md}.
+    function _getZKsyncOSChainConfigHash() internal view returns (bytes32) {
+        return
+            keccak256(
+                abi.encodePacked(
+                    s.chainId,
+                    ZKSYNC_OS_FRI_PROOF_VERIFICATION_DISABLED,
+                    uint256(_getZKsyncOSMaxTxGasLimit()),
+                    uint256(s.pubdataContent)
+                )
+            );
     }
 
     /// @notice Returns the effective ZKsync OS single-transaction gas limit (EIP-7825).

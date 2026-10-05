@@ -124,7 +124,7 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
         (txFrom, txTo, commitData) = Utils.encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, commitInfos);
 
         IExecutor.StoredBatchInfo[] memory storedArray = new IExecutor.StoredBatchInfo[](1);
-        storedArray[0] = _buildStoredBatchInfoZKsyncOS(commitInfo);
+        storedArray[0] = _buildStoredBatchInfoZKsyncOS(genesisStoredBatchInfo, commitInfo);
 
         (, , proveData) = Utils.encodeProveBatchesData(genesisStoredBatchInfo, storedArray, proofInput);
         (, , executeData) = Utils.encodeExecuteBatchesData(storedArray, priorityOps);
@@ -143,21 +143,29 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
         info.dependencyRootsRollingHash = bytes32(0);
     }
 
-    /// @dev Replicates the stored batch info that _commitOneBatch produces for the given commit info.
+    /// @notice Constructs the expected stored batch from its authenticated predecessor and commit data.
     function _buildStoredBatchInfoZKsyncOS(
-        CommitBatchInfoZKsyncOS memory commitInfo
+        IExecutor.StoredBatchInfo memory _previousBatch,
+        CommitBatchInfoZKsyncOS memory _commitInfo
     ) internal pure returns (IExecutor.StoredBatchInfo memory) {
         return
             IExecutor.StoredBatchInfo({
-                batchNumber: commitInfo.batchNumber,
-                batchHash: commitInfo.newStateCommitment,
+                batchNumber: _commitInfo.batchNumber,
+                batchHash: _commitInfo.newStateCommitment,
                 indexRepeatedStorageChanges: 0,
-                numberOfLayer1Txs: commitInfo.numberOfLayer1Txs,
-                priorityOperationsHash: commitInfo.priorityOperationsHash,
-                l2LogsTreeRoot: commitInfo.l2LogsTreeRoot,
-                dependencyRootsRollingHash: commitInfo.dependencyRootsRollingHash,
+                numberOfLayer1Txs: _commitInfo.numberOfLayer1Txs,
+                priorityOperationsHash: _commitInfo.priorityOperationsHash,
+                l2LogsTreeRoot: _commitInfo.l2LogsTreeRoot,
+                dependencyRootsRollingHash: _commitInfo.dependencyRootsRollingHash,
                 timestamp: 0,
-                commitment: _batchOutputHash(commitInfo)
+                commitment: keccak256(
+                    abi.encodePacked(
+                        _previousBatch.batchHash,
+                        _commitInfo.newStateCommitment,
+                        _commitInfo.chainConfigHash,
+                        _batchOutputHash(_commitInfo)
+                    )
+                )
             });
     }
 

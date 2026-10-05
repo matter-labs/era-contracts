@@ -130,6 +130,10 @@ interface IGetters is IZKChainBase {
     /// substituted when the value was never set explicitly.
     function getZKsyncOSMaxTxGasLimit() external view returns (uint64);
 
+    /// @notice Returns the current runtime configuration hash on this chain copy.
+    /// @return The hash used to validate batch commits; see {protocol-docs/chain-config.md}.
+    function getZKsyncOSChainConfigHash() external view returns (bytes32);
+
     /// @return Whether a withdrawal has been finalized.
     /// @param _l2BatchNumber The L2 batch number within which the withdrawal happened.
     /// @param _l2MessageIndex The index of the L2->L1 message denoting the withdrawal.

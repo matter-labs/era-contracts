@@ -85,12 +85,14 @@ contract ExecutorTest is UtilsCallMockerTest {
     uint256[] internal proofInput;
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](14);
+        bytes4[] memory selectors = new bytes4[](16);
         uint256 i = 0;
         selectors[i++] = admin.setPendingAdmin.selector;
         selectors[i++] = admin.acceptAdmin.selector;
         selectors[i++] = admin.setValidator.selector;
         selectors[i++] = admin.setPriorityTxMaxGasLimit.selector;
+        selectors[i++] = admin.setZKsyncOSMaxTxGasLimit.selector;
+        selectors[i++] = admin.setPubdataContent.selector;
         selectors[i++] = admin.changeFeeParams.selector;
         selectors[i++] = admin.setTokenMultiplier.selector;
         selectors[i++] = admin.upgradeChainFromVersion.selector;
@@ -124,9 +126,13 @@ contract ExecutorTest is UtilsCallMockerTest {
     }
 
     function getGettersSelectors() public view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](30);
+        bytes4[] memory selectors = new bytes4[](34);
         uint256 i = 0;
         selectors[i++] = getters.getVerifier.selector;
+        selectors[i++] = getters.getZKsyncOSChainConfigHash.selector;
+        selectors[i++] = getters.getProtocolVersion.selector;
+        selectors[i++] = getters.getL2SystemContractsUpgradeTxHash.selector;
+        selectors[i++] = getters.getL2SystemContractsUpgradeBatchNumber.selector;
         selectors[i++] = getters.getAdmin.selector;
         selectors[i++] = getters.getPendingAdmin.selector;
         selectors[i++] = getters.getTotalBlocksCommitted.selector;
@@ -404,7 +410,8 @@ contract ExecutorTest is UtilsCallMockerTest {
             lastBlockNumber: uint64(2),
             chainId: l2ChainId,
             operatorDAInput: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
-            slChainId: block.chainid
+            slChainId: block.chainid,
+            chainConfigHash: Utils.defaultChainConfigHash(l2ChainId)
         });
 
         dummyBridgehub.setZKChain(address(diamondProxy));

@@ -79,6 +79,8 @@ error CantRevertExecutedBatch();
 error ChainAlreadyLive();
 // 0xd054a77e
 error ChainBalanceMustBeZeroBeforeMigration(uint256 chainId, bytes32 assetId, uint256 chainBalance);
+// 0x1ca295a9
+error ChainConfigHashMismatch(bytes32 expected, bytes32 actual);
 // 0x24591d89
 error ChainIdAlreadyExists();
 // 0x717a1656
