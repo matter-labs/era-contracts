@@ -482,10 +482,10 @@
   {
     "contractName": "l1-contracts/L1Bridgehub",
     "evmBytecodePath": "/l1-contracts/out/L1Bridgehub.sol/L1Bridgehub.json",
-    "evmBytecodeHash": "0x2a6f2c440ea48cb04fd5d621b86c6fee039a9fa1f639641ca1ddf78e2f420b71",
-    "evmDeployedBytecodeHash": "0x1c6d8112db8357ff9d074dc6c1ccf1cdf14913515ddc1870a0a88ee4a3323560",
-    "evmDeployedBytecodeBlakeHash": "0xfa9a618f2f76e75f0fe63cbf93de39b0007a1a8c3851c0bb79b7106e23169f20",
-    "evmDeployedBytecodeLength": 14615
+    "evmBytecodeHash": "0x162246a46326b6094acdf6382d14c499ea841813bdc36bddf808c5b97e65cad7",
+    "evmDeployedBytecodeHash": "0x4f73c36d720346b591364d186ee5b758d42a756e25b93d62a11b30254ce81aff",
+    "evmDeployedBytecodeBlakeHash": "0xead5a4efa2af329b37977ee9ebf109d06be62707740b6564e304aa083a14955e",
+    "evmDeployedBytecodeLength": 15012
   },
   {
     "contractName": "l1-contracts/L1ChainAssetHandler",
@@ -506,9 +506,9 @@
   {
     "contractName": "l1-contracts/L1InteropCenter",
     "evmBytecodePath": "/l1-contracts/out/L1InteropCenter.sol/L1InteropCenter.json",
-    "evmBytecodeHash": "0x2d75ef4264ef2285b1b01be58d0666416764d448ee92faf19d7e76701242be62",
-    "evmDeployedBytecodeHash": "0xf894799e2ae004d90d946eca2ce8cdad3f7832b0ce6c986f65dcfe0a3780aa73",
-    "evmDeployedBytecodeBlakeHash": "0x36dd66dbd3653c4af1728380bebc266d99619cf6a6f7c5873e17a490fa1d7074",
+    "evmBytecodeHash": "0xd1096a724cfda8dcd2f1a2039e49c7ab600e8b2cbcb524c28c34ec1f81032089",
+    "evmDeployedBytecodeHash": "0xf1970ba0524f7e6ddc453ca3dcae87bf8560882f43f848540b73325407412695",
+    "evmDeployedBytecodeBlakeHash": "0x7947a77f9fbdcaa66629f645821ce4546de7d31a7ad2baa470d7af5e158557e4",
     "evmDeployedBytecodeLength": 12947
   },
   {
