@@ -30,7 +30,6 @@ import {CTMDeployedAddresses} from "../utils/Types.sol";
 struct Config {
     uint256 l1ChainId;
     address deployerAddress;
-    uint256 gatewayChainId;
     address ownerAddress;
     bytes32 zkTokenAssetId;
     bool testnetVerifier;
@@ -141,8 +140,8 @@ abstract contract DeployCTMUtils is DeployUtils {
     function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual returns (Diamond.FacetCut[] memory facetCuts) {
-        // Note: we use the provided stateTransition for the facet address, but not to get the selectors, as we use this feature for Gateway, which we cannot query.
-        // If we start to use different selectors for Gateway, we should change this.
+        // Note: the provided stateTransition supplies the facet addresses; the selectors come from the
+        // local artifacts.
         facetCuts = new Diamond.FacetCut[](6);
         facetCuts[0] = Diamond.FacetCut({
             facet: stateTransition.facets.adminFacet,

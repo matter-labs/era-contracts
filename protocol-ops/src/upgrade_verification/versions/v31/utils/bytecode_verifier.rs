@@ -65,10 +65,9 @@ impl BytecodeVerifier {
     }
 
     /// Tries to parse `maybe_bytecode` as init code by testing every possible 32-byte
-    /// constructor-argument suffix. Gateway ZKsync OS deployer constructors
-    /// carry dynamic structs and selector arrays, and zk-governance
-    /// Guardians carries a dynamic members array, so the legacy 0..9 word
-    /// scan is too narrow for those CREATE2 deploys.
+    /// constructor-argument suffix. zk-governance Guardians carries a dynamic
+    /// members array, so the legacy 0..9 word scan is too narrow for that
+    /// CREATE2 deploy.
     pub fn try_parse_bytecode(&self, maybe_bytecode: &[u8]) -> Option<(String, Vec<u8>)> {
         // We do not know how many extra 32-byte arguments there are,
         // so we try all values up to the caller-provided bound.
@@ -145,11 +144,6 @@ impl BytecodeVerifier {
         bytecode_hash: &FixedBytes<32>,
     ) -> Option<&String> {
         self.deployed_bytecode_file_by_hash.get(bytecode_hash)
-    }
-
-    /// Returns the file name corresponding to the given zk bytecode hash.
-    pub fn zk_bytecode_hash_to_file(&self, bytecode_hash: &FixedBytes<32>) -> Option<&String> {
-        self.zk_bytecode_file_by_hash.get(bytecode_hash)
     }
 
     /// Returns the zk bytecode hash that corresponds to the file

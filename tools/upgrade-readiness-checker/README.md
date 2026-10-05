@@ -13,15 +13,13 @@ The upgrade can be safely finalized on L1 once:
    included it in L2 block **N**), and
 2. Block **N-1** is finalized on the settlement layer — its batch has been
    executed. In zksync-os the `"finalized"` block tag resolves to
-   `last_executed_block`, so we compare `finalized >= N - 1`. For direct
-   L1-settling chains this corresponds to batch execution on L1; for
-   gateway-settling chains, on the gateway.
+   `last_executed_block`, so we compare `finalized >= N - 1`, i.e. batch
+   execution on the settlement layer.
 
 ## How it works
 
 1. Resolves `ChainTypeManager` via
-   `Bridgehub.chainTypeManager(chainId)` on the settlement layer (L1 for direct
-   chains, gateway L2 for gateway-settling chains).
+   `Bridgehub.chainTypeManager(chainId)` on the settlement layer.
 2. Scans for `NewUpgradeCutData(targetProtocolVersion, ...)` on the CTM and
    decodes the embedded `L2CanonicalTransaction` from the diamond cut init
    calldata.

@@ -3,9 +3,6 @@ testnet_verifier = true
 multi_proof_verifier = false
 zk_token_asset_id = "0x01000000000000000000000000000000000000000000000000000000000a2a6f"
 
-[gateway]
-chain_id = 123
-
 [contracts]
 governance_security_council_address = "0x0000000000000000000000000000000000000000"
 governance_min_delay = 0
