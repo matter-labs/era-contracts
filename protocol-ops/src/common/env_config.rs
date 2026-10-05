@@ -170,6 +170,8 @@ pub struct EnvConfig {
     pub upgrade_input_path: PathBuf,
     pub permanent: PermanentValues,
     pub upgrade_input: UpgradeInputs,
+    /// The upgrade-env directory the release values (input, salts, outputs) come from.
+    upgrade_env_dir: PathBuf,
 }
 
 impl EnvConfig {
@@ -180,11 +182,12 @@ impl EnvConfig {
     }
 
     /// `load` against an explicit upgrade-env directory (relative to `l1-contracts/`) instead of the
-    /// current release's.
-    fn load_from_upgrade_env_dir(env: &str, upgrade_env_dir: &str) -> anyhow::Result<Self> {
+    /// current release's. Used when a historical preparation selects another release's input.
+    pub fn load_from_upgrade_env_dir(env: &str, upgrade_env_dir: &str) -> anyhow::Result<Self> {
         let l1 = resolve_l1_contracts_path()?;
         let permanent_values_path = l1.join(PERMANENT_VALUES_DIR).join(format!("{env}.toml"));
-        let upgrade_input_path = l1.join(upgrade_env_dir).join(format!("{env}.toml"));
+        let upgrade_env_dir = l1.join(upgrade_env_dir);
+        let upgrade_input_path = upgrade_env_dir.join(format!("{env}.toml"));
 
         let pv_content = fs::read_to_string(&permanent_values_path).with_context(|| {
             format!(
@@ -211,7 +214,14 @@ impl EnvConfig {
             upgrade_input_path,
             permanent,
             upgrade_input,
+            upgrade_env_dir,
         })
+    }
+
+    /// This env's protocol-ops output dir inside the release directory it was loaded from, e.g.
+    /// `<upgrade-env dir>/output/<env>/`. Same layout as [`default_protocol_ops_out_dir`].
+    pub fn protocol_ops_out_dir(&self) -> PathBuf {
+        self.upgrade_env_dir.join("output").join(&self.env)
     }
 
     pub fn bridgehub(&self) -> Address {

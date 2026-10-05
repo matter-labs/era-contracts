@@ -33,6 +33,7 @@ use serde::{Deserialize, Serialize};
 use crate::commands::ecosystem::upgrade_full::UpgradeFull;
 use crate::commands::ecosystem::upgrade_inner::{CtmInputs, PrepareInputs, UpgradeInner};
 use crate::common::abi::AdminFunctionsAbi;
+use crate::common::env_config::EnvConfig;
 use crate::common::forge::scripts::{
     ADMIN_FUNCTIONS_INVOCATION, CURRENT_UPGRADE_ENV_DIR, CURRENT_UPGRADE_LOCAL_INPUT_PATH,
     DEFAULT_CORE_UPGRADE_SCRIPT_PATH, DEFAULT_CTM_UPGRADE_SCRIPT_PATH, UPGRADE_CORE_OUTPUT_PATH,
@@ -504,15 +505,30 @@ pub async fn run_list_ctms(args: ListCtmsArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// The `--env` preset for `upgrade-prepare-all`. Its release values (CREATE2 salts, owner, output dir) come
+/// from the same release directory as the upgrade input: the current release's by default, or the directory
+/// of an explicitly selected `--upgrade-input-path` (relative to `l1-contracts/`), so a historical
+/// re-prepare keeps that release's pinned salts instead of reading the current release's.
+fn prepare_env_config(args: &UpgradePrepareAllArgs) -> anyhow::Result<Option<EnvConfig>> {
+    match args.topology.env.as_deref() {
+        Some(env) if args.upgrade_input_path != CURRENT_UPGRADE_LOCAL_INPUT_PATH => {
+            let input_dir = Path::new(args.upgrade_input_path.trim_start_matches('/'))
+                .parent()
+                .and_then(Path::to_str)
+                .context("--upgrade-input-path has no parent directory")?;
+            Ok(Some(EnvConfig::load_from_upgrade_env_dir(env, input_dir)?))
+        }
+        _ => args.topology.env_config(),
+    }
+}
+
 pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow::Result<()> {
     // ── env preset auto-fills ────────────────────────────────────────
-    let env_cfg = args.topology.env_config()?;
+    let env_cfg = prepare_env_config(&args)?;
     if let Some(ref cfg) = env_cfg {
         // Default --out to the environment preset's protocol-ops preparation directory.
         if args.shared.out.is_none() {
-            args.shared.out = Some(
-                crate::common::env_config::default_protocol_ops_out_dir(&cfg.env)?.join("prepare"),
-            );
+            args.shared.out = Some(cfg.protocol_ops_out_dir().join("prepare"));
         }
         // Note: we intentionally do *not* default `--deployer-address` from
         // the env's `owner_address`. On stage / mainnet the env's
@@ -1137,7 +1153,8 @@ fn load_ctm_config(path: &Path) -> anyhow::Result<Vec<CtmInputs>> {
 mod release_script_tests {
     use super::*;
     use crate::common::forge::scripts::{
-        CORE_UPGRADE_V33_SCRIPT_PATH, CTM_UPGRADE_V33_SCRIPT_PATH, UPGRADE_V33_LOCAL_INPUT_PATH,
+        CORE_UPGRADE_V33_SCRIPT_PATH, CTM_UPGRADE_V33_SCRIPT_PATH, UPGRADE_V33_ENV_DIR,
+        UPGRADE_V33_LOCAL_INPUT_PATH,
     };
     use clap::CommandFactory;
 
@@ -1181,6 +1198,32 @@ mod release_script_tests {
             shared_base.contains(&format!("new {core}()")),
             "UpgradeTestShared must construct the default core script {core}"
         );
+    }
+
+    /// A historical re-prepare (`--upgrade-input-path` into an older release's directory) reads the env's
+    /// pinned salts from that directory, not from the current release's.
+    #[test]
+    fn explicit_input_selects_its_release_env_values() {
+        let historical = UpgradePrepareAllArgs::try_parse_from([
+            "prepare",
+            "--env",
+            "stage",
+            "--upgrade-input-path",
+            &format!("{UPGRADE_V33_ENV_DIR}/stage.toml"),
+        ])
+        .unwrap();
+        let cfg = prepare_env_config(&historical).unwrap().unwrap();
+        assert!(cfg.create2_factory_salt_for_upgrade().unwrap().is_some());
+        assert!(cfg
+            .protocol_ops_out_dir()
+            .ends_with("upgrade-envs/v0.33.0-atomic-interop/output/stage"));
+
+        let current = UpgradePrepareAllArgs::try_parse_from(["prepare", "--env", "stage"]).unwrap();
+        let cfg = prepare_env_config(&current).unwrap().unwrap();
+        assert!(cfg.protocol_ops_out_dir().ends_with(format!(
+            "{}/output/stage",
+            CURRENT_UPGRADE_ENV_DIR.trim_start_matches('/')
+        )));
     }
 
     #[test]
