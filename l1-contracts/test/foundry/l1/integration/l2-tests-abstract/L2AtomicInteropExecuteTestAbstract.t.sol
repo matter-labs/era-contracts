@@ -170,16 +170,15 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
     /// finality proofs, positionally aligned with the preimage. Both batches settled in time.
     function _commitRemoteLegAndBuildFinality() internal returns (AtomicFinalityProof memory finality) {
         uint256 remoteIndex = _insertCommit(AtomicFlowFixtures.commitValue(ectx.flowId, REMOTE_LEG));
-        finality = _buildFinality(
-            _inclusionProof({
-                _sourceChainId: destinationChainId,
-                _batchNumber: REMOTE_BATCH_NUMBER,
-                _leafIndex: remoteIndex,
-                _slChainId: L1_CHAIN_ID,
-                _slBlock: SL_BLOCK,
-                _l1Timestamp: DEADLINE - 1
-            })
-        );
+        (ImtProof memory remoteProof, ) = _inclusionProof({
+            _sourceChainId: destinationChainId,
+            _batchNumber: REMOTE_BATCH_NUMBER,
+            _leafIndex: remoteIndex,
+            _slChainId: L1_CHAIN_ID,
+            _slBlock: SL_BLOCK,
+            _l1Timestamp: DEADLINE - 1
+        });
+        finality = _buildFinality(remoteProof);
     }
 
     /// @dev Assembles the finality proof from the canonical-tree local proof and `_remoteProof`.
@@ -204,6 +203,16 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         uint256 _l1Timestamp
     ) internal view returns (ImtProof memory) {
         L2InteropCommitmentTree canonicalTree = L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR);
+        (bytes32[] memory settlementProof, ) = _settlementProof({
+            _sourceChainId: _sourceChainId,
+            _batchNumber: _batchNumber,
+            _imtRoot: canonicalTree.root(),
+            _slChainId: L1_CHAIN_ID,
+            _slBlock: SL_BLOCK,
+            _l1Timestamp: _l1Timestamp,
+            _batchLeafProofMask: 0,
+            _batchLeafSiblings: new bytes32[](0)
+        });
         return
             ImtProof({
                 sourceChainId: _sourceChainId,
@@ -211,7 +220,7 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
                 chainImtRoot: canonicalTree.root(),
                 // The finality path always authenticates the end root; the branch bool is ignored.
                 provesAgainstBeginRoot: false,
-                settlementProof: _settlementProof(L1_CHAIN_ID, SL_BLOCK, _l1Timestamp, new bytes32[](0)),
+                settlementProof: settlementProof,
                 leaf: canonicalTree.leafAt(_leafIndex),
                 imtLeafIndex: _leafIndex,
                 imtProof: canonicalTree.merklePath(_leafIndex)
@@ -405,17 +414,14 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
 
     /// @dev A proof for the remote leg that was never committed: the best available "membership" data
     /// is the oracle tree's genesis head leaf, whose value is not the leg's commit value.
-    function _uncommittedRemoteProof() internal view returns (ImtProof memory) {
-        return
-            ImtProof({
-                sourceChainId: destinationChainId,
-                batchNumber: REMOTE_BATCH_NUMBER,
-                chainImtRoot: tree.root(),
-                provesAgainstBeginRoot: false,
-                settlementProof: _settlementProof(L1_CHAIN_ID, SL_BLOCK, DEADLINE - 1, new bytes32[](0)),
-                leaf: tree.leafAt(0),
-                imtLeafIndex: 0,
-                imtProof: tree.merklePath(0)
-            });
+    function _uncommittedRemoteProof() internal view returns (ImtProof memory proof) {
+        (proof, ) = _inclusionProof({
+            _sourceChainId: destinationChainId,
+            _batchNumber: REMOTE_BATCH_NUMBER,
+            _leafIndex: 0,
+            _slChainId: L1_CHAIN_ID,
+            _slBlock: SL_BLOCK,
+            _l1Timestamp: DEADLINE - 1
+        });
     }
 }
