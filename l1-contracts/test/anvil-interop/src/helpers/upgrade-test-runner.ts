@@ -240,8 +240,8 @@ async function transferL1Ownership(
  *
  * For the upgrade scripts to issue calls from a contract owner, that owner has to be listed in
  * `ownable_proxies`, which reaches them only through protocol-ops' `--env` config — not available to this
- * harness, which passes addresses explicitly. So every owner has to be an EOA instead. In the v31 fixture
- * the CTM deployment leaves its ProxyAdmin owned by its own `Governance.sol` instance.
+ * harness, which passes addresses explicitly. So every owner has to be an EOA instead. In the anvil
+ * fixtures the CTM deployment leaves its ProxyAdmin owned by its own `Governance.sol` instance.
  */
 async function normalizeProxyAdminOwnerToEoa(
   provider: ethers.providers.JsonRpcProvider,

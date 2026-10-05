@@ -66,7 +66,7 @@ export async function transferOwnable2Step(
  * for a chain's diamond proxy so the per-chain upgrade passes
  * its `totalBatchesCommitted == totalBatchesExecuted` guard.
  *
- * In production all committed batches must be executed before the v31 upgrade
+ * In production all committed batches must be executed before a chain's upgrade
  * begins. On a forked chain whose pending batches haven't been executed at fork
  * time, we mark the gap as if execution had caught up — same end-state as the
  * production prerequisite, just realised via storage write instead of running

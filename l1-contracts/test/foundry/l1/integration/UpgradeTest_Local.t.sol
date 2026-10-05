@@ -79,7 +79,7 @@ contract DefaultCTMUpgradeForLocalTest is DefaultCTMUpgrade {
 ///         `DefaultCTMUpgrade`) against an ecosystem freshly deployed at the genesis version.
 /// @dev Release-agnostic by design: the target version is derived from genesis (minor + 1), and no
 ///      release-specific script is used, so this file does not need editing on a release bump.
-///      Historical release paths (e.g. v31 -> v33) are covered by the anvil upgrade runners instead.
+///      The upgrade from the previous release's real chain states is covered by the anvil upgrade test.
 contract UpgradeIntegrationTestLocal is UpgradeIntegrationTestBase, L1ContractDeployer, ZKChainDeployer, TokenDeployer {
     using Bytes for bytes;
 

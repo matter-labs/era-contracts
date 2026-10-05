@@ -101,8 +101,8 @@ export function getCreationBytecode(name: ContractName): string {
 /**
  * Legacy AdminFacet ABI: upgradeChainFromVersion(uint256, DiamondCutData) with 2 params. The current
  * AdminFacet has upgradeChainFromVersion(address, uint256, DiamondCutData) with 3 params. Only reachable
- * from fork runs against an ecosystem that predates the third parameter; the state-dump scenarios all
- * start at v31, which already has it.
+ * from fork runs against an ecosystem that predates the third parameter; the state-dump scenario starts at
+ * the previous release, which already has it.
  */
 export const LEGACY_ADMIN_ABI: string[] = [
   "function upgradeChainFromVersion(uint256, tuple(tuple(address,uint8,bool,bytes4[])[],address,bytes))",

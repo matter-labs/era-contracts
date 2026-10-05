@@ -89,7 +89,7 @@ cargo run --release --bin protocol_ops -- ecosystem verify-upgrade \
 
 | Flag                         | Role                                                                                           |
 | ---------------------------- | ---------------------------------------------------------------------------------------------- |
-| **`--env`**                  | `stage` / `testnet` / `mainnet`; selects the permanent-values + v31 input TOMLs.               |
+| **`--env`**                  | `stage` / `testnet` / `mainnet`; selects the permanent-values + current-release input TOMLs.   |
 | **`--ecosystem-toml`**       | Merged artifact from `upgrade-prepare-all`.                                                    |
 | **`--zk-governance-commit`** | zk-governance commit for PUH / Guardians / SecurityCouncil / EUB bytecode metadata (required). |
 | **`--contracts-commit`**     | Optional era-contracts commit; when omitted, the local checkout is the authority.              |
