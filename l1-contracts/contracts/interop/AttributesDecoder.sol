@@ -18,10 +18,6 @@ library AttributesDecoder {
         return abi.decode(_data[4:], (uint256, uint256, uint256, address));
     }
 
-    function decodeBytesArray(bytes calldata _data) internal pure returns (bytes[] memory) {
-        return abi.decode(_data[4:], (bytes[]));
-    }
-
     function decodeUint256(bytes calldata _data) internal pure returns (uint256) {
         return abi.decode(_data[4:], (uint256));
     }

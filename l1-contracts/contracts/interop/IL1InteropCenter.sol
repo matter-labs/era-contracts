@@ -14,8 +14,6 @@ import {IInteropCenterBase} from "./IInteropCenterBase.sol";
 /// @param refundRecipient The address on the destination chain that receives the fee refund.
 /// @param indirectCall Whether the message is an indirect call, i.e. it is passed through a cross-chain sender
 /// (e.g. the asset router) that constructs the actual destination-side call.
-/// @param factoryDepsProvided Whether the caller supplied a factory-dependencies attribute, including an empty array.
-/// @param factoryDeps Factory dependencies to be published with the L1->L2 transaction (direct calls only).
 struct L1MessageAttributes {
     uint256 interopCallValue;
     uint256 indirectCallMessageValue;
@@ -24,8 +22,6 @@ struct L1MessageAttributes {
     uint256 l2GasPerPubdataByteLimit;
     address refundRecipient;
     bool indirectCall;
-    bool factoryDepsProvided;
-    bytes[] factoryDeps;
 }
 
 /// @title L1 Interop Center interface

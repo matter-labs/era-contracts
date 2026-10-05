@@ -4,10 +4,8 @@ pragma solidity 0.8.28;
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L1InteropRequests} from "../../../../deploy-scripts/utils/L1InteropRequests.sol";
-import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
-import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {L1L2MessageParams, L1L2IndirectMessageParams} from "../../../../deploy-scripts/utils/L1InteropRequests.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";

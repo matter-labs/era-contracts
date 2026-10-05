@@ -138,7 +138,6 @@ contract PriorityModeExecutorTest is ExecutorTest {
                 l2Calldata: "",
                 l2GasLimit: l2GasLimit,
                 l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-                factoryDeps: new bytes[](0),
                 refundRecipient: prioritySender
             })
         );

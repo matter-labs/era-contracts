@@ -62,7 +62,6 @@ struct PrepareL1L2MessageParams {
     bytes l2Calldata;
     uint256 l2GasLimit;
     uint256 l2Value;
-    bytes[] factoryDeps;
     address dstAddress;
     uint256 chainId;
     address bridgehubAddress;
@@ -352,7 +351,6 @@ library Utils {
             l2Calldata: getDeterministicCreate2FactoryCalldata(create2Salt, initCode),
             l2GasLimit: l2GasLimit,
             l2Value: 0,
-            factoryDeps: new bytes[](0),
             dstAddress: DETERMINISTIC_CREATE2_ADDRESS,
             chainId: chainId,
             bridgehubAddress: bridgehubAddress,
@@ -393,7 +391,6 @@ library Utils {
             l2Calldata: params.l2Calldata,
             l2GasLimit: params.l2GasLimit,
             l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            factoryDeps: params.factoryDeps,
             refundRecipient: params.refundRecipient
         });
     }
@@ -443,7 +440,6 @@ library Utils {
         bytes memory l2Calldata,
         uint256 l2GasLimit,
         uint256 l2Value,
-        bytes[] memory factoryDeps,
         address dstAddress,
         uint256 chainId,
         address bridgehubAddress,
@@ -455,7 +451,6 @@ library Utils {
             l2Calldata: l2Calldata,
             l2GasLimit: l2GasLimit,
             l2Value: l2Value,
-            factoryDeps: factoryDeps,
             dstAddress: dstAddress,
             chainId: chainId,
             bridgehubAddress: bridgehubAddress,
@@ -478,11 +473,7 @@ library Utils {
         IL1InteropCenter l1InteropCenter = IL1InteropCenter(bridgehub.interopCenter());
         vm.broadcast(getBroadcasterAddress());
         vm.recordLogs();
-        bytes32 canonicalTxHash = L1InteropRequests.requestDirect(
-            l1InteropCenter,
-            requiredValueToDeploy,
-            l2TransactionRequestDirect
-        );
+        L1InteropRequests.requestDirect(l1InteropCenter, requiredValueToDeploy, l2TransactionRequestDirect);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed succeassfully! Extracting logs...");
 
@@ -505,7 +496,6 @@ library Utils {
             l2Calldata: hex"",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
             l2Value: amount,
-            factoryDeps: new bytes[](0),
             dstAddress: addr,
             chainId: chainId,
             bridgehubAddress: bridgehubAddress,
@@ -520,7 +510,6 @@ library Utils {
         uint256 l1GasPrice,
         bytes memory l2Calldata,
         uint256 l2GasLimit,
-        bytes[] memory factoryDeps,
         address dstAddress,
         uint256 chainId,
         address bridgehubAddress,
@@ -532,7 +521,6 @@ library Utils {
                 l2Calldata: l2Calldata,
                 l2GasLimit: l2GasLimit,
                 l2Value: 0,
-                factoryDeps: factoryDeps,
                 dstAddress: dstAddress,
                 chainId: chainId,
                 bridgehubAddress: bridgehubAddress,
@@ -635,7 +623,6 @@ library Utils {
         uint256 gasPrice,
         bytes memory l2Calldata,
         uint256 l2GasLimit,
-        bytes[] memory factoryDeps,
         address dstAddress,
         uint256 l2Value,
         uint256 chainId,
@@ -649,7 +636,6 @@ library Utils {
                 l2Calldata: l2Calldata,
                 l2GasLimit: l2GasLimit,
                 l2Value: l2Value,
-                factoryDeps: factoryDeps,
                 dstAddress: dstAddress,
                 chainId: chainId,
                 bridgehubAddress: bridgehubAddress,
@@ -740,7 +726,6 @@ library Utils {
         address accessControlRestriction,
         bytes memory l2Calldata,
         uint256 l2GasLimit,
-        bytes[] memory factoryDeps,
         address dstAddress,
         uint256 chainId,
         address bridgehubAddress,
@@ -751,7 +736,6 @@ library Utils {
             gasPrice: gasPrice,
             l2Calldata: l2Calldata,
             l2GasLimit: l2GasLimit,
-            factoryDeps: factoryDeps,
             dstAddress: dstAddress,
             l2Value: 0,
             chainId: chainId,
@@ -825,7 +809,6 @@ library Utils {
         bytes32 salt,
         bytes memory l2Calldata,
         uint256 l2GasLimit,
-        bytes[] memory factoryDeps,
         address dstAddress,
         uint256 chainId,
         address bridgehubAddress
@@ -836,7 +819,6 @@ library Utils {
                 l2Calldata: l2Calldata,
                 l2GasLimit: l2GasLimit,
                 l2Value: 0,
-                factoryDeps: factoryDeps,
                 dstAddress: dstAddress,
                 chainId: chainId,
                 bridgehubAddress: bridgehubAddress,
@@ -1036,27 +1018,6 @@ library Utils {
         }
 
         txHash = allLogs[0];
-    }
-
-    /**
-     * @dev Publish bytecodes to l2 through l1
-     */
-    function publishBytecodes(
-        bytes[] memory factoryDeps,
-        uint256 chainId,
-        address bridgehubAddress,
-        address refundRecipient
-    ) internal {
-        runL1L2Message({
-            l2Calldata: "",
-            l2GasLimit: MAX_PRIORITY_TX_GAS,
-            l2Value: 0,
-            factoryDeps: factoryDeps,
-            dstAddress: 0x0000000000000000000000000000000000000000,
-            chainId: chainId,
-            bridgehubAddress: bridgehubAddress,
-            refundRecipient: refundRecipient
-        });
     }
 
     function blakeHashBytecode(bytes memory _bytecode) internal returns (bytes32 hashedBytecode) {

@@ -21,10 +21,6 @@ interface IERC7786Attributes {
         address _refundRecipient
     ) external pure;
 
-    /// @notice Supplies factory dependencies for direct L1 sends.
-    /// @param _factoryDeps Bytecodes to publish with the transaction.
-    function factoryDeps(bytes[] calldata _factoryDeps) external pure;
-
     function indirectCall(uint256 _indirectCallMessageValue) external pure;
 
     function interopCallValue(uint256 _interopCallValue) external pure;

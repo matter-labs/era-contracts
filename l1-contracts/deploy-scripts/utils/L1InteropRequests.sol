@@ -14,7 +14,6 @@ struct L1L2MessageParams {
     bytes l2Calldata;
     uint256 l2GasLimit;
     uint256 l2GasPerPubdataByteLimit;
-    bytes[] factoryDeps;
     address refundRecipient;
 }
 
@@ -34,13 +33,12 @@ library L1InteropRequests {
     function encodeDirect(
         L1L2MessageParams memory _request
     ) internal pure returns (bytes memory recipient, bytes memory payload, bytes[] memory attributes) {
-        attributes = new bytes[](3);
+        attributes = new bytes[](2);
         attributes[0] = abi.encodeCall(
             IERC7786Attributes.l1ToL2TransactionParams,
             (_request.mintValue, _request.l2GasLimit, _request.l2GasPerPubdataByteLimit, _request.refundRecipient)
         );
         attributes[1] = abi.encodeCall(IERC7786Attributes.interopCallValue, (_request.l2Value));
-        attributes[2] = abi.encodeCall(IERC7786Attributes.factoryDeps, (_request.factoryDeps));
         return (
             InteroperableAddress.formatEvmV1(_request.chainId, _request.l2Contract),
             _request.l2Calldata,

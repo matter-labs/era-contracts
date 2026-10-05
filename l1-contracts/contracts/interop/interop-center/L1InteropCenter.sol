@@ -35,7 +35,6 @@ import {
     InteroperableAddressNotEmpty,
     AttributeAlreadySet,
     AttributeViolatesRestriction,
-    FactoryDepsNotAllowedForIndirectCall,
     L1ToL2TransactionParamsMissing,
     SingleCallBundleRequired
 } from "../InteropErrors.sol";
@@ -143,10 +142,6 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
         bytes[] calldata _eventAttributes
     ) private returns (bytes32 sendId) {
         address actualRecipient;
-        if (_attributes.indirectCall) {
-            require(!_attributes.factoryDepsProvided, FactoryDepsNotAllowedForIndirectCall());
-        }
-
         IZKChain zkChain = _getZKChain(_destinationChainId);
         if (_attributes.indirectCall) {
             (sendId, actualRecipient) = _sendIndirect({
@@ -203,7 +198,7 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
                 l2Calldata: _payload,
                 l2GasLimit: _attributes.l2GasLimit,
                 l2GasPerPubdataByteLimit: _attributes.l2GasPerPubdataByteLimit,
-                factoryDeps: _attributes.factoryDeps,
+                factoryDeps: new bytes[](0),
                 refundRecipient: _attributes.refundRecipient
             })
         );
@@ -359,15 +354,6 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
                     l1MessageAttributes.l2GasPerPubdataByteLimit,
                     l1MessageAttributes.refundRecipient
                 ) = AttributesDecoder.decodeL1ToL2TransactionParams(_attributes[i]);
-            } else if (selector == IERC7786Attributes.factoryDeps.selector) {
-                require(
-                    _restriction != L1AttributeParsingRestrictions.OnlyCallAttributes,
-                    AttributeViolatesRestriction(selector, uint256(_restriction))
-                );
-                require(!attributeUsed[3], AttributeAlreadySet(selector));
-                attributeUsed[3] = true;
-                l1MessageAttributes.factoryDepsProvided = true;
-                l1MessageAttributes.factoryDeps = AttributesDecoder.decodeBytesArray(_attributes[i]);
             } else {
                 revert IERC7786GatewaySource.UnsupportedAttribute(selector);
             }
@@ -398,8 +384,7 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
             [
                 IERC7786Attributes.interopCallValue.selector,
                 IERC7786Attributes.indirectCall.selector,
-                IERC7786Attributes.l1ToL2TransactionParams.selector,
-                IERC7786Attributes.factoryDeps.selector
+                IERC7786Attributes.l1ToL2TransactionParams.selector
             ];
     }
 

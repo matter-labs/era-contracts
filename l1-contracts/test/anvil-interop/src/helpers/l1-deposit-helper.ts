@@ -86,7 +86,6 @@ export async function depositETHToL2(params: DepositETHParams): Promise<DepositE
     l2Calldata: "0x",
     l2GasLimit,
     l2GasPerPubdataByteLimit,
-    factoryDeps: [],
     refundRecipient: recipient,
   };
 

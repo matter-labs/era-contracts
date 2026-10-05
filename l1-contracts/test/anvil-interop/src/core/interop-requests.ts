@@ -11,7 +11,6 @@ export interface L1L2MessageParams {
   l2Calldata: BytesLike;
   l2GasLimit: BigNumberish;
   l2GasPerPubdataByteLimit: BigNumberish;
-  factoryDeps: BytesLike[];
   refundRecipient: string;
 }
 
@@ -80,7 +79,6 @@ export function encodeDirectInteropRequest(request: L1L2MessageParams): InteropS
         request.refundRecipient,
       ]),
       iface.encodeFunctionData("interopCallValue", [request.l2Value]),
-      iface.encodeFunctionData("factoryDeps", [request.factoryDeps]),
     ],
   };
 }

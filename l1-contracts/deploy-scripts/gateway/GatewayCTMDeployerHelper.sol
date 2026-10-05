@@ -728,14 +728,6 @@ library GatewayCTMDeployerHelper {
         _logGatewayVerifyContract(addr, contractName, params);
     }
 
-    // ============ Factory Dependencies ============
-
-    /// @notice Returns all factory dependencies for deployment.
-    /// @dev Gateway CTM deployment needs no additional factory dependencies.
-    function getListOfFactoryDeps() external pure returns (bytes[] memory dependencies) {
-        return dependencies;
-    }
-
     // ======================== Deployment utilities ========================
 
     function _computeCreate2Address(

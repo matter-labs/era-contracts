@@ -20,7 +20,6 @@ import {L1InteropCenter} from "contracts/interop/interop-center/L1InteropCenter.
 import {
     AttributeAlreadySet,
     AttributeViolatesRestriction,
-    FactoryDepsNotAllowedForIndirectCall,
     L1ToL2TransactionParamsMissing,
     SingleCallBundleRequired
 } from "contracts/interop/InteropErrors.sol";
@@ -55,6 +54,7 @@ contract ReentrantL1CrossChainSender is IL1CrossChainSender {
         bytes calldata
     ) external payable returns (IndirectCallRequest memory request) {
         CENTER.sendMessage(hex"", hex"", new bytes[](0));
+        return request;
     }
     function confirmL2Transaction(uint256, bytes32, bytes32) external {}
 }
@@ -65,13 +65,11 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
     function test_sendMessage_direct_RevertWhen_incorrectETHParams(
         uint256 mockChainId,
         uint256 mockMintValue,
-        address mockL2Contract,
+        address _mockL2Contract,
         uint256 mockL2Value,
         uint256 msgValue,
         bytes memory mockL2Calldata,
-        uint256 mockL2GasLimit,
-        uint256 mockL2GasPerPubdataByteLimit,
-        bytes[] memory mockFactoryDeps
+        uint256 mockL2GasLimit
     ) public {
         _useMockSharedBridge();
         _initializeBridgehub();
@@ -79,14 +77,13 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
         address randomCaller = makeAddr("RANDOM_CALLER");
         vm.assume(msgValue != mockMintValue);
 
-        (L1L2MessageParams memory l2TxnReqDirect, bytes32 hash) = _prepareETHL2TransactionDirectRequest({
+        (L1L2MessageParams memory l2TxnReqDirect, ) = _prepareETHL2TransactionDirectRequest({
             mockChainId: mockChainId,
             mockMintValue: mockMintValue,
-            _mockL2Contract: mockL2Contract,
+            _mockL2Contract: _mockL2Contract,
             mockL2Value: mockL2Value,
             mockL2Calldata: mockL2Calldata,
-            mockL2GasLimit: mockL2GasLimit,
-            mockFactoryDeps: mockFactoryDeps
+            mockL2GasLimit: mockL2GasLimit
         });
 
         vm.deal(randomCaller, msgValue);
@@ -98,12 +95,10 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
     function test_sendMessage_direct_ETHCase(
         uint256 mockChainId,
         uint256 mockMintValue,
-        address mockL2Contract,
+        address _mockL2Contract,
         uint256 mockL2Value,
         bytes memory mockL2Calldata,
         uint256 mockL2GasLimit,
-        uint256 mockL2GasPerPubdataByteLimit,
-        bytes[] memory mockFactoryDeps,
         uint256 gasPrice
     ) public {
         _useMockSharedBridge();
@@ -117,11 +112,10 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
         (L1L2MessageParams memory l2TxnReqDirect, bytes32 hash) = _prepareETHL2TransactionDirectRequest({
             mockChainId: mockChainId,
             mockMintValue: mockMintValue,
-            _mockL2Contract: mockL2Contract,
+            _mockL2Contract: _mockL2Contract,
             mockL2Value: mockL2Value,
             mockL2Calldata: mockL2Calldata,
-            mockL2GasLimit: mockL2GasLimit,
-            mockFactoryDeps: mockFactoryDeps
+            mockL2GasLimit: mockL2GasLimit
         });
 
         vm.deal(randomCaller, l2TxnReqDirect.mintValue);
@@ -153,7 +147,6 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
             l2Calldata: hex"",
             l2GasLimit: 1_000_000,
             l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            factoryDeps: new bytes[](0),
             refundRecipient: randomCaller
         });
         bytes32 canonicalHash = keccak256("CANONICAL_TX_HASH");
@@ -300,7 +293,14 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
         bytes32 sendId = l1InteropCenter.sendMessage{value: msgValue}(recipient, payload, attributes);
 
         assertEq(sendId, canonicalHash);
-        _assertMessageSent(vm.getRecordedLogs(), request, outputRequest, caller, canonicalHash, attributes);
+        _assertMessageSent({
+            _logs: vm.getRecordedLogs(),
+            _request: request,
+            _outputRequest: outputRequest,
+            _caller: caller,
+            _canonicalHash: canonicalHash,
+            _attributes: attributes
+        });
     }
 
     function test_sendBundle_indirect_forwardsAndConfirmsExactRequest() public {
@@ -368,7 +368,14 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
         );
 
         assertEq(sendId, canonicalHash);
-        _assertMessageSent(vm.getRecordedLogs(), request, outputRequest, caller, canonicalHash, callAttributes);
+        _assertMessageSent({
+            _logs: vm.getRecordedLogs(),
+            _request: request,
+            _outputRequest: outputRequest,
+            _caller: caller,
+            _canonicalHash: canonicalHash,
+            _attributes: callAttributes
+        });
     }
 
     function _singleFactoryDependency() private pure returns (bytes[] memory factoryDeps) {
@@ -458,7 +465,6 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
     function test_sendMessage_indirectWrongBridgeAddress(
         uint256 chainId,
         uint256 mintValue,
-        uint256 msgValue,
         uint256 l2Value,
         uint256 l2GasLimit,
         uint256 l2GasPerPubdataByteLimit,
@@ -547,15 +553,13 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
         _initializeBridgehub();
 
         address caller = makeAddr("BUNDLE_CALLER");
-        bytes[] memory factoryDeps = _singleFactoryDependency();
         (L1L2MessageParams memory request, bytes32 canonicalHash) = _prepareETHL2TransactionDirectRequest({
             mockChainId: 501,
             mockMintValue: 1 ether,
             _mockL2Contract: makeAddr("L2_CONTRACT"),
             mockL2Value: 0.25 ether,
             mockL2Calldata: abi.encodeCall(SimpleExecutor.execute, (makeAddr("TARGET"), 0, hex"1234")),
-            mockL2GasLimit: 1_000_000,
-            mockFactoryDeps: factoryDeps
+            mockL2GasLimit: 1_000_000
         });
 
         bytes[] memory callAttributes = new bytes[](1);
@@ -566,12 +570,11 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
             data: request.l2Calldata,
             callAttributes: callAttributes
         });
-        bytes[] memory bundleAttributes = new bytes[](2);
+        bytes[] memory bundleAttributes = new bytes[](1);
         bundleAttributes[0] = abi.encodeCall(
             IERC7786Attributes.l1ToL2TransactionParams,
             (request.mintValue, request.l2GasLimit, request.l2GasPerPubdataByteLimit, request.refundRecipient)
         );
-        bundleAttributes[1] = abi.encodeCall(IERC7786Attributes.factoryDeps, (request.factoryDeps));
 
         vm.expectCall(
             sharedBridgeAddress,
@@ -593,7 +596,7 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
                     l2Calldata: request.l2Calldata,
                     l2GasLimit: request.l2GasLimit,
                     l2GasPerPubdataByteLimit: request.l2GasPerPubdataByteLimit,
-                    factoryDeps: request.factoryDeps,
+                    factoryDeps: new bytes[](0),
                     refundRecipient: caller
                 })
             )
@@ -715,20 +718,11 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
         attributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, (mockL2Value));
 
         vm.expectRevert(L1ToL2TransactionParamsMissing.selector);
-        l1InteropCenter.sendMessage(InteroperableAddress.formatEvmV1(DESTINATION_CHAIN_ID, mockL2Contract), hex"", attributes);
-    }
-
-    function test_sendMessage_RevertWhen_factoryDepsForIndirectCall() public {
-        _useMockSharedBridge();
-        _initializeBridgehub();
-
-        bytes[] memory attributes = new bytes[](3);
-        attributes[0] = abi.encodeCall(IERC7786Attributes.l1ToL2TransactionParams, (0, 0, 0, address(0)));
-        attributes[1] = abi.encodeCall(IERC7786Attributes.indirectCall, (uint256(0)));
-        attributes[2] = abi.encodeCall(IERC7786Attributes.factoryDeps, (new bytes[](1)));
-
-        vm.expectRevert(FactoryDepsNotAllowedForIndirectCall.selector);
-        l1InteropCenter.sendMessage(InteroperableAddress.formatEvmV1(DESTINATION_CHAIN_ID, crossChainSender), hex"", attributes);
+        l1InteropCenter.sendMessage(
+            InteroperableAddress.formatEvmV1(DESTINATION_CHAIN_ID, mockL2Contract),
+            hex"",
+            attributes
+        );
     }
 
     function test_sendMessage_RevertWhen_unsupportedAttribute() public {
@@ -746,7 +740,11 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
                 IERC7786Attributes.useFixedFee.selector
             )
         );
-        l1InteropCenter.sendMessage(InteroperableAddress.formatEvmV1(DESTINATION_CHAIN_ID, mockL2Contract), hex"", attributes);
+        l1InteropCenter.sendMessage(
+            InteroperableAddress.formatEvmV1(DESTINATION_CHAIN_ID, mockL2Contract),
+            hex"",
+            attributes
+        );
     }
 
     function test_sendMessage_RevertWhen_duplicateAttribute() public {
@@ -760,7 +758,11 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
         vm.expectRevert(
             abi.encodeWithSelector(AttributeAlreadySet.selector, IERC7786Attributes.l1ToL2TransactionParams.selector)
         );
-        l1InteropCenter.sendMessage(InteroperableAddress.formatEvmV1(DESTINATION_CHAIN_ID, mockL2Contract), hex"", attributes);
+        l1InteropCenter.sendMessage(
+            InteroperableAddress.formatEvmV1(DESTINATION_CHAIN_ID, mockL2Contract),
+            hex"",
+            attributes
+        );
     }
 
     function test_sendMessage_RevertWhen_chainIsNotRegistered() public {
@@ -800,12 +802,10 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
     function test_sendMessage_direct_emitsMessageSent(
         uint256 mockChainId,
         uint256 mockMintValue,
-        address mockL2Contract,
+        address _mockL2Contract,
         uint256 mockL2Value,
         bytes memory mockL2Calldata,
-        uint256 mockL2GasLimit,
-        uint256 mockL2GasPerPubdataByteLimit,
-        bytes[] memory mockFactoryDeps
+        uint256 mockL2GasLimit
     ) public {
         _useMockSharedBridge();
         _initializeBridgehub();
@@ -818,11 +818,10 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
         (L1L2MessageParams memory l2TxnReqDirect, bytes32 hash) = _prepareETHL2TransactionDirectRequest({
             mockChainId: mockChainId,
             mockMintValue: mockMintValue,
-            _mockL2Contract: mockL2Contract,
+            _mockL2Contract: _mockL2Contract,
             mockL2Value: mockL2Value,
             mockL2Calldata: mockL2Calldata,
-            mockL2GasLimit: mockL2GasLimit,
-            mockFactoryDeps: mockFactoryDeps
+            mockL2GasLimit: mockL2GasLimit
         });
 
         (bytes memory recipient, bytes memory payload, bytes[] memory attributes) = L1InteropRequests.encodeDirect(
@@ -853,7 +852,6 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
         assertTrue(l1InteropCenter.supportsAttribute(IERC7786Attributes.interopCallValue.selector));
         assertTrue(l1InteropCenter.supportsAttribute(IERC7786Attributes.indirectCall.selector));
         assertTrue(l1InteropCenter.supportsAttribute(IERC7786Attributes.l1ToL2TransactionParams.selector));
-        assertTrue(l1InteropCenter.supportsAttribute(IERC7786Attributes.factoryDeps.selector));
 
         assertFalse(l1InteropCenter.supportsAttribute(IERC7786Attributes.executionAddress.selector));
         assertFalse(l1InteropCenter.supportsAttribute(IERC7786Attributes.unbundlerAddress.selector));
@@ -876,16 +874,6 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
 
         // The estimation is forwarded to the destination chain's Mailbox through the interop center.
         assertEq(l1InteropCenter.l2TransactionBaseCost(chainId, 1 gwei, 1_000_000, 800), expectedBaseCost);
-    }
-    function test_sendMessage_rejectsEmptyFactoryDepsAttributeForIndirectCall() public {
-        _useMockSharedBridge();
-        _initializeBridgehub();
-        bytes[] memory attributes = new bytes[](3);
-        attributes[0] = abi.encodeCall(IERC7786Attributes.l1ToL2TransactionParams, (0, 0, 0, address(0)));
-        attributes[1] = abi.encodeCall(IERC7786Attributes.indirectCall, (0));
-        attributes[2] = abi.encodeCall(IERC7786Attributes.factoryDeps, (new bytes[](0)));
-        vm.expectRevert(FactoryDepsNotAllowedForIndirectCall.selector);
-        l1InteropCenter.sendMessage(InteroperableAddress.formatEvmV1(DESTINATION_CHAIN_ID, crossChainSender), hex"", attributes);
     }
 
     function test_reentrancyGuardCoversBothSendSurfaces() public {

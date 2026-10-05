@@ -164,7 +164,6 @@ contract DeployZKScript is Script {
             l2Calldata: hex"",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
             l2Value: _amount,
-            factoryDeps: new bytes[](0),
             dstAddress: _recipient,
             chainId: config.chainId,
             bridgehubAddress: config.bridgehub,

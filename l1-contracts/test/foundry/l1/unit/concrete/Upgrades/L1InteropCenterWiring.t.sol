@@ -46,7 +46,7 @@ contract L1InteropCenterWiringHarness is CoreUpgrade_v33 {
         coreAddresses.bridgehub.proxies.chainRegistrationSender = _proxy;
         coreAddresses.bridgehub.implementations.chainRegistrationSender = _implementation;
     }
-    function wiring() external returns (Call[] memory) {
+    function wiring() external view returns (Call[] memory) {
         return _buildL1InteropCenterWiringCalls();
     }
 }

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import "@openzeppelin/contracts-v4/utils/Strings.sol";
 import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {IInteropCenterBase} from "contracts/interop/IInteropCenterBase.sol";
@@ -712,7 +711,14 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
     }
 
     function test_directMessageToAssetRouterIsNotMigration() public {
-        Call memory call = _encodeMigraationCall(true, true, true, true, true, makeAddr("newAdmin"));
+        Call memory call = _encodeMigraationCall({
+            correctTarget: true,
+            correctSelector: true,
+            correctCrossChainSender: true,
+            correctEncodingVersion: true,
+            correctAssetId: true,
+            l2Admin: makeAddr("newAdmin")
+        });
         (bytes memory recipient, bytes memory payload, bytes[] memory attributes) = _decodeMigrationMessage(call);
         bytes[] memory directAttributes = new bytes[](2);
         directAttributes[0] = attributes[0];
@@ -721,8 +727,15 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         assertInvalidMigrationCall(call);
     }
 
-    function _migrationBundle(address _newAdmin, bool _indirect) private returns (Call memory call) {
-        call = _encodeMigraationCall(true, true, true, true, true, _newAdmin);
+    function _migrationBundle(address _newAdmin, bool _indirect) private view returns (Call memory call) {
+        call = _encodeMigraationCall({
+            correctTarget: true,
+            correctSelector: true,
+            correctCrossChainSender: true,
+            correctEncodingVersion: true,
+            correctAssetId: true,
+            l2Admin: _newAdmin
+        });
         (bytes memory recipient, bytes memory payload, bytes[] memory attributes) = _decodeMigrationMessage(call);
         (uint256 destinationChainId, address recipientAddress) = InteroperableAddress.parseEvmV1(recipient);
         bytes[] memory callAttributes = new bytes[](_indirect ? 2 : 1);
@@ -759,7 +772,14 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
     }
 
     function test_historicalRequestSelectorDoesNotMatch() public {
-        Call memory call = _encodeMigraationCall(true, true, true, true, true, makeAddr("newAdmin"));
+        Call memory call = _encodeMigraationCall({
+            correctTarget: true,
+            correctSelector: true,
+            correctCrossChainSender: true,
+            correctEncodingVersion: true,
+            correctAssetId: true,
+            l2Admin: makeAddr("newAdmin")
+        });
         call.data = bytes.concat(hex"24fd57fb", call.data);
         assertInvalidMigrationCall(call);
         call.target = address(bridgehub);
@@ -767,7 +787,14 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
     }
 
     function test_truncatedIndirectAttributeIsNotMigration() public {
-        Call memory call = _encodeMigraationCall(true, true, true, true, true, makeAddr("newAdmin"));
+        Call memory call = _encodeMigraationCall({
+            correctTarget: true,
+            correctSelector: true,
+            correctCrossChainSender: true,
+            correctEncodingVersion: true,
+            correctAssetId: true,
+            l2Admin: makeAddr("newAdmin")
+        });
         (bytes memory recipient, bytes memory payload, bytes[] memory attributes) = _decodeMigrationMessage(call);
         attributes[2] = abi.encodePacked(IERC7786Attributes.indirectCall.selector);
         call.data = abi.encodeCall(IERC7786GatewaySource.sendMessage, (recipient, payload, attributes));

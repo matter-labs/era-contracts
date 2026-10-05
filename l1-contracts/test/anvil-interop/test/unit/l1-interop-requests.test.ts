@@ -25,22 +25,20 @@ test("formats canonical ERC-7930 chain-reference boundaries", () => {
   );
 });
 
-test("direct calldata preserves value, dependencies and refund parameters", () => {
+test("direct calldata preserves value and refund parameters", () => {
   const encoded = encodeDirectInteropRequest({
     ...params,
     l2Contract: recipient,
     l2Calldata: "0x12345678",
-    factoryDeps: ["0xabcd"],
   });
   assert.equal(encoded.payload, "0x12345678");
   const parsed = encoded.attributes.map((data) => attributes.parseTransaction({ data }));
   assert.deepEqual(
     parsed.map((item) => item.name),
-    ["l1ToL2TransactionParams", "interopCallValue", "factoryDeps"]
+    ["l1ToL2TransactionParams", "interopCallValue"]
   );
   assert.deepEqual(parsed[0].args.map(String), ["123", "1000000", "800", recipient]);
   assert.equal(parsed[1].args[0].toString(), "7");
-  assert.deepEqual(Array.from(parsed[2].args[0]), ["0xabcd"]);
 });
 
 test("indirect calldata keeps the source sender and its ETH value distinct", () => {

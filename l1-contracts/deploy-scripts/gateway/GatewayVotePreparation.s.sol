@@ -163,14 +163,6 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             address create2FactoryAddress
         ) = GatewayCTMDeployerHelper.calculateAddresses(gatewayCTMDeployerConfig.salt, gatewayCTMDeployerConfig);
 
-        // Deploy all factory dependencies
-        bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps();
-        for (uint256 i = 0; i < deps.length; i++) {
-            bytes[] memory localDeps = new bytes[](1);
-            localDeps[0] = deps[i];
-            runGatewayL1L2TransactionWithFactoryDeps(address(0), hex"", localDeps);
-        }
-
         // Deploy DA contracts (RollupDAManager, ValidiumL1DAValidator, RelayedSLDAValidator)
         runGatewayL1L2Transaction(create2FactoryAddress, deployerCalldata.daCalldata);
 
@@ -222,25 +214,16 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         runGatewayL1L2Transaction(targetAddr, directCalldata.multicall3Calldata);
     }
 
-    function runGatewayL1L2TransactionWithFactoryDeps(
-        address to,
-        bytes memory data,
-        bytes[] memory factoryDeps
-    ) internal {
+    function runGatewayL1L2Transaction(address to, bytes memory data) internal {
         Utils.runL1L2Message({
             l2Calldata: data,
             l2GasLimit: 72_000_000,
             l2Value: 0,
-            factoryDeps: factoryDeps,
             dstAddress: to,
             chainId: gatewayChainId,
             bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
             refundRecipient: msg.sender
         });
-    }
-
-    function runGatewayL1L2Transaction(address to, bytes memory data) internal {
-        runGatewayL1L2TransactionWithFactoryDeps(to, data, new bytes[](0));
     }
 
     function _saveExpectedGatewayContractsToOutput(DeployedContracts memory expectedGatewayContracts) internal {

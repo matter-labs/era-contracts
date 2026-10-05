@@ -14,7 +14,6 @@ contract L2TxMocker is Test {
     uint256 internal mockL2GasPerPubdataByteLimit = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
 
     bytes internal mockL2Calldata;
-    bytes[] internal mockFactoryDeps;
 
     mapping(uint256 chainId => address l2MockContract) public chainContracts;
 
@@ -24,7 +23,6 @@ contract L2TxMocker is Test {
         mockL2SharedBridge = makeAddr("mockl2sharedbridge");
 
         mockL2Calldata = "";
-        mockFactoryDeps = new bytes[](0);
     }
 
     function _addL2ChainContract(uint256 _chainId, address _chainContract) internal {
@@ -38,7 +36,7 @@ contract L2TxMocker is Test {
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit,
         bytes memory _l2CallData
-    ) internal returns (L1L2MessageParams memory request) {
+    ) internal view returns (L1L2MessageParams memory request) {
         request.chainId = _chainId;
         request.mintValue = _mintValue;
         request.l2Value = _l2Value;
@@ -48,7 +46,6 @@ contract L2TxMocker is Test {
         request.l2Calldata = _l2CallData;
 
         //mocked
-        request.factoryDeps = mockFactoryDeps;
         request.refundRecipient = mockRefundRecipient;
     }
 
@@ -61,7 +58,7 @@ contract L2TxMocker is Test {
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit,
         bytes memory _indirectCallData
-    ) internal returns (L1L2IndirectMessageParams memory request) {
+    ) internal view returns (L1L2IndirectMessageParams memory request) {
         request.chainId = _chainId;
         request.mintValue = _mintValue;
         request.crossChainSender = _crossChainSender;

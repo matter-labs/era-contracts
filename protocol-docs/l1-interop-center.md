@@ -18,14 +18,13 @@ budget; the interface does not infer these parameters.
 | `l1ToL2TransactionParams(mintValue, l2GasLimit, l2GasPerPubdataByteLimit, refundRecipient)` | Required priority-transaction funding and gas parameters                  | Bundle           |
 | `interopCallValue(uint256)`                                                                 | Value delivered on the destination chain                                  | Call             |
 | `indirectCall(uint256)`                                                                     | Select a source-side cross-chain sender and the ETH value forwarded to it | Call             |
-| `factoryDeps(bytes[])`                                                                      | Bytecode dependencies for a direct call                                   | Bundle           |
 
 `sendMessage` accepts these attributes in one list. `sendBundle` separates call and
 bundle attributes and requires exactly one call because the transport delivers one
 priority transaction. Duplicate, unknown, misplaced and truncated attributes revert.
-Factory dependencies are rejected on indirect sends, even when the array is empty;
-the cross-chain sender supplies the dependencies in that case. L1-only attributes
-are unsupported by the L2 parser, and L2-only attributes are unsupported on L1.
+There is no factory-dependencies attribute: priority transactions cannot carry them
+(see {protocol-docs/bridging.md#priority-transaction-factory-dependencies}). L1-only
+attributes are unsupported by the L2 parser, and L2-only attributes are unsupported on L1.
 
 Direct sends fund the base token and submit the destination call. For indirect sends,
 the recipient identifies an L1 cross-chain sender. The center funds the base token,

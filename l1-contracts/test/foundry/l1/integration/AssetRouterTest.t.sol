@@ -7,8 +7,6 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {L1L2MessageParams, L1L2IndirectMessageParams} from "../../../../deploy-scripts/utils/L1InteropRequests.sol";
 import {Vm} from "forge-std/Vm.sol";
 
-import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
-import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 
 import {IMessageRootBase, IMessageVerification} from "contracts/core/message-root/IMessageRoot.sol";
@@ -18,7 +16,7 @@ import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
-import {FactoryDepsNotSupported} from "contracts/common/L1ContractErrors.sol";
+import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
 import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
@@ -318,7 +316,6 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
                 l2Calldata: indirectCallData,
                 l2GasLimit: 1000000,
                 l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-                factoryDeps: new bytes[](0),
                 refundRecipient: address(0)
             })
         );
@@ -358,25 +355,36 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         assertEq(request.transaction.reserved[0], 250000000000100, "Mint value should match requested amount");
     }
 
-    function test_DepositDirect_revert_FactoryDepsNotSupported() public {
+    /// @dev Priority transactions cannot carry factory dependencies, so the L1 Interop Center has no attribute for
+    ///      them; a caller still encoding one is rejected before any value moves.
+    function test_DepositDirect_revert_FactoryDepsAttributeUnsupported() public {
         uint256 mintValue = 1 ether;
         bytes32 baseTokenAssetId = addresses.bridgehub.baseTokenAssetId(eraZKChainId);
         uint256 senderBalanceBefore = address(this).balance;
         uint256 vaultBalanceBefore = address(addresses.l1NativeTokenVault).balance;
         uint256 bridgedOutBefore = addresses.l1NativeTokenVault.bridgedOut(baseTokenAssetId);
-        L1L2MessageParams memory request = _createL1L2MessageParams({
-            _chainId: eraZKChainId,
-            _mintValue: mintValue,
-            _l2Value: 0,
-            _l2GasLimit: mockL2GasLimit,
-            _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            _l2CallData: ""
-        });
-        request.factoryDeps = new bytes[](1);
-        request.factoryDeps[0] = "";
+        (bytes memory recipient, bytes memory payload, bytes[] memory directAttributes) = L1InteropRequests
+            .encodeDirect(
+                _createL1L2MessageParams({
+                    _chainId: eraZKChainId,
+                    _mintValue: mintValue,
+                    _l2Value: 0,
+                    _l2GasLimit: mockL2GasLimit,
+                    _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+                    _l2CallData: ""
+                })
+            );
+        bytes[] memory attributes = new bytes[](directAttributes.length + 1);
+        for (uint256 i = 0; i < directAttributes.length; ++i) {
+            attributes[i] = directAttributes[i];
+        }
+        bytes4 factoryDepsSelector = bytes4(keccak256("factoryDeps(bytes[])"));
+        attributes[directAttributes.length] = abi.encodeWithSelector(factoryDepsSelector, new bytes[](1));
 
-        vm.expectRevert(FactoryDepsNotSupported.selector);
-        L1InteropRequests.requestDirect(addresses.interopCenter, mintValue, request);
+        vm.expectRevert(
+            abi.encodeWithSelector(IERC7786GatewaySource.UnsupportedAttribute.selector, factoryDepsSelector)
+        );
+        addresses.interopCenter.sendMessage{value: mintValue}(recipient, payload, attributes);
 
         assertEq(address(this).balance, senderBalanceBefore);
         assertEq(address(addresses.l1NativeTokenVault).balance, vaultBalanceBefore);

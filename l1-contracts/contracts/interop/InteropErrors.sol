@@ -25,8 +25,6 @@ error DirectCallToL1NotSupported();
 error EmptyBundle();
 // 0xe845be4c
 error ExecutingNotAllowed(bytes32 bundleHash, bytes callerAddress, bytes executionAddress);
-// 0x77eb8fcf
-error FactoryDepsNotAllowedForIndirectCall();
 // 0x16b0fa00
 error FeeWithdrawalFailed();
 // 0x4afc3319

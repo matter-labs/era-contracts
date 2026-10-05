@@ -22,16 +22,11 @@ contract InteropAttributeDomainsTest is Test {
 
     function test_l2RejectsL1Attributes() public {
         bytes[] memory attributes = new bytes[](1);
-        bytes4[2] memory selectors = [
-            IERC7786Attributes.l1ToL2TransactionParams.selector,
-            IERC7786Attributes.factoryDeps.selector
-        ];
-        for (uint256 i = 0; i < selectors.length; ++i) {
-            attributes[0] = abi.encodePacked(selectors[i]);
-            assertFalse(parser.supportsAttribute(selectors[i]));
-            vm.expectRevert(abi.encodeWithSelector(IERC7786GatewaySource.UnsupportedAttribute.selector, selectors[i]));
-            parser.parseAttributes(attributes, IInteropCenter.AttributeParsingRestrictions.CallAndBundleAttributes);
-        }
+        bytes4 selector = IERC7786Attributes.l1ToL2TransactionParams.selector;
+        attributes[0] = abi.encodePacked(selector);
+        assertFalse(parser.supportsAttribute(selector));
+        vm.expectRevert(abi.encodeWithSelector(IERC7786GatewaySource.UnsupportedAttribute.selector, selector));
+        parser.parseAttributes(attributes, IInteropCenter.AttributeParsingRestrictions.CallAndBundleAttributes);
     }
 
     function test_l1RejectsL2Attributes() public {

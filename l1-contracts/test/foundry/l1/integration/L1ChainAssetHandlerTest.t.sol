@@ -2,8 +2,6 @@
 pragma solidity 0.8.28;
 
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {L1L2MessageParams, L1L2IndirectMessageParams} from "../../../../deploy-scripts/utils/L1InteropRequests.sol";
 
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 

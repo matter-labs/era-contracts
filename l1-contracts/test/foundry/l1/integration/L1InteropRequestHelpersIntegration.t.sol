@@ -94,50 +94,48 @@ contract L1InteropRequestHelpersIntegrationTest is BridgehubInvariantTests {
             );
             return
                 _admin
-                    ? Utils.prepareAdminL1L2IndirectMessage(
-                        gasPrice,
-                        REQUEST_GAS_LIMIT,
-                        requestChainId,
-                        address(addresses.bridgehub),
-                        address(addresses.sharedBridge),
-                        0,
-                        payload,
-                        caller
-                    )
-                    : Utils.prepareGovernanceL1L2IndirectMessage(
-                        gasPrice,
-                        REQUEST_GAS_LIMIT,
-                        requestChainId,
-                        address(addresses.bridgehub),
-                        address(addresses.sharedBridge),
-                        0,
-                        payload,
-                        caller
-                    );
+                    ? Utils.prepareAdminL1L2IndirectMessage({
+                        l1GasPrice: gasPrice,
+                        l2GasLimit: REQUEST_GAS_LIMIT,
+                        chainId: requestChainId,
+                        bridgehubAddress: address(addresses.bridgehub),
+                        crossChainSender: address(addresses.sharedBridge),
+                        indirectCallValue: 0,
+                        indirectCallData: payload,
+                        refundRecipient: caller
+                    })
+                    : Utils.prepareGovernanceL1L2IndirectMessage({
+                        l1GasPrice: gasPrice,
+                        l2GasLimit: REQUEST_GAS_LIMIT,
+                        chainId: requestChainId,
+                        bridgehubAddress: address(addresses.bridgehub),
+                        crossChainSender: address(addresses.sharedBridge),
+                        indirectCallValue: 0,
+                        indirectCallData: payload,
+                        refundRecipient: caller
+                    });
         } else {
             return
                 _admin
-                    ? Utils.prepareAdminL1L2Message(
-                        gasPrice,
-                        hex"",
-                        REQUEST_GAS_LIMIT,
-                        new bytes[](0),
-                        caller,
-                        0,
-                        requestChainId,
-                        address(addresses.bridgehub),
-                        caller
-                    )
-                    : Utils.prepareGovernanceL1L2Message(
-                        gasPrice,
-                        hex"",
-                        REQUEST_GAS_LIMIT,
-                        new bytes[](0),
-                        caller,
-                        requestChainId,
-                        address(addresses.bridgehub),
-                        caller
-                    );
+                    ? Utils.prepareAdminL1L2Message({
+                        gasPrice: gasPrice,
+                        l2Calldata: hex"",
+                        l2GasLimit: REQUEST_GAS_LIMIT,
+                        dstAddress: caller,
+                        l2Value: 0,
+                        chainId: requestChainId,
+                        bridgehubAddress: address(addresses.bridgehub),
+                        refundRecipient: caller
+                    })
+                    : Utils.prepareGovernanceL1L2Message({
+                        l1GasPrice: gasPrice,
+                        l2Calldata: hex"",
+                        l2GasLimit: REQUEST_GAS_LIMIT,
+                        dstAddress: caller,
+                        chainId: requestChainId,
+                        bridgehubAddress: address(addresses.bridgehub),
+                        refundRecipient: caller
+                    });
         }
     }
 }

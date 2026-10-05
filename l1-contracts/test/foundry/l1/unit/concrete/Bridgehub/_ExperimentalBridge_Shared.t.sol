@@ -44,7 +44,6 @@ import {
     ETH_TOKEN_ADDRESS,
     HARD_CODED_CHAIN_ID,
     MAINNET_CHAIN_ID,
-    MAX_NEW_FACTORY_DEPS,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     SEPOLIA_CHAIN_ID
 } from "contracts/common/Config.sol";
@@ -291,11 +290,8 @@ abstract contract ExperimentalBridgeTestBase is Test {
         address _mockL2Contract,
         uint256 mockL2Value,
         bytes memory mockL2Calldata,
-        uint256 mockL2GasLimit,
-        bytes[] memory mockFactoryDeps
+        uint256 mockL2GasLimit
     ) internal returns (L1L2MessageParams memory l2TxnReqDirect, bytes32 canonicalHash) {
-        vm.assume(mockFactoryDeps.length <= MAX_NEW_FACTORY_DEPS);
-
         l2TxnReqDirect = _createMockL2TransactionRequestDirect({
             mockChainId: mockChainId,
             mockMintValue: mockMintValue,
@@ -303,7 +299,6 @@ abstract contract ExperimentalBridgeTestBase is Test {
             mockL2Value: mockL2Value,
             mockL2Calldata: mockL2Calldata,
             mockL2GasLimit: mockL2GasLimit,
-            mockFactoryDeps: mockFactoryDeps,
             mockRefundRecipient: address(0)
         });
 
@@ -445,7 +440,6 @@ abstract contract ExperimentalBridgeTestBase is Test {
         uint256 mockL2Value,
         bytes memory mockL2Calldata,
         uint256 mockL2GasLimit,
-        bytes[] memory mockFactoryDeps,
         address mockRefundRecipient
     ) internal pure returns (L1L2MessageParams memory) {
         L1L2MessageParams memory l2TxnReqDirect;
@@ -457,7 +451,6 @@ abstract contract ExperimentalBridgeTestBase is Test {
         l2TxnReqDirect.l2Calldata = mockL2Calldata;
         l2TxnReqDirect.l2GasLimit = mockL2GasLimit;
         l2TxnReqDirect.l2GasPerPubdataByteLimit = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
-        l2TxnReqDirect.factoryDeps = mockFactoryDeps;
         l2TxnReqDirect.refundRecipient = mockRefundRecipient;
 
         return l2TxnReqDirect;

@@ -7,7 +7,7 @@ import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 
-import {IInteropCenter, L2InteropCenter} from "contracts/interop/interop-center/L2InteropCenter.sol";
+import {IInteropCenter} from "contracts/interop/interop-center/L2InteropCenter.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {AtomicFlowPreimage, ATOMIC_FLOW_PREIMAGE_VERSION} from "contracts/atomic-interop/IAtomicInterop.sol";

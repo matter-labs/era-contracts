@@ -2,7 +2,6 @@
 pragma solidity 0.8.28;
 
 import {L1InteropRequests} from "../../../../deploy-scripts/utils/L1InteropRequests.sol";
-import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";

@@ -5,9 +5,6 @@ import {Test} from "forge-std/Test.sol";
 
 import {BridgehubInvariantTests1} from "test/foundry/l1/integration/BridgehubInvariantTests_1.t.sol";
 
-import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
-import {L1L2MessageParams, L1L2IndirectMessageParams} from "../../../../deploy-scripts/utils/L1InteropRequests.sol";
-
 contract BoundedBridgehubInvariantTests2 is BridgehubInvariantTests1 {
     function depositEthSuccess(uint256 userIndexSeed, uint256 chainIndexSeed, uint256 l2Value) public {
         uint64 MAX = 2 ** 64 - 1;

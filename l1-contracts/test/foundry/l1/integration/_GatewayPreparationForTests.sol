@@ -211,10 +211,9 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
 
         // Send an indirect message from the chain admin through the L1 Interop Center.
         // This sets isMigrationInProgress[chainId] = true and pausedDepositsTimestamp on the diamond proxy.
-        // Capture the canonical L2 tx hash returned by the function.
         IL1InteropCenter l1InteropCenter = IL1InteropCenter(bridgehub.interopCenter());
         vm.startBroadcast(chainAdmin);
-        bytes32 canonicalTxHash = L1InteropRequests.requestIndirect(
+        L1InteropRequests.requestIndirect(
             l1InteropCenter,
             requiredValue,
             L1L2IndirectMessageParams({

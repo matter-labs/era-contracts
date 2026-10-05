@@ -2,10 +2,9 @@
 pragma solidity 0.8.28;
 
 import {L1InteropRequests} from "../../../../deploy-scripts/utils/L1InteropRequests.sol";
-import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
-import {L1L2MessageParams, L1L2IndirectMessageParams} from "../../../../deploy-scripts/utils/L1InteropRequests.sol";
+import {L1L2MessageParams} from "../../../../deploy-scripts/utils/L1InteropRequests.sol";
 
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 

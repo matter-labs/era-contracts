@@ -5,7 +5,6 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {CallAttributes} from "contracts/common/Messaging.sol";
-import {AttributesDecoder} from "contracts/interop/AttributesDecoder.sol";
 import {L2InteropCenter} from "contracts/interop/interop-center/L2InteropCenter.sol";
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";

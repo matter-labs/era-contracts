@@ -8,7 +8,6 @@ sol! {
     function l1ToL2TransactionParams(uint256 mintValue, uint256 l2GasLimit, uint256 l2GasPerPubdataByteLimit, address refundRecipient);
     function interopCallValue(uint256 value);
     function indirectCall(uint256 value);
-    function factoryDeps(bytes[] dependencies);
 }
 
 #[derive(Debug)]
@@ -61,22 +60,15 @@ pub fn decode(data: &[u8]) -> Result<L1Message, String> {
             indirectCallCall::SELECTOR => {
                 indirectCallCall::abi_decode(&attribute).map_err(|err| err.to_string())?;
             }
-            factoryDepsCall::SELECTOR => {
-                factoryDepsCall::abi_decode(&attribute).map_err(|err| err.to_string())?;
-            }
             _ => return Err("unsupported L1 attribute".into()),
         }
     }
     if !seen.contains(&l1ToL2TransactionParamsCall::SELECTOR) {
         return Err("missing L1 transaction parameters".into());
     }
-    let is_indirect = seen.contains(&indirectCallCall::SELECTOR);
-    if is_indirect && seen.contains(&factoryDepsCall::SELECTOR) {
-        return Err("factory dependencies are only valid for direct messages".into());
-    }
     Ok(L1Message {
         recipient,
-        is_indirect,
+        is_indirect: seen.contains(&indirectCallCall::SELECTOR),
     })
 }
 
@@ -127,14 +119,6 @@ mod tests {
             call.attributes.push(invalid);
             assert!(decode(&call.abi_encode()).is_err());
         }
-    }
-
-    #[test]
-    fn rejects_factory_dependencies_on_indirect_messages() {
-        let mut call = message(true);
-        call.attributes
-            .push(factoryDepsCall::new((vec![],)).abi_encode().into());
-        assert!(decode(&call.abi_encode()).is_err());
     }
 
     #[test]

@@ -64,32 +64,32 @@ contract L1InteropCenterIntegrationTest is BridgehubInvariantTests {
         );
         vm.expectEmit(true, true, false, true, address(addresses.sharedBridge));
         emit IL1AssetRouter.ClaimedFailedDepositAssetRouter(chainId, assetId, transferData);
-        addresses.l1Nullifier.bridgeRecoverFailedTransfer(
-            chainId,
-            caller,
-            assetId,
-            transferData,
-            canonicalHash,
-            1,
-            0,
-            0,
-            new bytes32[](0)
-        );
+        addresses.l1Nullifier.bridgeRecoverFailedTransfer({
+            _chainId: chainId,
+            _depositSender: caller,
+            _assetId: assetId,
+            _assetData: transferData,
+            _l2TxHash: canonicalHash,
+            _l2BatchNumber: 1,
+            _l2MessageIndex: 0,
+            _l2TxNumberInBatch: 0,
+            _merkleProof: new bytes32[](0)
+        });
         assertEq(token.balanceOf(caller), amount);
         assertEq(token.balanceOf(address(addresses.l1NativeTokenVault)), 0);
         assertEq(addresses.l1Nullifier.depositHappened(chainId, canonicalHash), bytes32(0));
         vm.expectRevert(abi.encodeWithSelector(DepositDoesNotExist.selector, bytes32(0), dataHash));
-        addresses.l1Nullifier.bridgeRecoverFailedTransfer(
-            chainId,
-            caller,
-            assetId,
-            transferData,
-            canonicalHash,
-            1,
-            0,
-            0,
-            new bytes32[](0)
-        );
+        addresses.l1Nullifier.bridgeRecoverFailedTransfer({
+            _chainId: chainId,
+            _depositSender: caller,
+            _assetId: assetId,
+            _assetData: transferData,
+            _l2TxHash: canonicalHash,
+            _l2BatchNumber: 1,
+            _l2MessageIndex: 0,
+            _l2TxNumberInBatch: 0,
+            _merkleProof: new bytes32[](0)
+        });
     }
 
     function test_directAndIndirectFundingMatrix() public {

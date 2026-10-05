@@ -29,26 +29,26 @@ contract L1InteropRequestHelpersTest is Test {
         vm.mockCall(bridgehub, abi.encodeWithSelector(IBridgehubBase.l2TransactionBaseCost.selector), abi.encode(123));
         vm.mockCall(router, abi.encodeCall(IL1AssetRouter.nativeTokenVault, ()), abi.encode(vault));
         Call[] memory calls = _admin
-            ? Utils.prepareAdminL1L2IndirectMessage(
-                1,
-                1_000_000,
-                271,
-                bridgehub,
-                router,
-                _forwardedValue,
-                hex"abcd",
-                address(this)
-            )
-            : Utils.prepareGovernanceL1L2IndirectMessage(
-                1,
-                1_000_000,
-                271,
-                bridgehub,
-                router,
-                _forwardedValue,
-                hex"abcd",
-                address(this)
-            );
+            ? Utils.prepareAdminL1L2IndirectMessage({
+                l1GasPrice: 1,
+                l2GasLimit: 1_000_000,
+                chainId: 271,
+                bridgehubAddress: bridgehub,
+                crossChainSender: router,
+                indirectCallValue: _forwardedValue,
+                indirectCallData: hex"abcd",
+                refundRecipient: address(this)
+            })
+            : Utils.prepareGovernanceL1L2IndirectMessage({
+                l1GasPrice: 1,
+                l2GasLimit: 1_000_000,
+                chainId: 271,
+                bridgehubAddress: bridgehub,
+                crossChainSender: router,
+                indirectCallValue: _forwardedValue,
+                indirectCallData: hex"abcd",
+                refundRecipient: address(this)
+            });
         assertEq(calls.length, _ethBase ? 1 : 2);
         Call memory send = calls[calls.length - 1];
         assertEq(send.target, center);
