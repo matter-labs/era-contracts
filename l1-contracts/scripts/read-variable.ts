@@ -4,6 +4,7 @@ import * as hre from "hardhat";
 import { Command } from "commander";
 import { BigNumber, ethers } from "ethers";
 import { web3Provider } from "./utils";
+import { readDynamicBytesFromSlots } from "./read-variable-utils";
 
 const provider = web3Provider();
 
@@ -36,16 +37,7 @@ async function readDynamicBytes(slot: BigNumber, address: string): Promise<strin
       slots.push(getStorageAt(address, firstSlot.add(slotShift)));
     }
 
-    const lastLength = length % 32;
-    let hex: string = "0x";
-    for (let i = 0; i < slots.length; i++) {
-      if (i === slots.length - 1) {
-        hex += (await slots[i]).substr(2, lastLength * 2);
-      } else {
-        hex += (await slots[i]).substr(2, 64);
-      }
-    }
-    return hex;
+    return readDynamicBytesFromSlots(length, await Promise.all(slots));
   }
 }
 
