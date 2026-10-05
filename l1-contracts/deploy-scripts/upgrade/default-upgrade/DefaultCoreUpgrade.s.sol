@@ -94,9 +94,10 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
     ///         upgrades. Every release refreshes all of them, so this lives here rather than being
     ///         restated per version; a release adds only what is new to it (a new proxy, say) by
     ///         overriding {deployVersionSpecificEcosystemContractsL1}.
-    /// @dev Includes the interop handler's implementation even though its *proxy* first appears in
-    ///      v33: the implementation is refreshed like any other core contract from then on, and the
-    ///      release that introduces the proxy reuses this deploy rather than repeating it.
+    /// @dev Includes the interop handler's and the L1 Interop Center's implementations even though their
+    ///      proxies are created by a release-specific hook: from then on they are refreshed like any other
+    ///      core contract, and when the hook deploys the same implementation again the CREATE2 deploy is a
+    ///      no-op.
     function deployNewEcosystemContractsL1() public virtual {
         coreAddresses.bridgehub.implementations.bridgehub = deploySimpleContract("L1Bridgehub");
         coreAddresses.bridgehub.implementations.messageRoot = deploySimpleContract("L1MessageRoot");
@@ -230,7 +231,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
             // address stays zero and the upgrade deploys the handler itself.
             coreAddresses = AddressIntrospector.getCoreDeployedAddressesV31(bridgehubProxy);
         } else {
-            coreAddresses = AddressIntrospector.getCoreDeployedAddressesPreL1InteropCenter(bridgehubProxy);
+            coreAddresses = AddressIntrospector.getCoreDeployedAddressesWithoutInteropCenter(bridgehubProxy);
         }
     }
 

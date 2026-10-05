@@ -133,7 +133,7 @@ const L2_ATOMIC_FLOW_MANAGER: Address = Address(FixedBytes::<20>(hex_literal::he
     "0000000000000000000000000000000000010014"
 )));
 
-// Stateless ERC-7786 attribute parser split out of the InteropCenter to keep the latter under the
+// Stateless ERC-7786 attribute parser split out of the L2InteropCenter to keep the latter under the
 // EIP-170 runtime code-size limit. Deployed as a SystemProxy, matching the L1 deploy scripts.
 const L2_INTEROP_ATTRIBUTE_PARSER: Address = Address(FixedBytes::<20>(hex_literal::hex!(
     "0000000000000000000000000000000000010015"

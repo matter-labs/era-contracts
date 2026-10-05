@@ -141,12 +141,12 @@ impl SimDescriptionRegistry {
     fn lookup(&self, target: Address, data_hex: &str) -> Option<String> {
         let selector = data_hex.get(..10)?;
         let inner = parse_first_inner_call(data_hex);
-        let raw = hex::decode(data_hex.strip_prefix("0x").unwrap_or(data_hex)).ok()?;
-        let l1_message = if crate::common::l1_interop::is_send_message(&raw) {
-            Some(crate::common::l1_interop::decode(&raw).ok()?)
-        } else {
-            None
-        };
+        let raw = hex::decode(data_hex.strip_prefix("0x").unwrap_or(data_hex)).unwrap_or_default();
+        let is_send_message = crate::common::l1_interop::is_send_message(&raw);
+        // A malformed send matches no recipient-keyed entry, but selector-only entries still apply.
+        let l1_message = is_send_message
+            .then(|| crate::common::l1_interop::decode(&raw).ok())
+            .flatten();
         for entry in &self.entries {
             if entry.target != target {
                 continue;
@@ -163,11 +163,11 @@ impl SimDescriptionRegistry {
             }
             // requestL2TransactionDirect: l2Contract at word 3 after the selector.
             if let Some(want) = entry.l2_contract {
-                let parsed = if let Some(message) = &l1_message {
-                    if message.is_indirect {
-                        continue;
+                let parsed = if is_send_message {
+                    match &l1_message {
+                        Some(message) if !message.is_indirect => message.recipient,
+                        _ => continue,
                     }
-                    message.recipient
                 } else {
                     let word_start = 10 + 3 * 64;
                     let word_hex = data_hex.get(word_start..word_start + 64)?;
@@ -179,11 +179,11 @@ impl SimDescriptionRegistry {
             }
             // requestL2TransactionTwoBridges: secondBridgeAddress at word 7.
             if let Some(want) = entry.second_bridge_address {
-                let parsed = if let Some(message) = &l1_message {
-                    if !message.is_indirect {
-                        continue;
+                let parsed = if is_send_message {
+                    match &l1_message {
+                        Some(message) if message.is_indirect => message.recipient,
+                        _ => continue,
                     }
-                    message.recipient
                 } else {
                     let word_start = 10 + 7 * 64;
                     let word_hex = data_hex.get(word_start..word_start + 64)?;
@@ -525,8 +525,8 @@ const CHECK_DEADLINE_TIME_INCREASE_SECS: u64 = 200_000;
 const CREATE2_FACTORY: &str = "0x4e59b44847b379578588920ca78fbf26c0b4956c";
 
 /// ETH (wei) minted to the governance sender (PUH) at the first stage-2 call
-/// so the `requestL2TransactionDirect{value: y}` / `...TwoBridges{value: y}`
-/// priority requests have msg.value coverage. 10 ETH is well above the
+/// so the priority requests it funds (`L1InteropCenter.sendMessage{value: y}`, or the Bridgehub
+/// request functions in historical bundles) have msg.value coverage. 10 ETH is well above the
 /// aggregate `priority_txs_l2_gas_limit * max_expected_l1_gas_price` budget
 /// across the v31 stage's stage-2 L1→L2 chain.
 const STAGE2_PUH_FUND_WEI: &str = "10000000000000000000";
@@ -1122,5 +1122,18 @@ mod tests {
         );
         message.attributes.clear();
         assert_eq!(registry.lookup(target, &data(&message)), None);
+
+        let selector_only = SimDescriptionRegistry {
+            entries: vec![SimDescriptionEntry {
+                l2_contract: None,
+                second_bridge_address: None,
+                desc: "any send".into(),
+                ..entry(false)
+            }],
+        };
+        assert_eq!(
+            selector_only.lookup(target, &data(&message)).as_deref(),
+            Some("any send")
+        );
     }
 }

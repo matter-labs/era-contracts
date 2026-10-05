@@ -10,7 +10,6 @@ import {
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
-// import {IInteropCenter} from "contracts/interop/interop-center/L2InteropCenter.sol";
 import {L2InteropCenter} from "contracts/interop/interop-center/L2InteropCenter.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {AtomicFlowPreimage, ATOMIC_FLOW_PREIMAGE_VERSION} from "contracts/atomic-interop/IAtomicInterop.sol";

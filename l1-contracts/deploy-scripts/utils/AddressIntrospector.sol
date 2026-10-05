@@ -176,8 +176,9 @@ library AddressIntrospector {
         coreAddresses.shared.governance = IOwnable(_bridgehubProxy).owner();
     }
 
-    /// @notice Discovers a v32/v33 ecosystem before the L1 Interop Center registry getter exists.
-    function getCoreDeployedAddressesPreL1InteropCenter(
+    /// @notice Discovers a v32+ ecosystem without reading the Bridgehub's `interopCenter` getter, which
+    ///         Bridgehubs that predate the L1 Interop Center lack; the center's addresses stay zero.
+    function getCoreDeployedAddressesWithoutInteropCenter(
         address _bridgehubProxy
     ) public view returns (CoreDeployedAddresses memory coreAddresses) {
         coreAddresses.bridgehub = _getL1BridgehubAddressesInternal(IL1Bridgehub(_bridgehubProxy), false);

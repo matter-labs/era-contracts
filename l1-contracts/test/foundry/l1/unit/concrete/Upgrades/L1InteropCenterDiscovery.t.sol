@@ -3,9 +3,9 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {DefaultCTMUpgrade} from "deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
 import {DefaultCoreUpgrade} from "deploy-scripts/upgrade/default-upgrade/DefaultCoreUpgrade.s.sol";
 import {CoreDeployedAddresses} from "deploy-scripts/utils/Types.sol";
+import {AddressIntrospector} from "deploy-scripts/utils/AddressIntrospector.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {L1InteropCenter} from "contracts/interop/interop-center/L1InteropCenter.sol";
@@ -66,18 +66,6 @@ contract DiscoveryFixtureCurrent is DiscoveryFixturePreCenter {
     }
 }
 
-contract CTMInteropDiscoveryHarness is DefaultCTMUpgrade {
-    function discover(
-        address _bridgehub,
-        bool _preV32,
-        bool _hasCenter
-    ) external returns (CoreDeployedAddresses memory) {
-        newConfig.hasL1InteropCenter = _hasCenter;
-        _discoverCoreAddresses(_bridgehub, _preV32);
-        return coreAddresses;
-    }
-}
-
 contract CoreInteropDiscoveryHarness is DefaultCoreUpgrade {
     function discover(
         address _bridgehub,
@@ -94,11 +82,9 @@ contract CoreInteropDiscoveryHarness is DefaultCoreUpgrade {
 }
 
 contract L1InteropCenterDiscoveryTest is Test {
-    CTMInteropDiscoveryHarness internal script;
     CoreInteropDiscoveryHarness internal coreScript;
 
     function setUp() public {
-        script = new CTMInteropDiscoveryHarness();
         coreScript = new CoreInteropDiscoveryHarness();
     }
 
@@ -108,7 +94,7 @@ contract L1InteropCenterDiscoveryTest is Test {
 
     function test_v31_discoveryDoesNotCallEitherNewGetter() public {
         address bridgehub = _proxy(address(new DiscoveryFixtureV31()));
-        CoreDeployedAddresses memory addresses = script.discover(bridgehub, true, false);
+        CoreDeployedAddresses memory addresses = coreScript.discover(bridgehub, true, false);
         assertEq(addresses.bridgehub.proxies.bridgehub, bridgehub);
         assertEq(addresses.bridgehub.proxies.interopCenter, address(0));
         assertEq(addresses.bridges.proxies.l1InteropHandler, address(0));
@@ -116,7 +102,7 @@ contract L1InteropCenterDiscoveryTest is Test {
 
     function test_v32AndV33_discoveryRetainsHandlerWithoutCenterGetter() public {
         address bridgehub = _proxy(address(new DiscoveryFixturePreCenter()));
-        CoreDeployedAddresses memory addresses = script.discover(bridgehub, false, false);
+        CoreDeployedAddresses memory addresses = coreScript.discover(bridgehub, false, false);
         assertEq(addresses.bridgehub.proxies.bridgehub, bridgehub);
         assertEq(addresses.bridgehub.proxies.interopCenter, address(0));
         assertEq(addresses.bridges.proxies.l1InteropHandler, bridgehub);
@@ -125,16 +111,31 @@ contract L1InteropCenterDiscoveryTest is Test {
     function test_current_discoveryRetainsExistingCenter() public {
         address implementation = address(new DiscoveryFixtureCurrent());
         address bridgehub = _proxy(implementation);
-        CoreDeployedAddresses memory addresses = script.discover(bridgehub, false, true);
+        CoreDeployedAddresses memory addresses = coreScript.discover(bridgehub, false, true);
         assertEq(addresses.bridgehub.proxies.interopCenter, bridgehub);
         assertEq(addresses.bridgehub.implementations.interopCenter, implementation);
         assertEq(addresses.bridges.proxies.l1InteropHandler, bridgehub);
     }
 
+    /// @dev The CTM upgrade discovers the core contracts without the center getter, so it works on
+    ///      Bridgehubs from before and after the L1 Interop Center alike.
+    function test_ctmDiscoveryIgnoresTheCenterGetter() public {
+        address preCenter = _proxy(address(new DiscoveryFixturePreCenter()));
+        address current = _proxy(address(new DiscoveryFixtureCurrent()));
+        CoreDeployedAddresses memory preCenterAddresses = AddressIntrospector
+            .getCoreDeployedAddressesWithoutInteropCenter(preCenter);
+        CoreDeployedAddresses memory currentAddresses = AddressIntrospector
+            .getCoreDeployedAddressesWithoutInteropCenter(current);
+        assertEq(preCenterAddresses.bridgehub.proxies.interopCenter, address(0));
+        assertEq(currentAddresses.bridgehub.proxies.interopCenter, address(0));
+        assertEq(currentAddresses.bridges.proxies.l1InteropHandler, current);
+    }
+
     function test_currentFlagOnHistoricalSource_revertsOnMissingGetter() public {
         address bridgehub = _proxy(address(new DiscoveryFixturePreCenter()));
-        vm.expectRevert();
-        script.discover(bridgehub, false, true);
+        // The proxy delegates to an implementation without `interopCenter()`, which reverts without data.
+        vm.expectRevert(bytes(""));
+        coreScript.discover(bridgehub, false, true);
     }
 
     function test_currentFlagRetainsRealCenterWithPreV32Introspection() public {
@@ -159,20 +160,22 @@ contract L1InteropCenterDiscoveryTest is Test {
         );
         // Unrelated core contracts share an ABI fixture; registry and center state use real proxies.
         address other = _proxy(address(new DiscoveryFixturePreCenter()));
-        bridgehub.setAddresses(other, ICTMDeploymentTracker(other), IMessageRootBase(other), other, other);
+        bridgehub.setAddresses({
+            _assetRouter: other,
+            _l1CtmDeployer: ICTMDeploymentTracker(other),
+            _messageRoot: IMessageRootBase(other),
+            _chainAssetHandler: other,
+            _chainRegistrationSender: other
+        });
         bridgehub.setInteropCenter(address(center));
         center.pause();
         address pendingOwner = makeAddr("pendingOwner");
         center.transferOwnership(pendingOwner);
 
         CoreDeployedAddresses memory coreAddresses = coreScript.discover(address(bridgehub), true, true);
-        CoreDeployedAddresses memory ctmAddresses = script.discover(address(bridgehub), true, true);
         assertEq(coreAddresses.bridgehub.proxies.interopCenter, address(center));
-        assertEq(ctmAddresses.bridgehub.proxies.interopCenter, address(center));
         assertEq(coreAddresses.bridgehub.implementations.interopCenter, address(implementation));
-        assertEq(ctmAddresses.bridgehub.implementations.interopCenter, address(implementation));
         assertEq(coreAddresses.bridges.proxies.l1InteropHandler, other);
-        assertEq(ctmAddresses.bridges.proxies.l1InteropHandler, other);
         assertEq(center.owner(), address(this));
         assertEq(center.pendingOwner(), pendingOwner);
         assertTrue(center.paused());
@@ -184,18 +187,6 @@ contract L1InteropCenterDiscoveryTest is Test {
         vm.writeFile(path, "pre_v32_introspection = false\n");
         vm.expectRevert("Set has_l1_interop_center explicitly");
         coreScript.initializeConfigWithArgs(address(0), bytes32(0), path);
-        vm.expectRevert("Set has_l1_interop_center explicitly");
-        script.initializeWithArgs({
-            ctmProxy: address(0),
-            bytecodesSupplier: address(0),
-            rollupDAManager: address(0),
-            create2FactorySalt: bytes32(0),
-            newConfigPath: string.concat("/", path),
-            _outputPath: "",
-            governance: address(0),
-            zkTokenAssetId: bytes32(0),
-            testnetVerifier: false
-        });
         vm.removeFile(path);
     }
 }

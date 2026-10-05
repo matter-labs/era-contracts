@@ -283,8 +283,9 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
 fn ensure_supported_ceremony(artifact: &toml::Value) -> anyhow::Result<()> {
     anyhow::ensure!(
         !contains_center_output(artifact),
-        "L1InteropCenter upgrade ceremonies are not supported by the historical v31 verifier. \
-         --display-upgrade-data can print their governance proposals, but does not validate them."
+        "This verifier only supports ceremonies prepared before the L1 Interop Center; this artifact \
+         records L1 Interop Center outputs. --display-upgrade-data can print its governance proposals, \
+         but does not validate them."
     );
     Ok(())
 }
@@ -382,6 +383,6 @@ mod tests {
         let error = run(args(false)).await.unwrap_err();
         assert!(error
             .to_string()
-            .contains("not supported by the historical v31 verifier"));
+            .contains("only supports ceremonies prepared before the L1 Interop Center"));
     }
 }

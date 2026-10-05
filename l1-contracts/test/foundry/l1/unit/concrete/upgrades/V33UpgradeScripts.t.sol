@@ -81,6 +81,23 @@ contract V33UpgradeScriptsTest is Test {
         }
     }
 
+    /// @notice Every v33 upgrade input states whether its ecosystem already has the L1 Interop Center.
+    /// @dev The core upgrade refuses to guess (see {protocol-docs/l1-interop-center.md#deployment-and-migration}),
+    ///      so a missing key fails `upgrade-prepare-all` for that environment at initialization.
+    function test_everyV33UpgradeInputDeclaresTheInteropCenterFlag() public view {
+        string[5] memory envs = ["local", "mainnet", "stage", "zksync-os-integration-test", "foundry-upgrade"];
+
+        for (uint256 i = 0; i < envs.length; ++i) {
+            string memory toml = vm.readFile(
+                string.concat(vm.projectRoot(), "/upgrade-envs/v0.33.0-atomic-interop/", envs[i], ".toml")
+            );
+            assertTrue(
+                stdToml.keyExists(toml, "$.has_l1_interop_center"),
+                string.concat(envs[i], " must declare has_l1_interop_center")
+            );
+        }
+    }
+
     /// @notice Every environment declares `testnet_verifier`, and only mainnet runs the real one.
     /// @dev The flag decides whether the upgrade installs a verifier that accepts unproven batches,
     ///      so it is a declared per-env value rather than a default. protocol-ops reads it from here

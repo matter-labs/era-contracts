@@ -139,7 +139,6 @@ interface IAdminFunctions {
         uint256 gatewayChainId,
         uint256 chainId,
         address bridgehub,
-        address l1AssetRouterProxy,
         address refundRecipient,
         bool shouldSend
     ) external;

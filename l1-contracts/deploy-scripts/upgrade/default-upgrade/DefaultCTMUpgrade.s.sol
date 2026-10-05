@@ -68,7 +68,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         uint256 governanceUpgradeTimerInitialDelay;
         bool hasPreV32IntrospectionOverride;
         bool usePreV32IntrospectionOverride;
-        bool hasL1InteropCenter;
     }
 
     struct GatewayConfig {
@@ -96,8 +95,8 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         bytes32 create2FactorySalt;
         address ctmProxy;
         address bytecodesSupplier;
-        /// @dev ZK token asset ID, used by `InteropCenter.initL2` for fixed-fee bundles.
-        ///      MUST be non-zero — `InteropCenter.initL2` reverts otherwise, which would abort the
+        /// @dev ZK token asset ID, used by `L2InteropCenter.initL2` for fixed-fee bundles.
+        ///      MUST be non-zero — `L2InteropCenter.initL2` reverts otherwise, which would abort the
         ///      L2 upgrade transaction.
         bytes32 zkTokenAssetId;
         /// @dev Whether the CTM's verifier is the testnet one, which accepts unproven batches.
@@ -172,7 +171,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         // The supplier is read off the CTM's `L1_BYTECODES_SUPPLIER()` immutable during discovery, so the
         // permanent-values entry is informational for this path.
         setAddressesBasedOnCTM();
-        // Must be non-zero: `InteropCenter.initL2` reverts on a zero asset ID. It runs on the genesis path
+        // Must be non-zero: `L2InteropCenter.initL2` reverts on a zero asset ID. It runs on the genesis path
         // of `performForceDeployedContractsInit` only, so this aborts the genesis of chains created from the
         // release rather than this upgrade — caught here so the misconfiguration surfaces during
         // preparation instead of at a chain's creation.
@@ -209,8 +208,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         bool testnetVerifier
     ) internal virtual {
         string memory toml = vm.readFile(newConfigPath);
-        require(toml.keyExists("$.has_l1_interop_center"), "Set has_l1_interop_center explicitly");
-        newConfig.hasL1InteropCenter = toml.readBool("$.has_l1_interop_center");
 
         // No `era_chain_id` read: the per-env input TOMLs still carry the key for the
         // v31 tooling and the zk-governance PUH redeploy (PUH's real constructor arg),
@@ -463,10 +460,12 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
 
         if (preV32Ecosystem) {
             ctmAddresses = AddressIntrospector.getCTMAddressesV31(ctm);
+            coreAddresses = AddressIntrospector.getCoreDeployedAddressesV31(bridgehubAddr);
         } else {
             ctmAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManager(ctm));
+            // The CTM upgrade does not use the L1 Interop Center, so discovery skips its getter.
+            coreAddresses = AddressIntrospector.getCoreDeployedAddressesWithoutInteropCenter(bridgehubAddr);
         }
-        _discoverCoreAddresses(bridgehubAddr, preV32Ecosystem);
 
         config.ownerAddress = ctmAddresses.admin.governance;
 
@@ -487,17 +486,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
             ctmProtocolVersion != getNewProtocolVersion(),
             "The new protocol version is already present on the ChainTypeManager"
         );
-    }
-
-    /// @notice Uses the source ecosystem's registry ABI during CTM preparation.
-    function _discoverCoreAddresses(address _bridgehub, bool _preV32Ecosystem) internal {
-        if (newConfig.hasL1InteropCenter) {
-            coreAddresses = AddressIntrospector.getCoreDeployedAddresses(_bridgehub);
-        } else if (_preV32Ecosystem) {
-            coreAddresses = AddressIntrospector.getCoreDeployedAddressesV31(_bridgehub);
-        } else {
-            coreAddresses = AddressIntrospector.getCoreDeployedAddressesPreL1InteropCenter(_bridgehub);
-        }
     }
 
     function getFixedForceDeploymentsData() internal override returns (FixedForceDeploymentsData memory data) {

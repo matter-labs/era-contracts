@@ -34,6 +34,9 @@ support_l2_legacy_shared_bridge_test = false
 # v31 -> v33.
 old_protocol_version = 0x1f00000000
 
+# The ecosystem predates the L1 Interop Center, so the upgrade deploys and registers it.
+has_l1_interop_center = false
+
 
 [contracts]
 governance_min_delay = 0

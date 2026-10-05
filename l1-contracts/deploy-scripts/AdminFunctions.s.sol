@@ -258,7 +258,9 @@ contract AdminFunctions is Script, IAdminFunctions {
 
         _savePreGovernanceAcceptOwnershipCalls(acceptCalls, acceptCount);
 
-        // Historical Bridgehub-discoverable proxies whose ProxyAdmins gate stage 1.
+        // Bridgehub-discoverable proxies whose ProxyAdmins gate the stage-1 `upgradeAndCall` calls. The L1
+        // Interop Center is not looked up: it shares the Bridgehub's ProxyAdmin, and a Bridgehub that
+        // predates it has no getter.
         address assetRouter = address(IL1Bridgehub(_bridgehub).assetRouter());
         address chainAssetHandler = address(IL1Bridgehub(_bridgehub).chainAssetHandler());
         address ctmDeploymentTracker = address(IL1Bridgehub(_bridgehub).l1CtmDeployer());
@@ -780,7 +782,6 @@ contract AdminFunctions is Script, IAdminFunctions {
         uint256 gatewayChainId;
         uint256 chainId;
         address bridgehub;
-        address l1AssetRouterProxy;
         address refundRecipient;
         bool shouldSend;
     }
@@ -814,7 +815,6 @@ contract AdminFunctions is Script, IAdminFunctions {
         uint256 _gatewayChainId,
         uint256 _chainId,
         address _bridgehub,
-        address _l1AssetRouterProxy,
         address _refundRecipient,
         bool _shouldSend
     ) public {
@@ -827,7 +827,6 @@ contract AdminFunctions is Script, IAdminFunctions {
                 gatewayChainId: _gatewayChainId,
                 chainId: _chainId,
                 bridgehub: _bridgehub,
-                l1AssetRouterProxy: _l1AssetRouterProxy,
                 refundRecipient: _refundRecipient,
                 shouldSend: _shouldSend
             })

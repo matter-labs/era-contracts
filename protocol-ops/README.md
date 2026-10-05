@@ -60,7 +60,9 @@ Safe-bundle-aware executor) with the keys from `wallets.yaml`.
 ## Running the Protocol Upgrade Verification Tool (PUVT)
 
 `ecosystem verify-upgrade` re-derives and cross-checks the calldata produced by
-`ecosystem upgrade-prepare-all` for the **v31 → v32 ZKsync OS upgrade**. It is
+`ecosystem upgrade-prepare-all` for the **v31 → v32 ZKsync OS upgrade**. It rejects artifacts
+prepared after the L1 Interop Center was introduced, which record `l1_interop_center_*` outputs
+(see `protocol-docs/l1-interop-center.md`). It is
 **read-only**: it never runs forge or spins up an Anvil fork. It reads the merged
 `ecosystem.toml`, replays the append-only `transactions.txt` deployment log against L1,
 and matches every CREATE2 deployment against `AllContractsHashes.json`. The tool is

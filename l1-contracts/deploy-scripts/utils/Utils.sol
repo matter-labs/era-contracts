@@ -629,7 +629,7 @@ library Utils {
         address bridgehubAddress,
         address refundRecipient
     ) internal view returns (Call[] memory calls) {
-        // 1) Prepare the L1L2MessageParams (same logic as before)
+        // 1) Prepare the L1L2MessageParams
         (L1L2MessageParams memory l2TransactionRequestDirect, uint256 requiredValueToDeploy) = prepareL1L2Message(
             PrepareL1L2MessageParams({
                 l1GasPrice: gasPrice,
