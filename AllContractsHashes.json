@@ -2712,7 +2712,7 @@
   {
     "contractName": "Bootloader",
     "zkBytecodePath": "/system-contracts/zkout/bootloader_test.yul/Bootloader.json",
-    "zkBytecodeHash": "0x01000c1fd20570f47cd878ce711d78a27a35f6096c8f870c6adc0f970d14948d",
+    "zkBytecodeHash": "0x01000c1fe6c0aac11d887950a794b81b2a60192c70e5093c9bb41ede4c0def0d",
     "evmBytecodePath": null,
     "evmBytecodeHash": null,
     "evmDeployedBytecodeHash": null,
@@ -2732,7 +2732,7 @@
   {
     "contractName": "Bootloader",
     "zkBytecodePath": "/system-contracts/zkout/fee_estimate.yul/Bootloader.json",
-    "zkBytecodeHash": "0x01000a6b495b789d4a70b048a460aeed2c6b5267e6abcf4199480001ed4814c2",
+    "zkBytecodeHash": "0x01000a6bfa07e7b25779e66cf6c30d1a3a560007bd6fe5e73464a71163530361",
     "evmBytecodePath": null,
     "evmBytecodeHash": null,
     "evmDeployedBytecodeHash": null,
@@ -2742,7 +2742,7 @@
   {
     "contractName": "Bootloader",
     "zkBytecodePath": "/system-contracts/zkout/gas_test.yul/Bootloader.json",
-    "zkBytecodeHash": "0x0100097742aa7b56919d64f03be080d7a9801d9fec3a4194bb2c1dfe067bcab6",
+    "zkBytecodeHash": "0x01000977e45b41592fc484c942ad7a75c95d173e8918c397f786ae56fc22de4d",
     "evmBytecodePath": null,
     "evmBytecodeHash": null,
     "evmDeployedBytecodeHash": null,
@@ -2752,7 +2752,7 @@
   {
     "contractName": "Bootloader",
     "zkBytecodePath": "/system-contracts/zkout/playground_batch.yul/Bootloader.json",
-    "zkBytecodeHash": "0x01000a6faa2a058ecdcef1d83ef011f8963ee05207284768135bf4a96046f031",
+    "zkBytecodeHash": "0x01000a6f98858ea28d00214dba4e29c0cd759cad35fb2c76bce67f0d30a25b93",
     "evmBytecodePath": null,
     "evmBytecodeHash": null,
     "evmDeployedBytecodeHash": null,
@@ -2762,7 +2762,7 @@
   {
     "contractName": "Bootloader",
     "zkBytecodePath": "/system-contracts/zkout/proved_batch.yul/Bootloader.json",
-    "zkBytecodeHash": "0x01000987471e4017c6b4541ce532026abb5d67f42533c2ad4e83eb6822b26c50",
+    "zkBytecodeHash": "0x010009873ba868c774ea7ec5261e5e885a6c2d8e2b9acd8dc75c77323958c1f2",
     "evmBytecodePath": null,
     "evmBytecodeHash": null,
     "evmDeployedBytecodeHash": null,

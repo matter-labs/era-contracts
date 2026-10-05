@@ -769,6 +769,10 @@ object "Bootloader" {
                 forceFail
             ) {
                 // Force-fail is supported only for batches settling on L1.
+                // The sender is not checked, so protocol-authored transactions can be force-failed too: service
+                // transactions (`SERVICE_TRANSACTION_SENDER`) and, on a settlement layer, relay wrappers
+                // (`SETTLEMENT_LAYER_RELAY_SENDER`). Those senders must be rejected here before a settlement
+                // layer runs this bootloader.
                 if forceFail {
                     if iszero(eq(getSettlementLayerChainId(), getL1ChainId())) {
                         assertionError("forceFail off L1 settlement")
