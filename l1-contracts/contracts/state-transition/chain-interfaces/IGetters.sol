@@ -138,6 +138,10 @@ interface IGetters is IZKChainBase {
     /// @return Whether L1 transaction filtering is enabled.
     function isZKsyncOSL1TxFilteringEnabled() external view returns (bool);
 
+    /// @notice Returns whether the larger ZKsync OS contract size limits are enabled.
+    /// @return Whether large contracts are enabled.
+    function isZKsyncOSLargeContractsEnabled() external view returns (bool);
+
     /// @return Whether a withdrawal has been finalized.
     /// @param _l2BatchNumber The L2 batch number within which the withdrawal happened.
     /// @param _l2MessageIndex The index of the L2->L1 message denoting the withdrawal.

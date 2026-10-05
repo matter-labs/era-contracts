@@ -91,13 +91,14 @@ contract ExecutorTest is UtilsCallMockerTest {
     uint256[] internal proofInput;
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](17);
+        bytes4[] memory selectors = new bytes4[](18);
         uint256 i = 0;
         selectors[i++] = admin.setPendingAdmin.selector;
         selectors[i++] = admin.acceptAdmin.selector;
         selectors[i++] = admin.setValidator.selector;
         selectors[i++] = admin.setPriorityTxMaxGasLimit.selector;
         selectors[i++] = admin.setZKsyncOSL1TxFiltering.selector;
+        selectors[i++] = admin.setZKsyncOSLargeContractsEnabled.selector;
         selectors[i++] = admin.setZKsyncOSMaxTxGasLimit.selector;
         selectors[i++] = admin.setPubdataContent.selector;
         selectors[i++] = admin.changeFeeParams.selector;
@@ -133,10 +134,12 @@ contract ExecutorTest is UtilsCallMockerTest {
     }
 
     function getGettersSelectors() public view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](35);
+        bytes4[] memory selectors = new bytes4[](38);
         uint256 i = 0;
         selectors[i++] = getters.getVerifier.selector;
         selectors[i++] = getters.getZKsyncOSChainConfigHash.selector;
+        selectors[i++] = getters.getPubdataContent.selector;
+        selectors[i++] = getters.getZKsyncOSMaxTxGasLimit.selector;
         selectors[i++] = getters.getProtocolVersion.selector;
         selectors[i++] = getters.getL2SystemContractsUpgradeTxHash.selector;
         selectors[i++] = getters.getL2SystemContractsUpgradeBatchNumber.selector;
@@ -156,6 +159,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         selectors[i++] = getters.isDiamondStorageFrozen.selector;
         selectors[i++] = getters.getPriorityTxMaxGasLimit.selector;
         selectors[i++] = getters.isZKsyncOSL1TxFilteringEnabled.selector;
+        selectors[i++] = getters.isZKsyncOSLargeContractsEnabled.selector;
         selectors[i++] = getters.isEthWithdrawalFinalized.selector;
         selectors[i++] = getters.facets.selector;
         selectors[i++] = getters.facetFunctionSelectors.selector;

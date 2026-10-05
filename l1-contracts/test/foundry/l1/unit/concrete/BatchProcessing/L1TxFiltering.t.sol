@@ -1,13 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {ExecutorTest} from "./_Executor_Shared.t.sol";
+import {ChainConfigTest} from "./_ChainConfig_Shared.t.sol";
 import {Utils} from "../Utils/Utils.sol";
-import {
-    PRIORITY_EXPIRATION,
-    TESTNET_COMMIT_TIMESTAMP_NOT_OLDER,
-    ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT
-} from "contracts/common/Config.sol";
+import {PRIORITY_EXPIRATION} from "contracts/common/Config.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
@@ -17,15 +13,7 @@ import {
     ZKsyncOSChainConfigUpdateWithUnverifiedBatches
 } from "contracts/common/L1ContractErrors.sol";
 
-// The shared fixture isolates DA and cryptographic verification. Batch state advances through
-// the real commit/prove/revert entry points to exercise the configuration-update boundary.
-contract L1TxFilteringTest is ExecutorTest {
-    function setUp() public {
-        vm.warp(TESTNET_COMMIT_TIMESTAMP_NOT_OLDER + 1);
-        newCommitBatchInfoZKsyncOS.firstBlockTimestamp = uint64(block.timestamp);
-        newCommitBatchInfoZKsyncOS.lastBlockTimestamp = uint64(block.timestamp);
-    }
-
+contract L1TxFilteringTest is ChainConfigTest {
     function test_filteringDisabledByDefault() public view {
         assertFalse(getters.isZKsyncOSL1TxFilteringEnabled());
     }
@@ -155,9 +143,7 @@ contract L1TxFilteringTest is ExecutorTest {
         );
 
         uint256[] memory expectedPublicInputs = new uint256[](1);
-        bytes32 chainConfigHash = keccak256(
-            abi.encode(getters.getChainId(), false, ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT, uint256(0), _enabled)
-        );
+        bytes32 chainConfigHash = _currentChainConfigHash();
         expectedPublicInputs[0] = uint256(
             keccak256(
                 abi.encode(
@@ -215,18 +201,5 @@ contract L1TxFilteringTest is ExecutorTest {
         admin.setZKsyncOSL1TxFiltering(_enabled);
 
         assertEq(getters.isZKsyncOSL1TxFilteringEnabled(), _enabled);
-    }
-
-    function _commitFirstBatch() internal returns (IExecutor.StoredBatchInfo memory) {
-        newCommitBatchInfoZKsyncOS.chainConfigHash = keccak256(
-            abi.encode(
-                getters.getChainId(),
-                false,
-                ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
-                uint256(0),
-                getters.isZKsyncOSL1TxFilteringEnabled()
-            )
-        );
-        return _commitOSBatchGetStored(genesisStoredBatchInfo, newCommitBatchInfoZKsyncOS);
     }
 }
