@@ -1,0 +1,33 @@
+name: "Ecosystem Upgrade: Deploy + Verify (v31)"
+
+# Registration stub, same pattern as `generate-ecosystem-upgrade-calldata.yaml`
+# (#2264): `workflow_dispatch` only lists workflows whose file exists on the
+# DEFAULT branch, so the file has to be here for the job to be dispatchable at
+# all — while the implementation it dispatches lives on the v31 branch, together
+# with the `protocol-ops` binary and the `upgrade-envs/v0.31.0-interopB/` configs
+# it drives (neither of which exists on `main` yet).
+#
+# Dispatching this workflow on a v31 branch runs THAT branch's version, inputs
+# included; this body only ever runs if someone dispatches it on `main`, where
+# there is nothing for it to deploy.
+#
+# Step 2 of the two-step v31 ecosystem-upgrade flow: step 1
+# (`generate-ecosystem-upgrade-calldata.yaml`) computes the calldata on a fork and
+# publishes the deploy bundle; this one broadcasts that bundle's deployer
+# transactions to a real L1 and verifies the deployed contracts on Etherscan.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Explain that the implementation lives on the v31 branch
+        run: |
+          echo "This is the dispatch-registration stub on the default branch."
+          echo "Dispatch this workflow on a v31 branch to run the real deploy."
