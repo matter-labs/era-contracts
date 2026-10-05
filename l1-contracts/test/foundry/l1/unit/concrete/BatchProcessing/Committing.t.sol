@@ -579,8 +579,8 @@ contract CommittingTest is ExecutorTest {
         assertEq(totalBatchesCommitted, 1);
     }
 
-    /// Era commits emit the Airbender commitment that is hashed into the stored batch, so the stored
-    /// batch can be rebuilt from logs.
+    /// Era commits emit the Airbender commitment hashed into the stored batch, so it is available from logs
+    /// the same way the Boojum one is from `BlockCommit`.
     function test_SuccessfullyCommitBatchEmitsAirbenderCommitment() public {
         bytes32 uncompressedStateDiffHash = Utils.randomBytes32("uncompressedStateDiffHash");
         bytes32 totalL2PubdataHash = Utils.randomBytes32("totalL2PubdataHash");

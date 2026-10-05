@@ -144,9 +144,13 @@ contract CommittingTest is ExecutorTest {
 
         // ZKsync OS batches carry no Airbender commitment, so only Era commits emit it.
         Vm.Log[] memory entries = vm.getRecordedLogs();
+        bool blockCommitEmitted;
         for (uint256 i = 0; i < entries.length; ++i) {
             assertTrue(entries[i].topics[0] != keccak256("BatchAirbenderCommitment(uint256,bytes32)"));
+            blockCommitEmitted =
+                blockCommitEmitted || entries[i].topics[0] == keccak256("BlockCommit(uint256,bytes32,bytes32)");
         }
+        assertTrue(blockCommitEmitted, "the commit must have been recorded");
     }
 
     function test_SuccessfullyCommitBatchWithBlobs() public {

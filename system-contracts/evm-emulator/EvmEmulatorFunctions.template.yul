@@ -260,7 +260,7 @@ function getMemPointer(rawOffset, size) -> pointer {
     pointer := MEM_OFFSET()
     if size {
         // Callers expand memory for the same region first, which already enforces this bound.
-        if gt(rawOffset, MAX_POSSIBLE_MEM_LEN()) {
+        if iszero(lt(rawOffset, MAX_POSSIBLE_MEM_LEN())) {
             panic()
         }
         pointer := add(MEM_OFFSET(), rawOffset)
