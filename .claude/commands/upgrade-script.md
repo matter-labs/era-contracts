@@ -1,50 +1,45 @@
-Create a new version upgrade script following the ZK Stack upgrade architecture.
+Start a new protocol release and, only if it needs one, its release-specific upgrade scripts.
 
 ## Usage
 
-Invoke with: `/upgrade-script <version_number>` (e.g., `/upgrade-script v32`)
+Invoke with: `/upgrade-script <release-name>` (e.g., `/upgrade-script chain-config`)
 
 ## What this skill does
 
-Creates a complete set of upgrade script files for a new protocol version. There is no single
-`EcosystemUpgrade` artifact — the ecosystem upgrade is composed from the per-domain upgrade scripts
-below, and `protocol-ops ecosystem upgrade-prepare-all` orchestrates running them together:
-
-```
-CoreUpgrade_v{N}    extends DefaultCoreUpgrade
-CTMUpgrade_v{N}     extends DefaultCTMUpgrade
-ChainUpgrade_v{N}   extends DefaultChainUpgrade
-```
+Every release is prepared by the **default upgrade** unless it needs release-specific work:
+`protocol-ops ecosystem upgrade-prepare-all` runs `DefaultCoreUpgrade` + `DefaultCTMUpgrade`
+(`l1-contracts/deploy-scripts/upgrade/default-upgrade/`), targets the protocol version in
+`configs/genesis/zksync-os/latest.json`, and reads its local input from the current release's upgrade-env dir
+(`current_upgrade_env_dir!` in `protocol-ops/src/common/forge/scripts/mod.rs`). The upgrade tests run exactly
+these defaults, so they always cover the release being built.
 
 ## Steps
 
-1. Read the base classes to understand current signatures:
-   - `l1-contracts/deploy-scripts/upgrade/default-upgrade/DefaultCoreUpgrade.s.sol`
-   - `l1-contracts/deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol`
-   - `l1-contracts/deploy-scripts/upgrade/default-upgrade/DefaultChainUpgrade.s.sol`
+1. From the repo root, run `yarn new-release <release-name> --dry-run`, show the user the planned changes, then
+   run it without `--dry-run`. It bumps the genesis minor version, scaffolds
+   `l1-contracts/upgrade-envs/v0.<N>.0-<release-name>/local.toml`, repoints protocol-ops' current upgrade-env dir,
+   and rotates the anvil fixtures (`config/anvil-config.json`).
 
-2. Read the most recent version upgrade (e.g., v31) as a template:
-   - `l1-contracts/deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol`
-   - `l1-contracts/deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol`
-   - `l1-contracts/deploy-scripts/upgrade/v31/ChainUpgrade_v31.s.sol`
+2. Do the follow-ups it prints: regenerate the new release's anvil chain states (the 'Regenerate Anvil Interop
+   Chain States' workflow) and add per-environment inputs (`stage.toml`, `mainnet.toml`, ...) when preparing for
+   those environments.
 
-3. Create new version directory: `l1-contracts/deploy-scripts/upgrade/v{N}/`
+3. Ask the user what the release changes. Only if it needs release-specific preparation (extra contracts, a
+   custom per-chain initializer, one-off governance calls):
+   - Read the base classes: `DefaultCoreUpgrade.s.sol`, `DefaultCTMUpgrade.s.sol`, `CTMUpgradeBase.sol`.
+   - Add thin subclasses under `l1-contracts/deploy-scripts/upgrade/v{N}/` (e.g. `CTMUpgrade_v{N} is
+DefaultCTMUpgrade`) overriding only what the release needs.
+   - Point protocol-ops' `upgrade-prepare-all` `--core-script-path` / `--ctm-script-path` defaults at them, so the
+     upgrade tests pick them up.
 
-4. Create the following files (minimal overrides, only add what's needed):
-   - `CoreUpgrade_v{N}.s.sol` - Override `deployNewEcosystemContractsL1()` and stage governance calls
-   - `CTMUpgrade_v{N}.s.sol` - Override `deployNewCTMContracts()` and stage governance calls
-   - `ChainUpgrade_v{N}.s.sol` - Override per-chain upgrade logic
-
-5. Create the upgrade environment config directory under `l1-contracts/upgrade-envs/` (versioned name,
-   e.g. `v0.31.0-interopB`)
-   - Copy and adapt from the most recent version's config
-
-6. Ask the user what new contracts or changes this upgrade introduces before filling in deployment logic.
+4. Run `cd protocol-ops && cargo test`, the anvil upgrade test (`yarn ts-node run-upgrade-test.ts` in
+   `l1-contracts/test/anvil-interop`) and the foundry upgrade tests
+   (`forge test --ffi --match-path 'test/foundry/l1/integration/UpgradeTest*'` in `l1-contracts`).
 
 ## Key rules
 
 - NEVER use try-catch or staticcall in upgrade scripts
-- Use composition (not diamond inheritance) for ecosystem upgrades
+- Prefer the default upgrade; release-specific scripts extend the `Default*` ones with minimal overrides
 - Three-stage governance: stage0 (pause), stage1 (upgrade), stage2 (unpause)
-- Output paths follow pattern: `/script-out/v{N}-upgrade-{core|ctm|ecosystem}.toml`
+- Never pin the upgrade tests to a release: they follow protocol-ops' defaults and the genesis version
 - Test with `forge script` in simulation mode before broadcasting

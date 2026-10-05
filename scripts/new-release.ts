@@ -108,7 +108,7 @@ function main(): void {
     "utf-8"
   );
   localInput = localInput.replace(
-    /^# Local v\d+ -> v\d+ upgrade input\./m,
+    /^# Local v\d+ -> v\d+ upgrade input\..*$/m,
     `# Local v${current.minor} -> v${next.minor} upgrade input.`
   );
   localInput = setTomlBareValue(localInput, "old_protocol_version", packSemVer({ ...current, patch: 0 }));
