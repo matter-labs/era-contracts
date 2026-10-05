@@ -6,6 +6,7 @@ import {AtomicFlowFixtures} from "./AtomicFlowFixtures.sol";
 
 import {ImtProof, ATOMIC_COMMIT_LEAF_TAG} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
+import {L2_MESSAGE_VERIFICATION} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {
     ProofImtRootInclusionFailed,
     ProofInvalidChainBatchRootDepth,
@@ -33,7 +34,7 @@ import {IMTLeafValueMismatch, IMTLowLeafNextTooSmall} from "contracts/common/L1C
 /// `test_RevertWhen_timeout_missingSettlementInteropRoot`, whose branch the real one cannot reach.
 contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// @dev Per-suite proof fixture values. Not hoisted onto the builder: other derived suites pick
-    /// their own (the execute abstract uses a different `SL_BLOCK`).
+    /// their own (the execute abstract uses its own per-leg SL blocks).
     uint256 internal constant SOURCE_CHAIN_ID = 271;
     uint256 internal constant BATCH_N = 100;
     uint256 internal constant SL_BLOCK = 555;
@@ -359,7 +360,11 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// @dev A missing settlement interop root has an unset timestamp that reads as 0 and is rejected.
     function test_RevertWhen_timeout_missingSettlementInteropRoot() public {
         // Stub: the real verifier needs a root at this same key, and storage never holds one with a zero timestamp.
-        _mockVerifier(true);
+        vm.mockCall(
+            address(L2_MESSAGE_VERIFICATION),
+            abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2LeafInclusionShared.selector),
+            abi.encode(true)
+        );
         (ImtProof memory absence, ) = _nonInclusionProof({
             _sourceChainId: SOURCE_CHAIN_ID,
             _batchNumber: BATCH_N,

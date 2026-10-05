@@ -82,8 +82,6 @@ contract AtomicInteropProofWrapper {
 ///       mask, a final-node proof, any timestamp or settlement layer, the local chain as source.
 ///       Callers import the returned root to authenticate, or withhold it to make the verifier reject.
 ///
-/// {_mockVerifier} stubs the verifier only for a branch the real one cannot reach; each caller says why.
-///
 /// Setup additionally stubs read-side WIRING (not proof-path logic): the L2 Bridgehub registry /
 /// chain-getter views the real aggregation oracle consults (`_ensureChainRegistered` /
 /// `_setUpAtomicFixtures`), so the canonical predeploys resolve without deploying the full bridgehub
@@ -382,16 +380,7 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
             });
     }
 
-    // Mocks / real-storage seeding
-
-    /// @dev Drives the (separately-tested) cross-chain leaf verifier to `_ok` for every call.
-    function _mockVerifier(bool _ok) internal {
-        vm.mockCall(
-            address(L2_MESSAGE_VERIFICATION),
-            abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2LeafInclusionShared.selector),
-            abi.encode(_ok)
-        );
-    }
+    // Real-storage seeding
 
     /// @dev Imports `(_root, _timestamp)` at `(_chainId, _blockOrBatchNumber)` into the REAL root storage
     /// through the production bootloader entry point. `_root` is what the real `L2MessageVerification`
