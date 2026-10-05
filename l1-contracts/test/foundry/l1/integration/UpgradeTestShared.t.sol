@@ -7,8 +7,8 @@ import {Vm} from "forge-std/Vm.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 import {Test} from "forge-std/Test.sol";
-import {CoreUpgrade_v33} from "../../../../deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol";
-import {CTMUpgrade_v33} from "../../../../deploy-scripts/upgrade/v33/CTMUpgrade_v33.s.sol";
+import {DefaultCoreUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCoreUpgrade.s.sol";
+import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
 import {IOwnableSingleStep, IChainAdminMulticall} from "../../../../deploy-scripts/AdminFunctions.s.sol";
 import {EcosystemUpgradeParams} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeParams.sol";
 import {DefaultChainUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultChainUpgrade.s.sol";
@@ -30,15 +30,18 @@ contract UpgradeIntegrationTestBase is Test {
 
     uint256 internal chainId;
 
-    CoreUpgrade_v33 internal coreUpgrade;
-    CTMUpgrade_v33 internal ctmUpgrade;
+    DefaultCoreUpgrade internal coreUpgrade;
+    DefaultCTMUpgrade internal ctmUpgrade;
     DefaultChainUpgrade internal chainUpgrade;
 
     /// @notice Per-test fixed paths for the deploy outputs the upgrade scripts read.
     string public ECOSYSTEM_INPUT = "file_1.toml";
-    string public ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/v0.33.0-atomic-interop/foundry-upgrade.toml";
+    /// @dev Version-free on purpose: the harness always runs the current default upgrade, so the input
+    ///      must not be tied to a release directory under `upgrade-envs/`.
+    string public ECOSYSTEM_UPGRADE_INPUT = "/test/foundry/l1/integration/fixtures/default-upgrade-input.toml";
     string public ECOSYSTEM_OUTPUT = "file_3.toml";
-    string public CTM_INPUT = "/upgrade-envs/v0.33.0-atomic-interop/foundry-upgrade.toml";
+    /// @dev The CTM deploy output (not an upgrade input): `_readEcosystemParams` reads deployed addresses from it.
+    string public CTM_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-ctm.toml";
     string public CORE_OUTPUT = "/script-out/foundry-upgrade/upgrade-core.toml";
     string public CTM_OUTPUT = "/script-out/foundry-upgrade/mainnet-gateway.toml";
     string public CHAIN_INPUT;
@@ -56,7 +59,7 @@ contract UpgradeIntegrationTestBase is Test {
     bool internal _ctmAdminCallsPrepared;
 
     function setupUpgrade() public virtual {
-        console.log("setupUpgrade: Creating CoreUpgrade_v33 and CTMUpgrade_v33");
+        console.log("setupUpgrade: Creating DefaultCoreUpgrade and DefaultCTMUpgrade");
         coreUpgrade = createCoreUpgrade();
         ctmUpgrade = createCTMUpgrade();
 
@@ -113,13 +116,13 @@ contract UpgradeIntegrationTestBase is Test {
     }
 
     /// @notice Override in child classes to use mocked versions.
-    function createCoreUpgrade() internal virtual returns (CoreUpgrade_v33) {
-        return new CoreUpgrade_v33();
+    function createCoreUpgrade() internal virtual returns (DefaultCoreUpgrade) {
+        return new DefaultCoreUpgrade();
     }
 
     /// @notice Override in child classes to use mocked versions.
-    function createCTMUpgrade() internal virtual returns (CTMUpgrade_v33) {
-        return new CTMUpgrade_v33();
+    function createCTMUpgrade() internal virtual returns (DefaultCTMUpgrade) {
+        return new DefaultCTMUpgrade();
     }
 
     /// @notice Hook for test-specific setup before chain upgrade.
