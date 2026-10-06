@@ -262,7 +262,8 @@ Still to do:
   - Point protocol-ops' --core-script-path / --ctm-script-path defaults (protocol-ops/src/commands/ecosystem/upgrade.rs)
     at this release's scripts: back to DefaultCoreUpgrade / DefaultCTMUpgrade, or, if the release needs
     release-specific preparation, at new scripts extending them under l1-contracts/deploy-scripts/upgrade/v${next.minor}/.
-    UpgradeTest_Local's CTM subclass must extend the same CTM script (protocol-ops' cargo test checks it).
+    UpgradeTest_Local's CTM subclass must extend the same CTM script. protocol-ops' cargo test fails until both
+    are done (release_specific_defaults_belong_to_the_current_release, prepare_defaults_match_the_foundry_full_flow_test).
   - Run \`cd protocol-ops && cargo test\` and the upgrade tests (\`yarn ts-node run-upgrade-test.ts\` in
     l1-contracts/test/anvil-interop, \`forge test --ffi --match-path 'test/foundry/l1/integration/UpgradeTest*'\`).`);
 }

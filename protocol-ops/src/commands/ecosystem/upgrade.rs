@@ -1200,6 +1200,28 @@ mod release_script_tests {
         );
     }
 
+    /// A release-specific default script must belong to the current release: `yarn new-release` moves the
+    /// upgrade-env dir but not the script defaults, so a stale `v<N>/` default would silently prepare the
+    /// next release with the previous release's scripts.
+    #[test]
+    fn release_specific_defaults_belong_to_the_current_release() {
+        let current_minor = CURRENT_UPGRADE_ENV_DIR
+            .split("/v0.")
+            .nth(1)
+            .and_then(|rest| rest.split('.').next())
+            .unwrap();
+        let args = UpgradePrepareAllArgs::try_parse_from(["prepare"]).unwrap();
+        for script in [&args.ctm_script_path, &args.core_script_path] {
+            if let Some(rest) = script.strip_prefix("deploy-scripts/upgrade/v") {
+                let script_minor = rest.split('/').next().unwrap();
+                assert_eq!(
+                    script_minor, current_minor,
+                    "{script} is not the current release's script"
+                );
+            }
+        }
+    }
+
     /// A historical re-prepare (`--upgrade-input-path` into an older release's directory) reads the env's
     /// pinned salts from that directory, not from the current release's.
     #[test]
