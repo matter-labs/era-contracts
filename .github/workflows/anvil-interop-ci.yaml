@@ -15,6 +15,12 @@ on:
       - "l1-contracts/foundry.toml"
       - "l1-contracts/hardhat.config.ts"
       - "l1-contracts/package.json"
+      # The upgrade test runs protocol-ops' default upgrade against the genesis version, so the
+      # default scripts, the current release's upgrade input and the genesis config decide what it tests.
+      - "l1-contracts/upgrade-envs/**"
+      - "protocol-ops/**"
+      - "protocol-ops.sh"
+      - "configs/genesis/**"
       - "da-contracts/contracts/**"
       - "da-contracts/lib/**"
       - "da-contracts/test/**"
