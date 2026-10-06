@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # Regenerate the v0.33.2 verifier-only upgrade artifacts for the ZKsync OS stage ecosystem:
 #   1. ZKsyncOSVerifierOnlyUpgrade.prepare -> output/stage/ecosystem.toml (simulation only, never broadcasts)
-#   2. protocol_ops governance-toml-to-simulator -> the transaction-simulator scenario, with the
-#      CREATE2 deployments prepended (tag `deploy`, sent by `[deploy_calls].deployer`)
+#   2. protocol_ops governance-toml-to-simulator -> the transaction-simulator scenario
+#
+# The CREATE2 deployments are not in the scenario: they are live on Sepolia (deploy-stage.sh,
+# output/stage/transactions.txt), so the fork already has them. This script refuses to emit a
+# scenario while any of them is missing.
 #
 # Needs: foundry-zksync v0.1.5 (the CI pin) on PATH, python3, and a release build of protocol-ops
 # (`cd protocol-ops && cargo build --release`).
@@ -37,27 +40,10 @@ print(v)" "$1"; }
   --ack test_upgrade_chain_zkos \
   --out "$SCENARIO"
 
-# The deployments go first: the governance calls name the contracts they create.
-DEPLOY_JSON=$(cast abi-decode --json --input 'f((address,uint256,bytes)[])' "$(toml_get deploy_calls.calls)")
-python3 - "$SCENARIO" "$OUT" "$DEPLOY_JSON" <<'PY'
-import json, sys, tomllib
-path, toml_path, calls = sys.argv[1:]
-d = tomllib.load(open(toml_path, "rb"))["deploy_calls"]
-calls = json.loads(calls)
-calls = calls["data"] if isinstance(calls, dict) else calls
-calls = calls[0]
-assert len(calls) == len(d["contracts"]), (calls, d["contracts"])
-deploys = []
-for i, ((target, value, data), name) in enumerate(zip(calls, d["contracts"])):
-    assert int(str(value), 0) == 0
-    tx = {"description": f"Deploy {name} via the CREATE2 factory", "network": "sepolia",
-          "from": d["deployer"].lower(), "to": target.lower(), "data": data, "value": "0"}
-    if i == 0:
-        tx["valueToMint"] = "1"
-    tx["tag"] = "deploy"
-    deploys.append(tx)
-scenario = json.load(open(path))
-json.dump(deploys + scenario, open(path, "w"), indent=2)
-open(path, "a").write("\n")
-PY
+# The governance calls name the deployed contracts, so they must exist on the network being forked.
+for KEY in state_transition.verifier_plonk_addr state_transition.verifier_addr \
+  deployed_addresses.upgrade_stage_validator deployed_addresses.l1_governance_upgrade_timer; do
+  [ "$(cast codesize "$(toml_get $KEY)" --rpc-url "$L1_RPC")" != "0" ] \
+    || { echo "$KEY $(toml_get $KEY) has no code: run deploy-stage.sh first"; exit 1; }
+done
 echo "scenario: $SCENARIO"
