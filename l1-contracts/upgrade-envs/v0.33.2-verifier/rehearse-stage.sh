@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Rehearse the v0.33.2 verifier-only stage upgrade on a Sepolia fork, along the path it really takes,
 # and assert the resulting L1 state:
-#   1. the CREATE2 deployments from `[deploy_calls]`, sent by `[deploy_calls].deployer`
+#   1. the CREATE2 deployments from `[deploy_calls]` the fork does not have yet (on Sepolia they are
+#      live, see output/stage/transactions.txt), sent by `[deploy_calls].deployer`
 #   2. governance stages 0/1/2 as the Governance owner's `scheduleTransparent` + `execute`
 #      (`[governance_operations]`), impersonated
 #   3. per chain, the committed bundles in output/stage/chain-upgrades/<id>/: 01 (`setUpgradeTimestamp`)
@@ -61,12 +62,23 @@ FORCE_DEPLOYMENT_HASH=$(call "$CTM" 'initialForceDeploymentHash()(bytes32)')
 
 # ---------------------------------------------------------------- 1. deployments
 DEPLOYER=$(toml_get deploy_calls.deployer)
-cast_json abi-decode --input 'f((address,uint256,bytes)[])' "$(toml_get deploy_calls.calls)" | python3 -c "
-import json, sys
-for target, value, data in json.load(sys.stdin)[0]:
-    print(target, data)" > "$S/deploy_calls.txt"
-while read -r target data; do
-  st=$(send "$DEPLOYER" "$target" "$data"); echo "deploy via $target: status $st"
+python3 -c "
+import json, subprocess, tomllib
+d = tomllib.load(open('$OUT', 'rb'))
+st, dep = d['state_transition'], d['deployed_addresses']
+addresses = [st['verifier_plonk_addr'], st['verifier_addr'], dep['upgrade_stage_validator'], dep['l1_governance_upgrade_timer']]
+j = json.loads(subprocess.check_output(['cast', 'abi-decode', '--json', '--input', 'f((address,uint256,bytes)[])', d['deploy_calls']['calls']]))
+calls = (j['data'] if isinstance(j, dict) else j)[0]
+assert len(calls) == len(addresses) == len(d['deploy_calls']['contracts'])
+for name, addr, (target, value, data) in zip(d['deploy_calls']['contracts'], addresses, calls):
+    print(name, addr, target, data)
+" > "$S/deploy_calls.txt"
+while read -r name addr target data; do
+  if [ "$(cast codesize "$addr" --rpc-url "$RPC")" != "0" ]; then
+    echo "$name already deployed at $addr"
+    continue
+  fi
+  st=$(send "$DEPLOYER" "$target" "$data"); echo "deploy $name via $target: status $st"
   [ "$st" = "0x1" ] || fail "deployment failed"
 done < "$S/deploy_calls.txt"
 chk "verifier VK" "$(call "$VERIFIER" 'verificationKeyHash()(bytes32)')" "$VK"
