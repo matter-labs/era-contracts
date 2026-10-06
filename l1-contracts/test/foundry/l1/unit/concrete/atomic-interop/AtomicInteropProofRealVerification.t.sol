@@ -14,7 +14,7 @@ import {ProofNotLastBatchInRoot} from "contracts/atomic-interop/AtomicInteropErr
 /// two-level right-child last-leaf path and its invalid counterpart with the builder's {_settlementProof}.
 contract AtomicInteropProofRealVerificationTest is AtomicInteropProofBuilder {
     /// @dev Per-suite proof fixture values. Not hoisted onto the builder: other derived suites pick
-    /// their own (the execute abstract uses its own per-leg SL blocks).
+    /// their own (the execute abstract takes a fresh SL block per import).
     uint256 internal constant SOURCE_CHAIN_ID = 271;
     uint256 internal constant BATCH_N = 100;
     uint256 internal constant SL_BLOCK = 555;

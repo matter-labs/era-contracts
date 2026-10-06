@@ -49,10 +49,6 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
     /// @dev The remote peer leg of every flow here: committed on the (Bridgehub-registered)
     /// destination chain in the happy paths, withheld in the missing-leg path.
     bytes32 internal constant REMOTE_LEG = keccak256("remote peer leg");
-    /// @dev Settlement-layer blocks the legs' roots are imported at. Each forward-computed proof
-    /// aggregates only its own chain, so the two roots differ and need separate keys.
-    uint256 internal constant LOCAL_SL_BLOCK = 401;
-    uint256 internal constant REMOTE_SL_BLOCK = 402;
     uint256 internal constant LOCAL_BATCH_NUMBER = 3;
     uint256 internal constant REMOTE_BATCH_NUMBER = 9;
 
@@ -189,7 +185,7 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
     /// the real atomic send populated) — the mirror of the builder's oracle-tree `_inclusionProof`,
     /// used for the local leg whose commitment went through the production path. The real send
     /// inserted the leg's commit value right after the genesis head leaf (index 1). Imports the proof's
-    /// root at `LOCAL_SL_BLOCK`.
+    /// root at a fresh SL block.
     function _canonicalTreeInclusionProof(
         uint256 _sourceChainId,
         uint256 _batchNumber,
@@ -197,6 +193,7 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         uint256 _l1Timestamp
     ) internal returns (ImtProof memory) {
         L2InteropCommitmentTree canonicalTree = L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR);
+        uint256 slBlock = _freshSlBlock();
         (bytes32[] memory settlementProof, bytes32 aggregatedRoot) = _settlementProof({
             _sourceChainId: _sourceChainId,
             _batchNumber: _batchNumber,
@@ -204,12 +201,12 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
             _imtRootLeafIndex: ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX,
             _otherImtRoot: OTHER_IMT_ROOT,
             _slChainId: L1_CHAIN_ID,
-            _slBlock: LOCAL_SL_BLOCK,
+            _slBlock: slBlock,
             _l1Timestamp: _l1Timestamp,
             _batchLeafProofMask: 0,
             _batchLeafSiblings: new bytes32[](0)
         });
-        _importInteropRoot(L1_CHAIN_ID, LOCAL_SL_BLOCK, _l1Timestamp, aggregatedRoot);
+        _importInteropRoot(L1_CHAIN_ID, slBlock, _l1Timestamp, aggregatedRoot);
         return
             ImtProof({
                 sourceChainId: _sourceChainId,
@@ -403,17 +400,18 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
     }
 
     /// @dev The remote leg's oracle-tree proof for the leaf at `_leafIndex`, with its root imported at
-    /// `REMOTE_SL_BLOCK`.
+    /// a fresh SL block.
     function _remoteLegProof(uint256 _leafIndex) internal returns (ImtProof memory proof) {
+        uint256 slBlock = _freshSlBlock();
         bytes32 aggregatedRoot;
         (proof, aggregatedRoot) = _inclusionProof({
             _sourceChainId: destinationChainId,
             _batchNumber: REMOTE_BATCH_NUMBER,
             _leafIndex: _leafIndex,
             _slChainId: L1_CHAIN_ID,
-            _slBlock: REMOTE_SL_BLOCK,
+            _slBlock: slBlock,
             _l1Timestamp: DEADLINE - 1
         });
-        _importInteropRoot(L1_CHAIN_ID, REMOTE_SL_BLOCK, DEADLINE - 1, aggregatedRoot);
+        _importInteropRoot(L1_CHAIN_ID, slBlock, DEADLINE - 1, aggregatedRoot);
     }
 }

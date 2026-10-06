@@ -116,6 +116,12 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
     /// @dev Monotonic SL block used as each imported root's key.
     uint256 internal _slBlockCursor = 1_000;
 
+    /// @dev An SL block no root has been imported at yet: storage rejects a second root at a key, so a
+    /// test that builds and imports a proof more than once needs a new key each time.
+    function _freshSlBlock() internal returns (uint256) {
+        return ++_slBlockCursor;
+    }
+
     /// @dev Deploys the wrapper + a fresh commitment tree, etches the real interop-root storage at
     /// its canonical address, seeds the tree, and stands up the REAL settlement machinery — the real
     /// {L2MessageVerification} at its canonical address and a real {L1MessageRoot} aggregation oracle —
@@ -200,7 +206,7 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
 
         address chainSender = IBridgehubBase(msgRootBridgehub).getZKChain(_sourceChainId);
         vm.warp(_batchTs);
-        vm.roll(++_slBlockCursor);
+        vm.roll(_freshSlBlock());
         vm.prank(chainSender);
         slMessageRoot.addChainBatchRootV32(_sourceChainId, batchNumber, chainBatchRoot);
     }

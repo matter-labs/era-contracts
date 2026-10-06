@@ -31,10 +31,11 @@ import {IMTLeafValueMismatch, IMTLowLeafNextTooSmall} from "contracts/common/L1C
 /// grown batch tree with a chosen mask, a final-node proof, another settlement layer, an arbitrary batch
 /// time), so they forward-compute the proof with the builder's {_settlementProof} and import its root; the
 /// authentication-failure cases withhold that import. The only stubbed verifier is in
-/// `test_RevertWhen_timeout_missingSettlementInteropRoot`, whose branch the real one cannot reach.
+/// `test_RevertWhen_timeout_missingSettlementInteropRoot`, whose branch the real one cannot reach by
+/// construction.
 contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// @dev Per-suite proof fixture values. Not hoisted onto the builder: other derived suites pick
-    /// their own (the execute abstract uses its own per-leg SL blocks).
+    /// their own (the execute abstract takes a fresh SL block per import).
     uint256 internal constant SOURCE_CHAIN_ID = 271;
     uint256 internal constant BATCH_N = 100;
     uint256 internal constant SL_BLOCK = 555;
@@ -366,8 +367,12 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     }
 
     /// @dev A missing settlement interop root has an unset timestamp that reads as 0 and is rejected.
+    /// The branch is defense-in-depth, unreachable through the real verifier by construction: that
+    /// verifier accepts the proof only at a non-zero `interopRoots(slChainId, slBlock).root`, the same
+    /// key the library reads the timestamp from, and `L2InteropRootStorage` rejects a zero root and a
+    /// zero timestamp. That is why this one case stubs the verifier: it keeps the branch covered.
     function test_RevertWhen_timeout_missingSettlementInteropRoot() public {
-        // Stub: the real verifier needs a root at this same key, and storage never holds one with a zero timestamp.
+        // The only verifier stub in these suites; see the @dev above.
         vm.mockCall(
             address(L2_MESSAGE_VERIFICATION),
             abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2LeafInclusionShared.selector),
