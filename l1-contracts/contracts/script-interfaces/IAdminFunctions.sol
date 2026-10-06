@@ -51,6 +51,8 @@ interface IAdminFunctions {
 
     function chainAdminAcceptAdmin(ChainAdmin chainAdmin, address target) external;
 
+    function chainAdminAcceptOwner(ChainAdmin _chainAdmin, address _target) external;
+
     function chainSetTokenMultiplierSetter(
         address chainAdmin,
         address accessControlRestriction,

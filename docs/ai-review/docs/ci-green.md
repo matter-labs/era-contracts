@@ -321,7 +321,7 @@ git status
 
 ## When CI is failing on a PR you didn't push
 
-`update-generated-artifacts.yaml` is the `workflow_dispatch` workflow to reach for: it regenerates hashes + selectors + zkstack-out (via `update-hashes-on-demand.yaml`) and then the chain-state snapshots, pushing both commits to the PR branch. It only works on PRs from the same repo (not forks), and requires `RELEASE_TOKEN`. Use it when a peer's PR is merge-blocked solely on stale artifacts and they don't have time to regenerate locally.
+`update-generated-artifacts.yaml` is the `workflow_dispatch` workflow to reach for: it regenerates hashes + selectors + zkstack-out (via `update-hashes-on-demand.yaml`) and then the chain-state snapshots, pushing both commits to the PR branch. It only works on PRs from the same repo (not forks). Both commits go through the GitHub API with the `matterlabs-bots` App token, so they are signed and pass the signed-commits rule. Dispatch it from the PR's base branch (`gh workflow run update-generated-artifacts.yaml --ref <base> -f pr_number=<N>`): a dispatch runs the workflow files of the chosen ref, and a PR branch that predates the signed commits still pushes unsigned ones. Use it when a peer's PR is merge-blocked solely on stale artifacts and they don't have time to regenerate locally.
 
 ## Things to NOT do when chasing green
 

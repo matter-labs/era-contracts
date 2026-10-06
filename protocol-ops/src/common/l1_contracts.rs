@@ -195,6 +195,16 @@ pub async fn resolve_chain_admin_owner(
     ensure_nonzero(eoa, "ChainAdmin.owner()")
 }
 
+/// Resolve `Ownable(target).owner()` for any OZ `Ownable` (`BridgehubAbi` carries the shared `owner()` selector).
+pub async fn resolve_ownable_owner(l1_rpc_url: &str, target: Address) -> anyhow::Result<Address> {
+    let owner = BridgehubAbi::new(target, provider(l1_rpc_url)?)
+        .owner()
+        .call()
+        .await
+        .with_context(|| format!("Ownable({target:#x}).owner() call failed"))?;
+    ensure_nonzero(owner, "Ownable.owner()")
+}
+
 /// Resolve `AccessControlDefaultAdminRules.defaultAdmin()` for the ACR-backed
 /// ChainAdmin path used by `Utils.adminExecuteCalls`.
 pub async fn resolve_access_control_default_admin(
