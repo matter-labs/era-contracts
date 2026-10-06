@@ -174,7 +174,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         // Cross-chain asset correctness is enforced by the ZK proof, so no per-batch log
-        // reconstruction / balance accounting happens here. See {protocol-docs/message-root.md#v31-vs-v32-append-flows}.
+        // reconstruction / balance accounting happens here. See {protocol-docs/message-root.md#v31-vs-v33-append-flows}.
         for (uint256 i = 0; i < nBatches; ++i) {
             _appendMessageRoot(batchesData[i].batchNumber, batchesData[i].l2LogsTreeRoot);
         }

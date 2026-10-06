@@ -49,8 +49,6 @@ error BaseTokenHolderAlreadyInitialized();
 error BaseTokenHolderMintFailed();
 // 0x8361ff70
 error BaseTokenNativeToThisChain();
-// 0x00a6b592
-error BaseTokenPreV31TotalSupplyNotSet();
 // 0xe3ec2bc9
 error BaseTokenTransferFailed();
 // 0x55ad3fd3
@@ -234,10 +232,6 @@ error InvalidTxCountInPriorityMode(uint256 l2TxCount, uint256 l1TxCount);
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
 // 0xfb5c22e6
 error L2TimestampTooBig();
-// 0xe4623697
-error LowerBoundAlreadyRecorded();
-// 0x5c25a57b
-error LowerBoundNotRecorded();
 // 0xafbb7a4e
 error MerkleIndexOrHeightMismatch();
 // 0x9bb54c35
@@ -348,8 +342,6 @@ error PriorityModeRequiresPermanentRollup();
 error PriorityOperationsRollingHashMismatch();
 // 0xbeda0935
 error PriorityOpsRequestTimestampMissing(uint256 requestId);
-// 0xa840274f
-error PriorityQueueNotReady();
 // 0x1a4d284a
 error PriorityTxPubdataExceedsMaxPubDataPerBatch();
 // 0x7672156c

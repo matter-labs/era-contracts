@@ -11,7 +11,7 @@ import {NotAllChainsOnL1} from "../core/bridgehub/L1BridgehubErrors.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Test-only `L1MessageRoot` that can stamp the v31 placeholder into
 ///         `v31UpgradeChainBatchNumber`, the way v31's `initializeL1V31Upgrade` did.
-/// @dev That initializer was removed in v32 — no ecosystem can call it any more, since the proxy has
+/// @dev That initializer was removed in v33 — no ecosystem can call it any more, since the proxy has
 ///      consumed reinitializer version 2 either during its v31 upgrade or through `initialize()`. Chains
 ///      whose per-chain v31 upgrade has not landed yet still carry the placeholder in inherited storage,
 ///      though, so `saveV31UpgradeChainBatchNumber` remains live and its tests need a way to reach that
