@@ -224,7 +224,8 @@ impl EnvConfig {
     }
 
     /// This env's protocol-ops output dir inside the release directory it was loaded from, e.g.
-    /// `<upgrade-env dir>/output/<env>/`. Same layout as [`default_protocol_ops_out_dir`].
+    /// `<upgrade-env dir>/output/<env>/`. Outputs land directly under the env dir, so the artifacts a
+    /// reviewer expects for stage / mainnet are immediately visible.
     pub fn protocol_ops_out_dir(&self) -> PathBuf {
         self.upgrade_env_dir.join("output").join(&self.env)
     }
@@ -346,17 +347,6 @@ impl EnvConfig {
     pub fn zk_token_asset_id(&self) -> Option<B256> {
         self.permanent.zk_token_asset_id
     }
-}
-
-/// Default output dir for an env, e.g.
-/// `<current upgrade-env dir>/output/<env>/`. Outputs land directly under
-/// the env dir — no `protocol-ops/` subfolder — so the artifacts a reviewer
-/// expects to find for stage / mainnet are immediately visible.
-pub fn default_protocol_ops_out_dir(env: &str) -> anyhow::Result<PathBuf> {
-    Ok(resolve_l1_contracts_path()?
-        .join(upgrade_env_dir())
-        .join("output")
-        .join(env))
 }
 
 fn parse_upgrade_input(content: &str) -> UpgradeInputs {

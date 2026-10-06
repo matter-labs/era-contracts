@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 use crate::common::abi::admin_functions::IAdminFunctions::ChainUpgradeParams;
 use crate::common::abi::AdminFunctionsAbi;
 use crate::common::addresses::ZERO_ADDRESS;
-use crate::common::env_config::default_protocol_ops_out_dir;
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
 use crate::common::SharedRunArgs;
@@ -139,7 +138,7 @@ pub async fn run(args: ChainUpgradeArgs) -> anyhow::Result<()> {
         if shared.out.is_none() {
             if let Some(ref cfg) = env_cfg {
                 shared.out = Some(
-                    default_protocol_ops_out_dir(&cfg.env)?
+                    cfg.protocol_ops_out_dir()
                         .join("chain-upgrades")
                         .join(cid.to_string()),
                 );
