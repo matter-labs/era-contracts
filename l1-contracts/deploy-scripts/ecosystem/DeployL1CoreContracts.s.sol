@@ -185,7 +185,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         L1NativeTokenVault l1NativeTokenVault = L1NativeTokenVault(
             payable(coreAddresses.bridges.proxies.l1NativeTokenVault)
         );
-        l1NativeTokenVault.transferOwnership(config.ownerAddress);
+        l1NativeTokenVault.transferOwnership(coreAddresses.shared.governance);
 
         IL1Nullifier l1Nullifier = IL1Nullifier(coreAddresses.bridges.proxies.l1Nullifier);
         IOwnable(address(l1Nullifier)).transferOwnership(coreAddresses.shared.governance);
@@ -199,6 +199,10 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         IOwnable(address(ctmDeploymentTracker)).transferOwnership(coreAddresses.shared.governance);
 
         IOwnable(coreAddresses.bridgehub.proxies.chainAssetHandler).transferOwnership(coreAddresses.shared.governance);
+
+        IOwnable(coreAddresses.bridgehub.proxies.chainRegistrationSender).transferOwnership(
+            coreAddresses.shared.governance
+        );
 
         vm.stopBroadcast();
         console.log("Owners updated");

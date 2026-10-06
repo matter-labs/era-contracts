@@ -9,6 +9,7 @@ use crate::commands::hub::register_ctm::{register_ctm, RegisterCtmInput};
 use crate::common::abi::AdminFunctionsAbi;
 use crate::common::env_config::EnvConfig;
 use crate::common::forge::scripts::deploy_ctm::DeployCTMOutput;
+use crate::common::l1_contracts::resolve_ownable_owner;
 use crate::common::output::write_output_if_requested;
 use crate::common::SharedRunArgs;
 use crate::common::{forge::ForgeRunner, logger, wallets::Wallet};
@@ -172,6 +173,11 @@ pub async fn ctm_init(
     let deployed = &deploy_output.deployed_addresses;
     let ctm_proxy = deployed.state_transition.state_transition_proxy_addr;
     logger::step("Accepting ownership of CTM contracts...");
+    // The ChainAdmin steps must be sent by its owner; standalone `ctm init` passes the ChainAdmin itself as `admin`.
+    let chain_admin_owner = runner
+        .prepare_sender(resolve_ownable_owner(&runner.rpc_url, deployed.chain_admin).await?)
+        .await?;
+    let ctm_owner = runner.prepare_sender(input.owner).await?;
     let accept_scripts = [
         runner
             .script_call(AdminFunctionsAbi::governanceAcceptOwnerCall {
@@ -185,8 +191,29 @@ pub async fn ctm_init(
                 _chainAdmin: deployed.chain_admin,
                 _target: ctm_proxy,
             })
-            .with_wallet(owner)
+            .with_wallet(&chain_admin_owner)
             .with_timing_label("ctm.accept_admin"),
+        runner
+            .script_call(AdminFunctionsAbi::governanceAcceptOwnerCall {
+                _governor: deployed.governance_addr,
+                _target: deployed.l1_rollup_da_manager,
+            })
+            .with_wallet(owner)
+            .with_timing_label("ctm.accept_rollup_da_manager_owner"),
+        runner
+            .script_call(AdminFunctionsAbi::chainAdminAcceptOwnerCall {
+                _chainAdmin: deployed.chain_admin,
+                _target: deployed.server_notifier_proxy_addr,
+            })
+            .with_wallet(&chain_admin_owner)
+            .with_timing_label("ctm.accept_server_notifier_owner"),
+        runner
+            .script_call(AdminFunctionsAbi::governanceAcceptOwnerConditionalCall {
+                _governor: input.owner,
+                _target: deployed.validator_timelock_addr,
+            })
+            .with_wallet(&ctm_owner)
+            .with_timing_label("ctm.accept_validator_timelock_owner"),
     ];
     runner.run_scripts(accept_scripts)?;
 
