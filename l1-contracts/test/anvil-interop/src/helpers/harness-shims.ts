@@ -128,7 +128,7 @@ export async function setSettlementLayerViaBootloader(params: {
  * Deploy the `L2ChainAssetHandlerDev` implementation at `L2_CHAIN_ASSET_HANDLER_ADDR`
  * on the given provider via `anvil_setCode`.
  *
- * The production v32 implementation disables chain migrations at bridgeBurn/bridgeMint; the Dev
+ * The production v33 implementation disables chain migrations at bridgeBurn/bridgeMint; the Dev
  * variant re-enables them so the preserved migration machinery stays covered by tests.
  *
  * Reverse TBM testing needs to drive the chain's `migrationNumber` counter on the
@@ -213,7 +213,7 @@ export async function simulateGWChainMigrationBurn(params: {
  * `L1ChainAssetHandler` TransparentUpgradeableProxy on L1 via the real upgrade
  * surface (no `anvil_setCode` on the impl slot, no storage writes).
  *
- * The production v32 implementation disables chain migrations at bridgeBurn/bridgeMint; the Dev
+ * The production v33 implementation disables chain migrations at bridgeBurn/bridgeMint; the Dev
  * variant re-enables them so the preserved migration machinery stays covered by tests.
  *
  * L1 `_getChainMigrationNumber(chainId)` reads `L1ChainAssetHandler.migrationNumber[chainId]`,
