@@ -24,6 +24,7 @@ import {
 } from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {IAtomicRecoverable} from "contracts/atomic-interop/IAtomicRecoverable.sol";
 import {INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, InteropBundle, InteropCall} from "contracts/common/Messaging.sol";
+import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
@@ -289,6 +290,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
             _sourceChainId: block.chainid,
             _batchNumber: REMOTE_BATCH_NUMBER,
             _absentValue: AtomicFlowFixtures.commitValue(lateFlowId, lateLeg),
+            _imtRootLeafIndex: ChainBatchRootTree.IMT_BEGIN_ROOT_LEAF_INDEX,
             _slChainId: SETTLEMENT_LAYER_CHAIN_ID,
             _slBlock: SL_BLOCK,
             _l1Timestamp: uint256(DEADLINE) + 1,
@@ -360,6 +362,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
             _sourceChainId: MISSING_LEG_CHAIN,
             _batchNumber: REMOTE_BATCH_NUMBER,
             _absentValue: AtomicFlowFixtures.commitValue(flowId, missingLeg),
+            _imtRootLeafIndex: ChainBatchRootTree.IMT_BEGIN_ROOT_LEAF_INDEX,
             _slChainId: SETTLEMENT_LAYER_CHAIN_ID,
             _slBlock: SL_BLOCK,
             _l1Timestamp: uint256(DEADLINE) + 1,

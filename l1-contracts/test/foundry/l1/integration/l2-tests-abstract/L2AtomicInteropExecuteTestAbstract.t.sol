@@ -8,6 +8,7 @@ import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 import {AtomicInteropProofBuilder} from "../../unit/concrete/atomic-interop/AtomicInteropProofBuilder.sol";
 
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
+import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
 import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
 import {IInteropHandlerBase} from "contracts/interop/interop-handler/IInteropHandlerBase.sol";
 import {
@@ -200,6 +201,8 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
             _sourceChainId: _sourceChainId,
             _batchNumber: _batchNumber,
             _imtRoot: canonicalTree.root(),
+            _imtRootLeafIndex: ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX,
+            _otherImtRoot: OTHER_IMT_ROOT,
             _slChainId: L1_CHAIN_ID,
             _slBlock: LOCAL_SL_BLOCK,
             _l1Timestamp: _l1Timestamp,

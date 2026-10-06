@@ -81,6 +81,8 @@ contract AtomicInteropProofWrapper {
 ///       it terminates at, reaching shapes live aggregation cannot: a grown batch tree with a chosen
 ///       mask, a final-node proof, any timestamp or settlement layer, the local chain as source.
 ///       Callers import the returned root to authenticate, or withhold it to make the verifier reject.
+///   - Every builder gives the batch distinct begin and end IMT roots, so a proof authenticates its
+///     IMT root as exactly one chain-batch-root leaf and the real verifier enforces the leaf index.
 ///
 /// Setup additionally stubs read-side WIRING (not proof-path logic): the L2 Bridgehub registry /
 /// chain-getter views the real aggregation oracle consults (`_ensureChainRegistered` /
@@ -89,9 +91,12 @@ contract AtomicInteropProofWrapper {
 abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
     /// @dev The settlement layer every atomic flow in these suites declares (L1).
     uint256 internal constant SETTLEMENT_LAYER_CHAIN_ID = 1;
-    /// @dev The flow deadline all proofs are built against (shared with the tests so the builders
-    /// can declare the honest timeout branch for a given batch timestamp).
+    /// @dev The flow deadline all proofs are built against (shared with the tests so the `_realTimeout*`
+    /// builders can check their batch timestamp against the branch they build).
     uint64 internal constant DEADLINE = 1_000;
+    /// @dev The IMT root at the batch boundary a proof does not present: the end root when it proves
+    /// the begin root, and vice versa. It differs from every tree root, so begin != end.
+    bytes32 internal constant OTHER_IMT_ROOT = keccak256("the batch's other IMT root");
 
     /// @dev The settlement layer every real proof aggregates + imports against (L1 in this release).
     /// Defaults to 1; harnesses whose flows declare a different `settlementLayerChainId` (e.g. the
@@ -303,11 +308,11 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
         uint256 _batchTs
     ) internal returns (ImtProof memory) {
         require(_batchTs > DEADLINE, "begin branch needs a late batch");
-        bytes32 imtSnapshot = tree.root(); // excludes the never-inserted absent value
+        bytes32 imtBegin = tree.root(); // excludes the never-inserted absent value
         (uint256 batchNumber, bytes32 previousChainRoot) = _aggregateBatch(
             _sourceChainId,
-            imtSnapshot,
-            imtSnapshot,
+            imtBegin,
+            OTHER_IMT_ROOT,
             _batchTs
         );
         (uint256 slBlock, ) = _importCurrentSharedRoot(); // T == _batchTs > DEADLINE
@@ -316,14 +321,14 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
             ImtProof({
                 sourceChainId: _sourceChainId,
                 batchNumber: batchNumber,
-                chainImtRoot: imtSnapshot,
+                chainImtRoot: imtBegin,
                 provesAgainstBeginRoot: true,
                 settlementProof: _realFirstPostGenesisBatchSettlementProof({
                     _sourceChainId: _sourceChainId,
                     _batchNumber: batchNumber,
                     _imtRootLeafIndex: ChainBatchRootTree.IMT_BEGIN_ROOT_LEAF_INDEX,
-                    _imtBegin: imtSnapshot,
-                    _imtEnd: imtSnapshot,
+                    _imtBegin: imtBegin,
+                    _imtEnd: OTHER_IMT_ROOT,
                     _batchTs: _batchTs,
                     _previousChainRoot: previousChainRoot,
                     _slBlock: slBlock
@@ -344,17 +349,17 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
         uint256 _batchTs
     ) internal returns (ImtProof memory) {
         require(_batchTs <= DEADLINE, "end branch needs an in-time batch");
-        bytes32 imtSnapshot = tree.root();
+        bytes32 imtEnd = tree.root();
         (uint256 batchNumber, bytes32 previousChainRoot) = _aggregateBatch(
             _sourceChainId,
-            imtSnapshot,
-            imtSnapshot,
+            OTHER_IMT_ROOT,
+            imtEnd,
             _batchTs
         );
         // Bump the shared root past the deadline via a different chain, keeping the source chain's
         // in-time batch its last one. `getMerklePathForChain`/`chainIndex` below reflect the post-bump tree.
         uint256 bumpChain = _sourceChainId + 1_000_000;
-        _aggregateBatch(bumpChain, imtSnapshot, imtSnapshot, uint256(DEADLINE) + 5);
+        _aggregateBatch(bumpChain, imtEnd, imtEnd, uint256(DEADLINE) + 5);
         (uint256 slBlock, ) = _importCurrentSharedRoot(); // T == DEADLINE + 5 > DEADLINE
 
         uint256 lowIndex = _lowNullifierIndex(_absentValue);
@@ -362,14 +367,14 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
             ImtProof({
                 sourceChainId: _sourceChainId,
                 batchNumber: batchNumber,
-                chainImtRoot: imtSnapshot,
+                chainImtRoot: imtEnd,
                 provesAgainstBeginRoot: false,
                 settlementProof: _realFirstPostGenesisBatchSettlementProof({
                     _sourceChainId: _sourceChainId,
                     _batchNumber: batchNumber,
                     _imtRootLeafIndex: ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX,
-                    _imtBegin: imtSnapshot,
-                    _imtEnd: imtSnapshot,
+                    _imtBegin: OTHER_IMT_ROOT,
+                    _imtEnd: imtEnd,
                     _batchTs: _batchTs,
                     _previousChainRoot: previousChainRoot,
                     _slBlock: slBlock
@@ -475,11 +480,24 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
             );
     }
 
-    /// @dev Forward-computes a two-hop `settlementProof` for `(_sourceChainId, _batchNumber)` and the
-    /// aggregated root it terminates at; the real verifier accepts it once `aggregatedRoot` is imported
-    /// at `(_slChainId, _slBlock)`. The batch commits nothing (begin == end == `_imtRoot`), so the same
-    /// words authenticate `_imtRoot` as either IMT leaf, and the chain-id leaf is alone in the
-    /// aggregation tree, so it is the root.
+    /// @dev The chain batch root of a batch with zero logs and multichain roots, `_imtRoot` at IMT leaf
+    /// `_imtRootLeafIndex` (2 = begin, 3 = end) and `_otherImtRoot` at the other IMT leaf.
+    function _chainBatchRoot(
+        bytes32 _imtRoot,
+        uint256 _imtRootLeafIndex,
+        bytes32 _otherImtRoot
+    ) internal pure returns (bytes32) {
+        return
+            _imtRootLeafIndex == ChainBatchRootTree.IMT_BEGIN_ROOT_LEAF_INDEX
+                ? ChainBatchRootTree.compute(bytes32(0), bytes32(0), _imtRoot, _otherImtRoot)
+                : ChainBatchRootTree.compute(bytes32(0), bytes32(0), _otherImtRoot, _imtRoot);
+    }
+
+    /// @dev Forward-computes a two-hop `settlementProof` that authenticates `_imtRoot` as chain-batch-root
+    /// leaf `_imtRootLeafIndex` of `(_sourceChainId, _batchNumber)`, and the aggregated root it terminates
+    /// at; the real verifier accepts it once `aggregatedRoot` is imported at `(_slChainId, _slBlock)`.
+    /// Hop 2 is a single-leaf aggregation tree with no siblings, so the chain-id leaf is the root.
+    /// @param _otherImtRoot The batch's other IMT root; a distinct value binds the proof to one IMT leaf.
     /// @param _batchLeafProofMask The batch leaf's position in the chain's batch tree (bit `i` = 1 iff
     /// the node is a RIGHT child at level `i`), which the timeout end branch's last-batch check reads.
     /// @param _batchLeafSiblings The batch leaf's path in the chain's batch tree (empty = single leaf).
@@ -487,19 +505,23 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
         uint256 _sourceChainId,
         uint256 _batchNumber,
         bytes32 _imtRoot,
+        uint256 _imtRootLeafIndex,
+        bytes32 _otherImtRoot,
         uint256 _slChainId,
         uint256 _slBlock,
         uint256 _l1Timestamp,
         uint256 _batchLeafProofMask,
         bytes32[] memory _batchLeafSiblings
     ) internal pure returns (bytes32[] memory proof, bytes32 aggregatedRoot) {
-        bytes32 batchLeaf = MessageHashing.batchLeafHash(
-            ChainBatchRootTree.compute(bytes32(0), bytes32(0), _imtRoot, _imtRoot),
-            _batchNumber,
-            _l1Timestamp
-        );
-        bytes32 chainIdRoot = Merkle.calculateRootMemory(_batchLeafSiblings, _batchLeafProofMask, batchLeaf);
-        aggregatedRoot = MessageHashing.chainIdLeafHash(chainIdRoot, _sourceChainId);
+        {
+            bytes32 batchLeaf = MessageHashing.batchLeafHash(
+                _chainBatchRoot(_imtRoot, _imtRootLeafIndex, _otherImtRoot),
+                _batchNumber,
+                _l1Timestamp
+            );
+            bytes32 chainIdRoot = Merkle.calculateRootMemory(_batchLeafSiblings, _batchLeafProofMask, batchLeaf);
+            aggregatedRoot = MessageHashing.chainIdLeafHash(chainIdRoot, _sourceChainId);
+        }
 
         uint256 topLen = ChainBatchRootTree.TREE_DEPTH;
         uint256 k = _batchLeafSiblings.length;
@@ -507,7 +529,7 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
         // hop2: [meta2(final)], with no siblings
         proof = new bytes32[](topLen + 6 + k);
         proof[0] = _composeMetadata({_logLeafProofLen: topLen, _batchLeafProofLen: k, _finalProofNode: false});
-        proof[1] = _imtRoot; // the other IMT snapshot (begin == end)
+        proof[1] = _otherImtRoot;
         proof[2] = keccak256(abi.encodePacked(bytes32(0), bytes32(0)));
         proof[3] = ChainBatchRootTree.RESERVED_SUBTREE_NODE;
         proof[topLen + 1] = bytes32(_l1Timestamp);
@@ -520,20 +542,23 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
         proof[topLen + 5 + k] = _composeMetadata({_logLeafProofLen: 0, _batchLeafProofLen: 0, _finalProofNode: true});
     }
 
-    /// @dev A *final* (single-hop) `settlementProof` for the same unchanged-IMT batch. It carries no
+    /// @dev A *final* (single-hop) `settlementProof` that authenticates `_imtRoot` as IMT leaf
+    /// `_imtRootLeafIndex` of a batch whose other IMT root is `_otherImtRoot`. It carries no
     /// settlement-layer batch reference, so the L2 verifier terminates at
     /// `interopRoots(sourceChainId, batchNumber)` and accepts it once `chainBatchRoot` is imported there.
     function _finalSettlementProof(
-        bytes32 _imtRoot
+        bytes32 _imtRoot,
+        uint256 _imtRootLeafIndex,
+        bytes32 _otherImtRoot
     ) internal pure returns (bytes32[] memory proof, bytes32 chainBatchRoot) {
-        chainBatchRoot = ChainBatchRootTree.compute(bytes32(0), bytes32(0), _imtRoot, _imtRoot);
+        chainBatchRoot = _chainBatchRoot(_imtRoot, _imtRootLeafIndex, _otherImtRoot);
         proof = new bytes32[](ChainBatchRootTree.TREE_DEPTH + 1);
         proof[0] = _composeMetadata({
             _logLeafProofLen: ChainBatchRootTree.TREE_DEPTH,
             _batchLeafProofLen: 0,
             _finalProofNode: true
         });
-        proof[1] = _imtRoot; // the other IMT snapshot (begin == end)
+        proof[1] = _otherImtRoot;
         proof[2] = keccak256(abi.encodePacked(bytes32(0), bytes32(0)));
         proof[3] = ChainBatchRootTree.RESERVED_SUBTREE_NODE;
     }
@@ -550,10 +575,11 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
         }
     }
 
-    // ImtProof assemblers over {_settlementProof}: import `aggregatedRoot` at `(_slChainId, _slBlock)`
-    // for the proof to authenticate.
+    // ImtProof assemblers over {_settlementProof}, presenting the real tree's root against
+    // {OTHER_IMT_ROOT}: import `aggregatedRoot` at `(_slChainId, _slBlock)` for the proof to authenticate.
 
-    /// @dev Inclusion proof for a value already inserted at `_leafIndex` in the real tree.
+    /// @dev Inclusion proof for a value already inserted at `_leafIndex` in the real tree, against the
+    /// batch-END root.
     function _inclusionProof(
         uint256 _sourceChainId,
         uint256 _batchNumber,
@@ -567,6 +593,8 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
             _sourceChainId: _sourceChainId,
             _batchNumber: _batchNumber,
             _imtRoot: tree.root(),
+            _imtRootLeafIndex: ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX,
+            _otherImtRoot: OTHER_IMT_ROOT,
             _slChainId: _slChainId,
             _slBlock: _slBlock,
             _l1Timestamp: _l1Timestamp,
@@ -587,12 +615,13 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
     }
 
     /// @dev Non-inclusion proof for an absent `_absentValue`: uses its low-nullifier (predecessor)
-    /// leaf. An empty batch-leaf path marks the batch as the chain's last inside the aggregated root
-    /// (single-leaf chain tree), so the proof is valid for both timeout branches.
+    /// leaf, presents the tree root as IMT leaf `_imtRootLeafIndex` and declares the matching timeout
+    /// branch.
     function _nonInclusionProof(
         uint256 _sourceChainId,
         uint256 _batchNumber,
         uint256 _absentValue,
+        uint256 _imtRootLeafIndex,
         uint256 _slChainId,
         uint256 _slBlock,
         uint256 _l1Timestamp,
@@ -604,6 +633,8 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
             _sourceChainId: _sourceChainId,
             _batchNumber: _batchNumber,
             _imtRoot: tree.root(),
+            _imtRootLeafIndex: _imtRootLeafIndex,
+            _otherImtRoot: OTHER_IMT_ROOT,
             _slChainId: _slChainId,
             _slBlock: _slBlock,
             _l1Timestamp: _l1Timestamp,
@@ -615,10 +646,7 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
             sourceChainId: _sourceChainId,
             batchNumber: _batchNumber,
             chainImtRoot: tree.root(),
-            // Declare the branch the way an honest prover does: begin root for a late batch,
-            // end root for an in-time one. Tests overriding the declaration set the field
-            // explicitly after building.
-            provesAgainstBeginRoot: _l1Timestamp > DEADLINE,
+            provesAgainstBeginRoot: _imtRootLeafIndex == ChainBatchRootTree.IMT_BEGIN_ROOT_LEAF_INDEX,
             settlementProof: settlementProof,
             leaf: tree.leafAt(lowIndex),
             imtLeafIndex: lowIndex,

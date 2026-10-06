@@ -60,6 +60,8 @@ contract AtomicInteropProofRealVerificationTest is AtomicInteropProofBuilder {
             _sourceChainId: SOURCE_CHAIN_ID,
             _batchNumber: BATCH_N,
             _imtRoot: tree.root(),
+            _imtRootLeafIndex: ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX,
+            _otherImtRoot: OTHER_IMT_ROOT,
             _slChainId: SETTLEMENT_LAYER_CHAIN_ID,
             _slBlock: SL_BLOCK,
             _l1Timestamp: DEADLINE - 1, // in-time batch -> end branch
@@ -101,6 +103,8 @@ contract AtomicInteropProofRealVerificationTest is AtomicInteropProofBuilder {
             _sourceChainId: SOURCE_CHAIN_ID,
             _batchNumber: BATCH_N,
             _imtRoot: tree.root(),
+            _imtRootLeafIndex: ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX,
+            _otherImtRoot: OTHER_IMT_ROOT,
             _slChainId: SETTLEMENT_LAYER_CHAIN_ID,
             _slBlock: SL_BLOCK,
             _l1Timestamp: DEADLINE - 1,
