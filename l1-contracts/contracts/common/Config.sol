@@ -133,9 +133,6 @@ struct DisabledProofSystems {
 /// a non-inclusion proof. The off-chain imt-engine must use the same value.
 bytes32 constant IMT_EMPTY_LEAF_HASH = keccak256("zkSync:IndexedMerkleTree:emptyLeaf");
 
-/// @dev The maximum number of L2 gas that a user can request for an L2 transaction
-uint256 constant MAX_GAS_PER_TRANSACTION = 80_000_000;
-
 /// @dev Even though the price for 1 byte of pubdata is 16 L1 gas, we have a slightly increased
 /// value.
 uint256 constant L1_GAS_PER_PUBDATA_BYTE = 17;
@@ -176,13 +173,18 @@ uint256 constant L1_TX_NATIVE_PER_GAS = 100_000_000;
 /// the cap above Ethereum's limit but must not set it below.
 uint64 constant ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT = uint64(1) << 24;
 
+uint256 constant ZKSYNC_OS_FRI_PROOF_VERIFICATION_DISABLED = 0;
+
 /// @dev The upper bound for the ZKsync OS single-transaction gas limit (EIP-7825), matching the
 /// ZKsync OS block gas limit. It equals `type(uint64).max / 256` (`2^56 - 1`), the maximum gas
 /// representable once ZKsync OS scales gas into its `uint64` ergs counter (256 ergs/gas).
 uint64 constant ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT = type(uint64).max / 256;
 
-/// @dev The maximum gas limit for a priority transaction in L2.
-uint256 constant PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
+/// @dev The protocol ceiling for newly admitted L1 -> L2 transactions.
+uint256 constant PRIORITY_TX_MAX_GAS_LIMIT = 1 << 24;
+
+/// @dev The gas ceiling for genesis and protocol-upgrade transactions.
+uint256 constant UPGRADE_TX_MAX_GAS_LIMIT = 72_000_000;
 
 /// @dev the address used to identify eth as the base token for chains.
 address constant ETH_TOKEN_ADDRESS = address(1);
@@ -290,7 +292,7 @@ enum PubdataPricingMode {
 PubdataPricingMode constant DEFAULT_PUBDATA_PRICING_MODE = PubdataPricingMode.Rollup;
 
 /// @dev Default maximum gas limit for priority transactions during chain creation.
-uint64 constant DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
+uint64 constant DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT = uint64(PRIORITY_TX_MAX_GAS_LIMIT);
 
 /// @dev The initial balance of the BaseTokenHolder contract (2^127 - 1).
 /// @dev Used to derive the real circulating supply: circulatingSupply = INITIAL - TotalSupplyBeforeMigration

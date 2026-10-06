@@ -423,7 +423,7 @@ async function executeSafeBundles(outDir: string, rpcUrl: string): Promise<void>
  * etc. We override only the ones that change per fork run: `--out` (temp dir)
  * and `--l1-rpc-url` (the forked anvil instance).
  *
- * Uses the production CoreUpgrade_v33 / CTMUpgrade_v33 forge scripts via
+ * Uses the current release's production upgrade scripts and per-env input via
  * protocol-ops defaults. Returns the dir the prepare phase wrote to.
  */
 export async function runEcosystemUpgradeScriptsForEnv(params: {

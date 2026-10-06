@@ -27,16 +27,24 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     function setValidator(address _validator, bool _active) external;
 
     /// @notice Change the max L2 gas limit for L1 -> L2 transactions
-    /// @param _newPriorityTxMaxGasLimit The maximum number of L2 gas that a user can request for L1 -> L2 transactions
+    /// @param _newPriorityTxMaxGasLimit The maximum number of L2 gas that a user can request for L1 -> L2 transactions,
+    /// at most `PRIORITY_TX_MAX_GAS_LIMIT`.
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external;
 
     /// @notice Change the ZKsync OS single-transaction gas limit (EIP-7825).
-    /// @dev Only for ZKsync OS chains, callable on the active settlement layer instance. The limit is
-    /// part of the runtime chain config committed into each batch proof public input, so it can only
-    /// change when all committed batches are verified.
+    /// @dev Callable on the active settlement layer instance after all committed batches are verified.
+    /// See {protocol-docs/chain-config.md} for the configuration-update policy.
     /// @param _newMaxTxGasLimit The new single-transaction gas limit; must not be below
     /// `ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT`
     function setZKsyncOSMaxTxGasLimit(uint64 _newMaxTxGasLimit) external;
+
+    /// @notice Enables or disables operator filtering of ZKsync OS priority transactions.
+    /// @param _enabled Whether L1 transaction filtering is enabled.
+    function setZKsyncOSL1TxFiltering(bool _enabled) external;
+
+    /// @notice Enables or disables the larger ZKsync OS contract size limits.
+    /// @param _enabled Whether to enable large contracts.
+    function setZKsyncOSLargeContractsEnabled(bool _enabled) external;
 
     /// @notice Change the fee params for L1->L2 transactions
     /// @param _newFeeParams The new fee params
@@ -144,6 +152,12 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
 
     /// @notice ZKsync OS single-transaction gas limit (EIP-7825) changed
     event NewZKsyncOSMaxTxGasLimit(uint64 oldMaxTxGasLimit, uint64 newMaxTxGasLimit);
+
+    /// @notice ZKsync OS L1 transaction filtering changed.
+    event NewZKsyncOSL1TxFiltering(bool oldEnabled, bool newEnabled);
+
+    /// @notice ZKsync OS large-contract support changed.
+    event NewZKsyncOSLargeContracts(bool oldEnabled, bool newEnabled);
 
     /// @notice Fee params for L1->L2 transactions changed
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);

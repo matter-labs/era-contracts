@@ -18,7 +18,7 @@ import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {GatewayDeployer} from "./_SharedGatewayDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS, PRIORITY_TX_MAX_GAS_LIMIT} from "contracts/common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {TxStatus, ConfirmTransferResultData, TokenBridgingData} from "contracts/common/Messaging.sol";
 
@@ -47,6 +47,7 @@ import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainA
 import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
 import {IMessageRootBase, IMessageVerification} from "contracts/core/message-root/IMessageRoot.sol";
 import {OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
+import {NotSettlementLayer} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 import {LogFinder} from "test-utils/LogFinder.sol";
 
@@ -206,6 +207,42 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         assertTrue(pausedDepositsTimestamp != 0, "Deposits should be paused after initiating migration");
     }
 
+    function testFuzz_filteringUpdateRevertsAfterMigration(bool _oldEnabled, bool _newEnabled) public {
+        _setUpGatewayWithFilterer();
+        address chainAdmin = migratingChain.getAdmin();
+        vm.prank(chainAdmin);
+        migratingChain.setZKsyncOSL1TxFiltering(_oldEnabled);
+
+        gatewayScript.migrateChainToGateway(migratingChainId);
+        assertEq(addresses.bridgehub.settlementLayer(migratingChainId), gatewayChainId);
+
+        vm.recordLogs();
+        vm.prank(chainAdmin);
+        vm.expectRevert(NotSettlementLayer.selector);
+        migratingChain.setZKsyncOSL1TxFiltering(_newEnabled);
+
+        assertEq(migratingChain.isZKsyncOSL1TxFilteringEnabled(), _oldEnabled);
+        assertEq(vm.getRecordedLogs().length, 0);
+    }
+
+    function testFuzz_largeContractsUpdateRevertsAfterMigration(bool _oldEnabled, bool _newEnabled) public {
+        _setUpGatewayWithFilterer();
+        address chainAdmin = migratingChain.getAdmin();
+        vm.prank(chainAdmin);
+        migratingChain.setZKsyncOSLargeContractsEnabled(_oldEnabled);
+
+        gatewayScript.migrateChainToGateway(migratingChainId);
+        assertEq(addresses.bridgehub.settlementLayer(migratingChainId), gatewayChainId);
+
+        vm.recordLogs();
+        vm.prank(chainAdmin);
+        vm.expectRevert(NotSettlementLayer.selector);
+        migratingChain.setZKsyncOSLargeContractsEnabled(_newEnabled);
+
+        assertEq(migratingChain.isZKsyncOSLargeContractsEnabled(), _oldEnabled);
+        assertEq(vm.getRecordedLogs().length, 0);
+    }
+
     function test_l2Registration() public {
         _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(migratingChainId);
@@ -259,7 +296,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             _chainId: migratingChainId,
             _mintValue: expectedValue,
             _l2Value: 0,
-            _l2GasLimit: 72000000,
+            _l2GasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
             _l2GasPerPubdataByteLimit: 800,
             _l2CallData: "0x"
         });
