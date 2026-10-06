@@ -135,9 +135,9 @@ npx ts-node setup-and-dump-state.ts
 
 Commit the regenerated `chain-states/` files alongside the contract change. CI never regenerates them on a PR by itself: the pre-merge `state-generation-check` only _verifies_ that a from-scratch regeneration matches what is committed, and the **Regenerate Anvil Interop Chain States** dispatch (also driven by **Update All Generated Artifacts**) is what pushes fresh ones onto the PR branch. Prefer the dispatch — local generation depends on the pinned foundry version.
 
-### 1c. Upgrade tests (v31→v33)
+### 1c. Upgrade test (previous release → current release)
 
-This exercises the full upgrade flow against the captured v31 chain states. It uses protocol-ops's split flow: `ecosystem upgrade-prepare-all` to deploy core + per-CTM contracts and emit merged governance calls, `ecosystem upgrade-governance` to replay stages 0/1/2, `ecosystem stage3` to populate `bridgedOut`, then `chain upgrade` per chain. In production a chain's priority-op lower bound must also be recorded (`RecordPriorityOpLowerBound.s.sol`) well before its `chain upgrade`; the test harness models the draft-v31 backfill prerequisite instead (see `harness-shims.ts`).
+This exercises the current release's upgrade against the previous release's captured chain states (`upgradeSourceStateVersion` in `config/anvil-config.json`). It uses protocol-ops's split flow: `ecosystem upgrade-prepare-all` to deploy core + per-CTM contracts and emit merged governance calls, `ecosystem upgrade-governance` to replay stages 0/1/2, then `chain upgrade` per chain.
 
 ```bash
 cd l1-contracts/test/anvil-interop
@@ -151,7 +151,7 @@ Prerequisites: same as anvil-interop tests (both foundry builds done). Plus:
 
 Common failures:
 
-- **"Script not found: deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol"** or **`CTMUpgrade_v33.s.sol`** — `yarn l1 build:foundry` not run, or the test override path is wrong.
+- **"Script not found: deploy-scripts/upgrade/..."** (the default core script or the release's CTM script) — `yarn l1 build:foundry` not run, or the test override path is wrong.
 - **"call to non-contract address 0x0…"** — usually the upgrade script reading an address before the contract is deployed/registered. Use `cast run <txhash>` against the still-running anvil to get the trace; see `AGENTS.md` "Debugging Failed Transactions with cast run" for the recipe.
 - **"vm.writeToml: path not allowed"** — script-out path concatenation issue. Check that `vm.projectRoot()` is concatenated once, not twice.
 

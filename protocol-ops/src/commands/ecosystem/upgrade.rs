@@ -544,7 +544,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         //
         // Fails closed on a missing file rather than keeping the CLI default. The default is the
         // *local* input, so a silent fallback would hand a real environment local's values for the
-        // keys the input does supply — `era_chain_id`, `pre_v32_introspection` and
+        // keys the input does supply — `era_chain_id` and
         // `governance_upgrade_timer_initial_delay`. Failing here also catches a mistyped `--env`.
         if args.upgrade_input_path == CURRENT_UPGRADE_LOCAL_INPUT_PATH {
             let per_env_rel = format!("{CURRENT_UPGRADE_ENV_DIR}/{}.toml", cfg.env);
@@ -1152,10 +1152,7 @@ fn load_ctm_config(path: &Path) -> anyhow::Result<Vec<CtmInputs>> {
 #[cfg(test)]
 mod release_script_tests {
     use super::*;
-    use crate::common::forge::scripts::{
-        CORE_UPGRADE_V33_SCRIPT_PATH, CTM_UPGRADE_V33_SCRIPT_PATH, UPGRADE_V33_ENV_DIR,
-        UPGRADE_V33_LOCAL_INPUT_PATH,
-    };
+    use crate::common::forge::scripts::UPGRADE_V33_ENV_DIR;
     use clap::CommandFactory;
 
     #[test]
@@ -1224,22 +1221,5 @@ mod release_script_tests {
             "{}/output/stage",
             CURRENT_UPGRADE_ENV_DIR.trim_start_matches('/')
         )));
-    }
-
-    #[test]
-    fn historical_prepare_can_select_v33() {
-        let args = UpgradePrepareAllArgs::try_parse_from([
-            "prepare",
-            "--ctm-script-path",
-            CTM_UPGRADE_V33_SCRIPT_PATH,
-            "--core-script-path",
-            CORE_UPGRADE_V33_SCRIPT_PATH,
-            "--upgrade-input-path",
-            UPGRADE_V33_LOCAL_INPUT_PATH,
-        ])
-        .unwrap();
-        assert_eq!(args.ctm_script_path, CTM_UPGRADE_V33_SCRIPT_PATH);
-        assert_eq!(args.core_script_path, CORE_UPGRADE_V33_SCRIPT_PATH);
-        assert_eq!(args.upgrade_input_path, UPGRADE_V33_LOCAL_INPUT_PATH);
     }
 }

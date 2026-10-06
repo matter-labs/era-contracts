@@ -276,8 +276,8 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationTestBase, L1ContractDe
 
         // The interop-handler wiring every upgraded ecosystem has to end up with. This fixture starts from
         // current contracts, so it is already wired and the default upgrade emits no wiring calls: these
-        // assertions pin the invariant. The release that introduced the wiring is covered by
-        // `PreV32ParityCalls.t.sol` (`test_wiresTheNewInteropHandler`).
+        // assertions pin the invariant. Discovery of the wired handler is covered by
+        // `AddressIntrospectorBridges.t.sol`.
         address l1InteropHandler = coreUpgrade.getCoreAddresses().bridges.proxies.l1InteropHandler;
         assertTrue(l1InteropHandler != address(0), "No L1InteropHandler after the upgrade");
         assertEq(
