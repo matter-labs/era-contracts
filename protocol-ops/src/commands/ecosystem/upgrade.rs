@@ -89,7 +89,7 @@ pub async fn run_upgrade_governance(mut args: UpgradeGovernanceArgs) -> anyhow::
     // ── env preset auto-fills ────────────────────────────────────────
     let env_cfg = args.topology.env_config()?;
     if let Some(ref cfg) = env_cfg {
-        let env_out_base = crate::common::env_config::default_protocol_ops_out_dir(&cfg.env)?;
+        let env_out_base = cfg.protocol_ops_out_dir();
         // Default --out to upgrade-envs/.../<env>/protocol-ops/governance
         if args.shared.out.is_none() {
             args.shared.out = Some(env_out_base.join("governance"));
@@ -511,7 +511,10 @@ pub async fn run_list_ctms(args: ListCtmsArgs) -> anyhow::Result<()> {
 /// re-prepare keeps that release's pinned salts instead of reading the current release's.
 fn prepare_env_config(args: &UpgradePrepareAllArgs) -> anyhow::Result<Option<EnvConfig>> {
     match args.topology.env.as_deref() {
-        Some(env) if args.upgrade_input_path != CURRENT_UPGRADE_LOCAL_INPUT_PATH => {
+        Some(env)
+            if args.topology.upgrade_env_dir.is_none()
+                && args.upgrade_input_path != CURRENT_UPGRADE_LOCAL_INPUT_PATH =>
+        {
             let input_dir = Path::new(args.upgrade_input_path.trim_start_matches('/'))
                 .parent()
                 .and_then(Path::to_str)

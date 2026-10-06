@@ -1,3 +1,5 @@
+import { execFileSync } from "child_process";
+import { randomBytes } from "crypto";
 import * as fs from "fs";
 import { join, relative } from "path";
 
@@ -5,13 +7,23 @@ import { join, relative } from "path";
 // to the next minor version, so the default upgrade (protocol-ops' `upgrade-prepare-all` defaults) and the
 // upgrade tests target it. Usage:
 //
-//   yarn new-release <name> [--dry-run]      e.g. `yarn new-release chain-config`
+//   yarn new-release <name> [--previous-release-ref <git-ref>] [--dry-run]
+//
+// e.g. on the next release's branch, after merging the outgoing release's branch into it:
+//   yarn new-release my-feature --previous-release-ref origin/draft/v0.34.0
+//
+// `--previous-release-ref` names the outgoing release's branch. Its `chain-states/<stateVersion>` become the
+// upgrade test's frozen source, copied byte for byte: on a branch that already carries the next release's
+// changes, the local folder of that name was regenerated from newer contracts and is not the release's
+// fixture. Without the flag the local folder is used, which is right only on the outgoing release's own branch.
 //
 // What it changes:
 //   1. `configs/genesis/zksync-os/latest.json` `protocol_semantic_version`: minor + 1, patch 0. The default
 //      upgrade scripts read their target version from it, and the upgrade tests assert it.
-//   2. `l1-contracts/upgrade-envs/v0.<minor>.0-<name>/local.toml`: the local upgrade input, copied from the
-//      current release's with its version fields moved.
+//   2. `l1-contracts/upgrade-envs/v0.<minor>.0-<name>/`: the local upgrade input and every per-environment
+//      input (`stage.toml`, `mainnet.toml`, ...), copied from the current release's with their version fields
+//      moved. Environment values (owner, era_chain_id, addresses) carry over; every CREATE2 and legacy-Gov salt
+//      is regenerated, so the new release's deployments do not resolve to the previous release's addresses.
 //   3. protocol-ops' current upgrade-env dir (`current_upgrade_env_dir!` in
 //      `protocol-ops/src/common/forge/scripts/mod.rs`): the prepare defaults and `--env` resolution follow it.
 //   4. `l1-contracts/test/anvil-interop/config/anvil-config.json`: the outgoing `stateVersion` becomes the
@@ -52,19 +64,67 @@ function versionString(version: SemVer): string {
 }
 
 function setTomlBareValue(contents: string, key: string, value: string): string {
-  const pattern = new RegExp(`^(${key}\\s*=\\s*)[^#\\n]*?(\\s*(#.*)?)$`, "m");
+  const pattern = new RegExp(`^(${key}\\s*=\\s*)[^#\\n]*?(\\s*#.*)?$`, "m");
   if (!pattern.test(contents)) {
     throw new Error(`local.toml has no \`${key}\` to move`);
   }
-  return contents.replace(pattern, `$1${value}$2`);
+  return contents.replace(pattern, `$1${value}`);
+}
+
+const SALT_KEYS = ["create2_factory_salt", "legacy_gov_salt"];
+
+function freshSalt(): string {
+  return `"0x${randomBytes(32).toString("hex")}"`;
+}
+
+/** Header of a per-environment upgrade input; the same text every release writes. */
+function envInputHeader(env: string, release: SemVer, sourceDir: string): string {
+  return `# Upgrade input for the ${env} environment on the v${release.minor} release.
+#
+# Created from the ${sourceDir} entry of the same name: the environment values (owner,
+# era_chain_id, bridgehub and the other addresses) are carried over, while the CREATE2 and legacy-Gov
+# salts are fresh, so this release's deployments do not resolve to v${release.minor - 1}'s addresses. The target protocol
+# version and chain-creation params come from \`configs/genesis/zksync-os/latest.json\`.
+#
+# protocol-ops' \`--env ${env}\` reads this file (its owner, era_chain_id and salts) for the current release;
+# a missing file fails closed rather than falling back to local's values.
+`;
+}
+
+/** A per-environment input for the next release: new header and versions, fresh salts. */
+function rotateEnvInput(contents: string, env: string, current: SemVer, next: SemVer, sourceDir: string): string {
+  const lines = contents.split("\n");
+  let start = 0;
+  while (start < lines.length && (lines[start].startsWith("#") || lines[start].trim() === "")) {
+    start++;
+  }
+  let body = lines.slice(start).join("\n");
+  body = body.replace(/^# v\d+ -> v\d+\.$/m, `# v${current.minor} -> v${next.minor}.`);
+  for (const [key, version] of [
+    ["old_protocol_version", { ...current, patch: 0 }],
+    ["latest_protocol_version", next],
+  ] as const) {
+    if (new RegExp(`^${key}\\s*=`, "m").test(body)) {
+      body = setTomlBareValue(body, key, packSemVer(version));
+    }
+  }
+  for (const key of SALT_KEYS) {
+    body = body.replace(new RegExp(`^(${key}\\s*=\\s*)"0x[0-9a-fA-F]{64}"`, "m"), (_m, prefix) => prefix + freshSalt());
+  }
+  body = body.replace(/^\[create2_factory_salts\]\n(?:(?!\[).*\n?)*/m, (section) =>
+    section.replace(/(=\s*)"0x[0-9a-fA-F]{64}"/g, (_m, prefix) => prefix + freshSalt())
+  );
+  return `${envInputHeader(env, next, sourceDir)}\n${body}`;
 }
 
 function main(): void {
   const args = process.argv.slice(2);
   const dryRun = args.includes("--dry-run");
-  const positional = args.filter((arg) => !arg.startsWith("--"));
-  if (positional.length !== 1 || !RELEASE_NAME_RE.test(positional[0])) {
-    throw new Error("usage: yarn new-release <kebab-case-name> [--dry-run]");
+  const refFlag = args.indexOf("--previous-release-ref");
+  const previousReleaseRef = refFlag >= 0 ? args[refFlag + 1] : undefined;
+  const positional = args.filter((arg, i) => !arg.startsWith("--") && !(refFlag >= 0 && i === refFlag + 1));
+  if (positional.length !== 1 || !RELEASE_NAME_RE.test(positional[0]) || (refFlag >= 0 && !previousReleaseRef)) {
+    throw new Error("usage: yarn new-release <kebab-case-name> [--previous-release-ref <git-ref>] [--dry-run]");
   }
   const name = positional[0];
   const writes: Array<() => void> = [];
@@ -98,6 +158,15 @@ function main(): void {
     throw new Error(`no current_upgrade_env_dir! macro in ${PROTOCOL_OPS_SCRIPTS_PATH}`);
   }
   const currentEnvDir = envDirMatch[2];
+  // The branch must already be on the release it moves away from: genesis and protocol-ops' current release
+  // agree. A branch that has not merged the outgoing release yet would otherwise be bumped from a stale version.
+  const envDirVersion = currentEnvDir.match(/^upgrade-envs\/v(\d+)\.(\d+)\.\d+-/);
+  if (!envDirVersion || Number(envDirVersion[1]) !== current.major || Number(envDirVersion[2]) !== current.minor) {
+    throw new Error(
+      `genesis is at ${versionString(current)} but protocol-ops' current release is ${currentEnvDir}; ` +
+        "merge the outgoing release's branch first"
+    );
+  }
   const nextEnvDir = `upgrade-envs/${versionString(next)}-${name}`;
   const nextEnvDirAbs = join(UPGRADE_ENVS_DIR, nextEnvDir.replace("upgrade-envs/", ""));
   if (fs.existsSync(nextEnvDirAbs)) {
@@ -114,6 +183,15 @@ function main(): void {
   localInput = setTomlBareValue(localInput, "old_protocol_version", packSemVer({ ...current, patch: 0 }));
   localInput = setTomlBareValue(localInput, "latest_protocol_version", packSemVer(next));
   write(join(nextEnvDirAbs, "local.toml"), localInput);
+  const currentEnvDirAbs = join(UPGRADE_ENVS_DIR, currentEnvDir.replace("upgrade-envs/", ""));
+  for (const file of fs.readdirSync(currentEnvDirAbs).filter((f) => f.endsWith(".toml") && f !== "local.toml")) {
+    const env = file.replace(/\.toml$/, "");
+    const contents = fs.readFileSync(join(currentEnvDirAbs, file), "utf-8");
+    write(
+      join(nextEnvDirAbs, file),
+      rotateEnvInput(contents, env, current, next, currentEnvDir.replace("upgrade-envs/", ""))
+    );
+  }
 
   // 3. protocol-ops' current upgrade-env dir.
   write(PROTOCOL_OPS_SCRIPTS_PATH, scripts.replace(ENV_DIR_MACRO_RE, `$1${nextEnvDir}$3`));
@@ -125,7 +203,37 @@ function main(): void {
   };
   const outgoingSource = anvilConfig.upgradeSourceStateVersion;
   const nextStateVersion = versionString(next);
-  if (!fs.existsSync(join(CHAIN_STATES_DIR, anvilConfig.stateVersion))) {
+  const frozenSourceDir = join(CHAIN_STATES_DIR, anvilConfig.stateVersion);
+  if (previousReleaseRef) {
+    const repoPath = (absolute: string) => relative(ROOT, absolute).split("\\").join("/");
+    const git = (gitArgs: string[]) => execFileSync("git", gitArgs, { cwd: ROOT, maxBuffer: 1 << 30 });
+    const refConfig = JSON.parse(git(["show", `${previousReleaseRef}:${repoPath(ANVIL_CONFIG_PATH)}`]).toString()) as {
+      stateVersion: string;
+    };
+    if (refConfig.stateVersion !== anvilConfig.stateVersion) {
+      throw new Error(
+        `${previousReleaseRef} generates ${refConfig.stateVersion}, not ${anvilConfig.stateVersion}: not the outgoing release`
+      );
+    }
+    const files = git(["ls-tree", "--name-only", `${previousReleaseRef}:${repoPath(frozenSourceDir)}`])
+      .toString()
+      .split("\n")
+      .filter(Boolean);
+    if (files.length === 0) {
+      throw new Error(`${previousReleaseRef} has no chain-states/${anvilConfig.stateVersion}`);
+    }
+    changed.push(`freeze  ${repoPath(frozenSourceDir)} from ${previousReleaseRef}`);
+    writes.push(() => {
+      fs.rmSync(frozenSourceDir, { recursive: true, force: true });
+      fs.mkdirSync(frozenSourceDir, { recursive: true });
+      for (const file of files) {
+        fs.writeFileSync(
+          join(frozenSourceDir, file),
+          git(["show", `${previousReleaseRef}:${repoPath(join(frozenSourceDir, file))}`])
+        );
+      }
+    });
+  } else if (!fs.existsSync(frozenSourceDir)) {
     throw new Error(`chain-states/${anvilConfig.stateVersion} is missing: it becomes the upgrade source`);
   }
   const rotated = {
@@ -150,7 +258,7 @@ Still to do:
   - Regenerate chain-states/${nextStateVersion} (the 'Regenerate Anvil Interop Chain States' workflow, or
     \`cd l1-contracts/test/anvil-interop && npx ts-node setup-and-dump-state.ts\`). Until then the interop
     tests have no states for ${nextStateVersion}; the upgrade test already runs ${anvilConfig.stateVersion} -> ${nextStateVersion}.
-  - Add per-environment upgrade inputs (stage.toml, mainnet.toml, ...) to ${nextEnvDir}/ when preparing for them.
+  - Review the per-environment inputs copied into ${nextEnvDir}/ (owner, era_chain_id and addresses carry over).
   - Point protocol-ops' --core-script-path / --ctm-script-path defaults (protocol-ops/src/commands/ecosystem/upgrade.rs)
     at this release's scripts: back to DefaultCoreUpgrade / DefaultCTMUpgrade, or, if the release needs
     release-specific preparation, at new scripts extending them under l1-contracts/deploy-scripts/upgrade/v${next.minor}/.

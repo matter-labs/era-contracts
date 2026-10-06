@@ -111,7 +111,7 @@ fn verify_env_config(args: &VerifyUpgradeArgs) -> anyhow::Result<EnvConfig> {
 pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     let env = args.env.as_str();
     let env_cfg = verify_env_config(&args)?;
-    let era_chain_id = env_cfg.era_chain_id().ok_or_else(|| {
+    let era_chain_id = env_cfg.era_chain_id()?.ok_or_else(|| {
         anyhow::anyhow!(
             "{} is missing top-level `era_chain_id`",
             env_cfg.upgrade_input_path.display()

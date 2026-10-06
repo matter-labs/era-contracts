@@ -62,6 +62,16 @@ Historical preparations must select the matching scripts and input explicitly. T
 covers the current release's upgrade. See
 [the activation requirements](../protocol-docs/chain-config.md#activation).
 
+## Environment inputs
+
+`--env <name>` reads `upgrade-envs/permanent-values/<name>.toml` and the release input
+`<release dir>/<name>.toml`. The release dir is the current release's (`current_upgrade_env_dir!` in
+`src/common/forge/scripts/mod.rs`) unless `--upgrade-env-dir` selects another, or `upgrade-prepare-all`'s
+`--upgrade-input-path` points into another release's dir. The owner, `era_chain_id` and CREATE2 salts come
+from that release input, and a command that needs one of them fails when the release has no input for the
+env: it never falls back to the deployer, local's values or random salts. `yarn new-release` creates the next
+release's inputs from the current ones with fresh salts.
+
 ## Execution model
 
 Every command that generates Safe bundles runs **exclusively against a temporary Anvil fork**
@@ -87,16 +97,16 @@ cargo run --release --bin protocol_ops -- ecosystem verify-upgrade \
   --zk-governance-commit <commit>
 ```
 
-| Flag                         | Role                                                                                                                                             |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **`--env`**                  | `stage` / `testnet` / `mainnet`; selects the permanent-values + current-release input TOMLs.                                                     |
-| **`--ecosystem-toml`**       | Merged artifact from `upgrade-prepare-all`.                                                                                                      |
-| **`--zk-governance-commit`** | zk-governance commit for PUH / Guardians / SecurityCouncil / EUB bytecode metadata (required).                                                   |
-| **`--contracts-commit`**     | Optional era-contracts commit; when omitted, the local checkout is the authority.                                                                |
-| **`--transactions-log`**     | Deployment tx-hash log; defaults to the env's `output/<env>/transactions.txt`.                                                                   |
-| **`--upgrade-env-dir`**      | Release dir for the env input and log (e.g. `upgrade-envs/v0.33.0-atomic-interop` to verify a v33 preparation); defaults to the current release. |
-| **`--l1-rpc-url`**           | L1 RPC (default `http://localhost:8545`).                                                                                                        |
-| **`--display-upgrade-data`** | Print each stage's ABI-encoded `UpgradeProposal` and skip the rest of the verifier.                                                              |
+| Flag                         | Role                                                                                                                                                                             |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`--env`**                  | `stage` / `testnet` / `mainnet`; selects the permanent-values + current-release input TOMLs.                                                                                     |
+| **`--ecosystem-toml`**       | Merged artifact from `upgrade-prepare-all`.                                                                                                                                      |
+| **`--zk-governance-commit`** | zk-governance commit for PUH / Guardians / SecurityCouncil / EUB bytecode metadata (required).                                                                                   |
+| **`--contracts-commit`**     | Optional era-contracts commit; when omitted, the local checkout is the authority.                                                                                                |
+| **`--transactions-log`**     | Deployment tx-hash log; defaults to the env's `output/<env>/transactions.txt`.                                                                                                   |
+| **`--upgrade-env-dir`**      | Release dir for the env input and log (e.g. `upgrade-envs/v0.33.0-atomic-interop` to verify a v33 preparation); defaults to the current release. Every `--env` command takes it. |
+| **`--l1-rpc-url`**           | L1 RPC (default `http://localhost:8545`).                                                                                                                                        |
+| **`--display-upgrade-data`** | Print each stage's ABI-encoded `UpgradeProposal` and skip the rest of the verifier.                                                                                              |
 
 ## Output
 

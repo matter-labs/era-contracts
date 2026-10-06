@@ -15,10 +15,13 @@ these defaults, so they always cover the release being built.
 
 ## Steps
 
-1. From the repo root, run `yarn new-release <release-name> --dry-run`, show the user the planned changes, then
+1. On the new release's branch, first merge the outgoing release's branch into it (so genesis and
+   protocol-ops already name the outgoing release; the script refuses otherwise). From the repo root, run
+   `yarn new-release <release-name> --previous-release-ref <outgoing release branch, e.g. origin/draft/v0.34.0> --dry-run`, show the user the planned changes, then
    run it without `--dry-run`. It bumps the genesis minor version, scaffolds
    `l1-contracts/upgrade-envs/v0.<N>.0-<release-name>/local.toml`, repoints protocol-ops' current upgrade-env dir,
-   and rotates the anvil fixtures (`config/anvil-config.json`).
+   rotates the anvil fixtures (`config/anvil-config.json`), freezing the outgoing release's chain states
+   byte for byte from `--previous-release-ref`, and copies every per-environment input with fresh salts.
 
 2. Do the follow-ups it prints: regenerate the new release's anvil chain states (the 'Regenerate Anvil Interop
    Chain States' workflow) and add per-environment inputs (`stage.toml`, `mainnet.toml`, ...) when preparing for
