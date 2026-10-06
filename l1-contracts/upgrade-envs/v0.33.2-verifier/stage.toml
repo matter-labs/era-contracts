@@ -1,0 +1,45 @@
+# v0.33.2 verifier-only upgrade of the ZKsync OS stage ecosystem — input for
+# deploy-scripts/upgrade/verifier-only/ZKsyncOSVerifierOnlyUpgrade.s.sol (see that script's doc).
+#
+# This is the atomic-interop stage ecosystem deployed from release/v0.33.0-atomic-interop on
+# 2026-08-27, NOT the older stage ecosystem `upgrade-envs/v0.33.0-atomic-interop/stage.toml`
+# describes (bridgehub 0x236D1c3F…, owned by the stage ProtocolUpgradeHandler). Here the CTM and
+# the ChainAssetHandler are owned by a `Governance` contract (0xFF657F25…, minDelay 0).
+#
+# The target version (0.33.2) and its VK hash come from configs/genesis/zksync-os/latest.json;
+# the script refuses to run if the deployed verifier's VK differs from it.
+
+bridgehub = "0xb9415d43C7753cCeBaa1ac05c8BabA36159ab13F"
+# ZKsync OS ChainTypeManager proxy (`isZKsyncOS() == true`).
+ctm = "0x94d8784d719181EA00f58ab4a85333959FFA5a79"
+
+# v0.33.0. The CTM never took v0.33.1, and a verifier-only upgrade may skip patch versions.
+old_protocol_version = 0x2100000000
+
+# The CTM owner is a `Governance` contract: the output also carries the scheduleTransparent /
+# execute calldata its owner sends per stage.
+owner_is_governance = true
+
+# Stage runs the testnet verifier flavour (mock proofs accepted), like the verifier it replaces.
+testnet_verifier = true
+
+# The GovernanceUpgradeTimer's INITIAL_DELAY. Nothing on L2 changes, so stage 1 may follow stage 0
+# immediately (the v29.5 VK patch used 0 as well).
+governance_upgrade_timer_initial_delay = 0
+
+# Deterministic CREATE2 factory. The salt is fresh for this upgrade: a repeated (salt, initcode)
+# pair resolves to an already deployed contract. Rotate it before any regen that must deploy anew:
+#   python3 -c "import secrets; print('0x' + secrets.token_hex(32))"
+create2_factory_salt = "0x2a089f887e5f31c7d3d527b3599e417eb20fd4b5f0c7f8140c6dc52b2f174557"
+
+# Sender of the CREATE2 deployments in the simulator scenario. Any funded EOA can send them;
+# this is the EOA that owns stage's Governance and every ChainAdmin.
+deployer = "0xd2d5391421f98A0086F4143D2EA0337a31Ca89E5"
+
+# Every chain registered on the CTM, all on v0.33.0. 2727 has never committed a batch.
+chain_ids = [2727, 2728, 2729, 27271, 27272, 27273]
+
+# Validium-priced chains that already commit FullPubdata with the EmptyNoDA scheme, which is not the
+# recommended DA state. This upgrade keeps their DA as it is; generate-chain-upgrades-stage.sh passes
+# `--acknowledge-unrecommended-noda` for them so protocol-ops prepares the cut without a DA move.
+keep_unrecommended_da_chain_ids = [2729, 27272]
