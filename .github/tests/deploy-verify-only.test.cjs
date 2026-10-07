@@ -104,3 +104,23 @@ test("missing key, missing log, and empty verification list fail closed", () => 
     assert.equal(runVerification(log, key).status, 1);
   }
 });
+
+test("the deployer key never reaches $GITHUB_ENV, and only the select and broadcast steps read it", () => {
+  for (const step of steps.filter((step) => step.run)) {
+    assert.doesNotMatch(step.run, /DEPLOYER_PK/, step.name);
+    assert.doesNotMatch(step.run, /echo\s+"[A-Z_]+=\$pk"/, step.name);
+  }
+  const readers = steps
+    .filter((step) => Object.values(step.env ?? {}).some((value) => String(value).includes("DEPLOYER_PRIVATE_KEY")))
+    .map((step) => step.name);
+  assert.deepEqual(readers, [
+    "Select + mask RPC and deployer key (L1 from the bundle)",
+    "Broadcast deployer bundles to L1",
+  ]);
+});
+
+test("run scripts take dispatch inputs through env, never by expression expansion", () => {
+  for (const step of steps.filter((step) => step.run)) {
+    assert.doesNotMatch(step.run, /\$\{\{\s*inputs\./, step.name);
+  }
+});

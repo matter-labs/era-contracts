@@ -135,11 +135,19 @@ The sender (`submit_and_confirm` in
   the _same nonce_ at a higher gas price (+15% per retry, ≥ geth's 10%
   replacement floor), up to `--max-gas-price-gwei`, then keeps trying at the
   ceiling until a 20-minute per-tx deadline.
-- **Nonce takeover** — if the sender's on-chain nonce advances past ours without
-  our tx landing (some other tx grabbed the nonce), it re-fetches the next free
-  nonce and resubmits our calldata there.
+- **Spent nonce** — if the sender's nonce moves past ours, it keeps asking for
+  receipts of every hash it sent at that nonce for ~36s: a load-balanced RPC can
+  serve the new nonce before the receipt of our own mined tx. If none of ours
+  shows up, the run stops and names those hashes instead of resending, because a
+  resend would execute the call twice if one of them did mine. Only a call never
+  sent at that nonce (a stale pending nonce) is resent at the next free one.
 - **Idempotent** — CREATE2 deploys already on-chain and known already-done
-  reverts are skipped, so a re-run after a partial deploy resumes cleanly.
+  reverts are skipped, so a re-run after a partial deploy resumes cleanly. A
+  `publishEraBytecodes` / `publishEVMBytecodes` batch is skipped only when every
+  bytecode in it is published, and an `AddressAlreadySet` only when the address
+  already set is the one the call sets. A skipped CREATE2 deploy leaves no
+  journal entry (its deployment tx is unknown), so the log names the address: if
+  PUVT reports it missing, append its deployment tx hash to `transactions.txt`.
 
 It journals each confirmed receipt immediately: the mined hash is appended to
 `transactions.txt` (next to `--out`) and the matching calldata is atomically

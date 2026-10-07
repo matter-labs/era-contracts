@@ -21,9 +21,10 @@ name: "Ecosystem Upgrade: Deploy + Verify"
 #
 # The sender broadcasts strictly one tx at a time and is robust to public-L1
 # hazards: a stuck (underpriced) tx is re-broadcast at a higher gas price up to
-# `max_gas_price_gwei`, and if the sender's nonce is grabbed by another tx the
-# calldata is resubmitted at the next free nonce (see `submit_and_confirm` in
-# `protocol-ops/src/commands/dev/execute_safe.rs`).
+# `max_gas_price_gwei`. If the sender's nonce moves past ours and none of our
+# submissions shows a receipt within a few blocks, the run stops with their
+# hashes instead of resending, which could execute the call twice (see
+# `submit_and_confirm` in `protocol-ops/src/commands/dev/execute_safe.rs`).
 #
 # ─── WHICH L1, WHICH SECRETS ───
 # The target L1 is taken from the downloaded bundle's `bundle-metadata.json`
@@ -443,9 +444,12 @@ jobs:
             echo "::error::bundle was prepared for deployer $want but this key is $deployer — its bundles would be skipped. Re-generate with -f deployer_address=$deployer, or use that account's key."
             exit 1
           fi
+          # The key itself is not exported: $GITHUB_ENV reaches every later step,
+          # including the Etherscan step that evaluates commands from the
+          # downloaded bundle. The broadcast step reads it from the secret again.
           {
             echo "L1_RPC_URL=$rpc"
-            echo "DEPLOYER_PK=$pk"
+            echo "L1_NETWORK=$net"
             echo "DEPLOYER_ADDR=$deployer"
             echo "ETHERSCAN_CHAIN=$net"
           } >> "$GITHUB_ENV"
@@ -454,16 +458,25 @@ jobs:
       # at a time. Writes transactions.txt next to --out for the PUVT.
       - name: Broadcast deployer bundles to L1
         if: ${{ !inputs.verify_only }}
+        env:
+          PK_SEPOLIA: ${{ secrets.DEPLOYER_PRIVATE_KEY_SEPOLIA }}
+          PK_MAINNET: ${{ secrets.DEPLOYER_PRIVATE_KEY_MAINNET }}
+          MAX_GAS_PRICE_GWEI: ${{ inputs.max_gas_price_gwei }}
         run: |
           set -euo pipefail
+          case "$L1_NETWORK" in
+            mainnet) pk="$PK_MAINNET" ;;
+            sepolia) pk="$PK_SEPOLIA" ;;
+            *) echo "::error::No deployer key wired for L1 network '$L1_NETWORK'"; exit 1 ;;
+          esac
           MANIFEST="$DEPLOY_BUNDLE_DIR/prepare/manifest.json"
           echo "Manifest: $MANIFEST"
           ./protocol-ops/target/release/protocol_ops ecosystem upgrade-broadcast \
             --manifest "$MANIFEST" \
             --l1-rpc-url "$L1_RPC_URL" \
-            --key "${DEPLOYER_ADDR}=${DEPLOYER_PK}" \
+            --key "${DEPLOYER_ADDR}=${pk}" \
             --skip-unkeyed \
-            --max-gas-price-gwei "${{ inputs.max_gas_price_gwei }}" \
+            --max-gas-price-gwei "$MAX_GAS_PRICE_GWEI" \
             --out "$DEPLOY_OUTDIR/deploy-executed.json"
           echo "=== transactions.txt ==="
           cat "$TXLOG" || true
