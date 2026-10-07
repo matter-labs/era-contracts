@@ -252,7 +252,11 @@ pub(crate) async fn verify(
     // Each tx is fetched from L1 RPC; stale entries (whose bytecode no longer
     // matches AllContractsHashes after a regen) are silently skipped — the
     // address-book lookup in `expect_create2_params` hard-errors only if a
-    // load-bearing deployment is missing.
+    // load-bearing deployment is missing. Entries the RPC cannot return even
+    // after retries are reported, as errors in an env with a historical list
+    // (see `historical_create2_deployments`), since the coverage check could
+    // not see their deployments.
+    let strict_fetch = historical_create2_deployments(verifiers.env).is_some();
     let count = {
         let bridgehub_address = verifiers.bridgehub_address;
         let Verifiers {
@@ -269,6 +273,7 @@ pub(crate) async fn verify(
                 &bridgehub_address,
                 expected_salts,
                 true,
+                strict_fetch,
                 bytecode_verifier,
                 result,
             )
@@ -281,6 +286,7 @@ pub(crate) async fn verify(
                 &bridgehub_address,
                 expected_salts,
                 false,
+                strict_fetch,
                 bytecode_verifier,
                 result,
             )

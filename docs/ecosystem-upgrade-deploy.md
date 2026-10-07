@@ -161,14 +161,16 @@ CREATE2 deployments.
 OUT=l1-contracts/upgrade-envs/v0.31.0-interopB/output/mainnet
 DEPLOYER_ADDR=$(cast wallet address --private-key "$DEPLOYER_KEY")
 
-# Broadcast the deployer bundles → writes $OUT/transactions.txt
+# Broadcast the deployer bundles → writes ./deploy-result/transactions.txt, this
+# deployment's journal. Keep it out of $OUT: the committed $OUT/transactions.txt
+# also holds earlier broadcasts and is step 3's reference log.
 ./protocol-ops/target/release/protocol_ops ecosystem upgrade-broadcast \
   --manifest "$OUT/prepare/manifest.json" \
   --l1-rpc-url <l1-rpc> \
   --key "${DEPLOYER_ADDR}=${DEPLOYER_KEY}" \
   --skip-unkeyed \
   --max-gas-price-gwei 500 \
-  --out "$OUT/deploy-executed.json"
+  --out ./deploy-result/deploy-executed.json
 
 # Verify on Etherscan — replay the logged forge verify-contract commands VERBATIM.
 # Step 1 already wrote the exact `--constructor-args <hex>` for every contract
@@ -232,13 +234,22 @@ having deployed nothing. `ETHERSCAN_API_KEY` is optional (verify only).
 
 ```bash
 OUT=l1-contracts/upgrade-envs/v0.31.0-interopB/output/mainnet
+# ./deploy-result: step 2's local journal, or the deploy run's
+# `ecosystem-upgrade-deploy-result-<env>` artifact downloaded there.
 ./protocol-ops/target/release/protocol_ops ecosystem verify-upgrade \
   --env mainnet \
   --ecosystem-toml "$OUT/ecosystem.toml" \
-  --transactions-log "$OUT/transactions.txt" \
+  --transactions-log ./deploy-result/transactions.txt \
+  --reference-transactions-log "$OUT/transactions.txt" \
   --l1-rpc-url <l1-rpc> --gw-rpc-url <l1-rpc> \
   --zk-governance-commit 9b06a16159cd58add109f25598e79731450d1772
 ```
+
+`--transactions-log` is salt-gated, so it must be this deployment's own journal.
+The committed `$OUT/transactions.txt` also holds earlier broadcasts (mainnet's
+July 2026 deployment), whose deploys carry that regen's salts, so it goes in as
+the reference log, as the deploy-bundle handoff passes it. Leaving
+`--transactions-log` out defaults to the committed file and fails the salt gate.
 
 Pre-governance (contracts deployed, governance not yet executed) this reports the
 allowed exemptions for contracts still owned by the legacy Governor pending their
