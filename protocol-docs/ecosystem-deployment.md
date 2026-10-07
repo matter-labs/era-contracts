@@ -282,12 +282,12 @@ the start: every power in the table above flows from it.
   `yarn verify-contracts <log-file> --chain <stage|testnet|mainnet>`, where the log file holds the
   `forge verify-contract` lines the scripts print. It only targets mainnet (`mainnet`) and Sepolia (`stage`, `testnet`);
   on any other L1, run those lines with that explorer's verifier settings.
-- Check ownership: `owner()` of the core proxies and the CTM must be the governance contract and
-  no `pendingOwner()` may be left dangling; the Bridgehub's `admin()` must be the
-  `ChainAdminOwnable`. After `hub init` and `ctm init` alone this check fails until the manual
-  steps listed under "Hub" and "CTM" have been executed; check `L1InteropHandler`,
-  `L1NativeTokenVault`, `ChainRegistrationSender`, `ValidatorTimelock`, `ServerNotifier` and
-  `RollupDAManager` explicitly.
+- Check ownership once the manual steps listed under "Hub" and "CTM" have been executed:
+  `owner()` must be the governance contract for the Bridgehub, asset router, nullifier, interop
+  handler, CTM deployment tracker, chain asset handler, `ChainRegistrationSender`,
+  `RollupDAManager` and the CTM; `owner_address` for the native token vault and
+  `ValidatorTimelock`; the `ChainAdminOwnable` for `ServerNotifier`. No `pendingOwner()` may be
+  left dangling, and the Bridgehub's and the CTM's `admin()` must be the `ChainAdminOwnable`.
 
 ## Local and test deployments
 

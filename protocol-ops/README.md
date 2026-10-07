@@ -70,7 +70,9 @@ file per consecutive run of transactions by the same signer, plus a **`manifest.
 | **`bundles`**  | One entry per bundle file, in execution order: `index`, `file`, `target` (the signer), `steps`, `tx_count`.                         |
 | **`metadata`** | One entry per command run into this directory: `command` (CLI path id, e.g. `chain.init`), `input` and `output` (both may be `{}`). |
 
-Without `--out` the command runs on the fork and writes nothing.
+Without `--out` no bundles are written, unless the command derives a default from `--env`:
+`upgrade-prepare-all` (which also rewrites the release's canonical `ecosystem.toml`), `stage3` and
+`chain upgrade` do.
 
 ## Requirements
 
