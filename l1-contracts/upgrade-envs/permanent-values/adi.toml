@@ -59,8 +59,8 @@ zk_token_asset_id = "0x83e2fbc0a739b3c765de4c2b4bf8072a71ea8fbb09c8cf579c71425d8
 [permanent_contracts]
 # Canonical deterministic CREATE2 deployer (Arachnid/foundry).
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
-# `create2_factory_salt` lives in the v31 input TOML — it rotates per regen, so it
-# is not a permanent value.
+# `create2_factory_salt` lives in the v31 input TOML, pinned to mainnet's v31 salts
+# so ADI reuses mainnet's ecosystem-independent implementations.
 
 [core_contracts]
 bridgehub_proxy_addr = "0x7a38c18a229Ef8a0AE7104Ba272A46280f2d59Cb"

@@ -55,14 +55,32 @@ owner_address = "0x8253F33026c49A430963FE3991441c02175bda95"
 # the old Bash reader tolerated and the current Rust schema does not.
 bridgehub_proxy_address = "0x7a38c18a229Ef8a0AE7104Ba272A46280f2d59Cb"
 
-# Per-regen CREATE2 salt for this upgrade's implementations. Fresh so a re-prepare
-# lands on unoccupied addresses. ROTATE ON EVERY REGEN.
-create2_factory_salt = "0x641ca02de50fd50531c7894e113ff57aebdc57f2f2c0ad649208b2a970146f36"
+# CREATE2 salts pinned to mainnet's v31 salts (`mainnet.toml`), so ADI reuses
+# mainnet's deployed implementations wherever the init code is byte-identical:
+# CREATE2 lands on the same address and `deployViaCreate2` returns the existing
+# contract instead of deploying. The ZKsync OS CTM salt below carries the reuse
+# (Executor/Committer/Migrator/Getters facets, DiamondInit, the v31 and genesis
+# upgrade contracts, EIP7702Checker, ServerNotifier and PermissionlessValidator
+# implementations, BytecodesSupplier, fflonk/plonk verifiers, deployed by mainnet
+# with 0x2acd…). Everything whose constructor names an ecosystem address or the
+# Era chain id lands on a fresh address. Core contracts all do, so this base salt
+# only matches mainnet's for consistency.
+#
+# Do not rotate these: a fresh salt deploys everything again. Requirements:
+# - ADI's deployer must not be mainnet's (0xaB75E283274247b43a1f220885850ebEFa399B88).
+#   ZKsyncOSDualVerifier takes the deployer as its initial owner, so the same
+#   deployer reproduces mainnet's verifier, which mainnet governance owns. The
+#   prepare then reverts in `initializeVerifier`'s `transferOwnership`.
+# - Reuse needs byte-identical init code. Mainnet's bundle was generated from
+#   cb4aa6a65; the reused contracts' AllContractsHashes rows are unchanged on
+#   draft-v31 (8ecd3f816).
+create2_factory_salt = "0xc134236ec9d6d9f26067f2aaddb93c5fef5c2a05f31754112806aec86e1c6c2d"
 # Per-regen salt for the legacy `Governance.sol` ceremony op ids — rotate on every
 # regen so a re-broadcast cannot collide with an already-executed op id.
 legacy_gov_salt = "0xb6268de745245a50c160109116524bec33001cf25f204da33816536eff29b291"
 
-# Per-CTM CREATE2 salt (one ZKsync-OS CTM), keeping that CTM's
-# GovernanceUpgradeTimer at its own address.
+# Per-CTM CREATE2 salt (one ZKsync-OS CTM): mainnet's Atlas CTM salt, see above.
+# ADI's GovernanceUpgradeTimer and UpgradeStageValidator still get their own
+# addresses, because their constructors take ADI's governance and CTM.
 [create2_factory_salts]
-"0x08A1D2962fC29AA46e869A1E7561112cc1026EfA" = "0x2996f0ee44b7f622954675e2d3707f0dbbf9ec1ee922d51363e5438a6b1604ed"
+"0x08A1D2962fC29AA46e869A1E7561112cc1026EfA" = "0x2acd8a0dd5e82ac9eb0bc5067cdbe61097b9a5cb8cd9fa9c86ff8cb759afe7b9"
