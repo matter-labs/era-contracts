@@ -62,8 +62,8 @@ pub async fn check_readiness(l2_rpc_url: &str, upgrade_tx_hash: B256) -> Result<
     let Some(receipt) = fetch_receipt(&client, l2_rpc_url, upgrade_tx_hash).await? else {
         return Ok(Readiness::ServerNotProcessed);
     };
-    let upgrade_block = parse_hex_u64(&receipt.block_number)
-        .context("parse receipt.blockNumber")?;
+    let upgrade_block =
+        parse_hex_u64(&receipt.block_number).context("parse receipt.blockNumber")?;
     if upgrade_block == 0 {
         // Genesis — nothing to wait for.
         return Ok(Readiness::ServerNotProcessed);
@@ -101,10 +101,7 @@ async fn fetch_receipt(
     rpc_call(client, rpc, body).await
 }
 
-async fn fetch_finalized_block_number(
-    client: &reqwest::Client,
-    rpc: &str,
-) -> Result<Option<u64>> {
+async fn fetch_finalized_block_number(client: &reqwest::Client, rpc: &str) -> Result<Option<u64>> {
     let body = json!({
         "jsonrpc": "2.0",
         "id": 1,

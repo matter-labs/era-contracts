@@ -31,11 +31,23 @@ args to `protocol_ops` unless the first post-flag word is `forge`/`cast`).
 | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `execute-deployer-safe-bundles` | Apply Safe bundles whose `target` is the ecosystem deployer EOA (bundles from the chain-init workflow, the upgrade-prepare workflow, and the migrate-to/from phase-2-finalize workflows). Signs with `DEPLOYER_PRIVATE_KEY_<env>` secret. |
 
+## v31 ecosystem-upgrade workflows
+
+| Workflow                              | Purpose                                                                                                                                                                                                                                                          |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `generate-ecosystem-upgrade-calldata` | Step 1: regenerate the v31 calldata on a fork, PUVT it, and publish the **deploy bundle** (`ecosystem-upgrade-deploy-inputs-<env>`). Its `verify-bundle-handoff` job re-deploys + re-verifies that bundle with no contract build, proving it is self-sufficient. |
+| `deploy-ecosystem-upgrade`            | Step 2: broadcast the bundle's deployer calls to a real L1, then verify on Etherscan. Takes the step-1 run id.                                                                                                                                                   |
+
+See [`docs/ecosystem-upgrade-deploy.md`](../../docs/ecosystem-upgrade-deploy.md)
+for the local equivalents (`protocol_ops ecosystem rehearse-upgrade` and
+`replay-bundle`) and why the bundle — not a re-run — is what
+transfers between machines.
+
 ## Conventions
 
 - **All workflows** share: `environment`, `protocol_ops_tag`, `l1_rpc_url`
 - **Integration-test-only** env vars (e.g. `L1_DIAMOND_CUT_DATA`) are NOT workflow inputs
 - **v30-only** overrides are marked `[v30 only]` in descriptions and `TODO(v30-removal)` in code
 - **Artifact names**:
-  - per-chain workflows: `safe-bundles-{operation}-{chain_name}-{environment}`
-  - ecosystem-wide workflows (`upgrade-prepare`, `upgrade-governance`): `safe-bundles-{operation}-{environment}` (no `chain_name`)
+  - per-chain workflows: `safe-bundles-{operation}-{chain_id}-{environment}` (the two upgrade workflows; older per-chain workflows still take `chain_name`)
+  - ecosystem-wide workflows (`upgrade-prepare`, `upgrade-governance`): `safe-bundles-{operation}-{environment}` (no chain component)

@@ -22,6 +22,10 @@
  *                                  real-chain broadcast)
  *
  * Optional env:
+ *   GW_RPC_URL=<gateway-rpc>     — overrides the Gateway RPC PUVT uses for
+ *                                  its read-only GW-side checks. Defaults to
+ *                                  stage's permanent-values
+ *                                  `[new_gateway] rpc_url`.
  *   PROTOCOL_OPS_IMAGE=...       — full image ref. Defaults to
  *                                  ghcr.io/matter-labs/protocol-ops:v31-camp-split
  *   PROTOCOL_OPS_BIN_HOST=...    — explicit path to a pre-built linux/amd64
@@ -145,7 +149,7 @@ function resolveBinaryMount(): string[] {
 /**
  * Bind mounts for files that change per regen. We want the image's Foundry +
  * compiled Solidity artifacts to stay frozen, but configs (CREATE2 salts,
- * legacy_gov_salt, addresses) and the anvil-interop wrappers need to come
+ * legacy_gov_salt, addresses) and the anvil-interop tooling need to come
  * from the host so a developer's edits take effect without a rebuild.
  */
 function commonMounts(): string[] {
@@ -167,6 +171,14 @@ function commonMounts(): string[] {
  * ignores `--disable-labels` for `forge script`, otherwise the prepare
  * hangs 5–30 min per CTM).
  */
+/**
+ * `--gw-rpc-url` only when the operator overrides it; otherwise
+ * `rehearse-upgrade` falls back to stage's `[new_gateway] rpc_url`.
+ */
+function gwRpcOverride(): string[] {
+  return process.env.GW_RPC_URL ? ["--gw-rpc-url", process.env.GW_RPC_URL] : [];
+}
+
 function sourcifyBlock(): string[] {
   return ["--add-host", "sourcify.dev:127.0.0.1", "--add-host", "repo.sourcify.dev:127.0.0.1"];
 }
@@ -177,36 +189,31 @@ function dockerRun(args: string[], opts: SpawnSyncOptions = {}): number {
 }
 
 function cmdRegen(pk: string, rpc: string, binMount: string[]): number {
-  // Forward any iteration-skip flags the wrapper script understands. Useful
-  // for re-running just PUVT (`SKIP_PREPARE=1 SKIP_BROADCAST=1`) after
-  // refreshing only the protocol_ops binary, or skipping PUVT for fast
-  // iteration on the sim layer.
-  const passthrough: string[] = [];
-  for (const k of ["SKIP_PREPARE", "SKIP_BROADCAST", "SKIP_PUVT", "KEEP_ANVIL"]) {
-    if (process.env[k]) {
-      passthrough.push("-e", `${k}=${process.env[k]}`);
-    }
-  }
+  // `rehearse-upgrade` forks the RPC inside the container and impersonates the
+  // deployer, so it only needs the deployer's address; the key never enters
+  // the container.
+  const deployer = new ethers.Wallet(pk).address;
   const args = [
     "run",
     "--rm",
     "--platform",
     "linux/amd64",
     ...sourcifyBlock(),
-    "-e",
-    `DEPLOYER_PK=${pk}`,
-    "-e",
-    `L1_RPC_URL=${rpc}`,
-    "-e",
-    `L1_FORK_URL=${rpc}`,
-    ...passthrough,
     ...binMount,
     ...commonMounts(),
     "-w",
-    "/contracts/l1-contracts",
+    "/contracts",
     IMAGE,
-    "bash",
-    "test/anvil-interop/regen-and-verify-stage.sh",
+    "protocol_ops",
+    "ecosystem",
+    "rehearse-upgrade",
+    "--env",
+    "stage",
+    "--fork-url",
+    rpc,
+    "--deployer-address",
+    deployer,
+    ...gwRpcOverride(),
   ];
   return dockerRun(args);
 }
@@ -567,8 +574,8 @@ async function main(): Promise<void> {
         "which produces bit-identical artifacts. Equivalents:",
         "",
         "  # phases 1 + 1.5 — prepare + fork-replay + PUVT",
-        "  cd l1-contracts/test/anvil-interop && \\",
-        "    DEPLOYER_PK_FILE=~/.test_pk L1_FORK_URL=<sepolia-rpc> ./regen-and-verify-stage.sh",
+        "  protocol_ops ecosystem rehearse-upgrade --env stage \\",
+        "    --fork-url <sepolia-rpc> --deployer-address <deployer-eoa>",
         "",
         "  # phase 2 — real-Sepolia broadcast",
         "  protocol_ops ecosystem upgrade-broadcast --manifest <prepare>/manifest.json \\",

@@ -7,10 +7,19 @@
 //! and returns the four PUH proposal calls that wire the new contracts into
 //! the existing PUH proxy:
 //!
-//!   1. `ProxyAdmin.upgradeAndCall(puhProxy, newPuhImpl, "")` — swap the impl
-//!   2. `PUH.updateSecurityCouncil(newSecurityCouncil)` — point at the new SecurityCouncil
-//!   3. `PUH.updateGuardians(newGuardians)` — point at the new Guardians
-//!   4. `PUH.updateEmergencyUpgradeBoard(newEmergencyUpgradeBoard)` — point at the new board
+//!   1. `ProxyAdmin.upgradeAndCall(puhProxy, newPuhImpl,
+//!      PUH.initialize(newSecurityCouncil, newGuardians, newEmergencyUpgradeBoard))` — swap the
+//!      impl and run its `reinitializer(2)` initializer in the same call, which both wires the
+//!      new governance set and consumes the reinitializer.
+//!
+//! It is ONE call on purpose. `ProtocolUpgradeHandler.initialize(address,address,address)` is
+//! `external reinitializer(2)` with no access control, so swapping the implementation without
+//! running it would leave the proxy on `_initialized == 1` and let ANY caller invoke
+//! `initialize` afterwards and set `securityCouncil`, `guardians` and `emergencyUpgradeBoard`
+//! to addresses of their choosing. Passing the initializer as the `upgradeAndCall` hook closes
+//! that window atomically. It sets exactly the three fields the previous
+//! `updateSecurityCouncil` / `updateGuardians` / `updateEmergencyUpgradeBoard` calls set, so
+//! those are no longer emitted.
 //!
 //! These land in **stage 0** so the new PUH governance set is wired before the
 //! v31 ecosystem proxy upgrades execute.
@@ -46,12 +55,12 @@ const EIP1967_ADMIN_SLOT: B256 = B256::new([
 /// on dispatch. We pass empty bytes for the post-upgrade call (no init-style
 /// hook needed for the impl swap).
 const PROXY_ADMIN_UPGRADE_AND_CALL_SELECTOR: [u8; 4] = [0x96, 0x23, 0x60, 0x9d];
-/// `ProtocolUpgradeHandler.updateSecurityCouncil(address)` selector.
-const PUH_UPDATE_SECURITY_COUNCIL_SELECTOR: [u8; 4] = [0xdb, 0xfe, 0x3e, 0x96];
-/// `ProtocolUpgradeHandler.updateGuardians(address)` selector.
-const PUH_UPDATE_GUARDIANS_SELECTOR: [u8; 4] = [0x69, 0x16, 0x16, 0xc5];
-/// `ProtocolUpgradeHandler.updateEmergencyUpgradeBoard(address)` selector.
-const PUH_UPDATE_EMERGENCY_BOARD_SELECTOR: [u8; 4] = [0x7a, 0xed, 0xf3, 0x37];
+/// `ProtocolUpgradeHandler.initialize(address,address,address)` selector — the proxy
+/// initializer, guarded by `reinitializer(2)`, run as the `upgradeAndCall` hook.
+/// `initialize(address,address,address)` on the PUH implementation — the hook the
+/// stage-0 impl swap carries. `stage0::the_verifier_and_generator_agree_on_the_puh_hook`
+/// pins this to the verifier's `initializeCall` selector.
+pub(crate) const PUH_INITIALIZE_SELECTOR: [u8; 4] = [0xc0, 0xc5, 0x3b, 0x8b];
 /// `bridgehub.chainAssetHandler()` selector.
 const BRIDGEHUB_CHAIN_ASSET_HANDLER_SELECTOR: [u8; 4] = [0x70, 0xd8, 0xaf, 0x87];
 
@@ -66,6 +75,8 @@ const DEFAULT_SCRIPT_PATH: &str = "scripts/DeployPUHAndGuardians.s.sol:DeployPUH
 pub(crate) const GOV_SALT_SEED: &[u8] = b"v31:gov";
 /// Default sibling checkout path for zk-governance.
 pub const DEFAULT_ZK_GOV_DIR: &str = "../../zk-governance";
+/// Optional path override used by CI and other non-sibling checkouts.
+pub const ZK_GOVERNANCE_DIR_ENV: &str = "ZK_GOVERNANCE_DIR";
 
 /// Inputs for the PUH/Guardians redeploy step. Most fields default — callers
 /// (`ecosystem upgrade-prepare-all`) should pass `env` for the auto-fills and
@@ -101,7 +112,9 @@ impl<'a> ZkGovernanceInputs<'a> {
             chain_asset_handler_override: None,
             create2_factory_override: None,
             gov_salt_override: None,
-            zk_governance_dir: PathBuf::from(DEFAULT_ZK_GOV_DIR),
+            zk_governance_dir: std::env::var_os(ZK_GOVERNANCE_DIR_ENV)
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from(DEFAULT_ZK_GOV_DIR)),
             zksync_os_ctm: None,
             use_testnet_puh,
         }
@@ -266,33 +279,28 @@ pub async fn deploy_puh_guardians(
         "New EmergencyBoard:   {new_emergency_upgrade_board:#x}"
     ));
 
-    // Stage-0 wiring, executed as the PUH via governance. The impl swap goes
-    // first; then the three `onlySelf` setters repoint the proxy at the freshly
-    // deployed SecurityCouncil, Guardians and EmergencyUpgradeBoard. The board
+    // Stage-0 wiring, executed as the PUH via governance: ONE call. The impl
+    // swap carries the new implementation's `initialize` as its `upgradeAndCall`
+    // hook, so the proxy is pointed at the freshly deployed SecurityCouncil,
+    // Guardians and EmergencyUpgradeBoard in the same transaction. The board
     // already embeds the new SC + Guardians as immutables (set at deploy), so
-    // pointing the PUH at the new board completes a consistent set.
-    let stage0_calls = vec![
-        GovernanceCall {
-            target: proxy_admin,
-            value: U256::ZERO,
-            data: encode_proxy_admin_upgrade(puh_proxy, new_puh_impl),
-        },
-        GovernanceCall {
-            target: puh_proxy,
-            value: U256::ZERO,
-            data: encode_puh_update_security_council(new_security_council),
-        },
-        GovernanceCall {
-            target: puh_proxy,
-            value: U256::ZERO,
-            data: encode_puh_update_guardians(new_guardians),
-        },
-        GovernanceCall {
-            target: puh_proxy,
-            value: U256::ZERO,
-            data: encode_puh_update_emergency_board(new_emergency_upgrade_board),
-        },
-    ];
+    // the set is consistent. Splitting this into a bare swap plus three
+    // `onlySelf` setters — the shape this replaced — leaves the proxy on
+    // `_initialized == 1` in between, where any caller can run `initialize`
+    // first and install their own governance set.
+    let stage0_calls = vec![GovernanceCall {
+        target: proxy_admin,
+        value: U256::ZERO,
+        data: encode_proxy_admin_upgrade(
+            puh_proxy,
+            new_puh_impl,
+            encode_puh_initialize(
+                new_security_council,
+                new_guardians,
+                new_emergency_upgrade_board,
+            ),
+        ),
+    }];
 
     Ok(ZkGovernanceOutcome {
         stage0_calls,
@@ -350,33 +358,72 @@ async fn read_eip1967_admin(rpc: &str, proxy: Address) -> anyhow::Result<Address
     Ok(addr)
 }
 
-fn encode_proxy_admin_upgrade(proxy: Address, new_impl: Address) -> Vec<u8> {
-    let mut buf = Vec::with_capacity(4 + 32 * 4);
+fn encode_proxy_admin_upgrade(
+    proxy: Address,
+    new_impl: Address,
+    post_upgrade_call: Vec<u8>,
+) -> Vec<u8> {
+    let mut buf = Vec::with_capacity(4 + 32 * 4 + post_upgrade_call.len());
     buf.extend_from_slice(&PROXY_ADMIN_UPGRADE_AND_CALL_SELECTOR);
-    // Matches Solidity `abi.encode(address, address, bytes)` (empty bytes for
-    // the post-upgrade call).
-    buf.extend_from_slice(&(proxy, new_impl, Bytes::new()).abi_encode_params());
+    // Matches Solidity `abi.encode(address, address, bytes)`.
+    buf.extend_from_slice(&(proxy, new_impl, Bytes::from(post_upgrade_call)).abi_encode_params());
     buf
 }
 
-fn encode_puh_update_guardians(new_guardians: Address) -> Vec<u8> {
-    encode_address_setter(PUH_UPDATE_GUARDIANS_SELECTOR, new_guardians)
-}
-
-fn encode_puh_update_security_council(new_security_council: Address) -> Vec<u8> {
-    encode_address_setter(PUH_UPDATE_SECURITY_COUNCIL_SELECTOR, new_security_council)
-}
-
-fn encode_puh_update_emergency_board(new_board: Address) -> Vec<u8> {
-    encode_address_setter(PUH_UPDATE_EMERGENCY_BOARD_SELECTOR, new_board)
-}
-
-/// Encodes a `selector(address)` call — the shape of all three PUH `update*`
-/// setters (`updateSecurityCouncil` / `updateGuardians` / `updateEmergencyUpgradeBoard`).
-fn encode_address_setter(selector: [u8; 4], addr: Address) -> Vec<u8> {
-    let mut buf = Vec::with_capacity(4 + 32);
-    buf.extend_from_slice(&selector);
-    // Single left-padded 32-byte word, same as `abi.encode(address)`.
-    buf.extend_from_slice(&addr.abi_encode());
+/// `PUH.initialize(securityCouncil, guardians, emergencyUpgradeBoard)`.
+fn encode_puh_initialize(
+    security_council: Address,
+    guardians: Address,
+    emergency_upgrade_board: Address,
+) -> Vec<u8> {
+    let mut buf = Vec::with_capacity(4 + 32 * 3);
+    buf.extend_from_slice(&PUH_INITIALIZE_SELECTOR);
+    buf.extend_from_slice(
+        &(security_council, guardians, emergency_upgrade_board).abi_encode_params(),
+    );
     buf
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The impl swap must carry the PUH's `reinitializer(2)` initializer as its
+    /// `upgradeAndCall` hook. Without it the proxy stays on `_initialized == 1` and any
+    /// caller can invoke `initialize` afterwards to set the whole governance set.
+    #[test]
+    fn the_impl_swap_runs_the_puh_initializer_with_the_new_governance_set() {
+        let proxy = Address::repeat_byte(0x11);
+        let new_impl = Address::repeat_byte(0x22);
+        let council = Address::repeat_byte(0x33);
+        let guardians = Address::repeat_byte(0x44);
+        let board = Address::repeat_byte(0x55);
+
+        let hook = encode_puh_initialize(council, guardians, board);
+        assert_eq!(&hook[..4], &PUH_INITIALIZE_SELECTOR, "initialize selector");
+        assert_eq!(hook.len(), 4 + 32 * 3);
+        for (index, expected) in [(0, council), (1, guardians), (2, board)] {
+            let word = &hook[4 + index * 32..4 + (index + 1) * 32];
+            assert_eq!(&word[12..], expected.as_slice(), "initialize arg {index}");
+        }
+
+        let call = encode_proxy_admin_upgrade(proxy, new_impl, hook.clone());
+        assert_eq!(&call[..4], &PROXY_ADMIN_UPGRADE_AND_CALL_SELECTOR);
+        assert!(
+            call.windows(hook.len())
+                .any(|window| window == hook.as_slice()),
+            "upgradeAndCall payload does not embed the initializer calldata"
+        );
+    }
+
+    /// An empty hook is the bug this guards against; keep the encoder's shape reviewable.
+    #[test]
+    fn an_empty_hook_encodes_to_a_bare_upgrade() {
+        let call = encode_proxy_admin_upgrade(Address::ZERO, Address::ZERO, Vec::new());
+        assert_eq!(
+            call.len(),
+            4 + 32 * 4,
+            "selector + (address, address, bytes) with empty bytes"
+        );
+    }
 }
