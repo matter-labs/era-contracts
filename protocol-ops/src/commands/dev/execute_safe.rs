@@ -990,13 +990,17 @@ fn split_bytecode_batch(data: &[u8]) -> Option<Vec<Bytes>> {
 /// address or the call was setting a different one.
 fn already_set_address_is_called(err: &str, data: &[u8]) -> bool {
     let lower = err.to_lowercase();
-    let Some(start) = lower.find(ADDRESS_ALREADY_SET_SELECTOR) else {
-        return false;
-    };
-    let word_start = start + ADDRESS_ALREADY_SET_SELECTOR.len();
-    let Some(word) = lower
-        .get(word_start..word_start + 64)
-        .and_then(|hex| alloy::hex::decode(hex).ok())
+    // anvil also names the selector in the message (`custom error 0x0dfb42bf: 0000…`), so take
+    // the first occurrence that is directly followed by the address word.
+    let Some(word) =
+        lower
+            .match_indices(ADDRESS_ALREADY_SET_SELECTOR)
+            .find_map(|(start, selector)| {
+                let word_start = start + selector.len();
+                lower
+                    .get(word_start..word_start + 64)
+                    .and_then(|hex| alloy::hex::decode(hex).ok())
+            })
     else {
         return false;
     };
@@ -1818,6 +1822,16 @@ mod tests {
         assert!(!super::already_set_address_is_called(
             "execution reverted, data: \"0x0dfb42bf\"",
             &call(&[set])
+        ));
+
+        // anvil also decodes the error into the message, ahead of `data`.
+        let anvil = format!(
+            "server returned an error response: error code 3: execution reverted: custom error 0x0dfb42bf: {set}, data: \"0x0dfb42bf{set}\""
+        );
+        assert!(super::already_set_address_is_called(&anvil, &call(&[set])));
+        assert!(!super::already_set_address_is_called(
+            &anvil,
+            &call(&[other])
         ));
     }
 }
