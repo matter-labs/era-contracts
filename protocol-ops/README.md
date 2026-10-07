@@ -66,7 +66,9 @@ covers the current release's upgrade. See
 
 `--env <name>` reads `upgrade-envs/permanent-values/<name>.toml` and the release input
 `<release dir>/<name>.toml`. The release dir is the current release's (`current_upgrade_env_dir!` in
-`src/common/forge/scripts/mod.rs`) unless `--upgrade-env-dir` selects another, or `upgrade-prepare-all`'s
+`src/common/forge/scripts/mod.rs`) unless `--upgrade-env-dir` selects another (on the commands built on the
+shared `--env` topology args and on `verify-upgrade`; `ecosystem init` / `ctm init` always use the current
+release), or `upgrade-prepare-all`'s
 `--upgrade-input-path` points into another release's dir. The owner, `era_chain_id` and CREATE2 salts come
 from that release input, and a command that needs one of them fails when the release has no input for the
 env: it never falls back to the deployer, local's values or random salts. `yarn new-release` creates the next
@@ -83,8 +85,14 @@ Safe-bundle-aware executor) with the keys from `wallets.yaml`.
 
 ## Running the Protocol Upgrade Verification Tool (PUVT)
 
+> **Not ported to v34 yet.** On this line `verify-upgrade` still runs the v31 verifier
+> (`upgrade_verification/versions/v31`), which is pinned to the 0.31.0 → 0.32.0 transition and rejects a
+> v34 bundle (0.33.x → 0.34.0) in stage 1. The working v33 verifier lives on
+> `release/v0.33.0-atomic-interop` (`versions/v33`); porting it to v34 must also move the cut-initializer
+> check to `v34_upgrade_addr`.
+
 `ecosystem verify-upgrade` re-derives and cross-checks the calldata produced by
-`ecosystem upgrade-prepare-all` for the current release's **ZKsync OS upgrade** (v33 → v34). It is
+`ecosystem upgrade-prepare-all` for a **ZKsync OS upgrade**. It is
 **read-only**: it never runs forge or spins up an Anvil fork. It reads the merged
 `ecosystem.toml`, replays the append-only `transactions.txt` deployment log against L1,
 and matches every CREATE2 deployment against `AllContractsHashes.json`. The tool is
@@ -97,16 +105,16 @@ cargo run --release --bin protocol_ops -- ecosystem verify-upgrade \
   --zk-governance-commit <commit>
 ```
 
-| Flag                         | Role                                                                                                                                                                             |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`--env`**                  | `stage` / `testnet` / `mainnet`; selects the permanent-values + current-release input TOMLs.                                                                                     |
-| **`--ecosystem-toml`**       | Merged artifact from `upgrade-prepare-all`.                                                                                                                                      |
-| **`--zk-governance-commit`** | zk-governance commit for PUH / Guardians / SecurityCouncil / EUB bytecode metadata (required).                                                                                   |
-| **`--contracts-commit`**     | Optional era-contracts commit; when omitted, the local checkout is the authority.                                                                                                |
-| **`--transactions-log`**     | Deployment tx-hash log; defaults to the env's `output/<env>/transactions.txt`.                                                                                                   |
-| **`--upgrade-env-dir`**      | Release dir for the env input and log (e.g. `upgrade-envs/v0.33.0-atomic-interop` to verify a v33 preparation); defaults to the current release. Every `--env` command takes it. |
-| **`--l1-rpc-url`**           | L1 RPC (default `http://localhost:8545`).                                                                                                                                        |
-| **`--display-upgrade-data`** | Print each stage's ABI-encoded `UpgradeProposal` and skip the rest of the verifier.                                                                                              |
+| Flag                         | Role                                                                                           |
+| ---------------------------- | ---------------------------------------------------------------------------------------------- |
+| **`--env`**                  | `stage` / `testnet` / `mainnet`; selects the permanent-values + current-release input TOMLs.   |
+| **`--ecosystem-toml`**       | Merged artifact from `upgrade-prepare-all`.                                                    |
+| **`--zk-governance-commit`** | zk-governance commit for PUH / Guardians / SecurityCouncil / EUB bytecode metadata (required). |
+| **`--contracts-commit`**     | Optional era-contracts commit; when omitted, the local checkout is the authority.              |
+| **`--transactions-log`**     | Deployment tx-hash log; defaults to the env's `output/<env>/transactions.txt`.                 |
+| **`--upgrade-env-dir`**      | Release dir for the env input and the default log; defaults to the current release.            |
+| **`--l1-rpc-url`**           | L1 RPC (default `http://localhost:8545`).                                                      |
+| **`--display-upgrade-data`** | Print each stage's ABI-encoded `UpgradeProposal` and skip the rest of the verifier.            |
 
 ## Output
 
