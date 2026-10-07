@@ -139,23 +139,23 @@ pub(crate) fn historical_create2_deployments(env: VerifyUpgradeEnv) -> Option<&'
 /// found these 17 besides the upgrade's own deployments; the generation and handoff runs of
 /// 36548947871 find 10 of them.
 const MAINNET_HISTORICAL_CREATE2_DEPLOYMENTS: [Address; 17] = [
-    alloy::primitives::address!("1b5706059A887630Db7f3D62B7C1577bb032f6E8"), // TransparentUpgradeableProxy
-    alloy::primitives::address!("36f23a378233Db0bFB9A243711a98d846D40521C"), // TransparentUpgradeableProxy
-    alloy::primitives::address!("37e3343831dbd4997f4283f8d1A8991091befC95"), // EIP7702Checker
-    alloy::primitives::address!("6A195c351EcCAE69165c0fD202095C4abdf1c197"), // TransparentUpgradeableProxy
-    alloy::primitives::address!("787C1F9CF40EF0bd852a9Bc571Bc3e3010Cf79B1"), // TransparentUpgradeableProxy
-    alloy::primitives::address!("7f60f575640E658CC2A400d59307f90fdEa05176"), // TransparentUpgradeableProxy
-    alloy::primitives::address!("8eF17384A157287921E1ebdb0a08a2f102ba4a92"), // TransparentUpgradeableProxy
-    alloy::primitives::address!("A17E687F56F6E8d892e3D6e3427eA14AdFefF1Cb"), // TransparentUpgradeableProxy
-    alloy::primitives::address!("A4AD3d2621F1d2B737d35a9c2E361D704cb8d3aF"), // RollupL1DAValidator
-    alloy::primitives::address!("AE273354E73714bC5Fb7b15c02c2bC0Dc03b4c5E"), // TransparentUpgradeableProxy
-    alloy::primitives::address!("E5d0a1CbAA5a65e76956B1c094fBB838B48841a2"), // TransparentUpgradeableProxy
-    alloy::primitives::address!("bd44a86d1469751cf173bcc00162748E8Ac6739A"), // TransparentUpgradeableProxy
-    alloy::primitives::address!("c2fc8952e3fF43c93369ce9f6517ED6dfC663137"), // EIP7702Checker
-    alloy::primitives::address!("d3a6C81d2F080b223f41ebdd3F7AD2BbeFD57B90"), // TransparentUpgradeableProxy
-    alloy::primitives::address!("e33cc25e7f9275cdcb65CAfb85c3215d45003C12"), // ZKsyncOSVerifierFflonk
-    alloy::primitives::address!("e8536Ff0bf73E9245Ce5bF58b7e06388Fe9dBD52"), // TransparentUpgradeableProxy
-    alloy::primitives::address!("ff216E1b4e38A9206721795cE4Ab5F76d1Dd1140"), // RollupL1DAValidator
+    alloy::primitives::address!("0x1b5706059A887630Db7f3D62B7C1577bb032f6E8"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0x36f23a378233Db0bFB9A243711a98d846D40521C"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0x37e3343831dbd4997f4283f8d1A8991091befC95"), // EIP7702Checker
+    alloy::primitives::address!("0x6A195c351EcCAE69165c0fD202095C4abdf1c197"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0x787C1F9CF40EF0bd852a9Bc571Bc3e3010Cf79B1"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0x7f60f575640E658CC2A400d59307f90fdEa05176"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0x8eF17384A157287921E1ebdb0a08a2f102ba4a92"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0xA17E687F56F6E8d892e3D6e3427eA14AdFefF1Cb"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0xA4AD3d2621F1d2B737d35a9c2E361D704cb8d3aF"), // RollupL1DAValidator
+    alloy::primitives::address!("0xAE273354E73714bC5Fb7b15c02c2bC0Dc03b4c5E"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0xE5d0a1CbAA5a65e76956B1c094fBB838B48841a2"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0xbd44a86d1469751cf173bcc00162748E8Ac6739A"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0xc2fc8952e3fF43c93369ce9f6517ED6dfC663137"), // EIP7702Checker
+    alloy::primitives::address!("0xd3a6C81d2F080b223f41ebdd3F7AD2BbeFD57B90"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0xe33cc25e7f9275cdcb65CAfb85c3215d45003C12"), // ZKsyncOSVerifierFflonk
+    alloy::primitives::address!("0xe8536Ff0bf73E9245Ce5bF58b7e06388Fe9dBD52"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0xff216E1b4e38A9206721795cE4Ab5F76d1Dd1140"), // RollupL1DAValidator
 ];
 
 pub(crate) const MAX_NUMBER_OF_ZK_CHAINS: u32 = 100;
