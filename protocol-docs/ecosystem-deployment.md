@@ -35,10 +35,13 @@ A deployment has three layers, each with its own Forge script and its own `proto
 subcommand. `protocol_ops` never broadcasts to the target L1 itself: it runs the scripts on a
 temporary Anvil fork of `--l1-rpc-url`, records every transaction, and writes Safe Transaction
 Builder bundles (one per consecutive run of transactions by the same signer) plus a `manifest.json`
-into `--out`. The bundles are then applied to the real L1 with `protocol_ops ecosystem
-upgrade-broadcast --manifest <out>/manifest.json` (which needs a `--key` for every signer in the
-manifest), with `protocol_ops dev execute-safe` per bundle, or with any Safe-bundle-aware
-executor; see `protocol-ops/README.md` for the execution model.
+into `--out`. Each bundle is then executed on the real L1 by its signer, in manifest order. For
+bundles whose signer is an EOA whose key you hold, `protocol_ops ecosystem upgrade-broadcast
+--manifest <out>/manifest.json --l1-rpc-url <l1> --key <addr>=<key>` sends them (it defaults to
+`http://localhost:8545` without `--l1-rpc-url`, needs a `--key` for every signer in the manifest,
+and signs each transaction directly), as does `protocol_ops dev execute-safe` for a single bundle.
+Bundles whose signer is a multisig, such as an `owner_address` Safe, are imported into that
+multisig's own transaction flow; see `protocol-ops/README.md` for the execution model.
 
 | Layer | `protocol_ops` command                                     | Forge scripts                                                | Signers                                                       |
 | ----- | ---------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------- |
@@ -124,8 +127,9 @@ deploys one CTM for one VM type (`--vm-type zksyncos|eravm`):
 
 The chain creation parameters the CTM stores (`setChainCreationParams`: genesis upgrade, genesis
 root, initial diamond cut, force deployment data) are built from `configs/genesis/<vm>/latest.json`
-and from the compiled L2 built-ins. The genesis file is produced by `tools/zksync-os-genesis-gen`
-and is what the operator's node must be started with; deploying a CTM from a build whose bytecodes
+and from the compiled L2 built-ins. The ZKsync OS genesis file is produced by
+`tools/zksync-os-genesis-gen` (the EraVM one is generated separately, by the zksync-era genesis
+tooling) and is what the operator's node must be started with; deploying a CTM from a build whose bytecodes
 do not match it produces chains whose genesis the node cannot reproduce.
 
 `DeployCTM.s.sol` ends by starting five two-step ownership transfers: the CTM to `Governance`
@@ -165,8 +169,8 @@ zero, so the CTM deployment script rejects a zero id up front.
    registers the chain in the message root and seeds its genesis batch root.
 4. Grants the operator addresses their `ValidatorTimelock` roles: the commit operator becomes the
    committer; the prove operator becomes the prover and also the precommitter, reverter and
-   upgrader; on ZKsync OS a separate execute operator becomes the executor (`--commit-operator`,
-   `--prove-operator`, `--execute-operator`), while on EraVM the prove operator executes too.
+   upgrader; on ZKsync OS a separate execute operator (`--execute-operator`, optional) becomes the
+   executor. Without it, and always on EraVM, the prove operator executes too.
 5. Sets the base-token price multiplier and, for a validium-priced chain, the validium pricing
    mode.
 6. Sets the chain's pending admin to the new `ChainAdmin`.
@@ -186,8 +190,10 @@ DA choices mean and {protocol-docs/system/contracts/chain_management/admin_role.
 admin role.
 
 On EraVM chains `chain init` additionally deploys the L2 contracts through priority transactions
-(EVM emulator enablement, paymaster, `ConsensusRegistry`, `Multicall3`, `TimestampAsserter`).
-ZKsync OS chains get all of their L2 built-ins from genesis and skip this block.
+(`ConsensusRegistry`, `Multicall3`, `TimestampAsserter`), unless `--skip-priority-txs` is set; it
+enables the EVM emulator only with `--evm-emulator` and deploys the testnet paymaster only with
+`--deploy-paymaster`. ZKsync OS chains get all of their L2 built-ins from genesis and skip this
+block.
 
 ### Interop registration
 
@@ -255,8 +261,10 @@ the start: every power in the table above flows from it.
   checklist a successful deployment satisfies: Bridgehub, asset router and vault have code, the CTM
   is registered, every chain has a diamond proxy, and every ZKsync OS built-in is present on the
   chain.
-- Verify the deployed contracts on the explorer with `yarn verify-contracts` in `l1-contracts`,
-  fed with the `forge verify-contract` lines the scripts log.
+- Verify the deployed contracts on the explorer from `l1-contracts` with
+  `yarn verify-contracts <log-file> --chain <stage|testnet|mainnet>`, where the log file holds the
+  `forge verify-contract` lines the scripts print. It only targets mainnet (`mainnet`) and Sepolia (`stage`, `testnet`);
+  on any other L1, run those lines with that explorer's verifier settings.
 - Check ownership: `owner()` of the core proxies and the CTM must be the governance contract and
   no `pendingOwner()` may be left dangling; the Bridgehub's `admin()` must be the
   `ChainAdminOwnable`. After `hub init` and `ctm init` alone this check fails until the manual

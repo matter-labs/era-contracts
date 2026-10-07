@@ -98,9 +98,13 @@ flowchart LR
 | 2. Deploy          | `ecosystem upgrade-broadcast`                                                                           | deployer, CTM admin  | yes                 |
 | 3. Verify          | `ecosystem verify-upgrade`, `ecosystem governance-toml-to-simulator`, `ecosystem manifest-to-simulator` | none                 | no                  |
 | 4. Governance      | `ecosystem upgrade-governance` or the governance's own proposal flow                                    | ecosystem governance | yes                 |
-| 5. Post-governance | release-specific, e.g. `ecosystem stage3`                                                               | any EOA              | yes                 |
-| 6. Per chain       | `chain set-upgrade-timestamp`, `chain upgrade`                                                          | each chain admin     | yes                 |
+| 5. Post-governance | release-specific, e.g. `ecosystem stage3` (emits a bundle)                                              | any EOA              | yes                 |
+| 6. Per chain       | `chain set-upgrade-timestamp`, `chain upgrade` (emit bundles)                                           | each chain admin     | yes                 |
 | 7. Close-out       | `ChainTypeManager.setProtocolVersionDeadline`                                                           | ecosystem governance | yes                 |
+
+Only `upgrade-broadcast` sends transactions. Every other `protocol_ops` command in the table runs
+on an Anvil fork and writes Safe bundles; a phase touches L1 when its signer executes those
+bundles (with `upgrade-broadcast`, `dev execute-safe`, or the signer's multisig).
 
 The `generate-upgrade-calldata-*`, `execute-deployer-safe-bundles` and `generate-chain-*-calldata`
 workflows under `.github/workflows/` still drive the previous `protocol_ops` CLI (`--ecosystem`,
@@ -234,7 +238,8 @@ every chain created afterwards starts on the new version.
 
 Some releases need work after governance and before the chains move, signed by any EOA because it
 carries no privilege. In v33 that is `protocol_ops ecosystem stage3 --env <env> --sender <EOA>`,
-which populates `L1NativeTokenVault.bridgedOut` for every pre-existing asset (see
+whose bundle, once that EOA executes it, populates `L1NativeTokenVault.bridgedOut` for every
+pre-existing asset (see
 {protocol-docs/bridging.md#populating-bridgedout-during-an-in-place-upgrade}). Such steps are
 described in the release's output README and, being broadcasts rather than calldata, are not
 covered by the verifier.
@@ -243,7 +248,9 @@ covered by the verifier.
 
 Each chain takes the cut through its own `ChainAdmin`. The order below is the ZKsync OS one (v33
 upgrades ZKsync OS chains only), and it matters because scheduling the upgrade is the point of no
-return for the node:
+return for the node. Both `chain` commands below only write a bundle
+(`ChainAdmin.multicall`, signed by the `ChainAdmin` owner); each step happens when that bundle is
+executed on L1, and the timestamp bundle must be executed before the cut bundle.
 
 1. **Check the cut's preconditions first.** The cut reverts unless they hold on the chain: the
    chain is on exactly the old version, every committed batch has been executed (the release
