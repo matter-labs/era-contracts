@@ -12,6 +12,10 @@ use crate::common::SharedRunArgs;
 #[derive(Serialize)]
 struct SetUpgradeTimestampOutput {
     admin_address: Address,
+    /// The ChainAdmin's owner, who sends the bundle; absent when an AccessControlRestriction
+    /// admin sends it instead.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    chain_admin_owner: Option<Address>,
     access_control_restriction: Address,
     bridgehub: Address,
     chain_id: u64,
@@ -69,6 +73,7 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
     let sender = runner
         .prepare_chain_admin_broadcaster(bridgehub, chain_id, args.access_control_restriction)
         .await?;
+    let sender_address = sender.address;
 
     let forge = runner
         .script_call(AdminFunctionsAbi::adminScheduleUpgradeCall {
@@ -113,6 +118,8 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
         &serde_json::json!({}),
         &SetUpgradeTimestampOutput {
             admin_address,
+            chain_admin_owner: (args.access_control_restriction == Address::ZERO)
+                .then_some(sender_address),
             access_control_restriction: args.access_control_restriction,
             bridgehub,
             chain_id,

@@ -27,6 +27,7 @@ use alloy::primitives::{Address, U256};
 use alloy::providers::{Provider, ProviderBuilder};
 use anyhow::{Context, Result};
 use clap::Parser;
+use reqwest::Url;
 use tracing::{info, warn};
 
 use crate::readiness::Readiness;
@@ -101,8 +102,14 @@ async fn main() -> ExitCode {
 
 async fn run() -> Result<()> {
     let cli = Cli::parse();
+    let l2_rpc_url = parse_http_rpc_url("--l2-rpc-url / L2_RPC_URL", &cli.l2_rpc_url)?;
+    let settlement_rpc_url = parse_http_rpc_url(
+        "--settlement-rpc-url / SETTLEMENT_RPC_URL",
+        &cli.settlement_rpc_url,
+    )?;
 
-    let target_protocol_version = pack_protocol_version(cli.target_minor_version, cli.target_patch_version);
+    let target_protocol_version =
+        pack_protocol_version(cli.target_minor_version, cli.target_patch_version);
     info!(
         minor = cli.target_minor_version,
         patch = cli.target_patch_version,
@@ -111,11 +118,7 @@ async fn run() -> Result<()> {
     );
 
     let settlement_provider = ProviderBuilder::new()
-        .connect_http(
-            cli.settlement_rpc_url
-                .parse()
-                .context("invalid --settlement-rpc-url")?,
-        )
+        .connect_http(settlement_rpc_url)
         .erased();
 
     // Step 1-3: find the pending upgrade's canonical L2 tx hash. Static once the
@@ -141,7 +144,7 @@ async fn run() -> Result<()> {
     // Step 4-5: block until the upgrade is finalized. Transient errors are logged
     // and retried on the next tick — we never give up on our own.
     loop {
-        match readiness::check_readiness(&cli.l2_rpc_url, upgrade_tx_hash).await {
+        match readiness::check_readiness(l2_rpc_url.as_str(), upgrade_tx_hash).await {
             Ok(Readiness::Ready {
                 upgrade_block,
                 finalized_block,
@@ -182,6 +185,17 @@ fn pack_protocol_version(minor: u32, patch: u32) -> U256 {
     (U256::from(minor) << PACKED_SEMVER_MINOR_OFFSET) | U256::from(patch)
 }
 
+fn parse_http_rpc_url(name: &str, value: &str) -> Result<Url> {
+    let url = Url::parse(value)
+        .with_context(|| format!("invalid {name}: expected an absolute http(s) JSON-RPC URL"))?;
+    match url.scheme() {
+        "http" | "https" => Ok(url),
+        scheme => anyhow::bail!(
+            "invalid {name}: unsupported URL scheme '{scheme}'; only http:// and https:// JSON-RPC URLs are supported"
+        ),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -195,5 +209,22 @@ mod tests {
         // 0.31.2 → minor=31 at offset 32, patch=2
         let packed = pack_protocol_version(31, 2);
         assert_eq!(packed, (U256::from(31u64) << 32) | U256::from(2u64));
+    }
+
+    #[test]
+    fn parse_http_rpc_url_accepts_http_and_https() {
+        assert!(parse_http_rpc_url("rpc", "http://localhost:8545").is_ok());
+        assert!(parse_http_rpc_url("rpc", "https://example.com").is_ok());
+    }
+
+    #[test]
+    fn parse_http_rpc_url_rejects_websocket_and_relative_urls() {
+        let err = parse_http_rpc_url("rpc", "wss://example.com").unwrap_err();
+        assert!(err.to_string().contains("unsupported URL scheme 'wss'"));
+
+        let err = parse_http_rpc_url("rpc", "sepolia").unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("expected an absolute http(s) JSON-RPC URL"));
     }
 }
