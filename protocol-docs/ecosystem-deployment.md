@@ -211,7 +211,9 @@ Creating a chain does not make it reachable for interop. `chain init --register-
 ecosystem and vice versa through `ChainRegistrationSender`, which is permissionless and
 once-per-ordered-pair. It skips, without failing, every pair that is not registrable yet: a chain
 with no batch in the message root (an EraVM chain until its first settled batch, since only ZKsync
-OS chains are seeded at creation) and a destination whose deposits are paused. A successful run
+OS chains are seeded at creation) and an existing destination whose deposits are paused. Registrations onto the new chain itself do
+not check its pause flag, so a chain created with `--pause-deposits` makes the run revert; unpause it
+first. A successful run
 therefore does not mean every pair is registered; re-run it once the skipped chains qualify. It is
 off by default on purpose: which chains of a production ecosystem may
 talk to each other is a decision, not a side effect of creating one. The guards the sender applies

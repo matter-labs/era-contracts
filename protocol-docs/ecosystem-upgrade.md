@@ -239,7 +239,9 @@ every chain created afterwards starts on the new version.
 Some releases need work after governance and before the chains move, signed by any EOA because it
 carries no privilege. In v33 that is `protocol_ops ecosystem stage3 --env <env> --l1-rpc-url <l1> --sender <EOA>`,
 whose bundle, once that EOA executes it, populates `L1NativeTokenVault.bridgedOut` for every
-pre-existing asset (see
+L1-native asset in the vault's `bridgedTokens` list. Legacy tokens missing from that list must be
+backfilled into it first with the vault's permissionless `addLegacyTokenToBridgedTokensList(token)`,
+otherwise their withdrawals keep reverting (see
 {protocol-docs/bridging.md#populating-bridgedout-during-an-in-place-upgrade}). Such steps are
 described in the release's output README and, being broadcasts rather than calldata, are not
 covered by the verifier.
