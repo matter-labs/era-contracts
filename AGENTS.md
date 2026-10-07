@@ -371,8 +371,9 @@ name (`uint256,`), and a contract with a payable `fallback` gets a `receive` run
 1. **Run linting fixes**: `yarn lint:sol --fix --noPrompt && yarn lint:ts --fix && yarn prettier:fix`
 2. **Check solc warnings**: `yarn l1 solc-warnings && yarn da solc-warnings`
 3. **Run foundry tests**: `cd l1-contracts && yarn test:foundry`
-4. **Verify no uncommitted changes**: `git status`
-5. **Commit and push**: Only after all checks pass
+4. **Review what you're about to push** when it addresses review comments or changes behavior: run `/ai-review` (Codex: `$ai-review`). Fix what it confirms. After two rounds, leave anything still open to a human.
+5. **Verify no uncommitted changes**: `git status`
+6. **Commit and push**: Only after all checks pass
 
 ### Common Linting Issues
 
