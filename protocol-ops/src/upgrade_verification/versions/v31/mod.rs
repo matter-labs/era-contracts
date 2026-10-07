@@ -119,6 +119,45 @@ pub(crate) fn expected_protocol_versions(
     }
 }
 
+/// CREATE2 deployments PUVT recognizes in an env's transactions logs that this upgrade does not
+/// use: contracts of earlier broadcasts (the July 2026 deployment kept as the reference log, and
+/// the 2026-09-07 broadcast whose contracts the re-cut bundle superseded). No element expects
+/// them, so no constructor check applies. For an env with a list, any other unchecked CREATE2
+/// deployment is an error (`report_unverified_create2_deployments`); envs without one keep the
+/// warning until a real run enumerates theirs.
+///
+/// `tests::mainnet_historical_create2_deployments_are_unused_by_the_upgrade` pins the mainnet
+/// list against the committed ecosystem TOML.
+pub(crate) fn historical_create2_deployments(env: VerifyUpgradeEnv) -> Option<&'static [Address]> {
+    match env {
+        VerifyUpgradeEnv::Mainnet => Some(&MAINNET_HISTORICAL_CREATE2_DEPLOYMENTS),
+        VerifyUpgradeEnv::Stage | VerifyUpgradeEnv::Testnet | VerifyUpgradeEnv::Adi => None,
+    }
+}
+
+/// The 2026-10-06 live mainnet PUVT (the full deployer journal plus the July reference log)
+/// found these 17 besides the upgrade's own deployments; the generation and handoff runs of
+/// 36548947871 find 10 of them.
+const MAINNET_HISTORICAL_CREATE2_DEPLOYMENTS: [Address; 17] = [
+    alloy::primitives::address!("0x1b5706059A887630Db7f3D62B7C1577bb032f6E8"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0x36f23a378233Db0bFB9A243711a98d846D40521C"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0x37e3343831dbd4997f4283f8d1A8991091befC95"), // EIP7702Checker
+    alloy::primitives::address!("0x6A195c351EcCAE69165c0fD202095C4abdf1c197"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0x787C1F9CF40EF0bd852a9Bc571Bc3e3010Cf79B1"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0x7f60f575640E658CC2A400d59307f90fdEa05176"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0x8eF17384A157287921E1ebdb0a08a2f102ba4a92"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0xA17E687F56F6E8d892e3D6e3427eA14AdFefF1Cb"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0xA4AD3d2621F1d2B737d35a9c2E361D704cb8d3aF"), // RollupL1DAValidator
+    alloy::primitives::address!("0xAE273354E73714bC5Fb7b15c02c2bC0Dc03b4c5E"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0xE5d0a1CbAA5a65e76956B1c094fBB838B48841a2"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0xbd44a86d1469751cf173bcc00162748E8Ac6739A"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0xc2fc8952e3fF43c93369ce9f6517ED6dfC663137"), // EIP7702Checker
+    alloy::primitives::address!("0xd3a6C81d2F080b223f41ebdd3F7AD2BbeFD57B90"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0xe33cc25e7f9275cdcb65CAfb85c3215d45003C12"), // ZKsyncOSVerifierFflonk
+    alloy::primitives::address!("0xe8536Ff0bf73E9245Ce5bF58b7e06388Fe9dBD52"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0xff216E1b4e38A9206721795cE4Ab5F76d1Dd1140"), // RollupL1DAValidator
+];
+
 pub(crate) const MAX_NUMBER_OF_ZK_CHAINS: u32 = 100;
 pub(crate) const MAX_PRIORITY_TX_GAS_LIMIT: u32 = 72_000_000;
 
@@ -213,7 +252,11 @@ pub(crate) async fn verify(
     // Each tx is fetched from L1 RPC; stale entries (whose bytecode no longer
     // matches AllContractsHashes after a regen) are silently skipped — the
     // address-book lookup in `expect_create2_params` hard-errors only if a
-    // load-bearing deployment is missing.
+    // load-bearing deployment is missing. Entries the RPC cannot return even
+    // after retries are reported, as errors in an env with a historical list
+    // (see `historical_create2_deployments`), since the coverage check could
+    // not see their deployments.
+    let strict_fetch = historical_create2_deployments(verifiers.env).is_some();
     let count = {
         let bridgehub_address = verifiers.bridgehub_address;
         let Verifiers {
@@ -230,6 +273,7 @@ pub(crate) async fn verify(
                 &bridgehub_address,
                 expected_salts,
                 true,
+                strict_fetch,
                 bytecode_verifier,
                 result,
             )
@@ -242,6 +286,7 @@ pub(crate) async fn verify(
                 &bridgehub_address,
                 expected_salts,
                 false,
+                strict_fetch,
                 bytecode_verifier,
                 result,
             )
@@ -272,7 +317,10 @@ pub(crate) async fn verify(
     verify_governance_stage_calls(artifact, &verifiers, result).await?;
 
     // Last, so it sees every expectation the elements above registered.
-    result.report_unverified_create2_deployments(&verifiers);
+    result.report_unverified_create2_deployments(
+        &verifiers,
+        historical_create2_deployments(verifiers.env),
+    );
 
     Ok(())
 }
@@ -371,5 +419,33 @@ mod tests {
             expected_protocol_versions(VerifyUpgradeEnv::Adi, CtmFlavor::ZksyncOs),
             expected_protocol_versions(VerifyUpgradeEnv::Mainnet, CtmFlavor::ZksyncOs)
         );
+    }
+
+    /// The mainnet list may only hold contracts the upgrade does not use: none of them appears
+    /// anywhere in the committed mainnet ecosystem TOML, as an address or inside calldata. It has
+    /// no duplicates, and the other envs have no list yet.
+    #[test]
+    fn mainnet_historical_create2_deployments_are_unused_by_the_upgrade() {
+        let toml = std::fs::read_to_string(path_from_root(
+            "l1-contracts/upgrade-envs/v0.31.0-interopB/output/mainnet/ecosystem.toml",
+        ))
+        .unwrap()
+        .to_lowercase();
+        let list = historical_create2_deployments(VerifyUpgradeEnv::Mainnet).unwrap();
+        let unique: std::collections::BTreeSet<_> = list.iter().collect();
+        assert_eq!(unique.len(), list.len(), "duplicate entries");
+        for address in list {
+            assert!(
+                !toml.contains(&alloy::hex::encode(address.as_slice())),
+                "{address} is used by the mainnet upgrade, so it is not historical"
+            );
+        }
+        for env in [
+            VerifyUpgradeEnv::Stage,
+            VerifyUpgradeEnv::Testnet,
+            VerifyUpgradeEnv::Adi,
+        ] {
+            assert!(historical_create2_deployments(env).is_none());
+        }
     }
 }

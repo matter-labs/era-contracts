@@ -61,7 +61,10 @@ pub struct VerifyUpgradeArgs {
     /// Stale entries (from older regens whose bytecode is no longer in
     /// AllContractsHashes) are silently skipped.
     ///
-    /// Defaults to `<l1-contracts>/upgrade-envs/v0.31.0-interopB/output/<env>/transactions.txt`
+    /// Defaults to `<l1-contracts>/upgrade-envs/v0.31.0-interopB/output/<env>/transactions.txt`.
+    /// Its deploys are salt-gated, so for an env whose committed log also holds
+    /// earlier broadcasts (mainnet) pass the deployment's own journal here and
+    /// the committed file as `--reference-transactions-log`.
     #[clap(long)]
     pub transactions_log: Option<PathBuf>,
 

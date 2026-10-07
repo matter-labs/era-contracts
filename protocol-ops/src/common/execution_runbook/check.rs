@@ -11,13 +11,15 @@ use alloy::rpc::types::TransactionRequest;
 use anyhow::Context;
 
 use super::{CheckFacts, Runbook};
-use crate::common::anvil::{evm_revert, evm_snapshot, set_balance};
+use crate::common::anvil::{evm_increase_time_and_mine, evm_revert, evm_snapshot, set_balance};
 use crate::common::ethereum::get_provider;
 
 /// Replay every tx of `runbook` on the anvil fork at `rpc_url` (with `--auto-impersonate`),
-/// in order, each from its sender, and fail on the first revert. The fork's state is restored
-/// afterwards. `fork_block` is the L1 block the fork was taken at; `replayed_after` says what
-/// the caller already replayed on it (e.g. the deploy bundle), for the page.
+/// in order, each from its sender, and fail on the first revert. A tx's `time_increase`
+/// advances the fork's clock before it is sent, as the page tells the simulator to (a stage
+/// timer's `checkDeadline()` reverts otherwise). The fork's state is restored afterwards.
+/// `fork_block` is the L1 block the fork was taken at; `replayed_after` says what the caller
+/// already replayed on it (e.g. the deploy bundle), for the page.
 pub async fn check_on_fork(
     rpc_url: &str,
     runbook: &Runbook,
@@ -78,6 +80,9 @@ async fn replay(rpc_url: &str, runbook: &Runbook) -> anyhow::Result<()> {
     }
     for (i, tx) in runbook.txs.iter().enumerate() {
         let what = format!("runbook tx {} ({}) from {:#x}", i + 1, tx.label, tx.from);
+        if let Some(seconds) = tx.time_increase {
+            evm_increase_time_and_mine(rpc_url, seconds).await?;
+        }
         let request = TransactionRequest::default()
             .with_from(tx.from)
             .with_to(tx.to)

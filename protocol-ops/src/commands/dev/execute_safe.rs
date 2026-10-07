@@ -163,10 +163,12 @@ impl ResumeJournal {
 
 /// Per-tx gas estimate buffer in basis points (12500 = 125% = 25% headroom).
 const GAS_ESTIMATE_BUFFER_BPS: u64 = 12_500;
-/// Maximum per-tx gas limit. Reth's elastic block gas limit converges to
-/// ~30M on a quiet chain; we cap below that so a single tx can never equal
-/// or exceed the block limit (which reth rejects with `gas limit too high`).
-const PER_TX_GAS_LIMIT_CAP: u64 = 20_000_000;
+/// Maximum per-tx gas limit: EIP-7825's transaction gas cap (2^24), which
+/// mainnet and Sepolia enforce since Fusaka. A tx declaring more is refused at
+/// send even when its execution would fit. It is also below reth's elastic
+/// block gas limit (~30M on a quiet chain), so a single tx never equals or
+/// exceeds the block limit (which reth rejects with `gas limit too high`).
+const PER_TX_GAS_LIMIT_CAP: u64 = 1 << 24;
 /// Floor gas price (1 gwei). Used when the node returns `eth_gasPrice` below
 /// it (anvil/reth on a quiet local chain reports near-zero).
 const GAS_PRICE_FLOOR_WEI: u128 = 1_000_000_000;
@@ -181,17 +183,26 @@ const GAS_PRICE_MULTIPLIER_BPS: u128 = 30_000;
 /// bump over the tx being replaced at the same nonce.
 const GAS_BUMP_BPS: u128 = 11_500;
 /// How long to wait for a receipt before treating a tx as stuck (then bump its
-/// gas / check for a nonce takeover). ~7 mainnet blocks.
+/// gas, or check whether its nonce was spent). ~7 mainnet blocks.
 const STUCK_WAIT_MS: u128 = 90_000;
 /// Poll interval while waiting for a receipt on a public chain.
 const CONFIRM_POLL_MS: u64 = 4_000;
+/// How long to keep asking for receipts of our own submissions once the
+/// sender's nonce has moved past ours (~3 mainnet blocks). Behind a
+/// load-balanced RPC, `eth_getTransactionCount` and `eth_getTransactionReceipt`
+/// can be answered by backends a block apart, so our own mined tx can briefly
+/// look like a nonce someone else took.
+const NONCE_SPENT_RECHECK_MS: u128 = 36_000;
 /// Overall per-tx deadline. Once gas hits the ceiling we keep re-broadcasting
 /// at the ceiling until this elapses, then give up so a genuinely un-includable
 /// tx can't hang a deploy forever.
 const MAX_TX_WAIT_MS: u128 = 1_200_000; // 20 min
 /// Default gas-price ceiling (gwei) for the bump loop, overridable per command
-/// via `--max-gas-price-gwei`.
-pub const DEFAULT_MAX_GAS_PRICE_GWEI: u128 = 500;
+/// via `--max-gas-price-gwei`. A string so it goes through the same parser as the flag.
+pub const DEFAULT_MAX_GAS_PRICE_GWEI: &str = "500";
+/// Wei per gwei; a gwei amount therefore has at most this many decimal places.
+const WEI_PER_GWEI: u128 = 1_000_000_000;
+const GWEI_DECIMALS: usize = 9;
 
 /// Receipt polling interval. Alloy's default is tuned for public chains;
 /// tighten it so per-tx receipt polling doesn't dominate bundle latency on
@@ -216,6 +227,14 @@ async fn resolve_gas_price<P: Provider>(provider: &P) -> anyhow::Result<u128> {
 fn format_gwei(gas_price: u128) -> String {
     alloy::primitives::utils::format_units(gas_price, "gwei")
         .unwrap_or_else(|_| gas_price.to_string())
+}
+
+/// Gas limit for a call whose `eth_estimateGas` returned `estimate`: the
+/// estimate plus `GAS_ESTIMATE_BUFFER_BPS` headroom, clamped to
+/// `PER_TX_GAS_LIMIT_CAP`.
+fn buffered_gas_limit(estimate: u64) -> u64 {
+    let buffered = estimate.saturating_mul(GAS_ESTIMATE_BUFFER_BPS) / 10_000;
+    std::cmp::min(buffered, PER_TX_GAS_LIMIT_CAP)
 }
 
 /// Next gas price for a stuck-tx retry, or `None` once at/above the ceiling.
@@ -248,19 +267,65 @@ async fn find_mined<P: Provider>(
     Ok(None)
 }
 
+/// `find_mined`, asked again for `NONCE_SPENT_RECHECK_MS`. Called once the
+/// sender's nonce has moved past ours, when either one of `hashes` mined (and a
+/// lagging backend has not served its receipt yet) or another tx took the nonce.
+async fn find_mined_after_nonce_spent<P: Provider>(
+    provider: &P,
+    hashes: &[B256],
+) -> anyhow::Result<Option<(B256, u64)>> {
+    if hashes.is_empty() {
+        return Ok(None);
+    }
+    let start = std::time::Instant::now();
+    loop {
+        if let Some(mined) = find_mined(provider, hashes).await? {
+            return Ok(Some(mined));
+        }
+        if start.elapsed().as_millis() >= NONCE_SPENT_RECHECK_MS {
+            return Ok(None);
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(CONFIRM_POLL_MS)).await;
+    }
+}
+
+/// The sender's nonce `nonce` was spent and, even after
+/// `find_mined_after_nonce_spent`, none of `submitted` has a receipt. `Ok` means
+/// nothing of ours went out at that nonce (we sent at a stale pending nonce), so
+/// nothing of ours can have executed and the caller resends at the next free
+/// nonce. Otherwise one of our submissions may still have mined behind a lagging
+/// RPC: resending could execute the call twice, so stop and name the hashes.
+fn nonce_spent_without_receipt(to: Address, nonce: u64, submitted: &[B256]) -> anyhow::Result<()> {
+    if submitted.is_empty() {
+        return Ok(());
+    }
+    let hashes = submitted
+        .iter()
+        .map(|h| format!("{h:#x}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    anyhow::bail!(
+        "nonce {nonce} was spent, but none of our submissions of the call to {to:#x} at that \
+         nonce has a receipt after {}s ({hashes}). Not resending: if one of them mined, a \
+         resend would execute the call twice. Check these hashes, then resume the run.",
+        NONCE_SPENT_RECHECK_MS / 1000
+    )
+}
+
 /// Submit one tx and confirm it, robust to the two public-chain hazards a naive
 /// send-and-await hits:
 ///
 ///  * **Stuck (underpriced) tx** — if no receipt lands within `STUCK_WAIT_MS`,
 ///    bump the legacy gas price (≥ +15%) and re-broadcast the SAME nonce (a
 ///    replacement), up to `max_gas_price_wei`, until it mines or `MAX_TX_WAIT_MS`.
-///  * **Nonce takeover** — if the sender's on-chain nonce advances past ours
-///    without any of OUR submissions landing (some other tx grabbed the nonce),
-///    re-fetch the next free nonce and re-broadcast our calldata there. Every
-///    hash sent for the nonce — the original and each gas-bumped replacement —
-///    is checked first: a replacement can reach the builder after the original
-///    was already included, and mistaking that for a takeover would re-send
-///    the same call at a fresh nonce and execute it twice.
+///  * **Spent nonce** — if the sender's nonce moves past ours, every hash sent
+///    for it (the original and each gas-bumped replacement) is asked for a
+///    receipt for up to `NONCE_SPENT_RECHECK_MS`: a lagging RPC backend, or a
+///    replacement reaching the builder after the original was included, can
+///    hide our own mined tx for a moment. If one of ours mined, that is the
+///    result. If none did, the run stops with the hashes instead of resending,
+///    since a resend could execute the call twice. Only a call never sent at
+///    that nonce (a stale pending nonce) is resent at the next free one.
 ///
 /// Callers award this before submitting the next tx, so the pending nonce is
 /// always the next free one (strict one-at-a-time). Returns `(hash, status)` of
@@ -314,17 +379,16 @@ async fn submit_and_confirm<P: Provider>(
             Err(e) => {
                 let es = e.to_string().to_lowercase();
                 if es.contains("nonce too low") || es.contains("nonce_too_low") {
-                    // Our nonce was consumed. If any of our own submissions for
-                    // it actually landed, take that one; otherwise resubmit our
-                    // calldata at the next free nonce.
-                    if let Some(mined) = find_mined(provider, &submitted).await? {
+                    // Our nonce was spent. If one of our own submissions for it
+                    // landed, take that one; resend only if we never sent at it.
+                    if let Some(mined) = find_mined_after_nonce_spent(provider, &submitted).await? {
                         return Ok(mined);
                     }
+                    nonce_spent_without_receipt(to, nonce, &submitted)?;
                     let old = nonce;
                     nonce = pending_nonce(provider, from).await?;
-                    submitted.clear();
                     logger::info(format!(
-                        "  nonce {old} taken by another tx; resubmitting at nonce {nonce}"
+                        "  nonce {old} already used before this call was sent; resubmitting at nonce {nonce}"
                     ));
                     continue;
                 }
@@ -381,16 +445,18 @@ async fn submit_and_confirm<P: Provider>(
             .await
             .context("eth_getTransactionCount(latest)")?;
         if latest > nonce {
-            // Our nonce is spent. One of our submissions (edge race), or
-            // someone else's tx?
-            if let Some(mined) = find_mined(provider, &submitted).await? {
+            // Our nonce is spent: by one of our submissions whose receipt a
+            // lagging backend has not served yet, or by another tx. We sent at
+            // this nonce, so if none of ours shows up this stops the run.
+            if let Some(mined) = find_mined_after_nonce_spent(provider, &submitted).await? {
                 return Ok(mined);
             }
+            nonce_spent_without_receipt(to, nonce, &submitted)?;
             let old = nonce;
             nonce = pending_nonce(provider, from).await?;
             submitted.clear();
             logger::info(format!(
-                "  nonce {old} taken by another tx; resubmitting at nonce {nonce}"
+                "  nonce {old} already used before this call was sent; resubmitting at nonce {nonce}"
             ));
             continue;
         }
@@ -457,10 +523,17 @@ pub struct DevExecuteSafeArgs {
     #[clap(long)]
     pub out: Option<PathBuf>,
 
-    /// Gas-price ceiling (gwei) for the stuck-tx bump loop. A tx that doesn't
-    /// mine promptly is re-broadcast at a higher gas price up to this cap.
-    #[clap(long, default_value_t = DEFAULT_MAX_GAS_PRICE_GWEI)]
-    pub max_gas_price_gwei: u128,
+    /// Gas-price ceiling (gwei, decimals allowed: `0.5`) for the stuck-tx bump
+    /// loop. A tx that doesn't mine promptly is re-broadcast at a higher gas
+    /// price up to this cap. The cap also applies to the first broadcast, so a
+    /// cap below the 1 gwei floor is the price every tx pays.
+    #[clap(
+        long = "max-gas-price-gwei",
+        value_name = "GWEI",
+        value_parser = parse_gwei,
+        default_value = DEFAULT_MAX_GAS_PRICE_GWEI
+    )]
+    pub max_gas_price_wei: u128,
 }
 
 pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
@@ -470,14 +543,50 @@ pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
         &args.l1_rpc_url,
         args.private_key.expose(),
         &mut journal,
-        gwei_to_wei(args.max_gas_price_gwei),
+        args.max_gas_price_wei,
     )
     .await
 }
 
 /// Convert a gwei ceiling to wei for the sender.
 pub fn gwei_to_wei(gwei: u128) -> u128 {
-    gwei.saturating_mul(1_000_000_000)
+    gwei.saturating_mul(WEI_PER_GWEI)
+}
+
+/// Parse a gwei amount, decimals allowed (`500`, `0.5`, `.25`), into wei. Exact
+/// (no floating point); rejects zero, more than 9 decimal places, signs,
+/// exponents and anything else that is not a plain decimal number.
+pub fn parse_gwei(value: &str) -> Result<u128, String> {
+    let invalid = || format!("expected a gwei amount like 500 or 0.5, got {value:?}");
+    let (whole, frac) = value.split_once('.').unwrap_or((value, ""));
+    let digits = |s: &str| s.bytes().all(|b| b.is_ascii_digit());
+    if (whole.is_empty() && frac.is_empty()) || !digits(whole) || !digits(frac) {
+        return Err(invalid());
+    }
+    if frac.len() > GWEI_DECIMALS {
+        return Err(format!(
+            "{value:?} has more than {GWEI_DECIMALS} decimal places (1 wei is 1e-9 gwei)"
+        ));
+    }
+    let whole_wei = match whole {
+        "" => 0,
+        w => w
+            .parse::<u128>()
+            .map_err(|_| invalid())?
+            .checked_mul(WEI_PER_GWEI)
+            .ok_or_else(invalid)?,
+    };
+    let frac_wei = match frac {
+        "" => 0,
+        f => format!("{f:0<width$}", width = GWEI_DECIMALS)
+            .parse::<u128>()
+            .map_err(|_| invalid())?,
+    };
+    match whole_wei.checked_add(frac_wei) {
+        Some(0) => Err("the gas-price ceiling must be above zero".to_string()),
+        Some(wei) => Ok(wei),
+        None => Err(invalid()),
+    }
 }
 
 /// Replay a single Safe bundle file under one signer. Despite the file
@@ -578,29 +687,22 @@ pub async fn execute_one_bundle(
         }
 
         // Estimate gas per tx so we don't trip node-side `gas limit too
-        // high` rejections (reth caps tx gas at the current elastic block
-        // gas limit, ~30M on a quiet local chain). Apply
-        // `GAS_ESTIMATE_BUFFER_BPS` headroom, clamped to
-        // `PER_TX_GAS_LIMIT_CAP` to stay below the block gas limit.
+        // high` rejections, then add headroom within the per-tx cap (see
+        // `buffered_gas_limit`).
         let estimate_req = TransactionRequest::default()
             .with_from(from)
             .with_to(to)
             .with_input(data.clone())
             .with_value(value);
         let gas_limit: u64 = match provider.estimate_gas(estimate_req).await {
-            Ok(est) => {
-                let buffered = est.saturating_mul(GAS_ESTIMATE_BUFFER_BPS) / 10_000;
-                std::cmp::min(buffered, PER_TX_GAS_LIMIT_CAP)
-            }
+            Ok(est) => buffered_gas_limit(est),
             Err(e) => {
                 // Idempotent skip: if estimation fails and the tx targets the
                 // CREATE2 factory, check whether the output address already has
                 // code (= already deployed in a prior partial broadcast). If so,
                 // skip this tx instead of aborting the whole bundle.
-                if should_skip_idempotent(&provider, to, &data).await {
-                    logger::info(format!(
-                        "Skipping Safe tx #{idx} (to {to:#x}) — already deployed / idempotent"
-                    ));
+                if let Some(deployed) = already_deployed_create2(&provider, to, &data).await {
+                    log_create2_skip(idx, to, deployed);
                     continue;
                 }
                 // Reverts that mean the call already took effect in a prior
@@ -787,6 +889,13 @@ fn classify_revert(err: &str) -> RevertClass {
 /// missing governance effect behind "Safe file executed"). For that revert the
 /// operation's state is read from the Governance contract and only `Done`
 /// skips.
+///
+/// Two `AlreadyDone` reverts need more than the selector:
+/// - `publishEraBytecodes` / `publishEVMBytecodes` revert on the FIRST member
+///   that is already published, so a batch skips only when every member is
+///   (each is checked by calling its single-bytecode publish).
+/// - `AddressAlreadySet(addr)` skips only when `addr` is one of the call's own
+///   arguments, i.e. the call was setting that same address.
 async fn idempotent_revert<P: Provider>(
     provider: &P,
     to: Address,
@@ -794,7 +903,30 @@ async fn idempotent_revert<P: Provider>(
     err: &str,
 ) -> anyhow::Result<Option<String>> {
     match classify_revert(err) {
-        RevertClass::AlreadyDone(name) => Ok(Some(name.to_string())),
+        RevertClass::AlreadyDone(name) => {
+            if let Some(members) = split_bytecode_batch(data) {
+                let count = members.len();
+                for member in members {
+                    let single = provider
+                        .call(TransactionRequest::default().with_to(to).with_input(member))
+                        .await;
+                    let published = match single {
+                        Ok(_) => false,
+                        Err(e) => classify_revert(&e.to_string()) == RevertClass::AlreadyDone(name),
+                    };
+                    if !published {
+                        return Ok(None);
+                    }
+                }
+                return Ok(Some(format!(
+                    "{name}; all {count} bytecodes in the batch are published"
+                )));
+            }
+            if name == "AddressAlreadySet" && !already_set_address_is_called(err, data) {
+                return Ok(None);
+            }
+            Ok(Some(name.to_string()))
+        }
         RevertClass::GovernanceOperationNotPending => {
             if governance_operation_is_done(provider, to, data).await? {
                 Ok(Some(
@@ -806,6 +938,74 @@ async fn idempotent_revert<P: Provider>(
         }
         RevertClass::Unknown => Ok(None),
     }
+}
+
+alloy::sol! {
+    function publishEraBytecode(bytes _bytecode);
+    function publishEraBytecodes(bytes[] _bytecodes);
+    function publishEVMBytecode(bytes _bytecode);
+    function publishEVMBytecodes(bytes[] _bytecodes);
+}
+
+/// For a `BytecodesSupplier.publishEraBytecodes` / `publishEVMBytecodes` batch,
+/// each member re-encoded as the matching single-bytecode publish call. `None`
+/// for any other call.
+fn split_bytecode_batch(data: &[u8]) -> Option<Vec<Bytes>> {
+    use alloy::sol_types::SolCall;
+    if let Ok(batch) = publishEraBytecodesCall::abi_decode(data) {
+        return Some(
+            batch
+                ._bytecodes
+                .into_iter()
+                .map(|bytecode| {
+                    publishEraBytecodeCall {
+                        _bytecode: bytecode,
+                    }
+                    .abi_encode()
+                    .into()
+                })
+                .collect(),
+        );
+    }
+    if let Ok(batch) = publishEVMBytecodesCall::abi_decode(data) {
+        return Some(
+            batch
+                ._bytecodes
+                .into_iter()
+                .map(|bytecode| {
+                    publishEVMBytecodeCall {
+                        _bytecode: bytecode,
+                    }
+                    .abi_encode()
+                    .into()
+                })
+                .collect(),
+        );
+    }
+    None
+}
+
+/// Whether the address an `AddressAlreadySet(address)` revert reports is one of
+/// the call's own 32-byte argument words. False when the revert carries no
+/// address or the call was setting a different one.
+fn already_set_address_is_called(err: &str, data: &[u8]) -> bool {
+    let lower = err.to_lowercase();
+    // anvil also names the selector in the message (`custom error 0x0dfb42bf: 0000…`), so take
+    // the first occurrence that is directly followed by the address word.
+    let Some(word) =
+        lower
+            .match_indices(ADDRESS_ALREADY_SET_SELECTOR)
+            .find_map(|(start, selector)| {
+                let word_start = start + selector.len();
+                lower
+                    .get(word_start..word_start + 64)
+                    .and_then(|hex| alloy::hex::decode(hex).ok())
+            })
+    else {
+        return false;
+    };
+    data.get(4..)
+        .is_some_and(|args| args.chunks_exact(32).any(|arg| arg == word.as_slice()))
 }
 
 /// Whether the operation carried by an `executeInstant(Operation)` /
@@ -854,27 +1054,37 @@ async fn governance_operation_is_done<P: Provider>(
 /// Well-known deterministic deployment proxy (EIP-2470 style).
 const CREATE2_FACTORY: &str = "4e59b44847b379578588920ca78fbf26c0b4956c";
 
-/// Check whether a failed `eth_estimateGas` should be treated as an
-/// idempotent skip rather than a hard error. Currently handles:
-/// - CREATE2 factory calls where the output address already has code
-///   (the contract was deployed in a prior partial broadcast).
-/// - Any other tx whose target already has code and the call reverts
-///   (likely an already-executed governance operation).
-async fn should_skip_idempotent<P: Provider>(provider: &P, to: Address, data: &Bytes) -> bool {
+/// For a CREATE2 factory call (calldata = salt(32) + initcode) whose output
+/// address already has code, that address: the contract was deployed by a prior
+/// partial broadcast, so a failed `eth_estimateGas` is an idempotent skip rather
+/// than a hard error. `None` for any other call.
+async fn already_deployed_create2<P: Provider>(
+    provider: &P,
+    to: Address,
+    data: &Bytes,
+) -> Option<Address> {
     let to_hex = format!("{to:#x}").to_lowercase();
-    // CREATE2 factory: calldata = salt(32) + initcode.
-    // Compute the would-be CREATE2 address and check if it already has code.
-    if to_hex.contains(CREATE2_FACTORY) && data.len() >= 32 {
-        let salt: [u8; 32] = data[..32].try_into().unwrap_or([0u8; 32]);
-        let initcode = &data[32..];
-        let deployed_addr = to.create2(salt, keccak256(initcode));
-        if let Ok(code) = provider.get_code_at(deployed_addr).await {
-            if !code.is_empty() {
-                return true;
-            }
-        }
+    if !to_hex.contains(CREATE2_FACTORY) || data.len() < 32 {
+        return None;
     }
-    false
+    let salt: [u8; 32] = data[..32].try_into().unwrap_or([0u8; 32]);
+    let deployed_addr = to.create2(salt, keccak256(&data[32..]));
+    match provider.get_code_at(deployed_addr).await {
+        Ok(code) if !code.is_empty() => Some(deployed_addr),
+        _ => None,
+    }
+}
+
+/// The skip leaves no journal entry: the tx that deployed the contract is not
+/// known here (a cancelled run, or a receipt that never reached the journal).
+/// PUVT attributes CREATE2 deployments through `transactions.txt`, so say which
+/// address needs its deployment hash appended if PUVT reports it missing.
+fn log_create2_skip(idx: usize, to: Address, deployed: Address) {
+    logger::warn(format!(
+        "Skipping Safe tx #{idx} (to {to:#x}) — already deployed at {deployed:#x}. Its deployment \
+         tx is not in this run's journal: if PUVT reports {deployed:#x} missing from the CREATE2 \
+         deployments, append that tx's hash to transactions.txt."
+    ));
 }
 
 fn receipt_input(tx: &Value) -> anyhow::Result<Vec<u8>> {
@@ -1072,17 +1282,12 @@ pub async fn execute_one_bundle_unlocked(
             .with_input(data.clone())
             .with_value(value);
         let gas_limit: u64 = match provider.estimate_gas(estimate_req).await {
-            Ok(estimated) => {
-                let buffered = estimated.saturating_mul(GAS_ESTIMATE_BUFFER_BPS) / 10_000;
-                std::cmp::min(buffered, PER_TX_GAS_LIMIT_CAP)
-            }
+            Ok(estimated) => buffered_gas_limit(estimated),
             Err(e) => {
                 // Keep unlocked replay idempotent like the signed path:
                 // skip already-deployed CREATE2 txs / known already-done ops.
-                if should_skip_idempotent(&provider, to, &data).await {
-                    logger::info(format!(
-                        "Skipping Safe tx #{idx} (to {to:#x}) — already deployed / idempotent"
-                    ));
+                if let Some(deployed) = already_deployed_create2(&provider, to, &data).await {
+                    log_create2_skip(idx, to, deployed);
                     skipped += 1;
                     continue;
                 }
@@ -1376,9 +1581,59 @@ mod tests {
     use tempfile::tempdir;
 
     use super::{
-        bump_gas, gwei_to_wei, load_executed_bundle, record_executed_tx, ExecutedBundle,
-        ExecutedTx, GAS_BUMP_BPS,
+        bump_gas, gwei_to_wei, load_executed_bundle, parse_gwei, record_executed_tx,
+        ExecutedBundle, ExecutedTx, GAS_BUMP_BPS,
     };
+
+    #[test]
+    fn gas_price_ceilings_parse_exactly_with_decimals() {
+        assert_eq!(parse_gwei("500"), Ok(gwei_to_wei(500)));
+        assert_eq!(parse_gwei("0.5"), Ok(500_000_000));
+        assert_eq!(parse_gwei(".25"), Ok(250_000_000));
+        assert_eq!(parse_gwei("2."), Ok(gwei_to_wei(2)));
+        assert_eq!(parse_gwei("1.000000001"), Ok(1_000_000_001));
+        assert_eq!(parse_gwei("0.000000001"), Ok(1));
+        for bad in [
+            "",
+            ".",
+            "0",
+            "0.0",
+            "-1",
+            "+1",
+            "1e9",
+            " 0.5",
+            "0.5 ",
+            "1.0000000001",
+            "1,5",
+            "abc",
+        ] {
+            assert!(parse_gwei(bad).is_err(), "{bad:?} should be rejected");
+        }
+    }
+
+    #[test]
+    fn the_cli_takes_a_fractional_ceiling() {
+        use clap::Parser;
+        let parse = |extra: &[&str]| {
+            let mut argv = vec![
+                "execute-safe",
+                "--safe-file",
+                "b.json",
+                "--private-key",
+                "0x01",
+            ];
+            argv.extend_from_slice(extra);
+            super::DevExecuteSafeArgs::try_parse_from(argv)
+        };
+        assert_eq!(
+            parse(&["--max-gas-price-gwei", "0.5"])
+                .unwrap()
+                .max_gas_price_wei,
+            500_000_000
+        );
+        assert_eq!(parse(&[]).unwrap().max_gas_price_wei, gwei_to_wei(500));
+        assert!(parse(&["--max-gas-price-gwei", "0"]).is_err());
+    }
 
     #[test]
     fn bump_gas_increases_by_at_least_the_replacement_threshold() {
@@ -1449,5 +1704,134 @@ mod tests {
             hashes.lines().collect::<Vec<_>>(),
             vec![format!("{first_hash:#x}"), format!("{second_hash:#x}")]
         );
+    }
+
+    /// EIP-7825 caps a tx at 2^24 gas. Estimates whose 25% buffer used to land
+    /// between the cap and the old 20M limit (refused at send) now get the cap;
+    /// smaller estimates keep their full buffer.
+    #[test]
+    fn buffered_gas_limit_stays_within_the_eip7825_cap() {
+        assert_eq!(super::PER_TX_GAS_LIMIT_CAP, 16_777_216);
+        assert_eq!(super::buffered_gas_limit(1_000_000), 1_250_000);
+        assert_eq!(super::buffered_gas_limit(13_421_772), 16_777_215);
+        assert_eq!(super::buffered_gas_limit(14_000_000), 16_777_216);
+        assert_eq!(super::buffered_gas_limit(u64::MAX), 16_777_216);
+    }
+
+    /// A spent nonce we never sent at (a stale pending nonce) is resent at the
+    /// next one. A spent nonce we did send at stops the run and names every hash:
+    /// one of them may have mined behind a lagging RPC, and a resend would
+    /// execute the call twice.
+    #[test]
+    fn a_spent_nonce_resends_only_calls_never_sent_at_it() {
+        let to = alloy::primitives::Address::repeat_byte(0x11);
+        assert!(super::nonce_spent_without_receipt(to, 7, &[]).is_ok());
+
+        let sent = [B256::repeat_byte(0xaa), B256::repeat_byte(0xbb)];
+        let err = super::nonce_spent_without_receipt(to, 7, &sent)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("nonce 7 was spent"), "{err}");
+        assert!(err.contains("Not resending"), "{err}");
+        for hash in sent {
+            assert!(err.contains(&format!("{hash:#x}")), "{err}");
+        }
+    }
+
+    /// A batch publish reverts on its first already-published member, so the
+    /// skip check splits it into single-bytecode publishes, one per member in
+    /// order, for both entry points. A single publish is decided by its own
+    /// revert, and unrelated calls are not batches.
+    #[test]
+    fn bytecode_batches_split_into_single_publishes() {
+        use super::{
+            publishEVMBytecodeCall, publishEVMBytecodesCall, publishEraBytecodeCall,
+            publishEraBytecodesCall,
+        };
+        use alloy::primitives::Bytes;
+        use alloy::sol_types::SolCall;
+
+        let a = Bytes::from(vec![0xaa; 64]);
+        let b = Bytes::from(vec![0xbb; 32]);
+        let era_batch = publishEraBytecodesCall {
+            _bytecodes: vec![a.clone(), b.clone()],
+        }
+        .abi_encode();
+        assert_eq!(
+            super::split_bytecode_batch(&era_batch).unwrap(),
+            vec![
+                Bytes::from(
+                    publishEraBytecodeCall {
+                        _bytecode: a.clone()
+                    }
+                    .abi_encode()
+                ),
+                Bytes::from(
+                    publishEraBytecodeCall {
+                        _bytecode: b.clone()
+                    }
+                    .abi_encode()
+                ),
+            ]
+        );
+        let evm_batch = publishEVMBytecodesCall {
+            _bytecodes: vec![b.clone()],
+        }
+        .abi_encode();
+        assert_eq!(
+            super::split_bytecode_batch(&evm_batch).unwrap(),
+            vec![Bytes::from(
+                publishEVMBytecodeCall { _bytecode: b }.abi_encode()
+            )]
+        );
+
+        let single = publishEraBytecodeCall { _bytecode: a }.abi_encode();
+        assert!(super::split_bytecode_batch(&single).is_none());
+        assert!(super::split_bytecode_batch(&[0x12, 0x34, 0x56, 0x78]).is_none());
+    }
+
+    /// `AddressAlreadySet(addr)` is a replay only when the call was setting
+    /// `addr`: a single-address setter, or `addVerifier(version, fflonk, plonk)`
+    /// naming it, skips. A call setting a different address, or a revert that
+    /// carries no address, does not.
+    #[test]
+    fn address_already_set_skips_only_for_the_same_address() {
+        let set = "000000000000000000000000c16161c7f704388285fe58db287f6216a350dafa";
+        let other = "0000000000000000000000001111111111111111111111111111111111111111";
+        let version = "000000000000000000000000000000000000000000000000000000000000001f";
+        let revert = format!(
+            "server returned an error response: error code 3: execution reverted, data: \"0x0dfb42bf{set}\""
+        );
+        let call = |args: &[&str]| {
+            let mut data = vec![0x12, 0x34, 0x56, 0x78];
+            for arg in args {
+                data.extend(alloy::hex::decode(arg).unwrap());
+            }
+            data
+        };
+
+        assert!(super::already_set_address_is_called(&revert, &call(&[set])));
+        assert!(super::already_set_address_is_called(
+            &revert,
+            &call(&[version, other, set])
+        ));
+        assert!(!super::already_set_address_is_called(
+            &revert,
+            &call(&[other])
+        ));
+        assert!(!super::already_set_address_is_called(
+            "execution reverted, data: \"0x0dfb42bf\"",
+            &call(&[set])
+        ));
+
+        // anvil also decodes the error into the message, ahead of `data`.
+        let anvil = format!(
+            "server returned an error response: error code 3: execution reverted: custom error 0x0dfb42bf: {set}, data: \"0x0dfb42bf{set}\""
+        );
+        assert!(super::already_set_address_is_called(&anvil, &call(&[set])));
+        assert!(!super::already_set_address_is_called(
+            &anvil,
+            &call(&[other])
+        ));
     }
 }

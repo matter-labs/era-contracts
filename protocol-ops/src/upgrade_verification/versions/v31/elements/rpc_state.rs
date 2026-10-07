@@ -952,24 +952,18 @@ async fn verify_v31_transitionary_owner(
 
     // The TransitionaryOwner has an immutable GOVERNANCE_ADDRESS baked into its
     // runtime bytecode, so a runtime-hash match against AllContractsHashes would
-    // fail. Instead rely on the CREATE2 deploy-tracking, which matched the
-    // deployment's *init* bytecode (+ constructor args) to the known contract at
-    // parse time (requires the TransitionaryOwner deploy tx in the transactions log).
-    match verifiers
-        .network_verifier
-        .create2_known_bytecodes
-        .get(&transitionary_owner)
-    {
-        Some(file) if file.as_str() == TRANSITIONARY_OWNER_CONTRACT_FILE => result.report_ok(&format!(
-            "TransitionaryOwner ({transitionary_owner}) is a recognized {TRANSITIONARY_OWNER_CONTRACT_FILE} CREATE2 deployment"
-        )),
-        Some(other) => result.report_error(&format!(
-            "TransitionaryOwner ({transitionary_owner}) deployment is {other}, expected {TRANSITIONARY_OWNER_CONTRACT_FILE}"
-        )),
-        None => result.report_error(&format!(
-            "TransitionaryOwner ({transitionary_owner}) is not a recognized CREATE2 deployment (missing from the transactions log?)"
-        )),
-    }
+    // fail. Instead check its CREATE2 deployment (requires its deploy tx in the
+    // transactions log): the init bytecode must be the TransitionaryOwner and the
+    // constructor argument governance. This also counts it in the init-code
+    // coverage report.
+    let mut governance_param = [0u8; 32];
+    governance_param[12..].copy_from_slice(governance.as_slice());
+    result.expect_create2_params(
+        verifiers,
+        &transitionary_owner,
+        governance_param,
+        TRANSITIONARY_OWNER_CONTRACT_FILE,
+    );
 
     let to = ITransitionaryOwner::new(transitionary_owner, provider.clone());
     match to.GOVERNANCE_ADDRESS().call().await {

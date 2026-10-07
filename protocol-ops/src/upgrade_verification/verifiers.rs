@@ -575,38 +575,93 @@ impl VerificationResult {
 }
 
 impl VerificationResult {
-    /// Every CREATE2 deployment in the transactions log came from this upgrade, so every one of
-    /// them should have had its constructor params checked by some element above. Anything left
-    /// over was deployed and never verified — the state RollupL1DAValidator was in, which is why
-    /// its 32 phantom bytes went unnoticed.
+    /// Every CREATE2 deployment of this upgrade should have had its constructor params checked by
+    /// some element above. Anything left over was deployed and never verified — the state
+    /// RollupL1DAValidator was in, which is why its 32 phantom bytes went unnoticed.
     ///
-    /// Reported as a warning only because the unverified set has never been enumerated on a real
-    /// run: promoting it to `report_error` (one call below) is the intended end state, once a
-    /// clean run shows the list is empty or the stragglers are triaged.
-    pub(crate) fn report_unverified_create2_deployments(&mut self, verifiers: &Verifiers) {
-        let mut unverified: Vec<String> = verifiers
+    /// The transactions logs also hold earlier broadcasts (a reference log, superseded bundles)
+    /// whose contracts this upgrade does not use. `historical` lists them for envs where a real
+    /// run enumerated the set: there every other unverified deployment is an error. Envs without
+    /// a list keep the warning until a real run enumerates theirs.
+    pub(crate) fn report_unverified_create2_deployments(
+        &mut self,
+        verifiers: &Verifiers,
+        historical: Option<&[Address]>,
+    ) {
+        let unverified: Vec<(Address, String)> = verifiers
             .network_verifier
             .create2_known_bytecodes
             .iter()
             .filter(|(address, _)| !self.verified_create2.contains(*address))
-            .map(|(address, file)| format!("{address} ({file})"))
+            .map(|(address, file)| (*address, file.clone()))
             .collect();
-        unverified.sort();
-
-        if unverified.is_empty() {
-            self.report_ok(&format!(
-                "Init-code coverage: all {} CREATE2 deployments had their constructor params verified",
-                self.verified_create2.len()
-            ));
-            return;
+        let (level, message) =
+            init_code_coverage(self.verified_create2.len(), unverified, historical);
+        match level {
+            CoverageLevel::Ok => self.report_ok(&message),
+            CoverageLevel::Warn => self.report_warn(&message),
+            CoverageLevel::Error => self.report_error(&message),
         }
-
-        self.report_warn(&format!(
-            "Init-code coverage: {} CREATE2 deployment(s) were never checked against a declared constructor expectation, so their addresses are unverified: {}",
-            unverified.len(),
-            unverified.join(", ")
-        ));
     }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum CoverageLevel {
+    Ok,
+    Warn,
+    Error,
+}
+
+/// Pure part of `report_unverified_create2_deployments`: the finding for `verified` checked
+/// deployments and the `unverified` ones (address, contract file), given the env's list of
+/// `historical` deployments, if it has one.
+fn init_code_coverage(
+    verified: usize,
+    mut unverified: Vec<(Address, String)>,
+    historical: Option<&[Address]>,
+) -> (CoverageLevel, String) {
+    unverified.sort();
+    let describe = |list: &[(Address, String)]| {
+        list.iter()
+            .map(|(address, file)| format!("{address} ({file})"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    let (listed, unexpected): (Vec<_>, Vec<_>) = match historical {
+        Some(historical) => unverified
+            .into_iter()
+            .partition(|(address, _)| historical.contains(address)),
+        None => (Vec::new(), unverified),
+    };
+    if !unexpected.is_empty() {
+        let level = if historical.is_some() {
+            CoverageLevel::Error
+        } else {
+            CoverageLevel::Warn
+        };
+        return (
+            level,
+            format!(
+                "Init-code coverage: {} CREATE2 deployment(s) were never checked against a declared constructor expectation, so their addresses are unverified: {}",
+                unexpected.len(),
+                describe(&unexpected)
+            ),
+        );
+    }
+    let historical_note = if listed.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "; {} historical deployment(s) from earlier broadcasts are not part of this upgrade",
+            listed.len()
+        )
+    };
+    (
+        CoverageLevel::Ok,
+        format!(
+            "Init-code coverage: all {verified} CREATE2 deployments had their constructor params verified{historical_note}"
+        ),
+    )
 }
 
 impl Display for VerificationResult {
@@ -631,5 +686,41 @@ impl Display for VerificationResult {
         } else {
             write!(f, "{} - result: {}", style("OK").green(), self.result)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alloy::primitives::Address;
+
+    use super::{init_code_coverage, CoverageLevel};
+
+    /// Without a historical list, unverified deployments stay a warning. With one, listed
+    /// deployments are noted as history and anything else is an error naming only itself.
+    #[test]
+    fn coverage_is_strict_only_for_envs_with_a_historical_list() {
+        let old = Address::repeat_byte(0xaa);
+        let new = Address::repeat_byte(0xbb);
+        let unverified = vec![
+            (new, "l1-contracts/New".to_string()),
+            (old, "l1-contracts/Old".to_string()),
+        ];
+
+        let (level, message) = init_code_coverage(5, unverified.clone(), None);
+        assert_eq!(level, CoverageLevel::Warn);
+        assert!(message.contains(&old.to_string()) && message.contains(&new.to_string()));
+
+        let (level, message) = init_code_coverage(5, unverified.clone(), Some(&[old, new]));
+        assert_eq!(level, CoverageLevel::Ok);
+        assert!(message.contains("all 5 CREATE2 deployments"), "{message}");
+        assert!(message.contains("2 historical deployment(s)"), "{message}");
+
+        let (level, message) = init_code_coverage(5, unverified, Some(&[old]));
+        assert_eq!(level, CoverageLevel::Error);
+        assert!(message.contains(&new.to_string()), "{message}");
+        assert!(!message.contains(&old.to_string()), "{message}");
+
+        let (level, _) = init_code_coverage(5, Vec::new(), None);
+        assert_eq!(level, CoverageLevel::Ok);
     }
 }
