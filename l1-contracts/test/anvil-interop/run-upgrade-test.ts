@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { readAnvilConfig } from "./src/core/anvil-config";
+import { readStateVersion } from "./src/core/anvil-config";
 import { runUpgradeScenario } from "./src/helpers/upgrade-test-runner";
 
 // The upgrade the current release ships, exactly as protocol-ops prepares it by default, applied to the previous
@@ -8,7 +8,7 @@ import { runUpgradeScenario } from "./src/helpers/upgrade-test-runner";
 // in the ZKsync OS genesis config, so nothing here names a release.
 runUpgradeScenario({
   label: "latest-upgrade",
-  stateVersion: readAnvilConfig().upgradeSourceStateVersion,
+  stateVersion: readStateVersion("upgradeSourceStateVersion"),
   // The fixture's chains still carry the genesis-upgrade tx hash from their creation, which blocks a new
   // upgrade (`PreviousUpgradeNotFinalized`).
   clearGenesisUpgradeTxHash: true,

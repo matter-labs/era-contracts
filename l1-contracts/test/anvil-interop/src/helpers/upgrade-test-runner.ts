@@ -37,7 +37,7 @@ import {
   SEMVER_MINOR_OFFSET,
   SYSTEM_CONTEXT_ADDR,
 } from "../core/const";
-import { getAbi, getBytecode, getCreationBytecode, LEGACY_ADMIN_ABI } from "../core/contracts";
+import { getAbi, getBytecode, getCreationBytecode } from "../core/contracts";
 import type { ContractName } from "../core/contracts";
 import { forceBatchExecutedEqualsCommitted, transferOwnable2Step } from "./harness-shims";
 import { impersonateAndRun, createProvider } from "../core/utils";
@@ -947,9 +947,6 @@ function decodeLatestL2UpgradeTx(broadcastPath: string): {
 
   const chainAdminIface = new ethers.utils.Interface(getAbi("ChainAdminOwnable"));
   const adminIface = new ethers.utils.Interface(getAbi("AdminFacet"));
-  // Legacy ABI: v29/v30 states have upgradeChainFromVersion(uint256, DiamondCutData) (2 params).
-  // Current ABI has upgradeChainFromVersion(address, uint256, DiamondCutData) (3 params).
-  const legacyAdminIface = new ethers.utils.Interface(LEGACY_ADMIN_ABI);
   const settlementLayerIface = new ethers.utils.Interface(getAbi("DefaultUpgradeZKsyncOS"));
 
   const errors: string[] = [];
@@ -968,14 +965,8 @@ function decodeLatestL2UpgradeTx(broadcastPath: string): {
         continue;
       }
 
-      // Try current ABI (3-param) then legacy (2-param).
       // The DiamondCutData tuple is (facetCuts[], initAddress, initCalldata).
-      let diamondCut: ethers.utils.Result;
-      try {
-        diamondCut = adminIface.decodeFunctionData("upgradeChainFromVersion", calls[0].data)[2];
-      } catch {
-        diamondCut = legacyAdminIface.decodeFunctionData("upgradeChainFromVersion", calls[0].data)[1];
-      }
+      const diamondCut = adminIface.decodeFunctionData("upgradeChainFromVersion", calls[0].data)[2];
       const initAddress: string = diamondCut.initAddress ?? diamondCut[1];
       const initCalldata: string = diamondCut.initCalldata ?? diamondCut[2];
 

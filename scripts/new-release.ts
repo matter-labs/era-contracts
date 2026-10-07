@@ -21,17 +21,18 @@ import { join, relative } from "path";
 //   1. `configs/genesis/zksync-os/latest.json` `protocol_semantic_version`: minor + 1, patch 0. The default
 //      upgrade scripts read their target version from it, and the upgrade tests assert it.
 //   2. `l1-contracts/upgrade-envs/v0.<minor>.0-<name>/`: the local upgrade input and every per-environment
-//      input (`stage.toml`, `mainnet.toml`, ...), copied from the current release's. They carry no version
-//      fields: the scripts read the old version from the CTM and the target from genesis. Environment values (owner, era_chain_id, addresses) carry over; every CREATE2 and legacy-Gov salt
-//      is regenerated, so the new release's deployments do not resolve to the previous release's addresses.
+//      input (`stage.toml`, `mainnet.toml`, ...), copied from the current release's: owner, era_chain_id and the
+//      upgrade timer carry over, and every CREATE2 and legacy-Gov salt is regenerated, so the new release's
+//      deployments do not resolve to the previous release's addresses.
 //   3. protocol-ops' current upgrade-env dir (`current_upgrade_env_dir!` in
 //      `protocol-ops/src/common/forge/scripts/mod.rs`): the prepare defaults and `--env` resolution follow it.
 //   4. `l1-contracts/test/anvil-interop/config/anvil-config.json`: the outgoing `stateVersion` becomes the
-//      `upgradeSourceStateVersion` the upgrade test starts from, `stateVersion` moves to the new release,
-//      and the previous source chain states are deleted.
+//      `upgradeSourceStateVersion` the upgrade test starts from (frozen from `--previous-release-ref` when
+//      given), `stateVersion` moves to the new release, and the previous source chain states are deleted.
 //
-// What it leaves to you (printed at the end): regenerating the new release's chain states, per-environment
-// upgrade inputs, and any release-specific upgrade scripts.
+// What it leaves to you (printed at the end): regenerating the new release's chain states, reviewing the
+// copied per-environment inputs, and pointing protocol-ops' prepare script defaults (and the Foundry full-flow
+// test) at the new release's scripts; protocol-ops' tests fail until that last step is done.
 
 const ROOT = join(__dirname, "..");
 const GENESIS_PATH = join(ROOT, "configs/genesis/zksync-os/latest.json");
@@ -57,23 +58,13 @@ function freshSalt(): string {
   return `"0x${randomBytes(32).toString("hex")}"`;
 }
 
-/** Header of a per-environment upgrade input; the same text every release writes. */
-function envInputHeader(env: string, release: SemVer, sourceDir: string): string {
-  return `# Upgrade input for the ${env} environment on the v${release.minor} release.
-#
-# Created from the ${sourceDir} entry of the same name: the environment values (owner,
-# era_chain_id, upgrade timer) are carried over, while the CREATE2 and legacy-Gov salts are fresh, so
-# this release's deployments do not resolve to v${release.minor - 1}'s addresses.
-#
-# Only these keys are read: protocol-ops' \`--env ${env}\` reads \`owner_address\`, \`era_chain_id\` and the
-# salts, and \`DefaultCTMUpgrade\` reads \`governance_upgrade_timer_initial_delay\`. The old protocol version
-# comes from each CTM and the target from \`configs/genesis/zksync-os/latest.json\`. A missing file fails
-# closed rather than falling back to local's values.
-`;
+/** Header of a per-environment upgrade input; what the keys mean lives in protocol-ops/README.md. */
+function envInputHeader(env: string, release: SemVer): string {
+  return `# Upgrade input for the ${env} environment on the v${release.minor} release. See protocol-ops/README.md "Environment inputs".\n`;
 }
 
 /** A per-environment input for the next release: new header and versions, fresh salts. */
-function rotateEnvInput(contents: string, env: string, next: SemVer, sourceDir: string): string {
+function rotateEnvInput(contents: string, env: string, next: SemVer): string {
   const lines = contents.split("\n");
   let start = 0;
   while (start < lines.length && (lines[start].startsWith("#") || lines[start].trim() === "")) {
@@ -86,7 +77,7 @@ function rotateEnvInput(contents: string, env: string, next: SemVer, sourceDir: 
   body = body.replace(/^\[create2_factory_salts\]\n(?:(?!\[).*\n?)*/m, (section) =>
     section.replace(/(=\s*)"0x[0-9a-fA-F]{64}"/g, (_m, prefix) => prefix + freshSalt())
   );
-  return `${envInputHeader(env, next, sourceDir)}\n${body}`;
+  return `${envInputHeader(env, next)}\n${body}`;
 }
 
 function main(): void {
@@ -149,7 +140,7 @@ function main(): void {
     "utf-8"
   );
   localInput = localInput.replace(
-    /^# Local v\d+ -> v\d+ upgrade input\..*$/m,
+    /^# Local v\d+ -> v\d+ upgrade input\./m,
     `# Local v${current.minor} -> v${next.minor} upgrade input.`
   );
   write(join(nextEnvDirAbs, "local.toml"), localInput);
@@ -157,7 +148,7 @@ function main(): void {
   for (const file of fs.readdirSync(currentEnvDirAbs).filter((f) => f.endsWith(".toml") && f !== "local.toml")) {
     const env = file.replace(/\.toml$/, "");
     const contents = fs.readFileSync(join(currentEnvDirAbs, file), "utf-8");
-    write(join(nextEnvDirAbs, file), rotateEnvInput(contents, env, next, currentEnvDir.replace("upgrade-envs/", "")));
+    write(join(nextEnvDirAbs, file), rotateEnvInput(contents, env, next));
   }
 
   // 3. protocol-ops' current upgrade-env dir.

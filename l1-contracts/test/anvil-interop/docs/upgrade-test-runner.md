@@ -237,8 +237,6 @@ No patches. Reads on-chain state to assert:
 
 ## Release bumps
 
-The harness has no release-specific code. When a release is cut, `config/anvil-config.json` moves
-`upgradeSourceStateVersion` to the outgoing `stateVersion` (whose chain states are kept as the new upgrade
-source), `stateVersion` moves to the new release and its chain states are regenerated, and the old source folder
-is deleted. The genesis config's protocol version and protocol-ops' default upgrade input move with the release
-as well; the runner picks both up without edits.
+The harness has no release-specific code. `yarn new-release` (`scripts/new-release.ts`, whose header lists every
+step) moves `upgradeSourceStateVersion` and `stateVersion` in `config/anvil-config.json` along with the genesis
+version and protocol-ops' defaults; the runner picks all of them up without edits.

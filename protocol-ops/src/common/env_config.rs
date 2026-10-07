@@ -505,6 +505,58 @@ mod tests {
 
     /// A release without `<env>.toml` fails closed on every release value instead of handing back
     /// empty defaults (which let `init` fall back to the deployer as owner, or the prepare to random salts).
+    /// `--env <name>` pairs `<current release dir>/<name>.toml` with `permanent-values/<name>.toml`: every
+    /// release input must have its permanent values, so no env loads half its config.
+    #[test]
+    fn every_current_release_input_has_its_permanent_values() {
+        let l1 = resolve_l1_contracts_path().unwrap();
+        let release_dir = l1.join(upgrade_env_dir());
+        let mut envs = 0;
+        for entry in fs::read_dir(&release_dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.extension().and_then(|e| e.to_str()) != Some("toml") {
+                continue;
+            }
+            let env = path.file_stem().unwrap().to_str().unwrap().to_string();
+            assert!(
+                l1.join(PERMANENT_VALUES_DIR)
+                    .join(format!("{env}.toml"))
+                    .exists(),
+                "{} has no permanent-values/{env}.toml",
+                path.display()
+            );
+            EnvConfig::load(&env).unwrap();
+            envs += 1;
+        }
+        assert!(envs > 0, "no release inputs in {}", release_dir.display());
+    }
+
+    /// Every env declares `testnet_verifier`, and only mainnet runs the production verifier: the flag decides
+    /// whether an upgrade installs a verifier that accepts unproven batches.
+    #[test]
+    fn every_env_declares_testnet_verifier_and_only_mainnet_is_production() {
+        let dir = resolve_l1_contracts_path()
+            .unwrap()
+            .join(PERMANENT_VALUES_DIR);
+        let mut saw_mainnet = false;
+        for entry in fs::read_dir(&dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.extension().and_then(|e| e.to_str()) != Some("toml") {
+                continue;
+            }
+            let env = path.file_stem().unwrap().to_str().unwrap();
+            let values: PermanentValues =
+                toml::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+            assert_eq!(
+                values.testnet_verifier,
+                Some(env != "mainnet"),
+                "{env} has a missing or wrong testnet_verifier"
+            );
+            saw_mainnet |= env == "mainnet";
+        }
+        assert!(saw_mainnet, "no mainnet permanent values");
+    }
+
     #[test]
     fn missing_release_input_fails_closed() {
         // This line's copy of the v33 release dir has no testnet input (release/v0.33.0-atomic-interop does).

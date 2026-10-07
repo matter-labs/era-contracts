@@ -208,8 +208,7 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationTestBase, L1ContractDe
         address ctm = ctmUpgrade.getCTMAddress();
         address bridgehub = coreUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
 
-        // Protocol version bumps: the default upgrade lands exactly one minor above genesis.
-        assertEq(_expectedNewVersion, _nextMinorAfterGenesis(), "Upgrade target is not genesis minor + 1");
+        // Protocol version bumps to the target set in `afterInitHook` (genesis minor + 1).
         assertEq(IChainTypeManager(ctm).protocolVersion(), _expectedNewVersion, "CTM protocolVersion not bumped");
         assertEq(IGetters(_eraDiamond).getProtocolVersion(), _expectedNewVersion, "Existing chain not upgraded");
         assertEq(

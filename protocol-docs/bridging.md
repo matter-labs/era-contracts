@@ -188,12 +188,10 @@ tokens) and rejects fee-on-transfer tokens (`TokensWithFeesNotSupported`).
 A vault that is upgraded in place starts with `bridgedOut == 0` while still holding all of the escrow that
 was bridged out before the upgrade. Every withdrawal of an L1-native asset would therefore look like an
 inbound amount exceeding the outstanding one and be rejected as forged. `populateBridgedOut(assetIds)` folds
-the pre-upgrade accounting into `bridgedOut`, once per asset. The v33 upgrade's `stage3` ran it (and
-`l1-contracts/deploy-scripts/upgrade/PopulateBridgedOut.s.sol` can resume it) for the
+the pre-upgrade accounting into `bridgedOut`, once per asset. The v33 upgrade's `stage3` ran it for the
 L1-native assets in the vault's `bridgedTokens` enumeration that have a non-zero pre-upgrade amount, batched
-across transactions (see `l1-contracts/deploy-scripts/upgrade/default-upgrade/BridgedOutPopulationLib.sol`;
-assets whose
-amount is zero are left out of the batches entirely, so their `bridgedOutPopulated` flag stays unset — there
+across transactions. That tooling (`BridgedOutPopulationLib`, `PopulateBridgedOut.s.sol`, which can resume a
+population) lives on `release/v0.33.0-atomic-interop`, where the v33 operation runs; assets whose amount is zero are left out of the batches entirely, so their `bridgedOutPopulated` flag stays unset — there
 is nothing to fold in for them, now or later).
 
 - For an asset the removed v31 `L1AssetTracker` registered, the amount is the complement of **L1's own

@@ -30,21 +30,13 @@ contract SystemContractProxyAdminTest is Test {
         assertEq(SystemContractProxyAdmin(proxyAdmin).owner(), RAND_ADDRESS, "owner not set");
     }
 
-    function test_RevertWhen_ForceSetOwnerByNonUpgrader() public {
-        address caller = makeAddr("notTheUpgrader");
-
-        vm.prank(caller);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, caller));
-        SystemContractProxyAdmin(proxyAdmin).forceSetOwner(RAND_ADDRESS);
-
-        assertEq(SystemContractProxyAdmin(proxyAdmin).owner(), address(0), "owner changed");
-    }
-
     function testFuzz_RevertWhen_ForceSetOwnerByAnyoneElse(address _caller, address _newOwner) public {
         vm.assume(_caller != L2_COMPLEX_UPGRADER_ADDR);
 
         vm.prank(_caller);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, _caller));
         SystemContractProxyAdmin(proxyAdmin).forceSetOwner(_newOwner);
+
+        assertEq(SystemContractProxyAdmin(proxyAdmin).owner(), address(0), "owner changed");
     }
 }

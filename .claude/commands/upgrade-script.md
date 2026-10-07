@@ -15,27 +15,18 @@ these defaults, so they always cover the release being built.
 
 ## Steps
 
-1. On the new release's branch, first merge the outgoing release's branch into it (so genesis and
-   protocol-ops already name the outgoing release; the script refuses otherwise). From the repo root, run
-   `yarn new-release <release-name> --previous-release-ref <outgoing release branch, e.g. origin/draft/v0.34.0> --dry-run`, show the user the planned changes, then
-   run it without `--dry-run`. It bumps the genesis minor version, scaffolds
-   `l1-contracts/upgrade-envs/v0.<N>.0-<release-name>/local.toml`, repoints protocol-ops' current upgrade-env dir,
-   rotates the anvil fixtures (`config/anvil-config.json`), freezing the outgoing release's chain states
-   byte for byte from `--previous-release-ref`, and copies every per-environment input with fresh salts.
+1. On the new release's branch, merge the outgoing release's branch in first (the script refuses otherwise).
+   From the repo root run `yarn new-release <release-name> --previous-release-ref <outgoing release branch>
+--dry-run`, show the user the planned changes, then run it without `--dry-run`. What it changes and the
+   follow-ups it cannot do are listed in the header of `scripts/new-release.ts` and printed at the end of a run;
+   do those follow-ups.
 
-2. Do the follow-ups it prints: regenerate the new release's anvil chain states (the 'Regenerate Anvil Interop
-   Chain States' workflow) and add per-environment inputs (`stage.toml`, `mainnet.toml`, ...) when preparing for
-   those environments.
+2. Ask the user what the release changes. Only if it needs release-specific preparation (extra contracts, a
+   custom per-chain initializer, one-off governance calls), add thin subclasses of the `Default*` scripts under
+   `l1-contracts/deploy-scripts/upgrade/v{N}/` (e.g. `CTMUpgrade_v{N}`), overriding only what the release needs,
+   and point the prepare defaults at them (one of the script's follow-ups).
 
-3. Ask the user what the release changes. Only if it needs release-specific preparation (extra contracts, a
-   custom per-chain initializer, one-off governance calls):
-   - Read the base classes: `DefaultCoreUpgrade.s.sol`, `DefaultCTMUpgrade.s.sol`, `CTMUpgradeBase.sol`.
-   - Add thin subclasses of the `Default*` scripts under `l1-contracts/deploy-scripts/upgrade/v{N}/` (e.g.
-     `CTMUpgrade_v{N}`), overriding only what the release needs.
-   - Point protocol-ops' `upgrade-prepare-all` `--core-script-path` / `--ctm-script-path` defaults at them, so the
-     upgrade tests pick them up.
-
-4. Run `cd protocol-ops && cargo test`, the anvil upgrade test (`yarn ts-node run-upgrade-test.ts` in
+3. Run `cd protocol-ops && cargo test`, the anvil upgrade test (`yarn ts-node run-upgrade-test.ts` in
    `l1-contracts/test/anvil-interop`) and the foundry upgrade tests
    (`forge test --ffi --match-path 'test/foundry/l1/integration/UpgradeTest*'` in `l1-contracts`).
 

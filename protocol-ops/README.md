@@ -64,7 +64,11 @@ covers the current release's upgrade. See
 ## Environment inputs
 
 `--env <name>` reads `upgrade-envs/permanent-values/<name>.toml` and the release input
-`<release dir>/<name>.toml`. The release dir is the current release's (`current_upgrade_env_dir!` in
+`<release dir>/<name>.toml`. A release input holds only what is read from it: `owner_address`, `era_chain_id`
+and the CREATE2 / legacy-Gov salts (`[contracts] create2_factory_salt`, `legacy_gov_salt`,
+`[create2_factory_salts]`, rotated every release because CREATE2 returns the previously deployed contract on a
+reused salt) for protocol-ops, and `governance_upgrade_timer_initial_delay` for `DefaultCTMUpgrade`. The old
+protocol version comes from each CTM and the target from `configs/genesis/zksync-os/latest.json`. The release dir is the current release's (`current_upgrade_env_dir!` in
 `src/common/forge/scripts/mod.rs`) unless `--upgrade-env-dir` selects another (on the commands built on the
 shared `--env` topology args and on `verify-upgrade`; `ecosystem init` / `ctm init` always use the current
 release). It is the only release selector: `upgrade-prepare-all` rejects an `--upgrade-input-path` outside the
