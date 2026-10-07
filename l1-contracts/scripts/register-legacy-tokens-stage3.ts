@@ -7,6 +7,29 @@
  * in NTV's bridgedTokens list, then calls L1AssetTracker.registerLegacyToken
  * only when the asset is not already registered.
  *
+ * Unlike the generic pre-scan, which skips assets whose NTV chainBalance is
+ * zero on every chain, this registers every listed token that has an NTV
+ * entry, zero-balance ones included. That costs one extra transaction per
+ * such token and is harmless: the asset ends up as a newly bridged token
+ * would, and it stays depositable (a legacy asset left unregistered fails
+ * deposits with `AssetIdNotRegistered` until someone registers it).
+ *
+ * A token missing from the list stays unregistered, so regenerate the list
+ * with `scripts/discover-legacy-bridged-tokens.ts` right before stage 3.
+ *
+ * It ends with a completeness check: every chain's base token must be
+ * registered in the AssetTracker afterwards. Base tokens are bridged via
+ * `requestL2Transaction*`, so a stale token list can miss them, and an
+ * unregistered one fails all of that chain's deposits and withdrawals with
+ * `AssetIdNotRegistered`. A real run exits non-zero listing them; `--dry-run`
+ * only prints the base tokens the run would leave unregistered.
+ *
+ * Both registration calls are permissionless. If another sender registers a
+ * token between this script's check and its transaction, gas estimation
+ * reverts with `TokenAlreadyInBridgedTokensList` / `AssetAlreadyRegistered`;
+ * the script logs that and continues. Any other error stops the run, and a
+ * rerun resumes where it stopped.
+ *
  * Prerequisite:
  *   Run `forge build` in l1-contracts/ so `out/**.json` ABI files exist.
  */
@@ -21,6 +44,8 @@ import { getBridgehubAddress, loadAbiFromFoundryOutput } from "./upgrade-script-
 const V31_UPGRADE_DIR = path.join(__dirname, "../upgrade-envs/v0.31.0-interopB");
 const ETH_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000001";
 const ZERO_BYTES32 = ethers.constants.HashZero;
+/** How deep `findRevertData` looks; ethers v5 puts the payload three `error` levels down. */
+const MAX_ERROR_NESTING_DEPTH = 8;
 
 interface TokenFile {
   tokens?: {
@@ -61,6 +86,64 @@ async function waitTx(label: string, tx: ethers.ContractTransaction, confirmatio
   console.log(`    tx sent: ${tx.hash}`);
   const receipt = await tx.wait(confirmations);
   console.log(`    ${label} confirmed in block ${receipt.blockNumber} (gasUsed=${receipt.gasUsed.toString()})`);
+}
+
+/**
+ * Returns the revert data of a failed gas estimation. ethers v5 nests the
+ * node's JSON-RPC error a few levels deep (`err.error.error…`); as in ethers'
+ * own lookup, the payload is the object whose `message` mentions a revert and
+ * whose `data` is hex.
+ */
+function findRevertData(value: unknown, depth = 0): string | undefined {
+  if (typeof value !== "object" || value === null || depth > MAX_ERROR_NESTING_DEPTH) {
+    return undefined;
+  }
+  const { message, data } = value as { message?: unknown; data?: unknown };
+  if (
+    typeof message === "string" &&
+    /revert/i.test(message) &&
+    typeof data === "string" &&
+    ethers.utils.isHexString(data)
+  ) {
+    return data;
+  }
+  for (const nested of Object.values(value)) {
+    const found = findRevertData(nested, depth + 1);
+    if (found !== undefined) {
+      return found;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Sends one of the two permissionless registration calls. Another sender can
+ * land the same registration between this script's state check and its
+ * transaction; gas estimation then reverts with `alreadyDoneError`, which
+ * leaves the asset in the state we want, so only that revert is tolerated.
+ * Returns whether this script's transaction did the work. Anything else is
+ * rethrown, and a rerun resumes where the run stopped.
+ */
+async function sendRegistration(
+  label: string,
+  send: () => Promise<ethers.ContractTransaction>,
+  errorInterface: ethers.utils.Interface,
+  alreadyDoneError: string,
+  confirmations: number
+): Promise<boolean> {
+  let tx: ethers.ContractTransaction;
+  try {
+    tx = await send();
+  } catch (err) {
+    const revertData = findRevertData(err)?.toLowerCase();
+    if (revertData === undefined || !revertData.startsWith(errorInterface.getSighash(alreadyDoneError))) {
+      throw err;
+    }
+    console.log(`    ${label} reverted with ${alreadyDoneError}: done by another sender meanwhile, continuing`);
+    return false;
+  }
+  await waitTx(label, tx, confirmations);
+  return true;
 }
 
 async function main(): Promise<void> {
@@ -104,7 +187,9 @@ async function main(): Promise<void> {
   const assetRouterAbi = loadAbiFromFoundryOutput("../out/IL1AssetRouter.sol/IL1AssetRouter.json");
   const ntvAbi = loadAbiFromFoundryOutput("../out/L1NativeTokenVault.sol/L1NativeTokenVault.json");
   const ntvBaseAbi = loadAbiFromFoundryOutput("../out/NativeTokenVaultBase.sol/NativeTokenVaultBase.json");
-  const assetTrackerAbi = loadAbiFromFoundryOutput("../out/IL1AssetTracker.sol/IL1AssetTracker.json");
+  // The implementation's ABI rather than IL1AssetTracker's: it carries the
+  // AssetAlreadyRegistered error that `sendRegistration` matches.
+  const assetTrackerAbi = loadAbiFromFoundryOutput("../out/L1AssetTracker.sol/L1AssetTracker.json");
   const assetTrackerBaseAbi = loadAbiFromFoundryOutput("../out/IAssetTrackerBase.sol/IAssetTrackerBase.json");
 
   const bridgehub = new ethers.Contract(bridgehubAddress, bridgehubAbi, signer);
@@ -137,6 +222,9 @@ async function main(): Promise<void> {
   let addedToBridgedList = 0;
   let registered = 0;
   let skippedMissingAssetId = 0;
+  let doneByOtherSender = 0;
+  // Dry-run only: assets this run would register, for the base-token check.
+  const plannedRegistrations = new Set<string>();
 
   for (let index = 0; index < tokens.length; ++index) {
     const token = tokens[index];
@@ -159,9 +247,18 @@ async function main(): Promise<void> {
       console.log("  NTV bridgedTokens: would add legacy token");
     } else {
       console.log("  NTV bridgedTokens: adding legacy token");
-      const tx = await ntvBase.addLegacyTokenToBridgedTokensList(token);
-      await waitTx("addLegacyTokenToBridgedTokensList", tx, opts.confirmations);
-      ++addedToBridgedList;
+      const added = await sendRegistration(
+        "addLegacyTokenToBridgedTokensList",
+        () => ntvBase.addLegacyTokenToBridgedTokensList(token),
+        ntvBase.interface,
+        "TokenAlreadyInBridgedTokensList",
+        opts.confirmations
+      );
+      if (added) {
+        ++addedToBridgedList;
+      } else {
+        ++doneByOtherSender;
+      }
     }
 
     const isRegistered = await assetTrackerBase.isAssetRegistered(assetId);
@@ -173,13 +270,23 @@ async function main(): Promise<void> {
 
     if (opts.dryRun) {
       console.log("  AssetTracker: would call registerLegacyToken");
+      plannedRegistrations.add(assetId);
       continue;
     }
 
     console.log("  AssetTracker: registering legacy token");
-    const tx = await assetTracker.registerLegacyToken(assetId);
-    await waitTx("registerLegacyToken", tx, opts.confirmations);
-    ++registered;
+    const didRegister = await sendRegistration(
+      "registerLegacyToken",
+      () => assetTracker.registerLegacyToken(assetId),
+      assetTracker.interface,
+      "AssetAlreadyRegistered",
+      opts.confirmations
+    );
+    if (didRegister) {
+      ++registered;
+    } else {
+      ++doneByOtherSender;
+    }
   }
 
   console.log("\nDone.");
@@ -187,6 +294,28 @@ async function main(): Promise<void> {
   console.log(`  Added to NTV bridged list: ${addedToBridgedList}`);
   console.log(`  Registered in AT:         ${registered}`);
   console.log(`  Missing NTV assetId:      ${skippedMissingAssetId}`);
+  console.log(`  Done by another sender:   ${doneByOtherSender}`);
+
+  const chainIds: ethers.BigNumber[] = await bridgehub.getAllZKChainChainIDs();
+  console.log(`\nBase-token check (${chainIds.length} chains):`);
+  const unregisteredBaseTokens: string[] = [];
+  for (const chainId of chainIds) {
+    const baseTokenAssetId: string = await bridgehub.baseTokenAssetId(chainId);
+    if (plannedRegistrations.has(baseTokenAssetId) || (await assetTrackerBase.isAssetRegistered(baseTokenAssetId))) {
+      continue;
+    }
+    const baseToken: string = await ntv.tokenAddress(baseTokenAssetId);
+    unregisteredBaseTokens.push(`chain ${chainId.toString()}: ${baseToken} (assetId ${baseTokenAssetId})`);
+  }
+  if (unregisteredBaseTokens.length === 0) {
+    console.log(`  every base token is registered${opts.dryRun ? " or would be by this run" : ""}`);
+  } else if (opts.dryRun) {
+    console.log(`  this run would leave base tokens unregistered: ${unregisteredBaseTokens.join("; ")}`);
+  } else {
+    throw new Error(
+      `Base tokens not registered in AssetTracker: ${unregisteredBaseTokens.join("; ")}. Add them to ${tokensFile} and rerun.`
+    );
+  }
 }
 
 main().catch((err) => {

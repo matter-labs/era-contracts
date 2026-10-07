@@ -32,7 +32,8 @@ pub struct VerifyUpgradeArgs {
     pub l1_rpc_url: String,
 
     /// Gateway RPC URL for the read-only gateway-side checks. Needed only for envs that
-    /// bring up a Gateway (`[new_gateway]`); gateway-less envs run without it.
+    /// bring up a Gateway (`[new_gateway]`); gateway-less envs run without it. Defaults to
+    /// the env's `[new_gateway] rpc_url` (permanent-values).
     #[clap(long, alias = "gw-rpc")]
     pub gw_rpc_url: Option<String>,
 
@@ -60,7 +61,10 @@ pub struct VerifyUpgradeArgs {
     /// Stale entries (from older regens whose bytecode is no longer in
     /// AllContractsHashes) are silently skipped.
     ///
-    /// Defaults to `<l1-contracts>/upgrade-envs/v0.31.0-interopB/output/<env>/transactions.txt`
+    /// Defaults to `<l1-contracts>/upgrade-envs/v0.31.0-interopB/output/<env>/transactions.txt`.
+    /// Its deploys are salt-gated, so for an env whose committed log also holds
+    /// earlier broadcasts (mainnet) pass the deployment's own journal here and
+    /// the committed file as `--reference-transactions-log`.
     #[clap(long)]
     pub transactions_log: Option<PathBuf>,
 
@@ -117,6 +121,7 @@ impl VerifyUpgradeEnv {
 pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     let env = args.env.as_str();
     let env_cfg = EnvConfig::load(env)?;
+    let gw_rpc_url = args.gw_rpc_url.as_deref().or_else(|| env_cfg.gw_rpc_url());
     let era_chain_id = env_cfg.era_chain_id().ok_or_else(|| {
         anyhow::anyhow!(
             "{} is missing top-level `era_chain_id`",
@@ -206,10 +211,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         transactions_log_path.display()
     ));
     logger::info(format!("L1 RPC URL: {}", args.l1_rpc_url));
-    logger::info(format!(
-        "Gateway RPC URL: {}",
-        args.gw_rpc_url.as_deref().unwrap_or("none")
-    ));
+    logger::info(format!("Gateway RPC URL: {}", gw_rpc_url.unwrap_or("none")));
     if let Some(contracts_commit) = &args.contracts_commit {
         logger::info(format!("Contracts commit: {contracts_commit}"));
     } else {
@@ -270,7 +272,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         args.env,
         &artifact,
         &args.l1_rpc_url,
-        args.gw_rpc_url.as_deref(),
+        gw_rpc_url,
         args.contracts_commit.as_deref(),
         args.zk_governance_commit.as_str(),
         era_chain_id,

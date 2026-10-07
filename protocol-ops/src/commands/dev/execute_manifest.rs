@@ -6,7 +6,7 @@ use alloy::signers::local::PrivateKeySigner;
 use anyhow::{bail, Context, Result};
 use clap::Parser;
 
-use crate::commands::dev::execute_safe::execute_one_bundle;
+use crate::commands::dev::execute_safe::{execute_one_bundle, ResumeJournal};
 use crate::common::{anvil::set_balance, logger, preflight::is_local_rpc, PrivateKey};
 
 /// Apply every bundle listed in a `manifest.json` file, routing each one to the
@@ -169,14 +169,17 @@ pub async fn apply_manifest_from(
             })?;
         }
 
+        // No `--out` here: nothing is journaled, so nothing is ever skipped.
+        let mut journal = ResumeJournal::load(None)?;
         execute_one_bundle(
             &bundle_path,
             l1_rpc_url,
             key,
-            None,
-            crate::commands::dev::execute_safe::gwei_to_wei(
+            &mut journal,
+            crate::commands::dev::execute_safe::parse_gwei(
                 crate::commands::dev::execute_safe::DEFAULT_MAX_GAS_PRICE_GWEI,
-            ),
+            )
+            .map_err(anyhow::Error::msg)?,
         )
         .await?;
     }

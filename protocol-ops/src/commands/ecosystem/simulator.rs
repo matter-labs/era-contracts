@@ -10,6 +10,7 @@ use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
+use crate::common::execution_runbook;
 use crate::common::governance_calls::decode_calls;
 use crate::common::logger;
 
@@ -77,6 +78,8 @@ struct RawSimDescriptionEntry {
 #[derive(Debug, Default)]
 struct SimDescriptionRegistry {
     entries: Vec<SimDescriptionEntry>,
+    /// `[labels]` inverted: the names this file gives addresses (several joined by ` / `).
+    labels: BTreeMap<Address, String>,
 }
 
 #[derive(Debug)]
@@ -126,6 +129,17 @@ fn resolve_address(
 fn build_registry(raw: RawSimDescriptionRegistry) -> anyhow::Result<SimDescriptionRegistry> {
     use anyhow::Context;
     let labels = &raw.labels;
+    let mut names: BTreeMap<Address, Vec<&str>> = BTreeMap::new();
+    for (name, address) in labels {
+        names.entry(*address).or_default().push(name);
+    }
+    let labels_by_address = names
+        .into_iter()
+        .map(|(address, mut names)| {
+            names.sort_unstable();
+            (address, names.join(" / "))
+        })
+        .collect();
     let mut entries = Vec::with_capacity(raw.entries.len());
     for (i, e) in raw.entries.into_iter().enumerate() {
         let target = resolve_address(&e.target, labels)
@@ -147,7 +161,10 @@ fn build_registry(raw: RawSimDescriptionRegistry) -> anyhow::Result<SimDescripti
             desc: e.desc,
         });
     }
-    Ok(SimDescriptionRegistry { entries })
+    Ok(SimDescriptionRegistry {
+        entries,
+        labels: labels_by_address,
+    })
 }
 
 impl SimDescriptionRegistry {
@@ -675,6 +692,7 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
             )
         })?;
         write_sim_inputs(manifest, &args.camp_a_signers, sim_inputs_dir)?;
+        write_sim_inputs_runbook(sim_inputs_dir, env_cfg.as_ref(), &descriptions)?;
         return Ok(());
     }
 
@@ -830,6 +848,47 @@ fn write_sim_inputs(
         kept.len(),
         out_dir.display()
     ));
+    Ok(())
+}
+
+/// Write `EXECUTE.md` next to the sim-inputs directory: the copy-into-MetaMask runbook of the
+/// Camp-B bundles, which their signers send by hand. Txs are labelled with their
+/// `sim-descriptions.toml` description and addresses named with its `[labels]` and the env's
+/// permanent values. Nothing is written when no Camp-B bundle is left.
+fn write_sim_inputs_runbook(
+    sim_inputs_dir: &Path,
+    env_cfg: Option<&crate::common::env_config::EnvConfig>,
+    descriptions: &SimDescriptionRegistry,
+) -> anyhow::Result<()> {
+    let manifest_path = sim_inputs_dir.join("manifest.json");
+    let manifest: PrepareManifest = serde_json::from_str(
+        &fs::read_to_string(&manifest_path)
+            .with_context(|| format!("failed to read {}", manifest_path.display()))?,
+    )
+    .with_context(|| format!("failed to parse {}", manifest_path.display()))?;
+    if manifest.bundles.is_empty() {
+        logger::info("No Camp-B bundles, so no execution runbook");
+        return Ok(());
+    }
+    let path = execution_runbook::default_runbook_path(sim_inputs_dir)?;
+    let mut names = env_cfg
+        .map(execution_runbook::env_names)
+        .unwrap_or_default();
+    names.extend(descriptions.labels.clone());
+    let options = execution_runbook::LoadOptions {
+        chain_id: env_cfg.and_then(|cfg| cfg.l1_chain_id()),
+        env: env_cfg.map(|cfg| cfg.env.clone()),
+        names,
+        ..Default::default()
+    };
+    let mut runbook = execution_runbook::load(sim_inputs_dir, &path, &options)?;
+    for tx in &mut runbook.txs {
+        if let Some(description) = descriptions.lookup(tx.to, &format!("{:#x}", tx.data)) {
+            tx.label = description;
+        }
+    }
+    execution_runbook::write(&runbook, &path)?;
+    logger::info(format!("Wrote execution runbook {}", path.display()));
     Ok(())
 }
 

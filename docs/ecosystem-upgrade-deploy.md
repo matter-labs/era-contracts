@@ -135,11 +135,19 @@ The sender (`submit_and_confirm` in
   the _same nonce_ at a higher gas price (+15% per retry, ≥ geth's 10%
   replacement floor), up to `--max-gas-price-gwei`, then keeps trying at the
   ceiling until a 20-minute per-tx deadline.
-- **Nonce takeover** — if the sender's on-chain nonce advances past ours without
-  our tx landing (some other tx grabbed the nonce), it re-fetches the next free
-  nonce and resubmits our calldata there.
+- **Spent nonce** — if the sender's nonce moves past ours, it keeps asking for
+  receipts of every hash it sent at that nonce for ~36s: a load-balanced RPC can
+  serve the new nonce before the receipt of our own mined tx. If none of ours
+  shows up, the run stops and names those hashes instead of resending, because a
+  resend would execute the call twice if one of them did mine. Only a call never
+  sent at that nonce (a stale pending nonce) is resent at the next free one.
 - **Idempotent** — CREATE2 deploys already on-chain and known already-done
-  reverts are skipped, so a re-run after a partial deploy resumes cleanly.
+  reverts are skipped, so a re-run after a partial deploy resumes cleanly. A
+  `publishEraBytecodes` / `publishEVMBytecodes` batch is skipped only when every
+  bytecode in it is published, and an `AddressAlreadySet` only when the address
+  already set is the one the call sets. A skipped CREATE2 deploy leaves no
+  journal entry (its deployment tx is unknown), so the log names the address: if
+  PUVT reports it missing, append its deployment tx hash to `transactions.txt`.
 
 It journals each confirmed receipt immediately: the mined hash is appended to
 `transactions.txt` (next to `--out`) and the matching calldata is atomically
@@ -153,14 +161,16 @@ CREATE2 deployments.
 OUT=l1-contracts/upgrade-envs/v0.31.0-interopB/output/mainnet
 DEPLOYER_ADDR=$(cast wallet address --private-key "$DEPLOYER_KEY")
 
-# Broadcast the deployer bundles → writes $OUT/transactions.txt
+# Broadcast the deployer bundles → writes ./deploy-result/transactions.txt, this
+# deployment's journal. Keep it out of $OUT: the committed $OUT/transactions.txt
+# also holds earlier broadcasts and is step 3's reference log.
 ./protocol-ops/target/release/protocol_ops ecosystem upgrade-broadcast \
   --manifest "$OUT/prepare/manifest.json" \
   --l1-rpc-url <l1-rpc> \
   --key "${DEPLOYER_ADDR}=${DEPLOYER_KEY}" \
   --skip-unkeyed \
   --max-gas-price-gwei 500 \
-  --out "$OUT/deploy-executed.json"
+  --out ./deploy-result/deploy-executed.json
 
 # Verify on Etherscan — replay the logged forge verify-contract commands VERBATIM.
 # Step 1 already wrote the exact `--constructor-args <hex>` for every contract
@@ -200,10 +210,23 @@ having deployed nothing. `ETHERSCAN_API_KEY` is optional (verify only).
 > `--out` path. In CI, dispatch a new deploy run with `resume_deploy_run_id` set
 > to the failed deploy run; the workflow validates and restores that run's
 > partial result artifact before broadcasting. Do not use GitHub's plain
-> “re-run failed jobs” button, which cannot add the resume input. Ownership-
-> transfer txs are **not** idempotent-skipped, so if a bundle was interrupted
-> after some ownership moved off the deployer, see the notes in
-> `execute_safe.rs` for building a resume bundle.
+> “re-run failed jobs” button, which cannot add the resume input.
+>
+> With a journal, a resume skips every call the journal proves already mined —
+> matched on target, calldata and value, then confirmed by the on-chain
+> receipt's sender, target and status — so ownership transfers that already
+> moved off the deployer are skipped too, not re-sent into a revert. Without a
+> journal only CREATE2 deploys whose address has code and a few revert
+> signatures (already-published bytecodes, already-scheduled governance ops)
+> are skipped.
+>
+> The same mechanism completes a **re-cut** deployment: when contracts changed
+> after a partial or full broadcast, regenerate the bundle (forking BEFORE the
+> earlier broadcast, so the prepare still owns what it deploys) and dispatch
+> the deploy with `resume_deploy_run_id` = the earlier deploy run and
+> `resume_from_other_bundle` = true. Unchanged contracts and their setup calls
+> are byte-identical to the journaled ones and are skipped; only the changed
+> contracts, their setup calls and new bytecode publishes go out.
 
 ---
 
@@ -211,13 +234,22 @@ having deployed nothing. `ETHERSCAN_API_KEY` is optional (verify only).
 
 ```bash
 OUT=l1-contracts/upgrade-envs/v0.31.0-interopB/output/mainnet
+# ./deploy-result: step 2's local journal, or the deploy run's
+# `ecosystem-upgrade-deploy-result-<env>` artifact downloaded there.
 ./protocol-ops/target/release/protocol_ops ecosystem verify-upgrade \
   --env mainnet \
   --ecosystem-toml "$OUT/ecosystem.toml" \
-  --transactions-log "$OUT/transactions.txt" \
+  --transactions-log ./deploy-result/transactions.txt \
+  --reference-transactions-log "$OUT/transactions.txt" \
   --l1-rpc-url <l1-rpc> --gw-rpc-url <l1-rpc> \
   --zk-governance-commit 9b06a16159cd58add109f25598e79731450d1772
 ```
+
+`--transactions-log` is salt-gated, so it must be this deployment's own journal.
+The committed `$OUT/transactions.txt` also holds earlier broadcasts (mainnet's
+July 2026 deployment), whose deploys carry that regen's salts, so it goes in as
+the reference log, as the deploy-bundle handoff passes it. Leaving
+`--transactions-log` out defaults to the committed file and fails the salt gate.
 
 Pre-governance (contracts deployed, governance not yet executed) this reports the
 allowed exemptions for contracts still owned by the legacy Governor pending their

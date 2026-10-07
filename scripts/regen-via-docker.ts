@@ -22,6 +22,10 @@
  *                                  real-chain broadcast)
  *
  * Optional env:
+ *   GW_RPC_URL=<gateway-rpc>     — overrides the Gateway RPC PUVT uses for
+ *                                  its read-only GW-side checks. Defaults to
+ *                                  stage's permanent-values
+ *                                  `[new_gateway] rpc_url`.
  *   PROTOCOL_OPS_IMAGE=...       — full image ref. Defaults to
  *                                  ghcr.io/matter-labs/protocol-ops:v31-camp-split
  *   PROTOCOL_OPS_BIN_HOST=...    — explicit path to a pre-built linux/amd64
@@ -167,6 +171,14 @@ function commonMounts(): string[] {
  * ignores `--disable-labels` for `forge script`, otherwise the prepare
  * hangs 5–30 min per CTM).
  */
+/**
+ * `--gw-rpc-url` only when the operator overrides it; otherwise
+ * `rehearse-upgrade` falls back to stage's `[new_gateway] rpc_url`.
+ */
+function gwRpcOverride(): string[] {
+  return process.env.GW_RPC_URL ? ["--gw-rpc-url", process.env.GW_RPC_URL] : [];
+}
+
 function sourcifyBlock(): string[] {
   return ["--add-host", "sourcify.dev:127.0.0.1", "--add-host", "repo.sourcify.dev:127.0.0.1"];
 }
@@ -201,6 +213,7 @@ function cmdRegen(pk: string, rpc: string, binMount: string[]): number {
     rpc,
     "--deployer-address",
     deployer,
+    ...gwRpcOverride(),
   ];
   return dockerRun(args);
 }

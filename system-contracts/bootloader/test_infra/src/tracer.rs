@@ -14,7 +14,10 @@ use zksync_multivm::zk_evm_latest::tracing::{BeforeExecutionData, VmLocalStateDa
 
 use zksync_state::interface::{StoragePtr, WriteStorage};
 
-use crate::hook::{TestVmHook, HOOK_EXECUTION_RESULT};
+use crate::hook::{
+    TestVmHook, HOOK_ASK_OPERATOR_FOR_REFUND, HOOK_EXECUTION_RESULT, HOOK_NOTIFY_ABOUT_REFUND,
+    HOOK_TX_HAS_ENDED, HOOK_VALIDATION_STEP_ENDED, ROOT_HOOK_FRAME_DEPTH,
+};
 
 /// Bootloader test tracer that is executing while the bootloader tests are running.
 /// It can check the asserts, return information about the running tests (and amount of tests) etc.
@@ -71,6 +74,24 @@ impl<S, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for BootloaderTestTracer {
         _storage: StoragePtr<S>,
     ) {
         let hook = TestVmHook::from_opcode_memory(&state, &data, memory);
+
+        // These hooks must remain in the root frame; a NoInline store helper breaks
+        // server tracers even when the existing hook-count checks still pass.
+        if matches!(
+            &hook,
+            TestVmHook::TxExecutionResult { .. }
+                | TestVmHook::OperatorHook(
+                    HOOK_VALIDATION_STEP_ENDED
+                        | HOOK_TX_HAS_ENDED
+                        | HOOK_ASK_OPERATOR_FOR_REFUND
+                        | HOOK_NOTIFY_ABOUT_REFUND
+                )
+        ) {
+            assert_eq!(
+                state.vm_local_state.callstack.inner.len(),
+                ROOT_HOOK_FRAME_DEPTH
+            );
+        }
 
         if let TestVmHook::TestLog(msg, data_str) = &hook {
             println!("{} {} {}", "Test log".bold(), msg, data_str);

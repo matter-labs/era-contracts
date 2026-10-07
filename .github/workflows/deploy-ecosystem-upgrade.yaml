@@ -1,4 +1,4 @@
-name: "Ecosystem Upgrade: Deploy + Verify (v31)"
+name: "Ecosystem Upgrade: Deploy + Verify"
 
 # Step 2 of the two-step v31 ecosystem-upgrade flow. Step 1
 # (`generate-ecosystem-upgrade-calldata.yaml`) produces the calldata + the
@@ -21,9 +21,10 @@ name: "Ecosystem Upgrade: Deploy + Verify (v31)"
 #
 # The sender broadcasts strictly one tx at a time and is robust to public-L1
 # hazards: a stuck (underpriced) tx is re-broadcast at a higher gas price up to
-# `max_gas_price_gwei`, and if the sender's nonce is grabbed by another tx the
-# calldata is resubmitted at the next free nonce (see `submit_and_confirm` in
-# `protocol-ops/src/commands/dev/execute_safe.rs`).
+# `max_gas_price_gwei`. If the sender's nonce moves past ours and none of our
+# submissions shows a receipt within a few blocks, the run stops with their
+# hashes instead of resending, which could execute the call twice (see
+# `submit_and_confirm` in `protocol-ops/src/commands/dev/execute_safe.rs`).
 #
 # ─── WHICH L1, WHICH SECRETS ───
 # The target L1 is taken from the downloaded bundle's `bundle-metadata.json`
@@ -62,8 +63,13 @@ on:
         required: false
         default: ""
         type: string
+      resume_from_other_bundle:
+        description: "Allow resume_deploy_run_id to point at a run that deployed a DIFFERENT bundle of the same environment (a re-cut after contract changes). The executor then skips only the calls that journal proves already mined — matched on target, calldata and value and confirmed by the on-chain receipt — and sends the rest. Off by default: normally a resume must belong to the same generation run and bundle."
+        required: false
+        default: false
+        type: boolean
       max_gas_price_gwei:
-        description: "Gas-price ceiling (gwei) for the stuck-tx bump loop"
+        description: "Gas-price ceiling in gwei, decimals allowed (e.g. 0.5). It caps the stuck-tx bump loop and the first broadcast, so a value below the 1 gwei floor is the price every tx pays."
         required: false
         default: "500"
         type: string
@@ -263,6 +269,26 @@ jobs:
           ./protocol-ops/target/release/protocol_ops ecosystem verify-bundle "$DEPLOY_BUNDLE_DIR"
           echo "DEPLOY_BUNDLE_DIR=$DEPLOY_BUNDLE_DIR" >> "$GITHUB_ENV"
 
+      # The bundle names the upgrade it was generated for; that upgrade's upgrade.toml in this
+      # checkout says how its broadcast is checked (protocol-ops/src/common/upgrade_descriptor.rs).
+      - name: Resolve the bundle's upgrade
+        run: |
+          set -euo pipefail
+          UPGRADE="$(jq -r '.upgrade // empty' "$DEPLOY_BUNDLE_DIR/bundle-metadata.json")"
+          if ! printf '%s' "$UPGRADE" | grep -qE '^[A-Za-z0-9._-]+$' || [ "$UPGRADE" = "." ] || [ "$UPGRADE" = ".." ]; then
+            echo "::error::bundle names an invalid upgrade '$UPGRADE'"; exit 1
+          fi
+          DESCRIPTOR="l1-contracts/upgrade-envs/$UPGRADE/upgrade.toml"
+          if [ ! -f "$DESCRIPTOR" ]; then
+            echo "::error::this checkout has no $DESCRIPTOR for the bundle's upgrade"; exit 1
+          fi
+          KIND="$(sed -nE 's/^[[:space:]]*prepare[[:space:]]*=[[:space:]]*"([a-z-]+)".*/\1/p' "$DESCRIPTOR" | head -1)"
+          echo "Bundle upgrade: $UPGRADE (prepare = $KIND)"
+          {
+            echo "UPGRADE=$UPGRADE"
+            echo "UPGRADE_KIND=$KIND"
+          } >> "$GITHUB_ENV"
+
       # Tie the downloaded bytes back to the exact successful generation run.
       # Broadcasting is commit-agnostic, but Etherscan verification recompiles
       # from this checkout, so a different checkout is still warned separately.
@@ -302,6 +328,7 @@ jobs:
           ENVIRONMENT: ${{ inputs.environment }}
           GENERATE_RUN_ID: ${{ inputs.generate_run_id }}
           RESUME_DEPLOY_RUN_ID: ${{ inputs.resume_deploy_run_id }}
+          RESUME_FROM_OTHER_BUNDLE: ${{ inputs.resume_from_other_bundle }}
         run: |
           set -euo pipefail
           OUTDIR="$GITHUB_WORKSPACE/deploy-result"
@@ -313,18 +340,33 @@ jobs:
             if [ -z "$previous_meta" ]; then
               echo "::error::resume artifact has no resume-metadata.json"; exit 1
             fi
-            jq -e \
-              --arg generation_run "$GENERATE_RUN_URL" \
-              --arg deployment_run "$RESUME_RUN_URL" \
-              --arg env "$ENVIRONMENT" \
-              --arg digest "$bundle_metadata_sha256" \
-              '.generation_run == $generation_run and
-               .deployment_run == $deployment_run and
-               .environment == $env and
-               .bundle_metadata_sha256 == $digest' \
-              "$previous_meta" >/dev/null || {
-                echo "::error::resume journal does not belong to this generation run, environment, and bundle"; exit 1;
-              }
+            if [ "$RESUME_FROM_OTHER_BUNDLE" = "true" ]; then
+              # Re-cut bundle: the journal comes from another generation run and
+              # bundle of the SAME environment. Only the environment is checked
+              # here; the executor decides per call, from the journal and the
+              # chain, what already mined.
+              jq -e \
+                --arg deployment_run "$RESUME_RUN_URL" \
+                --arg env "$ENVIRONMENT" \
+                '.deployment_run == $deployment_run and .environment == $env' \
+                "$previous_meta" >/dev/null || {
+                  echo "::error::resume journal does not belong to deploy run $RESUME_DEPLOY_RUN_ID and environment $ENVIRONMENT"; exit 1;
+                }
+              echo "::warning::resuming from a different bundle: journal generation run $(jq -r .generation_run "$previous_meta"), this bundle from $GENERATE_RUN_URL. Only calls the journal proves mined are skipped."
+            else
+              jq -e \
+                --arg generation_run "$GENERATE_RUN_URL" \
+                --arg deployment_run "$RESUME_RUN_URL" \
+                --arg env "$ENVIRONMENT" \
+                --arg digest "$bundle_metadata_sha256" \
+                '.generation_run == $generation_run and
+                 .deployment_run == $deployment_run and
+                 .environment == $env and
+                 .bundle_metadata_sha256 == $digest' \
+                "$previous_meta" >/dev/null || {
+                  echo "::error::resume journal does not belong to this generation run, environment, and bundle (set resume_from_other_bundle to resume a re-cut)"; exit 1;
+                }
+            fi
             previous_dir="$(dirname "$previous_meta")"
             [ ! -f "$previous_dir/transactions.txt" ] || cp "$previous_dir/transactions.txt" "$OUTDIR/transactions.txt"
             [ ! -f "$previous_dir/deploy-executed.json" ] || cp "$previous_dir/deploy-executed.json" "$OUTDIR/deploy-executed.json"
@@ -402,9 +444,12 @@ jobs:
             echo "::error::bundle was prepared for deployer $want but this key is $deployer — its bundles would be skipped. Re-generate with -f deployer_address=$deployer, or use that account's key."
             exit 1
           fi
+          # The key itself is not exported: $GITHUB_ENV reaches every later step,
+          # including the Etherscan step that evaluates commands from the
+          # downloaded bundle. The broadcast step reads it from the secret again.
           {
             echo "L1_RPC_URL=$rpc"
-            echo "DEPLOYER_PK=$pk"
+            echo "L1_NETWORK=$net"
             echo "DEPLOYER_ADDR=$deployer"
             echo "ETHERSCAN_CHAIN=$net"
           } >> "$GITHUB_ENV"
@@ -413,19 +458,40 @@ jobs:
       # at a time. Writes transactions.txt next to --out for the PUVT.
       - name: Broadcast deployer bundles to L1
         if: ${{ !inputs.verify_only }}
+        env:
+          PK_SEPOLIA: ${{ secrets.DEPLOYER_PRIVATE_KEY_SEPOLIA }}
+          PK_MAINNET: ${{ secrets.DEPLOYER_PRIVATE_KEY_MAINNET }}
+          MAX_GAS_PRICE_GWEI: ${{ inputs.max_gas_price_gwei }}
         run: |
           set -euo pipefail
+          case "$L1_NETWORK" in
+            mainnet) pk="$PK_MAINNET" ;;
+            sepolia) pk="$PK_SEPOLIA" ;;
+            *) echo "::error::No deployer key wired for L1 network '$L1_NETWORK'"; exit 1 ;;
+          esac
           MANIFEST="$DEPLOY_BUNDLE_DIR/prepare/manifest.json"
           echo "Manifest: $MANIFEST"
           ./protocol-ops/target/release/protocol_ops ecosystem upgrade-broadcast \
             --manifest "$MANIFEST" \
             --l1-rpc-url "$L1_RPC_URL" \
-            --key "${DEPLOYER_ADDR}=${DEPLOYER_PK}" \
+            --key "${DEPLOYER_ADDR}=${pk}" \
             --skip-unkeyed \
-            --max-gas-price-gwei "${{ inputs.max_gas_price_gwei }}" \
+            --max-gas-price-gwei "$MAX_GAS_PRICE_GWEI" \
             --out "$DEPLOY_OUTDIR/deploy-executed.json"
           echo "=== transactions.txt ==="
           cat "$TXLOG" || true
+
+      # A forge-script upgrade declares a read-only `verify_chain` check, run here against the
+      # real chain. v31's post-deploy check is PUVT, which stays a separate step.
+      - name: Check the broadcast on L1 (the upgrade's declared check)
+        if: ${{ !inputs.verify_only && env.UPGRADE_KIND == 'forge-script' }}
+        run: |
+          set -euo pipefail
+          ./protocol-ops/target/release/protocol_ops ecosystem replay-bundle \
+            --bundle "$DEPLOY_BUNDLE_DIR" \
+            --rpc "$L1_RPC_URL" \
+            --verify-only \
+            --transactions-log "$TXLOG"
 
       - name: Upload transactions.txt + executed log
         if: ${{ always() && !inputs.verify_only }}
@@ -454,6 +520,9 @@ jobs:
           fi
           LOG="$DEPLOY_BUNDLE_DIR/extra-verification-logs.txt"
           if [ ! -f "$LOG" ]; then
+            if [ "${UPGRADE_KIND:-}" = "forge-script" ]; then
+              echo "The bundle logged no contract deployments to verify ($UPGRADE)."; exit 0
+            fi
             echo "::error::extra-verification-logs.txt not found"; exit 1
           fi
           # $ETHERSCAN_CHAIN was resolved from the bundle's l1.chain_id, not from

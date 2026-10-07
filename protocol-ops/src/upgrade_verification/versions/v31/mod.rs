@@ -25,41 +25,142 @@ use elements::{
     rpc_state::verify_v31_artifact_state,
 };
 
-// Target protocol versions, per CTM flavour. Each CTM upgrades to its own
-// flavour's chain-creation `latestProtocolVersion`, which comes from that
-// flavour's genesis config — `DefaultCTMUpgrade.getNewProtocolVersion()` returns
-// `config.contracts.chainCreationParams.latestProtocolVersion`. The two
-// flavours' genesis lines moved independently, so a single shared constant
-// cannot describe both: this branch ships Era genesis v0.32.2 (see the
-// `old_protocol_version` note in `upgrade-envs/v0.31.0-interopB/
-// foundry-upgrade.toml`) and ZKsync-OS genesis v0.31.2.
-pub(crate) const EXPECTED_ERA_NEW_PROTOCOL_VERSION_STR: &str = "0.32.2";
-pub(crate) const EXPECTED_ZKSYNC_OS_NEW_PROTOCOL_VERSION_STR: &str = "0.31.2";
-// Source protocol versions, per CTM flavour: the version each CTM is on when
-// v31 executes, checked against both the artifact's `old_protocol_version` and
-// the live CTM's `protocolVersion()`.
-//
-// Era is v0.30.1, not the v0.29.4 the July calldata was cut against. Mainnet's
-// Era CTM moved to v0.30.1 at block 25766158 — after that calldata was
-// generated and 268k blocks after its contracts were deployed — so the recorded
-// ceremony would revert (`setNewVersionUpgrade old protocol version mismatch`)
-// and the re-cut upgrades Era from v0.30.1.
-// Source line each flavour upgrades from, as (major, minor) per environment.
-//
-// The patch digit is deliberately not pinned. It described a live CTM, so every
-// patch bump on someone else's chain made a pinned value wrong: ADI's ZKsync-OS
-// CTM went v0.30.1 -> v0.30.2 at block 25926020 and its calldata could no longer
-// be verified, while nothing about whether v31 applies had changed. Pinning the
-// patch is what made this table go stale three times.
-//
-// The minor still has to be per-environment, because the fleet genuinely
-// disagrees: mainnet's Era CTM is on the v0.30 line, testnet's is still on v0.29.
-// The artifact's own `old_protocol_version` is separately compared against the
-// live CTM, which is the stronger check; this table exists to catch v31 tooling
-// pointed at an ecosystem nowhere near the v0.30 line at all.
-const EXPECTED_ERA_OLD_PROTOCOL_LINE: (u64, u64) = (0, 30);
-const EXPECTED_ERA_OLD_PROTOCOL_LINE_TESTNET: (u64, u64) = (0, 29);
-const EXPECTED_ZKSYNC_OS_OLD_PROTOCOL_LINE: (u64, u64) = (0, 30);
+/// Protocol versions a v31 ceremony moves a CTM between, per environment and
+/// CTM flavour. The source side is checked against both the artifact's
+/// `old_protocol_version` and the live CTM's `protocolVersion()`; the target
+/// side against the artifact's `new_protocol_version`.
+///
+/// A ceremony generated from this branch targets each flavour's genesis
+/// `protocol_semantic_version` (`configs/genesis/<flavour>/latest.json`, which
+/// `DefaultCTMUpgrade.getNewProtocolVersion()` reads through
+/// `chainCreationParams`): Era v0.33.0, ZKsync OS v0.31.2. The two genesis
+/// lines moved independently, so one shared target cannot describe both.
+///
+/// The environments do not share one table either:
+///
+/// * Mainnet's Era CTM moved to v0.30.1 at block 25766158, after the July
+///   calldata was cut, so the recorded ceremony would revert
+///   (`setNewVersionUpgrade old protocol version mismatch`) and mainnet was
+///   re-cut from v0.30.1 against this branch's genesis. Its ceremony has not
+///   executed: exactly one target is acceptable.
+/// * ADI is a ZKsync-OS-only ecosystem on L1 mainnet, cut from the same branch.
+///   Its CTM took the v0.30.2 verifier patch at block 25926020, so it upgrades
+///   from v0.30.2, not mainnet's v0.30.1.
+/// * Sepolia (testnet, stage) already executed v31 from the July calldata —
+///   Era v0.29.4 → v0.31.0, ZKsync OS v0.30.1 → v0.31.0 — and their committed
+///   artifacts record that ceremony. A fresh rehearsal of those envs from this
+///   branch (the CI regen job forks Sepolia before the upgrade) targets the
+///   branch genesis instead; it is a tooling smoke test, not a ceremony that
+///   will run, so both targets are accepted there.
+///
+/// `tests::expected_versions_match_committed_artifacts` pins the table to the
+/// committed `output/<env>/ecosystem.toml` files, and
+/// `tests::branch_genesis_targets_match_genesis_configs` to the genesis files.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ExpectedProtocolVersions {
+    /// The version the CTM must be on when the ceremony executes.
+    pub(crate) old: ProtocolVersion,
+    /// Targets the artifact may declare (see above); never empty.
+    pub(crate) new: Vec<ProtocolVersion>,
+}
+
+impl ExpectedProtocolVersions {
+    pub(crate) fn accepts_new(&self, version: ProtocolVersion) -> bool {
+        self.new.contains(&version)
+    }
+
+    /// The accepted targets for an error message, e.g. `0.31.0 or 0.33.0`.
+    pub(crate) fn describe_new(&self) -> String {
+        self.new
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(" or ")
+    }
+}
+
+/// Each flavour's genesis `protocol_semantic_version` on this branch: what a
+/// ceremony generated here targets.
+/// Era is v0.33.0 so mainnet lands on the same label as stage, which receives
+/// this bootloader (zksolc 1.5.17 + DSE root-frame hooks) as its own v0.33.0.
+const BRANCH_GENESIS_ERA_PROTOCOL_VERSION: &str = "0.33.0";
+const BRANCH_GENESIS_ZKSYNC_OS_PROTOCOL_VERSION: &str = "0.31.2";
+/// What Sepolia (testnet, stage) executed v31 as, from the July calldata.
+const SEPOLIA_EXECUTED_V31_PROTOCOL_VERSION: &str = "0.31.0";
+/// Sepolia's source versions at execution: Era CTM v0.29.4, ZKsync OS CTM v0.30.1.
+const SEPOLIA_ERA_SOURCE_PROTOCOL_VERSION: &str = "0.29.4";
+const SEPOLIA_ZKSYNC_OS_SOURCE_PROTOCOL_VERSION: &str = "0.30.1";
+/// Both mainnet CTMs are on v0.30.1 when v31 executes.
+const MAINNET_SOURCE_PROTOCOL_VERSION: &str = "0.30.1";
+/// ADI's ZKsync OS CTM is on v0.30.2 (its verifier patch, block 25926020).
+const ADI_SOURCE_PROTOCOL_VERSION: &str = "0.30.2";
+
+pub(crate) fn expected_protocol_versions(
+    env: VerifyUpgradeEnv,
+    flavor: CtmFlavor,
+) -> ExpectedProtocolVersions {
+    let branch_genesis = match flavor {
+        CtmFlavor::Era => BRANCH_GENESIS_ERA_PROTOCOL_VERSION,
+        CtmFlavor::ZksyncOs => BRANCH_GENESIS_ZKSYNC_OS_PROTOCOL_VERSION,
+    };
+    let (old, new): (&str, Vec<&str>) = match (env, flavor) {
+        (VerifyUpgradeEnv::Stage | VerifyUpgradeEnv::Testnet, CtmFlavor::Era) => (
+            SEPOLIA_ERA_SOURCE_PROTOCOL_VERSION,
+            vec![SEPOLIA_EXECUTED_V31_PROTOCOL_VERSION, branch_genesis],
+        ),
+        (VerifyUpgradeEnv::Stage | VerifyUpgradeEnv::Testnet, CtmFlavor::ZksyncOs) => (
+            SEPOLIA_ZKSYNC_OS_SOURCE_PROTOCOL_VERSION,
+            vec![SEPOLIA_EXECUTED_V31_PROTOCOL_VERSION, branch_genesis],
+        ),
+        (VerifyUpgradeEnv::Mainnet, _) => (MAINNET_SOURCE_PROTOCOL_VERSION, vec![branch_genesis]),
+        (VerifyUpgradeEnv::Adi, _) => (ADI_SOURCE_PROTOCOL_VERSION, vec![branch_genesis]),
+    };
+    let parse = |v: &str| ProtocolVersion::from_str(v).expect("protocol version literal");
+    ExpectedProtocolVersions {
+        old: parse(old),
+        new: new.into_iter().map(parse).collect(),
+    }
+}
+
+/// CREATE2 deployments PUVT recognizes in an env's transactions logs that this upgrade does not
+/// use: contracts of earlier broadcasts (the July 2026 deployment kept as the reference log, and
+/// the 2026-09-07 broadcast whose contracts the re-cut bundle superseded). No element expects
+/// them, so no constructor check applies. For an env with a list, any other unchecked CREATE2
+/// deployment is an error (`report_unverified_create2_deployments`); envs without one keep the
+/// warning until a real run enumerates theirs.
+///
+/// `tests::mainnet_historical_create2_deployments_are_unused_by_the_upgrade` pins the mainnet
+/// list against the committed ecosystem TOML.
+pub(crate) fn historical_create2_deployments(env: VerifyUpgradeEnv) -> Option<&'static [Address]> {
+    match env {
+        VerifyUpgradeEnv::Mainnet => Some(&MAINNET_HISTORICAL_CREATE2_DEPLOYMENTS),
+        VerifyUpgradeEnv::Stage | VerifyUpgradeEnv::Testnet | VerifyUpgradeEnv::Adi => None,
+    }
+}
+
+/// The 2026-10-06 live mainnet PUVT (the full deployer journal plus the July reference log)
+/// found these 17 besides the upgrade's own deployments; the generation and handoff runs of
+/// 36548947871 find 10 of them.
+const MAINNET_HISTORICAL_CREATE2_DEPLOYMENTS: [Address; 17] = [
+    alloy::primitives::address!("0x1b5706059A887630Db7f3D62B7C1577bb032f6E8"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0x36f23a378233Db0bFB9A243711a98d846D40521C"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0x37e3343831dbd4997f4283f8d1A8991091befC95"), // EIP7702Checker
+    alloy::primitives::address!("0x6A195c351EcCAE69165c0fD202095C4abdf1c197"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0x787C1F9CF40EF0bd852a9Bc571Bc3e3010Cf79B1"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0x7f60f575640E658CC2A400d59307f90fdEa05176"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0x8eF17384A157287921E1ebdb0a08a2f102ba4a92"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0xA17E687F56F6E8d892e3D6e3427eA14AdFefF1Cb"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0xA4AD3d2621F1d2B737d35a9c2E361D704cb8d3aF"), // RollupL1DAValidator
+    alloy::primitives::address!("0xAE273354E73714bC5Fb7b15c02c2bC0Dc03b4c5E"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0xE5d0a1CbAA5a65e76956B1c094fBB838B48841a2"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0xbd44a86d1469751cf173bcc00162748E8Ac6739A"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0xc2fc8952e3fF43c93369ce9f6517ED6dfC663137"), // EIP7702Checker
+    alloy::primitives::address!("0xd3a6C81d2F080b223f41ebdd3F7AD2BbeFD57B90"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0xe33cc25e7f9275cdcb65CAfb85c3215d45003C12"), // ZKsyncOSVerifierFflonk
+    alloy::primitives::address!("0xe8536Ff0bf73E9245Ce5bF58b7e06388Fe9dBD52"), // TransparentUpgradeableProxy
+    alloy::primitives::address!("0xff216E1b4e38A9206721795cE4Ab5F76d1Dd1140"), // RollupL1DAValidator
+];
+
 pub(crate) const MAX_NUMBER_OF_ZK_CHAINS: u32 = 100;
 pub(crate) const MAX_PRIORITY_TX_GAS_LIMIT: u32 = 72_000_000;
 
@@ -71,39 +172,11 @@ pub(crate) const MAX_PRIORITY_TX_GAS_LIMIT: u32 = 72_000_000;
 /// `Bridgehub.settlementLayer(chainId) == L1` invariant on stage.
 pub(crate) const STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID: u64 = 270;
 
-pub(crate) fn get_expected_new_protocol_version_for_ctm_flavor(
-    flavor: CtmFlavor,
-) -> ProtocolVersion {
-    let version = match flavor {
-        CtmFlavor::Era => EXPECTED_ERA_NEW_PROTOCOL_VERSION_STR,
-        CtmFlavor::ZksyncOs => EXPECTED_ZKSYNC_OS_NEW_PROTOCOL_VERSION_STR,
-    };
-    ProtocolVersion::from_str(version).unwrap()
-}
-
-/// The `(major, minor)` line the given env's CTM of this flavour upgrades from.
-pub(crate) fn expected_old_protocol_line(env: VerifyUpgradeEnv, flavor: CtmFlavor) -> (u64, u64) {
-    match (env, flavor) {
-        (VerifyUpgradeEnv::Testnet, CtmFlavor::Era) => EXPECTED_ERA_OLD_PROTOCOL_LINE_TESTNET,
-        (_, CtmFlavor::Era) => EXPECTED_ERA_OLD_PROTOCOL_LINE,
-        (_, CtmFlavor::ZksyncOs) => EXPECTED_ZKSYNC_OS_OLD_PROTOCOL_LINE,
-    }
-}
-
-/// Human-readable form of [`expected_old_protocol_line`], e.g. `v0.30.x`.
-pub(crate) fn expected_old_protocol_line_label(env: VerifyUpgradeEnv, flavor: CtmFlavor) -> String {
-    let (major, minor) = expected_old_protocol_line(env, flavor);
-    format!("v{major}.{minor}.x")
-}
-
-/// Whether `version` sits on the source line [`expected_old_protocol_line`] names.
-/// Compares `(major, minor)` only — see the constants for why the patch is free.
-pub(crate) fn is_expected_old_protocol_version_for_ctm_flavor(
-    version: ProtocolVersion,
+pub(crate) fn get_expected_old_protocol_version(
     env: VerifyUpgradeEnv,
     flavor: CtmFlavor,
-) -> bool {
-    (version.major, version.minor) == expected_old_protocol_line(env, flavor)
+) -> ProtocolVersion {
+    expected_protocol_versions(env, flavor).old
 }
 
 /// Run the full v31 verification pipeline.
@@ -182,7 +255,11 @@ pub(crate) async fn verify(
     // Each tx is fetched from L1 RPC; stale entries (whose bytecode no longer
     // matches AllContractsHashes after a regen) are silently skipped — the
     // address-book lookup in `expect_create2_params` hard-errors only if a
-    // load-bearing deployment is missing.
+    // load-bearing deployment is missing. Entries the RPC cannot return even
+    // after retries are reported, as errors in an env with a historical list
+    // (see `historical_create2_deployments`), since the coverage check could
+    // not see their deployments.
+    let strict_fetch = historical_create2_deployments(verifiers.env).is_some();
     let count = {
         let bridgehub_address = verifiers.bridgehub_address;
         let Verifiers {
@@ -199,6 +276,7 @@ pub(crate) async fn verify(
                 &bridgehub_address,
                 expected_salts,
                 true,
+                strict_fetch,
                 bytecode_verifier,
                 result,
             )
@@ -211,6 +289,7 @@ pub(crate) async fn verify(
                 &bridgehub_address,
                 expected_salts,
                 false,
+                strict_fetch,
                 bytecode_verifier,
                 result,
             )
@@ -241,7 +320,10 @@ pub(crate) async fn verify(
     verify_governance_stage_calls(artifact, &verifiers, result).await?;
 
     // Last, so it sees every expectation the elements above registered.
-    result.report_unverified_create2_deployments(&verifiers);
+    result.report_unverified_create2_deployments(
+        &verifiers,
+        historical_create2_deployments(verifiers.env),
+    );
 
     Ok(())
 }
@@ -249,75 +331,126 @@ pub(crate) async fn verify(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::paths::path_from_root;
 
-    fn v(s: &str) -> ProtocolVersion {
-        ProtocolVersion::from_str(s).unwrap()
-    }
-
-    /// The fleet does not agree on one source line per flavour: mainnet's Era CTM
-    /// is on v0.30, testnet's is still on v0.29. A single per-flavour constant
-    /// cannot describe both, which is what made the testnet rehearsal fail its own
-    /// gate the moment the constant was moved for mainnet.
+    /// The per-env table must accept the ceremonies the committed artifacts
+    /// record; a regen that moves a version has to update both.
     #[test]
-    fn the_era_source_line_is_per_environment() {
-        assert!(is_expected_old_protocol_version_for_ctm_flavor(
-            v("0.29.4"),
-            VerifyUpgradeEnv::Testnet,
-            CtmFlavor::Era
-        ));
-        assert!(is_expected_old_protocol_version_for_ctm_flavor(
-            v("0.30.1"),
-            VerifyUpgradeEnv::Mainnet,
-            CtmFlavor::Era
-        ));
-        // ... and each rejects the other's line.
-        assert!(!is_expected_old_protocol_version_for_ctm_flavor(
-            v("0.30.1"),
-            VerifyUpgradeEnv::Testnet,
-            CtmFlavor::Era
-        ));
-        assert!(!is_expected_old_protocol_version_for_ctm_flavor(
-            v("0.29.4"),
-            VerifyUpgradeEnv::Mainnet,
-            CtmFlavor::Era
-        ));
-    }
-
-    /// A patch bump on a live CTM must not invalidate the calldata. ADI's ZKsync-OS
-    /// CTM went v0.30.1 -> v0.30.2 at block 25926020, which under a pinned patch
-    /// digit meant its calldata could no longer be verified even though nothing
-    /// about whether v31 applies had changed.
-    #[test]
-    fn a_patch_bump_stays_on_the_same_source_line() {
-        for env in [VerifyUpgradeEnv::Adi, VerifyUpgradeEnv::Mainnet] {
-            for version in ["0.30.0", "0.30.1", "0.30.2", "0.30.9"] {
+    fn expected_versions_match_committed_artifacts() {
+        for (env, dir) in [
+            (VerifyUpgradeEnv::Stage, "stage"),
+            (VerifyUpgradeEnv::Testnet, "testnet"),
+            (VerifyUpgradeEnv::Mainnet, "mainnet"),
+        ] {
+            let path = path_from_root(format!(
+                "l1-contracts/upgrade-envs/v0.31.0-interopB/output/{dir}/ecosystem.toml"
+            ));
+            let artifact = EcosystemUpgradeArtifact::read(&path)
+                .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+            assert!(!artifact.ctms.is_empty(), "{dir}: artifact lists no CTMs");
+            for ctm in &artifact.ctms {
+                let expected = expected_protocol_versions(env, ctm.flavor);
+                assert_eq!(
+                    ProtocolVersion::from(U256::from(ctm.contracts_config.old_protocol_version)),
+                    expected.old,
+                    "{dir} {} old_protocol_version",
+                    ctm.flavor.label()
+                );
+                let new =
+                    ProtocolVersion::from(U256::from(ctm.contracts_config.new_protocol_version));
                 assert!(
-                    is_expected_old_protocol_version_for_ctm_flavor(
-                        v(version),
-                        env,
-                        CtmFlavor::ZksyncOs
-                    ),
-                    "{env:?} should accept ZKsync-OS {version}"
+                    expected.accepts_new(new),
+                    "{dir} {} new_protocol_version {new} is not one of {}",
+                    ctm.flavor.label(),
+                    expected.describe_new()
                 );
             }
-            // A different minor is still a different line.
-            assert!(!is_expected_old_protocol_version_for_ctm_flavor(
-                v("0.29.4"),
-                env,
-                CtmFlavor::ZksyncOs
-            ));
         }
     }
 
+    /// The branch-genesis targets are what `DefaultCTMUpgrade.getNewProtocolVersion()`
+    /// reads from `configs/genesis/<flavour>/latest.json`; if a genesis line moves,
+    /// this table must move with it. Mainnet's single target IS the branch genesis;
+    /// the executed Sepolia envs accept it next to their executed version.
     #[test]
-    fn the_line_label_names_the_free_patch() {
-        assert_eq!(
-            expected_old_protocol_line_label(VerifyUpgradeEnv::Adi, CtmFlavor::ZksyncOs),
-            "v0.30.x"
-        );
-        assert_eq!(
-            expected_old_protocol_line_label(VerifyUpgradeEnv::Testnet, CtmFlavor::Era),
-            "v0.29.x"
-        );
+    fn branch_genesis_targets_match_genesis_configs() {
+        for (dir, flavor) in [("era", CtmFlavor::Era), ("zksync-os", CtmFlavor::ZksyncOs)] {
+            let path = path_from_root(format!("configs/genesis/{dir}/latest.json"));
+            let raw = std::fs::read_to_string(&path)
+                .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+            let json: serde_json::Value =
+                serde_json::from_str(&raw).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+            let semver = &json["protocol_semantic_version"];
+            let genesis = ProtocolVersion {
+                major: semver["major"]
+                    .as_u64()
+                    .expect("protocol_semantic_version.major"),
+                minor: semver["minor"]
+                    .as_u64()
+                    .expect("protocol_semantic_version.minor"),
+                patch: semver["patch"]
+                    .as_u64()
+                    .expect("protocol_semantic_version.patch"),
+            };
+            assert_eq!(
+                expected_protocol_versions(VerifyUpgradeEnv::Mainnet, flavor).new,
+                vec![genesis],
+                "{dir}: mainnet must target exactly the branch genesis"
+            );
+            for env in [VerifyUpgradeEnv::Stage, VerifyUpgradeEnv::Testnet] {
+                let expected = expected_protocol_versions(env, flavor);
+                assert!(
+                    expected.accepts_new(genesis),
+                    "{dir}: {} must accept a fresh rehearsal's target {genesis}",
+                    env.as_str()
+                );
+                assert!(
+                    expected.accepts_new(
+                        ProtocolVersion::from_str(SEPOLIA_EXECUTED_V31_PROTOCOL_VERSION).unwrap()
+                    ),
+                    "{dir}: {} must accept its executed ceremony's target",
+                    env.as_str()
+                );
+            }
+        }
+    }
+
+    /// ADI ships no Era CTM and is cut from mainnet's branch, so it shares mainnet's ZKsync OS
+    /// target. Its source differs: ADI's CTM took the v0.30.2 verifier patch, mainnet's did not.
+    #[test]
+    fn adi_shares_mainnets_target_but_upgrades_from_v0_30_2() {
+        let adi = expected_protocol_versions(VerifyUpgradeEnv::Adi, CtmFlavor::ZksyncOs);
+        let mainnet = expected_protocol_versions(VerifyUpgradeEnv::Mainnet, CtmFlavor::ZksyncOs);
+        assert_eq!(adi.new, mainnet.new);
+        assert_eq!(adi.old, ProtocolVersion::from_str("0.30.2").unwrap());
+        assert_eq!(mainnet.old, ProtocolVersion::from_str("0.30.1").unwrap());
+    }
+
+    /// The mainnet list may only hold contracts the upgrade does not use: none of them appears
+    /// anywhere in the committed mainnet ecosystem TOML, as an address or inside calldata. It has
+    /// no duplicates, and the other envs have no list yet.
+    #[test]
+    fn mainnet_historical_create2_deployments_are_unused_by_the_upgrade() {
+        let toml = std::fs::read_to_string(path_from_root(
+            "l1-contracts/upgrade-envs/v0.31.0-interopB/output/mainnet/ecosystem.toml",
+        ))
+        .unwrap()
+        .to_lowercase();
+        let list = historical_create2_deployments(VerifyUpgradeEnv::Mainnet).unwrap();
+        let unique: std::collections::BTreeSet<_> = list.iter().collect();
+        assert_eq!(unique.len(), list.len(), "duplicate entries");
+        for address in list {
+            assert!(
+                !toml.contains(&alloy::hex::encode(address.as_slice())),
+                "{address} is used by the mainnet upgrade, so it is not historical"
+            );
+        }
+        for env in [
+            VerifyUpgradeEnv::Stage,
+            VerifyUpgradeEnv::Testnet,
+            VerifyUpgradeEnv::Adi,
+        ] {
+            assert!(historical_create2_deployments(env).is_none());
+        }
     }
 }

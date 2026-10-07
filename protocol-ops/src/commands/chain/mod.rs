@@ -30,6 +30,7 @@ pub enum ChainCommands {
     /// the operator must re-set it before the chain can commit batches.
     SetDaValidatorPair(ChainSetDaValidatorPairArgs),
     /// Set the ZKsync OS pre-v31 base-token total supply after a v31 upgrade.
+    #[command(after_help = set_zkos_pre_v31_total_supply::ORDERING_HELP)]
     SetZkosPreV31TotalSupply(ChainSetZkosPreV31TotalSupplyArgs),
     /// Add a validator to the chain's ValidatorTimelock (all batch operator roles)
     AddValidator(ChainValidatorArgs),

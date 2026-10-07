@@ -2,6 +2,23 @@
 
 In the examples below I use `--upgrade-timestamp 1` for both Era and Zksync OS. This can be used to start an immediate upgrade.
 
+## Target protocol versions
+
+Every command below takes the target version explicitly, and it differs per
+environment and CTM flavour. PUVT enforces the same table
+(`expected_protocol_versions` in `protocol-ops/src/upgrade_verification/versions/v31/mod.rs`):
+
+| Environment                           | Era                     | ZKsync OS               |
+| ------------------------------------- | ----------------------- | ----------------------- |
+| testnet, stage (v31 already executed) | 0.31.0 = `133143986176` | 0.31.0 = `133143986176` |
+| mainnet, adi                          | 0.33.0 = `141733920768` | 0.31.2 = `133143986178` |
+
+`--new-protocol-version` takes the packed form (`minor << 32 | patch`); the
+readiness checker takes `--target-minor-version` / `--target-patch-version`.
+Use the version the chain's CTM registered with `setNewVersionUpgrade`: the
+readiness checker looks the `NewUpgradeCutData` up by exact version and errors
+when there is none for it.
+
 ## Transaction format
 
 By default all the commands below simulate the transactions on a fork and dump the executed transactions in the gnosis safe like format. If one needs to create a PR in the transaction simulator supported format, you can do the following:
@@ -27,7 +44,7 @@ cargo run --release -- chain set-upgrade-timestamp \
   --env <env> \
   --chain-id <chain-id> \
   --l1-rpc-url <l1-rpc-url> \
-  --new-protocol-version 133143986176 \
+  --new-protocol-version <packed-target-version> \
   --upgrade-timestamp <unix-seconds> \
   --out ./v31-upgrade/set-upgrade-timestamp \
   --subdir <unique-run-name>-set-ts
@@ -43,8 +60,8 @@ cargo run --release -- \
   --l2-rpc-url <chain-rpc> \
   --settlement-rpc-url <l1-or-gateway-rpc> \
   --bridgehub-address <bridgehub> \
-  --target-minor-version 31 \
-  --target-patch-version 0 \
+  --target-minor-version <target-minor> \
+  --target-patch-version <target-patch> \
   --zksync-os
 ```
 
@@ -80,6 +97,7 @@ RPC endpoints, upgrade transaction, and `raw uint256` value you provide. Once th
 total supply is set, the operation cannot be undone.
 
 After a ZKsync OS chain is upgraded to v31, provide its pre-v31 base-token total supply.
+The calculation script and the `chain set-zkos-pre-v31-total-supply` command come from #2533.
 First calculate the value from the repository root:
 
 ```
@@ -120,7 +138,7 @@ cargo run --release -- chain set-upgrade-timestamp \
   --env <env> \
   --chain-id <chain-id> \
   --l1-rpc-url <l1-rpc-url> \
-  --new-protocol-version 133143986176 \
+  --new-protocol-version <packed-target-version> \
   --upgrade-timestamp <unix-seconds> \
   --out ./v31-upgrade/set-upgrade-timestamp \
   --subdir <unique-run-name>-set-ts
@@ -136,8 +154,8 @@ cargo run --release -- \
   --l2-rpc-url <chain-rpc> \
   --settlement-rpc-url <l1-or-gateway-rpc> \
   --bridgehub-address <bridgehub> \
-  --target-minor-version 31 \
-  --target-patch-version 0 \
+  --target-minor-version <target-minor> \
+  --target-patch-version <target-patch> \
 ```
 
 If the server is ready, you can finalize the upgrade.
