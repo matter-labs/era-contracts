@@ -250,7 +250,10 @@ Each chain takes the cut through its own `ChainAdmin`. The order below is the ZK
 upgrades ZKsync OS chains only), and it matters because scheduling the upgrade is the point of no
 return for the node. Both `chain` commands below only write a bundle
 (`ChainAdmin.multicall`, signed by the `ChainAdmin` owner); each step happens when that bundle is
-executed on L1, and the timestamp bundle must be executed before the cut bundle.
+executed on L1, and the timestamp bundle must be executed before the cut bundle. With `--env`,
+`chain upgrade` writes its bundle to `output/<env>/chain-upgrades/<id>/` by default; `chain
+set-upgrade-timestamp` and `chain record-priority-op-lower-bound` write one only when `--out` is
+given, and produce no bundle otherwise.
 
 1. **Check the cut's preconditions first.** The cut reverts unless they hold on the chain: the
    chain is on exactly the old version, every committed batch has been executed (the release
@@ -261,8 +264,8 @@ executed on L1, and the timestamp bundle must be executed before the cut bundle.
    lower bound has been recorded
    (`protocol_ops chain record-priority-op-lower-bound`, in its own earlier transaction), and the
    priority queue has been drained past that bound.
-2. `protocol_ops chain set-upgrade-timestamp --env <env> --chain-id <id> --upgrade-timestamp <ts>`
-   calls `ServerNotifier.setUpgradeTimestamp`, keyed on the chain's current version; `1` means
+2. `protocol_ops chain set-upgrade-timestamp --env <env> --chain-id <id> --upgrade-timestamp <ts>
+--l1-rpc-url <l1> --out <dir>` prepares the call to `ServerNotifier.setUpgradeTimestamp`, keyed on the chain's current version; `1` means
    "immediately" (0 is rejected). On this event the node injects the L2 upgrade transaction into
    its next block (block N) and holds every later batch until the chain's L1 version moves, so the
    cut's preconditions must already hold: if the cut then reverts, the chain is stuck. Run after
@@ -351,7 +354,10 @@ on pull requests that touch the relevant paths.
   from the CTM. Beyond deploying the verifier, the governance call must run with migrations paused
   (`pauseMigration` before, `unpauseMigration` after) and from the CTM's current version (same
   major version, minor delta within the allowed limit, non-zero `defaultUpgrade`); chains still
-  apply it with the per-chain steps above.
+  apply it through their `ChainAdmin`, but not with the per-chain steps above: the cut carries no L2
+  upgrade transaction (it runs `upgradeVerifierOnly`), so there is no upgrade batch to wait for and
+  `upgrade-readiness-checker`, which decodes a full `ProposedUpgrade`, cannot be used. Time the cut
+  for a moment when no committed batch is still awaiting proof under the old verifier.
 - **Emergency.** Governance can freeze a chain (`freezeChain`, `unfreezeChain`) and execute a cut
   for it outside the normal proposal path (`ChainTypeManager.executeUpgrade(chainId, cut)`). The
   one-off scripts in `l1-contracts/deploy-scripts/upgrade/` (`EmergencyValidatorTimelockRestore.s.sol`,

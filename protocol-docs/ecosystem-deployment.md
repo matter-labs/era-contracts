@@ -51,7 +51,9 @@ multisig's own transaction flow; see `protocol-ops/README.md` for the execution 
 
 All scripts live under `l1-contracts/deploy-scripts/`. They need the contracts built first (`yarn
 da build:foundry && yarn sc build:foundry && yarn l1 build:foundry` from the repository root), since
-chain creation embeds the compiled L2 built-ins as factory dependencies.
+chain creation embeds the compiled L2 built-ins as factory dependencies. An EraVM `chain init` that
+deploys its L2 contracts (no `--skip-priority-txs`) also needs `yarn l2 build:foundry`, since it
+reads `l2-contracts/zkout/`.
 
 ## Hub: the core contracts
 
@@ -102,9 +104,9 @@ local Anvil (`L1Network::from_l1_rpc`); a private L1 needs a tooling change firs
 `DeployCTM.s.sol` discovers the core addresses from the Bridgehub (`AddressIntrospector`) and
 deploys one CTM for one VM type (`--vm-type zksyncos|eravm`):
 
-- **Governance.** By default (`--reuse-gov-and-admin`, on for both `ctm init` and `ecosystem init`)
-  the hub's `Governance`, `ChainAdminOwnable` and `ProxyAdmin` are reused; with
-  `--reuse-gov-and-admin false` the CTM gets its own set.
+- **Governance.** The hub's `Governance`, `ChainAdminOwnable` and `ProxyAdmin` are reused:
+  always by `ecosystem init`, and by `ctm init` unless it is run with `--reuse-gov-and-admin false`,
+  in which case the CTM gets its own set.
 - **`ChainTypeManager`** (proxy) and the diamond it will clone for every chain: the `Admin`,
   `Getters`, `Mailbox`, `Executor`, `Committer` and `Migrator` facets and `DiamondInit`.
 - **Verifiers.** The PLONK verifier and the main verifier for the VM; with `testnet_verifier` the
@@ -246,9 +248,11 @@ The public ecosystems do not keep `Governance` as the owner: ownership is moved 
 `ProtocolUpgradeHandler` of the `zk-governance` repository (Security Council, Guardians, and the
 emergency upgrade board), which is what `governance_kind = "puh"` in the env preset refers to. A
 fresh ecosystem starts under `Governance` owned by `owner_address`; moving it under a different
-governance is a plain two-step ownership transfer of the same contracts
-(`AdminFunctions.ensureCtmsAndProxyAdminsOwnedByGovernance` performs the CTM and `ProxyAdmin`
-half). For an ecosystem run by a single organization, `owner_address` should be a multisig from
+governance means transferring ownership of the same contracts through the current `Governance`:
+two-step for the core proxies and the CTM (the new governance accepts), single-step for the
+`ProxyAdmin`. `AdminFunctions.ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps` covers the CTM
+and `ProxyAdmin` half, given an owner-wrap entry of kind `legacy_governance` for the current
+`Governance`; the two-argument variant reverts on any contract owner. For an ecosystem run by a single organization, `owner_address` should be a multisig from
 the start: every power in the table above flows from it.
 
 ## Verifying a deployment
