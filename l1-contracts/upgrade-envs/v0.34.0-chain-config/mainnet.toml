@@ -1,36 +1,29 @@
 # Upgrade input for the mainnet environment on the v34 release.
 #
 # Created from the v0.33.0-atomic-interop entry of the same name: the environment values (owner,
-# era_chain_id, bridgehub and the other addresses) are carried over, while the CREATE2 and legacy-Gov
-# salts are fresh, so this release's deployments do not resolve to v33's addresses. The target protocol
-# version and chain-creation params come from `configs/genesis/zksync-os/latest.json`.
+# era_chain_id, upgrade timer) are carried over, while the CREATE2 and legacy-Gov salts are fresh, so
+# this release's deployments do not resolve to v33's addresses.
 #
-# protocol-ops' `--env mainnet` reads this file (its owner, era_chain_id and salts) for the current release;
-# a missing file fails closed rather than falling back to local's values.
+# Only these keys are read: protocol-ops' `--env mainnet` reads `owner_address`, `era_chain_id` and the
+# salts, and `DefaultCTMUpgrade` reads `governance_upgrade_timer_initial_delay`. The old protocol version
+# comes from each CTM and the target from `configs/genesis/zksync-os/latest.json`. A missing file fails
+# closed rather than falling back to local's values.
 
 era_chain_id = 324
-testnet_verifier = false
+
+# Delay armed on the `GovernanceUpgradeTimer` this upgrade deploys, bounding the window between stage 0
+# and stage 1 becoming executable. The timer is a fresh contract each upgrade, so it is a per-release input.
 governance_upgrade_timer_initial_delay = 172800
+
+# `bridgehub.owner()`, the signer of every governance stage.
 owner_address = "0xE30Dca3047B37dc7d88849dE4A4Dc07937ad5Ab3"
 
 [contracts]
-governance_min_delay = 0
-
-max_number_of_chains = 100
+# Rotated every release: CREATE2 returns the previously deployed contract if a salt is reused.
 create2_factory_salt = "0x10985c617abac7e43015d05988b5ea0a18d6b47d3de93b03910e247d41fae030"
-create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
-validator_timelock_execution_delay = 10800
-bridgehub_proxy_address = "0x303a465B659cBB0ab36eE643eA362c509EEb5213"
-rollup_da_manager = "0xE689e79a06D3D09f99C21E534cCF6a8b7C9b3C45"
 
-governance_security_council_address = "0x66E4431266DC7E04E7d8b7FE9d2181253df7F410"
-l1_bytecodes_supplier_addr = "0xC9F20FC268Fc3e0e597660550033Bf2C24218fd8"
-protocol_upgrade_handler_proxy_address = "0xE30Dca3047B37dc7d88849dE4A4Dc07937ad5Ab3"
-protocol_upgrade_handler_implementation_address = "0x36625Bd3dDB469377C6e9893712158cA3c0cC14B"
-
-[tokens]
-token_weth_address = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
-
+# Per-CTM CREATE2 salts, keyed by CTM proxy: each CTM prepare deploys its own `GovernanceUpgradeTimer`
+# with env-wide constructor args, so two CTMs need distinct salts.
 [create2_factory_salts]
 "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C" = "0xe19fe91227916f01e611221e8b29e22810d53d5804fd3e8ae9f97394dcb3c477"
 "0x1adf137f59949c9081157d5dE1e002D1c992071F" = "0x424791d8d48812c16e472008be31cb4129cc2d1bd4bb9da6f83831bcc6c78088"

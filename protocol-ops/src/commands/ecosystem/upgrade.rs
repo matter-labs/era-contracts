@@ -505,24 +505,33 @@ pub async fn run_list_ctms(args: ListCtmsArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// The `--env` preset for `upgrade-prepare-all`. Its release values (CREATE2 salts, owner, output dir) come
-/// from the same release directory as the upgrade input: the current release's by default, or the directory
-/// of an explicitly selected `--upgrade-input-path` (relative to `l1-contracts/`), so a historical
-/// re-prepare keeps that release's pinned salts instead of reading the current release's.
+/// The `--env` preset for `upgrade-prepare-all`, from the release dir `--upgrade-env-dir` selects (the current
+/// release's by default). That dir is the only release selector: an explicit `--upgrade-input-path` must sit in
+/// it, so the input, the CREATE2 salts and the output dir always belong to the same release.
 fn prepare_env_config(args: &UpgradePrepareAllArgs) -> anyhow::Result<Option<EnvConfig>> {
-    match args.topology.env.as_deref() {
-        Some(env)
-            if args.topology.upgrade_env_dir.is_none()
-                && args.upgrade_input_path != CURRENT_UPGRADE_LOCAL_INPUT_PATH =>
-        {
-            let input_dir = Path::new(args.upgrade_input_path.trim_start_matches('/'))
-                .parent()
-                .and_then(Path::to_str)
-                .context("--upgrade-input-path has no parent directory")?;
-            Ok(Some(EnvConfig::load_from_upgrade_env_dir(env, input_dir)?))
-        }
-        _ => args.topology.env_config(),
+    let Some(cfg) = args.topology.env_config()? else {
+        return Ok(None);
+    };
+    if args.upgrade_input_path != CURRENT_UPGRADE_LOCAL_INPUT_PATH {
+        let input_dir = paths::resolve_l1_contracts_path()?
+            .join(args.upgrade_input_path.trim_start_matches('/'))
+            .parent()
+            .map(Path::to_path_buf)
+            .context("--upgrade-input-path has no parent directory")?;
+        let env_dir = cfg
+            .upgrade_input_path
+            .parent()
+            .context("env input has no parent directory")?;
+        anyhow::ensure!(
+            input_dir == env_dir,
+            "--upgrade-input-path {} is not in the release dir {} that --env {} reads its salts and owner from; \
+             select that release with --upgrade-env-dir instead",
+            args.upgrade_input_path,
+            env_dir.display(),
+            cfg.env
+        );
     }
+    Ok(Some(cfg))
 }
 
 /// The env's upgrade input (`/<release dir>/<env>.toml`, relative to `l1-contracts/`) from the release dir
@@ -566,15 +575,8 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         // `--deployer-address <real-EOA>` (or derive it from the broadcast
         // signer's private key — see `regen-and-verify-stage.sh` for an
         // example using `cast wallet address`).
-        // Resolve --upgrade-input-path from --env, unless the caller passed one explicitly.
-        //
-        // Fails closed on a missing file rather than keeping the CLI default. The default is the
-        // *local* input, so a silent fallback would hand a real environment local's values for the
-        // keys the input does supply — `era_chain_id` and
-        // `governance_upgrade_timer_initial_delay`. Failing here also catches a mistyped `--env`.
-        //
-        // The input comes from the release dir the env config was loaded from (the current release's, or
-        // `--upgrade-env-dir`), so the input, the salts and the output dir all belong to the same release.
+        // Resolve --upgrade-input-path from --env, unless the caller passed one explicitly
+        // (see `per_env_upgrade_input`).
         if args.upgrade_input_path == CURRENT_UPGRADE_LOCAL_INPUT_PATH {
             let per_env_rel = per_env_upgrade_input(cfg)?;
             logger::info(format!("Using per-env upgrade input: {per_env_rel}"));
@@ -1236,10 +1238,8 @@ mod release_script_tests {
         }
     }
 
-    /// A historical re-prepare (`--upgrade-input-path` into an older release's directory) reads the env's
-    /// pinned salts from that directory, not from the current release's.
-    /// `--upgrade-env-dir` without `--upgrade-input-path` takes the env's input from the selected release
-    /// dir too, not the current release's, so a prepare never mixes one release's input with another's salts.
+    /// `--upgrade-env-dir` selects the env's input as well as its salts and output dir, so a prepare never mixes
+    /// one release's input with another's salts.
     #[test]
     fn upgrade_env_dir_selects_the_per_env_input() {
         let historical = UpgradePrepareAllArgs::try_parse_from([
@@ -1264,9 +1264,11 @@ mod release_script_tests {
         );
     }
 
+    /// `--upgrade-env-dir` is the only release selector: an explicit `--upgrade-input-path` from another
+    /// release's dir is rejected rather than mixed with the selected release's salts; one inside it is accepted.
     #[test]
-    fn explicit_input_selects_its_release_env_values() {
-        let historical = UpgradePrepareAllArgs::try_parse_from([
+    fn explicit_input_must_sit_in_the_selected_release_dir() {
+        let mixed = UpgradePrepareAllArgs::try_parse_from([
             "prepare",
             "--env",
             "stage",
@@ -1274,17 +1276,22 @@ mod release_script_tests {
             &format!("{UPGRADE_V33_ENV_DIR}/stage.toml"),
         ])
         .unwrap();
-        let cfg = prepare_env_config(&historical).unwrap().unwrap();
+        assert!(prepare_env_config(&mixed).is_err());
+
+        let consistent = UpgradePrepareAllArgs::try_parse_from([
+            "prepare",
+            "--env",
+            "stage",
+            "--upgrade-env-dir",
+            UPGRADE_V33_ENV_DIR.trim_start_matches('/'),
+            "--upgrade-input-path",
+            &format!("{UPGRADE_V33_ENV_DIR}/stage.toml"),
+        ])
+        .unwrap();
+        let cfg = prepare_env_config(&consistent).unwrap().unwrap();
         assert!(cfg.create2_factory_salt_for_upgrade().unwrap().is_some());
         assert!(cfg
             .protocol_ops_out_dir()
             .ends_with("upgrade-envs/v0.33.0-atomic-interop/output/stage"));
-
-        let current = UpgradePrepareAllArgs::try_parse_from(["prepare", "--env", "stage"]).unwrap();
-        let cfg = prepare_env_config(&current).unwrap().unwrap();
-        assert!(cfg.protocol_ops_out_dir().ends_with(format!(
-            "{}/output/stage",
-            CURRENT_UPGRADE_ENV_DIR.trim_start_matches('/')
-        )));
     }
 }

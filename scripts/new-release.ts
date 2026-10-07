@@ -62,12 +62,13 @@ function envInputHeader(env: string, release: SemVer, sourceDir: string): string
   return `# Upgrade input for the ${env} environment on the v${release.minor} release.
 #
 # Created from the ${sourceDir} entry of the same name: the environment values (owner,
-# era_chain_id, bridgehub and the other addresses) are carried over, while the CREATE2 and legacy-Gov
-# salts are fresh, so this release's deployments do not resolve to v${release.minor - 1}'s addresses. The target protocol
-# version and chain-creation params come from \`configs/genesis/zksync-os/latest.json\`.
+# era_chain_id, upgrade timer) are carried over, while the CREATE2 and legacy-Gov salts are fresh, so
+# this release's deployments do not resolve to v${release.minor - 1}'s addresses.
 #
-# protocol-ops' \`--env ${env}\` reads this file (its owner, era_chain_id and salts) for the current release;
-# a missing file fails closed rather than falling back to local's values.
+# Only these keys are read: protocol-ops' \`--env ${env}\` reads \`owner_address\`, \`era_chain_id\` and the
+# salts, and \`DefaultCTMUpgrade\` reads \`governance_upgrade_timer_initial_delay\`. The old protocol version
+# comes from each CTM and the target from \`configs/genesis/zksync-os/latest.json\`. A missing file fails
+# closed rather than falling back to local's values.
 `;
 }
 

@@ -1,10 +1,6 @@
 # Local v33 -> v34 upgrade input. See protocol-docs/chain-config.md.
+#
+# Only `era_chain_id` and `governance_upgrade_timer_initial_delay` are read; the old protocol version comes
+# from the CTM and the target from `configs/genesis/zksync-os/latest.json`.
 era_chain_id = 6565
-testnet_verifier = true
 governance_upgrade_timer_initial_delay = 0
-
-[contracts]
-governance_min_delay = 0
-max_number_of_chains = 100
-create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
-validator_timelock_execution_delay = 0

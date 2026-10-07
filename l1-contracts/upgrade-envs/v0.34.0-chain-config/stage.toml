@@ -1,42 +1,31 @@
 # Upgrade input for the stage environment on the v34 release.
 #
 # Created from the v0.33.0-atomic-interop entry of the same name: the environment values (owner,
-# era_chain_id, bridgehub and the other addresses) are carried over, while the CREATE2 and legacy-Gov
-# salts are fresh, so this release's deployments do not resolve to v33's addresses. The target protocol
-# version and chain-creation params come from `configs/genesis/zksync-os/latest.json`.
+# era_chain_id, upgrade timer) are carried over, while the CREATE2 and legacy-Gov salts are fresh, so
+# this release's deployments do not resolve to v33's addresses.
 #
-# protocol-ops' `--env stage` reads this file (its owner, era_chain_id and salts) for the current release;
-# a missing file fails closed rather than falling back to local's values.
+# Only these keys are read: protocol-ops' `--env stage` reads `owner_address`, `era_chain_id` and the
+# salts, and `DefaultCTMUpgrade` reads `governance_upgrade_timer_initial_delay`. The old protocol version
+# comes from each CTM and the target from `configs/genesis/zksync-os/latest.json`. A missing file fails
+# closed rather than falling back to local's values.
 
 era_chain_id = 270
-testnet_verifier = true
+
+# Delay armed on the `GovernanceUpgradeTimer` this upgrade deploys, bounding the window between stage 0
+# and stage 1 becoming executable. The timer is a fresh contract each upgrade, so it is a per-release input.
 governance_upgrade_timer_initial_delay = 1200
+
+# `bridgehub.owner()`, the signer of every governance stage.
 owner_address = "0x8f08627524aeD610192132A425D6b9C32a1727EF"
 
 [contracts]
-governance_min_delay = 0
-
-max_number_of_chains = 100
+# Rotated every release: CREATE2 returns the previously deployed contract if a salt is reused.
 create2_factory_salt = "0xb3ba30996341c8b82e535d6322f872fa02be7e0e8678a3ba7be4abd3b6e094fb"
-create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+# Salt for legacy `Governance.sol` op ids, rotated so they do not collide with executed ones.
 legacy_gov_salt = "0x0945e335b8afbf326106bd2199af8979ccc6feed7bed327934e73e0d4dff346e"
-validator_timelock_execution_delay = 0
-bridgehub_proxy_address = "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"
-rollup_da_manager = "0xeb7c0daaddfb52afa05400b489e7497b271d6122"
 
-governance_security_council_address = "0xed04b1ac422251851a3EC953Ff4395e5c2443647"
-l1_bytecodes_supplier_addr = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
-protocol_upgrade_handler_proxy_address = "0x8f08627524aeD610192132A425D6b9C32a1727EF"
-
-[tokens]
-token_weth_address = "0x7b79995e5f793a07bc00c21412e50ecae098e7f9"
-
-[state_transition]
-diamond_init_addr = "0x721035F2420fEc7EF12229ceF4A55DC0C7CB19EA"
-executor_facet_addr = "0xDdFB1d1403fA94c7bA810e4Abf790fC73b5A3B9D"
-genesis_upgrade_addr = "0x65dAd0914338b7b99bB70CD2c62A3BC7BcC26a81"
-getters_facet_addr = "0xb4bBbbA20Ebc8d4E0aCcD7EBBA04AD887ACCf783"
-
+# Per-CTM CREATE2 salts, keyed by CTM proxy: each CTM prepare deploys its own `GovernanceUpgradeTimer`
+# with env-wide constructor args, so two CTMs need distinct salts.
 [create2_factory_salts]
 "0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b" = "0x269f149271c75d19bb55bfe0ed6f5c186110c9a5ec58b3ae07b49450a527aa7d"
 "0x73bee414c6e006525f3cceedf6d8004c0370502e" = "0xfa06d48b9e988a0a52e824e23e15131a8b68e9116be16efdec3d885bf4a1d511"

@@ -52,9 +52,8 @@ Most subcommands flatten **`SharedRunArgs`** from `common/args.rs`:
 
 `ecosystem upgrade-prepare-all` defaults to `DefaultCoreUpgrade` and `CTMUpgrade_v34` (the default CTM
 upgrade with the v34 per-chain upgrade, `V34UpgradeZKsyncOS`), using `upgrade-envs/v0.34.0-chain-config/local.toml` for a local v33-to-v34 upgrade.
-For a named environment, provide its v34 TOML through `--upgrade-input-path` or place it under the v34
-input directory; missing inputs fail before deployment. Environment addresses and salts must match the
-target environment.
+With `--env <name>` the input is `<release dir>/<name>.toml` (see [Environment inputs](#environment-inputs));
+missing inputs fail before deployment.
 
 `--ctm-script-path`, `--core-script-path`, and `--upgrade-input-path` are visible in `--help`.
 Historical preparations must select the matching scripts and input explicitly. The anvil upgrade test
@@ -68,8 +67,9 @@ covers the current release's upgrade. See
 `<release dir>/<name>.toml`. The release dir is the current release's (`current_upgrade_env_dir!` in
 `src/common/forge/scripts/mod.rs`) unless `--upgrade-env-dir` selects another (on the commands built on the
 shared `--env` topology args and on `verify-upgrade`; `ecosystem init` / `ctm init` always use the current
-release), or `upgrade-prepare-all`'s
-`--upgrade-input-path` points into another release's dir. The owner, `era_chain_id` and CREATE2 salts come
+release). It is the only release selector: `upgrade-prepare-all` rejects an `--upgrade-input-path` outside the
+selected release dir rather than mixing one release's input with another's salts. The owner, `era_chain_id`
+and CREATE2 salts come
 from that release input, and a command that needs one of them fails when the release has no input for the
 env: it never falls back to the deployer, local's values or random salts. `yarn new-release` creates the next
 release's inputs from the current ones with fresh salts.

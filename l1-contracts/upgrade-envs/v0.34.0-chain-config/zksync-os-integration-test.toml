@@ -1,19 +1,13 @@
 # Upgrade input for the zksync-os-integration-test environment on the v34 release.
 #
 # Created from the v0.33.0-atomic-interop entry of the same name: the environment values (owner,
-# era_chain_id, bridgehub and the other addresses) are carried over, while the CREATE2 and legacy-Gov
-# salts are fresh, so this release's deployments do not resolve to v33's addresses. The target protocol
-# version and chain-creation params come from `configs/genesis/zksync-os/latest.json`.
+# era_chain_id, upgrade timer) are carried over, while the CREATE2 and legacy-Gov salts are fresh, so
+# this release's deployments do not resolve to v33's addresses.
 #
-# protocol-ops' `--env zksync-os-integration-test` reads this file (its owner, era_chain_id and salts) for the current release;
-# a missing file fails closed rather than falling back to local's values.
+# Only these keys are read: protocol-ops' `--env zksync-os-integration-test` reads `owner_address`, `era_chain_id` and the
+# salts, and `DefaultCTMUpgrade` reads `governance_upgrade_timer_initial_delay`. The old protocol version
+# comes from each CTM and the target from `configs/genesis/zksync-os/latest.json`. A missing file fails
+# closed rather than falling back to local's values.
 
 era_chain_id = 6565
-testnet_verifier = true
 governance_upgrade_timer_initial_delay = 0
-
-[contracts]
-governance_min_delay = 0
-max_number_of_chains = 100
-create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
-validator_timelock_execution_delay = 0
