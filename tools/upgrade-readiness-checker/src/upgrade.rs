@@ -122,7 +122,10 @@ async fn tx_hash_from_init_calldata(
     init_calldata: &[u8],
 ) -> anyhow::Result<B256> {
     if init_calldata.len() < 4 {
-        anyhow::bail!("DiamondCutData.initCalldata too short ({} bytes)", init_calldata.len());
+        anyhow::bail!(
+            "DiamondCutData.initCalldata too short ({} bytes)",
+            init_calldata.len()
+        );
     }
     // Skip the 4-byte selector and decode the ProposedUpgrade struct.
     let proposed = <crate::abi::IChainTypeManager::ProposedUpgrade as SolValue>::abi_decode(
