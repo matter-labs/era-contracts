@@ -154,6 +154,35 @@ pub mod admin_functions {
 }
 pub use admin_functions::AdminFunctionsAbi;
 
+/// `AdminFunctions.s.sol` entry points that the committed
+/// `zkstack-out/AdminFunctions.s.sol/AdminFunctions.json` (the ABI behind [`AdminFunctionsAbi`])
+/// does not carry yet: they came in with the draft-v31 merge, and `zkstack-out/` is a generated
+/// artifact refreshed by CI rather than by hand. Declared here, with the exact Solidity
+/// signatures, so protocol-ops builds against either version of that JSON. Once `zkstack-out/` is
+/// regenerated these can move back to `AdminFunctionsAbi`.
+pub mod admin_functions_ext {
+    alloy::sol! {
+        interface AdminFunctionsExtAbi {
+            /// Run `_callsToExecute` (an abi-encoded `Call[]`) as ONE `ChainAdmin.multicall`
+            /// broadcast by the ChainAdmin's EOA owner, so every call runs with
+            /// `msg.sender == _chainAdmin` (needed for an `acceptOwnership()` the ChainAdmin is
+            /// the pending owner of).
+            function executeChainAdminMulticall(bytes memory _callsToExecute, address _chainAdmin) external;
+
+            /// Backfill a ZKsync OS chain's pre-v31 base-token total supply through the v31
+            /// Admin facet's one-shot setter.
+            function setZKsyncOSPreV31TotalSupply(
+                address _bridgehub,
+                address _accessControlRestriction,
+                uint256 _chainId,
+                uint256 _preV31TotalSupply,
+                bool _shouldSend
+            ) external;
+        }
+    }
+}
+pub use admin_functions_ext::AdminFunctionsExtAbi;
+
 pub mod i_enable_evm_emulator {
     alloy::sol!(
         #[sol(rpc)]

@@ -195,7 +195,7 @@ contract InteropCenter is
         bytes calldata recipient,
         bytes calldata payload,
         bytes[] calldata attributes
-    ) external payable whenNotPaused nonReentrant returns (bytes32 sendId) {
+    ) external payable nonReentrant returns (bytes32 sendId) {
         (uint256 recipientChainId, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(recipient);
         // The recipient must carry a concrete address; a chain-only ERC-7930 encoding parses to address(0),
         // which would collect value up-front yet never be executable and has no refund path.
@@ -246,7 +246,7 @@ contract InteropCenter is
         bytes calldata _destinationChainId,
         InteropCallStarter[] calldata _callStarters,
         bytes[] calldata _bundleAttributes
-    ) external payable whenNotPaused nonReentrant returns (bytes32 bundleHash) {
+    ) external payable nonReentrant returns (bytes32 bundleHash) {
         _ensureEmptyAddress(_destinationChainId);
 
         // slither-disable-next-line unused-return
@@ -866,20 +866,6 @@ contract InteropCenter is
     /// @notice The stateless attribute parser deployed at its fixed built-in address.
     function _parser() private pure returns (IInteropAttributeParser) {
         return IInteropAttributeParser(L2_INTEROP_ATTRIBUTE_PARSER_ADDR);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            PAUSE
-    //////////////////////////////////////////////////////////////*/
-
-    /// @inheritdoc IInteropCenter
-    function pause() external onlyOwner {
-        _pause();
-    }
-
-    /// @inheritdoc IInteropCenter
-    function unpause() external onlyOwner {
-        _unpause();
     }
 
     /*//////////////////////////////////////////////////////////////

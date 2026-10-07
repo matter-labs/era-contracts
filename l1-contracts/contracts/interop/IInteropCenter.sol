@@ -116,12 +116,6 @@ interface IInteropCenter {
     /// @param _receiver Address to receive the fees.
     function claimZKFees(address _receiver) external;
 
-    /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
-    function pause() external;
-
-    /// @notice Unpauses the contract, re-enabling functions marked with `whenNotPaused`.
-    function unpause() external;
-
     /// @notice One-shot initialization for the InteropCenter; must never run again after v31.
     ///      See {protocol-docs/interop.md#initialization-and-versioning-notes}.
     /// @param _l1ChainId The chain ID of L1.

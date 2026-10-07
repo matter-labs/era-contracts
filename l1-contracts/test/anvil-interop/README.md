@@ -42,6 +42,8 @@ The runner auto-detects pregenerated state by checking for `chain-states/<protoc
 
 The per-chain state dumps are committed **gzip-compressed** (`<chainId>.json.gz`). These snapshots are multi-MB; storing them as raw JSON floods every regeneration with an enormous, unreviewable diff. GitHub renders `.gz` as binary ("Binary file not shown"), keeping them out of PR diffs, and gzip shrinks them ~10x. `addresses.json` stays plain text so contract-address changes remain reviewable. Compression/decompression is handled automatically by `dumpAllStates()` / `loadChainStates()` in `deployment-runner.ts` — no manual step.
 
+Because the directory is keyed by protocol version (`stateVersion` in `config/anvil-config.json`), bumping that version makes the previous snapshots unreachable and tests silently fall back to the full deployment until they are regenerated (see below, or the "Regenerate Anvil Interop Chain States" workflow). The older `v0.31.0` snapshots are kept deliberately — the upgrade test (`run-upgrade-test.ts`) uses them as the pre-upgrade source state.
+
 To regenerate pregenerated state after contract changes:
 
 ```bash

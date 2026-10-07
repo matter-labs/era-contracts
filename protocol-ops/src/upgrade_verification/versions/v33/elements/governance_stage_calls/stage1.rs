@@ -11,7 +11,8 @@
 //!                   pair is present iff the artifact's
 //!                   `l1_interop_handler_proxy_addr` is in this upgrade's
 //!                   CREATE2 deployments.
-//!   per-CTM +0..=+8 see [`STAGE1_PER_CTM_LEN`].
+//!   per-CTM +0..=+8 see [`STAGE1_PER_CTM_LEN`]; blocks are matched to their
+//!                   CTM by the upgrade timer at +0, not by artifact position.
 //!
 //! The leading `pauseMigration()` is unconditional in v33: it re-asserts the
 //! stage-0 pause that `PUH.executeEmergencyUpgrade` clears on the emergency
@@ -64,10 +65,12 @@ use super::{
 const STAGE1_CORE_LEN: usize = 11;
 
 /// Offsets within one per-CTM block, mirroring the `allCalls` assembly in
-/// `DefaultCTMUpgrade.prepareStage1GovernanceCalls`. `prepareDAValidatorCall`
-/// sits between `setNewVersionUpgrade` and the version-specific tail but is
-/// empty in v33, and the v33 CTM script adds no version-specific stage-1
-/// calls, so neither contributes an offset here.
+/// `DefaultCTMUpgrade.prepareStage1GovernanceCalls`: timer check, migrations
+/// check, the four proxy upgrades of `prepareUpgradeCTMCalls`,
+/// `setDefaultUpgrade`, `setNewVersionUpgrade`, `setChainCreationParams`.
+/// `prepareDAValidatorCall` follows `setChainCreationParams` but is empty in
+/// v33, and the v33 CTM script adds no version-specific stage-1 calls, so
+/// neither contributes an offset here.
 const PER_CTM_OFFSET_CHECK_DEADLINE: usize = 0;
 const PER_CTM_OFFSET_CHECK_MIGRATIONS_PAUSED: usize = 1;
 const PER_CTM_OFFSET_UPGRADE_CTM: usize = 2;
@@ -75,12 +78,38 @@ const PER_CTM_OFFSET_UPGRADE_VALIDATOR_TIMELOCK: usize = 3;
 const PER_CTM_OFFSET_UPGRADE_BYTECODES_SUPPLIER: usize = 4;
 const PER_CTM_OFFSET_UPGRADE_PERMISSIONLESS_VALIDATOR: usize = 5;
 const PER_CTM_OFFSET_SET_DEFAULT_UPGRADE: usize = 6;
-const PER_CTM_OFFSET_SET_CHAIN_CREATION_PARAMS: usize = 7;
-const PER_CTM_OFFSET_SET_NEW_VERSION_UPGRADE: usize = 8;
+// setNewVersionUpgrade must precede setChainCreationParams: the latter keys
+// newChainCreationParamsBlock on the version currently set on the CTM, so the
+// reverse order leaves the target version's pointer at zero and clobbers the
+// predecessor's.
+const PER_CTM_OFFSET_SET_NEW_VERSION_UPGRADE: usize = 7;
+const PER_CTM_OFFSET_SET_CHAIN_CREATION_PARAMS: usize = 8;
 const STAGE1_PER_CTM_LEN: usize = 9;
 
 fn ctm_block_start(ctm_index: usize, core_len: usize) -> usize {
     core_len + ctm_index * STAGE1_PER_CTM_LEN
+}
+
+/// Find the stage-1 per-CTM block start for `ctm` by matching its upgrade timer
+/// (offset 0 of each block). The prepare emits per-CTM blocks in env-config CTM
+/// order, which can differ from `artifact.ctms` order, so match by target
+/// rather than asserting a fixed position (per-CTM upgrade order is cosmetic —
+/// each CTM is upgraded independently).
+fn find_ctm_block_start(
+    ctm: &CtmArtifact,
+    calls: &CallList,
+    core_len: usize,
+    num_ctms: usize,
+    result: &mut VerificationResult,
+) -> Option<usize> {
+    let timer = required_ctm_address(
+        ctm,
+        &["deployed_addresses", "l1_governance_upgrade_timer"],
+        result,
+    )?;
+    (0..num_ctms)
+        .map(|k| ctm_block_start(k, core_len))
+        .find(|&block| calls.elems.get(block).is_some_and(|c| c.target == timer))
 }
 
 /// Requires that this upgrade deployed the `L1InteropHandler` proxy.
@@ -143,11 +172,11 @@ fn optional_core_address(
 }
 
 impl GovernanceStage1Calls {
-    /// Stage 1 — proxy impl swaps for the 7 core contracts (incl. MessageRoot
-    /// reinit), ChainRegistrationSender ownership handoff, ChainAssetHandler
-    /// address refresh, then per-CTM: timer checkDeadline, migrations-paused
-    /// sanity, CTM impl swap, `setChainCreationParams`, `setNewVersionUpgrade`,
-    /// VT impl swap.
+    /// Stage 1 — the migration-pause re-assert, proxy impl swaps for the 8
+    /// core contracts, the two `setL1InteropHandler` wiring calls, then
+    /// per-CTM: timer checkDeadline, migrations-paused sanity, the CTM / VT /
+    /// BytecodesSupplier / PermissionlessValidator impl swaps,
+    /// `setDefaultUpgrade`, `setNewVersionUpgrade`, `setChainCreationParams`.
     ///
     /// Split into two passes: `verify_call_shape` checks target+selector for
     /// every call; `verify_artifact_payloads` decodes args and cross-checks
@@ -197,15 +226,26 @@ impl GovernanceStage1Calls {
             errors += verify_call_by_name(&self.calls, index, target, method, verifiers, result);
         }
 
-        // Per-CTM block (6 calls per CTM, in artifact order):
+        // Per-CTM block (9 calls per CTM, located by its upgrade timer):
         //   +0 timer.checkDeadline()
         //   +1 stage-validator.checkMigrationsPaused()
         //   +2 CTM proxy admin.upgrade(CTM proxy, new impl)
-        //   +3 CTM proxy.setChainCreationParams(...)
-        //   +4 CTM proxy.setNewVersionUpgrade(...)
-        //   +5 VT proxy admin.upgrade(VT proxy, new impl)
-        for (ctm_index, ctm) in ctms.iter().enumerate() {
-            let block = ctm_block_start(ctm_index, core_len);
+        //   +3 VT proxy admin.upgrade(VT proxy, new impl)
+        //   +4 BytecodesSupplier proxy admin.upgrade(...)
+        //   +5 PermissionlessValidator proxy admin.upgrade(...)
+        //   +6 CTM proxy.setDefaultUpgrade(...)
+        //   +7 CTM proxy.setNewVersionUpgrade(...)
+        //   +8 CTM proxy.setChainCreationParams(...)
+        for ctm in ctms.iter() {
+            let Some(block) = find_ctm_block_start(ctm, &self.calls, core_len, ctms.len(), result)
+            else {
+                result.report_error(&format!(
+                    "Stage-1 per-CTM block for {} not found (no block whose first call targets its upgrade timer)",
+                    ctm.flavor.label()
+                ));
+                errors += STAGE1_PER_CTM_LEN;
+                continue;
+            };
             let timer_label = format!("{}.upgrade_timer", ctm.flavor.label());
             let validator_label = format!("{}.upgrade_stage_validator", ctm.flavor.label());
             let ctm_proxy_label = format!("{}.chain_type_manager_proxy", ctm.flavor.label());
@@ -458,13 +498,22 @@ impl GovernanceStage1Calls {
                 verify_set_interop_handler_call_args(&self.calls, index, caller, verifiers, result);
         }
 
-        // Per-CTM block: CTM proxy upgrade, setChainCreationParams,
-        // setNewVersionUpgrade. Validated against each CTM's own
+        // Per-CTM block: CTM proxy upgrade, setNewVersionUpgrade,
+        // setChainCreationParams. Validated against each CTM's own
         // chain_upgrade_diamond_cut + contracts_config.
-        for (i, ctm) in artifact.ctms.iter().enumerate() {
-            let block = ctm_block_start(i, core_len);
+        for ctm in artifact.ctms.iter() {
+            let Some(block) =
+                find_ctm_block_start(ctm, &self.calls, core_len, artifact.ctms.len(), result)
+            else {
+                result.report_error(&format!(
+                    "Stage-1 per-CTM payload block for {} not found",
+                    ctm.flavor.label()
+                ));
+                errors += 1;
+                continue;
+            };
             result.print_info(&format!(
-                "-- CTM[{i}] = {} ----------------------",
+                "-- CTM = {} ----------------------",
                 ctm.flavor.label()
             ));
             errors += verify_ctm_upgrade_call_args(
