@@ -237,7 +237,7 @@ every chain created afterwards starts on the new version.
 ### 5. Release-specific post-governance steps
 
 Some releases need work after governance and before the chains move, signed by any EOA because it
-carries no privilege. In v33 that is `protocol_ops ecosystem stage3 --env <env> --sender <EOA>`,
+carries no privilege. In v33 that is `protocol_ops ecosystem stage3 --env <env> --l1-rpc-url <l1> --sender <EOA>`,
 whose bundle, once that EOA executes it, populates `L1NativeTokenVault.bridgedOut` for every
 pre-existing asset (see
 {protocol-docs/bridging.md#populating-bridgedout-during-an-in-place-upgrade}). Such steps are
@@ -274,7 +274,7 @@ given, and produce no bundle otherwise.
 3. `tools/upgrade-readiness-checker` waits until the node has the upgrade transaction in block N
    and block N-1 is finalized, that is, every batch before the upgrade has been executed on L1. This
    is the signal that the L1 cut can be sent now, not that the upgrade is done.
-4. `protocol_ops chain upgrade --env <env> --chain-id <id>` emits a single `ChainAdmin.multicall`
+4. `protocol_ops chain upgrade --env <env> --chain-id <id> --l1-rpc-url <l1>` emits a single `ChainAdmin.multicall`
    with `upgradeChainFromVersion(chainAddress, oldVersion, cut)` and, when `--da-mode` is given,
    the DA validator pair and pubdata content the chain runs after the upgrade, in the same
    transaction so that the chain never commits a batch under a DA setup its new version does not
@@ -356,8 +356,8 @@ on pull requests that touch the relevant paths.
   major version, minor delta within the allowed limit, non-zero `defaultUpgrade`); chains still
   apply it through their `ChainAdmin`, but not with the per-chain steps above: the cut carries no L2
   upgrade transaction (it runs `upgradeVerifierOnly`), so there is no upgrade batch to wait for and
-  `upgrade-readiness-checker`, which decodes a full `ProposedUpgrade`, cannot be used. Time the cut
-  for a moment when no committed batch is still awaiting proof under the old verifier.
+  `upgrade-readiness-checker`, which decodes a full `ProposedUpgrade`, cannot be used. On ZKsync OS the
+  cut reverts (`NotAllBatchesExecuted`) unless every committed batch has been executed on L1.
 - **Emergency.** Governance can freeze a chain (`freezeChain`, `unfreezeChain`) and execute a cut
   for it outside the normal proposal path (`ChainTypeManager.executeUpgrade(chainId, cut)`). The
   one-off scripts in `l1-contracts/deploy-scripts/upgrade/` (`EmergencyValidatorTimelockRestore.s.sol`,

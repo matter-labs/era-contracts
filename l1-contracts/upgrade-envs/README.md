@@ -38,8 +38,9 @@ small: anything derivable from L1 is read from L1 instead. The old protocol vers
 is not read from here: the CTM script reads it from the CTM. The `old_protocol_version` and
 `testnet_verifier` keys some input files still carry are dead.
 
-The salts must be rotated before every regeneration. CREATE2 returns the previously deployed
-contract for a repeated `(salt, init code)` pair, so a reused salt silently keeps old bytecode.
+The salts must be rotated before every regeneration. A repeated `(salt, init code)` pair resolves to
+the contract an earlier run already deployed, so a regeneration with old salts deploys nothing new
+for unchanged contracts and its run records no deployment transaction for them.
 
 ```bash
 python3 -c "import secrets; print('0x' + secrets.token_hex(32))"

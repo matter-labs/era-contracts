@@ -153,6 +153,12 @@ are accepted by hand:
 
 As with the hub, making `ctm init` perform these itself is a tooling follow-up.
 
+Run `ctm init` as part of `ecosystem init` for a fresh ecosystem. Run on its own against a hub
+deployed by `hub init` (default `--reuse-gov-and-admin`), it signs the two acceptance steps as the
+Bridgehub's `ChainAdminOwnable` contract instead of that contract's owner, so `chainAdminAcceptAdmin`
+should revert on the `onlyOwner` `multicall` (derived from the code, not run). `ecosystem init`
+passes the real owner.
+
 The ZK token asset id (`--zk-token-asset-id`, or `zk_token_asset_id` of the env preset) must be
 non-zero: it is passed to `InteropCenter.initL2` during every chain's genesis, which reverts on
 zero, so the CTM deployment script rejects a zero id up front.
@@ -168,7 +174,8 @@ zero, so the CTM deployment script rejects a zero id up front.
 3. Calls `L1Bridgehub.createNewChain` through the Bridgehub admin. This is the transaction
    documented in {protocol-docs/chain-lifecycle.md#chain-creation-createnewchain}: the CTM deploys
    the diamond, runs `DiamondInit`, records the genesis upgrade transaction, and the Bridgehub
-   registers the chain in the message root and seeds its genesis batch root.
+   registers the chain in the message root and, for a ZKsync OS chain only, seeds its genesis batch
+   root.
 4. Grants the operator addresses their `ValidatorTimelock` roles: the commit operator becomes the
    committer; the prove operator becomes the prover and also the precommitter, reverter and
    upgrader; on ZKsync OS a separate execute operator (`--execute-operator`, optional) becomes the
@@ -202,7 +209,11 @@ block.
 Creating a chain does not make it reachable for interop. `chain init --register-for-interop`
 (or `RegisterOnAllChains.s.sol` on its own) registers the new chain on every other chain of the
 ecosystem and vice versa through `ChainRegistrationSender`, which is permissionless and
-once-per-ordered-pair. It is off by default on purpose: which chains of a production ecosystem may
+once-per-ordered-pair. It skips, without failing, every pair that is not registrable yet: a chain
+with no batch in the message root (an EraVM chain until its first settled batch, since only ZKsync
+OS chains are seeded at creation) and a destination whose deposits are paused. A successful run
+therefore does not mean every pair is registered; re-run it once the skipped chains qualify. It is
+off by default on purpose: which chains of a production ecosystem may
 talk to each other is a decision, not a side effect of creating one. The guards the sender applies
 are described in {protocol-docs/chain-lifecycle.md#interop-registration-chainregistrationsender}.
 
