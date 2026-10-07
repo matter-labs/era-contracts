@@ -103,7 +103,7 @@ library BatchDecoder {
     /// @notice Decodes proof data from a calldata byte array into the previous batch, an array of proved batches, and a proof array.
     /// @param _proofData The calldata byte array containing the data for proving batches.
     /// @return prevBatch The batch information before the batches to be verified.
-    /// @return provedBatches An array containing the the batches to be verified.
+    /// @return provedBatches An array containing the batches to be verified.
     /// @return proof An array containing the proof for the verifier.
     function _decodeProofData(
         bytes calldata _proofData
@@ -134,7 +134,7 @@ library BatchDecoder {
     /// @param _processBatchFrom The expected batch number of the first batch in the array.
     /// @param _processBatchTo The expected batch number of the last batch in the array.
     /// @return prevBatch The batch information before the batches to be verified.
-    /// @return provedBatches An array containing the the batches to be verified.
+    /// @return provedBatches An array containing the batches to be verified.
     /// @return proof An array containing the proof for the verifier.
     function decodeAndCheckProofData(
         bytes calldata _proofData,

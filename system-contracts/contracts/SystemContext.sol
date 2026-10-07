@@ -104,7 +104,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
         origin = _newOrigin;
     }
 
-    /// @notice Set the the current gas price.
+    /// @notice Set the current gas price.
     /// @param _gasPrice The new tx gasPrice.
     function setGasPrice(uint256 _gasPrice) external onlyCallFromBootloader {
         gasPrice = _gasPrice;
@@ -263,7 +263,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
         uint128 _newTimestamp
     ) internal {
         if (virtualBlockUpgradeInfo.virtualBlockFinishL2Block != 0) {
-            // No need to to do anything about virtual blocks anymore
+            // No need to do anything about virtual blocks anymore
             // All the info is the same as for L2 blocks.
             currentVirtualL2BlockInfo = currentL2BlockInfo;
             return;
