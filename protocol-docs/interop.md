@@ -113,7 +113,7 @@ Fees are **accumulated per `block.coinbase`** (`accumulatedProtocolFees` / `accu
 
 ## Send flow
 
-Both entry points (`sendMessage` and `sendBundle`, both `whenNotPaused nonReentrant`) funnel through the internal `_sendBundle`, which:
+Both entry points (`sendMessage` and `sendBundle`, both `nonReentrant`) funnel through the internal `_sendBundle`, which:
 
 1. **Validates destination** (see [Restrictions](#restrictions)) and, for atomic bundles, rejects L1 destinations before any burn.
 2. **Enforces salt uniqueness** and marks the (sender, salt) pair used.
@@ -274,4 +274,4 @@ An atomic bundle is a leg of an **atomic interop flow** (L2↔L2 only), marked w
 - `L2InteropHandler.initL2` only locks the reentrancy guard (the handler holds no configurable state); `L1InteropHandler` is initialized behind its proxy with an owner for pause control, and its implementation is locked in the constructor.
 - `L1_CHAIN_ID` always refers to the base-most L1, on whichever layer the contract is deployed.
 - Deprecated storage slots retained for layout compatibility: `InteropCenter.__DEPRECATED_interopBundleNonce`, `InteropHandlerBase.__DEPRECATED_L1_CHAIN_ID` (the handler now operates on `block.chainid`).
-- `InteropCenter` is pausable by its owner (`pause`/`unpause` gate both send entry points).
+- `InteropCenter` is not pausable: it keeps the `PausableUpgradeable` inheritance (and its storage) for potential future use, but exposes no `pause`/`unpause` and gates no entry point on it. An L2 chain is stopped through the L1 freezing mechanism instead (see the L2 pausability rule in `AGENTS.md`).

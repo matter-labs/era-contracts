@@ -5,10 +5,10 @@ use alloy::sol_types::SolCall;
 use serde::{Deserialize, Serialize};
 
 use crate::common::abi::{
-    AdminFunctionsAbi, DeployGatewayTransactionFiltererAbi, GatewayUtilsAbi, ICoreUpgradeV33Abi,
-    IDeployCTMAbi, IDeployL1CoreContractsAbi, IDeployPaymasterAbi, IEnableEvmEmulatorAbi,
-    IFinalizeChainInitAbi, IGatewayVotePreparationAbi, IRecordPriorityOpLowerBoundAbi,
-    IRegisterOnAllChainsAbi,
+    AdminFunctionsAbi, AdminFunctionsExtAbi, DeployGatewayTransactionFiltererAbi, GatewayUtilsAbi,
+    ICoreUpgradeV33Abi, IDeployCTMAbi, IDeployL1CoreContractsAbi, IDeployPaymasterAbi,
+    IEnableEvmEmulatorAbi, IFinalizeChainInitAbi, IGatewayVotePreparationAbi,
+    IRecordPriorityOpLowerBoundAbi, IRegisterOnAllChainsAbi,
 };
 
 pub mod deploy_ctm;
@@ -251,6 +251,9 @@ script_calls! {
     AdminFunctionsAbi::executeOwnableCallsWithWrapsCall                 => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::upgradeChainFromCTMCall                          => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::updateValidatorCall                              => ADMIN_FUNCTIONS_INVOCATION,
+    // AdminFunctions entry points not yet in the committed zkstack-out ABI (see `AdminFunctionsExtAbi`)
+    AdminFunctionsExtAbi::executeChainAdminMulticallCall               => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsExtAbi::setZKsyncOSPreV31TotalSupplyCall             => ADMIN_FUNCTIONS_INVOCATION,
     // GatewayUtils
     GatewayUtilsAbi::finishMigrateChainFromGatewayCall                 => GATEWAY_UTILS_INVOCATION,
     GatewayUtilsAbi::finishMigrateChainToGatewayCall                   => GATEWAY_UTILS_INVOCATION,

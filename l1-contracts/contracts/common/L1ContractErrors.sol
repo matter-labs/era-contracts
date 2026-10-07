@@ -139,6 +139,10 @@ error EmptyPublicInputsLength();
 error EraBytecodeAlreadyPublished(bytes32 bytecodeHash);
 // 0x61733a89
 error EVMBytecodeAlreadyPublished(bytes32 bytecodeHash);
+// 0x23298bd1
+error ExecutionDelayNotIncreased(uint32 currentDelay, uint32 newDelay);
+// 0xedfc1f1c
+error ExecutionDelayTooLarge(uint32 delay, uint32 maxDelay);
 // 0xac4a3f98
 error FacetExists(bytes4 selector, address);
 // 0x3fce21be

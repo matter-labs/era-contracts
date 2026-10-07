@@ -63,9 +63,11 @@ sol! {
     function setAddresses();
     function setDefaultUpgrade(address newUpgrade);
     function setL1InteropHandler(address handler);
-    function updateSecurityCouncil(address _newSecurityCouncil);
-    function updateGuardians(address _newGuardians);
-    function updateEmergencyUpgradeBoard(address _newEmergencyUpgradeBoard);
+    // The PUH's `reinitializer` initializer, carried as the `upgradeAndCall`
+    // hook of the stage-0 implementation swap. Selector 0xc0c53b8b, which must
+    // stay equal to `PUH_INITIALIZE_SELECTOR` in
+    // `commands::ecosystem::zk_governance` (the generator side).
+    function initialize(address _securityCouncil, address _guardians, address _emergencyUpgradeBoard);
 
     /// Decoded by stage 0 when it walks the deferred `acceptOwnership` tail.
     function acceptOwnership();
@@ -77,6 +79,7 @@ sol! {
 
     #[sol(rpc)]
     contract Ownable2Step {
+        function owner() external view returns (address);
         function pendingOwner() external view returns (address);
     }
 

@@ -29,6 +29,11 @@ use serde::Deserialize;
 
 use crate::common::paths::resolve_l1_contracts_path;
 
+/// The release's upgrade: the directory under `upgrade-envs/` that `upgrade-prepare-all`,
+/// PUVT and the generate / replay pipeline (`ecosystem rehearse-upgrade`, `replay-bundle`)
+/// target when none is named. Must stay equal to the last segment of [`UPGRADE_ENV_DIR`]
+/// (`tests::default_upgrade_is_the_release_env_dir` pins that).
+pub const DEFAULT_UPGRADE: &str = "v0.33.0-atomic-interop";
 /// The release's upgrade-env directory. Salts, per-env inputs and the canonical output
 /// directory all live here; it moves with each release rather than trailing an older one.
 const UPGRADE_ENV_DIR: &str = "upgrade-envs/v0.33.0-atomic-interop";
@@ -44,6 +49,13 @@ pub struct PermanentValues {
     #[serde(default)]
     pub zk_token_asset_id: Option<B256>,
     pub testnet_verifier: Option<bool>,
+    /// Legacy ZKsync Era chain id baked into the core withdrawal contracts
+    /// (L1AssetRouter / L1Nullifier / MailboxFacet `eraChainId`). On most envs
+    /// this equals the registered `era_chain_id`; on split-era testnets it
+    /// differs (e.g. 270 legacy for withdrawals vs 301 the registered Era).
+    /// Absent → callers default to `era_chain_id`.
+    #[serde(default)]
+    pub legacy_era_chain_id: Option<u64>,
     pub core_contracts: CoreContracts,
     #[serde(default)]
     pub ctm_contracts: Option<CtmContracts>,
@@ -130,7 +142,7 @@ pub struct OwnableProxyEntry {
 #[serde(rename_all = "snake_case")]
 pub enum OwnableProxyKind {
     /// Legacy ZKsync `Governance.sol` (Ownable2Step + delay-gated). Wrap as
-    /// `scheduleTransparent(op, 0)` + `executeInstant(op)` from the EOA owner.
+    /// `scheduleTransparent(op, 0)` + `execute(op)` from the EOA owner.
     LegacyGovernance,
     /// OZ `ChainAdmin` (Ownable2Step). Wrap as `multicall([call], true)`
     /// from the EOA owner.
@@ -403,6 +415,12 @@ impl EnvConfig {
         self.permanent.zk_token_asset_id
     }
 
+    /// Legacy ZKsync Era chain id for the core withdrawal contracts. None when
+    /// the env doesn't declare a split era (callers default to `era_chain_id`).
+    pub fn legacy_era_chain_id(&self) -> Option<u64> {
+        self.permanent.legacy_era_chain_id
+    }
+
     pub fn new_gateway(&self) -> Option<&NewGatewayConfig> {
         self.permanent.new_gateway.as_ref()
     }
@@ -415,6 +433,17 @@ impl EnvConfig {
 pub fn default_protocol_ops_out_dir(env: &str) -> anyhow::Result<PathBuf> {
     Ok(resolve_l1_contracts_path()?
         .join(UPGRADE_ENV_DIR)
+        .join("output")
+        .join(env))
+}
+
+/// `upgrade-envs/<upgrade>/output/<env>/`: where generating `upgrade` for `env` writes.
+/// For [`DEFAULT_UPGRADE`] this is [`default_protocol_ops_out_dir`].
+pub fn protocol_ops_out_dir(upgrade: &str, env: &str) -> anyhow::Result<PathBuf> {
+    crate::common::upgrade_descriptor::validate_upgrade_name(upgrade)?;
+    Ok(resolve_l1_contracts_path()?
+        .join("upgrade-envs")
+        .join(upgrade)
         .join("output")
         .join(env))
 }
@@ -593,6 +622,14 @@ mod tests {
         assert_eq!(ng.chain_id, 2709);
         // GW 2708 is a ZKsync OS chain → CTM source is Atlas (witness 2702).
         assert_eq!(ng.ctm_representative_chain_id, 2702);
+    }
+
+    /// The generate / replay pipeline's default upgrade and the directory every release
+    /// command reads its inputs from and writes its outputs to must name the same upgrade,
+    /// or `rehearse-upgrade` would pack one release's inputs under another's output dir.
+    #[test]
+    fn default_upgrade_is_the_release_env_dir() {
+        assert_eq!(UPGRADE_ENV_DIR, format!("upgrade-envs/{DEFAULT_UPGRADE}"));
     }
 
     /// Confirms `EnvConfig`'s on-demand readers pick up the

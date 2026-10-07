@@ -1,3 +1,4 @@
+use alloy::providers::RootProvider;
 use anyhow::Result;
 
 use crate::upgrade_verification::{
@@ -12,7 +13,8 @@ use crate::upgrade_verification::{
             fee_param_verifier::{FeeParamVerifier, FeeParams},
             network_verifier::{
                 Bridgehub as BridgehubContract, ChainRegistrationSender, ChainTypeManager,
-                L1AssetRouter, Ownable, Ownable2Step, ValidatorTimelock, ZKChainFeeParams,
+                L1AssetRouter, L1NativeTokenVault, Ownable, Ownable2Step, ValidatorTimelock,
+                ZKChainFeeParams,
             },
         },
         MAX_PRIORITY_TX_GAS_LIMIT, STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID,
@@ -27,11 +29,108 @@ use alloy::{
 
 const CREATE2_FACTORY_CONTRACT_NAME: &str = "Create2Factory";
 
+/// How a contract's `Ownable2Step` state relates to the ecosystem governance.
+#[derive(Debug, PartialEq, Eq)]
+enum GovernanceOwnership {
+    /// Governance holds it outright.
+    Governance,
+    /// Handoff in flight: the per-CTM ecosystem admin (the pre-existing owner) holds it and
+    /// governance is `pendingOwner`, with the `acceptOwnership()` deferred to a stage-0
+    /// governance call. This is the state the prepare pre-step
+    /// (`ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps`) leaves a contract it transfers.
+    PendingHandoff,
+    /// Held by the account that owns the governance contract itself. Legacy
+    /// `Governance.sol` ecosystems can keep their ValidatorTimelock there, so this is a
+    /// standing topology difference rather than a defect: the same principals are in control,
+    /// but without the governance timelock in front of them. Reported as a warning, never
+    /// silently accepted.
+    GovernanceController,
+    /// Anything else: nobody the ecosystem's governance chain accounts for.
+    Foreign,
+}
+
+fn classify_governance_ownership(
+    owner: Address,
+    pending: Address,
+    governance: Address,
+    governance_controller: Option<Address>,
+    ecosystem_admin: Address,
+) -> GovernanceOwnership {
+    if owner == governance {
+        GovernanceOwnership::Governance
+    } else if pending == governance && owner == ecosystem_admin {
+        GovernanceOwnership::PendingHandoff
+    } else if governance_controller.is_some_and(|controller| owner == controller) {
+        GovernanceOwnership::GovernanceController
+    } else {
+        GovernanceOwnership::Foreign
+    }
+}
+
+/// `governance.owner()`, or `None` when governance is not `Ownable` (a
+/// ProtocolUpgradeHandler is not) or the owner is unset.
+async fn governance_controller(provider: &RootProvider, governance: Address) -> Option<Address> {
+    match Ownable2Step::new(governance, provider.clone())
+        .owner()
+        .call()
+        .await
+    {
+        Ok(owner) if owner != Address::ZERO => Some(owner),
+        _ => None,
+    }
+}
+
+/// Check one `Ownable2Step` contract against the ecosystem governance and report the verdict.
+async fn report_governance_ownership(
+    result: &mut VerificationResult,
+    provider: &RootProvider,
+    what: &str,
+    contract: Address,
+    governance: Address,
+    ecosystem_admin: Address,
+) {
+    let ownable = Ownable2Step::new(contract, provider.clone());
+    let (owner, pending) = match (
+        ownable.owner().call().await,
+        ownable.pendingOwner().call().await,
+    ) {
+        (Ok(owner), Ok(pending)) => (owner, pending),
+        (Ok(owner), Err(_)) => (owner, Address::ZERO),
+        (Err(err), _) => {
+            result.report_error(&format!("Failed to call {what}.owner(): {err}"));
+            return;
+        }
+    };
+    let controller = governance_controller(provider, governance).await;
+    match classify_governance_ownership(owner, pending, governance, controller, ecosystem_admin) {
+        GovernanceOwnership::Governance => {
+            result.report_ok(&format!("{what}.owner() matches governance ({governance})"))
+        }
+        GovernanceOwnership::PendingHandoff => result.report_ok(&format!(
+            "{what} owned by the ecosystem admin ({owner}) with governance ({governance}) pending (accept deferred to stage 0)"
+        )),
+        GovernanceOwnership::GovernanceController => result.report_warn(&format!(
+            "{what}.owner() is {owner}, which owns governance {governance} rather than being it. \
+             The same principals control it, but without the governance timelock in front. \
+             Expected on legacy-`Governance.sol` ecosystems."
+        )),
+        GovernanceOwnership::Foreign => result.report_error(&format!(
+            "{what}.owner() mismatch: expected governance {governance} (or the ecosystem admin with governance pending), got {owner}"
+        )),
+    }
+}
+
 // `DiamondInit` writes the default fee params from `Config.sol` into
 // `ZKChainStorage.s.feeParams`; this slot matches the v33 storage layout.
 const FEE_PARAMS_STORAGE_SLOT: u64 = 38;
 const MAINNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS: u32 = 10_800;
 const TESTNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS: u32 = 0;
+// ZKsync OS (Atlas) chains commit through the `MultisigCommitter` rather than
+// the classic ValidatorTimelock flow, and their ValidatorTimelock proxy carries
+// a zero execution delay on every environment (mainnet included) — unlike Era,
+// which uses the env-standard delay. The upgrade reuses the existing VT proxy,
+// preserving this delay.
+const ZKSYNC_OS_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS: u32 = 0;
 
 /// Core proxies whose EIP-1967 admin slot must match the ecosystem
 /// `transparent_proxy_admin`.
@@ -44,6 +143,7 @@ const CORE_PROXIES_UNDER_TRANSPARENT_PROXY_ADMIN: &[&str] = &[
     "message_root_proxy",
     "ctm_deployment_tracker_proxy",
     "chain_asset_handler_proxy",
+    "chain_registration_sender_proxy",
 ];
 
 fn expect_address_eq(
@@ -344,6 +444,11 @@ async fn verify_v33_core_wiring(
         "core",
         &["upgrade_addresses", "native_token_vault_addr"],
     )?;
+    let expected_bridged_token_beacon = required_address(
+        &artifact.core,
+        "core",
+        &["upgrade_addresses", "bridges", "bridged_token_beacon"],
+    )?;
     let expected_chain_registration_sender = required_address(
         &artifact.core,
         "core",
@@ -410,7 +515,9 @@ async fn verify_v33_core_wiring(
             "Failed to call L1AssetRouter.owner() for core wiring checks: {err}"
         )),
     }
-    let era_chain_id = U256::from(verifiers.era_chain_id);
+    // L1AssetRouter is a core withdrawal contract: its ERA_CHAIN_ID() is the
+    // LEGACY era, which differs from the registered one on split-era envs.
+    let era_chain_id = U256::from(verifiers.legacy_era_chain_id);
     match asset_router.ERA_CHAIN_ID().call().await {
         Ok(actual) => {
             expect_debug_eq(result, "L1AssetRouter.eraChainId()", &actual, &era_chain_id);
@@ -443,6 +550,39 @@ async fn verify_v33_core_wiring(
         ),
         Err(err) => result.report_error(&format!(
             "Failed to call L1AssetRouter.nativeTokenVault() for core wiring checks: {err}"
+        )),
+    }
+
+    // The bridged-token beacon upgrades every bridged token at once, so its owner must be
+    // governance.
+    let ntv = L1NativeTokenVault::new(expected_ntv, provider.clone());
+    match ntv.bridgedTokenBeacon().call().await {
+        Ok(actual_beacon) => {
+            expect_address_eq(
+                result,
+                "L1NativeTokenVault.bridgedTokenBeacon()",
+                actual_beacon,
+                expected_bridged_token_beacon,
+            );
+            if actual_beacon == Address::ZERO {
+                result.report_error("L1NativeTokenVault.bridgedTokenBeacon() is address(0)");
+            } else {
+                let beacon_owner = Ownable::new(actual_beacon, provider.clone());
+                match beacon_owner.owner().call().await {
+                    Ok(actual_owner) => expect_address_eq(
+                        result,
+                        "L1NativeTokenVault.bridgedTokenBeacon().owner()",
+                        actual_owner,
+                        bridgehub_owner,
+                    ),
+                    Err(err) => result.report_error(&format!(
+                        "Failed to call bridged token beacon owner() for core wiring checks: {err}"
+                    )),
+                }
+            }
+        }
+        Err(err) => result.report_error(&format!(
+            "Failed to call L1NativeTokenVault.bridgedTokenBeacon() for core wiring checks: {err}"
         )),
     }
 
@@ -556,7 +696,12 @@ async fn verify_v33_validator_timelocks(
         )?;
         let expected_owner =
             required_address(&ctm.value, &scope, &["admin", "timer_governance_addr"])?;
-        let expected_delay = if ctm.contracts_config.is_testnet {
+        // ZKsync OS CTMs keep a zero VT execution delay on every env; only an
+        // Era CTM would use the env-standard delay (0 on testnet/stage, 10800 on
+        // mainnet).
+        let expected_delay = if ctm.flavor == CtmFlavor::ZksyncOs {
+            ZKSYNC_OS_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS
+        } else if ctm.contracts_config.is_testnet {
             TESTNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS
         } else {
             MAINNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS
@@ -575,18 +720,20 @@ async fn verify_v33_validator_timelocks(
             )),
         }
 
-        let owner_view = Ownable::new(validator_timelock, provider.clone());
-        match owner_view.owner().call().await {
-            Ok(actual) => expect_address_eq(
-                result,
-                &format!("{label}.ValidatorTimelock.owner()"),
-                actual,
-                expected_owner,
-            ),
-            Err(err) => result.report_error(&format!(
-                "Failed to call {label}.ValidatorTimelock.owner(): {err}"
-            )),
-        }
+        // The prepare pre-step transfers a VT that governance does not own yet
+        // through an Ownable2Step handoff whose acceptOwnership() is a stage-0
+        // governance call — not executed on a prepare fork. So accept either a
+        // completed transfer (owner == governance) or a pending one
+        // (pendingOwner == governance, accept deferred to stage 0).
+        report_governance_ownership(
+            result,
+            &provider,
+            &format!("{label}.ValidatorTimelock"),
+            validator_timelock,
+            expected_owner,
+            required_address(&ctm.value, &scope, &["admin", "ecosystem_admin_addr"])?,
+        )
+        .await;
 
         let timelock_view = ValidatorTimelock::new(validator_timelock, provider.clone());
         match timelock_view.executionDelay().call().await {
@@ -862,5 +1009,79 @@ async fn verify_v33_chain_settlement_layers(
                 "Failed to call Bridgehub.settlementLayer({chain_id}): {err}"
             )),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn addr(byte: u8) -> Address {
+        Address::repeat_byte(byte)
+    }
+
+    const GOVERNANCE: u8 = 0x11;
+    const ECOSYSTEM_ADMIN: u8 = 0x33;
+    const CONTROLLER: u8 = 0x44;
+    const STRANGER: u8 = 0x55;
+
+    fn classify(owner: u8, pending: u8, controller: Option<u8>) -> GovernanceOwnership {
+        classify_governance_ownership(
+            addr(owner),
+            addr(pending),
+            addr(GOVERNANCE),
+            controller.map(addr),
+            addr(ECOSYSTEM_ADMIN),
+        )
+    }
+
+    #[test]
+    fn governance_holding_it_outright_is_accepted() {
+        assert_eq!(
+            classify(GOVERNANCE, 0, None),
+            GovernanceOwnership::Governance
+        );
+    }
+
+    #[test]
+    fn handoff_in_flight_from_the_ecosystem_admin_is_accepted() {
+        assert_eq!(
+            classify(ECOSYSTEM_ADMIN, GOVERNANCE, None),
+            GovernanceOwnership::PendingHandoff
+        );
+    }
+
+    /// A pending handoff to governance is not enough on its own: an unknown intermediate
+    /// can still act on the contract until governance accepts.
+    #[test]
+    fn handoff_from_an_unknown_intermediate_is_not_accepted() {
+        assert_eq!(
+            classify(STRANGER, GOVERNANCE, None),
+            GovernanceOwnership::Foreign
+        );
+    }
+
+    #[test]
+    fn the_account_owning_governance_is_flagged_not_accepted_silently() {
+        assert_eq!(
+            classify(CONTROLLER, 0, Some(CONTROLLER)),
+            GovernanceOwnership::GovernanceController
+        );
+    }
+
+    #[test]
+    fn a_stranger_is_foreign_whether_or_not_governance_is_ownable() {
+        assert_eq!(
+            classify(STRANGER, 0, Some(CONTROLLER)),
+            GovernanceOwnership::Foreign
+        );
+        assert_eq!(classify(STRANGER, 0, None), GovernanceOwnership::Foreign);
+    }
+
+    /// `governance_controller` returns `None` for an unset owner, so a contract whose owner
+    /// reads as the zero address must never be mistaken for a governance-controlled one.
+    #[test]
+    fn an_unset_owner_is_foreign() {
+        assert_eq!(classify(0, 0, None), GovernanceOwnership::Foreign);
     }
 }

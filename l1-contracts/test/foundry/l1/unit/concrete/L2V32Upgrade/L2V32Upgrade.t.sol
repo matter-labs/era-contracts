@@ -26,7 +26,9 @@ import {L2V32Upgrade} from "contracts/l2-upgrades/L2V32Upgrade.sol";
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
 import {IL2V32Upgrade} from "contracts/upgrades/IL2V32Upgrade.sol";
-import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
+import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
+import {Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {TokenBridgingData, TokenMetadata} from "contracts/common/Messaging.sol";
 import {
     FixedForceDeploymentsData,
@@ -146,6 +148,30 @@ contract MockV32UpgradeBaseToken {
     }
 }
 
+/// @dev Isolates the Era system deployer: EVM tests cannot execute Era force deployments.
+/// Replaces code only; the new NTV's state is initialized through its real updateL2 call.
+contract MockV32NTVForceDeployer is Test {
+    bytes private _newRuntime;
+    uint256 public deploymentCalls;
+    address public wethBeforeReplacement;
+    address public wethAfterReplacement;
+
+    function setRuntime(bytes memory _runtime) external {
+        _newRuntime = _runtime;
+    }
+
+    function forceDeployOnAddresses(IL2ContractDeployer.ForceDeployment[] calldata _deployments) external {
+        assertEq(msg.sender, L2_COMPLEX_UPGRADER_ADDR);
+        assertEq(_deployments.length, 1);
+        assertEq(_deployments[0].newAddress, L2_NATIVE_TOKEN_VAULT_ADDR);
+        assertFalse(_deployments[0].callConstructor);
+        wethBeforeReplacement = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).WETH_TOKEN();
+        vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, _newRuntime);
+        wethAfterReplacement = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).WETH_TOKEN();
+        deploymentCalls++;
+    }
+}
+
 contract L2V32UpgradeUnitTest is Test {
     bytes32 internal constant BASE_TOKEN_ASSET_ID = keccak256("base-token");
     uint256 internal constant L1_CHAIN_ID = 9;
@@ -261,6 +287,84 @@ contract L2V32UpgradeUnitTest is Test {
         // Pre-v32 contracts stay untouched on the ZKsync OS path too.
         MockV32UpgradeBaseToken baseToken = MockV32UpgradeBaseToken(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
         assertEq(baseToken.initCalls(), 0, "base token must not be re-initialized on an upgrade");
+    }
+
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
+    /// @dev Era upgrade path: the old NTV exposed `WETH_TOKEN` as an immutable, so the helper must read it before
+    /// the deferred NTV force deployment replaces the code (the new storage slot starts empty), then hand the
+    /// captured address to `updateL2`. The Era system deployer is mocked (see `MockV32NTVForceDeployer`).
+    function testFuzz_UpgradePreservesWethAcrossImmutableToStorageReplacement(address _existingWeth) public {
+        vm.assume(_existingWeth != address(0));
+        _etchCode(
+            L2_NATIVE_TOKEN_VAULT_ADDR,
+            address(
+                new MockV32UpgradeNativeTokenVault(
+                    BASE_TOKEN_ASSET_ID,
+                    L1_CHAIN_ID,
+                    L2_TOKEN_PROXY_BYTECODE_HASH,
+                    _existingWeth
+                )
+            )
+        );
+        MockV32NTVForceDeployer deployer = new MockV32NTVForceDeployer();
+        vm.etch(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, address(deployer).code);
+        deployer = MockV32NTVForceDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR);
+        deployer.setRuntime(address(new L2NativeTokenVault()).code);
+        ZKChainSpecificForceDeploymentsData memory chainData = _buildZKChainSpecificData();
+        // Match the actual L1-generated payload: the WETH field starts at zero.
+        chainData.predeployedL2WethAddress = address(0);
+
+        vm.expectEmit(true, true, false, true, L2_NATIVE_TOKEN_VAULT_ADDR);
+        emit OwnershipTransferred(address(0), ALIASED_L1_GOVERNANCE);
+        vm.prank(L2_FORCE_DEPLOYER_ADDR);
+        L2ComplexUpgrader(L2_COMPLEX_UPGRADER_ADDR).upgrade(
+            address(testUpgrade),
+            abi.encodeCall(
+                IL2V32Upgrade.upgrade,
+                (false, CTM_DEPLOYER, abi.encode(_buildFixedForceDeploymentsData()), abi.encode(chainData))
+            )
+        );
+
+        assertEq(deployer.deploymentCalls(), 1);
+        assertEq(deployer.wethBeforeReplacement(), _existingWeth);
+        assertEq(deployer.wethAfterReplacement(), address(0), "new storage must not inherit the immutable");
+        L2NativeTokenVault vault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+        assertEq(vault.WETH_TOKEN(), _existingWeth, "preserve the original wrapped token");
+        assertEq(vault.owner(), ALIASED_L1_GOVERNANCE);
+        assertEq(vault.assetId(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR), BASE_TOKEN_ASSET_ID);
+    }
+
+    /// @dev An Era upgrade without an existing wrapped base token is rejected before the NTV code is replaced.
+    function test_UpgradeRejectsMissingExistingWeth() public {
+        _etchCode(
+            L2_NATIVE_TOKEN_VAULT_ADDR,
+            address(
+                new MockV32UpgradeNativeTokenVault(
+                    BASE_TOKEN_ASSET_ID,
+                    L1_CHAIN_ID,
+                    L2_TOKEN_PROXY_BYTECODE_HASH,
+                    address(0)
+                )
+            )
+        );
+        bytes32 previousCodeHash = L2_NATIVE_TOKEN_VAULT_ADDR.codehash;
+        vm.expectRevert(ZeroAddress.selector);
+        vm.prank(L2_FORCE_DEPLOYER_ADDR);
+        L2ComplexUpgrader(L2_COMPLEX_UPGRADER_ADDR).upgrade(
+            address(testUpgrade),
+            abi.encodeCall(
+                IL2V32Upgrade.upgrade,
+                (
+                    false,
+                    CTM_DEPLOYER,
+                    abi.encode(_buildFixedForceDeploymentsData()),
+                    abi.encode(_buildZKChainSpecificData())
+                )
+            )
+        );
+        assertEq(L2_NATIVE_TOKEN_VAULT_ADDR.codehash, previousCodeHash);
+        assertEq(MockV32UpgradeNativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).updateCalls(), 0);
     }
 
     function _buildFixedForceDeploymentsData() private pure returns (FixedForceDeploymentsData memory) {

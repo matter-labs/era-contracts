@@ -3,10 +3,7 @@
 pragma solidity 0.8.28;
 
 import {DEPLOYER_SYSTEM_CONTRACT} from "./L2ContractHelper.sol";
-import {
-    ForceDeployment,
-    IContractDeployer
-} from "@matterlabs/zksync-contracts/contracts/system-contracts/interfaces/IContractDeployer.sol";
+import {ForceDeployment, IContractDeployer} from "./interfaces/IContractDeployer.sol";
 
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The contract that calls force deployment during the L2 system contract upgrade.
