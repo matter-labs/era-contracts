@@ -35,8 +35,8 @@ use crate::commands::ecosystem::upgrade_inner::{CtmInputs, PrepareInputs, Upgrad
 use crate::common::abi::AdminFunctionsAbi;
 use crate::common::env_config::EnvConfig;
 use crate::common::forge::scripts::{
-    ADMIN_FUNCTIONS_INVOCATION, CTM_UPGRADE_V34_SCRIPT_PATH, CURRENT_UPGRADE_ENV_DIR,
-    CURRENT_UPGRADE_LOCAL_INPUT_PATH, DEFAULT_CORE_UPGRADE_SCRIPT_PATH, UPGRADE_CORE_OUTPUT_PATH,
+    ADMIN_FUNCTIONS_INVOCATION, CTM_UPGRADE_V34_SCRIPT_PATH, CURRENT_UPGRADE_LOCAL_INPUT_PATH,
+    DEFAULT_CORE_UPGRADE_SCRIPT_PATH, UPGRADE_CORE_OUTPUT_PATH,
 };
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
@@ -525,6 +525,29 @@ fn prepare_env_config(args: &UpgradePrepareAllArgs) -> anyhow::Result<Option<Env
     }
 }
 
+/// The env's upgrade input (`/<release dir>/<env>.toml`, relative to `l1-contracts/`) from the release dir
+/// `cfg` was loaded from, so the input, the salts and the output dir belong to the same release.
+///
+/// Fails closed on a missing file rather than keeping the CLI default. The default is the *local* input, so a
+/// silent fallback would hand a real environment local's values for the keys the input does supply —
+/// `era_chain_id` and `governance_upgrade_timer_initial_delay`. Failing here also catches a mistyped `--env`.
+fn per_env_upgrade_input(cfg: &EnvConfig) -> anyhow::Result<String> {
+    let per_env_abs = &cfg.upgrade_input_path;
+    anyhow::ensure!(
+        per_env_abs.exists(),
+        "no upgrade input for --env {} at {}. Add it — an empty file is fine if the environment needs \
+         nothing from the input — because this command will not fall back to the local default, which \
+         would silently give this environment local's `era_chain_id` and \
+         `governance_upgrade_timer_initial_delay`.",
+        cfg.env,
+        per_env_abs.display()
+    );
+    let relative = per_env_abs
+        .strip_prefix(paths::resolve_l1_contracts_path()?)
+        .with_context(|| format!("{} is outside l1-contracts", per_env_abs.display()))?;
+    Ok(format!("/{}", relative.display()))
+}
+
 pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow::Result<()> {
     // ── env preset auto-fills ────────────────────────────────────────
     let env_cfg = prepare_env_config(&args)?;
@@ -549,20 +572,11 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         // *local* input, so a silent fallback would hand a real environment local's values for the
         // keys the input does supply — `era_chain_id` and
         // `governance_upgrade_timer_initial_delay`. Failing here also catches a mistyped `--env`.
+        //
+        // The input comes from the release dir the env config was loaded from (the current release's, or
+        // `--upgrade-env-dir`), so the input, the salts and the output dir all belong to the same release.
         if args.upgrade_input_path == CURRENT_UPGRADE_LOCAL_INPUT_PATH {
-            let per_env_rel = format!("{CURRENT_UPGRADE_ENV_DIR}/{}.toml", cfg.env);
-            let per_env_abs = paths::contracts_root()
-                .join("l1-contracts")
-                .join(per_env_rel.trim_start_matches('/'));
-            anyhow::ensure!(
-                per_env_abs.exists(),
-                "no upgrade input for --env {} at {}. Add it — an empty file is fine if the \
-                 environment needs nothing from the input — because this command will not fall back \
-                 to the local default, which would silently give this environment local's \
-                 `era_chain_id` and `governance_upgrade_timer_initial_delay`.",
-                cfg.env,
-                per_env_abs.display()
-            );
+            let per_env_rel = per_env_upgrade_input(cfg)?;
             logger::info(format!("Using per-env upgrade input: {per_env_rel}"));
             args.upgrade_input_path = per_env_rel;
         }
@@ -1155,7 +1169,7 @@ fn load_ctm_config(path: &Path) -> anyhow::Result<Vec<CtmInputs>> {
 #[cfg(test)]
 mod release_script_tests {
     use super::*;
-    use crate::common::forge::scripts::UPGRADE_V33_ENV_DIR;
+    use crate::common::forge::scripts::{CURRENT_UPGRADE_ENV_DIR, UPGRADE_V33_ENV_DIR};
     use clap::CommandFactory;
 
     #[test]
@@ -1224,6 +1238,32 @@ mod release_script_tests {
 
     /// A historical re-prepare (`--upgrade-input-path` into an older release's directory) reads the env's
     /// pinned salts from that directory, not from the current release's.
+    /// `--upgrade-env-dir` without `--upgrade-input-path` takes the env's input from the selected release
+    /// dir too, not the current release's, so a prepare never mixes one release's input with another's salts.
+    #[test]
+    fn upgrade_env_dir_selects_the_per_env_input() {
+        let historical = UpgradePrepareAllArgs::try_parse_from([
+            "prepare",
+            "--env",
+            "stage",
+            "--upgrade-env-dir",
+            UPGRADE_V33_ENV_DIR.trim_start_matches('/'),
+        ])
+        .unwrap();
+        let cfg = prepare_env_config(&historical).unwrap().unwrap();
+        assert_eq!(
+            per_env_upgrade_input(&cfg).unwrap(),
+            format!("{UPGRADE_V33_ENV_DIR}/stage.toml")
+        );
+
+        let current = UpgradePrepareAllArgs::try_parse_from(["prepare", "--env", "stage"]).unwrap();
+        let cfg = prepare_env_config(&current).unwrap().unwrap();
+        assert_eq!(
+            per_env_upgrade_input(&cfg).unwrap(),
+            format!("{CURRENT_UPGRADE_ENV_DIR}/stage.toml")
+        );
+    }
+
     #[test]
     fn explicit_input_selects_its_release_env_values() {
         let historical = UpgradePrepareAllArgs::try_parse_from([
