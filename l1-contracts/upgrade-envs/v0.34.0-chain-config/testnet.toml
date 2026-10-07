@@ -1,0 +1,60 @@
+# Upgrade input for the testnet environment on the v34 release.
+#
+# Created from the v0.33.0-atomic-interop entry of the same name: the environment values (owner,
+# era_chain_id, bridgehub and the other addresses) are carried over, while the CREATE2 and legacy-Gov
+# salts are fresh, so this release's deployments do not resolve to v33's addresses. The target protocol
+# version and chain-creation params come from `configs/genesis/zksync-os/latest.json`.
+#
+# protocol-ops' `--env testnet` reads this file (its owner, era_chain_id and salts) for the current release;
+# a missing file fails closed rather than falling back to local's values.
+
+era_chain_id = 270
+
+# Delay armed on the `GovernanceUpgradeTimer` this upgrade deploys (20 minutes), bounding the
+# window between stage 0 and stage 1 becoming executable. Per-release: the timer is a fresh
+# contract each upgrade, so the value is an input to *this* ceremony, not a property of the env.
+governance_upgrade_timer_initial_delay = 1200
+
+# ProtocolUpgradeHandler proxy — `bridgehub.owner()`, the signer of every governance stage.
+# Like `era_chain_id` this is a permanent fact kept here only because
+# `EnvConfig::owner_address()` reads this file; same cross-env relocation caveat.
+owner_address = "0x803e5E7aF1FDD504F8844E28a249203Cfa7c471D"
+
+# NOTE: no `[legacy_gateway]` section, deliberately. `DefaultCoreUpgrade` reads
+# `$.legacy_gateway.chain_id` into `config.legacyGatewayChainId`, which is baked into the
+# redeployed `L1MessageRoot` as its immutable `ERA_GATEWAY_CHAIN_ID`. The key is optional,
+# and the currently deployed testnet `L1MessageRoot` (`0xe7047cD9…`) reports
+# `ERA_GATEWAY_CHAIN_ID() == 0` — testnet never had a Gateway to retire. Omitting the
+# section reproduces that 0 exactly. Do *not* copy the `531050204` placeholder from
+# `permanent-values/testnet.toml`: that is a real registered chain on this bridgehub, and
+# baking it in would make the new message root treat a live chain as the legacy Gateway.
+#
+# NOTE: no `pre_v32_introspection` either. The scripts default it from the CTM's own reported
+# version, and both testnet CTMs are already on v31, so the override has nothing to stand in for.
+#
+# NOTE: no `[state_transition]` section — stage.toml carries one, but nothing under
+# `deploy-scripts/` reads `$.state_transition`, so it is dead weight.
+#
+# NOTE: no `[tokens]` section — `DefaultCoreUpgrade` introspects
+# `L1AssetRouter.L1_WETH_TOKEN()` instead, which preserves this ecosystem's existing (and
+# admittedly wrong — see #2447) mainnet-WETH immutable rather than silently changing it.
+#
+# NOTE: no `testnet_verifier`, `support_l2_legacy_shared_bridge_test`, `old_protocol_version`
+# or `[contracts] create2_factory_addr`. The first is an env property already in
+# permanent-values (which is the copy protocol-ops reads); the second is only read by the
+# from-scratch deploy scripts, which this file never reaches; the third had no consumer at all
+# (each CTM's real transition is introspected from `ctm.protocolVersion()`); the fourth
+# duplicates `permanent-values [permanent_contracts] create2_factory_addr`.
+
+[contracts]
+# Rotated for this regen, and the reason this section exists at all: CREATE2 returns the
+# previously deployed contract if a salt is reused, so a stale salt would silently ship v31
+# bytecode. Per-regen, hence not a permanent value.
+create2_factory_salt = "0xf084a44fda7f640b9f90e03bdb87c8bdd402f34410930084371edbb4afd258d9"
+
+# Per-CTM CREATE2 salts, keyed by CTM proxy address, rotated per regen like the core salt.
+# Needed because each CTM prepare deploys its own `GovernanceUpgradeTimer` whose constructor
+# args are env-wide constants — without a CTM-distinct salt two CTMs collide on one address.
+[create2_factory_salts]
+# ZKsync OS (Atlas) CTM — the only CTM this release can upgrade.
+"0x54D55e74De9c6003E7a68a1fE70E633f05761eb5" = "0x57676bfeb0bfbc8687f1fca9884b42c3cf03207e14205128c047c0469948270c"

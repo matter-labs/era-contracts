@@ -21,8 +21,8 @@ import { join, relative } from "path";
 //   1. `configs/genesis/zksync-os/latest.json` `protocol_semantic_version`: minor + 1, patch 0. The default
 //      upgrade scripts read their target version from it, and the upgrade tests assert it.
 //   2. `l1-contracts/upgrade-envs/v0.<minor>.0-<name>/`: the local upgrade input and every per-environment
-//      input (`stage.toml`, `mainnet.toml`, ...), copied from the current release's with their version fields
-//      moved. Environment values (owner, era_chain_id, addresses) carry over; every CREATE2 and legacy-Gov salt
+//      input (`stage.toml`, `mainnet.toml`, ...), copied from the current release's. They carry no version
+//      fields: the scripts read the old version from the CTM and the target from genesis. Environment values (owner, era_chain_id, addresses) carry over; every CREATE2 and legacy-Gov salt
 //      is regenerated, so the new release's deployments do not resolve to the previous release's addresses.
 //   3. protocol-ops' current upgrade-env dir (`current_upgrade_env_dir!` in
 //      `protocol-ops/src/common/forge/scripts/mod.rs`): the prepare defaults and `--env` resolution follow it.
@@ -40,9 +40,9 @@ const PROTOCOL_OPS_SCRIPTS_PATH = join(ROOT, "protocol-ops/src/common/forge/scri
 const ANVIL_CONFIG_PATH = join(ROOT, "l1-contracts/test/anvil-interop/config/anvil-config.json");
 const CHAIN_STATES_DIR = join(ROOT, "l1-contracts/test/anvil-interop/chain-states");
 
-// Same packing as `SemVer.packSemVer`.
-const SEMVER_MINOR_OFFSET = 32n;
-const SEMVER_MAJOR_OFFSET = 64n;
+function versionString(version: SemVer): string {
+  return `v${version.major}.${version.minor}.${version.patch}`;
+}
 
 const RELEASE_NAME_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const VERSION_BLOCK_RE =
@@ -50,26 +50,6 @@ const VERSION_BLOCK_RE =
 const ENV_DIR_MACRO_RE = /(macro_rules! current_upgrade_env_dir \{\s*\(\) => \{\s*")(upgrade-envs\/[^"]+)(")/;
 
 type SemVer = { major: number; minor: number; patch: number };
-
-function packSemVer(version: SemVer): string {
-  const packed =
-    (BigInt(version.major) << SEMVER_MAJOR_OFFSET) |
-    (BigInt(version.minor) << SEMVER_MINOR_OFFSET) |
-    BigInt(version.patch);
-  return `0x${packed.toString(16)}`;
-}
-
-function versionString(version: SemVer): string {
-  return `v${version.major}.${version.minor}.${version.patch}`;
-}
-
-function setTomlBareValue(contents: string, key: string, value: string): string {
-  const pattern = new RegExp(`^(${key}\\s*=\\s*)[^#\\n]*?(\\s*#.*)?$`, "m");
-  if (!pattern.test(contents)) {
-    throw new Error(`local.toml has no \`${key}\` to move`);
-  }
-  return contents.replace(pattern, `$1${value}`);
-}
 
 const SALT_KEYS = ["create2_factory_salt", "legacy_gov_salt"];
 
@@ -92,22 +72,13 @@ function envInputHeader(env: string, release: SemVer, sourceDir: string): string
 }
 
 /** A per-environment input for the next release: new header and versions, fresh salts. */
-function rotateEnvInput(contents: string, env: string, current: SemVer, next: SemVer, sourceDir: string): string {
+function rotateEnvInput(contents: string, env: string, next: SemVer, sourceDir: string): string {
   const lines = contents.split("\n");
   let start = 0;
   while (start < lines.length && (lines[start].startsWith("#") || lines[start].trim() === "")) {
     start++;
   }
   let body = lines.slice(start).join("\n");
-  body = body.replace(/^# v\d+ -> v\d+\.$/m, `# v${current.minor} -> v${next.minor}.`);
-  for (const [key, version] of [
-    ["old_protocol_version", { ...current, patch: 0 }],
-    ["latest_protocol_version", next],
-  ] as const) {
-    if (new RegExp(`^${key}\\s*=`, "m").test(body)) {
-      body = setTomlBareValue(body, key, packSemVer(version));
-    }
-  }
   for (const key of SALT_KEYS) {
     body = body.replace(new RegExp(`^(${key}\\s*=\\s*)"0x[0-9a-fA-F]{64}"`, "m"), (_m, prefix) => prefix + freshSalt());
   }
@@ -180,17 +151,12 @@ function main(): void {
     /^# Local v\d+ -> v\d+ upgrade input\..*$/m,
     `# Local v${current.minor} -> v${next.minor} upgrade input.`
   );
-  localInput = setTomlBareValue(localInput, "old_protocol_version", packSemVer({ ...current, patch: 0 }));
-  localInput = setTomlBareValue(localInput, "latest_protocol_version", packSemVer(next));
   write(join(nextEnvDirAbs, "local.toml"), localInput);
   const currentEnvDirAbs = join(UPGRADE_ENVS_DIR, currentEnvDir.replace("upgrade-envs/", ""));
   for (const file of fs.readdirSync(currentEnvDirAbs).filter((f) => f.endsWith(".toml") && f !== "local.toml")) {
     const env = file.replace(/\.toml$/, "");
     const contents = fs.readFileSync(join(currentEnvDirAbs, file), "utf-8");
-    write(
-      join(nextEnvDirAbs, file),
-      rotateEnvInput(contents, env, current, next, currentEnvDir.replace("upgrade-envs/", ""))
-    );
+    write(join(nextEnvDirAbs, file), rotateEnvInput(contents, env, next, currentEnvDir.replace("upgrade-envs/", "")));
   }
 
   // 3. protocol-ops' current upgrade-env dir.

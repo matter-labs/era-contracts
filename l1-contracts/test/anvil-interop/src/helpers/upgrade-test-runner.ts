@@ -211,7 +211,6 @@ async function transferL1Ownership(
     l1SharedBridge: string;
     l1NativeTokenVault: string;
     l1NullifierProxy?: string;
-    l1ChainAssetHandler?: string;
   },
   ctmAddresses: { chainTypeManager: string }
 ): Promise<void> {

@@ -13,10 +13,6 @@ testnet_verifier = false
 governance_upgrade_timer_initial_delay = 172800
 owner_address = "0xE30Dca3047B37dc7d88849dE4A4Dc07937ad5Ab3"
 
-# v33 -> v34.
-old_protocol_version = 0x2100000000
-
-
 [contracts]
 governance_min_delay = 0
 
@@ -28,7 +24,6 @@ bridgehub_proxy_address = "0x303a465B659cBB0ab36eE643eA362c509EEb5213"
 rollup_da_manager = "0xE689e79a06D3D09f99C21E534cCF6a8b7C9b3C45"
 
 governance_security_council_address = "0x66E4431266DC7E04E7d8b7FE9d2181253df7F410"
-latest_protocol_version = 0x2200000000
 l1_bytecodes_supplier_addr = "0xC9F20FC268Fc3e0e597660550033Bf2C24218fd8"
 protocol_upgrade_handler_proxy_address = "0xE30Dca3047B37dc7d88849dE4A4Dc07937ad5Ab3"
 protocol_upgrade_handler_implementation_address = "0x36625Bd3dDB469377C6e9893712158cA3c0cC14B"

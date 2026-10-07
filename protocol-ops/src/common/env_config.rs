@@ -15,7 +15,7 @@
 //!   upgrade-envs/permanent-values/<env>.toml      (bridgehub, ctms, create2)
 //!   <current upgrade-env dir>/<env>.toml          (owner, era_chain_id)
 //!
-//! The latter contains unquoted hex literals (e.g. `old_protocol_version =
+//! Older releases' inputs contain unquoted hex literals (e.g. `old_protocol_version =
 //! 0x1d…`) which `toml-rs` chokes on, so we parse it line-by-line for the
 //! handful of fields we need.
 
@@ -507,7 +507,7 @@ mod tests {
     /// empty defaults (which let `init` fall back to the deployer as owner, or the prepare to random salts).
     #[test]
     fn missing_release_input_fails_closed() {
-        // The v33 release never had a testnet input.
+        // This line's copy of the v33 release dir has no testnet input (release/v0.33.0-atomic-interop does).
         let cfg =
             EnvConfig::load_from_upgrade_env_dir("testnet", "upgrade-envs/v0.33.0-atomic-interop")
                 .expect("permanent values alone still load");

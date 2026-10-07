@@ -137,9 +137,9 @@ async function main(): Promise<void> {
   // upgrade tx only.
   const skipL2 = process.env.FORK_SKIP_L2 === "1";
   // Skip the per-chain upgrade phase entirely. Use when targeted chains are
-  // not on the `old_protocol_version` the prepare-input expects (e.g. stage
-  // chains lagging behind v29 — `upgradeCutDataBlock[chainVersion]` is empty
-  // and `GetDiamondCutData.getDiamondCutData` reverts with `NoLogsFound`).
+  // not on the version their CTM upgrades from (e.g. chains lagging several
+  // releases behind — `upgradeCutDataBlock[chainVersion]` is empty and
+  // `GetDiamondCutData.getDiamondCutData` reverts with `NoLogsFound`).
   // Lets us still reach + validate prepare and governance on the same fork.
   const skipChainUpgrades = process.env.FORK_SKIP_CHAIN_UPGRADES === "1";
 
