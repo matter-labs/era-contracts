@@ -50,6 +50,8 @@ Registration flows:
   deliberately permissionless (`registerToken`, `ensureTokenIsRegistered`) so bridging native tokens never
   needs an allowlist.
 
+![Custom asset handler registration](./img/custom_asset_handler_registration.png)
+
 ## Asset routing: burn / mint
 
 All transfers follow one pattern: the source-side asset handler's `bridgeBurn` locks or burns the funds and
@@ -88,6 +90,10 @@ ZKsync OS does not support factory dependencies in priority transactions. The Ma
 `factoryDeps` to be empty. The shared canonical transaction format retains the field because system
 upgrade transactions use it to identify bytecode preimages. Contract deployment in ordinary priority
 transactions uses EVM execution.
+
+![Token deposit via requestL2TransactionTwoBridges](./img/deposit_two_bridges.png)
+
+![Base-token deposit via requestL2TransactionDirect](./img/deposit_direct.png)
 
 ### Refund-recipient resolution
 
@@ -181,7 +187,7 @@ tokens) and rejects fee-on-transfer tokens (`TokensWithFeesNotSupported`).
   `chainBalance(chainId, assetId)` getter remains for backwards compatibility and will revert in the next release.
 - **Pausability**: inherited by both vaults from the base. On L1 it is part of the emergency controls; on
   L2 it exists only for shared-code reasons and should not be used as an emergency mechanism — future L2
-  logic should rely on the L1/Gateway freeze flow.
+  logic should rely on L1-governed emergency controls.
 
 ### Populating `bridgedOut` during an in-place upgrade
 
@@ -272,9 +278,9 @@ to preserve the deployed storage layout.
     re-credit `handleFinalizeBridgingOnL2` performs there is nothing to reverse: the destination was not L1,
     and the base token is never native to the chain (so it has no `chainBalance` at all). Both invariants
     are asserted, for every asset — the vault asks before disbursing a failed transfer.
-- `interopInfo` (`totalWithdrawalsToL1`, `totalSuccessfulDepositsFromL1`) is the L2-side accounting used to
-  compute the amount to keep on L1 during the L1 -> Gateway migration; `totalWithdrawalsToL1` is consumed
-  once during that migration and must stay append-only.
+- `interopInfo` (`totalWithdrawalsToL1`, `totalSuccessfulDepositsFromL1`) retains the L2-side counters
+  used by the protocol's disabled settlement-layer migration machinery. `totalWithdrawalsToL1` must
+  remain append-only.
 - **v31 migration accounting**: `totalPreV31TotalSupply[assetId]` snapshots the token's total supply before
   its first post-v31 bridge operation (for pre-v31 tokens this should equal
   `totalSuccessfulDeposits - totalWithdrawalsToL1`). Bridged tokens snapshot `totalSupply()`; native tokens snapshot
@@ -345,8 +351,8 @@ mintData)` on the asset handler registered for the asset (`assetHandlerAddress[a
 - **L2 -> L1 withdrawals are never revertable.** The `InteropCenter` rejects L1-destined atomic bundles at
   send time, and both `L2AssetRouter.recoverAtomicCall` and
   `L2AssetTracker.assertRecoveryIsAccountingNeutral` assert `destChainId != L1_CHAIN_ID`. The reason is
-  accounting: `totalWithdrawalsToL1` is consumed exactly once during the L1 -> Gateway migration and must
-  stay append-only; a revertable withdrawal would corrupt the migrated balance.
+  accounting: `totalWithdrawalsToL1` is append-only and is consumed by the disabled settlement-layer
+  migration machinery; a revertable withdrawal would corrupt that accounting.
 - **Message forgery**: finalization is only reachable through the interop handler with a proven message,
   the sender must be the counterpart asset router, the payload selector is pinned to `finalizeDeposit`, and
   the sender chain ID must equal the payload's source chain ID.
@@ -363,11 +369,11 @@ mintData)` on the asset handler registered for the asset (`assetHandlerAddress[a
   [Finalization (destination side)](#finalization-destination-side)). Numerous
   `__DEPRECATED_*` storage slots remain across `L1AssetRouter`, `L2AssetRouter`, `L1Nullifier`,
   `L2NativeTokenVault`, `L1NativeTokenVault` and `L2AssetTracker` solely to preserve the upgradeable
-  storage layouts of already-deployed proxies; they must not be reused. Three are still read:
-  `L1NativeTokenVault.__DEPRECATED_l1AssetTracker`, which locates the legacy accounting for the
-  `bridgedOut` population, and `L1Nullifier`'s `__DEPRECATED_l2BridgeAddress` (the sender check on the
-  legacy withdrawal path) and `__DEPRECATED_chainBalance` (its getter, and the nullification the NTV
-  triggers).
+  storage layouts of already-deployed proxies; they must not be reused.
+  `L1NativeTokenVault.__DEPRECATED_l1AssetTracker` is still read to locate legacy accounting while
+  populating `bridgedOut`. `L1Nullifier.__DEPRECATED_l2BridgeAddress` and
+  `L1Nullifier.__DEPRECATED_chainBalance` remain declarations with generated compatibility getters;
+  production withdrawal authentication and accounting no longer use them.
 - Legacy bridged tokens on L2 may predate the NTV: `BridgedStandardERC20.onlyNTV` lazily migrates them by
   setting `nativeTokenVault` to `L2_NATIVE_TOKEN_VAULT_ADDR` and deriving the asset ID on first use.
   `addLegacyTokenToBridgedTokensList` backfills such tokens into the vault's `bridgedTokens` enumeration,

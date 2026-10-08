@@ -45,7 +45,7 @@ contract GatewayVotePreparationForTest is GatewayVotePreparation {
 
 /// @title GatewayVotePreparationTests
 /// @notice Integration tests for GatewayVotePreparation script.
-/// @dev Deploys the full L1 environment (bridgehub, CTM, era chain), then calls through
+/// @dev Deploys the full L1 environment (bridgehub, CTM, ZKsync OS chain), then calls through
 /// GatewayVotePreparation's initialization path and exercises calculateAddresses.
 contract GatewayVotePreparationTests is ZKChainDeployer {
     GatewayVotePreparationForTest internal votePreparationScript;
@@ -55,9 +55,18 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
         "/script-out/foundry-gateway-vote-preparation/config.toml";
     string internal constant GATEWAY_VOTE_PREPARATION_OUTPUT_PATH =
         "/script-out/foundry-gateway-vote-preparation/output.toml";
+    string internal constant ZKSYNC_OS_CTM_CONFIG_PATH = "/script-out/foundry-gateway-vote-preparation/ctm.toml";
 
     function setUp() public {
-        _deployL1Contracts();
+        string memory root = vm.projectRoot();
+        vm.createDir(string.concat(root, "/script-out/foundry-gateway-vote-preparation"), true);
+        string memory ctmConfig = vm.readFile(
+            string.concat(root, "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-ctm.toml")
+        );
+        string memory ctmConfigPath = string.concat(root, ZKSYNC_OS_CTM_CONFIG_PATH);
+        vm.writeFile(ctmConfigPath, ctmConfig);
+        vm.writeToml("true", ctmConfigPath, ".is_zk_sync_os");
+        _deployL1Contracts(ZKSYNC_OS_CTM_CONFIG_PATH);
         _deployEra();
 
         votePreparationScript = new GatewayVotePreparationForTest();

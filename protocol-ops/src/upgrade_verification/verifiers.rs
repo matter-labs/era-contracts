@@ -14,7 +14,7 @@ use crate::{
     commands::ecosystem::verify_upgrade::VerifyUpgradeEnv,
     upgrade_verification::{
         artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
-        versions::v31::utils::{
+        versions::v33::utils::{
             address_verifier::AddressVerifier,
             apply_l2_to_l1_alias,
             bytecode_verifier::BytecodeVerifier,
@@ -61,9 +61,38 @@ impl GenesisConfigKind {
 }
 
 impl Verifiers {
-    /// Creates a v31 verifier context from the single ecosystem TOML.
+    #[cfg(test)]
+    pub(crate) fn offline_v34() -> Self {
+        Self {
+            env: VerifyUpgradeEnv::Testnet,
+            bridgehub_address: Address::ZERO,
+            bridgehub_owner: Address::ZERO,
+            address_verifier: AddressVerifier {
+                address_to_name: Default::default(),
+                name_to_address: Default::default(),
+            },
+            bytecode_verifier: BytecodeVerifier::init_from_local().unwrap(),
+            network_verifier: NetworkVerifier {
+                l1_provider: alloy::providers::RootProvider::new_http(
+                    "http://127.0.0.1:1".parse().unwrap(),
+                ),
+                l1_chain_id: 1,
+                create2_known_bytecodes: Default::default(),
+                create2_constructor_params: Default::default(),
+            },
+            zksync_os_genesis_config: GenesisConfig::init_v33_from_local(
+                GenesisConfigKind::ZksyncOs,
+            )
+            .unwrap(),
+            era_chain_id: 0,
+            expected_l1_chain_id: 1,
+            zk_token_asset_id: FixedBytes::ZERO,
+        }
+    }
+
+    /// Creates a v33 verifier context from the single ecosystem TOML.
     #[allow(clippy::too_many_arguments)]
-    pub async fn new_v31(
+    pub async fn new_v33(
         env: VerifyUpgradeEnv,
         artifact: &EcosystemUpgradeArtifact,
         l1_rpc: impl Into<String>,
@@ -93,8 +122,8 @@ impl Verifiers {
             &["upgrade_addresses", "bridgehub", "bridgehub_proxy_addr"],
         )?;
         let bytecode_verifier =
-            BytecodeVerifier::init_v31(contracts_commit, zk_governance_commit).await?;
-        let network_verifier = NetworkVerifier::new_v31(l1_rpc.into()).await?;
+            BytecodeVerifier::init_v33(contracts_commit, zk_governance_commit).await?;
+        let network_verifier = NetworkVerifier::new_v33(l1_rpc.into()).await?;
 
         // `Bridgehub.owner()` is the L1 governance executor (the PUH proxy on
         // PUH-governed envs). It is the authoritative source for the
@@ -117,7 +146,7 @@ impl Verifiers {
         })?;
         let aliased_bridgehub_owner = apply_l2_to_l1_alias(bridgehub_owner);
 
-        let mut address_verifier = AddressVerifier::new_v31_from_artifact(artifact)?;
+        let mut address_verifier = AddressVerifier::new_v33_from_artifact(artifact)?;
         address_verifier.add_address(bridgehub_owner, "protocol_upgrade_handler_proxy");
         address_verifier.add_address(
             aliased_bridgehub_owner,
@@ -125,7 +154,7 @@ impl Verifiers {
         );
 
         let zksync_os_genesis_config =
-            GenesisConfig::init_v31(GenesisConfigKind::ZksyncOs, contracts_commit).await?;
+            GenesisConfig::init_v33(GenesisConfigKind::ZksyncOs, contracts_commit).await?;
 
         Ok(Self {
             env,
@@ -151,21 +180,23 @@ impl Verifiers {
 #[derive(Debug, Clone, Deserialize)]
 pub struct GenesisConfig {
     pub genesis_root: String,
+    pub protocol_semantic_version:
+        crate::upgrade_verification::versions::v33::elements::protocol_version::ProtocolVersion,
 }
 
 impl GenesisConfig {
-    pub async fn init_v31(
+    pub async fn init_v33(
         kind: GenesisConfigKind,
         contracts_commit: Option<&str>,
     ) -> anyhow::Result<Self> {
         if let Some(contracts_commit) = contracts_commit {
-            return Self::init_v31_from_github(kind, contracts_commit).await;
+            return Self::init_v33_from_github(kind, contracts_commit).await;
         }
 
-        Self::init_v31_from_local(kind)
+        Self::init_v33_from_local(kind)
     }
 
-    fn init_v31_from_local(kind: GenesisConfigKind) -> anyhow::Result<Self> {
+    fn init_v33_from_local(kind: GenesisConfigKind) -> anyhow::Result<Self> {
         let path = repo_relative_path(kind.local_path());
         let data = fs::read_to_string(&path)
             .map_err(|e| anyhow::anyhow!("failed to read {}: {e}", path.display()))?;
@@ -173,7 +204,7 @@ impl GenesisConfig {
             .map_err(|e| anyhow::anyhow!("failed to parse {}: {e}", path.display()))
     }
 
-    async fn init_v31_from_github(kind: GenesisConfigKind, commit: &str) -> anyhow::Result<Self> {
+    async fn init_v33_from_github(kind: GenesisConfigKind, commit: &str) -> anyhow::Result<Self> {
         let path = kind.local_path();
         let data = get_contents_from_github(commit, "matter-labs/era-contracts", path).await;
         serde_json::from_str(&data).map_err(|e| {
@@ -374,6 +405,47 @@ impl VerificationResult {
             self.report_ok(&format!("{} at {}", expected_file, address));
         }
         true
+    }
+
+    /// Verifies a proxy this upgrade did **not** deploy.
+    ///
+    /// Some proxies are kept across releases and only have their
+    /// implementation swapped, so they carry no CREATE2 provenance in this
+    /// upgrade's transaction log. What is checkable is that the address is a
+    /// live proxy under the expected `ProxyAdmin`, and that the implementation
+    /// the governance calls point it at was deployed here — the latter is
+    /// verified by the stage-1 payload pass, which reads the call rather than
+    /// the pre-upgrade storage slot.
+    pub(crate) async fn expect_preexisting_proxy(
+        &mut self,
+        verifiers: &Verifiers,
+        address: &Address,
+        expected_admin: Address,
+        label: &str,
+    ) {
+        if verifiers
+            .network_verifier
+            .get_bytecode_hash_at(address)
+            .await
+            == FixedBytes::ZERO
+        {
+            self.report_error(&format!(
+                "{label} proxy {address} is expected to pre-exist, but has no code on L1"
+            ));
+            return;
+        }
+
+        let admin = verifiers.network_verifier.get_proxy_admin(*address).await;
+        if admin != expected_admin {
+            self.report_error(&format!(
+                "{label} proxy {address} is administered by {admin}, expected {expected_admin}"
+            ));
+            return;
+        }
+
+        self.report_ok(&format!(
+            "{label} proxy {address} pre-exists under the expected ProxyAdmin"
+        ));
     }
 
     /// Verifies create2 parameters for a proxy contract that uses a separate implementation.

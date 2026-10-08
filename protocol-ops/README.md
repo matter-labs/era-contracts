@@ -89,11 +89,11 @@ Safe-bundle-aware executor) with the keys from `wallets.yaml`.
 
 ## Running the Protocol Upgrade Verification Tool (PUVT)
 
-> **Not ported to v34 yet.** On this line `verify-upgrade` still runs the v31 verifier
-> (`upgrade_verification/versions/v31`), which is pinned to the 0.31.0 → 0.32.0 transition and rejects a
-> v34 bundle (0.33.x → 0.34.0) in stage 1. The working v33 verifier lives on
-> `release/v0.33.0-atomic-interop` (`versions/v33`); porting it to v34 must also move the cut-initializer
-> check to `v34_upgrade_addr`.
+> The verifier is reconciled with v34's contracts and default upgrade scripts. It accepts v0.33.x
+> source versions, reads the target version from genesis, and distinguishes `v34_upgrade_addr`
+> (the cut initializer) from `default_upgrade_addr` (the generic stored default). The Solidity-payload
+> regression below exercises the ABI and force-deployment checks; it does not exercise live RPC state
+> or the full governance ceremony.
 
 `ecosystem verify-upgrade` re-derives and cross-checks the calldata produced by
 `ecosystem upgrade-prepare-all` for a **ZKsync OS upgrade**. It is
@@ -136,3 +136,17 @@ Commands that support **`--out`** write a **`CommandEnvelope`** snapshot after a
 ## Requirements
 
 You need a working Foundry toolchain (`forge`, `cast`, etc.) and repo contract artifacts as expected by the scripts this tool wraps. From the repo root, `l1-contracts` must be built (`forge build`).
+
+### Checking the upgrade-verifier ABI against Solidity
+
+After building L1/DA artifacts and refreshing `AllContractsHashes.json`, run with the pinned
+Foundry version on `PATH`:
+
+```bash
+cargo test accepts_solidity_v34_payload_and_rejects_corrupted_deployments -- --ignored
+```
+
+This runs the v34 Solidity payload builder and checks its force deployments, factory dependencies,
+and `IL2DefaultUpgrade` calldata with the Rust verifier. It also rejects a missing ComplexUpgrader
+upgrade and corrupted delegate bytecode descriptors. RPC state and governance execution are covered
+separately by the upgrade integration tests.

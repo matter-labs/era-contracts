@@ -8,7 +8,7 @@ use crate::{
     common::logger,
     upgrade_verification::{
         artifact_shape, artifacts::EcosystemUpgradeArtifact, verifiers::VerificationResult,
-        versions::v31::utils::transactions_log,
+        versions::v33::utils::transactions_log,
     },
 };
 
@@ -38,7 +38,7 @@ pub struct VerifyUpgradeArgs {
     #[clap(long, default_value = "http://localhost:8545")]
     pub l1_rpc_url: String,
 
-    /// Path to the v31 ecosystem upgrade TOML produced by `upgrade-prepare`.
+    /// Path to the ecosystem upgrade TOML produced by `upgrade-prepare`.
     #[clap(long)]
     pub ecosystem_toml: PathBuf,
 
@@ -166,7 +166,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         env_cfg.permanent_values_path.display()
     ));
     logger::info(format!(
-        "V31 input: {}",
+        "Upgrade input: {}",
         env_cfg.upgrade_input_path.display()
     ));
     logger::info(format!("Ecosystem TOML: {}", args.ecosystem_toml.display()));
@@ -210,7 +210,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
 
     let mut result = VerificationResult::default();
 
-    let verification_result = crate::upgrade_verification::versions::v31::verify(
+    let verification_result = crate::upgrade_verification::versions::v33::verify(
         args.env,
         &artifact,
         &args.l1_rpc_url,
@@ -245,7 +245,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
 }
 
 fn print_encoded_upgrade_data(label: &str, stage_calls_hex: &str) {
-    use crate::upgrade_verification::versions::v31::elements::call_list::{
+    use crate::upgrade_verification::versions::v33::elements::call_list::{
         CallList, UpgradeProposal,
     };
     use alloy::sol_types::SolValue;
