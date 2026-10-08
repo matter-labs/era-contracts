@@ -34,6 +34,10 @@ contract BaseUpgradeUtils is ZKChainBase {
         s.priorityTxMaxGasLimit = _priorityTxMaxGasLimit;
     }
 
+    function getPriorityTxMaxGasLimit() public view returns (uint256) {
+        return s.priorityTxMaxGasLimit;
+    }
+
     function setPriorityTxMaxPubdata(uint32 _priorityTxMaxPubdata) public {
         s.feeParams.priorityTxMaxPubdata = _priorityTxMaxPubdata;
     }

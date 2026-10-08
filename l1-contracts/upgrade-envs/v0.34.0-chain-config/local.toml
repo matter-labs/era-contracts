@@ -1,0 +1,3 @@
+# Local v33 -> v34 upgrade input. See protocol-ops/README.md "Environment inputs".
+era_chain_id = 6565
+governance_upgrade_timer_initial_delay = 0

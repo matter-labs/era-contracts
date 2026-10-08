@@ -202,7 +202,7 @@ contract L2DefaultUpgradeUnitTest is Test {
     /// unchanged since v31 and one-shot, so a chain that already went through v31 must not run them again.
     /// This upgrade therefore leaves the asset tracker and the base token alone; what it does run for them
     /// is covered by `L2GenesisForceDeploymentHelper.t.sol`.
-    function test_UpgradeViaComplexUpgrader_LeavesPreV32ContractsAlone() public {
+    function test_UpgradeViaComplexUpgrader_LeavesV31ContractsAlone() public {
         _runUpgrade();
 
         // AssetTracker: not re-initialized.

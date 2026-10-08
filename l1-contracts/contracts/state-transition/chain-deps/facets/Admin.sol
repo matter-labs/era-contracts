@@ -8,7 +8,7 @@ import {
     ProofSystem,
     L2DACommitmentScheme,
     PubdataContent,
-    MAX_GAS_PER_TRANSACTION,
+    PRIORITY_TX_MAX_GAS_LIMIT,
     MAX_PRICE_CHANGE_DENOMINATOR,
     MAX_PRICE_CHANGE_NUMERATOR,
     PRICE_REFERENCE_L1_GAS,
@@ -155,7 +155,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external onlyChainTypeManager onlyL1 {
-        if (_newPriorityTxMaxGasLimit > MAX_GAS_PER_TRANSACTION) {
+        if (_newPriorityTxMaxGasLimit > PRIORITY_TX_MAX_GAS_LIMIT) {
             revert TooMuchGas();
         }
 
@@ -181,9 +181,28 @@ contract AdminFacet is ZKChainBase, IAdmin {
         emit NewZKsyncOSMaxTxGasLimit(oldMaxTxGasLimit, _newMaxTxGasLimit);
     }
 
-    /// @dev The runtime chain config is read from storage when the batch proof public input is
-    /// computed, so it must not change while committed-but-unverified batches exist: those batches
-    /// were executed by ZKsync OS under the old config and would become unprovable.
+    /// @inheritdoc IAdmin
+    function setZKsyncOSL1TxFiltering(bool _enabled) external onlyAdmin onlySettlementLayer {
+        if (_enabled && s.priorityModeInfo.canBeActivated) {
+            revert NotCompatibleWithPriorityMode();
+        }
+        _enforceNoUnverifiedBatchesForChainConfigUpdate();
+
+        bool oldEnabled = s.zksyncOSL1TxFilteringEnabled;
+        s.zksyncOSL1TxFilteringEnabled = _enabled;
+        emit NewZKsyncOSL1TxFiltering(oldEnabled, _enabled);
+    }
+
+    /// @inheritdoc IAdmin
+    function setZKsyncOSLargeContractsEnabled(bool _enabled) external onlyAdmin onlySettlementLayer {
+        _enforceNoUnverifiedBatchesForChainConfigUpdate();
+
+        bool oldEnabled = s.zksyncOSLargeContractsEnabled;
+        s.zksyncOSLargeContractsEnabled = _enabled;
+        emit NewZKsyncOSLargeContracts(oldEnabled, _enabled);
+    }
+
+    /// @notice Enforces the configuration-update boundary described in {protocol-docs/chain-config.md}.
     function _enforceNoUnverifiedBatchesForChainConfigUpdate() internal view {
         if (s.totalBatchesCommitted != s.totalBatchesVerified) {
             revert ZKsyncOSChainConfigUpdateWithUnverifiedBatches(s.totalBatchesVerified, s.totalBatchesCommitted);
@@ -440,6 +459,9 @@ contract AdminFacet is ZKChainBase, IAdmin {
     function permanentlyAllowPriorityMode() external onlyAdmin onlySettlementLayer onlyL1 {
         if (s.priorityModeInfo.canBeActivated) {
             revert PriorityModeAlreadyAllowed();
+        }
+        if (s.zksyncOSL1TxFilteringEnabled) {
+            revert NotCompatibleWithPriorityMode();
         }
         // Ensure that there is at least one priority tx with a non-zero request timestamp.
         // This guarantees that activatePriorityMode can actually function, since it relies on

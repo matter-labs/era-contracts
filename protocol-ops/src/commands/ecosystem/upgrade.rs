@@ -3,7 +3,7 @@
 //! Two top-level commands:
 //!
 //!   `upgrade-prepare-all` deploys new ecosystem contracts (deployer EOA signs)
-//!                         by running `CoreUpgrade_v33` once + `CTMUpgrade_v33`
+//!                         by running `DefaultCoreUpgrade` once + `CTMUpgrade_v34`
 //!                         once for the target `--ctm-proxy` on a single anvil fork, then
 //!                         executes operational CTM-admin calls such as
 //!                         ServerNotifier ProxyAdmin upgrades. Emits per-script
@@ -33,9 +33,10 @@ use serde::{Deserialize, Serialize};
 use crate::commands::ecosystem::upgrade_full::UpgradeFull;
 use crate::commands::ecosystem::upgrade_inner::{CtmInputs, PrepareInputs, UpgradeInner};
 use crate::common::abi::AdminFunctionsAbi;
+use crate::common::env_config::EnvConfig;
 use crate::common::forge::scripts::{
-    ADMIN_FUNCTIONS_INVOCATION, CORE_UPGRADE_V33_SCRIPT_PATH, CTM_UPGRADE_V33_SCRIPT_PATH,
-    UPGRADE_V33_CORE_OUTPUT_PATH, UPGRADE_V33_ENV_DIR, UPGRADE_V33_LOCAL_INPUT_PATH,
+    ADMIN_FUNCTIONS_INVOCATION, CTM_UPGRADE_V34_SCRIPT_PATH, CURRENT_UPGRADE_LOCAL_INPUT_PATH,
+    DEFAULT_CORE_UPGRADE_SCRIPT_PATH, UPGRADE_CORE_OUTPUT_PATH,
 };
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
@@ -88,7 +89,7 @@ pub async fn run_upgrade_governance(mut args: UpgradeGovernanceArgs) -> anyhow::
     // ── env preset auto-fills ────────────────────────────────────────
     let env_cfg = args.topology.env_config()?;
     if let Some(ref cfg) = env_cfg {
-        let env_out_base = crate::common::env_config::default_protocol_ops_out_dir(&cfg.env)?;
+        let env_out_base = cfg.protocol_ops_out_dir();
         // Default --out to upgrade-envs/.../<env>/protocol-ops/governance
         if args.shared.out.is_none() {
             args.shared.out = Some(env_out_base.join("governance"));
@@ -351,20 +352,21 @@ pub struct UpgradePrepareAllArgs {
 
     #[clap(
         long,
-        default_value = UPGRADE_V33_LOCAL_INPUT_PATH,
-        hide = true
+        default_value = CURRENT_UPGRADE_LOCAL_INPUT_PATH
     )]
     pub upgrade_input_path: String,
 
     /// Override the core-prepare output TOML path (relative to l1-contracts
-    /// root). Defaults to the canonical `script-out/v33-upgrade-core.toml`.
-    #[clap(long, default_value = UPGRADE_V33_CORE_OUTPUT_PATH, hide = true)]
+    /// root). Defaults to the canonical `script-out/upgrade-core.toml`.
+    #[clap(long, default_value = UPGRADE_CORE_OUTPUT_PATH, hide = true)]
     pub core_output_path: String,
 
-    #[clap(long, default_value = CORE_UPGRADE_V33_SCRIPT_PATH, hide = true)]
+    /// Core upgrade script; historical releases must select their own script and input.
+    #[clap(long, default_value = DEFAULT_CORE_UPGRADE_SCRIPT_PATH)]
     pub core_script_path: String,
 
-    #[clap(long, default_value = CTM_UPGRADE_V33_SCRIPT_PATH, hide = true)]
+    /// CTM upgrade script; historical releases must select their own script and input.
+    #[clap(long, default_value = CTM_UPGRADE_V34_SCRIPT_PATH)]
     pub ctm_script_path: String,
 
     /// Path to a TOML file describing the CTM inputs (proxy + optional
@@ -503,15 +505,65 @@ pub async fn run_list_ctms(args: ListCtmsArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// The `--env` preset for `upgrade-prepare-all`, from the release dir `--upgrade-env-dir` selects (the current
+/// release's by default). That dir is the only release selector: an explicit `--upgrade-input-path` must sit in
+/// it, so the input, the CREATE2 salts and the output dir always belong to the same release.
+fn prepare_env_config(args: &UpgradePrepareAllArgs) -> anyhow::Result<Option<EnvConfig>> {
+    let Some(cfg) = args.topology.env_config()? else {
+        return Ok(None);
+    };
+    if args.upgrade_input_path != CURRENT_UPGRADE_LOCAL_INPUT_PATH {
+        let input_dir = paths::resolve_l1_contracts_path()?
+            .join(args.upgrade_input_path.trim_start_matches('/'))
+            .parent()
+            .map(Path::to_path_buf)
+            .context("--upgrade-input-path has no parent directory")?;
+        let env_dir = cfg
+            .upgrade_input_path
+            .parent()
+            .context("env input has no parent directory")?;
+        anyhow::ensure!(
+            input_dir == env_dir,
+            "--upgrade-input-path {} is not in the release dir {} that --env {} reads its salts and owner from; \
+             select that release with --upgrade-env-dir instead",
+            args.upgrade_input_path,
+            env_dir.display(),
+            cfg.env
+        );
+    }
+    Ok(Some(cfg))
+}
+
+/// The env's upgrade input (`/<release dir>/<env>.toml`, relative to `l1-contracts/`) from the release dir
+/// `cfg` was loaded from, so the input, the salts and the output dir belong to the same release.
+///
+/// Fails closed on a missing file rather than keeping the CLI default. The default is the *local* input, so a
+/// silent fallback would hand a real environment local's values for the keys the input does supply —
+/// `era_chain_id` and `governance_upgrade_timer_initial_delay`. Failing here also catches a mistyped `--env`.
+fn per_env_upgrade_input(cfg: &EnvConfig) -> anyhow::Result<String> {
+    let per_env_abs = &cfg.upgrade_input_path;
+    anyhow::ensure!(
+        per_env_abs.exists(),
+        "no upgrade input for --env {} at {}. Add it — an empty file is fine if the environment needs \
+         nothing from the input — because this command will not fall back to the local default, which \
+         would silently give this environment local's `era_chain_id` and \
+         `governance_upgrade_timer_initial_delay`.",
+        cfg.env,
+        per_env_abs.display()
+    );
+    let relative = per_env_abs
+        .strip_prefix(paths::resolve_l1_contracts_path()?)
+        .with_context(|| format!("{} is outside l1-contracts", per_env_abs.display()))?;
+    Ok(format!("/{}", relative.display()))
+}
+
 pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow::Result<()> {
     // ── env preset auto-fills ────────────────────────────────────────
-    let env_cfg = args.topology.env_config()?;
+    let env_cfg = prepare_env_config(&args)?;
     if let Some(ref cfg) = env_cfg {
-        // Default --out to upgrade-envs/v0.33.0-atomic-interop/output/<env>/protocol-ops/prepare/
+        // Default --out to the environment preset's protocol-ops preparation directory.
         if args.shared.out.is_none() {
-            args.shared.out = Some(
-                crate::common::env_config::default_protocol_ops_out_dir(&cfg.env)?.join("prepare"),
-            );
+            args.shared.out = Some(cfg.protocol_ops_out_dir().join("prepare"));
         }
         // Note: we intentionally do *not* default `--deployer-address` from
         // the env's `owner_address`. On stage / mainnet the env's
@@ -523,32 +575,16 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         // `--deployer-address <real-EOA>` (or derive it from the broadcast
         // signer's private key — see `regen-and-verify-stage.sh` for an
         // example using `cast wallet address`).
-        // Resolve --upgrade-input-path from --env, unless the caller passed one explicitly.
-        //
-        // Fails closed on a missing file rather than keeping the CLI default. The default is the
-        // *local* input, so a silent fallback would hand a real environment local's values for the
-        // keys the input does supply — `era_chain_id`, `pre_v32_introspection` and
-        // `governance_upgrade_timer_initial_delay`. Failing here also catches a mistyped `--env`.
-        if args.upgrade_input_path == UPGRADE_V33_LOCAL_INPUT_PATH {
-            let per_env_rel = format!("{UPGRADE_V33_ENV_DIR}/{}.toml", cfg.env);
-            let per_env_abs = paths::contracts_root()
-                .join("l1-contracts")
-                .join(per_env_rel.trim_start_matches('/'));
-            anyhow::ensure!(
-                per_env_abs.exists(),
-                "no upgrade input for --env {} at {}. Add it — an empty file is fine if the \
-                 environment needs nothing from the input — because this command will not fall back \
-                 to the local default, which would silently give this environment local's \
-                 `era_chain_id` and `governance_upgrade_timer_initial_delay`.",
-                cfg.env,
-                per_env_abs.display()
-            );
+        // Resolve --upgrade-input-path from --env, unless the caller passed one explicitly
+        // (see `per_env_upgrade_input`).
+        if args.upgrade_input_path == CURRENT_UPGRADE_LOCAL_INPUT_PATH {
+            let per_env_rel = per_env_upgrade_input(cfg)?;
             logger::info(format!("Using per-env upgrade input: {per_env_rel}"));
             args.upgrade_input_path = per_env_rel;
         }
     }
     // Auto-fill the CREATE2 salt from the per-version upgrade input
-    // (`upgrade-envs/v0.33.0-atomic-interop/<env>.toml [contracts]
+    // (`<current upgrade-env dir>/<env>.toml [contracts]
     // create2_factory_salt`). Recording the salt in version control makes
     // re-prepares reproducible (same addresses every run regardless of who
     // runs it), so deployer-bundle broadcasts can land at addresses that
@@ -1130,4 +1166,132 @@ fn load_ctm_config(path: &Path) -> anyhow::Result<Vec<CtmInputs>> {
         .collect();
 
     Ok(ctms)
+}
+
+#[cfg(test)]
+mod release_script_tests {
+    use super::*;
+    use crate::common::forge::scripts::{CURRENT_UPGRADE_ENV_DIR, UPGRADE_V33_ENV_DIR};
+    use clap::CommandFactory;
+
+    #[test]
+    fn prepare_defaults_to_current_release() {
+        let args = UpgradePrepareAllArgs::try_parse_from(["prepare"]).unwrap();
+        assert_eq!(args.ctm_script_path, CTM_UPGRADE_V34_SCRIPT_PATH);
+        assert_eq!(args.core_script_path, DEFAULT_CORE_UPGRADE_SCRIPT_PATH);
+        assert_eq!(args.upgrade_input_path, CURRENT_UPGRADE_LOCAL_INPUT_PATH);
+        let help = UpgradePrepareAllArgs::command()
+            .render_long_help()
+            .to_string();
+        assert!(help.contains("--ctm-script-path"));
+        assert!(help.contains("--upgrade-input-path"));
+    }
+
+    /// The Foundry full-flow upgrade test (`UpgradeTest_Local`) must run the scripts this command prepares
+    /// with by default: its CTM test subclass extends the default CTM script, and the shared base constructs
+    /// the default core script. A release that changes a default here fails this until that test is moved
+    /// onto the new script too.
+    #[test]
+    fn prepare_defaults_match_the_foundry_full_flow_test() {
+        let contract_name = |script_path: &str| -> String {
+            let file = script_path.rsplit('/').next().unwrap();
+            file.trim_end_matches(".s.sol").to_string()
+        };
+        let read = |relative: &str| {
+            std::fs::read_to_string(crate::common::paths::path_from_root(relative)).unwrap()
+        };
+        let args = UpgradePrepareAllArgs::try_parse_from(["prepare"]).unwrap();
+
+        let local_test = read("l1-contracts/test/foundry/l1/integration/UpgradeTest_Local.t.sol");
+        let ctm = contract_name(&args.ctm_script_path);
+        assert!(
+            local_test.contains(&format!(" is {ctm} {{")),
+            "UpgradeTest_Local's CTM test subclass must extend the default CTM script {ctm}"
+        );
+        let shared_base = read("l1-contracts/test/foundry/l1/integration/UpgradeTestShared.t.sol");
+        let core = contract_name(&args.core_script_path);
+        assert!(
+            shared_base.contains(&format!("new {core}()")),
+            "UpgradeTestShared must construct the default core script {core}"
+        );
+    }
+
+    /// A release-specific default script must belong to the current release: `yarn new-release` moves the
+    /// upgrade-env dir but not the script defaults, so a stale `v<N>/` default would silently prepare the
+    /// next release with the previous release's scripts.
+    #[test]
+    fn release_specific_defaults_belong_to_the_current_release() {
+        let current_minor = CURRENT_UPGRADE_ENV_DIR
+            .split("/v0.")
+            .nth(1)
+            .and_then(|rest| rest.split('.').next())
+            .unwrap();
+        let args = UpgradePrepareAllArgs::try_parse_from(["prepare"]).unwrap();
+        for script in [&args.ctm_script_path, &args.core_script_path] {
+            if let Some(rest) = script.strip_prefix("deploy-scripts/upgrade/v") {
+                let script_minor = rest.split('/').next().unwrap();
+                assert_eq!(
+                    script_minor, current_minor,
+                    "{script} is not the current release's script"
+                );
+            }
+        }
+    }
+
+    /// `--upgrade-env-dir` selects the env's input as well as its salts and output dir, so a prepare never mixes
+    /// one release's input with another's salts.
+    #[test]
+    fn upgrade_env_dir_selects_the_per_env_input() {
+        let historical = UpgradePrepareAllArgs::try_parse_from([
+            "prepare",
+            "--env",
+            "stage",
+            "--upgrade-env-dir",
+            UPGRADE_V33_ENV_DIR.trim_start_matches('/'),
+        ])
+        .unwrap();
+        let cfg = prepare_env_config(&historical).unwrap().unwrap();
+        assert_eq!(
+            per_env_upgrade_input(&cfg).unwrap(),
+            format!("{UPGRADE_V33_ENV_DIR}/stage.toml")
+        );
+
+        let current = UpgradePrepareAllArgs::try_parse_from(["prepare", "--env", "stage"]).unwrap();
+        let cfg = prepare_env_config(&current).unwrap().unwrap();
+        assert_eq!(
+            per_env_upgrade_input(&cfg).unwrap(),
+            format!("{CURRENT_UPGRADE_ENV_DIR}/stage.toml")
+        );
+    }
+
+    /// `--upgrade-env-dir` is the only release selector: an explicit `--upgrade-input-path` from another
+    /// release's dir is rejected rather than mixed with the selected release's salts; one inside it is accepted.
+    #[test]
+    fn explicit_input_must_sit_in_the_selected_release_dir() {
+        let mixed = UpgradePrepareAllArgs::try_parse_from([
+            "prepare",
+            "--env",
+            "stage",
+            "--upgrade-input-path",
+            &format!("{UPGRADE_V33_ENV_DIR}/stage.toml"),
+        ])
+        .unwrap();
+        assert!(prepare_env_config(&mixed).is_err());
+
+        let consistent = UpgradePrepareAllArgs::try_parse_from([
+            "prepare",
+            "--env",
+            "stage",
+            "--upgrade-env-dir",
+            UPGRADE_V33_ENV_DIR.trim_start_matches('/'),
+            "--upgrade-input-path",
+            &format!("{UPGRADE_V33_ENV_DIR}/stage.toml"),
+        ])
+        .unwrap();
+        let cfg = prepare_env_config(&consistent).unwrap().unwrap();
+        assert!(cfg.create2_factory_salt_for_upgrade().unwrap().is_some());
+        assert!(cfg
+            .protocol_ops_out_dir()
+            .ends_with("upgrade-envs/v0.33.0-atomic-interop/output/stage"));
+    }
 }

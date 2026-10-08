@@ -311,6 +311,7 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
         batches[0].newStateCommitment = keccak256(abi.encode(_chain, batches[0].batchNumber));
         batches[0].chainId = IGetters(_chain).getChainId();
         batches[0].slChainId = block.chainid;
+        batches[0].chainConfigHash = Utils.defaultChainConfigHash(batches[0].chainId);
         batches[0].firstBlockTimestamp = uint64(block.timestamp);
         batches[0].lastBlockTimestamp = uint64(block.timestamp);
         batches[0].daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;

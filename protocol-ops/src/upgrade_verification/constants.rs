@@ -58,7 +58,7 @@ pub const L2_BRIDGEHUB_ADDR: Address = l2_addr(0x02);
 pub const L2_ASSET_ROUTER_ADDR: Address = l2_addr(0x03);
 pub const L2_NATIVE_TOKEN_VAULT_ADDR: Address = l2_addr(0x04);
 pub const L2_MESSAGE_ROOT_ADDR: Address = l2_addr(0x05);
-/// The removed v31 GWAssetTracker's address: the v32 upgrade swaps its system proxy's
+/// The removed v31 GWAssetTracker's address: the v33 upgrade swaps its system proxy's
 /// implementation for `EmptyContract` (see `getRemovedTrackerNeutralizations`).
 pub const L2_REMOVED_GW_ASSET_TRACKER_ADDR: Address = l2_addr(0x10);
 pub const SLOAD_CONTRACT_ADDR: Address = l2_addr(0x06);

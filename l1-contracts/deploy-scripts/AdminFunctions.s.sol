@@ -38,6 +38,7 @@ import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2DACommitmentScheme, PubdataContent} from "contracts/common/Config.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
 
@@ -107,9 +108,12 @@ contract AdminFunctions is Script, IAdminFunctions {
         address assetRouter = address(IL1Bridgehub(_bridgehub).assetRouter());
         address chainAssetHandler = address(IL1Bridgehub(_bridgehub).chainAssetHandler());
         address ctmDeploymentTracker = address(IL1Bridgehub(_bridgehub).l1CtmDeployer());
+        address chainRegistrationSender = IL1Bridgehub(_bridgehub).chainRegistrationSender();
 
         IL1AssetRouter assetRouterContract = IL1AssetRouter(assetRouter);
         address l1Nullifier = address(assetRouterContract.L1_NULLIFIER());
+        address l1NativeTokenVault = address(assetRouterContract.nativeTokenVault());
+        address l1InteropHandler = IL1Nullifier(l1Nullifier).l1InteropHandler();
 
         if (Ownable2Step(_bridgehub).pendingOwner() == _governor) {
             governanceAcceptOwner(_governor, _bridgehub);
@@ -120,11 +124,20 @@ contract AdminFunctions is Script, IAdminFunctions {
         if (Ownable2Step(l1Nullifier).pendingOwner() == _governor) {
             governanceAcceptOwner(_governor, l1Nullifier);
         }
+        if (Ownable2Step(l1NativeTokenVault).pendingOwner() == _governor) {
+            governanceAcceptOwner(_governor, l1NativeTokenVault);
+        }
+        if (Ownable2Step(l1InteropHandler).pendingOwner() == _governor) {
+            governanceAcceptOwner(_governor, l1InteropHandler);
+        }
         if (Ownable2Step(ctmDeploymentTracker).pendingOwner() == _governor) {
             governanceAcceptOwner(_governor, ctmDeploymentTracker);
         }
         if (Ownable2Step(chainAssetHandler).pendingOwner() == _governor) {
             governanceAcceptOwner(_governor, chainAssetHandler);
+        }
+        if (Ownable2Step(chainRegistrationSender).pendingOwner() == _governor) {
+            governanceAcceptOwner(_governor, chainRegistrationSender);
         }
     }
 
@@ -455,6 +468,19 @@ contract AdminFunctions is Script, IAdminFunctions {
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: _target, value: 0, data: abi.encodeCall(adminContract.acceptAdmin, ())});
+
+        vm.startBroadcast();
+        _chainAdmin.multicall(calls, true);
+        vm.stopBroadcast();
+    }
+
+    /// @notice Accepts an `Ownable2Step` transfer pending to `_chainAdmin`. Broadcasts as `--sender`, which must
+    /// be allowed to call `_chainAdmin.multicall` (the ChainAdmin owner).
+    /// @param _chainAdmin The pending owner.
+    /// @param _target The `Ownable2Step` contract.
+    function chainAdminAcceptOwner(ChainAdmin _chainAdmin, address _target) public {
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: _target, value: 0, data: abi.encodeCall(Ownable2Step.acceptOwnership, ())});
 
         vm.startBroadcast();
         _chainAdmin.multicall(calls, true);
@@ -888,6 +914,46 @@ contract AdminFunctions is Script, IAdminFunctions {
             target: chainInfo.diamondProxy,
             value: 0,
             data: abi.encodeCall(IAdmin.setZKsyncOSMaxTxGasLimit, (_newMaxTxGasLimit))
+        });
+
+        saveAndSendAdminTx(chainInfo.admin, _accessControlRestriction, calls, _shouldSend);
+    }
+
+    /// @inheritdoc IAdminFunctions
+    function setZKsyncOSL1TxFiltering(
+        address _bridgehub,
+        address _accessControlRestriction,
+        uint256 _chainId,
+        bool _enabled,
+        bool _shouldSend
+    ) public {
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: chainInfo.diamondProxy,
+            value: 0,
+            data: abi.encodeCall(IAdmin.setZKsyncOSL1TxFiltering, (_enabled))
+        });
+
+        saveAndSendAdminTx(chainInfo.admin, _accessControlRestriction, calls, _shouldSend);
+    }
+
+    /// @inheritdoc IAdminFunctions
+    function setZKsyncOSLargeContractsEnabled(
+        address _bridgehub,
+        address _accessControlRestriction,
+        uint256 _chainId,
+        bool _enabled,
+        bool _shouldSend
+    ) public {
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: chainInfo.diamondProxy,
+            value: 0,
+            data: abi.encodeCall(IAdmin.setZKsyncOSLargeContractsEnabled, (_enabled))
         });
 
         saveAndSendAdminTx(chainInfo.admin, _accessControlRestriction, calls, _shouldSend);

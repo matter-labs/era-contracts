@@ -6,7 +6,7 @@ import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {
-    PRIORITY_TX_MAX_GAS_LIMIT,
+    UPGRADE_TX_MAX_GAS_LIMIT,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE
 } from "contracts/common/Config.sol";
@@ -74,7 +74,7 @@ contract BaseUpgrade is Test {
             txType: ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE,
             from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
             to: uint256(uint160(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR)),
-            gasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
+            gasLimit: UPGRADE_TX_MAX_GAS_LIMIT,
             gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
             maxFeePerGas: uint256(0),
             maxPriorityFeePerGas: uint256(0),

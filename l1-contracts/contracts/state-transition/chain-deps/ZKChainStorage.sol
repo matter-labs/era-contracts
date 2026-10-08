@@ -277,7 +277,7 @@ struct ZKChainStorage {
     uint64 zksyncOSMaxTxGasLimit;
     /// @dev The pubdata content: whether the batch commits the full pubdata (`FULL_PUBDATA`) or only the mandatory
     /// L2->L1 log region (`LOGS_ONLY`). Orthogonal to `l2DACommitmentScheme` (the mechanism). Committed
-    /// into the ZKsync OS batch public input via the chain config hash (see `Executor`). ZKsync OS only.
+    /// into the ZKsync OS batch public input via `ZKChainBase._getZKsyncOSChainConfigHash`. ZKsync OS only.
     /// Permanent-rollup chains are locked to `FULL_PUBDATA` (see `Admin.setPubdataContent` / `makePermanentRollup`).
     /// @dev STORAGE SLOT: 68 (packed with baseTokenHasTotalSupply + zksyncOSMaxTxGasLimit)
     PubdataContent pubdataContent;
@@ -288,4 +288,10 @@ struct ZKChainStorage {
     /// switched off (see `Admin.setProofSystemStatus`).
     /// @dev STORAGE SLOT: 68 (packed with baseTokenHasTotalSupply + zksyncOSMaxTxGasLimit + pubdataContent)
     uint8 disabledProofSystems;
+    /// @dev See {protocol-docs/chain-config.md#l1-transaction-filtering}.
+    /// @dev STORAGE SLOT: 68 (packed after disabledProofSystems)
+    bool zksyncOSL1TxFilteringEnabled;
+    /// @dev See {protocol-docs/chain-config.md#large-contracts}.
+    /// @dev STORAGE SLOT: 68 (packed after zksyncOSL1TxFilteringEnabled)
+    bool zksyncOSLargeContractsEnabled;
 }
