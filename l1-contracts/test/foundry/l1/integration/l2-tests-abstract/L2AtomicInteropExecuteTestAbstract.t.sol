@@ -8,6 +8,7 @@ import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 import {AtomicInteropProofBuilder} from "../../unit/concrete/atomic-interop/AtomicInteropProofBuilder.sol";
 
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
+import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
 import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
 import {IInteropHandlerBase} from "contracts/interop/interop-handler/IInteropHandlerBase.sol";
 import {
@@ -37,12 +38,10 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 /// `InteropCenter.sendBundle` (asset-router burn + IMT commit) produces the bundle, the VM switches to
 /// the destination chain id, and execution runs the atomicity gate
 /// (`AtomicFlowManager.requireFlowFinalized`), the bundle's calls (the destination NTV mint), and the
-/// replay guard — all real, against the real Bridgehub interop registry.
+/// replay guard — all real, against the real Bridgehub interop registry. Each leg's settlement proof is
+/// forward-computed by {AtomicInteropProofBuilder} and its root imported, so the real
+/// {L2MessageVerification} authenticates both legs.
 ///
-/// The only logic mock is the separately-tested cross-chain leaf verifier (from
-/// {AtomicInteropProofBuilder}): this two-leg flow switches `block.chainid` between source and
-/// destination, and the settlement-layer {L1MessageRoot} refuses to aggregate the current chain as
-/// remote — so real end-to-end authentication is covered by the atomic unit suites instead.
 /// L1-context wrapper only (the canonical-address `deployCodeTo`/`vm.etch` setup does not compile
 /// under zkFoundry); the full flow also runs on a local node in the anvil-interop
 /// `13-imt-atomic-swap` spec.
@@ -50,8 +49,6 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
     /// @dev The remote peer leg of every flow here: committed on the (Bridgehub-registered)
     /// destination chain in the happy paths, withheld in the missing-leg path.
     bytes32 internal constant REMOTE_LEG = keccak256("remote peer leg");
-    /// @dev Settlement-layer block both legs' batches settle at (arbitrary; authentication mocked).
-    uint256 internal constant SL_BLOCK = 401;
     uint256 internal constant LOCAL_BATCH_NUMBER = 3;
     uint256 internal constant REMOTE_BATCH_NUMBER = 9;
 
@@ -170,20 +167,11 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
     /// finality proofs, positionally aligned with the preimage. Both batches settled in time.
     function _commitRemoteLegAndBuildFinality() internal returns (AtomicFinalityProof memory finality) {
         uint256 remoteIndex = _insertCommit(AtomicFlowFixtures.commitValue(ectx.flowId, REMOTE_LEG));
-        finality = _buildFinality(
-            _inclusionProof({
-                _sourceChainId: destinationChainId,
-                _batchNumber: REMOTE_BATCH_NUMBER,
-                _leafIndex: remoteIndex,
-                _slChainId: L1_CHAIN_ID,
-                _slBlock: SL_BLOCK,
-                _l1Timestamp: DEADLINE - 1
-            })
-        );
+        finality = _buildFinality(_remoteLegProof(remoteIndex));
     }
 
     /// @dev Assembles the finality proof from the canonical-tree local proof and `_remoteProof`.
-    function _buildFinality(ImtProof memory _remoteProof) internal view returns (AtomicFinalityProof memory finality) {
+    function _buildFinality(ImtProof memory _remoteProof) internal returns (AtomicFinalityProof memory finality) {
         finality.flow = AtomicFlow({flowId: ectx.flowId, preimage: ectxPreimage});
         finality.proofs = new ImtProof[](2);
         (uint256 localIndex, uint256 remoteIndex) = ectxPreimage.legBundleHashes[0] == ectx.bundleHash
@@ -196,14 +184,29 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
     /// @dev Inclusion proof for a commit value inserted into the CANONICAL commitment tree (the one
     /// the real atomic send populated) — the mirror of the builder's oracle-tree `_inclusionProof`,
     /// used for the local leg whose commitment went through the production path. The real send
-    /// inserted the leg's commit value right after the genesis head leaf (index 1).
+    /// inserted the leg's commit value right after the genesis head leaf (index 1). Imports the proof's
+    /// root at a fresh SL block.
     function _canonicalTreeInclusionProof(
         uint256 _sourceChainId,
         uint256 _batchNumber,
         uint256 _leafIndex,
         uint256 _l1Timestamp
-    ) internal view returns (ImtProof memory) {
+    ) internal returns (ImtProof memory) {
         L2InteropCommitmentTree canonicalTree = L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR);
+        uint256 slBlock = _freshSlBlock();
+        (bytes32[] memory settlementProof, bytes32 aggregatedRoot) = _settlementProof({
+            _sourceChainId: _sourceChainId,
+            _batchNumber: _batchNumber,
+            _imtRoot: canonicalTree.root(),
+            _imtRootLeafIndex: ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX,
+            _otherImtRoot: OTHER_IMT_ROOT,
+            _slChainId: L1_CHAIN_ID,
+            _slBlock: slBlock,
+            _l1Timestamp: _l1Timestamp,
+            _batchLeafProofMask: 0,
+            _batchLeafSiblings: new bytes32[](0)
+        });
+        _importInteropRoot(L1_CHAIN_ID, slBlock, _l1Timestamp, aggregatedRoot);
         return
             ImtProof({
                 sourceChainId: _sourceChainId,
@@ -211,17 +214,15 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
                 chainImtRoot: canonicalTree.root(),
                 // The finality path always authenticates the end root; the branch bool is ignored.
                 provesAgainstBeginRoot: false,
-                settlementProof: _settlementProof(L1_CHAIN_ID, SL_BLOCK, _l1Timestamp, new bytes32[](0)),
+                settlementProof: settlementProof,
                 leaf: canonicalTree.leafAt(_leafIndex),
                 imtLeafIndex: _leafIndex,
                 imtProof: canonicalTree.merklePath(_leafIndex)
             });
     }
 
-    /// @dev Phase 3: become the destination chain and execute. The verifier mock (the one mocked
-    /// dependency) is armed here.
+    /// @dev Phase 3: become the destination chain and execute.
     function _executeOnDestination(AtomicFinalityProof memory _finality) internal {
-        _mockVerifier(true);
         vm.chainId(destinationChainId);
         L2InteropHandler(L2_INTEROP_HANDLER_ADDR).executeAtomicBundle(ectxBundleBytes, _finality);
     }
@@ -267,8 +268,8 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         _sendAtomicLegWithRemotePeer(keccak256("atomic execute missing-leg salt"), bytes(""));
 
         // The remote leg's commit value was never inserted; the best available "membership" data is
-        // the oracle tree's genesis head leaf, whose value (0) is not the leg's commit value.
-        ImtProof memory bogusRemoteProof = _uncommittedRemoteProof();
+        // the oracle tree's genesis head leaf (index 0), whose value (0) is not the leg's commit value.
+        ImtProof memory bogusRemoteProof = _remoteLegProof(0);
         AtomicFinalityProof memory finality = _buildFinality(bogusRemoteProof);
 
         vm.expectRevert(
@@ -287,7 +288,6 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         _setUpAtomicStack();
         _sendAtomicLegWithRemotePeer(keccak256("atomic execute wrong-chain salt"), bytes(""));
         AtomicFinalityProof memory finality = _commitRemoteLegAndBuildFinality();
-        _mockVerifier(true);
 
         // No vm.chainId: we are still on the source chain.
         vm.expectRevert(
@@ -310,7 +310,6 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         _sendAtomicLegWithRemotePeer(keccak256("atomic execute foreign-executor salt"), executorAttribute);
         AtomicFinalityProof memory finality = _commitRemoteLegAndBuildFinality();
 
-        _mockVerifier(true);
         uint256 sourceChainId = block.chainid;
         vm.chainId(destinationChainId);
 
@@ -337,7 +336,6 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         AtomicFinalityProof memory finality = _commitRemoteLegAndBuildFinality();
 
         uint256 receiverBalanceBefore = IERC20(ectx.l2Token).balanceOf(_receiver());
-        _mockVerifier(true);
         vm.chainId(destinationChainId);
 
         vm.expectEmit(true, true, true, true, L2_INTEROP_HANDLER_ADDR);
@@ -367,11 +365,10 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         _sendAtomicLegWithRemotePeer(keccak256("atomic verify missing-leg salt"), bytes(""));
 
         // The remote leg's commit value was never inserted; the best available "membership" data is
-        // the oracle tree's genesis head leaf, whose value (0) is not the leg's commit value.
-        ImtProof memory bogusRemoteProof = _uncommittedRemoteProof();
+        // the oracle tree's genesis head leaf (index 0), whose value (0) is not the leg's commit value.
+        ImtProof memory bogusRemoteProof = _remoteLegProof(0);
         AtomicFinalityProof memory finality = _buildFinality(bogusRemoteProof);
 
-        _mockVerifier(true);
         vm.chainId(destinationChainId);
 
         vm.expectRevert(
@@ -394,7 +391,6 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         _sendAtomicLegWithRemotePeer(keccak256("atomic verify-twice salt"), bytes(""));
         AtomicFinalityProof memory finality = _commitRemoteLegAndBuildFinality();
 
-        _mockVerifier(true);
         vm.chainId(destinationChainId);
         L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyAtomicBundle(ectxBundleBytes, finality);
 
@@ -403,19 +399,19 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyAtomicBundle(ectxBundleBytes, emptyFinality);
     }
 
-    /// @dev A proof for the remote leg that was never committed: the best available "membership" data
-    /// is the oracle tree's genesis head leaf, whose value is not the leg's commit value.
-    function _uncommittedRemoteProof() internal view returns (ImtProof memory) {
-        return
-            ImtProof({
-                sourceChainId: destinationChainId,
-                batchNumber: REMOTE_BATCH_NUMBER,
-                chainImtRoot: tree.root(),
-                provesAgainstBeginRoot: false,
-                settlementProof: _settlementProof(L1_CHAIN_ID, SL_BLOCK, DEADLINE - 1, new bytes32[](0)),
-                leaf: tree.leafAt(0),
-                imtLeafIndex: 0,
-                imtProof: tree.merklePath(0)
-            });
+    /// @dev The remote leg's oracle-tree proof for the leaf at `_leafIndex`, with its root imported at
+    /// a fresh SL block.
+    function _remoteLegProof(uint256 _leafIndex) internal returns (ImtProof memory proof) {
+        uint256 slBlock = _freshSlBlock();
+        bytes32 aggregatedRoot;
+        (proof, aggregatedRoot) = _inclusionProof({
+            _sourceChainId: destinationChainId,
+            _batchNumber: REMOTE_BATCH_NUMBER,
+            _leafIndex: _leafIndex,
+            _slChainId: L1_CHAIN_ID,
+            _slBlock: slBlock,
+            _l1Timestamp: DEADLINE - 1
+        });
+        _importInteropRoot(L1_CHAIN_ID, slBlock, DEADLINE - 1, aggregatedRoot);
     }
 }

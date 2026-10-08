@@ -24,6 +24,7 @@ import {
 } from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {IAtomicRecoverable} from "contracts/atomic-interop/IAtomicRecoverable.sol";
 import {INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, InteropBundle, InteropCall} from "contracts/common/Messaging.sol";
+import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
@@ -37,9 +38,10 @@ import {
 /// @dev Manager + commitment tree run at their canonical predeploys; the committed leg goes through
 /// the real `append` (pranked canonical InteropCenter). The MISSING leg declares a remote source
 /// (`MISSING_LEG_CHAIN`) so its absence proof runs end-to-end through real aggregation + import +
-/// {L2MessageVerification} (see {AtomicInteropProofBuilder}); only the force-failure negative and the
-/// intrinsically-local late-commit case stub the leaf verifier. Real fund recovery is covered by
-/// `L2AtomicInteropSendRefundTestAbstract` and `AtomicRecoveryForgery.t.sol`.
+/// {L2MessageVerification} (see {AtomicInteropProofBuilder}); the intrinsically-local late-commit case
+/// forward-computes its proof instead, and the authentication-failure case withholds the root import.
+/// Real fund recovery is covered by `L2AtomicInteropSendRefundTestAbstract` and
+/// `AtomicRecoveryForgery.t.sol`.
 contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
     uint256 internal constant REMOTE_BATCH_NUMBER = 7;
     uint256 internal constant SL_BLOCK = 300;
@@ -282,17 +284,20 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         );
 
         // Intrinsically LOCAL: the proven-absent leg's source is this chain, which the settlement-layer
-        // MessageRoot cannot aggregate as remote — so this case (alone) stubs the leaf verifier.
-        _mockVerifier(true);
-        _seedSettlementLayerInteropRoot(SETTLEMENT_LAYER_CHAIN_ID, SL_BLOCK, uint256(DEADLINE) + 1);
-        ImtProof memory absence = _nonInclusionProof({
+        // MessageRoot cannot aggregate as remote — so this case forward-computes the proof and imports
+        // its root directly.
+        (ImtProof memory absence, bytes32 aggregatedRoot) = _nonInclusionProof({
             _sourceChainId: block.chainid,
             _batchNumber: REMOTE_BATCH_NUMBER,
             _absentValue: AtomicFlowFixtures.commitValue(lateFlowId, lateLeg),
+            _imtRootLeafIndex: ChainBatchRootTree.IMT_BEGIN_ROOT_LEAF_INDEX,
             _slChainId: SETTLEMENT_LAYER_CHAIN_ID,
             _slBlock: SL_BLOCK,
-            _l1Timestamp: uint256(DEADLINE) + 1
+            _l1Timestamp: uint256(DEADLINE) + 1,
+            _batchLeafProofMask: 0,
+            _batchLeafSiblings: new bytes32[](0)
         });
+        _importInteropRoot(SETTLEMENT_LAYER_CHAIN_ID, SL_BLOCK, uint256(DEADLINE) + 1, aggregatedRoot);
 
         vm.expectEmit(true, true, true, true, address(manager));
         emit IAtomicFlowManager.FlowRefundAuthorized(lateFlowId, lateLeg);
@@ -352,17 +357,18 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
 
     /// @notice A proof whose IMT root fails cross-chain authentication reverts the authorization.
     function test_RevertWhen_AbsenceProofNotAuthenticated() public {
-        // The ONE force-failure negative: making the real verifier reject would require corrupting
-        // settlement state, so this case alone stubs it false over a fixed-shape blob.
-        ImtProof memory absence = _nonInclusionProof({
+        // Well-formed, but its settlement root is never imported, so the real verifier rejects it.
+        (ImtProof memory absence, ) = _nonInclusionProof({
             _sourceChainId: MISSING_LEG_CHAIN,
             _batchNumber: REMOTE_BATCH_NUMBER,
             _absentValue: AtomicFlowFixtures.commitValue(flowId, missingLeg),
+            _imtRootLeafIndex: ChainBatchRootTree.IMT_BEGIN_ROOT_LEAF_INDEX,
             _slChainId: SETTLEMENT_LAYER_CHAIN_ID,
             _slBlock: SL_BLOCK,
-            _l1Timestamp: uint256(DEADLINE) + 1
+            _l1Timestamp: uint256(DEADLINE) + 1,
+            _batchLeafProofMask: 0,
+            _batchLeafSiblings: new bytes32[](0)
         });
-        _mockVerifier(false);
 
         vm.expectRevert(
             abi.encodeWithSelector(
