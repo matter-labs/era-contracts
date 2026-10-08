@@ -14,11 +14,11 @@ string constant LEGACY_V33_COMMITMENT_FACETS_PATH = "test/foundry/l1/integration
 
 // Shared with ZKsync OS public_input.rs golden-vector tests; see {protocol-docs/chain-config.md}.
 uint256 constant GOLDEN_CHAIN_ID = 37;
-bytes32 constant BATCH_OUTPUT_HASH_GOLDEN = 0x1c24f398aa0701f9348912ecca748ba93bfb84bfe4f283c16514311419f4f658;
-bytes32 constant PUBLIC_INPUT_HASH_GOLDEN = 0x115e07747f99e4785e3f1c91d3ff85f05eee22c99004e6a81adc37b1b21495fe;
-bytes32 constant PUBLIC_INPUT_HASH_GOLDEN_FILTERING_ONLY = 0x7bb4bea265b944d45623d3e57de083aceb9c7d9f30240c3a917fa187a4444282;
-bytes32 constant PUBLIC_INPUT_HASH_GOLDEN_LARGE_CONTRACTS_ONLY = 0xac58d82a0990197b31c12ec9cc33b330e5dbda74011eafd37b7e78a5241f0ec7;
-bytes32 constant PUBLIC_INPUT_HASH_GOLDEN_BOTH_FLAGS = 0xa78ab15446de058e9f871114c4b0333d8ab23ec8959f89b582c33409751aa837;
+bytes32 constant BATCH_OUTPUT_HASH_GOLDEN = 0x3fa2b6bcbfde24e4aa05b9d48bb04bd3f183713bdd31889f976c74ff7694c1ab;
+bytes32 constant PUBLIC_INPUT_HASH_GOLDEN = 0x080b613ec5a9df68d47b8008f89e814a87d2b13fc3a3fa5752c44677ad58b8a3;
+bytes32 constant PUBLIC_INPUT_HASH_GOLDEN_FILTERING_ONLY = 0xa078b769783cbdc3cb68c5f68bd3e330668d78f369bf95c1f6b019e3aaf41b50;
+bytes32 constant PUBLIC_INPUT_HASH_GOLDEN_LARGE_CONTRACTS_ONLY = 0x500121afefb9942d2cbc7b7b689bbcc4054777c8eccc4a46eeb1d9a3626a6b78;
+bytes32 constant PUBLIC_INPUT_HASH_GOLDEN_BOTH_FLAGS = 0x5364213bf06d28ee488265c45060455d09ad9d76bfbb329c8dfb9befccf19512;
 // Batch output hashes of `_goldenInteropFeeBatch(7)` / `(0)` in ZKsyncOSPublicInput.t.sol, shared with ZKsync OS
 // public_input.rs `batch_output_hash_commits_to_interop_fee_units_last`; see {protocol-docs/interop-fee.md}.
 bytes32 constant BATCH_OUTPUT_HASH_GOLDEN_INTEROP_FEE_UNITS_7 = 0x82cf2f4e531d92c0cf48eb93b02a24791907cbfe3b92362df3519e8a0c62fb7b;

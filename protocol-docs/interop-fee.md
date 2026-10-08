@@ -59,8 +59,9 @@ the `CommitterFacet` as an immutable and can be read as `getInteropFeeManager()`
 protocol governance from initialization, and controls:
 
 - `feePerUnit`: wei per interop fee unit; `0`, the initial value, turns the switch off;
-- `feeRecipient`: where the permissionless `sweep()` sends the accrued fees; initially governance, which can point
-  it at the $ZK Fee Flow System.
+- `feeRecipient`: where the permissionless `sweep()` sends the accrued fees; initially governance. Routing them to the
+  $ZK Fee Flow System, which takes approved ERC-20s on ZKsync Era, means pointing it at an L1 contract that forwards
+  the ETH there: no protocol upgrade is needed.
 
 Fees are paid in ETH. Charging only moves value between the manager's internal ledgers, so the prepaid balances plus
 the accrued fees are always backed by the contract's ETH.

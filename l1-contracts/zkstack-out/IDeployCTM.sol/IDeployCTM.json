@@ -170,11 +170,6 @@
                 "internalType": "address"
               },
               {
-                "name": "interopFeeManagerImplementation",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
                 "name": "interopFeeManager",
                 "type": "address",
                 "internalType": "address"

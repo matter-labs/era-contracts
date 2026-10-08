@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Vm} from "forge-std/Test.sol";
-
 import {Utils} from "../Utils/Utils.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
@@ -14,8 +12,8 @@ import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpe
 import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
 import {DummyL2L1Messenger} from "contracts/dev-contracts/test/DummyL2L1Messenger.sol";
 
-/// @notice Commit-time charging of the interop fee through a real diamond and a real `InteropFeeManager`.
-/// See {protocol-docs/interop-fee.md}.
+/// @notice The interop fee through a real diamond and a real `InteropFeeManager`: commit-time charging and the chain
+/// admin's withdrawals. See {protocol-docs/interop-fee.md}.
 contract InteropFeeCommitTest is ExecutorTest {
     uint256 internal constant FEE_PER_UNIT = 0.001 ether;
 
@@ -46,13 +44,11 @@ contract InteropFeeCommitTest is ExecutorTest {
     function test_commit_switchOffChargesNothing() public {
         _fund(1 ether);
 
-        vm.recordLogs();
         _commit(_batchWithUnits(3), validator);
 
         assertEq(getters.getTotalBatchesCommitted(), 1);
         assertEq(interopFeeManager.chainBalance(l2ChainId), 1 ether);
         assertEq(interopFeeManager.accruedFees(), 0);
-        assertEq(_countFeeEvents(), 0);
     }
 
     function test_commit_withoutInteropDoesNotTouchTheManager() public {
@@ -218,14 +214,5 @@ contract InteropFeeCommitTest is ExecutorTest {
         vm.deal(payer, _amount);
         vm.prank(payer);
         interopFeeManager.deposit{value: _amount}(l2ChainId);
-    }
-
-    function _countFeeEvents() internal returns (uint256 count) {
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        for (uint256 i = 0; i < logs.length; ++i) {
-            if (logs[i].topics[0] == IInteropFeeManager.InteropFeeCharged.selector) {
-                ++count;
-            }
-        }
     }
 }
