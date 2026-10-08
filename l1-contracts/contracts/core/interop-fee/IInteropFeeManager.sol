@@ -56,8 +56,8 @@ interface IInteropFeeManager {
     /// @param _amount The amount in wei.
     function withdraw(uint256 _chainId, address _to, uint256 _amount) external;
 
-    /// @notice Charges `feePerUnit * _units` from the chain's prepaid balance. Only callable by the chain's
-    /// diamond proxy; reverts if the balance does not cover the fee.
+    /// @notice Charges `feePerUnit * _units` from the chain's prepaid balance; a no-op while the fee is zero.
+    /// Otherwise only callable by the chain's diamond proxy, and reverts if the balance does not cover the fee.
     /// @param _chainId The chain being charged.
     /// @param _batchNumber The committed batch the units belong to.
     /// @param _units The interop fee units the batch sent.

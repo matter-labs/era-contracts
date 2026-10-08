@@ -513,7 +513,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         });
     }
 
-    /// @dev Mirrors the `batchOutputHash` formula from Committer._commitOneBatch.
+    /// @dev Mirrors {CommitterFacet._getBatchOutputHash}.
     function _batchOutputHash(
         CommitBatchInfoZKsyncOS memory _batch,
         bytes32 _upgradeTxHash

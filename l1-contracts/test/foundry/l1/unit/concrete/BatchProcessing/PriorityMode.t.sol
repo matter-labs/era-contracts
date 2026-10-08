@@ -110,7 +110,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
     }
 
     function test_priorityModeBatchIsNotChargedTheInteropFee() public {
-        // Switched on without a balance: the escape hatch never depends on the fee.
+        // Switched on without a balance; see {protocol-docs/interop-fee.md#charging-and-enforcement}.
         vm.prank(owner);
         interopFeeManager.setFeePerUnit(1);
         _activatePriorityMode();

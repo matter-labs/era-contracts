@@ -134,7 +134,8 @@ struct DisabledProofSystems {
 bytes32 constant IMT_EMPTY_LEAF_HASH = keccak256("zkSync:IndexedMerkleTree:emptyLeaf");
 
 /// @dev Storage slot of the L2 `InteropCenter`'s interop fee unit counter,
-/// `bytes32(uint256(keccak256("zksync.interop-center.interop-fee-units")) - 1)` (checked by a unit test).
+/// `bytes32(uint256(keccak256("zksync.interop-center.interop-fee-units")) - 1)` (checked by
+/// `test_interopFeeUnits_slotConstantMatchesDerivation`).
 /// Consensus-critical: the ZKsync OS bootloader reads it at batch boundaries. See {protocol-docs/interop-fee.md}.
 bytes32 constant INTEROP_FEE_UNITS_SLOT = 0xcb06feb7f26e08c2ab18254891cfbe115998e9ed512f0732aa6fc7f097a78265;
 

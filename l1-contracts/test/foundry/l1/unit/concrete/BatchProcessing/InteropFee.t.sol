@@ -25,7 +25,7 @@ contract InteropFeeCommitTest is ExecutorTest {
 
         vm.expectEmit(address(interopFeeManager));
         emit IInteropFeeManager.InteropFeeCharged(l2ChainId, 1, 3, 3 * FEE_PER_UNIT);
-        _commit(_batchWithUnits(3), validator);
+        _commitOSBatchGetStored(genesisStoredBatchInfo, _batchWithUnits(3));
 
         assertEq(getters.getTotalBatchesCommitted(), 1);
         assertEq(interopFeeManager.chainBalance(l2ChainId), 1 ether - 3 * FEE_PER_UNIT);
@@ -33,8 +33,6 @@ contract InteropFeeCommitTest is ExecutorTest {
     }
 
     function test_commit_unitsAreBoundIntoTheProofCommitment() public {
-        // The verifier checks this commitment, so a batch committed with a count other than the proven one can't be
-        // proven, let alone executed.
         uint256 snapshot = vm.snapshotState();
         bytes32 commitment = _commitOSBatchGetStored(genesisStoredBatchInfo, _batchWithUnits(3)).commitment;
         vm.revertToState(snapshot);
@@ -44,7 +42,7 @@ contract InteropFeeCommitTest is ExecutorTest {
     function test_commit_switchOffChargesNothing() public {
         _fund(1 ether);
 
-        _commit(_batchWithUnits(3), validator);
+        _commitOSBatchGetStored(genesisStoredBatchInfo, _batchWithUnits(3));
 
         assertEq(getters.getTotalBatchesCommitted(), 1);
         assertEq(interopFeeManager.chainBalance(l2ChainId), 1 ether);
@@ -60,7 +58,7 @@ contract InteropFeeCommitTest is ExecutorTest {
             abi.encodeWithSelector(IInteropFeeManager.chargeInteropFee.selector),
             0
         );
-        _commit(_batchWithUnits(0), validator);
+        _commitOSBatchGetStored(genesisStoredBatchInfo, _batchWithUnits(0));
 
         assertEq(getters.getTotalBatchesCommitted(), 1);
         assertEq(interopFeeManager.accruedFees(), 0);
@@ -102,12 +100,12 @@ contract InteropFeeCommitTest is ExecutorTest {
         _setFee(FEE_PER_UNIT);
         _fund(1 ether);
 
-        _commit(_batchWithUnits(3), validator);
+        _commitOSBatchGetStored(genesisStoredBatchInfo, _batchWithUnits(3));
         vm.prank(validator);
         executor.revertBatchesSharedBridge(address(0), 0);
         assertEq(getters.getTotalBatchesCommitted(), 0);
 
-        _commit(_batchWithUnits(3), validator);
+        _commitOSBatchGetStored(genesisStoredBatchInfo, _batchWithUnits(3));
 
         assertEq(interopFeeManager.chainBalance(l2ChainId), 1 ether - 6 * FEE_PER_UNIT);
         assertEq(interopFeeManager.accruedFees(), 6 * FEE_PER_UNIT);
@@ -117,11 +115,6 @@ contract InteropFeeCommitTest is ExecutorTest {
     function test_revertWhen_committerOnL1HasNoFeeManager() public {
         vm.expectRevert(ZeroAddress.selector);
         new CommitterFacet(block.chainid, IInteropFeeManager(address(0)));
-    }
-
-    function test_committerOffL1NeedsNoFeeManager() public {
-        CommitterFacet facet = new CommitterFacet(block.chainid + 1, IInteropFeeManager(address(0)));
-        assertEq(facet.getInteropFeeManager(), address(0));
     }
 
     function test_commit_offL1IsNeverCharged() public {
@@ -138,7 +131,7 @@ contract InteropFeeCommitTest is ExecutorTest {
             abi.encodeWithSelector(IInteropFeeManager.chargeInteropFee.selector),
             0
         );
-        _commit(batch, validator);
+        _commitOSBatchGetStored(genesisStoredBatchInfo, batch);
 
         assertEq(getters.getTotalBatchesCommitted(), 1);
     }
@@ -178,7 +171,7 @@ contract InteropFeeCommitTest is ExecutorTest {
             _fund(fee);
         }
 
-        _commit(_batchWithUnits(_units), validator);
+        _commitOSBatchGetStored(genesisStoredBatchInfo, _batchWithUnits(_units));
 
         assertEq(interopFeeManager.chainBalance(l2ChainId), 0);
         assertEq(interopFeeManager.accruedFees(), fee);
@@ -195,13 +188,6 @@ contract InteropFeeCommitTest is ExecutorTest {
         CommitBatchInfoZKsyncOS[] memory batches = new CommitBatchInfoZKsyncOS[](1);
         batches[0] = _batch;
         return Utils.encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, batches);
-    }
-
-    function _commit(CommitBatchInfoZKsyncOS memory _batch, address _sender) internal {
-        (uint256 from, uint256 to, bytes memory data) = _encode(_batch);
-        _mockDAForCommit(_batch.batchNumber);
-        vm.prank(_sender);
-        committer.commitBatchesSharedBridge(address(0), from, to, data);
     }
 
     function _setFee(uint256 _feePerUnit) internal {

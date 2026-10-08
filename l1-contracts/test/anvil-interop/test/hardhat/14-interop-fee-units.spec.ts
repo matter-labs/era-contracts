@@ -21,6 +21,7 @@ import { getInteropSourceAddress } from "../../src/core/accounts";
 const CALL_VALUE = ethers.utils.parseUnits("10", "gwei");
 const WITHDRAWAL_AMOUNT = ethers.utils.parseUnits("1", "gwei");
 const PREPAID_AMOUNT = ethers.utils.parseUnits("1", "gwei");
+const EIP1967_ADMIN_SLOT = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
 
 /**
  * 14 - Interop fee units
@@ -55,6 +56,12 @@ describe("14 - Interop fee units", function () {
 
   async function feeUnits(provider: ethers.providers.JsonRpcProvider): Promise<BigNumber> {
     return interopCenter(provider).interopFeeUnits();
+  }
+
+  async function proxyAdminOf(proxy: string): Promise<string> {
+    return ethers.utils.getAddress(
+      ethers.utils.hexDataSlice(await l1Provider.getStorageAt(proxy, EIP1967_ADMIN_SLOT), 12)
+    );
   }
 
   async function sendDirectCalls(callCount: number) {
@@ -103,9 +110,13 @@ describe("14 - Interop fee units", function () {
     expect((await feeManager.feePerUnit()).toString(), "the switch ships off").to.equal("0");
     expect((await feeManager.accruedFees()).toString()).to.equal("0");
     expect(await feeManager.BRIDGE_HUB()).to.equal(state.l1Addresses!.bridgehub);
-    // Governance owns the switch and receives the fees from initialization.
-    expect(await feeManager.owner()).to.equal(state.l1Addresses!.governance);
-    expect(await feeManager.feeRecipient()).to.equal(state.l1Addresses!.governance);
+    // The manager sits behind the CTM's ProxyAdmin, and the governance owning that ProxyAdmin owns the switch and
+    // receives the fees from initialization.
+    const proxyAdmin = await proxyAdminOf(feeManager.address);
+    expect(proxyAdmin).to.equal(await proxyAdminOf(state.ctmAddresses!.chainTypeManager));
+    const governance: string = await new Contract(proxyAdmin, getAbi("ProxyAdmin"), l1Provider).owner();
+    expect(await feeManager.owner()).to.equal(governance);
+    expect(await feeManager.feeRecipient()).to.equal(governance);
     expect(await feeManager.pendingOwner()).to.equal(ethers.constants.AddressZero);
   });
 
@@ -113,7 +124,7 @@ describe("14 - Interop fee units", function () {
     const bridgehub = new Contract(state.l1Addresses!.bridgehub, getAbi("L1Bridgehub"), l1Provider);
     const diamond = new Contract(await bridgehub.getZKChain(sourceChainId), getAbi("GettersFacet"), l1Provider);
     const chainAdmin: string = await diamond.getAdmin();
-    const receiver = ethers.Wallet.createRandom().address;
+    const receiver = Wallet.createRandom().address;
     const balanceBefore = await feeManager.chainBalance(sourceChainId);
 
     const depositor = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);

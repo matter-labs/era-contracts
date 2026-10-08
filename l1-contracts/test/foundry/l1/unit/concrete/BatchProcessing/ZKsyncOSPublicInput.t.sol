@@ -144,8 +144,8 @@ contract ZKsyncOSPublicInputTest is Test {
         assertNotEq(flat, rolling);
     }
 
-    /// @notice The batch output hash commits to `interopFeeUnits` exactly like the ZKsync OS `BatchOutput::hash`,
-    /// so an operator can't commit a different count than the proven one. See {protocol-docs/interop-fee.md}.
+    /// @notice Pins the batch output layout to ZKsync OS `batch_output_hash_commits_to_interop_fee_units_last`.
+    /// See {protocol-docs/interop-fee.md}.
     function test_batchOutputHash_matchesZKsyncOSInteropFeeUnitsGoldenVectors() public view {
         CommitBatchInfoZKsyncOS memory batch = _goldenInteropFeeBatch(7);
         assertEq(

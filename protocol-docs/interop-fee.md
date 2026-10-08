@@ -9,9 +9,8 @@ from, and does not change, the user-side fees `InteropCenter` charges on L2 (see
 A batch is charged `feePerUnit × interopFeeUnits`, where `interopFeeUnits` is the number of **interop calls** the
 batch sent: every call of every L2→L2 bundle. L2→L1 withdrawals are not interop and are never counted.
 
-The unit is decided in one place, on L2, so it can change without touching the proof system: `InteropCenter` bumps a
-monotonic counter, and everything downstream (the bootloader, the batch output, L1) only carries the difference.
-Counting a different unit (per bundle, per completed flow) is an L2 contract change only.
+The unit is decided only on L2: `InteropCenter` bumps a monotonic counter, and everything downstream (the bootloader,
+the batch output, L1) only carries the difference, so changing the unit is an L2 contract change.
 
 ## How the count reaches L1
 
@@ -27,7 +26,8 @@ Counting a different unit (per bundle, per completed flow) is an L2 contract cha
    coordinated protocol change.
 3. **L1 commit.** `CommitBatchInfoZKsyncOS.interopFeeUnits` is hashed last into the batch output hash
    (`CommitterFacet._getBatchOutputHash`, commit encoding version 6), which goes into the proof public input. A batch
-   committed with a count other than the one its state transition produced can't be proven, so it never executes.
+   committed with a count other than the one its state transition produced can't pass verification of a real proof, so
+   it never executes.
 
 The batch output layout is pinned by golden vectors shared with ZKsync OS:
 `BATCH_OUTPUT_HASH_GOLDEN_INTEROP_FEE_UNITS_*` in `l1-contracts/test/foundry/TestConstants.sol` and
@@ -39,37 +39,36 @@ The batch output layout is pinned by golden vectors shared with ZKsync OS:
 when:
 
 - `interopFeeUnits != 0`: batches without interop never touch the manager;
-- the batch settles on L1: the manager is an L1 contract, so batches settled elsewhere are not charged;
+- the batch settles on L1, where the manager lives;
 - priority mode is off: the escape hatch never depends on the fee.
 
 The manager debits the chain's **prepaid balance** (`deposit(chainId)`, payable by anyone, withdrawable only by the
 chain admin). If the balance does not cover the fee, the commit reverts and the chain can't advance until it is
 topped up. Batches committed earlier still prove and execute, so in-flight withdrawals keep finalizing.
 
-Charging happens at commit, not at execute, because commit is where the count arrives; binding it into the proof
-makes the operator-supplied value safe to charge. The trade-off is that a reverted batch is not refunded, whoever
-reverts it (the operator, the CTM, or priority-mode activation): interop re-committed outside priority mode is
-charged again.
+Charging happens at commit, where the count arrives, before it is proven. A count other than the proven one only
+costs the chain itself: it is charged, but its batch can never execute and has to be reverted, so a chain's exposure to
+a faulty commit is its prepaid balance. A reverted batch is not refunded, whoever reverts it (the operator, the CTM, or
+priority-mode activation), and interop re-committed outside priority mode is charged again.
 
 ## The switch
 
-`InteropFeeManager` is one proxy per CTM. `DeployCTM` deploys it, as does the CTM upgrade that introduces it; later
+`DeployCTM` deploys an `InteropFeeManager` proxy with the CTM, as does the CTM upgrade that introduces it; later
 upgrades keep the one the current `CommitterFacet` charges, which holds the chains' prepaid balances. It is passed to
 the `CommitterFacet` as an immutable and can be read as `getInteropFeeManager()` on any chain's diamond. Its owner is
 protocol governance from initialization, and controls:
 
 - `feePerUnit`: wei per interop fee unit; `0`, the initial value, turns the switch off;
-- `feeRecipient`: where the permissionless `sweep()` sends the accrued fees; initially governance. Routing them to the
-  $ZK Fee Flow System, which takes approved ERC-20s on ZKsync Era, means pointing it at an L1 contract that forwards
-  the ETH there: no protocol upgrade is needed.
+- `feeRecipient`: where the permissionless `sweep()` sends the accrued fees; initially governance.
 
 Fees are paid in ETH. Charging only moves value between the manager's internal ledgers, so the prepaid balances plus
 the accrued fees are always backed by the contract's ETH.
 
 ## Activation
 
-The count changes both the commit wire and the ZKsync OS batch output, so it activates with the protocol upgrade
-that ships the ZKsync OS version committing `interop_fee_units` (with its verification key) together with the
-`CommitterFacet` hashing it. `DefaultUpgradeZKsyncOS` requires every committed batch to be executed first, so no batch
-committed in the old layout is left to prove: from the upgrade on, batches are committed with encoding version 6, and
-version 5 is rejected.
+Commit encoding version 6 appends `interopFeeUnits`; the new decoder rejects earlier commit versions. The server,
+external nodes and the ZKsync OS version committing `interop_fee_units` (with its verification key) must switch at
+protocol v35. Historical v34 and earlier data must still be decoded using their original formats.
+
+Before upgrading across the v35 boundary, all committed batches must be executed or reverted; `DefaultUpgradeZKsyncOS`
+enforces it.

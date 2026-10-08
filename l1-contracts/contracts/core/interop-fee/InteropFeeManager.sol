@@ -37,9 +37,11 @@ contract InteropFeeManager is IInteropFeeManager, ReentrancyGuard, Ownable2StepU
     /// @inheritdoc IInteropFeeManager
     mapping(uint256 chainId => uint256 balance) public chainBalance;
 
-    constructor(IBridgehubBase _bridgehub) {
-        BRIDGE_HUB = _bridgehub;
+    /// @dev Contract is expected to be used as proxy implementation.
+    /// @dev Initialize the implementation to prevent Parity hack.
+    constructor(IBridgehubBase _bridgehub) reentrancyGuardInitializer {
         _disableInitializers();
+        BRIDGE_HUB = _bridgehub;
     }
 
     /// @notice Initializes the proxy. The switch starts off (`feePerUnit == 0`).
@@ -91,11 +93,11 @@ contract InteropFeeManager is IInteropFeeManager, ReentrancyGuard, Ownable2StepU
 
     /// @inheritdoc IInteropFeeManager
     function chargeInteropFee(uint256 _chainId, uint256 _batchNumber, uint256 _units) external {
-        require(msg.sender == _getZKChain(_chainId), Unauthorized(msg.sender));
         uint256 fee = feePerUnit * _units;
         if (fee == 0) {
             return;
         }
+        require(msg.sender == _getZKChain(_chainId), Unauthorized(msg.sender));
         uint256 balance = chainBalance[_chainId];
         require(fee <= balance, InsufficientInteropFeeBalance(_chainId, balance, fee));
         chainBalance[_chainId] = balance - fee;

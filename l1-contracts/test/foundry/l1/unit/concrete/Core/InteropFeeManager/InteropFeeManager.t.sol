@@ -126,7 +126,7 @@ contract InteropFeeManagerTest is Test {
 
     function test_revertWhen_implementationInitialized() public {
         InteropFeeManager impl = new InteropFeeManager(IBridgehubBase(address(registry)));
-        vm.expectRevert("Initializable: contract is already initialized");
+        vm.expectRevert(SlotOccupied.selector);
         impl.initialize(owner, recipient);
     }
 
@@ -313,6 +313,7 @@ contract InteropFeeManagerTest is Test {
     function test_charge_isNoOpWhileSwitchedOff() public {
         // The chain has no balance: while the switch is off, a commit never depends on one.
         vm.recordLogs();
+        vm.expectCall(address(registry), abi.encodeWithSelector(IBridgehubBase.getZKChain.selector), 0);
         vm.prank(zkChain);
         manager.chargeInteropFee(CHAIN_ID, 5, 3);
 
@@ -373,6 +374,7 @@ contract InteropFeeManagerTest is Test {
     }
 
     function test_revertWhen_chargedForUnregisteredChain() public {
+        _setFee(FEE_PER_UNIT);
         vm.prank(zkChain);
         vm.expectRevert(ZKChainNotRegistered.selector);
         manager.chargeInteropFee(UNREGISTERED_CHAIN_ID, 1, 3);
