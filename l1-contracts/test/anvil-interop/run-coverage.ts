@@ -69,7 +69,7 @@ const PORT_OFFSET_PER_WORKER = 100;
  * Ports a run reserves. Bases must be multiples of this: base 0 and base 500 both allocate 500-900,
  * and the later run's `startChain` would kill the earlier run's Anvil processes.
  */
-const RUN_PORT_SPAN = 1000;
+const RUN_PORT_SPAN = 2000;
 const MAX_SHARDS_PER_RUN = RUN_PORT_SPAN / PORT_OFFSET_PER_WORKER;
 
 /** Throws unless a run at this base cannot overlap a run at any other permitted base. */
