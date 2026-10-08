@@ -51,8 +51,8 @@ pub const L2_CREATE2_FACTORY_ADDR: Address = l2_addr(0x00);
 pub const ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR: Address =
     address!("0x4e59b44847b379578588920ca78fbf26c0b4956c");
 /// Alias of `L2_GENESIS_UPGRADE_ADDR` in Solidity — same on-chain address
-/// (`BUILT_IN_CONTRACTS_OFFSET + 0x01`). `L2DefaultUpgrade` is not deployed
-/// here but at an address derived from its bytecode info.
+/// (`BUILT_IN_CONTRACTS_OFFSET + 0x01`), exposed under the version-specific
+/// name because v33 force-deploys `L2V32Upgrade` there.
 pub const L2_VERSION_SPECIFIC_UPGRADER_ADDR: Address = l2_addr(0x01);
 pub const L2_BRIDGEHUB_ADDR: Address = l2_addr(0x02);
 pub const L2_ASSET_ROUTER_ADDR: Address = l2_addr(0x03);
@@ -62,7 +62,7 @@ pub const L2_MESSAGE_ROOT_ADDR: Address = l2_addr(0x05);
 /// implementation for `EmptyContract` (see `getRemovedTrackerNeutralizations`).
 pub const L2_REMOVED_GW_ASSET_TRACKER_ADDR: Address = l2_addr(0x10);
 pub const SLOAD_CONTRACT_ADDR: Address = l2_addr(0x06);
-// v31 no longer force-deploys the WrappedBaseToken, so this address is only referenced by the
+// v33 no longer force-deploys the WrappedBaseToken, so this address is only referenced by the
 // address-consistency test below; keep it as part of the canonical L2 address map.
 #[allow(dead_code)]
 pub const L2_WRAPPED_BASE_TOKEN_IMPL_ADDR: Address = l2_addr(0x07);
@@ -79,8 +79,8 @@ pub const L2_ATOMIC_FLOW_MANAGER_ADDR: Address = l2_addr(0x14);
 pub const L2_BASE_TOKEN_HOLDER_ADDR: Address = l2_addr(0x11);
 
 /// L2 system contract addresses (`SYSTEM_CONTRACTS_OFFSET + <offset>`).
-/// Current addresses match `L2ContractAddresses.sol`; this verifier module
-/// also retains its version-specific Era address constants.
+/// Sourced from `L2ContractAddresses.sol` where available; the rest live in
+/// `system-contracts/contracts/Constants.sol`.
 pub const L2_BOOTLOADER_ADDRESS: Address = system_contract_addr(0x01);
 pub const L2_ACCOUNT_CODE_STORAGE_ADDR: Address = system_contract_addr(0x02);
 pub const L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR: Address = system_contract_addr(0x04);
@@ -97,10 +97,13 @@ pub const L2_PUBDATA_CHUNK_PUBLISHER_ADDR: Address = system_contract_addr(0x11);
 pub const CODE_ORACLE_SYSTEM_CONTRACT: Address = system_contract_addr(0x12);
 pub const EVM_GAS_MANAGER: Address = system_contract_addr(0x13);
 pub const EVM_PREDEPLOYS_MANAGER: Address = system_contract_addr(0x14);
-/// Historical Era Keccak precompile address.
+/// Solidity hardcodes this as `address(0x8010)` rather than the offset form;
+/// see the comment in `system-contracts/Constants.sol`. The value is still
+/// `SYSTEM_CONTRACTS_OFFSET + 0x10`.
 pub const KECCAK256_SYSTEM_CONTRACT: Address = literal_addr(0x8010);
 
-/// EVM precompile addresses.
+/// EVM precompile addresses. Sourced from `system-contracts/Constants.sol`
+/// where they're declared as `address(0xNN)` literals (no offset).
 pub const ECRECOVER_SYSTEM_CONTRACT: Address = literal_addr(0x01);
 pub const SHA256_SYSTEM_CONTRACT: Address = literal_addr(0x02);
 pub const IDENTITY_SYSTEM_CONTRACT: Address = literal_addr(0x04);
@@ -109,16 +112,18 @@ pub const ECADD_SYSTEM_CONTRACT: Address = literal_addr(0x06);
 pub const ECMUL_SYSTEM_CONTRACT: Address = literal_addr(0x07);
 pub const ECPAIRING_SYSTEM_CONTRACT: Address = literal_addr(0x08);
 
-/// v31 L2 protocol upgrade transaction parameters.
-/// ZKsync OS upgrade txs use txType 126 (Era VM's 254 is gone with the Era
-/// CTM); gas + pubdata limits are fixed by v31 deploy scripts and travel
-/// with the artifact.
+/// v33 L2 protocol upgrade transaction parameters. Gas + pubdata limits are
+/// fixed by the v33 deploy scripts and travel with the artifact. Era VM's
+/// `txType` (254) is not listed: v33 is a ZKsync OS-only release.
 pub const ZKSYNC_OS_SYSTEM_UPGRADE_TX_TYPE: u64 = 126;
 pub const L2_UPGRADE_GAS_LIMIT: u64 = 72_000_000;
 pub const L2_UPGRADE_GAS_PER_PUBDATA_BYTE_LIMIT: u64 = 800;
 
-/// AllContractsHashes file-name key consulted by the bytecode verifier.
-pub const L2_DEFAULT_UPGRADE_CONTRACT: &str = "l1-contracts/L2DefaultUpgrade";
+/// AllContractsHashes file-name keys consulted by the bytecode verifier.
+/// The Era VM system contracts (`Bootloader`, `DefaultAccount`, `EvmEmulator`)
+/// are absent: only an Era CTM's chain-creation and upgrade payloads named
+/// them, and v33 has no Era flavor.
+pub const L2_V32_UPGRADE_CONTRACT: &str = "l1-contracts/L2V32Upgrade";
 
 #[cfg(test)]
 mod tests {

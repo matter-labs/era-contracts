@@ -410,9 +410,9 @@
   {
     "contractName": "l1-contracts/GatewayCTMDeployerVerifiers",
     "evmBytecodePath": "/l1-contracts/out/GatewayCTMDeployerVerifiers.sol/GatewayCTMDeployerVerifiers.json",
-    "evmBytecodeHash": "0x2e17159fab5e009bf3ab284b96e0b97a2805670aa680c62ee9a1c8402d1496d7",
-    "evmDeployedBytecodeHash": "0x9e7db9e6c8d65518e244f4085acdc3d34717523961cbb2521d75dc2a93c45a10",
-    "evmDeployedBytecodeBlakeHash": "0xff617225ba0d82f36d87e0d617f1547b47e9d79cf74ab7a6f84d4231ed555e4a",
+    "evmBytecodeHash": "0x80831bcbb0a07854161bc8b8d960c9042ee6600dbb65977d0682b83daa082e73",
+    "evmDeployedBytecodeHash": "0xbcdce81d37ce34ae6be9341b462fbeb9c8126a520f6a943959cb7cd9228959de",
+    "evmDeployedBytecodeBlakeHash": "0xcd9b38d652d11fe0e201ccf14edfe84f64ad5bbcf8cbf2292f32d229cb3484fe",
     "evmDeployedBytecodeLength": 256
   },
   {
@@ -1194,10 +1194,10 @@
   {
     "contractName": "l1-contracts/ZKsyncOSVerifierPlonk",
     "evmBytecodePath": "/l1-contracts/out/ZKsyncOSVerifierPlonk.sol/ZKsyncOSVerifierPlonk.json",
-    "evmBytecodeHash": "0xf60e245348784bc7dfc52de45c10949cabc46ba3b24d834d20f31d90fc9f46cd",
-    "evmDeployedBytecodeHash": "0xbd2c180ea8e952f3c7b6213303a22bae95f0d8fecebe5cd333d46e56f02c205d",
-    "evmDeployedBytecodeBlakeHash": "0xde5dc514c018aa9874f031f546dd7242d5d9332c9271a1d14fb390389e22335b",
-    "evmDeployedBytecodeLength": 17229
+    "evmBytecodeHash": "0x2473261cd21beaeb81e6a97a460fe8bb9ae05f7c18c032f4c48ee85e43fc6b9f",
+    "evmDeployedBytecodeHash": "0x707a41946fe2fda63081ed917e01fcad211b427650301879be369adb2663b3b6",
+    "evmDeployedBytecodeBlakeHash": "0xc65141d0eaa532d7205fd5b985ec39bbf68d5b83914419c34ab81329fb8670b0",
+    "evmDeployedBytecodeLength": 17225
   },
   {
     "contractName": "l1-contracts/ZiskTestnetVerifier",
