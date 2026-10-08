@@ -48,10 +48,10 @@ Most subcommands flatten **`SharedRunArgs`** from `common/args.rs`:
 > an EOA to simulate forge scripts against the Anvil fork. Extra signers (e.g.
 > **`--owner`**) stay on specific commands.
 
-## Preparing protocol v34
+## Preparing protocol v35
 
-`ecosystem upgrade-prepare-all` defaults to `DefaultCoreUpgrade` and `CTMUpgrade_v34` (the default CTM
-upgrade with the v34 per-chain upgrade, `V34UpgradeZKsyncOS`), using `upgrade-envs/v0.34.0-chain-config/local.toml` for a local v33-to-v34 upgrade.
+`ecosystem upgrade-prepare-all` defaults to the default upgrade scripts (`DefaultCoreUpgrade` and
+`DefaultCTMUpgrade`), using `upgrade-envs/v0.35.0-upgrade-system/local.toml` for a local v34-to-v35 upgrade.
 With `--env <name>` the input is `<release dir>/<name>.toml` (see [Environment inputs](#environment-inputs));
 missing inputs fail before deployment.
 

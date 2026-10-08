@@ -19,14 +19,15 @@ pub const FINALIZE_CHAIN_INIT_SCRIPT_PATH: &str = "deploy-scripts/chain/Finalize
 /// The default core upgrade script, used by releases without release-specific ecosystem preparation.
 pub const DEFAULT_CORE_UPGRADE_SCRIPT_PATH: &str =
     "deploy-scripts/upgrade/default-upgrade/DefaultCoreUpgrade.s.sol";
-/// The v34 CTM upgrade: the default upgrade with `V34UpgradeZKsyncOS` as the cut's per-chain initializer.
-pub const CTM_UPGRADE_V34_SCRIPT_PATH: &str = "deploy-scripts/upgrade/v34/CTMUpgrade_v34.s.sol";
+/// The default CTM upgrade script, used by releases without release-specific per-chain preparation.
+pub const DEFAULT_CTM_UPGRADE_SCRIPT_PATH: &str =
+    "deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
 /// The current release's upgrade-env directory, relative to `l1-contracts/`. It is the only place the
 /// current release is named: the prepare defaults below and `--env` resolution (`EnvConfig`) derive from
 /// it. `scripts/new-release.ts` moves it on a release bump.
 macro_rules! current_upgrade_env_dir {
     () => {
-        "upgrade-envs/v0.34.0-chain-config"
+        "upgrade-envs/v0.35.0-upgrade-system"
     };
 }
 pub const CURRENT_UPGRADE_ENV_DIR: &str = concat!("/", current_upgrade_env_dir!());

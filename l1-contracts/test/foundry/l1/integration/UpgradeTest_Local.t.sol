@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import {console2 as console} from "forge-std/Script.sol";
 
 import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
-import {CTMUpgrade_v34} from "../../../../deploy-scripts/upgrade/v34/CTMUpgrade_v34.s.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {IZKsyncOSVerifier} from "contracts/state-transition/chain-interfaces/IZKsyncOSVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
@@ -31,11 +30,11 @@ import {Bytes} from "contracts/vendor/Bytes.sol";
 
 /// @notice Test-only variant of the CTM script protocol-ops prepares with by default, skipping the
 ///         bytecode-heavy steps to avoid MemoryOOG.
-/// @dev Only the two memory-trimming overrides below differ from {CTMUpgrade_v34}; everything else (deploys,
+/// @dev Only the two memory-trimming overrides below differ from {DefaultCTMUpgrade}; everything else (deploys,
 ///      governance calls, per-chain cut and its initializer) is the production script. protocol-ops'
 ///      `prepare_defaults_match_the_foundry_full_flow_test` fails if this stops extending the default
 ///      `--ctm-script-path` script.
-contract CTMUpgradeForLocalTest is CTMUpgrade_v34 {
+contract CTMUpgradeForLocalTest is DefaultCTMUpgrade {
     /// @notice Override to skip bytecode publishing which reads large JSON files.
     function publishBytecodes() public override {
         console.log("Test mode: Skipping bytecode publishing to avoid MemoryOOG");

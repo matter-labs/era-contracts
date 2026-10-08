@@ -59,12 +59,9 @@ v34 is prepared by `CTMUpgrade_v34`, the default CTM upgrade with one change: th
 force-deploys `L2DefaultUpgrade` and delegates to it, with the chain's
 `ZKChainSpecificForceDeploymentsData` substituted on L1 by `DefaultUpgradeZKsyncOS.getL2UpgradeTxData`.
 
-Protocol-ops defaults to `DefaultCoreUpgrade` and `CTMUpgrade_v34`, with a v33-to-v34 local input under
-`upgrade-envs/v0.34.0-chain-config/local.toml`. The visible `--ctm-script-path`,
-`--core-script-path`, and `--upgrade-input-path` flags select historical or environment-specific
-preparations. A named environment must supply its v34 input; missing inputs fail rather than falling
-back to v33 or local parameters. The anvil upgrade test runs exactly these defaults against the v33 chain
-states, so it covers v33 to v34.
+v34 is prepared with `DefaultCoreUpgrade` and `CTMUpgrade_v34`, with its inputs under
+`upgrade-envs/v0.34.0-chain-config/`. Protocol-ops' defaults have moved on to the current release, so a v34
+preparation selects these through `--ctm-script-path`, `--core-script-path` and `--upgrade-env-dir`.
 
 Config setters retain their existing guard against updates with unproved committed batches to keep
 this commitment-format upgrade from also changing the existing administrative update policy. This
