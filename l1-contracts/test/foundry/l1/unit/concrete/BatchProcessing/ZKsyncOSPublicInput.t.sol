@@ -23,7 +23,7 @@ import {ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT, PUBLIC_INPUT_SHIFT} from "contracts/
 
 contract CommitterZKsyncOSPublicInputHarness is TestCommitter {
     // Only the public-input hashing is exercised, which never charges the interop fee.
-    constructor() TestCommitter(IInteropFeeManager(address(0))) {}
+    constructor() TestCommitter(IInteropFeeManager(address(1))) {}
 
     function util_setZKsyncOSChainConfig(uint256 _chainId, uint64 _maxTxGasLimit) external {
         s.chainId = _chainId;

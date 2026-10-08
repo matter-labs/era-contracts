@@ -348,7 +348,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         IOwnable(ctmAddresses.stateTransition.proxies.serverNotifier).transferOwnership(ctmAddresses.chainAdmin);
         IOwnable(ctmAddresses.daAddresses.daContracts.rollupDAManager).transferOwnership(ctmAddresses.admin.governance);
-        IOwnable(ctmAddresses.l1Specific.interopFeeManager).transferOwnership(ctmAddresses.admin.governance);
 
         vm.stopBroadcast();
         console.log("Owners updated");

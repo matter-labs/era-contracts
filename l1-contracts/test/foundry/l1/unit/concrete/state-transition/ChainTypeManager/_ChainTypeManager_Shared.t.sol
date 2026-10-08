@@ -176,7 +176,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         );
         facetCuts.push(
             Diamond.FacetCut({
-                facet: address(new CommitterFacet(block.chainid, IInteropFeeManager(address(0)))),
+                facet: address(new CommitterFacet(block.chainid, IInteropFeeManager(makeAddr("interopFeeManager")))),
                 action: Diamond.Action.Add,
                 isFreezable: true,
                 selectors: Utils.getCommitterSelectors()

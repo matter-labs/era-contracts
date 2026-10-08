@@ -30,7 +30,8 @@ import {
     L2TimestampTooBig,
     NonZeroBlobToVerifyZKsyncOS,
     TimeNotReached,
-    UpgradeBatchNumberIsNotZero
+    UpgradeBatchNumberIsNotZero,
+    ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
 import {MismatchL2DACommitmentScheme, SettlementLayerChainIdMismatch} from "../../L1StateTransitionErrors.sol";
 
@@ -61,6 +62,9 @@ contract CommitterFacet is ZKChainBase, ICommitter {
     IInteropFeeManager internal immutable INTEROP_FEE_MANAGER;
 
     constructor(uint256 _l1ChainId, IInteropFeeManager _interopFeeManager) {
+        // On L1 every interop batch is charged, so a facet without a manager would make those commits revert
+        // even with the switch off. Settlement layers other than L1 never charge and pass zero.
+        require(_l1ChainId != block.chainid || address(_interopFeeManager) != address(0), ZeroAddress());
         L1_CHAIN_ID = _l1ChainId;
         INTEROP_FEE_MANAGER = _interopFeeManager;
         // Allow testnet operators to submit batches with older timestamps

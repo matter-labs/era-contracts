@@ -11,6 +11,8 @@ import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.s
 import {IInteropFeeManager} from "contracts/core/interop-fee/IInteropFeeManager.sol";
 import {InsufficientInteropFeeBalance} from "contracts/core/interop-fee/InteropFeeErrors.sol";
 import {PRIORITY_EXPIRATION} from "contracts/common/Config.sol";
+import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
 
 /// @notice Commit-time charging of the interop fee through a real diamond and a real `InteropFeeManager`.
 /// See {protocol-docs/interop-fee.md}.
@@ -154,6 +156,17 @@ contract InteropFeeCommitTest is ExecutorTest {
 
         assertEq(interopFeeManager.chainBalance(l2ChainId), 1 ether - 6 * FEE_PER_UNIT);
         assertEq(interopFeeManager.accruedFees(), 6 * FEE_PER_UNIT);
+    }
+
+    /// @dev A Committer on L1 without a manager would revert every interop commit even with the switch off.
+    function test_revertWhen_committerOnL1HasNoFeeManager() public {
+        vm.expectRevert(ZeroAddress.selector);
+        new CommitterFacet(block.chainid, IInteropFeeManager(address(0)));
+    }
+
+    function test_committerOffL1NeedsNoFeeManager() public {
+        CommitterFacet facet = new CommitterFacet(block.chainid + 1, IInteropFeeManager(address(0)));
+        assertGt(address(facet).code.length, 0);
     }
 
     function testFuzz_commit_chargesLinearlyInUnits(uint32 _units, uint64 _feePerUnit) public {

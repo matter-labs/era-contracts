@@ -360,10 +360,12 @@ abstract contract DeployCTMUtils is DeployUtils {
         } else if (compareStrings(contractName, "PermissionlessValidator")) {
             return abi.encodeCall(PermissionlessValidator.initialize, ());
         } else if (compareStrings(contractName, "InteropFeeManager")) {
-            // Fees accrue to governance until it routes them elsewhere; ownership moves to governance in
-            // `updateOwners`.
+            // Governance owns the switch from the start, and fees accrue to it until it routes them elsewhere.
             return
-                abi.encodeCall(InteropFeeManager.initialize, (config.deployerAddress, ctmAddresses.admin.governance));
+                abi.encodeCall(
+                    InteropFeeManager.initialize,
+                    (ctmAddresses.admin.governance, ctmAddresses.admin.governance)
+                );
         } else {
             revert(string.concat("Contract ", contractName, " initialize calldata not set"));
         }

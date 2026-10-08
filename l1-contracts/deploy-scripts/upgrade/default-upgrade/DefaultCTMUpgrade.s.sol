@@ -225,6 +225,12 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         if (rollupDAManager != address(0)) {
             ctmAddresses.daAddresses.daContracts.rollupDAManager = rollupDAManager;
         }
+
+        // The fee manager is only reachable through the Committer facet's immutable, so it can't be discovered:
+        // releases after the one that introduced it must pass it in, or they would replace it (and its balances).
+        if (toml.keyExists("$.interop_fee_manager")) {
+            ctmAddresses.l1Specific.interopFeeManager = toml.readAddress("$.interop_fee_manager");
+        }
     }
 
     /// @notice Full default upgrade preparation flow
@@ -314,6 +320,15 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         // Deploy `MultisigCommitter` (a superset of ValidatorTimelock) as the default validator impl so the
         // upgrade does NOT downgrade proxies that already run a MultisigCommitter.
         ctmAddresses.stateTransition.implementations.validatorTimelock = deploySimpleContract("MultisigCommitter");
+
+        // The Committer facet takes the fee manager as an immutable; the release that introduces the switch
+        // deploys it (governance-owned, switched off).
+        if (ctmAddresses.l1Specific.interopFeeManager == address(0)) {
+            (
+                ctmAddresses.l1Specific.interopFeeManagerImplementation,
+                ctmAddresses.l1Specific.interopFeeManager
+            ) = deployTuppWithContract("InteropFeeManager");
+        }
 
         deployStateTransitionDiamondFacets();
     }
@@ -947,6 +962,11 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
             "state_transition",
             "committer_facet_addr",
             ctmAddresses.stateTransition.facets.committerFacet
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "interop_fee_manager_proxy_addr",
+            ctmAddresses.l1Specific.interopFeeManager
         );
         vm.serializeAddress("state_transition", "diamond_init_addr", ctmAddresses.stateTransition.facets.diamondInit);
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", ctmAddresses.stateTransition.genesisUpgrade);

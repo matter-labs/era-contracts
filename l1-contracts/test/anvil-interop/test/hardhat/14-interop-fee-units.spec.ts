@@ -103,9 +103,10 @@ describe("14 - Interop fee units", function () {
     expect((await manager.feePerUnit()).toString(), "the switch ships off").to.equal("0");
     expect((await manager.accruedFees()).toString()).to.equal("0");
     expect(await manager.BRIDGE_HUB()).to.equal(state.l1Addresses!.bridgehub);
-    // Ownership is handed to the CTM's governance contract (two-step, so it is still pending here).
-    const pendingOwner: string = await manager.pendingOwner();
-    expect(await l1Provider.getCode(pendingOwner), "pending owner must be the governance contract").to.not.equal("0x");
+    // Governance owns the switch from initialization; no deployer key ever controls it.
+    const owner: string = await manager.owner();
+    expect(await l1Provider.getCode(owner), "owner must be the governance contract").to.not.equal("0x");
+    expect(await manager.pendingOwner()).to.equal(ethers.constants.AddressZero);
   });
 
   it("counts every call of an L2->L2 bundle on the source chain only", async () => {
