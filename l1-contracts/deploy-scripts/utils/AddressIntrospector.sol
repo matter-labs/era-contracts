@@ -345,8 +345,9 @@ library AddressIntrospector {
 
     /// @notice Returns the interop fee manager the Committer facet of the CTM's up-to-date chain charges, so that a
     /// later release keeps the manager holding the chains' prepaid balances.
-    /// @dev Zero before the release that introduced it, and without an up-to-date chain (a fresh ecosystem). The CTM
-    /// upgrade requires an up-to-date chain (`getUptoDateZkChainAddresses`), so there zero always means the former.
+    /// @dev Zero before the release that introduced it, and when no chain is on the CTM's current version (e.g. a fresh
+    /// ecosystem). The CTM upgrade requires such a chain (`getUptoDateZkChainAddresses`), so there zero always means the
+    /// former.
     /// @param _ctm The CTM being introspected.
     /// @param _committerFacet The Committer facet of a chain on the CTM's protocol version, or zero if there is none.
     function _getInteropFeeManager(ChainTypeManager _ctm, address _committerFacet) internal view returns (address) {

@@ -7,7 +7,8 @@ from, and does not change, the user-side fees `InteropCenter` charges on L2 (see
 ## What is charged
 
 A batch is charged `feePerUnit × interopFeeUnits`, where `interopFeeUnits` is the number of **interop calls** the
-batch sent: every call of every L2→L2 bundle. L2→L1 withdrawals are not interop and are never counted.
+batch sent: every call of every L2→L2 bundle, so a bundle without calls counts nothing. L2→L1 withdrawals are not
+interop and are never counted.
 
 The unit is decided only on L2: `InteropCenter` bumps a monotonic counter, and everything downstream (the bootloader,
 the batch output, L1) only carries the difference, so changing the unit is an L2 contract change.
@@ -49,7 +50,9 @@ topped up. Batches committed earlier still prove and execute, so in-flight withd
 Charging happens at commit, where the count arrives, before it is proven. A count other than the proven one only
 costs the chain itself: it is charged, but its batch can never execute and has to be reverted, so a chain's exposure to
 a faulty commit is its prepaid balance. A reverted batch is not refunded, whoever reverts it (the operator, the CTM, or
-priority-mode activation), and interop re-committed outside priority mode is charged again.
+priority-mode activation), and interop re-committed outside priority mode is charged again. Until the proof, the
+count is guarded by the external nodes, which derive it from their own execution before signing the commit, like the
+rest of the commit data ({protocol-docs/chain-config.md#external-node-signatures}).
 
 ## The switch
 
