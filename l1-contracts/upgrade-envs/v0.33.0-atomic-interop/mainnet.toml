@@ -9,14 +9,16 @@
 # back to the local default, which would silently substitute local's values for the keys this
 # file does supply.
 #
-# ⚠ Salts, `owner_address` and `era_chain_id` are NOT read from this file yet.
-# `EnvConfig` still resolves them from `upgrade-envs/v0.31.0-interopB/<env>.toml`
-# (`env_config.rs`'s `V31_UPGRADE_DIR`), so editing them here has no effect — and a v33
-# prepare consequently reuses the v31 CREATE2 salt, which the salt is explicitly not
-# supposed to be (it rotates per regen, or CREATE2 returns the previously deployed
-# contract). Moving that namespace per release also moves the canonical review-artifact
-# directory (`output/<env>/`), so it is left as a follow-up decision rather than folded
-# into this PR.
+# ⚠ `[contracts] create2_factory_salt` and the `[create2_factory_salts]` entries MUST be
+# rotated before every regen. CREATE2 returns the previously deployed contract for a repeated
+# (salt, initcode) pair, so a reused salt silently keeps the old bytecode instead of deploying
+# the new one. Mint fresh ones with:
+#   python3 -c "import secrets; print('0x' + secrets.token_hex(32))"
+#
+# (An earlier revision of this header claimed the salts, `owner_address` and `era_chain_id`
+# were still resolved from `upgrade-envs/v0.31.0-interopB/<env>.toml` and that editing them
+# here had no effect. That is wrong and was dangerous: `env_config.rs` sets
+# `UPGRADE_ENV_DIR = "upgrade-envs/v0.33.0-atomic-interop"`, so this file *is* the source.)
 #
 # Pruned for v33: the EraVM chain-creation params and v29-era leftovers earlier envs carried
 # (bootloader / default-AA / EVM-emulator hashes, `recursion_*_vk_hash`, `genesis_*`,

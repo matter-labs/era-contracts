@@ -38,16 +38,27 @@ and regenerate the contract.
 `verificationKeyHash()` is `keccak256` over the three pins in that order, so
 a rotation of any pin rotates the hash.
 
-The current `rootCVadcopFinal` and the committed Plonk verification key match
-ZiSK [v1.3.0-alpha](https://github.com/0xPolygonHermez/zisk/releases/tag/v1.3.0-alpha)
-(`zisk-contracts/` at the tag). The program VK pins are the 1.3.0-alpha
-`cargo-zisk setup` values of the zksync-os-zisk guests, derived in
-[rotation runs 35695453171](https://github.com/matter-labs/zksync-os-zisk/actions/runs/35695453171) (aggregator) and [35702731860](https://github.com/matter-labs/zksync-os-zisk/actions/runs/35702731860) (inner, after the guest moved its state commitment to the blake2sf precompile).
-The real-proof fixtures use the same 1.3.0-alpha setup and program VKs, from
-[GPU run 36396740141](https://github.com/matter-labs/zksync-os-zisk/actions/runs/36396740141).
-The run reproduces both guest ELFs, compares all four proved batch commitments
-with native execution, and checks the aggregated binding digest before the
-fixtures are verified against the real Plonk backend in Foundry.
+The pins come from [zksync-os-zisk release 0.0.8](https://github.com/matter-labs/zksync-os-zisk/releases/tag/0.0.8),
+using ZiSK [v1.3.1-alpha](https://github.com/0xPolygonHermez/zisk/releases/tag/v1.3.1-alpha)
+and zksync-os-revm v0.3.3. The release's `zisk-release.json` records both
+reproducible ELF hashes, program VKs and the vadcop-final root. Its published
+verification-key archive SHA-256 is
+`2456bf72d2c19d05ca89cc387b46d0212d486b3cc9cca3a1b195fc29c2ef4cb0`.
+The combined verification-key hash is
+`0xccbd185e1a69e66b423e578f2e67662943907fdf510d91ff9fbe45c579320d38`.
+
+The final PLONK circuit key is unchanged from ZiSK 1.3.0-alpha: its domain,
+SRS, omega, coset constants and circuit commitments match the upstream
+1.3.1-alpha verifier. Existing backends for that circuit can be reused.
+
+The real-proof fixtures come from [fixture-session run 37659618382](https://github.com/matter-labs/zksync-os-zisk/actions/runs/37659618382).
+Its ELF hashes and all three key pins match release 0.0.8. The session proved
+four deterministic batches, compared their commitments against native
+execution, and produced the aggregated binding digest
+`0x3d7f030cacc8d291c78c7550d5f0c7cbc5fa54095165dda50f899d8eb3809bcd`.
+The proof artifacts were uploaded before the separate fixture-publication
+job failed to compile a native dependency; local Foundry tests verify both
+PLONK fixtures against the real upstream backend.
 
 ## Preparing the backend
 

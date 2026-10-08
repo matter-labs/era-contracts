@@ -8,7 +8,7 @@ use crate::{
     common::logger,
     upgrade_verification::{
         artifact_shape, artifacts::EcosystemUpgradeArtifact, verifiers::VerificationResult,
-        versions::v31::utils::transactions_log,
+        versions::v33::utils::transactions_log,
     },
 };
 
@@ -38,7 +38,7 @@ pub struct VerifyUpgradeArgs {
     #[clap(long, default_value = "http://localhost:8545")]
     pub l1_rpc_url: String,
 
-    /// Path to the v31 ecosystem upgrade TOML produced by `upgrade-prepare`.
+    /// Path to the release ecosystem upgrade TOML produced by `upgrade-prepare`.
     #[clap(long)]
     pub ecosystem_toml: PathBuf,
 
@@ -117,6 +117,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
             env_cfg.upgrade_input_path.display()
         )
     })?;
+    let message_root_era_gateway_chain_id = env_cfg.message_root_era_gateway_chain_id();
     let l1_chain_id = env_cfg.l1_chain_id().ok_or_else(|| {
         anyhow::anyhow!(
             "{} is missing top-level `l1_chain_id`",
@@ -135,6 +136,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
             env_cfg.permanent_values_path.display()
         )
     })?;
+
     // Collect every pinned CREATE2 salt declared in the env config — the Core
     // salt from `[contracts] create2_factory_salt` plus the per-CTM salts under
     // `[create2_factory_salts]`. PUVT hard-errors per deploy whose salt isn't
@@ -166,7 +168,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         env_cfg.permanent_values_path.display()
     ));
     logger::info(format!(
-        "V31 input: {}",
+        "Release input: {}",
         env_cfg.upgrade_input_path.display()
     ));
     logger::info(format!("Ecosystem TOML: {}", args.ecosystem_toml.display()));
@@ -184,8 +186,9 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         "zk-governance commit: {}",
         args.zk_governance_commit
     ));
+    logger::info(format!("Representative ZK chain ID: {era_chain_id}"));
     logger::info(format!(
-        "Era chain ID (v31-ceremony input; feeds the PUH ERA_CHAIN_ID constructor check): {era_chain_id}"
+        "L1MessageRoot ERA_GATEWAY_CHAIN_ID: {message_root_era_gateway_chain_id}"
     ));
     logger::info(format!("L1 chain ID (expected): {l1_chain_id}"));
     logger::info(format!("CREATE2 factory: {create2_factory}"));
@@ -210,13 +213,14 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
 
     let mut result = VerificationResult::default();
 
-    let verification_result = crate::upgrade_verification::versions::v31::verify(
+    let verification_result = crate::upgrade_verification::versions::v33::verify(
         args.env,
         &artifact,
         &args.l1_rpc_url,
         args.contracts_commit.as_deref(),
         args.zk_governance_commit.as_str(),
         era_chain_id,
+        message_root_era_gateway_chain_id,
         l1_chain_id,
         &tx_hashes,
         create2_factory,
@@ -245,7 +249,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
 }
 
 fn print_encoded_upgrade_data(label: &str, stage_calls_hex: &str) {
-    use crate::upgrade_verification::versions::v31::elements::call_list::{
+    use crate::upgrade_verification::versions::v33::elements::call_list::{
         CallList, UpgradeProposal,
     };
     use alloy::sol_types::SolValue;
