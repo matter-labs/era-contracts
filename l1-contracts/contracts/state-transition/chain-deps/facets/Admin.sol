@@ -23,6 +23,7 @@ import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
 import {
+    DepositsPaused,
     L1DAValidatorAddressIsZero,
     NotL1,
     PriorityModeAlreadyAllowed,
@@ -462,6 +463,12 @@ contract AdminFacet is ZKChainBase, IAdmin {
         }
         if (s.zksyncOSL1TxFilteringEnabled) {
             revert NotCompatibleWithPriorityMode();
+        }
+        // Paused deposits block every new L1->L2 request, so allowing Priority Mode on top of a pause
+        // would leave users unable to submit the forced transactions it exists for. This mirrors the
+        // check in `pauseDepositsBeforeInitiatingMigration`, which refuses to pause once Priority Mode is allowed.
+        if (s.pausedDepositsTimestamp != 0) {
+            revert DepositsPaused();
         }
         // Ensure that there is at least one priority tx with a non-zero request timestamp.
         // This guarantees that activatePriorityMode can actually function, since it relies on

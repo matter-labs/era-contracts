@@ -6,12 +6,15 @@ import {ExecutorTest} from "./_Executor_Shared.t.sol";
 import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {
     InvalidTxCountInPriorityMode,
+    NotCompatibleWithPriorityMode,
     PriorityModeActivationTooEarly,
     PriorityModeIsNotAllowed,
     PriorityModeRequiresPermanentRollup,
     PriorityOpsRequestTimestampMissing,
     Unauthorized
 } from "contracts/common/L1ContractErrors.sol";
+import {DepositsPaused} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {PRIORITY_EXPIRATION} from "contracts/common/Config.sol";
 
 contract PriorityModeExecutorTest is ExecutorTest {
@@ -36,6 +39,53 @@ contract PriorityModeExecutorTest is ExecutorTest {
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(PriorityOpsRequestTimestampMissing.selector, 0));
         admin.permanentlyAllowPriorityMode();
+    }
+
+    /// @dev Regression test (AIH-431): the admin pauses deposits first and then permanently allows Priority Mode.
+    /// Without the guard, the chain would advertise the escape hatch while no user can submit a new
+    /// priority transaction, and once the queue drains `activatePriorityMode` can never be triggered.
+    function test_revertWhen_permanentlyAllowPriorityMode_depositsPaused() public {
+        vm.prank(owner);
+        admin.makePermanentRollup();
+        _requestPriorityOp();
+
+        vm.prank(owner);
+        migrator.pauseDepositsBeforeInitiatingMigration();
+        assertEq(utilsFacet.util_getPausedDepositsTimestamp(), block.timestamp);
+
+        vm.prank(owner);
+        vm.expectRevert(DepositsPaused.selector);
+        admin.permanentlyAllowPriorityMode();
+
+        assertFalse(utilsFacet.util_getPriorityModeCanBeActivated());
+    }
+
+    /// @dev Once the admin unpauses deposits, Priority Mode can be allowed, and from then on deposits
+    /// cannot be paused again, so the pause and Priority Mode can never coexist in either order.
+    function test_permanentlyAllowPriorityMode_afterDepositsUnpaused() public {
+        vm.prank(owner);
+        admin.makePermanentRollup();
+        _requestPriorityOp();
+
+        vm.prank(owner);
+        migrator.pauseDepositsBeforeInitiatingMigration();
+
+        // `unpauseDeposits` asks the bridgehub's chain asset handler whether a migration is in progress.
+        dummyBridgehub.setChainAssetHandler(address(chainAssetHandler));
+        vm.prank(owner);
+        migrator.unpauseDeposits();
+        assertEq(utilsFacet.util_getPausedDepositsTimestamp(), 0);
+
+        vm.expectEmit(true, true, true, true, address(admin));
+        emit IAdmin.PriorityModeAllowed();
+        vm.prank(owner);
+        admin.permanentlyAllowPriorityMode();
+        assertTrue(utilsFacet.util_getPriorityModeCanBeActivated());
+
+        vm.prank(owner);
+        vm.expectRevert(NotCompatibleWithPriorityMode.selector);
+        migrator.pauseDepositsBeforeInitiatingMigration();
+        assertEq(utilsFacet.util_getPausedDepositsTimestamp(), 0);
     }
 
     function test_revertWhen_activatePriorityMode_tooEarly() public {
