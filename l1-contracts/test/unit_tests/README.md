@@ -1,4 +1,3 @@
 # Tips
 
-- When testing, when using initialDeployment make deployer have verbose:true, this will print out deployment logs.
--
+- To print deployment logs, set `verbose: true` in `defaultDeployerForTests` (used by `initialTestnetDeploymentProcess`) or `defaultEraDeployerForTests` (used by `initialEraTestnetDeploymentProcess` and `initialPreUpgradeContractsDeployment`) in `l1-contracts/src.ts/deploy-test-process.ts`.
