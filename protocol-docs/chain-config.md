@@ -63,7 +63,8 @@ Protocol-ops defaults to `DefaultCoreUpgrade` and `CTMUpgrade_v34`, with a v33-t
 `upgrade-envs/v0.34.0-chain-config/local.toml`. The visible `--ctm-script-path`,
 `--core-script-path`, and `--upgrade-input-path` flags select historical or environment-specific
 preparations. A named environment must supply its v34 input; missing inputs fail rather than falling
-back to v33 or local parameters. The historical v31-to-v33 runner explicitly selects v33 scripts.
+back to v33 or local parameters. The anvil upgrade test runs exactly these defaults against the v33 chain
+states, so it covers v33 to v34.
 
 Config setters retain their existing guard against updates with unproved committed batches to keep
 this commitment-format upgrade from also changing the existing administrative update policy. This

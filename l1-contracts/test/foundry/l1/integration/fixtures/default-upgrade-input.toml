@@ -1,0 +1,9 @@
+# Upgrade input for the Foundry local upgrade harness (`UpgradeTest_Local.t.sol`), which runs the
+# current default upgrade scripts (`DefaultCoreUpgrade` + `DefaultCTMUpgrade`) against a freshly
+# deployed ecosystem.
+#
+# Deliberately version-free: the target protocol version is derived in the test from the genesis
+# config (genesis minor + 1), so nothing here needs editing on a release bump.
+#
+# Both scripts require an input file but every key in it is optional, and the harness needs none of
+# them, so this file is intentionally empty of keys.

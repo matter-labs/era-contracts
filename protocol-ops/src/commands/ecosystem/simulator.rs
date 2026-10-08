@@ -333,7 +333,7 @@ pub struct GovernanceTomlToSimulatorArgs {
     pub topology: crate::common::EcosystemArgs,
 
     /// Path to a protocol-ops governance TOML. Defaults to
-    /// `upgrade-envs/v0.33.0-atomic-interop/output/<env>/ecosystem.toml`
+    /// `<current upgrade-env dir>/output/<env>/ecosystem.toml`
     /// when `--env` is set — that's where `upgrade-prepare-all` writes the
     /// merged TOML (canonical tracked path).
     #[clap(long)]
@@ -345,7 +345,7 @@ pub struct GovernanceTomlToSimulatorArgs {
     pub network: Option<String>,
 
     /// Sender to put into every transaction. Defaults to the env's
-    /// `owner_address` from `upgrade-envs/v0.33.0-atomic-interop/<env>.toml`.
+    /// `owner_address` from `<current upgrade-env dir>/<env>.toml`.
     #[clap(long)]
     pub from: Option<Address>,
 
@@ -385,7 +385,7 @@ pub struct GovernanceTomlToSimulatorArgs {
     /// Optional path to a `sim-descriptions.toml` that overrides each
     /// emitted tx's `description` field with a human-readable string keyed by
     /// `(target, selector)` (+ optional discriminators). Auto-discovered at
-    /// `upgrade-envs/v0.33.0-atomic-interop/<env>/sim-descriptions.toml` when
+    /// `<current upgrade-env dir>/<env>/sim-descriptions.toml` when
     /// `--env` is set and the file exists.
     #[clap(long)]
     pub descriptions: Option<PathBuf>,
@@ -550,8 +550,7 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
             let cfg = env_cfg.as_ref().ok_or_else(|| {
                 anyhow::anyhow!("--governance-toml is required unless --env is set")
             })?;
-            crate::common::env_config::default_protocol_ops_out_dir(&cfg.env)?
-                .join("ecosystem.toml")
+            cfg.protocol_ops_out_dir().join("ecosystem.toml")
         }
     };
 
@@ -565,12 +564,13 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
 
     let from = match args.from {
         Some(addr) => addr,
-        None => env_cfg
-            .as_ref()
-            .and_then(|cfg| cfg.owner_address())
-            .ok_or_else(|| {
-                anyhow::anyhow!("--from is required unless --env resolves an owner_address")
-            })?,
+        None => match env_cfg.as_ref() {
+            Some(cfg) => cfg.owner_address()?,
+            None => None,
+        }
+        .ok_or_else(|| {
+            anyhow::anyhow!("--from is required unless --env resolves an owner_address")
+        })?,
     };
 
     // Resolve manifest path: explicit `--include-manifest` wins; otherwise
@@ -582,29 +582,26 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
     let manifest_path = match args.include_manifest {
         Some(path) => Some(path),
         None => env_cfg.as_ref().and_then(|cfg| {
-            crate::common::env_config::default_protocol_ops_out_dir(&cfg.env)
-                .ok()
-                .and_then(|base| {
-                    let sim_inputs = base.join("sim-inputs").join("manifest.json");
-                    let prepare = base.join("prepare").join("manifest.json");
-                    let candidates = if args.emit_sim_inputs.is_some() {
-                        [prepare, sim_inputs]
-                    } else {
-                        [sim_inputs, prepare]
-                    };
-                    candidates.into_iter().find(|p| p.is_file())
-                })
+            Some(cfg.protocol_ops_out_dir()).and_then(|base| {
+                let sim_inputs = base.join("sim-inputs").join("manifest.json");
+                let prepare = base.join("prepare").join("manifest.json");
+                let candidates = if args.emit_sim_inputs.is_some() {
+                    [prepare, sim_inputs]
+                } else {
+                    [sim_inputs, prepare]
+                };
+                candidates.into_iter().find(|p| p.is_file())
+            })
         }),
     };
 
     // Resolve descriptions registry: explicit `--descriptions` wins; otherwise
     // auto-discover the file alongside the env config TOML (one level up from
     // `<env-out>/`). For the v31 stage env that's
-    // `upgrade-envs/v0.33.0-atomic-interop/sim-descriptions.toml`.
+    // `<current upgrade-env dir>/sim-descriptions.toml`.
     let descriptions_path = args.descriptions.or_else(|| {
         env_cfg.as_ref().and_then(|cfg| {
-            crate::common::env_config::default_protocol_ops_out_dir(&cfg.env)
-                .ok()
+            Some(cfg.protocol_ops_out_dir())
                 .and_then(|out| out.parent().map(|p| p.to_path_buf()))
                 .and_then(|out_parent| out_parent.parent().map(|p| p.to_path_buf()))
                 .map(|root| root.join("sim-descriptions.toml"))

@@ -1,9 +1,17 @@
 l1_chain_id = 11155111
 
-# TODO(testnet): no L1NativeTokenVault asset ID is registered yet. Populate this
-# once the token is live; PUVT and `ecosystem upgrade-prepare-all --env testnet`
-# will bail without it.
-# zk_token_asset_id = "0x..." # TODO
+# ZK token asset ID as registered in this ecosystem's L1NativeTokenVault (0xF8d4A519...).
+# Resolves to 0xd1Ee6cE0A0fDB29793cbDC41DcFE5d356C7d5C7f ("ZKsync"/ZK), whose originChainId
+# is 301 — the bridged L1 representation of the chain-301 ZK token.
+#
+# Recovered from live state rather than chosen: it is the `zkTokenAssetId` field of the
+# ZKsync OS CTM's current chain-creation params, as emitted by `NewChainCreationParams` in
+# the v31 upgrade (tx 0xb7141992..., block 11172145). Keeping it identical means the v33
+# params carry the same L2 `InteropCenter.ZK_TOKEN_ASSET_ID` the ecosystem already runs with.
+#
+# NOTE: not 0xc479e944..., which is what the same NTV assigns to 0xF41D4478... (a stage-NTV
+# bridged ZK token that testnet re-registered as an L1-native asset).
+zk_token_asset_id = "0xefb0794fa43edc760ef9bf5b09af2fc0a667a288453d2d55d48878897dc2f317"
 
 # Whether this environment's CTM verifier is the testnet one. Env-wide, not per-CTM.
 # Non-mainnet envs run `ZKsyncOSTestnetVerifier`, which accepts unproven batches.
@@ -11,12 +19,16 @@ testnet_verifier = true
 
 [permanent_contracts]
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
-# `create2_factory_salt` lives in the v31 input TOML
-# (`upgrade-envs/v0.31.0-interopB/<env>.toml [contracts] create2_factory_salt`),
-# not here — it rotates every regen so it isn't a permanent value.
+# `create2_factory_salt` lives in the release input TOML
+# (`<release dir>/<env>.toml [contracts] create2_factory_salt`),
+# not here — it rotates every release so it isn't a permanent value.
 
 [core_contracts]
 bridgehub_proxy_addr = "0xc4fd2580c3487bba18d63f50301020132342fdbd"
+# `bridgehub.owner()` is the ProtocolUpgradeHandler 0x803e5E7aF1FDD504F8844E28a249203Cfa7c471D,
+# not a plain `Ownable` — so governance replay must impersonate the handler directly rather
+# than taking the schedule+execute path.
+governance_kind = "puh"
 
 
 # TODO(EVM-1200): Retained for consumers of the legacy single-CTM shape; points to Atlas.

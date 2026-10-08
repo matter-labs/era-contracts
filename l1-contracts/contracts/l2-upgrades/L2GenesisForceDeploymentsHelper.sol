@@ -343,10 +343,10 @@ library L2GenesisForceDeploymentsHelper {
     }
 
     /// @notice Calls initL2() on the contracts initialized after the bridgehub wiring in `_finalizeDeployments`.
-    /// @dev Genesis only: every chain an upgrade from this release applies to (v32 or later) already runs them
+    /// @dev Genesis only: every chain an upgrade from this release applies to (v33 or later) already runs them
     /// initialized, and their `initL2`s are one-shot. The v31 contracts keep the position v31 called them from,
     /// so the genesis sequence is unchanged; none of them reads the wiring. The atomic-interop built-ins are the
-    /// v32 additions (see
+    /// v33 additions (see
     /// {protocol-docs/chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins}).
     function _initContractsAfterWiring(
         FixedForceDeploymentsData memory _fixedForceDeploymentsData,

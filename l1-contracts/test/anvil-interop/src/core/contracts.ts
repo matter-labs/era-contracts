@@ -60,10 +60,8 @@ const ARTIFACTS = {
   MockL2MessageVerification: "MockL2MessageVerification.sol/MockL2MessageVerification.json",
   MockMintBaseTokenHook: "MockMintBaseTokenHook.sol/MockMintBaseTokenHook.json",
   Ownable2Step: "Ownable2Step.sol/Ownable2Step.json",
-  PriorityOpLowerBound: "PriorityOpLowerBound.sol/PriorityOpLowerBound.json",
   ProxyAdmin: "ProxyAdmin.sol/ProxyAdmin.json",
   DefaultUpgradeZKsyncOS: "DefaultUpgradeZKsyncOS.sol/DefaultUpgradeZKsyncOS.json",
-  V32UpgradeZKsyncOS: "V32UpgradeZKsyncOS.sol/V32UpgradeZKsyncOS.json",
   SystemContractProxy: "SystemContractProxy.sol/SystemContractProxy.json",
   SystemContractProxyAdmin: "SystemContractProxyAdmin.sol/SystemContractProxyAdmin.json",
   SystemContext: "SystemContext.sol/SystemContext.json",
@@ -97,22 +95,3 @@ export function getCreationBytecode(name: ContractName): string {
 // ── Legacy ABIs ─────────────────────────────────────────────────
 // ABIs for older contract versions that no longer exist as artifacts.
 // Kept here (not inline) so every consumer imports from a single source of truth.
-
-/**
- * Legacy AdminFacet ABI: upgradeChainFromVersion(uint256, DiamondCutData) with 2 params. The current
- * AdminFacet has upgradeChainFromVersion(address, uint256, DiamondCutData) with 3 params. Only reachable
- * from fork runs against an ecosystem that predates the third parameter; the state-dump scenarios all
- * start at v31, which already has it.
- */
-export const LEGACY_ADMIN_ABI: string[] = [
-  "function upgradeChainFromVersion(uint256, tuple(tuple(address,uint8,bool,bytes4[])[],address,bytes))",
-];
-
-/**
- * v31 Admin facet entry point removed in v32 (the backfill service-transaction request). The
- * harness calls it on forked v31 chains whose fixture never ran the backfill, so the current
- * AdminFacet artifact no longer carries the selector.
- */
-export const LEGACY_V31_ADMIN_BACKFILL_ABI: string[] = [
-  "function setZKsyncOSPreV31TotalSupply(uint256 _totalSupply) returns (bytes32)",
-];
