@@ -585,18 +585,25 @@ async fn verify_v31_core_wiring(
             if actual_beacon == Address::ZERO {
                 result.report_error("L1NativeTokenVault.bridgedTokenBeacon() is address(0)");
             } else {
-                let beacon_owner = Ownable::new(actual_beacon, provider.clone());
-                match beacon_owner.owner().call().await {
-                    Ok(actual_owner) => expect_address_eq(
-                        result,
-                        "L1NativeTokenVault.bridgedTokenBeacon().owner()",
-                        actual_owner,
-                        bridgehub_owner,
-                    ),
-                    Err(err) => result.report_error(&format!(
-                        "Failed to call bridged token beacon owner() for core wiring checks: {err}"
-                    )),
-                }
+                // Through the shared classifier, like the ValidatorTimelock /
+                // RollupDAManager / verifier checks. A raw equality against
+                // `bridgehub_owner` errors on an ecosystem whose beacon is held by
+                // whoever owns the governance rather than by the governance itself:
+                // ADI's beacon is owned by the Safe that owns its `Governance.sol`.
+                // The classifier calls that `GovernanceController` and warns — same
+                // principals, no timelock in front, and v31 does not transfer it.
+                // There is no ecosystem admin at core scope (it is per-CTM) and the
+                // beacon has no v31 handoff, so no ecosystem-admin path applies.
+                report_governance_ownership(
+                    result,
+                    &provider,
+                    "L1NativeTokenVault.bridgedTokenBeacon()",
+                    actual_beacon,
+                    bridgehub_owner,
+                    artifact.transitionary_owner,
+                    Address::ZERO,
+                )
+                .await;
             }
         }
         Err(err) => result.report_error(&format!(

@@ -44,6 +44,8 @@ use elements::{
 ///   re-cut from v0.30.1 against this branch's genesis. Its ceremony has not
 ///   executed: exactly one target is acceptable.
 /// * ADI is a ZKsync-OS-only ecosystem on L1 mainnet, cut from the same branch.
+///   Its CTM took the v0.30.2 verifier patch at block 25926020, so it upgrades
+///   from v0.30.2, not mainnet's v0.30.1.
 /// * Sepolia (testnet, stage) already executed v31 from the July calldata —
 ///   Era v0.29.4 → v0.31.0, ZKsync OS v0.30.1 → v0.31.0 — and their committed
 ///   artifacts record that ceremony. A fresh rehearsal of those envs from this
@@ -88,8 +90,10 @@ const SEPOLIA_EXECUTED_V31_PROTOCOL_VERSION: &str = "0.31.0";
 /// Sepolia's source versions at execution: Era CTM v0.29.4, ZKsync OS CTM v0.30.1.
 const SEPOLIA_ERA_SOURCE_PROTOCOL_VERSION: &str = "0.29.4";
 const SEPOLIA_ZKSYNC_OS_SOURCE_PROTOCOL_VERSION: &str = "0.30.1";
-/// Both mainnet CTMs (and ADI's) are on v0.30.1 when v31 executes.
+/// Both mainnet CTMs are on v0.30.1 when v31 executes.
 const MAINNET_SOURCE_PROTOCOL_VERSION: &str = "0.30.1";
+/// ADI's ZKsync OS CTM is on v0.30.2 (its verifier patch, block 25926020).
+const ADI_SOURCE_PROTOCOL_VERSION: &str = "0.30.2";
 
 pub(crate) fn expected_protocol_versions(
     env: VerifyUpgradeEnv,
@@ -108,9 +112,8 @@ pub(crate) fn expected_protocol_versions(
             SEPOLIA_ZKSYNC_OS_SOURCE_PROTOCOL_VERSION,
             vec![SEPOLIA_EXECUTED_V31_PROTOCOL_VERSION, branch_genesis],
         ),
-        (VerifyUpgradeEnv::Mainnet | VerifyUpgradeEnv::Adi, _) => {
-            (MAINNET_SOURCE_PROTOCOL_VERSION, vec![branch_genesis])
-        }
+        (VerifyUpgradeEnv::Mainnet, _) => (MAINNET_SOURCE_PROTOCOL_VERSION, vec![branch_genesis]),
+        (VerifyUpgradeEnv::Adi, _) => (ADI_SOURCE_PROTOCOL_VERSION, vec![branch_genesis]),
     };
     let parse = |v: &str| ProtocolVersion::from_str(v).expect("protocol version literal");
     ExpectedProtocolVersions {
@@ -412,13 +415,15 @@ mod tests {
         }
     }
 
-    /// ADI ships no Era CTM and is cut from mainnet's branch: same ZKsync OS pair.
+    /// ADI ships no Era CTM and is cut from mainnet's branch, so it shares mainnet's ZKsync OS
+    /// target. Its source differs: ADI's CTM took the v0.30.2 verifier patch, mainnet's did not.
     #[test]
-    fn adi_follows_mainnet() {
-        assert_eq!(
-            expected_protocol_versions(VerifyUpgradeEnv::Adi, CtmFlavor::ZksyncOs),
-            expected_protocol_versions(VerifyUpgradeEnv::Mainnet, CtmFlavor::ZksyncOs)
-        );
+    fn adi_shares_mainnets_target_but_upgrades_from_v0_30_2() {
+        let adi = expected_protocol_versions(VerifyUpgradeEnv::Adi, CtmFlavor::ZksyncOs);
+        let mainnet = expected_protocol_versions(VerifyUpgradeEnv::Mainnet, CtmFlavor::ZksyncOs);
+        assert_eq!(adi.new, mainnet.new);
+        assert_eq!(adi.old, ProtocolVersion::from_str("0.30.2").unwrap());
+        assert_eq!(mainnet.old, ProtocolVersion::from_str("0.30.1").unwrap());
     }
 
     /// The mainnet list may only hold contracts the upgrade does not use: none of them appears

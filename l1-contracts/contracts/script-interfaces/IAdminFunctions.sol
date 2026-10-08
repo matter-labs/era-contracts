@@ -17,6 +17,9 @@ import {L2DACommitmentScheme, PubdataPricingMode} from "contracts/common/Config.
 ///     wrapped via `scheduleTransparent` + `executeInstant` from EOA)
 ///   - 2 = `OWNER_KIND_OZ_CHAIN_ADMIN` (Ownable2Step `ChainAdmin`, wrapped
 ///     via `multicall` from EOA)
+///   - 3 = `OWNER_KIND_SAFE` (Gnosis Safe — the call is issued as the Safe
+///     itself, so it lands in a bundle keyed by the Safe for its signers to
+///     execute; there is no on-chain wrapper to route through)
 struct OwnerWrap {
     address ownableContract;
     uint8 kind;
@@ -25,6 +28,7 @@ struct OwnerWrap {
 uint8 constant OWNER_KIND_NONE = 0;
 uint8 constant OWNER_KIND_LEGACY_GOVERNANCE = 1;
 uint8 constant OWNER_KIND_OZ_CHAIN_ADMIN = 2;
+uint8 constant OWNER_KIND_SAFE = 3;
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
