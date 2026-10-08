@@ -66,8 +66,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         uint256 oldProtocolVersion;
         address ecosystemAdminAddress;
         uint256 governanceUpgradeTimerInitialDelay;
-        bool hasPreV32IntrospectionOverride;
-        bool usePreV32IntrospectionOverride;
     }
 
     struct NewlyGeneratedData {
@@ -216,12 +214,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
             testnetVerifier: testnetVerifier
         });
         ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(Utils.genesisConfigPath());
-
-        // Optional override for pre-v32 introspection selection
-        if (toml.keyExists("$.pre_v32_introspection")) {
-            newConfig.hasPreV32IntrospectionOverride = true;
-            newConfig.usePreV32IntrospectionOverride = toml.readBool("$.pre_v32_introspection");
-        }
 
         initializeConfig(chainCreationParams, permanentConfig, governance);
 
@@ -434,28 +426,11 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         // Verify CTM contract exists
         require(ctm.code.length > 0, "CTM contract does not exist at specified address");
 
-        // CTM exists - get bridgehub and determine which introspection to use
         address bridgehubAddr = ChainTypeManager(ctm).BRIDGE_HUB();
         bridgehub = L1Bridgehub(bridgehubAddr);
 
-        bool preV32Ecosystem;
-        if (newConfig.hasPreV32IntrospectionOverride) {
-            preV32Ecosystem = newConfig.usePreV32IntrospectionOverride;
-        } else if (!AddressIntrospector.hasRegisteredChains(bridgehubAddr)) {
-            // A chainless ecosystem has no protocol version to inspect. It cannot have been upgraded into
-            // existence either, so it was deployed from scratch with the current contracts.
-            preV32Ecosystem = false;
-        } else {
-            preV32Ecosystem = AddressIntrospector.shouldUsePreV32Introspection(bridgehubAddr);
-        }
-
-        if (preV32Ecosystem) {
-            ctmAddresses = AddressIntrospector.getCTMAddressesV31(ctm);
-            coreAddresses = AddressIntrospector.getCoreDeployedAddressesV31(bridgehubAddr);
-        } else {
-            ctmAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManager(ctm));
-            coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubAddr);
-        }
+        ctmAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManager(ctm));
+        coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubAddr);
 
         config.ownerAddress = ctmAddresses.admin.governance;
 
@@ -737,7 +712,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     /// @notice Points the CTM at the upgrade contract deployed by this release, so that later upgrades that need
     /// no custom upgrade logic (e.g. verifier-only ones) can reuse it.
     /// @dev Must be executed after the CTM implementation upgrade, as `setDefaultUpgrade` is only present
-    /// starting from v32.
+    /// starting from v33.
     function prepareSetDefaultUpgradeCall() public virtual returns (Call[] memory calls) {
         require(
             ctmAddresses.stateTransition.proxies.chainTypeManager != address(0),

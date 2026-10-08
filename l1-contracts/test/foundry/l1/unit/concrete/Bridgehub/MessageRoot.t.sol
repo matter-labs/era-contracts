@@ -310,9 +310,9 @@ contract MessageRootTest is Test {
     }
 
     /// @notice The legacy (v31) entry point records the root and advances the batch counter but does
-    /// NOT touch the interop trees: only v32 executors (via `addChainBatchRootV32`) populate them, so
-    /// a non-empty chain tree implies v32-format roots. Pre-upgrade executor facets keep calling this
-    /// name, and the consecutive numbering continues seamlessly after the switch to the V32 flow.
+    /// NOT touch the interop trees: only v33 executors (via `addChainBatchRootV32`) populate them, so
+    /// a non-empty chain tree implies v33-format roots. Pre-upgrade executor facets keep calling this
+    /// name, and the consecutive numbering continues seamlessly after the switch to the v33 flow.
     function test_addChainBatchRoot_v31RecordsWithoutTreePush() public {
         address alphaChainSender = makeAddr("alphaChainSender");
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
@@ -337,11 +337,11 @@ contract MessageRootTest is Test {
         assertEq(messageRoot.getAggregatedRoot(), sharedRootBefore, "shared tree must be untouched");
         assertEq(messageRoot.chainBatchRootTimestamp(alphaChainId, 1), 0, "no leaf timestamp recorded");
 
-        // The V32 flow continues the same numbering afterwards (post-upgrade switch).
+        // The v33 flow continues the same numbering afterwards (post-upgrade switch).
         vm.prank(alphaChainSender);
-        messageRoot.addChainBatchRootV32(alphaChainId, 2, keccak256("v32-root-2"));
+        messageRoot.addChainBatchRootV32(alphaChainId, 2, keccak256("v33-root-2"));
         assertEq(messageRoot.currentChainBatchNumber(alphaChainId), 2);
-        assertTrue(messageRoot.getChainRoot(alphaChainId) != chainRootBefore, "v32 push must move the chain tree");
+        assertTrue(messageRoot.getChainRoot(alphaChainId) != chainRootBefore, "v33 push must move the chain tree");
     }
 
     function test_addChainBatchRoot_1() public {

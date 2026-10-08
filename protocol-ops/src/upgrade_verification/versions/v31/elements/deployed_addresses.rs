@@ -944,34 +944,40 @@ fn verify_ctm_base_provenance(
         result.expect_create2_params(verifiers, &addr, Vec::<u8>::new(), expected_file);
     }
 
-    // PriorityOpLowerBound() — no ctor args; the registry the per-chain upgrade embeds.
-    let priority_op_lower_bound = required_address(
-        &ctm.value,
-        &scope,
-        &["state_transition", "priority_op_lower_bound_addr"],
-    )?;
-    result.expect_create2_params(
-        verifiers,
-        &priority_op_lower_bound,
-        Vec::<u8>::new(),
-        "l1-contracts/PriorityOpLowerBound",
-    );
-
-    // V32UpgradeZKsyncOS(IPriorityOpLowerBound) — the per-chain upgrade contract embeds the
-    // registry address as its single constructor argument, encoded as a left-padded 32-byte word.
+    // DefaultUpgradeZKsyncOS() — no ctor args. This is the reusable per-chain upgrade the CTM keeps
+    // as its default (`setDefaultUpgrade`), so it must be the generic implementation.
     let default_upgrade = required_address(
         &ctm.value,
         &scope,
         &["state_transition", "default_upgrade_addr"],
     )?;
-    let mut default_upgrade_ctor = vec![0u8; 32];
-    default_upgrade_ctor[12..].copy_from_slice(priority_op_lower_bound.as_slice());
     result.expect_create2_params(
         verifiers,
         &default_upgrade,
-        default_upgrade_ctor,
-        "l1-contracts/V32UpgradeZKsyncOS",
+        Vec::<u8>::new(),
+        "l1-contracts/DefaultUpgradeZKsyncOS",
     );
+
+    // V34UpgradeZKsyncOS() — no ctor args; the v34 cut's per-chain initializer. Only the v34
+    // release script (`CTMUpgrade_v34`) emits it, so it is checked when present.
+    if ctm
+        .value
+        .get("state_transition")
+        .and_then(|st| st.get("v34_upgrade_addr"))
+        .is_some()
+    {
+        let v34_upgrade = required_address(
+            &ctm.value,
+            &scope,
+            &["state_transition", "v34_upgrade_addr"],
+        )?;
+        result.expect_create2_params(
+            verifiers,
+            &v34_upgrade,
+            Vec::<u8>::new(),
+            "l1-contracts/V34UpgradeZKsyncOS",
+        );
+    }
 
     // DiamondInit() — no constructor arguments.
     let diamond_init = required_address(
