@@ -145,13 +145,21 @@ contract ZKsyncOSPublicInputTest is Test {
     /// so an operator can't commit a different count than the proven one. See {protocol-docs/interop-fee.md}.
     function test_batchOutputHash_matchesZKsyncOSInteropFeeUnitsGoldenVectors() public view {
         CommitBatchInfoZKsyncOS memory batch = _goldenInteropFeeBatch(7);
-        assertEq(committer.getBatchOutputHash(batch, _repeatedByte(0x44)), BATCH_OUTPUT_HASH_GOLDEN_INTEROP_FEE_UNITS_7);
+        assertEq(
+            committer.getBatchOutputHash(batch, _repeatedByte(0x44)),
+            BATCH_OUTPUT_HASH_GOLDEN_INTEROP_FEE_UNITS_7
+        );
 
         batch.interopFeeUnits = 0;
-        assertEq(committer.getBatchOutputHash(batch, _repeatedByte(0x44)), BATCH_OUTPUT_HASH_GOLDEN_INTEROP_FEE_UNITS_0);
+        assertEq(
+            committer.getBatchOutputHash(batch, _repeatedByte(0x44)),
+            BATCH_OUTPUT_HASH_GOLDEN_INTEROP_FEE_UNITS_0
+        );
     }
 
-    function _goldenInteropFeeBatch(uint256 _interopFeeUnits) internal pure returns (CommitBatchInfoZKsyncOS memory batch) {
+    function _goldenInteropFeeBatch(
+        uint256 _interopFeeUnits
+    ) internal pure returns (CommitBatchInfoZKsyncOS memory batch) {
         // Only the fields hashed into the batch output matter; the rest stay zero.
         batch.firstBlockTimestamp = 1;
         batch.lastBlockTimestamp = 2;

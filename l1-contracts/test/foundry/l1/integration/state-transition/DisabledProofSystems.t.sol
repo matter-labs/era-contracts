@@ -272,7 +272,10 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
         cuts[0] = _cut(address(new AdminFacet(block.chainid, RollupDAManager(address(0)))), selectors);
         selectors = new bytes4[](1);
         selectors[0] = ICommitter.commitBatchesSharedBridge.selector;
-        cuts[1] = _cut(address(new CommitterFacet(block.chainid, IInteropFeeManager(makeAddr("interopFeeManager")))), selectors);
+        cuts[1] = _cut(
+            address(new CommitterFacet(block.chainid, IInteropFeeManager(makeAddr("interopFeeManager")))),
+            selectors
+        );
         selectors = new bytes4[](1);
         selectors[0] = IExecutor.proveBatchesSharedBridge.selector;
         cuts[2] = _cut(address(new ExecutorFacet()), selectors);

@@ -34,10 +34,7 @@ abstract contract L2InteropFeeUnitsTestAbstract is L2InteropTestUtils {
     }
 
     function test_interopFeeUnits_slotConstantMatchesDerivation() public pure {
-        assertEq(
-            INTEROP_FEE_UNITS_SLOT,
-            bytes32(uint256(keccak256("zksync.interop-center.interop-fee-units")) - 1)
-        );
+        assertEq(INTEROP_FEE_UNITS_SLOT, bytes32(uint256(keccak256("zksync.interop-center.interop-fee-units")) - 1));
     }
 
     function test_interopFeeUnits_startsAtZero() public view {

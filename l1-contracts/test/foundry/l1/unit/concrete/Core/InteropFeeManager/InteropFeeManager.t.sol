@@ -9,7 +9,12 @@ import {IInteropFeeManager} from "contracts/core/interop-fee/IInteropFeeManager.
 import {InsufficientInteropFeeBalance, InteropFeeTransferFailed} from "contracts/core/interop-fee/InteropFeeErrors.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {ZKChainNotRegistered} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
-import {AmountMustBeGreaterThanZero, SlotOccupied, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {
+    AmountMustBeGreaterThanZero,
+    SlotOccupied,
+    Unauthorized,
+    ZeroAddress
+} from "contracts/common/L1ContractErrors.sol";
 
 /// @dev These tests isolate the fee manager from the Bridgehub and the diamond: the manager only reads
 /// `getZKChain` and `getAdmin`, so minimal stand-ins keep the setup readable. The full commit path with a

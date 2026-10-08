@@ -81,7 +81,11 @@ contract InteropFeeCommitTest is ExecutorTest {
         // No balance at all: a batch with no interop must still commit while the switch is on.
         _setFee(FEE_PER_UNIT);
 
-        vm.expectCall(address(interopFeeManager), abi.encodeWithSelector(IInteropFeeManager.chargeInteropFee.selector), 0);
+        vm.expectCall(
+            address(interopFeeManager),
+            abi.encodeWithSelector(IInteropFeeManager.chargeInteropFee.selector),
+            0
+        );
         _commit(_batchWithUnits(0), validator);
 
         assertEq(getters.getTotalBatchesCommitted(), 1);
@@ -97,7 +101,12 @@ contract InteropFeeCommitTest is ExecutorTest {
         _mockDAForCommit(batch.batchNumber);
         vm.prank(validator);
         vm.expectRevert(
-            abi.encodeWithSelector(InsufficientInteropFeeBalance.selector, l2ChainId, 2 * FEE_PER_UNIT, 3 * FEE_PER_UNIT)
+            abi.encodeWithSelector(
+                InsufficientInteropFeeBalance.selector,
+                l2ChainId,
+                2 * FEE_PER_UNIT,
+                3 * FEE_PER_UNIT
+            )
         );
         committer.commitBatchesSharedBridge(address(0), from, to, data);
 
@@ -134,7 +143,11 @@ contract InteropFeeCommitTest is ExecutorTest {
         // the permissionless validator without any prepaid balance.
         CommitBatchInfoZKsyncOS memory batch = _batchWithUnits(5);
         batch.numberOfLayer1Txs = 1;
-        vm.expectCall(address(interopFeeManager), abi.encodeWithSelector(IInteropFeeManager.chargeInteropFee.selector), 0);
+        vm.expectCall(
+            address(interopFeeManager),
+            abi.encodeWithSelector(IInteropFeeManager.chargeInteropFee.selector),
+            0
+        );
         _commit(batch, address(permissionlessValidator));
 
         assertEq(getters.getTotalBatchesCommitted(), 1);
