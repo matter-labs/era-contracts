@@ -1,0 +1,55 @@
+{
+  "l1Addresses": {
+    "bridgehub": "0x3BFDCfcc2Ac1d41071F3D8c52991f00C9Ac4D1B0",
+    "l1SharedBridge": "0x29b707d0E015407E37b5B04415AA59E8BB7FDC09",
+    "l1NullifierProxy": "0x2FD88F829BB8444b3c2500689576F115e1053aD4",
+    "l1NativeTokenVault": "0xe70F2Fd8cD8b92f12d715FA9D433e6e9A3fbBa6A",
+    "governance": "0xa60F07cAaFA0aE451296c0ca5C261578A390105e",
+    "transparentProxyAdmin": "0x0FA38b5c8cb180809E0C95E2EE923eC093123285",
+    "messageRoot": "0x4A4554662690D48e352C304aa64F7A471381D5eb",
+    "ctmDeploymentTracker": "0x7670f46FD22a3E012EB92bcd447ff26d520448EE",
+    "chainRegistrationSender": "0x031A653CFDA8d5e8f065d12c5b653Ab0F62f6e01"
+  },
+  "ctmAddresses": {
+    "chainTypeManager": "0x38E64Ba4118d5a67E0d1e1D03737121305f92156",
+    "chainAdmin": "0x16b5d0b1A5c64195453315C58671A6f847CE1aC2",
+    "verifier": "0x72a38a9930be419557939833c94701A4B26F1374",
+    "rollupL1DAValidator": "0xC533CcE441ED81782127ef99B936bFbeB62DD26B"
+  },
+  "chainAddresses": [
+    {
+      "chainId": 10,
+      "diamondProxy": "0xdD13b5D3E5776784f87eD56078Fd168B63E07258"
+    },
+    {
+      "chainId": 11,
+      "diamondProxy": "0x9976B04821F8E3894f0aF2aa1d92460394AaDE47"
+    },
+    {
+      "chainId": 12,
+      "diamondProxy": "0x2741365ef20319C72d404D328796185242c60984"
+    },
+    {
+      "chainId": 13,
+      "diamondProxy": "0x07B1D4ABed4DFD3cE881Cb993Ffa42Ed349D25ab"
+    },
+    {
+      "chainId": 14,
+      "diamondProxy": "0xA616166468703BBF197E0d4d17119254e9A4fb32"
+    }
+  ],
+  "testTokens": {
+    "10": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "11": "0x9A676e781A523b5d0C0e43731313A708CB607508",
+    "12": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "13": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "14": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+  },
+  "customBaseTokens": {
+    "14": "0x367761085BF3C12e5DA2Df99AC6E1a824612b8fb"
+  },
+  "zkToken": {
+    "l1Address": "0x4826533B4897376654Bb4d4AD88B7faFD0C98528",
+    "assetId": "0x29531b98baea905c89e9dcf602fc1ec219c72187989e76331e5fa3bf89c0b124"
+  }
+}
