@@ -109,7 +109,8 @@ library Utils {
                 chainId: TEST_CHAIN_ID,
                 operatorDAInput: abi.encodePacked(uint256(0)),
                 slChainId: block.chainid,
-                chainConfigHash: defaultChainConfigHash(TEST_CHAIN_ID)
+                chainConfigHash: defaultChainConfigHash(TEST_CHAIN_ID),
+                interopFeeUnits: 0
             });
     }
 

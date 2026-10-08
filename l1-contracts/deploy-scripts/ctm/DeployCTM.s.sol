@@ -27,6 +27,7 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
 import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
+import {IInteropFeeManager} from "contracts/core/interop-fee/IInteropFeeManager.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {CTMDeployedAddresses, Config, DeployCTMUtils} from "./DeployCTMUtils.s.sol";
@@ -170,6 +171,12 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         ) = deployServerNotifier();
 
         initializeGeneratedData();
+
+        // The Committer facet takes the fee manager as an immutable, so it has to exist first.
+        (
+            ctmAddresses.l1Specific.interopFeeManagerImplementation,
+            ctmAddresses.l1Specific.interopFeeManager
+        ) = deployTuppWithContract("InteropFeeManager");
 
         deployStateTransitionDiamondFacets();
         (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(CTMContract.ChainTypeManager);
@@ -341,6 +348,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         IOwnable(ctmAddresses.stateTransition.proxies.serverNotifier).transferOwnership(ctmAddresses.chainAdmin);
         IOwnable(ctmAddresses.daAddresses.daContracts.rollupDAManager).transferOwnership(ctmAddresses.admin.governance);
+        IOwnable(ctmAddresses.l1Specific.interopFeeManager).transferOwnership(ctmAddresses.admin.governance);
 
         vm.stopBroadcast();
         console.log("Owners updated");
@@ -410,6 +418,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             "deployed_addresses",
             "server_notifier_proxy_addr",
             ctmAddresses.stateTransition.proxies.serverNotifier
+        );
+        vm.serializeAddress(
+            "deployed_addresses",
+            "interop_fee_manager_proxy_addr",
+            ctmAddresses.l1Specific.interopFeeManager
         );
 
         vm.serializeAddress("deployed_addresses", "governance_addr", ctmAddresses.admin.governance);
@@ -632,7 +645,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         );
         ExecutorFacet executorFacet = new ExecutorFacet();
         MigratorFacet migratorFacet = new MigratorFacet(1, false);
-        CommitterFacet committerFacet = new CommitterFacet(1);
+        CommitterFacet committerFacet = new CommitterFacet(1, IInteropFeeManager(address(0)));
         bytes4[] memory adminFacetSelectors = Utils.getAllSelectors(address(adminFacet).code);
         bytes4[] memory gettersFacetSelectors = Utils.getAllSelectors(address(gettersFacet).code);
         bytes4[] memory mailboxFacetSelectors = Utils.getAllSelectors(address(mailboxFacet).code);

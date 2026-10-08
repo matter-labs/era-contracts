@@ -6,6 +6,7 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
+import {StorageSlot} from "@openzeppelin/contracts-v4/utils/StorageSlot.sol";
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
@@ -20,7 +21,7 @@ import {
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT
 } from "../common/l2-helpers/L2ContractInterfaces.sol";
 
-import {SETTLEMENT_LAYER_RELAY_SENDER, ETH_TOKEN_ADDRESS} from "../common/Config.sol";
+import {SETTLEMENT_LAYER_RELAY_SENDER, ETH_TOKEN_ADDRESS, INTEROP_FEE_UNITS_SLOT} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {
     L2_BOOTLOADER_ADDRESS,
@@ -736,6 +737,14 @@ contract InteropCenter is
             _lowNullifierIndex: _atomicSend.lowNullifierIndex,
             _flowPreimage: _atomicSend.flowPreimage
         });
+
+        // Counted in the same call as the IMT append: a leg that is not counted cannot be executed.
+        StorageSlot.getUint256Slot(INTEROP_FEE_UNITS_SLOT).value += _bundle.calls.length;
+    }
+
+    /// @inheritdoc IInteropCenter
+    function interopFeeUnits() external view returns (uint256) {
+        return StorageSlot.getUint256Slot(INTEROP_FEE_UNITS_SLOT).value;
     }
 
     /// @notice Emits ERC-7786 MessageSent events for each call in a bundle.

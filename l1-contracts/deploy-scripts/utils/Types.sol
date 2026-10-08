@@ -83,6 +83,8 @@ struct DataAvailabilityDeployedAddresses {
 /// @notice L1-specific state transition addresses that are not used in the Gateway context.
 struct L1SpecificStateTransitionAddresses {
     address legacyValidatorTimelock;
+    address interopFeeManagerImplementation;
+    address interopFeeManager;
 }
 
 struct CTMAdminAddresses {

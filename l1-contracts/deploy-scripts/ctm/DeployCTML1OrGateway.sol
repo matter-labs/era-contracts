@@ -16,6 +16,7 @@ struct CTMCoreDeploymentConfig {
     address verifierFflonk;
     address verifierPlonk;
     address permissionlessValidator;
+    address interopFeeManager;
 }
 
 /// @notice Canonical identifier for CTM / state-transition contracts.
@@ -82,7 +83,7 @@ library DeployCTML1OrGateway {
         } else if (_contractName == CTMContract.MigratorFacet) {
             return abi.encode(_config.l1ChainId, _config.testnetVerifier);
         } else if (_contractName == CTMContract.CommitterFacet) {
-            return abi.encode(_config.l1ChainId);
+            return abi.encode(_config.l1ChainId, _config.interopFeeManager);
         } else if (_contractName == CTMContract.DiamondInit) {
             return abi.encode();
         } else if (_contractName == CTMContract.DualVerifier || _contractName == CTMContract.TestnetVerifier) {

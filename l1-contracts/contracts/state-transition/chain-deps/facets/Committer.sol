@@ -15,6 +15,7 @@ import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {StoredBatchHashing} from "../StoredBatchHashing.sol";
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../../../common/l2-helpers/L2ContractInterfaces.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
+import {IInteropFeeManager} from "../../../core/interop-fee/IInteropFeeManager.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
 import {
     BatchNumberMismatch,
@@ -55,8 +56,13 @@ contract CommitterFacet is ZKChainBase, ICommitter {
     /// @dev Timestamp - seconds since unix epoch.
     uint256 internal immutable COMMIT_TIMESTAMP_NOT_OLDER;
 
-    constructor(uint256 _l1ChainId) {
+    /// @notice The L1 interop fee switch that batches committed on L1 are charged from.
+    /// See {protocol-docs/interop-fee.md}.
+    IInteropFeeManager internal immutable INTEROP_FEE_MANAGER;
+
+    constructor(uint256 _l1ChainId, IInteropFeeManager _interopFeeManager) {
         L1_CHAIN_ID = _l1ChainId;
+        INTEROP_FEE_MANAGER = _interopFeeManager;
         // Allow testnet operators to submit batches with older timestamps
         // compared to mainnet. This quality-of-life improvement is intended for
         // testnets, where outages may be resolved slower.
@@ -245,7 +251,8 @@ contract CommitterFacet is ZKChainBase, ICommitter {
                 _newBatch.l2LogsTreeRoot,
                 _expectedSystemContractUpgradeTxHash,
                 _newBatch.dependencyRootsRollingHash,
-                _newBatch.slChainId
+                _newBatch.slChainId,
+                _newBatch.interopFeeUnits
             )
         );
 
@@ -280,6 +287,12 @@ contract CommitterFacet is ZKChainBase, ICommitter {
             L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
                 abi.encode(RELAYED_EXECUTOR_VERSION_ZKSYNC_OS, storedBatchInfo)
             );
+        }
+
+        // A wrong `interopFeeUnits` makes the batch unprovable, so every executed batch was charged its proven
+        // count. Priority-mode batches are never charged, so the fee can't block the escape hatch.
+        if (_newBatch.interopFeeUnits != 0 && L1_CHAIN_ID == block.chainid && !s.priorityModeInfo.activated) {
+            INTEROP_FEE_MANAGER.chargeInteropFee(s.chainId, _newBatch.batchNumber, _newBatch.interopFeeUnits);
         }
 
         if (_newBatch.firstBlockNumber > _newBatch.lastBlockNumber) {

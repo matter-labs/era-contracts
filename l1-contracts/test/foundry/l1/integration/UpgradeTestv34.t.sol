@@ -295,7 +295,7 @@ contract UpgradeTestV34 is ExecutorTest {
             l2LogsTreeRoot: info.l2LogsTreeRoot,
             dependencyRootsRollingHash: info.dependencyRootsRollingHash,
             timestamp: 0,
-            commitment: _batchOutputHash(info, bytes32(0))
+            commitment: _legacyV33BatchOutputHash(info)
         });
         _mockDAForCommit(info.batchNumber);
         vm.expectEmit(address(committer));
@@ -309,6 +309,26 @@ contract UpgradeTestV34 is ExecutorTest {
         );
         assertEq(getters.storedBatchHash(info.batchNumber), keccak256(abi.encode(stored)));
         assertEq(getters.getTotalBatchesCommitted(), info.batchNumber);
+    }
+
+    /// @dev The v33 Committer's batch output hash: the current layout without the trailing `interopFeeUnits`.
+    function _legacyV33BatchOutputHash(CommitBatchInfoZKsyncOS memory _batch) internal pure returns (bytes32) {
+        return
+            keccak256(
+                abi.encodePacked(
+                    _batch.firstBlockTimestamp,
+                    _batch.lastBlockTimestamp,
+                    uint256(_batch.daCommitmentScheme),
+                    _batch.daCommitment,
+                    _batch.numberOfLayer1Txs,
+                    _batch.numberOfLayer2Txs,
+                    _batch.priorityOperationsHash,
+                    _batch.l2LogsTreeRoot,
+                    bytes32(0),
+                    _batch.dependencyRootsRollingHash,
+                    _batch.slChainId
+                )
+            );
     }
 
     function _proveBatch(

@@ -185,7 +185,13 @@ library AddressIntrospector {
             defaultUpgrade: ctm.defaultUpgrade(),
             chainTypeManagerProxyAdmin: Utils.getProxyAdminAddress(ctmAddr)
         });
-        info.l1Specific = L1SpecificStateTransitionAddresses({legacyValidatorTimelock: ctm.validatorTimelock()});
+        // The interop fee manager is only reachable through the Committer facet's immutable, so it is not
+        // introspected; the upgrade that introduces it deploys a fresh one.
+        info.l1Specific = L1SpecificStateTransitionAddresses({
+            legacyValidatorTimelock: ctm.validatorTimelock(),
+            interopFeeManagerImplementation: address(0),
+            interopFeeManager: address(0)
+        });
         info.admin = CTMAdminAddresses({
             transparentProxyAdmin: Utils.getProxyAdminAddress(ctmAddr),
             governance: IOwnable(ctmAddr).owner(),
