@@ -3,7 +3,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { utils } from "ethers";
-import { compareChainState, compareStateDirectories, ctmVersionKeyedBlockSlots } from "../../compare-chain-states";
+import { compareStateDirectories } from "../../compare-chain-states";
 import { createSuite } from "./harness";
 
 const { test, run } = createSuite("compare-chain-states");
@@ -95,25 +95,6 @@ test("continues comparing arbitrary storage on non-diamond accounts", () => {
   writeFixture(committed, "v0.34.0", {}, { [word(10_000)]: word(1) });
   writeFixture(generated, "v0.34.0", {}, { [word(10_000)]: word(2) });
   assert.match(compareStateDirectories(committed, generated).join("\n"), new RegExp(OTHER));
-});
-
-test("ignores patch-version CTM registration block drift but still compares fixed storage", () => {
-  for (const patch of [1, 2]) {
-    const [, slot] = ctmVersionKeyedBlockSlots({ major: 0, minor: 33, patch });
-    assert.equal(
-      slot,
-      utils.keccak256(utils.defaultAbiCoder.encode(["uint256", "uint256"], [(33n << 32n) | BigInt(patch), 167]))
-    );
-  }
-  const [, activeSlot] = ctmVersionKeyedBlockSlots();
-  const committed = { accounts: { [OTHER]: { storage: { [activeSlot]: word(50), [word(10_000)]: word(1) } } } };
-  const generated = { accounts: { [OTHER]: { storage: { [activeSlot]: word(80), [word(10_000)]: word(2) } } } };
-  const diffs = compareChainState(committed, generated, "state.json", {
-    skip: new Set(),
-    diamonds: new Set(),
-  }).join("\n");
-  assert.match(diffs, new RegExp(`slot ${word(10_000)}`));
-  assert.ok(!diffs.includes(activeSlot));
 });
 
 run();

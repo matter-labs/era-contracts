@@ -95,25 +95,8 @@ jobs:
           # Scoped to the generated files so this cannot sweep unrelated formatting into the commit.
           npx prettier --write "l1-contracts/zkstack-out/**/*.json" "AllContractsHashes.json"
 
-      - name: Authorize private genesis dependencies
-        id: genesis-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          app-id: ${{ secrets.MATTERLABS_BOTS_APP_ID }}
-          private-key: ${{ secrets.MATTERLABS_BOTS_PRIVATE_KEY }}
-          repositories: |
-            zksync-os-private
-            zksync-airbender-private
-          permission-contents: read
-
       - name: Regenerate ZKsync OS genesis
         working-directory: tools/zksync-os-genesis-gen
-        env:
-          GH_TOKEN: ${{ steps.genesis-token.outputs.token }}
-          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-          GIT_CONFIG_COUNT: "1"
-          GIT_CONFIG_KEY_0: credential.helper
-          GIT_CONFIG_VALUE_0: "!gh auth git-credential"
         run: |
           cargo run --locked --release --bin zksync-os-genesis-gen -- \
             --output-file ../../configs/genesis/zksync-os/latest.json

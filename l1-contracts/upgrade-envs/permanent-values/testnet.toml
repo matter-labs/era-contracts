@@ -34,6 +34,7 @@ governance_kind = "puh"
 # TODO(EVM-1200): Retained for consumers of the legacy single-CTM shape; points to Atlas.
 [ctm_contracts]
 ctm_proxy_addr = "0x54D55e74De9c6003E7a68a1fE70E633f05761eb5"
+l1_bytecodes_supplier_addr = "0x3ad11E8BAAa24708086EEdaEE28722B8c1489e3b"
 rollup_da_manager = "0xC90E4E4897421E9380d734b72221f5485C3fd116"
 
 # Multi-CTM list for `protocol-ops ecosystem upgrade-prepare-all`. Only
@@ -45,4 +46,5 @@ rollup_da_manager = "0xC90E4E4897421E9380d734b72221f5485C3fd116"
 # CTM and still points at the old RollupDAManager `0x2732eA4D...`; the v31
 # upgrade flow targets the current v30 state, so we pin the v30 value.
 proxy = "0x54D55e74De9c6003E7a68a1fE70E633f05761eb5"
+bytecodes_supplier = "0x3ad11E8BAAa24708086EEdaEE28722B8c1489e3b"
 rollup_da_manager = "0xC90E4E4897421E9380d734b72221f5485C3fd116"

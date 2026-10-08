@@ -31,10 +31,6 @@ callable by the Bridgehub owner or admin). In one transaction it:
 5. Seeds the chain's genesis batch root (`messageRoot.seedGenesisRoot(_chainId)`, see below) and
    emits `NewChain`.
 
-End-to-end chain creation on L1 and the genesis upgrade on the new chain's L2:
-
-![Chain deployment and genesis (ZKsync OS)](./img/chain_deployment.png)
-
 ### Genesis chain state (`DiamondInit`)
 
 `DiamondInit` initializes the diamond's storage: verifier(s), admin, base-token asset id, protocol
@@ -99,7 +95,7 @@ Checks performed before sending the registration:
 - Both chains settle on the **same** settlement layer (`ChainsSettlementLayerMismatch` otherwise).
   Both settling directly on L1 is permitted as of v33: L1 itself builds interop roots
   (`MessageRootBase.addChainBatchRootV32`) and serves the corresponding inclusion proofs, so
-  L1-settled chains participate in interop directly. (In v31 this case was rejected with
+  L1-settled chains participate in interop without a gateway. (In v31 this case was rejected with
   the now-removed `ChainsSettlingOnL1` error.)
 - The chain to be registered has at least one batch leaf in this layer's message root
   (`messageRoot.chainTreeLeafCount(chainId) > 0`), else it reverts with
@@ -107,7 +103,7 @@ Checks performed before sending the registration:
   timeout precondition: interop towards a chain is only enabled once the chain both has its
   `sharedTree` leaf and has a batch in its chain tree.
 
-No backfill of pre-existing chains is needed for this gate: during v31 non-L1 settlement was never
+No backfill of pre-existing chains is needed for this gate: during v31 the ZK Gateway was never
 activated and registration required that a chain does **not** settle on L1, so at the start of v33
 no chains have been registered for interop — every chain passes through this gate (and gets its
 tree populated) before interop can target it.
@@ -131,13 +127,11 @@ destination's `L2NativeTokenVault.updateL2` consumes to initialize the chain's b
 on the destination), and the base token supports `totalSupply()` (true for everything except
 pre-v31 ZKsync OS chains, whose value is backfilled during v31 before the v33 upgrade).
 
-<a id="v32-chain-migrations-are-explicitly-disabled"></a>
-
 ### v33: chain migrations are explicitly disabled
 
-Beginning with v33 and still in this release, the protocol operates under the invariant that **all
-supported chains settle on L1**. Chain migrations between settlement layers are explicitly disabled
-to remove migration-related risks:
+In the v33 release the protocol operates under the invariant that **all chains settle on L1**, and
+chain migrations between settlement layers are explicitly disabled to remove migration-related
+risks for the time being:
 
 - The switch is `CHAIN_MIGRATIONS_ENABLED = false` in `common/Config.sol`, surfaced via
   `ChainAssetHandlerBase.migrationsEnabled()` and enforced by the `whenMigrationsEnabled` modifier

@@ -25,6 +25,7 @@ governance_kind = "puh"
 # overwrites `ctm_proxy_addr`). Points to the Atlas (ZKsync OS) CTM: the Era CTM cannot be
 # targeted by this release. protocol-ops consumes the `[[ctm_contracts.ctms]]` array below.
 ctm_proxy_addr = "0x1adf137f59949c9081157d5dE1e002D1c992071F"
+l1_bytecodes_supplier_addr = "0xC9F20FC268Fc3e0e597660550033Bf2C24218fd8"
 rollup_da_manager = "0x3F54A35a979Fe576159002B05bE2eDf9b455FAAA"
 
 # Multi-CTM list for `protocol-ops ecosystem upgrade-prepare-all`. Only
@@ -37,4 +38,5 @@ rollup_da_manager = "0x3F54A35a979Fe576159002B05bE2eDf9b455FAAA"
 # carry a single `l1_bytecodes_supplier_addr` per env, matching the pattern
 # already documented on stage/testnet).
 proxy = "0x1adf137f59949c9081157d5dE1e002D1c992071F"
+bytecodes_supplier = "0xC9F20FC268Fc3e0e597660550033Bf2C24218fd8"
 rollup_da_manager = "0x3F54A35a979Fe576159002B05bE2eDf9b455FAAA"

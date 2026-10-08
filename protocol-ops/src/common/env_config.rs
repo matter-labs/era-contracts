@@ -59,69 +59,6 @@ pub struct PermanentValues {
     /// Empty/absent on envs where every current owner is already an EOA.
     #[serde(default, rename = "ownable_proxies")]
     pub ownable_proxies: Vec<OwnableProxyEntry>,
-    /// Optional new-Gateway bring-up block. When present, the v31 ecosystem
-    /// prepare flow runs `GatewayVotePreparation.s.sol` against this gateway
-    /// and folds its `governance_calls_to_execute` into the merged stage-2
-    /// hex — that single bundle whitelists the GW on L1, registers the GW
-    /// CTM, wires asset handlers, accepts ownership of the GW RollupDAManager
-    /// + ServerNotifier, and sets the initial interop settlement fee.
-    #[serde(default)]
-    pub new_gateway: Option<NewGatewayConfig>,
-    /// Historical gateway configuration for chains that settled on the legacy
-    /// Gateway before v31.
-    #[serde(default)]
-    pub legacy_gateway: Option<LegacyGatewayConfig>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct LegacyGatewayConfig {
-    pub chain_id: u64,
-    /// Per-chain historical migration intervals that PUVT cross-checks against
-    /// every `setHistoricalMigrationInterval` call in stage 2's decommission
-    /// prefix. One TOML entry per call; order is preserved.
-    #[serde(default)]
-    pub chain_intervals: Vec<ChainInterval>,
-}
-
-/// Mirrors a `[[legacy_gateway.chain_intervals]]` entry in
-/// `permanent-values/<env>.toml`. The Solidity struct
-/// `MigrationInterval` ([IChainAssetHandler.sol]) is built from these fields
-/// plus `settlementLayerChainId = legacy_gateway.chain_id` and
-/// `isActive = false` (these are historical/completed intervals).
-#[derive(Debug, Deserialize, Clone)]
-pub struct ChainInterval {
-    pub chain_id: u64,
-    pub migrate_to_sl_batch: u64,
-    pub migrate_from_sl_batch: u64,
-    pub sl_batch_lower_bound: u64,
-    pub sl_batch_upper_bound: u64,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct NewGatewayConfig {
-    /// Chain ID of the gateway being brought up (e.g. 2708 for stage).
-    pub chain_id: u64,
-    /// Where unused L1→L2 priority-tx gas is refunded. EOAs work as-is
-    /// (`AddressAliasHelper` is a no-op on them), so the natural default is
-    /// the deployer EOA that publishes the call on L1 — `prepare_new_gateway`
-    /// applies that default when this field is absent. Override here only
-    /// when you specifically want refunds to land somewhere else (e.g. a
-    /// chain-admin Safe).
-    ///
-    /// NOTE: setting this to a contract (e.g. governance / PUH) makes refunds
-    /// land at the aliased contract address on L2, which is generally
-    /// uncontrolled — funds get stuck.
-    #[serde(default)]
-    pub refund_recipient: Option<Address>,
-    /// Chain ID whose registered CTM `GatewayVotePreparation` should treat as
-    /// the "source" — the deployed GW CTM is a variant of this CTM. Pick the
-    /// chain whose CTM is the one the new gateway will host (typically Era).
-    pub ctm_representative_chain_id: u64,
-    /// Optional pre-deployed server notifier address. When present, the
-    /// `GatewayVotePreparation` skips the redeploy + ownership-transfer
-    /// preamble. Leave absent on first GW bring-up.
-    #[serde(default)]
-    pub server_notifier: Option<Address>,
 }
 
 #[derive(Debug, Deserialize, Clone, Copy)]
@@ -185,7 +122,8 @@ pub struct CtmContracts {
     /// field so the legacy shape isn't carried in two places.
     #[serde(default)]
     pub ctm_proxy_addr: Option<Address>,
-    /// v31 multi-CTM list — proxy + per-CTM overrides for pre-v31 envs.
+    /// Multi-CTM list — proxy + optional per-CTM address overrides. Every
+    /// entry must be a ZKsync OS CTM; the prepare flow fails on anything else.
     #[serde(default, rename = "ctms")]
     pub ctms: Vec<CtmEntry>,
 }
@@ -193,8 +131,6 @@ pub struct CtmContracts {
 #[derive(Debug, Deserialize, Clone)]
 pub struct CtmEntry {
     pub proxy: Address,
-    #[serde(default)]
-    pub is_zk_sync_os: Option<bool>,
     #[serde(default)]
     pub bytecodes_supplier: Option<Address>,
     #[serde(default)]
@@ -224,10 +160,6 @@ pub struct PermanentContracts {
 pub struct UpgradeInputs {
     pub owner_address: Option<Address>,
     pub era_chain_id: Option<u64>,
-    /// `[legacy_gateway] chain_id` as read by `DefaultCoreUpgrade.s.sol`, which
-    /// bakes it into `L1MessageRoot.ERA_GATEWAY_CHAIN_ID`. Absent means the
-    /// deploy passed 0 — see [`EnvConfig::message_root_era_gateway_chain_id`].
-    pub legacy_gateway_chain_id: Option<u64>,
 }
 
 /// Fully-resolved per-env config.
@@ -393,34 +325,6 @@ impl EnvConfig {
         self.env == "mainnet"
     }
 
-    pub fn legacy_gateway_chain_id(&self) -> Option<u64> {
-        self.permanent.legacy_gateway.as_ref().map(|gw| gw.chain_id)
-    }
-
-    /// The value the deploy actually baked into `L1MessageRoot.ERA_GATEWAY_CHAIN_ID`.
-    ///
-    /// `DefaultCoreUpgrade.s.sol` reads `[legacy_gateway] chain_id` from the
-    /// **upgrade input** TOML and leaves the constructor arg at 0 when the
-    /// section is absent, so this must mirror the upgrade input and not
-    /// permanent-values. The two diverge on testnet, where permanent-values
-    /// carries a documented placeholder chain id (EVM-1200) that no contract
-    /// should be constructed with. Permanent-values stays the source of truth
-    /// for the historical-migration `chain_intervals` that pair with it.
-    pub fn message_root_era_gateway_chain_id(&self) -> u64 {
-        self.upgrade_input
-            .as_ref()
-            .and_then(|input| input.legacy_gateway_chain_id)
-            .unwrap_or(0)
-    }
-
-    pub fn legacy_gateway_chain_intervals(&self) -> &[ChainInterval] {
-        self.permanent
-            .legacy_gateway
-            .as_ref()
-            .map(|gw| gw.chain_intervals.as_slice())
-            .unwrap_or(&[])
-    }
-
     pub fn l1_chain_id(&self) -> Option<u64> {
         self.permanent.l1_chain_id
     }
@@ -443,10 +347,6 @@ impl EnvConfig {
     pub fn zk_token_asset_id(&self) -> Option<B256> {
         self.permanent.zk_token_asset_id
     }
-
-    pub fn new_gateway(&self) -> Option<&NewGatewayConfig> {
-        self.permanent.new_gateway.as_ref()
-    }
 }
 
 fn parse_upgrade_input(content: &str) -> UpgradeInputs {
@@ -459,28 +359,7 @@ fn parse_upgrade_input(content: &str) -> UpgradeInputs {
             out.era_chain_id = Some(id);
         }
     }
-    out.legacy_gateway_chain_id = read_uint_under_section(content, "legacy_gateway", "chain_id");
     out
-}
-
-fn read_uint_under_section(content: &str, section_name: &str, key: &str) -> Option<u64> {
-    let mut in_section = false;
-    for raw in content.lines() {
-        let line = raw.trim();
-        if line.is_empty() || line.starts_with('#') {
-            continue;
-        }
-        if let Some(section) = parse_section_header(line) {
-            in_section = section == section_name;
-            continue;
-        }
-        if in_section {
-            if let Some(v) = match_unquoted_uint(line, key) {
-                return Some(v);
-            }
-        }
-    }
-    None
 }
 
 /// Read `[contracts] create2_factory_salt` from a v31 input TOML.
@@ -597,12 +476,9 @@ fn match_quoted_h256(line: &str, key: &str) -> Option<B256> {
 mod tests {
     use super::*;
 
-    /// Smoke-tests that `permanent-values/stage.toml` (which is the env used
-    /// for the v31 prepare-all rehearsal on Sepolia stage) deserializes into
-    /// `PermanentValues` end-to-end — including the optional `[new_gateway]`
-    /// block and its U256 hex literal. Catches any future TOML drift before
-    /// it shows up as a runtime parse error from `protocol-ops ecosystem
-    /// upgrade-prepare-all --env stage`.
+    /// Smoke-tests that `permanent-values/stage.toml` deserializes into `PermanentValues`
+    /// end-to-end. Catches any future TOML drift before it shows up as a runtime parse error
+    /// from `protocol-ops ecosystem upgrade-prepare-all --env stage`.
     #[test]
     fn stage_permanent_values_parses() {
         let path = resolve_l1_contracts_path()
@@ -613,8 +489,12 @@ mod tests {
             fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
         let pv: PermanentValues =
             toml::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
-        assert!(pv.new_gateway.is_none());
-        assert!(pv.legacy_gateway.is_none());
+        let ctms = pv
+            .ctm_contracts
+            .expect("permanent-values/stage.toml must carry [ctm_contracts]");
+        assert_eq!(ctms.ctms.len(), 1, "stage upgrades a single (Atlas) CTM");
+        assert_eq!(pv.ownable_proxies.len(), 2);
+        assert_eq!(pv.l1_chain_id, Some(11155111));
     }
 
     /// The salt readers run on the current release's real per-env inputs, so these also guard that the
@@ -679,9 +559,9 @@ mod tests {
 
     #[test]
     fn missing_release_input_fails_closed() {
-        // Select an absent release directory so this check does not depend on historical inputs.
+        // This line's copy of the v33 release dir has no testnet input (release/v0.33.0-atomic-interop does).
         let cfg =
-            EnvConfig::load_from_upgrade_env_dir("testnet", "upgrade-envs/missing-release-input")
+            EnvConfig::load_from_upgrade_env_dir("testnet", "upgrade-envs/v0.33.0-atomic-interop")
                 .expect("permanent values alone still load");
         assert_ne!(cfg.bridgehub(), Address::ZERO);
         assert!(cfg.owner_address().is_err());

@@ -136,29 +136,23 @@ function ignoredDiamondSlots(
 // it drifts run-to-run like the slots below — and the keccak slot itself moves on every genesis
 // protocol-version bump, since the version is the mapping key: the v31 and v32 keys were listed here
 // as raw hashes and the bump to v33 (#2429) broke the check again. Derive the slots from the version
-// instead, including the full current OS version so patch releases are covered too.
+// instead, over a range wide enough that the next bump needs no new hash here.
 const CTM_VERSION_KEYED_BLOCK_SLOT_INDICES = [166, 167];
+const CTM_VERSION_KEYED_MINOR_FROM = 25;
+const CTM_VERSION_KEYED_MINOR_TO = 45;
 
-export interface ProtocolSemanticVersion {
-  major: number;
-  minor: number;
-  patch: number;
-}
-
-function currentGenesisProtocolVersion(): ProtocolSemanticVersion {
-  const genesisPath = path.resolve(__dirname, "../../../configs/genesis/zksync-os/latest.json");
-  return JSON.parse(fs.readFileSync(genesisPath, "utf-8")).protocol_semantic_version;
-}
-
-/** `[upgradeCutDataBlock, newChainCreationParamsBlock]` slots for `version`. */
-export function ctmVersionKeyedBlockSlots(
-  { major, minor, patch }: ProtocolSemanticVersion = currentGenesisProtocolVersion()
-): string[] {
-  const packedProtocolVersion = (BigInt(major) << 64n) | (BigInt(minor) << 32n) | BigInt(patch);
-
-  return CTM_VERSION_KEYED_BLOCK_SLOT_INDICES.map((slotIndex) =>
-    utils.keccak256(utils.defaultAbiCoder.encode(["uint256", "uint256"], [packedProtocolVersion, slotIndex]))
-  );
+function ctmVersionKeyedBlockSlots(): string[] {
+  const slots: string[] = [];
+  for (let minor = CTM_VERSION_KEYED_MINOR_FROM; minor <= CTM_VERSION_KEYED_MINOR_TO; minor++) {
+    // SemVer.packSemVer(0, minor, 0) — the mapping key.
+    const packedProtocolVersion = minor * 2 ** 32;
+    for (const slotIndex of CTM_VERSION_KEYED_BLOCK_SLOT_INDICES) {
+      slots.push(
+        utils.keccak256(utils.defaultAbiCoder.encode(["uint256", "uint256"], [packedProtocolVersion, slotIndex]))
+      );
+    }
+  }
+  return slots;
 }
 
 // Keccak-derived slots (collision-free across contracts) holding an L2 block/batch number in the
@@ -207,7 +201,7 @@ interface ChainStateData {
   accounts?: Record<string, ChainStateAccount>;
 }
 
-export function compareChainState(
+function compareChainState(
   data1: ChainStateData,
   data2: ChainStateData,
   name: string,
