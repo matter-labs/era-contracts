@@ -2,9 +2,15 @@ import { expect } from "chai";
 import type { BigNumber } from "ethers";
 import { Contract, Wallet, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { getChainIdsByRole, getL2Chain, createProvider, impersonateAndRun } from "../../src/core/utils";
+import {
+  getChainIdByRole,
+  getChainIdsByRole,
+  getL2Chain,
+  createProvider,
+  impersonateAndRun,
+} from "../../src/core/utils";
 import { getAbi } from "../../src/core/contracts";
-import { ANVIL_DEFAULT_PRIVATE_KEY, INTEROP_CENTER_ADDR } from "../../src/core/const";
+import { ANVIL_DEFAULT_PRIVATE_KEY, EIP1967_ADMIN_SLOT, INTEROP_CENTER_ADDR } from "../../src/core/const";
 import { encodeEvmAddress } from "../../src/helpers/erc7930";
 import {
   sendInteropBundle,
@@ -21,20 +27,14 @@ import { getInteropSourceAddress } from "../../src/core/accounts";
 const CALL_VALUE = ethers.utils.parseUnits("10", "gwei");
 const WITHDRAWAL_AMOUNT = ethers.utils.parseUnits("1", "gwei");
 const PREPAID_AMOUNT = ethers.utils.parseUnits("1", "gwei");
-const EIP1967_ADMIN_SLOT = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
 
 /**
  * 14 - Interop fee units
  *
- * The L1 interop fee is charged on the number of interop calls a batch sent, which the source chain's
- * InteropCenter counts in a monotonic counter (see {protocol-docs/interop-fee.md}). This spec runs real
- * bundles between two chains and checks the counter: every call of an L2->L2 bundle counts once on the
- * source, executing a bundle counts nothing on the destination, and withdrawals to L1 are never counted.
- * It also checks that a fresh deployment ships the L1 fee manager switched off, and that the manager resolves
- * chains and their admins through the real Bridgehub and diamonds.
- *
- * The harness does not commit batches to L1; the commit-time charge is covered by the foundry suite
- * (BatchProcessing/InteropFee.t.sol).
+ * The interop fee pieces on the deployed ecosystem: the InteropCenter counter on real bundles and
+ * withdrawals, and the L1 fee manager against the real Bridgehub and diamonds. See
+ * {protocol-docs/interop-fee.md}. The harness does not commit batches to L1; the commit-time charge is
+ * covered by the foundry suite (BatchProcessing/InteropFee.t.sol).
  */
 describe("14 - Interop fee units", function () {
   this.timeout(0);
@@ -43,6 +43,7 @@ describe("14 - Interop fee units", function () {
   let state: ReturnType<typeof runner.loadState>;
 
   let sourceChainId: number;
+  let directSettledChainId: number;
   let destChainId: number;
   let sourceProvider: ethers.providers.JsonRpcProvider;
   let destProvider: ethers.providers.JsonRpcProvider;
@@ -100,12 +101,13 @@ describe("14 - Interop fee units", function () {
     destProvider = createProvider(getL2Chain(state.chains, destChainId).rpcUrl);
 
     dummyRecipient = await deployDummyInteropRecipient(destProvider);
+    directSettledChainId = getChainIdByRole(state.chains.config, "directSettled");
 
     l1Provider = createProvider(state.chains.l1!.rpcUrl);
     feeManager = new Contract(state.ctmAddresses.interopFeeManager, getAbi("InteropFeeManager"), l1Provider);
   });
 
-  it("deploys the L1 fee manager switched off", async () => {
+  it("deploys the L1 fee manager switched off and owned by the CTM's governance", async () => {
     expect(await l1Provider.getCode(feeManager.address), "fee manager must be deployed").to.not.equal("0x");
     expect((await feeManager.feePerUnit()).toString(), "the switch ships off").to.equal("0");
     expect((await feeManager.accruedFees()).toString()).to.equal("0");
@@ -122,21 +124,21 @@ describe("14 - Interop fee units", function () {
 
   it("holds a chain's prepaid balance for its admin", async () => {
     const bridgehub = new Contract(state.l1Addresses!.bridgehub, getAbi("L1Bridgehub"), l1Provider);
-    const diamond = new Contract(await bridgehub.getZKChain(sourceChainId), getAbi("GettersFacet"), l1Provider);
+    const diamond = new Contract(await bridgehub.getZKChain(directSettledChainId), getAbi("GettersFacet"), l1Provider);
     const chainAdmin: string = await diamond.getAdmin();
     const receiver = Wallet.createRandom().address;
-    const balanceBefore = await feeManager.chainBalance(sourceChainId);
+    const balanceBefore = await feeManager.chainBalance(directSettledChainId);
 
     const depositor = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
-    await (await feeManager.connect(depositor).deposit(sourceChainId, { value: PREPAID_AMOUNT })).wait();
-    expect((await feeManager.chainBalance(sourceChainId)).toString()).to.equal(
+    await (await feeManager.connect(depositor).deposit(directSettledChainId, { value: PREPAID_AMOUNT })).wait();
+    expect((await feeManager.chainBalance(directSettledChainId)).toString()).to.equal(
       balanceBefore.add(PREPAID_AMOUNT).toString()
     );
 
     await impersonateAndRun(l1Provider, chainAdmin, async (adminSigner) => {
-      await (await feeManager.connect(adminSigner).withdraw(sourceChainId, receiver, PREPAID_AMOUNT)).wait();
+      await (await feeManager.connect(adminSigner).withdraw(directSettledChainId, receiver, PREPAID_AMOUNT)).wait();
     });
-    expect((await feeManager.chainBalance(sourceChainId)).toString()).to.equal(balanceBefore.toString());
+    expect((await feeManager.chainBalance(directSettledChainId)).toString()).to.equal(balanceBefore.toString());
     expect((await l1Provider.getBalance(receiver)).toString()).to.equal(PREPAID_AMOUNT.toString());
   });
 
@@ -157,15 +159,14 @@ describe("14 - Interop fee units", function () {
   });
 
   it("does not count withdrawals to L1", async () => {
-    const withdrawingChainId = getChainIdsByRole(state.chains!.config, "directSettled")[0];
-    const withdrawingChain = getL2Chain(state.chains!, withdrawingChainId);
+    const withdrawingChain = getL2Chain(state.chains!, directSettledChainId);
     const provider = createProvider(withdrawingChain.rpcUrl);
     const before = await feeUnits(provider);
 
     await initiateEthWithdrawal({
       l2RpcUrl: withdrawingChain.rpcUrl,
       l1RpcUrl: state.chains!.l1!.rpcUrl,
-      chainId: withdrawingChainId,
+      chainId: directSettledChainId,
       l1Addresses: state.l1Addresses!,
       amount: WITHDRAWAL_AMOUNT,
     });

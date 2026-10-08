@@ -360,7 +360,7 @@ jobs:
         if: always()
         working-directory: l1-contracts/test/anvil-interop
         run: |
-          for offset in $(seq 0 100 1900); do
+          for offset in 0 100 200 300 400 500 600 700 800 900; do
             ANVIL_INTEROP_PORT_OFFSET=$offset ANVIL_INTEROP_RUN_SUFFIX="-p$offset" yarn cleanup
           done
 

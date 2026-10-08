@@ -68,9 +68,13 @@ contract InteropFeeCommitTest is ExecutorTest {
         _setFee(FEE_PER_UNIT);
         _fund(2 * FEE_PER_UNIT);
 
-        CommitBatchInfoZKsyncOS memory batch = _batchWithUnits(3);
-        (uint256 from, uint256 to, bytes memory data) = _encode(batch);
-        _mockDAForCommit(batch.batchNumber);
+        CommitBatchInfoZKsyncOS[] memory batches = new CommitBatchInfoZKsyncOS[](1);
+        batches[0] = _batchWithUnits(3);
+        (uint256 from, uint256 to, bytes memory data) = Utils.encodeCommitBatchesDataZKsyncOS(
+            genesisStoredBatchInfo,
+            batches
+        );
+        _mockDAForCommit(batches[0].batchNumber);
         vm.prank(validator);
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -96,7 +100,7 @@ contract InteropFeeCommitTest is ExecutorTest {
 
     /// @dev Documented trade-off: a reverted batch's fee is not refunded, so re-committing the same interop
     /// pays again. See {protocol-docs/interop-fee.md}.
-    function test_revertedBatchIsChargedAgainOnRecommit() public {
+    function test_commit_recommitAfterRevertIsChargedAgain() public {
         _setFee(FEE_PER_UNIT);
         _fund(1 ether);
 
@@ -111,7 +115,6 @@ contract InteropFeeCommitTest is ExecutorTest {
         assertEq(interopFeeManager.accruedFees(), 6 * FEE_PER_UNIT);
     }
 
-    /// @dev A Committer on L1 without a manager would revert every interop commit even with the switch off.
     function test_revertWhen_committerOnL1HasNoFeeManager() public {
         vm.expectRevert(ZeroAddress.selector);
         new CommitterFacet(block.chainid, IInteropFeeManager(address(0)));
@@ -180,14 +183,6 @@ contract InteropFeeCommitTest is ExecutorTest {
     function _batchWithUnits(uint256 _units) internal view returns (CommitBatchInfoZKsyncOS memory batch) {
         batch = newCommitBatchInfoZKsyncOS;
         batch.interopFeeUnits = _units;
-    }
-
-    function _encode(
-        CommitBatchInfoZKsyncOS memory _batch
-    ) internal view returns (uint256 from, uint256 to, bytes memory data) {
-        CommitBatchInfoZKsyncOS[] memory batches = new CommitBatchInfoZKsyncOS[](1);
-        batches[0] = _batch;
-        return Utils.encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, batches);
     }
 
     function _setFee(uint256 _feePerUnit) internal {

@@ -12,7 +12,7 @@
  *
  * Sharding is what makes this affordable in CI: the specs run against Anvil with
  * `--steps-tracing`, which is several times slower than a normal run, so running
- * all 10 specs in one serial process dominated the coverage job.
+ * every spec in one serial process dominated the coverage job.
  *
  * Modes:
  *   default            shard every spec across workers (see MAX_PARALLEL_WORKERS)
@@ -124,7 +124,7 @@ function timedRun(label: string, command: string, args: string[], cwd: string, e
  * Whether the parent should fan out into shards.
  *
  * Without pre-generated chain states each worker does its own full deployment, so sharding would race
- * ten of them on one config/permanent-values.toml and broadcast directory. Fresh deploys are excluded
+ * one per spec on one config/permanent-values.toml and broadcast directory. Fresh deploys are excluded
  * for the same reason; a single spec or --serial has nothing to gain.
  */
 export function shouldShardRun(opts: {

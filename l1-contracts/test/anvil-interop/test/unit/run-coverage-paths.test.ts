@@ -10,6 +10,8 @@
  */
 
 import * as assert from "assert/strict";
+import * as path from "path";
+import { discoverSpecs } from "../../src/core/specs";
 import { createSuite } from "./harness";
 import {
   applyPortOffset,
@@ -127,6 +129,11 @@ test("accepts bases a whole span apart", () => {
 test("rejects a shard count that would outgrow its reserved range", () => {
   assert.doesNotThrow(() => assertDisjointPortRange(0, 20));
   assert.throws(() => assertDisjointPortRange(0, 21), /reserves\s+only 2000|only 2000/);
+});
+
+// The default local run shards every spec, so adding one must not outgrow the range unnoticed.
+test("reserves enough ports to shard every spec in one run", () => {
+  assert.doesNotThrow(() => assertDisjointPortRange(0, discoverSpecs(path.join(__dirname, "../hardhat")).length));
 });
 
 // Single-process runs (one spec, --serial, --fresh-deploy) wrote to the unscoped default, so two

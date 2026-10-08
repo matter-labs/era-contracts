@@ -54,6 +54,9 @@ export const ANVIL_DEFAULT_PRIVATE_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bac
 // Anvil account #1 — used as a distinct recipient in tests where sender != recipient
 export const ANVIL_RECIPIENT_ADDR = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
 
+// ERC-1967 admin slot: bytes32(uint256(keccak256("eip1967.proxy.admin")) - 1)
+export const EIP1967_ADMIN_SLOT = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
+
 // 100 ETH in hex — used to fund impersonated accounts
 export const ANVIL_FUND_BALANCE = "0x56BC75E2D63100000";
 
