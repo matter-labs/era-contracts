@@ -42,6 +42,8 @@ export interface CTMDeployedAddresses {
   verifier: string;
   validiumL1DAValidator: string;
   rollupL1DAValidator: string;
+  /** Absent in chain states generated before the interop fee switch existed. */
+  interopFeeManager?: string;
 }
 
 export interface ChainConfig {

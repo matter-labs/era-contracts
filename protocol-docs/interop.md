@@ -90,6 +90,7 @@ Every user of interop can choose between two fee options per bundle (via `useFix
   - Requires the ZK token to already be bridged to the source chain (resolved from `ZK_TOKEN_ASSET_ID` via the NativeTokenVault and cached in `zkToken`); otherwise the send reverts with `ZKTokenNotAvailable`.
   - On chains where ZK is the base token, `useFixedFee = true` still requires wrapped ZK (ERC-20 transfer), while `useFixedFee = false` accepts native ZK via `msg.value`. This is intentional.
 - **L2→L1 bundles are free**: they are withdrawals, not interop, so neither fee is charged.
+- **Operators pay separately on L1**: every call of an L2→L2 bundle also counts as one interop fee unit, which the chain operator is charged for when committing the batch on L1. See {protocol-docs/interop-fee.md}.
 
 Fees are **accumulated per `block.coinbase`** (`accumulatedProtocolFees` / `accumulatedZKFees`) rather than pushed, and later claimed by the coinbase via `claimProtocolFees` / `claimZKFees`. Accumulation (instead of direct transfer) prevents a malicious operator from failing sends by supplying a faulty coinbase, and avoids calls to untrusted contracts during a send.
 
