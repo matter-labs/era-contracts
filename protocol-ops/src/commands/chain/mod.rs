@@ -1,14 +1,12 @@
 use clap::Subcommand;
 
 use crate::commands::chain::{
-    init::ChainInitArgs, record_priority_op_lower_bound::ChainRecordPriorityOpLowerBoundArgs,
-    set_da_validator_pair::ChainSetDaValidatorPairArgs,
+    init::ChainInitArgs, set_da_validator_pair::ChainSetDaValidatorPairArgs,
     set_upgrade_timestamp::ChainSetUpgradeTimestampArgs, upgrade::ChainUpgradeArgs,
     validator::ChainValidatorArgs,
 };
 
 pub mod init;
-pub mod record_priority_op_lower_bound;
 pub mod set_da_validator_pair;
 pub mod set_upgrade_timestamp;
 pub mod upgrade;
@@ -21,10 +19,6 @@ pub enum ChainCommands {
     Init(ChainInitArgs),
     /// Upgrade chain to new protocol version
     Upgrade(ChainUpgradeArgs),
-    /// Record the chain's priority-op lower bound — a mandatory prerequisite of the v33 per-chain
-    /// upgrade, which must land in its own transaction before `chain upgrade`
-    #[command(name = "record-priority-op-lower-bound")]
-    RecordPriorityOpLowerBound(ChainRecordPriorityOpLowerBoundArgs),
     /// Set upgrade timestamp so server can detect pending upgrade
     SetUpgradeTimestamp(ChainSetUpgradeTimestampArgs),
     /// Set the chain's DA validator pair (L1 validator + L2 commitment scheme).
@@ -41,9 +35,6 @@ pub async fn run(args: ChainCommands) -> anyhow::Result<()> {
     match args {
         ChainCommands::Init(args) => init::run(args).await,
         ChainCommands::Upgrade(args) => upgrade::run(args).await,
-        ChainCommands::RecordPriorityOpLowerBound(args) => {
-            record_priority_op_lower_bound::run(args).await
-        }
         ChainCommands::SetUpgradeTimestamp(args) => set_upgrade_timestamp::run(args).await,
         ChainCommands::SetDaValidatorPair(args) => set_da_validator_pair::run(args).await,
         ChainCommands::AddValidator(args) => validator::run_add(args).await,

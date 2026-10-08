@@ -249,15 +249,6 @@ pub mod i_core_upgrade {
 }
 pub use i_core_upgrade::ICoreUpgradeAbi;
 
-pub mod i_core_upgrade_v33 {
-    alloy::sol!(
-        #[sol(rpc)]
-        ICoreUpgradeV33Abi,
-        "../l1-contracts/zkstack-out/ICoreUpgradeV33.sol/ICoreUpgradeV33.json"
-    );
-}
-pub use i_core_upgrade_v33::ICoreUpgradeV33Abi;
-
 pub mod i_ctm_upgrade {
     alloy::sol!(
         #[sol(rpc)]
@@ -266,15 +257,6 @@ pub mod i_ctm_upgrade {
     );
 }
 pub use i_ctm_upgrade::ICTMUpgradeAbi;
-
-pub mod i_record_priority_op_lower_bound {
-    alloy::sol!(
-        #[sol(rpc)]
-        IRecordPriorityOpLowerBoundAbi,
-        "../l1-contracts/zkstack-out/IRecordPriorityOpLowerBound.sol/IRecordPriorityOpLowerBound.json"
-    );
-}
-pub use i_record_priority_op_lower_bound::IRecordPriorityOpLowerBoundAbi;
 
 pub mod i_finalize_chain_init {
     // Hand-declared: the artifact JSON's `enum L2DACommitmentScheme`

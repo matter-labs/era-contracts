@@ -174,7 +174,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         // Cross-chain asset correctness is enforced by the ZK proof, so no per-batch log
-        // reconstruction / balance accounting happens here. See {protocol-docs/message-root.md#v31-vs-v32-append-flows}.
+        // reconstruction / balance accounting happens here. See {protocol-docs/message-root.md#v31-vs-v33-append-flows}.
         for (uint256 i = 0; i < nBatches; ++i) {
             _appendMessageRoot(batchesData[i].batchNumber, batchesData[i].l2LogsTreeRoot);
         }
@@ -220,19 +220,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // Check that the batch passed by the validator is indeed the first unverified batch
         _checkBatchHashMismatch(prevBatch, currentTotalBatchesVerified, true);
 
-        bytes32 prevBatchStateCommitment = prevBatch.batchHash;
         for (uint256 i = 0; i < committedBatchesLength; ++i) {
             currentTotalBatchesVerified = currentTotalBatchesVerified.uncheckedInc();
             _checkBatchHashMismatch(committedBatches[i], currentTotalBatchesVerified, false);
 
-            bytes32 currentBatchStateCommitment = committedBatches[i].batchHash;
-            proofPublicInput[i] = _getBatchProofPublicInput(
-                prevBatchStateCommitment,
-                currentBatchStateCommitment,
-                committedBatches[i].commitment
-            );
-
-            prevBatchStateCommitment = currentBatchStateCommitment;
+            proofPublicInput[i] = uint256(committedBatches[i].commitment);
         }
         if (currentTotalBatchesVerified > s.totalBatchesCommitted) {
             revert VerifiedBatchesExceedsCommittedBatches();
@@ -249,33 +241,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (!successVerifyProof) {
             revert InvalidProof();
         }
-    }
-
-    /// @dev Gets the proof public input for a batch.
-    function _getBatchProofPublicInput(
-        bytes32 _prevBatchStateCommitment,
-        bytes32 _currentBatchStateCommitment,
-        bytes32 _currentBatchCommitment
-    ) internal view returns (uint256) {
-        // `fri_proof_verification_enabled` is always disabled, hence the `0` word.
-        // The final word is the pubdata content (`FULL_PUBDATA=0`/`LOGS_ONLY=1`), mirroring `ChainConfig::hash`
-        // on ZKsync OS, which appends `pubdata_content` after `max_tx_gas_limit`.
-        bytes32 chainConfigHash = keccak256(
-            abi.encodePacked(s.chainId, uint256(0), uint256(_getZKsyncOSMaxTxGasLimit()), uint256(s.pubdataContent))
-        );
-        // Untruncated: the prover folds the full per-batch hashes, so PUBLIC_INPUT_SHIFT is
-        // applied once by `computeZKsyncOSHash` after the fold.
-        return
-            uint256(
-                keccak256(
-                    abi.encodePacked(
-                        _prevBatchStateCommitment,
-                        _currentBatchStateCommitment,
-                        chainConfigHash,
-                        _currentBatchCommitment
-                    )
-                )
-            );
     }
 
     /// @inheritdoc IExecutor

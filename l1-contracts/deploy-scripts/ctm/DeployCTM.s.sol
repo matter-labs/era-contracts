@@ -38,6 +38,7 @@ import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2G
 import {IDeployCTM} from "contracts/script-interfaces/IDeployCTM.sol";
 import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
 import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     using stdToml for string;
@@ -145,8 +146,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         // The CTM keeps this implementation and reuses it for every upgrade that needs no bespoke
         // logic — a verifier or VK swap, say — so it has to be the reusable one. A one-shot migration
-        // like `V32UpgradeZKsyncOS` would be replayed by those later upgrades.
-        priorityOpLowerBound = deploySimpleContract("PriorityOpLowerBound");
+        // like `V34UpgradeZKsyncOS` would be replayed by those later upgrades.
         (ctmAddresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgradeZKsyncOS");
         (ctmAddresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade");
 
@@ -310,7 +310,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         );
         rollupDAManager.updateDAPair(
             ctmAddresses.daAddresses.l1BlobsDAValidatorZKsyncOS,
-            getRollupL2DACommitmentScheme(),
+            L2DACommitmentScheme.BLOBS_ZKSYNC_OS,
             true
         );
         vm.stopBroadcast();
@@ -387,7 +387,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         }
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", ctmAddresses.stateTransition.genesisUpgrade);
         vm.serializeAddress("state_transition", "default_upgrade_addr", ctmAddresses.stateTransition.defaultUpgrade);
-        vm.serializeAddress("state_transition", "priority_op_lower_bound_addr", priorityOpLowerBound);
         vm.serializeAddress("state_transition", "eip7702_checker_addr", ctmAddresses.admin.eip7702Checker);
         vm.serializeAddress(
             "state_transition",

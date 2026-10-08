@@ -130,7 +130,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
     ///         through L1->L2 transactions.
     /// @dev DISABLED IN v33. No gateway is deployed in this release: chain migrations are switched off
     ///      ecosystem-wide (`CHAIN_MIGRATIONS_ENABLED == false` in `Config.sol`, see
-    ///      {protocol-docs/chain-lifecycle.md#v32-chain-migrations-are-explicitly-disabled}), so no chain
+    ///      {protocol-docs/chain-lifecycle.md#v33-chain-migrations-are-explicitly-disabled}), so no chain
     ///      can ever settle on a gateway created here, and the release's gateway-side pieces are
     ///      consequently untested. Rather than emit a governance bundle that deploys an unusable — and
     ///      unverified — CTM onto an L2, this reverts.
@@ -229,7 +229,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
     ) internal {
         Utils.runL1L2Transaction({
             l2Calldata: data,
-            l2GasLimit: 72_000_000,
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
             l2Value: 0,
             factoryDeps: factoryDeps,
             dstAddress: to,

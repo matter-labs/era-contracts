@@ -22,6 +22,7 @@ use alloy::sol_types::SolCall;
 use anyhow::Context;
 
 use crate::common::abi::{ICTMUpgradeAbi, ICoreUpgradeAbi};
+use crate::common::forge::scripts::UPGRADE_CTM_OUTPUT_PATH_PREFIX;
 use crate::common::wallets::Wallet;
 use crate::common::{forge::ForgeRunner, logger};
 
@@ -322,8 +323,9 @@ impl<'a> UpgradeInner<'a> {
             "Per-CTM create2 salt: {create2_salt:#x} (ctm={ctm_proxy:#x})"
         ));
 
-        // Per-CTM output path so back-to-back prepares don't clobber each other.
-        let output_path_str = format!("/script-out/v33-upgrade-ctm-{ctm_proxy:#x}.toml");
+        // Per-CTM output path so back-to-back prepares don't clobber each other. Version-free: the same
+        // name serves every release's prepare.
+        let output_path_str = format!("{UPGRADE_CTM_OUTPUT_PATH_PREFIX}{ctm_proxy:#x}.toml");
         let ctm_output_path = self
             .contracts_path
             .join(output_path_str.trim_start_matches('/'));

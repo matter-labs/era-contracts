@@ -6,8 +6,8 @@ import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
 import {CommitBatchInfoZKsyncOS, ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {BatchHashMismatch} from "contracts/common/L1ContractErrors.sol";
-import {L2DACommitmentScheme} from "contracts/common/Config.sol";
+import {BatchHashMismatch, ChainConfigHashMismatch} from "contracts/common/L1ContractErrors.sol";
+import {L2DACommitmentScheme, ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT, PubdataContent} from "contracts/common/Config.sol";
 import {MismatchL2DACommitmentScheme} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {
@@ -19,6 +19,55 @@ import {BlobsL1DAValidatorZKsyncOS} from "../../../da-contracts-imports/BlobsL1D
 
 contract CommittingTest is ExecutorTest {
     function setUp() public {}
+
+    function test_RevertWhen_ChainConfigHashDoesNotMatch() public {
+        CommitBatchInfoZKsyncOS[] memory batches = new CommitBatchInfoZKsyncOS[](1);
+        batches[0] = newCommitBatchInfoZKsyncOS;
+        bytes32 expectedHash = batches[0].chainConfigHash;
+        batches[0].chainConfigHash = keccak256("different config");
+        (uint256 from, uint256 to, bytes memory data) = Utils.encodeCommitBatchesDataZKsyncOS(
+            genesisStoredBatchInfo,
+            batches
+        );
+        vm.expectRevert(
+            abi.encodeWithSelector(ChainConfigHashMismatch.selector, expectedHash, batches[0].chainConfigHash)
+        );
+        vm.prank(validator);
+        committer.commitBatchesSharedBridge(address(0), from, to, data);
+        assertEq(getters.getTotalBlocksCommitted(), 0);
+    }
+
+    function test_ConfigChangeInvalidatesStaleCommit() public {
+        uint64 newGasLimit = ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT + 1;
+        vm.prank(owner);
+        admin.setZKsyncOSMaxTxGasLimit(newGasLimit);
+        bytes32 newConfigHash = Utils.chainConfigHash(l2ChainId, newGasLimit, PubdataContent.FULL_PUBDATA);
+        CommitBatchInfoZKsyncOS[] memory batches = new CommitBatchInfoZKsyncOS[](1);
+        batches[0] = newCommitBatchInfoZKsyncOS;
+        (uint256 from, uint256 to, bytes memory data) = Utils.encodeCommitBatchesDataZKsyncOS(
+            genesisStoredBatchInfo,
+            batches
+        );
+        vm.expectRevert(
+            abi.encodeWithSelector(ChainConfigHashMismatch.selector, newConfigHash, batches[0].chainConfigHash)
+        );
+        vm.prank(validator);
+        committer.commitBatchesSharedBridge(address(0), from, to, data);
+        assertEq(getters.getTotalBlocksCommitted(), 0);
+
+        batches[0].chainConfigHash = newConfigHash;
+        IExecutor.StoredBatchInfo memory stored = _commitOSBatchGetStored(genesisStoredBatchInfo, batches[0]);
+        bytes32 expected = keccak256(
+            abi.encodePacked(
+                genesisStoredBatchInfo.batchHash,
+                batches[0].newStateCommitment,
+                newConfigHash,
+                _batchOutputHash(batches[0], bytes32(0))
+            )
+        );
+        assertEq(stored.commitment, expected);
+        assertEq(getters.getTotalBlocksCommitted(), 1);
+    }
 
     function test_SuccessfullyCommitBatchWithCalldata() public {
         // Calldata DA
@@ -612,7 +661,18 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectEmit(true, true, true, true, address(committer));
-        emit ICommitter.BlockCommit(1, batch.newStateCommitment, _batchOutputHash(batch, upgradeTxHash));
+        emit ICommitter.BlockCommit(
+            1,
+            batch.newStateCommitment,
+            keccak256(
+                abi.encodePacked(
+                    genesisStoredBatchInfo.batchHash,
+                    batch.newStateCommitment,
+                    batch.chainConfigHash,
+                    _batchOutputHash(batch, upgradeTxHash)
+                )
+            )
+        );
         vm.expectEmit(true, true, true, true, address(committer));
         emit ICommitter.ReportCommittedBatchProtocolVersion(1, 0, upgradeTxHash);
         committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
@@ -638,29 +698,6 @@ contract CommittingTest is ExecutorTest {
             genesisStoredBatchInfo,
             batchArray
         );
-    }
-
-    /// @dev Mirrors the `batchOutputHash` formula from Committer._commitOneBatch.
-    function _batchOutputHash(
-        CommitBatchInfoZKsyncOS memory _batch,
-        bytes32 _upgradeTxHash
-    ) internal pure returns (bytes32) {
-        return
-            keccak256(
-                abi.encodePacked(
-                    _batch.firstBlockTimestamp,
-                    _batch.lastBlockTimestamp,
-                    uint256(_batch.daCommitmentScheme),
-                    _batch.daCommitment,
-                    _batch.numberOfLayer1Txs,
-                    _batch.numberOfLayer2Txs,
-                    _batch.priorityOperationsHash,
-                    _batch.l2LogsTreeRoot,
-                    _upgradeTxHash,
-                    _batch.dependencyRootsRollingHash,
-                    _batch.slChainId
-                )
-            );
     }
 
     function test_RevertWhen_CommittingWithWrongLastCommittedBatchData() public {

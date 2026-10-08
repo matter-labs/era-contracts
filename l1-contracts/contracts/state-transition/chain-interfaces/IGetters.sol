@@ -123,12 +123,25 @@ interface IGetters is IZKChainBase {
     /// executed (i.e. finalized).
     function getL2SystemContractsUpgradeBatchNumber() external view returns (uint256);
 
-    /// @return The maximum number of L2 gas that a user can request for L1 -> L2 transactions
+    /// @notice Returns the effective gas limit for newly requested L1 -> L2 transactions.
+    /// @return The chain's configured limit, at most the protocol ceiling.
     function getPriorityTxMaxGasLimit() external view returns (uint256);
 
     /// @return The effective ZKsync OS single-transaction gas limit (EIP-7825), with the default
     /// substituted when the value was never set explicitly.
     function getZKsyncOSMaxTxGasLimit() external view returns (uint64);
+
+    /// @notice Returns the current runtime configuration hash on this chain copy.
+    /// @return The hash used to validate batch commits; see {protocol-docs/chain-config.md}.
+    function getZKsyncOSChainConfigHash() external view returns (bytes32);
+
+    /// @notice Returns whether operator filtering of priority transactions is enabled.
+    /// @return Whether L1 transaction filtering is enabled.
+    function isZKsyncOSL1TxFilteringEnabled() external view returns (bool);
+
+    /// @notice Returns whether the larger ZKsync OS contract size limits are enabled.
+    /// @return Whether large contracts are enabled.
+    function isZKsyncOSLargeContractsEnabled() external view returns (bool);
 
     /// @return Whether a withdrawal has been finalized.
     /// @param _l2BatchNumber The L2 batch number within which the withdrawal happened.

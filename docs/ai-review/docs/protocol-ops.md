@@ -3,7 +3,7 @@
 ## Relevant files
 
 - `protocol-ops/src/main.rs` — top-level CLI dispatcher.
-- `protocol-ops/src/commands/ecosystem/` — ecosystem-wide commands (`upgrade-prepare-all`, `upgrade-governance`, `stage3`, `list-ctms`, `governance-toml-to-simulator`, …).
+- `protocol-ops/src/commands/ecosystem/` — ecosystem-wide commands (`upgrade-prepare-all`, `upgrade-governance`, `list-ctms`, `governance-toml-to-simulator`, …).
 - `protocol-ops/src/commands/ecosystem/v31_upgrade_inner.rs` — canonical v31 prepare-phase orchestration (`V31UpgradeInner::prepare`).
 - `protocol-ops/src/commands/ecosystem/v31_upgrade_full.rs` — `V31UpgradeFull` = Inner + ecosystem precondition (`ensureCtmsAndProxyAdminsOwnedByGovernance`).
 - `protocol-ops/src/commands/ecosystem/upgrade.rs` — CLI handlers (`run_upgrade_prepare_all`, `run_upgrade_governance`, `run_list_ctms`) and the free `replay_governance_stages` helper.

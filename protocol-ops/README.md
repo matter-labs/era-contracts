@@ -48,6 +48,36 @@ Most subcommands flatten **`SharedRunArgs`** from `common/args.rs`:
 > an EOA to simulate forge scripts against the Anvil fork. Extra signers (e.g.
 > **`--owner`**) stay on specific commands.
 
+## Preparing protocol v34
+
+`ecosystem upgrade-prepare-all` defaults to `DefaultCoreUpgrade` and `CTMUpgrade_v34` (the default CTM
+upgrade with the v34 per-chain upgrade, `V34UpgradeZKsyncOS`), using `upgrade-envs/v0.34.0-chain-config/local.toml` for a local v33-to-v34 upgrade.
+With `--env <name>` the input is `<release dir>/<name>.toml` (see [Environment inputs](#environment-inputs));
+missing inputs fail before deployment.
+
+`--ctm-script-path`, `--core-script-path`, and `--upgrade-input-path` are visible in `--help`.
+Historical preparations must select the matching scripts and input explicitly. The anvil upgrade test
+(`l1-contracts/test/anvil-interop/run-upgrade-test.ts`) uses the defaults with no overrides, so it always
+covers the current release's upgrade. See
+[the activation requirements](../protocol-docs/chain-config.md#activation).
+
+## Environment inputs
+
+`--env <name>` reads `upgrade-envs/permanent-values/<name>.toml` and the release input
+`<release dir>/<name>.toml`. A release input holds only what is read from it: `owner_address`, `era_chain_id`
+and the CREATE2 / legacy-Gov salts (`[contracts] create2_factory_salt`, `legacy_gov_salt`,
+`[create2_factory_salts]`, rotated every release because CREATE2 returns the previously deployed contract on a
+reused salt) for protocol-ops, and `governance_upgrade_timer_initial_delay` for `DefaultCTMUpgrade`. The old
+protocol version comes from each CTM and the target from `configs/genesis/zksync-os/latest.json`. The release dir is the current release's (`current_upgrade_env_dir!` in
+`src/common/forge/scripts/mod.rs`) unless `--upgrade-env-dir` selects another (on the commands built on the
+shared `--env` topology args and on `verify-upgrade`; `ecosystem init` / `ctm init` always use the current
+release). It is the only release selector: `upgrade-prepare-all` rejects an `--upgrade-input-path` outside the
+selected release dir rather than mixing one release's input with another's salts. The owner, `era_chain_id`
+and CREATE2 salts come
+from that release input, and a command that needs one of them fails when the release has no input for the
+env: it never falls back to the deployer, local's values or random salts. `yarn new-release` creates the next
+release's inputs from the current ones with fresh salts.
+
 ## Execution model
 
 Every command that generates Safe bundles runs **exclusively against a temporary Anvil fork**
@@ -59,8 +89,14 @@ Safe-bundle-aware executor) with the keys from `wallets.yaml`.
 
 ## Running the Protocol Upgrade Verification Tool (PUVT)
 
+> **Not ported to v34 yet.** On this line `verify-upgrade` still runs the v31 verifier
+> (`upgrade_verification/versions/v31`), which is pinned to the 0.31.0 → 0.32.0 transition and rejects a
+> v34 bundle (0.33.x → 0.34.0) in stage 1. The working v33 verifier lives on
+> `release/v0.33.0-atomic-interop` (`versions/v33`); porting it to v34 must also move the cut-initializer
+> check to `v34_upgrade_addr`.
+
 `ecosystem verify-upgrade` re-derives and cross-checks the calldata produced by
-`ecosystem upgrade-prepare-all` for the **v31 → v32 ZKsync OS upgrade**. It is
+`ecosystem upgrade-prepare-all` for a **ZKsync OS upgrade**. It is
 **read-only**: it never runs forge or spins up an Anvil fork. It reads the merged
 `ecosystem.toml`, replays the append-only `transactions.txt` deployment log against L1,
 and matches every CREATE2 deployment against `AllContractsHashes.json`. The tool is
@@ -75,11 +111,12 @@ cargo run --release --bin protocol_ops -- ecosystem verify-upgrade \
 
 | Flag                         | Role                                                                                           |
 | ---------------------------- | ---------------------------------------------------------------------------------------------- |
-| **`--env`**                  | `stage` / `testnet` / `mainnet`; selects the permanent-values + v31 input TOMLs.               |
+| **`--env`**                  | `stage` / `testnet` / `mainnet`; selects the permanent-values + current-release input TOMLs.   |
 | **`--ecosystem-toml`**       | Merged artifact from `upgrade-prepare-all`.                                                    |
 | **`--zk-governance-commit`** | zk-governance commit for PUH / Guardians / SecurityCouncil / EUB bytecode metadata (required). |
 | **`--contracts-commit`**     | Optional era-contracts commit; when omitted, the local checkout is the authority.              |
 | **`--transactions-log`**     | Deployment tx-hash log; defaults to the env's `output/<env>/transactions.txt`.                 |
+| **`--upgrade-env-dir`**      | Release dir for the env input and the default log; defaults to the current release.            |
 | **`--l1-rpc-url`**           | L1 RPC (default `http://localhost:8545`).                                                      |
 | **`--display-upgrade-data`** | Print each stage's ABI-encoded `UpgradeProposal` and skip the rest of the verifier.            |
 

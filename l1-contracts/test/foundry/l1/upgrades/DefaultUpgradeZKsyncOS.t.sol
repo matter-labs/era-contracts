@@ -43,7 +43,7 @@ contract DummyDefaultUpgradeZKsyncOS is DefaultUpgradeZKsyncOS, BaseUpgradeUtils
 ///         before the generic upgrade runs, and the per-chain force-deployments-data substitution it does.
 /// @dev The ecosystem contracts the substitution reads (bridgehub, asset router, native token vault) are
 ///      mocked: the behaviour under test is which values end up in the rewritten transaction, not how the
-///      vault stores them. The end-to-end composition is covered by the anvil `v31 -> v32` scenario.
+///      vault stores them. The end-to-end composition is covered by the anvil upgrade scenario (`run-upgrade-test.ts`).
 contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
     DummyDefaultUpgradeZKsyncOS internal upgradeContract;
 
