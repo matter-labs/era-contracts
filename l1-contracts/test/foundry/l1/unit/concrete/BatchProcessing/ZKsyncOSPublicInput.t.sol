@@ -16,10 +16,13 @@ import {
 import {TestCommitter} from "contracts/dev-contracts/test/TestCommitter.sol";
 import {IInteropFeeManager} from "contracts/core/interop-fee/IInteropFeeManager.sol";
 import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
-import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT, PUBLIC_INPUT_SHIFT} from "contracts/common/Config.sol";
+import {
+    L2DACommitmentScheme,
+    ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
+    PUBLIC_INPUT_SHIFT
+} from "contracts/common/Config.sol";
 
 contract CommitterZKsyncOSPublicInputHarness is TestCommitter {
     // Only the public-input hashing is exercised, which never charges the interop fee.
@@ -160,10 +163,11 @@ contract ZKsyncOSPublicInputTest is Test {
     function _goldenInteropFeeBatch(
         uint256 _interopFeeUnits
     ) internal pure returns (CommitBatchInfoZKsyncOS memory batch) {
-        // Only the fields hashed into the batch output matter; the rest stay zero.
+        // The same batch output as ZKsync OS `batch_output_hash_commits_to_interop_fee_units_last`; only the hashed
+        // fields are set.
         batch.firstBlockTimestamp = 1;
         batch.lastBlockTimestamp = 2;
-        batch.daCommitmentScheme = L2DACommitmentScheme(1);
+        batch.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
         batch.daCommitment = _repeatedByte(0x11);
         batch.numberOfLayer1Txs = 3;
         batch.numberOfLayer2Txs = 4;

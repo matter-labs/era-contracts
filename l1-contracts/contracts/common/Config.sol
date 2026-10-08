@@ -133,10 +133,9 @@ struct DisabledProofSystems {
 /// a non-inclusion proof. The off-chain imt-engine must use the same value.
 bytes32 constant IMT_EMPTY_LEAF_HASH = keccak256("zkSync:IndexedMerkleTree:emptyLeaf");
 
-/// @dev Storage slot of the L2 `InteropCenter`'s monotonic interop fee unit counter,
-/// `bytes32(uint256(keccak256("zksync.interop-center.interop-fee-units")) - 1)`. CONSENSUS-CRITICAL: the
-/// ZKsync OS bootloader reads it at every batch boundary, so it is hardcoded (locked by a unit test) to be
-/// copied verbatim. See {protocol-docs/interop-fee.md}.
+/// @dev Storage slot of the L2 `InteropCenter`'s interop fee unit counter,
+/// `bytes32(uint256(keccak256("zksync.interop-center.interop-fee-units")) - 1)` (checked by a unit test).
+/// Consensus-critical: the ZKsync OS bootloader reads it at batch boundaries. See {protocol-docs/interop-fee.md}.
 bytes32 constant INTEROP_FEE_UNITS_SLOT = 0xcb06feb7f26e08c2ab18254891cfbe115998e9ed512f0732aa6fc7f097a78265;
 
 /// @dev Even though the price for 1 byte of pubdata is 16 L1 gas, we have a slightly increased

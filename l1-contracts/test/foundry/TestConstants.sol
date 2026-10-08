@@ -19,6 +19,7 @@ bytes32 constant PUBLIC_INPUT_HASH_GOLDEN = 0x115e07747f99e4785e3f1c91d3ff85f05e
 bytes32 constant PUBLIC_INPUT_HASH_GOLDEN_FILTERING_ONLY = 0x7bb4bea265b944d45623d3e57de083aceb9c7d9f30240c3a917fa187a4444282;
 bytes32 constant PUBLIC_INPUT_HASH_GOLDEN_LARGE_CONTRACTS_ONLY = 0xac58d82a0990197b31c12ec9cc33b330e5dbda74011eafd37b7e78a5241f0ec7;
 bytes32 constant PUBLIC_INPUT_HASH_GOLDEN_BOTH_FLAGS = 0xa78ab15446de058e9f871114c4b0333d8ab23ec8959f89b582c33409751aa837;
-// Shared with the ZKsync OS `BatchOutput::hash` golden-vector tests; see {protocol-docs/interop-fee.md}.
+// Batch output hashes of `_goldenInteropFeeBatch(7)` / `(0)` in ZKsyncOSPublicInput.t.sol, shared with ZKsync OS
+// public_input.rs `batch_output_hash_commits_to_interop_fee_units_last`; see {protocol-docs/interop-fee.md}.
 bytes32 constant BATCH_OUTPUT_HASH_GOLDEN_INTEROP_FEE_UNITS_7 = 0x82cf2f4e531d92c0cf48eb93b02a24791907cbfe3b92362df3519e8a0c62fb7b;
 bytes32 constant BATCH_OUTPUT_HASH_GOLDEN_INTEROP_FEE_UNITS_0 = 0xafe723d2b10a24d8e3c16572229996f1b43e2d9d9fbb5a6b3a0b32b1c8408be1;

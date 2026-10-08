@@ -134,6 +134,7 @@ Live environment variables:
 | `08-interop-messages`        | Base-token and ERC20 messages across ETH and custom-base-token chains                                                                                        |
 | `09-interop-unbundle`        | Bundle verification and recovery of calls that cannot execute                                                                                                |
 | `13-imt-atomic-swap`         | IMT-backed atomic swaps, timeout refunds, and invalid-flow rejection                                                                                         |
+| `14-interop-fee-units`       | Interop fee units: L2->L2 calls counted on the source only, withdrawals never; L1 fee manager ships off, prepaid balance round trip                          |
 
 ## Coverage
 
@@ -285,7 +286,8 @@ test/anvil-interop/
 │   ├── 07-interop-bundles.spec.ts
 │   ├── 08-interop-messages.spec.ts
 │   ├── 09-interop-unbundle.spec.ts
-│   └── 13-imt-atomic-swap.spec.ts
+│   ├── 13-imt-atomic-swap.spec.ts
+│   └── 14-interop-fee-units.spec.ts
 └── outputs/                       # Deployment outputs (gitignored)
 ```
 

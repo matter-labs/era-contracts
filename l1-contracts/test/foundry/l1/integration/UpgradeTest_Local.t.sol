@@ -26,6 +26,8 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {Utils} from "../../../../deploy-scripts/utils/Utils.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DefaultUpgradeZKsyncOS} from "contracts/upgrades/DefaultUpgradeZKsyncOS.sol";
+import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
+import {InteropFeeManager} from "contracts/core/interop-fee/InteropFeeManager.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {Bytes} from "contracts/vendor/Bytes.sol";
 
@@ -294,6 +296,27 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationTestBase, L1ContractDe
             coreUpgrade.getDiscoveredBridgehub().proxies.chainRegistrationSender,
             "Bridgehub does not know the ChainRegistrationSender"
         );
+
+        // Both chains charge the CTM's interop fee manager, which ships switched off and owned by governance. This
+        // fixture's ecosystem is deployed with current scripts and so starts with a manager, but discovery skips it
+        // below the release that introduces the fee: like a real ecosystem, the upgrade to it deploys a new one.
+        InteropFeeManager interopFeeManager = InteropFeeManager(ctmUpgrade.getAddresses().l1Specific.interopFeeManager);
+        assertTrue(address(interopFeeManager) != address(0), "No interop fee manager after the upgrade");
+        assertEq(
+            CommitterFacet(_eraDiamond).getInteropFeeManager(),
+            address(interopFeeManager),
+            "Existing chain charges another interop fee manager"
+        );
+        assertEq(
+            CommitterFacet(_newChainDiamond).getInteropFeeManager(),
+            address(interopFeeManager),
+            "New chain charges another interop fee manager"
+        );
+        address governance = ctmUpgrade.getAddresses().admin.governance;
+        assertEq(interopFeeManager.owner(), governance, "Interop fee manager not owned by governance");
+        assertEq(interopFeeManager.feeRecipient(), governance, "Interop fees not swept to governance");
+        assertEq(interopFeeManager.feePerUnit(), 0, "Interop fee not switched off");
+        assertEq(address(interopFeeManager.BRIDGE_HUB()), bridgehub, "Interop fee manager on another bridgehub");
 
         if (_serverNotifierProxy != address(0)) {
             assertEq(

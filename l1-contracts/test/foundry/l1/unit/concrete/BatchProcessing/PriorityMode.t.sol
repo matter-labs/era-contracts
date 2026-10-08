@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import {Utils} from "../Utils/Utils.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+import {IInteropFeeManager} from "contracts/core/interop-fee/IInteropFeeManager.sol";
 import {
     InvalidTxCountInPriorityMode,
     PriorityModeActivationTooEarly,
@@ -106,5 +107,47 @@ contract PriorityModeExecutorTest is ExecutorTest {
         vm.prank(address(permissionlessValidator));
         vm.expectRevert(abi.encodeWithSelector(InvalidTxCountInPriorityMode.selector, 0, 0));
         committer.commitBatchesSharedBridge(address(0), commitFrom, commitTo, commitData);
+    }
+
+    function test_priorityModeBatchIsNotChargedTheInteropFee() public {
+        // Switched on without a balance: the escape hatch never depends on the fee.
+        vm.prank(owner);
+        interopFeeManager.setFeePerUnit(1);
+        _activatePriorityMode();
+
+        _mockDAForCommit(newCommitBatchInfoZKsyncOS.batchNumber);
+
+        // A priority transaction can still send interop through the InteropCenter.
+        CommitBatchInfoZKsyncOS memory commitInfo = newCommitBatchInfoZKsyncOS;
+        commitInfo.numberOfLayer1Txs = 1;
+        commitInfo.interopFeeUnits = 5;
+
+        CommitBatchInfoZKsyncOS[] memory commitInfos = new CommitBatchInfoZKsyncOS[](1);
+        commitInfos[0] = commitInfo;
+
+        (uint256 commitFrom, uint256 commitTo, bytes memory commitData) = Utils.encodeCommitBatchesDataZKsyncOS(
+            genesisStoredBatchInfo,
+            commitInfos
+        );
+
+        vm.expectCall(
+            address(interopFeeManager),
+            abi.encodeWithSelector(IInteropFeeManager.chargeInteropFee.selector),
+            0
+        );
+        vm.prank(address(permissionlessValidator));
+        committer.commitBatchesSharedBridge(address(0), commitFrom, commitTo, commitData);
+
+        assertEq(getters.getTotalBatchesCommitted(), 1);
+    }
+
+    function _activatePriorityMode() internal {
+        vm.prank(owner);
+        admin.makePermanentRollup();
+        _requestPriorityOp();
+        vm.prank(owner);
+        admin.permanentlyAllowPriorityMode();
+        vm.warp(block.timestamp + PRIORITY_EXPIRATION + 1);
+        admin.activatePriorityMode();
     }
 }

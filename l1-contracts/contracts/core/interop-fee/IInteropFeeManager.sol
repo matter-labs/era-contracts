@@ -4,20 +4,20 @@ pragma solidity ^0.8.21;
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Network-level interop fee switch: per-chain prepaid balances that chains are charged from when
-/// they commit batches. See {protocol-docs/interop-fee.md}.
+/// @notice The L1 interop fee switch: per-chain prepaid balances that chains are charged from when they commit
+/// batches. See {protocol-docs/interop-fee.md}.
 interface IInteropFeeManager {
     /// @notice Emitted when the owner changes the fee charged per interop fee unit.
-    event FeePerUnitSet(uint256 oldFeePerUnit, uint256 newFeePerUnit);
+    event NewFeePerUnit(uint256 oldFeePerUnit, uint256 newFeePerUnit);
 
-    /// @notice Emitted when the owner changes the recipient of swept fees.
-    event FeeRecipientSet(address indexed oldRecipient, address indexed newRecipient);
+    /// @notice Emitted when the recipient of swept fees is set.
+    event NewFeeRecipient(address indexed oldFeeRecipient, address indexed newFeeRecipient);
 
     /// @notice Emitted when a chain's prepaid balance is topped up.
-    event Deposited(uint256 indexed chainId, address indexed from, uint256 amount);
+    event ChainBalanceDeposited(uint256 indexed chainId, address indexed from, uint256 amount);
 
     /// @notice Emitted when a chain admin withdraws from the chain's prepaid balance.
-    event Withdrawn(uint256 indexed chainId, address indexed to, uint256 amount);
+    event ChainBalanceWithdrawn(uint256 indexed chainId, address indexed to, uint256 amount);
 
     /// @notice Emitted when a committed batch is charged.
     event InteropFeeCharged(uint256 indexed chainId, uint256 indexed batchNumber, uint256 units, uint256 fee);

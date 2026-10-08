@@ -1,9 +1,10 @@
 import { expect } from "chai";
-import { BigNumber, Contract, ethers } from "ethers";
+import type { BigNumber } from "ethers";
+import { Contract, Wallet, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { getChainIdsByRole, getL2Chain, createProvider } from "../../src/core/utils";
+import { getChainIdsByRole, getL2Chain, createProvider, impersonateAndRun } from "../../src/core/utils";
 import { getAbi } from "../../src/core/contracts";
-import { INTEROP_CENTER_ADDR } from "../../src/core/const";
+import { ANVIL_DEFAULT_PRIVATE_KEY, INTEROP_CENTER_ADDR } from "../../src/core/const";
 import { encodeEvmAddress } from "../../src/helpers/erc7930";
 import {
   sendInteropBundle,
@@ -19,6 +20,7 @@ import { getInteropSourceAddress } from "../../src/core/accounts";
 
 const CALL_VALUE = ethers.utils.parseUnits("10", "gwei");
 const WITHDRAWAL_AMOUNT = ethers.utils.parseUnits("1", "gwei");
+const PREPAID_AMOUNT = ethers.utils.parseUnits("1", "gwei");
 
 /**
  * 14 - Interop fee units
@@ -27,7 +29,8 @@ const WITHDRAWAL_AMOUNT = ethers.utils.parseUnits("1", "gwei");
  * InteropCenter counts in a monotonic counter (see {protocol-docs/interop-fee.md}). This spec runs real
  * bundles between two chains and checks the counter: every call of an L2->L2 bundle counts once on the
  * source, executing a bundle counts nothing on the destination, and withdrawals to L1 are never counted.
- * It also checks that a fresh deployment ships the L1 fee manager switched off.
+ * It also checks that a fresh deployment ships the L1 fee manager switched off, and that the manager resolves
+ * chains and their admins through the real Bridgehub and diamonds.
  *
  * The harness does not commit batches to L1; the commit-time charge is covered by the foundry suite
  * (BatchProcessing/InteropFee.t.sol).
@@ -43,6 +46,8 @@ describe("14 - Interop fee units", function () {
   let sourceProvider: ethers.providers.JsonRpcProvider;
   let destProvider: ethers.providers.JsonRpcProvider;
   let dummyRecipient: string;
+  let l1Provider: ethers.providers.JsonRpcProvider;
+  let feeManager: Contract;
 
   function interopCenter(provider: ethers.providers.JsonRpcProvider): Contract {
     return new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
@@ -88,21 +93,40 @@ describe("14 - Interop fee units", function () {
     destProvider = createProvider(getL2Chain(state.chains, destChainId).rpcUrl);
 
     dummyRecipient = await deployDummyInteropRecipient(destProvider);
+
+    l1Provider = createProvider(state.chains.l1!.rpcUrl);
+    feeManager = new Contract(state.ctmAddresses.interopFeeManager, getAbi("InteropFeeManager"), l1Provider);
   });
 
   it("deploys the L1 fee manager switched off", async () => {
-    const managerAddress = state.ctmAddresses!.interopFeeManager;
-    const l1Provider = createProvider(state.chains!.l1!.rpcUrl);
-    const manager = new Contract(managerAddress, getAbi("InteropFeeManager"), l1Provider);
+    expect(await l1Provider.getCode(feeManager.address), "fee manager must be deployed").to.not.equal("0x");
+    expect((await feeManager.feePerUnit()).toString(), "the switch ships off").to.equal("0");
+    expect((await feeManager.accruedFees()).toString()).to.equal("0");
+    expect(await feeManager.BRIDGE_HUB()).to.equal(state.l1Addresses!.bridgehub);
+    // Governance owns the switch and receives the fees from initialization.
+    expect(await feeManager.owner()).to.equal(state.l1Addresses!.governance);
+    expect(await feeManager.feeRecipient()).to.equal(state.l1Addresses!.governance);
+    expect(await feeManager.pendingOwner()).to.equal(ethers.constants.AddressZero);
+  });
 
-    expect(await l1Provider.getCode(managerAddress), "fee manager must be deployed").to.not.equal("0x");
-    expect((await manager.feePerUnit()).toString(), "the switch ships off").to.equal("0");
-    expect((await manager.accruedFees()).toString()).to.equal("0");
-    expect(await manager.BRIDGE_HUB()).to.equal(state.l1Addresses!.bridgehub);
-    // Governance owns the switch from initialization; no deployer key ever controls it.
-    const owner: string = await manager.owner();
-    expect(await l1Provider.getCode(owner), "owner must be the governance contract").to.not.equal("0x");
-    expect(await manager.pendingOwner()).to.equal(ethers.constants.AddressZero);
+  it("holds a chain's prepaid balance for its admin", async () => {
+    const bridgehub = new Contract(state.l1Addresses!.bridgehub, getAbi("L1Bridgehub"), l1Provider);
+    const diamond = new Contract(await bridgehub.getZKChain(sourceChainId), getAbi("GettersFacet"), l1Provider);
+    const chainAdmin: string = await diamond.getAdmin();
+    const receiver = ethers.Wallet.createRandom().address;
+    const balanceBefore = await feeManager.chainBalance(sourceChainId);
+
+    const depositor = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
+    await (await feeManager.connect(depositor).deposit(sourceChainId, { value: PREPAID_AMOUNT })).wait();
+    expect((await feeManager.chainBalance(sourceChainId)).toString()).to.equal(
+      balanceBefore.add(PREPAID_AMOUNT).toString()
+    );
+
+    await impersonateAndRun(l1Provider, chainAdmin, async (adminSigner) => {
+      await (await feeManager.connect(adminSigner).withdraw(sourceChainId, receiver, PREPAID_AMOUNT)).wait();
+    });
+    expect((await feeManager.chainBalance(sourceChainId)).toString()).to.equal(balanceBefore.toString());
+    expect((await l1Provider.getBalance(receiver)).toString()).to.equal(PREPAID_AMOUNT.toString());
   });
 
   it("counts every call of an L2->L2 bundle on the source chain only", async () => {
@@ -110,15 +134,15 @@ describe("14 - Interop fee units", function () {
     const destBefore = await feeUnits(destProvider);
 
     const single = await sendDirectCalls(1);
-    expect((await feeUnits(sourceProvider)).sub(sourceBefore).toNumber(), "one call").to.equal(1);
+    expect((await feeUnits(sourceProvider)).sub(sourceBefore).toString(), "one call").to.equal("1");
 
     const triple = await sendDirectCalls(3);
-    expect((await feeUnits(sourceProvider)).sub(sourceBefore).toNumber(), "one + three calls").to.equal(4);
+    expect((await feeUnits(sourceProvider)).sub(sourceBefore).toString(), "one + three calls").to.equal("4");
 
     // Executing on the destination is not sending: the destination's counter does not move.
     expect((await executeBundle(destProvider, single.bundleData, sourceChainId)).status).to.equal(1);
     expect((await executeBundle(destProvider, triple.bundleData, sourceChainId)).status).to.equal(1);
-    expect((await feeUnits(destProvider)).eq(destBefore), "destination counter unchanged").to.equal(true);
+    expect((await feeUnits(destProvider)).toString(), "destination counter unchanged").to.equal(destBefore.toString());
   });
 
   it("does not count withdrawals to L1", async () => {
@@ -135,6 +159,6 @@ describe("14 - Interop fee units", function () {
       amount: WITHDRAWAL_AMOUNT,
     });
 
-    expect((await feeUnits(provider)).eq(before), "withdrawal must not be counted").to.equal(true);
+    expect((await feeUnits(provider)).toString(), "withdrawal must not be counted").to.equal(before.toString());
   });
 });

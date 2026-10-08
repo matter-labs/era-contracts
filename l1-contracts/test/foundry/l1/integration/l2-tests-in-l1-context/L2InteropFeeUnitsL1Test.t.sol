@@ -15,10 +15,6 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 contract L2InteropFeeUnitsL1Test is Test, SharedL2ContractL1Deployer, L2InteropFeeUnitsTestAbstract {
     function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {}
 
-    function setUp() public virtual override(SharedL2ContractDeployer, L2InteropFeeUnitsTestAbstract) {
-        L2InteropFeeUnitsTestAbstract.setUp();
-    }
-
     function initSystemContracts(
         SystemContractsArgs memory _args
     ) internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {

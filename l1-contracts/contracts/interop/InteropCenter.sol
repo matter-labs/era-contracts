@@ -738,13 +738,8 @@ contract InteropCenter is
             _flowPreimage: _atomicSend.flowPreimage
         });
 
-        // Counted in the same call as the IMT append: a leg that is not counted cannot be executed.
+        // Counted together with the IMT append, so every leg that can execute on its destination is counted.
         StorageSlot.getUint256Slot(INTEROP_FEE_UNITS_SLOT).value += _bundle.calls.length;
-    }
-
-    /// @inheritdoc IInteropCenter
-    function interopFeeUnits() external view returns (uint256) {
-        return StorageSlot.getUint256Slot(INTEROP_FEE_UNITS_SLOT).value;
     }
 
     /// @notice Emits ERC-7786 MessageSent events for each call in a bundle.
@@ -891,6 +886,11 @@ contract InteropCenter is
     /*//////////////////////////////////////////////////////////////
                             Fee Management
     //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc IInteropCenter
+    function interopFeeUnits() external view returns (uint256) {
+        return StorageSlot.getUint256Slot(INTEROP_FEE_UNITS_SLOT).value;
+    }
 
     /// @inheritdoc IInteropCenter
     function setInteropFee(uint256 _fee) external onlyCallFromBootloader {

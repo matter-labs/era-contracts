@@ -7,15 +7,12 @@ import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
-import {MsgValueMismatch} from "contracts/common/L1ContractErrors.sol";
 import {INTEROP_FEE_UNITS_SLOT} from "contracts/common/Config.sol";
 import {
     L2_INTEROP_CENTER_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR,
-    L2_BOOTLOADER_ADDRESS,
-    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
+    L2_BOOTLOADER_ADDRESS
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
@@ -23,16 +20,6 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 /// @notice Covers the InteropCenter's interop fee unit counter that the L1 interop fee is charged on.
 /// See {protocol-docs/interop-fee.md}.
 abstract contract L2InteropFeeUnitsTestAbstract is L2InteropTestUtils {
-    function setUp() public virtual override {
-        super.setUp();
-        // `sendBundle` to another L2 needs a settlement layer.
-        vm.mockCall(
-            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
-            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
-            abi.encode(block.chainid)
-        );
-    }
-
     function test_interopFeeUnits_slotConstantMatchesDerivation() public pure {
         assertEq(INTEROP_FEE_UNITS_SLOT, bytes32(uint256(keccak256("zksync.interop-center.interop-fee-units")) - 1));
     }
@@ -68,26 +55,15 @@ abstract contract L2InteropFeeUnitsTestAbstract is L2InteropTestUtils {
         assertEq(l2InteropCenter.interopFeeUnits(), 2);
     }
 
-    function test_interopFeeUnits_failedSendIsNotCounted() public {
-        uint256 protocolFee = 0.01 ether;
-        vm.prank(L2_BOOTLOADER_ADDRESS);
-        l2InteropCenter.setInteropFee(protocolFee);
-
-        address sender = makeAddr("feeUnitsSender");
-        vm.deal(sender, 1 ether);
-        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(
-            address(0),
-            UNBUNDLER_ADDRESS,
-            false,
-            bytes32(0)
+    /// @dev The ERC-7786 entry point sends a single-call bundle.
+    function test_interopFeeUnits_sendMessageCountsOneCall() public {
+        vm.prank(makeAddr("feeUnitsSender"));
+        l2InteropCenter.sendMessage(
+            InteroperableAddress.formatEvmV1(destinationChainId, interopTargetContract),
+            hex"",
+            InteropLibrary.buildBundleAttributes(address(0), address(0), false, bytes32(0))
         );
-        InteropCallStarter[] memory calls = _calls(2);
-
-        vm.prank(sender);
-        vm.expectRevert(abi.encodeWithSelector(MsgValueMismatch.selector, protocolFee * 2, 0));
-        l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(destinationChainId), calls, bundleAttributes);
-
-        assertEq(l2InteropCenter.interopFeeUnits(), 0);
+        assertEq(l2InteropCenter.interopFeeUnits(), 1);
     }
 
     function test_interopFeeUnits_withdrawalToL1IsNotCounted() public {
@@ -95,12 +71,6 @@ abstract contract L2InteropFeeUnitsTestAbstract is L2InteropTestUtils {
         uint256 withdrawAmount = 100;
         l2NativeToken.mint(address(this), withdrawAmount);
         l2NativeToken.approve(L2_NATIVE_TOKEN_VAULT_ADDR, withdrawAmount);
-        // All L2->L1 messages pass in this environment.
-        vm.mockCall(
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSignature("sendToL1(bytes)"),
-            abi.encode(bytes32(uint256(1)))
-        );
 
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(l2NativeToken));
         l2InteropCenter.sendBundle(
@@ -129,11 +99,12 @@ abstract contract L2InteropFeeUnitsTestAbstract is L2InteropTestUtils {
     function _sendBundle(uint256 _callCount, uint256 _value) internal {
         address sender = makeAddr("feeUnitsSender");
         vm.deal(sender, _value);
+        // The counter grows with every send, so it is a fresh salt for the sender.
         bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(
             address(0),
             UNBUNDLER_ADDRESS,
             false,
-            keccak256(abi.encode(l2InteropCenter.interopFeeUnits(), _callCount))
+            bytes32(l2InteropCenter.interopFeeUnits())
         );
         InteropCallStarter[] memory calls = _calls(_callCount);
         vm.prank(sender);

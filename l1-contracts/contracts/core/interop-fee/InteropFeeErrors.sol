@@ -3,6 +3,4 @@
 pragma solidity ^0.8.21;
 
 // 0x5825e8d8
-error InsufficientInteropFeeBalance(uint256 chainId, uint256 balance, uint256 fee);
-// 0x7ae7a034
-error InteropFeeTransferFailed();
+error InsufficientInteropFeeBalance(uint256 chainId, uint256 balance, uint256 required);

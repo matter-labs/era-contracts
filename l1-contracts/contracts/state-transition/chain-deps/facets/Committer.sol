@@ -62,8 +62,7 @@ contract CommitterFacet is ZKChainBase, ICommitter {
     IInteropFeeManager internal immutable INTEROP_FEE_MANAGER;
 
     constructor(uint256 _l1ChainId, IInteropFeeManager _interopFeeManager) {
-        // On L1 every interop batch is charged, so a facet without a manager would make those commits revert
-        // even with the switch off. Settlement layers other than L1 never charge and pass zero.
+        // On L1 the manager is called for every interop batch, even with the switch off; off L1 it is never called.
         require(_l1ChainId != block.chainid || address(_interopFeeManager) != address(0), ZeroAddress());
         L1_CHAIN_ID = _l1ChainId;
         INTEROP_FEE_MANAGER = _interopFeeManager;
@@ -283,14 +282,13 @@ contract CommitterFacet is ZKChainBase, ICommitter {
             );
         }
 
-        // A wrong `interopFeeUnits` makes the batch unprovable, so every executed batch was charged its proven
-        // count. Priority-mode batches are never charged, so the fee can't block the escape hatch.
-        if (_newBatch.interopFeeUnits != 0 && L1_CHAIN_ID == block.chainid && !s.priorityModeInfo.activated) {
-            INTEROP_FEE_MANAGER.chargeInteropFee(s.chainId, _newBatch.batchNumber, _newBatch.interopFeeUnits);
-        }
-
         if (_newBatch.firstBlockNumber > _newBatch.lastBlockNumber) {
             revert InvalidBlockRange(_newBatch.batchNumber, _newBatch.firstBlockNumber, _newBatch.lastBlockNumber);
+        }
+
+        // See {protocol-docs/interop-fee.md#charging-and-enforcement}.
+        if (_newBatch.interopFeeUnits != 0 && L1_CHAIN_ID == block.chainid && !s.priorityModeInfo.activated) {
+            INTEROP_FEE_MANAGER.chargeInteropFee(s.chainId, _newBatch.batchNumber, _newBatch.interopFeeUnits);
         }
 
         // Emitting the block range for a batch. This is needed for indexing purposes.

@@ -145,6 +145,7 @@ interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader {
     ) external;
     /// @dev Check that batches were committed at least X time ago and
     /// make a call to the zkChain diamond contract with the same calldata.
+    /// @dev Settlement fee payer address is encoded within _batchData to maintain interface stability.
     function executeBatchesSharedBridge(
         address _chainAddress,
         uint256 _processBatchFrom,

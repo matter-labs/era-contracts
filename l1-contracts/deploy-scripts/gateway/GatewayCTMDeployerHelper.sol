@@ -336,7 +336,6 @@ library GatewayCTMDeployerHelper {
         );
 
         // CommitterFacet
-        // The interop fee switch lives on L1 only; batches settled elsewhere are not charged.
         bytes memory committerFacetArgs = abi.encode(config.l1ChainId, address(0));
         (addresses.facets.committerFacet, data.committerFacetCalldata) = _calculateCreate2AddressAndCalldata(
             _create2Salt,

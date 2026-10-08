@@ -641,7 +641,8 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         );
         ExecutorFacet executorFacet = new ExecutorFacet();
         MigratorFacet migratorFacet = new MigratorFacet(1, false);
-        CommitterFacet committerFacet = new CommitterFacet(1, IInteropFeeManager(address(0)));
+        // Only its selectors are read; any non-zero manager satisfies the constructor on every chain.
+        CommitterFacet committerFacet = new CommitterFacet(1, IInteropFeeManager(address(1)));
         bytes4[] memory adminFacetSelectors = Utils.getAllSelectors(address(adminFacet).code);
         bytes4[] memory gettersFacetSelectors = Utils.getAllSelectors(address(gettersFacet).code);
         bytes4[] memory mailboxFacetSelectors = Utils.getAllSelectors(address(mailboxFacet).code);

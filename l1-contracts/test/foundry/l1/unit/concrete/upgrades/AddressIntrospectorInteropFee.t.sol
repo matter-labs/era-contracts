@@ -41,7 +41,7 @@ contract AddressIntrospectorInteropFeeTest is Test {
         assertEq(AddressIntrospector._getInteropFeeManager(ctm, makeAddr("legacyCommitterFacet")), address(0));
     }
 
-    function test_noManagerForAChainlessEcosystem() public {
+    function test_noManagerWithoutAnUpToDateChain() public {
         _mockProtocolVersion(FIRST_PROTOCOL_VERSION_WITH_INTEROP_FEE);
         assertEq(AddressIntrospector._getInteropFeeManager(ctm, address(0)), address(0));
     }

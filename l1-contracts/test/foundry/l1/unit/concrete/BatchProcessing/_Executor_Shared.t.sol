@@ -15,8 +15,7 @@ import {
 import {
     ETH_TOKEN_ADDRESS,
     TESTNET_COMMIT_TIMESTAMP_NOT_OLDER,
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-    PRIORITY_EXPIRATION
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA
 } from "contracts/common/Config.sol";
 import {DummyBaseTokenBridge} from "contracts/dev-contracts/test/DummyBaseTokenBridge.sol";
 import {IAssetRouterShared} from "contracts/bridge/asset-router/IAssetRouterShared.sol";
@@ -69,7 +68,6 @@ contract ExecutorTest is UtilsCallMockerTest {
     TestExecutor internal executor;
     TestCommitter internal committer;
     InteropFeeManager internal interopFeeManager;
-    address internal interopFeeRecipient;
     GettersFacet internal getters;
     MailboxFacet internal mailbox;
     // UtilsFacet is attached to every diamond by default (see constructor) so tests can manipulate chain state.
@@ -131,9 +129,10 @@ contract ExecutorTest is UtilsCallMockerTest {
     }
 
     function getCommitterSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](1);
+        bytes4[] memory selectors = new bytes4[](2);
         uint256 i = 0;
         selectors[i++] = committer.commitBatchesSharedBridge.selector;
+        selectors[i++] = committer.getInteropFeeManager.selector;
         return selectors;
     }
 
@@ -288,13 +287,12 @@ contract ExecutorTest is UtilsCallMockerTest {
         admin = new AdminFacet(block.chainid, rollupDAManager);
         getters = new GettersFacet();
         executor = new TestExecutor();
-        interopFeeRecipient = makeAddr("interopFeeRecipient");
         interopFeeManager = InteropFeeManager(
             address(
                 new TransparentUpgradeableProxy(
                     address(new InteropFeeManager(IBridgehubBase(address(dummyBridgehub)))),
                     makeAddr("interopFeeManagerProxyAdmin"),
-                    abi.encodeCall(InteropFeeManager.initialize, (owner, interopFeeRecipient))
+                    abi.encodeCall(InteropFeeManager.initialize, (owner, makeAddr("interopFeeRecipient")))
                 )
             )
         );
@@ -541,16 +539,6 @@ contract ExecutorTest is UtilsCallMockerTest {
 
     // add this to be excluded from coverage report
     function test() internal virtual override {}
-
-    function _activatePriorityMode() internal virtual {
-        vm.prank(owner);
-        admin.makePermanentRollup();
-        _requestPriorityOp();
-        vm.prank(owner);
-        admin.permanentlyAllowPriorityMode();
-        vm.warp(block.timestamp + PRIORITY_EXPIRATION + 1);
-        admin.activatePriorityMode();
-    }
 
     function _requestPriorityOp() internal returns (uint256 requestTimestamp) {
         address prioritySender = makeAddr("prioritySender");
