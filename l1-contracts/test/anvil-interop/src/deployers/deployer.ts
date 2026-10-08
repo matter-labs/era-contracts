@@ -137,7 +137,7 @@ export class ForgeDeployer {
       validiumL1DAValidator: (deployedAddresses.validium_l1_da_validator_addr ||
         output.validium_l1da_validator) as string,
       rollupL1DAValidator: (deployedAddresses.rollup_l1_da_validator_addr || output.rollup_l1da_validator) as string,
-      interopFeeManager: deployedAddresses.interop_fee_manager_proxy_addr as string,
+      interopFeeManager: stateTransition.interop_fee_manager_proxy_addr as string,
     };
   }
 

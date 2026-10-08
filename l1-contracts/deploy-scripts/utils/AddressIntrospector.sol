@@ -191,7 +191,6 @@ library AddressIntrospector {
         });
         info.l1Specific = L1SpecificStateTransitionAddresses({
             legacyValidatorTimelock: ctm.validatorTimelock(),
-            interopFeeManagerImplementation: address(0),
             interopFeeManager: _getInteropFeeManager(ctm, facets.committerFacet)
         });
         info.admin = CTMAdminAddresses({

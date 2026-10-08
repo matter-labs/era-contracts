@@ -173,10 +173,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         initializeGeneratedData();
 
         // The Committer facet takes the fee manager as an immutable, so it has to exist first.
-        (
-            ctmAddresses.l1Specific.interopFeeManagerImplementation,
-            ctmAddresses.l1Specific.interopFeeManager
-        ) = deployTuppWithContract("InteropFeeManager");
+        (, ctmAddresses.l1Specific.interopFeeManager) = deployTuppWithContract("InteropFeeManager");
 
         deployStateTransitionDiamondFacets();
         (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(CTMContract.ChainTypeManager);
@@ -400,6 +397,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             "bytecodes_supplier_impl_addr",
             ctmAddresses.stateTransition.implementations.bytecodesSupplier
         );
+        vm.serializeAddress(
+            "state_transition",
+            "interop_fee_manager_proxy_addr",
+            ctmAddresses.l1Specific.interopFeeManager
+        );
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "bytecodes_supplier_addr",
@@ -417,11 +419,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             "deployed_addresses",
             "server_notifier_proxy_addr",
             ctmAddresses.stateTransition.proxies.serverNotifier
-        );
-        vm.serializeAddress(
-            "deployed_addresses",
-            "interop_fee_manager_proxy_addr",
-            ctmAddresses.l1Specific.interopFeeManager
         );
 
         vm.serializeAddress("deployed_addresses", "governance_addr", ctmAddresses.admin.governance);
