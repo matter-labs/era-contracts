@@ -482,9 +482,9 @@
   {
     "contractName": "l1-contracts/InteropFeeManager",
     "evmBytecodePath": "/l1-contracts/out/InteropFeeManager.sol/InteropFeeManager.json",
-    "evmBytecodeHash": "0x38d396ff0a29dea61c219a29abdf94f61c223252c86d4132f0c057726168ec60",
-    "evmDeployedBytecodeHash": "0xe786bdc973f8d277f006dbef7a23079b1e655f677fd8552ed29069dc802b852f",
-    "evmDeployedBytecodeBlakeHash": "0xde25bd9756058690fa45a8c5c986e1d9ac7f77caa795d00c4942f9e5c736e7de",
+    "evmBytecodeHash": "0xb0621ed26b32ef1a2d48bbda2b1264f0c0c99dcd1539b82a861e4bd92ae4fc14",
+    "evmDeployedBytecodeHash": "0x31a40c9989e22195f6ba71b6fc7b5e083d880316cfedd4d870441280f920d0b5",
+    "evmDeployedBytecodeBlakeHash": "0x668c9b427b484736da402b457350b018749aab1f2d8bf7babe2463fbabb732ce",
     "evmDeployedBytecodeLength": 5037
   },
   {
