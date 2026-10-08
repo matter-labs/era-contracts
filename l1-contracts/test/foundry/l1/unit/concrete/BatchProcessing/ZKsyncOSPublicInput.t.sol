@@ -8,11 +8,15 @@ import {
     PUBLIC_INPUT_HASH_GOLDEN,
     PUBLIC_INPUT_HASH_GOLDEN_FILTERING_ONLY,
     PUBLIC_INPUT_HASH_GOLDEN_LARGE_CONTRACTS_ONLY,
-    PUBLIC_INPUT_HASH_GOLDEN_BOTH_FLAGS
+    PUBLIC_INPUT_HASH_GOLDEN_BOTH_FLAGS,
+    BATCH_OUTPUT_HASH_GOLDEN_INTEROP_FEE_UNITS_7,
+    BATCH_OUTPUT_HASH_GOLDEN_INTEROP_FEE_UNITS_0
 } from "foundry-test/TestConstants.sol";
 
 import {TestCommitter} from "contracts/dev-contracts/test/TestCommitter.sol";
 import {IInteropFeeManager} from "contracts/core/interop-fee/IInteropFeeManager.sol";
+import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT, PUBLIC_INPUT_SHIFT} from "contracts/common/Config.sol";
@@ -29,6 +33,13 @@ contract CommitterZKsyncOSPublicInputHarness is TestCommitter {
     function util_setZKsyncOSChainConfigFlags(bool _filteringEnabled, bool _largeContractsEnabled) external {
         s.zksyncOSL1TxFilteringEnabled = _filteringEnabled;
         s.zksyncOSLargeContractsEnabled = _largeContractsEnabled;
+    }
+
+    function getBatchOutputHash(
+        CommitBatchInfoZKsyncOS memory _batch,
+        bytes32 _upgradeTxHash
+    ) external pure returns (bytes32) {
+        return _getBatchOutputHash(_batch, _upgradeTxHash);
     }
 
     function getBatchProofPublicInput(
@@ -128,6 +139,35 @@ contract ZKsyncOSPublicInputTest is Test {
 
         assertEq(verifier.computeZKsyncOSHash(0, inputs), flat);
         assertNotEq(flat, rolling);
+    }
+
+    /// @notice The batch output hash commits to `interopFeeUnits` exactly like the ZKsync OS `BatchOutput::hash`,
+    /// so an operator can't commit a different count than the proven one. See {protocol-docs/interop-fee.md}.
+    function test_batchOutputHash_matchesZKsyncOSInteropFeeUnitsGoldenVectors() public view {
+        CommitBatchInfoZKsyncOS memory batch = _goldenInteropFeeBatch(7);
+        assertEq(committer.getBatchOutputHash(batch, _repeatedByte(0x44)), BATCH_OUTPUT_HASH_GOLDEN_INTEROP_FEE_UNITS_7);
+
+        batch.interopFeeUnits = 0;
+        assertEq(committer.getBatchOutputHash(batch, _repeatedByte(0x44)), BATCH_OUTPUT_HASH_GOLDEN_INTEROP_FEE_UNITS_0);
+    }
+
+    function _goldenInteropFeeBatch(uint256 _interopFeeUnits) internal pure returns (CommitBatchInfoZKsyncOS memory batch) {
+        // Only the fields hashed into the batch output matter; the rest stay zero.
+        batch.firstBlockTimestamp = 1;
+        batch.lastBlockTimestamp = 2;
+        batch.daCommitmentScheme = L2DACommitmentScheme(1);
+        batch.daCommitment = _repeatedByte(0x11);
+        batch.numberOfLayer1Txs = 3;
+        batch.numberOfLayer2Txs = 4;
+        batch.priorityOperationsHash = _repeatedByte(0x22);
+        batch.l2LogsTreeRoot = _repeatedByte(0x33);
+        batch.dependencyRootsRollingHash = _repeatedByte(0x55);
+        batch.slChainId = 31337;
+        batch.interopFeeUnits = _interopFeeUnits;
+    }
+
+    function _repeatedByte(uint8 _byte) internal pure returns (bytes32) {
+        return bytes32(uint256(_byte) * 0x0101010101010101010101010101010101010101010101010101010101010101);
     }
 
     /// @notice A single-batch range is the bare hash, with no keccak over it.
