@@ -90,16 +90,12 @@ describe("14 - Interop fee units", function () {
     dummyRecipient = await deployDummyInteropRecipient(destProvider);
   });
 
-  it("deploys the L1 fee manager switched off", async function () {
+  it("deploys the L1 fee manager switched off", async () => {
     const managerAddress = state.ctmAddresses!.interopFeeManager;
-    if (!managerAddress) {
-      // Pregenerated chain states predate the fee manager; run with ANVIL_INTEROP_FRESH_DEPLOY=1.
-      this.skip();
-    }
     const l1Provider = createProvider(state.chains!.l1!.rpcUrl);
-    const manager = new Contract(managerAddress!, getAbi("InteropFeeManager"), l1Provider);
+    const manager = new Contract(managerAddress, getAbi("InteropFeeManager"), l1Provider);
 
-    expect(await l1Provider.getCode(managerAddress!), "fee manager must be deployed").to.not.equal("0x");
+    expect(await l1Provider.getCode(managerAddress), "fee manager must be deployed").to.not.equal("0x");
     expect((await manager.feePerUnit()).toString(), "the switch ships off").to.equal("0");
     expect((await manager.accruedFees()).toString()).to.equal("0");
     expect(await manager.BRIDGE_HUB()).to.equal(state.l1Addresses!.bridgehub);

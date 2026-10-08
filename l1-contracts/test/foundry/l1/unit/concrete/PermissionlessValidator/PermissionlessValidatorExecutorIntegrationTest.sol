@@ -16,7 +16,7 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
         _activatePriorityMode();
     }
 
-    function _activatePriorityMode() internal {
+    function _activatePriorityMode() internal override {
         vm.prank(owner);
         admin.makePermanentRollup();
         address prioritySender = makeAddr("prioritySender");

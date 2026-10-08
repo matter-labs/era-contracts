@@ -289,6 +289,7 @@ export class DeploymentRunner {
         verifier: ZERO_ADDRESS,
         validiumL1DAValidator: ZERO_ADDRESS,
         rollupL1DAValidator: ZERO_ADDRESS,
+        interopFeeManager: ZERO_ADDRESS,
       },
       chainAddresses: [],
       testTokens,

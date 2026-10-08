@@ -107,14 +107,4 @@ contract PriorityModeExecutorTest is ExecutorTest {
         vm.expectRevert(abi.encodeWithSelector(InvalidTxCountInPriorityMode.selector, 0, 0));
         committer.commitBatchesSharedBridge(address(0), commitFrom, commitTo, commitData);
     }
-
-    function _activatePriorityMode() internal {
-        vm.prank(owner);
-        admin.makePermanentRollup();
-        _requestPriorityOp();
-        vm.prank(owner);
-        admin.permanentlyAllowPriorityMode();
-        vm.warp(block.timestamp + PRIORITY_EXPIRATION + 1);
-        admin.activatePriorityMode();
-    }
 }

@@ -97,6 +97,13 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         _commitBatchesSharedBridge(_processFrom, _processTo, _commitData);
     }
 
+    /// @notice The L1 interop fee switch batches are charged from, or zero for a facet that never charges
+    /// (one deployed on a settlement layer other than L1). See {protocol-docs/interop-fee.md}.
+    /// @dev Not part of `ICommitter`: the validator timelocks implement that interface to forward commits.
+    function getInteropFeeManager() external view returns (address) {
+        return address(INTEROP_FEE_MANAGER);
+    }
+
     function _commitBatchesSharedBridge(uint256 _processFrom, uint256 _processTo, bytes calldata _commitData) internal {
         (
             IExecutor.StoredBatchInfo memory lastCommittedBatchData,

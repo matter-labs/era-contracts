@@ -225,12 +225,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         if (rollupDAManager != address(0)) {
             ctmAddresses.daAddresses.daContracts.rollupDAManager = rollupDAManager;
         }
-
-        // The fee manager is only reachable through the Committer facet's immutable, so it can't be discovered:
-        // releases after the one that introduced it must pass it in, or they would replace it (and its balances).
-        if (toml.keyExists("$.interop_fee_manager")) {
-            ctmAddresses.l1Specific.interopFeeManager = toml.readAddress("$.interop_fee_manager");
-        }
     }
 
     /// @notice Full default upgrade preparation flow
@@ -321,8 +315,8 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         // upgrade does NOT downgrade proxies that already run a MultisigCommitter.
         ctmAddresses.stateTransition.implementations.validatorTimelock = deploySimpleContract("MultisigCommitter");
 
-        // The Committer facet takes the fee manager as an immutable; the release that introduces the switch
-        // deploys it (governance-owned, switched off).
+        // The Committer facet takes the fee manager as an immutable. Later releases reuse the one discovered from
+        // the current facet (it holds the chains' prepaid balances); the release that introduces it deploys it.
         if (ctmAddresses.l1Specific.interopFeeManager == address(0)) {
             (
                 ctmAddresses.l1Specific.interopFeeManagerImplementation,

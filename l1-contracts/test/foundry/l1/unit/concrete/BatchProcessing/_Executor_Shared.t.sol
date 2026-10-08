@@ -15,7 +15,8 @@ import {
 import {
     ETH_TOKEN_ADDRESS,
     TESTNET_COMMIT_TIMESTAMP_NOT_OLDER,
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    PRIORITY_EXPIRATION
 } from "contracts/common/Config.sol";
 import {DummyBaseTokenBridge} from "contracts/dev-contracts/test/DummyBaseTokenBridge.sol";
 import {IAssetRouterShared} from "contracts/bridge/asset-router/IAssetRouterShared.sol";
@@ -540,6 +541,16 @@ contract ExecutorTest is UtilsCallMockerTest {
 
     // add this to be excluded from coverage report
     function test() internal virtual override {}
+
+    function _activatePriorityMode() internal virtual {
+        vm.prank(owner);
+        admin.makePermanentRollup();
+        _requestPriorityOp();
+        vm.prank(owner);
+        admin.permanentlyAllowPriorityMode();
+        vm.warp(block.timestamp + PRIORITY_EXPIRATION + 1);
+        admin.activatePriorityMode();
+    }
 
     function _requestPriorityOp() internal returns (uint256 requestTimestamp) {
         address prioritySender = makeAddr("prioritySender");

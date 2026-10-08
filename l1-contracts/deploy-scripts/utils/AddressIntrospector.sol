@@ -24,6 +24,9 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {NativeTokenVaultBase} from "contracts/bridge/ntv/NativeTokenVaultBase.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
+import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
+import {SemVer} from "contracts/common/libraries/SemVer.sol";
+import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
 import {
     CoreDeployedAddresses,
     BridgehubAddresses,
@@ -34,7 +37,8 @@ import {
     BridgeContracts,
     CTMDeployedAddresses,
     CTMAdminAddresses,
-    L1SpecificStateTransitionAddresses
+    L1SpecificStateTransitionAddresses,
+    FIRST_PROTOCOL_VERSION_WITH_INTEROP_FEE
 } from "./Types.sol";
 import {StateTransitionContracts, Verifiers, Facets} from "contracts/common/StateTransitionTypes.sol";
 import {DeployCTML1OrGateway} from "../ctm/DeployCTML1OrGateway.sol";
@@ -185,12 +189,10 @@ library AddressIntrospector {
             defaultUpgrade: ctm.defaultUpgrade(),
             chainTypeManagerProxyAdmin: Utils.getProxyAdminAddress(ctmAddr)
         });
-        // The interop fee manager is only reachable through the Committer facet's immutable, so it is not
-        // introspected; the upgrade that introduces it deploys a fresh one.
         info.l1Specific = L1SpecificStateTransitionAddresses({
             legacyValidatorTimelock: ctm.validatorTimelock(),
             interopFeeManagerImplementation: address(0),
-            interopFeeManager: address(0)
+            interopFeeManager: _getInteropFeeManager(ctm, facets.committerFacet)
         });
         info.admin = CTMAdminAddresses({
             transparentProxyAdmin: Utils.getProxyAdminAddress(ctmAddr),
@@ -340,6 +342,17 @@ library AddressIntrospector {
             }
         }
         return address(0);
+    }
+
+    /// @dev Reads the fee manager the CTM's current Committer facet charges, so every release keeps the one
+    /// that holds the chains' prepaid balances. Zero before the release that introduced it, and for a
+    /// chainless ecosystem (no facets to read).
+    function _getInteropFeeManager(ChainTypeManager _ctm, address _committerFacet) internal view returns (address) {
+        (, uint32 minor, ) = SemVer.unpackSemVer(SafeCast.toUint96(_ctm.protocolVersion()));
+        if (minor < FIRST_PROTOCOL_VERSION_WITH_INTEROP_FEE || _committerFacet == address(0)) {
+            return address(0);
+        }
+        return CommitterFacet(_committerFacet).getInteropFeeManager();
     }
 
     function _getVerifierFromUptoDateZkChain(ChainTypeManager _ctm) private view returns (address) {

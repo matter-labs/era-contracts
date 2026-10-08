@@ -10,7 +10,6 @@ import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfac
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IInteropFeeManager} from "contracts/core/interop-fee/IInteropFeeManager.sol";
 import {InsufficientInteropFeeBalance} from "contracts/core/interop-fee/InteropFeeErrors.sol";
-import {PRIORITY_EXPIRATION} from "contracts/common/Config.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
 
@@ -122,7 +121,14 @@ contract InteropFeeCommitTest is ExecutorTest {
         (uint256 from, uint256 to, bytes memory data) = _encode(batch);
         _mockDAForCommit(batch.batchNumber);
         vm.prank(validator);
-        vm.expectRevert();
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                InsufficientInteropFeeBalance.selector,
+                l2ChainId,
+                2 * FEE_PER_UNIT,
+                3 * FEE_PER_UNIT
+            )
+        );
         committer.commitBatchesSharedBridge(address(0), from, to, data);
 
         // Anyone can top the chain up; the very same batch then commits.
@@ -179,7 +185,11 @@ contract InteropFeeCommitTest is ExecutorTest {
 
     function test_committerOffL1NeedsNoFeeManager() public {
         CommitterFacet facet = new CommitterFacet(block.chainid + 1, IInteropFeeManager(address(0)));
-        assertGt(address(facet).code.length, 0);
+        assertEq(facet.getInteropFeeManager(), address(0));
+    }
+
+    function test_getInteropFeeManager_returnsTheChargedManager() public view {
+        assertEq(committer.getInteropFeeManager(), address(interopFeeManager));
     }
 
     function testFuzz_commit_chargesLinearlyInUnits(uint32 _units, uint64 _feePerUnit) public {
@@ -234,15 +244,5 @@ contract InteropFeeCommitTest is ExecutorTest {
                 ++count;
             }
         }
-    }
-
-    function _activatePriorityMode() internal {
-        vm.prank(owner);
-        admin.makePermanentRollup();
-        _requestPriorityOp();
-        vm.prank(owner);
-        admin.permanentlyAllowPriorityMode();
-        vm.warp(block.timestamp + PRIORITY_EXPIRATION + 1);
-        admin.activatePriorityMode();
     }
 }
