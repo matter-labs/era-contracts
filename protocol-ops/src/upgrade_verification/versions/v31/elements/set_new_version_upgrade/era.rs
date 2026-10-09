@@ -1,7 +1,7 @@
 //! Era-VM `forceDeployAndUpgrade` payload verification.
 //!
-//! Owns the expected `ForceDeployment[]` list (44 entries: 31 EraVM system
-//! contracts + 12 fixed-address core contracts + L2V31Upgrade), the per-entry
+//! Owns the expected outer `ForceDeployment[]` list (31 EraVM system contracts,
+//! 11 fixed-address core contracts, and L2V31Upgrade), the per-entry
 //! shape walker, the special `L2ChainAssetHandler` constructor-input decoder,
 //! the Era factory-dep bytecode list, and the Era orchestrator wired from
 //! `ProposedUpgrade::verify_l2_protocol_upgrade_tx`.
@@ -23,7 +23,7 @@ use crate::upgrade_verification::{
         L2_CREATE2_FACTORY_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_INTEROP_CENTER_ADDR,
         L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE_ADDR,
         L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT_ADDR,
-        L2_MESSAGE_VERIFICATION_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_PUBDATA_CHUNK_PUBLISHER_ADDR,
+        L2_MESSAGE_VERIFICATION_ADDR, L2_PUBDATA_CHUNK_PUBLISHER_ADDR,
         L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
         L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_V31_UPGRADE_CONTRACT,
         L2_VERSION_SPECIFIC_UPGRADER_ADDR, MODEXP_SYSTEM_CONTRACT, MSG_VALUE_SYSTEM_CONTRACT,
@@ -138,13 +138,12 @@ fn expected_v31_era_force_deployments() -> Vec<EraExpectedFd> {
             "l1-contracts/SystemContractProxyAdmin",
             L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
         ),
-        // ── Fixed-address core contracts (FIXED_ADDRESS_CORE_CONTRACTS_COUNT = 12; L2WrappedBaseToken excluded) ──
+        // NTV is deferred to L2GenesisForceDeploymentsHelper: it must read the old
+        // WETH immutable before replacing NTV. Its bytecode remains mandatory in
+        // EXPECTED_V31_ERA_BYTECODES and FixedForceDeploymentsData.l2NtvBytecodeInfo is
+        // verified separately. An outer NTV deployment is therefore unexpected.
         simple!("l1-contracts/L2Bridgehub", L2_BRIDGEHUB_ADDR),
         simple!("l1-contracts/L2AssetRouter", L2_ASSET_ROUTER_ADDR),
-        simple!(
-            "l1-contracts/L2NativeTokenVault",
-            L2_NATIVE_TOKEN_VAULT_ADDR
-        ),
         simple!("l1-contracts/L2MessageRoot", L2_MESSAGE_ROOT_ADDR),
         // L2WrappedBaseToken is intentionally NOT force-deployed by v31 (its impl is left as-is).
         simple!(
@@ -398,4 +397,29 @@ pub(super) async fn verify_era_force_deploy_and_upgrade(
         expected_fixed_force_deployments_data,
     )
     .await
+}
+
+#[cfg(test)]
+mod deferred_ntv_tests {
+    use super::*;
+    use crate::upgrade_verification::constants::L2_NATIVE_TOKEN_VAULT_ADDR;
+
+    #[test]
+    fn ntv_is_deferred_but_its_factory_dependency_remains_required() {
+        let outer = expected_v31_era_force_deployments();
+        assert!(!outer
+            .iter()
+            .any(|entry| entry.address == L2_NATIVE_TOKEN_VAULT_ADDR));
+        assert!(EXPECTED_V31_ERA_BYTECODES.contains(&"l1-contracts/L2NativeTokenVault"));
+        assert!(outer
+            .iter()
+            .any(|entry| entry.file == L2_V31_UPGRADE_CONTRACT));
+        // Do not accidentally remove the neighboring direct deployments too.
+        assert!(outer
+            .iter()
+            .any(|entry| entry.address == L2_ASSET_ROUTER_ADDR));
+        assert!(outer
+            .iter()
+            .any(|entry| entry.address == L2_MESSAGE_ROOT_ADDR));
+    }
 }

@@ -1,0 +1,127 @@
+{
+  "abi": [
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": true, "internalType": "uint256", "name": "chainId", "type": "uint256" },
+        { "indexed": true, "internalType": "address", "name": "from", "type": "address" },
+        { "indexed": false, "internalType": "address", "name": "l1Token", "type": "address" },
+        { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
+      ],
+      "name": "BridgehubDepositBaseTokenInitiated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": true, "internalType": "uint256", "name": "chainId", "type": "uint256" },
+        { "indexed": true, "internalType": "bytes32", "name": "txDataHash", "type": "bytes32" },
+        { "indexed": true, "internalType": "bytes32", "name": "l2DepositTxHash", "type": "bytes32" }
+      ],
+      "name": "BridgehubDepositFinalized",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": true, "internalType": "uint256", "name": "chainId", "type": "uint256" },
+        { "indexed": true, "internalType": "bytes32", "name": "txDataHash", "type": "bytes32" },
+        { "indexed": true, "internalType": "address", "name": "from", "type": "address" },
+        { "indexed": false, "internalType": "address", "name": "to", "type": "address" },
+        { "indexed": false, "internalType": "address", "name": "l1Token", "type": "address" },
+        { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
+      ],
+      "name": "BridgehubDepositInitiated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": true, "internalType": "uint256", "name": "chainId", "type": "uint256" },
+        { "indexed": true, "internalType": "address", "name": "to", "type": "address" },
+        { "indexed": true, "internalType": "address", "name": "l1Token", "type": "address" },
+        { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
+      ],
+      "name": "ClaimedFailedDepositSharedBridge",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [{ "indexed": false, "internalType": "uint8", "name": "version", "type": "uint8" }],
+      "name": "Initialized",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": true, "internalType": "uint256", "name": "chainId", "type": "uint256" },
+        { "indexed": true, "internalType": "bytes32", "name": "l2DepositTxHash", "type": "bytes32" },
+        { "indexed": true, "internalType": "address", "name": "from", "type": "address" },
+        { "indexed": false, "internalType": "address", "name": "to", "type": "address" },
+        { "indexed": false, "internalType": "address", "name": "l1Token", "type": "address" },
+        { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
+      ],
+      "name": "LegacyDepositInitiated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": true, "internalType": "address", "name": "oldAdmin", "type": "address" },
+        { "indexed": true, "internalType": "address", "name": "newAdmin", "type": "address" }
+      ],
+      "name": "NewAdmin",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": true, "internalType": "address", "name": "oldPendingAdmin", "type": "address" },
+        { "indexed": true, "internalType": "address", "name": "newPendingAdmin", "type": "address" }
+      ],
+      "name": "NewPendingAdmin",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": true, "internalType": "address", "name": "previousOwner", "type": "address" },
+        { "indexed": true, "internalType": "address", "name": "newOwner", "type": "address" }
+      ],
+      "name": "OwnershipTransferStarted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": true, "internalType": "address", "name": "previousOwner", "type": "address" },
+        { "indexed": true, "internalType": "address", "name": "newOwner", "type": "address" }
+      ],
+      "name": "OwnershipTransferred",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [{ "indexed": false, "internalType": "address", "name": "account", "type": "address" }],
+      "name": "Paused",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [{ "indexed": false, "internalType": "address", "name": "account", "type": "address" }],
+      "name": "Unpaused",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": true, "internalType": "uint256", "name": "chainId", "type": "uint256" },
+        { "indexed": true, "internalType": "address", "name": "to", "type": "address" },
+        { "indexed": true, "internalType": "address", "name": "l1Token", "type": "address" },
+        { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
+      ],
+      "name": "WithdrawalFinalizedSharedBridge",
+      "type": "event"
+    }
+  ]
+}
