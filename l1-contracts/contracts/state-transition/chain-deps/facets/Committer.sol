@@ -15,7 +15,6 @@ import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {StoredBatchHashing} from "../StoredBatchHashing.sol";
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../../../common/l2-helpers/L2ContractInterfaces.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
-import {IInteropFeeManager} from "../../../core/interop-fee/IInteropFeeManager.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
 import {
     BatchNumberMismatch,
@@ -30,8 +29,7 @@ import {
     L2TimestampTooBig,
     NonZeroBlobToVerifyZKsyncOS,
     TimeNotReached,
-    UpgradeBatchNumberIsNotZero,
-    ZeroAddress
+    UpgradeBatchNumberIsNotZero
 } from "../../../common/L1ContractErrors.sol";
 import {MismatchL2DACommitmentScheme, SettlementLayerChainIdMismatch} from "../../L1StateTransitionErrors.sol";
 
@@ -57,15 +55,8 @@ contract CommitterFacet is ZKChainBase, ICommitter {
     /// @dev Timestamp - seconds since unix epoch.
     uint256 internal immutable COMMIT_TIMESTAMP_NOT_OLDER;
 
-    /// @notice The L1 interop fee switch that batches committed on L1 are charged from.
-    /// See {protocol-docs/interop-fee.md}.
-    IInteropFeeManager internal immutable INTEROP_FEE_MANAGER;
-
-    constructor(uint256 _l1ChainId, IInteropFeeManager _interopFeeManager) {
-        // On L1 the manager is called for every interop batch, even with the switch off; off L1 it is never called.
-        require(_l1ChainId != block.chainid || address(_interopFeeManager) != address(0), ZeroAddress());
+    constructor(uint256 _l1ChainId) {
         L1_CHAIN_ID = _l1ChainId;
-        INTEROP_FEE_MANAGER = _interopFeeManager;
         // Allow testnet operators to submit batches with older timestamps
         // compared to mainnet. This quality-of-life improvement is intended for
         // testnets, where outages may be resolved slower.
@@ -94,13 +85,6 @@ contract CommitterFacet is ZKChainBase, ICommitter {
             revert InvalidProtocolVersion();
         }
         _commitBatchesSharedBridge(_processFrom, _processTo, _commitData);
-    }
-
-    /// @notice The L1 interop fee switch batches are charged from, or zero for a facet that never charges
-    /// (one deployed on a settlement layer other than L1). See {protocol-docs/interop-fee.md}.
-    /// @dev Not part of `ICommitter`: the validator timelocks implement that interface to forward commits.
-    function getInteropFeeManager() external view returns (address) {
-        return address(INTEROP_FEE_MANAGER);
     }
 
     function _commitBatchesSharedBridge(uint256 _processFrom, uint256 _processTo, bytes calldata _commitData) internal {
@@ -286,10 +270,9 @@ contract CommitterFacet is ZKChainBase, ICommitter {
             revert InvalidBlockRange(_newBatch.batchNumber, _newBatch.firstBlockNumber, _newBatch.lastBlockNumber);
         }
 
-        // See {protocol-docs/interop-fee.md#charging-and-enforcement}.
-        if (_newBatch.interopFeeUnits != 0 && L1_CHAIN_ID == block.chainid && !s.priorityModeInfo.activated) {
-            INTEROP_FEE_MANAGER.chargeInteropFee(s.chainId, _newBatch.batchNumber, _newBatch.interopFeeUnits);
-        }
+        // Charged when the batch executes; see {protocol-docs/interop-fee.md#charging-and-enforcement}. Written for every
+        // batch, so a batch number committed again after a revert never keeps the reverted batch's count.
+        s.interopFeeUnits[_newBatch.batchNumber] = _newBatch.interopFeeUnits;
 
         // Emitting the block range for a batch. This is needed for indexing purposes.
         // IMPORTANT:in this release this range is not trusted and provided by the operator while not being included to the proof.

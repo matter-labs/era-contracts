@@ -140,9 +140,10 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
                 selectors: Utils.getAdminSelectors()
             })
         );
+        // These tests execute no interop, so the fee manager is never called.
         facetCuts.push(
             Diamond.FacetCut({
-                facet: address(new ExecutorFacet()),
+                facet: address(new ExecutorFacet(block.chainid, IInteropFeeManager(makeAddr("interopFeeManager")))),
                 action: Diamond.Action.Add,
                 isFreezable: true,
                 selectors: Utils.getExecutorSelectors()
@@ -174,10 +175,9 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
                 selectors: Utils.getMigratorSelectors()
             })
         );
-        // These tests commit no interop, so the fee manager is never called.
         facetCuts.push(
             Diamond.FacetCut({
-                facet: address(new CommitterFacet(block.chainid, IInteropFeeManager(makeAddr("interopFeeManager")))),
+                facet: address(new CommitterFacet(block.chainid)),
                 action: Diamond.Action.Add,
                 isFreezable: true,
                 selectors: Utils.getCommitterSelectors()

@@ -61,7 +61,7 @@ contract ReentrantReceiver {
 }
 
 /// @dev Isolates the fee manager from the Bridgehub and the diamond: it only reads `getZKChain` and `getAdmin`,
-/// so minimal stand-ins keep the setup readable. The commit path with a real diamond is covered in
+/// so minimal stand-ins keep the setup readable. Settlement with a real diamond is covered in
 /// `BatchProcessing/InteropFee.t.sol`.
 contract InteropFeeManagerTest is Test {
     uint256 internal constant CHAIN_ID = 271;
@@ -311,7 +311,7 @@ contract InteropFeeManagerTest is Test {
     }
 
     function test_charge_isNoOpWhileSwitchedOff() public {
-        // The chain has no balance: while the switch is off, a commit never depends on one.
+        // The chain has no balance: while the switch is off, execution never depends on one.
         vm.recordLogs();
         vm.expectCall(address(registry), abi.encodeWithSelector(IBridgehubBase.getZKChain.selector), 0);
         vm.prank(zkChain);

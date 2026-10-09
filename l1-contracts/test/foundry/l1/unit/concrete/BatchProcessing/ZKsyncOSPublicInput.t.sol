@@ -14,7 +14,6 @@ import {
 } from "foundry-test/TestConstants.sol";
 
 import {TestCommitter} from "contracts/dev-contracts/test/TestCommitter.sol";
-import {IInteropFeeManager} from "contracts/core/interop-fee/IInteropFeeManager.sol";
 import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
@@ -25,9 +24,6 @@ import {
 } from "contracts/common/Config.sol";
 
 contract CommitterZKsyncOSPublicInputHarness is TestCommitter {
-    // Only the public-input hashing is exercised, which never charges the interop fee.
-    constructor() TestCommitter(IInteropFeeManager(address(1))) {}
-
     function util_setZKsyncOSChainConfig(uint256 _chainId, uint64 _maxTxGasLimit) external {
         s.chainId = _chainId;
         s.zksyncOSMaxTxGasLimit = _maxTxGasLimit;

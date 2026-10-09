@@ -315,7 +315,7 @@ library GatewayCTMDeployerHelper {
             _create2Salt,
             "Executor.sol",
             "ExecutorFacet",
-            hex""
+            abi.encode(config.l1ChainId, address(0))
         );
 
         // GettersFacet
@@ -336,7 +336,7 @@ library GatewayCTMDeployerHelper {
         );
 
         // CommitterFacet
-        bytes memory committerFacetArgs = abi.encode(config.l1ChainId, address(0));
+        bytes memory committerFacetArgs = abi.encode(config.l1ChainId);
         (addresses.facets.committerFacet, data.committerFacetCalldata) = _calculateCreate2AddressAndCalldata(
             _create2Salt,
             "Committer.sol",

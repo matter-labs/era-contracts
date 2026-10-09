@@ -26,9 +26,10 @@ the batch output, L1) only carries the difference, so changing the unit is an L2
    last word of the batch output hash. The slot is therefore **consensus-critical**: it must not move without a
    coordinated protocol change.
 3. **L1 commit.** `CommitBatchInfoZKsyncOS.interopFeeUnits` is hashed last into the batch output hash
-   (`CommitterFacet._getBatchOutputHash`, commit encoding version 6), which goes into the proof public input. A batch
-   committed with a count other than the one its state transition produced can't pass verification of a real proof, so
-   it never executes.
+   (`CommitterFacet._getBatchOutputHash`, commit encoding version 6), which goes into the proof public input, and the
+   count is recorded for the batch number. A batch committed with a count other than the one its state transition
+   produced can't pass verification of a real proof, so it never executes.
+4. **L1 execution.** Executing the proven batch charges the recorded count.
 
 The batch output layout is pinned by golden vectors shared with ZKsync OS:
 `BATCH_OUTPUT_HASH_GOLDEN_INTEROP_FEE_UNITS_*` in `l1-contracts/test/foundry/TestConstants.sol` and
@@ -36,7 +37,7 @@ The batch output layout is pinned by golden vectors shared with ZKsync OS:
 
 ## Charging and enforcement
 
-`CommitterFacet` calls `InteropFeeManager.chargeInteropFee(chainId, batchNumber, units)` after validating the batch,
+`ExecutorFacet` calls `InteropFeeManager.chargeInteropFee(chainId, batchNumber, units)` for every batch it executes,
 when:
 
 - `interopFeeUnits != 0`: batches without interop never touch the manager;
@@ -44,22 +45,18 @@ when:
 - priority mode is off: the escape hatch never depends on the fee.
 
 The manager debits the chain's **prepaid balance** (`deposit(chainId)`, payable by anyone, withdrawable only by the
-chain admin). If the balance does not cover the fee, the commit reverts and the chain can't advance until it is
-topped up. Batches committed earlier still prove and execute, so in-flight withdrawals keep finalizing.
+chain admin). If the balance does not cover the fee, the execution reverts and the chain can't execute batches, and so
+finalize their withdrawals, until it is topped up; committing and proving continue.
 
-Charging happens at commit, where the count arrives, before it is proven. A count other than the proven one only
-costs the chain itself: it is charged, but its batch can never execute and has to be reverted, so a chain's exposure to
-a faulty commit is its prepaid balance. A reverted batch is not refunded, whoever reverts it (the operator, the CTM, or
-priority-mode activation), and interop re-committed outside priority mode is charged again. On chains whose commits
-need external-node signatures (`MultisigCommitter` with a non-zero signing threshold), those nodes guard the count until
-the proof: they derive it from their own execution before signing, like the rest of the commit data
-({protocol-docs/chain-config.md#external-node-signatures}).
+Only proven counts of executed batches are charged. A reverted batch is never charged, whoever reverts it (the
+operator, the CTM, or priority-mode activation): every commit records its batch's count, overwriting the count of a
+reverted batch with the same number.
 
 ## The switch
 
 `DeployCTM` deploys an `InteropFeeManager` proxy with the CTM, as does the CTM upgrade that introduces it; later
-upgrades keep the one the current `CommitterFacet` charges, which holds the chains' prepaid balances. It is passed to
-the `CommitterFacet` as an immutable and can be read as `getInteropFeeManager()` on the diamond of any chain from v35
+upgrades keep the one the current `ExecutorFacet` charges, which holds the chains' prepaid balances. It is passed to
+the `ExecutorFacet` as an immutable and can be read as `getInteropFeeManager()` on the diamond of any chain from v35
 on. Its owner is protocol governance from initialization, and controls:
 
 - `feePerUnit`: wei per interop fee unit; `0`, the initial value, turns the switch off;
@@ -75,4 +72,4 @@ external nodes and the ZKsync OS version committing `interop_fee_units` (with it
 protocol v35. Historical v34 and earlier data must still be decoded using their original formats.
 
 Before upgrading across the v35 boundary, all committed batches must be executed or reverted; `DefaultUpgradeZKsyncOS`
-enforces it.
+enforces it. Every batch executed after the upgrade was therefore committed with its count recorded.

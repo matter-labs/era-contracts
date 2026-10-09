@@ -4,8 +4,8 @@ pragma solidity ^0.8.21;
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice The L1 interop fee switch: per-chain prepaid balances that chains are charged from when they commit
-/// batches. See {protocol-docs/interop-fee.md}.
+/// @notice The L1 interop fee switch: per-chain prepaid balances that chains are charged from when their batches
+/// execute. See {protocol-docs/interop-fee.md}.
 interface IInteropFeeManager {
     /// @notice Emitted when the owner changes the fee charged per interop fee unit.
     event NewFeePerUnit(uint256 oldFeePerUnit, uint256 newFeePerUnit);
@@ -19,7 +19,7 @@ interface IInteropFeeManager {
     /// @notice Emitted when a chain admin withdraws from the chain's prepaid balance.
     event ChainBalanceWithdrawn(uint256 indexed chainId, address indexed to, uint256 amount);
 
-    /// @notice Emitted when a committed batch is charged.
+    /// @notice Emitted when an executed batch is charged.
     event InteropFeeCharged(uint256 indexed chainId, uint256 indexed batchNumber, uint256 units, uint256 fee);
 
     /// @notice Emitted when the accrued fees are sent to the fee recipient.
@@ -59,7 +59,7 @@ interface IInteropFeeManager {
     /// @notice Charges `feePerUnit * _units` from the chain's prepaid balance; a no-op while the fee is zero.
     /// Otherwise only callable by the chain's diamond proxy, and reverts if the balance does not cover the fee.
     /// @param _chainId The chain being charged.
-    /// @param _batchNumber The committed batch the units belong to.
+    /// @param _batchNumber The executed batch the units belong to.
     /// @param _units The interop fee units the batch sent.
     function chargeInteropFee(uint256 _chainId, uint256 _batchNumber, uint256 _units) external;
 

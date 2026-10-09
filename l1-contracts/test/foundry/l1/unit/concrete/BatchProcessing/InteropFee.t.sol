@@ -5,31 +5,47 @@ import {Utils} from "../Utils/Utils.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
 import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IInteropFeeManager} from "contracts/core/interop-fee/IInteropFeeManager.sol";
 import {InsufficientInteropFeeBalance} from "contracts/core/interop-fee/InteropFeeErrors.sol";
 import {Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
+import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {DummyL2L1Messenger} from "contracts/dev-contracts/test/DummyL2L1Messenger.sol";
 
-/// @notice The interop fee through a real diamond and a real `InteropFeeManager`: commit-time charging and the chain
-/// admin's withdrawals. See {protocol-docs/interop-fee.md}.
-contract InteropFeeCommitTest is ExecutorTest {
+/// @notice The interop fee through a real diamond and a real `InteropFeeManager`: commits record each batch's count,
+/// execution charges it, and the chain admin withdraws. See {protocol-docs/interop-fee.md}.
+contract InteropFeeSettlementTest is ExecutorTest {
     uint256 internal constant FEE_PER_UNIT = 0.001 ether;
 
     function setUp() public {}
 
-    function test_commit_chargesFeePerUnit() public {
+    function test_execute_chargesFeePerUnit() public {
         _setFee(FEE_PER_UNIT);
         _fund(1 ether);
+        IExecutor.StoredBatchInfo memory stored = _commitAndProve(_batchWithUnits(3));
 
         vm.expectEmit(address(interopFeeManager));
         emit IInteropFeeManager.InteropFeeCharged(l2ChainId, 1, 3, 3 * FEE_PER_UNIT);
-        _commitOSBatchGetStored(genesisStoredBatchInfo, _batchWithUnits(3));
+        _execute(stored);
 
-        assertEq(getters.getTotalBatchesCommitted(), 1);
+        assertEq(getters.getTotalBatchesExecuted(), 1);
         assertEq(interopFeeManager.chainBalance(l2ChainId), 1 ether - 3 * FEE_PER_UNIT);
         assertEq(interopFeeManager.accruedFees(), 3 * FEE_PER_UNIT);
+    }
+
+    function test_commitAndProve_chargeNothing() public {
+        // Switched on without a balance: committing and proving never depend on one.
+        _setFee(FEE_PER_UNIT);
+
+        vm.expectCall(
+            address(interopFeeManager),
+            abi.encodeWithSelector(IInteropFeeManager.chargeInteropFee.selector),
+            0
+        );
+        _commitAndProve(_batchWithUnits(3));
+
+        assertEq(getters.getTotalBatchesVerified(), 1);
     }
 
     function test_commit_unitsAreBoundIntoTheProofCommitment() public {
@@ -39,42 +55,37 @@ contract InteropFeeCommitTest is ExecutorTest {
         assertNotEq(_commitOSBatchGetStored(genesisStoredBatchInfo, _batchWithUnits(4)).commitment, commitment);
     }
 
-    function test_commit_switchOffChargesNothing() public {
+    function test_execute_switchOffChargesNothing() public {
         _fund(1 ether);
 
-        _commitOSBatchGetStored(genesisStoredBatchInfo, _batchWithUnits(3));
+        _execute(_commitAndProve(_batchWithUnits(3)));
 
-        assertEq(getters.getTotalBatchesCommitted(), 1);
+        assertEq(getters.getTotalBatchesExecuted(), 1);
         assertEq(interopFeeManager.chainBalance(l2ChainId), 1 ether);
         assertEq(interopFeeManager.accruedFees(), 0);
     }
 
-    function test_commit_withoutInteropDoesNotTouchTheManager() public {
-        // No balance at all: a batch with no interop must still commit while the switch is on.
+    function test_execute_withoutInteropDoesNotTouchTheManager() public {
+        // No balance at all: a batch with no interop must still execute while the switch is on.
         _setFee(FEE_PER_UNIT);
+        IExecutor.StoredBatchInfo memory stored = _commitAndProve(_batchWithUnits(0));
 
         vm.expectCall(
             address(interopFeeManager),
             abi.encodeWithSelector(IInteropFeeManager.chargeInteropFee.selector),
             0
         );
-        _commitOSBatchGetStored(genesisStoredBatchInfo, _batchWithUnits(0));
+        _execute(stored);
 
-        assertEq(getters.getTotalBatchesCommitted(), 1);
-        assertEq(interopFeeManager.accruedFees(), 0);
+        assertEq(getters.getTotalBatchesExecuted(), 1);
     }
 
-    function test_commit_revertsUntilToppedUp() public {
+    function test_execute_revertsUntilToppedUp() public {
         _setFee(FEE_PER_UNIT);
         _fund(2 * FEE_PER_UNIT);
+        IExecutor.StoredBatchInfo memory stored = _commitAndProve(_batchWithUnits(3));
+        (uint256 from, uint256 to, bytes memory data) = _encodeExecute(stored);
 
-        CommitBatchInfoZKsyncOS[] memory batches = new CommitBatchInfoZKsyncOS[](1);
-        batches[0] = _batchWithUnits(3);
-        (uint256 from, uint256 to, bytes memory data) = Utils.encodeCommitBatchesDataZKsyncOS(
-            genesisStoredBatchInfo,
-            batches
-        );
-        _mockDAForCommit(batches[0].batchNumber);
         vm.prank(validator);
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -84,63 +95,68 @@ contract InteropFeeCommitTest is ExecutorTest {
                 3 * FEE_PER_UNIT
             )
         );
-        committer.commitBatchesSharedBridge(address(0), from, to, data);
-        assertEq(getters.getTotalBatchesCommitted(), 0);
+        executor.executeBatchesSharedBridge(address(0), from, to, data);
+        assertEq(getters.getTotalBatchesExecuted(), 0);
         assertEq(interopFeeManager.chainBalance(l2ChainId), 2 * FEE_PER_UNIT);
 
-        // Anyone can top the chain up; the very same batch then commits.
+        // Anyone can top the chain up; the very same batch then executes.
         _fund(FEE_PER_UNIT);
         vm.prank(validator);
-        committer.commitBatchesSharedBridge(address(0), from, to, data);
+        executor.executeBatchesSharedBridge(address(0), from, to, data);
 
-        assertEq(getters.getTotalBatchesCommitted(), 1);
+        assertEq(getters.getTotalBatchesExecuted(), 1);
         assertEq(interopFeeManager.chainBalance(l2ChainId), 0);
         assertEq(interopFeeManager.accruedFees(), 3 * FEE_PER_UNIT);
     }
 
-    /// @dev Documented trade-off: a reverted batch's fee is not refunded, so re-committing the same interop
-    /// pays again. See {protocol-docs/interop-fee.md}.
-    function test_commit_recommitAfterRevertIsChargedAgain() public {
+    /// @dev The batch number committed again after the revert carries only its new count.
+    function test_execute_revertedBatchIsNeverCharged() public {
         _setFee(FEE_PER_UNIT);
         _fund(1 ether);
-
-        _commitOSBatchGetStored(genesisStoredBatchInfo, _batchWithUnits(3));
+        _commitAndProve(_batchWithUnits(3));
         vm.prank(validator);
         executor.revertBatchesSharedBridge(address(0), 0);
-        assertEq(getters.getTotalBatchesCommitted(), 0);
 
-        _commitOSBatchGetStored(genesisStoredBatchInfo, _batchWithUnits(3));
-
-        assertEq(interopFeeManager.chainBalance(l2ChainId), 1 ether - 6 * FEE_PER_UNIT);
-        assertEq(interopFeeManager.accruedFees(), 6 * FEE_PER_UNIT);
-    }
-
-    function test_revertWhen_committerOnL1HasNoFeeManager() public {
-        vm.expectRevert(ZeroAddress.selector);
-        new CommitterFacet(block.chainid, IInteropFeeManager(address(0)));
-    }
-
-    function test_commit_offL1IsNeverCharged() public {
-        // Switched on without a balance: a batch committed on a settlement layer other than L1 still commits.
-        _setFee(FEE_PER_UNIT);
-        vm.chainId(block.chainid + 1);
-        // Off L1 the committer relays the committed batch to L1 through the messenger.
-        vm.etch(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, address(new DummyL2L1Messenger()).code);
-
-        CommitBatchInfoZKsyncOS memory batch = _batchWithUnits(3);
-        batch.slChainId = block.chainid;
+        IExecutor.StoredBatchInfo memory stored = _commitAndProve(_batchWithUnits(0));
         vm.expectCall(
             address(interopFeeManager),
             abi.encodeWithSelector(IInteropFeeManager.chargeInteropFee.selector),
             0
         );
-        _commitOSBatchGetStored(genesisStoredBatchInfo, batch);
+        _execute(stored);
 
-        assertEq(getters.getTotalBatchesCommitted(), 1);
+        assertEq(getters.getTotalBatchesExecuted(), 1);
+        assertEq(interopFeeManager.chainBalance(l2ChainId), 1 ether);
+        assertEq(interopFeeManager.accruedFees(), 0);
+    }
+
+    function test_revertWhen_executorOnL1HasNoFeeManager() public {
+        vm.expectRevert(ZeroAddress.selector);
+        new ExecutorFacet(block.chainid, IInteropFeeManager(address(0)));
+    }
+
+    function test_execute_offL1IsNeverCharged() public {
+        // Switched on without a balance: a batch settled on a settlement layer other than L1 still executes.
+        _setFee(FEE_PER_UNIT);
+        vm.chainId(block.chainid + 1);
+        // Off L1 the committer relays the committed batch to L1 through the messenger.
+        vm.etch(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, address(new DummyL2L1Messenger()).code);
+        CommitBatchInfoZKsyncOS memory batch = _batchWithUnits(3);
+        batch.slChainId = block.chainid;
+        IExecutor.StoredBatchInfo memory stored = _commitAndProve(batch);
+
+        vm.expectCall(
+            address(interopFeeManager),
+            abi.encodeWithSelector(IInteropFeeManager.chargeInteropFee.selector),
+            0
+        );
+        _execute(stored);
+
+        assertEq(getters.getTotalBatchesExecuted(), 1);
     }
 
     function test_getInteropFeeManager_returnsTheChargedManager() public view {
-        assertEq(committer.getInteropFeeManager(), address(interopFeeManager));
+        assertEq(executor.getInteropFeeManager(), address(interopFeeManager));
     }
 
     /// @dev The manager reads the chain admin from the diamond on every withdrawal, so it follows admin changes.
@@ -167,14 +183,14 @@ contract InteropFeeCommitTest is ExecutorTest {
         assertEq(interopFeeManager.chainBalance(l2ChainId), 0);
     }
 
-    function testFuzz_commit_chargesLinearlyInUnits(uint32 _units, uint64 _feePerUnit) public {
+    function testFuzz_execute_chargesLinearlyInUnits(uint32 _units, uint64 _feePerUnit) public {
         _setFee(_feePerUnit);
         uint256 fee = uint256(_feePerUnit) * _units;
         if (fee != 0) {
             _fund(fee);
         }
 
-        _commitOSBatchGetStored(genesisStoredBatchInfo, _batchWithUnits(_units));
+        _execute(_commitAndProve(_batchWithUnits(_units)));
 
         assertEq(interopFeeManager.chainBalance(l2ChainId), 0);
         assertEq(interopFeeManager.accruedFees(), fee);
@@ -182,7 +198,40 @@ contract InteropFeeCommitTest is ExecutorTest {
 
     function _batchWithUnits(uint256 _units) internal view returns (CommitBatchInfoZKsyncOS memory batch) {
         batch = newCommitBatchInfoZKsyncOS;
+        // Executed without dependency interop roots, whose rolling hash is then zero.
+        batch.dependencyRootsRollingHash = bytes32(0);
         batch.interopFeeUnits = _units;
+    }
+
+    /// @dev Commits `_batch` after genesis and proves it.
+    function _commitAndProve(
+        CommitBatchInfoZKsyncOS memory _batch
+    ) internal returns (IExecutor.StoredBatchInfo memory stored) {
+        stored = _commitOSBatchGetStored(genesisStoredBatchInfo, _batch);
+        IExecutor.StoredBatchInfo[] memory batches = new IExecutor.StoredBatchInfo[](1);
+        batches[0] = stored;
+        (uint256 from, uint256 to, bytes memory data) = Utils.encodeProveBatchesData(
+            genesisStoredBatchInfo,
+            batches,
+            proofInput
+        );
+        vm.prank(validator);
+        executor.proveBatchesSharedBridge(address(0), from, to, data);
+    }
+
+    function _execute(IExecutor.StoredBatchInfo memory _stored) internal {
+        (uint256 from, uint256 to, bytes memory data) = _encodeExecute(_stored);
+        vm.prank(validator);
+        executor.executeBatchesSharedBridge(address(0), from, to, data);
+    }
+
+    /// @dev Execute data for one batch without priority operations.
+    function _encodeExecute(
+        IExecutor.StoredBatchInfo memory _stored
+    ) internal pure returns (uint256 from, uint256 to, bytes memory data) {
+        IExecutor.StoredBatchInfo[] memory batches = new IExecutor.StoredBatchInfo[](1);
+        batches[0] = _stored;
+        return Utils.encodeExecuteBatchesData(batches, Utils.generatePriorityOps(1, 0));
     }
 
     function _setFee(uint256 _feePerUnit) internal {

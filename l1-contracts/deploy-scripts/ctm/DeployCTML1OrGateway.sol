@@ -79,11 +79,11 @@ library DeployCTML1OrGateway {
         } else if (_contractName == CTMContract.ValidatorTimelock) {
             return abi.encode(_config.bridgehubProxy);
         } else if (_contractName == CTMContract.ExecutorFacet) {
-            return abi.encode();
+            return abi.encode(_config.l1ChainId, _config.interopFeeManager);
         } else if (_contractName == CTMContract.MigratorFacet) {
             return abi.encode(_config.l1ChainId, _config.testnetVerifier);
         } else if (_contractName == CTMContract.CommitterFacet) {
-            return abi.encode(_config.l1ChainId, _config.interopFeeManager);
+            return abi.encode(_config.l1ChainId);
         } else if (_contractName == CTMContract.DiamondInit) {
             return abi.encode();
         } else if (_contractName == CTMContract.DualVerifier || _contractName == CTMContract.TestnetVerifier) {

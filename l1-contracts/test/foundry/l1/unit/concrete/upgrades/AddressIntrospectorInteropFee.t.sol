@@ -8,37 +8,37 @@ import {FIRST_PROTOCOL_VERSION_WITH_INTEROP_FEE} from "deploy-scripts/utils/Type
 
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
+import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {IInteropFeeManager} from "contracts/core/interop-fee/IInteropFeeManager.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
 /// @notice Fee manager discovery used by the default upgrade scripts: a release from v35 on reuses the manager the
-///         current Committer facet charges, so the chains' prepaid balances stay in place.
+///         current Executor facet charges, so the chains' prepaid balances stay in place.
 /// @dev The CTM is mocked: discovery only reads its protocol version, and standing up a CTM with chains is unrelated
-///      to what is under test. The Committer facet is real.
+///      to what is under test. The Executor facet is real.
 contract AddressIntrospectorInteropFeeTest is Test {
     ChainTypeManager internal ctm;
     address internal manager;
-    address internal committerFacet;
+    address internal executorFacet;
 
     function setUp() public {
         ctm = ChainTypeManager(makeAddr("ctm"));
         manager = makeAddr("interopFeeManager");
-        committerFacet = address(new CommitterFacet(block.chainid, IInteropFeeManager(manager)));
+        executorFacet = address(new ExecutorFacet(block.chainid, IInteropFeeManager(manager)));
     }
 
-    function test_reusesTheManagerOfTheCurrentCommitter() public {
+    function test_reusesTheManagerOfTheCurrentExecutor() public {
         _mockProtocolVersion(FIRST_PROTOCOL_VERSION_WITH_INTEROP_FEE);
-        assertEq(AddressIntrospector._getInteropFeeManager(ctm, committerFacet), manager);
+        assertEq(AddressIntrospector._getInteropFeeManager(ctm, executorFacet), manager);
 
         _mockProtocolVersion(FIRST_PROTOCOL_VERSION_WITH_INTEROP_FEE + 1);
-        assertEq(AddressIntrospector._getInteropFeeManager(ctm, committerFacet), manager);
+        assertEq(AddressIntrospector._getInteropFeeManager(ctm, executorFacet), manager);
     }
 
-    /// @dev Older Committer facets have no getter, so they are never called.
+    /// @dev Older Executor facets have no getter, so they are never called.
     function test_noManagerBeforeTheReleaseThatIntroducedIt() public {
         _mockProtocolVersion(FIRST_PROTOCOL_VERSION_WITH_INTEROP_FEE - 1);
-        assertEq(AddressIntrospector._getInteropFeeManager(ctm, makeAddr("legacyCommitterFacet")), address(0));
+        assertEq(AddressIntrospector._getInteropFeeManager(ctm, makeAddr("legacyExecutorFacet")), address(0));
     }
 
     function test_noManagerWithoutAnUpToDateChain() public {

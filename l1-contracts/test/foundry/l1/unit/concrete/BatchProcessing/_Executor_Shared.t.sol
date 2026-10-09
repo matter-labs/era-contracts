@@ -117,7 +117,7 @@ contract ExecutorTest is UtilsCallMockerTest {
     }
 
     function getExecutorSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](6);
+        bytes4[] memory selectors = new bytes4[](7);
         uint256 i = 0;
         selectors[i++] = executor.proveBatchesSharedBridge.selector;
         selectors[i++] = executor.executeBatchesSharedBridge.selector;
@@ -125,14 +125,14 @@ contract ExecutorTest is UtilsCallMockerTest {
         selectors[i++] = executor.setPriorityTreeStartIndex.selector;
         selectors[i++] = executor.setPriorityTreeHistoricalRoot.selector;
         selectors[i++] = executor.appendPriorityOp.selector;
+        selectors[i++] = executor.getInteropFeeManager.selector;
         return selectors;
     }
 
     function getCommitterSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](2);
+        bytes4[] memory selectors = new bytes4[](1);
         uint256 i = 0;
         selectors[i++] = committer.commitBatchesSharedBridge.selector;
-        selectors[i++] = committer.getInteropFeeManager.selector;
         return selectors;
     }
 
@@ -286,7 +286,6 @@ contract ExecutorTest is UtilsCallMockerTest {
 
         admin = new AdminFacet(block.chainid, rollupDAManager);
         getters = new GettersFacet();
-        executor = new TestExecutor();
         interopFeeManager = InteropFeeManager(
             address(
                 new TransparentUpgradeableProxy(
@@ -296,7 +295,8 @@ contract ExecutorTest is UtilsCallMockerTest {
                 )
             )
         );
-        committer = new TestCommitter(interopFeeManager);
+        executor = new TestExecutor(interopFeeManager);
+        committer = new TestCommitter();
         mailbox = new MailboxFacet(block.chainid, address(chainAssetHandler), eip7702Checker, false);
 
         DummyCTM chainTypeManager = new DummyCTM(owner, address(0));

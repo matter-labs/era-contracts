@@ -61,7 +61,7 @@ contract InteropFeeManagerHandler is Test {
     function chargeInteropFee(uint256 _chainSeed, uint256 _batchNumber, uint256 _units) external {
         uint256 chainId = _chain(_chainSeed);
         uint256 feePerUnit = MANAGER.feePerUnit();
-        // Only charges the balance covers: an uncovered one reverts the commit and moves nothing.
+        // Only charges the balance covers: an uncovered one reverts the execution and moves nothing.
         uint256 maxUnits = feePerUnit == 0 ? type(uint32).max : MANAGER.chainBalance(chainId) / feePerUnit;
         uint256 units = bound(_units, 0, maxUnits);
         vm.prank(zkChains[chainId]);

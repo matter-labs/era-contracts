@@ -33,7 +33,7 @@ const PREPAID_AMOUNT = ethers.utils.parseUnits("1", "gwei");
  *
  * The interop fee pieces on the deployed ecosystem: the InteropCenter counter on real bundles and
  * withdrawals, and the L1 fee manager against the real Bridgehub and diamonds. See
- * {protocol-docs/interop-fee.md}. The harness does not commit batches to L1; the commit-time charge is
+ * {protocol-docs/interop-fee.md}. The harness does not settle batches on L1; the charge at execution is
  * covered by the foundry suite (BatchProcessing/InteropFee.t.sol).
  */
 describe("14 - Interop fee units", function () {

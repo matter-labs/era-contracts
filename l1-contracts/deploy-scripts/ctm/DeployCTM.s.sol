@@ -172,7 +172,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         initializeGeneratedData();
 
-        // The Committer facet takes the fee manager as an immutable, so it has to exist first.
+        // The Executor facet takes the fee manager as an immutable, so it has to exist first.
         (, ctmAddresses.l1Specific.interopFeeManager) = deployTuppWithContract("InteropFeeManager");
 
         deployStateTransitionDiamondFacets();
@@ -639,10 +639,10 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             IEIP7702Checker(address(1)),
             false
         );
-        ExecutorFacet executorFacet = new ExecutorFacet();
-        MigratorFacet migratorFacet = new MigratorFacet(1, false);
         // Only its selectors are read; any non-zero manager satisfies the constructor on every chain.
-        CommitterFacet committerFacet = new CommitterFacet(1, IInteropFeeManager(address(1)));
+        ExecutorFacet executorFacet = new ExecutorFacet(1, IInteropFeeManager(address(1)));
+        MigratorFacet migratorFacet = new MigratorFacet(1, false);
+        CommitterFacet committerFacet = new CommitterFacet(1);
         bytes4[] memory adminFacetSelectors = Utils.getAllSelectors(address(adminFacet).code);
         bytes4[] memory gettersFacetSelectors = Utils.getAllSelectors(address(gettersFacet).code);
         bytes4[] memory mailboxFacetSelectors = Utils.getAllSelectors(address(mailboxFacet).code);
