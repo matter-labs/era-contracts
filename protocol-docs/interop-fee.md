@@ -50,9 +50,10 @@ topped up. Batches committed earlier still prove and execute, so in-flight withd
 Charging happens at commit, where the count arrives, before it is proven. A count other than the proven one only
 costs the chain itself: it is charged, but its batch can never execute and has to be reverted, so a chain's exposure to
 a faulty commit is its prepaid balance. A reverted batch is not refunded, whoever reverts it (the operator, the CTM, or
-priority-mode activation), and interop re-committed outside priority mode is charged again. Until the proof, the
-count is guarded by the external nodes, which derive it from their own execution before signing the commit, like the
-rest of the commit data ({protocol-docs/chain-config.md#external-node-signatures}).
+priority-mode activation), and interop re-committed outside priority mode is charged again. On chains whose commits
+need external-node signatures (`MultisigCommitter` with a non-zero signing threshold), those nodes guard the count until
+the proof: they derive it from their own execution before signing, like the rest of the commit data
+({protocol-docs/chain-config.md#external-node-signatures}).
 
 ## The switch
 

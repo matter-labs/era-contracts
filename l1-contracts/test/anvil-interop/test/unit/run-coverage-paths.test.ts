@@ -104,8 +104,8 @@ test("applyPortOffset publishes any resolved offset, including non-zero", () => 
   const key = "ANVIL_INTEROP_PORT_OFFSET";
   const previous = process.env[key];
   try {
-    applyPortOffset(1000);
-    assert.equal(process.env[key], "1000");
+    applyPortOffset(2000);
+    assert.equal(process.env[key], "2000");
   } finally {
     if (previous === undefined) delete process.env[key];
     else process.env[key] = previous;
@@ -152,7 +152,7 @@ test("rejects --port-offset with no value", () => {
   assert.throws(() => resolvePortOffset(["--port-offset"]), /requires a value/);
   assert.throws(() => resolvePortOffset(["--html", "--port-offset"]), /requires a value/);
   // ...and must not fall back to the environment, which would mask the mistake.
-  assert.throws(() => resolvePortOffset(["--port-offset"], "1000"), /requires a value/);
+  assert.throws(() => resolvePortOffset(["--port-offset"], "2000"), /requires a value/);
 });
 
 // The range check was only reached in the sharded branch, so a one-spec, --serial or
