@@ -26,6 +26,7 @@ import {L2DACommitmentScheme} from "../../common/Config.sol";
 /// @param operatorDAInput Input to the L1 data-availability validator
 /// @param slChainId Settlement-layer chain ID used during execution
 /// @param chainConfigHash Hash of the runtime configuration used to execute the batch
+/// @param interopFeeUnits Interop fee units sent by the batch, bound by the proof (see {protocol-docs/interop-fee.md})
 struct CommitBatchInfoZKsyncOS {
     uint64 batchNumber;
     bytes32 newStateCommitment;
@@ -44,6 +45,7 @@ struct CommitBatchInfoZKsyncOS {
     bytes operatorDAInput;
     uint256 slChainId;
     bytes32 chainConfigHash;
+    uint256 interopFeeUnits;
 }
 
 /// @title The interface of the ZKsync Committer contract responsible for batch commitment operations.

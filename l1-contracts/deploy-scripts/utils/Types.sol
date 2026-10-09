@@ -9,6 +9,10 @@ import {StateTransitionDeployedAddresses, DAContracts} from "contracts/common/St
 /// verifiers exported it as the legacy `IS_TESTNET_VERIFIER` constant.
 uint32 constant FIRST_PROTOCOL_VERSION_WITH_VERIFIER_FLAG = 34;
 
+/// @dev First protocol version whose Executor facet charges the L1 interop fee and exposes its manager
+/// (`getInteropFeeManager()`).
+uint32 constant FIRST_PROTOCOL_VERSION_WITH_INTEROP_FEE = 35;
+
 struct BridgehubContracts {
     address bridgehub;
     address messageRoot;
@@ -83,6 +87,7 @@ struct DataAvailabilityDeployedAddresses {
 /// @notice L1-specific state transition addresses that are not used in the Gateway context.
 struct L1SpecificStateTransitionAddresses {
     address legacyValidatorTimelock;
+    address interopFeeManager;
 }
 
 struct CTMAdminAddresses {

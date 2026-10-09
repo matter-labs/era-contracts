@@ -26,6 +26,8 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {Utils} from "../../../../deploy-scripts/utils/Utils.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DefaultUpgradeZKsyncOS} from "contracts/upgrades/DefaultUpgradeZKsyncOS.sol";
+import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
+import {InteropFeeManager} from "contracts/core/interop-fee/InteropFeeManager.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {Bytes} from "contracts/vendor/Bytes.sol";
 
@@ -294,6 +296,32 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationTestBase, L1ContractDe
             coreUpgrade.getDiscoveredBridgehub().proxies.chainRegistrationSender,
             "Bridgehub does not know the ChainRegistrationSender"
         );
+
+        // Both chains charge the CTM's interop fee manager, which ships switched off, owned by governance and behind
+        // the CTM's ProxyAdmin.
+        InteropFeeManager interopFeeManager = InteropFeeManager(ctmUpgrade.getAddresses().l1Specific.interopFeeManager);
+        assertTrue(address(interopFeeManager) != address(0), "No interop fee manager after the upgrade");
+        assertEq(
+            ExecutorFacet(_eraDiamond).getInteropFeeManager(),
+            address(interopFeeManager),
+            "Existing chain charges another interop fee manager"
+        );
+        assertEq(
+            ExecutorFacet(_newChainDiamond).getInteropFeeManager(),
+            address(interopFeeManager),
+            "New chain charges another interop fee manager"
+        );
+        address governance = ctmUpgrade.getAddresses().admin.governance;
+        assertEq(interopFeeManager.owner(), governance, "Interop fee manager not owned by governance");
+        assertEq(interopFeeManager.pendingOwner(), address(0), "Interop fee manager has a pending owner");
+        assertEq(
+            Utils.getProxyAdminAddress(address(interopFeeManager)),
+            Utils.getProxyAdminAddress(ctm),
+            "Interop fee manager not behind the CTM's ProxyAdmin"
+        );
+        assertEq(interopFeeManager.feeRecipient(), governance, "Interop fees not swept to governance");
+        assertEq(interopFeeManager.feePerUnit(), 0, "Interop fee not switched off");
+        assertEq(address(interopFeeManager.BRIDGE_HUB()), bridgehub, "Interop fee manager on another bridgehub");
 
         if (_serverNotifierProxy != address(0)) {
             assertEq(

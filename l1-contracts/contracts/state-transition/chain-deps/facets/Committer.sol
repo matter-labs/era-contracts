@@ -135,6 +135,8 @@ contract CommitterFacet is ZKChainBase, ICommitter {
             s.storedBatchHashes[_lastCommittedBatchData.batchNumber] = StoredBatchHashing.hashStoredBatchInfo(
                 _lastCommittedBatchData
             );
+            // Written even when zero, so a re-commit after a revert replaces the reverted batch's count.
+            s.interopFeeUnits[_lastCommittedBatchData.batchNumber] = _newBatchesData[i].interopFeeUnits;
             emit BlockCommit(
                 _lastCommittedBatchData.batchNumber,
                 _lastCommittedBatchData.batchHash,
@@ -231,23 +233,7 @@ contract CommitterFacet is ZKChainBase, ICommitter {
             revert SettlementLayerChainIdMismatch();
         }
 
-        // The batch output hash commits to the batch data opened on L1. It is combined below
-        // with the previous/new state commitments and chain config hash in the proof public input.
-        bytes32 batchOutputHash = keccak256(
-            abi.encodePacked(
-                _newBatch.firstBlockTimestamp,
-                _newBatch.lastBlockTimestamp,
-                uint256(_newBatch.daCommitmentScheme),
-                _newBatch.daCommitment,
-                _newBatch.numberOfLayer1Txs,
-                _newBatch.numberOfLayer2Txs,
-                _newBatch.priorityOperationsHash,
-                _newBatch.l2LogsTreeRoot,
-                _expectedSystemContractUpgradeTxHash,
-                _newBatch.dependencyRootsRollingHash,
-                _newBatch.slChainId
-            )
-        );
+        bytes32 batchOutputHash = _getBatchOutputHash(_newBatch, _expectedSystemContractUpgradeTxHash);
 
         // We are using same stored batch info structure as was used for Era VM state transition.
         // But we set some fields differently:
@@ -293,6 +279,35 @@ contract CommitterFacet is ZKChainBase, ICommitter {
             _newBatch.firstBlockNumber,
             _newBatch.lastBlockNumber
         );
+    }
+
+    /// @notice Computes the hash of the batch data opened on L1. It is combined with the previous/new state
+    /// commitments and the chain config hash into the proof public input, so its layout must match the
+    /// ZKsync OS `BatchOutput::hash`.
+    /// @param _batch The committed batch.
+    /// @param _upgradeTxHash The system upgrade transaction expected in this batch, or zero.
+    /// @return The batch output hash.
+    function _getBatchOutputHash(
+        CommitBatchInfoZKsyncOS memory _batch,
+        bytes32 _upgradeTxHash
+    ) internal pure returns (bytes32) {
+        return
+            keccak256(
+                abi.encodePacked(
+                    _batch.firstBlockTimestamp,
+                    _batch.lastBlockTimestamp,
+                    uint256(_batch.daCommitmentScheme),
+                    _batch.daCommitment,
+                    _batch.numberOfLayer1Txs,
+                    _batch.numberOfLayer2Txs,
+                    _batch.priorityOperationsHash,
+                    _batch.l2LogsTreeRoot,
+                    _upgradeTxHash,
+                    _batch.dependencyRootsRollingHash,
+                    _batch.slChainId,
+                    _batch.interopFeeUnits
+                )
+            );
     }
 
     /// @notice Computes the full, untruncated batch proof public-input hash.

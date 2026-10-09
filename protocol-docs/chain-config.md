@@ -83,9 +83,9 @@ are unchanged.
 
 The v34 diamond-transition test deploys frozen pre-v34 Committer and Executor bytecode from
 `7b398269a03e531fefa013d14a16f15c5fdfd16c`. It commits version-4 data, proves the legacy batch,
-executes it, applies the script-generated v34 cut, and commits/proves/executes version-5 data. Two
-more paths check that an unverified or a proved-but-unexecuted legacy batch prevents the cut and
-leaves both facets and stored batch data intact.
+executes it, applies the script-generated v34 cut, and commits/proves/executes data in the current
+commit encoding. Two more paths check that an unverified or a proved-but-unexecuted legacy batch
+prevents the cut and leaves both facets and stored batch data intact.
 
 The fixture records its source revision and compiler/toolchain settings. Regenerate it only when
 intentionally changing the historical baseline: export that revision, build the two facets with the

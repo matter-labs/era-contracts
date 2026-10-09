@@ -14,6 +14,7 @@ import type { ContractInterface } from "@ethersproject/contracts";
 import { impersonateAndRun } from "../core/utils";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
+  EIP1967_ADMIN_SLOT,
   L2_BOOTLOADER_ADDR,
   L2_BRIDGEHUB_ADDR,
   L2_CHAIN_ASSET_HANDLER_ADDR,
@@ -21,10 +22,6 @@ import {
   SYSTEM_CONTEXT_ADDR,
 } from "../core/const";
 import { getAbi, getBytecode, getCreationBytecode } from "../core/contracts";
-
-// EIP-1967 storage slot for the admin of a TransparentUpgradeableProxy.
-//   keccak256("eip1967.proxy.admin") - 1
-const EIP1967_ADMIN_SLOT = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
 
 // `ZKChainBase.s` (the only state variable) lives at slot 0 of the proxy, so
 // `ZKChainStorage` field offsets are absolute. Used by

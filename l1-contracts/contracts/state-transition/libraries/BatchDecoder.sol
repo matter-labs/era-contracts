@@ -28,8 +28,8 @@ library BatchDecoder {
     /// @dev A breaking re-encoding of the execute wire must bump this version, never reuse an old byte.
     uint8 internal constant SUPPORTED_ENCODING_VERSION_EXECUTE = 2;
     /// @notice The currently supported encoding version for commit data.
-    /// @dev Retired commit encoding versions remain reserved.
-    uint8 internal constant SUPPORTED_ENCODING_VERSION_COMMIT = 5;
+    /// @dev Retired commit encoding versions remain reserved: 5 is the layout without `interopFeeUnits`.
+    uint8 internal constant SUPPORTED_ENCODING_VERSION_COMMIT = 6;
 
     /// @notice Decodes commit data from a calldata bytes into the last committed batch data and an
     /// array of new batch data.

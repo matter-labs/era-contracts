@@ -294,4 +294,8 @@ struct ZKChainStorage {
     /// @dev See {protocol-docs/chain-config.md#large-contracts}.
     /// @dev STORAGE SLOT: 68 (packed after zksyncOSL1TxFilteringEnabled)
     bool zksyncOSLargeContractsEnabled;
+    /// @dev The interop fee units each committed batch sent, charged when it executes.
+    /// See {protocol-docs/interop-fee.md}.
+    /// @dev STORAGE SLOT: 69
+    mapping(uint256 batchNumber => uint256 units) interopFeeUnits;
 }

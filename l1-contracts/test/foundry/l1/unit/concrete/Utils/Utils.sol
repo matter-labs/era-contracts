@@ -109,7 +109,8 @@ library Utils {
                 chainId: TEST_CHAIN_ID,
                 operatorDAInput: abi.encodePacked(uint256(0)),
                 slChainId: block.chainid,
-                chainConfigHash: defaultChainConfigHash(TEST_CHAIN_ID)
+                chainConfigHash: defaultChainConfigHash(TEST_CHAIN_ID),
+                interopFeeUnits: 0
             });
     }
 
@@ -206,11 +207,12 @@ library Utils {
     }
 
     function getExecutorSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](3);
+        bytes4[] memory selectors = new bytes4[](4);
         uint256 i = 0;
         selectors[i++] = ExecutorFacet.proveBatchesSharedBridge.selector;
         selectors[i++] = ExecutorFacet.executeBatchesSharedBridge.selector;
         selectors[i++] = ExecutorFacet.revertBatchesSharedBridge.selector;
+        selectors[i++] = ExecutorFacet.getInteropFeeManager.selector;
         return selectors;
     }
 

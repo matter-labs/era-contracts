@@ -134,6 +134,7 @@ Live environment variables:
 | `08-interop-messages`        | Base-token and ERC20 messages across ETH and custom-base-token chains                                                                                        |
 | `09-interop-unbundle`        | Bundle verification and recovery of calls that cannot execute                                                                                                |
 | `13-imt-atomic-swap`         | IMT-backed atomic swaps, timeout refunds, and invalid-flow rejection                                                                                         |
+| `14-interop-fee-units`       | Interop fee units: L2->L2 calls counted on the source only, withdrawals never; L1 fee manager ships off, prepaid balance round trip                          |
 
 ## Coverage
 
@@ -178,9 +179,9 @@ Two coverage runs can coexist: pass `--port-offset N` or export `ANVIL_INTEROP_P
 output to `coverage/anvil/run-pN/`, and `--html` to `coverage/anvil/html-pN/`, so one run cannot
 delete the other's. Offset 0 keeps the unsuffixed paths that CI and `yarn l1 coverage:merge` expect.
 
-**Valid offsets are 0, 1000, 2000, …** — whole multiples of 1000. A run reserves 1000 ports (up to
-ten shards, 100 apart), so bases closer than that overlap: a run at 500 would allocate the same
-ports as shards 6 to 10 of a run at 0, and the later run's `startChain` kills the earlier run's
+**Valid offsets are 0, 2000, 4000, …** — whole multiples of 2000. A run reserves 2000 ports (up to
+twenty shards, 100 apart), so bases closer than that overlap: a run at 500 would allocate the same
+ports as shards 6 to 20 of a run at 0, and the later run's `startChain` kills the earlier run's
 Anvil processes. Anything else is rejected with a message naming the valid values.
 
 Tracing multiplies Anvil's memory and CPU cost, so cap the concurrency on small machines with
@@ -285,7 +286,8 @@ test/anvil-interop/
 │   ├── 07-interop-bundles.spec.ts
 │   ├── 08-interop-messages.spec.ts
 │   ├── 09-interop-unbundle.spec.ts
-│   └── 13-imt-atomic-swap.spec.ts
+│   ├── 13-imt-atomic-swap.spec.ts
+│   └── 14-interop-fee-units.spec.ts
 └── outputs/                       # Deployment outputs (gitignored)
 ```
 

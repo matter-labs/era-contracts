@@ -10,13 +10,15 @@ import {IExecutor} from "../../chain-interfaces/IExecutor.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
+import {IInteropFeeManager} from "../../../core/interop-fee/IInteropFeeManager.sol";
 import {
     CantExecuteUnprovenBatches,
     InvalidMessageRoot,
     InvalidProof,
     NonSequentialBatch,
     PriorityOperationsRollingHashMismatch,
-    VerifiedBatchesExceedsCommittedBatches
+    VerifiedBatchesExceedsCommittedBatches,
+    ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
 import {
     CommitBasedInteropNotSupported,
@@ -41,6 +43,27 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @inheritdoc IZKChainBase
     // solhint-disable-next-line const-name-snakecase
     string public constant override getName = "ExecutorFacet";
+
+    /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to
+    /// the L1 that is at the most base layer.
+    uint256 internal immutable L1_CHAIN_ID;
+
+    /// @dev Exposed as {getInteropFeeManager}.
+    IInteropFeeManager internal immutable INTEROP_FEE_MANAGER;
+
+    constructor(uint256 _l1ChainId, IInteropFeeManager _interopFeeManager) {
+        // On L1 the manager is called for every interop batch, even with the switch off; off L1 it is never called.
+        require(_l1ChainId != block.chainid || address(_interopFeeManager) != address(0), ZeroAddress());
+        L1_CHAIN_ID = _l1ChainId;
+        INTEROP_FEE_MANAGER = _interopFeeManager;
+    }
+
+    /// @notice The L1 interop fee switch that batches executed on L1 are charged from; facets deployed on another
+    /// settlement layer have none. See {protocol-docs/interop-fee.md}.
+    /// @dev Not part of `IExecutor`: the validator timelocks implement that interface to forward settlement.
+    function getInteropFeeManager() external view returns (address) {
+        return address(INTEROP_FEE_MANAGER);
+    }
 
     function _rollingHash(bytes32[] memory _hashes) internal pure returns (bytes32) {
         bytes32 hash = EMPTY_STRING_KECCAK;
@@ -78,6 +101,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @notice Executes one batch
     /// @dev 1. Processes all pending operations (Complete priority requests)
     /// @dev 2. Finalizes batch
+    /// @dev 3. Charges the batch's interop fee units
     /// @dev _executedBatchIdx is an index in the array of the batches that we want to execute together
     function _executeOneBatch(
         StoredBatchInfo memory _storedBatch,
@@ -97,6 +121,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
         // Save root hash of L2 -> L1 logs tree
         s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
+
+        // See {protocol-docs/interop-fee.md#charging-and-enforcement}.
+        uint256 interopFeeUnits = s.interopFeeUnits[currentBatchNumber];
+        if (interopFeeUnits != 0 && L1_CHAIN_ID == block.chainid && !s.priorityModeInfo.activated) {
+            INTEROP_FEE_MANAGER.chargeInteropFee(s.chainId, currentBatchNumber, interopFeeUnits);
+        }
     }
 
     /// @notice Verifies the dependency message roots that the chain relied on.
