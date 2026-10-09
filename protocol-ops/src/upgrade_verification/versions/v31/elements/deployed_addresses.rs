@@ -54,7 +54,7 @@ mod core_signatures {
             constructor(address _bridgehub, address _messageRoot);
         }
         contract V31L1MessageRoot {
-            constructor(address _bridgehub, uint256 _eraGatewayChainId, address _chainAssetHandler);
+            constructor(address _bridgehub, address _chainAssetHandler);
         }
         contract V31L1ChainAssetHandler {
             constructor(address _owner, address _bridgehub);
@@ -645,13 +645,11 @@ async fn verify_core_provenance(
             .abi_encode(),
             "l1-contracts/L1ChainAssetHandler",
         ),
-        // L1MessageRoot(_bridgehub, _eraGatewayChainId, _chainAssetHandler). The v33 flow
-        // deploys no Gateway; `DefaultCoreUpgrade` passes 0 for `_eraGatewayChainId`.
+        // L1MessageRoot impl(bridgehub, chainAssetHandler).
         (
             message_root_impl,
             V31L1MessageRoot::constructorCall::new((
                 context.bridgehub_addr,
-                U256::ZERO,
                 chain_asset_handler_proxy,
             ))
             .abi_encode(),

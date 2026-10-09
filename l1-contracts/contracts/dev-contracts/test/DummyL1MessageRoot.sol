@@ -17,11 +17,7 @@ import {ProofData} from "../../common/libraries/MessageHashing.sol";
  * at least for L1 settlement. This would validate the proof construction path too.
  */
 contract DummyL1MessageRoot is L1MessageRoot {
-    constructor(
-        address _bridgehub,
-        uint256 _eraGatewayChainId,
-        address _chainAssetHandler
-    ) L1MessageRoot(_bridgehub, _eraGatewayChainId, _chainAssetHandler) {}
+    constructor(address _bridgehub, address _chainAssetHandler) L1MessageRoot(_bridgehub, _chainAssetHandler) {}
 
     // ── Proof verification overrides (always return true) ──
 

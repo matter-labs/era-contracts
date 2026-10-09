@@ -3,25 +3,33 @@
 pragma solidity 0.8.28;
 
 import {L1ChainAssetHandler} from "../core/chain-asset-handler/L1ChainAssetHandler.sol";
+import {MigrationInterval} from "../core/chain-asset-handler/IChainAssetHandler.sol";
 
-/// @notice Test-only variant of `L1ChainAssetHandler` for the Anvil multichain harness.
-/// @dev In production, `migrationNumber` on L1 is bumped by `bridgeMint` when a
-/// chain returns from Gateway to L1 as part of the chain-level migrate-from-gateway
-/// governance flow. That flow ultimately invokes `Migrator.forwardedBridgeBurn` on
-/// the migrating chain's Gateway diamond proxy, which enforces
-/// `priorityTree.getSize() == 0` and `totalBatchesCommitted == totalBatchesExecuted` —
-/// invariants that a sequencer-less Anvil harness can only satisfy via a matching
-/// `MigratorFacetDev` dev-variant, installed via `anvil_setCode` after a fresh-deploy
-/// copy of this contract is built so the L1-side immutables (`BRIDGEHUB`,
-/// `L1_CHAIN_ID`, `ETH_TOKEN_ASSET_ID`) are baked in with the production values.
+/// @notice Test-only variant of `L1ChainAssetHandler` for the Anvil harness and foundry tests.
+/// @dev It re-enables chain migrations. Production records migration numbers and intervals only
+/// during a real chain migration, whose `Migrator.forwardedBridgeBurn` invariants
+/// (`priorityTree.getSize() == 0`, `totalBatchesCommitted == totalBatchesExecuted`) a sequencer-less
+/// harness cannot meet, so the setters below reproduce that state. A fresh copy is installed behind
+/// the production proxy, so the L1-side immutables (`BRIDGEHUB`, `L1_CHAIN_ID`, `ETH_TOKEN_ASSET_ID`)
+/// keep their production values.
 /// @dev Gated by `onlyOwner` (same modifier that gates `setAddresses`), so the
-/// setter cannot be reached from any non-governance surface.
+/// setters cannot be reached from any non-governance surface.
 contract L1ChainAssetHandlerDev is L1ChainAssetHandler {
     constructor(address _owner, address _bridgehub) L1ChainAssetHandler(_owner, _bridgehub) {}
 
     /// @dev For local testing only.
     function setMigrationNumberForTesting(uint256 _chainId, uint256 _migrationNumber) external onlyOwner {
         migrationNumber[_chainId] = _migrationNumber;
+    }
+
+    /// @dev For local testing only. Production records intervals only while a chain migrates
+    /// (`_recordMigrationToSL` / `_recordMigrationFromSL`); tests reproduce that state through this call.
+    function setMigrationIntervalForTesting(
+        uint256 _chainId,
+        uint256 _migrationNumber,
+        MigrationInterval calldata _interval
+    ) external onlyOwner {
+        _migrationInterval[_chainId][_migrationNumber] = _interval;
     }
 
     /// @dev Re-enables chain migrations (disabled in production via `CHAIN_MIGRATIONS_ENABLED` in

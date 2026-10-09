@@ -9,8 +9,9 @@ import {
   L2_ASSET_ROUTER_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
 } from "../core/const";
-import { encodeAssetRouterBridgehubDepositData, encodeBridgeBurnData, encodeNtvAssetId } from "../core/data-encoding";
+import { encodeAssetRouterBridgehubDepositData, encodeBridgeBurnData } from "../core/data-encoding";
 import type { CoreDeployedAddresses } from "../core/types";
+import { getAssetIdForToken } from "./balance-helpers";
 import { indirectCallAttr, interopCallValueAttr, sendInteropBundle } from "./interop-helpers";
 import { encodeEvmAddress } from "./erc7930";
 
@@ -55,13 +56,6 @@ export interface InitiateWithdrawalParams {
 
 export interface InitiateErc20WithdrawalParams extends InitiateWithdrawalParams {
   l2TokenAddress: string;
-  /**
-   * Chain where the token originates. For an L2-native token this is the L2
-   * chain id; for an L1-native token bridged to L2 this is `L1_CHAIN_ID`. The
-   * value feeds `DataEncoding.encodeNTVAssetId` so the resulting `assetId`
-   * matches what the L2 `NativeTokenVault` assigned on registration.
-   */
-  tokenOriginChainId: number;
 }
 
 /**
@@ -126,7 +120,7 @@ export async function initiateEthWithdrawal(params: InitiateWithdrawalParams): P
  * {protocol-docs/bridging.md#deposit-initiation-source-side}.
  */
 export async function initiateErc20Withdrawal(params: InitiateErc20WithdrawalParams): Promise<PendingWithdrawal> {
-  const { l2RpcUrl, l1RpcUrl, l2TokenAddress, tokenOriginChainId, chainId, amount } = params;
+  const { l2RpcUrl, l1RpcUrl, l2TokenAddress, chainId, amount } = params;
   const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
 
   const l2Provider = createProvider(l2RpcUrl);
@@ -134,9 +128,8 @@ export async function initiateErc20Withdrawal(params: InitiateErc20WithdrawalPar
   const l2Wallet = new Wallet(privateKey, l2Provider);
   const l1Recipient = params.l1Recipient || l2Wallet.address;
 
-  // `assetId` is a deterministic function of (origin chain, token address); the
-  // L2 NTV assigns the same value during `registerToken`.
-  const assetId = encodeNtvAssetId(tokenOriginChainId, l2TokenAddress);
+  // Read from the L2 NTV: a bridged token's assetId is keyed by its origin token, not by its L2 address.
+  const assetId = await getAssetIdForToken(l2Provider, l2TokenAddress);
 
   // The burn pulls the tokens from the original caller (the `sendBundle` sender) via the NTV,
   // hence the NTV approval.
@@ -183,9 +176,8 @@ export async function initiateErc20Withdrawal(params: InitiateErc20WithdrawalPar
  * (the nullifier points to the handler, which re-invokes the L1 asset router's `finalizeDeposit`).
  *
  * Returns `{ success: true, txHash }` if the L1 tx lands, otherwise
- * `{ success: false, errorMessage, revertData }` — callers can drive the
- * "attempt → revert → retry" pattern the source TBM suite uses around
- * `InsufficientChainBalance`. When the call reverts, `revertData` carries the
+ * `{ success: false, errorMessage, revertData }`, so callers can drive an
+ * "attempt → revert → retry" pattern. When the call reverts, `revertData` carries the
  * 4-byte selector (plus args) so callers can match the exact custom error.
  */
 export async function finalizeWithdrawalOnL1(

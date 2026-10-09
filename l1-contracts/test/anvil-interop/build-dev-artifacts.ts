@@ -13,13 +13,11 @@ const ANVIL_INTEROP_DEV_ARTIFACTS: DevArtifact[] = [
   },
   {
     contractPath: "contracts/dev-contracts/L2ChainAssetHandlerDev.sol",
-    reason:
-      "installed at the Gateway ChainAssetHandler address so reverse-TBM setup can bump migrationNumber through onlyUpgrader",
+    reason: "installed at the Gateway ChainAssetHandler address to re-enable chain migrations",
   },
   {
     contractPath: "contracts/dev-contracts/L1ChainAssetHandlerDev.sol",
-    reason:
-      "deployed behind the L1 ChainAssetHandler proxy so reverse-TBM setup can bump migrationNumber through onlyOwner",
+    reason: "deployed behind the L1 ChainAssetHandler proxy to re-enable chain migrations",
   },
   {
     contractPath: "contracts/dev-contracts/TestnetERC20Token.sol",

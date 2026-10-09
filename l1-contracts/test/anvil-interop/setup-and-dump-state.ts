@@ -27,14 +27,14 @@ async function main(): Promise<void> {
     fs.rmSync(stateDir, { recursive: true, force: true });
     const dumpStatePaths = runner.buildDumpStatePaths(stateDir);
 
-    // Run full deployment + test tokens + TBM with pinned inputs:
+    // Run full deployment + test tokens + wrapped-ZK seeding with pinned inputs:
     // - blockTime 1 = match the fresh-deploy harness's known-good mining cadence
     // - timestamp 1 = fixed genesis timestamp
     // - dumpStatePaths = Anvil will dump state to these files on exit
     // Contract bytecode and addresses are deterministic. Interval mining makes the final block height
     // and block-indexed state wall-clock-dependent; compare-chain-states.ts normalizes that documented
     // drift in CI.
-    const { l1Addresses, ctmAddresses, chainAddresses } = await runner.deployAndSetupWithTBM(anvilManager, {
+    const { l1Addresses, ctmAddresses, chainAddresses } = await runner.deployAndSetupWithWrappedZk(anvilManager, {
       startChainOptions: { blockTime: 1, timestamp: 1, dumpStatePaths },
     });
 

@@ -8,11 +8,6 @@
         "internalType": "address"
       },
       {
-        "name": "_eraGatewayChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
         "name": "_chainAssetHandler",
         "type": "address",
         "internalType": "address"
@@ -42,19 +37,6 @@
         "name": "",
         "type": "address",
         "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "ERA_GATEWAY_CHAIN_ID",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -518,25 +500,6 @@
   },
   {
     "type": "function",
-    "name": "isPreV31",
-    "inputs": [
-      {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "lastEmitBlock",
     "inputs": [],
     "outputs": [
@@ -865,19 +828,6 @@
   },
   {
     "type": "function",
-    "name": "saveV31UpgradeChainBatchNumber",
-    "inputs": [
-      {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "seedGenesisRoot",
     "inputs": [
       {
@@ -1097,11 +1047,6 @@
   },
   {
     "type": "error",
-    "name": "CurrentBatchNumberAlreadySet",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "HashedLogIsDefault",
     "inputs": []
   },
@@ -1243,21 +1188,6 @@
   },
   {
     "type": "error",
-    "name": "OnlyOnSettlementLayer",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "TotalBatchesExecutedZero",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "UnsupportedProofMetadataVersion",
     "inputs": [
       {
@@ -1266,11 +1196,6 @@
         "internalType": "uint256"
       }
     ]
-  },
-  {
-    "type": "error",
-    "name": "V31UpgradeChainBatchNumberAlreadySet",
-    "inputs": []
   },
   {
     "type": "error",

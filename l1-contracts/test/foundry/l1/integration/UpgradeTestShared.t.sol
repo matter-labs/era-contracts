@@ -177,7 +177,7 @@ contract UpgradeIntegrationTestBase is Test {
         // Hook for test-specific setup before chain upgrade
         beforeChainUpgrade();
 
-        console.log("Upgrading gateway");
+        console.log("Upgrading the chain");
         // Re-arm so chain-side events (DiamondCut, NewChain, NewZKChain) are captured.
         vm.recordLogs();
 

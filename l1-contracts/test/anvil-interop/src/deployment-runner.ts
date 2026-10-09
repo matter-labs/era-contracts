@@ -753,7 +753,7 @@ export class DeploymentRunner {
       config: config.chains,
     };
 
-    // Populate deployment state so downstream tools (TBM, tests) work
+    // Populate deployment state so downstream tools (tests) work
     const state = this.loadState();
     state.chains = chainInfo;
     state.l1Addresses = l1Addresses;
@@ -956,7 +956,7 @@ export class DeploymentRunner {
    * Thin wrapper over {@link deployAndSetup} that additionally seeds wrapped ZK balances on
    * ETH-base-token L2 chains (no on-chain balance migration step is needed anymore).
    */
-  async deployAndSetupWithTBM(
+  async deployAndSetupWithWrappedZk(
     anvilManager: AnvilManager,
     options?: DeployAndSetupOptions
   ): Promise<FullDeploymentResult> {

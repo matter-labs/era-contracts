@@ -91,7 +91,7 @@ export class AnvilManager {
     const foundryBinPath = homeDir ? path.join(homeDir, ".foundry/bin") : "";
     const enrichedPath = foundryBinPath ? `${foundryBinPath}:${process.env.PATH || ""}` : process.env.PATH;
 
-    // Interval mining is required so the interop relayers and TBM keep progressing. It is not what
+    // Interval mining is required so the interop relayers keep progressing. It is not what
     // paces the suite, though: 0.2s blocks moved it by ~5%, because the specs wait on receipts
     // rather than on blocks — see createProvider in core/utils.ts for what actually cost the time.
     const effectiveBlockTime = blockTime ?? 1;

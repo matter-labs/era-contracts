@@ -95,7 +95,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         messageroot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(address(bridgehub), 1, address(chainAssetHandler))),
+                    address(new L1MessageRoot(address(bridgehub), address(chainAssetHandler))),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initialize, ())
                 )

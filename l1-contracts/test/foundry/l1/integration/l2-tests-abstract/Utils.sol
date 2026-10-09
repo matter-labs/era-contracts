@@ -7,7 +7,6 @@ address constant L2_INTEROP_ACCOUNT_ADDR = address(0x000000000000000000000000000
 struct SystemContractsArgs {
     bool broadcast;
     uint256 l1ChainId;
-    uint256 gatewayChainId;
     uint256 eraChainId;
     address l1AssetRouter;
     address l2TokenBeacon;

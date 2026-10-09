@@ -229,7 +229,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(address(dummyBridgehub), 1, address(chainAssetHandler))),
+                    address(new L1MessageRoot(address(dummyBridgehub), address(chainAssetHandler))),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initialize, ())
                 )

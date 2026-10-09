@@ -763,9 +763,7 @@ library GatewayCTMDeployerHelper {
     /// Emit a `forge verify-contract` line for a GW-side deploy. GW contracts
     /// are EVM-equivalent (ZKsync OS), so no toolchain flag is needed — the
     /// operator supplies the GW chain id and (if required) a custom
-    /// `--verifier-url` at script invocation time. Routing into
-    /// `gw-verification-logs.txt` is handled on the Rust side based on the
-    /// emitting forge script (`GatewayVotePreparation.s.sol`).
+    /// `--verifier-url` at script invocation time.
     function _logGatewayVerifyContract(
         address contractAddr,
         string memory contractName,
