@@ -268,6 +268,10 @@ contract CommitterFacet is ZKChainBase, ICommitter {
                 _lastCommittedBatchData.batchHash,
                 _lastCommittedBatchData.commitment
             );
+            emit BatchAirbenderCommitment(
+                _lastCommittedBatchData.batchNumber,
+                _lastCommittedBatchData.airbenderCommitment
+            );
 
             if (i == 0) {
                 // The upgrade transaction must only be included in the first batch.

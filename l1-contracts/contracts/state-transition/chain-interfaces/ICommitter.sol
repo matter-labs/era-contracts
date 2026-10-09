@@ -115,6 +115,10 @@ interface ICommitter is IZKChainBase {
     /// @dev It has the name "BlockCommit" and not "BatchCommit" due to backward compatibility considerations
     event BlockCommit(uint256 indexed batchNumber, bytes32 indexed batchHash, bytes32 indexed commitment);
 
+    /// @notice Emitted alongside `BlockCommit` for Era batches, carrying the Airbender commitment that is
+    /// part of the stored batch hash.
+    event BatchAirbenderCommitment(uint256 indexed batchNumber, bytes32 airbenderCommitment);
+
     /// @notice Emitted when a new precommitment is set for a batch.
     /// @param batchNumber The batch number for which the precommitment was recorded.
     /// @param untrustedLastL2BlockNumberHint The hint to what L2 block number the precommitment should correspond to. Note, that there are no

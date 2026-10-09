@@ -259,7 +259,10 @@ function checkOverflow(data1, data2) {
 function getMemPointer(rawOffset, size) -> pointer {
     pointer := MEM_OFFSET()
     if size {
-        // expandMemory has already ensured that this doesn't overflow
+        // Callers expand memory for the same region first, which already enforces this bound.
+        if iszero(lt(rawOffset, MAX_POSSIBLE_MEM_LEN())) {
+            panic()
+        }
         pointer := add(MEM_OFFSET(), rawOffset)
     }
 }

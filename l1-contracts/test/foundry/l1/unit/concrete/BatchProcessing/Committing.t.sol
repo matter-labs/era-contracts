@@ -15,7 +15,7 @@ import {
     SystemLogKey,
     TOTAL_BLOBS_IN_COMMITMENT
 } from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+import {CommitBatchInfo, ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
 
 import {BLOB_DATA_OFFSET} from "../../../da-contracts-imports/CalldataDA.sol";
@@ -569,7 +569,7 @@ contract CommittingTest is ExecutorTest {
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        assertEq(entries.length, 1 + EVENT_INDEX);
+        assertEq(entries.length, 2 + EVENT_INDEX);
         assertEq(entries[EVENT_INDEX].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
         assertEq(entries[EVENT_INDEX].topics[1], bytes32(uint256(1))); // batchNumber
         assertEq(entries[EVENT_INDEX].topics[2], correctNewCommitBatchInfo.newStateRoot); // batchHash
@@ -577,6 +577,59 @@ contract CommittingTest is ExecutorTest {
 
         uint256 totalBatchesCommitted = getters.getTotalBatchesCommitted();
         assertEq(totalBatchesCommitted, 1);
+    }
+
+    /// Era commits emit the Airbender commitment hashed into the stored batch, so it is available from logs
+    /// the same way the Boojum one is from `BlockCommit`.
+    function test_SuccessfullyCommitBatchEmitsAirbenderCommitment() public {
+        bytes32 uncompressedStateDiffHash = Utils.randomBytes32("uncompressedStateDiffHash");
+        bytes32 totalL2PubdataHash = Utils.randomBytes32("totalL2PubdataHash");
+        bytes32[] memory blobsLinearHashes = new bytes32[](1);
+        blobsLinearHashes[0] = Utils.randomBytes32("blobsLinearHashes");
+
+        CommitBatchInfo[] memory batches = new CommitBatchInfo[](1);
+        batches[0] = newCommitBatchInfo;
+        batches[0].operatorDAInput = abi.encodePacked(
+            uncompressedStateDiffHash,
+            totalL2PubdataHash,
+            uint8(1),
+            blobsLinearHashes,
+            bytes1(0x01),
+            defaultBlobCommitment,
+            EMPTY_PREPUBLISHED_COMMITMENT
+        );
+        bytes[] memory correctL2Logs = Utils.createSystemLogs(
+            Utils.constructRollupL2DAValidatorOutputHash(
+                uncompressedStateDiffHash,
+                totalL2PubdataHash,
+                uint8(1),
+                blobsLinearHashes
+            )
+        );
+        correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
+        );
+        batches[0].systemLogs = Utils.encodePacked(correctL2Logs);
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+            genesisStoredBatchInfo,
+            batches
+        );
+        bytes32 expectedAirbenderCommitment = Utils.airbenderCommitmentForSingleBlob(
+            batches[0],
+            uncompressedStateDiffHash,
+            blobsLinearHashes[0],
+            defaultBlobVersionedHashes[0]
+        );
+
+        vm.prank(validator);
+        vm.blobhashes(defaultBlobVersionedHashes);
+        vm.expectEmit(address(committer));
+        emit ICommitter.BatchAirbenderCommitment(1, expectedAirbenderCommitment);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_SuccessfullyCommitBatchWithOneBlob() public {
@@ -609,7 +662,7 @@ contract CommittingTest is ExecutorTest {
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        assertEq(entries.length, 1 + EVENT_INDEX);
+        assertEq(entries.length, 2 + EVENT_INDEX);
         assertEq(entries[EVENT_INDEX].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
         assertEq(entries[EVENT_INDEX].topics[1], bytes32(uint256(1))); // batchNumber
 
@@ -678,7 +731,7 @@ contract CommittingTest is ExecutorTest {
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        assertEq(entries.length, 1 + EVENT_INDEX);
+        assertEq(entries.length, 2 + EVENT_INDEX);
         assertEq(entries[EVENT_INDEX].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
         assertEq(entries[EVENT_INDEX].topics[1], bytes32(uint256(1))); // batchNumber
 

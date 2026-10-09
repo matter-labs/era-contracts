@@ -113,6 +113,21 @@ contract MailboxUserPriorityTxGasCapTest is MailboxTest {
         assertTrue(canonicalTxHash != bytes32(0), "ZKsync OS chains must not inherit the EraVM cap");
     }
 
+    /// `getUserPriorityTxMaxGasLimit` is what integrators size requests from, so it must report the
+    /// body gas ceiling the Mailbox actually enforces.
+    function test_userCapGetterMatchesEnforcedBoundary() public {
+        utilsFacet.util_setPriorityTxMaxGasLimit(DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT);
+        uint256 maxAccepted = gettersFacet.getUserPriorityTxMaxGasLimit() + TX_SLOT_OVERHEAD_L2_GAS;
+
+        vm.startPrank(bridgehub);
+        bytes32 canonicalTxHash = mailboxFacet.bridgehubRequestL2Transaction(_userRequest(maxAccepted));
+        assertTrue(canonicalTxHash != bytes32(0), "a request at the reported ceiling must be accepted");
+
+        vm.expectRevert(TooMuchGas.selector);
+        mailboxFacet.bridgehubRequestL2Transaction(_userRequest(maxAccepted + 1));
+        vm.stopPrank();
+    }
+
     /// Service txs hardcode `SERVICE_TX_MAX_GAS_LIMIT`, well above the user cap. They must remain
     /// unaffected, otherwise asset-migration confirmations and chain registration break.
     function test_serviceTxIsNotSubjectToTheUserCap() public {

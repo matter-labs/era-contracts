@@ -126,6 +126,10 @@ contract GettersFacetWrapper is GettersFacet, Test {
         s.priorityTxMaxGasLimit = _priorityTxMaxGasLimit;
     }
 
+    function util_setZksyncOS(bool _zksyncOS) external {
+        s.zksyncOS = _zksyncOS;
+    }
+
     function util_setIsFunctionFreezable(bytes4 _selector, bool _isFreezable) external {
         Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
 

@@ -220,6 +220,11 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
+    function getUserPriorityTxMaxGasLimit() external view returns (uint256) {
+        return _userPriorityTxMaxGasLimit();
+    }
+
+    /// @inheritdoc IGetters
     function getZKsyncOSMaxTxGasLimit() external view returns (uint64) {
         return _getZKsyncOSMaxTxGasLimit();
     }
