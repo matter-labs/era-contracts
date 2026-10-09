@@ -47,6 +47,12 @@ Priority Mode is available only after the chain admin irreversibly opts in throu
 at least one pending priority operation with a recorded request timestamp. The chain must also be a
 permanent rollup before activation.
 
+Deposits must not be paused at opt-in, and once opted in they can no longer be paused. A deposit
+pause blocks every new L1 → L2 request, so on top of Priority Mode it would leave users unable to
+submit the requests that Priority Mode exists to force through, and once the queue drained, nothing
+could trigger activation. Only the admin can lift the pause, and the admin is the actor Priority Mode
+constrains.
+
 After opt-in, the objective censorship signal is an unprocessed priority operation whose recorded
 request timestamp is at least `PRIORITY_EXPIRATION` old. Once that condition is met, any account can
 activate Priority Mode on L1 through `AdminFacet.activatePriorityMode`. Activation reverts all batches
