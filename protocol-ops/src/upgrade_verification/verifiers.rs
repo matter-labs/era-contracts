@@ -18,7 +18,6 @@ use crate::{
             address_verifier::AddressVerifier,
             apply_l2_to_l1_alias,
             bytecode_verifier::BytecodeVerifier,
-            fee_param_verifier::FeeParamVerifier,
             get_contents_from_github,
             network_verifier::{Bridgehub as BridgehubContract, NetworkVerifier},
             repo_relative_path,
@@ -39,7 +38,10 @@ pub(crate) struct Verifiers {
     pub bytecode_verifier: BytecodeVerifier,
     pub network_verifier: NetworkVerifier,
     pub zksync_os_genesis_config: GenesisConfig,
-    pub fee_param_verifier: FeeParamVerifier,
+    /// Era chain id from the env's upgrade input TOML. Consumed only by the
+    /// PUH/Guardians checks (`ERA_CHAIN_ID` constructor arg and getter — the
+    /// real ABI of the external zk-governance contracts). The L1AssetRouter no
+    /// longer exposes an Era chain id, so no router wiring check reads this.
     pub era_chain_id: u64,
     pub expected_l1_chain_id: u64,
     pub zk_token_asset_id: FixedBytes<32>,
@@ -59,6 +61,35 @@ impl GenesisConfigKind {
 }
 
 impl Verifiers {
+    #[cfg(test)]
+    pub(crate) fn offline_v34() -> Self {
+        Self {
+            env: VerifyUpgradeEnv::Testnet,
+            bridgehub_address: Address::ZERO,
+            bridgehub_owner: Address::ZERO,
+            address_verifier: AddressVerifier {
+                address_to_name: Default::default(),
+                name_to_address: Default::default(),
+            },
+            bytecode_verifier: BytecodeVerifier::init_from_local().unwrap(),
+            network_verifier: NetworkVerifier {
+                l1_provider: alloy::providers::RootProvider::new_http(
+                    "http://127.0.0.1:1".parse().unwrap(),
+                ),
+                l1_chain_id: 1,
+                create2_known_bytecodes: Default::default(),
+                create2_constructor_params: Default::default(),
+            },
+            zksync_os_genesis_config: GenesisConfig::init_v33_from_local(
+                GenesisConfigKind::ZksyncOs,
+            )
+            .unwrap(),
+            era_chain_id: 0,
+            expected_l1_chain_id: 1,
+            zk_token_asset_id: FixedBytes::ZERO,
+        }
+    }
+
     /// Creates a v33 verifier context from the single ecosystem TOML.
     #[allow(clippy::too_many_arguments)]
     pub async fn new_v33(
@@ -92,10 +123,8 @@ impl Verifiers {
         )?;
         let bytecode_verifier =
             BytecodeVerifier::init_v33(contracts_commit, zk_governance_commit).await?;
-        let network_verifier = NetworkVerifier::new_v33(l1_rpc.into(), era_chain_id).await?;
-        let fee_param_verifier =
-            FeeParamVerifier::safe_init(&bridgehub_address, &network_verifier, contracts_commit)
-                .await?;
+        let network_verifier = NetworkVerifier::new_v33(l1_rpc.into()).await?;
+
         // `Bridgehub.owner()` is the L1 governance executor (the PUH proxy on
         // PUH-governed envs). It is the authoritative source for the
         // `aliased_protocol_upgrade_handler_proxy` value consumed by the
@@ -135,7 +164,6 @@ impl Verifiers {
             bytecode_verifier,
             network_verifier,
             zksync_os_genesis_config,
-            fee_param_verifier,
             era_chain_id,
             expected_l1_chain_id,
             zk_token_asset_id,
@@ -152,9 +180,8 @@ impl Verifiers {
 #[derive(Debug, Clone, Deserialize)]
 pub struct GenesisConfig {
     pub genesis_root: String,
-    // `genesis_rollup_leaf_index` and `genesis_batch_commitment` are not read:
-    // only an Era CTM's chain-creation params carried them, and ZKsync OS
-    // pins both to constants (0 and bytes32(1)) checked in stage 1.
+    pub protocol_semantic_version:
+        crate::upgrade_verification::versions::v33::elements::protocol_version::ProtocolVersion,
 }
 
 impl GenesisConfig {
@@ -254,39 +281,6 @@ impl VerificationResult {
                     Location::caller()
                 ));
                 false
-            }
-        }
-    }
-
-    #[track_caller]
-    pub(crate) fn expect_zk_bytecode(
-        &mut self,
-        verifiers: &Verifiers,
-        bytecode_hash: &FixedBytes<32>,
-        expected: &str,
-    ) {
-        match verifiers
-            .bytecode_verifier
-            .zk_bytecode_hash_to_file(bytecode_hash)
-        {
-            Some(file_name) if file_name == expected => {
-                // All good.
-            }
-            Some(file_name) => {
-                self.report_error(&format!(
-                    "Expected bytecode {}, got {} at {}",
-                    expected,
-                    file_name,
-                    Location::caller()
-                ));
-            }
-            None => {
-                self.report_error(&format!(
-                    "Cannot verify bytecode hash: {} - expected {} at {}",
-                    bytecode_hash,
-                    expected,
-                    Location::caller()
-                ));
             }
         }
     }

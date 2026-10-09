@@ -1784,7 +1784,7 @@ dependencies = [
 [[package]]
 name = "blake2s_u32"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-airbender-private?branch=di%2Ffix%2F87680-fri-fix-dev#af42767a2835411ba18a0f45a4e435d692faa8bf"
+source = "git+https://github.com/matter-labs/zksync-airbender?rev=af42767a2835411ba18a0f45a4e435d692faa8bf#af42767a2835411ba18a0f45a4e435d692faa8bf"
 dependencies = [
  "unroll",
 ]
@@ -2055,7 +2055,7 @@ dependencies = [
 [[package]]
 name = "common_constants"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-airbender-private?branch=di%2Ffix%2F87680-fri-fix-dev#af42767a2835411ba18a0f45a4e435d692faa8bf"
+source = "git+https://github.com/matter-labs/zksync-airbender?rev=af42767a2835411ba18a0f45a4e435d692faa8bf#af42767a2835411ba18a0f45a4e435d692faa8bf"
 dependencies = [
  "seq-macro",
 ]
@@ -2260,7 +2260,7 @@ dependencies = [
 [[package]]
 name = "cs"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-airbender-private?branch=di%2Ffix%2F87680-fri-fix-dev#af42767a2835411ba18a0f45a4e435d692faa8bf"
+source = "git+https://github.com/matter-labs/zksync-airbender?rev=af42767a2835411ba18a0f45a4e435d692faa8bf#af42767a2835411ba18a0f45a4e435d692faa8bf"
 dependencies = [
  "common_constants",
  "field",
@@ -2616,7 +2616,7 @@ dependencies = [
 [[package]]
 name = "field"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-airbender-private?branch=di%2Ffix%2F87680-fri-fix-dev#af42767a2835411ba18a0f45a4e435d692faa8bf"
+source = "git+https://github.com/matter-labs/zksync-airbender?rev=af42767a2835411ba18a0f45a4e435d692faa8bf#af42767a2835411ba18a0f45a4e435d692faa8bf"
 dependencies = [
  "rand 0.9.5",
  "seq-macro",
@@ -4593,7 +4593,7 @@ checksum = "68b59d645e392e041ad18f5e529ed13242d8405c66bb192f59703ea2137017d0"
 [[package]]
 name = "riscv_transpiler"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-airbender-private?branch=di%2Ffix%2F87680-fri-fix-dev#af42767a2835411ba18a0f45a4e435d692faa8bf"
+source = "git+https://github.com/matter-labs/zksync-airbender?rev=af42767a2835411ba18a0f45a4e435d692faa8bf#af42767a2835411ba18a0f45a4e435d692faa8bf"
 dependencies = [
  "blake2s_u32",
  "capstone",
@@ -6226,7 +6226,7 @@ checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
 [[package]]
 name = "worker"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-airbender-private?branch=di%2Ffix%2F87680-fri-fix-dev#af42767a2835411ba18a0f45a4e435d692faa8bf"
+source = "git+https://github.com/matter-labs/zksync-airbender?rev=af42767a2835411ba18a0f45a4e435d692faa8bf#af42767a2835411ba18a0f45a4e435d692faa8bf"
 dependencies = [
  "num_cpus",
  "rayon",

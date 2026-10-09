@@ -10,14 +10,13 @@ import {
     ZKsyncOSMaxTxGasLimitTooHigh,
     ZKsyncOSMaxTxGasLimitTooLow
 } from "contracts/common/L1ContractErrors.sol";
-import {NotSettlementLayer, NotZKsyncOS} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {NotSettlementLayer} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 contract SetZKsyncOSChainConfigTest is AdminTest {
     event NewZKsyncOSMaxTxGasLimit(uint64 oldMaxTxGasLimit, uint64 newMaxTxGasLimit);
 
     function setUp() public override {
         super.setUp();
-        utilsFacet.util_setZksyncOS(true);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -51,14 +50,6 @@ contract SetZKsyncOSChainConfigTest is AdminTest {
         assertEq(utilsFacet.util_getZKsyncOSMaxTxGasLimit(), ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT);
     }
 
-    function test_setZKsyncOSMaxTxGasLimit_revertWhen_notZKsyncOS() public {
-        utilsFacet.util_setZksyncOS(false);
-
-        vm.startPrank(utilsFacet.util_getAdmin());
-        vm.expectRevert(NotZKsyncOS.selector);
-        adminFacet.setZKsyncOSMaxTxGasLimit(ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT);
-    }
-
     function test_setZKsyncOSMaxTxGasLimit_revertWhen_notSettlementLayer() public {
         utilsFacet.util_setSettlementLayer(makeAddr("settlementLayer"));
 
@@ -80,7 +71,6 @@ contract SetZKsyncOSChainConfigTest is AdminTest {
         uint64 newMaxTxGasLimit = ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT * 2;
 
         // The old value reported is the effective one: the default, since it was never set.
-        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(adminFacet));
         emit NewZKsyncOSMaxTxGasLimit(ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT, newMaxTxGasLimit);
 

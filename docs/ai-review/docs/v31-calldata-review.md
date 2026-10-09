@@ -1,11 +1,21 @@
 # Manual review procedure for v31 calldata
 
+> **Historical (v31 ceremony).** This procedure describes the v31 calldata and its dual-CTM
+> (EraVM + ZKsync OS) shape. The current release is ZKsync OS only: `_isZKsyncOS`,
+> `l2TokenProxyBytecodeHash`, `IComplexUpgrader.forceDeployAndUpgrade`, `L2NativeTokenVaultZKOS`,
+> `[ctms.era]` and the router's `ERA_CHAIN_ID` referenced below no longer exist. Use it only to
+> re-review v31-era packages; for current packages follow `protocol-ops verify-upgrade` output.
+> The Gateway sections below (legacy-Gateway decommission, new-Gateway bring-up, `[new_gateway]`)
+> are historical too: v33 deploys no Gateway, and the Gateway ceremony tooling and PUVT checks were
+> removed (EVM-1689).
+
 ## Relevant files
 
 - `protocol-ops/src/commands/ecosystem/verify_upgrade.rs` - PUVT entry point.
 - `protocol-ops/src/upgrade_verification/` - PUVT calldata and state verifiers.
 - `protocol-ops/README.md` - current PUVT build and run commands.
-- `l1-contracts/test/anvil-interop/regen-upgrade-calldata.sh` - stage calldata regeneration, replay, and PUVT flow.
+- `l1-contracts/test/anvil-interop/run-fork-upgrade-test.ts` - stage calldata regeneration, replay, and PUVT flow
+  (`FORK_ENV_PRESET=stage`; replaces the removed `regen-and-verify-stage.sh` wrapper).
 - `l1-contracts/deploy-scripts/upgrade/v31/` - v31 upgrade script entry points.
 - `l1-contracts/deploy-scripts/upgrade/default-upgrade/` - shared v31 upgrade payload construction.
 - `l1-contracts/contracts/upgrades/` - governance and L2 upgrade structs used for decoding.
@@ -989,8 +999,8 @@ cast calldata-decode "registerLegacyToken(bytes32)" <call_data>
 Use these only for Sepolia stage review. They are repo-local anchors in the
 reviewed commit.
 
-- stage generation and PUVT replay script:
-  `l1-contracts/test/anvil-interop/regen-upgrade-calldata.sh`
+- stage generation and PUVT replay harness:
+  `l1-contracts/test/anvil-interop/run-fork-upgrade-test.ts` with `FORK_ENV_PRESET=stage`
 - stage v31 input:
   `l1-contracts/upgrade-envs/v0.31.0-interopB/stage.toml`
 - stage permanent values:

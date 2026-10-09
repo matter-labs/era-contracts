@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.28;
 
-// solhint-disable gas-custom-errors, reason-string
-
 import {IL1DAValidator, L1DAValidatorOutput} from "../../IL1DAValidator.sol";
 import {IAvailBridge} from "./IAvailBridge.sol";
 import {AvailAttestationLib} from "./AvailAttestationLib.sol";

@@ -7,7 +7,7 @@
 
 use alloy::network::Ethereum;
 use alloy::primitives::{Address, U256};
-use alloy::providers::{ProviderBuilder, RootProvider};
+use alloy::providers::{Provider, ProviderBuilder, RootProvider};
 use anyhow::Context;
 
 use crate::common::abi::{BridgehubAbi, IChainTypeManagerAbi, ZkChainAbi};
@@ -142,7 +142,7 @@ pub async fn discover_all_ctms(
 
 /// Resolve `ctm.L1_BYTECODES_SUPPLIER()` → bytecodes supplier address.
 ///
-/// This getter is on the concrete `ChainTypeManagerBase` but not in the
+/// This getter is on the concrete `ChainTypeManager` but not in the
 /// `IChainTypeManager` interface; we use a minimal inline sol! binding.
 pub async fn resolve_bytecodes_supplier(
     l1_rpc_url: &str,
@@ -156,39 +156,6 @@ pub async fn resolve_bytecodes_supplier(
         .await
         .context("ctm.L1_BYTECODES_SUPPLIER() call failed")?;
     ensure_nonzero(addr, "ctm.L1_BYTECODES_SUPPLIER()")
-}
-
-/// Resolve `bridgehub.settlementLayer(chainId)` → gateway chain ID.
-///
-/// Returns the chain ID of the gateway the given chain settles on, or an error
-/// if the chain settles on L1 (i.e. `settlementLayer == L1_CHAIN_ID` or 0).
-pub async fn resolve_settlement_layer(
-    l1_rpc_url: &str,
-    bridgehub: Address,
-    chain_id: u64,
-) -> anyhow::Result<u64> {
-    let p = provider(l1_rpc_url)?;
-    let bh = BridgehubAbi::new(bridgehub, p);
-    let l1_chain_id = u64::try_from(
-        bh.L1_CHAIN_ID()
-            .call()
-            .await
-            .context("bridgehub.L1_CHAIN_ID() call failed")?,
-    )
-    .context("L1 chain ID overflow")?;
-    let sl = u64::try_from(
-        bh.settlementLayer(U256::from(chain_id))
-            .call()
-            .await
-            .context("bridgehub.settlementLayer() call failed")?,
-    )
-    .context("settlement layer chain ID overflow")?;
-    anyhow::ensure!(
-        sl != 0 && sl != l1_chain_id,
-        "chain {chain_id} settles on L1 (settlementLayer={sl}, L1_CHAIN_ID={l1_chain_id}) — \
-         not migrated to a gateway"
-    );
-    Ok(sl)
 }
 
 /// Resolve `bridgehub.owner()` → governance contract address.
@@ -226,6 +193,16 @@ pub async fn resolve_chain_admin_owner(
         .await
         .with_context(|| format!("ChainAdmin({admin:#x}).owner() call failed"))?;
     ensure_nonzero(eoa, "ChainAdmin.owner()")
+}
+
+/// Resolve `Ownable(target).owner()` for any OZ `Ownable` (`BridgehubAbi` carries the shared `owner()` selector).
+pub async fn resolve_ownable_owner(l1_rpc_url: &str, target: Address) -> anyhow::Result<Address> {
+    let owner = BridgehubAbi::new(target, provider(l1_rpc_url)?)
+        .owner()
+        .call()
+        .await
+        .with_context(|| format!("Ownable({target:#x}).owner() call failed"))?;
+    ensure_nonzero(owner, "Ownable.owner()")
 }
 
 /// Resolve `AccessControlDefaultAdminRules.defaultAdmin()` for the ACR-backed
@@ -358,35 +335,23 @@ pub async fn resolve_rollup_da_manager(
     ensure_nonzero(manager, "zkChain.getRollupDAManager()")
 }
 
-/// Resolve `ctm.isZKsyncOS()` → bool.
-/// Resolve the VM a CTM's chains run, so callers do not have to be told which one they are on.
-pub async fn resolve_vm_type(
-    l1_rpc_url: &str,
-    ctm_proxy: Address,
-) -> anyhow::Result<crate::types::VMOption> {
-    let is_zksync_os = resolve_is_zksync_os(l1_rpc_url, ctm_proxy)
-        .await
-        .context("Failed to resolve isZKsyncOS from CTM")?;
-    Ok(if is_zksync_os {
-        crate::types::VMOption::ZKSyncOsVM
-    } else {
-        crate::types::VMOption::EraVM
-    })
-}
-
-pub async fn resolve_is_zksync_os(l1_rpc_url: &str, ctm_proxy: Address) -> anyhow::Result<bool> {
-    let ctm = IChainTypeManagerAbi::new(ctm_proxy, provider(l1_rpc_url)?);
-    ctm.isZKsyncOS()
-        .call()
-        .await
-        .context("ctm.isZKsyncOS() call failed")
-}
-
-/// Resolve whether the current verifier is a testnet verifier by querying
-/// `IS_TESTNET_VERIFIER()` on the verifier contract.
+/// Assert that the CTM at `ctm_proxy` is a supported ZKsync OS CTM.
 ///
-/// Returns `false` if the verifier doesn't expose this constant (production
-/// verifiers or older deployments).
+/// This is the single gate that keeps non-OS CTMs out of every protocol-ops command. Pre-v31
+/// CTMs (the EraVM ones among them) do not expose `isZKsyncOS()` at all, so the call reverts
+/// with empty data; report that as "unsupported CTM" instead of a bare RPC failure.
+pub async fn ensure_supported_os_ctm(l1_rpc_url: &str, ctm_proxy: Address) -> anyhow::Result<()> {
+    let ctm = IChainTypeManagerAbi::new(ctm_proxy, provider(l1_rpc_url)?);
+    match ctm.isZKsyncOS().call().await {
+        Ok(true) => Ok(()),
+        Ok(false) => anyhow::bail!("CTM {ctm_proxy:#x} is not a ZKsync OS CTM"),
+        Err(err) => anyhow::bail!(
+            "CTM {ctm_proxy:#x} is not a supported ZKsync OS CTM: `isZKsyncOS()` reverted or is \
+             not exposed (pre-v31 CTMs, including EraVM ones, lack it). Underlying error: {err}"
+        ),
+    }
+}
+
 /// Resolve `chain.getPubdataPricingMode()` — `Rollup` (0) or `Validium` (1). Available on every
 /// version of the diamond, unlike the pubdata-content getter.
 pub async fn resolve_pubdata_pricing_mode(
@@ -434,6 +399,12 @@ pub async fn resolve_ctm_minor_protocol_version(
     Ok(minor.to::<u64>())
 }
 
+/// Resolve whether the current verifier is a testnet verifier by querying
+/// `isTestnetVerifier()` (v34+) or the legacy `IS_TESTNET_VERIFIER()` constant
+/// (pre-v34 testnet verifiers) on the verifier contract.
+///
+/// Returns `false` if the verifier exposes neither (a pre-v34 production
+/// verifier).
 pub async fn resolve_is_testnet_verifier(
     l1_rpc_url: &str,
     ctm_proxy: Address,
@@ -455,11 +426,22 @@ pub async fn resolve_is_testnet_verifier(
         .context("ctm.protocolVersionVerifier() call failed")?;
     ensure_nonzero(verifier, "ctm.protocolVersionVerifier()")?;
 
+    let code = p
+        .get_code_at(verifier)
+        .await
+        .context("get_code(verifier) failed")?;
+    anyhow::ensure!(!code.is_empty(), "verifier {verifier} has no code");
+
     let verifier_contract = ITestnetVerifier::new(verifier, p);
-    match verifier_contract.IS_TESTNET_VERIFIER().call().await {
+    match verifier_contract.isTestnetVerifier().call().await {
         Ok(is_testnet) => Ok(is_testnet),
-        // Older verifiers don't expose IS_TESTNET_VERIFIER — treat as production.
-        Err(_) => Ok(false),
+        // Pre-v34 verifiers don't have the camelCase getter; testnet ones exported the flag as
+        // the legacy IS_TESTNET_VERIFIER constant instead.
+        Err(_) => match verifier_contract.IS_TESTNET_VERIFIER().call().await {
+            Ok(is_testnet) => Ok(is_testnet),
+            // Neither name answers — a pre-v34 production verifier.
+            Err(_) => Ok(false),
+        },
     }
 }
 

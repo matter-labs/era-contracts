@@ -397,30 +397,13 @@
   },
   {
     "type": "error",
-    "name": "GasPerPubdataMismatch",
+    "name": "FactoryDepsNotSupported",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "LengthIsNotDivisibleBy32",
-    "inputs": [
-      {
-        "name": "length",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "MalformedBytecode",
-    "inputs": [
-      {
-        "name": "",
-        "type": "uint8",
-        "internalType": "enum BytecodeError"
-      }
-    ]
+    "name": "GasPerPubdataMismatch",
+    "inputs": []
   },
   {
     "type": "error",
@@ -487,22 +470,12 @@
   },
   {
     "type": "error",
-    "name": "TooManyFactoryDeps",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "TooMuchGas",
     "inputs": []
   },
   {
     "type": "error",
     "name": "TransactionNotAllowed",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "TxnBodyGasLimitNotEnoughGas",
     "inputs": []
   },
   {

@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-// solhint-disable no-console, gas-custom-errors
-
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
@@ -10,27 +8,18 @@ import {Utils} from "../utils/Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
-import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
-import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IRollupDAManager} from "../interfaces/IRollupDAManager.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";
 
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-
-import {Governance} from "contracts/governance/Governance.sol";
-import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
-import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
@@ -38,9 +27,6 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
 import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
-import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
-import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
-import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {CTMDeployedAddresses, Config, DeployCTMUtils} from "./DeployCTMUtils.s.sol";
@@ -52,6 +38,7 @@ import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2G
 import {IDeployCTM} from "contracts/script-interfaces/IDeployCTM.sol";
 import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
 import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     using stdToml for string;
@@ -71,29 +58,33 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     function runWithBridgehub(address bridgehub, bool reuseGovAndAdmin) public {
         console.log("Deploying CTM related contracts");
-        runInner(
-            "/script-config/config-deploy-ctm.toml",
-            "/script-out/output-deploy-ctm.toml",
-            bridgehub,
-            reuseGovAndAdmin,
-            false
-        );
+        runInner({
+            inputPath: "/script-config/config-deploy-ctm.toml",
+            outputPath: "/script-out/output-deploy-ctm.toml",
+            bridgehub: bridgehub,
+            reuseGovAndAdmin: reuseGovAndAdmin
+        });
     }
 
-    function runForTest(address bridgehub, bool skipL1Deployments) public {
-        _runConfiguredTest(bridgehub, skipL1Deployments, true);
+    function runForTest(address bridgehub) public {
+        _runConfiguredTest(bridgehub, true);
     }
 
     /// @notice Like runForTest but skips saveDiamondSelectors().
-    function runForAnvilTest(address bridgehub, bool skipL1Deployments) public {
-        _runConfiguredTest(bridgehub, skipL1Deployments, false);
+    function runForAnvilTest(address bridgehub) public {
+        _runConfiguredTest(bridgehub, false);
     }
 
-    function _runConfiguredTest(address bridgehub, bool skipL1Deployments, bool shouldSaveSelectors) internal {
+    function _runConfiguredTest(address bridgehub, bool shouldSaveSelectors) internal {
         if (shouldSaveSelectors) {
             saveDiamondSelectors();
         }
-        runInner(vm.envString("CTM_CONFIG"), vm.envString("CTM_OUTPUT"), bridgehub, false, skipL1Deployments);
+        runInner({
+            inputPath: vm.envString("CTM_CONFIG"),
+            outputPath: vm.envString("CTM_OUTPUT"),
+            bridgehub: bridgehub,
+            reuseGovAndAdmin: false
+        });
     }
 
     function getAddresses() public view virtual returns (CTMDeployedAddresses memory) {
@@ -113,8 +104,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         string memory inputPath,
         string memory outputPath,
         address bridgehub,
-        bool reuseGovAndAdmin,
-        bool skipL1Deployments
+        bool reuseGovAndAdmin
     ) public {
         string memory root = vm.projectRoot();
         inputPath = string.concat(root, inputPath);
@@ -124,26 +114,22 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         // clobber each other's batches.
         _blakeBatchTmpFile = string.concat(outputPath, ".blake-batch.txt");
 
-        initializeConfig(inputPath, bridgehub);
+        initializeConfig(inputPath);
 
         console.log("Initializing core contracts from BH");
-        IL1Bridgehub bridgehubProxy = IL1Bridgehub(bridgehub);
         // Populate discovered addresses via inspector
         coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehub);
-        address assetRouterAddr = address(bridgehubProxy.assetRouter());
-        config.eraChainId = AddressIntrospector.getEraChainId(assetRouterAddr);
 
         if (reuseGovAndAdmin) {
             ctmAddresses.admin.governance = coreAddresses.shared.governance;
             ctmAddresses.chainAdmin = coreAddresses.shared.bridgehubAdmin;
             ctmAddresses.admin.transparentProxyAdmin = coreAddresses.shared.transparentProxyAdmin;
         } else {
-            (ctmAddresses.admin.governance) = deploySimpleContract("Governance", false);
-            (ctmAddresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable", false);
+            (ctmAddresses.admin.governance) = deploySimpleContract("Governance");
+            (ctmAddresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable");
             ctmAddresses.admin.transparentProxyAdmin = deployWithCreate2AndOwner(
                 "ProxyAdmin",
-                ctmAddresses.admin.governance,
-                false
+                ctmAddresses.admin.governance
             );
         }
 
@@ -154,29 +140,29 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         (
             ctmAddresses.stateTransition.implementations.bytecodesSupplier,
             ctmAddresses.stateTransition.proxies.bytecodesSupplier
-        ) = deployTuppWithContract("BytecodesSupplier", false);
+        ) = deployTuppWithContract("BytecodesSupplier");
 
         deployVerifiers();
 
-        // The CTM stores this contract and runs it for upgrades that need no custom upgrade logic — e.g.
-        // the verifier-only ones — so it has to match the VM of the ecosystem being deployed.
-        (, string memory defaultUpgradeName) = DeployCTML1OrGateway.resolve(
-            config.isZKsyncOS,
-            CTMContract.DefaultUpgrade
-        );
-        (ctmAddresses.stateTransition.defaultUpgrade) = deploySimpleContract(defaultUpgradeName, false);
-        (ctmAddresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
+        // The CTM keeps this implementation and reuses it for every upgrade that needs no bespoke
+        // logic — a verifier or VK swap, say — so it has to be the reusable one. A one-shot migration
+        // like `V34UpgradeZKsyncOS` would be replayed by those later upgrades.
+        (ctmAddresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgradeZKsyncOS");
+        (ctmAddresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade");
 
         // The single owner chainAdmin does not have a separate control restriction contract.
         // We set to it to zero explicitly so that it is clear to the reader.
         ctmAddresses.admin.accessControlRestrictionAddress = address(0);
 
-        (, ctmAddresses.stateTransition.proxies.validatorTimelock) = deployTuppWithContract("ValidatorTimelock", false);
+        // `MultisigCommitter` derives from `ValidatorTimelock` and the v31 upgrade installs it as the
+        // validator implementation, so deploying the plain timelock here would leave a fresh ecosystem
+        // without the multisig-commit support an upgraded one has.
+        (, ctmAddresses.stateTransition.proxies.validatorTimelock) = deployTuppWithContract("MultisigCommitter");
 
         (
             ctmAddresses.stateTransition.implementations.permissionlessValidator,
             ctmAddresses.stateTransition.proxies.permissionlessValidator
-        ) = deployTuppWithContract("PermissionlessValidator", false);
+        ) = deployTuppWithContract("PermissionlessValidator");
 
         (
             ctmAddresses.stateTransition.implementations.serverNotifier,
@@ -186,14 +172,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         initializeGeneratedData();
 
         deployStateTransitionDiamondFacets();
-        (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(
-            config.isZKsyncOS,
-            CTMContract.ChainTypeManager
-        );
+        (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(CTMContract.ChainTypeManager);
         (
             ctmAddresses.stateTransition.implementations.chainTypeManager,
             ctmAddresses.stateTransition.proxies.chainTypeManager
-        ) = deployTuppWithContract(ctmContractName, false);
+        ) = deployTuppWithContract(ctmContractName);
 
         setChainTypeManagerInServerNotifier();
 
@@ -220,18 +203,65 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function deployVerifiers() internal {
-        (, string memory plonkName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.VerifierPlonk);
-        (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(
-            config.isZKsyncOS,
-            config.testnetVerifier
-        );
+        (, string memory plonkName) = DeployCTML1OrGateway.resolve(CTMContract.VerifierPlonk);
 
-        if (!config.isZKsyncOS) {
-            (, string memory fflonkName) = DeployCTML1OrGateway.resolve(false, CTMContract.VerifierFflonk);
-            ctmAddresses.stateTransition.verifiers.verifierFflonk = deploySimpleContract(fflonkName, false);
+        ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract(plonkName);
+
+        delete ctmAddresses.multiProof;
+        (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(config.testnetVerifier);
+        address airbenderVerifier = deploySimpleContract(verifierName);
+        if (config.multiProof.enabled) {
+            deployMultiProofVerifiers(airbenderVerifier);
+        } else {
+            ctmAddresses.stateTransition.verifiers.verifier = airbenderVerifier;
         }
-        ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract(plonkName, false);
-        ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName, false);
+    }
+
+    /// @notice Deploys the multiproof verifier and its ZiSK components.
+    /// @param _airbenderVerifier Deployed Airbender component.
+    function deployMultiProofVerifiers(address _airbenderVerifier) internal {
+        // ZiskVerifier wraps a pre-deployed standalone snarkJS Plonk verifier
+        // (see verifiers/README.md for its generation and deployment) passed
+        // in by address.
+        require(
+            config.multiProof.ziskPlonkVerifierAddr != address(0),
+            "set zisk_plonk_verifier_addr to the deployed snarkJS Plonk verifier"
+        );
+        // Deploying it is a manual step outside this script, so the address it
+        // leaves behind is checked here rather than at the first settlement.
+        require(
+            config.multiProof.ziskPlonkVerifierAddr.code.length > 0,
+            "zisk_plonk_verifier_addr holds no code: deploy the snarkJS Plonk verifier first"
+        );
+        // Single-VK lane: every proof, single batch or many, verifies through
+        // the range verifier, which reconstructs the ZiSK public values from
+        // its own pinned VKs. It defaults to the ZiskVerifier deployed below;
+        // an operator may override it with a separately deployed aggregator
+        // verifier through zisk_range_verifier_addr, which must already hold
+        // code as well.
+        if (config.multiProof.ziskRangeVerifierAddr != address(0)) {
+            require(
+                config.multiProof.ziskRangeVerifierAddr.code.length > 0,
+                "zisk_range_verifier_addr holds no code: deploy the range verifier first"
+            );
+        }
+        ctmAddresses.multiProof.airbenderVerifier = _airbenderVerifier;
+        ctmAddresses.multiProof.ziskVerifier = config.multiProof.ziskRangeVerifierAddr;
+        if (ctmAddresses.multiProof.ziskVerifier == address(0)) {
+            ctmAddresses.multiProof.ziskVerifier = deploySimpleContract("ZiskVerifier");
+        }
+        if (config.testnetVerifier) {
+            ctmAddresses.multiProof.ziskTestnetVerifier = deploySimpleContract("ZiskTestnetVerifier");
+        }
+        ctmAddresses.multiProof.multiProofVerifier = deploySimpleContract("MultiProofVerifier");
+
+        if (config.testnetVerifier) {
+            // Testnet: wrap MultiProofVerifier with MultiProofTestnetVerifier for mock proof support.
+            ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract("MultiProofTestnetVerifier");
+        } else {
+            // Prod: use MultiProofVerifier directly.
+            ctmAddresses.stateTransition.verifiers.verifier = ctmAddresses.multiProof.multiProofVerifier;
+        }
     }
 
     function setChainTypeManagerInServerNotifier() internal {
@@ -249,31 +279,25 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function deployEIP7702Checker() internal {
-        ctmAddresses.admin.eip7702Checker = deploySimpleContract("EIP7702Checker", false);
+        ctmAddresses.admin.eip7702Checker = deploySimpleContract("EIP7702Checker");
     }
 
     function deployDAValidators() internal {
         ctmAddresses.daAddresses.daContracts.rollupDAManager = deployWithCreate2AndOwner(
             "RollupDAManager",
-            getDeployerAddress(),
-            false
+            getDeployerAddress()
         );
         updateRollupDAManager();
 
         // This contract is located in the `da-contracts` folder, we output it the same way for consistency/ease of use.
-        ctmAddresses.daAddresses.daContracts.rollupSLDAValidator = deploySimpleContract("RollupL1DAValidator", false);
-        if (config.isZKsyncOS) {
-            ctmAddresses.daAddresses.l1BlobsDAValidatorZKsyncOS = deploySimpleContract(
-                "BlobsL1DAValidatorZKsyncOS",
-                false
-            );
-        }
+        ctmAddresses.daAddresses.daContracts.rollupSLDAValidator = deploySimpleContract("RollupL1DAValidator");
+        ctmAddresses.daAddresses.l1BlobsDAValidatorZKsyncOS = deploySimpleContract("BlobsL1DAValidatorZKsyncOS");
 
-        ctmAddresses.daAddresses.daContracts.validiumDAValidator = deploySimpleContract("ValidiumL1DAValidator", false);
+        ctmAddresses.daAddresses.daContracts.validiumDAValidator = deploySimpleContract("ValidiumL1DAValidator");
 
         if (config.contracts.availL1DAValidator == address(0)) {
-            ctmAddresses.daAddresses.availBridge = deploySimpleContract("DummyAvailBridge", false);
-            ctmAddresses.daAddresses.availL1DAValidator = deploySimpleContract("AvailL1DAValidator", false);
+            ctmAddresses.daAddresses.availBridge = deploySimpleContract("DummyAvailBridge");
+            ctmAddresses.daAddresses.availL1DAValidator = deploySimpleContract("AvailL1DAValidator");
         } else {
             ctmAddresses.daAddresses.availL1DAValidator = config.contracts.availL1DAValidator;
         }
@@ -284,13 +308,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             getRollupL2DACommitmentScheme(),
             true
         );
-        if (config.isZKsyncOS) {
-            rollupDAManager.updateDAPair(
-                ctmAddresses.daAddresses.l1BlobsDAValidatorZKsyncOS,
-                getRollupL2DACommitmentScheme(),
-                true
-            );
-        }
+        rollupDAManager.updateDAPair(
+            ctmAddresses.daAddresses.l1BlobsDAValidatorZKsyncOS,
+            L2DACommitmentScheme.BLOBS_ZKSYNC_OS,
+            true
+        );
         vm.stopBroadcast();
     }
 
@@ -325,11 +347,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function saveOutput(string memory outputPath) internal virtual {
-        string memory bridgehub = vm.serializeAddress(
-            "bridgehub",
-            "bridgehub_proxy_addr",
-            coreAddresses.bridgehub.proxies.bridgehub
-        );
+        vm.serializeAddress("bridgehub", "bridgehub_proxy_addr", coreAddresses.bridgehub.proxies.bridgehub);
         vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", coreAddresses.bridges.proxies.l1Nullifier);
         string memory bridges = vm.serializeAddress(
             "bridges",
@@ -343,6 +361,30 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             ctmAddresses.stateTransition.proxies.chainTypeManager
         );
         vm.serializeAddress("state_transition", "verifier_addr", ctmAddresses.stateTransition.verifiers.verifier);
+        if (ctmAddresses.multiProof.airbenderVerifier != address(0)) {
+            vm.serializeAddress(
+                "state_transition",
+                "airbender_verifier_addr",
+                ctmAddresses.multiProof.airbenderVerifier
+            );
+        }
+        if (ctmAddresses.multiProof.ziskVerifier != address(0)) {
+            vm.serializeAddress("state_transition", "zisk_verifier_addr", ctmAddresses.multiProof.ziskVerifier);
+        }
+        if (ctmAddresses.multiProof.ziskTestnetVerifier != address(0)) {
+            vm.serializeAddress(
+                "state_transition",
+                "zisk_testnet_verifier_addr",
+                ctmAddresses.multiProof.ziskTestnetVerifier
+            );
+        }
+        if (ctmAddresses.multiProof.multiProofVerifier != address(0)) {
+            vm.serializeAddress(
+                "state_transition",
+                "multi_proof_verifier_addr",
+                ctmAddresses.multiProof.multiProofVerifier
+            );
+        }
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", ctmAddresses.stateTransition.genesisUpgrade);
         vm.serializeAddress("state_transition", "default_upgrade_addr", ctmAddresses.stateTransition.defaultUpgrade);
         vm.serializeAddress("state_transition", "eip7702_checker_addr", ctmAddresses.admin.eip7702Checker);
@@ -399,13 +441,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             "no_da_validium_l1_validator_addr",
             ctmAddresses.daAddresses.daContracts.validiumDAValidator
         );
-        if (config.isZKsyncOS) {
-            vm.serializeAddress(
-                "deployed_addresses",
-                "blobs_zksync_os_l1_da_validator_addr",
-                ctmAddresses.daAddresses.l1BlobsDAValidatorZKsyncOS
-            );
-        }
+        vm.serializeAddress(
+            "deployed_addresses",
+            "blobs_zksync_os_l1_da_validator_addr",
+            ctmAddresses.daAddresses.l1BlobsDAValidatorZKsyncOS
+        );
         vm.serializeAddress(
             "deployed_addresses",
             "avail_l1_da_validator_addr",
@@ -417,21 +457,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             "chain_creation_params",
             "latest_protocol_version",
             config.contracts.chainCreationParams.latestProtocolVersion
-        );
-        vm.serializeBytes32(
-            "chain_creation_params",
-            "bootloader_hash",
-            config.contracts.chainCreationParams.bootloaderHash
-        );
-        vm.serializeBytes32(
-            "chain_creation_params",
-            "default_aa_hash",
-            config.contracts.chainCreationParams.defaultAAHash
-        );
-        vm.serializeBytes32(
-            "chain_creation_params",
-            "evm_emulator_hash",
-            config.contracts.chainCreationParams.evmEmulatorHash
         );
         vm.serializeBytes32("chain_creation_params", "genesis_root", config.contracts.chainCreationParams.genesisRoot);
         vm.serializeUint(
@@ -452,7 +477,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         vm.serializeAddress("root", "multicall3_addr", config.contracts.multicall3Addr);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "contracts", contracts);
-        vm.serializeBool("root", "is_zk_sync_os", config.isZKsyncOS);
         string memory toml = vm.serializeString("root", "contracts_config", contractsConfig);
         vm.writeToml(toml, outputPath);
     }
@@ -492,13 +516,12 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         bytes[10] memory bytecodes;
         for (uint256 i = 0; i < contracts.length; i++) {
-            (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(true, contracts[i]);
-            bytecodes[i] = BytecodeUtils.readDeployedBytecodeL1(true, fileName, contractName);
+            (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(contracts[i]);
+            bytecodes[i] = BytecodeUtils.readDeployedBytecodeL1(fileName, contractName);
             vm.writeLine(tmpFile, vm.toString(bytecodes[i]));
         }
         // Also add SystemContractProxy (used for proxy-upgrade bytecode info)
         bytes memory proxyBytecode = BytecodeUtils.readDeployedBytecodeL1(
-            true,
             "SystemContractProxy.sol",
             "SystemContractProxy"
         );
@@ -546,43 +569,29 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     function _getProxyUpgradeBytecodeInfo(
         string memory _fileName,
         string memory _contractName
-    ) private returns (bytes memory) {
-        if (config.isZKsyncOS) {
-            bytes memory implBytecode = BytecodeUtils.readDeployedBytecodeL1(true, _fileName, _contractName);
-            bytes memory proxyBytecode = BytecodeUtils.readDeployedBytecodeL1(
-                true,
-                "SystemContractProxy.sol",
-                "SystemContractProxy"
-            );
-            return abi.encode(_cachedZKOSBytecodeInfo(implBytecode), _cachedZKOSBytecodeInfo(proxyBytecode));
-        }
-        return CoreOnGatewayHelper.getBytecodeInfo(false, CoreContract.L2Bridgehub); // unreachable, but keeps compiler happy
+    ) private view returns (bytes memory) {
+        bytes memory implBytecode = BytecodeUtils.readDeployedBytecodeL1(_fileName, _contractName);
+        bytes memory proxyBytecode = BytecodeUtils.readDeployedBytecodeL1(
+            "SystemContractProxy.sol",
+            "SystemContractProxy"
+        );
+        return abi.encode(_cachedZKOSBytecodeInfo(implBytecode), _cachedZKOSBytecodeInfo(proxyBytecode));
     }
 
-    /// @dev Get bytecode info, using cached blake hashes for ZKsyncOS or CoreOnGatewayHelper for Era.
+    /// @dev Get bytecode info, using cached blake hashes.
     function _getBytecodeInfo(CoreContract _c) internal virtual returns (bytes memory) {
-        if (config.isZKsyncOS) {
-            (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(true, _c);
-            return _getProxyUpgradeBytecodeInfo(fileName, contractName);
-        }
-        return CoreOnGatewayHelper.getBytecodeInfo(false, _c);
+        (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(_c);
+        return _getProxyUpgradeBytecodeInfo(fileName, contractName);
     }
 
     function _buildForceDeploymentsData(
         address _governance
     ) internal virtual returns (FixedForceDeploymentsData memory data) {
-        if (config.isZKsyncOS) {
-            _precomputeBlakeHashes();
-        }
+        _precomputeBlakeHashes();
 
         data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
-            eraChainId: config.eraChainId,
             l1AssetRouter: coreAddresses.bridges.proxies.l1AssetRouter,
-            l2TokenProxyBytecodeHash: CoreOnGatewayHelper.getDeployedBytecodeHash(
-                config.isZKsyncOS,
-                CoreContract.BeaconProxy
-            ),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(_governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
             bridgehubBytecodeInfo: _getBytecodeInfo(CoreContract.L2Bridgehub),
@@ -608,8 +617,8 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     function deployServerNotifier() internal returns (address implementation, address proxy) {
         // We will not store the address of the ProxyAdmin as it is trivial to query if needed.
-        address ecosystemProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", ctmAddresses.chainAdmin, false);
-        (implementation, proxy) = deployTuppWithContractAndProxyAdmin("ServerNotifier", ecosystemProxyAdmin, false);
+        address ecosystemProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", ctmAddresses.chainAdmin);
+        (implementation, proxy) = deployTuppWithContractAndProxyAdmin("ServerNotifier", ecosystemProxyAdmin);
     }
 
     function saveDiamondSelectors() public {

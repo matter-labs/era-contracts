@@ -112,18 +112,21 @@ struct ZKChainStorage {
     address __DEPRECATED_allowList;
     /// @dev STORAGE SLOT: 20-22 (3 bytes32 fields)
     VerifierParams __DEPRECATED_verifierParams;
-    /// @notice Bytecode hash of bootloader program.
-    /// @dev Used as an input to zkp-circuit.
+    /// @dev Deprecated slot, retained to preserve the storage layout. Formerly `l2BootloaderBytecodeHash`
+    /// (EraVM bootloader bytecode hash, a zkp-circuit input); ZKsync OS chains have no bootloader.
+    /// No current path reads or writes it.
     /// @dev STORAGE SLOT: 23
-    bytes32 l2BootloaderBytecodeHash;
-    /// @notice Bytecode hash of default account (bytecode for EOA).
-    /// @dev Used as an input to zkp-circuit.
+    bytes32 __DEPRECATED_l2BootloaderBytecodeHash;
+    /// @dev Deprecated slot, retained to preserve the storage layout. Formerly `l2DefaultAccountBytecodeHash`
+    /// (EraVM default-account bytecode hash, a zkp-circuit input); ZKsync OS chains have no default account.
+    /// Same lifecycle as {__DEPRECATED_l2BootloaderBytecodeHash}.
     /// @dev STORAGE SLOT: 24
-    bytes32 l2DefaultAccountBytecodeHash;
-    /// @dev Indicates that the porter may be touched on L2 transactions.
-    /// @dev Used as an input to zkp-circuit.
+    bytes32 __DEPRECATED_l2DefaultAccountBytecodeHash;
+    /// @dev Deprecated slot, retained to preserve the storage layout. Formerly `zkPorterIsAvailable`
+    /// (whether the zkPorter shard could be touched on L2 transactions, a zkp-circuit input); zkPorter
+    /// never shipped and ZKsync OS has no such shard. The value was false on every deployed chain.
     /// @dev STORAGE SLOT: 25
-    bool zkPorterIsAvailable;
+    bool __DEPRECATED_zkPorterIsAvailable;
     /// @dev The maximum number of the L2 gas that a user can request for L1 -> L2 transactions
     /// @dev This is the maximum number of L2 gas that is available for the "body" of the transaction, i.e.
     /// without overhead for proving the batch.
@@ -220,16 +223,21 @@ struct ZKChainStorage {
     /// it does not enforce any other parameters, e.g. `pubdataPricingMode`
     /// @dev STORAGE SLOT: 57
     bool isPermanentRollup;
-    /// @notice Bytecode hash of evm emulator.
-    /// @dev Used as an input to zkp-circuit.
+    /// @dev Deprecated slot, retained to preserve the storage layout. Formerly `l2EvmEmulatorBytecodeHash`
+    /// (EraVM EVM-emulator bytecode hash, a zkp-circuit input); ZKsync OS chains have no EVM emulator.
+    /// Same lifecycle as {__DEPRECATED_l2BootloaderBytecodeHash}.
     /// @dev STORAGE SLOT: 58
-    bytes32 l2EvmEmulatorBytecodeHash;
-    /// @notice The precommitment for the latest uncommitted batch (i.e. totalBatchesCommitted + 1).
-    /// @dev Whenever the `totalBatchesCommitted` changes, this variable is reset to `DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH`
-    /// (the value of the constant can be found in Config.sol).
+    bytes32 __DEPRECATED_l2EvmEmulatorBytecodeHash;
+    /// @dev Deprecated slot, retained to preserve the storage layout. Formerly
+    /// `precommitmentForTheLatestBatch` — the rolling precommitment of the latest uncommitted
+    /// batch, an EraVM-only feature (ZKsync OS chains always rejected precommits). Deployed
+    /// chains hold the non-zero default sentinel `bytes32(uint256(1))` here; fresh chains no
+    /// longer initialize it, and nothing reads it.
     /// @dev STORAGE SLOT: 59
-    bytes32 precommitmentForTheLatestBatch;
-    /// @dev ZKsync OS flag, if `true` state transition is done with ZKsync OS, otherwise Era VM
+    bytes32 __DEPRECATED_precommitmentForTheLatestBatch;
+    /// @dev Whether the chain was initialized as ZKsync OS. Retained as compatibility state so
+    /// legacy Era chains continue to report `false` while ZKsync OS chains report `true`; current
+    /// runtime logic does not branch on this value.
     /// @dev STORAGE SLOT: 60 (packed: bool + enum + address — shares with l2DACommitmentScheme + __DEPRECATED_assetTracker)
     bool zksyncOS;
     /// @dev The scheme of L2 DA commitment. Different L1 validators may use different schemes.
@@ -269,8 +277,21 @@ struct ZKChainStorage {
     uint64 zksyncOSMaxTxGasLimit;
     /// @dev The pubdata content: whether the batch commits the full pubdata (`FULL_PUBDATA`) or only the mandatory
     /// L2->L1 log region (`LOGS_ONLY`). Orthogonal to `l2DACommitmentScheme` (the mechanism). Committed
-    /// into the ZKsync OS batch public input via the chain config hash (see `Executor`). ZKsync OS only.
+    /// into the ZKsync OS batch public input via `ZKChainBase._getZKsyncOSChainConfigHash`. ZKsync OS only.
     /// Permanent-rollup chains are locked to `FULL_PUBDATA` (see `Admin.setPubdataContent` / `makePermanentRollup`).
     /// @dev STORAGE SLOT: 68 (packed with baseTokenHasTotalSupply + zksyncOSMaxTxGasLimit)
     PubdataContent pubdataContent;
+    /// @dev Bit mask of the proof systems this chain does not require in order to settle. `0`, the value
+    /// every chain has until its admin writes it, requires all of them. A multi-proof verifier reads it off
+    /// the calling chain, since one verifier instance serves every chain of a protocol version.
+    /// @dev A ZKsync OS chain accepts only the `ProofSystem.Zisk` disable bit, so its Airbender lane can not be
+    /// switched off (see `Admin.setProofSystemStatus`).
+    /// @dev STORAGE SLOT: 68 (packed with baseTokenHasTotalSupply + zksyncOSMaxTxGasLimit + pubdataContent)
+    uint8 disabledProofSystems;
+    /// @dev See {protocol-docs/chain-config.md#l1-transaction-filtering}.
+    /// @dev STORAGE SLOT: 68 (packed after disabledProofSystems)
+    bool zksyncOSL1TxFilteringEnabled;
+    /// @dev See {protocol-docs/chain-config.md#large-contracts}.
+    /// @dev STORAGE SLOT: 68 (packed after zksyncOSL1TxFilteringEnabled)
+    bool zksyncOSLargeContractsEnabled;
 }

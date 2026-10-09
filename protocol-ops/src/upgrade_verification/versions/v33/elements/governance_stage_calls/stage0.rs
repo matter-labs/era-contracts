@@ -20,8 +20,10 @@
 //! [`verify_puh_immutables`] reads every immutable getter on the *new* PUH
 //! implementation and compares against either the current PUH (for "must-be-
 //! unchanged" immutables) or an expected artifact-derived address (for newly
-//! introduced immutables like `CHAIN_ASSET_HANDLER` and the per-flavor
-//! `ERA_CHAIN_TYPE_MANAGER` / `ZKSYNC_OS_CHAIN_TYPE_MANAGER`).
+//! introduced immutables like `CHAIN_ASSET_HANDLER` and
+//! `ZKSYNC_OS_CHAIN_TYPE_MANAGER`). The `ERA_CHAIN_TYPE_MANAGER` immutable
+//! is not checked — this OS-only build carries no `[ctms.era]` artifact to
+//! derive the expected value from.
 
 use alloy::{
     hex,
@@ -588,16 +590,6 @@ async fn verify_puh_immutables(
             )),
         }
     }
-
-    // v33 touches no Era CTM, so `ERA_CHAIN_TYPE_MANAGER` has no artifact
-    // entry to compare against and must simply survive the PUH redeploy
-    // unchanged.
-    compare_puh_shared_address(
-        result,
-        "PUH.ERA_CHAIN_TYPE_MANAGER()",
-        current_puh.ERA_CHAIN_TYPE_MANAGER().call().await,
-        new_impl.ERA_CHAIN_TYPE_MANAGER().call().await,
-    );
 
     if let Some(zkos_ctm) = artifact
         .ctms

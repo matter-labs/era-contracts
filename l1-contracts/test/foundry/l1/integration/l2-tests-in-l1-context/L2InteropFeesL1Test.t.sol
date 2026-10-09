@@ -2,10 +2,7 @@
 
 pragma solidity ^0.8.20;
 
-// solhint-disable gas-custom-errors
-
 import {Test} from "forge-std/Test.sol";
-import "forge-std/console.sol";
 
 import {SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {L2InteropFeesTestAbstract} from "../l2-tests-abstract/L2InteropFeesTestAbstract.t.sol";
@@ -47,9 +44,8 @@ contract L2InteropFeesL1Test is Test, SharedL2ContractL1Deployer, L2InteropFeesT
     }
 
     function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
+        string memory contractName
     ) internal virtual override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
-        return super.getInitializeCalldata(contractName, isZKBytecode);
+        return super.getInitializeCalldata(contractName);
     }
 }

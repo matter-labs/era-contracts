@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// solhint-disable no-console, gas-custom-errors
-
 import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {stdToml} from "forge-std/StdToml.sol";
@@ -19,9 +17,8 @@ import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
 
@@ -32,13 +29,10 @@ import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.so
 import {CTMDeployedAddresses} from "../../ctm/DeployCTMUtils.s.sol";
 
 import {BytecodePublisher, PublishFactoryDepsResult} from "../../utils/bytecode/BytecodePublisher.s.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {CoreContract} from "../../ecosystem/CoreContract.sol";
 import {CoreOnGatewayHelper} from "../../ecosystem/CoreOnGatewayHelper.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
-import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
 
@@ -60,31 +54,20 @@ interface IAdminPreV31 {
 contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     using stdToml for string;
 
-    uint256 internal constant ERA_TEST_CREATE_CHAIN_ID = 555;
     uint256 internal constant ZKSYNC_OS_TEST_CREATE_CHAIN_ID = 556;
 
-    // solhint-disable-next-line gas-struct-packing
     struct UpgradeDeployedAddresses {
         address upgradeTimer;
         address upgradeStageValidator;
     }
 
-    // solhint-disable-next-line gas-struct-packing
     struct AdditionalConfig {
         address ctm;
         uint256 oldProtocolVersion;
         address ecosystemAdminAddress;
         uint256 governanceUpgradeTimerInitialDelay;
-        bool hasPreV32IntrospectionOverride;
-        bool usePreV32IntrospectionOverride;
     }
 
-    // solhint-disable-next-line gas-struct-packing
-    struct GatewayConfig {
-        uint256 chainId;
-    }
-
-    // solhint-disable-next-line gas-struct-packing
     struct NewlyGeneratedData {
         bytes diamondCutData;
         bytes upgradeCutData;
@@ -106,7 +89,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         bytes32 create2FactorySalt;
         address ctmProxy;
         address bytecodesSupplier;
-        bool isZKsyncOS;
         /// @dev ZK token asset ID, used by `InteropCenter.initL2` for fixed-fee bundles.
         ///      MUST be non-zero — `InteropCenter.initL2` reverts otherwise, which would abort the
         ///      L2 upgrade transaction.
@@ -127,10 +109,9 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
 
     // Input for the script
     AdditionalConfig internal newConfig;
-    GatewayConfig internal gatewayConfig;
 
     // Discovered addresses
-    ZkChainAddresses internal discoveredEraZkChain;
+    ZkChainAddresses internal discoveredRepresentativeZkChain;
     ZkChainAddresses internal upToDateZkChain;
     L1Bridgehub internal bridgehub;
 
@@ -139,7 +120,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     function initializeWithArgs(
         address ctmProxy,
         address bytecodesSupplier,
-        bool isZKsyncOS,
         address rollupDAManager,
         bytes32 create2FactorySalt,
         string memory newConfigPath,
@@ -150,17 +130,16 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     ) public virtual {
         string memory root = vm.projectRoot();
         newConfigPath = string.concat(root, newConfigPath);
-        initializeConfigFromArgs(
-            ctmProxy,
-            bytecodesSupplier,
-            isZKsyncOS,
-            rollupDAManager,
-            create2FactorySalt,
-            newConfigPath,
-            governance,
-            zkTokenAssetId,
-            testnetVerifier
-        );
+        initializeConfigFromArgs({
+            ctmProxy: ctmProxy,
+            bytecodesSupplier: bytecodesSupplier,
+            rollupDAManager: rollupDAManager,
+            create2FactorySalt: create2FactorySalt,
+            newConfigPath: newConfigPath,
+            governance: governance,
+            zkTokenAssetId: zkTokenAssetId,
+            testnetVerifier: testnetVerifier
+        });
 
         console.log("Initialized config from %s", newConfigPath);
         upgradeConfig.outputPath = string.concat(root, _outputPath);
@@ -173,6 +152,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         // Optional
         address governance
     ) public {
+        require(IChainTypeManager(permanentConfig.ctmProxy).isZKsyncOS(), "CTM is not ZKsync OS");
         // Only override the salt when explicitly provided (non-zero).
         // When zero, the script falls back to the CREATE2_FACTORY_SALT env var or built-in default.
         if (permanentConfig.create2FactorySalt != bytes32(0)) {
@@ -184,7 +164,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         // The supplier is read off the CTM's `L1_BYTECODES_SUPPLIER()` immutable during discovery, so the
         // permanent-values entry is informational for this path.
         setAddressesBasedOnCTM();
-        config.isZKsyncOS = permanentConfig.isZKsyncOS;
         // Must be non-zero: `InteropCenter.initL2` reverts on a zero asset ID. It runs on the genesis path
         // of `performForceDeployedContractsInit` only, so this aborts the genesis of chains created from the
         // release rather than this upgrade — caught here so the misconfiguration surfaces during
@@ -205,18 +184,15 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         config.contracts.validatorTimelockExecutionDelay = IValidatorTimelock(
             ctmAddresses.stateTransition.proxies.validatorTimelock
         ).executionDelay();
-        // Declared per environment rather than introspected off the deployed verifier: pre-v31 L1
-        // state predates `ZKsyncOSTestnetVerifier.IS_TESTNET_VERIFIER`. Getting this wrong on
-        // mainnet would install a verifier that accepts unproven batches, so it is a required key
-        // with no default.
-        config.testnetVerifier = permanentConfig.testnetVerifier;
+        config.testnetVerifier = UpgradeUtils.resolveTestnetVerifier(
+            IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager)
+        );
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }
 
     function initializeConfigFromArgs(
         address ctmProxy,
         address bytecodesSupplier,
-        bool isZKsyncOS,
         address rollupDAManager,
         bytes32 create2FactorySalt,
         string memory newConfigPath,
@@ -226,29 +202,18 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     ) internal virtual {
         string memory toml = vm.readFile(newConfigPath);
 
-        if (toml.keyExists("$.era_chain_id")) {
-            config.eraChainId = toml.readUint("$.era_chain_id");
-        }
+        // No `era_chain_id` read: the per-env input TOMLs still carry the key for the
+        // v31 tooling and the zk-governance PUH redeploy (PUH's real constructor arg),
+        // but nothing in this flow consumes an Era chain id.
 
         PermanentCTMConfig memory permanentConfig = PermanentCTMConfig({
             ctmProxy: ctmProxy,
             bytecodesSupplier: bytecodesSupplier,
-            isZKsyncOS: isZKsyncOS,
             create2FactorySalt: create2FactorySalt,
             zkTokenAssetId: zkTokenAssetId,
             testnetVerifier: testnetVerifier
         });
-        // Set config.isZKsyncOS before getChainCreationParamsConfig.
-        config.isZKsyncOS = isZKsyncOS;
-        ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(
-            Utils.genesisConfigPath(isZKsyncOS)
-        );
-
-        // Optional override for pre-v32 introspection selection
-        if (toml.keyExists("$.pre_v32_introspection")) {
-            newConfig.hasPreV32IntrospectionOverride = true;
-            newConfig.usePreV32IntrospectionOverride = toml.readBool("$.pre_v32_introspection");
-        }
+        ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(Utils.genesisConfigPath());
 
         initializeConfig(chainCreationParams, permanentConfig, governance);
 
@@ -274,30 +239,32 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         console.log("Upgrade data generated!");
     }
 
+    /// @notice Deploy the per-chain upgrade contract.
+    /// @dev `DefaultUpgradeZKsyncOS` substitutes each chain's data into the `L2DefaultUpgrade` placeholder that
+    ///      {getL2UpgradeTargetAndData} emits, so it is the only valid default here.
     function deployUsedUpgradeContract() internal virtual returns (address) {
-        return deploySimpleContract("DefaultUpgrade", false);
+        return deploySimpleContract("DefaultUpgradeZKsyncOS");
     }
 
     function deployGovernanceUpgradeTimer() internal virtual {
-        upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer", false);
+        upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer");
     }
 
     /// @notice Single-call entry point invoked by the protocol-ops CLI's `ecosystem
     ///         upgrade-prepare-all`, once per CTM proxy. Drives the whole CTM-side prepare phase
     ///         (deploy + bytecode publish + upgrade-cut generation + call serialization).
     function noGovernancePrepare(CTMUpgradeParams memory _params) public virtual {
-        initializeWithArgs(
-            _params.ctmProxy,
-            _params.bytecodesSupplier,
-            _params.isZKsyncOS,
-            _params.rollupDAManager,
-            _params.create2FactorySalt,
-            _params.upgradeInputPath,
-            _params.outputPath,
-            _params.governance,
-            _params.zkTokenAssetId,
-            _params.testnetVerifier
-        );
+        initializeWithArgs({
+            ctmProxy: _params.ctmProxy,
+            bytecodesSupplier: _params.bytecodesSupplier,
+            rollupDAManager: _params.rollupDAManager,
+            create2FactorySalt: _params.create2FactorySalt,
+            newConfigPath: _params.upgradeInputPath,
+            _outputPath: _params.outputPath,
+            governance: _params.governance,
+            zkTokenAssetId: _params.zkTokenAssetId,
+            testnetVerifier: _params.testnetVerifier
+        });
         prepareCTMUpgrade();
         prepareDefaultGovernanceCalls();
         prepareDefaultCTMAdminCalls();
@@ -311,7 +278,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     ///      contract is release-specific and comes from {deployUsedUpgradeContract}.
     function deployNewCTMContracts() public virtual {
         (ctmAddresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
-        (ctmAddresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
+        (ctmAddresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade");
 
         deployVerifiers();
 
@@ -332,31 +299,21 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
             ctmAddresses.stateTransition.proxies.permissionlessValidator != address(0),
             "CTM has no PermissionlessValidator registered; it is expected from v31 on"
         );
-        ctmAddresses.stateTransition.implementations.bytecodesSupplier = deploySimpleContract(
-            "BytecodesSupplier",
-            false
-        );
+        ctmAddresses.stateTransition.implementations.bytecodesSupplier = deploySimpleContract("BytecodesSupplier");
         ctmAddresses.stateTransition.implementations.permissionlessValidator = deploySimpleContract(
-            "PermissionlessValidator",
-            false
+            "PermissionlessValidator"
         );
 
         // The constructor receives the new BytecodesSupplier and PermissionlessValidator proxy addresses.
-        (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(
-            config.isZKsyncOS,
-            CTMContract.ChainTypeManager
-        );
+        (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(CTMContract.ChainTypeManager);
         console.log("Deploying ChainTypeManager:", ctmContractName);
-        ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmContractName, false);
+        ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmContractName);
 
-        ctmAddresses.stateTransition.implementations.serverNotifier = deploySimpleContract("ServerNotifier", false);
+        ctmAddresses.stateTransition.implementations.serverNotifier = deploySimpleContract("ServerNotifier");
 
         // Deploy `MultisigCommitter` (a superset of ValidatorTimelock) as the default validator impl so the
         // upgrade does NOT downgrade proxies that already run a MultisigCommitter.
-        ctmAddresses.stateTransition.implementations.validatorTimelock = deploySimpleContract(
-            "MultisigCommitter",
-            false
-        );
+        ctmAddresses.stateTransition.implementations.validatorTimelock = deploySimpleContract("MultisigCommitter");
 
         deployStateTransitionDiamondFacets();
     }
@@ -401,14 +358,12 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     function generateUpgradeCutDataFromLocalConfig(
         StateTransitionDeployedAddresses memory _stateTransition
     ) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
-        upgradeCutData = generateUpgradeCutData(
-            _stateTransition,
-            config.contracts.chainCreationParams,
-            config.l1ChainId,
-            config.ownerAddress,
-            factoryDepsResult,
-            upToDateZkChain.zkChainProxy
-        );
+        upgradeCutData = generateUpgradeCutData({
+            _stateTransition: _stateTransition,
+            _chainCreationParams: config.contracts.chainCreationParams,
+            _factoryDepsResult: factoryDepsResult,
+            _registeredChainIdDiamondProxy: upToDateZkChain.zkChainProxy
+        });
     }
 
     function getOwnerAddress() public virtual returns (address) {
@@ -429,10 +384,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
 
     function getBridgehubAdmin() public virtual returns (address admin) {
         return coreAddresses.shared.bridgehubAdmin;
-    }
-
-    function getGatewayConfig() public virtual returns (GatewayConfig memory) {
-        return gatewayConfig;
     }
 
     function getGovernanceUpgradeTimerInitialDelay() public view virtual returns (uint256) {
@@ -475,43 +426,24 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         // Verify CTM contract exists
         require(ctm.code.length > 0, "CTM contract does not exist at specified address");
 
-        // CTM exists - get bridgehub and determine which introspection to use
-        address bridgehubAddr = ChainTypeManagerBase(ctm).BRIDGE_HUB();
+        address bridgehubAddr = ChainTypeManager(ctm).BRIDGE_HUB();
         bridgehub = L1Bridgehub(bridgehubAddr);
 
-        bool preV32Ecosystem;
-        if (newConfig.hasPreV32IntrospectionOverride) {
-            preV32Ecosystem = newConfig.usePreV32IntrospectionOverride;
-        } else if (!AddressIntrospector.hasRegisteredChains(bridgehubAddr)) {
-            // A chainless ecosystem has no protocol version to inspect. It cannot have been upgraded into
-            // existence either, so it was deployed from scratch with the current contracts.
-            preV32Ecosystem = false;
-        } else {
-            preV32Ecosystem = AddressIntrospector.shouldUsePreV32Introspection(bridgehubAddr);
-        }
-
-        if (preV32Ecosystem) {
-            ctmAddresses = AddressIntrospector.getCTMAddressesV31(ctm, config.isZKsyncOS);
-            coreAddresses = AddressIntrospector.getCoreDeployedAddressesV31(bridgehubAddr);
-        } else {
-            ctmAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
-            coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubAddr);
-        }
+        ctmAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManager(ctm));
+        coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubAddr);
 
         config.ownerAddress = ctmAddresses.admin.governance;
-        config.eraChainId = AddressIntrospector.getEraChainId(coreAddresses.bridges.proxies.l1AssetRouter);
 
-        address eraChainAddress = bridgehub.getZKChain(config.eraChainId);
-        if (eraChainAddress != address(0)) {
-            // ERA chain exists, discover its addresses
-            discoveredEraZkChain = AddressIntrospector.getZkChainAddresses(IZKChain(eraChainAddress));
-            ctmAddresses.daAddresses.daContracts.rollupSLDAValidator = discoveredEraZkChain.l1DAValidator;
+        address representativeChain = AddressIntrospector.getRepresentativeZkChain(bridgehubAddr);
+        if (representativeChain != address(0)) {
+            discoveredRepresentativeZkChain = AddressIntrospector.getZkChainAddresses(IZKChain(representativeChain));
+            ctmAddresses.daAddresses.daContracts.rollupSLDAValidator = discoveredRepresentativeZkChain.l1DAValidator;
         } else {
-            // ERA chain doesn't exist yet (fresh deployment), use up-to-date addresses
-            console.log("ERA chain not found in bridgehub, using up-to-date addresses");
+            // Chainless ecosystem (fresh deployment), use up-to-date addresses
+            console.log("No registered chain in bridgehub, using up-to-date addresses");
         }
 
-        upToDateZkChain = AddressIntrospector.getUptoDateZkChainAddresses(ChainTypeManagerBase(ctm));
+        upToDateZkChain = AddressIntrospector.getUptoDateZkChainAddresses(ChainTypeManager(ctm));
 
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
         newConfig.oldProtocolVersion = ctmProtocolVersion;
@@ -542,53 +474,18 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
 
     /////////////////////////// Blockchain interactions ////////////////////////////
 
-    bool skipFactoryDepsCheck = false;
+    bool internal skipFactoryDepsCheck = false;
 
+    // solhint-disable-next-line func-name-mixedcase
     function setSkipFactoryDepsCheck_TestOnly(bool _skipFactoryDepsCheck) public virtual {
         skipFactoryDepsCheck = _skipFactoryDepsCheck;
     }
 
     function publishBytecodes() public virtual {
-        bytes[] memory allDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(
-            config.isZKsyncOS,
-            getAdditionalFactoryDependencyContracts()
-        );
+        bytes[] memory allDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(getFactoryDependencyContracts());
         BytecodesSupplier supplier = BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier);
 
-        PublishFactoryDepsResult memory result = BytecodePublisher.publishAndProcessFactoryDeps(
-            config.isZKsyncOS,
-            supplier,
-            allDeps
-        );
-
-        // Era-only invariant: factoryDepsHashes[0..3] == (bootloader,
-        // defaultAA, evmEmulator). ZKsyncOS has none of these concepts —
-        // `chainCreationParams.{bootloader,defaultAA,evmEmulator}Hash` are
-        // zero and the factoryDepsHashes describe a different, smaller set
-        // of contracts, so indexing [1]/[2] would go out of bounds.
-        if (!config.isZKsyncOS && result.factoryDepsHashes.length > 0) {
-            console.logBytes32(config.contracts.chainCreationParams.bootloaderHash);
-            console.log(result.factoryDepsHashes[0]);
-            console.logBytes32(config.contracts.chainCreationParams.defaultAAHash);
-            console.log(result.factoryDepsHashes[1]);
-            console.logBytes32(config.contracts.chainCreationParams.evmEmulatorHash);
-            console.log(result.factoryDepsHashes[2]);
-
-            if (!skipFactoryDepsCheck) {
-                require(
-                    bytes32(result.factoryDepsHashes[0]) == config.contracts.chainCreationParams.bootloaderHash,
-                    "bootloader hash factory dep mismatch"
-                );
-                require(
-                    bytes32(result.factoryDepsHashes[1]) == config.contracts.chainCreationParams.defaultAAHash,
-                    "default aa hash factory dep mismatch"
-                );
-                require(
-                    bytes32(result.factoryDepsHashes[2]) == config.contracts.chainCreationParams.evmEmulatorHash,
-                    "EVM emulator hash factory dep mismatch"
-                );
-            }
-        }
+        PublishFactoryDepsResult memory result = BytecodePublisher.publishAndProcessFactoryDeps(supplier, allDeps);
 
         factoryDepsResult = result;
         upgradeConfig.factoryDepsPublished = true;
@@ -617,7 +514,11 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
             abi.encode(stage2Calls)
         );
 
-        vm.writeToml(governanceCallsSerialized, upgradeConfig.outputPath, ".governance_calls");
+        // Upstream forge's keyed `vm.writeToml(json, path, key)` silently no-ops when the key
+        // does not exist in the file yet, so append sections by re-serializing into the same
+        // "root" object and rewriting the whole file instead.
+        string memory updatedToml = vm.serializeString("root", "governance_calls", governanceCallsSerialized);
+        vm.writeToml(updatedToml, upgradeConfig.outputPath);
     }
 
     function prepareDefaultCTMAdminCalls() public virtual returns (Call[] memory calls) {
@@ -636,25 +537,15 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
             abi.encode(calls)
         );
 
-        vm.writeToml(ctmAdminCallsSerialized, upgradeConfig.outputPath, ".ctm_admin_calls");
+        // See the note in prepareDefaultGovernanceCalls on why keyed writeToml is not used here.
+        string memory updatedCtmAdminToml = vm.serializeString("root", "ctm_admin_calls", ctmAdminCallsSerialized);
+        vm.writeToml(updatedCtmAdminToml, upgradeConfig.outputPath);
     }
 
-    /// @notice Whether to emit the `test_upgrade_chain` smoke call into `[test_upgrade_calls]`.
-    /// @dev A release whose per-chain upgrade needs preconditions the artifact cannot express —
-    ///      v33 requires a recorded priority-op lower bound and an upgrade timestamp — should not
-    ///      pretend a single generated call covers it. Turning this off keeps the artifact honest;
-    ///      the per-chain upgrade is then produced by `protocol_ops chain upgrade`, which emits the
-    ///      real bundle, and the simulator scenario acknowledges the absence explicitly.
-    function TESTONLY_emitsTestUpgradeChainCall() internal view virtual returns (bool) {
-        return true;
-    }
-
-    function prepareDefaultTestUpgradeCalls() public virtual {
-        if (TESTONLY_emitsTestUpgradeChainCall()) {
-            (Call[] memory testUpgradeChainCall, address ZKChainAdmin) = TESTONLY_prepareTestUpgradeChainCall();
-            vm.serializeAddress("test_upgrade_calls", "test_upgrade_chain_caller", ZKChainAdmin);
-            vm.serializeBytes("test_upgrade_calls", "test_upgrade_chain", abi.encode(testUpgradeChainCall));
-        }
+    function prepareDefaultTestUpgradeCalls() public {
+        (Call[] memory testUpgradeChainCall, address ZKChainAdmin) = TESTONLY_prepareTestUpgradeChainCall();
+        vm.serializeAddress("test_upgrade_calls", "test_upgrade_chain_caller", ZKChainAdmin);
+        vm.serializeBytes("test_upgrade_calls", "test_upgrade_chain", abi.encode(testUpgradeChainCall));
         (Call[] memory testCreateChainCall, address bridgehubAdmin) = TESTONLY_prepareCreateChainCall();
         vm.serializeAddress("test_upgrade_calls", "test_create_chain_caller", bridgehubAdmin);
 
@@ -664,7 +555,13 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
             abi.encode(testCreateChainCall)
         );
 
-        vm.writeToml(testUpgradeCallsSerialized, upgradeConfig.outputPath, ".test_upgrade_calls");
+        // See the note in prepareDefaultGovernanceCalls on why keyed writeToml is not used here.
+        string memory updatedTestCallsToml = vm.serializeString(
+            "root",
+            "test_upgrade_calls",
+            testUpgradeCallsSerialized
+        );
+        vm.writeToml(updatedTestCallsToml, upgradeConfig.outputPath);
     }
 
     function prepareUpgradeServerNotifierCall() public virtual returns (Call[] memory calls) {
@@ -714,7 +611,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         allCalls[5] = provideSetNewVersionUpgradeCall();
         console.log("prepareStage1GovernanceCalls: prepareDAValidatorCall");
         allCalls[6] = prepareDAValidatorCall();
-        console.log("prepareStage1GovernanceCalls: prepareGatewaySpecificStage1GovernanceCalls");
+        console.log("prepareStage1GovernanceCalls: prepareVersionSpecificStage1GovernanceCallsL1");
         allCalls[7] = prepareVersionSpecificStage1GovernanceCallsL1();
         calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
@@ -815,41 +712,20 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     /// @notice Points the CTM at the upgrade contract deployed by this release, so that later upgrades that need
     /// no custom upgrade logic (e.g. verifier-only ones) can reuse it.
     /// @dev Must be executed after the CTM implementation upgrade, as `setDefaultUpgrade` is only present
-    /// starting from v32.
+    /// starting from v33.
     function prepareSetDefaultUpgradeCall() public virtual returns (Call[] memory calls) {
         require(
             ctmAddresses.stateTransition.proxies.chainTypeManager != address(0),
             "stateTransitionManagerAddress is zero in newConfig"
         );
-        address storedDefaultUpgrade = getCtmStoredDefaultUpgrade();
-        require(storedDefaultUpgrade != address(0), "defaultUpgrade is zero in newConfig");
+        require(ctmAddresses.stateTransition.defaultUpgrade != address(0), "defaultUpgrade is zero in newConfig");
         calls = new Call[](1);
 
         calls[0] = Call({
             target: ctmAddresses.stateTransition.proxies.chainTypeManager,
-            data: abi.encodeCall(IChainTypeManager.setDefaultUpgrade, (storedDefaultUpgrade)),
+            data: abi.encodeCall(IChainTypeManager.setDefaultUpgrade, (ctmAddresses.stateTransition.defaultUpgrade)),
             value: 0
         });
-    }
-
-    /// @notice The upgrade contract to leave stored on the CTM as its `defaultUpgrade`.
-    /// @dev Zero means "same as the contract this release's cut delegates to", which is the normal
-    ///      case. A release only sets this when its own cut is one-shot — see
-    ///      {getCtmStoredDefaultUpgrade}.
-    address internal ctmStoredDefaultUpgrade;
-
-    /// @notice The upgrade contract to leave stored on the CTM as its `defaultUpgrade`.
-    /// @dev Defaults to this release's own upgrade contract, which is correct whenever that
-    ///      contract carries no one-off logic. A release whose cut *does* carry one-off logic sets
-    ///      {ctmStoredDefaultUpgrade} to a separately deployed generic contract instead:
-    ///      `setDefaultUpgrade` is what *later* upgrades reuse when they need no custom logic of
-    ///      their own, so storing a one-shot contract there would make every such upgrade revert
-    ///      on preconditions that only ever held during this release. v33 is such a release.
-    function getCtmStoredDefaultUpgrade() internal virtual returns (address) {
-        return
-            ctmStoredDefaultUpgrade == address(0)
-                ? ctmAddresses.stateTransition.defaultUpgrade
-                : ctmStoredDefaultUpgrade;
     }
 
     function prepareNewChainCreationParamsCall() public virtual returns (Call[] memory calls) {
@@ -982,6 +858,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     }
 
     /// @notice Tests that it is possible to upgrade a chain to the new version
+    // solhint-disable-next-line func-name-mixedcase
     function TESTONLY_prepareTestUpgradeChainCall() private returns (Call[] memory calls, address admin) {
         address chainDiamondProxyAddress = L1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).getZKChain(
             upToDateZkChain.chainId
@@ -1008,9 +885,10 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
 
     /// @notice Tests that it is possible to create a new chain with the new version
     function getDefaultTestCreateChainId() public view virtual returns (uint256) {
-        return config.isZKsyncOS ? ZKSYNC_OS_TEST_CREATE_CHAIN_ID : ERA_TEST_CREATE_CHAIN_ID;
+        return ZKSYNC_OS_TEST_CREATE_CHAIN_ID;
     }
 
+    // solhint-disable-next-line func-name-mixedcase
     function TESTONLY_prepareCreateChainCall() private returns (Call[] memory calls, address admin) {
         admin = getBridgehubAdmin();
         calls = new Call[](1);
@@ -1018,14 +896,10 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     }
 
     function deployUpgradeStageValidator() internal {
-        upgradeAddresses.upgradeStageValidator = deploySimpleContract("UpgradeStageValidator", false);
+        upgradeAddresses.upgradeStageValidator = deploySimpleContract("UpgradeStageValidator");
     }
 
-    function getCreationCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
-        require(!isZKBytecode, "ZK bytecodes are not supported in CTM upgrade");
+    function getCreationCalldata(string memory contractName) internal view virtual override returns (bytes memory) {
         if (compareStrings(contractName, "UpgradeStageValidator")) {
             return abi.encode(ctmAddresses.stateTransition.proxies.chainTypeManager, getNewProtocolVersion());
         } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
@@ -1033,7 +907,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
             uint256 maxAdditionalDelay = 2 weeks;
             return abi.encode(initialDelay, maxAdditionalDelay, config.ownerAddress, newConfig.ecosystemAdminAddress);
         } else {
-            return super.getCreationCalldata(contractName, isZKBytecode);
+            return super.getCreationCalldata(contractName);
         }
     }
 
@@ -1114,9 +988,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
                 ctmAddresses.stateTransition.implementations.serverNotifier
             );
         }
-        // What the CTM ends up storing. Equal to `default_upgrade_addr` unless this release's
-        // cut is one-shot, in which case the two deliberately differ.
-        vm.serializeAddress("state_transition", "ctm_stored_default_upgrade_addr", getCtmStoredDefaultUpgrade());
         serializeVersionSpecificStateTransition();
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
@@ -1125,10 +996,14 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         );
 
         // Serialize newly deployed upgrade addresses
-        vm.serializeAddress("deployed_addresses", "chain_admin", discoveredEraZkChain.chainAdmin);
+        vm.serializeAddress("deployed_addresses", "chain_admin", discoveredRepresentativeZkChain.chainAdmin);
         vm.serializeAddress("deployed_addresses", "access_control_restriction_addr", address(0));
         vm.serializeAddress("deployed_addresses", "transparent_proxy_admin", ctmAddresses.admin.transparentProxyAdmin);
-        vm.serializeAddress("deployed_addresses", "rollup_l1_da_validator_addr", discoveredEraZkChain.l1DAValidator);
+        vm.serializeAddress(
+            "deployed_addresses",
+            "rollup_l1_da_validator_addr",
+            discoveredRepresentativeZkChain.l1DAValidator
+        );
         vm.serializeAddress("deployed_addresses", "validium_l1_da_validator_addr", address(0));
         vm.serializeAddress(
             "deployed_addresses",
@@ -1188,12 +1063,14 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     }
 
     /// @dev Test-only: inject pre-computed upgrade cut data to avoid recomputing (memory optimization).
+    // solhint-disable-next-line func-name-mixedcase
     function setChainUpgradeDiamondCutData_TestOnly(bytes memory _data) public {
         newlyGeneratedData.upgradeCutData = _data;
         upgradeConfig.upgradeCutPrepared = true;
     }
 
     /// @dev Test-only: inject pre-computed fixed force deployments data.
+    // solhint-disable-next-line func-name-mixedcase
     function setFixedForceDeploymentsData_TestOnly(bytes memory _data) public {
         generatedData.forceDeploymentsData = _data;
         upgradeConfig.fixedForceDeploymentsDataGenerated = true;

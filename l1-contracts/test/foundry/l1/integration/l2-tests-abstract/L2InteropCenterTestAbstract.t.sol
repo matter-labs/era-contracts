@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.20;
-// solhint-disable gas-custom-errors
 
 import {L2InteropLibraryBasicTestAbstract} from "./L2InteropLibraryBasicTestAbstract.t.sol";
 import {L2InteropNativeTokenSimpleTestAbstract} from "./L2InteropNativeTokenSimpleTestAbstract.t.sol";

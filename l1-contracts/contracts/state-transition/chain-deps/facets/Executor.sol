@@ -5,13 +5,12 @@ pragma solidity 0.8.28;
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
 import {IMessageRootBase} from "../../../core/message-root/IMessageRoot.sol";
-import {EMPTY_STRING_KECCAK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
+import {EMPTY_STRING_KECCAK} from "../../../common/Config.sol";
 import {IExecutor} from "../../chain-interfaces/IExecutor.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
 import {
-    CanOnlyProcessOneBatch,
     CantExecuteUnprovenBatches,
     InvalidMessageRoot,
     InvalidProof,
@@ -133,7 +132,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 revert InvalidInteropRootTimestamp(correctTimestamp, interopRoot.timestamp);
             }
             dependencyRootsRollingHash = keccak256(
-                // solhint-disable-next-line func-named-parameters
                 abi.encodePacked(
                     dependencyRootsRollingHash,
                     interopRoot.chainId,
@@ -176,7 +174,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         // Cross-chain asset correctness is enforced by the ZK proof, so no per-batch log
-        // reconstruction / balance accounting happens here. See {protocol-docs/message-root.md#v31-vs-v32-append-flows}.
+        // reconstruction / balance accounting happens here. See {protocol-docs/message-root.md#v31-vs-v33-append-flows}.
         for (uint256 i = 0; i < nBatches; ++i) {
             _appendMessageRoot(batchesData[i].batchNumber, batchesData[i].l2LogsTreeRoot);
         }
@@ -222,26 +220,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // Check that the batch passed by the validator is indeed the first unverified batch
         _checkBatchHashMismatch(prevBatch, currentTotalBatchesVerified, true);
 
-        bytes32 prevBatchCommitment = prevBatch.commitment;
-        bytes32 prevBatchStateCommitment = prevBatch.batchHash;
         for (uint256 i = 0; i < committedBatchesLength; ++i) {
             currentTotalBatchesVerified = currentTotalBatchesVerified.uncheckedInc();
             _checkBatchHashMismatch(committedBatches[i], currentTotalBatchesVerified, false);
 
-            bytes32 currentBatchCommitment = committedBatches[i].commitment;
-            bytes32 currentBatchStateCommitment = committedBatches[i].batchHash;
-            if (s.zksyncOS) {
-                proofPublicInput[i] = _getBatchProofPublicInputZKsyncOS(
-                    prevBatchStateCommitment,
-                    currentBatchStateCommitment,
-                    currentBatchCommitment
-                );
-            } else {
-                proofPublicInput[i] = _getBatchProofPublicInput(prevBatchCommitment, currentBatchCommitment);
-            }
-
-            prevBatchCommitment = currentBatchCommitment;
-            prevBatchStateCommitment = currentBatchStateCommitment;
+            proofPublicInput[i] = uint256(committedBatches[i].commitment);
         }
         if (currentTotalBatchesVerified > s.totalBatchesCommitted) {
             revert VerifiedBatchesExceedsCommittedBatches();
@@ -254,52 +237,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     function _verifyProof(uint256[] memory proofPublicInput, uint256[] memory _proof) internal view {
-        // We only allow processing of 1 batch proof at a time on Era Chains.
-        // We allow processing multiple proofs at once on ZKsync OS Chains.
-        if (!s.zksyncOS && proofPublicInput.length != 1) {
-            revert CanOnlyProcessOneBatch();
-        }
-
         bool successVerifyProof = s.verifier.verify(proofPublicInput, _proof);
         if (!successVerifyProof) {
             revert InvalidProof();
         }
-    }
-
-    /// @dev Gets zk proof public input for ZKSync OS.
-    function _getBatchProofPublicInputZKsyncOS(
-        bytes32 _prevBatchStateCommitment,
-        bytes32 _currentBatchStateCommitment,
-        bytes32 _currentBatchCommitment
-    ) internal view returns (uint256) {
-        // `fri_proof_verification_enabled` is always disabled, hence the `0` word.
-        // The final word is the pubdata content (`FULL_PUBDATA=0`/`LOGS_ONLY=1`), mirroring `ChainConfig::hash`
-        // on ZKsync OS, which appends `pubdata_content` after `max_tx_gas_limit`.
-        bytes32 chainConfigHash = keccak256(
-            abi.encodePacked(s.chainId, uint256(0), uint256(_getZKsyncOSMaxTxGasLimit()), uint256(s.pubdataContent))
-        );
-        // Untruncated: the prover folds the full per-batch hashes, so PUBLIC_INPUT_SHIFT is
-        // applied once by `computeZKsyncOSHash` after the fold.
-        return
-            uint256(
-                keccak256(
-                    abi.encodePacked(
-                        _prevBatchStateCommitment,
-                        _currentBatchStateCommitment,
-                        chainConfigHash,
-                        _currentBatchCommitment
-                    )
-                )
-            );
-    }
-
-    /// @dev Gets zk proof public input for Era
-    function _getBatchProofPublicInput(
-        bytes32 _prevBatchCommitment,
-        bytes32 _currentBatchCommitment
-    ) internal pure returns (uint256) {
-        return
-            uint256(keccak256(abi.encodePacked(_prevBatchCommitment, _currentBatchCommitment))) >> PUBLIC_INPUT_SHIFT;
     }
 
     /// @inheritdoc IExecutor

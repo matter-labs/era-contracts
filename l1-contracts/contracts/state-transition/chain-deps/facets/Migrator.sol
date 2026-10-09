@@ -30,7 +30,7 @@ import {
     InvalidNumberOfBatchHashes,
     NotAllBatchesExecuted,
     NotChainAdmin,
-    NotEraChain,
+    SettlementLayerCTMMismatch,
     NotHistoricalRoot,
     NotL1,
     NotMigrated,
@@ -174,16 +174,16 @@ contract MigratorFacet is ZKChainBase, IMigrator {
             DepositsNotPaused()
         );
 
-        // We want to trust interop messages coming from Era chains which implies they can use only trusted settlement layers,
-        // ie, controlled by the governance, which is currently Era Gateways and Ethereum.
-        // Otherwise a malicious settlement layer could forge an interop message from an Era chain.
+        // A chain may only migrate onto a settlement layer managed by its own CTM (i.e. one whose
+        // upgrades governance controls): interop messages from this chain are trusted, and a
+        // settlement layer under a foreign CTM could forge them.
         if (_settlementLayer != L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS) {
             uint256 chainId = IZKChain(_settlementLayer).getChainId();
             if (_settlementLayer != IL1Bridgehub(s.bridgehub).getZKChain(chainId)) {
                 revert NotAZKChain(_settlementLayer);
             }
             if (s.chainTypeManager != IL1Bridgehub(s.bridgehub).chainTypeManager(chainId)) {
-                revert NotEraChain();
+                revert SettlementLayerCTMMismatch();
             }
         }
 
@@ -238,7 +238,9 @@ contract MigratorFacet is ZKChainBase, IMigrator {
         s.totalBatchesVerified = batchesVerified;
         s.totalBatchesExecuted = batchesExecuted;
         s.isPermanentRollup = _commitment.isPermanentRollup;
-        s.precommitmentForTheLatestBatch = _commitment.precommitmentForTheLatestBatch;
+        // _commitment.precommitmentForTheLatestBatch is deliberately ignored: precommitments were
+        // an EraVM feature and the storage slot is a tombstone. The field stays in the commitment
+        // encoding for wire compatibility until the migration encoding is explicitly versioned.
 
         // Some consistency checks just in case.
         if (batchesExecuted > batchesVerified) {
@@ -341,7 +343,8 @@ contract MigratorFacet is ZKChainBase, IMigrator {
         commitment.l2SystemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
         commitment.priorityTree = s.priorityTree.getCommitment();
         commitment.isPermanentRollup = s.isPermanentRollup;
-        commitment.precommitmentForTheLatestBatch = s.precommitmentForTheLatestBatch;
+        // Deprecated wire field (see above): encoded as its default; never read on the other side.
+        commitment.precommitmentForTheLatestBatch = bytes32(0);
 
         // just in case
         if (commitment.totalBatchesExecuted > commitment.totalBatchesVerified) {

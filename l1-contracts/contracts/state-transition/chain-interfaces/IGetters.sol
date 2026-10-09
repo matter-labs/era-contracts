@@ -5,7 +5,7 @@ pragma solidity ^0.8.21;
 import {VerifierParams} from "../chain-interfaces/IVerifier.sol";
 import {PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
 import {IZKChainBase} from "./IZKChainBase.sol";
-import {L2DACommitmentScheme, PubdataContent} from "../../common/Config.sol";
+import {DisabledProofSystems, L2DACommitmentScheme, PubdataContent} from "../../common/Config.sol";
 
 /// @title The interface of the Getters Contract that implements functions for getting contract state from outside the blockchain.
 /// @author Matter Labs
@@ -57,6 +57,13 @@ interface IGetters is IZKChainBase {
     // @return Address of transaction filterer
     function getTransactionFilterer() external view returns (address);
 
+    /// @notice Returns the real proof format accepted by this ZKsync OS chain.
+    /// @return The accepted real proof type: 2 for Airbender or 5 for multiprover.
+    function getProofMode() external view returns (uint256);
+
+    /// @return Named disable flags for each proof system; these do not indicate verifier support.
+    function disabledProofSystems() external view returns (DisabledProofSystems memory);
+
     /// @return The total number of priority operations that were added to the priority queue, including all processed ones
     function getTotalPriorityTxs() external view returns (uint256);
 
@@ -93,15 +100,6 @@ interface IGetters is IZKChainBase {
     /// @return The hash of committed L2 batch.
     function storedBatchHash(uint256 _batchNumber) external view returns (bytes32);
 
-    /// @return Bytecode hash of bootloader program.
-    function getL2BootloaderBytecodeHash() external view returns (bytes32);
-
-    /// @return Bytecode hash of default account (bytecode for EOA).
-    function getL2DefaultAccountBytecodeHash() external view returns (bytes32);
-
-    /// @return Bytecode hash of EVM emulator.
-    function getL2EvmEmulatorBytecodeHash() external view returns (bytes32);
-
     /// @return Verifier parameters.
     /// @dev This function is deprecated and will soon be removed.
     function getVerifierParams() external view returns (VerifierParams memory);
@@ -125,12 +123,25 @@ interface IGetters is IZKChainBase {
     /// executed (i.e. finalized).
     function getL2SystemContractsUpgradeBatchNumber() external view returns (uint256);
 
-    /// @return The maximum number of L2 gas that a user can request for L1 -> L2 transactions
+    /// @notice Returns the effective gas limit for newly requested L1 -> L2 transactions.
+    /// @return The chain's configured limit, at most the protocol ceiling.
     function getPriorityTxMaxGasLimit() external view returns (uint256);
 
     /// @return The effective ZKsync OS single-transaction gas limit (EIP-7825), with the default
     /// substituted when the value was never set explicitly.
     function getZKsyncOSMaxTxGasLimit() external view returns (uint64);
+
+    /// @notice Returns the current runtime configuration hash on this chain copy.
+    /// @return The hash used to validate batch commits; see {protocol-docs/chain-config.md}.
+    function getZKsyncOSChainConfigHash() external view returns (bytes32);
+
+    /// @notice Returns whether operator filtering of priority transactions is enabled.
+    /// @return Whether L1 transaction filtering is enabled.
+    function isZKsyncOSL1TxFilteringEnabled() external view returns (bool);
+
+    /// @notice Returns whether the larger ZKsync OS contract size limits are enabled.
+    /// @return Whether large contracts are enabled.
+    function isZKsyncOSLargeContractsEnabled() external view returns (bool);
 
     /// @return Whether a withdrawal has been finalized.
     /// @param _l2BatchNumber The L2 batch number within which the withdrawal happened.
@@ -185,6 +196,6 @@ interface IGetters is IZKChainBase {
     /// @return The pubdata content (full pubdata vs logs-only).
     function getPubdataContent() external view returns (PubdataContent);
 
-    /// @return Whether the chain uses ZKsyncOS.
+    /// @return Whether the chain uses ZKsync OS.
     function getZKsyncOS() external view returns (bool);
 }

@@ -10,7 +10,6 @@ import {
 import {Vm} from "forge-std/Vm.sol";
 
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
-import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 
 import {IMessageRootBase, IMessageVerification} from "contracts/core/message-root/IMessageRoot.sol";
@@ -20,6 +19,7 @@ import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
+import {FactoryDepsNotSupported} from "contracts/common/L1ContractErrors.sol";
 import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
@@ -56,12 +56,12 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         bytes[] factoryDeps;
     }
 
-    uint256 constant TEST_USERS_COUNT = 10;
+    uint256 internal constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
     bytes32 public l2TokenAssetId;
     address public tokenL1Address;
-    SimpleExecutor simpleExecutor;
+    SimpleExecutor internal simpleExecutor;
 
     // generate MAX_USERS addresses and append it to users array
     function _generateUserAddresses() internal {
@@ -281,6 +281,9 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
 
         // Verify transaction was recorded (logs were emitted)
         assertTrue(logs.length > 0, "Transaction should emit logs");
+        NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
+        assertEq(request.transaction.factoryDeps.length, 0);
+        assertEq(request.factoryDeps.length, 0);
 
         // Verify balance decreased after withdrawal request
         uint256 balanceAfter = IERC20(tokenL1Address).balanceOf(address(this));
@@ -350,6 +353,31 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         );
         assertEq(request.transaction.value, 0, "L2 value should be 0");
         assertEq(request.transaction.reserved[0], 250000000000100, "Mint value should match requested amount");
+    }
+
+    function test_DepositDirect_revert_FactoryDepsNotSupported() public {
+        uint256 mintValue = 1 ether;
+        bytes32 baseTokenAssetId = addresses.bridgehub.baseTokenAssetId(eraZKChainId);
+        uint256 senderBalanceBefore = address(this).balance;
+        uint256 vaultBalanceBefore = address(addresses.l1NativeTokenVault).balance;
+        uint256 bridgedOutBefore = addresses.l1NativeTokenVault.bridgedOut(baseTokenAssetId);
+        L2TransactionRequestDirect memory request = _createL2TransactionRequestDirect({
+            _chainId: eraZKChainId,
+            _mintValue: mintValue,
+            _l2Value: 0,
+            _l2GasLimit: mockL2GasLimit,
+            _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+            _l2CallData: ""
+        });
+        request.factoryDeps = new bytes[](1);
+        request.factoryDeps[0] = "";
+
+        vm.expectRevert(FactoryDepsNotSupported.selector);
+        addresses.bridgehub.requestL2TransactionDirect{value: mintValue}(request);
+
+        assertEq(address(this).balance, senderBalanceBefore);
+        assertEq(address(addresses.l1NativeTokenVault).balance, vaultBalanceBefore);
+        assertEq(addresses.l1NativeTokenVault.bridgedOut(baseTokenAssetId), bridgedOutBefore);
     }
 
     function test_DepositToL1AndWithdraw7702() public {
@@ -423,13 +451,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
 
         // Step 2: Decode assetData into the bridge mint fields
         {
-            (
-                address originalCaller,
-                address remoteReceiver,
-                address parsedOriginToken,
-                uint256 amount,
-                bytes memory erc20Metadata
-            ) = abi.decode(assetData, (address, address, address, uint256, bytes));
+            (, address remoteReceiver, , , ) = abi.decode(assetData, (address, address, address, uint256, bytes));
 
             // Checking that caller hasn't been aliased
             assertEq(remoteReceiver, randomCaller, "Remote receiver mismatch");

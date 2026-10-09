@@ -1,45 +1,27 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-// solhint-disable no-console, gas-custom-errors
-
-import {console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {Governance} from "contracts/governance/Governance.sol";
 import {CTMDeploymentTracker} from "contracts/core/ctm-deployment/CTMDeploymentTracker.sol";
-import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
-import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
-import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
-import {DummyL1MessageRoot} from "contracts/dev-contracts/test/DummyL1MessageRoot.sol";
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
-import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
-import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {ChainRegistrationSender} from "contracts/core/chain-registration/ChainRegistrationSender.sol";
-import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {CoreDeployedAddresses} from "../utils/Types.sol";
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
 
-// solhint-disable-next-line gas-struct-packing
 struct Config {
     uint256 l1ChainId;
     address ownerAddress;
     address deployerAddress;
-    uint256 eraChainId;
-    address eraDiamondProxyAddress;
-    bool supportL2LegacySharedBridgeTest;
-    uint256 legacyGatewayChainId;
     ContractsConfig contracts;
     TokensConfig tokens;
 }
 
-// solhint-disable-next-line gas-struct-packing
 struct ContractsConfig {
     address governanceSecurityCouncilAddress;
     uint256 governanceMinDelay;
@@ -67,9 +49,7 @@ contract DeployL1CoreUtils is DeployUtils {
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
-        config.eraChainId = toml.readUint("$.era_chain_id");
         config.ownerAddress = toml.readAddress("$.owner_address");
-        config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
 
         config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
             "$.contracts.governance_security_council_address"
@@ -77,24 +57,12 @@ contract DeployL1CoreUtils is DeployUtils {
         config.contracts.governanceMinDelay = toml.readUint("$.contracts.governance_min_delay");
         config.contracts.maxNumberOfChains = toml.readUint("$.contracts.max_number_of_chains");
 
-        if (vm.keyExistsToml(toml, "$.contracts.era_diamond_proxy_addr")) {
-            config.eraDiamondProxyAddress = toml.readAddress("$.contracts.era_diamond_proxy_addr");
-        }
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
-        // Legacy Era gateway chain ID, baked into L1MessageRoot as immutable
-        // ERA_GATEWAY_CHAIN_ID and used by L1ChainAssetHandler.setHistoricalMigrationInterval
-        // to gate intervals settled on the legacy GW. Optional: absent on fresh deployments.
-        if (vm.keyExistsToml(toml, "$.gateway.chain_id")) {
-            config.legacyGatewayChainId = toml.readUint("$.gateway.chain_id");
-        }
     }
 
     ////////////////////////////// Contract deployment modes /////////////////////////////////
 
-    function getCreationCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
+    function getCreationCalldata(string memory contractName) internal view virtual override returns (bytes memory) {
         if (compareStrings(contractName, "ProxyAdmin")) {
             return abi.encode();
         } else if (compareStrings(contractName, "ChainRegistrationSender")) {
@@ -113,7 +81,7 @@ contract DeployL1CoreUtils is DeployUtils {
             return
                 abi.encode(
                     coreAddresses.bridgehub.proxies.bridgehub,
-                    config.legacyGatewayChainId,
+                    0, // _eraGatewayChainId: no legacy Era Gateway
                     coreAddresses.bridgehub.proxies.chainAssetHandler
                 );
         } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
@@ -129,9 +97,7 @@ contract DeployL1CoreUtils is DeployUtils {
                 abi.encode(
                     config.tokens.tokenWethAddress,
                     coreAddresses.bridgehub.proxies.bridgehub,
-                    coreAddresses.bridges.proxies.l1Nullifier,
-                    config.eraChainId,
-                    config.eraDiamondProxyAddress
+                    coreAddresses.bridges.proxies.l1Nullifier
                 );
         } else if (compareStrings(contractName, "L1NativeTokenVault")) {
             return
@@ -162,55 +128,33 @@ contract DeployL1CoreUtils is DeployUtils {
         return coreAddresses.shared.transparentProxyAdmin;
     }
 
-    function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
-        if (!isZKBytecode) {
-            // L1Nullifier has a config-dependent implementation swap
-            if (compareStrings(contractName, "L1Nullifier")) {
-                string memory resolved = config.supportL2LegacySharedBridgeTest ? "L1NullifierDev" : "L1Nullifier";
-                return ContractsBytecodesLib.getCreationCodeEVM(resolved);
-            }
-            return ContractsBytecodesLib.getCreationCodeEVM(contractName);
-        }
-        return ContractsBytecodesLib.getCreationCodeEra(contractName);
-    }
-
-    function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual override returns (bytes memory) {
-        if (!isZKBytecode) {
-            if (compareStrings(contractName, "L1Bridgehub")) {
-                return abi.encodeCall(L1Bridgehub.initialize, (config.deployerAddress));
-            } else if (
-                compareStrings(contractName, "L1MessageRoot") || compareStrings(contractName, "DummyL1MessageRoot")
-            ) {
-                return abi.encodeCall(L1MessageRoot.initialize, ());
-            } else if (compareStrings(contractName, "ChainRegistrationSender")) {
-                return abi.encodeCall(ChainRegistrationSender.initialize, (config.deployerAddress));
-            } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
-                return abi.encodeCall(L1ChainAssetHandler.initialize, (config.deployerAddress));
-            } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
-                return abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress));
-            } else if (compareStrings(contractName, "L1Nullifier")) {
-                return abi.encodeCall(L1Nullifier.initialize, (config.deployerAddress));
-            } else if (compareStrings(contractName, "L1InteropHandler")) {
-                return abi.encodeCall(L1InteropHandler.initialize, (config.deployerAddress));
-            } else if (compareStrings(contractName, "L1AssetRouter")) {
-                return abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress));
-            } else if (compareStrings(contractName, "L1NativeTokenVault")) {
-                return
-                    abi.encodeCall(
-                        L1NativeTokenVault.initialize,
-                        (config.deployerAddress, coreAddresses.bridges.bridgedTokenBeacon)
-                    );
-            } else {
-                revert(string.concat("Contract ", contractName, " initialize calldata not set"));
-            }
+    function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory) {
+        if (compareStrings(contractName, "L1Bridgehub")) {
+            return abi.encodeCall(L1Bridgehub.initialize, (config.deployerAddress));
+        } else if (
+            compareStrings(contractName, "L1MessageRoot") || compareStrings(contractName, "DummyL1MessageRoot")
+        ) {
+            return abi.encodeCall(L1MessageRoot.initialize, ());
+        } else if (compareStrings(contractName, "ChainRegistrationSender")) {
+            return abi.encodeCall(ChainRegistrationSender.initialize, (config.deployerAddress));
+        } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
+            return abi.encodeCall(L1ChainAssetHandler.initialize, (config.deployerAddress));
+        } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
+            return abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress));
+        } else if (compareStrings(contractName, "L1Nullifier")) {
+            return abi.encodeCall(L1Nullifier.initialize, (config.deployerAddress));
+        } else if (compareStrings(contractName, "L1InteropHandler")) {
+            return abi.encodeCall(L1InteropHandler.initialize, (config.deployerAddress));
+        } else if (compareStrings(contractName, "L1AssetRouter")) {
+            return abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress));
+        } else if (compareStrings(contractName, "L1NativeTokenVault")) {
+            return
+                abi.encodeCall(
+                    L1NativeTokenVault.initialize,
+                    (config.deployerAddress, coreAddresses.bridges.bridgedTokenBeacon)
+                );
         } else {
-            revert(string.concat("Contract ", contractName, " ZK initialize calldata not set"));
+            revert(string.concat("Contract ", contractName, " initialize calldata not set"));
         }
     }
 

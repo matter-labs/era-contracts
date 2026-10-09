@@ -51,14 +51,14 @@ pub const L2_CREATE2_FACTORY_ADDR: Address = l2_addr(0x00);
 pub const ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR: Address =
     address!("0x4e59b44847b379578588920ca78fbf26c0b4956c");
 /// Alias of `L2_GENESIS_UPGRADE_ADDR` in Solidity — same on-chain address
-/// (`BUILT_IN_CONTRACTS_OFFSET + 0x01`), exposed under the version-specific
-/// name because v33 force-deploys `L2V32Upgrade` there.
+/// (`BUILT_IN_CONTRACTS_OFFSET + 0x01`). `L2DefaultUpgrade` is not deployed
+/// here but at an address derived from its bytecode info.
 pub const L2_VERSION_SPECIFIC_UPGRADER_ADDR: Address = l2_addr(0x01);
 pub const L2_BRIDGEHUB_ADDR: Address = l2_addr(0x02);
 pub const L2_ASSET_ROUTER_ADDR: Address = l2_addr(0x03);
 pub const L2_NATIVE_TOKEN_VAULT_ADDR: Address = l2_addr(0x04);
 pub const L2_MESSAGE_ROOT_ADDR: Address = l2_addr(0x05);
-/// The removed v33 GWAssetTracker's address: the v32 upgrade swaps its system proxy's
+/// The removed v31 GWAssetTracker's address: the v33 upgrade swaps its system proxy's
 /// implementation for `EmptyContract` (see `getRemovedTrackerNeutralizations`).
 pub const L2_REMOVED_GW_ASSET_TRACKER_ADDR: Address = l2_addr(0x10);
 pub const SLOAD_CONTRACT_ADDR: Address = l2_addr(0x06);
@@ -79,8 +79,8 @@ pub const L2_ATOMIC_FLOW_MANAGER_ADDR: Address = l2_addr(0x14);
 pub const L2_BASE_TOKEN_HOLDER_ADDR: Address = l2_addr(0x11);
 
 /// L2 system contract addresses (`SYSTEM_CONTRACTS_OFFSET + <offset>`).
-/// Sourced from `L2ContractAddresses.sol` where available; the rest live in
-/// `system-contracts/contracts/Constants.sol`.
+/// Current addresses match `L2ContractAddresses.sol`; this verifier module
+/// also retains its version-specific Era address constants.
 pub const L2_BOOTLOADER_ADDRESS: Address = system_contract_addr(0x01);
 pub const L2_ACCOUNT_CODE_STORAGE_ADDR: Address = system_contract_addr(0x02);
 pub const L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR: Address = system_contract_addr(0x04);
@@ -97,13 +97,10 @@ pub const L2_PUBDATA_CHUNK_PUBLISHER_ADDR: Address = system_contract_addr(0x11);
 pub const CODE_ORACLE_SYSTEM_CONTRACT: Address = system_contract_addr(0x12);
 pub const EVM_GAS_MANAGER: Address = system_contract_addr(0x13);
 pub const EVM_PREDEPLOYS_MANAGER: Address = system_contract_addr(0x14);
-/// Solidity hardcodes this as `address(0x8010)` rather than the offset form;
-/// see the comment in `system-contracts/Constants.sol`. The value is still
-/// `SYSTEM_CONTRACTS_OFFSET + 0x10`.
+/// Historical Era Keccak precompile address.
 pub const KECCAK256_SYSTEM_CONTRACT: Address = literal_addr(0x8010);
 
-/// EVM precompile addresses. Sourced from `system-contracts/Constants.sol`
-/// where they're declared as `address(0xNN)` literals (no offset).
+/// EVM precompile addresses.
 pub const ECRECOVER_SYSTEM_CONTRACT: Address = literal_addr(0x01);
 pub const SHA256_SYSTEM_CONTRACT: Address = literal_addr(0x02);
 pub const IDENTITY_SYSTEM_CONTRACT: Address = literal_addr(0x04);
@@ -112,18 +109,16 @@ pub const ECADD_SYSTEM_CONTRACT: Address = literal_addr(0x06);
 pub const ECMUL_SYSTEM_CONTRACT: Address = literal_addr(0x07);
 pub const ECPAIRING_SYSTEM_CONTRACT: Address = literal_addr(0x08);
 
-/// v33 L2 protocol upgrade transaction parameters. Gas + pubdata limits are
-/// fixed by the v33 deploy scripts and travel with the artifact. Era VM's
-/// `txType` (254) is not listed: v33 is a ZKsync OS-only release.
+/// v31 L2 protocol upgrade transaction parameters.
+/// ZKsync OS upgrade txs use txType 126 (Era VM's 254 is gone with the Era
+/// CTM); gas + pubdata limits are fixed by v31 deploy scripts and travel
+/// with the artifact.
 pub const ZKSYNC_OS_SYSTEM_UPGRADE_TX_TYPE: u64 = 126;
 pub const L2_UPGRADE_GAS_LIMIT: u64 = 72_000_000;
 pub const L2_UPGRADE_GAS_PER_PUBDATA_BYTE_LIMIT: u64 = 800;
 
-/// AllContractsHashes file-name keys consulted by the bytecode verifier.
-/// The Era VM system contracts (`Bootloader`, `DefaultAccount`, `EvmEmulator`)
-/// are absent: only an Era CTM's chain-creation and upgrade payloads named
-/// them, and v33 has no Era flavor.
-pub const L2_V32_UPGRADE_CONTRACT: &str = "l1-contracts/L2V32Upgrade";
+/// AllContractsHashes file-name key consulted by the bytecode verifier.
+pub const L2_DEFAULT_UPGRADE_CONTRACT: &str = "l1-contracts/L2DefaultUpgrade";
 
 #[cfg(test)]
 mod tests {
@@ -139,9 +134,6 @@ mod tests {
     ///
     /// Also matches the `address payable constant ... = payable(address(...))`
     /// wrapper used for `L2_INTEROP_HANDLER_ADDR` / `BOOTLOADER_FORMAL_ADDRESS`.
-    /// `USER_CONTRACTS_OFFSET` (an alias of `BUILT_IN_CONTRACTS_OFFSET` in
-    /// `Constants.sol`) is intentionally ignored — those entries duplicate
-    /// the BUILT_IN ones in `L2ContractAddresses.sol`.
     fn parse_solidity_addresses(source: &str) -> HashMap<String, Address> {
         enum Pattern {
             BuiltIn(usize),
@@ -208,7 +200,7 @@ mod tests {
         out
     }
 
-    /// Asserts every Rust address constant matches its Solidity definition.
+    /// Asserts current contract addresses match their Solidity definitions.
     /// `include_str!` resolves at compile time, so a renamed/moved Solidity
     /// file fails the build rather than silently skipping the check.
     #[test]
@@ -216,16 +208,9 @@ mod tests {
         const L2_CONTRACT_ADDRESSES: &str = include_str!(
             "../../../l1-contracts/contracts/common/l2-helpers/L2ContractAddresses.sol"
         );
-        const SYSTEM_CONSTANTS: &str =
-            include_str!("../../../system-contracts/contracts/Constants.sol");
+        let addrs = parse_solidity_addresses(L2_CONTRACT_ADDRESSES);
 
-        let mut addrs = parse_solidity_addresses(L2_CONTRACT_ADDRESSES);
-        // Later inserts overwrite — fine because any duplicate names across
-        // the two files (e.g. `MSG_VALUE_SYSTEM_CONTRACT`) resolve to the
-        // same address.
-        addrs.extend(parse_solidity_addresses(SYSTEM_CONSTANTS));
-
-        // Every Rust constant must appear in the Solidity source with the
+        // Current constants must appear in the Solidity source with the
         // same on-chain address. For aliases the Solidity-side name differs
         // from the Rust-side name (e.g. `L2_VERSION_SPECIFIC_UPGRADER_ADDR`
         // is `= L2_GENESIS_UPGRADE_ADDR`); look up by the Solidity name.
@@ -263,11 +248,6 @@ mod tests {
             ),
             // SYSTEM_CONTRACTS_OFFSET range
             ("L2_BOOTLOADER_ADDRESS", L2_BOOTLOADER_ADDRESS),
-            ("L2_ACCOUNT_CODE_STORAGE_ADDR", L2_ACCOUNT_CODE_STORAGE_ADDR),
-            (
-                "L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR",
-                L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR,
-            ),
             (
                 "L2_DEPLOYER_SYSTEM_CONTRACT_ADDR",
                 L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
@@ -277,7 +257,6 @@ mod tests {
                 "L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR",
                 L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
             ),
-            ("MSG_VALUE_SYSTEM_CONTRACT", MSG_VALUE_SYSTEM_CONTRACT),
             (
                 "L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR",
                 L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -286,26 +265,7 @@ mod tests {
                 "L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR",
                 L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
             ),
-            ("EVENT_WRITER_CONTRACT", EVENT_WRITER_CONTRACT),
-            ("L2_COMPRESSOR_ADDR", L2_COMPRESSOR_ADDR),
             ("L2_COMPLEX_UPGRADER_ADDR", L2_COMPLEX_UPGRADER_ADDR),
-            (
-                "L2_PUBDATA_CHUNK_PUBLISHER_ADDR",
-                L2_PUBDATA_CHUNK_PUBLISHER_ADDR,
-            ),
-            ("CODE_ORACLE_SYSTEM_CONTRACT", CODE_ORACLE_SYSTEM_CONTRACT),
-            ("EVM_GAS_MANAGER", EVM_GAS_MANAGER),
-            ("EVM_PREDEPLOYS_MANAGER", EVM_PREDEPLOYS_MANAGER),
-            // Hardcoded literal (`address(0x8010)`)
-            ("KECCAK256_SYSTEM_CONTRACT", KECCAK256_SYSTEM_CONTRACT),
-            // EVM precompiles (literal `address(0xNN)`)
-            ("ECRECOVER_SYSTEM_CONTRACT", ECRECOVER_SYSTEM_CONTRACT),
-            ("SHA256_SYSTEM_CONTRACT", SHA256_SYSTEM_CONTRACT),
-            ("IDENTITY_SYSTEM_CONTRACT", IDENTITY_SYSTEM_CONTRACT),
-            ("MODEXP_SYSTEM_CONTRACT", MODEXP_SYSTEM_CONTRACT),
-            ("ECADD_SYSTEM_CONTRACT", ECADD_SYSTEM_CONTRACT),
-            ("ECMUL_SYSTEM_CONTRACT", ECMUL_SYSTEM_CONTRACT),
-            ("ECPAIRING_SYSTEM_CONTRACT", ECPAIRING_SYSTEM_CONTRACT),
         ] {
             let actual = addrs
                 .get(sol_name)

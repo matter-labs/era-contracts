@@ -1,6 +1,6 @@
 # Multi-Chain Anvil Interop Tests
 
-End-to-end tests for ZKsync interoperability across 5 Anvil chains: L1 contract deployment, L1<->L2 bridging (ETH + ERC20), L2<->L2 interop transfers, and gateway setup with chain migration.
+End-to-end tests for ZKsync interoperability across 6 Anvil chains: L1 contract deployment, L1<->L2 bridging (ETH + ERC20), L2<->L2 interop transfers, and gateway setup with chain migration.
 
 ## Chain Topology
 
@@ -12,19 +12,20 @@ End-to-end tests for ZKsync interoperability across 5 Anvil chains: L1 contract 
        │
        ├──► L2  (10)  port 4050 — settled directly on L1
        │
-       ├──► GW  (11)  port 4051 — gateway chain (settled on L1, settlement layer for L2A/L2B)
+       ├──► GW  (11)  port 4051 — gateway chain (settled on L1, settlement layer for L2A/L2B/L2C)
        │     │
        │     ├──► L2A (12)  port 4052 — settled via GW
-       │     └──► L2B (13)  port 4053 — settled via GW
+       │     ├──► L2B (13)  port 4053 — settled via GW
+       │     └──► L2C (14)  port 4054 — custom-base-token chain settled via GW
        │
-       └──► (L2A and L2B also registered on L1 but migrated to GW)
+       └──► (L2A, L2B, and L2C also registered on L1 but migrated to GW)
 ```
 
 ## Quick Start
 
 ```bash
-# From contracts/l1-contracts/ — run all tests with pregenerated state (~85s)
-cd contracts/l1-contracts
+# From the repository root — run all tests with pregenerated state (~85s)
+cd l1-contracts
 yarn test:hardhat:interop
 
 # Force full deployment from scratch (~5 min)
@@ -36,20 +37,22 @@ yarn test:hardhat:interop --keep-chains
 
 ## Pregenerated Chain States
 
-Tests load pregenerated Anvil snapshots from `chain-states/v0.32.0/` by default (the current protocol version). This skips the full deployment and cuts test time from ~5 min to ~85s.
+Tests load pregenerated Anvil snapshots from `chain-states/v0.34.0/` by default (the current snapshot version, configured as `stateVersion` in `config/anvil-config.json`). This skips the full deployment and cuts test time from ~5 min to ~85s.
 
-The runner auto-detects pregenerated state by checking for `chain-states/<protocol-version>/addresses.json`. If found, it gunzips each `<chainId>.json.gz` dump and starts each Anvil process with `--load-state`. If not found (or `FRESH_DEPLOY=1`), it runs the full 5-step deployment.
+The runner auto-detects pregenerated state by checking for `chain-states/<state-version>/addresses.json`. If found, it gunzips each `<chainId>.json.gz` dump and starts each Anvil process with `--load-state`. If not found (or `ANVIL_INTEROP_FRESH_DEPLOY=1`), it runs the full deployment.
+
+Only the current snapshot directory, selected by `stateVersion`, is regenerated. Upgrade scenarios select their frozen source fixture explicitly; those fixtures must not be regenerated from current contracts.
 
 The per-chain state dumps are committed **gzip-compressed** (`<chainId>.json.gz`). These snapshots are multi-MB; storing them as raw JSON floods every regeneration with an enormous, unreviewable diff. GitHub renders `.gz` as binary ("Binary file not shown"), keeping them out of PR diffs, and gzip shrinks them ~10x. `addresses.json` stays plain text so contract-address changes remain reviewable. Compression/decompression is handled automatically by `dumpAllStates()` / `loadChainStates()` in `deployment-runner.ts` — no manual step.
 
-To regenerate pregenerated state after contract changes:
+To regenerate pregenerated state after contract changes, first finalize `configs/genesis/zksync-os/latest.json` from the production build, then build the `anvil-interop` profile and generate the snapshots. The genesis root is part of CTM deployment data; changing it afterward invalidates the snapshot addresses.
 
 ```bash
-cd contracts/l1-contracts/test/anvil-interop
+cd l1-contracts/test/anvil-interop
 yarn setup-and-dump
 ```
 
-This runs the full deployment with deterministic settings (`blockTime=0`, `timestamp=1`) and dumps each chain's state to the `chain-states/` directory.
+This runs the full deployment with pinned settings (`blockTime=1`, `timestamp=1`) and dumps each chain's state to the `chain-states/` directory. Interval mining makes the final block height and block-indexed state wall-clock-dependent, so the CI determinism check uses `compare-chain-states.ts` to normalize the documented drift and requires every non-normalized field to match.
 
 ## Running Tests Without Redeployment
 
@@ -57,9 +60,9 @@ After running once with `--keep-chains`, the Anvil chains and deployment state p
 
 ```bash
 # Run all test specs (no redeployment)
-cd contracts/l1-contracts
+cd l1-contracts
 ANVIL_INTEROP_SKIP_SETUP=1 ANVIL_INTEROP_SKIP_CLEANUP=1 \
-  yarn hardhat test test/anvil-interop/test/hardhat/0*.spec.ts \
+  yarn hardhat test test/anvil-interop/test/hardhat/*.spec.ts \
   --network hardhat --no-compile
 
 # Run a single spec file
@@ -85,7 +88,7 @@ deploys a fresh L1 `TestnetERC20Token`, mints it to `LIVE_SOURCE_PRIVATE_KEY`, d
 `L2NativeTokenVault` at execution time.
 
 ```bash
-cd contracts/l1-contracts
+cd l1-contracts
 
 ANVIL_INTEROP_LIVE=1 \
 LIVE_L1_RPC=<l1-rpc> \
@@ -121,12 +124,16 @@ Live environment variables:
 
 | Spec                         | What it tests                                                                                                                                                |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `01-deployment-verification` | L1 contracts deployed, CTM registered, all 4 L2 chains have diamond proxies, L2 system contracts present, test tokens deployed, initial chainBalance is zero |
+| `01-deployment-verification` | L1 contracts deployed, CTM registered, all 5 L2 chains have diamond proxies, L2 system contracts present, test tokens deployed, initial chainBalance is zero |
 | `02-direct-bridge`           | L1->L2 ETH deposit + L2->L1 ETH withdrawal on chain 10 (direct L1 settlement), net flow assertions                                                           |
 | `03-interop-transfer`        | Unsupported interop routes revert; only GW-settled L2<->GW-settled L2 interop is intentionally registered                                                    |
 | `04-gateway-setup`           | GW chain contracts deployed, interop chains registered on GW L2Bridgehub, GW designated as settlement layer on L1                                            |
 | `05-gateway-bridge`          | L1->L2A ETH deposit + L2A->L1 ETH withdrawal on chain 12 (via GW)                                                                                            |
 | `06-gateway-interop`         | L2A<->L2B interop transfers between GW-settled L2 chains                                                                                                     |
+| `07-interop-bundles`         | Direct, indirect, and mixed bundles; fees, replay protection, and execution-address checks                                                                   |
+| `08-interop-messages`        | Base-token and ERC20 messages across ETH and custom-base-token chains                                                                                        |
+| `09-interop-unbundle`        | Bundle verification and recovery of calls that cannot execute                                                                                                |
+| `13-imt-atomic-swap`         | IMT-backed atomic swaps, timeout refunds, and invalid-flow rejection                                                                                         |
 
 ## Coverage
 
@@ -231,18 +238,18 @@ Copy-paste into a terminal (while chains are still running) to get the full exec
 test/anvil-interop/
 ├── run-hardhat-interop-test.ts    # Main entry: deployment + hardhat test runner
 ├── setup-and-dump-state.ts        # Generate pregenerated chain state snapshots
-├── run-upgrade-test.ts            # V31 → V33 upgrade test
+├── run-upgrade-test.ts            # Latest default upgrade test
 ├── cleanup.sh                     # Kill Anvil processes, reset state
 ├── config/
 │   ├── anvil-config.json          # Chain IDs, ports, gateway designation
 │   ├── l1-deployment.toml         # L1 contract deployment params
 │   ├── ctm-deployment.toml        # ChainTypeManager params
 │   ├── permanent-values.toml      # Immutable protocol values
-│   └── chain-{10,11,12,13}.toml   # Per-chain deployment params (generated)
+│   └── chain-{10,11,12,13,14}.toml # Per-chain deployment params (generated)
 ├── chain-states/
-│   └── v0.32.0/                   # Pregenerated Anvil state snapshots
+│   └── v0.34.0/                   # Pregenerated Anvil state snapshots (current, regenerated)
 │       ├── 31337.json.gz          # L1 state dump (gzip; kept out of diffs)
-│       ├── {10,11,12,13}.json.gz  # L2 chain state dumps (gzip)
+│       ├── {10,11,12,13,14}.json.gz # L2 chain state dumps (gzip)
 │       └── addresses.json         # All contract addresses + test tokens
 ├── src/
 │   ├── deployment-runner.ts       # Orchestrates all deployment steps
@@ -274,7 +281,11 @@ test/anvil-interop/
 │   ├── 03-interop-transfer.spec.ts
 │   ├── 04-gateway-setup.spec.ts
 │   ├── 05-gateway-bridge.spec.ts
-│   └── 06-gateway-interop.spec.ts
+│   ├── 06-gateway-interop.spec.ts
+│   ├── 07-interop-bundles.spec.ts
+│   ├── 08-interop-messages.spec.ts
+│   ├── 09-interop-unbundle.spec.ts
+│   └── 13-imt-atomic-swap.spec.ts
 └── outputs/                       # Deployment outputs (gitignored)
 ```
 
@@ -285,7 +296,6 @@ test/anvil-interop/
 - **L1→L2 transaction failures / refundRecipient**: Priority requests always succeed on Anvil; failure + refund logic is untested
 - **Batch settlement**: No real sequencer or prover; batches are never committed/proved/executed
 - **Custom pubdata pricing**: Gas and pubdata costs use Anvil defaults, not ZKsync fee models
-- **Non-ETH base tokens**: All chains use ETH as the base token
 - **Validium mode**: All chains run as rollup (validium carries no meaning without batch settlement)
 - **Settlement fees**: `processLogsAndMessages` still uses a zero settlement fee payer; interop sends cover non-zero dynamic base-token fees and fixed ZK fees separately
 
@@ -297,11 +307,11 @@ Source of truth for the Anvil predeploy layout lives in
 | Mock                        | Address   | Replaces              | Difference                                           |
 | --------------------------- | --------- | --------------------- | ---------------------------------------------------- |
 | `MockL2MessageVerification` | `0x10009` | L2MessageVerification | All proof checks return `true`                       |
-| `MockL1MessengerHook`       | `0x7001`  | L1_MESSENGER_HOOK     | No-op; real L1MessengerZKOS still emits events       |
+| `MockL1MessengerHook`       | `0x7001`  | L1_MESSENGER_HOOK     | No-op; real L1Messenger still emits events           |
 | `MockMintBaseTokenHook`     | `0x7100`  | MINT_BASE_TOKEN_HOOK  | No-op; L2BaseToken pre-funded via `anvil_setBalance` |
 | `DummyL1MessageRoot`        | L1        | L1MessageRoot         | All proof verification returns `true`                |
 
-Real contracts used: `SystemContext` at `0x800b`, `L1MessengerZKOS` at `0x8008`, `L2BaseTokenZKOS` at `0x800a`, all other L2 system contracts at their production addresses.
+Real contracts used: `SystemContext` at `0x800b`, `L1Messenger` at `0x8008`, `L2BaseToken` at `0x800a`, all other L2 system contracts at their production addresses.
 
 ### L2 Deployment: Synthetic Prestate + Real Genesis Upgrade
 
@@ -327,9 +337,9 @@ Contracts are first bootstrapped at hardcoded addresses via `anvil_setCode` and 
 - **Interop proofs**: Correct struct shape but empty proof arrays
 - **processLogsAndMessages impersonation**: The diamond proxy is impersonated instead of the operator (production uses the operator role)
 - **Settlement layer notification via impersonation**: `SystemContext.setSettlementLayerChainId` is called by impersonating the bootloader. On ZKsync OS, this is only emitted during actual migration between settlement layers (and during genesis/v31 upgrades), not at every batch
-- **v31 -> v33 upgrade harness**: `run-upgrade-test.ts` still applies two direct `anvil_setStorageAt` patches. Before governance it clears the genesis-upgrade tx hash the fixture's chains still carry, which a real chain's server clears once it processes the batch and which otherwise blocks a new upgrade with `PreviousUpgradeNotFinalized`. Before each per-chain upgrade, `forceBatchExecutedEqualsCommitted` copies `totalBatchesCommitted` onto `totalBatchesExecuted` so the upgrade's outstanding-batches check passes without a sequencer and prover. Both are test-only compatibility bridges, not a production upgrade flow.
+- **Upgrade harness**: `run-upgrade-test.ts` still applies two direct `anvil_setStorageAt` patches. Before governance it clears the genesis-upgrade tx hash the fixture's chains still carry, which a real chain's server clears once it processes the batch and which otherwise blocks a new upgrade with `PreviousUpgradeNotFinalized`. Before each per-chain upgrade, `forceBatchExecutedEqualsCommitted` copies `totalBatchesCommitted` onto `totalBatchesExecuted` so the upgrade's outstanding-batches check passes without a sequencer and prover. Both are test-only compatibility bridges, not a production upgrade flow.
 - **L2 genesis bootstrap**: `l2-genesis-upgrade-deployer.ts` still bootstraps contract code and base-token balance via Anvil RPC before relaying the real genesis transaction. Production chains get that state directly from genesis.
-- **Temporary upgrade inputs**: the upgrade harness copies the scenario's config inputs into `test/anvil-interop/outputs/upgrade-harness-inputs-<scenario label>/` and passes them to Forge via env overrides. It no longer mutates checked-in `upgrade-envs/.../local.toml`.
+- **Default upgrade inputs**: the upgrade harness passes no script or input overrides to `upgrade-prepare-all`; it uses protocol-ops' default upgrade input and writes its outputs under `test/anvil-interop/outputs/upgrade-harness-inputs-<scenario label>/`.
 
 ## Adding New Tests
 
@@ -352,6 +362,6 @@ Note: `cleanup.sh` reads ports from `anvil-config.json` automatically — no man
 
 ```bash
 # Full cleanup: kill chains, remove outputs, reset state
-cd contracts/l1-contracts/test/anvil-interop
+cd l1-contracts/test/anvil-interop
 yarn cleanup
 ```

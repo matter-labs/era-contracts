@@ -17,7 +17,6 @@ IMPORT_REGEX = re.compile(r'^\s*import\s*{([^}]*)}\s*from\s*["\']([^"\']+)["\'];
 
 dependency_files = [
     "contracts/l1-contracts/contracts/common/Dependencies.sol",
-    "contracts/l2-contracts/contracts/Dependencies.sol",
 ]
 
 def process_file(path: str):

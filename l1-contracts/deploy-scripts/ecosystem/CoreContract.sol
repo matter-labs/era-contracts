@@ -2,63 +2,9 @@
 
 pragma solidity ^0.8.24;
 
-/// @notice Programming language of a system contract.
-enum Language {
-    Solidity,
-    Yul
-}
-
-/// @notice How a built-in contract is deployed in ZKsyncOS upgrades.
-/// SystemProxy: deployed via conductContractUpgrade (behind a system proxy).
-/// Unsafe: force-deployed directly (no proxy upgrade flow).
-enum ZKsyncOSUpgradeType {
-    SystemProxy,
-    Unsafe
-}
-
-/// @notice Identifier for every system contract that lives inside the
-///         `system-contracts` folder.  The numeric value encodes the
-///         position in the canonical deployment array (index 0..29).
-///         Resolver functions in `SystemContractsProcessing` map each
-///         entry to its address, Era code-name, language and precompile flag.
-enum EraVmSystemContract {
-    EmptyContract_0x0000,
-    Ecrecover,
-    SHA256,
-    Identity,
-    EcAdd,
-    EcMul,
-    EcPairing,
-    Modexp,
-    EmptyContract_0x8001,
-    AccountCodeStorage,
-    NonceHolder,
-    KnownCodesStorage,
-    ImmutableSimulator,
-    ContractDeployer,
-    L1Messenger,
-    MsgValueSimulator,
-    L2BaseToken,
-    SystemContext,
-    BootloaderUtilities,
-    EventWriter,
-    Compressor,
-    Keccak256,
-    CodeOracle,
-    EvmGasManager,
-    EvmPredeploysManager,
-    EvmHashesStorage,
-    P256Verify,
-    PubdataChunkPublisher,
-    Create2Factory,
-    SloadContract,
-    SystemContractProxyAdmin
-}
-
 /// @notice Canonical identifier for core L2 contracts that participate in
 ///         force-deployments and factory-dependency publishing.
-///         The enum value is VM-neutral; `CoreOnGatewayHelper.resolve` maps it to
-///         the correct Era or ZKsyncOS contract / artifact name.
+///         `CoreOnGatewayHelper.resolve` maps it to the contract and artifact name.
 enum CoreContract {
     L2Bridgehub,
     L2AssetRouter,
@@ -75,24 +21,20 @@ enum CoreContract {
     L2MessageVerification,
     L2InteropRootStorage,
     BeaconProxy,
-    L2V32Upgrade,
+    L2DefaultUpgrade,
     BridgedStandardERC20,
     DiamondProxy,
     ProxyAdmin,
     TransparentUpgradeableProxy,
-    // Atomic-interop built-ins, part of `getZKsyncOSOnlyContracts`: the commitment tree's storage is read
-    // by the ZKsync OS bootloader, and Era chains have no atomic interop.
+    // Atomic-interop built-ins; the bootloader reads the commitment tree's storage.
     L2InteropCommitmentTree,
     AtomicFlowManager
 }
 
-/// @notice System contracts that have ZKsyncOS-specific implementations in l1-contracts.
-///         Separate from EraVmSystemContract because these need EVM bytecodes (from l1-contracts/out/)
-///         for ZKsyncOS proxy upgrades, while EraVmSystemContract entries use ZK bytecodes
-///         (from system-contracts/zkout/) for Era force deployments.
-enum ZkSyncOsSystemContract {
+/// @notice Fixed-address L2 system contracts upgraded through `SystemContractProxy`.
+enum L2SystemContract {
     L2BaseToken,
     L1Messenger,
     SystemContext,
-    ContractDeployer
+    L2ComplexUpgrader
 }

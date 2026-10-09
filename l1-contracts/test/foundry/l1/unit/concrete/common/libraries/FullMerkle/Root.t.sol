@@ -10,9 +10,9 @@ contract RootTest is FullMerkleTest {
     function test_emptyTree() public view {
         FullMerkleMemory.FullTree memory merkleTestMemory = _setupMemoryTree(1);
 
-        // Initially tree is empty, root is the zero hash
-        assertEq(merkleTest.root(), zeroHash, "Root should be zero hash initially");
-        assertEq(merkleTestMemory.root(), zeroHash, "Root 0,0 should be zero hash initially");
+        // Initially tree is empty, root is the ZERO hash
+        assertEq(merkleTest.root(), ZERO_HASH, "Root should be ZERO hash initially");
+        assertEq(merkleTestMemory.root(), ZERO_HASH, "Root 0,0 should be ZERO hash initially");
     }
 
     function test_oneLeaf() public {

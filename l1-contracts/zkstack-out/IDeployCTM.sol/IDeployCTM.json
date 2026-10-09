@@ -168,11 +168,6 @@
                 "name": "legacyValidatorTimelock",
                 "type": "address",
                 "internalType": "address"
-              },
-              {
-                "name": "eraDiamondProxy",
-                "type": "address",
-                "internalType": "address"
               }
             ]
           },
@@ -261,6 +256,33 @@
             "name": "chainAdmin",
             "type": "address",
             "internalType": "address"
+          },
+          {
+            "name": "multiProof",
+            "type": "tuple",
+            "internalType": "struct MultiProofAddresses",
+            "components": [
+              {
+                "name": "airbenderVerifier",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "ziskVerifier",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "ziskTestnetVerifier",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "multiProofVerifier",
+                "type": "address",
+                "internalType": "address"
+              }
+            ]
           }
         ]
       }
@@ -288,16 +310,6 @@
             "internalType": "address"
           },
           {
-            "name": "eraChainId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "gatewayChainId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
             "name": "ownerAddress",
             "type": "address",
             "internalType": "address"
@@ -313,14 +325,26 @@
             "internalType": "bool"
           },
           {
-            "name": "supportL2LegacySharedBridgeTest",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
-            "name": "isZKsyncOS",
-            "type": "bool",
-            "internalType": "bool"
+            "name": "multiProof",
+            "type": "tuple",
+            "internalType": "struct MultiProofConfig",
+            "components": [
+              {
+                "name": "enabled",
+                "type": "bool",
+                "internalType": "bool"
+              },
+              {
+                "name": "ziskPlonkVerifierAddr",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "ziskRangeVerifierAddr",
+                "type": "address",
+                "internalType": "address"
+              }
+            ]
           },
           {
             "name": "contracts",
@@ -386,21 +410,6 @@
                     "name": "latestProtocolVersion",
                     "type": "uint256",
                     "internalType": "uint256"
-                  },
-                  {
-                    "name": "bootloaderHash",
-                    "type": "bytes32",
-                    "internalType": "bytes32"
-                  },
-                  {
-                    "name": "defaultAAHash",
-                    "type": "bytes32",
-                    "internalType": "bytes32"
-                  },
-                  {
-                    "name": "evmEmulatorHash",
-                    "type": "bytes32",
-                    "internalType": "bytes32"
                   }
                 ]
               }
@@ -426,11 +435,6 @@
         "name": "bridgehub",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "skipL1Deployments",
-        "type": "bool",
-        "internalType": "bool"
       }
     ],
     "outputs": [],
@@ -457,11 +461,6 @@
       },
       {
         "name": "reuseGovAndAdmin",
-        "type": "bool",
-        "internalType": "bool"
-      },
-      {
-        "name": "skipL1Deployments",
         "type": "bool",
         "internalType": "bool"
       }

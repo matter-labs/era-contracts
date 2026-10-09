@@ -75,18 +75,6 @@ contract GettersFacetWrapper is GettersFacet, Test {
         s.storedBatchHashes[batchNumber] = _storedBatchHash;
     }
 
-    function util_setL2BootloaderBytecodeHash(bytes32 _l2BootloaderBytecodeHash) external {
-        s.l2BootloaderBytecodeHash = _l2BootloaderBytecodeHash;
-    }
-
-    function util_setL2DefaultAccountBytecodeHash(bytes32 _l2DefaultAccountBytecodeHash) external {
-        s.l2DefaultAccountBytecodeHash = _l2DefaultAccountBytecodeHash;
-    }
-
-    function utils_setL2EvmEmulatorBytecodeHash(bytes32 _l2EvmEmulatorBytecodeHash) external {
-        s.l2EvmEmulatorBytecodeHash = _l2EvmEmulatorBytecodeHash;
-    }
-
     function util_setVerifierParams(VerifierParams memory _verifierParams) external {
         s.__DEPRECATED_verifierParams = _verifierParams;
     }
@@ -170,6 +158,10 @@ contract GettersFacetWrapper is GettersFacet, Test {
 
     function util_setChainId(uint256 _chainId) external {
         s.chainId = _chainId;
+    }
+
+    function util_setZKsyncOS(bool _zksyncOS) external {
+        s.zksyncOS = _zksyncOS;
     }
 
     function util_setPriorityTreeStartIndex(uint256 _startIndex) external {

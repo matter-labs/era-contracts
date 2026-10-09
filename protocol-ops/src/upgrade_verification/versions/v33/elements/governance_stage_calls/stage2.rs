@@ -1,13 +1,10 @@
 //! Stage 2 — post-upgrade governance calls.
 //!
-//! Shape, and the whole of it:
-//!   `[ unpauseMigration,
-//!      (checkProtocolUpgradePresence, checkMigrationsUnpaused) × N CTMs ]`
+//! Canonical shape:
+//!   `[ unpauseMigration, (checkProtocolUpgradePresence, checkMigrationsUnpaused) × N CTMs ]`
 //!
-//! There is no Gateway in a v33 ecosystem — not a new one to bring up and not
-//! a legacy one to decommission — so stage 2 has neither the interval/blacklist
-//! prefix nor the bring-up appendix that earlier releases carried, and the
-//! generators emit no calls for either.
+//! v31 carried two Gateway sections around this core (a legacy-Gateway decommission prefix and a
+//! new-Gateway bring-up appendix); v33 deploys no Gateway, so stage 2 is exactly the core.
 
 use crate::upgrade_verification::{
     artifacts::EcosystemUpgradeArtifact,
@@ -18,7 +15,8 @@ use super::helpers::{required_ctm_address, verify_call_by_address, verify_call_b
 use super::GovernanceStage2Calls;
 
 impl GovernanceStage2Calls {
-    /// Stage 2 — `unpauseMigration` then, per CTM, the two stage-validator assertions.
+    /// Stage 2: `unpauseMigration` then per-CTM
+    /// (`checkProtocolUpgradePresence`, `checkMigrationsUnpaused`).
     pub(crate) async fn verify_artifact(
         &self,
         artifact: &EcosystemUpgradeArtifact,
@@ -27,12 +25,12 @@ impl GovernanceStage2Calls {
     ) -> anyhow::Result<()> {
         result.print_info("== Gov stage 2 calls ===");
 
-        // `unpauseMigration()` then, per CTM, the two stage-validator
-        // assertions. That is the whole of stage 2 in v33: there is no Gateway
-        // in this ecosystem, so neither the legacy-Gateway decommission prefix
-        // nor a Gateway bring-up appendix exists, and `DefaultCoreUpgrade` /
-        // `DefaultCTMUpgrade` emit no calls for either.
-        let mut errors = verify_call_by_name(
+        let mut errors = 0;
+        let expected_call_count = 1 + artifact.ctms.len() * 2;
+
+        // Call 0 — ChainAssetHandler.unpauseMigration() re-enables cross-chain
+        // migrations now that impls are swapped.
+        errors += verify_call_by_name(
             &self.calls,
             0,
             "chain_asset_handler_proxy",
@@ -76,7 +74,6 @@ impl GovernanceStage2Calls {
             );
         }
 
-        let expected_call_count = 1 + artifact.ctms.len() * 2;
         match self.calls.elems.len().cmp(&expected_call_count) {
             std::cmp::Ordering::Less => {
                 result.report_error(&format!(

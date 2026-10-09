@@ -2,12 +2,11 @@
 pragma solidity 0.8.28;
 
 import {StdStorage, stdStorage, stdToml} from "forge-std/Test.sol";
-import {Script, console2 as console} from "forge-std/Script.sol";
+import {console2 as console} from "forge-std/Script.sol";
 
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_BRIDGEHUB_ADDR,
-    L2_INTEROP_CENTER_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
@@ -38,10 +37,10 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
     }
 
     function deployL2Contracts(uint256 _l1ChainId) public virtual override {
-        deployL2ContractsInner(_l1ChainId, false);
+        deployL2ContractsInner(_l1ChainId);
     }
 
-    function deployL2ContractsInner(uint256 _l1ChainId, bool _skip) public {
+    function deployL2ContractsInner(uint256 _l1ChainId) public {
         string memory root = vm.projectRoot();
         string memory CONTRACTS_PATH = vm.envString("CONTRACTS_PATH");
         string memory inputPath = string.concat(
@@ -51,7 +50,7 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
             "/l1-contracts",
             "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-ctm.toml"
         );
-        initializeConfig(inputPath, L2_BRIDGEHUB_ADDR);
+        initializeConfig(inputPath);
         coreAddresses.bridgehub.proxies.bridgehub = L2_BRIDGEHUB_ADDR;
         coreAddresses.bridges.proxies.l1AssetRouter = L2_ASSET_ROUTER_ADDR;
         coreAddresses.bridges.proxies.l1NativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
@@ -62,13 +61,10 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         ctmAddresses.admin.transparentProxyAdmin = makeAddr("transparentProxyAdmin");
         ctmAddresses.admin.governance = makeAddr("governance");
         ctmAddresses.chainAdmin = makeAddr("chainAdmin");
-        ctmAddresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade", true);
-        (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(
-            config.isZKsyncOS,
-            config.testnetVerifier
-        );
-        ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName, true);
-        ctmAddresses.stateTransition.proxies.validatorTimelock = deploySimpleContract("ValidatorTimelock", true);
+        ctmAddresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade");
+        (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(config.testnetVerifier);
+        ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName);
+        ctmAddresses.stateTransition.proxies.validatorTimelock = deploySimpleContract("ValidatorTimelock");
         (
             ctmAddresses.stateTransition.implementations.serverNotifier,
             ctmAddresses.stateTransition.proxies.serverNotifier
@@ -76,11 +72,11 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         ctmAddresses.admin.eip7702Checker = address(0);
         initializeGeneratedData();
         deployStateTransitionDiamondFacets();
-        string memory ctmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
+        string memory ctmContractName = "ChainTypeManager";
         (
             ctmAddresses.stateTransition.implementations.chainTypeManager,
             ctmAddresses.stateTransition.proxies.chainTypeManager
-        ) = deployTuppWithContract(ctmContractName, true);
+        ) = deployTuppWithContract(ctmContractName);
     }
 
     // add this to be excluded from coverage report
@@ -94,7 +90,10 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         override(DeployCTMIntegrationScript, DeployIntegrationUtils)
         returns (Diamond.FacetCut[] memory)
     {
-        return super.getChainCreationFacetCuts(stateTransition);
+        // This standard-EVM harness reads selectors from ordinary Forge artifacts.
+        // It must not depend on the old Foundry-ZKsync test side effect that wrote
+        // script-out/diamond-selectors.toml.
+        return DeployIntegrationUtils.getChainCreationFacetCuts(stateTransition);
     }
 
     function getUpgradeAddedFacetCuts(
@@ -105,13 +104,12 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         override(DeployCTMIntegrationScript, DeployIntegrationUtils)
         returns (Diamond.FacetCut[] memory)
     {
-        return super.getUpgradeAddedFacetCuts(stateTransition);
+        return DeployIntegrationUtils.getUpgradeAddedFacetCuts(stateTransition);
     }
 
     function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
+        string memory contractName
     ) internal virtual override(DeployIntegrationUtils, DeployCTMUtils) returns (bytes memory) {
-        return super.getInitializeCalldata(contractName, isZKBytecode);
+        return super.getInitializeCalldata(contractName);
     }
 }

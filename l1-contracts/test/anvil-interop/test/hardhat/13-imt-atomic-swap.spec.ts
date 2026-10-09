@@ -99,9 +99,6 @@ type ChainCtx = {
   stack: AtomicStack;
 };
 
-const NTV_TOKEN_ADDRESS_ABI = ["function tokenAddress(bytes32 assetId) view returns (address)"];
-const ERC20_BALANCE_ABI = ["function balanceOf(address) view returns (uint256)"];
-
 /** assetId = keccak256(abi.encode(originChainId, L2_NATIVE_TOKEN_VAULT_ADDR, originToken)). */
 function ntvAssetId(originChainId: number, originToken: string): string {
   return ethers.utils.keccak256(
@@ -434,18 +431,18 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     // are delta-based for the same reason).
     const abAssetId = ntvAssetId(chainA.chainId, chainA.testToken.address);
     const baAssetId = ntvAssetId(chainB.chainId, chainB.testToken.address);
-    const ntvOnB = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, NTV_TOKEN_ADDRESS_ABI, chainB.provider);
-    const ntvOnA = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, NTV_TOKEN_ADDRESS_ABI, chainA.provider);
+    const ntvOnB = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("L2NativeTokenVault"), chainB.provider);
+    const ntvOnA = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("L2NativeTokenVault"), chainA.provider);
     const shimAonBAddrBefore: string = await ntvOnB.tokenAddress(abAssetId);
     const shimAonBBefore: BigNumber =
       shimAonBAddrBefore === ethers.constants.AddressZero
         ? BigNumber.from(0)
-        : await new Contract(shimAonBAddrBefore, ERC20_BALANCE_ABI, chainB.provider).balanceOf(user);
+        : await new Contract(shimAonBAddrBefore, getAbi("TestnetERC20Token"), chainB.provider).balanceOf(user);
     const shimBonAAddrBefore: string = await ntvOnA.tokenAddress(baAssetId);
     const shimBonABefore: BigNumber =
       shimBonAAddrBefore === ethers.constants.AddressZero
         ? BigNumber.from(0)
-        : await new Contract(shimBonAAddrBefore, ERC20_BALANCE_ABI, chainA.provider).balanceOf(user);
+        : await new Contract(shimBonAAddrBefore, getAbi("TestnetERC20Token"), chainA.provider).balanceOf(user);
 
     const handlerB = chainB.stack.interopHandler.connect(chainB.user);
     const handlerA = chainA.stack.interopHandler.connect(chainA.user);
@@ -462,7 +459,11 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     // B receives a bridged shim for A's token (assetId of A.testToken on chain A).
     const shimAonB = await ntvOnB.tokenAddress(abAssetId);
     expect(shimAonB).to.not.equal(ethers.constants.AddressZero, "shim for A's token deployed on B");
-    const shimAonBAfter: BigNumber = await new Contract(shimAonB, ERC20_BALANCE_ABI, chainB.provider).balanceOf(user);
+    const shimAonBAfter: BigNumber = await new Contract(
+      shimAonB,
+      getAbi("TestnetERC20Token"),
+      chainB.provider
+    ).balanceOf(user);
     expect(shimAonBAfter.sub(shimAonBBefore).toString()).to.equal(
       aAmount.toString(),
       "recipient on B received aAmount"
@@ -471,7 +472,11 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     // A receives a bridged shim for B's token.
     const shimBonA = await ntvOnA.tokenAddress(baAssetId);
     expect(shimBonA).to.not.equal(ethers.constants.AddressZero, "shim for B's token deployed on A");
-    const shimBonAAfter: BigNumber = await new Contract(shimBonA, ERC20_BALANCE_ABI, chainA.provider).balanceOf(user);
+    const shimBonAAfter: BigNumber = await new Contract(
+      shimBonA,
+      getAbi("TestnetERC20Token"),
+      chainA.provider
+    ).balanceOf(user);
     expect(shimBonAAfter.sub(shimBonABefore).toString()).to.equal(
       bAmount.toString(),
       "recipient on A received bAmount"

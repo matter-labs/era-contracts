@@ -2,8 +2,7 @@
 
 pragma solidity ^0.8.21;
 
-import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
-import {console2 as console} from "forge-std/Script.sol";
+import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
@@ -12,7 +11,6 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
@@ -24,26 +22,23 @@ import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Commi
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {
     IChainTypeManager,
     ChainCreationParams,
     ChainTypeManagerInitializeData
 } from "contracts/state-transition/IChainTypeManager.sol";
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
+import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 
-import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
@@ -53,8 +48,8 @@ import {PermissionlessValidator} from "contracts/state-transition/validators/Per
 contract ChainTypeManagerTest is UtilsCallMockerTest {
     using stdStorage for StdStorage;
 
-    EraChainTypeManager internal chainTypeManager;
-    EraChainTypeManager internal chainContractAddress;
+    ChainTypeManager internal chainTypeManager;
+    ChainTypeManager internal chainContractAddress;
     L1GenesisUpgrade internal genesisUpgradeContract;
     L1Bridgehub internal bridgehub;
     L1ChainAssetHandler internal chainAssetHandler;
@@ -72,12 +67,12 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
     address internal serverNotifier;
     bytes32 internal baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, baseToken);
     address internal newChainAdmin;
-    uint256 l1ChainId = 5;
-    uint256 chainId = 112;
-    address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    uint256 internal l1ChainId = 5;
+    uint256 internal chainId = 112;
+    address internal testnetVerifier = address(new ZKsyncOSTestnetVerifier(IVerifier(address(this))));
     bytes internal forceDeploymentsData = hex"";
 
-    uint256 eraChainId = 9;
+    uint256 internal zkChainId = 9;
     uint256 internal constant MAX_NUMBER_OF_ZK_CHAINS = 10;
 
     Diamond.FacetCut[] internal facetCuts;
@@ -124,8 +119,8 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
 
         newChainAdmin = makeAddr("chainadmin");
 
-        chainTypeManager = new EraChainTypeManager(address(bridgehub), interopCenterAddress, address(0), address(0));
-        diamondInit = address(new DiamondInit(false));
+        chainTypeManager = new ChainTypeManager(address(bridgehub), interopCenterAddress, address(0), address(0));
+        diamondInit = address(new DiamondInit());
         genesisUpgradeContract = new L1GenesisUpgrade();
 
         facetCuts.push(
@@ -226,23 +221,19 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
             admin,
             abi.encodeCall(IChainTypeManager.initialize, ctmInitializeData)
         );
-        chainContractAddress = EraChainTypeManager(address(transparentUpgradeableProxy));
+        chainContractAddress = ChainTypeManager(address(transparentUpgradeableProxy));
 
         rollupL1DAValidator = Utils.deployL1RollupDAValidatorBytecode();
     }
 
     function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
-        InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain();
-
-        bytes memory initCalldata = abi.encode(initializeData);
-
-        return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: initCalldata});
+        return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: hex""});
     }
 
     function getDiamondCutDataWithCustomFacets(
         address _diamondInit,
         Diamond.FacetCut[] memory _facetCuts
-    ) internal returns (Diamond.DiamondCutData memory) {
+    ) internal pure returns (Diamond.DiamondCutData memory) {
         return Diamond.DiamondCutData({facetCuts: _facetCuts, initAddress: _diamondInit, initCalldata: bytes("")});
     }
 

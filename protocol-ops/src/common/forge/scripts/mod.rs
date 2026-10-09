@@ -5,37 +5,38 @@ use alloy::sol_types::SolCall;
 use serde::{Deserialize, Serialize};
 
 use crate::common::abi::{
-    AdminFunctionsAbi, DeployGatewayTransactionFiltererAbi, GatewayUtilsAbi, ICoreUpgradeV33Abi,
-    IDeployCTMAbi, IDeployL1CoreContractsAbi, IDeployPaymasterAbi, IEnableEvmEmulatorAbi,
-    IFinalizeChainInitAbi, IGatewayVotePreparationAbi, IRecordPriorityOpLowerBoundAbi,
+    AdminFunctionsAbi, IDeployCTMAbi, IDeployL1CoreContractsAbi, IFinalizeChainInitAbi,
     IRegisterOnAllChainsAbi,
 };
 
 pub mod deploy_ctm;
 pub mod deploy_ecosystem;
-pub mod deploy_l2_contracts;
 pub mod register_chain;
 
 pub const ADMIN_FUNCTIONS_SCRIPT_PATH: &str = "deploy-scripts/AdminFunctions.s.sol";
 pub const FINALIZE_CHAIN_INIT_SCRIPT_PATH: &str = "deploy-scripts/chain/FinalizeChainInit.s.sol";
 
-/// v33 upgrade flow. Unlike the v31 scripts these extend the `Default*` bases directly: the
-/// v30 -> v31 one-off work (stage-2 legacy-Gateway decommission, stage-3 bridged-token
-/// migration) has no v33 counterpart and must not be replayed. See
-/// `deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol`.
-pub const CORE_UPGRADE_V33_SCRIPT_PATH: &str = "deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol";
-pub const CTM_UPGRADE_V33_SCRIPT_PATH: &str = "deploy-scripts/upgrade/v33/CTMUpgrade_v33.s.sol";
+/// The default core upgrade script, used by releases without release-specific ecosystem preparation.
+pub const DEFAULT_CORE_UPGRADE_SCRIPT_PATH: &str =
+    "deploy-scripts/upgrade/default-upgrade/DefaultCoreUpgrade.s.sol";
+/// The v34 CTM upgrade: the default upgrade with `V34UpgradeZKsyncOS` as the cut's per-chain initializer.
+pub const CTM_UPGRADE_V34_SCRIPT_PATH: &str = "deploy-scripts/upgrade/v34/CTMUpgrade_v34.s.sol";
+/// The current release's upgrade-env directory, relative to `l1-contracts/`. It is the only place the
+/// current release is named: the prepare defaults below and `--env` resolution (`EnvConfig`) derive from
+/// it. `scripts/new-release.ts` moves it on a release bump.
+macro_rules! current_upgrade_env_dir {
+    () => {
+        "upgrade-envs/v0.34.0-chain-config"
+    };
+}
+pub const CURRENT_UPGRADE_ENV_DIR: &str = concat!("/", current_upgrade_env_dir!());
+pub const CURRENT_UPGRADE_LOCAL_INPUT_PATH: &str =
+    concat!("/", current_upgrade_env_dir!(), "/local.toml");
+/// Core prepare output. Version-free: every release's prepare writes it.
+pub const UPGRADE_CORE_OUTPUT_PATH: &str = "/script-out/upgrade-core.toml";
+/// Per-CTM prepare output, `<prefix><ctm proxy>.toml` (lowercase hex). Version-free, like the core output.
+pub const UPGRADE_CTM_OUTPUT_PATH_PREFIX: &str = "/script-out/upgrade-ctm-";
 pub const UPGRADE_V33_ENV_DIR: &str = "/upgrade-envs/v0.33.0-atomic-interop";
-pub const UPGRADE_V33_LOCAL_INPUT_PATH: &str = "/upgrade-envs/v0.33.0-atomic-interop/local.toml";
-pub const UPGRADE_V33_CORE_OUTPUT_PATH: &str = "/script-out/v33-upgrade-core.toml";
-pub const RECORD_PRIORITY_OP_LOWER_BOUND_SCRIPT_PATH: &str =
-    "deploy-scripts/upgrade/v33/RecordPriorityOpLowerBound.s.sol";
-pub const GATEWAY_UTILS_SCRIPT_TARGET_PATH: &str =
-    "deploy-scripts/gateway/GatewayUtils.s.sol:GatewayUtils";
-pub const DEPLOY_GATEWAY_TRANSACTION_FILTERER_SCRIPT_TARGET_PATH: &str =
-    "deploy-scripts/gateway/DeployGatewayTransactionFilterer.s.sol:DeployGatewayTransactionFilterer";
-pub const GATEWAY_VOTE_PREPARATION_SCRIPT_PATH: &str =
-    "deploy-scripts/gateway/GatewayVotePreparation.s.sol";
 
 #[derive(Debug, Clone, Copy)]
 pub struct ForgeScriptParams {
@@ -142,68 +143,10 @@ pub static FINALIZE_CHAIN_INIT_INVOCATION: ForgeScriptParams = ForgeScriptParams
 .with_ffi()
 .with_rpc_url();
 
-pub static GATEWAY_UTILS_INVOCATION: ForgeScriptParams =
-    ForgeScriptParams::new("", "", GATEWAY_UTILS_SCRIPT_TARGET_PATH).with_rpc_url();
-
-pub static DEPLOY_GATEWAY_TRANSACTION_FILTERER_INVOCATION: ForgeScriptParams =
-    ForgeScriptParams::new(
-        "",
-        "",
-        DEPLOY_GATEWAY_TRANSACTION_FILTERER_SCRIPT_TARGET_PATH,
-    )
-    .with_ffi()
-    .with_rpc_url();
-
-pub static GATEWAY_VOTE_PREPARATION_INVOCATION: ForgeScriptParams =
-    ForgeScriptParams::new("", "", GATEWAY_VOTE_PREPARATION_SCRIPT_PATH)
-        .with_ffi()
-        .with_rpc_url();
-
-pub static DEPLOY_L2_CONTRACTS_INVOCATION: ForgeScriptParams = ForgeScriptParams::new(
-    "script-config/config-deploy-l2-contracts.toml",
-    "script-out/output-deploy-l2-contracts.toml",
-    "deploy-scripts/chain/DeployL2Contracts.sol",
-)
-.with_ffi()
-.with_rpc_url();
-
 pub static REGISTER_CHAIN_INVOCATION: ForgeScriptParams = ForgeScriptParams::new(
     "script-config/register-zk-chain.toml",
     "script-out/output-register-zk-chain.toml",
     "deploy-scripts/ctm/RegisterZKChain.s.sol",
-)
-.with_ffi()
-.with_rpc_url();
-
-pub static DEPLOY_PAYMASTER_INVOCATION: ForgeScriptParams = ForgeScriptParams::new(
-    "script-config/config-deploy-paymaster.toml",
-    "script-out/output-deploy-paymaster.toml",
-    "deploy-scripts/chain/DeployPaymaster.s.sol",
-)
-.with_ffi()
-.with_rpc_url();
-
-pub static STAGE3_CORE_UPGRADE_INVOCATION: ForgeScriptParams = ForgeScriptParams::new(
-    "",
-    "",
-    "deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol:CoreUpgrade_v33",
-)
-.with_ffi()
-.with_rpc_url()
-.with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT);
-
-pub static RECORD_PRIORITY_OP_LOWER_BOUND_INVOCATION: ForgeScriptParams = ForgeScriptParams::new(
-    "script-config/record-priority-op-lower-bound.toml",
-    "script-out/output-record-priority-op-lower-bound.toml",
-    RECORD_PRIORITY_OP_LOWER_BOUND_SCRIPT_PATH,
-)
-.with_ffi()
-.with_rpc_url();
-
-pub static ENABLE_EVM_EMULATOR_INVOCATION: ForgeScriptParams = ForgeScriptParams::new(
-    "script-config/enable-evm-emulator.toml",
-    "script-out/output-enable-evm-emulator.toml",
-    "deploy-scripts/chain/EnableEvmEmulator.s.sol",
 )
 .with_ffi()
 .with_rpc_url();
@@ -233,40 +176,24 @@ macro_rules! script_calls {
 script_calls! {
     // AdminFunctions
     AdminFunctionsAbi::pauseDepositsBeforeInitiatingMigrationCall       => ADMIN_FUNCTIONS_INVOCATION,
-    AdminFunctionsAbi::notifyServerMigrationToGatewayCall               => ADMIN_FUNCTIONS_INVOCATION,
-    AdminFunctionsAbi::migrateChainToGatewayCall                        => ADMIN_FUNCTIONS_INVOCATION,
-    AdminFunctionsAbi::enableValidatorViaGatewayCall                    => ADMIN_FUNCTIONS_INVOCATION,
-    AdminFunctionsAbi::setDAValidatorPairWithGatewayCall                => ADMIN_FUNCTIONS_INVOCATION,
-    AdminFunctionsAbi::notifyServerMigrationFromGatewayCall             => ADMIN_FUNCTIONS_INVOCATION,
-    AdminFunctionsAbi::startMigrateChainFromGatewayCall                 => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::setDAValidatorPairCall                           => ADMIN_FUNCTIONS_INVOCATION,
-    AdminFunctionsAbi::grantGatewayWhitelistCall                        => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::governanceExecuteCallsCall                       => ADMIN_FUNCTIONS_INVOCATION,
-    AdminFunctionsAbi::revokeGatewayWhitelistCall                       => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::adminScheduleUpgradeCall                         => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::governanceAcceptOwnerCall                        => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::chainAdminAcceptAdminCall                        => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsAbi::chainAdminAcceptOwnerCall                        => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsAbi::governanceAcceptOwnerConditionalCall             => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::governanceAcceptOwnerAggregatedCall              => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::ensureCtmsAndProxyAdminsOwnedByGovernanceWithWrapsCall => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::executeOwnableCallsWithWrapsCall                 => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::upgradeChainFromCTMCall                          => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::updateValidatorCall                              => ADMIN_FUNCTIONS_INVOCATION,
-    // GatewayUtils
-    GatewayUtilsAbi::finishMigrateChainFromGatewayCall                 => GATEWAY_UTILS_INVOCATION,
-    GatewayUtilsAbi::finishMigrateChainToGatewayCall                   => GATEWAY_UTILS_INVOCATION,
-    GatewayUtilsAbi::dumpForceDeploymentsCall                          => GATEWAY_UTILS_INVOCATION,
     // Other scripts
-    DeployGatewayTransactionFiltererAbi::deployAndSetOnChainCall        => DEPLOY_GATEWAY_TRANSACTION_FILTERER_INVOCATION,
-    IGatewayVotePreparationAbi::runCall                                 => GATEWAY_VOTE_PREPARATION_INVOCATION,
     IFinalizeChainInitAbi::finalizeChainInitCall                        => FINALIZE_CHAIN_INIT_INVOCATION,
-    IEnableEvmEmulatorAbi::chainAllowEvmEmulationCall                   => ENABLE_EVM_EMULATOR_INVOCATION,
-    IDeployPaymasterAbi::runCall                                        => DEPLOY_PAYMASTER_INVOCATION,
     IRegisterOnAllChainsAbi::registerOnOtherChainsCall                  => REGISTER_ON_ALL_CHAINS_INVOCATION,
     IDeployL1CoreContractsAbi::runInnerCall                             => DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION,
     // DeployCTM
     IDeployCTMAbi::runInnerCall                                         => DEPLOY_CTM_INVOCATION,
-    IRecordPriorityOpLowerBoundAbi::runCall                             => RECORD_PRIORITY_OP_LOWER_BOUND_INVOCATION,
-    ICoreUpgradeV33Abi::stage3Call                                         => STAGE3_CORE_UPGRADE_INVOCATION,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

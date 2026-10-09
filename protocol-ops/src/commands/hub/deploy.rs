@@ -16,7 +16,6 @@ use serde::Serialize;
 #[derive(Debug, Clone, Serialize)]
 pub struct DeployInput {
     pub owner: Address,
-    pub era_chain_id: u64,
     pub create2_factory_salt: Option<B256>,
     /// L1 WETH token. Baked as an immutable into the `L1AssetRouter` and
     /// `L1NativeTokenVault` implementations, so it cannot be changed after
@@ -42,13 +41,7 @@ pub fn deploy(
         None => L1Network::from_l1_rpc(&runner.rpc_url)?.weth_address()?,
     };
 
-    let deploy_config = DeployL1Config::new(
-        input.owner,
-        &initial_config,
-        input.era_chain_id,
-        // The legacy shared-bridge test support this gated was removed.
-        false,
-    );
+    let deploy_config = DeployL1Config::new(input.owner, &initial_config);
 
     let input_path = runner.input_path(&DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION)?;
     deploy_config.save(&input_path)?;

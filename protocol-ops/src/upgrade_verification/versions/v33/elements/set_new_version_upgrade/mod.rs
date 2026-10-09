@@ -3,20 +3,16 @@
 //! Decodes `setNewVersionUpgrade(diamondCut, …).diamondCut.initCalldata` as
 //! `DefaultUpgrade.upgrade(ProposedUpgrade)` and validates the entire
 //! `ProposedUpgrade` payload — static fields, the L1→L2 upgrade tx, the
-//! `forceDeployAndUpgrade(Universal)` inner call, factory deps, and the
-//! `IL2V32Upgrade.upgrade` arguments.
+//! `forceDeployAndUpgradeUniversal` inner call, factory deps, and the
+//! `IL2DefaultUpgrade.upgrade` arguments.
 //!
-//! The flavor split lives in submodules:
-//! - [`era`] — Era-VM expected force-deployments, `L2ChainAssetHandler` input
-//!   shape, Era factory-dep set, and the Era `forceDeployAndUpgrade` orchestrator.
-//! - [`zksync_os`] — ZKsync OS expected force-deployments, deployed-bytecode-info
-//!   decoding, ZKsync OS factory-dep set, and the ZKsync OS
-//!   `forceDeployAndUpgradeUniversal` orchestrator.
+//! The [`zksync_os`] submodule owns expected force-deployments, deployed-bytecode-info
+//! decoding, the factory-dep set, and the `forceDeployAndUpgradeUniversal` orchestrator.
 //!
 //! This module owns the shared `sol!` types (re-exported under the module
 //! path for external consumers like `governance_stage_calls`), the
-//! `ProposedUpgrade` impl that dispatches by flavor, `verify_factory_deps`,
-//! and `verify_l2_upgrade_inner_calldata` (used by both flavors).
+//! `ProposedUpgrade` impl, `verify_factory_deps`, and
+//! `verify_l2_v33_upgrade_inner_calldata`.
 
 use alloy::{
     hex,
@@ -133,26 +129,11 @@ sol! {
         }
 
         #[derive(Debug)]
-        struct ForceDeployment {
-            bytes32 bytecodeHash;
-            address newAddress;
-            bool callConstructor;
-            uint256 value;
-            bytes input;
-        }
-
-        #[derive(Debug)]
         struct UniversalContractUpgradeInfo {
             ContractUpgradeType upgradeType;
             bytes deployedBytecodeInfo;
             address newAddress;
         }
-
-        function forceDeployAndUpgrade(
-            ForceDeployment[] calldata _forceDeployments,
-            address _delegateTo,
-            bytes calldata _calldata
-        ) external payable;
 
         function forceDeployAndUpgradeUniversal(
             UniversalContractUpgradeInfo[] calldata _forceDeployments,
@@ -161,9 +142,8 @@ sol! {
         ) external payable;
     }
 
-    interface IL2V32Upgrade {
+    interface IL2DefaultUpgrade {
         function upgrade(
-            bool _isZKsyncOS,
             address _ctmDeployer,
             bytes calldata _fixedForceDeploymentsData,
             bytes calldata _additionalForceDeploymentsData
@@ -172,24 +152,14 @@ sol! {
 
     #[sol(rpc)]
     contract BytecodesSupplier {
-        mapping(bytes32 bytecodeHash => uint256 blockNumber) public publishingBlock;
         mapping(bytes32 bytecodeHash => uint256 blockNumber) public evmPublishingBlock;
     }
-}
-
-/// Selects which `BytecodesSupplier` mapping (and which bytecode-verifier
-/// lookup table) to consult for a factoryDep hash. Era L2 uses ZK bytecodes;
-/// ZKsync OS L2 uses EVM-shaped bytecodes.
-#[derive(Debug, Clone, Copy)]
-pub(super) enum FactoryDepHashKind {
-    EraZkBytecode,
-    ZksyncOsEvmBytecode,
 }
 
 impl ProposedUpgrade {
     /// Top-level entry: dispatches `verify_static_fields` (bytecode hashes
     /// per flavor + empty-field invariants) and `verify_l2_protocol_upgrade_tx`
-    /// (canonical L2 tx shape + inner `forceDeployAndUpgrade(Universal)` walk).
+    /// (canonical L2 tx shape + inner `forceDeployAndUpgradeUniversal` walk).
     pub async fn verify_v33_template(
         &self,
         verifiers: &Verifiers,
@@ -216,7 +186,7 @@ impl ProposedUpgrade {
 
         let new_errors = (result.errors - initial_error_count) as usize;
         if new_errors == 0 {
-            result.report_ok("DefaultUpgrade ProposedUpgrade matches v33 template");
+            result.report_ok("DefaultUpgrade ProposedUpgrade matches v31 template");
         }
         Ok(new_errors)
     }
@@ -259,11 +229,11 @@ impl ProposedUpgrade {
         }
 
         if !self.l1ContractsUpgradeCalldata.is_empty() {
-            result.report_error("ProposedUpgrade l1ContractsUpgradeCalldata must be empty for v33");
+            result.report_error("ProposedUpgrade l1ContractsUpgradeCalldata must be empty for v31");
         }
 
         if !self.postUpgradeCalldata.is_empty() {
-            result.report_error("ProposedUpgrade postUpgradeCalldata must be empty for v33");
+            result.report_error("ProposedUpgrade postUpgradeCalldata must be empty for v31");
         }
 
         if self.upgradeTimestamp != U256::default() {
@@ -278,11 +248,10 @@ impl ProposedUpgrade {
         }
     }
 
-    /// Validates the canonical L2 tx shape, then dispatches strictly on the
-    /// CTM flavor: Era expects `(txType=254, data=forceDeployAndUpgrade)`,
-    /// ZKsync OS expects `(txType=126, data=forceDeployAndUpgradeUniversal)`.
-    /// Mismatched `(flavor, txType)` or `(flavor, inner-data selector)` pairs
-    /// are rejected explicitly rather than via decode failure.
+    /// Validates the canonical L2 tx shape, then the ZKsync OS payload:
+    /// `(txType=126, data=forceDeployAndUpgradeUniversal)`. A mismatched
+    /// txType or inner-data selector is rejected explicitly rather than via
+    /// decode failure.
     #[allow(clippy::too_many_arguments)]
     async fn verify_l2_protocol_upgrade_tx(
         &self,
@@ -376,7 +345,6 @@ impl ProposedUpgrade {
                     zksync_os::EXPECTED_V33_ZKSYNC_OS_BYTECODES,
                     "ZKsync OS",
                     bytecodes_supplier_addr,
-                    FactoryDepHashKind::ZksyncOsEvmBytecode,
                 )
                 .await;
                 zksync_os::verify_zksync_os_force_deploy_and_upgrade(
@@ -393,7 +361,7 @@ impl ProposedUpgrade {
     }
 }
 
-/// Calldata-only check that `factoryDeps[]` matches the expected v33 set, plus
+/// Calldata-only check that `factoryDeps[]` matches the expected v31 set, plus
 /// an optional live-RPC check that each bytecode was actually published to the
 /// `BytecodesSupplier` (required for the L2 sequencer to fetch it during the
 /// upgrade tx). When `bytecodes_supplier_addr` is `None` the supplier round-trip
@@ -405,7 +373,6 @@ async fn verify_factory_deps(
     expected_bytecodes: &[&str],
     label: &str,
     bytecodes_supplier_addr: Option<Address>,
-    hash_kind: FactoryDepHashKind,
 ) {
     let expected_bytecodes: HashSet<&str> = expected_bytecodes.iter().copied().collect();
     let mut actual_bytecodes = HashSet::new();
@@ -413,7 +380,7 @@ async fn verify_factory_deps(
 
     for dep in factory_deps {
         let dep = fixed_bytes_from_u256(dep);
-        match bytecode_hash_to_file(verifiers, &dep, hash_kind) {
+        match bytecode_hash_to_file(verifiers, &dep) {
             Some(file_name) => {
                 if !expected_bytecodes.contains(file_name.as_str()) {
                     errors += 1;
@@ -453,32 +420,23 @@ async fn verify_factory_deps(
 
     if errors == 0 {
         result.report_ok(&format!(
-            "{label} L2 upgrade tx factoryDeps match expected v33 dependency set"
+            "{label} L2 upgrade tx factoryDeps match expected v31 dependency set"
         ));
     }
 
-    // Re-add the legacy PUVT `BytecodesSupplier.publishingBlock(hash) != 0`
-    // check for every factoryDep when an RPC + supplier address are
-    // available. This is intentionally a post-calldata check: it requires
-    // reading on-chain state from a live L1 RPC with the v33 prepare bundles
-    // already replayed.
+    // `BytecodesSupplier.evmPublishingBlock` must be queried after the prepare
+    // bundles have been replayed on the L1 RPC.
     if let Some(supplier_addr) = bytecodes_supplier_addr {
         let supplier =
             BytecodesSupplier::new(supplier_addr, verifiers.network_verifier.get_l1_provider());
         let mut publish_errors = 0usize;
         for dep in factory_deps {
             let dep = fixed_bytes_from_u256(dep);
-            let publishing_block = match hash_kind {
-                FactoryDepHashKind::EraZkBytecode => supplier.publishingBlock(dep).call().await,
-                FactoryDepHashKind::ZksyncOsEvmBytecode => {
-                    supplier.evmPublishingBlock(dep).call().await
-                }
-            };
-            match publishing_block {
+            match supplier.evmPublishingBlock(dep).call().await {
                 Ok(block) if block != U256::ZERO => {}
                 Ok(_) => {
                     publish_errors += 1;
-                    let dep_label = bytecode_hash_to_file(verifiers, &dep, hash_kind)
+                    let dep_label = bytecode_hash_to_file(verifiers, &dep)
                         .cloned()
                         .unwrap_or_else(|| format!("0x{dep:x}"));
                     result.report_error(&format!(
@@ -487,12 +445,8 @@ async fn verify_factory_deps(
                 }
                 Err(err) => {
                     publish_errors += 1;
-                    let mapping_name = match hash_kind {
-                        FactoryDepHashKind::EraZkBytecode => "publishingBlock",
-                        FactoryDepHashKind::ZksyncOsEvmBytecode => "evmPublishingBlock",
-                    };
                     result.report_error(&format!(
-                        "BytecodesSupplier.{mapping_name} call failed for {label} factoryDep 0x{dep:x}: {err}"
+                        "BytecodesSupplier.evmPublishingBlock call failed for {label} factoryDep 0x{dep:x}: {err}"
                     ));
                 }
             }
@@ -506,27 +460,19 @@ async fn verify_factory_deps(
     }
 }
 
-/// Decodes the `IL2V32Upgrade.upgrade(...)` inner calldata from the
-/// `forceDeployAndUpgrade(Universal)` `_calldata` argument and validates each
-/// field. Shared by both Era and ZKsync OS paths — they only differ in the
-/// expected value of `_isZKsyncOS`.
-pub(super) async fn verify_l2_upgrade_inner_calldata(
+/// Decodes the `IL2DefaultUpgrade.upgrade(...)` inner calldata from the
+/// `forceDeployAndUpgradeUniversal` `_calldata` argument and validates each
+/// field.
+pub(super) async fn verify_l2_v33_upgrade_inner_calldata(
     verifiers: &Verifiers,
     result: &mut VerificationResult,
     calldata: &[u8],
-    expected_is_zksync_os: bool,
     expected_fixed_force_deployments_data: &str,
 ) -> anyhow::Result<()> {
     use anyhow::Context;
-    let decoded = IL2V32Upgrade::upgradeCall::abi_decode(calldata)
-        .context("decoding IL2V32Upgrade.upgrade inner calldata")?;
+    let decoded = IL2DefaultUpgrade::upgradeCall::abi_decode(calldata)
+        .context("decoding IL2DefaultUpgrade.upgrade inner calldata")?;
 
-    if decoded._isZKsyncOS != expected_is_zksync_os {
-        result.report_error(&format!(
-            "IL2V32Upgrade.upgrade _isZKsyncOS mismatch: expected {}, got {}",
-            expected_is_zksync_os, decoded._isZKsyncOS
-        ));
-    }
     result.expect_address(
         verifiers,
         &decoded._ctmDeployer,
@@ -540,11 +486,11 @@ pub(super) async fn verify_l2_upgrade_inner_calldata(
         let actual = hex::encode(&decoded._fixedForceDeploymentsData);
         if !actual.eq_ignore_ascii_case(expected) {
             result.report_error(&format!(
-                "IL2V32Upgrade.upgrade fixedForceDeploymentsData mismatch. Expected: 0x{}\nReceived: 0x{}",
+                "IL2DefaultUpgrade.upgrade fixedForceDeploymentsData mismatch. Expected: 0x{}\nReceived: 0x{}",
                 expected, actual
             ));
         } else {
-            result.report_ok("IL2V32Upgrade.upgrade fixedForceDeploymentsData matches TOML");
+            result.report_ok("IL2DefaultUpgrade.upgrade fixedForceDeploymentsData matches TOML");
         }
     }
 
@@ -554,16 +500,18 @@ pub(super) async fn verify_l2_upgrade_inner_calldata(
     match FixedForceDeploymentsData::abi_decode(&decoded._fixedForceDeploymentsData) {
         Ok(fixed_data) => fixed_data.verify(verifiers, result).await?,
         Err(err) => result.report_error(&format!(
-            "Failed to decode IL2V32Upgrade.upgrade fixedForceDeploymentsData: {err}"
+            "Failed to decode IL2DefaultUpgrade.upgrade fixedForceDeploymentsData: {err}"
         )),
     }
 
     if !decoded._additionalForceDeploymentsData.is_empty() {
         result.report_error(
-            "IL2V32Upgrade.upgrade additionalForceDeploymentsData template must be empty",
+            "IL2DefaultUpgrade.upgrade additionalForceDeploymentsData template must be empty",
         );
     } else {
-        result.report_ok("IL2V32Upgrade.upgrade additionalForceDeploymentsData template is empty");
+        result.report_ok(
+            "IL2DefaultUpgrade.upgrade additionalForceDeploymentsData template is empty",
+        );
     }
 
     Ok(())
@@ -576,16 +524,10 @@ fn fixed_bytes_from_u256(value: &U256) -> FixedBytes<32> {
 fn bytecode_hash_to_file<'a>(
     verifiers: &'a Verifiers,
     bytecode_hash: &FixedBytes<32>,
-    hash_kind: FactoryDepHashKind,
 ) -> Option<&'a String> {
-    match hash_kind {
-        FactoryDepHashKind::EraZkBytecode => verifiers
-            .bytecode_verifier
-            .zk_bytecode_hash_to_file(bytecode_hash),
-        FactoryDepHashKind::ZksyncOsEvmBytecode => verifiers
-            .bytecode_verifier
-            .evm_deployed_bytecode_hash_to_file(bytecode_hash),
-    }
+    verifiers
+        .bytecode_verifier
+        .evm_deployed_bytecode_hash_to_file(bytecode_hash)
 }
 
 fn expect_zero_bytecode_hash(

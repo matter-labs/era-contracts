@@ -3,16 +3,11 @@ description: >
   Restores the artifacts a `build` job produced for this exact commit, for the jobs that consume
   them rather than compile their own.
 
-  It exists to hold the path list once for every reader. Cache entries are versioned by their
-  paths, so a copy that drifts by one line stops matching the saved entry — and with
-  fail-on-cache-miss that is a hard failure reading as infrastructure flake. This repo has already
-  had that bug: a comment sitting inside a `path:` block was parsed as a path, which is how
-  `l1-contracts/zkout` went missing from one job's list.
+  Keep the paths identical to the cache save and artifact upload lists in
+  l1-contracts-ci.yaml and build-contract-artifacts.yaml.
 
-  Two copies of the list remain outside this action, both in build-contract-artifacts.yaml: the
-  `actions/cache/save` step and the `actions/upload-artifact` step. actions/cache's restore/save
-  split has no mechanism for sharing inputs between them, and upload-artifact is a different
-  action entirely. Keep all three in step.
+  Cache entries are versioned by their paths. Keep comments outside `path:` blocks: YAML treats
+  them as paths inside these block scalars.
 
 inputs:
   key:
@@ -47,7 +42,3 @@ runs:
           da-contracts/out
           l1-contracts/cache-forge
           l1-contracts/out
-          l1-contracts/zkout
-          l2-contracts/cache-forge
-          l2-contracts/zkout
-          system-contracts/zkout

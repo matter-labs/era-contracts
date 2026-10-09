@@ -1,13 +1,10 @@
 use std::path::{Path, PathBuf};
 
-use alloy::primitives::{Address, Bytes, B256, U256};
-use alloy::providers::Provider;
-use alloy::signers::local::PrivateKeySigner;
+use alloy::primitives::Bytes;
 use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 use strum::Display;
 
-use crate::common::ethereum::get_provider;
 use crate::common::wallets::Wallet;
 
 /// ForgeScript is a wrapper around the forge script command.
@@ -72,14 +69,14 @@ impl ForgeScript {
         self
     }
 
-    /// Skip forge's post-run label collection. After every script run forge
-    /// queries Sourcify (+ Etherscan if a key is configured) to map every
-    /// traced address to its contract name. Those lookups frequently hang
-    /// for 5–30+ minutes per CTM today, even though the underlying script
-    /// work has finished. `--disable-labels` skips the lookups entirely;
-    /// `--silent` only suppresses the printout (the work still runs).
-    pub fn with_disable_labels(mut self) -> Self {
-        self.args.add_arg(ForgeScriptArg::DisableLabels);
+    /// Run forge without ancillary network access (`--offline`). This skips
+    /// the post-run Sourcify/Etherscan label lookups that frequently hang for
+    /// 5–30+ minutes per CTM even though the underlying script work has
+    /// finished (`--silent` only suppresses the printout — the work still
+    /// runs). RPC traffic to the target chain is unaffected; solc must
+    /// already be installed.
+    pub fn with_offline(mut self) -> Self {
+        self.args.add_arg(ForgeScriptArg::Offline);
         self
     }
 
@@ -98,39 +95,6 @@ impl ForgeScript {
             .with_unlocked()
     }
 
-    /// Adds the private key of the deployer account.
-    pub fn with_private_key(mut self, private_key: B256) -> Self {
-        self.args.add_arg(ForgeScriptArg::PrivateKey {
-            private_key: alloy::hex::encode(private_key),
-        });
-        self
-    }
-
-    // Do not start the script if balance is not enough
-    pub fn private_key(&self) -> anyhow::Result<Option<PrivateKeySigner>> {
-        for a in &self.args.args {
-            if let ForgeScriptArg::PrivateKey { private_key } = a {
-                let key: B256 = private_key
-                    .parse()
-                    .map_err(|e| anyhow::anyhow!("invalid private key hex: {e}"))?;
-                let signer = PrivateKeySigner::from_bytes(&key)
-                    .map_err(|e| anyhow::anyhow!("invalid private key: {e}"))?;
-                return Ok(Some(signer));
-            }
-        }
-        Ok(None)
-    }
-
-    pub fn rpc_url(&self) -> Option<String> {
-        self.args.args.iter().find_map(|a| {
-            if let ForgeScriptArg::RpcUrl { url } = a {
-                Some(url.clone())
-            } else {
-                None
-            }
-        })
-    }
-
     pub fn sig(&self) -> Option<String> {
         self.args.args.iter().find_map(|a| {
             if let ForgeScriptArg::Sig { sig } = a {
@@ -146,26 +110,6 @@ impl ForgeScript {
             .args
             .iter()
             .any(|a| matches!(a, ForgeScriptArg::Broadcast))
-    }
-
-    pub fn address(&self) -> anyhow::Result<Option<Address>> {
-        Ok(self.private_key()?.map(|k| k.address()))
-    }
-
-    pub async fn get_the_balance(&self) -> anyhow::Result<Option<U256>> {
-        let Some(rpc_url) = self.rpc_url() else {
-            return Ok(None);
-        };
-        let Some(signer) = self.private_key()? else {
-            return Ok(None);
-        };
-        let provider = get_provider(&rpc_url)?;
-        let balance = provider.get_balance(signer.address()).await?;
-        Ok(Some(balance))
-    }
-
-    pub fn needs_bridgehub_skip(&self) -> bool {
-        self.script_path == Path::new("deploy-scripts/DeployCTM.s.sol")
     }
 
     pub fn script_name(&self) -> &Path {
@@ -200,10 +144,6 @@ pub enum ForgeScriptArg {
         api_key: String,
     },
     Ffi,
-    #[strum(to_string = "private-key={private_key}")]
-    PrivateKey {
-        private_key: String,
-    },
     #[strum(to_string = "rpc-url={url}")]
     RpcUrl {
         url: String,
@@ -230,14 +170,8 @@ pub enum ForgeScriptArg {
     GasLimit {
         gas_limit: u64,
     },
-    DisableLabels,
-    Silent,
+    Offline,
     Unlocked,
-    Zksync,
-    #[strum(to_string = "skip={skip_path}")]
-    Skip {
-        skip_path: String,
-    },
 }
 
 /// ForgeScriptArgs is a set of arguments that can be passed to the forge script command.
@@ -259,8 +193,6 @@ pub struct ForgeScriptArgs {
     /// Verifier API key
     #[clap(long)]
     pub verifier_api_key: Option<String>,
-    #[clap(long)]
-    pub zksync: bool,
     /// List of additional arguments that can be passed through the CLI.
     ///
     /// e.g.: `[COMMAND] -a --with-gas-price=4000000000`
@@ -274,10 +206,6 @@ impl ForgeScriptArgs {
     pub fn build(&mut self) -> Vec<String> {
         self.add_verify_args();
         self.cleanup_contract_args();
-        if self.zksync {
-            self.add_arg(ForgeScriptArg::Zksync);
-        }
-
         self.args
             .iter()
             .map(|arg| arg.to_string())

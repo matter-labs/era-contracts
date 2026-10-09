@@ -1,5 +1,6 @@
-// TODO: drop once the scaffolding kept for R2 (fee-params) and S2d
-// (`check_gw_create2_deploy`) is resolved.
+// The v31 verifier still carries helpers and artifact mirrors nothing reads on this branch, and
+// `Verifiers` / `VerificationResult` are `pub(crate)` but flow through `pub` element methods;
+// both are a separate cleanup.
 #![allow(dead_code, private_interfaces)]
 
 use std::str::FromStr;
@@ -25,10 +26,8 @@ use elements::{
     rpc_state::verify_v33_artifact_state,
 };
 
-pub(crate) const EXPECTED_NEW_PROTOCOL_VERSION_STR: &str = "0.33.0";
-pub(crate) const EXPECTED_ZKSYNC_OS_OLD_PROTOCOL_VERSION_STR: &str = "0.31.0";
+pub(crate) const EXPECTED_ZKSYNC_OS_OLD_PROTOCOL_VERSION_STR: &str = "0.33.0";
 pub(crate) const MAX_NUMBER_OF_ZK_CHAINS: u32 = 100;
-pub(crate) const MAX_PRIORITY_TX_GAS_LIMIT: u32 = 72_000_000;
 
 /// Stage Sepolia's Era chain (270) is the single registered chain still
 /// settling on the legacy stage Gateway at v33 upgrade time.
@@ -38,8 +37,8 @@ pub(crate) const MAX_PRIORITY_TX_GAS_LIMIT: u32 = 72_000_000;
 /// `Bridgehub.settlementLayer(chainId) == L1` invariant on stage.
 pub(crate) const STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID: u64 = 270;
 
-pub(crate) fn get_expected_new_protocol_version() -> ProtocolVersion {
-    ProtocolVersion::from_str(EXPECTED_NEW_PROTOCOL_VERSION_STR).unwrap()
+pub(crate) fn get_expected_new_protocol_version(verifiers: &Verifiers) -> ProtocolVersion {
+    verifiers.zksync_os_genesis_config.protocol_semantic_version
 }
 
 pub(crate) fn get_expected_old_protocol_version_for_ctm_flavor(
@@ -54,7 +53,7 @@ pub(crate) fn get_expected_old_protocol_version_for_ctm_flavor(
 /// Whether `version` is the release this upgrade starts from.
 ///
 /// Compares major.minor and ignores the patch: a CTM sitting on a patch release of the source
-/// version (testnet's ZKsync OS CTM is on v0.31.1) is still on v31, and this upgrade applies to
+/// version (e.g. v0.33.2) is still on v33, and this upgrade applies to
 /// it unchanged — the diamond cut is keyed on the CTM's own reported version, not on a pinned
 /// patch. Requiring an exact match rejected a legitimately-patched ecosystem.
 pub(crate) fn is_expected_old_protocol_version_for_ctm_flavor(
@@ -67,7 +66,7 @@ pub(crate) fn is_expected_old_protocol_version_for_ctm_flavor(
 
 pub(crate) fn expected_old_protocol_version_label(flavor: CtmFlavor) -> &'static str {
     match flavor {
-        CtmFlavor::ZksyncOs => "v0.31.x",
+        CtmFlavor::ZksyncOs => "v0.33.x",
     }
 }
 
@@ -76,14 +75,13 @@ pub(crate) fn expected_old_protocol_version_label(flavor: CtmFlavor) -> &'static
 /// Ordering mirrors the legacy PUVT (`UpgradeOutput::verify` in
 /// `protocol-upgrade-verification-tool`):
 ///
-///   1. Verifier construction (incl. SystemConfig.json fee-params init).
-///   2. CREATE2 provenance map population — v33-specific prep that must precede
+///   1. Verifier construction.
+///   2. CREATE2 provenance map population — upgrade-specific prep that must precede
 ///      provenance consumption below.
 ///   3. RPC state checks — chain ids, Create2Factory bytecode, proxy admins,
-///      live core wiring, validator timelocks, fee params, settlement layer.
+///      live core wiring, validator timelocks, settlement layer.
 ///      Subsumes legacy's early chain-id sanity (legacy steps 2–3).
-///   4. Deployment provenance — every named v33 deploy + the new-GW CTM
-///      provenance flow (legacy step 4).
+///   4. Deployment provenance — every named upgrade deploy (legacy step 4).
 ///   5. Per-chain protocol-version sweep — was bundled inside legacy
 ///      `deployed_addresses.verify`; sits next to provenance for the same
 ///      reason.
@@ -96,7 +94,6 @@ pub(crate) async fn verify(
     contracts_commit: Option<&str>,
     zk_governance_commit: &str,
     era_chain_id: u64,
-    message_root_era_gateway_chain_id: u64,
     l1_chain_id: u64,
     tx_hashes: &[FixedBytes<32>],
     create2_factory: Address,
@@ -128,7 +125,6 @@ pub(crate) async fn verify(
     // address-book lookup in `expect_create2_params` hard-errors only if a
     // load-bearing deployment is missing.
     let count = {
-        let bridgehub_address = verifiers.bridgehub_address;
         let Verifiers {
             bytecode_verifier,
             network_verifier,
@@ -138,7 +134,6 @@ pub(crate) async fn verify(
             .populate_create2_from_transactions_log(
                 tx_hashes,
                 &create2_factory,
-                &bridgehub_address,
                 expected_salts,
                 bytecode_verifier,
                 result,
@@ -153,14 +148,7 @@ pub(crate) async fn verify(
 
     verify_v33_artifact_state(artifact, &verifiers, create2_factory, result).await?;
 
-    verify_v33_provenance(
-        artifact,
-        &verifiers,
-        era_chain_id,
-        message_root_era_gateway_chain_id,
-        result,
-    )
-    .await?;
+    verify_v33_provenance(artifact, &verifiers, result).await?;
 
     verify_per_chain_protocol_versions(artifact, &verifiers, result).await?;
 
@@ -169,4 +157,26 @@ pub(crate) async fn verify(
     verify_ctm_admin_calls(artifact, &verifiers, result).await?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn v34_target_comes_from_genesis_and_accepts_v33_patch_sources() {
+        let verifiers = Verifiers::offline_v34();
+        assert_eq!(
+            get_expected_new_protocol_version(&verifiers),
+            ProtocolVersion::from_str("0.34.0").unwrap()
+        );
+        assert!(is_expected_old_protocol_version_for_ctm_flavor(
+            ProtocolVersion::from_str("0.33.2").unwrap(),
+            CtmFlavor::ZksyncOs
+        ));
+        assert!(!is_expected_old_protocol_version_for_ctm_flavor(
+            ProtocolVersion::from_str("0.34.0").unwrap(),
+            CtmFlavor::ZksyncOs
+        ));
+    }
 }

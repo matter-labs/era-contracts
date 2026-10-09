@@ -1,17 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
-
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/Admin.sol";
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
+import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 
 contract TestBaseFacet is ZKChainBase {
@@ -38,10 +35,10 @@ bytes constant ERROR_ONLY_BRIDGEHUB = "ZKChain: not bridgehub";
 bytes constant ERROR_ONLY_ADMIN_OR_STATE_TRANSITION_MANAGER = "ZKChain: Only by admin or state transition manager";
 bytes constant ERROR_ONLY_VALIDATOR_OR_STATE_TRANSITION_MANAGER = "ZKChain: Only by validator or state transition manager";
 
-contract ZKChainBaseTest is UtilsTest {
+contract ZKChainBaseTest is UtilsCallMockerTest {
     TestBaseFacet internal testBaseFacet;
     UtilsFacet internal utilsFacet;
-    address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    address internal testnetVerifier = address(new ZKsyncOSTestnetVerifier(IVerifier(address(0))));
     DummyBridgehub internal dummyBridgehub;
 
     function getTestBaseFacetSelectors() public pure returns (bytes4[] memory selectors) {

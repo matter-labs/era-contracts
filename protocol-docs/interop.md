@@ -4,20 +4,7 @@ This document is the single source of truth for the protocol-level behaviour of 
 
 ## Overview
 
-Interop is ZKsync's mechanism for sending messages and value between chains in the ecosystem. The
-`InteropCenter` is the L2 send-side entry point for users and bridges. It is not deployed on L1. The
-contracts target ZKsync OS chains and require timestamp-carrying interop-root imports from the
-ZKsync OS bootloader.
-
-The current release supports exactly two routes:
-
-- **L2 -> L2:** an atomic bundle committed to the source chain's interop commitment tree and proven on
-  the destination with an `AtomicFinalityProof`. The `atomicBundle` attribute is mandatory.
-- **L2 -> L1:** a non-atomic, single-call asset withdrawal published as an L2 -> L1 message and proven
-  to `L1InteropHandler` with a `MessageInclusionProof`.
-
-Public non-atomic L2 -> L2 bundles, triggers, aliased accounts, and automatic-execution accounts are
-not part of this version. Execution is driven by a user or relayer submitting the appropriate proof.
+Interop is ZKsync's mechanism for sending messages and value between chains in the ecosystem. The `InteropCenter` (an L2 contract) is the primary entry point for communication between chains connected to interop, facilitating interactions between end users and bridges. As of v31 the `InteropCenter` is only deployed on L2s, not on L1. Interop was **not activated in v31**; the contracts here target v33+ and are expected to run on ZKsync OS chains only (the EraVM bootloader does not support the timestamp-carrying interop-root import entry points).
 
 The lifecycle of an interop interaction is:
 
@@ -186,7 +173,7 @@ the entire send revert, including its burns.
   supported by this release.
 - The imported tuple is double-checked on the settlement layer during batch execution (`ExecutorFacet._verifyDependencyInteropRoots`, against `MessageRoot.historicalRoot`), so time-sensitive proofs — e.g. the atomic-interop timeout protocol — can rely on the timestamp as much as on the root itself.
 - Zero roots and zero timestamps are rejected on import, keeping the invariant structural: a zero stored timestamp only ever means "nothing imported at this key" (the atomic timeout path relies on this). A root for a given key can be set only once (`InteropRootAlreadyExists`).
-- This logic is deployed on ZKsync OS chains only. No roots recorded under previous protocol versions exist, because interop was not activated in v31; the v31→v33 widening of the stored value from `bytes32` to a struct is storage-safe (the mapping was empty, and the struct's first member occupies the old slot).
+- This logic is **not compatible with EraVM** (its bootloader does not support the timestamp-carrying import entry points); it is deployed on ZKsync OS chains only. No roots recorded under previous protocol versions exist, because interop was not activated in v31; the v31→v33 widening of the stored value from `bytes32` to a struct is storage-safe (the mapping was empty, and the struct's first member occupies the old slot).
 
 ### Message verification (`L2MessageVerification`)
 

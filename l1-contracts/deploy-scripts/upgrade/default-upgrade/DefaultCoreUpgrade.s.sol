@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// solhint-disable no-console, gas-custom-errors
-
 import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {stdToml} from "forge-std/StdToml.sol";
@@ -43,9 +41,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
 
     struct AdditionalConfigParams {
         uint256 newProtocolVersion;
-        bool isZKsyncOS;
-        bool hasPreV32IntrospectionOverride;
-        bool usePreV32IntrospectionOverride;
     }
     AdditionalConfigParams internal additionalConfig;
 
@@ -53,7 +48,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
 
     function initializeWithArgs(
         address bridgehubProxyAddress,
-        bool isZKsyncOS,
         bytes32 create2FactorySalt,
         string memory upgradeInputPath,
         string memory _outputPath
@@ -61,7 +55,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
         string memory root = vm.projectRoot();
         upgradeInputPath = string.concat(root, upgradeInputPath);
 
-        initializeConfigWithArgs(bridgehubProxyAddress, isZKsyncOS, create2FactorySalt, upgradeInputPath);
+        initializeConfigWithArgs(bridgehubProxyAddress, create2FactorySalt, upgradeInputPath);
 
         upgradeConfig.outputPath = string.concat(root, _outputPath);
         upgradeConfig.initialized = true;
@@ -81,7 +75,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
     function noGovernancePrepare(CoreUpgradeParams memory _params) public virtual {
         initializeWithArgs(
             _params.bridgehubProxyAddress,
-            _params.isZKsyncOS,
             _params.create2FactorySalt,
             _params.upgradeInputPath,
             _params.outputPath
@@ -98,21 +91,17 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
     ///      v33: the implementation is refreshed like any other core contract from then on, and the
     ///      release that introduces the proxy reuses this deploy rather than repeating it.
     function deployNewEcosystemContractsL1() public virtual {
-        coreAddresses.bridgehub.implementations.bridgehub = deploySimpleContract("L1Bridgehub", false);
-        coreAddresses.bridgehub.implementations.messageRoot = deploySimpleContract("L1MessageRoot", false);
-        coreAddresses.bridges.implementations.l1Nullifier = deploySimpleContract("L1Nullifier", false);
-        coreAddresses.bridges.implementations.l1AssetRouter = deploySimpleContract("L1AssetRouter", false);
-        coreAddresses.bridges.implementations.l1NativeTokenVault = deploySimpleContract("L1NativeTokenVault", false);
-        coreAddresses.bridgehub.implementations.ctmDeploymentTracker = deploySimpleContract(
-            "CTMDeploymentTracker",
-            false
-        );
-        coreAddresses.bridgehub.implementations.chainAssetHandler = deploySimpleContract("L1ChainAssetHandler", false);
+        coreAddresses.bridgehub.implementations.bridgehub = deploySimpleContract("L1Bridgehub");
+        coreAddresses.bridgehub.implementations.messageRoot = deploySimpleContract("L1MessageRoot");
+        coreAddresses.bridges.implementations.l1Nullifier = deploySimpleContract("L1Nullifier");
+        coreAddresses.bridges.implementations.l1AssetRouter = deploySimpleContract("L1AssetRouter");
+        coreAddresses.bridges.implementations.l1NativeTokenVault = deploySimpleContract("L1NativeTokenVault");
+        coreAddresses.bridgehub.implementations.ctmDeploymentTracker = deploySimpleContract("CTMDeploymentTracker");
+        coreAddresses.bridgehub.implementations.chainAssetHandler = deploySimpleContract("L1ChainAssetHandler");
         coreAddresses.bridgehub.implementations.chainRegistrationSender = deploySimpleContract(
-            "ChainRegistrationSender",
-            false
+            "ChainRegistrationSender"
         );
-        coreAddresses.bridges.implementations.l1InteropHandler = deploySimpleContract("L1InteropHandler", false);
+        coreAddresses.bridges.implementations.l1InteropHandler = deploySimpleContract("L1InteropHandler");
 
         deployVersionSpecificEcosystemContractsL1();
     }
@@ -154,11 +143,12 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
 
     function initializeConfigWithArgs(
         address bridgehubProxyAddress,
-        bool isZKsyncOS,
         bytes32 create2FactorySalt,
         string memory upgradeInputPath
     ) public virtual {
-        string memory upgradeToml = vm.readFile(upgradeInputPath);
+        // The core half reads no key from the upgrade input, but the input is still required to exist so
+        // that a mistyped path fails here rather than in the CTM half.
+        require(vm.isFile(upgradeInputPath), "upgrade input not found");
 
         // Only override the salt when explicitly provided (non-zero).
         // When zero, the script falls back to the CREATE2_FACTORY_SALT env var or built-in default.
@@ -166,26 +156,8 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
             setCreate2Salt(create2FactorySalt);
         }
 
-        additionalConfig.isZKsyncOS = isZKsyncOS;
-
-        // Optional override for pre-v32 introspection selection. Autodetection reads the protocol version of
-        // a registered chain, which lags the L1 contracts: an ecosystem whose core contracts are already v32
-        // while its chains have not upgraded yet (mid-upgrade, or a fixture deployed from current code with a
-        // v31 genesis) must state so here.
-        if (upgradeToml.keyExists("$.pre_v32_introspection")) {
-            additionalConfig.hasPreV32IntrospectionOverride = true;
-            additionalConfig.usePreV32IntrospectionOverride = upgradeToml.readBool("$.pre_v32_introspection");
-        }
-
         // Protocol version comes from genesis config
         additionalConfig.newProtocolVersion = loadProtocolVersionFromGenesis();
-
-        // Legacy Era gateway chain ID — baked into L1MessageRoot as immutable
-        // ERA_GATEWAY_CHAIN_ID. Read from the upgrade input TOML ([legacy_gateway] section)
-        // so the constructor gets the right value. Optional: absent on fresh/local.
-        if (upgradeToml.keyExists("$.legacy_gateway.chain_id")) {
-            config.legacyGatewayChainId = upgradeToml.readUint("$.legacy_gateway.chain_id");
-        }
 
         coreAddresses.bridgehub.proxies.bridgehub = bridgehubProxyAddress;
         require(coreAddresses.bridgehub.proxies.bridgehub != address(0), "bridgehub_proxy_addr is zero");
@@ -199,9 +171,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
         Governance governance = Governance(payable(coreAddresses.shared.governance));
         config.l1ChainId = block.chainid;
         config.deployerAddress = getBroadcasterAddress();
-        config.eraChainId = assetRouter.ERA_CHAIN_ID();
-        config.eraDiamondProxyAddress = bridgehub.getZKChain(assetRouter.ERA_CHAIN_ID());
-
         config.ownerAddress = assetRouter.owner();
 
         config.contracts.governanceSecurityCouncilAddress = governance.securityCouncil();
@@ -214,24 +183,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
     function setAddressesBasedOnBridgehub() internal virtual {
         address bridgehubProxy = coreAddresses.bridgehub.proxies.bridgehub;
 
-        bool preV32Ecosystem;
-        if (additionalConfig.hasPreV32IntrospectionOverride) {
-            preV32Ecosystem = additionalConfig.usePreV32IntrospectionOverride;
-        } else if (!AddressIntrospector.hasRegisteredChains(bridgehubProxy)) {
-            // A chainless ecosystem has no protocol version to inspect. It cannot have been upgraded into
-            // existence either, so it was deployed from scratch with the current contracts.
-            preV32Ecosystem = false;
-        } else {
-            preV32Ecosystem = AddressIntrospector.shouldUsePreV32Introspection(bridgehubProxy);
-        }
-
-        if (preV32Ecosystem) {
-            // v31 ecosystem: the nullifier has no `l1InteropHandler` getter yet, so the discovered
-            // address stays zero and the upgrade deploys the handler itself.
-            coreAddresses = AddressIntrospector.getCoreDeployedAddressesV31(bridgehubProxy);
-        } else {
-            coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubProxy);
-        }
+        coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubProxy);
     }
 
     function saveOutput(string memory outputPath) internal virtual {
@@ -377,7 +329,11 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
             abi.encode(stage2Calls)
         );
 
-        vm.writeToml(governanceCallsSerialized, upgradeConfig.outputPath, ".governance_calls");
+        // Upstream forge's keyed `vm.writeToml(json, path, key)` silently no-ops when the key
+        // does not exist in the file yet, so append sections by re-serializing into the same
+        // "root" object and rewriting the whole file instead.
+        string memory updatedToml = vm.serializeString("root", "governance_calls", governanceCallsSerialized);
+        vm.writeToml(updatedToml, upgradeConfig.outputPath);
     }
 
     function prepareDefaultEcosystemAdminCalls() public virtual returns (Call[] memory calls) {
@@ -420,7 +376,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
         console.log("prepareStage1GovernanceCalls: prepareUpgradeProxiesCalls");
         allCalls[1] = prepareUpgradeProxiesCalls();
         allCalls[2] = provideSetNewVersionUpgradeCall();
-        console.log("prepareStage1GovernanceCalls: prepareGatewaySpecificStage1GovernanceCalls");
+        console.log("prepareStage1GovernanceCalls: prepareVersionSpecificStage1GovernanceCallsL1");
         allCalls[3] = prepareVersionSpecificStage1GovernanceCallsL1();
 
         calls = UpgradeUtils.mergeCallsArray(allCalls);
@@ -544,11 +500,8 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
 
     /// @notice Load protocol version from genesis config
     function loadProtocolVersionFromGenesis() internal virtual returns (uint256) {
-        string memory genesisPath = Utils.genesisConfigPath(additionalConfig.isZKsyncOS);
-        return
-            ChainCreationParamsLib
-                .getChainCreationParams(genesisPath, additionalConfig.isZKsyncOS)
-                .latestProtocolVersion;
+        string memory genesisPath = Utils.genesisConfigPath();
+        return ChainCreationParamsLib.getChainCreationParams(genesisPath).latestProtocolVersion;
     }
 
     function getBroadcasterAddress() internal view virtual returns (address) {

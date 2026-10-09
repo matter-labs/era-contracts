@@ -15,10 +15,9 @@ const CONTRACTS_DIRECTORIES: Record<string, string[]> = {
     "state-transition/L1StateTransitionErrors.sol",
     "upgrades/ZkSyncUpgradeErrors.sol",
   ],
-  "./deploy-scripts": ["utils/ZkSyncScriptErrors.sol"],
-  "../l2-contracts/contracts": ["errors/L2ContractErrors.sol"],
-  "../system-contracts/contracts": ["SystemContractErrors.sol"],
+  "./deploy-scripts": ["utils/ZkSyncScriptErrors.sol", "ecosystem/DeployScriptErrors.sol"],
   "../da-contracts/contracts": ["DAContractsErrors.sol"],
+  "./contracts/l2-system": ["zksync-os/errors/SystemContractErrors.sol"],
 };
 
 // ---------- Helpers: signature DB ----------
@@ -197,8 +196,6 @@ async function processFile(
       if (
         trimmedItem === "L2DACommitmentScheme" ||
         trimmedItem === "PubdataPricingMode" ||
-        trimmedItem === "SharedBridgeKey" ||
-        trimmedItem === "BytecodeError" ||
         trimmedItem === "UpgradeTxVerifyParam" ||
         /^[A-Z][a-zA-Z]*(?:Scheme|Mode|Type|Status|State|Kind|Level|Priority|Error|Key)$/.test(trimmedItem) ||
         /^[A-Z][a-z]*[A-Z][a-zA-Z]*$/.test(trimmedItem)

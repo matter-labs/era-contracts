@@ -8,7 +8,7 @@ import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
 
 contract BlakeContractHashing is Script {
     function run(string calldata fileName, string calldata contractName) public {
-        bytes memory contractBytecode = BytecodeUtils.readBytecodeL1(true, fileName, contractName);
+        bytes memory contractBytecode = BytecodeUtils.readBytecodeL1(fileName, contractName);
 
         bytes32 result = Utils.blakeHashBytecode(contractBytecode);
 

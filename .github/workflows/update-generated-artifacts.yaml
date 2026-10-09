@@ -1,5 +1,8 @@
-# One-click regen for everything pre-merge-checks.yaml validates: hashes +
-# selectors + zkstack-out, then chain states (sequential so the pushes don't race).
+# One-click regen for what pre-merge-checks.yaml validates: hashes + selectors +
+# zkstack-out, then chain states (sequential so the pushes don't race).
+#
+# configs/genesis/zksync-os/latest.json is covered too: update-hashes-on-demand runs the
+# tools/zksync-os-genesis-gen binary against the same Linux build and commits the result.
 name: Update All Generated Artifacts
 
 on:

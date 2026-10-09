@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
@@ -15,8 +14,7 @@ import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.s
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
 import {NotSettlementLayer} from "contracts/state-transition/L1StateTransitionErrors.sol";
@@ -29,16 +27,15 @@ contract ZKChainBaseModifiersTest is UtilsCallMockerTest {
     IMailbox internal mailboxFacet;
     UtilsFacet internal utilsFacet;
     DummyBridgehub internal dummyBridgehub;
-    address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
-    uint256 constant eraChainId = 9;
+    address internal testnetVerifier = address(new ZKsyncOSTestnetVerifier(IVerifier(address(0))));
+    uint256 internal constant ERA_CHAIN_ID = 9;
 
     function getAdminSelectors() internal pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](16);
+        bytes4[] memory selectors = new bytes4[](15);
         uint256 i = 0;
         selectors[i++] = IAdmin.setPendingAdmin.selector;
         selectors[i++] = IAdmin.acceptAdmin.selector;
         selectors[i++] = IAdmin.setValidator.selector;
-        selectors[i++] = IAdmin.setPorterAvailability.selector;
         selectors[i++] = IAdmin.setPriorityTxMaxGasLimit.selector;
         selectors[i++] = IAdmin.changeFeeParams.selector;
         selectors[i++] = IAdmin.setTokenMultiplier.selector;
@@ -106,7 +103,7 @@ contract ZKChainBaseModifiersTest is UtilsCallMockerTest {
     }
 
     // Test that onlySettlementLayer passes when settlementLayer is zero
-    function test_onlySettlementLayerPassesWhenZero() public {
+    function test_onlySettlementLayerPassesWhenZero() public view {
         // By default, settlementLayer is address(0), so the modifier should pass
         address settlementLayer = utilsFacet.util_getSettlementLayer();
         assertEq(settlementLayer, address(0), "Settlement layer should be zero by default");

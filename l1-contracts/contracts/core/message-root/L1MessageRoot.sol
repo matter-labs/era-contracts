@@ -89,7 +89,7 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
     function saveV31UpgradeChainBatchNumber(uint256 _chainId) external onlyChain(_chainId) {
         // While it is checked in other places that all chains settle on L1 at the time of the v31 upgrade,
         // we have this double check just in case.
-        require(block.chainid == IBridgehubBase(_bridgehub()).settlementLayer(_chainId), OnlyOnSettlementLayer());
+        require(block.chainid == IBridgehubBase(_getBridgehub()).settlementLayer(_chainId), OnlyOnSettlementLayer());
         uint256 totalBatchesExecuted = IGetters(msg.sender).getTotalBatchesExecuted();
         require(totalBatchesExecuted > 0, TotalBatchesExecutedZero());
         require(
@@ -139,7 +139,7 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
             v31UpgradeBatchNumber == V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE ||
             _batchNumber < v31UpgradeBatchNumber
         ) {
-            return IGetters(IBridgehubBase(_bridgehub()).getZKChain(_chainId)).l2LogsRootHash(_batchNumber);
+            return IGetters(IBridgehubBase(_getBridgehub()).getZKChain(_chainId)).l2LogsRootHash(_batchNumber);
         }
         return bytes32(0);
     }
@@ -148,7 +148,7 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
                         IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    function _bridgehub() internal view override returns (address) {
+    function _getBridgehub() internal view override returns (address) {
         return BRIDGE_HUB;
     }
 
@@ -157,7 +157,7 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
         return block.chainid;
     }
 
-    function _chainAssetHandler() internal view override returns (address) {
+    function _getChainAssetHandler() internal view override returns (address) {
         return CHAIN_ASSET_HANDLER;
     }
 }

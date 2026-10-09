@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
-
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
@@ -19,7 +17,7 @@ import {ChainCreationParamsLib} from "../../../../deploy-scripts/ctm/ChainCreati
 import {Utils} from "../../../../deploy-scripts/utils/Utils.sol";
 
 contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
-    uint256 constant TEST_USERS_COUNT = 10;
+    uint256 internal constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
 
@@ -59,7 +57,7 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
 
     // Check whether the sum of ETH deposits from tests, updated on each deposit and withdrawal,
     // equals the balance of L1Shared bridge.
-    function test_initialDeployment() public {
+    function test_initialDeployment() public view {
         uint256 chainId = zkChainIds[0];
         address newChainAddress = addresses.bridgehub.getZKChain(chainId);
         address admin = IZKChain(addresses.bridgehub.getZKChain(chainId)).getAdmin();
@@ -78,7 +76,7 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         // Derived from the same genesis config the CTM was deployed from, rather than hardcoded:
         // the packed version moves on every protocol bump, and a literal here silently rots.
         uint256 expectedProtocolVersion = ChainCreationParamsLib
-            .getChainCreationParams(Utils.genesisConfigPath(false), false)
+            .getChainCreationParams(Utils.genesisConfigPath())
             .latestProtocolVersion;
 
         uint256 protocolVersion = addresses.chainTypeManager.getProtocolVersion(chainId);
@@ -92,16 +90,15 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
             uint256 chainId = currentZKChainId++;
             bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(chainId, ETH_TOKEN_ADDRESS);
 
-            address chain = _deployZkChain(
-                chainId,
-                baseTokenAssetId,
-                owner,
-                addresses.chainTypeManager.protocolVersion(),
-                addresses.chainTypeManager.storedBatchZero(),
-                address(addresses.bridgehub),
-                address(addresses.interopCenter),
-                address(addresses.chainTypeManager)
-            );
+            address chain = _deployZkChain({
+                _chainId: chainId,
+                _baseTokenAssetId: baseTokenAssetId,
+                _admin: owner,
+                _protocolVersion: addresses.chainTypeManager.protocolVersion(),
+                _storedBatchZero: addresses.chainTypeManager.storedBatchZero(),
+                _bridgehub: address(addresses.bridgehub),
+                _chainTypeManager: address(addresses.chainTypeManager)
+            });
 
             address stmAddr = IZKChain(chain).getChainTypeManager();
 
@@ -134,16 +131,15 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
                 "Chain should not be registered before deployment"
             );
 
-            address chain = _deployZkChain(
-                chainId,
-                baseTokenAssetId,
-                owner,
-                addresses.chainTypeManager.protocolVersion(),
-                addresses.chainTypeManager.storedBatchZero(),
-                address(addresses.bridgehub),
-                address(addresses.interopCenter),
-                address(addresses.chainTypeManager)
-            );
+            address chain = _deployZkChain({
+                _chainId: chainId,
+                _baseTokenAssetId: baseTokenAssetId,
+                _admin: owner,
+                _protocolVersion: addresses.chainTypeManager.protocolVersion(),
+                _storedBatchZero: addresses.chainTypeManager.storedBatchZero(),
+                _bridgehub: address(addresses.bridgehub),
+                _chainTypeManager: address(addresses.chainTypeManager)
+            });
 
             // Verify chain was deployed
             assertTrue(chain != address(0), "Chain should be deployed at a valid address");

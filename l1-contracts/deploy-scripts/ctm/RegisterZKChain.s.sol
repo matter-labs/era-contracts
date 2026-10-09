@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// solhint-disable no-console, gas-custom-errors, reason-string
-
-import {Script, console2 as console} from "forge-std/Script.sol";
+import {console2 as console} from "forge-std/Script.sol";
 
 import {stdToml} from "forge-std/StdToml.sol";
 
@@ -20,28 +18,21 @@ import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
-import {ADDRESS_ONE, Utils} from "../utils/Utils.sol";
+import {ADDRESS_ONE} from "../utils/Utils.sol";
 import {Create2FactoryUtils} from "../utils/deploy/Create2FactoryUtils.s.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
-import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-
-import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {Call} from "contracts/governance/Common.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {
-    ZkChainAddresses,
-    StateTransitionDeployedAddresses,
-    CTMDeployedAddresses,
-    CoreDeployedAddresses
-} from "../utils/Types.sol";
+import {ZkChainAddresses, CTMDeployedAddresses, CoreDeployedAddresses} from "../utils/Types.sol";
 import {IRegisterZKChain, RegisterZKChainConfig} from "contracts/script-interfaces/IRegisterZKChain.sol";
 import {GetDiamondCutData} from "../utils/GetDiamondCutData.sol";
 
@@ -54,15 +45,6 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
     function getDeployerAddress() public view returns (address) {
         return tx.origin;
     }
-
-    struct LegacySharedBridgeParams {
-        bytes implementationConstructorParams;
-        address implementationAddress;
-        bytes proxyConstructorParams;
-        address proxyAddress;
-    }
-
-    LegacySharedBridgeParams internal legacySharedBridgeParams;
 
     CTMDeployedAddresses internal ctmAddresses;
     CoreDeployedAddresses internal coreAddresses;
@@ -92,7 +74,6 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
         string memory path = string.concat(root, inputPath);
         initializeConfig(path, _chainTypeManagerProxy, _chainChainId);
         loadChainCreationData(_chainTypeManagerProxy);
-        // TODO: some chains may not want to have a legacy shared bridge
         runInner(outputPath);
     }
 
@@ -215,21 +196,13 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
             config.validatorSenderOperatorExecute = address(0);
         }
 
-        if (vm.keyExistsToml(toml, "$.initialize_legacy_bridge")) {
-            config.initializeLegacyBridge = toml.readBool("$.initialize_legacy_bridge");
-        }
-
         config.l1SharedBridgeProxy = coreAddresses.bridges.proxies.l1AssetRouter;
 
         (config.create2FactoryAddress, config.create2Salt) = getCreate2FactoryParams();
-
-        if (vm.keyExistsToml(toml, "$.chain.allow_evm_emulator")) {
-            config.allowEvmEmulator = toml.readBool("$.chain.allow_evm_emulator");
-        }
     }
 
     function initializeConfigFromOnChain(address _ctmAddress) internal {
-        ChainTypeManagerBase ctm = ChainTypeManagerBase(_ctmAddress);
+        ChainTypeManager ctm = ChainTypeManager(_ctmAddress);
         ctmAddresses = AddressIntrospector.getCTMAddresses(ctm);
         IL1Bridgehub bridgehub = IL1Bridgehub(ctm.BRIDGE_HUB());
         coreAddresses = AddressIntrospector.getCoreDeployedAddresses(address(bridgehub));
@@ -275,7 +248,6 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
         ChainAdminOwnable admin = ChainAdminOwnable(payable(coreAddresses.shared.bridgehubAdmin));
         INativeTokenVaultBase ntv = INativeTokenVaultBase(coreAddresses.bridges.proxies.l1NativeTokenVault);
         bytes32 baseTokenAssetId = ntv.assetId(config.baseToken);
-        uint256 baseTokenOriginChain = ntv.originChainId(baseTokenAssetId);
 
         if (baseTokenAssetId == bytes32(0)) {
             baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, config.baseToken);
@@ -300,7 +272,6 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
     function registerTokenOnNTV() internal {
         INativeTokenVaultBase ntv = INativeTokenVaultBase(coreAddresses.bridges.proxies.l1NativeTokenVault);
         bytes32 baseTokenAssetId = ntv.assetId(config.baseToken);
-        uint256 baseTokenOriginChain = ntv.originChainId(baseTokenAssetId);
 
         // If it hasn't been registered already with ntv
         if (baseTokenAssetId == bytes32(0)) {
@@ -403,15 +374,15 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
 
         vm.startBroadcast(getDeployerAddress());
 
-        // Eth-path operator (ZKsync Era): precommit / revert / upgrader. When dedicated ZKsync OS prove
-        // and execute operators are set, they receive PROVER / EXECUTOR instead (see below).
+        // Eth-path operator: revert / upgrader. When dedicated ZKsync OS prove and execute
+        // operators are set, they receive PROVER / EXECUTOR instead (see below).
         bool zkSyncOsValidatorSplit = config.validatorSenderOperatorProve != address(0) &&
             config.validatorSenderOperatorExecute != address(0);
         validatorTimelock.addValidatorRoles(
             chainAddress,
             config.validatorSenderOperatorEth,
             IValidatorTimelock.ValidatorRotationParams({
-                rotatePrecommitterRole: true,
+                rotatePrecommitterRole: false,
                 rotateCommitterRole: false,
                 rotateReverterRole: true,
                 rotateProverRole: !zkSyncOsValidatorSplit,
@@ -492,15 +463,6 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
         console.log("Owner for ", output.diamondProxy, "set to", output.chainAdmin);
     }
 
-    function unpauseDeposits() internal {
-        IZKChain zkChain = IZKChain(output.diamondProxy);
-        if (zkChain.depositsPaused()) {
-            vm.broadcast(msg.sender);
-            zkChain.unpauseDeposits();
-            console.log("Deposits unpaused");
-        }
-    }
-
     function deployChainProxyAddress() internal {
         address proxyAdmin = create2WithDeterministicOwner(type(ProxyAdmin).creationCode, output.chainAdmin);
 
@@ -516,9 +478,6 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
     function saveOutput(string memory outputPath) internal {
         vm.serializeAddress("root", "diamond_proxy_addr", output.diamondProxy);
         vm.serializeAddress("root", "chain_admin_addr", output.chainAdmin);
-        if (output.l2LegacySharedBridge != address(0)) {
-            vm.serializeAddress("root", "l2_legacy_shared_bridge_addr", output.l2LegacySharedBridge);
-        }
         vm.serializeAddress("root", "access_control_restriction_addr", output.accessControlRestrictionAddress);
         vm.serializeAddress("root", "chain_proxy_admin_addr", output.chainProxyAdmin);
 
@@ -526,7 +485,6 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
         vm.serializeString("root", "chain", chain);
 
         string memory toml = vm.serializeAddress("root", "governance_addr", output.governance);
-        string memory root = vm.projectRoot();
         vm.writeToml(toml, outputPath);
         console.log("Output saved at:", outputPath);
     }

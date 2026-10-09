@@ -42,9 +42,6 @@ contract L1NullifierTest is Test {
     address public assetRouter;
     address public nativeTokenVault;
 
-    uint256 public constant ERA_CHAIN_ID = 9;
-    address public eraDiamondProxy;
-
     TestERC20 public token;
 
     function setUp() public {
@@ -55,7 +52,6 @@ contract L1NullifierTest is Test {
         interopCenter = makeAddr("interopCenter");
         assetRouter = makeAddr("assetRouter");
         nativeTokenVault = makeAddr("nativeTokenVault");
-        eraDiamondProxy = makeAddr("eraDiamondProxy");
 
         token = new TestERC20();
 

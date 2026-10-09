@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// solhint-disable-next-line gas-struct-packing
 struct RegisterZKChainConfig {
     address deployerAddress;
     address ownerAddress;
@@ -20,11 +19,10 @@ struct RegisterZKChainConfig {
     uint128 baseTokenGasPriceMultiplierDenominator;
     address governanceSecurityCouncilAddress;
     uint256 governanceMinDelay;
-    bool initializeLegacyBridge;
     address governance;
     address create2FactoryAddress;
     bytes32 create2Salt;
-    bool allowEvmEmulator;
+    // optional - if not set, then equal to 0
     address l1SharedBridgeProxy;
     bytes diamondCutData;
     bytes forceDeploymentsData;

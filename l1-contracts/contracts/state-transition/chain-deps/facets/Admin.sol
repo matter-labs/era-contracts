@@ -3,12 +3,12 @@
 pragma solidity 0.8.28;
 
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
-import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {
+    ProofSystem,
     L2DACommitmentScheme,
     PubdataContent,
-    MAX_GAS_PER_TRANSACTION,
+    PRIORITY_TX_MAX_GAS_LIMIT,
     MAX_PRICE_CHANGE_DENOMINATOR,
     MAX_PRICE_CHANGE_NUMERATOR,
     PRICE_REFERENCE_L1_GAS,
@@ -25,7 +25,6 @@ import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
 import {
     L1DAValidatorAddressIsZero,
     NotL1,
-    NotZKsyncOS,
     PriorityModeAlreadyAllowed,
     ExecutedIsNotConsistentWithVerified,
     VerifiedIsNotConsistentWithCommitted,
@@ -40,6 +39,7 @@ import {
     FeeParamsChangeTooLarge,
     HashMismatch,
     InvalidDAForPermanentRollup,
+    InvalidProofSystem,
     InvalidL2DACommitmentScheme,
     InvalidPubdataPricingMode,
     NonFullPubdataContentForPermanentRollup,
@@ -61,8 +61,6 @@ import {
 } from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
-import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
-import {AllowedBytecodeTypes, IL2ContractDeployer} from "../../../common/interfaces/IL2ContractDeployer.sol";
 import {IServerNotifier} from "../../../governance/IServerNotifier.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -156,15 +154,8 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setPorterAvailability(bool _zkPorterIsAvailable) external onlyChainTypeManager {
-        // Change the porter availability
-        s.zkPorterIsAvailable = _zkPorterIsAvailable;
-        emit IsPorterAvailableStatusUpdate(_zkPorterIsAvailable);
-    }
-
-    /// @inheritdoc IAdmin
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external onlyChainTypeManager onlyL1 {
-        if (_newPriorityTxMaxGasLimit > MAX_GAS_PER_TRANSACTION) {
+        if (_newPriorityTxMaxGasLimit > PRIORITY_TX_MAX_GAS_LIMIT) {
             revert TooMuchGas();
         }
 
@@ -174,7 +165,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setZKsyncOSMaxTxGasLimit(uint64 _newMaxTxGasLimit) external onlyAdmin onlySettlementLayer onlyZKsyncOS {
+    function setZKsyncOSMaxTxGasLimit(uint64 _newMaxTxGasLimit) external onlyAdmin onlySettlementLayer {
         // The cap may only be raised above Ethereum's EIP-7825 single-tx gas limit, never below.
         if (_newMaxTxGasLimit < ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT) {
             revert ZKsyncOSMaxTxGasLimitTooLow();
@@ -190,9 +181,28 @@ contract AdminFacet is ZKChainBase, IAdmin {
         emit NewZKsyncOSMaxTxGasLimit(oldMaxTxGasLimit, _newMaxTxGasLimit);
     }
 
-    /// @dev The runtime chain config is read from storage when the batch proof public input is
-    /// computed, so it must not change while committed-but-unverified batches exist: those batches
-    /// were executed by ZKsync OS under the old config and would become unprovable.
+    /// @inheritdoc IAdmin
+    function setZKsyncOSL1TxFiltering(bool _enabled) external onlyAdmin onlySettlementLayer {
+        if (_enabled && s.priorityModeInfo.canBeActivated) {
+            revert NotCompatibleWithPriorityMode();
+        }
+        _enforceNoUnverifiedBatchesForChainConfigUpdate();
+
+        bool oldEnabled = s.zksyncOSL1TxFilteringEnabled;
+        s.zksyncOSL1TxFilteringEnabled = _enabled;
+        emit NewZKsyncOSL1TxFiltering(oldEnabled, _enabled);
+    }
+
+    /// @inheritdoc IAdmin
+    function setZKsyncOSLargeContractsEnabled(bool _enabled) external onlyAdmin onlySettlementLayer {
+        _enforceNoUnverifiedBatchesForChainConfigUpdate();
+
+        bool oldEnabled = s.zksyncOSLargeContractsEnabled;
+        s.zksyncOSLargeContractsEnabled = _enabled;
+        emit NewZKsyncOSLargeContracts(oldEnabled, _enabled);
+    }
+
+    /// @notice Enforces the configuration-update boundary described in {protocol-docs/chain-config.md}.
     function _enforceNoUnverifiedBatchesForChainConfigUpdate() internal view {
         if (s.totalBatchesCommitted != s.totalBatchesVerified) {
             revert ZKsyncOSChainConfigUpdateWithUnverifiedBatches(s.totalBatchesVerified, s.totalBatchesCommitted);
@@ -378,13 +388,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert InvalidL2DACommitmentScheme(_l2DACommitmentScheme);
         }
 
-        // `BLOBS_ZKSYNC_OS` is only supported on ZKsync OS, where the STF interprets the scheme. It has
-        // no commitment implementation on the Era VM (`L2DAValidator.makeDACommitment` reverts for it),
-        // so reject it here to avoid configuring an unusable DA pair.
-        if (_l2DACommitmentScheme == L2DACommitmentScheme.BLOBS_ZKSYNC_OS && !s.zksyncOS) {
-            revert NotZKsyncOS();
-        }
-
         if (s.isPermanentRollup && !ROLLUP_DA_MANAGER.isPairAllowed(_l1DAValidator, _l2DACommitmentScheme)) {
             revert InvalidDAForPermanentRollup();
         }
@@ -393,7 +396,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setPubdataContent(PubdataContent _pubdataContent) external onlyAdmin onlyZKsyncOS {
+    function setPubdataContent(PubdataContent _pubdataContent) external onlyAdmin {
         // A permanent rollup is locked to `FULL_PUBDATA` — its pubdata content can never be changed (in particular it
         // can never be relaxed to `LOGS_ONLY`), mirroring how the permanent-rollup flag itself is one-way.
         if (s.isPermanentRollup) {
@@ -402,6 +405,21 @@ contract AdminFacet is ZKChainBase, IAdmin {
         _enforceNoUnverifiedBatchesForChainConfigUpdate();
         emit NewPubdataContent(s.pubdataContent, _pubdataContent);
         s.pubdataContent = _pubdataContent;
+    }
+
+    /// @inheritdoc IAdmin
+    function setProofSystemStatus(ProofSystem _proofSystem, bool _enabled) external onlyAdmin {
+        if (_proofSystem != ProofSystem.Zisk) {
+            revert InvalidProofSystem(uint8(_proofSystem));
+        }
+        // The emergency switch must also work while committed batches wait for a proof.
+        uint8 proofSystemMask = uint8(1 << uint8(_proofSystem));
+        uint8 oldDisabledProofSystems = s.disabledProofSystems;
+        uint8 newDisabledProofSystems = _enabled
+            ? oldDisabledProofSystems & ~proofSystemMask
+            : oldDisabledProofSystems | proofSystemMask;
+        s.disabledProofSystems = newDisabledProofSystems;
+        emit NewDisabledProofSystems(oldDisabledProofSystems, newDisabledProofSystems);
     }
 
     /// @inheritdoc IAdmin
@@ -438,9 +456,12 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function permanentlyAllowPriorityMode() external onlyAdmin onlySettlementLayer onlyL1 onlyZKsyncOS {
+    function permanentlyAllowPriorityMode() external onlyAdmin onlySettlementLayer onlyL1 {
         if (s.priorityModeInfo.canBeActivated) {
             revert PriorityModeAlreadyAllowed();
+        }
+        if (s.zksyncOSL1TxFilteringEnabled) {
+            revert NotCompatibleWithPriorityMode();
         }
         // Ensure that there is at least one priority tx with a non-zero request timestamp.
         // This guarantees that activatePriorityMode can actually function, since it relies on
@@ -501,15 +522,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
         // to commit, prove, and execute batches in one go.
         _revertBatches(s.totalBatchesExecuted);
         emit PriorityModeActivated();
-    }
-
-    /// @inheritdoc IAdmin
-    function allowEvmEmulation() external onlyAdmin onlyL1 notPriorityMode onlyEra returns (bytes32 canonicalTxHash) {
-        canonicalTxHash = IMailbox(address(this)).requestL2ServiceTransaction(
-            L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
-            abi.encodeCall(IL2ContractDeployer.setAllowedBytecodeTypesToDeploy, AllowedBytecodeTypes.EraVmAndEVM)
-        );
-        emit EnableEvmEmulator();
     }
 
     /*//////////////////////////////////////////////////////////////

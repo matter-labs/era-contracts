@@ -13,7 +13,6 @@ use crate::common::forge::scripts::deploy_ecosystem::DeployL1CoreContractsOutput
 use crate::common::output::write_output_if_requested;
 use crate::common::SharedRunArgs;
 use crate::common::{forge::ForgeRunner, logger, wallets::Wallet};
-use crate::types::VMOption;
 
 // ── CLI args ────────────────────────────────────────────────────────────────
 
@@ -21,8 +20,8 @@ use crate::types::VMOption;
 pub struct EcosystemInitArgs {
     /// Per-env preset (`stage` / `testnet` / `mainnet` / `local`). Loads
     /// `upgrade-envs/permanent-values/<env>.toml` and supplies defaults for
-    /// `--zk-token-asset-id`, `--era-chain-id`, and `--owner` when those flags
-    /// are omitted. Explicit flags still win.
+    /// `--zk-token-asset-id` and `--owner` when those flags are omitted.
+    /// Explicit flags still win.
     #[clap(long, help_heading = "Topology")]
     pub env: Option<String>,
 
@@ -43,15 +42,18 @@ pub struct EcosystemInitArgs {
     pub shared: SharedRunArgs,
 
     // Advanced input
-    /// Era chain ID (default: 270, or env's `era_chain_id` when `--env` is set).
-    #[clap(long, help_heading = "Advanced input")]
-    pub era_chain_id: Option<u64>,
-    /// VM type: zksyncos (default) or eravm
-    #[clap(long, value_enum, default_value_t = VMOption::ZKSyncOsVM, help_heading = "Advanced input")]
-    pub vm_type: VMOption,
     /// Use testnet verifier (default: true)
     #[clap(long, default_value_t = true, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub with_testnet_verifier: bool,
+    /// Deploy the Airbender + ZiSK multi-proof verifier lane.
+    #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
+    pub multi_proof_verifier: bool,
+    /// Pre-deployed snarkJS Plonk verifier used by the ZiSK verifier.
+    #[clap(long, help_heading = "Advanced input")]
+    pub zisk_plonk_verifier_addr: Option<Address>,
+    /// Optional pre-deployed ZiSK range verifier override.
+    #[clap(long, help_heading = "Advanced input")]
+    pub zisk_range_verifier_addr: Option<Address>,
     /// ZK token asset ID (defaults from env's `zk_token_asset_id` when
     /// `--env` is set).
     #[clap(long, help_heading = "Advanced input")]
@@ -75,15 +77,13 @@ pub async fn run(args: EcosystemInitArgs) -> anyhow::Result<()> {
 
     let mut runner = ForgeRunner::new(&args.shared)?;
     let sender = runner.prepare_sender(args.deployer_address).await?;
-    let owner_override = args
-        .owner
-        .or_else(|| env_cfg.as_ref().and_then(|c| c.owner_address()));
+    let owner_override = match (args.owner, env_cfg.as_ref()) {
+        (Some(owner), _) => Some(owner),
+        (None, Some(cfg)) => cfg.owner_address()?,
+        (None, None) => None,
+    };
     let owner = Wallet::resolve(owner_override, None, &sender)?;
 
-    let era_chain_id = args
-        .era_chain_id
-        .or_else(|| env_cfg.as_ref().and_then(|c| c.era_chain_id()))
-        .unwrap_or(270);
     let zk_token_asset_id = args
         .zk_token_asset_id
         .or_else(|| env_cfg.as_ref().and_then(|c| c.zk_token_asset_id()));
@@ -91,9 +91,10 @@ pub async fn run(args: EcosystemInitArgs) -> anyhow::Result<()> {
     let input = EcosystemInitInput {
         sender: sender.address,
         owner: owner.address,
-        era_chain_id,
-        vm_type: args.vm_type,
         with_testnet_verifier: args.with_testnet_verifier,
+        multi_proof_verifier: args.multi_proof_verifier,
+        zisk_plonk_verifier_addr: args.zisk_plonk_verifier_addr,
+        zisk_range_verifier_addr: args.zisk_range_verifier_addr,
         zk_token_asset_id,
         create2_factory_salt: args.create2_factory_salt,
         token_weth_address: args.token_weth_address,
@@ -131,7 +132,6 @@ pub async fn ecosystem_init(
     // Initialize Bridgehub contracts
     let hub_input = HubInitInput {
         owner: owner.address,
-        era_chain_id: input.era_chain_id,
         create2_factory_salt: input.create2_factory_salt,
         token_weth_address: input.token_weth_address,
     };
@@ -142,9 +142,11 @@ pub async fn ecosystem_init(
     let ctm_input = CtmInitInput {
         bridgehub: bridgehub_addr,
         owner: owner.address,
-        vm_type: input.vm_type,
         reuse_gov_and_admin: true,
         with_testnet_verifier: input.with_testnet_verifier,
+        multi_proof_verifier: input.multi_proof_verifier,
+        zisk_plonk_verifier_addr: input.zisk_plonk_verifier_addr,
+        zisk_range_verifier_addr: input.zisk_range_verifier_addr,
         zk_token_asset_id: input.zk_token_asset_id,
         create2_factory_salt: input.create2_factory_salt,
     };
@@ -162,9 +164,10 @@ pub async fn ecosystem_init(
 pub struct EcosystemInitInput {
     pub sender: Address,
     pub owner: Address,
-    pub era_chain_id: u64,
-    pub vm_type: VMOption,
     pub with_testnet_verifier: bool,
+    pub multi_proof_verifier: bool,
+    pub zisk_plonk_verifier_addr: Option<Address>,
+    pub zisk_range_verifier_addr: Option<Address>,
     pub zk_token_asset_id: Option<B256>,
     pub create2_factory_salt: Option<B256>,
     pub token_weth_address: Option<Address>,

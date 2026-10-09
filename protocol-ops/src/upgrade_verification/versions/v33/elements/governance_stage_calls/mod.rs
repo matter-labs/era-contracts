@@ -67,7 +67,7 @@ sol! {
     function updateGuardians(address _newGuardians);
     function updateEmergencyUpgradeBoard(address _newEmergencyUpgradeBoard);
 
-    /// Decoded by stage 0 when it walks the deferred `acceptOwnership` tail.
+    // Decoded by stage 0 to spot the PUH `acceptOwnership` hand-over.
     function acceptOwnership();
 
     #[sol(rpc)]

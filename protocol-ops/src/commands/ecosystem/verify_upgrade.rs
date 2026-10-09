@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use alloy::primitives::{keccak256, Address, FixedBytes};
 use clap::{Parser, ValueEnum};
 
-use crate::common::env_config::{default_protocol_ops_out_dir, EnvConfig, GovernanceKind};
+use crate::common::env_config::{EnvConfig, GovernanceKind};
 use crate::{
     common::logger,
     upgrade_verification::{
@@ -22,22 +22,29 @@ use super::zk_governance::GOV_SALT_SEED;
 /// scripts or creating an anvil fork.
 #[derive(Debug, Clone, Parser)]
 pub struct VerifyUpgradeArgs {
-    /// Environment whose permanent-values and v33 input TOMLs define verification constants.
+    /// Environment whose permanent-values and release input TOMLs define verification constants.
     #[clap(long, value_enum)]
     pub env: VerifyUpgradeEnv,
+
+    /// Release upgrade-env directory (relative to `l1-contracts/`, e.g.
+    /// `upgrade-envs/v0.33.0-atomic-interop`) whose `<env>.toml` supplies the pinned salts and
+    /// `era_chain_id`, and whose `output/<env>/` holds the default `transactions.txt`. Defaults to the
+    /// current release's directory; pass the older one to verify a historical preparation.
+    #[clap(long)]
+    pub upgrade_env_dir: Option<String>,
 
     /// L1 RPC URL used by deployment provenance to fetch each CREATE2 deployment tx
     /// and by later phases for read-only on-chain checks.
     #[clap(long, default_value = "http://localhost:8545")]
     pub l1_rpc_url: String,
 
-    /// Path to the v33 ecosystem upgrade TOML produced by `upgrade-prepare`.
+    /// Path to the ecosystem upgrade TOML produced by `upgrade-prepare`.
     #[clap(long)]
     pub ecosystem_toml: PathBuf,
 
     /// Optional era-contracts commit to load contract metadata from GitHub.
     /// If omitted, the local checkout is the authority for AllContractsHashes.json
-    /// and SystemConfig.json; verify that the checkout matches the reviewed commit.
+    /// and the genesis configs; verify that the checkout matches the reviewed commit.
     #[clap(long)]
     pub contracts_commit: Option<String>,
 
@@ -55,7 +62,7 @@ pub struct VerifyUpgradeArgs {
     /// Stale entries (from older regens whose bytecode is no longer in
     /// AllContractsHashes) are silently skipped.
     ///
-    /// Defaults to `<l1-contracts>/upgrade-envs/v0.33.0-atomic-interop/output/<env>/transactions.txt`
+    /// Defaults to `<l1-contracts>/<upgrade-env dir>/output/<env>/transactions.txt`
     #[clap(long)]
     pub transactions_log: Option<PathBuf>,
 
@@ -92,16 +99,24 @@ impl VerifyUpgradeEnv {
     }
 }
 
+/// The env preset whose release directory supplies the verification constants: `--upgrade-env-dir` when
+/// given, the current release's otherwise.
+fn verify_env_config(args: &VerifyUpgradeArgs) -> anyhow::Result<EnvConfig> {
+    match args.upgrade_env_dir.as_deref() {
+        Some(dir) => EnvConfig::load_from_upgrade_env_dir(args.env.as_str(), dir),
+        None => EnvConfig::load(args.env.as_str()),
+    }
+}
+
 pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     let env = args.env.as_str();
-    let env_cfg = EnvConfig::load(env)?;
-    let era_chain_id = env_cfg.era_chain_id().ok_or_else(|| {
+    let env_cfg = verify_env_config(&args)?;
+    let era_chain_id = env_cfg.era_chain_id()?.ok_or_else(|| {
         anyhow::anyhow!(
             "{} is missing top-level `era_chain_id`",
             env_cfg.upgrade_input_path.display()
         )
     })?;
-    let message_root_era_gateway_chain_id = env_cfg.message_root_era_gateway_chain_id();
     let l1_chain_id = env_cfg.l1_chain_id().ok_or_else(|| {
         anyhow::anyhow!(
             "{} is missing top-level `l1_chain_id`",
@@ -120,7 +135,6 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
             env_cfg.permanent_values_path.display()
         )
     })?;
-
     // Collect every pinned CREATE2 salt declared in the env config — the Core
     // salt from `[contracts] create2_factory_salt` plus the per-CTM salts under
     // `[create2_factory_salts]`. PUVT hard-errors per deploy whose salt isn't
@@ -142,7 +156,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
 
     let transactions_log_path = match args.transactions_log.clone() {
         Some(path) => path,
-        None => default_protocol_ops_out_dir(env)?.join("transactions.txt"),
+        None => env_cfg.protocol_ops_out_dir().join("transactions.txt"),
     };
 
     logger::step("Verifying ecosystem upgrade artifacts");
@@ -152,7 +166,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         env_cfg.permanent_values_path.display()
     ));
     logger::info(format!(
-        "V33 input: {}",
+        "Upgrade input: {}",
         env_cfg.upgrade_input_path.display()
     ));
     logger::info(format!("Ecosystem TOML: {}", args.ecosystem_toml.display()));
@@ -170,9 +184,8 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         "zk-governance commit: {}",
         args.zk_governance_commit
     ));
-    logger::info(format!("Representative ZK chain ID: {era_chain_id}"));
     logger::info(format!(
-        "L1MessageRoot ERA_GATEWAY_CHAIN_ID: {message_root_era_gateway_chain_id}"
+        "Era chain ID (v31-ceremony input; feeds the PUH ERA_CHAIN_ID constructor check): {era_chain_id}"
     ));
     logger::info(format!("L1 chain ID (expected): {l1_chain_id}"));
     logger::info(format!("CREATE2 factory: {create2_factory}"));
@@ -204,7 +217,6 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         args.contracts_commit.as_deref(),
         args.zk_governance_commit.as_str(),
         era_chain_id,
-        message_root_era_gateway_chain_id,
         l1_chain_id,
         &tx_hashes,
         create2_factory,
@@ -248,4 +260,32 @@ fn print_encoded_upgrade_data(label: &str, stage_calls_hex: &str) {
         "{label} encoded upgrade data = 0x{}",
         alloy::hex::encode(proposal.abi_encode())
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::common::forge::scripts::UPGRADE_V33_ENV_DIR;
+
+    /// Verifying a historical preparation reads that release's pinned salts and transactions log.
+    #[test]
+    fn upgrade_env_dir_selects_the_release_constants() {
+        let args = VerifyUpgradeArgs::try_parse_from([
+            "verify-upgrade",
+            "--env",
+            "stage",
+            "--ecosystem-toml",
+            "ecosystem.toml",
+            "--zk-governance-commit",
+            "0",
+            "--upgrade-env-dir",
+            UPGRADE_V33_ENV_DIR.trim_start_matches('/'),
+        ])
+        .unwrap();
+        let cfg = verify_env_config(&args).unwrap();
+        assert!(cfg.create2_factory_salt_for_upgrade().unwrap().is_some());
+        assert!(cfg
+            .protocol_ops_out_dir()
+            .ends_with("upgrade-envs/v0.33.0-atomic-interop/output/stage"));
+    }
 }

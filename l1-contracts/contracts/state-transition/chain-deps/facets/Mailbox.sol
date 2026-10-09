@@ -16,12 +16,11 @@ import {
     WritePriorityOpParams
 } from "../../../common/Messaging.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
-import {L2ContractHelper} from "../../../common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {
-    MAX_NEW_FACTORY_DEPS,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    PRIORITY_TX_MAX_GAS_LIMIT,
     SERVICE_TRANSACTION_SENDER,
     SETTLEMENT_LAYER_RELAY_SENDER,
     PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
@@ -32,7 +31,7 @@ import {
     AddressNotZero,
     GasPerPubdataMismatch,
     MsgValueTooLow,
-    TooManyFactoryDeps,
+    FactoryDepsNotSupported,
     TransactionNotAllowed,
     ValueMismatch,
     ZeroAddress
@@ -166,8 +165,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
                 contractL2: L2_INTEROP_CENTER_ADDR,
                 mintValue: 0,
                 l2Value: 0,
-                // Very large amount
-                l2GasLimit: 72_000_000,
+                l2GasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
                 l2Calldata: data,
                 l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
                 factoryDeps: new bytes[](0),
@@ -187,8 +185,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
                 contractL2: _contractL2,
                 mintValue: 0,
                 l2Value: 0,
-                // Very large amount
-                l2GasLimit: 72_000_000,
+                l2GasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
                 l2Calldata: _l2Calldata,
                 l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
                 factoryDeps: new bytes[](0),
@@ -244,10 +241,6 @@ contract MailboxFacet is ZKChainBase, IMailbox {
     function _requestL2Transaction(WritePriorityOpParams memory _params) internal returns (bytes32 canonicalTxHash) {
         BridgehubL2TransactionRequest memory request = _params.request;
 
-        // For ZKsync OS factory deps will be ignored
-        if (request.factoryDeps.length > MAX_NEW_FACTORY_DEPS) {
-            revert TooManyFactoryDeps();
-        }
         _params.txId = _nextPriorityTxId();
 
         // Checking that the user provided enough ether to pay for the transaction.
@@ -281,7 +274,6 @@ contract MailboxFacet is ZKChainBase, IMailbox {
             ? refundRecipient
             : AddressAliasHelper.applyRefundRecipientAlias(refundRecipient, is7702AccountRefundRecipient);
         // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
-        // Please note, currently ZKsync address derivation is different from Ethereum one, but it may be changed in the future.
         // solhint-disable avoid-tx-origin
         // slither-disable-next-line tx-origin
         if (request.sender != tx.origin && !is7702AccountSender) {
@@ -321,8 +313,11 @@ contract MailboxFacet is ZKChainBase, IMailbox {
 
     function _serializeL2Transaction(
         WritePriorityOpParams memory _priorityOpParams
-    ) internal view returns (L2CanonicalTransaction memory transaction) {
+    ) internal pure returns (L2CanonicalTransaction memory transaction) {
         BridgehubL2TransactionRequest memory request = _priorityOpParams.request;
+        if (request.factoryDeps.length != 0) {
+            revert FactoryDepsNotSupported();
+        }
         transaction = L2CanonicalTransaction({
             txType: _getPriorityTxType(),
             from: uint256(uint160(request.sender)),
@@ -338,7 +333,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
             reserved: [request.mintValue, uint256(uint160(request.refundRecipient)), 0, 0],
             data: request.l2Calldata,
             signature: new bytes(0),
-            factoryDeps: L2ContractHelper.hashFactoryDeps(request.factoryDeps),
+            factoryDeps: new uint256[](0),
             paymasterInput: new bytes(0),
             reservedDynamic: new bytes(0)
         });
@@ -349,13 +344,10 @@ contract MailboxFacet is ZKChainBase, IMailbox {
     ) internal view returns (L2CanonicalTransaction memory transaction, bytes32 canonicalTxHash) {
         transaction = _serializeL2Transaction(_priorityOpParams);
         bytes memory transactionEncoding = abi.encode(transaction);
-        // solhint-disable-next-line func-named-parameters
         TransactionValidator.validateL1ToL2Transaction(
             transaction,
-            transactionEncoding,
             s.priorityTxMaxGasLimit,
-            s.feeParams.priorityTxMaxPubdata,
-            s.zksyncOS
+            s.feeParams.priorityTxMaxPubdata
         );
         canonicalTxHash = keccak256(transactionEncoding);
     }
@@ -387,7 +379,6 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         emit NewPriorityRequestId(_transaction.nonce, _canonicalTxHash);
     }
 
-    // solhint-disable-next-line no-unused-vars
     function _writePriorityOpHash(bytes32 _canonicalTxHash) internal {
         s.priorityTree.push(_canonicalTxHash);
         uint256 totalPriorityTxs = s.priorityTree.getTotalPriorityTxs();

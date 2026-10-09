@@ -12,12 +12,6 @@ error L2UpgradeNonceNotEqualToNewProtocolVersion(uint256 nonce, uint256 protocol
 error NewProtocolMajorVersionNotZero();
 // 0xd7f50a9d
 error PatchCantSetUpgradeTxn();
-// 0x962fd7d0
-error PatchUpgradeCantSetBootloader();
-// 0x559cc34e
-error PatchUpgradeCantSetDefaultAccount();
-// 0xc231eccd
-error PatchUpgradeCantSetEvmEmulator();
 // 0x5c598b60
 error PreviousProtocolMajorVersionNotZero();
 // 0xd7f8c13e

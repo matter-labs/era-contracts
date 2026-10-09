@@ -36,10 +36,6 @@ on:
         description: "[v30 only] L1 RollupDAManager address"
         required: false
         type: string
-      is_zk_sync_os:
-        description: "[v30 only] Whether chains use ZKsync OS (true/false)"
-        required: false
-        type: string
 
 permissions:
   contents: read
@@ -58,7 +54,7 @@ jobs:
       - name: Run ecosystem upgrade no-governance-prepare
         run: |
           mkdir -p "$WORK_DIR"
-          # TODO(v30-removal): the three v30-only override flags are appended
+          # TODO(v30-removal): the v30-only override flags are appended
           # conditionally — protocol-ops auto-resolves them from L1 on v31+.
           extra=()
           if [ -n "${{ inputs.bytecodes_supplier_addr }}" ]; then
@@ -66,9 +62,6 @@ jobs:
           fi
           if [ -n "${{ inputs.rollup_da_manager_addr }}" ]; then
             extra+=(--rollup-da-manager-address "${{ inputs.rollup_da_manager_addr }}")
-          fi
-          if [ -n "${{ inputs.is_zk_sync_os }}" ]; then
-            extra+=(--is-zk-sync-os "${{ inputs.is_zk_sync_os }}")
           fi
           bash protocol-ops.sh --tag "${{ inputs.protocol_ops_tag }}" \
             ecosystem upgrade-prepare \

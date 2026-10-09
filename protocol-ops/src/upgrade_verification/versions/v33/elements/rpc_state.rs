@@ -2,20 +2,17 @@ use anyhow::Result;
 
 use crate::upgrade_verification::{
     artifacts::{
-        optional_address_in_value, required_address_in_value as required_address, CtmFlavor,
+        optional_address_in_value, required_address_in_value as required_address,
         EcosystemUpgradeArtifact,
     },
     constants::EIP1967_PROXY_ADMIN_SLOT,
     verifiers::{VerificationResult, Verifiers},
     versions::v33::{
-        utils::{
-            fee_param_verifier::{FeeParamVerifier, FeeParams},
-            network_verifier::{
-                Bridgehub as BridgehubContract, ChainRegistrationSender, ChainTypeManager,
-                L1AssetRouter, Ownable, Ownable2Step, ValidatorTimelock, ZKChainFeeParams,
-            },
+        utils::network_verifier::{
+            Bridgehub as BridgehubContract, ChainRegistrationSender, ChainTypeManager,
+            L1AssetRouter, Ownable, Ownable2Step, ValidatorTimelock,
         },
-        MAX_PRIORITY_TX_GAS_LIMIT, STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID,
+        STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID,
     },
 };
 
@@ -27,9 +24,6 @@ use alloy::{
 
 const CREATE2_FACTORY_CONTRACT_NAME: &str = "Create2Factory";
 
-// `DiamondInit` writes the default fee params from `Config.sol` into
-// `ZKChainStorage.s.feeParams`; this slot matches the v33 storage layout.
-const FEE_PARAMS_STORAGE_SLOT: u64 = 38;
 const MAINNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS: u32 = 10_800;
 const TESTNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS: u32 = 0;
 
@@ -61,60 +55,6 @@ fn expect_address_eq(
     }
 }
 
-fn expect_debug_eq<T: std::fmt::Debug + PartialEq>(
-    result: &mut VerificationResult,
-    label: &str,
-    actual: &T,
-    expected: &T,
-) {
-    if actual == expected {
-        result.report_ok(&format!("{label} matches expected value ({expected:?})"));
-    } else {
-        result.report_error(&format!(
-            "{label} mismatch: expected {expected:?}, got {actual:?}"
-        ));
-    }
-}
-
-fn expect_fee_params_eq(result: &mut VerificationResult, actual: &FeeParams, expected: &FeeParams) {
-    expect_debug_eq(
-        result,
-        "Era feeParams.pubdataPricingMode",
-        &actual.pubdataPricingMode,
-        &expected.pubdataPricingMode,
-    );
-    expect_debug_eq(
-        result,
-        "Era feeParams.batchOverheadL1Gas",
-        &actual.batchOverheadL1Gas,
-        &expected.batchOverheadL1Gas,
-    );
-    expect_debug_eq(
-        result,
-        "Era feeParams.maxPubdataPerBatch",
-        &actual.maxPubdataPerBatch,
-        &expected.maxPubdataPerBatch,
-    );
-    expect_debug_eq(
-        result,
-        "Era feeParams.maxL2GasPerBatch",
-        &actual.maxL2GasPerBatch,
-        &expected.maxL2GasPerBatch,
-    );
-    expect_debug_eq(
-        result,
-        "Era feeParams.priorityTxMaxPubdata",
-        &actual.priorityTxMaxPubdata,
-        &expected.priorityTxMaxPubdata,
-    );
-    expect_debug_eq(
-        result,
-        "Era feeParams.minimalL2GasPrice",
-        &actual.minimalL2GasPrice,
-        &expected.minimalL2GasPrice,
-    );
-}
-
 /// RPC state checks
 ///
 /// This is intentionally the *non-overlapping* slice of legacy PUVT's
@@ -128,7 +68,6 @@ fn expect_fee_params_eq(result: &mut VerificationResult, actual: &FeeParams, exp
 /// - Pre-upgrade core wiring: AssetRouter owner / legacy bridge / NTV and
 ///   Bridgehub / ChainAssetHandler wiring.
 /// - ValidatorTimelock owner and execution delay.
-/// - Era fee params and priority-tx max gas limit.
 ///
 /// Per-implementation deployed-bytecode and constructor-arg checks live in
 /// deployment provenance: they use init bytecode + constructor args (via
@@ -137,8 +76,8 @@ fn expect_fee_params_eq(result: &mut VerificationResult, actual: &FeeParams, exp
 /// weaker and produced misleading errors for every contract with immutables;
 /// Phase 6 supersedes it.
 ///
-/// Bytecode-supplier `publishingBlock` checks for the L2 upgrade tx
-/// `factoryDeps` are restored separately inside
+/// Bytecode-supplier `evmPublishingBlock` checks for the L2 upgrade tx
+/// `factoryDeps` live inside
 /// `set_new_version_upgrade::verify_factory_deps` so they sit alongside the
 /// rest of the L2 upgrade tx checks.
 pub(crate) async fn verify_v33_artifact_state(
@@ -156,10 +95,10 @@ pub(crate) async fn verify_v33_artifact_state(
     verify_v33_proxy_admins(artifact, verifiers, result).await?;
     verify_v33_core_wiring(artifact, verifiers, result).await?;
     verify_v33_validator_timelocks(artifact, verifiers, result).await?;
-    verify_v33_era_fee_params(verifiers, result).await;
     verify_v33_timer_admin_state(artifact, verifiers, result).await?;
     verify_v33_ctm_permissionless_validator(artifact, verifiers, result).await?;
-    verify_v33_ctm_flavor(artifact, verifiers, result).await?;
+    // The exact ChainTypeManager creation bytecode and constructor arguments are verified
+    // by deployment provenance, so no additional runtime flavor probe is needed here.
     verify_v33_chain_settlement_layers(verifiers, result).await;
 
     Ok(())
@@ -410,30 +349,17 @@ async fn verify_v33_core_wiring(
             "Failed to call L1AssetRouter.owner() for core wiring checks: {err}"
         )),
     }
-    let era_chain_id = U256::from(verifiers.era_chain_id);
-    match asset_router.ERA_CHAIN_ID().call().await {
-        Ok(actual) => {
-            expect_debug_eq(result, "L1AssetRouter.eraChainId()", &actual, &era_chain_id);
+    if let Some(expected) = expected_legacy_bridge {
+        match asset_router.legacyBridge().call().await {
+            Ok(actual) => {
+                expect_address_eq(result, "L1AssetRouter.legacyBridge()", actual, expected)
+            }
+            Err(err) => result.report_error(&format!(
+                "Failed to call L1AssetRouter.legacyBridge() for core wiring checks: {err}"
+            )),
         }
-        Err(err) => result.report_error(&format!(
-            "Failed to call L1AssetRouter.eraChainId() for core wiring checks: {err}"
-        )),
-    };
-
-    match (
-        expected_legacy_bridge,
-        asset_router.legacyBridge().call().await,
-    ) {
-        (Some(expected), Ok(actual)) => {
-            expect_address_eq(result, "L1AssetRouter.legacyBridge()", actual, expected)
-        }
-        (None, Ok(_)) => result.print_info(
-            "L1AssetRouter.legacyBridge(): skipped — artifact records no erc20_bridge_proxy_addr",
-        ),
-        (_, Err(err)) => result.report_error(&format!(
-            "Failed to call L1AssetRouter.legacyBridge() for core wiring checks: {err}"
-        )),
     }
+
     match asset_router.nativeTokenVault().call().await {
         Ok(actual) => expect_address_eq(
             result,
@@ -604,76 +530,6 @@ async fn verify_v33_validator_timelocks(
     Ok(())
 }
 
-async fn verify_v33_era_fee_params(verifiers: &Verifiers, result: &mut VerificationResult) {
-    let era_chain_id = verifiers.era_chain_id;
-    let diamond = match verifiers
-        .network_verifier
-        .try_get_chain_diamond_from_bridgehub(verifiers.bridgehub_address, U256::from(era_chain_id))
-        .await
-    {
-        Ok(addr) if addr != Address::ZERO => addr,
-        Ok(_) => {
-            // An ecosystem whose `ERA_CHAIN_ID` names no registered chain has no Era diamond to
-            // read fee params from. Absence, not a mismatch — see `FeeParamVerifier::safe_init`.
-            result.print_info(&format!(
-                "Era fee params: skipped — Bridgehub.getZKChain({era_chain_id}) returned \
-                 address(0), so this ecosystem has no Era diamond"
-            ));
-            return;
-        }
-        Err(err) => {
-            result.report_error(&format!(
-                "Cannot verify Era fee params: Bridgehub.getZKChain({era_chain_id}) failed: {err}"
-            ));
-            return;
-        }
-    };
-
-    let provider = verifiers.network_verifier.get_l1_provider();
-    let raw = match provider
-        .get_storage_at(diamond, U256::from(FEE_PARAMS_STORAGE_SLOT))
-        .await
-    {
-        Ok(value) => value.to_be_bytes::<32>(),
-        Err(err) => {
-            result.report_error(&format!(
-                "Cannot verify Era fee params: eth_getStorageAt({diamond}, slot {FEE_PARAMS_STORAGE_SLOT}) failed: {err}"
-            ));
-            return;
-        }
-    };
-
-    let actual_fee_params = match FeeParamVerifier::decode_storage_word(FixedBytes::from(raw)) {
-        Ok(value) => value,
-        Err(err) => {
-            result.report_error(&format!(
-                "Cannot verify Era fee params: failed to decode storage slot {FEE_PARAMS_STORAGE_SLOT}: {err}"
-            ));
-            return;
-        }
-    };
-    expect_fee_params_eq(
-        result,
-        &actual_fee_params,
-        &verifiers.fee_param_verifier.fee_params,
-    );
-
-    let chain_getters = ZKChainFeeParams::new(diamond, provider);
-    match chain_getters.getPriorityTxMaxGasLimit().call().await {
-        Ok(actual) if actual == U256::from(MAX_PRIORITY_TX_GAS_LIMIT) => result.report_ok(
-            &format!(
-                "Era getPriorityTxMaxGasLimit() matches expected value ({MAX_PRIORITY_TX_GAS_LIMIT})"
-            ),
-        ),
-        Ok(actual) => result.report_error(&format!(
-            "Era getPriorityTxMaxGasLimit() mismatch: expected {MAX_PRIORITY_TX_GAS_LIMIT}, got {actual}"
-        )),
-        Err(err) => result.report_error(&format!(
-            "Failed to call Era getPriorityTxMaxGasLimit(): {err}"
-        )),
-    }
-}
-
 /// Sanity-check the live ownership state that should match the timer
 /// constructor addresses recorded under `[ctms.<flavor>.admin]`.
 ///
@@ -775,46 +631,7 @@ async fn verify_v33_ctm_permissionless_validator(
     Ok(())
 }
 
-/// `isZKsyncOS()` is `external pure` on the v33 CTM impl so it's safe to call
-/// directly on the implementation contract (no proxy, no init required). This
-/// guards against the artifact mislabeling a ZKsync OS CTM as Era or vice
-/// versa — an artifact-side swap that all other per-CTM checks would happily
-/// pass through.
-async fn verify_v33_ctm_flavor(
-    artifact: &EcosystemUpgradeArtifact,
-    verifiers: &Verifiers,
-    result: &mut VerificationResult,
-) -> Result<()> {
-    let provider = verifiers.network_verifier.get_l1_provider();
-    for ctm in &artifact.ctms {
-        let label = ctm.flavor.label();
-        let scope = format!("ctms.{label}");
-        let ctm_impl = required_address(
-            &ctm.value,
-            &scope,
-            &["state_transition", "chain_type_manager_implementation_addr"],
-        )?;
-        let expected = matches!(ctm.flavor, CtmFlavor::ZksyncOs);
-        match ChainTypeManager::new(ctm_impl, provider.clone())
-            .isZKsyncOS()
-            .call()
-            .await
-        {
-            Ok(actual) if actual == expected => result.report_ok(&format!(
-                "{label}.chain_type_manager_implementation.isZKsyncOS() = {actual} matches artifact flavor"
-            )),
-            Ok(actual) => result.report_error(&format!(
-                "{label}.chain_type_manager_implementation.isZKsyncOS() = {actual} disagrees with artifact flavor (expected {expected})"
-            )),
-            Err(err) => result.report_error(&format!(
-                "Failed to call {label}.chain_type_manager_implementation.isZKsyncOS(): {err}"
-            )),
-        }
-    }
-    Ok(())
-}
-
-/// Stage-1 `MessageRoot.initializeL1V33Upgrade()` iterates
+/// Stage-1 `MessageRoot.initializeL1V31Upgrade()` iterates
 /// `Bridgehub.getAllZKChainChainIDs()` and `require`s every chain to have
 /// `settlementLayer(chainId) == block.chainid`. Failing that on execution
 /// would revert the governance proposal after signers approve it, so PUVT

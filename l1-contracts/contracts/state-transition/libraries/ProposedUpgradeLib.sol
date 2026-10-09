@@ -7,9 +7,9 @@ import {VerifierParams} from "../chain-interfaces/IVerifier.sol";
 
 /// @notice The struct that represents the upgrade proposal.
 /// @param l2ProtocolUpgradeTx The system upgrade transaction.
-/// @param bootloaderHash The hash of the new bootloader bytecode. If zero, it will not be updated.
-/// @param defaultAccountHash The hash of the new default account bytecode. If zero, it will not be updated.
-/// @param evmEmulatorHash The hash of the new EVM emulator bytecode. If zero, it will not be updated.
+/// @param bootloaderHash Deprecated. Ignored: EraVM bytecode hashes are kept for calldata compatibility only.
+/// @param defaultAccountHash Deprecated. Ignored, same as bootloaderHash.
+/// @param evmEmulatorHash Deprecated. Ignored, same as bootloaderHash.
 /// @param verifier Deprecated. Verifier is fetched from CTM based on protocol version.
 /// @param verifierParams Deprecated. Verifier params are kept for backward compatibility.
 /// @param l1ContractsUpgradeCalldata Custom calldata for L1 contracts upgrade, it may be interpreted differently
@@ -33,7 +33,7 @@ struct ProposedUpgrade {
 }
 
 /// @notice Helpers for constructing zero-initialised upgrade structs.
-/// @dev Shared between runtime contracts (ChainTypeManagerBase) and deploy scripts (CTMUpgradeBase)
+/// @dev Shared between runtime contracts (ChainTypeManager) and deploy scripts (CTMUpgradeBase)
 /// to avoid manual zero-struct assembly that can desync when fields change.
 library ProposedUpgradeLib {
     function emptyL2CanonicalTransaction() internal pure returns (L2CanonicalTransaction memory) {

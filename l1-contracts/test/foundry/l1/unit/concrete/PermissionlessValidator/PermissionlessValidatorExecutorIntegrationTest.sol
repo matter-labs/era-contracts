@@ -12,10 +12,6 @@ import {PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/
 import {L2TransactionRequestDirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
-    function isZKsyncOS() internal pure override returns (bool) {
-        return true;
-    }
-
     function setUp() public {
         _activatePriorityMode();
     }
@@ -60,14 +56,14 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
             bytes memory executeData
         ) = _encodeSettleData(commitInfo, priorityOps);
 
-        permissionlessValidator.settleBatchesSharedBridge(
-            address(executor),
-            txFrom,
-            txTo,
-            commitData,
-            proveData,
-            executeData
-        );
+        permissionlessValidator.settleBatchesSharedBridge({
+            _chainAddress: address(executor),
+            _processBatchFrom: txFrom,
+            _processBatchTo: txTo,
+            _commitData: commitData,
+            _proveData: proveData,
+            _executeData: executeData
+        });
 
         assertEq(getters.getTotalBatchesCommitted(), 1);
         assertEq(getters.getTotalBatchesVerified(), 1);
@@ -128,7 +124,7 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
         (txFrom, txTo, commitData) = Utils.encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, commitInfos);
 
         IExecutor.StoredBatchInfo[] memory storedArray = new IExecutor.StoredBatchInfo[](1);
-        storedArray[0] = _buildStoredBatchInfoZKsyncOS(commitInfo);
+        storedArray[0] = _buildStoredBatchInfoZKsyncOS(genesisStoredBatchInfo, commitInfo);
 
         (, , proveData) = Utils.encodeProveBatchesData(genesisStoredBatchInfo, storedArray, proofInput);
         (, , executeData) = Utils.encodeExecuteBatchesData(storedArray, priorityOps);
@@ -147,44 +143,30 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
         info.dependencyRootsRollingHash = bytes32(0);
     }
 
-    /// @dev Replicates the stored batch info that _commitOneBatchZKsyncOS produces for the given commit info.
+    /// @notice Constructs the expected stored batch from its authenticated predecessor and commit data.
     function _buildStoredBatchInfoZKsyncOS(
-        CommitBatchInfoZKsyncOS memory commitInfo
-    ) internal view returns (IExecutor.StoredBatchInfo memory) {
+        IExecutor.StoredBatchInfo memory _previousBatch,
+        CommitBatchInfoZKsyncOS memory _commitInfo
+    ) internal pure returns (IExecutor.StoredBatchInfo memory) {
         return
             IExecutor.StoredBatchInfo({
-                batchNumber: commitInfo.batchNumber,
-                batchHash: commitInfo.newStateCommitment,
+                batchNumber: _commitInfo.batchNumber,
+                batchHash: _commitInfo.newStateCommitment,
                 indexRepeatedStorageChanges: 0,
-                numberOfLayer1Txs: commitInfo.numberOfLayer1Txs,
-                priorityOperationsHash: commitInfo.priorityOperationsHash,
-                l2LogsTreeRoot: commitInfo.l2LogsTreeRoot,
-                dependencyRootsRollingHash: commitInfo.dependencyRootsRollingHash,
+                numberOfLayer1Txs: _commitInfo.numberOfLayer1Txs,
+                priorityOperationsHash: _commitInfo.priorityOperationsHash,
+                l2LogsTreeRoot: _commitInfo.l2LogsTreeRoot,
+                dependencyRootsRollingHash: _commitInfo.dependencyRootsRollingHash,
                 timestamp: 0,
-                commitment: _batchOutputHash(commitInfo)
-            });
-    }
-
-    /// @dev Mirror the batchOutputHash formula from Committer._commitOneBatchZKsyncOS.
-    /// Note: the chain id is not part of the batch output; it is committed via the chain config
-    /// section of the batch proof public input instead.
-    function _batchOutputHash(CommitBatchInfoZKsyncOS memory c) internal pure returns (bytes32) {
-        return
-            keccak256(
-                abi.encodePacked(
-                    c.firstBlockTimestamp,
-                    c.lastBlockTimestamp,
-                    uint256(c.daCommitmentScheme),
-                    c.daCommitment,
-                    c.numberOfLayer1Txs,
-                    c.numberOfLayer2Txs,
-                    c.priorityOperationsHash,
-                    c.l2LogsTreeRoot,
-                    bytes32(0), // no system-contract upgrade tx
-                    c.dependencyRootsRollingHash,
-                    c.slChainId
+                commitment: keccak256(
+                    abi.encodePacked(
+                        _previousBatch.batchHash,
+                        _commitInfo.newStateCommitment,
+                        _commitInfo.chainConfigHash,
+                        _batchOutputHash(_commitInfo, bytes32(0))
+                    )
                 )
-            );
+            });
     }
 
     function _rollingHash(bytes32[] memory hashes) internal pure returns (bytes32) {

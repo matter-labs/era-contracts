@@ -6,15 +6,15 @@ narrative. For the atomic interop flow itself, see {protocol-docs/atomicity/READ
 
 ## Contract map
 
-| Contract                                                                                          | Chain                      | Role                                                                                                                                                         |
-| ------------------------------------------------------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `AssetRouterBase` / `L1AssetRouter` / `L2AssetRouter`                                             | L1 + every ZK chain        | Routes asset transfers (L1 <-> ZK chain bridging and L2 <-> L2 interop) to per-asset handlers.                                                               |
-| `NativeTokenVaultBase` / `L1NativeTokenVault` / `L2NativeTokenVault` (+ `L2NativeTokenVaultZKOS`) | L1 + every ZK chain        | The default asset handler for ETH and ERC20 tokens: escrows native tokens, mints/burns bridged representations.                                              |
-| `L2AssetTracker`                                                                                  | every ZK chain             | Chain-local token bookkeeping: outbound/inbound amounts, pre-v31 total-supply snapshots, and L1-deposit/withdrawal counters.                                 |
-| `L1Nullifier`                                                                                     | L1                         | Tracks initiated L1 -> L2 deposits (`depositHappened`) and verifies/clears them when a failed deposit is claimed back on L1.                                 |
-| `BaseTokenHolder` (`l2-system/`)                                                                  | every ZK chain             | Escrow of the chain's base-token reserves; replaces mint/burn with transfers for EVM compatibility.                                                          |
-| `BridgedStandardERC20`                                                                            | ZK chains (beacon-proxied) | The standard bridged-token implementation, deployed per token behind the NTV's beacon.                                                                       |
-| `L2WrappedBaseToken`                                                                              | ZK chains                  | The canonical wrapped-base-token (WETH-style) implementation. An `ERC20PermitUpgradeable`, deployed behind its own proxy — **not** the bridged-token beacon. |
+| Contract                                                             | Chain                      | Role                                                                                                                                                         |
+| -------------------------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `AssetRouterBase` / `L1AssetRouter` / `L2AssetRouter`                | L1 + every ZK chain        | Routes asset transfers (L1 <-> ZK chain bridging and L2 <-> L2 interop) to per-asset handlers.                                                               |
+| `NativeTokenVaultBase` / `L1NativeTokenVault` / `L2NativeTokenVault` | L1 + every ZK chain        | The default asset handler for ETH and ERC20 tokens: escrows native tokens, mints/burns bridged representations.                                              |
+| `L2AssetTracker`                                                     | every ZK chain             | Chain-local token bookkeeping: outbound/inbound amounts, pre-v31 total-supply snapshots, L1-deposit/withdrawal counters used by the L1 -> Gateway migration. |
+| `L1Nullifier`                                                        | L1                         | Tracks initiated L1 -> L2 deposits (`depositHappened`) and verifies/clears them when a failed deposit is claimed back on L1.                                 |
+| `BaseTokenHolder` (`l2-system/`)                                     | every ZK chain             | Escrow of the chain's base-token reserves; replaces mint/burn with transfers for EVM compatibility.                                                          |
+| `BridgedStandardERC20`                                               | ZK chains (beacon-proxied) | The standard bridged-token implementation, deployed per token behind the NTV's beacon.                                                                       |
+| `L2WrappedBaseToken`                                                 | ZK chains                  | The canonical wrapped-base-token (WETH-style) implementation. An `ERC20PermitUpgradeable`, deployed behind its own proxy — **not** the bridged-token beacon. |
 
 The `L2AssetRouter`, `L2NativeTokenVault`, `L2AssetTracker`, `BaseTokenHolder`, interop center/handler and
 atomic-flow manager are genesis-deployed built-ins at fixed, identical addresses on every ZK chain
@@ -76,10 +76,20 @@ returns `bridgeMintData`; the destination-side handler's `bridgeMint` consumes t
   calldata is identical. The bridged amount travels inside that calldata, not as call value: the returned
   starter merely echoes the requested `interopCallValue` (always zero for an indirect call) so the
   InteropCenter's `IndirectCallValueMismatch` check passes.
-- `bridgehubDepositBaseToken` lets the Bridgehub (L1) or `InteropCenter` (L2) acquire the destination
+- `bridgehubDepositBaseToken` lets the Bridgehub (L1) / `InteropCenter` (L2) acquire the destination
   chain's `mintValue`: it burns the base token through the
   handler but records nothing, because a failed transaction refunds the base token to the L2
-  `refundRecipient` rather than being claimable on L1.
+  `refundRecipient` rather than being claimable on L1. The historical exception for the Era diamond
+  proxy (`onlyBridgehubOrEra`, serving the retired legacy `Mailbox.requestL2Transaction` path) is gone:
+  a deployed diamond that still exposes that path must be upgraded off it before the shared router is
+  upgraded to this implementation, otherwise its legacy direct deposits revert with `Unauthorized`.
+
+### Priority-transaction factory dependencies
+
+ZKsync OS does not support factory dependencies in priority transactions. The Mailbox requires
+`factoryDeps` to be empty. The shared canonical transaction format retains the field because system
+upgrade transactions use it to identify bytecode preimages. Contract deployment in ordinary priority
+transactions uses EVM execution.
 
 ![Token deposit via requestL2TransactionTwoBridges](./img/deposit_two_bridges.png)
 
@@ -165,10 +175,9 @@ tokens) and rejects fee-on-transfer tokens (`TokensWithFeesNotSupported`).
 - Bridged tokens are `BridgedStandardERC20` beacon proxies deployed via CREATE2 at a deterministic address
   (`calculateCreate2TokenAddress`); the deployed address is checked against the expectation. The salt is
   `keccak256(abi.encode(originChainId, originToken))`, except on L2 for L1-origin tokens where it is the
-  plain L1 token address (legacy compatibility). On L2 the deployment goes through the `ContractDeployer`
-  system contract with the pinned `L2_TOKEN_PROXY_BYTECODE_HASH`; `L2NativeTokenVaultZKOS` uses plain
-  CREATE2 (zkOS-first chains have no legacy shared bridge, so the NTV is the sole deployer of bridged
-  tokens) and must hold no storage of its own.
+  plain L1 token address (legacy compatibility). On L2 the NTV uses plain CREATE2 over the canonical
+  `BeaconProxy` creation code and the current beacon constructor argument. `L2TokenBeaconUpdated`
+  reports that proxy's runtime-code hash; governance no longer supplies or stores an independent hash.
 - **L1 accounting**: `L1NativeTokenVault.bridgedOut[assetId]` is the net amount of each L1-native token
   currently bridged out of L1. It increases on outbound flows and decreases on inbound ones, so unlike raw
   `balanceOf` it cannot be skewed by direct transfers into the vault, and it is bounded by the actually
@@ -185,11 +194,10 @@ tokens) and rejects fee-on-transfer tokens (`TokensWithFeesNotSupported`).
 A vault that is upgraded in place starts with `bridgedOut == 0` while still holding all of the escrow that
 was bridged out before the upgrade. Every withdrawal of an L1-native asset would therefore look like an
 inbound amount exceeding the outstanding one and be rejected as forged. `populateBridgedOut(assetIds)` folds
-the pre-upgrade accounting into `bridgedOut`, once per asset, and `stage3` of the upgrade runs it for the
+the pre-upgrade accounting into `bridgedOut`, once per asset. The v33 upgrade's `stage3` ran it for the
 L1-native assets in the vault's `bridgedTokens` enumeration that have a non-zero pre-upgrade amount, batched
-across transactions (see `l1-contracts/deploy-scripts/upgrade/default-upgrade/BridgedOutPopulationLib.sol`;
-assets whose
-amount is zero are left out of the batches entirely, so their `bridgedOutPopulated` flag stays unset — there
+across transactions. That tooling (`BridgedOutPopulationLib`, `PopulateBridgedOut.s.sol`, which can resume a
+population) lives on `release/v0.33.0-atomic-interop`, where the v33 operation runs; assets whose amount is zero are left out of the batches entirely, so their `bridgedOutPopulated` flag stays unset — there
 is nothing to fold in for them, now or later).
 
 - For an asset the removed v31 `L1AssetTracker` registered, the amount is the complement of **L1's own
@@ -211,7 +219,7 @@ is nothing to fold in for them, now or later).
 - Until an asset is populated, only its pre-upgrade escrow is unwithdrawable — amounts bridged out after the
   upgrade raise `bridgedOut` normally and can be withdrawn against. Legacy tokens that predate the
   `bridgedTokens` enumeration have to be backfilled into it before they can be populated at all, which is why
-  `stage3` registers them first.
+  the v33 `stage3` registered them first.
 
 ## Base-token handling
 
@@ -219,13 +227,17 @@ is nothing to fold in for them, now or later).
   tokens; transfers from the holder replace minting (better EVM/Foundry compatibility). `give` (interop
   handler only) pays out inbound value; `burnAndStartBridging` (InteropCenter or NTV) receives outbound
   value; both notify the `L2AssetTracker` first. Its balance means "funds the chain can still mint";
-  force-sent funds (refund recipient, selfdestruct on ZK OS) only skew the `totalSupply()` view, never
+  force-sent funds (refund recipient, selfdestruct) only skew the `totalSupply()` view, never
   bridging accounting.
   - The operator must keep the base-token total supply below `2^127`, otherwise the holder's balance
     could underflow; overflow is impossible since users can only gain what the holder loses.
-  - On ZKsync OS the holder's initial balance is minted by `L2BaseTokenZKOS.initL2()` via a raw call to
+  - The holder's initial balance is minted by `L2BaseToken.initL2()` via a raw call to
     `MINT_BASE_TOKEN_HOOK` with the amount abi-encoded as a `uint256`; the hook credits the caller and
     only accepts calls from the L2 base-token address.
+  - `totalSupply()` adds the historical `zkosPreV31TotalSupply` baseline to the initial reserve before
+    subtracting the holder's balance. Returning historical circulating tokens can raise that balance
+    above the initial reserve, but never above the sum of the reserve and the historical supply:
+    subsequent issuance draws from the holder. This keeps the subtraction valid even after a net burn.
 - In `NativeTokenVaultBase._getTokenAndBridgeToChain`, a base-token burn requires `amount == msg.value`.
   If the base token is bridged (always the case on L2), the value goes through
   `BaseTokenHolder.burnAndStartBridging`; the native branch (plain accounting) only occurs on L1 for ETH.
@@ -258,6 +270,8 @@ to preserve the deployed storage layout.
     is L1 and the chain settles on L1, `totalSuccessfulDepositsFromL1` is increased. For the base token,
     failed deposits are refunded on L2 to the `refundRecipient` rather than claimed on L1, so the gap
     between initiated deposits and this counter is not uniformly "claimable on L1" across asset types.
+    The OS runtime also calls the base-token hook as `L2BaseToken` for L1-transaction minting, operator
+    payments and refunds, including zero-amount prewarming calls; both system callers remain authorized.
   - `assertRecoveryIsAccountingNeutral` (and its base-token wrapper
     `assertBaseTokenRecoveryIsAccountingNeutral`, called by `BaseTokenHolder.recoverBaseToken`) — recovery of
     a failed/timed-out bridge-out. Only L2 -> L2 bridge-outs are recoverable, and beyond the `chainBalance`
@@ -275,12 +289,12 @@ to preserve the deployed storage layout.
   `registerNewTokenIfNeeded` get `MAX_TOKEN_BALANCE` (native) or `0` (first-time bridged). Legacy tokens are
   registered lazily on their first bridge operation, or eagerly by anyone via `registerLegacyToken`.
 - **ZKsync OS base token**: the pre-v31 supply of an upgraded ZKsync OS chain lives in
-  `L2BaseTokenZKOS.zkosPreV31TotalSupply`, populated while the chain ran v31 (via the since-removed backfill
+  `L2BaseToken.zkosPreV31TotalSupply`, populated while the chain ran v31 (via the since-removed backfill
   service transaction), so `totalSupply()` is always available here. This release carries no backfill path:
-  the v33 upgrade of a ZKsync OS chain is forbidden on L1 (`V32UpgradeZKsyncOS`) unless
-  `baseTokenHasTotalSupply` was set by the v31 backfill _and_ its L2 execution is proven — a
-  `PriorityOpLowerBound` registry permissionlessly pins a priority-op count observed after the flag was set,
-  and the upgrade requires all ops below it to be processed. Fresh chains have no pre-v31 history and keep
+  the v33 per-chain upgrade of a ZKsync OS chain was refused on L1 unless `baseTokenHasTotalSupply` was set
+  by the v31 backfill _and_ its L2 execution was proven (through a priority-op lower bound recorded after the
+  flag was set). That one-off gate shipped with v33 only; every chain this line upgrades is already past it.
+  Fresh chains have no pre-v31 history and keep
   zero. The tracker's own backfill flag and entry point are gone, and its slot is deprecated.
 
 ## L1Nullifier and failed-deposit recovery

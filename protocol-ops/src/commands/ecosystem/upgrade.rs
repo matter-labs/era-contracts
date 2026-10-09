@@ -1,10 +1,10 @@
-//! Ecosystem-level v31 upgrade flow.
+//! Ecosystem-level upgrade flow.
 //!
 //! Two top-level commands:
 //!
 //!   `upgrade-prepare-all` deploys new ecosystem contracts (deployer EOA signs)
-//!                         by running `CoreUpgrade_v31` once + `CTMUpgrade_v31`
-//!                         once per `--ctm-proxy` on a single anvil fork, then
+//!                         by running `DefaultCoreUpgrade` once + `CTMUpgrade_v34`
+//!                         once for the target `--ctm-proxy` on a single anvil fork, then
 //!                         executes operational CTM-admin calls such as
 //!                         ServerNotifier ProxyAdmin upgrades. Emits per-script
 //!                         governance TOMLs.
@@ -33,9 +33,10 @@ use serde::{Deserialize, Serialize};
 use crate::commands::ecosystem::upgrade_full::UpgradeFull;
 use crate::commands::ecosystem::upgrade_inner::{CtmInputs, PrepareInputs, UpgradeInner};
 use crate::common::abi::AdminFunctionsAbi;
+use crate::common::env_config::EnvConfig;
 use crate::common::forge::scripts::{
-    ADMIN_FUNCTIONS_INVOCATION, CORE_UPGRADE_V33_SCRIPT_PATH, CTM_UPGRADE_V33_SCRIPT_PATH,
-    UPGRADE_V33_CORE_OUTPUT_PATH, UPGRADE_V33_ENV_DIR, UPGRADE_V33_LOCAL_INPUT_PATH,
+    ADMIN_FUNCTIONS_INVOCATION, CTM_UPGRADE_V34_SCRIPT_PATH, CURRENT_UPGRADE_LOCAL_INPUT_PATH,
+    DEFAULT_CORE_UPGRADE_SCRIPT_PATH, UPGRADE_CORE_OUTPUT_PATH,
 };
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
@@ -88,7 +89,7 @@ pub async fn run_upgrade_governance(mut args: UpgradeGovernanceArgs) -> anyhow::
     // ── env preset auto-fills ────────────────────────────────────────
     let env_cfg = args.topology.env_config()?;
     if let Some(ref cfg) = env_cfg {
-        let env_out_base = crate::common::env_config::default_protocol_ops_out_dir(&cfg.env)?;
+        let env_out_base = cfg.protocol_ops_out_dir();
         // Default --out to upgrade-envs/.../<env>/protocol-ops/governance
         if args.shared.out.is_none() {
             args.shared.out = Some(env_out_base.join("governance"));
@@ -193,14 +194,8 @@ struct GovernanceCalls {
 struct TestUpgradeCalls {
     test_create_chain: String,
     test_create_chain_caller: String,
-    /// Absent when the release opts out via `TESTONLY_emitsTestUpgradeChainCall()`. v33 does: its
-    /// per-chain upgrade needs a recorded priority-op lower bound and an upgrade timestamp, so a
-    /// single generated call cannot stand for it and `protocol_ops chain upgrade` emits the real
-    /// bundle instead.
-    #[serde(default)]
-    test_upgrade_chain: Option<String>,
-    #[serde(default)]
-    test_upgrade_chain_caller: Option<String>,
+    test_upgrade_chain: String,
+    test_upgrade_chain_caller: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -321,7 +316,7 @@ async fn stage_governance_execute(
 // ── upgrade-prepare-all (split-flow orchestrator) ──────────────────────────
 
 /// Unified split-flow prepare. Runs the core script's `noGovernancePrepare` once
-/// and the CTM script's `noGovernancePrepare` once per `--ctm-proxy`, all on a
+/// and the CTM script's `noGovernancePrepare` for the target `--ctm-proxy`, all on a
 /// single anvil fork so deployer and operational admin broadcasts emit as one
 /// prepare bundle set. The downstream `upgrade-governance` consumes the
 /// per-step TOMLs (passed as `--governance-toml` once each).
@@ -346,71 +341,61 @@ pub struct UpgradePrepareAllArgs {
     #[clap(long)]
     pub deployer_address: Option<Address>,
 
-    /// Target CTMs to upgrade. Pass once per CTM (e.g. ZKsyncOS CTM and EraVM
-    /// CTM on stage). Each must already have at least one registered chain so
-    /// rollup-DA-manager auto-resolution works.
-    #[clap(long = "ctm-proxy", num_args = 1..)]
-    pub ctm_proxies: Vec<Address>,
+    /// Target CTM to upgrade. Only a ZKsync OS CTM can be targeted on this
+    /// release. It must have at least one registered chain so rollup-DA-manager
+    /// auto-resolution works.
+    #[clap(long = "ctm-proxy")]
+    pub ctm_proxy: Option<Address>,
 
     #[clap(long)]
     pub create2_factory_salt: Option<B256>,
 
     #[clap(
         long,
-        default_value = UPGRADE_V33_LOCAL_INPUT_PATH,
-        hide = true
+        default_value = CURRENT_UPGRADE_LOCAL_INPUT_PATH
     )]
     pub upgrade_input_path: String,
 
     /// Override the core-prepare output TOML path (relative to l1-contracts
-    /// root). Defaults to the canonical `script-out/v33-upgrade-core.toml`.
-    #[clap(long, default_value = UPGRADE_V33_CORE_OUTPUT_PATH, hide = true)]
+    /// root). Defaults to the canonical `script-out/upgrade-core.toml`.
+    #[clap(long, default_value = UPGRADE_CORE_OUTPUT_PATH, hide = true)]
     pub core_output_path: String,
 
-    #[clap(long, default_value = CORE_UPGRADE_V33_SCRIPT_PATH, hide = true)]
+    /// Core upgrade script; historical releases must select their own script and input.
+    #[clap(long, default_value = DEFAULT_CORE_UPGRADE_SCRIPT_PATH)]
     pub core_script_path: String,
 
-    #[clap(long, default_value = CTM_UPGRADE_V33_SCRIPT_PATH, hide = true)]
+    /// CTM upgrade script; historical releases must select their own script and input.
+    #[clap(long, default_value = CTM_UPGRADE_V34_SCRIPT_PATH)]
     pub ctm_script_path: String,
 
-    /// Path to a TOML file describing per-CTM inputs (proxy + optional
-    /// overrides). Mutually exclusive with the legacy single-CTM flags
-    /// (`--ctm-proxy`, `--is-zk-sync-os`, `--bytecodes-supplier-address`,
-    /// `--rollup-da-manager-address`); use this when upgrading more than one
-    /// CTM in a single fork (e.g. Era + Atlas/ZKsyncOS on stage/mainnet) or
-    /// when the per-CTM overrides differ.
+    /// Path to a TOML file describing the CTM inputs (proxy + optional
+    /// overrides). Mutually exclusive with the direct CTM flags
+    /// (`--ctm-proxy`, `--bytecodes-supplier-address`,
+    /// `--rollup-da-manager-address`). The file must contain exactly one CTM,
+    /// and anything that is not a ZKsync OS CTM fails the prepare.
     ///
     /// Schema:
     /// ```toml
     /// [[ctm]]
     /// proxy = "0x..."
-    /// is_zk_sync_os = false                  # optional
     /// bytecodes_supplier = "0x..."           # optional
     /// rollup_da_manager  = "0x..."           # optional
     /// ```
     #[clap(long, conflicts_with_all = [
-        "ctm_proxies",
-        "is_zk_sync_os",
+        "ctm_proxy",
         "bytecodes_supplier_address",
         "rollup_da_manager_address",
     ])]
     pub ctm_config: Option<PathBuf>,
 
-    /// Override `isZKsyncOS`. Auto-resolved via `ctm.isZKsyncOS()` on v31+;
-    /// pre-v31 ecosystems (where the getter doesn't exist yet) must pass
-    /// this flag explicitly. Single-CTM legacy mode only — for multi-CTM,
-    /// use `--ctm-config`.
-    #[clap(long)]
-    pub is_zk_sync_os: Option<bool>,
-
-    /// Override the bytecodes supplier address. Auto-resolved from CTM on
-    /// v31+ ecosystems; pre-v31 callers must pass it explicitly.
+    /// Override the bytecodes supplier address. Auto-resolved from the CTM's
+    /// `L1_BYTECODES_SUPPLIER()` getter when omitted.
     #[clap(long)]
     pub bytecodes_supplier_address: Option<Address>,
 
     /// Override the rollup DA manager address. Auto-resolved from a
-    /// representative ZK chain on v31+ ecosystems; pre-v31 callers must
-    /// pass it explicitly.
+    /// representative ZK chain on the CTM when omitted.
     #[clap(long)]
     pub rollup_da_manager_address: Option<Address>,
 
@@ -432,19 +417,11 @@ pub struct UpgradePrepareAllArgs {
 struct CtmConfigFile {
     #[serde(rename = "ctm", default)]
     ctms: Vec<CtmConfigEntry>,
-    /// Override `isZKsyncOS` for the core prepare. The Core script is
-    /// CTM-agnostic but its signature still takes the flag, so we need a
-    /// value. Defaults to the value of the first CTM entry's `is_zk_sync_os`
-    /// field if absent (and required if no per-CTM value is set either).
-    #[serde(default)]
-    core_is_zk_sync_os: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
 struct CtmConfigEntry {
     proxy: Address,
-    #[serde(default)]
-    is_zk_sync_os: Option<bool>,
     #[serde(default)]
     bytecodes_supplier: Option<Address>,
     #[serde(default)]
@@ -458,10 +435,10 @@ struct UpgradePrepareAllOutput {
     /// Merged ecosystem TOML written to `<env-out>/ecosystem.toml`, when
     /// `--out` is set. Contains top-level `[governance_calls]` (merged stage
     /// 0/1/2 hex), `[core]` (the CTM-agnostic core prepare output), and one
-    /// `[ctms.<flavor>]` table per CTM (`era` or `zksync_os`, keyed off
-    /// `is_zk_sync_os`) carrying the per-CTM diamond cut + contracts config.
-    /// Downstream `upgrade-governance --env <env>` and `verify-upgrade` both
-    /// consume this single file.
+    /// `[ctms.zksync_os]` table carrying the CTM diamond cut +
+    /// contracts config (this release only upgrades ZKsyncOS CTMs). Downstream
+    /// `upgrade-governance --env <env>` and `verify-upgrade` both consume this
+    /// single file.
     #[serde(skip_serializing_if = "Option::is_none")]
     merged_ecosystem_toml: Option<String>,
     puh_proxy: String,
@@ -514,9 +491,8 @@ pub async fn run_list_ctms(args: ListCtmsArgs) -> anyhow::Result<()> {
     out.push_str(&format!("# L1 RPC:    {}\n", args.l1_rpc_url));
     out.push_str("#\n");
     out.push_str(
-        "# `is_zk_sync_os`, `bytecodes_supplier`, `rollup_da_manager` are commented out\n\
-         # so auto-resolution kicks in on v31+ ecosystems. Uncomment + fill them on pre-v31\n\
-         # ecosystems where the on-chain getters don't exist yet.\n",
+        "# `bytecodes_supplier` and `rollup_da_manager` are commented out so the\n\
+         # prepare flow auto-resolves them from the CTM's on-chain getters.\n",
     );
     for (proxy, witness_chain) in &ctms {
         out.push_str("\n[[ctm]]\n");
@@ -524,7 +500,6 @@ pub async fn run_list_ctms(args: ListCtmsArgs) -> anyhow::Result<()> {
             "# witness chain (any chain registered on this CTM): {witness_chain}\n"
         ));
         out.push_str(&format!("proxy = \"{proxy:#x}\"\n"));
-        out.push_str("# is_zk_sync_os      = false\n");
         out.push_str("# bytecodes_supplier = \"0x...\"\n");
         out.push_str("# rollup_da_manager  = \"0x...\"\n");
     }
@@ -543,15 +518,65 @@ pub async fn run_list_ctms(args: ListCtmsArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// The `--env` preset for `upgrade-prepare-all`, from the release dir `--upgrade-env-dir` selects (the current
+/// release's by default). That dir is the only release selector: an explicit `--upgrade-input-path` must sit in
+/// it, so the input, the CREATE2 salts and the output dir always belong to the same release.
+fn prepare_env_config(args: &UpgradePrepareAllArgs) -> anyhow::Result<Option<EnvConfig>> {
+    let Some(cfg) = args.topology.env_config()? else {
+        return Ok(None);
+    };
+    if args.upgrade_input_path != CURRENT_UPGRADE_LOCAL_INPUT_PATH {
+        let input_dir = paths::resolve_l1_contracts_path()?
+            .join(args.upgrade_input_path.trim_start_matches('/'))
+            .parent()
+            .map(Path::to_path_buf)
+            .context("--upgrade-input-path has no parent directory")?;
+        let env_dir = cfg
+            .upgrade_input_path
+            .parent()
+            .context("env input has no parent directory")?;
+        anyhow::ensure!(
+            input_dir == env_dir,
+            "--upgrade-input-path {} is not in the release dir {} that --env {} reads its salts and owner from; \
+             select that release with --upgrade-env-dir instead",
+            args.upgrade_input_path,
+            env_dir.display(),
+            cfg.env
+        );
+    }
+    Ok(Some(cfg))
+}
+
+/// The env's upgrade input (`/<release dir>/<env>.toml`, relative to `l1-contracts/`) from the release dir
+/// `cfg` was loaded from, so the input, the salts and the output dir belong to the same release.
+///
+/// Fails closed on a missing file rather than keeping the CLI default. The default is the *local* input, so a
+/// silent fallback would hand a real environment local's values for the keys the input does supply —
+/// `era_chain_id` and `governance_upgrade_timer_initial_delay`. Failing here also catches a mistyped `--env`.
+fn per_env_upgrade_input(cfg: &EnvConfig) -> anyhow::Result<String> {
+    let per_env_abs = &cfg.upgrade_input_path;
+    anyhow::ensure!(
+        per_env_abs.exists(),
+        "no upgrade input for --env {} at {}. Add it — an empty file is fine if the environment needs \
+         nothing from the input — because this command will not fall back to the local default, which \
+         would silently give this environment local's `era_chain_id` and \
+         `governance_upgrade_timer_initial_delay`.",
+        cfg.env,
+        per_env_abs.display()
+    );
+    let relative = per_env_abs
+        .strip_prefix(paths::resolve_l1_contracts_path()?)
+        .with_context(|| format!("{} is outside l1-contracts", per_env_abs.display()))?;
+    Ok(format!("/{}", relative.display()))
+}
+
 pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow::Result<()> {
     // ── env preset auto-fills ────────────────────────────────────────
-    let env_cfg = args.topology.env_config()?;
+    let env_cfg = prepare_env_config(&args)?;
     if let Some(ref cfg) = env_cfg {
-        // Default --out to upgrade-envs/v0.33.0-atomic-interop/output/<env>/protocol-ops/prepare/
+        // Default --out to the environment preset's protocol-ops preparation directory.
         if args.shared.out.is_none() {
-            args.shared.out = Some(
-                crate::common::env_config::default_protocol_ops_out_dir(&cfg.env)?.join("prepare"),
-            );
+            args.shared.out = Some(cfg.protocol_ops_out_dir().join("prepare"));
         }
         // Note: we intentionally do *not* default `--deployer-address` from
         // the env's `owner_address`. On stage / mainnet the env's
@@ -561,36 +586,17 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         // works on a fork via `anvil_impersonateAccount`; on a real chain
         // nobody can sign as that contract. The caller must pass
         // `--deployer-address <real-EOA>` (or derive it from the broadcast
-        // signer's private key — see `regen-upgrade-calldata.sh` for an
-        // example using `cast wallet address`).
-        // Resolve --upgrade-input-path from --env, unless the caller passed one explicitly.
-        //
-        // Fails closed on a missing file rather than keeping the CLI default. The default is the
-        // *local* input, so a silent fallback would hand a real environment local's values for the
-        // keys the input does supply — `era_chain_id`, `pre_v32_introspection`,
-        // `governance_upgrade_timer_initial_delay`, and the gateway chain id that is baked into
-        // `L1MessageRoot` as `ERA_GATEWAY_CHAIN_ID`. Losing that last one would redeploy the message
-        // root with 0. Failing here also catches a mistyped `--env`.
-        if args.upgrade_input_path == UPGRADE_V33_LOCAL_INPUT_PATH {
-            let per_env_rel = format!("{UPGRADE_V33_ENV_DIR}/{}.toml", cfg.env);
-            let per_env_abs = paths::contracts_root()
-                .join("l1-contracts")
-                .join(per_env_rel.trim_start_matches('/'));
-            anyhow::ensure!(
-                per_env_abs.exists(),
-                "no upgrade input for --env {} at {}. Add it — an empty file is fine if the \
-                 environment needs nothing from the input — because this command will not fall back \
-                 to the local default, which would silently give this environment local's \
-                 `era_chain_id`, `governance_upgrade_timer_initial_delay` and gateway chain id.",
-                cfg.env,
-                per_env_abs.display()
-            );
+        // signer's private key — use `cast wallet address`).
+        // Resolve --upgrade-input-path from --env, unless the caller passed one explicitly
+        // (see `per_env_upgrade_input`).
+        if args.upgrade_input_path == CURRENT_UPGRADE_LOCAL_INPUT_PATH {
+            let per_env_rel = per_env_upgrade_input(cfg)?;
             logger::info(format!("Using per-env upgrade input: {per_env_rel}"));
             args.upgrade_input_path = per_env_rel;
         }
     }
     // Auto-fill the CREATE2 salt from the per-version upgrade input
-    // (`upgrade-envs/v0.33.0-atomic-interop/<env>.toml [contracts]
+    // (`<current upgrade-env dir>/<env>.toml [contracts]
     // create2_factory_salt`). Recording the salt in version control makes
     // re-prepares reproducible (same addresses every run regardless of who
     // runs it), so deployer-bundle broadcasts can land at addresses that
@@ -612,9 +618,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     // script the prepare flow spawns. `Utils.executeCalls` / `executeUpgrade`
     // read this via `vm.envOr("LEGACY_GOV_SALT", bytes32(0))`. Child
     // processes inherit env vars from this process, so a single `set_var`
-    // here covers every script in the pipeline. See
-    // `contracts/.claude/skills/regenerate-upgrade-calldata/SKILL.md`
-    // ("Core principle") for why a per-regen salt is required.
+    // here covers every script in the pipeline.
     if let Some(cfg) = env_cfg.as_ref() {
         if let Some(salt) = cfg.v31_legacy_gov_salt()? {
             logger::info(format!(
@@ -635,23 +639,14 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     })?;
 
     // ── CTM list resolution ─────────────────────────────────────────
-    let (ctms, core_is_zk_sync_os_override) = if let Some(cfg_path) = &args.ctm_config {
+    let ctms = if let Some(cfg_path) = &args.ctm_config {
         load_ctm_config(cfg_path)?
-    } else if !args.ctm_proxies.is_empty() {
-        // Legacy single-CTM mode: the global `--is-zk-sync-os` /
-        // `--bytecodes-supplier-address` / `--rollup-da-manager-address`
-        // overrides apply to every entry in `--ctm-proxy`.
-        let ctms = args
-            .ctm_proxies
-            .iter()
-            .map(|proxy| CtmInputs {
-                proxy: *proxy,
-                is_zk_sync_os: args.is_zk_sync_os,
-                bytecodes_supplier: args.bytecodes_supplier_address,
-                rollup_da_manager: args.rollup_da_manager_address,
-            })
-            .collect::<Vec<_>>();
-        (ctms, args.is_zk_sync_os)
+    } else if let Some(proxy) = args.ctm_proxy {
+        vec![CtmInputs {
+            proxy,
+            bytecodes_supplier: args.bytecodes_supplier_address,
+            rollup_da_manager: args.rollup_da_manager_address,
+        }]
     } else if let Some(ref cfg) = env_cfg {
         let entries = cfg.ctms();
         if entries.is_empty() {
@@ -675,17 +670,22 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
             .iter()
             .map(|e| CtmInputs {
                 proxy: e.proxy,
-                is_zk_sync_os: e.is_zk_sync_os,
                 bytecodes_supplier: e.bytecodes_supplier,
                 rollup_da_manager: e.rollup_da_manager,
             })
             .collect::<Vec<_>>();
-        (ctms, infer_core_is_zk_sync_os(entries))
+        ctms
     } else {
         anyhow::bail!(
             "either --ctm-config, --ctm-proxy, or --env <name> (with [[ctm_contracts.ctms]] in permanent-values) must be provided"
         );
     };
+    if ctms.len() != 1 {
+        anyhow::bail!(
+            "this release prepares exactly one ZKsync OS CTM; received {} entries",
+            ctms.len()
+        );
+    }
 
     let bridgehub = args.topology.resolve()?;
     let zk_token_asset_id = match env_cfg.as_ref() {
@@ -748,7 +748,6 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         core_output_path: args.core_output_path.clone(),
         core_script_path: args.core_script_path.clone(),
         ctm_script_path: args.ctm_script_path.clone(),
-        core_is_zk_sync_os_override,
         zk_token_asset_id,
         testnet_verifier,
     };
@@ -756,10 +755,8 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         .as_ref()
         .map(|cfg| cfg.ownable_proxies().to_vec())
         .unwrap_or_default();
-    let new_gateway_cfg = env_cfg.as_ref().and_then(|cfg| cfg.new_gateway().cloned());
     let full = UpgradeFull::new(UpgradeInner::new(&contracts_path, bridgehub))
-        .with_ownable_proxies(proxies)
-        .with_new_gateway(new_gateway_cfg);
+        .with_ownable_proxies(proxies);
     let prepared = full.prepare(&mut runner, &deployer, &inputs).await?;
 
     // `ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps` wrote one
@@ -770,34 +767,23 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 
     // Phase 1b on the same fork: redeploy ProtocolUpgradeHandler + Guardians
     // and capture the stage-0 governance calls that wire them into the live
-    // PUH proxy.
-    //
-    // This is release-specific work, not something every upgrade wants: the
-    // redeploy exists because v31 shipped a new zk-governance set, and its
-    // CREATE2 salt seed is literally `b"v31:gov"`. A protocol upgrade that is
-    // not also a governance migration must leave the live PUH set alone, so
-    // the step is opt-in via `--redeploy-zk-governance` rather than implied by
-    // `governance_kind = "puh"`.
-    //
-    // It still *requires* a PUH-governed env — there is nothing to redeploy on
-    // an env owned by a legacy ZKsync `Governance.sol` — so asking for it
-    // anywhere else is a hard error rather than a silent no-op.
+    // PUH proxy. Only meaningful on PUH-governed envs (stage / mainnet) —
+    // legacy-Governance envs (e.g. testnet's internal `0xc4fd…` bridgehub
+    // owned by ZKsync `Governance.sol`) don't have a PUH to redeploy, so we
+    // skip this step entirely and the merged ecosystem.toml carries only
+    // the core + per-CTM calls.
     let governance_kind = env_cfg
         .as_ref()
         .map(|c| c.governance_kind())
         .unwrap_or_default();
     let is_puh_governed = governance_kind == crate::common::env_config::GovernanceKind::Puh;
-    if args.redeploy_zk_governance && !is_puh_governed {
-        anyhow::bail!(
-            "--redeploy-zk-governance requires a PUH-governed environment, but governance_kind \
-             is not \"puh\" — there is no ProtocolUpgradeHandler to redeploy"
-        );
-    }
-    let zksync_os_ctm_proxy = prepared
-        .ctm_tomls
-        .iter()
-        .find(|e| e.is_zk_sync_os)
-        .map(|e| e.proxy);
+    // Every prepared CTM is ZKsync OS (prepare rejects anything else); the first
+    // one in input order is the representative passed to the PUH redeploy.
+    let zksync_os_ctm_proxy = prepared.ctm_tomls.first().map(|e| e.proxy);
+    anyhow::ensure!(
+        !args.redeploy_zk_governance || is_puh_governed,
+        "--redeploy-zk-governance requires a PUH-governed environment"
+    );
     let puh_outcome = if args.redeploy_zk_governance {
         let mut puh_inputs =
             crate::commands::ecosystem::zk_governance::ZkGovernanceInputs::from_env(
@@ -829,8 +815,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     };
 
     // Merge core + per-CTM governance calls + (when present) the in-memory
-    // PUH/Guardians stage-0 calls + (when present) the new-Gateway bring-up
-    // bundle into a single `<env-out>/ecosystem.toml`. The Solidity
+    // PUH/Guardians stage-0 calls into a single `<env-out>/ecosystem.toml`. The Solidity
     // scripts each emit their own toml under `script-out/` (forge
     // requirement), but downstream (PUVT + governance replay) only consumes
     // the merged file.
@@ -858,7 +843,6 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
             &prepared.ctm_tomls,
             &extra_stage0,
             puh_outcome.as_ref(),
-            &prepared.new_gateway_tomls,
             inputs.zk_token_asset_id,
             &merged_path,
         )?;
@@ -871,12 +855,6 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         logger::info(format!(
             "Wrote extra verification logs → {}",
             extra_verification_logs_path.display()
-        ));
-        let gw_verification_logs_path = canonical_dir.join("gw-verification-logs.txt");
-        runner.write_gw_verification_logs(&gw_verification_logs_path)?;
-        logger::info(format!(
-            "Wrote GW verification logs → {}",
-            gw_verification_logs_path.display()
         ));
         Some(merged_path)
     } else {
@@ -934,27 +912,13 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     Ok(())
 }
 
-/// Pick the `is_zk_sync_os` flavor the Core script will deploy under when
-/// running against a multi-CTM ecosystem (Era + Atlas). Era wins if any entry
-/// declares `is_zk_sync_os = false` — its system contracts are the strict
-/// subset, so a Core deploy targeting Era is also valid for Atlas. If no entry
-/// pins the flavor, fall back to the first entry's hint.
-fn infer_core_is_zk_sync_os(entries: &[crate::common::env_config::CtmEntry]) -> Option<bool> {
-    entries
-        .iter()
-        .find_map(|e| (e.is_zk_sync_os == Some(false)).then_some(false))
-        .or_else(|| entries.first().and_then(|e| e.is_zk_sync_os))
-}
-
 /// Read each per-script governance TOML and write a single merged TOML
 /// containing all stage 0/1/2 calls in source-order (core first, then CTMs
-/// in the order they were prepared, then the optional new-Gateway bundle
-/// appended to stage 2). `extra_stage0` is appended to stage 0 after the
+/// in the order they were prepared). `extra_stage0` is appended to stage 0 after the
 /// file-sourced calls — used for the PUH/Guardians redeploy calls emitted
 /// in-memory by [`puh_guardians::deploy_puh_guardians`].
 /// Merge the core + per-CTM prepare TOMLs (plus optional in-memory PUH
-/// stage-0 calls and an optional `GatewayVotePreparation` bundle for the
-/// new gateway) into a single ecosystem TOML at `dst`. Shape:
+/// stage-0 calls) into a single ecosystem TOML at `dst`. Shape:
 ///
 /// ```toml
 /// [governance_calls]              # merged stage 0/1/2 hex across all sources
@@ -963,10 +927,6 @@ fn infer_core_is_zk_sync_os(entries: &[crate::common::env_config::CtmEntry]) -> 
 /// stage2_calls = "0x..."
 ///
 /// [test_upgrade_calls]            # optional: copied from CTM prepare output
-/// test_create_chain_era = "0x..."
-/// test_create_chain_era_caller = "0x..."
-/// test_upgrade_chain_era = "0x..."
-/// test_upgrade_chain_era_caller = "0x..."
 /// test_create_chain_zkos = "0x..."
 /// test_create_chain_zkos_caller = "0x..."
 /// test_upgrade_chain_zkos = "0x..."
@@ -975,13 +935,9 @@ fn infer_core_is_zk_sync_os(entries: &[crate::common::env_config::CtmEntry]) -> 
 /// [core]                          # whole core TOML minus its [governance_calls]
 /// ...
 ///
-/// [ctms.era]                      # whole CTM TOML minus its [governance_calls];
-/// ...                             # key is "era" if !is_zk_sync_os else "zksync_os".
-/// [ctms.zksync_os]                # second CTM, when present.
+/// [ctms.zksync_os]                # whole CTM TOML minus its [governance_calls];
+/// ...                             # one section per ZKsyncOS CTM.
 /// ...
-///
-/// [new_gateway]                   # only when present: GatewayVotePreparation
-/// ...                             # output minus governance_calls_to_execute.
 ///
 /// [zk_governance]                 # only when the PUH governance set was redeployed
 /// new_puh_impl = "0x..."
@@ -994,7 +950,6 @@ fn write_merged_ecosystem_toml(
     ctm_entries: &[crate::commands::ecosystem::upgrade_inner::CtmPrepareEntry],
     extra_stage0: &[crate::common::governance_calls::GovernanceCall],
     zk_governance: Option<&crate::commands::ecosystem::zk_governance::ZkGovernanceOutcome>,
-    new_gateway_tomls: &[PathBuf],
     _zk_token_asset_id: B256,
     dst: &Path,
 ) -> anyhow::Result<()> {
@@ -1048,19 +1003,17 @@ fn write_merged_ecosystem_toml(
     let mut stage0: Vec<String> = vec![core_gov.stage0_calls];
     let mut stage1: Vec<String> = vec![core_gov.stage1_calls];
     let mut stage2: Vec<String> = vec![core_gov.stage2_calls];
-    let mut era_test_calls: Option<TestUpgradeCalls> = None;
     let mut zksync_os_test_calls: Option<TestUpgradeCalls> = None;
 
+    // `UpgradeInner::prepare` rejects any non-ZKsync-OS CTM, so every CTM that
+    // reaches the merge is ZKsync OS. The merge keys per-CTM sections by the fixed
+    // `zksync_os` label, so two CTMs in one upgrade collide here.
     for entry in ctm_entries {
         let (body, gov, test_calls) = load_and_split(&entry.toml)?;
-        let label = if entry.is_zk_sync_os {
-            "zksync_os"
-        } else {
-            "era"
-        };
+        let label = "zksync_os";
         if ctms_table.contains_key(label) {
             anyhow::bail!(
-                "duplicate CTM flavor `{label}`: two CTMs cannot share the same `is_zk_sync_os` value in one upgrade"
+                "duplicate CTM section `{label}`: a single upgrade merges at most one ZKsyncOS CTM"
             );
         }
         ctms_table.insert(label.to_string(), Value::Table(body));
@@ -1069,63 +1022,13 @@ fn write_merged_ecosystem_toml(
         stage2.push(gov.stage2_calls);
 
         if let Some(test_calls) = test_calls {
-            if entry.is_zk_sync_os {
-                zksync_os_test_calls = Some(test_calls);
-            } else {
-                era_test_calls = Some(test_calls);
-            }
+            zksync_os_test_calls = Some(test_calls);
         }
-    }
-
-    let has_era_ctm = ctm_entries.iter().any(|entry| !entry.is_zk_sync_os);
-    let has_zkos_ctm = ctm_entries.iter().any(|entry| entry.is_zk_sync_os);
-    if has_era_ctm && has_zkos_ctm && (era_test_calls.is_none() || zksync_os_test_calls.is_none()) {
-        anyhow::bail!(
-            "both Era and ZKOS CTMs are present, but one flavor is missing [test_upgrade_calls]"
-        );
     }
 
     if !extra_stage0.is_empty() {
         stage0.push(format!("0x{}", hex::encode(encode_calls(extra_stage0))));
     }
-
-    // `GatewayVotePreparation` writes a flat TOML whose `governance_calls_to_execute`
-    // field is an abi-encoded `Call[]`. Pop that into the stage-2 chunks, keep
-    // the rest (per-contract addresses + diamond cut data) under a top-level
-    // `[new_gateway]` block so reviewers can still audit the deployed addresses.
-    //
-    // When `[new_gateway]` is configured, append each GW TOML's
-    // `governance_calls_to_execute` to stage 2. Multiple GW TOMLs arise when
-    // more than one CTM is deployed on the gateway (e.g. both Era + ZKsyncOS).
-    let new_gateway_body: Option<Table> = if !new_gateway_tomls.is_empty() {
-        let mut first_body: Option<Table> = None;
-        for path in new_gateway_tomls {
-            let raw =
-                fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
-            let mut value: Table =
-                toml::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
-            let gov_hex = value
-                .remove("governance_calls_to_execute")
-                .with_context(|| {
-                    format!("missing governance_calls_to_execute in {}", path.display())
-                })?;
-            let gov_hex = match gov_hex {
-                Value::String(s) => s,
-                other => anyhow::bail!(
-                    "governance_calls_to_execute in {} is not a string (got {})",
-                    path.display(),
-                    other.type_str()
-                ),
-            };
-            stage2.push(gov_hex);
-            if first_body.is_none() {
-                first_body = Some(value);
-            }
-        }
-        first_body
-    } else {
-        None
-    };
 
     let merge = |chunks: &[String]| -> anyhow::Result<String> {
         if chunks.is_empty() {
@@ -1144,62 +1047,35 @@ fn write_merged_ecosystem_toml(
     governance_calls_table.insert("stage2_calls".into(), Value::String(s2));
 
     // Build the document with [governance_calls] first, then optional
-    // [test_upgrade_calls], then [core], [ctms.*], optional [new_gateway],
+    // [test_upgrade_calls], then [core], [ctms.*], optional [zk_governance],
     // and [misc] last. `toml::to_string` orders keys as inserted.
     let mut doc = Table::new();
     doc.insert(
         "governance_calls".into(),
         Value::Table(governance_calls_table),
     );
-    if era_test_calls.is_some() || zksync_os_test_calls.is_some() {
+    if let Some(test_calls) = zksync_os_test_calls {
         let mut test_table = Table::new();
-        if let Some(test_calls) = era_test_calls {
-            test_table.insert(
-                "test_create_chain_era".into(),
-                Value::String(test_calls.test_create_chain),
-            );
-            test_table.insert(
-                "test_create_chain_era_caller".into(),
-                Value::String(test_calls.test_create_chain_caller),
-            );
-            if let (Some(call), Some(caller)) = (
-                test_calls.test_upgrade_chain,
-                test_calls.test_upgrade_chain_caller,
-            ) {
-                test_table.insert("test_upgrade_chain_era".into(), Value::String(call));
-                test_table.insert(
-                    "test_upgrade_chain_era_caller".into(),
-                    Value::String(caller),
-                );
-            }
-        }
-        if let Some(test_calls) = zksync_os_test_calls {
-            test_table.insert(
-                "test_create_chain_zkos".into(),
-                Value::String(test_calls.test_create_chain),
-            );
-            test_table.insert(
-                "test_create_chain_zkos_caller".into(),
-                Value::String(test_calls.test_create_chain_caller),
-            );
-            if let (Some(call), Some(caller)) = (
-                test_calls.test_upgrade_chain,
-                test_calls.test_upgrade_chain_caller,
-            ) {
-                test_table.insert("test_upgrade_chain_zkos".into(), Value::String(call));
-                test_table.insert(
-                    "test_upgrade_chain_zkos_caller".into(),
-                    Value::String(caller),
-                );
-            }
-        }
+        test_table.insert(
+            "test_create_chain_zkos".into(),
+            Value::String(test_calls.test_create_chain),
+        );
+        test_table.insert(
+            "test_create_chain_zkos_caller".into(),
+            Value::String(test_calls.test_create_chain_caller),
+        );
+        test_table.insert(
+            "test_upgrade_chain_zkos".into(),
+            Value::String(test_calls.test_upgrade_chain),
+        );
+        test_table.insert(
+            "test_upgrade_chain_zkos_caller".into(),
+            Value::String(test_calls.test_upgrade_chain_caller),
+        );
         doc.insert("test_upgrade_calls".into(), Value::Table(test_table));
     }
     doc.insert("core".into(), Value::Table(core_body));
     doc.insert("ctms".into(), Value::Table(ctms_table));
-    if let Some(body) = new_gateway_body {
-        doc.insert("new_gateway".into(), Value::Table(body));
-    }
     if let Some(zk_governance) = zk_governance {
         let mut table = Table::new();
         table.insert(
@@ -1224,23 +1100,19 @@ fn write_merged_ecosystem_toml(
         doc.insert("misc".into(), Value::Table(body));
     }
 
-    let new_gateway_count = if new_gateway_tomls.is_empty() { 0 } else { 1 };
     let body = format!(
         "# Auto-generated by `protocol-ops ecosystem upgrade-prepare-all`.\n\
          # Merged ecosystem upgrade artifact: top-level [governance_calls] holds\n\
          # the combined stage 0/1/2 hex from {} prepare TOML(s). Optional\n\
-         # [test_upgrade_calls] is copied from per-CTM prepare output under\n\
-         # flavor-suffixed keys (`*_era`, `*_zkos`). [core] mirrors the\n\
-         # core prepare output (minus its own [governance_calls]); [ctms.<flavor>]\n\
-         # mirrors each per-CTM prepare output (one section per `is_zk_sync_os`\n\
-         # value) for downstream verification. [misc] carries shared metadata used\n\
-         # by verification. When [new_gateway] is present, it\n\
-         # mirrors GatewayVotePreparation's output (deployed GW CTM addresses +\n\
-         # diamond cut data) — its `governance_calls_to_execute` has already been\n\
-         # folded into stage 2 above. When [zk_governance] is present, it names\n\
+         # [test_upgrade_calls] is copied from the per-CTM prepare output under\n\
+         # `*_zkos` keys. [core] mirrors the\n\
+         # core prepare output (minus its own [governance_calls]); [ctms.zksync_os]\n\
+         # mirrors the ZKsyncOS CTM prepare output\n\
+         # for downstream verification. [misc] carries shared metadata used\n\
+         # by verification. When [zk_governance] is present, it names\n\
          # the zk-governance contracts deployed in stage 0 and used by PUVT for\n\
          # CREATE2 provenance checks.\n\n{}",
-        1 + ctm_entries.len() + new_gateway_count,
+        1 + ctm_entries.len(),
         toml::to_string(&doc).context("serialize merged ecosystem TOML")?
     );
     fs::write(dst, body)
@@ -1289,14 +1161,9 @@ pub(super) fn read_pre_governance_accept_ownership_calls(
     })
 }
 
-/// Read the multi-CTM config TOML and return per-CTM inputs + the
-/// `core_is_zk_sync_os` value to pass to the Core script. If the TOML doesn't
-/// set `core_is_zk_sync_os`, derive it from the CTM entries: prefer `false`
-/// (Era) over `true` when both flavors are present (Era's v31 ABI is a
-/// superset, so a Core deploy targeting Era is also valid for Atlas). The
-/// preference is intentionally order-independent — `[[ctm]]` ordering in the
-/// TOML must not change the resulting Core flavor.
-fn load_ctm_config(path: &Path) -> anyhow::Result<(Vec<CtmInputs>, Option<bool>)> {
+/// Read the multi-CTM config TOML and return per-CTM inputs. This release
+/// only upgrades ZKsyncOS CTMs; prepare fails on anything else.
+fn load_ctm_config(path: &Path) -> anyhow::Result<Vec<CtmInputs>> {
     let content = fs::read_to_string(path)
         .with_context(|| format!("Failed to read CTM config TOML: {}", path.display()))?;
     let parsed: CtmConfigFile = toml::from_str(&content)
@@ -1309,26 +1176,143 @@ fn load_ctm_config(path: &Path) -> anyhow::Result<(Vec<CtmInputs>, Option<bool>)
         );
     }
 
-    let core_is_zk_sync_os = parsed.core_is_zk_sync_os.or_else(|| {
-        if parsed.ctms.iter().any(|c| c.is_zk_sync_os == Some(false)) {
-            Some(false)
-        } else if parsed.ctms.iter().any(|c| c.is_zk_sync_os == Some(true)) {
-            Some(true)
-        } else {
-            None
-        }
-    });
-
     let ctms: Vec<CtmInputs> = parsed
         .ctms
         .into_iter()
         .map(|e| CtmInputs {
             proxy: e.proxy,
-            is_zk_sync_os: e.is_zk_sync_os,
             bytecodes_supplier: e.bytecodes_supplier,
             rollup_da_manager: e.rollup_da_manager,
         })
         .collect();
 
-    Ok((ctms, core_is_zk_sync_os))
+    Ok(ctms)
+}
+
+#[cfg(test)]
+mod release_script_tests {
+    use super::*;
+    use crate::common::forge::scripts::{CURRENT_UPGRADE_ENV_DIR, UPGRADE_V33_ENV_DIR};
+    use clap::CommandFactory;
+
+    #[test]
+    fn prepare_defaults_to_current_release() {
+        let args = UpgradePrepareAllArgs::try_parse_from(["prepare"]).unwrap();
+        assert_eq!(args.ctm_script_path, CTM_UPGRADE_V34_SCRIPT_PATH);
+        assert_eq!(args.core_script_path, DEFAULT_CORE_UPGRADE_SCRIPT_PATH);
+        assert_eq!(args.upgrade_input_path, CURRENT_UPGRADE_LOCAL_INPUT_PATH);
+        let help = UpgradePrepareAllArgs::command()
+            .render_long_help()
+            .to_string();
+        assert!(help.contains("--ctm-script-path"));
+        assert!(help.contains("--upgrade-input-path"));
+    }
+
+    /// The Foundry full-flow upgrade test (`UpgradeTest_Local`) must run the scripts this command prepares
+    /// with by default: its CTM test subclass extends the default CTM script, and the shared base constructs
+    /// the default core script. A release that changes a default here fails this until that test is moved
+    /// onto the new script too.
+    #[test]
+    fn prepare_defaults_match_the_foundry_full_flow_test() {
+        let contract_name = |script_path: &str| -> String {
+            let file = script_path.rsplit('/').next().unwrap();
+            file.trim_end_matches(".s.sol").to_string()
+        };
+        let read = |relative: &str| {
+            std::fs::read_to_string(crate::common::paths::path_from_root(relative)).unwrap()
+        };
+        let args = UpgradePrepareAllArgs::try_parse_from(["prepare"]).unwrap();
+
+        let local_test = read("l1-contracts/test/foundry/l1/integration/UpgradeTest_Local.t.sol");
+        let ctm = contract_name(&args.ctm_script_path);
+        assert!(
+            local_test.contains(&format!(" is {ctm} {{")),
+            "UpgradeTest_Local's CTM test subclass must extend the default CTM script {ctm}"
+        );
+        let shared_base = read("l1-contracts/test/foundry/l1/integration/UpgradeTestShared.t.sol");
+        let core = contract_name(&args.core_script_path);
+        assert!(
+            shared_base.contains(&format!("new {core}()")),
+            "UpgradeTestShared must construct the default core script {core}"
+        );
+    }
+
+    /// A release-specific default script must belong to the current release: `yarn new-release` moves the
+    /// upgrade-env dir but not the script defaults, so a stale `v<N>/` default would silently prepare the
+    /// next release with the previous release's scripts.
+    #[test]
+    fn release_specific_defaults_belong_to_the_current_release() {
+        let current_minor = CURRENT_UPGRADE_ENV_DIR
+            .split("/v0.")
+            .nth(1)
+            .and_then(|rest| rest.split('.').next())
+            .unwrap();
+        let args = UpgradePrepareAllArgs::try_parse_from(["prepare"]).unwrap();
+        for script in [&args.ctm_script_path, &args.core_script_path] {
+            if let Some(rest) = script.strip_prefix("deploy-scripts/upgrade/v") {
+                let script_minor = rest.split('/').next().unwrap();
+                assert_eq!(
+                    script_minor, current_minor,
+                    "{script} is not the current release's script"
+                );
+            }
+        }
+    }
+
+    /// `--upgrade-env-dir` selects the env's input as well as its salts and output dir, so a prepare never mixes
+    /// one release's input with another's salts.
+    #[test]
+    fn upgrade_env_dir_selects_the_per_env_input() {
+        let historical = UpgradePrepareAllArgs::try_parse_from([
+            "prepare",
+            "--env",
+            "stage",
+            "--upgrade-env-dir",
+            UPGRADE_V33_ENV_DIR.trim_start_matches('/'),
+        ])
+        .unwrap();
+        let cfg = prepare_env_config(&historical).unwrap().unwrap();
+        assert_eq!(
+            per_env_upgrade_input(&cfg).unwrap(),
+            format!("{UPGRADE_V33_ENV_DIR}/stage.toml")
+        );
+
+        let current = UpgradePrepareAllArgs::try_parse_from(["prepare", "--env", "stage"]).unwrap();
+        let cfg = prepare_env_config(&current).unwrap().unwrap();
+        assert_eq!(
+            per_env_upgrade_input(&cfg).unwrap(),
+            format!("{CURRENT_UPGRADE_ENV_DIR}/stage.toml")
+        );
+    }
+
+    /// `--upgrade-env-dir` is the only release selector: an explicit `--upgrade-input-path` from another
+    /// release's dir is rejected rather than mixed with the selected release's salts; one inside it is accepted.
+    #[test]
+    fn explicit_input_must_sit_in_the_selected_release_dir() {
+        let mixed = UpgradePrepareAllArgs::try_parse_from([
+            "prepare",
+            "--env",
+            "stage",
+            "--upgrade-input-path",
+            &format!("{UPGRADE_V33_ENV_DIR}/stage.toml"),
+        ])
+        .unwrap();
+        assert!(prepare_env_config(&mixed).is_err());
+
+        let consistent = UpgradePrepareAllArgs::try_parse_from([
+            "prepare",
+            "--env",
+            "stage",
+            "--upgrade-env-dir",
+            UPGRADE_V33_ENV_DIR.trim_start_matches('/'),
+            "--upgrade-input-path",
+            &format!("{UPGRADE_V33_ENV_DIR}/stage.toml"),
+        ])
+        .unwrap();
+        let cfg = prepare_env_config(&consistent).unwrap().unwrap();
+        assert!(cfg.create2_factory_salt_for_upgrade().unwrap().is_some());
+        assert!(cfg
+            .protocol_ops_out_dir()
+            .ends_with("upgrade-envs/v0.33.0-atomic-interop/output/stage"));
+    }
 }

@@ -33,8 +33,7 @@ contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils, IDeplo
             type(GatewayTransactionFilterer).creationCode,
             abi.encode(bridgehub, l1AssetRouter),
             "GatewayTransactionFilterer",
-            "GatewayTransactionFilterer",
-            false
+            "GatewayTransactionFilterer"
         );
 
         // Prepare the initialization calldata.
@@ -51,8 +50,7 @@ contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils, IDeplo
                 initData // initialization calldata to set chainAdmin as owner
             ),
             "TransparentUpgradeableProxy",
-            "GatewayTxFiltererProxy",
-            false
+            "GatewayTxFiltererProxy"
         );
 
         saveOutput(proxy);
@@ -82,7 +80,7 @@ contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils, IDeplo
         string memory configPath = string.concat(root, vm.envString("DEPLOY_GATEWAY_TX_FILTERER_INPUT"));
         string memory toml = vm.readFile(configPath);
 
-        address proxy = run(
+        run(
             toml.readAddress("$.bridgehub_proxy_addr"),
             toml.readAddress("$.chain_admin"),
             toml.readAddress("$.chain_proxy_admin")

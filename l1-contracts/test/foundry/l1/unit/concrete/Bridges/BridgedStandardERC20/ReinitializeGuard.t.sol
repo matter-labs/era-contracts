@@ -8,10 +8,10 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts-v4/proxy/ERC1967/ERC1967Proxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
-contract BridgedStandardERC20_ReinitializeGuard_Test is Test {
-    BridgedStandardERC20 implementation;
-    address originToken = address(0xBEEF);
-    bytes32 assetId = keccak256(abi.encode("assetId"));
+contract BridgedStandardERC20ReinitializeGuardTest is Test {
+    BridgedStandardERC20 internal implementation;
+    address internal originToken = address(0xBEEF);
+    bytes32 internal assetId = keccak256(abi.encode("assetId"));
 
     function setUp() public {
         implementation = new BridgedStandardERC20();

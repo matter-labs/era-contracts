@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-// solhint-disable no-console, gas-custom-errors
-
 import {console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 import {Test} from "forge-std/Test.sol";
-import {CoreUpgrade_v33} from "../../../../deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol";
-import {CTMUpgrade_v33} from "../../../../deploy-scripts/upgrade/v33/CTMUpgrade_v33.s.sol";
+import {DefaultCoreUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCoreUpgrade.s.sol";
+import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
 import {IOwnableSingleStep, IChainAdminMulticall} from "../../../../deploy-scripts/AdminFunctions.s.sol";
 import {EcosystemUpgradeParams} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeParams.sol";
 import {DefaultChainUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultChainUpgrade.s.sol";
@@ -30,17 +28,20 @@ contract UpgradeIntegrationTestBase is Test {
 
     uint256 internal constant NEW_CHAIN_ID = 555;
 
-    uint256 chainId;
+    uint256 internal chainId;
 
-    CoreUpgrade_v33 coreUpgrade;
-    CTMUpgrade_v33 ctmUpgrade;
-    DefaultChainUpgrade chainUpgrade;
+    DefaultCoreUpgrade internal coreUpgrade;
+    DefaultCTMUpgrade internal ctmUpgrade;
+    DefaultChainUpgrade internal chainUpgrade;
 
     /// @notice Per-test fixed paths for the deploy outputs the upgrade scripts read.
     string public ECOSYSTEM_INPUT = "file_1.toml";
-    string public ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/v0.33.0-atomic-interop/foundry-upgrade.toml";
+    /// @dev Version-free on purpose: the harness always runs the current default upgrade, so the input
+    ///      must not be tied to a release directory under `upgrade-envs/`.
+    string public ECOSYSTEM_UPGRADE_INPUT = "/test/foundry/l1/integration/fixtures/default-upgrade-input.toml";
     string public ECOSYSTEM_OUTPUT = "file_3.toml";
-    string public CTM_INPUT = "/upgrade-envs/v0.33.0-atomic-interop/foundry-upgrade.toml";
+    /// @dev The CTM deploy output (not an upgrade input): `_readEcosystemParams` reads deployed addresses from it.
+    string public CTM_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-ctm.toml";
     string public CORE_OUTPUT = "/script-out/foundry-upgrade/upgrade-core.toml";
     string public CTM_OUTPUT = "/script-out/foundry-upgrade/mainnet-gateway.toml";
     string public CHAIN_INPUT;
@@ -51,13 +52,14 @@ contract UpgradeIntegrationTestBase is Test {
     address internal _eraDiamond;
     address internal _newChainDiamond;
     bytes32 internal _expectedUpgradeCutHash;
+    address internal _expectedNewVerifier;
     address internal _expectedNewChainAdmin;
     bytes32 internal _expectedBaseTokenAssetId;
     Call[] internal _ctmAdminCalls;
     bool internal _ctmAdminCallsPrepared;
 
-    function setupUpgrade(bool skipFactoryDepsCheck) public virtual {
-        console.log("setupUpgrade: Creating CoreUpgrade_v33 and CTMUpgrade_v33");
+    function setupUpgrade() public virtual {
+        console.log("setupUpgrade: Creating DefaultCoreUpgrade and DefaultCTMUpgrade");
         coreUpgrade = createCoreUpgrade();
         ctmUpgrade = createCTMUpgrade();
 
@@ -72,25 +74,23 @@ contract UpgradeIntegrationTestBase is Test {
         console.log("setupUpgrade: Initializing core upgrade");
         coreUpgrade.initializeWithArgs(
             params.bridgehubProxyAddress,
-            params.isZKsyncOS,
             params.create2FactorySalt,
             params.upgradeInputPath,
             CORE_OUTPUT
         );
         console.log("setupUpgrade: Initializing CTM upgrade");
-        ctmUpgrade.initializeWithArgs(
-            params.ctmProxy,
-            params.bytecodesSupplier,
-            params.isZKsyncOS,
-            params.rollupDAManager,
-            params.create2FactorySalt,
-            params.upgradeInputPath,
-            CTM_OUTPUT,
-            params.governance,
-            params.zkTokenAssetId,
+        ctmUpgrade.initializeWithArgs({
+            ctmProxy: params.ctmProxy,
+            bytecodesSupplier: params.bytecodesSupplier,
+            rollupDAManager: params.rollupDAManager,
+            create2FactorySalt: params.create2FactorySalt,
+            newConfigPath: params.upgradeInputPath,
+            _outputPath: CTM_OUTPUT,
+            governance: params.governance,
+            zkTokenAssetId: params.zkTokenAssetId,
             // Anvil fixtures run the testnet verifier, as every non-mainnet env does.
-            true
-        );
+            testnetVerifier: true
+        });
 
         console.log("setupUpgrade: Deploying new ecosystem contracts");
         coreUpgrade.deployNewEcosystemContractsL1();
@@ -116,13 +116,13 @@ contract UpgradeIntegrationTestBase is Test {
     }
 
     /// @notice Override in child classes to use mocked versions.
-    function createCoreUpgrade() internal virtual returns (CoreUpgrade_v33) {
-        return new CoreUpgrade_v33();
+    function createCoreUpgrade() internal virtual returns (DefaultCoreUpgrade) {
+        return new DefaultCoreUpgrade();
     }
 
     /// @notice Override in child classes to use mocked versions.
-    function createCTMUpgrade() internal virtual returns (CTMUpgrade_v33) {
-        return new CTMUpgrade_v33();
+    function createCTMUpgrade() internal virtual returns (DefaultCTMUpgrade) {
+        return new DefaultCTMUpgrade();
     }
 
     /// @notice Hook for test-specific setup before chain upgrade.
@@ -225,6 +225,7 @@ contract UpgradeIntegrationTestBase is Test {
             ctmUpgrade.getCTMAddress()
         );
         assertEq(uint256(npvv.topics[1]), ctmUpgrade.getNewProtocolVersion(), "Verifier protocol version mismatch");
+        _expectedNewVerifier = address(uint160(uint256(npvv.topics[2])));
 
         // Chain-op events
         chainOpsLogs.requireAtLeast("DiamondCut((address,uint8,bool,bytes4[])[],address,bytes)", 1);
@@ -345,10 +346,9 @@ contract UpgradeIntegrationTestBase is Test {
         address bytecodesSupplier = outputDeployCTMToml.readAddress(
             "$.deployed_addresses.state_transition.bytecodes_supplier_addr"
         );
-        bool isZKsyncOs = outputDeployCTMToml.readBool("$.is_zk_sync_os");
-        address rollupDAManager = isZKsyncOs
-            ? outputDeployCTMToml.readAddress("$.deployed_addresses.blobs_zksync_os_l1_da_validator_addr")
-            : outputDeployCTMToml.readAddress("$.deployed_addresses.l1_rollup_da_manager");
+        address rollupDAManager = outputDeployCTMToml.readAddress(
+            "$.deployed_addresses.blobs_zksync_os_l1_da_validator_addr"
+        );
         address governance = outputDeployL1Toml.readAddress("$.deployed_addresses.governance_addr");
 
         return
@@ -357,7 +357,6 @@ contract UpgradeIntegrationTestBase is Test {
                 ctmProxy: ctmProxy,
                 bytecodesSupplier: bytecodesSupplier,
                 rollupDAManager: rollupDAManager,
-                isZKsyncOS: isZKsyncOs,
                 create2FactorySalt: bytes32(0),
                 upgradeInputPath: ECOSYSTEM_UPGRADE_INPUT,
                 ecosystemOutputPath: ECOSYSTEM_OUTPUT,

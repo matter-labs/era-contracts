@@ -24,20 +24,20 @@ contract AtomicFlowManagerRecoveryHarness is AtomicFlowManager {
 }
 
 contract L2AssetRouterRecoveryHarness is L2AssetRouter {
-    address internal immutable manager;
-    address internal immutable ntv;
+    address internal immutable MANAGER;
+    address internal immutable NTV;
 
     constructor(address _manager, address _ntv) {
-        manager = _manager;
-        ntv = _ntv;
+        MANAGER = _manager;
+        NTV = _ntv;
     }
 
-    function _atomicFlowManagerAddr() internal view override returns (address) {
-        return manager;
+    function _getAtomicFlowManagerAddr() internal view override returns (address) {
+        return MANAGER;
     }
 
-    function _nativeTokenVaultAddr() internal view override returns (address) {
-        return ntv;
+    function _getNativeTokenVaultAddr() internal view override returns (address) {
+        return NTV;
     }
 
     /// @dev Initializes the inherited reentrancy guard via its real initializer (rather than a storage
@@ -77,7 +77,6 @@ contract MockRecoveringNativeTokenVault {
 /// suite) since the gate under test is at recovery.
 contract AtomicRecoveryForgeryTest is Test {
     uint256 internal constant L1_CHAIN_ID = 1;
-    uint256 internal constant ERA_CHAIN_ID = 271;
 
     AtomicFlowManagerRecoveryHarness internal manager;
     MockRecoveringNativeTokenVault internal ntv;
@@ -282,10 +281,8 @@ contract AtomicRecoveryForgeryTest is Test {
 
     function _initializeRouterChainIds() internal {
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        // solhint-disable-next-line func-named-parameters
         router.updateL2(
             L1_CHAIN_ID,
-            ERA_CHAIN_ID,
             IL1AssetRouter(makeAddr("l1 asset router")),
             keccak256("base token asset id"),
             makeAddr("aliased owner")

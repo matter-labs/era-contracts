@@ -25,26 +25,26 @@ contract FinalizeChainInit is AdminFunctions, IFinalizeChainInit {
         }
 
         if (_params.shouldSetDaValidatorPair) {
-            setDAValidatorPair(
-                _params.bridgehub,
-                _params.accessControlRestriction,
-                _params.chainId,
-                _params.l1DaValidator,
-                _params.l2DaCommitmentScheme,
-                true
-            );
+            setDAValidatorPair({
+                _bridgehub: _params.bridgehub,
+                _accessControlRestriction: _params.accessControlRestriction,
+                _chainId: _params.chainId,
+                _l1DaValidator: _params.l1DaValidator,
+                _l2DaCommitmentScheme: _params.l2DaCommitmentScheme,
+                _shouldSend: true
+            });
         }
 
         // Before the permanent-rollup step below: that one requires `FULL_PUBDATA` and, once taken, locks
         // the pubdata content for good.
         if (_params.shouldSetPubdataContent) {
-            setPubdataContent(
-                _params.bridgehub,
-                _params.accessControlRestriction,
-                _params.chainId,
-                _params.pubdataContent,
-                true
-            );
+            setPubdataContent({
+                _bridgehub: _params.bridgehub,
+                _accessControlRestriction: _params.accessControlRestriction,
+                _chainId: _params.chainId,
+                _pubdataContent: _params.pubdataContent,
+                _shouldSend: true
+            });
         }
 
         if (_params.shouldMakePermanentRollup) {
