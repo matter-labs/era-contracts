@@ -230,8 +230,9 @@ contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
             genesisBatchHash: config.contracts.chainCreationParams.genesisRoot,
             genesisIndexRepeatedStorageChanges: uint64(config.contracts.chainCreationParams.genesisRollupLeafIndex),
             genesisBatchCommitment: config.contracts.chainCreationParams.genesisBatchCommitment,
-            // Stage's v0.33.0 CTM predates Airbender settlement; this script is the record of that
-            // executed upgrade and carries no Airbender genesis commitment.
+            // This line's ChainCreationParams has a field stage's v0.33.0 CTM lacks, so here the script
+            // no longer reproduces the executed upgrade: the committed output/stage/ecosystem.toml is
+            // its record. The zero only keeps the script compiling.
             genesisAirbenderBatchCommitment: bytes32(0),
             diamondCut: initialCut,
             forceDeploymentsData: _rebuildForceDeploymentsData(forceDeploymentsData)
