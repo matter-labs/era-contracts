@@ -124,7 +124,7 @@ describe("14 - Interop fee units", function () {
 
   it("holds a chain's prepaid balance for its admin", async () => {
     const bridgehub = new Contract(state.l1Addresses!.bridgehub, getAbi("L1Bridgehub"), l1Provider);
-    const diamond = new Contract(await bridgehub.getZKChain(directSettledChainId), getAbi("GettersFacet"), l1Provider);
+    const diamond = new Contract(await bridgehub.getZKChain(directSettledChainId), getAbi("IZKChain"), l1Provider);
     const chainAdmin: string = await diamond.getAdmin();
     const receiver = Wallet.createRandom().address;
     const balanceBefore = await feeManager.chainBalance(directSettledChainId);

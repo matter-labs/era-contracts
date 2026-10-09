@@ -33,6 +33,14 @@ const ANVIL_INTEROP_DEV_ARTIFACTS: DevArtifact[] = [
     contractPath: "contracts/interop/L2InteropRootStorage.sol",
     reason: "spec 13 and the live-interop helpers read the imported (root, timestamp) tuple via its ABI",
   },
+  {
+    contractPath: "contracts/core/interop-fee/InteropFeeManager.sol",
+    reason: "spec 14 reads the L1 interop fee manager and round-trips a chain's prepaid balance via its ABI",
+  },
+  {
+    contractPath: "lib/openzeppelin-contracts-v4/contracts/proxy/transparent/ProxyAdmin.sol",
+    reason: "spec 14 reads the owner of the CTM's ProxyAdmin, which must also own the interop fee manager",
+  },
 ];
 
 function main(): void {
