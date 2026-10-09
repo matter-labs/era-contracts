@@ -227,7 +227,7 @@ No patches. Reads on-chain state to assert:
 
 ## What IS tested end-to-end (unpatched production code)
 
-- The default L1 upgrade scripts protocol-ops prepares with (`DefaultCoreUpgrade`, the CTM default) and the
+- The L1 upgrade scripts protocol-ops prepares with by default (the current release's core and CTM scripts) and the
   `protocol-ops` prepare, governance and chain-upgrade commands
 - Governance call generation and execution (stages 0-2)
 - Proxy upgrades for all L1 core contracts

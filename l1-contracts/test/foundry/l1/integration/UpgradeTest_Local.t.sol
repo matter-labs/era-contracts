@@ -3,7 +3,10 @@ pragma solidity ^0.8.24;
 
 import {console2 as console} from "forge-std/Script.sol";
 
+import {DefaultCoreUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCoreUpgrade.s.sol";
 import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
+import {CoreUpgrade_v35} from "../../../../deploy-scripts/upgrade/v35/CoreUpgrade_v35.s.sol";
+import {CTMUpgrade_v35} from "../../../../deploy-scripts/upgrade/v35/CTMUpgrade_v35.s.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {IZKsyncOSVerifier} from "contracts/state-transition/chain-interfaces/IZKsyncOSVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
@@ -30,11 +33,11 @@ import {Bytes} from "contracts/vendor/Bytes.sol";
 
 /// @notice Test-only variant of the CTM script protocol-ops prepares with by default, skipping the
 ///         bytecode-heavy steps to avoid MemoryOOG.
-/// @dev Only the two memory-trimming overrides below differ from {DefaultCTMUpgrade}; everything else (deploys,
+/// @dev Only the two memory-trimming overrides below differ from {CTMUpgrade_v35}; everything else (deploys,
 ///      governance calls, per-chain cut and its initializer) is the production script. protocol-ops'
 ///      `prepare_defaults_match_the_foundry_full_flow_test` fails if this stops extending the default
 ///      `--ctm-script-path` script.
-contract CTMUpgradeForLocalTest is DefaultCTMUpgrade {
+contract CTMUpgradeForLocalTest is CTMUpgrade_v35 {
     /// @notice Override to skip bytecode publishing which reads large JSON files.
     function publishBytecodes() public override {
         console.log("Test mode: Skipping bytecode publishing to avoid MemoryOOG");
@@ -78,10 +81,10 @@ contract CTMUpgradeForLocalTest is DefaultCTMUpgrade {
     }
 }
 
-/// @notice End-to-end run of the upgrade scripts protocol-ops prepares with by default (`DefaultCoreUpgrade`
-///         + the default CTM script) against an ecosystem freshly deployed at the genesis version.
-/// @dev The target version is derived from genesis (minor + 1). The only release-specific name is the CTM
-///      script {CTMUpgradeForLocalTest} extends, which protocol-ops pins to its default.
+/// @notice End-to-end run of the upgrade scripts protocol-ops prepares with by default (the current release's
+///         core and CTM scripts) against an ecosystem freshly deployed at the genesis version.
+/// @dev The target version is derived from genesis (minor + 1). The only release-specific names are the two
+///      scripts, which protocol-ops pins to its defaults and `yarn new-release` moves on.
 ///      The upgrade from the previous release's real chain states is covered by the anvil upgrade test.
 contract UpgradeIntegrationTestLocal is UpgradeIntegrationTestBase, L1ContractDeployer, ZKChainDeployer, TokenDeployer {
     using Bytes for bytes;
@@ -91,8 +94,12 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationTestBase, L1ContractDe
     address private _expectedServerNotifierProxyAdminOwner;
     bytes32 private _expectedRewrittenUpgradeTxHash;
 
+    /// @notice Override to run the default core script; it needs no memory trimming.
+    function createCoreUpgrade() internal override returns (DefaultCoreUpgrade) {
+        return new CoreUpgrade_v35();
+    }
+
     /// @notice Override to inject the memory-trimmed default CTM script (skips bytecode-heavy reads).
-    /// @dev The core side needs no test subclass: the plain {DefaultCoreUpgrade} from the base is used.
     function createCTMUpgrade() internal override returns (DefaultCTMUpgrade) {
         return new CTMUpgradeForLocalTest();
     }

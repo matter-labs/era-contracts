@@ -59,9 +59,8 @@ v34 is prepared by `CTMUpgrade_v34`, the default CTM upgrade with one change: th
 force-deploys `L2DefaultUpgrade` and delegates to it, with the chain's
 `ZKChainSpecificForceDeploymentsData` substituted on L1 by `DefaultUpgradeZKsyncOS.getL2UpgradeTxData`.
 
-v34 is prepared with `DefaultCoreUpgrade` and `CTMUpgrade_v34`, with its inputs under
-`upgrade-envs/v0.34.0-chain-config/`. Protocol-ops' defaults have moved on to the current release, so a v34
-preparation selects these through `--ctm-script-path`, `--core-script-path` and `--upgrade-env-dir`.
+v34 is prepared from its release branch with `DefaultCoreUpgrade` and `CTMUpgrade_v34`, with its inputs under
+`upgrade-envs/v0.34.0-chain-config/`. Later releases' branches no longer carry its scripts.
 
 Config setters retain their existing guard against updates with unproved committed batches to keep
 this commitment-format upgrade from also changing the existing administrative update policy. This
@@ -75,19 +74,6 @@ helps cross-check the encoding; external nodes still derive the hash from their 
 The runtime public-input formula and the ZKsync OS runtime's
 [`ChainStateCommitment`](https://github.com/matter-labs/zksync-os-private/blob/draft-0.6.0/basic_bootloader/src/bootloader/block_flow/zk/post_tx_op/public_input.rs)
 are unchanged.
-
-## Transition regression
-
-The v34 diamond-transition test deploys frozen pre-v34 Committer and Executor bytecode from
-`7b398269a03e531fefa013d14a16f15c5fdfd16c`. It commits version-4 data, proves the legacy batch,
-executes it, applies the script-generated v34 cut, and commits/proves/executes version-5 data. Two
-more paths check that an unverified or a proved-but-unexecuted legacy batch prevents the cut and
-leaves both facets and stored batch data intact.
-
-The fixture records its source revision and compiler/toolchain settings. Regenerate it only when
-intentionally changing the historical baseline: export that revision, build the two facets with the
-pinned upstream Foundry toolchain, and copy their `bytecode.object` fields into the fixture. These
-historical bytes are not part of the current-contract artifact regeneration.
 
 ## L1 transaction filtering
 

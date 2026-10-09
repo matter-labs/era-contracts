@@ -50,8 +50,9 @@ Most subcommands flatten **`SharedRunArgs`** from `common/args.rs`:
 
 ## Preparing protocol v35
 
-`ecosystem upgrade-prepare-all` defaults to the default upgrade scripts (`DefaultCoreUpgrade` and
-`DefaultCTMUpgrade`), using `upgrade-envs/v0.35.0-upgrade-system/local.toml` for a local v34-to-v35 upgrade.
+`ecosystem upgrade-prepare-all` defaults to the release's scripts, `CoreUpgrade_v35` and `CTMUpgrade_v35` under
+`l1-contracts/deploy-scripts/upgrade/v35/` (still the plain `DefaultCoreUpgrade` and `DefaultCTMUpgrade`), using
+`upgrade-envs/v0.35.0-upgrade-system/local.toml` for a local v34-to-v35 upgrade.
 With `--env <name>` the input is `<release dir>/<name>.toml` (see [Environment inputs](#environment-inputs));
 missing inputs fail before deployment.
 

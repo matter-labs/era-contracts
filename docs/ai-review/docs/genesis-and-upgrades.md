@@ -40,8 +40,8 @@ The upgrade that is incoming is v35 (an in-place v34 → v35 upgrade; only ZKsyn
 supported). It has no release-specific preparation yet, so its per-chain upgrade contract is the
 default:
 
-- DefaultUpgradeZKsyncOS.sol (deployed by `DefaultCTMUpgrade`; a release that needs a per-chain step
-  adds a `V35UpgradeZKsyncOS` extending it, prepared by a `deploy-scripts/upgrade/v35/` script)
+- DefaultUpgradeZKsyncOS.sol (deployed by `CTMUpgrade_v35`, still the plain `DefaultCTMUpgrade`; a release
+  that needs a per-chain step adds a `V35UpgradeZKsyncOS` extending it and deploys it from `CTMUpgrade_v35`)
 
 And the corresponding L2 upgrade contract that should be used is the release-agnostic:
 
