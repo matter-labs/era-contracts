@@ -21,6 +21,7 @@ pub(crate) struct EcosystemUpgradeArtifact {
     pub(crate) zk_governance: Option<ZkGovernanceArtifact>,
     /// Raw top-level `[misc]` table for shared metadata that does not belong to
     /// core or a particular CTM.
+    #[allow(dead_code)]
     pub(crate) misc: toml::Value,
 }
 
@@ -32,6 +33,7 @@ pub(crate) struct ZkGovernanceArtifact {
     pub(crate) new_emergency_upgrade_board: Address,
 }
 
+/// Supported CTM flavors on this OS-only build.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CtmFlavor {
     ZksyncOs,
@@ -88,6 +90,26 @@ pub(crate) fn required_address_in_value(
 
     raw.parse::<Address>()
         .with_context(|| format!("{path_label} is not a valid address"))
+}
+
+/// Like [`required_address_in_value`], but yields `None` when the key is simply absent.
+///
+/// For fields a release may legitimately stop emitting — the legacy ERC20 bridge, for
+/// instance, which v33's core prepare no longer records. A malformed value is still an error;
+/// only absence is tolerated.
+pub(crate) fn optional_address_in_value(
+    value: &toml::Value,
+    scope: &str,
+    path: &[&str],
+) -> anyhow::Result<Option<Address>> {
+    let mut current = value;
+    for segment in path {
+        match current.get(*segment) {
+            Some(next) => current = next,
+            None => return Ok(None),
+        }
+    }
+    required_address_in_value(value, scope, path).map(Some)
 }
 
 impl EcosystemUpgradeArtifact {
@@ -266,6 +288,8 @@ mod tests {
         assert!(a.core.get("deployer_addr").is_some());
     }
 
+    /// v33 accepts only ZKsync OS CTMs; an artifact carrying `[ctms.era]` was
+    /// not produced by the v33 scripts, which refuse EraVM CTMs outright.
     #[test]
     fn rejects_era_ctm_section_with_clear_error() {
         let toml = r#"

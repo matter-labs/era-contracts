@@ -62,7 +62,7 @@ pub const L2_MESSAGE_ROOT_ADDR: Address = l2_addr(0x05);
 /// implementation for `EmptyContract` (see `getRemovedTrackerNeutralizations`).
 pub const L2_REMOVED_GW_ASSET_TRACKER_ADDR: Address = l2_addr(0x10);
 pub const SLOAD_CONTRACT_ADDR: Address = l2_addr(0x06);
-// v31 no longer force-deploys the WrappedBaseToken, so this address is only referenced by the
+// v33 no longer force-deploys the WrappedBaseToken, so this address is only referenced by the
 // address-consistency test below; keep it as part of the canonical L2 address map.
 #[allow(dead_code)]
 pub const L2_WRAPPED_BASE_TOKEN_IMPL_ADDR: Address = l2_addr(0x07);

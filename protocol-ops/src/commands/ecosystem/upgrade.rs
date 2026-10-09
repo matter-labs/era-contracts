@@ -398,6 +398,19 @@ pub struct UpgradePrepareAllArgs {
     /// representative ZK chain on the CTM when omitted.
     #[clap(long)]
     pub rollup_da_manager_address: Option<Address>,
+
+    /// Also redeploy the zk-governance set (ProtocolUpgradeHandler impl,
+    /// Guardians, SecurityCouncil, EmergencyUpgradeBoard) from the sibling
+    /// `zk-governance` checkout and fold the four calls that wire it into the
+    /// live PUH proxy into stage 0.
+    ///
+    /// Off by default, and deliberately not implied by `governance_kind =
+    /// "puh"`: swapping the governance set is release-specific work that v31
+    /// happened to carry (its CREATE2 salt seed is `b"v31:gov"`), not a step
+    /// every protocol upgrade wants. A release that only moves the protocol
+    /// version must leave the live handler alone. Requires a PUH-governed env.
+    #[clap(long, default_value_t = false)]
+    pub redeploy_zk_governance: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -573,8 +586,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         // works on a fork via `anvil_impersonateAccount`; on a real chain
         // nobody can sign as that contract. The caller must pass
         // `--deployer-address <real-EOA>` (or derive it from the broadcast
-        // signer's private key — see `regen-and-verify-stage.sh` for an
-        // example using `cast wallet address`).
+        // signer's private key — use `cast wallet address`).
         // Resolve --upgrade-input-path from --env, unless the caller passed one explicitly
         // (see `per_env_upgrade_input`).
         if args.upgrade_input_path == CURRENT_UPGRADE_LOCAL_INPUT_PATH {
@@ -606,9 +618,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     // script the prepare flow spawns. `Utils.executeCalls` / `executeUpgrade`
     // read this via `vm.envOr("LEGACY_GOV_SALT", bytes32(0))`. Child
     // processes inherit env vars from this process, so a single `set_var`
-    // here covers every script in the pipeline. See
-    // `contracts/.claude/skills/regenerate-v31-stage-calldata/SKILL.md`
-    // ("Core principle") for why a per-regen salt is required.
+    // here covers every script in the pipeline.
     if let Some(cfg) = env_cfg.as_ref() {
         if let Some(salt) = cfg.v31_legacy_gov_salt()? {
             logger::info(format!(
@@ -770,7 +780,11 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     // Every prepared CTM is ZKsync OS (prepare rejects anything else); the first
     // one in input order is the representative passed to the PUH redeploy.
     let zksync_os_ctm_proxy = prepared.ctm_tomls.first().map(|e| e.proxy);
-    let puh_outcome = if is_puh_governed {
+    anyhow::ensure!(
+        !args.redeploy_zk_governance || is_puh_governed,
+        "--redeploy-zk-governance requires a PUH-governed environment"
+    );
+    let puh_outcome = if args.redeploy_zk_governance {
         let mut puh_inputs =
             crate::commands::ecosystem::zk_governance::ZkGovernanceInputs::from_env(
                 env_cfg.as_ref(),
@@ -786,6 +800,13 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
             .await
             .context("PUH/Guardians redeploy step")?,
         )
+    } else if is_puh_governed {
+        logger::info(
+            "Skipping PUH/Guardians redeploy: this release does not ship a new zk-governance \
+             set, so the live ProtocolUpgradeHandler is left as-is. Pass \
+             --redeploy-zk-governance to include it.",
+        );
+        None
     } else {
         logger::info(
             "Skipping PUH/Guardians redeploy (governance_kind != \"puh\" — env uses legacy Governance.sol)",

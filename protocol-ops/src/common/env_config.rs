@@ -559,10 +559,12 @@ mod tests {
 
     #[test]
     fn missing_release_input_fails_closed() {
-        // This line's copy of the v33 release dir has no testnet input (release/v0.33.0-atomic-interop does).
-        let cfg =
-            EnvConfig::load_from_upgrade_env_dir("testnet", "upgrade-envs/v0.33.0-atomic-interop")
-                .expect("permanent values alone still load");
+        let missing_release = tempfile::tempdir().unwrap();
+        let cfg = EnvConfig::load_from_upgrade_env_dir(
+            "testnet",
+            missing_release.path().to_str().unwrap(),
+        )
+        .expect("permanent values alone still load");
         assert_ne!(cfg.bridgehub(), Address::ZERO);
         assert!(cfg.owner_address().is_err());
         assert!(cfg.era_chain_id().is_err());
