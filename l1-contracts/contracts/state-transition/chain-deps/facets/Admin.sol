@@ -463,6 +463,10 @@ contract AdminFacet is ZKChainBase, IAdmin {
         if (s.zksyncOSL1TxFilteringEnabled) {
             revert NotCompatibleWithPriorityMode();
         }
+        // See {protocol-docs/system/contracts/chain_management/stage1.md}.
+        if (s.pausedDepositsTimestamp != 0) {
+            revert NotCompatibleWithPriorityMode();
+        }
         // Ensure that there is at least one priority tx with a non-zero request timestamp.
         // This guarantees that activatePriorityMode can actually function, since it relies on
         // the timestamp of the first unprocessed tx. After the v31 upgrade, old priority txs
