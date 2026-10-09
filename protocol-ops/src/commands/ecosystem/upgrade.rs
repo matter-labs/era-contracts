@@ -3,7 +3,7 @@
 //! Two top-level commands:
 //!
 //!   `upgrade-prepare-all` deploys new ecosystem contracts (deployer EOA signs)
-//!                         by running `DefaultCoreUpgrade` once + `CTMUpgrade_v34`
+//!                         by running the release's `CoreUpgrade_v<N>` once + `CTMUpgrade_v<N>`
 //!                         once for the target `--ctm-proxy` on a single anvil fork, then
 //!                         executes operational CTM-admin calls such as
 //!                         ServerNotifier ProxyAdmin upgrades. Emits per-script
@@ -35,8 +35,8 @@ use crate::commands::ecosystem::upgrade_inner::{CtmInputs, PrepareInputs, Upgrad
 use crate::common::abi::AdminFunctionsAbi;
 use crate::common::env_config::EnvConfig;
 use crate::common::forge::scripts::{
-    ADMIN_FUNCTIONS_INVOCATION, CTM_UPGRADE_V34_SCRIPT_PATH, CURRENT_UPGRADE_LOCAL_INPUT_PATH,
-    DEFAULT_CORE_UPGRADE_SCRIPT_PATH, UPGRADE_CORE_OUTPUT_PATH,
+    ADMIN_FUNCTIONS_INVOCATION, CURRENT_CORE_UPGRADE_SCRIPT_PATH, CURRENT_CTM_UPGRADE_SCRIPT_PATH,
+    CURRENT_UPGRADE_LOCAL_INPUT_PATH, UPGRADE_CORE_OUTPUT_PATH,
 };
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
@@ -362,11 +362,11 @@ pub struct UpgradePrepareAllArgs {
     pub core_output_path: String,
 
     /// Core upgrade script; historical releases must select their own script and input.
-    #[clap(long, default_value = DEFAULT_CORE_UPGRADE_SCRIPT_PATH)]
+    #[clap(long, default_value = CURRENT_CORE_UPGRADE_SCRIPT_PATH)]
     pub core_script_path: String,
 
     /// CTM upgrade script; historical releases must select their own script and input.
-    #[clap(long, default_value = CTM_UPGRADE_V34_SCRIPT_PATH)]
+    #[clap(long, default_value = CURRENT_CTM_UPGRADE_SCRIPT_PATH)]
     pub ctm_script_path: String,
 
     /// Path to a TOML file describing the CTM inputs (proxy + optional
@@ -1177,8 +1177,8 @@ mod release_script_tests {
     #[test]
     fn prepare_defaults_to_current_release() {
         let args = UpgradePrepareAllArgs::try_parse_from(["prepare"]).unwrap();
-        assert_eq!(args.ctm_script_path, CTM_UPGRADE_V34_SCRIPT_PATH);
-        assert_eq!(args.core_script_path, DEFAULT_CORE_UPGRADE_SCRIPT_PATH);
+        assert_eq!(args.ctm_script_path, CURRENT_CTM_UPGRADE_SCRIPT_PATH);
+        assert_eq!(args.core_script_path, CURRENT_CORE_UPGRADE_SCRIPT_PATH);
         assert_eq!(args.upgrade_input_path, CURRENT_UPGRADE_LOCAL_INPUT_PATH);
         let help = UpgradePrepareAllArgs::command()
             .render_long_help()
@@ -1188,9 +1188,9 @@ mod release_script_tests {
     }
 
     /// The Foundry full-flow upgrade test (`UpgradeTest_Local`) must run the scripts this command prepares
-    /// with by default: its CTM test subclass extends the default CTM script, and the shared base constructs
-    /// the default core script. A release that changes a default here fails this until that test is moved
-    /// onto the new script too.
+    /// with by default: its CTM test subclass extends the default CTM script, and it constructs the default
+    /// core script. A release that changes a default here fails this until that test is moved onto the new
+    /// script too.
     #[test]
     fn prepare_defaults_match_the_foundry_full_flow_test() {
         let contract_name = |script_path: &str| -> String {
@@ -1208,17 +1208,16 @@ mod release_script_tests {
             local_test.contains(&format!(" is {ctm} {{")),
             "UpgradeTest_Local's CTM test subclass must extend the default CTM script {ctm}"
         );
-        let shared_base = read("l1-contracts/test/foundry/l1/integration/UpgradeTestShared.t.sol");
         let core = contract_name(&args.core_script_path);
         assert!(
-            shared_base.contains(&format!("new {core}()")),
-            "UpgradeTestShared must construct the default core script {core}"
+            local_test.contains(&format!("new {core}()")),
+            "UpgradeTest_Local must construct the default core script {core}"
         );
     }
 
-    /// A release-specific default script must belong to the current release: `yarn new-release` moves the
-    /// upgrade-env dir but not the script defaults, so a stale `v<N>/` default would silently prepare the
-    /// next release with the previous release's scripts.
+    /// The default scripts must be the current release's: `yarn new-release` moves them together with the
+    /// upgrade-env dir, so a hand edit of one without the other would prepare a release with another
+    /// release's scripts.
     #[test]
     fn release_specific_defaults_belong_to_the_current_release() {
         let current_minor = CURRENT_UPGRADE_ENV_DIR
@@ -1228,13 +1227,14 @@ mod release_script_tests {
             .unwrap();
         let args = UpgradePrepareAllArgs::try_parse_from(["prepare"]).unwrap();
         for script in [&args.ctm_script_path, &args.core_script_path] {
-            if let Some(rest) = script.strip_prefix("deploy-scripts/upgrade/v") {
-                let script_minor = rest.split('/').next().unwrap();
-                assert_eq!(
-                    script_minor, current_minor,
-                    "{script} is not the current release's script"
-                );
-            }
+            let script_minor = script
+                .strip_prefix("deploy-scripts/upgrade/v")
+                .and_then(|rest| rest.split('/').next());
+            assert_eq!(
+                script_minor,
+                Some(current_minor),
+                "{script} is not the current release's script"
+            );
         }
     }
 

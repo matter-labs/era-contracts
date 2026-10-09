@@ -9,8 +9,6 @@ uint256 constant TEST_PRIORITY_TX_L1_GAS_PRICE = 10_000_000;
 
 uint32 constant TEST_CHAIN_CONFIG_UPGRADE_VERSION = 34;
 uint256 constant TEST_CHAIN_ID = 9;
-uint8 constant LEGACY_V33_COMMIT_ENCODING_VERSION = 4;
-string constant LEGACY_V33_COMMITMENT_FACETS_PATH = "test/foundry/l1/integration/fixtures/v33-commitment-facets.json";
 
 // Shared with ZKsync OS public_input.rs golden-vector tests; see {protocol-docs/chain-config.md}.
 uint256 constant GOLDEN_CHAIN_ID = 37;

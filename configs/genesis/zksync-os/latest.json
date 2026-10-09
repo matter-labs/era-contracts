@@ -277,7 +277,7 @@
   "genesis_root": "0x6293d3a383daf069df41e324efe8e27732b54a04c311f5b38155655626656a22",
   "protocol_semantic_version": {
     "major": 0,
-    "minor": 34,
+    "minor": 35,
     "patch": 0
   },
   "execution_version": 5,
