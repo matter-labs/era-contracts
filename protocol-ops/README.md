@@ -126,8 +126,10 @@ The fork's tx hashes are appended to `transactions.txt` next to `--out`, here th
 `fork-rehearsal/`. They exist only on this fork, so they must stay out of the committed
 `output/<env>/transactions.txt`, which holds real-network hashes only. PUVT reads the file passed
 with `--transactions-log`, fetches each tx via `--l1-rpc-url`, and reconstructs the deployment
-provenance. `l1-contracts/test/anvil-interop/regen-upgrade-calldata.sh` runs all three steps and
-passes PUVT the committed log concatenated with the fork log.
+provenance. Stage has no committed log for this release, so the fork log is all PUVT needs here; for
+an env that already has a committed `transactions.txt` (testnet), pass it concatenated with the
+fork log. `l1-contracts/test/anvil-interop/regen-upgrade-calldata.sh` runs all three steps and does
+that concatenation.
 
 ```bash
 export L1_RPC_URL=http://127.0.0.1:48546

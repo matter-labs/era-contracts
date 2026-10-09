@@ -107,13 +107,14 @@ Only `upgrade-broadcast` sends transactions. The verify commands only read; ever
 touches L1 when its signer executes those bundles (with `upgrade-broadcast`, `dev execute-safe`,
 or the signer's multisig).
 
-The `generate-upgrade-calldata-*`, `execute-deployer-safe-bundles` and the per-chain
-`generate-chain-{add,remove}-validator`, `-set-upgrade-timestamp` and `-upgrade-calldata` workflows
+The `generate-upgrade-calldata-*` workflows and the per-chain
+`generate-chain-{add-validator,remove-validator,set-upgrade-timestamp,upgrade}-calldata` workflows
 under `.github/workflows/` still drive the previous `protocol_ops` CLI (`--ecosystem`,
 `--chain <name>`, `--governance-toml-out`, `--new-protocol-version`, none of which exist any more)
 and have to be updated before they can run these phases; until then the commands are run by hand.
-`generate-chain-init-calldata` already uses the current flags, but resolves the Bridgehub from
-`environments/<env>/ecosystem.yaml`, which is committed only for `stage-interop-tests`.
+`generate-chain-init-calldata` and `execute-deployer-safe-bundles` already use the current flags,
+but read the Bridgehub and the deployer from `environments/<env>/ecosystem.yaml`, which is
+committed only for `stage-interop-tests` (with a placeholder deployer).
 
 `l1-contracts/test/anvil-interop/regen-upgrade-calldata.sh <env>` chains phases 1 and 3 (prepare,
 rehearse the bundles on the fork, run the verifier) into one command; the
@@ -371,7 +372,9 @@ on pull requests that touch the relevant paths.
   cut as `upgrade(ProposedUpgrade)` and cannot parse an `upgradeVerifierOnly` cut (zksync-os-server
   `lib/l1_watcher/src/upgrade_tx_watcher.rs`, derived from the code, not run). Until the node handles
   it, a ZKsync OS patch release goes through the regular `setNewVersionUpgrade` path with a
-  `ProposedUpgrade` that carries no L2 upgrade transaction, which the node treats as patch-only.
+  `ProposedUpgrade` that carries no L2 upgrade transaction, which the node treats as patch-only. A
+  minor bump without an L2 upgrade transaction has no working path on ZKsync OS today: for any
+  minor bump the node expects an upgrade transaction.
 - **Emergency.** Governance can freeze a chain (`freezeChain`, `unfreezeChain`) and execute a cut
   for it outside the normal proposal path (`ChainTypeManager.executeUpgrade(chainId, cut)`). The
   one-off scripts in `l1-contracts/deploy-scripts/upgrade/` (`EmergencyValidatorTimelockRestore.s.sol`,

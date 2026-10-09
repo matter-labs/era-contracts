@@ -40,10 +40,13 @@ hold the key of every signer in the manifest, `protocol_ops ecosystem upgrade-br
 <out>/manifest.json --l1-rpc-url <l1> --key <addr>=<key>` sends all of them (it defaults to
 `http://localhost:8545` without `--l1-rpc-url`, signs each transaction directly, and refuses to send
 anything if a signer has no `--key`). With a multisig signer in the manifest, such as an
-`owner_address` Safe, either filter the manifest down to the EOA bundles (as the v33 testnet rollout
-does with `manifest-deployer-only.json`) or send each EOA bundle with `protocol_ops dev execute-safe`,
-in manifest order; the multisig's bundles are imported into its own transaction flow. See
-`protocol-ops/README.md` for the execution model.
+`owner_address` Safe, the multisig's bundles are imported into its own transaction flow and the
+bundles are executed one at a time in manifest order: each EOA bundle with `protocol_ops dev
+execute-safe`, waiting for every multisig bundle to land before the next EOA bundle, since later
+bundles depend on earlier ones (in `chain init` the deployer adds validators only after the owner
+has created the chain). Filtering the manifest down to the EOA bundles, as the v33 testnet rollout
+does with `manifest-deployer-only.json`, is only safe when no EOA bundle follows a multisig bundle,
+as in `hub init`. See `protocol-ops/README.md` for the execution model.
 
 | Layer | `protocol_ops` command                                     | Forge scripts                                                | Signers                                                       |
 | ----- | ---------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------- |
@@ -160,8 +163,8 @@ Run `ctm init` as part of `ecosystem init`; on its own it does not complete toda
 deployed by `hub init` it signs as the Bridgehub's `ChainAdminOwnable` contract instead of that
 contract's owner, so `chainAdminAcceptAdmin` reverts on the `onlyOwner` `multicall`, and
 `RegisterCTM.s.sol` would revert as well, since it calls `Governance.scheduleTransparent`
-(`onlyOwner`) from the same address. With `--reuse-gov-and-admin false` the acceptances are signed
-by the hub's `Governance` contract and revert the same way (derived from the code, not run).
+(`onlyOwner`) from the same address. With `--reuse-gov-and-admin false`, `chainAdminAcceptAdmin` is
+signed by the hub's `Governance` contract and reverts the same way (derived from the code, not run).
 `ecosystem init` passes the real owner for all of them.
 
 The ZK token asset id (`--zk-token-asset-id`, or `zk_token_asset_id` of the env preset) must be
