@@ -1,57 +1,75 @@
-# upgrade envs
+# Upgrade environments
 
-This directory is used to create actual payloads for upgrades.
+This directory holds the inputs and the committed outputs of ecosystem upgrades, per release and
+per environment. The pipeline that consumes them is described in
+[protocol-docs/ecosystem-upgrade.md](../../protocol-docs/ecosystem-upgrade.md).
 
-It contains the $ECOSYSTEM_NAME.toml file with the input data, that is later fed into EcosystemUpgrade.s.sol, which publishes the necessary bytecodes, and creates the output data that ends out in outputs/ dir.
+## Layout
 
-## Naming Convention
+```
+upgrade-envs/
+  permanent-values/<env>.toml           # per-environment facts, independent of the release
+  <release>/<env>.toml                  # per-release inputs for that environment
+  <release>/output/<env>/               # the committed artifacts of that rollout
+  <release>/sim-descriptions.toml       # labels for the transaction-simulator scenarios
+```
 
-The YAML files under the `output/` directory contain critical upgrade information. New files should follow the naming convention `upgrade-envs/<UPGRADE_NAME>/output/<ENVIRONMENT>/<VERSION>-ecosystem.yaml`, where:
+`<release>` is the full release name (`v0.33.0-atomic-interop`); `<env>` is `stage`, `testnet`,
+`mainnet`, `local`, `foundry-upgrade` or `zksync-os-integration-test`. `protocol_ops --env <env>` reads
+`permanent-values/<env>.toml` together with `<release>/<env>.toml` of the release named by
+`UPGRADE_ENV_DIR` in `protocol-ops/src/common/env_config.rs`, and writes to
+`<release>/output/<env>/`. Both files must exist for an environment: the tooling refuses to fall
+back to `local` values.
 
-- `UPGRADE_NAME` is the full name of the upgrade (e.g. `v0.28.0-precompiles`, or `v0.29.1-interopA-ff`)
-- `ENVIRONMENT` is the environment of the upgrade (e.g. `stage`, `testnet`, `mainnet`)
-- `VERSION` is the version of the upgrade (e.g. `v28`, or `v29.1`)
+### `permanent-values/<env>.toml`
 
-For example, the YAML file for the v31.0 upgrade in the stage environment should be named something like `upgrade-envs/v0.30.0-interopB/output/stage/v31.0-ecosystem.yaml`.
+What identifies the environment: L1 chain id, Bridgehub, the registered CTMs with their VM type,
+the governance kind (`puh` for a `ProtocolUpgradeHandler`, otherwise the legacy `Governance`),
+the testnet-verifier flag (`testnet_verifier`, true everywhere except mainnet; the prepare refuses
+to run without it), the ZK token asset id, owners that must be wrapped rather than impersonated, and the legacy gateway history the verifier
+cross-checks. Update it when a release moves an address; never put per-release values here.
 
-## Generating inputs
+### `<release>/<env>.toml`
 
-Inputs should be generated manually, and are usually a combination of things
-that are specific to a given upgrade (for example genesis hashes) and to the
-given ecosystem (for example bridgehub address).
+What the release needs from the environment: the owner address and Era chain id, the CREATE2 salt
+for the core deploys and one per CTM under `[create2_factory_salts]`, the governance timer delay,
+the legacy gateway chain id (`[legacy_gateway] chain_id`) and `pre_v32_introspection`. Keep it
+small: anything derivable from L1 is read from L1 instead. The old protocol version in particular
+is not read from here: the CTM script reads it from the CTM. The `old_protocol_version` and
+`testnet_verifier` keys some input files still carry are dead.
 
-We should aim at keeping the inputs as small as possible - as many things should be auto-detected from the network (which makes it less error prone).
+The salts must be rotated before every regeneration. A repeated `(salt, init code)` pair resolves to
+the contract an earlier run already deployed, so a regeneration with old salts deploys nothing new
+for unchanged contracts and its run records no deployment transaction for them.
 
-## Generating outputs
+```bash
+python3 -c "import secrets; print('0x' + secrets.token_hex(32))"
+```
 
-Outputs usually consist of 4 files:
+### `<release>/output/<env>/`
 
-- ecosystem.toml
-- ecosystem.yaml
-- run-latest.json
-- verification logs
+| File                          | Committed | Content                                                                                                    |
+| ----------------------------- | --------- | ---------------------------------------------------------------------------------------------------------- |
+| `ecosystem.toml`              | yes       | the artifact: every new address plus the hex-encoded governance calls of stages 0, 1 and 2                 |
+| `transactions.txt`            | yes       | L1 transaction hashes of the deployer's broadcasts, appended on every run; the verifier's provenance input |
+| `extra-verification-logs.txt` | yes       | `forge verify-contract` lines with constructor arguments, one per deployed contract                        |
+| `sim-inputs/`, `simulator/`   | yes       | transaction-simulator inputs and scenarios                                                                 |
+| `chain-upgrades/<chain-id>/`  | yes       | the per-chain Safe bundles (`set-upgrade-timestamp`, `upgrade`)                                            |
+| `README.md`                   | yes       | the rollout record for that environment: ceremony, validation results, reproduction commands               |
+| `prepare/`, `fork-rehearsal/` | no        | per-run Safe bundles, `manifest.json` and rehearsal logs, regenerated by the prepare (see below)           |
 
-### Ecosystem.toml
+`.gitignore` excludes the whole `fork-rehearsal/` directory. Elsewhere under `output/`, including
+`prepare/`, the per-run files are ignored by file pattern: every `*.safe.json` and `manifest.json`
+(except in `sim-inputs/` and `chain-upgrades/`) plus a list of scratch files (`executed.json`,
+`anvil.log`, `manifest-deployer-only.json`, `sepolia-deploy-executed.json`, `regen/`, ...).
+Anything else written into `prepare/` shows up as untracked and must not be committed.
 
-This is the output coming from the running of EcosystemUpgrade.s.sol script with a given's ecosystem input file.
+If the deployer broadcast is run again after a regeneration, the previously deployed contracts
+are skipped, so `transactions.txt` is append-only: the hashes of earlier runs stay in it so that
+the verifier can still attribute those deployments.
 
-The detailed instructions on how to do it can be found in README of deploy-scripts.
+## Earlier releases
 
-### run-latest.json
-
-This is the file taken from the broadcast dir, after EcosystemUpgrade script is run. It would contain information about the transactions that were executed etc.
-
-### verification-logs
-
-This contains commands used to verify the bytecodes on etherscan. Currently has to be created manually by "grep" over the logs from EcosystemUpgrade script.
-
-Note: make sure to add the --chain sepolia when running stage or testnet.
-
-### Ecosystem.yaml
-
-This is the final file that can be sent for verification. It contains the same fields as Ecosystem.toml, but with addition of list of transaction hashes (as verifier tool needs them to check the correctness of addresses, bytecodes and constructor parameters).
-
-## Important
-
-If you generate the calldata multiple times, then the next runs might no longer deploy the contracts that were not changed.
-In such case, you'll have to manually add the transactions that deployed the original contracts to the final yaml file (you can simply add all the transaction hashes from the previous run).
+The `v0.26.x` to `v0.30.0` directories predate the current tooling and keep the format of their
+time (`*-ecosystem.yaml` outputs generated by `upgrade-yaml-output-generator`, `run-latest.json`
+broadcast logs, `verification-logs`). They are historical records and are not regenerated.

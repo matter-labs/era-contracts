@@ -19,3 +19,5 @@ no constructors or immutables and are initialized through `initL2`/upgrade calls
 
 For the exact transaction ordering, invariants, fixed addresses, and differences between new and
 upgraded chains, see {protocol-docs/chain-lifecycle.md}.
+The scripts and inputs that perform chain creation, and the deployment of the Bridgehub and CTM
+it depends on, are described in {protocol-docs/ecosystem-deployment.md}.

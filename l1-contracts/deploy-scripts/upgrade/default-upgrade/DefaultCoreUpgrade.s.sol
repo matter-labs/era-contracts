@@ -138,9 +138,9 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
     }
 
     function getOldProtocolDeadline() public virtual returns (uint256) {
-        // Returns max deadline initially. After the upgrade is complete (stage2),
-        // governance should call setNewVersionUpgrade with deadline=0 to force
-        // all chains to upgrade immediately.
+        // Returns max deadline initially. Once every chain has upgraded, governance expires the
+        // old version with `ChainTypeManager.setProtocolVersionDeadline(oldVersion, timestamp)`;
+        // calling setNewVersionUpgrade again would revert, since the CTM is no longer on the old version.
         return type(uint256).max;
     }
 
