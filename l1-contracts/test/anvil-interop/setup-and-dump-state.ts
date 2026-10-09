@@ -7,6 +7,14 @@ import { AnvilManager } from "./src/daemons/anvil-manager";
 import { DeploymentRunner } from "./src/deployment-runner";
 
 async function main(): Promise<void> {
+  // Setup deploys the test tokens and seeds the wrapped ZK under the interop source key, so another key
+  // would move them to other addresses and accounts than the committed snapshots.
+  if (process.env.ANVIL_INTEROP_PRIVATE_KEY) {
+    throw new Error(
+      "Unset ANVIL_INTEROP_PRIVATE_KEY: the committed chain states are generated with the default account"
+    );
+  }
+
   // Use the anvil-interop Foundry profile which disables CBOR metadata,
   // producing deterministic bytecode across platforms (macOS vs Linux CI).
   process.env.FOUNDRY_PROFILE = "anvil-interop";

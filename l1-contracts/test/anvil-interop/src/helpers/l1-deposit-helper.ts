@@ -1,8 +1,12 @@
 import type { BigNumber } from "ethers";
 import { Contract, Wallet, ethers } from "ethers";
+import { expect } from "chai";
 import type { CoreDeployedAddresses } from "../core/types";
 import { extractAndRelayNewPriorityRequests, createProvider } from "../core/utils";
 import { getAbi } from "../core/contracts";
+import { expectBalanceDelta, expectEvent, expectNativeSpend, expectSuccessfulReceipt } from "./balance-helpers";
+import { getL1BaseTokenAssetId, getL1BridgedOut } from "./bridged-out-helper";
+import { getInteropSourceAddress, getInteropSourcePrivateKey } from "../core/accounts";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
   ANVIL_INTEROP_BASE_TOKEN_PRIORITY_TX_GAS_LIMIT,
@@ -28,7 +32,6 @@ export interface DepositETHResult {
   l1TxHash: string;
   l2TxHash: string | null;
   amount: BigNumber;
-  mintValue: BigNumber;
 }
 
 export interface DepositERC20Params {
@@ -62,10 +65,9 @@ export interface DepositERC20Result {
  */
 export async function depositETHToL2(params: DepositETHParams): Promise<DepositETHResult> {
   const { l1RpcUrl, l2RpcUrl, chainId, l1Addresses, amount } = params;
-  const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
 
   const l1Provider = createProvider(l1RpcUrl);
-  const l1Wallet = new Wallet(privateKey, l1Provider);
+  const l1Wallet = new Wallet(getInteropSourcePrivateKey(), l1Provider);
   const recipient = params.recipient || l1Wallet.address;
 
   const bridgehub = new Contract(l1Addresses.bridgehub, getAbi("L1Bridgehub"), l1Wallet);
@@ -117,8 +119,66 @@ export async function depositETHToL2(params: DepositETHParams): Promise<DepositE
     l1TxHash: tx.hash,
     l2TxHash,
     amount,
-    mintValue: baseCost.add(amount),
   };
+}
+
+/**
+ * Deposits `amount` ETH with {@link depositETHToL2} and asserts the exact outcome: the L1 request and its L2 relay
+ * succeed, L1AssetRouter reports the Bridgehub-quoted mint value, the sender pays exactly that plus gas, the
+ * relayed L2 transaction sends `amount` from the sender to the recipient, who receives exactly that, and
+ * L1NativeTokenVault.bridgedOut[ETH] grows by the mint value.
+ */
+export async function expectEthDeposit(params: DepositETHParams & { recipient: string }): Promise<void> {
+  const { l1RpcUrl, chainId, l1Addresses, amount, recipient } = params;
+  const sender = getInteropSourceAddress();
+  const l1Provider = createProvider(l1RpcUrl);
+  const l2Provider = createProvider(params.l2RpcUrl);
+  const senderL1Before = await l1Provider.getBalance(sender);
+  const recipientL2Before = await l2Provider.getBalance(recipient);
+  const ethAssetId = await getL1BaseTokenAssetId(l1RpcUrl, l1Addresses.l1NativeTokenVault);
+  const bridgedOutBefore = await getL1BridgedOut(l1RpcUrl, l1Addresses.l1NativeTokenVault, ethAssetId);
+  const bridgehub = new Contract(l1Addresses.bridgehub, getAbi("L1Bridgehub"), l1Provider);
+  const expectedMintValue = amount.add(
+    await bridgehub.l2TransactionBaseCost(
+      chainId,
+      ANVIL_INTEROP_PRIORITY_TX_L1_GAS_PRICE_WEI,
+      ANVIL_INTEROP_BASE_TOKEN_PRIORITY_TX_GAS_LIMIT,
+      ANVIL_INTEROP_REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+    )
+  );
+
+  const result = await depositETHToL2(params);
+
+  const l1Receipt = await expectSuccessfulReceipt(l1Provider, result.l1TxHash, "deposit L1");
+  await expectSuccessfulReceipt(l2Provider, result.l2TxHash, "deposit L2 relay");
+  // The harness relays the priority request as a plain impersonated transfer, which emits no L2 event to check.
+  const l2Tx = await l2Provider.getTransaction(result.l2TxHash!);
+  expect(l2Tx.from, "deposit L2 relay sender").to.equal(sender);
+  expect(l2Tx.to, "deposit L2 relay recipient").to.equal(recipient);
+  expect(l2Tx.value.toString(), "deposit L2 relay value").to.equal(amount.toString());
+  expect(l2Tx.data, "deposit L2 relay calldata").to.equal("0x");
+  const initiated = expectEvent(
+    l1Receipt,
+    "L1AssetRouter",
+    l1Addresses.l1SharedBridge,
+    "BridgehubDepositBaseTokenInitiated"
+  );
+  expect(initiated.chainId.toNumber()).to.equal(chainId);
+  expect(initiated.from).to.equal(sender);
+  expect(initiated.assetId).to.equal(ethAssetId);
+  expect(initiated.amount.toString()).to.equal(expectedMintValue.toString());
+  const senderL1After = await l1Provider.getBalance(sender);
+  expectNativeSpend(
+    { native: senderL1Before },
+    { native: senderL1After },
+    expectedMintValue,
+    l1Receipt,
+    "deposit sender L1"
+  );
+  // The Anvil priority relay forwards l2Value exactly; bootloader fee refunds are not simulated.
+  expectBalanceDelta(recipientL2Before, await l2Provider.getBalance(recipient), amount, "deposit recipient L2");
+  const bridgedOutAfter = await getL1BridgedOut(l1RpcUrl, l1Addresses.l1NativeTokenVault, ethAssetId);
+  expectBalanceDelta(bridgedOutBefore, bridgedOutAfter, expectedMintValue, "L1NativeTokenVault.bridgedOut[ETH]");
 }
 
 /**

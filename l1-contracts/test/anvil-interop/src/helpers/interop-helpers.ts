@@ -14,6 +14,7 @@ import { getInteropSourcePrivateKey, isLiveInteropMode } from "../core/accounts"
 import {
   ATOMIC_SEND_BUNDLE_GAS_LIMIT,
   DEFAULT_TX_GAS_LIMIT,
+  FAILING_INTEROP_CALL_REASON,
   INTEROP_BUNDLE_TUPLE_TYPE,
   INTEROP_CENTER_ADDR,
   L2_BOOTLOADER_ADDR,
@@ -24,7 +25,7 @@ import {
 } from "../core/const";
 import { encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "../core/data-encoding";
 import { impersonateAndRun } from "../core/utils";
-import { encodeEvmChain, encodeEvmAddress } from "./erc7930";
+import { decodeEvmChainId, encodeEvmChain, encodeEvmAddress } from "./erc7930";
 import {
   atomicFinalityProofTuple,
   buildInclusionProof,
@@ -38,7 +39,13 @@ import {
 } from "./imt-engine-lib";
 import type { AtomicFlowPreimage } from "./imt-engine-lib";
 export type { AtomicFlowPreimage } from "./imt-engine-lib";
-import { approveTokenForNtv, expectBalanceDelta, getTokenAddressForAsset, getTokenBalance } from "./balance-helpers";
+import {
+  approveTokenForNtv,
+  expectEvent,
+  expectBalanceDelta,
+  getTokenAddressForAsset,
+  getTokenBalance,
+} from "./balance-helpers";
 
 const abiCoder = ethers.utils.defaultAbiCoder;
 const sendResultsByBundleData = new Map<string, InteropSendResult>();
@@ -319,9 +326,7 @@ export async function sendAndExecuteTokenInterop(params: SendAndExecuteTokenInte
     value: fee,
   });
 
-  expect(sendResult.txHash, `${params.label}: tx hash should exist`).to.not.be.null;
-  const receipt = await executeBundle(params.receiveProvider, sendResult, params.sourceChainId);
-  expect(receipt.status, `${params.label}: executeBundle tx should succeed`).to.equal(1);
+  await executeBundle(params.receiveProvider, sendResult, params.sourceChainId);
 
   const destTokenAfter = await getTokenAddressForAsset(params.receiveProvider, params.assetId);
   const recipientAfter = await getTokenBalance(params.receiveProvider, destTokenAfter, params.recipientAddress);
@@ -452,24 +457,14 @@ export async function sendInteropBundle(options: SendBundleOptions): Promise<Int
   });
   const receipt = await tx.wait();
 
-  // Extract InteropBundleSent event
-  let interopBundle: unknown = null;
-  let bundleHash: string = ethers.constants.HashZero;
-  for (const logEntry of receipt.logs) {
-    try {
-      const parsed = interopCenter.interface.parseLog({ topics: logEntry.topics, data: logEntry.data });
-      if (parsed?.name === "InteropBundleSent") {
-        interopBundle = parsed.args["interopBundle"];
-        bundleHash = parsed.args["interopBundleHash"];
-        break;
-      }
-    } catch {
-      // Not an InteropCenter log
-    }
-  }
-  if (!interopBundle) {
-    throw new Error("InteropBundleSent event not found in source transaction receipt");
-  }
+  const sent = expectEvent(receipt, "InteropCenter", INTEROP_CENTER_ADDR, "InteropBundleSent");
+  const interopBundle = sent.interopBundle;
+  const bundleHash: string = sent.interopBundleHash;
+  expect(interopBundle.sourceChainId.toNumber(), "sent bundle source chain").to.equal(legSourceChainId);
+  expect(interopBundle.destinationChainId.toNumber(), "sent bundle destination chain").to.equal(
+    options.destinationChainId
+  );
+  expect(interopBundle.calls, "sent bundle call count").to.have.length(options.callStarters.length);
 
   // For the auto single-leg path the predicted hash feeds the atomic flowId; a mismatch would make the
   // finality proof unverifiable. (Caller-managed flows do their own cross-check.)
@@ -571,24 +566,14 @@ export async function sendInteropMessage(options: SendMessageOptions): Promise<I
   );
   const receipt = await tx.wait();
 
-  // Extract InteropBundleSent event
-  let interopBundle: unknown = null;
-  let bundleHash: string = ethers.constants.HashZero;
-  for (const logEntry of receipt.logs) {
-    try {
-      const parsed = interopCenter.interface.parseLog({ topics: logEntry.topics, data: logEntry.data });
-      if (parsed?.name === "InteropBundleSent") {
-        interopBundle = parsed.args["interopBundle"];
-        bundleHash = parsed.args["interopBundleHash"];
-        break;
-      }
-    } catch {
-      // Not an InteropCenter log
-    }
-  }
-  if (!interopBundle) {
-    throw new Error("InteropBundleSent event not found in sendMessage receipt");
-  }
+  const sent = expectEvent(receipt, "InteropCenter", INTEROP_CENTER_ADDR, "InteropBundleSent");
+  const interopBundle = sent.interopBundle;
+  const bundleHash: string = sent.interopBundleHash;
+  expect(interopBundle.sourceChainId.toNumber(), "sent message bundle source chain").to.equal(atomic.sourceChainId);
+  expect(interopBundle.destinationChainId.toNumber(), "sent message bundle destination chain").to.equal(
+    decodeEvmChainId(options.recipient)
+  );
+  expect(interopBundle.calls, "sent message bundle call count").to.have.length(1);
 
   if (bundleHash.toLowerCase() !== predictedBundleHash.toLowerCase()) {
     throw new Error(`predicted message bundleHash ${predictedBundleHash} != emitted ${bundleHash}`);
@@ -614,6 +599,22 @@ export async function sendInteropMessage(options: SendMessageOptions): Promise<I
 }
 
 // ── InteropHandler.executeBundle wrapper ───────────────────────
+
+/** {L2InteropHandler} on `provider`, signed by `signerKey` (the interop source key by default). */
+function connectInteropHandler(provider: providers.JsonRpcProvider, signerKey?: string): Contract {
+  const wallet = new Wallet(signerKey || getInteropSourcePrivateKey(), provider);
+  return new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
+}
+
+/** Asserts `receipt` carries exactly one L2InteropHandler `eventName` for `bundleHash`. */
+export function expectBundleEvent(
+  receipt: providers.TransactionReceipt,
+  eventName: "BundleExecuted" | "BundleVerified" | "BundleUnbundled",
+  bundleHash: string
+): void {
+  const event = expectEvent(receipt, "L2InteropHandler", L2_INTEROP_HANDLER_ADDR, eventName);
+  expect(event.bundleHash, `${eventName} bundle hash`).to.equal(bundleHash);
+}
 
 export type BundleExecutionInput = string | InteropSendResult;
 
@@ -655,14 +656,14 @@ export async function executeBundle(
   sourceChainId: number,
   gasLimit?: number
 ): Promise<ethers.providers.TransactionReceipt> {
-  const wallet = new Wallet(getInteropSourcePrivateKey(), destProvider);
-  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
   const { bundleData, proof } = await getInteropExecutionData(destProvider, bundleInput, sourceChainId);
 
-  const tx = await interopHandler.executeAtomicBundle(bundleData, proof, {
+  const tx = await connectInteropHandler(destProvider).executeAtomicBundle(bundleData, proof, {
     gasLimit: gasLimit || DEFAULT_TX_GAS_LIMIT,
   });
-  return tx.wait();
+  const receipt = await tx.wait();
+  expectBundleEvent(receipt, "BundleExecuted", ethers.utils.keccak256(bundleData));
+  return receipt;
 }
 
 /**
@@ -674,11 +675,9 @@ export async function simulateExecuteBundle(
   sourceChainId: number,
   gasLimit?: number
 ): Promise<void> {
-  const wallet = new Wallet(getInteropSourcePrivateKey(), destProvider);
-  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
   const { bundleData, proof } = await getInteropExecutionData(destProvider, bundleInput, sourceChainId);
 
-  await interopHandler.callStatic.executeAtomicBundle(bundleData, proof, {
+  await connectInteropHandler(destProvider).callStatic.executeAtomicBundle(bundleData, proof, {
     gasLimit: gasLimit || DEFAULT_TX_GAS_LIMIT,
   });
 }
@@ -694,12 +693,14 @@ export async function verifyBundle(
   sourceChainId: number,
   signerKey?: string
 ): Promise<ethers.providers.TransactionReceipt> {
-  const wallet = new Wallet(signerKey || getInteropSourcePrivateKey(), destProvider);
-  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
   const { bundleData, proof } = await getInteropExecutionData(destProvider, bundleInput, sourceChainId);
 
-  const tx = await interopHandler.verifyAtomicBundle(bundleData, proof, { gasLimit: DEFAULT_TX_GAS_LIMIT });
-  return tx.wait();
+  const tx = await connectInteropHandler(destProvider, signerKey).verifyAtomicBundle(bundleData, proof, {
+    gasLimit: DEFAULT_TX_GAS_LIMIT,
+  });
+  const receipt = await tx.wait();
+  expectBundleEvent(receipt, "BundleVerified", ethers.utils.keccak256(bundleData));
+  return receipt;
 }
 
 /**
@@ -730,11 +731,12 @@ export async function unbundleBundle(
   callStatuses: number[],
   signerKey?: string
 ): Promise<ethers.providers.TransactionReceipt> {
-  const wallet = new Wallet(signerKey || getInteropSourcePrivateKey(), destProvider);
-  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
-
-  const tx = await interopHandler.unbundleBundle(bundleData, callStatuses, { gasLimit: DEFAULT_TX_GAS_LIMIT });
-  return tx.wait();
+  const tx = await connectInteropHandler(destProvider, signerKey).unbundleBundle(bundleData, callStatuses, {
+    gasLimit: DEFAULT_TX_GAS_LIMIT,
+  });
+  const receipt = await tx.wait();
+  expectBundleEvent(receipt, "BundleUnbundled", ethers.utils.keccak256(bundleData));
+  return receipt;
 }
 
 /**
@@ -746,10 +748,9 @@ export async function simulateUnbundleBundle(
   callStatuses: number[],
   signerKey?: string
 ): Promise<void> {
-  const wallet = new Wallet(signerKey || getInteropSourcePrivateKey(), destProvider);
-  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
-
-  await interopHandler.callStatic.unbundleBundle(bundleData, callStatuses, { gasLimit: DEFAULT_TX_GAS_LIMIT });
+  await connectInteropHandler(destProvider, signerKey).callStatic.unbundleBundle(bundleData, callStatuses, {
+    gasLimit: DEFAULT_TX_GAS_LIMIT,
+  });
 }
 
 /**
@@ -931,21 +932,27 @@ export async function deployDummyInteropRecipient(
   return contract.address;
 }
 
-/**
- * Deploy a minimal contract that reverts on any call.
- * Used to create deterministic failing calls in unbundle tests.
- *
- * Bytecode: PUSH1 0x00 PUSH1 0x00 REVERT (runtime: 0x60006000fd)
- * Init code: deploys the revert bytecode as runtime code.
- */
+/** Deploy a receiver that always reverts with a distinctive reason, so unrelated failures cannot satisfy tests. */
 export async function deployRevertingContract(
   provider: providers.JsonRpcProvider,
   signerKey?: string
 ): Promise<string> {
   const wallet = new Wallet(signerKey || getInteropSourcePrivateKey(), provider);
-  // Init code that returns 0x60006000fd as the deployed runtime code
-  // PUSH5 0x60006000fd PUSH1 0x00 MSTORE PUSH1 0x05 PUSH1 0x1b RETURN
-  const initCode = "0x6460006000fd6000526005601bf3";
+  const revertData =
+    ethers.utils.id("Error(string)").slice(0, 10) + abiCoder.encode(["string"], [FAILING_INTEROP_CALL_REASON]).slice(2);
+  // Both programs copy the bytes following their 12-byte header: runtime reverts with the
+  // ABI-encoded reason; init code returns that runtime. No Solidity fixture changes are needed.
+  const push1Length = (bytes: string, what: string): string => {
+    const length = ethers.utils.hexDataLength(bytes);
+    if (length > 0xff) {
+      throw new Error(`reverting contract ${what} is ${length} bytes, but its PUSH1 length operand fits at most 255`);
+    }
+    return `60${length.toString(16).padStart(2, "0")}`;
+  };
+  const pushDataLength = push1Length(revertData, "revert data");
+  const runtime = `0x${pushDataLength}600c600039${pushDataLength}6000fd${revertData.slice(2)}`;
+  const pushRuntimeLength = push1Length(runtime, "runtime");
+  const initCode = `0x${pushRuntimeLength}600c600039${pushRuntimeLength}6000f3${runtime.slice(2)}`;
   const tx = await wallet.sendTransaction({ data: initCode });
   const receipt = await tx.wait();
   if (!receipt.contractAddress) throw new Error("Failed to deploy reverting contract");
