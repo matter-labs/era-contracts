@@ -33,7 +33,7 @@ cargo run --release --bin protocol_ops -- chain init \
   --out ./chain-init-271
 ```
 
-See `chain init --help` for owners, bridgehub admin keys, and forge passthrough flags.
+See `chain init --help` for the owner, operator, DA and forge passthrough flags.
 
 ### Common flags (most init / upgrade commands)
 
@@ -48,7 +48,7 @@ Most subcommands flatten **`SharedRunArgs`** from `common/args.rs`:
 > **`--deployer-address` / `--private-key`** are **not** part of `SharedRunArgs`.
 > Bootstrap and apply commands declare their own deployer key flags because they need
 > an EOA to simulate forge scripts against the Anvil fork. Extra signers (e.g.
-> **`--owner`**, bridgehub keys) stay on specific commands.
+> **`--owner`**) stay on specific commands.
 
 ## Execution model
 
@@ -119,11 +119,15 @@ cargo run --release --bin protocol_ops -- ecosystem upgrade-broadcast \
   --manifest ../l1-contracts/upgrade-envs/v0.33.0-atomic-interop/output/stage/prepare/manifest.json \
   --l1-rpc-url http://127.0.0.1:48546 \
   --unlocked \
-  --out ../l1-contracts/upgrade-envs/v0.33.0-atomic-interop/output/stage/executed-bundles.json
+  --out ../l1-contracts/upgrade-envs/v0.33.0-atomic-interop/output/stage/fork-rehearsal/executed.json
 ```
 
-The deployment tx hashes are appended to the committed `transactions.txt` next to `ecosystem.toml`.
-PUVT reads that file, fetches each tx via `--l1-rpc-url`, and reconstructs the deployment provenance.
+The fork's tx hashes are appended to `transactions.txt` next to `--out`, here the git-ignored
+`fork-rehearsal/`. They exist only on this fork, so they must stay out of the committed
+`output/<env>/transactions.txt`, which holds real-network hashes only. PUVT reads the file passed
+with `--transactions-log`, fetches each tx via `--l1-rpc-url`, and reconstructs the deployment
+provenance. `l1-contracts/test/anvil-interop/regen-upgrade-calldata.sh` runs all three steps and
+passes PUVT the committed log concatenated with the fork log.
 
 ```bash
 export L1_RPC_URL=http://127.0.0.1:48546
@@ -132,6 +136,7 @@ cargo run --release --bin protocol_ops -- ecosystem verify-upgrade \
   --env stage \
   --ecosystem-toml "../l1-contracts/upgrade-envs/v0.33.0-atomic-interop/output/stage/ecosystem.toml" \
   --l1-rpc-url "$L1_RPC_URL" \
+  --transactions-log "../l1-contracts/upgrade-envs/v0.33.0-atomic-interop/output/stage/fork-rehearsal/transactions.txt" \
   --zk-governance-commit 41ad762d7478c80e1e8c3a2c8cabbdfca9f7ffce
 ```
 

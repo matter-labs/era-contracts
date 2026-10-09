@@ -107,10 +107,13 @@ Only `upgrade-broadcast` sends transactions. The verify commands only read; ever
 touches L1 when its signer executes those bundles (with `upgrade-broadcast`, `dev execute-safe`,
 or the signer's multisig).
 
-The `generate-upgrade-calldata-*`, `execute-deployer-safe-bundles` and `generate-chain-*-calldata`
-workflows under `.github/workflows/` still drive the previous `protocol_ops` CLI (`--ecosystem`,
+The `generate-upgrade-calldata-*`, `execute-deployer-safe-bundles` and the per-chain
+`generate-chain-{add,remove}-validator`, `-set-upgrade-timestamp` and `-upgrade-calldata` workflows
+under `.github/workflows/` still drive the previous `protocol_ops` CLI (`--ecosystem`,
 `--chain <name>`, `--governance-toml-out`, `--new-protocol-version`, none of which exist any more)
 and have to be updated before they can run these phases; until then the commands are run by hand.
+`generate-chain-init-calldata` already uses the current flags, but resolves the Bridgehub from
+`environments/<env>/ecosystem.yaml`, which is committed only for `stage-interop-tests`.
 
 `l1-contracts/test/anvil-interop/regen-upgrade-calldata.sh <env>` chains phases 1 and 3 (prepare,
 rehearse the bundles on the fork, run the verifier) into one command; the
@@ -252,7 +255,8 @@ covered by the verifier.
 Each chain takes the cut through its own `ChainAdmin`. The order below is the ZKsync OS one (v33
 upgrades ZKsync OS chains only), and it matters because scheduling the upgrade is the point of no
 return for the node. Both `chain` commands below only write a bundle
-(`ChainAdmin.multicall`, signed by the `ChainAdmin` owner); each step happens when that bundle is
+(`ChainAdmin.multicall`, signed by the `ChainAdmin` owner, or by the `AccessControlRestriction`'s
+default admin when `--access-control-restriction` is passed); each step happens when that bundle is
 executed on L1, and the timestamp bundle must be executed before the cut bundle. With `--env`,
 `chain upgrade` writes its bundle to `output/<env>/chain-upgrades/<id>/` by default; `chain
 set-upgrade-timestamp` and `chain record-priority-op-lower-bound` write one only when `--out` is
@@ -356,11 +360,18 @@ on pull requests that touch the relevant paths.
   changes no facets: the cut runs the stored `defaultUpgrade`, which picks the new verifier up
   from the CTM. Beyond deploying the verifier, the governance call must run with migrations paused
   (`pauseMigration` before, `unpauseMigration` after) and from the CTM's current version (same
-  major version, minor delta within the allowed limit, non-zero `defaultUpgrade`); chains still
-  apply it through their `ChainAdmin`, but not with the per-chain steps above: the cut carries no L2
-  upgrade transaction (it runs `upgradeVerifierOnly`), so there is no upgrade batch to wait for and
-  `upgrade-readiness-checker`, which decodes a full `ProposedUpgrade`, cannot be used. On ZKsync OS the
-  cut reverts (`NotAllBatchesExecuted`) unless every committed batch has been executed on L1.
+  major version, minor delta within the allowed limit, non-zero `defaultUpgrade`). Chains still
+  apply it with `chain upgrade` through their `ChainAdmin`, since `_setNewVersionUpgrade` records
+  the cut like any other, but without the upgrade-transaction steps: the cut carries no L2 upgrade
+  transaction (it runs `upgradeVerifierOnly`), so there is no upgrade batch to wait for and
+  `upgrade-readiness-checker`, which decodes a full `ProposedUpgrade`, cannot be used. On ZKsync OS
+  the cut reverts (`NotAllBatchesExecuted`) unless every committed batch has been executed on L1.
+  The ZKsync OS node also switches its protocol version only on the chain's `UpgradeTimestampUpdated`
+  event, so `chain set-upgrade-timestamp` is still needed; but its L1 watcher decodes the recorded
+  cut as `upgrade(ProposedUpgrade)` and cannot parse an `upgradeVerifierOnly` cut (zksync-os-server
+  `lib/l1_watcher/src/upgrade_tx_watcher.rs`, derived from the code, not run). Until the node handles
+  it, a ZKsync OS patch release goes through the regular `setNewVersionUpgrade` path with a
+  `ProposedUpgrade` that carries no L2 upgrade transaction, which the node treats as patch-only.
 - **Emergency.** Governance can freeze a chain (`freezeChain`, `unfreezeChain`) and execute a cut
   for it outside the normal proposal path (`ChainTypeManager.executeUpgrade(chainId, cut)`). The
   one-off scripts in `l1-contracts/deploy-scripts/upgrade/` (`EmergencyValidatorTimelockRestore.s.sol`,

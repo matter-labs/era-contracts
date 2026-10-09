@@ -32,16 +32,18 @@ side effect of creating a chain.
 ## Layers and the tooling
 
 A deployment has three layers, each with its own Forge script and its own `protocol_ops`
-subcommand. `protocol_ops` never broadcasts to the target L1 itself: it runs the scripts on a
-temporary Anvil fork of `--l1-rpc-url`, records every transaction, and writes Safe Transaction
+subcommand. The init commands never broadcast to the target L1 themselves: they run the scripts on
+a temporary Anvil fork of `--l1-rpc-url`, record every transaction, and write Safe Transaction
 Builder bundles (one per consecutive run of transactions by the same signer) plus a `manifest.json`
-into `--out`. Each bundle is then executed on the real L1 by its signer, in manifest order. For
-bundles whose signer is an EOA whose key you hold, `protocol_ops ecosystem upgrade-broadcast
---manifest <out>/manifest.json --l1-rpc-url <l1> --key <addr>=<key>` sends them (it defaults to
-`http://localhost:8545` without `--l1-rpc-url`, needs a `--key` for every signer in the manifest,
-and signs each transaction directly), as does `protocol_ops dev execute-safe` for a single bundle.
-Bundles whose signer is a multisig, such as an `owner_address` Safe, are imported into that
-multisig's own transaction flow; see `protocol-ops/README.md` for the execution model.
+into `--out`. Each bundle is then executed on the real L1 by its signer, in manifest order. When you
+hold the key of every signer in the manifest, `protocol_ops ecosystem upgrade-broadcast --manifest
+<out>/manifest.json --l1-rpc-url <l1> --key <addr>=<key>` sends all of them (it defaults to
+`http://localhost:8545` without `--l1-rpc-url`, signs each transaction directly, and refuses to send
+anything if a signer has no `--key`). With a multisig signer in the manifest, such as an
+`owner_address` Safe, either filter the manifest down to the EOA bundles (as the v33 testnet rollout
+does with `manifest-deployer-only.json`) or send each EOA bundle with `protocol_ops dev execute-safe`,
+in manifest order; the multisig's bundles are imported into its own transaction flow. See
+`protocol-ops/README.md` for the execution model.
 
 | Layer | `protocol_ops` command                                     | Forge scripts                                                | Signers                                                       |
 | ----- | ---------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------- |
@@ -106,7 +108,8 @@ deploys one CTM for one VM type (`--vm-type zksyncos|eravm`):
 
 - **Governance.** The hub's `Governance`, `ChainAdminOwnable` and `ProxyAdmin` are reused:
   always by `ecosystem init`, and by `ctm init` unless it is run with `--reuse-gov-and-admin false`,
-  in which case the CTM gets its own set.
+  in which case the CTM gets its own set. That flag exists only on standalone `ctm init`, which does
+  not complete today (see below).
 - **`ChainTypeManager`** (proxy) and the diamond it will clone for every chain: the `Admin`,
   `Getters`, `Mailbox`, `Executor`, `Committer` and `Migrator` facets and `DiamondInit`.
 - **Verifiers.** The PLONK verifier and the main verifier for the VM; with `testnet_verifier` the
@@ -153,12 +156,13 @@ are accepted by hand:
 
 As with the hub, making `ctm init` perform these itself is a tooling follow-up.
 
-Run `ctm init` as part of `ecosystem init` for a fresh ecosystem. Run on its own against a hub
-deployed by `hub init` (default `--reuse-gov-and-admin`), it runs the two acceptance scripts with the
-Bridgehub's `ChainAdminOwnable` contract as the wallet instead of that contract's owner.
-`governanceAcceptOwner` still broadcasts as `Governance.owner()`, but `chainAdminAcceptAdmin` should
-revert on the `onlyOwner` `multicall` (derived from the code, not run). `ecosystem init` passes the
-real owner.
+Run `ctm init` as part of `ecosystem init`; on its own it does not complete today. Against a hub
+deployed by `hub init` it signs as the Bridgehub's `ChainAdminOwnable` contract instead of that
+contract's owner, so `chainAdminAcceptAdmin` reverts on the `onlyOwner` `multicall`, and
+`RegisterCTM.s.sol` would revert as well, since it calls `Governance.scheduleTransparent`
+(`onlyOwner`) from the same address. With `--reuse-gov-and-admin false` the acceptances are signed
+by the hub's `Governance` contract and revert the same way (derived from the code, not run).
+`ecosystem init` passes the real owner for all of them.
 
 The ZK token asset id (`--zk-token-asset-id`, or `zk_token_asset_id` of the env preset) must be
 non-zero: it is passed to `InteropCenter.initL2` during every chain's genesis, which reverts on
@@ -200,7 +204,7 @@ DA choices mean and {protocol-docs/system/contracts/chain_management/admin_role.
 admin role.
 
 On EraVM chains `chain init` additionally deploys the L2 contracts through priority transactions
-(`ConsensusRegistry`, `Multicall3`, `TimestampAsserter`), unless `--skip-priority-txs` is set; it
+(`ForceDeployUpgrader`, `ConsensusRegistry`, `Multicall3`, `TimestampAsserter`), unless `--skip-priority-txs` is set; it
 enables the EVM emulator only with `--evm-emulator` and deploys the testnet paymaster only with
 `--deploy-paymaster`. ZKsync OS chains get all of their L2 built-ins from genesis and skip this
 block.
