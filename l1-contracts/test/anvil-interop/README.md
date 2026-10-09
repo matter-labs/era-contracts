@@ -54,6 +54,16 @@ yarn setup-and-dump
 
 This runs the full deployment with pinned settings (`blockTime=1`, `timestamp=1`) and dumps each chain's state to the `chain-states/` directory. Interval mining makes the final block height and block-indexed state wall-clock-dependent, so the CI determinism check uses `compare-chain-states.ts` to normalize the documented drift and requires every non-normalized field to match.
 
+Spec `01` compares all predeploy runtimes byte-for-byte against a reference chosen by how the chains
+were started, which the run records in its deployment state, so reruns against kept chains use the
+same one. On loaded snapshots the reference is the current sources built with the `anvil-interop`
+Foundry profile the snapshots use, so a stale snapshot fails: its setup builds those artifacts in
+`outputs/predeploy-identity<run-suffix>/`, leaving the default artifacts used by coverage intact. A
+cold identity build adds compilation time; reruns reuse that separate cache. A fresh deployment
+(`ANVIL_INTEROP_FRESH_DEPLOY=1`, `run-coverage.ts --fresh-deploy`, or no snapshots for the state
+version) installs the predeploys from `out/`, whatever profile built it, so the spec compares
+against those artifacts and skips the reference build.
+
 ## Running Tests Without Redeployment
 
 After running once with `--keep-chains`, the Anvil chains and deployment state persist. Re-run just the hardhat tests:
@@ -124,7 +134,7 @@ Live environment variables:
 
 | Spec                         | What it tests                                                                                                                                                |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `01-deployment-verification` | L1 contracts deployed, CTM registered, all 5 L2 chains have diamond proxies, L2 system contracts present, test tokens deployed, initial chainBalance is zero |
+| `01-deployment-verification` | L1 core contracts wired together, CTM registered, all 5 L2 chains registered on L1 with chain ID + CTM, exact predeploy runtimes, test token decimals/supply |
 | `02-direct-bridge`           | L1->L2 ETH deposit + L2->L1 ETH withdrawal on chain 10 (direct L1 settlement), net flow assertions                                                           |
 | `03-interop-transfer`        | Unsupported interop routes revert; only GW-settled L2<->GW-settled L2 interop is intentionally registered                                                    |
 | `04-gateway-setup`           | GW chain contracts deployed, interop chains registered on GW L2Bridgehub, GW designated as settlement layer on L1                                            |
@@ -169,7 +179,7 @@ Shards resolve only the contracts their own specs touched, so their file and lin
 the union takes the max hit count per line and per function. Denominators do not matter here —
 `scripts/merge-coverage.ts` rebases everything onto the Foundry LCOV. The union itself is
 covered by `test/unit/lcov-merge.test.ts`. `yarn test:unit` runs every suite under `test/unit/`
-(48 cases, ~4s), and takes a substring to narrow it: `yarn test:unit trace` runs only the trace
+(a few seconds), and takes a substring to narrow it: `yarn test:unit trace` runs only the trace
 guard. CI runs the whole set in the jobs that depend on it.
 
 Two coverage runs can coexist: pass `--port-offset N` or export `ANVIL_INTEROP_PORT_OFFSET=N`
@@ -211,6 +221,7 @@ pass as "these specs added no coverage". Both union paths use the same `lcov-mer
 | `ANVIL_INTEROP_PORT_OFFSET=N`          | Offset all chain ports by N (useful for parallel runs)                  |
 | `ANVIL_INTEROP_RUN_SUFFIX=X`           | Suffix for output dirs (set automatically by parallel workers)          |
 | `ANVIL_INTEROP_MAX_PARALLEL_WORKERS=N` | Cap concurrent test/coverage workers (0 or unset = one per spec)        |
+| `ANVIL_INTEROP_PRIVATE_KEY=0x…`        | Spec sender; token specs also need `ANVIL_INTEROP_FRESH_DEPLOY=1`       |
 | `ANVIL_COVERAGE_MODE=1`                | Start Anvil with `--steps-tracing` so traces can be collected afterward |
 
 ### CLI Parameters

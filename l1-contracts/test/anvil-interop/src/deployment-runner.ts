@@ -21,7 +21,7 @@ import type {
 import { getChainIdsByRole, timeIt, createProvider } from "./core/utils";
 import { getAbi, getCreationBytecode } from "./core/contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS, INTEROP_CENTER_ADDR } from "./core/const";
-import { getInteropSourcePrivateKey, isLiveInteropMode } from "./core/accounts";
+import { getInteropSourceAddress, getInteropSourcePrivateKey, isLiveInteropMode } from "./core/accounts";
 import { encodeNtvAssetId } from "./core/data-encoding";
 import { deployTestTokens } from "./helpers/deploy-test-token";
 import { depositERC20ToL2 } from "./helpers/l1-deposit-helper";
@@ -446,6 +446,7 @@ export class DeploymentRunner {
         l1Addresses: state.l1Addresses,
         tokenAddress: state.zkToken.l1Address,
         amount,
+        recipient: getInteropSourceAddress(),
         gwRpcUrl: chainConfig.role === "gwSettled" ? gatewayChain?.rpcUrl : undefined,
       });
     }
@@ -544,6 +545,7 @@ export class DeploymentRunner {
 
     const state = this.loadState();
     state.chains = chainInfo;
+    state.startedFrom = "freshDeploy";
     this.saveState(state);
 
     return { chains: chainInfo };
@@ -756,6 +758,7 @@ export class DeploymentRunner {
     // Populate deployment state so downstream tools (TBM, tests) work
     const state = this.loadState();
     state.chains = chainInfo;
+    state.startedFrom = "chainStates";
     state.l1Addresses = l1Addresses;
     state.ctmAddresses = ctmAddresses;
     state.chainAddresses = chainAddresses;

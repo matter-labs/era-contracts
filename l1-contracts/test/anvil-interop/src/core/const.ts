@@ -159,6 +159,7 @@ export enum CallStatus {
 
 // Selector for a non-existent function: someVeryUnfortunateCall()
 export const FAILING_CALL_CALLDATA = "0x00056d83";
+export const FAILING_INTEROP_CALL_REASON = "Intentional interop receiver failure";
 
 // From SemVer.sol: bit offsets of the minor and major components in a packed protocol version.
 export const SEMVER_MINOR_OFFSET = 32;

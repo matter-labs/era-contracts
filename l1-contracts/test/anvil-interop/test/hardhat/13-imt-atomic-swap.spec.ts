@@ -11,8 +11,9 @@ import { BigNumber, Contract, Wallet, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
 import { getChainIdsByRole, getL2Chain, impersonateAndRun, createProvider } from "../../src/core/utils";
 import { getAbi } from "../../src/core/contracts";
+import { getInteropSourcePrivateKey } from "../../src/core/accounts";
 import {
-  ANVIL_DEFAULT_PRIVATE_KEY,
+  ANVIL_RECIPIENT_ADDR,
   BundleStatus,
   INTEROP_CENTER_ADDR,
   L2_ASSET_ROUTER_ADDR,
@@ -26,9 +27,17 @@ import {
   DEFAULT_TX_GAS_LIMIT,
 } from "../../src/core/const";
 import { encodeEvmAddress, encodeEvmChain } from "../../src/core/data-encoding";
-import { customError, expectRevert } from "../../src/helpers/balance-helpers";
+import {
+  customError,
+  expectRevert,
+  expectEvent,
+  captureBalance,
+  expectNativeSpend,
+  expectBalanceDelta,
+} from "../../src/helpers/balance-helpers";
 import {
   atomicBundleAttr,
+  expectBundleEvent,
   interopBundleSaltAttr,
   getInteropProtocolFee,
   getTokenTransferData,
@@ -116,6 +125,7 @@ async function ensureTokenRegistered(ctx: ChainCtx): Promise<void> {
   const registered: string = await vault.assetId(ctx.testToken.address);
   if (registered === ethers.constants.HashZero) {
     await (await vault.registerToken(ctx.testToken.address)).wait();
+    expect(await vault.assetId(ctx.testToken.address)).to.equal(ntvAssetId(ctx.chainId, ctx.testToken.address));
   }
 }
 
@@ -128,6 +138,9 @@ async function ensureNtvApproval(ctx: ChainCtx, amount: BigNumber): Promise<void
   const current: BigNumber = await ctx.testToken.allowance(ctx.user.address, L2_NATIVE_TOKEN_VAULT_ADDR);
   if (current.lt(amount)) {
     await (await ctx.testToken.connect(ctx.user).approve(L2_NATIVE_TOKEN_VAULT_ADDR, amount)).wait();
+    expect((await ctx.testToken.allowance(ctx.user.address, L2_NATIVE_TOKEN_VAULT_ADDR)).toString()).to.equal(
+      amount.toString()
+    );
   }
 }
 
@@ -179,20 +192,8 @@ async function ensureSettlementInteropRoot(
         sides: [ethers.utils.keccak256(ethers.utils.toUtf8Bytes(`settlement-interop-root-${settlementBlock}`))],
       })
     ).wait();
+    expect((await storage.interopRoots(DEFAULT_SL_CHAIN_ID, settlementBlock)).timestamp.toNumber()).to.equal(timestamp);
   });
-}
-
-type ParsedManagerLog = { name: string; args: ethers.utils.Result } | undefined;
-
-/** Parse an AtomicFlowManager event log, returning {name, args} or undefined for non-manager logs. */
-function parseManagerLog(manager: Contract, log: ethers.providers.Log): ParsedManagerLog {
-  if (log.address.toLowerCase() !== manager.address.toLowerCase()) return undefined;
-  try {
-    const parsed = manager.interface.parseLog(log);
-    return { name: parsed.name, args: parsed.args };
-  } catch {
-    return undefined;
-  }
 }
 
 describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
@@ -221,7 +222,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
       [aId, bId].map(async (chainId) => {
         const rpcUrl = getL2Chain(state.chains!, chainId).rpcUrl;
         const provider = createProvider(rpcUrl);
-        const user = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, provider);
+        const user = new Wallet(getInteropSourcePrivateKey(), provider);
         const tokenAddress = state.testTokens![chainId];
         if (!tokenAddress) throw new Error(`No test token registered for chain ${chainId}`);
         const testToken = new Contract(tokenAddress, getAbi("TestnetERC20Token"), user);
@@ -312,6 +313,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     const value = commitValue(flowId, predictedBundleHash);
     const lowNull = await lowNullifierIndexFor(source.stack.tree, value);
 
+    const senderBefore = await captureBalance(source.provider, source.testToken.address);
     const sendResult = await sendInteropBundle({
       sourceProvider: source.provider,
       destinationChainId: dest.chainId,
@@ -324,6 +326,10 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
       gasLimit: ATOMIC_SEND_BUNDLE_GAS_LIMIT,
     });
 
+    const senderAfter = await captureBalance(source.provider, source.testToken.address);
+    expectNativeSpend(senderBefore, senderAfter, fee, sendResult.receipt, "atomic leg sender");
+    expectBalanceDelta(senderBefore.token!, senderAfter.token!, amount.mul(-1), "atomic leg source token");
+
     // Cross-check the predicted bundleHash against the actual one the InteropCenter emitted.
     expect(sendResult.bundleHash.toLowerCase(), "predicted bundleHash matches emitted").to.equal(
       predictedBundleHash.toLowerCase()
@@ -332,7 +338,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
   }
 
   it("happy path: atomic send -> executeBundle mints both legs and leaves source Committed", async () => {
-    const user = chainA.user.address; // anvil acct #0, the depositor + recipient on both chains
+    const user = chainA.user.address; // the interop source account, the depositor + recipient on both chains
     const now = Math.max(await chainNow(chainA.provider), await chainNow(chainB.provider));
     // The deadline is an SL timestamp; the harness sets each leg's batch `l1Timestamp == deadline`,
     // pinning the inclusive `l1Timestamp <= deadline` finality bound exactly at the boundary.
@@ -446,8 +452,14 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
 
     const handlerB = chainB.stack.interopHandler.connect(chainB.user);
     const handlerA = chainA.stack.interopHandler.connect(chainA.user);
-    await (await handlerB.executeAtomicBundle(ab.bundleData, finality, { gasLimit: DEFAULT_TX_GAS_LIMIT })).wait();
-    await (await handlerA.executeAtomicBundle(ba.bundleData, finality, { gasLimit: DEFAULT_TX_GAS_LIMIT })).wait();
+    const receiptB = await (
+      await handlerB.executeAtomicBundle(ab.bundleData, finality, { gasLimit: DEFAULT_TX_GAS_LIMIT })
+    ).wait();
+    const receiptA = await (
+      await handlerA.executeAtomicBundle(ba.bundleData, finality, { gasLimit: DEFAULT_TX_GAS_LIMIT })
+    ).wait();
+    expectBundleEvent(receiptB, "BundleExecuted", hAB);
+    expectBundleEvent(receiptA, "BundleExecuted", hBA);
 
     // Destination bundles are FullyExecuted; source legs remain Committed (terminal on the happy path).
     expect(await handlerB.bundleStatus(hAB)).to.equal(BundleStatus.FullyExecuted, "AB executed on B");
@@ -492,7 +504,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     // root created after the flow's deadline has been imported (the flow could already be timed out).
     const settlementInteropRootBlock = 201;
 
-    const refundRecipient = chainB.user.address; // irrelevant for refund; distinct dest recipient
+    const refundRecipient = ANVIL_RECIPIENT_ADDR;
     const aTimeoutAmount = ethers.utils.parseUnits("3", TEST_TOKEN_DECIMALS);
     const bTimeoutAmount = ethers.utils.parseUnits("5", TEST_TOKEN_DECIMALS);
 
@@ -512,6 +524,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     const flowId = computeFlowId(flowPreimage);
 
     // ── Commit only the AB leg on A. B never commits BA. ─────────────────────────────────────
+    const recipientBefore: BigNumber = await chainA.testToken.balanceOf(refundRecipient);
     const aBalanceBefore: BigNumber = await chainA.testToken.balanceOf(user);
     const ab = await sendAtomicLeg({
       source: chainA,
@@ -559,14 +572,17 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     ).wait();
     expect(await chainA.stack.manager.legState(flowId, hAB)).to.equal(LegState.Revertable, "AB revertable on A");
     expect(
-      refundAuth.logs
-        .map((l: ethers.providers.Log) => parseManagerLog(chainA.stack.manager, l))
-        .some((p: ParsedManagerLog) => p?.name === "FlowRefundAuthorized" && p.args.bundleHash === hAB),
-      "FlowRefundAuthorized(hAB) on A"
-    ).to.be.true;
+      expectEvent(refundAuth, "AtomicFlowManager", L2_ATOMIC_FLOW_MANAGER_ADDR, "FlowRefundAuthorized").bundleHash
+    ).to.equal(hAB);
 
     // ── claimRefund on A -> depositor recovers the burned tokens; state Reverted. ────────────
     const claim = await (await managerA.claimRefund(flowId, ab.bundleData, { gasLimit: DEFAULT_TX_GAS_LIMIT })).wait();
+    expectBalanceDelta(
+      recipientBefore,
+      await chainA.testToken.balanceOf(refundRecipient),
+      ethers.constants.Zero,
+      "refund must return to depositor, not destination recipient"
+    );
     expect(await chainA.stack.manager.legState(flowId, hAB)).to.equal(LegState.Reverted, "AB reverted on A");
 
     const aAfterRefund: BigNumber = await chainA.testToken.balanceOf(user);
@@ -575,12 +591,9 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
       "AB depositor fully recovered the burned tokens"
     );
 
-    expect(
-      claim.logs
-        .map((l: ethers.providers.Log) => parseManagerLog(chainA.stack.manager, l))
-        .some((p: ParsedManagerLog) => p?.name === "FlowRefunded" && p.args.bundleHash === hAB),
-      "FlowRefunded(hAB) on A"
-    ).to.be.true;
+    expect(expectEvent(claim, "AtomicFlowManager", L2_ATOMIC_FLOW_MANAGER_ADDR, "FlowRefunded").bundleHash).to.equal(
+      hAB
+    );
   });
 
   /** A fabricated (never-sent) two-leg flow for proof-validation tests: authorizeRefund verifies the
@@ -609,7 +622,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     const deadline = 2_000;
     const settlementInteropRootBlock = 202;
 
-    const refundRecipient = chainB.user.address;
+    const refundRecipient = ANVIL_RECIPIENT_ADDR;
     const aTimeoutAmount = ethers.utils.parseUnits("2", TEST_TOKEN_DECIMALS);
     const bTimeoutAmount = ethers.utils.parseUnits("4", TEST_TOKEN_DECIMALS);
 
@@ -627,6 +640,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     const flowPreimage = flowPreimageOf(legHashesAsc, chainIdsAsc, deadline);
     const flowId = computeFlowId(flowPreimage);
 
+    const recipientBefore: BigNumber = await chainA.testToken.balanceOf(refundRecipient);
     const aBalanceBefore: BigNumber = await chainA.testToken.balanceOf(user);
     const ab = await sendAtomicLeg({
       source: chainA,
@@ -657,7 +671,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     const missingIdx = legHashesAsc[0] === hBA ? 0 : 1;
 
     const managerA = chainA.stack.manager.connect(chainA.user);
-    await (
+    const refundAuth = await (
       await managerA.authorizeRefund(
         atomicFlowTuple({ flowId, preimage: flowPreimage }),
         missingIdx,
@@ -665,9 +679,21 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
         { gasLimit: DEFAULT_TX_GAS_LIMIT }
       )
     ).wait();
+    expect(
+      expectEvent(refundAuth, "AtomicFlowManager", L2_ATOMIC_FLOW_MANAGER_ADDR, "FlowRefundAuthorized").bundleHash
+    ).to.equal(hAB);
     expect(await chainA.stack.manager.legState(flowId, hAB)).to.equal(LegState.Revertable, "AB revertable on A");
 
-    await (await managerA.claimRefund(flowId, ab.bundleData, { gasLimit: DEFAULT_TX_GAS_LIMIT })).wait();
+    const claim = await (await managerA.claimRefund(flowId, ab.bundleData, { gasLimit: DEFAULT_TX_GAS_LIMIT })).wait();
+    expect(expectEvent(claim, "AtomicFlowManager", L2_ATOMIC_FLOW_MANAGER_ADDR, "FlowRefunded").bundleHash).to.equal(
+      hAB
+    );
+    expectBalanceDelta(
+      recipientBefore,
+      await chainA.testToken.balanceOf(refundRecipient),
+      ethers.constants.Zero,
+      "refund must return to depositor, not destination recipient"
+    );
     expect(await chainA.stack.manager.legState(flowId, hAB)).to.equal(LegState.Reverted, "AB reverted on A");
     expect((await chainA.testToken.balanceOf(user)).toString()).to.equal(
       aBalanceBefore.toString(),
@@ -695,10 +721,14 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
       );
 
     // 1. Preimage whose legs do NOT include the bundle actually being sent.
+    const strayPreimage = flowPreimageOf([strayLeg], [chainA.chainId], deadline);
     await expectRevert(
-      sendWithPreimage(flowPreimageOf([strayLeg], [chainA.chainId], deadline)),
+      sendWithPreimage(strayPreimage),
       "atomic send with preimage missing the bundle",
-      customError("AtomicFlowManager", "ManagerCommittedBundleNotInFlow(bytes32,bytes32)")
+      customError("AtomicFlowManager", "ManagerCommittedBundleNotInFlow(bytes32,bytes32)", [
+        computeFlowId(strayPreimage),
+        realHash,
+      ])
     );
 
     // 2. Preimage that contains the bundle, but declares the wrong source chain for it.
@@ -706,16 +736,19 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
       { hash: realHash, chainId: chainB.chainId }, // wrong: this leg is sent from chain A
       { hash: strayLeg, chainId: chainA.chainId },
     ].sort((a, b) => (BigNumber.from(a.hash).lt(BigNumber.from(b.hash)) ? -1 : 1));
+    const misdeclaredPreimage = flowPreimageOf(
+      misdeclaredLegs.map((l) => l.hash),
+      misdeclaredLegs.map((l) => l.chainId),
+      deadline
+    );
     await expectRevert(
-      sendWithPreimage(
-        flowPreimageOf(
-          misdeclaredLegs.map((l) => l.hash),
-          misdeclaredLegs.map((l) => l.chainId),
-          deadline
-        )
-      ),
+      sendWithPreimage(misdeclaredPreimage),
       "atomic send with wrong declared source chain",
-      customError("AtomicFlowManager", "ManagerCommittedLegSourceChainMismatch(bytes32,uint256,uint256)")
+      customError("AtomicFlowManager", "ManagerCommittedLegSourceChainMismatch(bytes32,uint256,uint256)", [
+        computeFlowId(misdeclaredPreimage),
+        chainA.chainId,
+        chainB.chainId,
+      ])
     );
 
     // 3. Preimage whose co-leg declares a source chain the Bridgehub does not know (a phantom leg
@@ -734,7 +767,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
         )
       ),
       "atomic send with unregistered co-leg source chain",
-      customError("AtomicFlowManager", "ManagerLegSourceChainNotRegistered(uint256)")
+      customError("AtomicFlowManager", "ManagerLegSourceChainNotRegistered(uint256)", [unregisteredChainId])
     );
 
     // 4. The exact same bundle with a well-formed preimage still sends fine (control for 1/2/3: proves
@@ -782,22 +815,26 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     await expectRevert(
       () => managerA.callStatic.authorizeRefund(flow, missingIdx, proofTuple(staleSettlementRootProof)),
       "stale settlement interop root",
-      customError("AtomicFlowManager", "ProofInteropRootNotAfterDeadline(uint256,uint64)")
+      customError("AtomicFlowManager", "ProofInteropRootNotAfterDeadline(uint256,uint64)", [deadline, deadline])
     );
 
     // 2. Settlement interop root is missing, so its unset timestamp reads as 0: rejected.
+    const missingSettlementRootBlock = 999_999;
     const missingSettlementRootProof = await buildNonInclusionProof({
       l2Tree: chainB.stack.tree,
       chainId: chainB.chainId,
       value: missingValue,
       l1Timestamp: deadline + 1,
       provesAgainstBeginRoot: true,
-      slBlock: 999_999,
+      slBlock: missingSettlementRootBlock,
     });
     await expectRevert(
       () => managerA.callStatic.authorizeRefund(flow, missingIdx, proofTuple(missingSettlementRootProof)),
       "missing settlement interop root",
-      customError("AtomicFlowManager", "ProofSettlementLayerInteropRootNotImported(uint256,uint256)")
+      customError("AtomicFlowManager", "ProofSettlementLayerInteropRootNotImported(uint256,uint256)", [
+        DEFAULT_SL_CHAIN_ID,
+        missingSettlementRootBlock,
+      ])
     );
 
     // 3. In-time batch that is NOT the chain's last inside the settlement interop root: the batch-leaf
@@ -805,6 +842,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     //    rejects it.
     const validSettlementRootBlock = 204;
     await ensureSettlementInteropRoot(chainA.provider, validSettlementRootBlock, deadline + 5);
+    const populatedRightSibling = ethers.utils.id("populated-right-subtree");
     const notLastBatch = await buildNonInclusionProof({
       l2Tree: chainB.stack.tree,
       chainId: chainB.chainId,
@@ -812,13 +850,13 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
       l1Timestamp: deadline - 1,
       provesAgainstBeginRoot: false,
       slBlock: validSettlementRootBlock,
-      batchLeafSiblings: [ethers.utils.id("populated-right-subtree")],
+      batchLeafSiblings: [populatedRightSibling],
       batchLeafMask: 0, // left child at level 0 -> the sibling above must be the empty-subtree hash
     });
     await expectRevert(
       () => managerA.callStatic.authorizeRefund(flow, missingIdx, proofTuple(notLastBatch)),
       "in-time batch not last in root",
-      customError("AtomicFlowManager", "ProofNotLastBatchInRoot(uint256,bytes32)")
+      customError("AtomicFlowManager", "ProofNotLastBatchInRoot(uint256,bytes32)", [0, populatedRightSibling])
     );
   });
 });

@@ -6,6 +6,7 @@
  */
 
 import type { JsonFragment } from "@ethersproject/abi";
+import * as path from "path";
 import { loadAbiFromOut, loadBytecodeFromOut, loadCreationBytecodeFromOut } from "./artifacts";
 
 // ── Artifact path registry ──────────────────────────────────────
@@ -90,6 +91,16 @@ export function getBytecode(name: ContractName): string {
 
 export function getCreationBytecode(name: ContractName): string {
   return loadCreationBytecodeFromOut(ARTIFACTS[name]);
+}
+
+/** Solidity contract name behind `name`, which can differ from the harness name. */
+export function getSolidityContractName(name: ContractName): string {
+  return path.basename(ARTIFACTS[name], ".json");
+}
+
+/** Name of the Solidity source file that defines `name`, e.g. `SystemContext.sol`. */
+export function getSoliditySourceFileName(name: ContractName): string {
+  return path.dirname(ARTIFACTS[name]);
 }
 
 // ── Legacy ABIs ─────────────────────────────────────────────────

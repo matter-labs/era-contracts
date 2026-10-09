@@ -10,7 +10,7 @@ import {
   isLiveInteropMode,
 } from "../../src/core/accounts";
 import { ANVIL_INTEROP_PROTOCOL_FEE_WEI, INTEROP_CENTER_ADDR, L2_ASSET_ROUTER_ADDR } from "../../src/core/const";
-import { encodeEvmAddress } from "../../src/helpers/erc7930";
+import { encodeEvmAddress, encodeEvmChainAddress } from "../../src/helpers/erc7930";
 import {
   sendInteropBundle,
   executeBundle,
@@ -213,9 +213,6 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
 
     const balAfter = await captureBalance(sourceProvider);
 
-    expect(sendResult.txHash, "single direct call: tx hash should exist").to.not.be.null;
-    expect(sendResult.interopBundle, "single direct call: interopBundle should exist").to.not.be.null;
-
     expectNativeSpend(balBefore, balAfter, msgValue, sendResult.receipt, "single direct call");
     if (protocolFeesBefore) {
       await expectAccumulatedProtocolFeeDelta(
@@ -232,9 +229,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     // ── Execute on destination ──
     const recipientBefore = await getNativeBalance(destProvider, dummyRecipient1);
 
-    const receipt = await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
-
-    expect(receipt.status, "single direct call: executeBundle tx should succeed").to.equal(1);
+    await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
 
     const recipientAfter = await getNativeBalance(destProvider, dummyRecipient1);
     expectBalanceDelta(recipientBefore, recipientAfter, amount, "single direct call: recipient native");
@@ -291,8 +286,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     );
 
     const recipientBefore = await getNativeBalance(destProvider, dummyRecipient1);
-    const receipt = await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
-    expect(receipt.status, "single direct call fixed fee: executeBundle tx should succeed").to.equal(1);
+    await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
 
     const recipientAfter = await getNativeBalance(destProvider, dummyRecipient1);
     expectBalanceDelta(recipientBefore, recipientAfter, amount, "single direct call fixed fee: recipient native");
@@ -324,9 +318,6 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
 
     const balAfter = await captureBalance(sourceProvider, sourceTokenAddress);
 
-    expect(sendResult.txHash, "single indirect call: tx hash should exist").to.not.be.null;
-    expect(sendResult.interopBundle, "single indirect call: interopBundle should exist").to.not.be.null;
-
     expectNativeSpend(balBefore, balAfter, msgValue, sendResult.receipt, "single indirect call");
 
     // Token balance should decrease by exactly tokenAmount
@@ -342,9 +333,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     let destTokenAddress = await getTokenAddressForAsset(destProvider, sourceAssetId);
     const recipientTokenBefore = await getTokenBalance(destProvider, destTokenAddress, getInteropRecipientAddress());
 
-    const receipt = await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
-
-    expect(receipt.status, "single indirect call: executeBundle tx should succeed").to.equal(1);
+    await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
 
     // Re-resolve token address (NTV may have deployed the bridged token during executeBundle)
     destTokenAddress = await getTokenAddressForAsset(destProvider, sourceAssetId);
@@ -387,9 +376,6 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
 
     const balAfter = await captureBalance(sourceProvider);
 
-    expect(sendResult.txHash, "two direct calls: tx hash should exist").to.not.be.null;
-    expect(sendResult.interopBundle, "two direct calls: interopBundle should exist").to.not.be.null;
-
     expectNativeSpend(balBefore, balAfter, msgValue, sendResult.receipt, "two direct calls");
 
     console.log("   [send] Two direct calls bundle sent");
@@ -398,9 +384,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     const recipient1Before = await getNativeBalance(destProvider, dummyRecipient1);
     const recipient2Before = await getNativeBalance(destProvider, dummyRecipient2);
 
-    const receipt = await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
-
-    expect(receipt.status, "two direct calls: executeBundle tx should succeed").to.equal(1);
+    await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
 
     const recipient1After = await getNativeBalance(destProvider, dummyRecipient1);
     const recipient2After = await getNativeBalance(destProvider, dummyRecipient2);
@@ -443,9 +427,6 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
 
     const balAfter = await captureBalance(sourceProvider, sourceTokenAddress);
 
-    expect(sendResult.txHash, "two indirect calls: tx hash should exist").to.not.be.null;
-    expect(sendResult.interopBundle, "two indirect calls: interopBundle should exist").to.not.be.null;
-
     expectNativeSpend(balBefore, balAfter, msgValue, sendResult.receipt, "two indirect calls");
 
     expect(
@@ -464,9 +445,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
       getInteropSecondaryRecipientAddress()
     );
 
-    const receipt = await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
-
-    expect(receipt.status, "two indirect calls: executeBundle tx should succeed").to.equal(1);
+    await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
 
     destTokenAddress = await getTokenAddressForAsset(destProvider, sourceAssetId);
     const recipient1TokenAfter = await getTokenBalance(destProvider, destTokenAddress, getInteropRecipientAddress());
@@ -527,9 +506,6 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
 
     const balAfter = await captureBalance(sourceProvider, sourceTokenAddress);
 
-    expect(sendResult.txHash, "mixed bundle: tx hash should exist").to.not.be.null;
-    expect(sendResult.interopBundle, "mixed bundle: interopBundle should exist").to.not.be.null;
-
     expectNativeSpend(balBefore, balAfter, msgValue, sendResult.receipt, "mixed bundle");
 
     expect(
@@ -544,9 +520,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     const recipientTokenBefore = await getTokenBalance(destProvider, destTokenAddress, getInteropRecipientAddress());
     const recipient2NativeBefore = await getNativeBalance(destProvider, dummyRecipient2);
 
-    const receipt = await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
-
-    expect(receipt.status, "mixed bundle: executeBundle tx should succeed").to.equal(1);
+    await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
 
     destTokenAddress = await getTokenAddressForAsset(destProvider, sourceAssetId);
     const recipientTokenAfter = await getTokenBalance(destProvider, destTokenAddress, getInteropRecipientAddress());
@@ -584,14 +558,13 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     });
 
     // First execution should succeed
-    const receipt = await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
-    expect(receipt.status).to.equal(1);
+    await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
 
     // Second execution with same data should revert
     await expectRevert(
       () => simulateExecuteBundle(destProvider, sendResult.bundleData, sourceChainId),
       "replay executeBundle",
-      customError("L2InteropHandler", "BundleAlreadyProcessed(bytes32)"),
+      customError("L2InteropHandler", "BundleAlreadyProcessed(bytes32)", [sendResult.bundleHash]),
       destProvider
     );
 
@@ -626,7 +599,11 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     await expectRevert(
       () => simulateExecuteBundle(destProvider, sendResult.bundleData, sourceChainId),
       "execute from wrong executionAddress",
-      customError("L2InteropHandler", "ExecutingNotAllowed(bytes32,bytes,bytes)"),
+      customError("L2InteropHandler", "ExecutingNotAllowed(bytes32,bytes,bytes)", [
+        sendResult.bundleHash,
+        encodeEvmChainAddress(getInteropSourceAddress(), destChainId),
+        encodeEvmAddress(getInteropSecondaryRecipientAddress()),
+      ]),
       destProvider
     );
 
@@ -645,10 +622,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
       value: ethers.BigNumber.from(0),
     });
 
-    expect(sendResult.txHash).to.not.be.null;
-
-    const receipt = await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
-    expect(receipt.status).to.equal(1);
+    await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
 
     console.log("   [edge] Zero-call bundle accepted and executed");
   });
@@ -679,7 +653,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
           value: excessValue,
         }),
       "excess msg.value",
-      customError("InteropCenter", "MsgValueMismatch(uint256,uint256)"),
+      customError("InteropCenter", "MsgValueMismatch(uint256,uint256)", [correctValue, excessValue]),
       sourceProvider
     );
 
