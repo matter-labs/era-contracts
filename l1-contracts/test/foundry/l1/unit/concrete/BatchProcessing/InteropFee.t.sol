@@ -326,9 +326,9 @@ contract InteropFeeTest is ExecutorTest {
     }
 
     function _fund(uint256 _amount) internal {
-        address payer = makeAddr("depositor");
-        vm.deal(payer, _amount);
-        vm.prank(payer);
+        address depositor = makeAddr("depositor");
+        vm.deal(depositor, _amount);
+        vm.prank(depositor);
         interopFeeManager.deposit{value: _amount}(l2ChainId);
     }
 }

@@ -162,9 +162,9 @@ async function main(): Promise<void> {
 
   if (shouldParallelize) {
     // Each worker runs its own set of 6 Anvil chains plus a hardhat process, so running every spec
-    // group at once oversubscribes small runners (a 4-core CI box) and
-    // causes load-dependent RPC flakes. ANVIL_INTEROP_MAX_PARALLEL_WORKERS caps how many workers run
-    // concurrently; unset (or 0) preserves the fully-parallel behavior.
+    // group at once oversubscribes small runners (a 4-core CI box) and causes load-dependent RPC
+    // flakes. ANVIL_INTEROP_MAX_PARALLEL_WORKERS caps how many workers run concurrently; unset (or 0)
+    // preserves the fully-parallel behavior.
     const maxWorkers = Number(process.env.ANVIL_INTEROP_MAX_PARALLEL_WORKERS || 0) || parallelSpecGroups.length;
     await timedAsync("parallel hardhat interop workers", async () => {
       const queue = parallelSpecGroups.map((specs, index) => ({ specs, index }));

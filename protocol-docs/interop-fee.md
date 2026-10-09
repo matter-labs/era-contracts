@@ -59,7 +59,7 @@ reverted batch with the same number.
 
 `DeployCTM` deploys an `InteropFeeManager` proxy with the CTM, as does the CTM upgrade that introduces it; later
 upgrades keep the one the current `ExecutorFacet` charges, which holds the chains' prepaid balances. It is passed to
-the `ExecutorFacet` as an immutable and can be read as `getInteropFeeManager()` on the diamond of any chain from v35
+the `ExecutorFacet` as an immutable and can be read as `getInteropFeeManager()` on the L1 diamond of any chain from v35
 on. Its owner is protocol governance from initialization, and controls:
 
 - `feePerUnit`: wei per interop fee unit; `0`, the initial value, turns the switch off;
