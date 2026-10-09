@@ -618,6 +618,7 @@ fn known_functions_have_the_selectors_the_contracts_use() {
         ("0x3b6d7534", "`upgradeChainFromVersion(...)`"),
         ("0xfc57565f", "`upgradeChainFromVersion(...)`"),
         ("0x8265f458", "`setNewVersionUpgrade(...)`"),
+        ("0x4958bf4f", "`setChainCreationParams(...)`"),
         ("0x9b016b8b", "`setChainCreationParams(...)`"),
         ("0xac700e63", "`pauseMigration()`"),
         ("0xf7c7eb92", "`unpauseMigration()`"),

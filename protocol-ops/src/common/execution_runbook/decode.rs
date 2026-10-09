@@ -27,6 +27,9 @@ const KNOWN_FUNCTIONS: &[&str] = &[
     "upgradeChainFromVersion(uint256,((address,uint8,bool,bytes4[])[],address,bytes))",
     // ChainTypeManager
     "setNewVersionUpgrade(((address,uint8,bool,bytes4[])[],address,bytes),uint256,uint256,uint256,address)",
+    // setChainCreationParams: this line's ChainCreationParams (with genesisAirbenderBatchCommitment),
+    // then the pre-Airbender layout of the v31-line CTMs
+    "setChainCreationParams((address,bytes32,uint64,bytes32,bytes32,((address,uint8,bool,bytes4[])[],address,bytes),bytes))",
     "setChainCreationParams((address,bytes32,uint64,bytes32,((address,uint8,bool,bytes4[])[],address,bytes),bytes))",
     // ChainAssetHandler
     "pauseMigration()",
