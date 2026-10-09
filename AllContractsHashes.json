@@ -354,9 +354,9 @@
   {
     "contractName": "l1-contracts/ExecutorFacet",
     "evmBytecodePath": "/l1-contracts/out/Executor.sol/ExecutorFacet.json",
-    "evmBytecodeHash": "0x9feb45a20b7927cba0ad9910b0d9b1cb2b464ca3d696e83cc983e38bb0f81524",
-    "evmDeployedBytecodeHash": "0xc9933d7de1fbadfafb5808d455d046e40876b735cb22b8013f963ce1e6e5bbbd",
-    "evmDeployedBytecodeBlakeHash": "0xbe5e83005d677fce713c54e4d4a3ede11218101d4df275895144d54178fbd76b",
+    "evmBytecodeHash": "0xdca7aa03d17b559617e53b5a376f6fc8a3ed706d72e0c10f95960034ddad05af",
+    "evmDeployedBytecodeHash": "0x403049b87135396391fdc13ec181604ef5a1a0bd51e2ff0c83da9db9f37856a5",
+    "evmDeployedBytecodeBlakeHash": "0x0e44ebdbafbbf5f339ba11a7e872f65114bbff853218311a247be81f9362a88d",
     "evmDeployedBytecodeLength": 10828
   },
   {
