@@ -45,8 +45,11 @@ when:
 - priority mode is off: the escape hatch never depends on the fee.
 
 The manager debits the chain's **prepaid balance** (`deposit(chainId)`, payable by anyone, withdrawable only by the
-chain admin). If the balance does not cover the fee, the execution reverts and the chain can't execute batches, and so
-finalize their withdrawals, until it is topped up; committing and proving continue.
+chain admin) at the `feePerUnit` in force when the batch executes, so a rate change also applies to batches already
+committed. If the balance does not cover the fee, the execution reverts: until the chain is topped up, its batches and
+the withdrawals in them can't execute, while committing and proving continue. A chain whose admin allowed priority mode
+and that stays unpaid with pending priority transactions can then be put into priority mode by anyone
+(`AdminFacet.activatePriorityMode`), which reverts its unexecuted batches.
 
 Only proven counts of executed batches are charged. A reverted batch is never charged, whoever reverts it (the
 operator, the CTM, or priority-mode activation): every commit records its batch's count, overwriting the count of a
@@ -61,6 +64,10 @@ on. Its owner is protocol governance from initialization, and controls:
 
 - `feePerUnit`: wei per interop fee unit; `0`, the initial value, turns the switch off;
 - `feeRecipient`: where the permissionless `sweep()` sends the accrued fees; initially governance.
+
+Users can choose the fixed per-call ZK fee, which the operator can't reprice, over the operator-set one
+({protocol-docs/interop.md#fee-model}), so a `feePerUnit` worth more than `ZK_INTEROP_FEE` lets users make an operator
+pay more than it collects.
 
 Fees are paid in ETH. Charging only moves value between the manager's internal ledgers, so the prepaid balances plus
 the accrued fees are always backed by the contract's ETH.

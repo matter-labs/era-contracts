@@ -135,6 +135,8 @@ contract CommitterFacet is ZKChainBase, ICommitter {
             s.storedBatchHashes[_lastCommittedBatchData.batchNumber] = StoredBatchHashing.hashStoredBatchInfo(
                 _lastCommittedBatchData
             );
+            // Written even when zero, so a re-commit after a revert replaces the reverted batch's count.
+            s.interopFeeUnits[_lastCommittedBatchData.batchNumber] = _newBatchesData[i].interopFeeUnits;
             emit BlockCommit(
                 _lastCommittedBatchData.batchNumber,
                 _lastCommittedBatchData.batchHash,
@@ -269,10 +271,6 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         if (_newBatch.firstBlockNumber > _newBatch.lastBlockNumber) {
             revert InvalidBlockRange(_newBatch.batchNumber, _newBatch.firstBlockNumber, _newBatch.lastBlockNumber);
         }
-
-        // Charged when the batch executes; see {protocol-docs/interop-fee.md#charging-and-enforcement}. Written for every
-        // batch, so a batch number committed again after a revert never keeps the reverted batch's count.
-        s.interopFeeUnits[_newBatch.batchNumber] = _newBatch.interopFeeUnits;
 
         // Emitting the block range for a batch. This is needed for indexing purposes.
         // IMPORTANT:in this release this range is not trusted and provided by the operator while not being included to the proof.

@@ -44,8 +44,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     // solhint-disable-next-line const-name-snakecase
     string public constant override getName = "ExecutorFacet";
 
-    /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
-    /// L1 that is at the most base layer.
+    /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to
+    /// the L1 that is at the most base layer.
     uint256 internal immutable L1_CHAIN_ID;
 
     /// @notice The L1 interop fee switch that batches executed on L1 are charged from.
@@ -59,8 +59,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         INTEROP_FEE_MANAGER = _interopFeeManager;
     }
 
-    /// @notice The L1 interop fee switch batches are charged from, or zero for a facet that never charges
-    /// (one deployed on a settlement layer other than L1). See {protocol-docs/interop-fee.md}.
+    /// @notice The L1 interop fee switch that batches executed on L1 are charged from.
+    /// See {protocol-docs/interop-fee.md}.
     /// @dev Not part of `IExecutor`: the validator timelocks implement that interface to forward settlement.
     function getInteropFeeManager() external view returns (address) {
         return address(INTEROP_FEE_MANAGER);
@@ -102,6 +102,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @notice Executes one batch
     /// @dev 1. Processes all pending operations (Complete priority requests)
     /// @dev 2. Finalizes batch
+    /// @dev 3. Charges the batch's interop fee units
     /// @dev _executedBatchIdx is an index in the array of the batches that we want to execute together
     function _executeOneBatch(
         StoredBatchInfo memory _storedBatch,

@@ -315,8 +315,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         // upgrade does NOT downgrade proxies that already run a MultisigCommitter.
         ctmAddresses.stateTransition.implementations.validatorTimelock = deploySimpleContract("MultisigCommitter");
 
-        // The Executor facet takes the fee manager as an immutable. Later releases reuse the one discovered from
-        // the current facet (it holds the chains' prepaid balances); the release that introduces it deploys it.
+        // Zero only in the release that introduces the manager; see {protocol-docs/interop-fee.md#the-switch}.
         if (ctmAddresses.l1Specific.interopFeeManager == address(0)) {
             (, ctmAddresses.l1Specific.interopFeeManager) = deployTuppWithContract("InteropFeeManager");
         }

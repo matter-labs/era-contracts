@@ -275,7 +275,6 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
         cuts[1] = _cut(address(new CommitterFacet(block.chainid)), selectors);
         selectors = new bytes4[](1);
         selectors[0] = IExecutor.proveBatchesSharedBridge.selector;
-        // These tests execute no batches, so the fee manager is never called.
         cuts[2] = _cut(
             address(new ExecutorFacet(block.chainid, IInteropFeeManager(makeAddr("interopFeeManager")))),
             selectors
