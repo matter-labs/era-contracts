@@ -48,8 +48,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// the L1 that is at the most base layer.
     uint256 internal immutable L1_CHAIN_ID;
 
-    /// @notice The L1 interop fee switch that batches executed on L1 are charged from.
-    /// See {protocol-docs/interop-fee.md}.
+    /// @dev Exposed as {getInteropFeeManager}.
     IInteropFeeManager internal immutable INTEROP_FEE_MANAGER;
 
     constructor(uint256 _l1ChainId, IInteropFeeManager _interopFeeManager) {
@@ -59,8 +58,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         INTEROP_FEE_MANAGER = _interopFeeManager;
     }
 
-    /// @notice The L1 interop fee switch that batches executed on L1 are charged from.
-    /// See {protocol-docs/interop-fee.md}.
+    /// @notice The L1 interop fee switch that batches executed on L1 are charged from; facets deployed on another
+    /// settlement layer have none. See {protocol-docs/interop-fee.md}.
     /// @dev Not part of `IExecutor`: the validator timelocks implement that interface to forward settlement.
     function getInteropFeeManager() external view returns (address) {
         return address(INTEROP_FEE_MANAGER);

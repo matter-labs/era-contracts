@@ -266,7 +266,7 @@ contract InteropFeeTest is ExecutorTest {
         _prove(_single(stored));
     }
 
-    /// @dev Commits batches 1 and 2 with the given counts and proves both.
+    /// @dev Commits batches 1 and 2 with the given counts, proves both, and mocks the MessageRoot append for batch 2.
     function _commitAndProveTwoBatches(
         uint256 _firstUnits,
         uint256 _secondUnits
@@ -277,7 +277,7 @@ contract InteropFeeTest is ExecutorTest {
         second.batchNumber = 2;
         batches[1] = _commitOSBatchGetStored(batches[0], second);
         _prove(batches);
-        // The fixture mocks the MessageRoot append for batch 1 only.
+        // As the fixture does for batch 1.
         vm.mockCall(
             address(messageRoot),
             abi.encodeWithSelector(IMessageRootBase.addChainBatchRootV32.selector, l2ChainId, 2, bytes32(0)),

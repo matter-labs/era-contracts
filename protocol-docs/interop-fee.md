@@ -47,9 +47,9 @@ when:
 The manager debits the chain's **prepaid balance** (`deposit(chainId)`, payable by anyone, withdrawable only by the
 chain admin) at the `feePerUnit` in force when the batch executes, so a rate change also applies to batches already
 committed. If the balance does not cover the fee, the execution reverts: until the chain is topped up, its batches and
-the withdrawals in them can't execute, while committing and proving continue. A chain whose admin allowed priority mode
-and that stays unpaid with pending priority transactions can then be put into priority mode by anyone
-(`AdminFacet.activatePriorityMode`), which reverts its unexecuted batches.
+the withdrawals in them can't execute, while committing and proving continue. Its priority transactions aren't processed
+either, so once the oldest has waited `PRIORITY_EXPIRATION`, anyone can activate priority mode on a chain that permits
+it (`AdminFacet.activatePriorityMode`), which reverts its unexecuted batches.
 
 Only proven counts of executed batches are charged. A reverted batch is never charged, whoever reverts it (the
 operator, the CTM, or priority-mode activation): every commit records its batch's count, overwriting the count of a
