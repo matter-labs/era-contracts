@@ -102,9 +102,10 @@ flowchart LR
 | 6. Per chain       | `chain set-upgrade-timestamp`, `chain upgrade` (emit bundles)                                           | each chain admin     | yes                 |
 | 7. Close-out       | `ChainTypeManager.setProtocolVersionDeadline`                                                           | ecosystem governance | yes                 |
 
-Only `upgrade-broadcast` sends transactions. Every other `protocol_ops` command in the table runs
-on an Anvil fork and writes Safe bundles; a phase touches L1 when its signer executes those
-bundles (with `upgrade-broadcast`, `dev execute-safe`, or the signer's multisig).
+Only `upgrade-broadcast` sends transactions. The verify commands only read; every other
+`protocol_ops` command in the table runs on an Anvil fork and writes Safe bundles, and a phase
+touches L1 when its signer executes those bundles (with `upgrade-broadcast`, `dev execute-safe`,
+or the signer's multisig).
 
 The `generate-upgrade-calldata-*`, `execute-deployer-safe-bundles` and `generate-chain-*-calldata`
 workflows under `.github/workflows/` still drive the previous `protocol_ops` CLI (`--ecosystem`,
@@ -241,7 +242,7 @@ carries no privilege. In v33 that is `protocol_ops ecosystem stage3 --env <env> 
 whose bundle, once that EOA executes it, populates `L1NativeTokenVault.bridgedOut` for every
 L1-native asset in the vault's `bridgedTokens` list. Legacy tokens missing from that list must be
 backfilled into it first with the vault's permissionless `addLegacyTokenToBridgedTokensList(token)`,
-otherwise their withdrawals keep reverting (see
+otherwise their pre-upgrade escrow stays unwithdrawable (see
 {protocol-docs/bridging.md#populating-bridgedout-during-an-in-place-upgrade}). Such steps are
 described in the release's output README and, being broadcasts rather than calldata, are not
 covered by the verifier.

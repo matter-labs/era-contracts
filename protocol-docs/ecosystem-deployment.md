@@ -154,10 +154,11 @@ are accepted by hand:
 As with the hub, making `ctm init` perform these itself is a tooling follow-up.
 
 Run `ctm init` as part of `ecosystem init` for a fresh ecosystem. Run on its own against a hub
-deployed by `hub init` (default `--reuse-gov-and-admin`), it signs the two acceptance steps as the
-Bridgehub's `ChainAdminOwnable` contract instead of that contract's owner, so `chainAdminAcceptAdmin`
-should revert on the `onlyOwner` `multicall` (derived from the code, not run). `ecosystem init`
-passes the real owner.
+deployed by `hub init` (default `--reuse-gov-and-admin`), it runs the two acceptance scripts with the
+Bridgehub's `ChainAdminOwnable` contract as the wallet instead of that contract's owner.
+`governanceAcceptOwner` still broadcasts as `Governance.owner()`, but `chainAdminAcceptAdmin` should
+revert on the `onlyOwner` `multicall` (derived from the code, not run). `ecosystem init` passes the
+real owner.
 
 The ZK token asset id (`--zk-token-asset-id`, or `zk_token_asset_id` of the env preset) must be
 non-zero: it is passed to `InteropCenter.initL2` during every chain's genesis, which reverts on
@@ -271,7 +272,7 @@ the start: every power in the table above flows from it.
 ## Verifying a deployment
 
 - The Forge scripts write their output TOMLs under `l1-contracts/script-out/` and `protocol_ops
---out` writes the command envelope with every address; these are the inputs of the node
+--out` records every address in `manifest.json` (`metadata[].output`); these are the inputs of the node
   configuration (Bridgehub, diamond proxy, validator timelock, DA validator, chain id) and of the
   `permanent-values` entry.
 - `l1-contracts/test/anvil-interop/test/hardhat/01-deployment-verification.spec.ts` is the

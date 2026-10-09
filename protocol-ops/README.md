@@ -71,8 +71,8 @@ file per consecutive run of transactions by the same signer, plus a **`manifest.
 | **`metadata`** | One entry per command run into this directory: `command` (CLI path id, e.g. `chain.init`), `input` and `output` (both may be `{}`). |
 
 Without `--out` no bundles are written, unless the command derives a default from `--env`:
-`upgrade-prepare-all` (which also rewrites the release's canonical `ecosystem.toml`), `stage3` and
-`chain upgrade` do.
+`upgrade-prepare-all` (which also rewrites the release's canonical `ecosystem.toml`),
+`upgrade-governance`, `stage3` and `chain upgrade` do.
 
 ## Requirements
 
