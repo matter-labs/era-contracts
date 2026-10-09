@@ -121,11 +121,10 @@ upgrades) **and** the release-level migrations ban below. On migration to a sett
 `bridgeBurn` also fills `originToken`/`originChainId` of the base-token bridging data, which the
 destination's `L2NativeTokenVault.updateL2` consumes to initialize the chain's base token.
 
-`L1ChainAssetHandler.isReadyForMigration` additionally requires: the chain is not pre-v31
-(per the L1 `MessageRoot`), its base token is registered in the L1 `NativeTokenVault`
-(`tokenAddress(baseAssetId) != address(0)`, otherwise L1->L2 base-token deposits would not work
-on the destination), and the base token supports `totalSupply()` (true for everything except
-pre-v31 ZKsync OS chains, whose value is backfilled during v31 before the v33 upgrade).
+`L1ChainAssetHandler.isReadyForMigration` additionally requires: the chain's base token is registered
+in the L1 `NativeTokenVault` (`tokenAddress(baseAssetId) != address(0)`, otherwise L1->L2 base-token
+deposits would not work on the destination), and the base token supports `totalSupply()` (true for
+everything except pre-v31 ZKsync OS chains, whose value is backfilled during v31 before the v33 upgrade).
 
 ### v33: chain migrations are explicitly disabled
 
@@ -142,10 +141,25 @@ risks for the time being:
 - Recovery of a failed migration (`bridgeConfirmTransferResult`) is intentionally **not** gated by
   the flag, since it only ever returns a chain back to settling on L1.
 - The whole migration machinery (chain asset handlers, `Migrator` facet, migration intervals,
-  migration numbers) is kept intact and covered by tests, so a future release can bring settlement
-  layers (e.g. ZK Gateway) back by flipping the constant. `_getChainMigrationsEnabled()` is `virtual`
-  only so dev/test variants can re-enable migrations for coverage; production contracts must not
-  override it.
+  migration numbers) is kept intact and covered by tests, so that a future release can use settlement
+  layers again. Flipping the constant is necessary but not sufficient: production
+  `GatewayVotePreparation.deployGatewayCTM` reverts while the constant is off, and this release's upgrade
+  does not cover chains that settle on a settlement layer (see
+  [Upgrading an existing ecosystem onto this release](#upgrading-an-existing-ecosystem-onto-this-release)).
+  `_getChainMigrationsEnabled()` is `virtual` only so dev/test variants can re-enable migrations for
+  coverage; production contracts must not override it.
+
+### Migration intervals
+
+A migration records its interval under `MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER`, and
+`L1ChainAssetHandler.isValidSettlementLayer` reads only from there.
+
+Migration number 0 is ignored. It was reserved for the legacy Era Gateway's intervals, which the v31
+upgrade could register through the since-removed `setHistoricalMigrationInterval`. ZKsync OS chains never
+settled on an Era Gateway, but Era-CTM chains on a shared bridgehub did (on stage, on Gateway 123), and their
+intervals stay in storage, unread. Batches settled through that Gateway can't be proven on v33+ core
+contracts anyway: v33 bound the L1 timestamp into the chain batch leaf, which the legacy Gateway's message
+roots don't commit to.
 
 ### Migrated chains and the message root (IMPORTANT)
 
@@ -200,6 +214,13 @@ proof under the old verifier would stop being provable.
 Address discovery (`AddressIntrospector`) reads the getters of the current release only
 (`chainRegistrationSender`, `l1InteropHandler`, `defaultUpgrade`, …): this line only upgrades ecosystems
 that are already on v33 or later, so there is no per-era discovery path to choose between.
+
+Every chain registered in the bridgehub must have run its per-chain v31 upgrade before this release, and in
+practice before v33: the v31 upgrade first reads `IL1NativeTokenVault.l1AssetTracker()`, which the v33 vault
+no longer has, so a chain still on the v31 placeholder can't complete it on a v33+ ecosystem. That includes
+Era-CTM chains, which share the `L1MessageRoot`. v35 also removes `saveV31UpgradeChainBatchNumber`, `isPreV31`
+and the v31 placeholder. Historical batch roots stay provable: `_noBatchFallback` reads them from the chain for
+any batch below the stored value.
 
 ## ZKsync OS genesis force deployments: atomic-interop built-ins
 

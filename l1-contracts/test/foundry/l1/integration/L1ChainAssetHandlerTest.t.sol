@@ -17,21 +17,23 @@ import {
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {IChainAssetHandlerBase, MigrationInterval} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {BridgehubMintCTMAssetData} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {
-    MigrationNumberMismatch,
-    MigrationIntervalNotSet,
-    MigrationIntervalInvalid,
-    HistoricalSettlementLayerMismatch,
-    NotSystemContext
-} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+    MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER,
+    MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1
+} from "contracts/common/Config.sol";
+import {MigrationNumberMismatch, NotSystemContext} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 import {NotAssetRouter, MigrationPaused, ChainMigrationsDisabled} from "contracts/common/L1ContractErrors.sol";
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
+import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
 import {IL2ChainAssetHandler} from "contracts/core/chain-asset-handler/IL2ChainAssetHandler.sol";
 import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
+import {L1ChainAssetHandlerDev} from "contracts/dev-contracts/L1ChainAssetHandlerDev.sol";
 import {L2ChainAssetHandlerDev} from "contracts/dev-contracts/L2ChainAssetHandlerDev.sol";
 
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
@@ -278,7 +280,7 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
     }
 
     /*//////////////////////////////////////////////////////////////
-                    setHistoricalMigrationInterval
+                        isValidSettlementLayer
     //////////////////////////////////////////////////////////////*/
 
     function _l1ChainAssetHandler() internal view returns (IL1ChainAssetHandler) {
@@ -289,189 +291,23 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         return Ownable2StepUpgradeable(address(_l1ChainAssetHandler())).owner();
     }
 
-    function _legacyGwChainId() internal view returns (uint256) {
-        return IL1MessageRoot(ecosystemAddresses.bridgehub.proxies.messageRoot).ERA_GATEWAY_CHAIN_ID();
+    /// @dev Any chain ID other than L1's, so that L1 and the settlement layer are distinguishable.
+    uint256 internal constant SETTLEMENT_LAYER_CHAIN_ID = 506;
+
+    /// @dev Production records migration intervals only while a chain migrates, which these tests don't do,
+    /// so the proxy is switched to the Dev implementation, whose setters reproduce that state. Only the
+    /// implementation is swapped; proxy state and immutable values stay identical to production.
+    function _installDevHandler() internal returns (L1ChainAssetHandlerDev handler) {
+        address cahProxy = address(_l1ChainAssetHandler());
+        L1ChainAssetHandlerDev devImpl = new L1ChainAssetHandlerDev(
+            _owner(),
+            ecosystemAddresses.bridgehub.proxies.bridgehub
+        );
+        ProxyAdmin proxyAdmin = ProxyAdmin(ecosystemAddresses.shared.transparentProxyAdmin);
+        vm.prank(proxyAdmin.owner());
+        proxyAdmin.upgrade(ITransparentUpgradeableProxy(payable(cahProxy)), address(devImpl));
+        handler = L1ChainAssetHandlerDev(cahProxy);
     }
-
-    function test_setHistoricalMigrationInterval_success() public {
-        uint256 gwChainId = _legacyGwChainId();
-        MigrationInterval memory interval = MigrationInterval({
-            migrateToGWBatchNumber: 10,
-            migrateFromGWBatchNumber: 50,
-            settlementLayerBatchLowerBound: 100,
-            settlementLayerBatchUpperBound: 200,
-            settlementLayerChainId: gwChainId,
-            isActive: false
-        });
-
-        vm.prank(_owner());
-        _l1ChainAssetHandler().setHistoricalMigrationInterval(eraZKChainId, 0, interval);
-
-        MigrationInterval memory stored = _l1ChainAssetHandler().migrationInterval(eraZKChainId, 0);
-        assertEq(stored.migrateToGWBatchNumber, 10, "migrateToGWBatchNumber mismatch");
-        assertEq(stored.migrateFromGWBatchNumber, 50, "migrateFromGWBatchNumber mismatch");
-        assertEq(stored.settlementLayerBatchLowerBound, 100, "settlementLayerBatchLowerBound mismatch");
-        assertEq(stored.settlementLayerBatchUpperBound, 200, "settlementLayerBatchUpperBound mismatch");
-        assertEq(stored.settlementLayerChainId, gwChainId, "settlementLayerChainId mismatch");
-        assertFalse(stored.isActive, "historical interval should not be active");
-    }
-
-    function test_setHistoricalMigrationInterval_revertMigrationNumberNotZero() public {
-        uint256 gwChainId = _legacyGwChainId();
-        MigrationInterval memory interval = MigrationInterval({
-            migrateToGWBatchNumber: 10,
-            migrateFromGWBatchNumber: 50,
-            settlementLayerBatchLowerBound: 100,
-            settlementLayerBatchUpperBound: 200,
-            settlementLayerChainId: gwChainId,
-            isActive: false
-        });
-
-        vm.prank(_owner());
-        vm.expectRevert(abi.encodeWithSelector(MigrationNumberMismatch.selector, 0, 1));
-        _l1ChainAssetHandler().setHistoricalMigrationInterval(eraZKChainId, 1, interval);
-    }
-
-    function test_setHistoricalMigrationInterval_revertNotSet() public {
-        uint256 gwChainId = _legacyGwChainId();
-        MigrationInterval memory interval = MigrationInterval({
-            migrateToGWBatchNumber: 10,
-            migrateFromGWBatchNumber: 50,
-            settlementLayerBatchLowerBound: 100,
-            settlementLayerBatchUpperBound: 200,
-            settlementLayerChainId: gwChainId,
-            isActive: true
-        });
-
-        vm.prank(_owner());
-        vm.expectRevert(abi.encodeWithSelector(MigrationIntervalNotSet.selector));
-        _l1ChainAssetHandler().setHistoricalMigrationInterval(eraZKChainId, 0, interval);
-    }
-
-    function test_setHistoricalMigrationInterval_revertWrongSL() public {
-        uint256 gwChainId = _legacyGwChainId();
-        uint256 wrongSL = 9999;
-        MigrationInterval memory interval = MigrationInterval({
-            migrateToGWBatchNumber: 10,
-            migrateFromGWBatchNumber: 50,
-            settlementLayerBatchLowerBound: 100,
-            settlementLayerBatchUpperBound: 200,
-            settlementLayerChainId: wrongSL,
-            isActive: false
-        });
-
-        vm.prank(_owner());
-        vm.expectRevert(abi.encodeWithSelector(HistoricalSettlementLayerMismatch.selector, gwChainId, wrongSL));
-        _l1ChainAssetHandler().setHistoricalMigrationInterval(eraZKChainId, 0, interval);
-    }
-
-    function test_setHistoricalMigrationInterval_revertInvalidBatchNumbers() public {
-        uint256 gwChainId = _legacyGwChainId();
-        MigrationInterval memory interval = MigrationInterval({
-            migrateToGWBatchNumber: 50,
-            migrateFromGWBatchNumber: 30, // invalid: from must be > to
-            settlementLayerBatchLowerBound: 100,
-            settlementLayerBatchUpperBound: 200,
-            settlementLayerChainId: gwChainId,
-            isActive: false
-        });
-
-        vm.prank(_owner());
-        vm.expectRevert(abi.encodeWithSelector(MigrationIntervalInvalid.selector));
-        _l1ChainAssetHandler().setHistoricalMigrationInterval(eraZKChainId, 0, interval);
-    }
-
-    function test_setHistoricalMigrationInterval_revertMigrateFromGWBatchNumberZero() public {
-        uint256 gwChainId = _legacyGwChainId();
-        MigrationInterval memory interval = MigrationInterval({
-            migrateToGWBatchNumber: 10,
-            migrateFromGWBatchNumber: 0, // invalid: from must be > to
-            settlementLayerBatchLowerBound: 100,
-            settlementLayerBatchUpperBound: 200,
-            settlementLayerChainId: gwChainId,
-            isActive: false
-        });
-
-        vm.prank(_owner());
-        vm.expectRevert(abi.encodeWithSelector(MigrationIntervalInvalid.selector));
-        _l1ChainAssetHandler().setHistoricalMigrationInterval(eraZKChainId, 0, interval);
-    }
-
-    function test_setHistoricalMigrationInterval_revertInvalidSettlementLayerBatchBounds() public {
-        uint256 gwChainId = _legacyGwChainId();
-        MigrationInterval memory interval = MigrationInterval({
-            migrateToGWBatchNumber: 10,
-            migrateFromGWBatchNumber: 50,
-            settlementLayerBatchLowerBound: 100,
-            settlementLayerBatchUpperBound: 100, // invalid: upper must be > lower
-            settlementLayerChainId: gwChainId,
-            isActive: false
-        });
-
-        vm.prank(_owner());
-        vm.expectRevert(abi.encodeWithSelector(MigrationIntervalInvalid.selector));
-        _l1ChainAssetHandler().setHistoricalMigrationInterval(eraZKChainId, 0, interval);
-    }
-
-    function test_setHistoricalMigrationInterval_revertNotOwner() public {
-        uint256 gwChainId = _legacyGwChainId();
-        MigrationInterval memory interval = MigrationInterval({
-            migrateToGWBatchNumber: 10,
-            migrateFromGWBatchNumber: 50,
-            settlementLayerBatchLowerBound: 100,
-            settlementLayerBatchUpperBound: 200,
-            settlementLayerChainId: gwChainId,
-            isActive: false
-        });
-
-        vm.expectRevert("Ownable: caller is not the owner");
-        vm.prank(makeAddr("notOwner"));
-        _l1ChainAssetHandler().setHistoricalMigrationInterval(eraZKChainId, 0, interval);
-    }
-
-    function test_setHistoricalMigrationInterval_migrateToGWBatchNumberZero() public {
-        uint256 gwChainId = _legacyGwChainId();
-        // migrateToGWBatchNumber == 0 is valid: the chain migrated before any batches were committed
-        MigrationInterval memory interval = MigrationInterval({
-            migrateToGWBatchNumber: 0,
-            migrateFromGWBatchNumber: 50,
-            settlementLayerBatchLowerBound: 100,
-            settlementLayerBatchUpperBound: 200,
-            settlementLayerChainId: gwChainId,
-            isActive: false
-        });
-
-        vm.prank(_owner());
-        _l1ChainAssetHandler().setHistoricalMigrationInterval(eraZKChainId, 0, interval);
-
-        MigrationInterval memory stored = _l1ChainAssetHandler().migrationInterval(eraZKChainId, 0);
-        assertEq(stored.migrateToGWBatchNumber, 0);
-        assertEq(stored.migrateFromGWBatchNumber, 50);
-        assertEq(stored.settlementLayerBatchLowerBound, 100);
-        assertEq(stored.settlementLayerBatchUpperBound, 200);
-        assertEq(stored.settlementLayerChainId, gwChainId);
-        assertFalse(stored.isActive);
-    }
-
-    function test_setHistoricalMigrationInterval_revertMigrateFromGWBatchNumberEqualTo() public {
-        uint256 gwChainId = _legacyGwChainId();
-        MigrationInterval memory interval = MigrationInterval({
-            migrateToGWBatchNumber: 50,
-            migrateFromGWBatchNumber: 50, // invalid: from == to
-            settlementLayerBatchLowerBound: 100,
-            settlementLayerBatchUpperBound: 200,
-            settlementLayerChainId: gwChainId,
-            isActive: false
-        });
-
-        vm.prank(_owner());
-        vm.expectRevert(abi.encodeWithSelector(MigrationIntervalInvalid.selector));
-        _l1ChainAssetHandler().setHistoricalMigrationInterval(eraZKChainId, 0, interval);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                        isValidSettlementLayer
-    //////////////////////////////////////////////////////////////*/
 
     function test_isValidSettlementLayer_noMigration() public {
         // Clear the mock so the real function is called
@@ -484,37 +320,35 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         assertFalse(result, "Claiming wrong SL should return false");
     }
 
-    function test_isValidSettlementLayer_afterHistoricalMigration() public {
+    function test_isValidSettlementLayer_afterMigrationRoundTrip() public {
         // Clear mocks so real functions are called
         vm.clearMockedCalls();
 
-        // Override ERA_GATEWAY_CHAIN_ID to differ from block.chainid so L1 and GW are distinguishable
-        uint256 gwChainId = 506;
-        vm.mockCall(
-            address(ecosystemAddresses.bridgehub.proxies.messageRoot),
-            abi.encodeWithSelector(IL1MessageRoot.ERA_GATEWAY_CHAIN_ID.selector),
-            abi.encode(gwChainId)
-        );
-
+        // The chain moved to the settlement layer after batch 10 and returned after batch 50.
         MigrationInterval memory interval = MigrationInterval({
             migrateToGWBatchNumber: 10,
             migrateFromGWBatchNumber: 50,
             settlementLayerBatchLowerBound: 100,
             settlementLayerBatchUpperBound: 200,
-            settlementLayerChainId: gwChainId,
+            settlementLayerChainId: SETTLEMENT_LAYER_CHAIN_ID,
             isActive: false
         });
+        L1ChainAssetHandlerDev handler = _installDevHandler();
+        vm.startPrank(_owner());
+        handler.setMigrationIntervalForTesting(eraZKChainId, MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER, interval);
+        handler.setMigrationNumberForTesting(eraZKChainId, MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1);
+        vm.stopPrank();
 
-        vm.prank(_owner());
-        _l1ChainAssetHandler().setHistoricalMigrationInterval(eraZKChainId, 0, interval);
-
-        MigrationInterval memory stored = _l1ChainAssetHandler().migrationInterval(eraZKChainId, 0);
+        MigrationInterval memory stored = _l1ChainAssetHandler().migrationInterval(
+            eraZKChainId,
+            MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER
+        );
         assertEq(stored.migrateToGWBatchNumber, 10, "migrateToGWBatchNumber mismatch");
         assertEq(stored.migrateFromGWBatchNumber, 50, "migrateFromGWBatchNumber mismatch");
         assertEq(stored.settlementLayerBatchLowerBound, 100, "settlementLayerBatchLowerBound mismatch");
         assertEq(stored.settlementLayerBatchUpperBound, 200, "settlementLayerBatchUpperBound mismatch");
-        assertEq(stored.settlementLayerChainId, gwChainId, "settlementLayerChainId mismatch");
-        assertFalse(stored.isActive, "historical interval should not be active");
+        assertEq(stored.settlementLayerChainId, SETTLEMENT_LAYER_CHAIN_ID, "settlementLayerChainId mismatch");
+        assertFalse(stored.isActive, "closed interval should not be active");
 
         // Batch before migration (batch 5 <= migrateToSL=10) -> on L1
         assertTrue(
@@ -522,14 +356,14 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
             "Batch before migration should be on L1"
         );
         assertFalse(
-            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 5, gwChainId, 150),
-            "Batch before migration should NOT be on GW"
+            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 5, SETTLEMENT_LAYER_CHAIN_ID, 150),
+            "Batch before migration should NOT be on the SL"
         );
 
-        // Batch during migration (10 < batch 30 <= migrateFromSL=50) -> on GW with valid SL batch
+        // Batch during migration (10 < batch 30 <= migrateFromSL=50) -> on the SL with a valid SL batch
         assertTrue(
-            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 30, gwChainId, 150),
-            "Batch during migration should be on GW"
+            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 30, SETTLEMENT_LAYER_CHAIN_ID, 150),
+            "Batch during migration should be on the SL"
         );
         assertFalse(
             _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 30, block.chainid, 0),
@@ -538,13 +372,13 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
 
         // Batch during migration but SL batch number below lower bound -> invalid
         assertFalse(
-            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 30, gwChainId, 50),
+            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 30, SETTLEMENT_LAYER_CHAIN_ID, 50),
             "SL batch below lower bound should be invalid"
         );
 
         // Batch during migration but SL batch number above upper bound -> invalid
         assertFalse(
-            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 30, gwChainId, 300),
+            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 30, SETTLEMENT_LAYER_CHAIN_ID, 300),
             "SL batch above upper bound should be invalid"
         );
 
@@ -554,8 +388,8 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
             "Batch after return should be on L1"
         );
         assertFalse(
-            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 60, gwChainId, 150),
-            "Batch after return should NOT be on GW"
+            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 60, SETTLEMENT_LAYER_CHAIN_ID, 150),
+            "Batch after return should NOT be on the SL"
         );
 
         // Wrong chain ID always returns false
@@ -564,5 +398,141 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
             _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 5, wrongChainId, 0),
             "Wrong chain ID should be invalid"
         );
+    }
+
+    function test_isValidSettlementLayer_whileOnSettlementLayer() public {
+        // Clear mocks so real functions are called
+        vm.clearMockedCalls();
+
+        // The chain moved to the settlement layer after batch 10 and has not returned, so the interval's
+        // upper bounds are not known yet.
+        MigrationInterval memory interval = MigrationInterval({
+            migrateToGWBatchNumber: 10,
+            migrateFromGWBatchNumber: 0,
+            settlementLayerBatchLowerBound: 100,
+            settlementLayerBatchUpperBound: 0,
+            settlementLayerChainId: SETTLEMENT_LAYER_CHAIN_ID,
+            isActive: true
+        });
+        L1ChainAssetHandlerDev handler = _installDevHandler();
+        vm.startPrank(_owner());
+        handler.setMigrationIntervalForTesting(eraZKChainId, MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER, interval);
+        handler.setMigrationNumberForTesting(eraZKChainId, MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER);
+        vm.stopPrank();
+
+        // Batch before migration (batch 5 <= migrateToSL=10) -> on L1
+        assertTrue(
+            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 5, block.chainid, 0),
+            "Batch before migration should be on L1"
+        );
+
+        // Batch after migration -> on the SL, from the SL batch lower bound on
+        assertTrue(
+            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 30, SETTLEMENT_LAYER_CHAIN_ID, 150),
+            "Batch after migration should be on the SL"
+        );
+        assertFalse(
+            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 30, SETTLEMENT_LAYER_CHAIN_ID, 50),
+            "SL batch below lower bound should be invalid"
+        );
+        assertFalse(
+            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 30, block.chainid, 0),
+            "Batch after migration should NOT be on L1"
+        );
+    }
+
+    function test_isValidSettlementLayer_ignoresLegacyGatewayIntervals() public {
+        // Clear mocks so real functions are called
+        vm.clearMockedCalls();
+
+        // The v31 upgrade stored the legacy GW intervals at migration number 0, which is no longer read:
+        // the chain's migration number stays 0, so no recorded migration covers the batch.
+        MigrationInterval memory interval = MigrationInterval({
+            migrateToGWBatchNumber: 10,
+            migrateFromGWBatchNumber: 50,
+            settlementLayerBatchLowerBound: 100,
+            settlementLayerBatchUpperBound: 200,
+            settlementLayerChainId: SETTLEMENT_LAYER_CHAIN_ID,
+            isActive: false
+        });
+        L1ChainAssetHandlerDev handler = _installDevHandler();
+        vm.prank(_owner());
+        handler.setMigrationIntervalForTesting(eraZKChainId, 0, interval);
+
+        assertFalse(
+            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 30, SETTLEMENT_LAYER_CHAIN_ID, 150),
+            "A legacy GW interval should not make the GW a valid settlement layer"
+        );
+        assertTrue(
+            _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 30, block.chainid, 0),
+            "Without a recorded migration the batch should count as settled on L1"
+        );
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    bridgeMint migration numbers on L1
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Delivers a chain to L1 the way the asset router does when the chain returns from a settlement layer.
+    /// The migration numbers are checked before anything else, so the rest of the mint data stays empty.
+    function _bridgeMintOnL1(uint256 _incomingMigrationNumber) internal {
+        BridgehubMintCTMAssetData memory data;
+        data.chainId = eraZKChainId;
+        data.migrationNumber = _incomingMigrationNumber;
+        vm.prank(address(addresses.sharedBridge));
+        IChainAssetHandlerBase(address(_l1ChainAssetHandler())).bridgeMint(eraZKChainId, bytes32(0), abi.encode(data));
+    }
+
+    function test_bridgeMint_revertWhen_chainNeverLeftL1() public {
+        // Migration number 0: the chain never migrated, so nothing can return it to L1.
+        _installDevHandler();
+
+        vm.expectRevert(
+            abi.encodeWithSelector(MigrationNumberMismatch.selector, MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER, 0)
+        );
+        _bridgeMintOnL1(MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(MigrationNumberMismatch.selector, MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER, 0)
+        );
+        _bridgeMintOnL1(MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1);
+    }
+
+    function test_bridgeMint_revertWhen_chainAlreadyReturnedToL1() public {
+        L1ChainAssetHandlerDev handler = _installDevHandler();
+        vm.prank(_owner());
+        handler.setMigrationNumberForTesting(eraZKChainId, MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                MigrationNumberMismatch.selector,
+                MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER,
+                MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1
+            )
+        );
+        _bridgeMintOnL1(MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1 + 1);
+    }
+
+    function test_bridgeMint_revertWhen_unexpectedIncomingMigrationNumber() public {
+        // The chain is on the settlement layer, so the only accepted arrival is `MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1`.
+        L1ChainAssetHandlerDev handler = _installDevHandler();
+        vm.prank(_owner());
+        handler.setMigrationNumberForTesting(eraZKChainId, MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER);
+
+        uint256[3] memory incoming = [
+            uint256(0),
+            MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER,
+            MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1 + 1
+        ];
+        for (uint256 i = 0; i < incoming.length; ++i) {
+            vm.expectRevert(
+                abi.encodeWithSelector(
+                    MigrationNumberMismatch.selector,
+                    MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1,
+                    incoming[i]
+                )
+            );
+            _bridgeMintOnL1(incoming[i]);
+        }
     }
 }

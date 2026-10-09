@@ -472,7 +472,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         L1MessageRoot messageRootNew = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(address(bridgehub), 1, makeAddr("chainAssetHandler"))),
+                    address(new L1MessageRoot(address(bridgehub), makeAddr("chainAssetHandler"))),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initialize, ())
                 )

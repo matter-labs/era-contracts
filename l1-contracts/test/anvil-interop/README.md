@@ -125,7 +125,7 @@ Live environment variables:
 | Spec                         | What it tests                                                                                                                                                |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `01-deployment-verification` | L1 contracts deployed, CTM registered, all 5 L2 chains have diamond proxies, L2 system contracts present, test tokens deployed, initial chainBalance is zero |
-| `02-direct-bridge`           | L1->L2 ETH deposit + L2->L1 ETH withdrawal on chain 10 (direct L1 settlement), net flow assertions                                                           |
+| `02-direct-bridge`           | L1->L2 ETH deposit + L2->L1 ETH withdrawal, and an L1-native ERC20 round trip, on chain 10 (direct L1 settlement), net flow assertions                       |
 | `03-interop-transfer`        | Unsupported interop routes revert; only GW-settled L2<->GW-settled L2 interop is intentionally registered                                                    |
 | `04-gateway-setup`           | GW chain contracts deployed, interop chains registered on GW L2Bridgehub, GW designated as settlement layer on L1                                            |
 | `05-gateway-bridge`          | L1->L2A ETH deposit + L2A->L1 ETH withdrawal on chain 12 (via GW)                                                                                            |
@@ -297,7 +297,6 @@ test/anvil-interop/
 - **Batch settlement**: No real sequencer or prover; batches are never committed/proved/executed
 - **Custom pubdata pricing**: Gas and pubdata costs use Anvil defaults, not ZKsync fee models
 - **Validium mode**: All chains run as rollup (validium carries no meaning without batch settlement)
-- **Settlement fees**: `processLogsAndMessages` still uses a zero settlement fee payer; interop sends cover non-zero dynamic base-token fees and fixed ZK fees separately
 
 ### Mock Contracts
 
@@ -335,7 +334,6 @@ Contracts are first bootstrapped at hardcoded addresses via `anvil_setCode` and 
 - **L2 genesis deployment via anvil_setCode**: System contracts are bootstrapped at hardcoded addresses, not via real genesis state. Production chains get that state directly from genesis.
 - **Synthetic merkle proofs**: Encode settlement layer chain ID but contain no real cryptographic data
 - **Interop proofs**: Correct struct shape but empty proof arrays
-- **processLogsAndMessages impersonation**: The diamond proxy is impersonated instead of the operator (production uses the operator role)
 - **Settlement layer notification via impersonation**: `SystemContext.setSettlementLayerChainId` is called by impersonating the bootloader. On ZKsync OS, this is only emitted during actual migration between settlement layers (and during genesis/v31 upgrades), not at every batch
 - **Upgrade harness**: `run-upgrade-test.ts` still applies two direct `anvil_setStorageAt` patches. Before governance it clears the genesis-upgrade tx hash the fixture's chains still carry, which a real chain's server clears once it processes the batch and which otherwise blocks a new upgrade with `PreviousUpgradeNotFinalized`. Before each per-chain upgrade, `forceBatchExecutedEqualsCommitted` copies `totalBatchesCommitted` onto `totalBatchesExecuted` so the upgrade's outstanding-batches check passes without a sequencer and prover. Both are test-only compatibility bridges, not a production upgrade flow.
 - **L2 genesis bootstrap**: `l2-genesis-upgrade-deployer.ts` still bootstraps contract code and base-token balance via Anvil RPC before relaying the real genesis transaction. Production chains get that state directly from genesis.

@@ -6,15 +6,15 @@ narrative. For the atomic interop flow itself, see {protocol-docs/atomicity/READ
 
 ## Contract map
 
-| Contract                                                             | Chain                      | Role                                                                                                                                                         |
-| -------------------------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `AssetRouterBase` / `L1AssetRouter` / `L2AssetRouter`                | L1 + every ZK chain        | Routes asset transfers (L1 <-> ZK chain bridging and L2 <-> L2 interop) to per-asset handlers.                                                               |
-| `NativeTokenVaultBase` / `L1NativeTokenVault` / `L2NativeTokenVault` | L1 + every ZK chain        | The default asset handler for ETH and ERC20 tokens: escrows native tokens, mints/burns bridged representations.                                              |
-| `L2AssetTracker`                                                     | every ZK chain             | Chain-local token bookkeeping: outbound/inbound amounts, pre-v31 total-supply snapshots, L1-deposit/withdrawal counters used by the L1 -> Gateway migration. |
-| `L1Nullifier`                                                        | L1                         | Tracks initiated L1 -> L2 deposits (`depositHappened`) and verifies/clears them when a failed deposit is claimed back on L1.                                 |
-| `BaseTokenHolder` (`l2-system/`)                                     | every ZK chain             | Escrow of the chain's base-token reserves; replaces mint/burn with transfers for EVM compatibility.                                                          |
-| `BridgedStandardERC20`                                               | ZK chains (beacon-proxied) | The standard bridged-token implementation, deployed per token behind the NTV's beacon.                                                                       |
-| `L2WrappedBaseToken`                                                 | ZK chains                  | The canonical wrapped-base-token (WETH-style) implementation. An `ERC20PermitUpgradeable`, deployed behind its own proxy — **not** the bridged-token beacon. |
+| Contract                                                             | Chain                      | Role                                                                                                                                                                  |
+| -------------------------------------------------------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AssetRouterBase` / `L1AssetRouter` / `L2AssetRouter`                | L1 + every ZK chain        | Routes asset transfers (L1 <-> ZK chain bridging and L2 <-> L2 interop) to per-asset handlers.                                                                        |
+| `NativeTokenVaultBase` / `L1NativeTokenVault` / `L2NativeTokenVault` | L1 + every ZK chain        | The default asset handler for ETH and ERC20 tokens: escrows native tokens, mints/burns bridged representations.                                                       |
+| `L2AssetTracker`                                                     | every ZK chain             | Chain-local token bookkeeping: outbound/inbound amounts, pre-v31 total-supply snapshots, L1-deposit/withdrawal counters kept for a future settlement-layer migration. |
+| `L1Nullifier`                                                        | L1                         | Tracks initiated L1 -> L2 deposits (`depositHappened`) and verifies/clears them when a failed deposit is claimed back on L1.                                          |
+| `BaseTokenHolder` (`l2-system/`)                                     | every ZK chain             | Escrow of the chain's base-token reserves; replaces mint/burn with transfers for EVM compatibility.                                                                   |
+| `BridgedStandardERC20`                                               | ZK chains (beacon-proxied) | The standard bridged-token implementation, deployed per token behind the NTV's beacon.                                                                                |
+| `L2WrappedBaseToken`                                                 | ZK chains                  | The canonical wrapped-base-token (WETH-style) implementation. An `ERC20PermitUpgradeable`, deployed behind its own proxy — **not** the bridged-token beacon.          |
 
 The `L2AssetRouter`, `L2NativeTokenVault`, `L2AssetTracker`, `BaseTokenHolder`, interop center/handler and
 atomic-flow manager are genesis-deployed built-ins at fixed, identical addresses on every ZK chain
@@ -272,9 +272,9 @@ to preserve the deployed storage layout.
     re-credit `handleFinalizeBridgingOnL2` performs there is nothing to reverse: the destination was not L1,
     and the base token is never native to the chain (so it has no `chainBalance` at all). Both invariants
     are asserted, for every asset — the vault asks before disbursing a failed transfer.
-- `interopInfo` (`totalWithdrawalsToL1`, `totalSuccessfulDepositsFromL1`) is the L2-side accounting used to
-  compute the amount to keep on L1 during the L1 -> Gateway migration; `totalWithdrawalsToL1` is consumed
-  once during that migration and must stay append-only.
+- `interopInfo` (`totalWithdrawalsToL1`, `totalSuccessfulDepositsFromL1`) is the L2-side accounting a
+  settlement-layer migration would need to compute the amount to keep on L1. Nothing consumes it in this
+  release, but `totalWithdrawalsToL1` must stay append-only for that use.
 - **v31 migration accounting**: `totalPreV31TotalSupply[assetId]` snapshots the token's total supply before
   its first post-v31 bridge operation (for pre-v31 tokens this should equal
   `totalSuccessfulDeposits - totalWithdrawalsToL1`). Bridged tokens snapshot `totalSupply()`; native tokens snapshot
@@ -345,8 +345,8 @@ mintData)` on the asset handler registered for the asset (`assetHandlerAddress[a
 - **L2 -> L1 withdrawals are never revertable.** The `InteropCenter` rejects L1-destined atomic bundles at
   send time, and both `L2AssetRouter.recoverAtomicCall` and
   `L2AssetTracker.assertRecoveryIsAccountingNeutral` assert `destChainId != L1_CHAIN_ID`. The reason is
-  accounting: `totalWithdrawalsToL1` is consumed exactly once during the L1 -> Gateway migration and must
-  stay append-only; a revertable withdrawal would corrupt the migrated balance.
+  accounting: `totalWithdrawalsToL1` must stay append-only for a future settlement-layer migration, where a
+  revertable withdrawal would corrupt the migrated balance.
 - **Message forgery**: finalization is only reachable through the interop handler with a proven message,
   the sender must be the counterpart asset router, the payload selector is pinned to `finalizeDeposit`, and
   the sender chain ID must equal the payload's source chain ID.

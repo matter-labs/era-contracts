@@ -297,29 +297,6 @@
   },
   {
     "type": "function",
-    "name": "forwardTransactionOnGateway",
-    "inputs": [
-      {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_canonicalTxHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "_expirationTimestamp",
-        "type": "uint64",
-        "internalType": "uint64"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "forwardedBridgeBurnSetSettlementLayer",
     "inputs": [
       {
@@ -1160,27 +1137,6 @@
     "type": "error",
     "name": "NotCurrentSettlementLayer",
     "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "NotInGatewayMode",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "NotRelayedSender",
-    "inputs": [
-      {
-        "name": "msgSender",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "settlementLayerRelaySender",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
   },
   {
     "type": "error",

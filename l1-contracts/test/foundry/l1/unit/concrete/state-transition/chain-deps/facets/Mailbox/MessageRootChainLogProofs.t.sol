@@ -16,6 +16,10 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {InvalidSettlementLayerForBatch} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 import {MigrationInterval} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {
+    MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER,
+    MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1
+} from "contracts/common/Config.sol";
 
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {L1MessageRootDev} from "contracts/dev-contracts/L1MessageRootDev.sol";
@@ -42,8 +46,10 @@ contract MessageRootChainLogProofs is MailboxTest {
     uint8 internal shardId;
     L1MessageRoot internal messageRoot;
 
-    /// @dev Gateway chain ID used for legacy historical migration intervals.
-    uint256 internal constant LEGACY_GW_CHAIN_ID = 1;
+    /// @dev Settlement layer the chain under proof migrated to and back from.
+    uint256 internal constant SETTLEMENT_LAYER_CHAIN_ID = 1;
+    /// @dev First batch whose root `L1MessageRoot` stores itself; every batch the tests prove comes before it.
+    uint256 internal constant V31_UPGRADE_BATCH_NUMBER = 100;
 
     function setUp() public virtual {
         setupDiamondProxy();
@@ -54,33 +60,20 @@ contract MessageRootChainLogProofs is MailboxTest {
         batchNumber = gettersFacet.getTotalBatchesExecuted();
         chainId = gettersFacet.getChainId();
 
-        // Mock getAllZKChainChainIDs to return the test chain so v31 upgrade sets the placeholder
-        uint256[] memory chainIds = new uint256[](1);
-        chainIds[0] = gettersFacet.getChainId();
-        vm.mockCall(
-            address(bridgehub),
-            abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
-            abi.encode(chainIds)
-        );
-        vm.mockCall(
-            address(bridgehub),
-            abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector, gettersFacet.getChainId()),
-            abi.encode(block.chainid)
-        );
-
-        // Deploy messageRoot as a proxy with v31 upgrade initialization so that
-        // v31UpgradeChainBatchNumber is set to the placeholder value, enabling
-        // _noBatchFallback to query l2LogsRootHash from the chain directly.
+        // The batches under proof predate the chain's v31 upgrade, so `_noBatchFallback` reads their roots
+        // from the chain's own `l2LogsRootHash`.
         messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(
-                        new L1MessageRootDev(address(bridgehub), LEGACY_GW_CHAIN_ID, address(realChainAssetHandler))
-                    ),
+                    address(new L1MessageRootDev(address(bridgehub), address(realChainAssetHandler))),
                     address(uint160(1)),
-                    abi.encodeCall(L1MessageRootDev.stampV31Placeholders, ())
+                    ""
                 )
             )
+        );
+        L1MessageRootDev(address(messageRoot)).setV31UpgradeChainBatchNumberForTesting(
+            chainId,
+            V31_UPGRADE_BATCH_NUMBER
         );
 
         vm.mockCall(
@@ -181,6 +174,42 @@ contract MessageRootChainLogProofs is MailboxTest {
 
         // Assert that the proof has failed
         assertEq(ret, false);
+    }
+
+    /// From the chain's v31 upgrade batch on, `L1MessageRoot` stores the batch roots itself, so a root the
+    /// chain reports for such a batch is not accepted.
+    function test_noBatchFallback_ignoresChainRootFromV31UpgradeBatch() public {
+        uint256 logIndex = _addHashedLogToMerkleTree({
+            _shardId: 0,
+            _isService: true,
+            _txNumberInBatch: 0,
+            _sender: address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR),
+            _key: bytes32(uint256(uint160(sender))),
+            _value: keccak256(data)
+        });
+        _addHashedLogToMerkleTree({
+            _shardId: 0,
+            _isService: true,
+            _txNumberInBatch: 1,
+            _sender: address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR),
+            _key: bytes32(uint256(uint160(sender))),
+            _value: keccak256(data)
+        });
+        bytes32 root = merkleTree.getRoot(elements);
+        utilsFacet.util_setL2LogsRootHash(V31_UPGRADE_BATCH_NUMBER - 1, root);
+        utilsFacet.util_setL2LogsRootHash(V31_UPGRADE_BATCH_NUMBER, root);
+
+        L2Message memory message = L2Message({txNumberInBatch: 0, sender: sender, data: data});
+        bytes32[] memory proof = merkleTree.getProof(elements, logIndex);
+
+        assertTrue(
+            _proveL2MessageInclusion(V31_UPGRADE_BATCH_NUMBER - 1, logIndex, message, proof, bytes("")),
+            "The last pre-v31 batch should be proven against the chain's root"
+        );
+        assertFalse(
+            _proveL2MessageInclusion(V31_UPGRADE_BATCH_NUMBER, logIndex, message, proof, bytes("")),
+            "The v31 upgrade batch should not fall back to the chain's root"
+        );
     }
 
     function test_success_proveL2LogInclusion() public {
@@ -305,7 +334,7 @@ contract MessageRootChainLogProofs is MailboxTest {
         assertEq(ret, true);
     }
 
-    /// @dev Sets up a historical migration interval so that `batchNumber` (the main chain's batch)
+    /// @dev Records a migration round trip so that `batchNumber` (the main chain's batch)
     ///      falls within the SL range for `_settlementLayerChainId`, making it a valid settlement layer.
     function _setupSettlementForChain(uint256 _settlementLayerChainId) internal {
         // The main chain's batchNumber is 2 (set in setUp).
@@ -319,9 +348,19 @@ contract MessageRootChainLogProofs is MailboxTest {
             settlementLayerChainId: _settlementLayerChainId,
             isActive: false
         });
-        // setHistoricalMigrationInterval only accepts migration number 0 and the legacy GW chain ID.
-        // We use LEGACY_GW_CHAIN_ID as the settlement layer to match this constraint.
-        realChainAssetHandler.setHistoricalMigrationInterval(gettersFacet.getChainId(), 0, interval);
+        _recordRoundTrip(interval);
+    }
+
+    /// @dev Leaves the chain as a completed L1 -> SL -> L1 migration does: the interval is stored, closed,
+    ///      under `MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER`, and the migration number is
+    ///      `MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1`.
+    function _recordRoundTrip(MigrationInterval memory _interval) internal {
+        realChainAssetHandler.setMigrationIntervalForTesting(
+            chainId,
+            MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER,
+            _interval
+        );
+        realChainAssetHandler.setMigrationNumberForTesting(chainId, MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1);
     }
 
     function checkRecursiveLeafProof(
@@ -356,7 +395,7 @@ contract MessageRootChainLogProofs is MailboxTest {
         secondUtils.util_setL2LogsRootHash(secondBatchNumber, requiredRoot);
         assertEq(secondGetters.l2LogsRootHash(secondBatchNumber), requiredRoot);
 
-        // Use setHistoricalMigrationInterval on the real ChainAssetHandler to mark
+        // Record a migration round trip on the real ChainAssetHandler to mark
         // the settlement layer as valid (or leave it unset for invalid cases).
         if (shouldSetupValidSL) {
             _setupSettlementForChain(proofInfo.settlementLayerChainId);
@@ -403,7 +442,7 @@ contract MessageRootChainLogProofs is MailboxTest {
                     // We override it since it is only known here
                     settlementLayerBatchNumber: 0,
                     settlementLayerBatchRootMask: 3,
-                    settlementLayerChainId: LEGACY_GW_CHAIN_ID,
+                    settlementLayerChainId: SETTLEMENT_LAYER_CHAIN_ID,
                     chainIdProof: bytes32Arr(2, bytes32(uint256(1)), bytes32(uint256(0)))
                 }),
                 true
@@ -426,7 +465,7 @@ contract MessageRootChainLogProofs is MailboxTest {
                     // We override it since it is only known here
                     settlementLayerBatchNumber: 0,
                     settlementLayerBatchRootMask: 3,
-                    settlementLayerChainId: LEGACY_GW_CHAIN_ID,
+                    settlementLayerChainId: SETTLEMENT_LAYER_CHAIN_ID,
                     chainIdProof: bytes32Arr(2, bytes32(uint256(1)), bytes32(uint256(0)))
                 }),
                 true
@@ -447,7 +486,7 @@ contract MessageRootChainLogProofs is MailboxTest {
             // We override it since it is only known here
             settlementLayerBatchNumber: 0,
             settlementLayerBatchRootMask: 3,
-            settlementLayerChainId: LEGACY_GW_CHAIN_ID,
+            settlementLayerChainId: SETTLEMENT_LAYER_CHAIN_ID,
             chainIdProof: bytes32Arr(2, bytes32(uint256(1)), bytes32(uint256(0)))
         });
 
@@ -456,7 +495,7 @@ contract MessageRootChainLogProofs is MailboxTest {
     }
 
     function test_RevertWhen_recursiveProofBatchBeforeMigration() external {
-        // Set up a historical migration where the chain migrated at batch 5.
+        // Set up a migration where the chain migrated at batch 5.
         // Our batchNumber is 1, which is BEFORE the migration.
         // The proof claims the batch is on the GW, but it should be on L1.
         MigrationInterval memory interval = MigrationInterval({
@@ -464,10 +503,10 @@ contract MessageRootChainLogProofs is MailboxTest {
             migrateFromGWBatchNumber: 100,
             settlementLayerBatchLowerBound: 0,
             settlementLayerBatchUpperBound: type(uint256).max,
-            settlementLayerChainId: LEGACY_GW_CHAIN_ID,
+            settlementLayerChainId: SETTLEMENT_LAYER_CHAIN_ID,
             isActive: false
         });
-        realChainAssetHandler.setHistoricalMigrationInterval(gettersFacet.getChainId(), 0, interval);
+        _recordRoundTrip(interval);
 
         RecursiveProofInfo memory proofInfo = RecursiveProofInfo({
             leaf: bytes32(0),
@@ -479,7 +518,7 @@ contract MessageRootChainLogProofs is MailboxTest {
             batchLeafProofMask: 1,
             settlementLayerBatchNumber: 0,
             settlementLayerBatchRootMask: 3,
-            settlementLayerChainId: LEGACY_GW_CHAIN_ID,
+            settlementLayerChainId: SETTLEMENT_LAYER_CHAIN_ID,
             chainIdProof: bytes32Arr(2, bytes32(uint256(1)), bytes32(uint256(0)))
         });
 
@@ -519,7 +558,7 @@ contract MessageRootChainLogProofs is MailboxTest {
                 InvalidSettlementLayerForBatch.selector,
                 gettersFacet.getChainId(),
                 batchNumber,
-                LEGACY_GW_CHAIN_ID
+                SETTLEMENT_LAYER_CHAIN_ID
             )
         );
         messageRoot.proveL2LeafInclusionShared(chainId, batchNumber, proofInfo.leafProofMask, proofInfo.leaf, proof);
@@ -537,10 +576,10 @@ contract MessageRootChainLogProofs is MailboxTest {
             migrateFromGWBatchNumber: 5,
             settlementLayerBatchLowerBound: 0,
             settlementLayerBatchUpperBound: type(uint256).max,
-            settlementLayerChainId: LEGACY_GW_CHAIN_ID,
+            settlementLayerChainId: SETTLEMENT_LAYER_CHAIN_ID,
             isActive: false
         });
-        realChainAssetHandler.setHistoricalMigrationInterval(gettersFacet.getChainId(), 0, interval);
+        _recordRoundTrip(interval);
 
         RecursiveProofInfo memory proofInfo = RecursiveProofInfo({
             leaf: bytes32(0),
@@ -552,7 +591,7 @@ contract MessageRootChainLogProofs is MailboxTest {
             batchLeafProofMask: 1,
             settlementLayerBatchNumber: 0,
             settlementLayerBatchRootMask: 3,
-            settlementLayerChainId: LEGACY_GW_CHAIN_ID,
+            settlementLayerChainId: SETTLEMENT_LAYER_CHAIN_ID,
             chainIdProof: bytes32Arr(2, bytes32(uint256(1)), bytes32(uint256(0)))
         });
 
@@ -591,7 +630,7 @@ contract MessageRootChainLogProofs is MailboxTest {
                 InvalidSettlementLayerForBatch.selector,
                 gettersFacet.getChainId(),
                 batchNumber,
-                LEGACY_GW_CHAIN_ID
+                SETTLEMENT_LAYER_CHAIN_ID
             )
         );
         messageRoot.proveL2LeafInclusionShared(chainId, batchNumber, proofInfo.leafProofMask, proofInfo.leaf, proof);

@@ -10,12 +10,12 @@ Instead, use the `cleanup.sh` script in the anvil-interop directory, which targe
 
 ## Gateway is softly deprecated
 
-v33 onwards deploys no Gateway, and its ceremony tooling is gone. The Gateway contracts, the scripts that stand one up in tests, the foundry Gateway suites and the anvil-interop Gateway specs (04–06) remain only so the Gateway could be brought back in a working state; removing them is tracked in EVM-1729. Beyond keeping those tests passing, nothing depends on the Gateway.
+v33 onwards deploys no Gateway, and its ceremony tooling is gone. The settlement-layer machinery in the contracts, the scripts that stand a Gateway up in tests, the foundry Gateway suites and the anvil-interop Gateway specs (04–06) remain so that a future settlement layer can use chain migration; removing them is tracked in EVM-1729. Support for the legacy Era Gateway is gone. Beyond keeping those tests passing, nothing depends on the Gateway.
 
 Unless the user explicitly asks about the Gateway:
 
 - Don't reason about the Gateway, Gateway-settled chains or chain migration while designing, implementing or reviewing a change, and don't add Gateway cases to new tests or docs.
-- Don't extend, refactor or rename Gateway code. Gateway-named identifiers in the core contracts (`ERA_GATEWAY_CHAIN_ID`, `migrateToGateway`, …) are ABI and stay as they are.
+- Don't extend, refactor or rename Gateway code. Gateway-named identifiers in the core contracts (`migrateToGateway`, `InteropCenter.forwardTransactionOnGateway`, …) are ABI and stay as they are.
 - If a change breaks an existing Gateway test, the smallest fix that keeps it passing is enough.
 
 ## Code style requirements
@@ -79,7 +79,7 @@ address result = _tryAddress(target, "someFunction()");
 ✅ **CORRECT APPROACH:**
 
 - Use real contract calls and flows to achieve the desired state
-- If a flow requires multiple steps (e.g., Token Balance Migration), implement all steps properly
+- If a flow requires multiple steps (e.g., a chain migration), implement all steps properly
 - If a relay transaction fails, fix the root cause instead of setting storage directly
 
 **WHY THIS RULE EXISTS:**

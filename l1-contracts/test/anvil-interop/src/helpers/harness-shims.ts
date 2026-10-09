@@ -15,9 +15,7 @@ import { impersonateAndRun } from "../core/utils";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
   L2_BOOTLOADER_ADDR,
-  L2_BRIDGEHUB_ADDR,
   L2_CHAIN_ASSET_HANDLER_ADDR,
-  L2_COMPLEX_UPGRADER_ADDR,
   SYSTEM_CONTEXT_ADDR,
 } from "../core/const";
 import { getAbi, getBytecode, getCreationBytecode } from "../core/contracts";
@@ -131,16 +129,7 @@ export async function setSettlementLayerViaBootloader(params: {
  * The production v33 implementation disables chain migrations at bridgeBurn/bridgeMint; the Dev
  * variant re-enables them so the preserved migration machinery stays covered by tests.
  *
- * Reverse TBM testing needs to drive the chain's `migrationNumber` counter on the
- * Gateway without going through the production `bridgeBurn` → `Migrator.forwardedBridgeBurn`
- * path, which enforces `priorityTree.getSize() == 0` and `totalBatchesCommitted ==
- * totalBatchesExecuted`. The Anvil harness has no sequencer and no proving flow, so the
- * priority tree is never drained and the committed/executed counters are never advanced.
- *
- * The dev variant exposes a small `setMigrationNumberForTesting` setter (gated by
- * `onlyUpgrader`, same modifier as the production update paths) so the harness can move
- * the counter through a real Solidity call instead of rewriting storage slots. The dev
- * bytecode preserves the production contract's storage layout and every existing entry
+ * The dev bytecode preserves the production contract's storage layout and every existing entry
  * point, so installing it at the production address leaves all non-test flows unchanged.
  */
 export async function installL2ChainAssetHandlerDev(provider: providers.JsonRpcProvider): Promise<void> {
@@ -154,76 +143,12 @@ export async function installL2ChainAssetHandlerDev(provider: providers.JsonRpcP
 }
 
 /**
- * Harness-only shim: reproduce the Gateway-side state transition that the Gateway
- * sequencer would apply when processing the L1→GW priority tx that starts a chain's
- * migration back to L1.
- *
- * Production reverse-migration sequence (end-to-end) is:
- *   1. The L1 chain admin submits an L1→GW priority tx that sends the CTM-asset
- *      withdrawal (`BridgehubBurnCTMAssetData`) as a bundle through the GW `InteropCenter`.
- *   2. The Gateway sequencer picks up the priority tx → GW `InteropCenter` → GW
- *      `L2AssetRouter` → GW `L2ChainAssetHandler.bridgeBurn` → bridgehub
- *      `forwardedBridgeBurnSetSettlementLayer` + `migrationNumber[chainId]++`.
- *   3. A GW→L1 message is emitted and later finalised on L1.
- *
- * The Anvil harness cannot execute step 2 natively: it has no sequencer to drain the
- * GW diamond's priority tree (required by `Migrator.forwardedBridgeBurn`) and no
- * batch commit/execute flow to satisfy the `totalBatchesCommitted == totalBatchesExecuted`
- * invariant. Rather than fake these invariants at the contract layer, we reproduce the
- * two observable state transitions directly through real Solidity entry points:
- *
- *   - `forwardedBridgeBurnSetSettlementLayer` on the GW `L2Bridgehub`, gated by
- *     `onlyChainAssetHandler` → impersonated from `L2_CHAIN_ASSET_HANDLER_ADDR`, exactly
- *     how the production `bridgeBurn` call reaches it.
- *   - `setMigrationNumberForTesting` on the dev variant of `L2ChainAssetHandler`, gated
- *     by `onlyUpgrader` → impersonated from `L2_COMPLEX_UPGRADER_ADDR`, matching the
- *     access surface of every other `onlyUpgrader`-gated setter on this contract.
- *
- * Prereq: `installL2ChainAssetHandlerDev(gwProvider)` must have been called first so
- * that `setMigrationNumberForTesting` is reachable.
- */
-export async function simulateGWChainMigrationBurn(params: {
-  gwProvider: providers.JsonRpcProvider;
-  chainId: number;
-  newSettlementLayerChainId: number;
-  newMigrationNumber: number;
-  gasLimit?: number;
-}): Promise<void> {
-  const { gwProvider, chainId, newSettlementLayerChainId, newMigrationNumber, gasLimit = 1_000_000 } = params;
-
-  const bridgehub = new Contract(L2_BRIDGEHUB_ADDR, getAbi("L2Bridgehub"), gwProvider);
-  await impersonateAndRun(gwProvider, L2_CHAIN_ASSET_HANDLER_ADDR, async (signer) => {
-    const tx = await bridgehub
-      .connect(signer)
-      .forwardedBridgeBurnSetSettlementLayer(chainId, newSettlementLayerChainId, { gasLimit });
-    await tx.wait();
-  });
-
-  const chainAssetHandler = new Contract(L2_CHAIN_ASSET_HANDLER_ADDR, getAbi("L2ChainAssetHandlerDev"), gwProvider);
-  await impersonateAndRun(gwProvider, L2_COMPLEX_UPGRADER_ADDR, async (signer) => {
-    const tx = await chainAssetHandler
-      .connect(signer)
-      .setMigrationNumberForTesting(chainId, newMigrationNumber, { gasLimit });
-    await tx.wait();
-  });
-}
-
-/**
  * Install the `L1ChainAssetHandlerDev` implementation behind the production
  * `L1ChainAssetHandler` TransparentUpgradeableProxy on L1 via the real upgrade
  * surface (no `anvil_setCode` on the impl slot, no storage writes).
  *
  * The production v33 implementation disables chain migrations at bridgeBurn/bridgeMint; the Dev
  * variant re-enables them so the preserved migration machinery stays covered by tests.
- *
- * L1 `_getChainMigrationNumber(chainId)` reads `L1ChainAssetHandler.migrationNumber[chainId]`,
- * which production bumps via `bridgeMint` during the chain-level migrate-from-gateway
- * governance flow. That flow ultimately drives `Migrator.forwardedBridgeBurn` on the
- * migrating chain's Gateway diamond proxy, which enforces invariants
- * (`priorityTree.getSize() == 0`, `totalBatchesCommitted == totalBatchesExecuted`)
- * that a sequencer-less / prover-less Anvil harness cannot satisfy. The dev variant
- * exposes `setMigrationNumberForTesting(chainId, value)` so the harness can drive
- * the same observable transition through a real `onlyOwner`-gated call.
  *
  * L1ChainAssetHandler lives behind a `TransparentUpgradeableProxy` and has
  * immutables (`BRIDGEHUB`, `L1_CHAIN_ID`, `ETH_TOKEN_ASSET_ID`). We swap the
@@ -239,8 +164,7 @@ export async function simulateGWChainMigrationBurn(params: {
  *
  * After the upgrade, the production proxy delegates into the Dev bytecode with
  * the production proxy's storage. Every inherited entry point keeps its
- * production semantics; `setMigrationNumberForTesting` becomes reachable to the
- * `onlyOwner` caller.
+ * production semantics.
  */
 export async function installL1ChainAssetHandlerDev(
   l1Provider: providers.JsonRpcProvider,
@@ -273,84 +197,4 @@ export async function installL1ChainAssetHandlerDev(
   });
 
   return proxy;
-}
-
-/**
- * Bump `L1ChainAssetHandler.migrationNumber[chainId]` via the dev setter installed
- * by {@link installL1ChainAssetHandlerDev}. Standing in for the production
- * `bridgeMint`-driven update that lands on L1 at the end of the chain-level
- * migrate-from-gateway flow.
- */
-export async function setL1ChainMigrationNumber(params: {
-  l1Provider: providers.JsonRpcProvider;
-  chainAssetHandlerProxy: string;
-  chainId: number;
-  newMigrationNumber: number;
-  gasLimit?: number;
-}): Promise<void> {
-  const { l1Provider, chainAssetHandlerProxy, chainId, newMigrationNumber, gasLimit = 1_000_000 } = params;
-
-  const cah = new Contract(chainAssetHandlerProxy, getAbi("L1ChainAssetHandlerDev"), l1Provider);
-  const owner: string = await cah.owner();
-
-  await impersonateAndRun(l1Provider, owner, async (signer) => {
-    const tx = await cah.connect(signer).setMigrationNumberForTesting(chainId, newMigrationNumber, { gasLimit });
-    await tx.wait();
-  });
-}
-
-/**
- * Flip `L1Bridgehub.settlementLayer[chainId]` back to `L1_CHAIN_ID` by calling
- * `forwardedBridgeMint` via the chain-asset-handler access surface.
- *
- * In production this runs at the end of the chain-level migrate-from-gateway
- * flow, when `L1ChainAssetHandler.bridgeMint` invokes
- * `L1Bridgehub.forwardedBridgeMint(...)`. Without it, L1 still routes
- * deposits/withdrawals for the chain through the L1→GW→L2 path (the
- * `settlementLayerChainId` encoded into withdrawal proofs picks the GW
- * `chainBalance` for decrement), so the downstream reverse-TBM withdrawal
- * lifecycle can't distinguish "pre-finalisation" from "post-finalisation".
- *
- * Idempotent with production state: every non-settlement-layer field
- * `forwardedBridgeMint` writes (`chainTypeManager`, `baseTokenAssetId`,
- * `assetIdIsRegistered`) was already set during chain registration and is
- * rewritten to the same value here.
- */
-export async function completeL1ChainMigrationSettlementLayer(params: {
-  l1Provider: providers.JsonRpcProvider;
-  chainAssetHandlerProxy: string;
-  bridgehubAddr: string;
-  chainId: number;
-  baseTokenAssetId: string;
-  baseTokenOriginChainId: number;
-  baseTokenOriginAddress: string;
-  gasLimit?: number;
-}): Promise<void> {
-  const {
-    l1Provider,
-    chainAssetHandlerProxy,
-    bridgehubAddr,
-    chainId,
-    baseTokenAssetId,
-    baseTokenOriginChainId,
-    baseTokenOriginAddress,
-    gasLimit = 2_000_000,
-  } = params;
-
-  const bridgehub = new Contract(bridgehubAddr, getAbi("IL1Bridgehub"), l1Provider);
-  const ctmAssetId: string = await bridgehub.ctmAssetIdFromChainId(chainId);
-
-  await impersonateAndRun(l1Provider, chainAssetHandlerProxy, async (signer) => {
-    const tx = await bridgehub.connect(signer).forwardedBridgeMint(
-      ctmAssetId,
-      chainId,
-      {
-        assetId: baseTokenAssetId,
-        originChainId: baseTokenOriginChainId,
-        originToken: baseTokenOriginAddress,
-      },
-      { gasLimit }
-    );
-    await tx.wait();
-  });
 }
