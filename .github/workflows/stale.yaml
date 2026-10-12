@@ -1,0 +1,50 @@
+# Nudges PRs with no activity for 30 days, closes them 14 days later.
+# Any push / comment / review removes the stale label and resets the clock.
+# Add the `keep-open` label to opt a PR out (long-lived integration/reference PRs).
+# Issues are not touched.
+name: Stale PRs
+
+on:
+  schedule:
+    - cron: "0 7 * * 1-5" # weekdays 07:00 UTC
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Log what would happen without labeling or closing"
+        type: boolean
+        default: true
+
+permissions:
+  actions: write # actions/stale keeps its run state in the Actions cache
+  pull-requests: write
+  issues: write # labels are managed through the issues API
+
+# A manual run overlapping the scheduled one could post the stale comment twice.
+concurrency:
+  group: stale-prs
+  cancel-in-progress: false
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@4391f3da665fdf50b6810c1a66712fb9ba21aa93 # v11.0.0
+        with:
+          days-before-issue-stale: -1
+          days-before-issue-close: -1
+          days-before-pr-stale: 30
+          days-before-pr-close: 14
+          stale-pr-label: stale
+          close-pr-label: closed-stale
+          exempt-pr-labels: keep-open,protocol-upgrade
+          remove-pr-stale-when-updated: true
+          delete-branch: false # keep branches so a closed PR can be reopened
+          operations-per-run: 300
+          debug-only: ${{ inputs.dry-run == true }}
+          stale-pr-message: >
+            This PR has had no activity for 30 days. It will be closed in 14 days
+            unless it is updated or labeled `keep-open`. If it is superseded or no
+            longer needed, please close it now.
+          close-pr-message: >
+            Closed after 44 days without activity. The branch is kept, so the PR can
+            be reopened at any time.
