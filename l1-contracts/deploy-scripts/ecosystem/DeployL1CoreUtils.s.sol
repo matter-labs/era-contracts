@@ -81,7 +81,6 @@ contract DeployL1CoreUtils is DeployUtils {
             return
                 abi.encode(
                     coreAddresses.bridgehub.proxies.bridgehub,
-                    0, // _eraGatewayChainId: no legacy Era Gateway
                     coreAddresses.bridgehub.proxies.chainAssetHandler
                 );
         } else if (compareStrings(contractName, "CTMDeploymentTracker")) {

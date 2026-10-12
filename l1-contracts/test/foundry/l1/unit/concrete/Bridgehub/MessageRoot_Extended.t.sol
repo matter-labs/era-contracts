@@ -15,9 +15,7 @@ import {
     ChainExists,
     MessageRootNotRegistered,
     OnlyChainAssetHandler,
-    OnlyChain,
-    OnlyOnSettlementLayer,
-    TotalBatchesExecutedZero
+    OnlyChain
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
 import {L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -31,7 +29,6 @@ import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 contract MessageRootExtendedTest is Test {
     address internal bridgeHub;
     uint256 internal L1_CHAIN_ID;
-    uint256 internal gatewayChainId;
     L1MessageRoot internal messageRoot;
     L2MessageRoot internal l2MessageRoot;
     address internal assetTracker;
@@ -42,7 +39,6 @@ contract MessageRootExtendedTest is Test {
         chainAssetHandler = makeAddr("chainAssetHandler");
         assetTracker = makeAddr("assetTracker");
         L1_CHAIN_ID = 1;
-        gatewayChainId = 506;
 
         vm.mockCall(bridgeHub, abi.encodeWithSelector(IL1Bridgehub.L1_CHAIN_ID.selector), abi.encode(L1_CHAIN_ID));
         vm.mockCall(
@@ -62,7 +58,7 @@ contract MessageRootExtendedTest is Test {
         messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(bridgeHub, gatewayChainId, chainAssetHandler)),
+                    address(new L1MessageRoot(bridgeHub, chainAssetHandler)),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initialize, ())
                 )
@@ -133,7 +129,7 @@ contract MessageRootExtendedTest is Test {
         assertTrue(root != bytes32(0));
     }
 
-    function test_SaveV31UpgradeChainBatchNumber_NotChain() public {
+    function test_AddChainBatchRoot_RevertWhen_NotChain() public {
         uint256 chainId = 271;
         address wrongSender = makeAddr("wrongSender");
 
@@ -145,50 +141,7 @@ contract MessageRootExtendedTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(OnlyChain.selector, wrongSender, makeAddr("correctChain")));
         vm.prank(wrongSender);
-        messageRoot.saveV31UpgradeChainBatchNumber(chainId);
-    }
-
-    function test_SaveV31UpgradeChainBatchNumber_NotOnSettlementLayer() public {
-        uint256 chainId = 271;
-        address chainSender = makeAddr("chainSender");
-
-        vm.mockCall(
-            bridgeHub,
-            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, chainId),
-            abi.encode(chainSender)
-        );
-        vm.mockCall(
-            bridgeHub,
-            abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector, chainId),
-            abi.encode(2) // Different settlement layer
-        );
-
-        vm.expectRevert(OnlyOnSettlementLayer.selector);
-        vm.prank(chainSender);
-        messageRoot.saveV31UpgradeChainBatchNumber(chainId);
-    }
-
-    function test_SaveV31UpgradeChainBatchNumber_TotalBatchesExecutedZero() public {
-        uint256 chainId = 271;
-        address chainSender = makeAddr("chainSender");
-
-        vm.mockCall(
-            bridgeHub,
-            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, chainId),
-            abi.encode(chainSender)
-        );
-        vm.mockCall(
-            bridgeHub,
-            abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector, chainId),
-            abi.encode(block.chainid)
-        );
-
-        // Mock getTotalBatchesExecuted to return 0
-        vm.mockCall(chainSender, abi.encodeWithSelector(IGetters.getTotalBatchesExecuted.selector), abi.encode(0));
-
-        vm.expectRevert(TotalBatchesExecutedZero.selector);
-        vm.prank(chainSender);
-        messageRoot.saveV31UpgradeChainBatchNumber(chainId);
+        messageRoot.addChainBatchRoot(chainId, 1, keccak256("batchRoot"));
     }
 
     function test_setMigratingChainBatchNumber_Success() public {
@@ -385,11 +338,6 @@ contract MessageRootExtendedTest is Test {
     function test_L1_CHAIN_ID() public view {
         uint256 chainId = messageRoot.L1_CHAIN_ID();
         assertEq(chainId, block.chainid);
-    }
-
-    function test_ERA_GATEWAY_CHAIN_ID() public view {
-        uint256 eraGatewayId = messageRoot.ERA_GATEWAY_CHAIN_ID();
-        assertEq(eraGatewayId, gatewayChainId);
     }
 
     function test_BRIDGE_HUB() public view {

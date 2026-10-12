@@ -27,15 +27,12 @@ import {IL2ChainAssetHandler} from "./IL2ChainAssetHandler.sol";
 import {ChainNotReadyForMigration, ZKChainNotRegistered} from "../bridgehub/L1BridgehubErrors.sol";
 import {CTMNotRegistered} from "../../common/L1ContractErrors.sol";
 import {
-    MigrationIntervalInvalid,
     MigrationIntervalNotSet,
     MigrationNumberMismatch,
     SettlementLayerMustNotBeL1,
-    IteratedMigrationsNotSupported,
-    HistoricalSettlementLayerMismatch
+    IteratedMigrationsNotSupported
 } from "../bridgehub/L1BridgehubErrors.sol";
 import {MigrationInterval} from "./IChainAssetHandler.sol";
-import {IL1MessageRoot} from "../message-root/IL1MessageRoot.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -54,10 +51,10 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     /// @dev The mapping showing for each chain if migration is in progress or not, used for freezing deposits.
     mapping(uint256 chainId => bool isMigrationInProgress) public isMigrationInProgress;
 
-    /// @notice Tracks migration batch numbers for chains that migrated to Gateway.
+    /// @notice Tracks migration batch numbers for chains that migrated to a settlement layer.
     /// @dev Used to validate that settlement layer claims match the batch number.
-    /// @dev Migration number 0 is reserved for legacy GW historical data.
     /// @dev Migration numbers 1+ are for regular L1 <-> SL migrations.
+    /// @dev Migration number 0 was reserved for the legacy Era Gateway and is never read, see `isValidSettlementLayer`.
     mapping(uint256 chainId => mapping(uint256 migrationNum => MigrationInterval interval)) internal _migrationInterval;
 
     /// @dev The message root contract. Set via `setAddresses` after deployment because
@@ -183,8 +180,6 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         IL1NativeTokenVault nativeTokenVault = IL1NativeTokenVault(address(l1AssetRouter.nativeTokenVault()));
 
         return
-            // The chain must have version higher than v31.
-            !IL1MessageRoot(address(_getMessageRoot())).isPreV31(_chainId) &&
             // The chain's base token must be registered in the NTV, as otherwise L1->L2 base-token
             // deposits (which the destination NTV relies on) would not work.
             nativeTokenVault.tokenAddress(baseAssetId) != address(0) &&
@@ -216,44 +211,24 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IL1ChainAssetHandler
-    function setHistoricalMigrationInterval(
-        uint256 _chainId,
-        uint256 _migrationNumber,
-        MigrationInterval calldata _interval
-    ) external onlyOwner {
-        require(_migrationNumber == 0, MigrationNumberMismatch(0, _migrationNumber));
-        require(!_interval.isActive, MigrationIntervalNotSet());
-        uint256 legacyGwChainId = IL1MessageRoot(address(_getMessageRoot())).ERA_GATEWAY_CHAIN_ID();
-        require(
-            _interval.settlementLayerChainId == legacyGwChainId,
-            HistoricalSettlementLayerMismatch(legacyGwChainId, _interval.settlementLayerChainId)
-        );
-        require(_interval.migrateFromGWBatchNumber > _interval.migrateToGWBatchNumber, MigrationIntervalInvalid());
-        require(
-            _interval.settlementLayerBatchUpperBound > _interval.settlementLayerBatchLowerBound,
-            MigrationIntervalInvalid()
-        );
-        _migrationInterval[_chainId][_migrationNumber] = _interval;
-    }
-
-    /// @inheritdoc IL1ChainAssetHandler
     /// @dev Used by MessageRoot to validate that proofs claim the correct settlement layer; checks
-    /// all migration intervals for the chain, including legacy GW data (migration number 0).
+    /// the chain's migration intervals from `MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER` on.
+    /// @dev Index 0 is skipped: it holds only legacy Era Gateway intervals, which no proof can use since v33 bound
+    /// the L1 timestamp into the chain batch leaf, see {protocol-docs/chain-lifecycle.md#migration-intervals}.
     function isValidSettlementLayer(
         uint256 _chainId,
         uint256 _batchNumber,
         uint256 _claimedSettlementLayer,
         uint256 _claimedSettlementLayerBatchNumber
     ) external view returns (bool) {
-        // Check all migration intervals for this chain (including legacy GW at index 0)
-        // We iterate from 0 to current migration number to find which interval contains this batch
+        // We iterate up to the current migration number to find which interval contains this batch
         uint256 currentMigrationNum = migrationNumber[_chainId];
         // IMPORTANT: this method is safe only while migrations are limited to one round-trip (L1->SL->L1).
         // If this was not the case, the chain admin would be able to migrate back and forth multiple times,
         // causing the function to run out of gas and blocking withdrawals, which would violate stage1-compatibility requirements.
         require(currentMigrationNum <= MAX_ALLOWED_NUMBER_OF_MIGRATIONS, IteratedMigrationsNotSupported());
 
-        for (uint256 i = 0; i <= currentMigrationNum; ++i) {
+        for (uint256 i = MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER; i <= currentMigrationNum; ++i) {
             MigrationInterval memory interval = _migrationInterval[_chainId][i];
 
             // Skip uninitialized intervals

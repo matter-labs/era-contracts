@@ -72,7 +72,7 @@ contract MessageRootTest is Test {
         messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(bridgeHub, 1, chainAssetHandler)),
+                    address(new L1MessageRoot(bridgeHub, chainAssetHandler)),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initialize, ())
                 )

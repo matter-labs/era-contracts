@@ -52,17 +52,6 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
 
     uint256 internal constant EXPECTED_MAX_L1_GAS_PRICE = 50 gwei;
 
-    /// Packed protocol version of v31.0.0 — anything `>=` this exposes the
-    /// `serverNotifierAddress()` getter directly. Pre-v31 CTMs predate the
-    /// getter, so we fall back to a raw storage load. Temporary shim: once
-    /// every active CTM is upgraded past v31 this branch can be deleted.
-    uint256 internal constant MIN_V31_PROTOCOL_VERSION = 0x1F00000000;
-    /// Storage slot of `ChainTypeManager.serverNotifierAddress`. Confirmed
-    /// via `forge inspect ChainTypeManager storage-layout`. Stays at the
-    /// same slot across v30 → v31 (verified by reading the slot on both Atlas
-    /// (v30.1) and Era (older) CTM on Sepolia). Drop with the version branch.
-    bytes32 internal constant SERVER_NOTIFIER_ADDRESS_SLOT = bytes32(uint256(164));
-
     uint256 internal gatewayChainId;
     bytes internal forceDeploymentsData;
 
@@ -266,19 +255,6 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         (implementation, proxy) = deployTuppWithContractAndProxyAdmin("ServerNotifier", ecosystemProxyAdmin);
     }
 
-    /// Read the CTM's existing ServerNotifier proxy from chain. v31+ CTMs
-    /// expose a `serverNotifierAddress()` getter; pre-v31 CTMs hold the same
-    /// field at slot 164 but lack the getter, so we read storage directly.
-    /// Returns `address(0)` when the CTM never had one — caller takes the
-    /// deploy-new path in that case.
-    function _resolveExistingServerNotifier(address _ctm) internal view returns (address existing) {
-        if (IChainTypeManager(_ctm).protocolVersion() >= MIN_V31_PROTOCOL_VERSION) {
-            existing = IChainTypeManager(_ctm).serverNotifierAddress();
-        } else {
-            existing = address(uint160(uint256(vm.load(_ctm, SERVER_NOTIFIER_ADDRESS_SLOT))));
-        }
-    }
-
     function prepareForGWVoting(address bridgehubProxy, uint256 ctmRepresentativeChainId) public {
         console.log("Setting up the Gateway script");
 
@@ -300,7 +276,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         // place so the proxy address stays stable for off-chain services (the
         // server polls a hardcoded address). Only deploy a fresh proxy when
         // the CTM has never had one — initial gateway-setup case.
-        serverNotifier = _resolveExistingServerNotifier(ctm);
+        serverNotifier = IChainTypeManager(ctm).serverNotifierAddress();
 
         Call[] memory ecosystemAdminCalls;
         if (serverNotifier == address(0)) {

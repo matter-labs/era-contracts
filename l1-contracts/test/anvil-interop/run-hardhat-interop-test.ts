@@ -204,16 +204,18 @@ async function main(): Promise<void> {
       const runner = new DeploymentRunner();
       const anvilManager = new AnvilManager();
 
-      // Try loading pre-generated chain states (much faster — skips deploy + TBM)
+      // Try loading pre-generated chain states (much faster — skips deploy + wrapped-ZK seeding)
       // Set ANVIL_INTEROP_FRESH_DEPLOY=1 to force full deployment instead.
-      // Pre-generated states already include test tokens and TBM.
+      // Pre-generated states already include test tokens and wrapped-ZK balances.
       if (!freshDeploy && runner.hasChainStates()) {
         const stateDir = runner.getChainStatesDir();
         console.log(`\nFound pre-generated chain states at ${stateDir}`);
         await timedAsync("load chain states", () => runner.loadChainStates(anvilManager, stateDir));
       } else {
         console.log("\nNo pre-generated chain states found, running full deployment...");
-        await timedAsync("full deployment + test tokens + TBM", () => runner.deployAndSetupWithTBM(anvilManager));
+        await timedAsync("full deployment + test tokens + wrapped-ZK seeding", () =>
+          runner.deployAndSetupWithWrappedZk(anvilManager)
+        );
       }
     }
 

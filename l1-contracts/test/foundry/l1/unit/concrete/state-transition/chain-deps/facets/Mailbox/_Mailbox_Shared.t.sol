@@ -14,7 +14,7 @@ import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCall
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
-import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
+import {L1ChainAssetHandlerDev} from "contracts/dev-contracts/L1ChainAssetHandlerDev.sol";
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 
 contract MailboxTest is UtilsCallMockerTest {
@@ -29,7 +29,7 @@ contract MailboxTest is UtilsCallMockerTest {
     address internal chainAssetHandler;
     address internal interopCenter;
     IEIP7702Checker internal eip7702Checker;
-    L1ChainAssetHandler internal realChainAssetHandler;
+    L1ChainAssetHandlerDev internal realChainAssetHandler;
 
     function setupEcosystem() internal {
         sender = makeAddr("sender");
@@ -45,8 +45,9 @@ contract MailboxTest is UtilsCallMockerTest {
             abi.encode(new uint256[](0))
         );
 
-        // Deploy a real L1ChainAssetHandler for settlement layer validation (avoiding mocks).
-        realChainAssetHandler = new L1ChainAssetHandler(
+        // Deploy a real L1ChainAssetHandler for settlement layer validation (avoiding mocks). The Dev
+        // variant lets tests seed migration intervals.
+        realChainAssetHandler = new L1ChainAssetHandlerDev(
             address(this), // owner
             bridgehub
         );

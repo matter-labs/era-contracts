@@ -16,7 +16,7 @@ import {GatewayVerifiersDeployerConfig} from "./GatewayCTMDeployer.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Gateway CTM ZKsyncOS Verifiers deployer: deploys ZKsyncOS verifier contracts.
 /// @dev Deploys ZKsyncOSVerifierPlonk and the ZKsync OS main/testnet verifier.
-/// This contract is expected to be deployed via the built-in L2 `Create2Factory`.
+/// This contract is expected to be deployed via the deterministic CREATE2 factory.
 contract GatewayCTMDeployerVerifiers {
     Verifiers internal deployedResult;
 

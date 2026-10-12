@@ -69,8 +69,7 @@ contract BaseTokenHolder is IBaseTokenHolder {
             return;
         }
 
-        // Notify the asset tracker BEFORE transferring, so that
-        // _needToForceSetAssetMigrationOnL2 can use totalSupply() == 0 consistently.
+        // Update the asset tracker's accounting before sending value to `_to`.
         L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(_fromChainId, _amount);
         Address.sendValue(payable(_to), _amount);
         emit BaseTokenMintedInterop(_to, _amount);
