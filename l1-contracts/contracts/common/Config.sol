@@ -314,3 +314,8 @@ uint256 constant MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1 = 2;
 
 /// @dev Iterated migrations are not supported; chain can migrate only to settlement layer and back once.
 uint256 constant MAX_ALLOWED_NUMBER_OF_MIGRATIONS = 2;
+
+/// @dev The maximal execution delay configurable in the `ValidatorTimelock`.
+/// @dev Footgun prevention only, not a trust guarantee: governance can upgrade the timelock, and outside
+/// stage 1 a chain admin can revoke the validator roles and stall execution anyway.
+uint32 constant MAX_VALIDATOR_TIMELOCK_EXECUTION_DELAY = 30 days;
