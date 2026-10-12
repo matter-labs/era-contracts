@@ -44,14 +44,10 @@ RUN yarn --cwd system-contracts build:foundry
 # Nothing below this line, or in the scan, may download a compiler.
 ENV FOUNDRY_OFFLINE=true
 
-# Offline from here, and these must succeed: the setup scripts the L1 tests run, and compiling the EraVM test sets that
-# `yarn test:zkfoundry` and l2-contracts' `yarn test:foundry` select (`forge test --list` compiles without running).
-RUN cd l1-contracts \
-    && forge script --sig 0x2dd0ebe3 DeployCTMScript --ffi \
-    && forge script --sig 'releaseConfigLock()' ConfigSemaphore \
-    && forge test --zksync --match-path 'test/foundry/l2/*' --list > /dev/null \
-    && cd ../l2-contracts \
-    && forge test --zksync --list > /dev/null
+# Offline from here, and these must succeed: each suite's own script with `--list` appended (Yarn 1 adds it to the
+# script's last command), which runs the setup scripts and compiles the test set without running it.
+RUN (cd l1-contracts && yarn test:foundry --list > /dev/null && yarn test:zkfoundry --list > /dev/null) \
+ && (cd l2-contracts && yarn test:foundry --list > /dev/null)
 
 # Smoke-test the suites as CI runs them. Test failures do not fail the build.
 RUN (cd l1-contracts && timeout 1200 yarn test:foundry \
