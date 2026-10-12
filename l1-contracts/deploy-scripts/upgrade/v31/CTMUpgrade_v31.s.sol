@@ -21,6 +21,7 @@ import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {CTMUpgradeParams} from "../default-upgrade/UpgradeParams.sol";
 import {CoreContract} from "../../ecosystem/CoreContract.sol";
 import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
+import {IRollupDAManager} from "../../interfaces/IRollupDAManager.sol";
 
 /// @notice Script used for v31 upgrade flow
 contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
@@ -56,6 +57,19 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
 
     /// @notice Deploy everything that should be deployed
     function deployNewCTMContracts() public virtual override {
+        // v31 Era-specific DA setup: the Era CTM does NOT reuse its pre-v31
+        // RollupDAManager (whose legacy `(address,address)` DA-pair API is
+        // incompatible with the v31 AdminFacet). Instead we deploy a fresh
+        // RollupDAManager + RollupL1DAValidator and register the rollup DA pair,
+        // mirroring the canonical CTM deployment flow (`DeployCTM.deployDAValidators`).
+        // This must run before `deployStateTransitionDiamondFacets()` because the
+        // AdminFacet bakes in the RollupDAManager address as an immutable.
+        // ZKsync OS reuses its existing (v30) RollupDAManager and validator, so
+        // we leave its DA addresses untouched.
+        if (!config.isZKsyncOS) {
+            deployEraRollupDA();
+        }
+
         (ctmAddresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
         (ctmAddresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
 
@@ -93,11 +107,15 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
 
         // v31 adds `UPGRADER_ROLE` + `upgradeChainFromVersion()` (IChainUpgrader) to ValidatorTimelock;
         // existing chains' proxy still points at the v30 impl, so swap it under the same CREATE2 flow.
-        // Deploy `MultisigCommitter` (a superset of ValidatorTimelock) as the default validator impl so the
-        // upgrade does NOT downgrade proxies that already run a MultisigCommitter — the v31 stage-1 upgrade
-        // previously deployed plain `ValidatorTimelock` here, which silently dropped multisig-commit support.
+        // The validator implementation is chain-type specific:
+        //  - Era uses plain `ValidatorTimelock`.
+        //  - ZKsyncOS uses `MultisigCommitter` (a superset of ValidatorTimelock) so the upgrade does NOT
+        //    downgrade ZKsyncOS proxies that already run a MultisigCommitter — deploying plain
+        //    `ValidatorTimelock` there would silently drop multisig-commit support.
+        string memory validatorTimelockContractName = config.isZKsyncOS ? "MultisigCommitter" : "ValidatorTimelock";
+        console.log("Deploying validator timelock implementation:", validatorTimelockContractName);
         ctmAddresses.stateTransition.implementations.validatorTimelock = deploySimpleContract(
-            "MultisigCommitter",
+            validatorTimelockContractName,
             false
         );
 
@@ -126,6 +144,68 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
             ),
             value: 0
         });
+    }
+
+    /// @notice Deploy a fresh RollupDAManager + RollupL1DAValidator for the Era CTM
+    ///         and register the rollup DA pair on it.
+    /// @dev Mirrors `DeployCTM.deployDAValidators` (minus the validium/avail/zksync-os
+    ///      validators that an Era rollup CTM upgrade does not need). The manager is
+    ///      deployed owned by the deployer, which registers the DA pair while it still
+    ///      owns the manager; the protocol-ops prepare flow then transfers the manager
+    ///      to governance (the deferred `acceptOwnership()` lands in stage 0). The
+    ///      freshly deployed manager address is what the AdminFacet immutable and the
+    ///      merged `ecosystem.toml` ([ctms.era].deployed_addresses.l1_rollup_da_manager)
+    ///      use, overriding the pre-v31 permanent value.
+    function deployEraRollupDA() internal virtual {
+        address deployer = getDeployerAddress();
+
+        console.log("Deploying fresh v31 RollupDAManager for Era CTM");
+        ctmAddresses.daAddresses.daContracts.rollupDAManager = deployWithCreate2AndOwner(
+            "RollupDAManager",
+            deployer,
+            false
+        );
+        updateRollupDAManager();
+
+        console.log("Deploying fresh RollupL1DAValidator for Era CTM");
+        ctmAddresses.daAddresses.daContracts.rollupSLDAValidator = deploySimpleContract("RollupL1DAValidator", false);
+
+        vm.broadcast(deployer);
+        IRollupDAManager(ctmAddresses.daAddresses.daContracts.rollupDAManager).updateDAPair(
+            ctmAddresses.daAddresses.daContracts.rollupSLDAValidator,
+            getRollupL2DACommitmentScheme(),
+            true
+        );
+
+        console.log("Era RollupDAManager:", ctmAddresses.daAddresses.daContracts.rollupDAManager);
+        console.log("Era RollupL1DAValidator:", ctmAddresses.daAddresses.daContracts.rollupSLDAValidator);
+    }
+
+    /// @notice Record the freshly deployed Era rollup L1 DA validator in the CTM output.
+    /// @dev `DefaultCTMUpgrade.saveOutput` writes the discovered chain's DA validator
+    ///      (`discoveredEraZkChain.l1DAValidator`) by default. For the Era CTM we deploy
+    ///      a new validator, so overwrite that field with the freshly deployed address.
+    ///      For the ZKsync OS CTM we reuse the existing (v30) RollupDAManager + validator,
+    ///      so the fresh-DA verification must be skipped. The default `saveOutput` records
+    ///      the discovered *Era* chain's L1 DA validator here, which is non-zero whenever a
+    ///      real Era chain is registered (e.g. mainnet chain 324) and would wrongly trigger
+    ///      that verification. Write zero to signal "reuse" — matching the environments where
+    ///      the Era chain is unregistered (testnet's legacy era 270) and the discovered
+    ///      validator is already zero.
+    function saveOutputVersionSpecific() internal virtual override {
+        if (!config.isZKsyncOS && ctmAddresses.daAddresses.daContracts.rollupSLDAValidator != address(0)) {
+            vm.writeToml(
+                vm.toString(ctmAddresses.daAddresses.daContracts.rollupSLDAValidator),
+                upgradeConfig.outputPath,
+                ".deployed_addresses.rollup_l1_da_validator_addr"
+            );
+        } else if (config.isZKsyncOS) {
+            vm.writeToml(
+                vm.toString(address(0)),
+                upgradeConfig.outputPath,
+                ".deployed_addresses.rollup_l1_da_validator_addr"
+            );
+        }
     }
 
     /// @notice Override to deploy the correct v31 upgrade contract based on chain type.

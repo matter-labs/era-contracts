@@ -25,6 +25,11 @@ pub(crate) struct EcosystemUpgradeArtifact {
     /// provenance verification can stay decoupled from stage-0 calldata
     /// decoding; stage-0 verification binds decoded calls back to these values.
     pub(crate) zk_governance: Option<ZkGovernanceArtifact>,
+    /// Ecosystem TransitionaryOwner (`[transitionary_owner].addr`): the trustless
+    /// contract that temporarily holds ownership (owner) of the deployer-deployed
+    /// Ownable2Step contracts with governance as their pendingOwner, until
+    /// governance accepts. `None` when the aux ownership step didn't run.
+    pub(crate) transitionary_owner: Option<Address>,
     /// Raw top-level `[misc]` table for shared metadata that does not belong to
     /// core or a particular CTM.
     pub(crate) misc: toml::Value,
@@ -257,6 +262,17 @@ impl EcosystemUpgradeArtifact {
             None => None,
         };
 
+        // `[transitionary_owner]` is present when the aux ownership step routed
+        // the deployer-owned Ownable2Step contracts through a TransitionaryOwner.
+        let transitionary_owner = match root.remove("transitionary_owner") {
+            Some(value) => Some(required_address_in_value(
+                &value,
+                "transitionary_owner",
+                &["addr"],
+            )?),
+            None => None,
+        };
+
         let misc = match root.remove("misc") {
             Some(value) => toml::Value::Table(expect_table(value, "misc")?),
             None => toml::Value::Table(Table::new()),
@@ -268,6 +284,7 @@ impl EcosystemUpgradeArtifact {
             ctms,
             new_gateway,
             zk_governance,
+            transitionary_owner,
             misc,
         })
     }

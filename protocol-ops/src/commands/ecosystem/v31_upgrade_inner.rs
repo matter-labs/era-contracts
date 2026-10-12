@@ -22,6 +22,7 @@ use alloy::sol_types::SolCall;
 use anyhow::Context;
 
 use crate::common::abi::{ICTMUpgradeV31Abi, ICoreUpgradeV31Abi};
+use crate::common::env_config::RollupDAPairConfig;
 use crate::common::wallets::Wallet;
 use crate::common::{forge::ForgeRunner, logger};
 
@@ -40,6 +41,9 @@ pub struct CtmInputs {
     pub bytecodes_supplier: Option<Address>,
     /// Override for the rollup DA manager address. Required on pre-v31.
     pub rollup_da_manager: Option<Address>,
+    /// Optional DA pair to allow on the CTM's RollupDAManager during v31
+    /// governance.
+    pub rollup_da_pair: Option<RollupDAPairConfig>,
 }
 
 /// Inputs to the prepare phase. The CLI handler builds this from clap args.
@@ -97,6 +101,8 @@ pub struct CtmPrepareEntry {
     pub proxy: Address,
     pub toml: PathBuf,
     pub is_zk_sync_os: bool,
+    pub rollup_da_manager: Address,
+    pub rollup_da_pair: Option<RollupDAPairConfig>,
 }
 
 // ── struct ────────────────────────────────────────────────────────────────
@@ -143,7 +149,7 @@ impl<'a> V31UpgradeInner<'a> {
 
         let mut ctm_tomls = Vec::with_capacity(inputs.ctms.len());
         for ctm in &inputs.ctms {
-            let (path, is_zk_sync_os) = self
+            let (path, is_zk_sync_os, rollup_da_manager) = self
                 .prepare_ctm(runner, deployer, inputs, ctm)
                 .await
                 .with_context(|| format!("ctm prepare ({:#x})", ctm.proxy))?;
@@ -151,6 +157,8 @@ impl<'a> V31UpgradeInner<'a> {
                 proxy: ctm.proxy,
                 toml: path,
                 is_zk_sync_os,
+                rollup_da_manager,
+                rollup_da_pair: ctm.rollup_da_pair,
             });
         }
 
@@ -249,7 +257,7 @@ impl<'a> V31UpgradeInner<'a> {
         deployer: &Wallet,
         inputs: &V31PrepareInputs,
         ctm: &CtmInputs,
-    ) -> anyhow::Result<(PathBuf, bool)> {
+    ) -> anyhow::Result<(PathBuf, bool, Address)> {
         ensure_script_exists(self.contracts_path, &inputs.ctm_script_path)?;
 
         let ctm_proxy = ctm.proxy;
@@ -419,7 +427,7 @@ impl<'a> V31UpgradeInner<'a> {
             .run(script)
             .context("Failed to execute CTMUpgrade_v31.noGovernancePrepare")?;
 
-        Ok((ctm_output_path, is_zk_sync_os))
+        Ok((ctm_output_path, is_zk_sync_os, rollup_da_manager))
     }
 }
 

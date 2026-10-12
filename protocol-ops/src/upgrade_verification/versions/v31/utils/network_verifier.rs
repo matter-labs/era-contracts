@@ -16,6 +16,44 @@ use crate::upgrade_verification::constants::{
     EIP1967_PROXY_ADMIN_SLOT, L2_CREATE2_FACTORY_ADDR, ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR,
 };
 
+/// Lookups per transactions-log entry (its tx, then its receipt) before it
+/// counts as unfetchable. A hash in a log is expected to exist, so a null or
+/// failed answer is usually a flaky or lagging RPC backend: public endpoints
+/// return null receipts intermittently.
+const LOG_FETCH_ATTEMPTS: u32 = 4;
+/// Wait before the second lookup, doubled for each later one (1s, 2s, 4s).
+const LOG_FETCH_FIRST_RETRY_MS: u64 = 1_000;
+
+/// Sleep before lookup number `attempt` (1-based retries) of a log entry.
+async fn log_fetch_backoff(attempt: u32) {
+    let ms = LOG_FETCH_FIRST_RETRY_MS << (attempt - 1);
+    tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
+}
+
+/// The finding for transactions-log entries still unfetchable after
+/// `LOG_FETCH_ATTEMPTS`, whose deployments were therefore never checked:
+/// `(is_error, message)`. An error when `strict` (an env with a historical
+/// deployment list, where every entry must be accounted for), a warning
+/// otherwise, since an append-only log may also hold stale entries of another
+/// network. `None` when every entry was fetched.
+fn unfetched_finding(unfetched: &[(TxHash, String)], strict: bool) -> Option<(bool, String)> {
+    if unfetched.is_empty() {
+        return None;
+    }
+    let list = unfetched
+        .iter()
+        .map(|(hash, why)| format!("{hash:#x} ({why})"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    Some((
+        strict,
+        format!(
+            "transactions log: {} tx(s) could not be fetched after {LOG_FETCH_ATTEMPTS} attempts, so their deployments were not checked: {list}",
+            unfetched.len()
+        ),
+    ))
+}
+
 sol! {
     #[derive(Debug)]
     struct L2TransactionRequestDirect {
@@ -43,6 +81,7 @@ sol! {
         function l1CtmDeployer() external view returns (address);
         function messageRoot() external view returns (address);
         function chainAssetHandler() external view returns (address);
+        function chainRegistrationSender() external view returns (address);
         function getZKChain(uint256 _chainId) external view returns (address chainAddress);
         function baseToken(uint256 _chainId) external view returns (address);
         function requestL2TransactionDirect(
@@ -58,6 +97,11 @@ sol! {
         function ERA_CHAIN_ID() public view returns (uint256);
 
         function nativeTokenVault() public view returns (address);
+    }
+
+    #[sol(rpc)]
+    contract L1NativeTokenVault {
+        function bridgedTokenBeacon() external view returns (address);
     }
 
     #[sol(rpc)]
@@ -112,6 +156,11 @@ sol! {
         function executionDelay() external view returns (uint32);
     }
 
+    #[sol(rpc)]
+    contract RollupDAManager {
+        function isAllowedDAConfiguration(address l1DAValidator, uint8 l2DACommitmentScheme) external view returns (bool);
+    }
+
     function create2AndTransferParams(bytes memory bytecode, bytes32 salt, address owner);
 
     function create2(
@@ -125,8 +174,10 @@ pub struct NetworkVerifier {
     pub l1_provider: RootProvider,
     pub era_chain_id: u64,
     pub l1_chain_id: u64,
-    pub gateway_chain_id: u64,
-    pub gw_provider: RootProvider,
+    /// Both absent on gateway-less envs; every gateway-side check is gated on the artifact's
+    /// `[new_gateway]` and errors out if it is reached without a gateway RPC.
+    pub gateway_chain_id: Option<u64>,
+    pub gw_provider: Option<RootProvider>,
 
     // todo: maybe merge into one struct.
     pub create2_known_bytecodes: HashMap<Address, String>,
@@ -143,7 +194,7 @@ struct ParsedCreate2Deployment {
 impl NetworkVerifier {
     pub async fn new_v31(
         l1_rpc: String,
-        gw_rpc: String,
+        gw_rpc: Option<String>,
         era_chain_id: u64,
     ) -> anyhow::Result<Self> {
         let l1_provider = RootProvider::new_http(l1_rpc.parse().context("invalid L1 RPC URL")?);
@@ -151,12 +202,22 @@ impl NetworkVerifier {
             .get_chain_id()
             .await
             .context("failed to fetch L1 chain id")?;
-        let gw_provider =
-            RootProvider::new_http(gw_rpc.parse().context("invalid gateway RPC URL")?);
-        let gateway_chain_id = gw_provider
-            .get_chain_id()
-            .await
-            .context("failed to fetch gateway chain id")?;
+        let gw_provider = gw_rpc
+            .map(|url| {
+                url.parse()
+                    .context("invalid gateway RPC URL")
+                    .map(RootProvider::new_http)
+            })
+            .transpose()?;
+        let gateway_chain_id = match &gw_provider {
+            Some(provider) => Some(
+                provider
+                    .get_chain_id()
+                    .await
+                    .context("failed to fetch gateway chain id")?,
+            ),
+            None => None,
+        };
 
         Ok(Self {
             l1_provider,
@@ -175,7 +236,6 @@ impl NetworkVerifier {
     ///
     /// `transactions.txt` is append-only across regens, so we silently skip
     /// txs that:
-    ///   - aren't on the RPC (wrong network, or stale-file warning)
     ///   - reverted on-chain (status != 1)
     ///   - don't target the configured Create2Factory
     ///   - have <32 bytes of input
@@ -183,36 +243,49 @@ impl NetworkVerifier {
     ///     `AllContractsHashes.json` (stale deploy from a prior regen — the
     ///     natural filter for the append-only file)
     ///
-    /// Surfaces two classes of issue via `result`:
-    ///   - Salt sanity (`expected_salts`): every recognized deploy whose salt
-    ///     isn't in the env-declared set is a hard ERROR.
+    /// Surfaces three classes of issue via `result`:
+    ///   - Unfetchable txs: each lookup is retried (`LOG_FETCH_ATTEMPTS`), and a
+    ///     tx or receipt still missing after that is reported (`unfetched_finding`):
+    ///     an ERROR when `strict_fetch` (an env with a historical deployment list,
+    ///     where every entry must be accounted for), a WARNING otherwise. A
+    ///     dropped tx would otherwise hide its deployment from the coverage and
+    ///     salt checks.
+    ///   - Salt sanity (`expected_salts`, only when `enforce_salts`): every
+    ///     recognized deploy whose salt isn't in the env-declared set is a hard
+    ///     ERROR. Pass `enforce_salts = false` for a *reference* log — a prior
+    ///     regen's already-broadcast deployment, fed in only to enrich the
+    ///     address book. Its deploys legitimately carry the salts of that
+    ///     regen, and rotating `create2_factory_salt` (which every regen must
+    ///     do) would otherwise make every one of them an error.
     ///   - Duplicate metadata: if the same deployed address shows up twice
     ///     with different `(name, ctor_args)`, that's a hard ERROR.
+    // Nine positional parameters: the RPC-facing addresses, the salt and fetch
+    // policies and the two sinks. Grouping them into a struct would just move the
+    // same fields.
+    #[allow(clippy::too_many_arguments)]
     pub async fn populate_create2_from_transactions_log(
         &mut self,
         tx_hashes: &[FixedBytes<32>],
         create2_factory: &Address,
         bridgehub_addr: &Address,
         expected_salts: &[FixedBytes<32>],
+        enforce_salts: bool,
+        strict_fetch: bool,
         bytecode_verifier: &BytecodeVerifier,
         result: &mut crate::upgrade_verification::verifiers::VerificationResult,
     ) {
-        let mut fetch_failures = 0_usize;
+        let mut unfetched: Vec<(TxHash, String)> = Vec::new();
         let mut reverted = 0_usize;
         let mut parsed_gateway_deployments = 0_usize;
 
         for tx_hash in tx_hashes {
             let hash = TxHash::from(*tx_hash);
 
-            let tx = match self.l1_provider.get_transaction_by_hash(hash).await {
-                Ok(Some(tx)) => tx,
-                Ok(None) => {
-                    fetch_failures += 1;
-                    continue;
-                }
-                Err(err) => {
-                    logger::warn(format!("eth_getTransactionByHash({hash:#x}) failed: {err}"));
-                    fetch_failures += 1;
+            let tx = match self.fetch_logged_tx(hash).await {
+                Ok(tx) => tx,
+                Err(why) => {
+                    logger::warn(format!("{hash:#x}: {why}"));
+                    unfetched.push((hash, why));
                     continue;
                 }
             };
@@ -237,39 +310,30 @@ impl NetworkVerifier {
                 continue;
             };
 
-            match self.l1_provider.get_transaction_receipt(hash).await {
-                Ok(Some(receipt)) => {
+            match self.fetch_logged_receipt(hash).await {
+                Ok(receipt) => {
                     if !receipt.status() {
                         reverted += 1;
                         continue;
                     }
                 }
-                Ok(None) => {
-                    logger::warn(format!(
-                        "eth_getTransactionReceipt({hash:#x}) returned null"
-                    ));
-                    fetch_failures += 1;
-                    continue;
-                }
-                Err(err) => {
-                    logger::warn(format!(
-                        "eth_getTransactionReceipt({hash:#x}) failed: {err}"
-                    ));
-                    fetch_failures += 1;
+                Err(why) => {
+                    logger::warn(format!("{hash:#x}: {why}"));
+                    unfetched.push((hash, why));
                     continue;
                 }
             }
 
             if to == *bridgehub_addr {
                 parsed_gateway_deployments += 1;
-                if !expected_salts.contains(&deployment.salt) {
+                if enforce_salts && !expected_salts.contains(&deployment.salt) {
                     result.report_error(&format!(
                         "Gateway CREATE2 deployment of {} at {} (tx {hash:#x}) used salt {} \
                          which is not in the env-declared salt set",
                         deployment.name, deployment.addr, deployment.salt
                     ));
                 }
-            } else if !expected_salts.contains(&deployment.salt) {
+            } else if enforce_salts && !expected_salts.contains(&deployment.salt) {
                 // Salt sanity: only enforced after recognition, so non-deploy tx
                 // first-32 bytes (which aren't salts at all) don't trigger errors.
                 // Hard ERROR per offending deploy — `ensure_success` rejects the
@@ -286,10 +350,10 @@ impl NetworkVerifier {
             self.insert_create2_deployment(deployment, result);
         }
 
-        if fetch_failures > 0 {
-            logger::warn(format!(
-                "transactions.txt: {fetch_failures} tx(s) not found on the RPC — wrong network, or stale file?"
-            ));
+        match unfetched_finding(&unfetched, strict_fetch) {
+            Some((true, message)) => result.report_error(&message),
+            Some((false, message)) => result.report_warn(&message),
+            None => {}
         }
         if reverted > 0 {
             logger::warn(format!(
@@ -301,6 +365,46 @@ impl NetworkVerifier {
                 "transactions.txt: loaded {parsed_gateway_deployments} Gateway L1→L2 CREATE2 deployment tx(s)"
             ));
         }
+    }
+
+    /// `eth_getTransactionByHash` for a transactions-log entry, retried (see
+    /// `LOG_FETCH_ATTEMPTS`). `Err` carries the last failure, for the report.
+    async fn fetch_logged_tx(
+        &self,
+        hash: TxHash,
+    ) -> Result<alloy::rpc::types::Transaction, String> {
+        let mut last = String::new();
+        for attempt in 0..LOG_FETCH_ATTEMPTS {
+            if attempt > 0 {
+                log_fetch_backoff(attempt).await;
+            }
+            match self.l1_provider.get_transaction_by_hash(hash).await {
+                Ok(Some(tx)) => return Ok(tx),
+                Ok(None) => last = "eth_getTransactionByHash returned null".to_string(),
+                Err(err) => last = format!("eth_getTransactionByHash failed: {err}"),
+            }
+        }
+        Err(last)
+    }
+
+    /// `eth_getTransactionReceipt` for a transactions-log entry, retried (see
+    /// `LOG_FETCH_ATTEMPTS`). `Err` carries the last failure, for the report.
+    async fn fetch_logged_receipt(
+        &self,
+        hash: TxHash,
+    ) -> Result<alloy::rpc::types::TransactionReceipt, String> {
+        let mut last = String::new();
+        for attempt in 0..LOG_FETCH_ATTEMPTS {
+            if attempt > 0 {
+                log_fetch_backoff(attempt).await;
+            }
+            match self.l1_provider.get_transaction_receipt(hash).await {
+                Ok(Some(receipt)) => return Ok(receipt),
+                Ok(None) => last = "eth_getTransactionReceipt returned null".to_string(),
+                Err(err) => last = format!("eth_getTransactionReceipt failed: {err}"),
+            }
+        }
+        Err(last)
     }
 
     fn insert_create2_deployment(
@@ -344,7 +448,7 @@ impl NetworkVerifier {
         self.create2_constructor_params.insert(addr, params);
     }
 
-    pub fn get_gateway_chain_id(&self) -> u64 {
+    pub fn get_gateway_chain_id(&self) -> Option<u64> {
         self.gateway_chain_id
     }
 
@@ -382,8 +486,10 @@ impl NetworkVerifier {
         self.l1_provider.clone()
     }
 
-    pub fn get_gw_provider(&self) -> RootProvider {
-        self.gw_provider.clone()
+    pub fn get_gw_provider(&self) -> anyhow::Result<RootProvider> {
+        self.gw_provider
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("this check needs the Gateway RPC; pass --gw-rpc-url"))
     }
 
     pub async fn try_get_l1_chain_id(&self) -> anyhow::Result<u64> {
@@ -473,7 +579,7 @@ impl NetworkVerifier {
         let slot = FixedBytes::<32>::from_hex(EIP1967_PROXY_ADMIN_SLOT)
             .context("invalid EIP-1967 admin slot literal")?;
         let storage = self
-            .gw_provider
+            .get_gw_provider()?
             .get_storage_at(addr, U256::from_be_bytes(slot.0))
             .await
             .with_context(|| format!("failed to read Gateway proxy admin slot for {addr}"))?;
@@ -509,19 +615,11 @@ fn parse_l1_create2_deploy_from_input(
     let salt = &input[0..32];
     let salt = FixedBytes::<32>::from_slice(salt);
 
-    if let Some((name, params)) = bytecode_verifier.try_parse_bytecode(&input[32..]) {
-        let addr = compute_create2_address_evm(to, salt, keccak256(&input[32..]));
-        return Some(ParsedCreate2Deployment {
-            addr,
-            name,
-            params,
-            salt,
-        });
-    };
-
     let bytecode_input = &input[32..];
 
-    // Okay, this may be the `Create2AndTransfer` method.
+    // Recognize the wrapper FIRST: its creation code is itself in the hash registry.
+    // Parsing it as an ordinary deployment would index the wrapper, losing the inner
+    // contract's address and constructor provenance (e.g. Era's RollupDAManager).
     if let Some(create2_and_transfer_input) =
         bytecode_verifier.is_create2_and_transfer_bytecode_prefix(bytecode_input)
     {
@@ -547,9 +645,14 @@ fn parse_l1_create2_deploy_from_input(
         });
     }
 
-    None
+    let (name, params) = bytecode_verifier.try_parse_bytecode(bytecode_input)?;
+    Some(ParsedCreate2Deployment {
+        addr: compute_create2_address_evm(to, salt, keccak256(bytecode_input)),
+        name,
+        params,
+        salt,
+    })
 }
-
 fn check_gw_create2_deploy_from_input(
     to: Address,
     input: &[u8],
@@ -604,4 +707,135 @@ fn check_gw_create2_deploy_from_input(
     }
 
     None
+}
+
+#[cfg(test)]
+mod create2_provenance_tests {
+    use super::super::bytecode_verifier::ContractHashes;
+    use super::*;
+
+    // Synthetic inner code isolates transaction parsing; the real, hash-pinned
+    // wrapper stays registered too, which reproduces the shadowing regression.
+    const INNER_CODE: &[u8] = &[0x60; 64];
+    const INNER_NAME: &str = "test/Inner";
+
+    fn verifier() -> BytecodeVerifier {
+        let mut hashes = ContractHashes::init_from_local().unwrap();
+        hashes.hashes.push(
+            serde_json::from_value(serde_json::json!({
+                "contractName": INNER_NAME,
+                "evmBytecodeHash": format!("{:#x}", keccak256(INNER_CODE))
+            }))
+            .unwrap(),
+        );
+        BytecodeVerifier::from_contract_hashes(hashes)
+    }
+
+    fn wrapped_input(
+        verifier: &BytecodeVerifier,
+        outer_salt: FixedBytes<32>,
+        inner_salt: FixedBytes<32>,
+        inner: Vec<u8>,
+    ) -> Vec<u8> {
+        let mut input = outer_salt.to_vec();
+        input.extend(verifier.get_create2_and_transfer_bytecode());
+        input.extend(
+            create2AndTransferParamsCall {
+                bytecode: inner.into(),
+                salt: inner_salt,
+                owner: Address::ZERO,
+            }
+            .abi_encode()[4..]
+                .iter()
+                .copied(),
+        );
+        input
+    }
+
+    #[test]
+    fn registered_wrapper_indexes_inner_address_and_constructor_params() {
+        let verifier = verifier();
+        let salt = FixedBytes::<32>::ZERO;
+        let factory = Address::ZERO;
+        for params in [vec![], vec![0x42; 32]] {
+            let inner = [INNER_CODE, params.as_slice()].concat();
+            let input = wrapped_input(&verifier, salt, salt, inner.clone());
+            let wrapper = compute_create2_address_evm(factory, salt, keccak256(&input[32..]));
+            let parsed = parse_l1_create2_deploy_from_input(factory, &input, &verifier).unwrap();
+            assert_eq!(parsed.name, INNER_NAME);
+            assert_eq!(
+                parsed.addr,
+                compute_create2_address_evm(wrapper, salt, keccak256(&inner))
+            );
+            assert_ne!(parsed.addr, wrapper);
+            assert_eq!(parsed.params, params);
+            assert_eq!(parsed.salt, salt);
+        }
+    }
+
+    #[test]
+    fn malformed_wrapper_does_not_fall_back_to_outer_deployment() {
+        let verifier = verifier();
+        let salt = FixedBytes::<32>::ZERO;
+        let wrong_salt = FixedBytes::<32>::repeat_byte(1);
+        let input = wrapped_input(&verifier, salt, wrong_salt, INNER_CODE.to_vec());
+        assert!(parse_l1_create2_deploy_from_input(Address::ZERO, &input, &verifier).is_none());
+        let mut input = salt.to_vec();
+        input.extend(verifier.get_create2_and_transfer_bytecode());
+        assert!(parse_l1_create2_deploy_from_input(Address::ZERO, &input, &verifier).is_none());
+        let input = wrapped_input(&verifier, salt, salt, vec![0xff]);
+        assert!(parse_l1_create2_deploy_from_input(Address::ZERO, &input, &verifier).is_none());
+    }
+
+    #[test]
+    fn direct_create2_still_preserves_constructor_params() {
+        let verifier = verifier();
+        let salt = FixedBytes::<32>::ZERO;
+        let params = vec![0x42; 32];
+        let init = [INNER_CODE, params.as_slice()].concat();
+        let input = [salt.as_slice(), init.as_slice()].concat();
+        let parsed = parse_l1_create2_deploy_from_input(Address::ZERO, &input, &verifier).unwrap();
+        assert_eq!(parsed.name, INNER_NAME);
+        assert_eq!(parsed.params, params);
+        assert_eq!(
+            parsed.addr,
+            compute_create2_address_evm(Address::ZERO, salt, keccak256(&init))
+        );
+        assert!(parse_l1_create2_deploy_from_input(Address::ZERO, &[0; 31], &verifier).is_none());
+    }
+}
+
+#[cfg(test)]
+mod unfetched_tests {
+    use super::{unfetched_finding, TxHash};
+
+    /// Entries still unfetchable after the retries are reported with their hashes: an error
+    /// for an env with a historical list (strict), a warning otherwise, nothing when all fetched.
+    #[test]
+    fn unfetched_log_entries_are_reported_and_strict_envs_fail() {
+        assert!(unfetched_finding(&[], true).is_none());
+
+        let unfetched = vec![
+            (
+                TxHash::repeat_byte(0x8c),
+                "eth_getTransactionReceipt returned null".to_string(),
+            ),
+            (
+                TxHash::repeat_byte(0x43),
+                "eth_getTransactionByHash failed: 429".to_string(),
+            ),
+        ];
+        let (is_error, message) = unfetched_finding(&unfetched, true).unwrap();
+        assert!(is_error);
+        assert!(
+            message.contains("2 tx(s) could not be fetched"),
+            "{message}"
+        );
+        for (hash, why) in &unfetched {
+            assert!(message.contains(&format!("{hash:#x} ({why})")), "{message}");
+        }
+
+        let (is_error, _) = unfetched_finding(&unfetched, false).unwrap();
+        assert!(!is_error);
+    }
 }
