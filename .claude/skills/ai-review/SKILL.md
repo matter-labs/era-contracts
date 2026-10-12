@@ -25,8 +25,8 @@ Ground rules:
 - **PR**: from the arguments, else `gh pr view --json number,baseRefName,headRefOid,title,body` for the current branch.
   No PR is fine.
 - **HEAD**: the PR head on GitHub. On your own branch it is the working tree, committed plus uncommitted.
-- **BASE**: the merge-base of HEAD with the PR's base branch. Without a PR, use the `origin/main` or `origin/draft/*`
-  branch with the fewest commits between it and HEAD.
+- **BASE**: the merge-base of HEAD with the PR's base branch. Without a PR, use whichever long-lived branch
+  (`origin/main`, `origin/draft*` or `origin/release*`) has the fewest commits between it and HEAD.
 - **SINCE**, the part that needs the closest look:
   - your own branch with unpushed work: the pushed head (`@{u}`, or the PR's `headRefOid`). You are checking what is
     about to be pushed;
