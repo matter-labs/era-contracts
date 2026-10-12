@@ -24,6 +24,9 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {NativeTokenVaultBase} from "contracts/bridge/ntv/NativeTokenVaultBase.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
+import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
+import {SemVer} from "contracts/common/libraries/SemVer.sol";
+import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {
     CoreDeployedAddresses,
     BridgehubAddresses,
@@ -34,7 +37,8 @@ import {
     BridgeContracts,
     CTMDeployedAddresses,
     CTMAdminAddresses,
-    L1SpecificStateTransitionAddresses
+    L1SpecificStateTransitionAddresses,
+    FIRST_PROTOCOL_VERSION_WITH_INTEROP_FEE
 } from "./Types.sol";
 import {StateTransitionContracts, Verifiers, Facets} from "contracts/common/StateTransitionTypes.sol";
 import {DeployCTML1OrGateway} from "../ctm/DeployCTML1OrGateway.sol";
@@ -185,7 +189,10 @@ library AddressIntrospector {
             defaultUpgrade: ctm.defaultUpgrade(),
             chainTypeManagerProxyAdmin: Utils.getProxyAdminAddress(ctmAddr)
         });
-        info.l1Specific = L1SpecificStateTransitionAddresses({legacyValidatorTimelock: ctm.validatorTimelock()});
+        info.l1Specific = L1SpecificStateTransitionAddresses({
+            legacyValidatorTimelock: ctm.validatorTimelock(),
+            interopFeeManager: _getInteropFeeManager(ctm, facets.executorFacet)
+        });
         info.admin = CTMAdminAddresses({
             transparentProxyAdmin: Utils.getProxyAdminAddress(ctmAddr),
             governance: IOwnable(ctmAddr).owner(),
@@ -334,6 +341,21 @@ library AddressIntrospector {
             }
         }
         return address(0);
+    }
+
+    /// @notice Returns the interop fee manager the Executor facet of the CTM's up-to-date chain charges, so that a
+    /// later release keeps the manager holding the chains' prepaid balances.
+    /// @dev Zero before the release that introduced it, and when no chain is on the CTM's current version (e.g. a
+    /// fresh ecosystem). The CTM upgrade requires such a chain (`getUptoDateZkChainAddresses`), so there zero always
+    /// means the former.
+    /// @param _ctm The CTM being introspected.
+    /// @param _executorFacet The Executor facet of a chain on the CTM's protocol version, or zero if there is none.
+    function _getInteropFeeManager(ChainTypeManager _ctm, address _executorFacet) internal view returns (address) {
+        (, uint32 minor, ) = SemVer.unpackSemVer(SafeCast.toUint96(_ctm.protocolVersion()));
+        if (minor < FIRST_PROTOCOL_VERSION_WITH_INTEROP_FEE || _executorFacet == address(0)) {
+            return address(0);
+        }
+        return ExecutorFacet(_executorFacet).getInteropFeeManager();
     }
 
     function _getVerifierFromUptoDateZkChain(ChainTypeManager _ctm) private view returns (address) {

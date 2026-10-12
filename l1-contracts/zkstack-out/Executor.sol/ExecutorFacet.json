@@ -1,5 +1,21 @@
 [
   {
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "_l1ChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_interopFeeManager",
+        "type": "address",
+        "internalType": "contract IInteropFeeManager"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
     "type": "function",
     "name": "executeBatchesSharedBridge",
     "inputs": [
@@ -26,6 +42,19 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "getInteropFeeManager",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -425,6 +454,11 @@
   {
     "type": "error",
     "name": "VerifiedBatchesExceedsCommittedBatches",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ZeroAddress",
     "inputs": []
   }
 ]

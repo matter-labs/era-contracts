@@ -315,7 +315,7 @@ library GatewayCTMDeployerHelper {
             _create2Salt,
             "Executor.sol",
             "ExecutorFacet",
-            hex""
+            abi.encode(config.l1ChainId, address(0))
         );
 
         // GettersFacet
@@ -694,7 +694,8 @@ library GatewayCTMDeployerHelper {
                 eip7702Checker: address(0),
                 verifierFflonk: _deployedContracts.stateTransition.verifiers.verifierFflonk,
                 verifierPlonk: _deployedContracts.stateTransition.verifiers.verifierPlonk,
-                permissionlessValidator: address(0)
+                permissionlessValidator: address(0),
+                interopFeeManager: address(0)
             });
     }
 

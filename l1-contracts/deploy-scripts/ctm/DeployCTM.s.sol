@@ -27,6 +27,7 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
 import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
+import {IInteropFeeManager} from "contracts/core/interop-fee/IInteropFeeManager.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {CTMDeployedAddresses, Config, DeployCTMUtils} from "./DeployCTMUtils.s.sol";
@@ -170,6 +171,9 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         ) = deployServerNotifier();
 
         initializeGeneratedData();
+
+        // The Executor facet takes the fee manager as an immutable, so it has to exist first.
+        (, ctmAddresses.l1Specific.interopFeeManager) = deployTuppWithContract("InteropFeeManager");
 
         deployStateTransitionDiamondFacets();
         (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(CTMContract.ChainTypeManager);
@@ -392,6 +396,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             "state_transition",
             "bytecodes_supplier_impl_addr",
             ctmAddresses.stateTransition.implementations.bytecodesSupplier
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "interop_fee_manager_proxy_addr",
+            ctmAddresses.l1Specific.interopFeeManager
         );
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
@@ -630,7 +639,8 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             IEIP7702Checker(address(1)),
             false
         );
-        ExecutorFacet executorFacet = new ExecutorFacet();
+        // Only its selectors are read; any non-zero manager satisfies the constructor on every chain.
+        ExecutorFacet executorFacet = new ExecutorFacet(1, IInteropFeeManager(address(1)));
         MigratorFacet migratorFacet = new MigratorFacet(1, false);
         CommitterFacet committerFacet = new CommitterFacet(1);
         bytes4[] memory adminFacetSelectors = Utils.getAllSelectors(address(adminFacet).code);

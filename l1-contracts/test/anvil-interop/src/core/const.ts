@@ -59,6 +59,9 @@ export const ANVIL_FUND_BALANCE = "0x56BC75E2D63100000";
 
 export const SERVICE_TX_SENDER_ADDR = "0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF";
 
+// EIP-1967 admin slot: bytes32(uint256(keccak256("eip1967.proxy.admin")) - 1)
+export const EIP1967_ADMIN_SLOT = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
+
 // Default gas limits for test transactions.
 // Every interop send is atomic: it appends the leg's commit value to the chain's {L2InteropCommitmentTree}
 // via {AtomicFlowManager.append}. The dynamic-height IndexedMerkleTree (#2235, FullMerkle-backed) insert

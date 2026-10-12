@@ -7,6 +7,7 @@ import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {DiamondCutTestContract} from "contracts/dev-contracts/test/DiamondCutTestContract.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
+import {IInteropFeeManager} from "contracts/core/interop-fee/IInteropFeeManager.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -42,8 +43,8 @@ contract FacetCutTest is DiamondCutTest {
         IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
         mailboxFacet = new MailboxFacet(block.chainid, address(0), eip7702Checker, false);
         gettersFacet = new GettersFacet();
-        executorFacet1 = new ExecutorFacet();
-        executorFacet2 = new ExecutorFacet();
+        executorFacet1 = new ExecutorFacet(block.chainid, IInteropFeeManager(makeAddr("interopFeeManager")));
+        executorFacet2 = new ExecutorFacet(block.chainid, IInteropFeeManager(makeAddr("interopFeeManager")));
     }
 
     function test_AddingFacetsToFreeSelectors() public {

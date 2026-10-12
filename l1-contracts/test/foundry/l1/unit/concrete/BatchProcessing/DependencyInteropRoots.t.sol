@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
+import {IInteropFeeManager} from "contracts/core/interop-fee/IInteropFeeManager.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {InteropRoot} from "contracts/common/Messaging.sol";
@@ -21,6 +22,9 @@ import {
 /// production entry points — no mocked root values; the full execute flow is covered by the
 /// batch-processing tests.
 contract DependencyInteropRootsHarness is ExecutorFacet {
+    // Only the dependency-root check is exercised, which never charges the interop fee.
+    constructor() ExecutorFacet(block.chainid, IInteropFeeManager(address(1))) {}
+
     function setBridgehub(address _bridgehub) external {
         s.bridgehub = _bridgehub;
     }
