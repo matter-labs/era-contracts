@@ -102,7 +102,7 @@ Out of scope: `dev-contracts/`, `test-contracts/`, `test/`, `deploy-scripts/`, `
   it: delete `l1-contracts/test/foundry/l1/integration/deploy-scripts/script-config/.lock`.
 - L2-side bridge and messaging tests in EraVM mode: `cd l1-contracts && yarn test:zkfoundry`.
 - Running the L1 tests rewrites or deletes `l1-contracts/snapshots/Executor.json` (forge gas snapshots). Restore it
-  with `git checkout -- l1-contracts/snapshots` before writing a patch, and do not report it.
+  with `git checkout -- :/l1-contracts/snapshots` before writing a patch, and do not report it.
 - L2 contracts: `cd l2-contracts && yarn test:foundry`.
 - System contracts and the bootloader have no offline harness in this image. Their hardhat tests need a
   running anvil-zksync node, and the bootloader tests are a Rust crate. Reason from the code. Where a
