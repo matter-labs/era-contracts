@@ -9,16 +9,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl git jq xz-utils build-essential python3 \
     && rm -rf /var/lib/apt/lists/*
 
-# Node 18.18.0 (.nvmrc) and Yarn 1.
-RUN arch="$(dpkg --print-architecture | sed 's/amd64/x64/')" \
-    && curl -fsSL "https://nodejs.org/dist/v18.18.0/node-v18.18.0-linux-${arch}.tar.xz" \
+# Node from .nvmrc, Yarn 1, and foundry-zksync from the release l1-contracts-ci.yaml downloads, so a CI bump needs no
+# edit here. forge and cast build for both EVM and EraVM (--zksync); tests shell out to cast and node via ffi.
+COPY .nvmrc .github/workflows/l1-contracts-ci.yaml /pins/
+RUN version="$(tr -d '[:space:]' < /pins/.nvmrc)" \
+    && arch="$(dpkg --print-architecture | sed 's/amd64/x64/')" \
+    && curl -fsSL "https://nodejs.org/dist/${version}/node-${version}-linux-${arch}.tar.xz" \
        | tar -xJ -C /usr/local --strip-components=1 \
     && npm install -g yarn@1.22.19 \
     && npm cache clean --force
 
-# foundry-zksync at the nightly CI pins: forge and cast for both EVM and EraVM (--zksync) builds. Tests shell out to
-# cast and node via ffi.
-RUN curl -fsSL "https://github.com/matter-labs/foundry-zksync/releases/download/nightly-ae913af65381734ad46c044a9495b67310bc77c4/foundry_nightly_linux_$(dpkg --print-architecture).tar.gz" \
+RUN release="$(grep -om1 'foundry-zksync/releases/download/nightly-[0-9a-f]*' /pins/l1-contracts-ci.yaml)" \
+    && curl -fsSL "https://github.com/matter-labs/${release}/foundry_nightly_linux_$(dpkg --print-architecture).tar.gz" \
        | tar -xz -C /usr/local/bin forge cast \
     && forge --version
 
