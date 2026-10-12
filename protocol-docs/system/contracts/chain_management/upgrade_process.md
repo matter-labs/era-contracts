@@ -44,4 +44,6 @@ version-specific implementation and staged governance calls.
   they do not make an invalid proof valid.
 
 Release-specific state migrations and ZKsync OS force deployments are documented in
-{protocol-docs/chain-lifecycle.md#upgrading-an-existing-ecosystem-onto-this-release}.
+[Upgrading an existing ecosystem onto this release](../../../chain-lifecycle.md#upgrading-an-existing-ecosystem-onto-this-release).
+The operational pipeline that prepares, verifies and rolls out a release across an ecosystem is
+described in [Upgrading an ecosystem](../../../ecosystem-upgrade.md).
