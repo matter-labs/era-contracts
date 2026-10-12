@@ -98,7 +98,8 @@ Out of scope: `dev-contracts/`, `test-contracts/`, `test/`, `deploy-scripts/`, `
   Unit tests per component are in `l1-contracts/test/foundry/l1/unit/concrete/`. Fixtures that deploy a whole
   ecosystem (Bridgehub, ChainTypeManager, chains, tokens) are in
   `l1-contracts/test/foundry/l1/integration/_Shared*.sol`. A proof of concept is most useful as a Foundry
-  test that extends these fixtures.
+  test that extends these fixtures. If one reverts with `Can't acquire config lock`, an earlier run died holding
+  it: delete `l1-contracts/test/foundry/l1/integration/deploy-scripts/script-config/.lock`.
 - L2-side bridge and messaging tests in EraVM mode: `cd l1-contracts && yarn test:zkfoundry`.
 - Running the L1 tests rewrites or deletes `l1-contracts/snapshots/Executor.json` (forge gas snapshots). Restore it
   with `git checkout -- l1-contracts/snapshots` before writing a patch, and do not report it.
