@@ -1,7 +1,8 @@
 # Build for Anthropic's OSS Scanner (https://github.com/anthropics/oss-scanner, projects/era-contracts), which builds
 # main with this file: a Yarn workspace of Foundry projects (l1-contracts, l2-contracts, system-contracts,
 # da-contracts) built with foundry-zksync, dependencies in git submodules. Mirrors
-# .github/workflows/l1-contracts-ci.yaml: when CI bumps Node, foundry-zksync or a compiler, bump them here too.
+# .github/workflows/l1-contracts-ci.yaml, as does docker/protocol/Dockerfile (same Node, Yarn and foundry-zksync pins):
+# when CI bumps Node, foundry-zksync or a compiler, bump them in both Dockerfiles too.
 FROM debian:bookworm
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
