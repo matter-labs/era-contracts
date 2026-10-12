@@ -126,15 +126,6 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
         _;
     }
 
-    /// @notice Checks that the message sender is the specified ZK Chain.
-    /// @param _chainId The ID of the chain that is required to be the caller.
-    modifier onlyChain(uint256 _chainId) {
-        if (msg.sender != IBridgehubBase(_getBridgehub()).getZKChain(_chainId)) {
-            revert OnlyChain(msg.sender, IBridgehubBase(_getBridgehub()).getZKChain(_chainId));
-        }
-        _;
-    }
-
     /// @notice Restricts batch-root appends to the chain's own diamond (its `Executor` calls
     /// directly while settling).
     modifier addChainBatchRootRestriction(uint256 _chainId) {

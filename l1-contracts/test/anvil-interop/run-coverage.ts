@@ -402,7 +402,9 @@ async function runSingleProcess(
     await timedAsync("load chain states (coverage mode)", () => runner.loadChainStates(anvilManager, stateDir));
   } else {
     console.log("\nNo pre-generated chain states found, running full deployment...");
-    await timedAsync("full deployment + test tokens + TBM", () => runner.deployAndSetupWithTBM(anvilManager));
+    await timedAsync("full deployment + test tokens + wrapped-ZK seeding", () =>
+      runner.deployAndSetupWithWrappedZk(anvilManager)
+    );
   }
 
   // Tests run with --no-compile since compilation is already done.

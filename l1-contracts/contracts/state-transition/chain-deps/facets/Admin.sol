@@ -27,8 +27,7 @@ import {
     NotL1,
     PriorityModeAlreadyAllowed,
     ExecutedIsNotConsistentWithVerified,
-    VerifiedIsNotConsistentWithCommitted,
-    NotMigrated
+    VerifiedIsNotConsistentWithCommitted
 } from "../../L1StateTransitionErrors.sol";
 import {
     AlreadyPermanentRollup,
@@ -113,13 +112,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
     function _executeDiamondCut(Diamond.DiamondCutData memory _diamondCut) internal {
         Diamond.diamondCut(_diamondCut);
         emit ExecuteUpgrade(_diamondCut);
-    }
-
-    /// @dev Requires the chain to be currently migrated (settlement layer != 0)
-    function _requireMigrated() internal view {
-        if (s.settlementLayer == address(0)) {
-            revert NotMigrated();
-        }
     }
 
     /// @inheritdoc IAdmin

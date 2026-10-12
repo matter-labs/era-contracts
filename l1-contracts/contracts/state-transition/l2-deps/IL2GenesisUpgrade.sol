@@ -16,8 +16,7 @@ struct ZKChainSpecificForceDeploymentsData {
 }
 
 /// @notice The structure that describes force deployments that are the same for each chain.
-/// @dev Note, that for simplicity, the same struct is used both for upgrading to the
-/// Gateway version and for the Genesis. Some fields may not be used in either of those.
+/// @dev The same struct is used both for upgrades and for the Genesis. Some fields may not be used in either of those.
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
     address l1AssetRouter;

@@ -26,9 +26,8 @@
 #
 # Also dropped (EVM-1689): `support_l2_legacy_shared_bridge_test`. Its only readers were the
 # from-scratch deploy scripts (`DeployL1CoreUtils` / `DeployCTMUtils`), which never see this file,
-# and #2400 removed them. And `[legacy_gateway] chain_id`: the v33 flow has no Gateway step —
-# `DefaultCoreUpgrade` no longer reads a legacy-Gateway chain id, so the redeployed
-# `L1MessageRoot` gets `ERA_GATEWAY_CHAIN_ID = 0` (the live stage one reports 123).
+# and #2400 removed them. And `[legacy_gateway] chain_id`: the v33 flow has no Gateway step, and
+# nothing reads a legacy-Gateway chain id any more.
 
 era_chain_id = 270
 testnet_verifier = true

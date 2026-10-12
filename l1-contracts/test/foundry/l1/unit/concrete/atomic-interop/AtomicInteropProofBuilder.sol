@@ -155,7 +155,7 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
         slMessageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(msgRootBridgehub, 1, makeAddr("atomicProofChainAssetHandler"))),
+                    address(new L1MessageRoot(msgRootBridgehub, makeAddr("atomicProofChainAssetHandler"))),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initialize, ())
                 )

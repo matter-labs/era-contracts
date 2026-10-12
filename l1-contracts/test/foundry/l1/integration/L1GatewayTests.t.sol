@@ -18,7 +18,12 @@ import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {GatewayDeployer} from "./_SharedGatewayDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
-import {ETH_TOKEN_ADDRESS, PRIORITY_TX_MAX_GAS_LIMIT} from "contracts/common/Config.sol";
+import {
+    ETH_TOKEN_ADDRESS,
+    MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER,
+    MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1,
+    PRIORITY_TX_MAX_GAS_LIMIT
+} from "contracts/common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {TxStatus, ConfirmTransferResultData, TokenBridgingData} from "contracts/common/Messaging.sol";
 
@@ -43,7 +48,7 @@ import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
-import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {IChainAssetHandlerBase, MigrationInterval} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
 import {IMessageRootBase, IMessageVerification} from "contracts/core/message-root/IMessageRoot.sol";
 import {OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
@@ -377,12 +382,24 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(migratingChainId);
         // Note: forward migration is not confirmed via _confirmMigration — migrateBackChain()
-        // simulates the L2 gateway side directly by switching vm.chainId and mocking proofs.
-        // As a result, some L1-side state (isMigrationInProgress, settlementLayer == block.chainid)
-        // is not fully resolved — those transitions only happen via bridgeConfirmTransferResult,
-        // which this test path skips.
+        // simulates the L2 gateway side directly by mocking proofs. As a result, isMigrationInProgress
+        // stays set — that transition only happens via bridgeConfirmTransferResult, which this test path skips.
 
         migrateBackChain();
+
+        // The return to L1 closes the migration interval that the forward migration opened.
+        address chainAssetHandler = address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler);
+        assertEq(
+            IChainAssetHandlerBase(chainAssetHandler).migrationNumber(migratingChainId),
+            MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1,
+            "Migration number should be MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1 after migration back"
+        );
+        MigrationInterval memory interval = IL1ChainAssetHandler(chainAssetHandler).migrationInterval(
+            migratingChainId,
+            MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER
+        );
+        assertEq(interval.settlementLayerChainId, gatewayChainId, "Migration interval should record the gateway");
+        assertFalse(interval.isActive, "Migration interval should be closed after migration back");
 
         // Verify the chain exists on L1 and is accessible
         IZKChain migratingChainContract = IZKChain(addresses.bridgehub.getZKChain(migratingChainId));
@@ -391,12 +408,11 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         // Verify the chain contract is properly deployed at a non-zero address
         assertTrue(address(migratingChainContract).code.length > 0, "Chain contract should have deployed code");
 
-        // Verify settlement layer is no longer the gateway.
-        // Note: cannot assert == block.chainid because the simulated migration-back executes
-        // under vm.chainId(migratingChainId), so the recorded settlement layer is migratingChainId,
-        // not L1's block.chainid.
-        uint256 settlementLayer = addresses.bridgehub.settlementLayer(migratingChainId);
-        assertTrue(settlementLayer != gatewayChainId, "Settlement layer should not be gateway after migration back");
+        assertEq(
+            addresses.bridgehub.settlementLayer(migratingChainId),
+            block.chainid,
+            "Settlement layer should be L1 after migration back"
+        );
 
         // Verify base token asset ID is correctly set in bridgehub
         bytes32 expectedBaseTokenAssetId = eraConfig.baseTokenAssetId;
@@ -432,10 +448,6 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
         bytes32 baseTokenAssetId = eraConfig.baseTokenAssetId;
 
-        uint256 currentChainId = block.chainid;
-        // we are already on L1, so we have to set another chain id, it cannot be GW or mintChainId.
-        vm.chainId(migratingChainId);
-
         vm.mockCall(
             address(ecosystemAddresses.bridgehub.proxies.messageRoot),
             abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
@@ -455,7 +467,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         TokenBridgingData memory baseTokenBridgingData = TokenBridgingData({
             assetId: baseTokenAssetId,
             originToken: makeAddr("baseTokenOrigin"),
-            originChainId: currentChainId
+            originChainId: block.chainid
         });
 
         uint256 protocolVersion = addresses.chainTypeManager.getProtocolVersion(migratingChainId);
@@ -493,8 +505,6 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             message: message,
             merkleProof: new bytes32[](0)
         });
-
-        vm.chainId(currentChainId);
 
         assertEq(
             addresses.bridgehub.baseTokenAssetId(migratingChainId),
