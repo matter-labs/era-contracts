@@ -210,8 +210,8 @@ is nothing to fold in for them, now or later).
   the population only ever adds to `bridgedOut`.
 - Until an asset is populated, only its pre-upgrade escrow is unwithdrawable — amounts bridged out after the
   upgrade raise `bridgedOut` normally and can be withdrawn against. Legacy tokens that predate the
-  `bridgedTokens` enumeration have to be backfilled into it before they can be populated at all, which is why
-  `stage3` registers them first.
+  `bridgedTokens` enumeration have to be backfilled into it before they can be populated at all, which `stage3`
+  does not do: call the vault's permissionless `addLegacyTokenToBridgedTokensList(token)` for each of them first.
 
 ## Base-token handling
 
