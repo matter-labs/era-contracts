@@ -13,7 +13,7 @@ contract DummyChainTypeManagerWBH is ChainTypeManager {
 
     address internal zkChain;
     /// @notice Constructor
-    constructor(address bridgeHub) ChainTypeManager(bridgeHub, address(0), address(0), address(0)) {}
+    constructor(address bridgeHub) ChainTypeManager(bridgeHub, address(0), address(0), address(0), address(0)) {}
 
     function setZKChain(address _zkChain) external {
         zkChain = _zkChain;

@@ -107,11 +107,13 @@ describe("14 - Interop fee units", function () {
     feeManager = new Contract(state.ctmAddresses.interopFeeManager, getAbi("L1InteropFeeManager"), l1Provider);
   });
 
-  it("deploys the L1 fee manager switched off and owned by the CTM's governance", async () => {
+  it("deploys the L1 fee manager into the CTM, switched off and owned by the CTM's governance", async () => {
     expect(await l1Provider.getCode(feeManager.address), "fee manager must be deployed").to.not.equal("0x");
     expect((await feeManager.feePerUnit()).toString(), "the switch ships off").to.equal("0");
     expect((await feeManager.accruedFees()).toString()).to.equal("0");
     expect(await feeManager.BRIDGE_HUB()).to.equal(state.l1Addresses!.bridgehub);
+    const ctm = new Contract(state.ctmAddresses!.chainTypeManager, getAbi("IChainTypeManager"), l1Provider);
+    expect(await ctm.L1_INTEROP_FEE_MANAGER(), "the CTM points its chains at the manager").to.equal(feeManager.address);
     // The manager sits behind the CTM's ProxyAdmin, and the governance owning that ProxyAdmin owns the switch and
     // receives the fees from initialization.
     const proxyAdmin = await proxyAdminOf(feeManager.address);

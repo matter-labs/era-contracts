@@ -8,47 +8,39 @@ import {FIRST_PROTOCOL_VERSION_WITH_INTEROP_FEE} from "deploy-scripts/utils/Type
 
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
-import {IL1InteropFeeManager} from "contracts/core/interop-fee/IL1InteropFeeManager.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
-/// @notice Fee manager discovery used by the default upgrade scripts: a release from v35 on reuses the manager the
-///         current Executor facet charges, so the chains' prepaid balances stay in place.
-/// @dev The CTM is mocked: discovery only reads its protocol version, and standing up a CTM with chains is unrelated
-///      to what is under test. The Executor facet is real.
+/// @notice Fee manager discovery used by the default upgrade scripts: a release from v35 on reuses the CTM's manager,
+///         so the chains' prepaid balances stay in place.
+/// @dev The CTM's protocol version is mocked: setting it for real needs an initialized CTM proxy, which is unrelated
+///      to what is under test. The manager is read from a real CTM implementation.
 contract AddressIntrospectorInteropFeeTest is Test {
     ChainTypeManager internal ctm;
     address internal manager;
-    address internal executorFacet;
 
     function setUp() public {
-        ctm = ChainTypeManager(makeAddr("ctm"));
         manager = makeAddr("interopFeeManager");
-        executorFacet = address(new ExecutorFacet(block.chainid, IL1InteropFeeManager(manager)));
+        ctm = new ChainTypeManager(makeAddr("bridgehub"), makeAddr("interopCenter"), address(0), address(0), manager);
     }
 
-    function test_reusesTheManagerOfTheCurrentExecutor() public {
-        _mockProtocolVersion(FIRST_PROTOCOL_VERSION_WITH_INTEROP_FEE);
-        assertEq(AddressIntrospector._getInteropFeeManager(ctm, executorFacet), manager);
+    function test_reusesTheManagerOfTheCTM() public {
+        _mockProtocolVersion(ctm, FIRST_PROTOCOL_VERSION_WITH_INTEROP_FEE);
+        assertEq(AddressIntrospector._getInteropFeeManager(ctm), manager);
 
-        _mockProtocolVersion(FIRST_PROTOCOL_VERSION_WITH_INTEROP_FEE + 1);
-        assertEq(AddressIntrospector._getInteropFeeManager(ctm, executorFacet), manager);
+        _mockProtocolVersion(ctm, FIRST_PROTOCOL_VERSION_WITH_INTEROP_FEE + 1);
+        assertEq(AddressIntrospector._getInteropFeeManager(ctm), manager);
     }
 
-    /// @dev Older Executor facets have no getter, so they are never called.
+    /// @dev Older CTMs have no getter: the legacy CTM here has no code, so calling it would revert.
     function test_noManagerBeforeTheReleaseThatIntroducedIt() public {
-        _mockProtocolVersion(FIRST_PROTOCOL_VERSION_WITH_INTEROP_FEE - 1);
-        assertEq(AddressIntrospector._getInteropFeeManager(ctm, makeAddr("legacyExecutorFacet")), address(0));
+        ChainTypeManager legacyCtm = ChainTypeManager(makeAddr("legacyCtm"));
+        _mockProtocolVersion(legacyCtm, FIRST_PROTOCOL_VERSION_WITH_INTEROP_FEE - 1);
+        assertEq(AddressIntrospector._getInteropFeeManager(legacyCtm), address(0));
     }
 
-    function test_noManagerWithoutAnUpToDateChain() public {
-        _mockProtocolVersion(FIRST_PROTOCOL_VERSION_WITH_INTEROP_FEE);
-        assertEq(AddressIntrospector._getInteropFeeManager(ctm, address(0)), address(0));
-    }
-
-    function _mockProtocolVersion(uint32 _minor) internal {
+    function _mockProtocolVersion(ChainTypeManager _ctm, uint32 _minor) internal {
         vm.mockCall(
-            address(ctm),
+            address(_ctm),
             abi.encodeCall(IChainTypeManager.protocolVersion, ()),
             abi.encode(SemVer.packSemVer(0, _minor, 0))
         );

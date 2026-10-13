@@ -28,7 +28,6 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {Utils} from "../../../../deploy-scripts/utils/Utils.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DefaultUpgradeZKsyncOS} from "contracts/upgrades/DefaultUpgradeZKsyncOS.sol";
-import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {L1InteropFeeManager} from "contracts/core/interop-fee/L1InteropFeeManager.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {Bytes} from "contracts/vendor/Bytes.sol";
@@ -303,19 +302,16 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationTestBase, L1ContractDe
             "Bridgehub does not know the ChainRegistrationSender"
         );
 
-        // Both chains charge the CTM's interop fee manager, which ships switched off, owned by governance and behind
-        // the CTM's ProxyAdmin.
-        L1InteropFeeManager interopFeeManager = L1InteropFeeManager(ctmUpgrade.getAddresses().l1Specific.interopFeeManager);
+        // The upgraded CTM points its chains at the interop fee manager, which ships switched off, owned by governance
+        // and behind the CTM's ProxyAdmin.
+        L1InteropFeeManager interopFeeManager = L1InteropFeeManager(
+            ctmUpgrade.getAddresses().l1Specific.interopFeeManager
+        );
         assertTrue(address(interopFeeManager) != address(0), "No interop fee manager after the upgrade");
         assertEq(
-            ExecutorFacet(_eraDiamond).getInteropFeeManager(),
+            IChainTypeManager(ctm).L1_INTEROP_FEE_MANAGER(),
             address(interopFeeManager),
-            "Existing chain charges another interop fee manager"
-        );
-        assertEq(
-            ExecutorFacet(_newChainDiamond).getInteropFeeManager(),
-            address(interopFeeManager),
-            "New chain charges another interop fee manager"
+            "CTM points at another interop fee manager"
         );
         address governance = ctmUpgrade.getAddresses().admin.governance;
         assertEq(interopFeeManager.owner(), governance, "Interop fee manager not owned by governance");

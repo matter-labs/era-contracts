@@ -37,11 +37,10 @@ The batch output layout is pinned by golden vectors shared with ZKsync OS:
 
 ## Charging and enforcement
 
-`ExecutorFacet` calls `L1InteropFeeManager.chargeInteropFee(chainId, batchNumber, units)` for every batch it executes,
-when:
+`ExecutorFacet` calls `chargeInteropFee(chainId, batchNumber, units)` on its CTM's `L1_INTEROP_FEE_MANAGER()` for
+every batch it executes, when:
 
 - `interopFeeUnits != 0`: batches without interop never touch the manager;
-- the batch settles on L1, where the manager lives;
 - priority mode is off: the escape hatch never depends on the fee.
 
 The manager debits the chain's **prepaid balance** (`deposit(chainId)`, payable by anyone, withdrawable only by the
@@ -58,9 +57,8 @@ reverted batch with the same number.
 ## The switch
 
 `DeployCTM` deploys an `L1InteropFeeManager` proxy with the CTM, as does the CTM upgrade that introduces it; later
-upgrades keep the one the current `ExecutorFacet` charges, which holds the chains' prepaid balances. It is passed to
-the `ExecutorFacet` as an immutable and can be read as `getInteropFeeManager()` on the L1 diamond of any chain from v35
-on. Its owner is protocol governance from initialization, and controls:
+upgrades keep the one the current CTM points at, which holds the chains' prepaid balances. The CTM takes it as an
+immutable, `L1_INTEROP_FEE_MANAGER()`, from v35 on. Its owner is protocol governance from initialization, and controls:
 
 - `feePerUnit`: wei per interop fee unit; `0`, the initial value, turns the switch off;
 - `feeRecipient`: where the permissionless `sweep()` sends the accrued fees; initially governance.

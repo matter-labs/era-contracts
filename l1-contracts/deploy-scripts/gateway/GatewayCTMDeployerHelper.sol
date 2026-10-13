@@ -315,7 +315,7 @@ library GatewayCTMDeployerHelper {
             _create2Salt,
             "Executor.sol",
             "ExecutorFacet",
-            abi.encode(config.l1ChainId, address(0))
+            hex""
         );
 
         // GettersFacet
@@ -540,7 +540,7 @@ library GatewayCTMDeployerHelper {
         result.chainTypeManagerImplementation = _deployInternalWithParams(
             ctmName,
             ctmFile,
-            abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), address(0)),
+            abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), address(0), address(0)),
             innerConfig
         );
 

@@ -9,10 +9,7 @@ import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.s
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IL1InteropFeeManager} from "contracts/core/interop-fee/IL1InteropFeeManager.sol";
 import {InsufficientInteropFeeBalance} from "contracts/core/interop-fee/InteropFeeErrors.sol";
-import {Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
-import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
-import {DummyL2L1Messenger} from "contracts/dev-contracts/test/DummyL2L1Messenger.sol";
+import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 /// @notice The interop fee through a real diamond and a real `L1InteropFeeManager`: commits record each batch's count,
 /// execution charges it, and the chain admin withdraws. See {protocol-docs/interop-fee.md}.
@@ -182,36 +179,6 @@ contract InteropFeeTest is ExecutorTest {
 
         assertEq(getters.getTotalBatchesExecuted(), 0);
         assertEq(interopFeeManager.chainBalance(l2ChainId), 2 * FEE_PER_UNIT);
-    }
-
-    function test_revertWhen_executorOnL1HasNoFeeManager() public {
-        vm.expectRevert(ZeroAddress.selector);
-        new ExecutorFacet(block.chainid, IL1InteropFeeManager(address(0)));
-    }
-
-    /// @dev Pins the settlement-layer condition of the charge.
-    function test_execute_offL1IsNeverCharged() public {
-        // Switched on without a balance: a batch settled on a settlement layer other than L1 still executes.
-        _setFee(FEE_PER_UNIT);
-        vm.chainId(block.chainid + 1);
-        // Off L1 the committer relays the committed batch to L1 through the messenger.
-        vm.etch(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, address(new DummyL2L1Messenger()).code);
-        CommitBatchInfoZKsyncOS memory batch = _batchWithUnits(3);
-        batch.slChainId = block.chainid;
-        IExecutor.StoredBatchInfo memory stored = _commitAndProve(batch);
-
-        vm.expectCall(
-            address(interopFeeManager),
-            abi.encodeWithSelector(IL1InteropFeeManager.chargeInteropFee.selector),
-            0
-        );
-        _execute(stored);
-
-        assertEq(getters.getTotalBatchesExecuted(), 1);
-    }
-
-    function test_getInteropFeeManager_returnsTheChargedManager() public view {
-        assertEq(executor.getInteropFeeManager(), address(interopFeeManager));
     }
 
     /// @dev The manager reads the chain admin from the diamond on every withdrawal, so it follows admin changes.

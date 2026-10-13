@@ -9,8 +9,7 @@ import {StateTransitionDeployedAddresses, DAContracts} from "contracts/common/St
 /// verifiers exported it as the legacy `IS_TESTNET_VERIFIER` constant.
 uint32 constant FIRST_PROTOCOL_VERSION_WITH_VERIFIER_FLAG = 34;
 
-/// @dev First protocol version whose Executor facet charges the L1 interop fee and exposes its manager
-/// (`getInteropFeeManager()`).
+/// @dev First protocol version whose CTM exposes the L1 interop fee manager (`L1_INTEROP_FEE_MANAGER()`).
 uint32 constant FIRST_PROTOCOL_VERSION_WITH_INTEROP_FEE = 35;
 
 struct BridgehubContracts {

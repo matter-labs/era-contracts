@@ -117,7 +117,7 @@ contract ExecutorTest is UtilsCallMockerTest {
     }
 
     function getExecutorSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](7);
+        bytes4[] memory selectors = new bytes4[](6);
         uint256 i = 0;
         selectors[i++] = executor.proveBatchesSharedBridge.selector;
         selectors[i++] = executor.executeBatchesSharedBridge.selector;
@@ -125,7 +125,6 @@ contract ExecutorTest is UtilsCallMockerTest {
         selectors[i++] = executor.setPriorityTreeStartIndex.selector;
         selectors[i++] = executor.setPriorityTreeHistoricalRoot.selector;
         selectors[i++] = executor.appendPriorityOp.selector;
-        selectors[i++] = executor.getInteropFeeManager.selector;
         return selectors;
     }
 
@@ -295,11 +294,17 @@ contract ExecutorTest is UtilsCallMockerTest {
                 )
             )
         );
-        executor = new TestExecutor(interopFeeManager);
+        executor = new TestExecutor();
         committer = new TestCommitter();
         mailbox = new MailboxFacet(block.chainid, address(chainAssetHandler), eip7702Checker, false);
 
         DummyCTM chainTypeManager = new DummyCTM(owner, address(0));
+        // The CTM stub has no interop fee manager; it points at the real one above.
+        vm.mockCall(
+            address(chainTypeManager),
+            abi.encodeWithSelector(IChainTypeManager.L1_INTEROP_FEE_MANAGER.selector),
+            abi.encode(address(interopFeeManager))
+        );
         vm.mockCall(
             address(chainTypeManager),
             abi.encodeWithSelector(IChainTypeManager.protocolVersionIsActive.selector),

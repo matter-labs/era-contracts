@@ -304,7 +304,12 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
             "PermissionlessValidator"
         );
 
-        // The constructor receives the new BytecodesSupplier and PermissionlessValidator proxy addresses.
+        // Zero only in the release that introduces the manager; see {protocol-docs/interop-fee.md#the-switch}.
+        if (ctmAddresses.l1Specific.interopFeeManager == address(0)) {
+            (, ctmAddresses.l1Specific.interopFeeManager) = deployTuppWithContract("L1InteropFeeManager");
+        }
+
+        // The constructor receives the BytecodesSupplier, PermissionlessValidator and interop fee manager proxies.
         (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(CTMContract.ChainTypeManager);
         console.log("Deploying ChainTypeManager:", ctmContractName);
         ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmContractName);
@@ -314,11 +319,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         // Deploy `MultisigCommitter` (a superset of ValidatorTimelock) as the default validator impl so the
         // upgrade does NOT downgrade proxies that already run a MultisigCommitter.
         ctmAddresses.stateTransition.implementations.validatorTimelock = deploySimpleContract("MultisigCommitter");
-
-        // Zero only in the release that introduces the manager; see {protocol-docs/interop-fee.md#the-switch}.
-        if (ctmAddresses.l1Specific.interopFeeManager == address(0)) {
-            (, ctmAddresses.l1Specific.interopFeeManager) = deployTuppWithContract("L1InteropFeeManager");
-        }
 
         deployStateTransitionDiamondFacets();
     }

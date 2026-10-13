@@ -79,7 +79,7 @@ library DeployCTML1OrGateway {
         } else if (_contractName == CTMContract.ValidatorTimelock) {
             return abi.encode(_config.bridgehubProxy);
         } else if (_contractName == CTMContract.ExecutorFacet) {
-            return abi.encode(_config.l1ChainId, _config.interopFeeManager);
+            return abi.encode();
         } else if (_contractName == CTMContract.MigratorFacet) {
             return abi.encode(_config.l1ChainId, _config.testnetVerifier);
         } else if (_contractName == CTMContract.CommitterFacet) {
@@ -94,7 +94,8 @@ library DeployCTML1OrGateway {
                     _config.bridgehubProxy,
                     _config.interopCenterProxy,
                     _config.l1BytecodesSupplier,
-                    _config.permissionlessValidator
+                    _config.permissionlessValidator,
+                    _config.interopFeeManager
                 );
         } else if (_contractName == CTMContract.BlobsL1DAValidatorZKsyncOS) {
             return abi.encode();

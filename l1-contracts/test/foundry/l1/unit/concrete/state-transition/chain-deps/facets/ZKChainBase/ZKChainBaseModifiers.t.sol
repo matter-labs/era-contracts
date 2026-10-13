@@ -7,7 +7,6 @@ import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCall
 
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
-import {IL1InteropFeeManager} from "contracts/core/interop-fee/IL1InteropFeeManager.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
@@ -67,7 +66,7 @@ contract ZKChainBaseModifiersTest is UtilsCallMockerTest {
             selectors: Utils.getUtilsFacetSelectors()
         });
         facetCuts[2] = Diamond.FacetCut({
-            facet: address(new ExecutorFacet(block.chainid, IL1InteropFeeManager(makeAddr("interopFeeManager")))),
+            facet: address(new ExecutorFacet()),
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: Utils.getExecutorSelectors()

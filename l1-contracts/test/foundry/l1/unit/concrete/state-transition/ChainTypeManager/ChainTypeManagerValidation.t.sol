@@ -11,7 +11,6 @@ import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
-import {IL1InteropFeeManager} from "contracts/core/interop-fee/IL1InteropFeeManager.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -120,7 +119,13 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
         chainAssetHandler.setAddresses();
 
         vm.startPrank(address(bridgehub));
-        chainTypeManager = new ChainTypeManager(address(bridgehub), interopCenterAddress, address(0), address(0));
+        chainTypeManager = new ChainTypeManager(
+            address(bridgehub),
+            interopCenterAddress,
+            address(0),
+            address(0),
+            address(0)
+        );
         diamondInit = address(new DiamondInit());
         genesisUpgradeContract = new L1GenesisUpgrade();
 
@@ -142,7 +147,7 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
         );
         facetCuts.push(
             Diamond.FacetCut({
-                facet: address(new ExecutorFacet(block.chainid, IL1InteropFeeManager(makeAddr("interopFeeManager")))),
+                facet: address(new ExecutorFacet()),
                 action: Diamond.Action.Add,
                 isFreezable: true,
                 selectors: Utils.getExecutorSelectors()
@@ -200,7 +205,13 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
     // ============================================================
 
     function test_constructor() public {
-        ChainTypeManager ctm = new ChainTypeManager(address(bridgehub), interopCenterAddress, address(0), address(0));
+        ChainTypeManager ctm = new ChainTypeManager(
+            address(bridgehub),
+            interopCenterAddress,
+            address(0),
+            address(0),
+            address(0)
+        );
         assertEq(ctm.BRIDGE_HUB(), address(bridgehub));
         assertTrue(ctm.isZKsyncOS());
     }

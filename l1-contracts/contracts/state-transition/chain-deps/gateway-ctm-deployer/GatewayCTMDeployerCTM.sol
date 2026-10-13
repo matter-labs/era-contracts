@@ -72,9 +72,15 @@ contract GatewayCTMDeployerCTM {
         GatewayCTMFinalConfig memory _config,
         GatewayCTMFinalResult memory _result
     ) internal {
-        // PermissionlessValidator is address(0) since Priority Mode is L1-only
+        // PermissionlessValidator is address(0) since Priority Mode is L1-only, as is the interop fee manager
         _result.chainTypeManagerImplementation = address(
-            new ChainTypeManager{salt: _salt}(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), address(0))
+            new ChainTypeManager{salt: _salt}({
+                _bridgehub: L2_BRIDGEHUB_ADDR,
+                _interopCenter: L2_INTEROP_CENTER_ADDR,
+                _l1BytecodesSupplier: address(0),
+                _permissionlessValidator: address(0),
+                _l1InteropFeeManager: address(0)
+            })
         );
 
         GatewayCTMDeployerConfig memory baseConfig = _config.baseConfig;
