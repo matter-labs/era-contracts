@@ -260,7 +260,7 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 #                                    that impersonates the deployer and signs
 #                                    nothing)
 #   GW_RPC_URL                    — Gateway RPC, passed to PUVT as
-#                                   `--gw-rpc-url` when set (v33's PUVT has no
+#                                   `--gw-rpc-url` when set (the PUVT has no
 #                                   Gateway-side checks and ignores it).
 
 on:
@@ -588,9 +588,7 @@ jobs:
       # Foundry supplies anvil + cast and `protocol_ops` supplies the replay. There is
       # no contract build: PUVT reads committed configuration, never `out/`.
       - name: Install Foundry (anvil + cast)
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: v1.5.1
+        uses: ./.github/actions/install-foundry
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
