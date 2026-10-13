@@ -189,6 +189,8 @@ export async function runUpgradeScenario(scenario: UpgradeScenario): Promise<voi
     console.log("\n── Chain upgrades complete, verifying final protocol versions ──");
     await verifyProtocolVersions(l1Provider, upgradeChainAddresses, readGenesisProtocolVersion().toHexString());
     console.log("✅ All protocol versions verified successfully!\n");
+    await verifyInteropFeeManager(l1Provider, ctmAddresses.chainTypeManager, l1Addresses.bridgehub);
+    console.log("✅ Upgraded CTM points at the interop fee manager, switched off\n");
   } finally {
     if (cleanupUpgradeHarnessInputs) {
       cleanupUpgradeHarnessInputs();
@@ -1116,6 +1118,30 @@ export async function verifyProtocolVersions(
         `Chain ${chain.chainId}: protocol version ${version.toHexString()}, expected ${expectedVersion.toHexString()}`
       );
     }
+  }
+}
+
+/** The CTM's interop fee manager must be deployed, on this bridgehub and switched off: the Executor charges through it. */
+export async function verifyInteropFeeManager(
+  provider: ethers.providers.JsonRpcProvider,
+  ctmAddr: string,
+  bridgehubAddr: string
+): Promise<void> {
+  const ctm = new ethers.Contract(ctmAddr, getAbi("IChainTypeManager"), provider);
+  const feeManagerAddr: string = await ctm.L1_INTEROP_FEE_MANAGER();
+  if ((await provider.getCode(feeManagerAddr)) === "0x") {
+    throw new Error(`CTM ${ctmAddr}: no interop fee manager deployed at ${feeManagerAddr}`);
+  }
+  const feeManager = new ethers.Contract(feeManagerAddr, getAbi("L1InteropFeeManager"), provider);
+  const feeManagerBridgehub: string = await feeManager.BRIDGE_HUB();
+  if (feeManagerBridgehub.toLowerCase() !== bridgehubAddr.toLowerCase()) {
+    throw new Error(
+      `Interop fee manager ${feeManagerAddr} is on bridgehub ${feeManagerBridgehub}, expected ${bridgehubAddr}`
+    );
+  }
+  const feePerUnit: ethers.BigNumber = await feeManager.feePerUnit();
+  if (!feePerUnit.isZero()) {
+    throw new Error(`Interop fee manager ${feeManagerAddr} is switched on: feePerUnit = ${feePerUnit.toString()}`);
   }
 }
 
