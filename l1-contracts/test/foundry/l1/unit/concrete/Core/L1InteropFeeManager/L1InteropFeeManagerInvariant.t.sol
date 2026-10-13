@@ -9,8 +9,8 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {ChainRegistryStub, ZKChainStub} from "./L1InteropFeeManager.t.sol";
 
-/// @dev Drives the manager through every state-changing entry point, each from its authorized caller, and tracks
-/// the value that moved through it.
+/// @dev Drives the manager through every entry point that moves value or sets the rate, each from its authorized
+/// caller, and tracks the value that moved through it. The fee recipient stays fixed: the sweep invariant relies on it.
 contract L1InteropFeeManagerHandler is Test {
     L1InteropFeeManager internal immutable MANAGER;
     address internal immutable OWNER;

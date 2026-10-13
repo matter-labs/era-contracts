@@ -29,6 +29,7 @@ import {Utils} from "../../../../deploy-scripts/utils/Utils.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DefaultUpgradeZKsyncOS} from "contracts/upgrades/DefaultUpgradeZKsyncOS.sol";
 import {L1InteropFeeManager} from "contracts/core/interop-fee/L1InteropFeeManager.sol";
+import {IL1InteropFeeManager} from "contracts/core/interop-fee/IL1InteropFeeManager.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {Bytes} from "contracts/vendor/Bytes.sol";
 
@@ -94,6 +95,9 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationTestBase, L1ContractDe
     address private _serverNotifierProxyAdmin;
     address private _expectedServerNotifierProxyAdminOwner;
     bytes32 private _expectedRewrittenUpgradeTxHash;
+    address private _interopFeeManagerBeforeUpgrade;
+
+    uint256 private constant INTEROP_FEE_DEPOSIT = 1 ether;
 
     /// @notice Override to run the default core script; it needs no memory trimming.
     function createCoreUpgrade() internal override returns (DefaultCoreUpgrade) {
@@ -170,6 +174,9 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationTestBase, L1ContractDe
         CHAIN_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-era.toml";
         CHAIN_OUTPUT = "/script-out/foundry-upgrade/local-gateway.toml";
         console.log("setUp: Paths configured");
+        // Prepaid interop fees must survive the upgrade, asserted in `test_DefaultUpgradeZKsyncOS_Local`.
+        _interopFeeManagerBeforeUpgrade = addresses.chainTypeManager.L1_INTEROP_FEE_MANAGER();
+        IL1InteropFeeManager(_interopFeeManagerBeforeUpgrade).deposit{value: INTEROP_FEE_DEPOSIT}(eraZKChainId);
         setupUpgrade();
         console.log("setUp: Upgrade setup complete");
         _snapshotExpectedZKsyncOSUpgradeTxHash();
@@ -302,17 +309,22 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationTestBase, L1ContractDe
             "Bridgehub does not know the ChainRegistrationSender"
         );
 
-        // The upgraded CTM points its chains at the interop fee manager, which ships switched off, owned by governance
-        // and behind the CTM's ProxyAdmin.
+        // The upgraded CTM keeps the interop fee manager it had, with the chains' prepaid balances; the manager ships
+        // switched off, owned by governance and behind the CTM's ProxyAdmin.
         L1InteropFeeManager interopFeeManager = L1InteropFeeManager(
             ctmUpgrade.getAddresses().l1Specific.interopFeeManager
         );
-        assertTrue(address(interopFeeManager) != address(0), "No interop fee manager after the upgrade");
+        assertEq(
+            address(interopFeeManager),
+            _interopFeeManagerBeforeUpgrade,
+            "Upgrade replaced the interop fee manager"
+        );
         assertEq(
             IChainTypeManager(ctm).L1_INTEROP_FEE_MANAGER(),
             address(interopFeeManager),
             "CTM points at another interop fee manager"
         );
+        assertEq(interopFeeManager.chainBalance(eraZKChainId), INTEROP_FEE_DEPOSIT, "Prepaid interop fees lost");
         address governance = ctmUpgrade.getAddresses().admin.governance;
         assertEq(interopFeeManager.owner(), governance, "Interop fee manager not owned by governance");
         assertEq(interopFeeManager.pendingOwner(), address(0), "Interop fee manager has a pending owner");
