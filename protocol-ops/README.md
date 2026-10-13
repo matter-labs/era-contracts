@@ -133,7 +133,7 @@ file per consecutive run of transactions by the same signer, plus a **`manifest.
 
 Without `--out` no bundles are written, unless the command derives a default from `--env`:
 `upgrade-prepare-all` (which also rewrites the release's canonical `ecosystem.toml`),
-`upgrade-governance`, `stage3` and `chain upgrade` do.
+`upgrade-governance` and `chain upgrade` do.
 
 ## Requirements
 

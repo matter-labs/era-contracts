@@ -154,7 +154,9 @@ Do not write comments that explain how Solidity works, or that preempt a misread
 
 Sometimes an environment needs a protocol version that server `dev` already uses for something else. Example (2026-09):
 stage's Era chains got v0.33.0 = compiler only (zksolc 1.5.17 + DSE bootloader, from `draft-v31`), while server `dev`
-used Version33 for the undeployed force-fail/Airbender release. Terms used below:
+used Version33 for the undeployed force-fail/Airbender release. The procedure is written for the EraVM line: the Era
+paths it names (`configs/genesis/era/`, `upgrade-envs/v0.31.0-interopB/foundry-upgrade.toml`) do not exist on the
+ZKsync OS-only `draft/v0.34.0` line. Terms used below:
 
 - **Deployment candidate:** the exact era-contracts commit going to the environment (here `draft-v31` at v0.33.0).
 - **Dev integration:** the contracts commit server `dev` checks out after the change: `dev`'s current `contracts` pin

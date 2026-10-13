@@ -14,10 +14,11 @@ upgrade-envs/
   <release>/sim-descriptions.toml       # labels for the transaction-simulator scenarios
 ```
 
-`<release>` is the full release name (`v0.33.0-atomic-interop`); `<env>` is `stage`, `testnet`,
+`<release>` is the full release name (`v0.34.0-chain-config`); `<env>` is `stage`, `testnet`,
 `mainnet`, `local`, `foundry-upgrade` or `zksync-os-integration-test`. `protocol_ops --env <env>` reads
 `permanent-values/<env>.toml` together with `<release>/<env>.toml` of the release named by
-`UPGRADE_ENV_DIR` in `protocol-ops/src/common/env_config.rs`, and writes to
+`current_upgrade_env_dir!` in `protocol-ops/src/common/forge/scripts/mod.rs` (moved by
+`yarn new-release`), and writes to
 `<release>/output/<env>/`. Both files must exist for an environment: the tooling refuses to fall
 back to `local` values.
 
@@ -26,15 +27,14 @@ back to `local` values.
 What identifies the environment: L1 chain id, Bridgehub, the registered CTMs with their VM type,
 the governance kind (`puh` for a `ProtocolUpgradeHandler`, otherwise the legacy `Governance`),
 the testnet-verifier flag (`testnet_verifier`, true everywhere except mainnet; the prepare refuses
-to run without it), the ZK token asset id, owners that must be wrapped rather than impersonated, and the legacy gateway history the verifier
-cross-checks. Update it when a release moves an address; never put per-release values here.
+to run without it), the ZK token asset id and owners that must be wrapped rather than
+impersonated. Update it when a release moves an address; never put per-release values here.
 
 ### `<release>/<env>.toml`
 
 What the release needs from the environment: the owner address and Era chain id, the CREATE2 salt
-for the core deploys and one per CTM under `[create2_factory_salts]`, the governance timer delay,
-the legacy gateway chain id (`[legacy_gateway] chain_id`) and `pre_v32_introspection`. Keep it
-small: anything derivable from L1 is read from L1 instead. The old protocol version in particular
+for the core deploys and one per CTM under `[create2_factory_salts]`, and the governance timer
+delay. Keep it small: anything derivable from L1 is read from L1 instead. The old protocol version in particular
 is not read from here: the CTM script reads it from the CTM. The `old_protocol_version` and
 `testnet_verifier` keys some input files still carry are dead.
 

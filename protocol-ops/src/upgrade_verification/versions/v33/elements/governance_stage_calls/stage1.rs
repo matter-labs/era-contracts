@@ -105,8 +105,7 @@ fn find_ctm_block_start(
 
 impl GovernanceStage1Calls {
     /// Stage 1 — the migration-pause re-assert, proxy impl swaps for the 8
-    /// core contracts, the two `setL1InteropHandler` wiring calls, then
-    /// per-CTM: timer checkDeadline, migrations-paused sanity, the CTM / VT /
+    /// core contracts, then per-CTM: timer checkDeadline, migrations-paused sanity, the CTM / VT /
     /// BytecodesSupplier / PermissionlessValidator impl swaps,
     /// `setDefaultUpgrade`, `setNewVersionUpgrade`, `setChainCreationParams`.
     ///
