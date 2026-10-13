@@ -21,7 +21,7 @@ import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7
 ///         `Utils.getAllSelectors` extraction production deployments register in the diamond,
 ///         which excludes the unregistered helper views `getName()` and `selectors()`).
 /// @dev If a facet gains or loses an external function without its `selectors()` list being
-///      regenerated, the corresponding test here fails.
+///      regenerated (`yarn l1 facet-selectors --fix`), the corresponding test here fails.
 contract FacetSelfDescriptionTest is Test {
     function _assertSelfDescription(ISelfDescribingFacet _facet, string memory _name) internal {
         bytes4[] memory declared = _sort(_facet.selectors());

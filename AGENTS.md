@@ -320,6 +320,18 @@ npx ts-node setup-and-dump-state.ts
 
    Then commit the updated `selectors` file.
 
+6. **Facet self-descriptions out of date**: every diamond facet's `selectors()` is generated from its
+   ABI. If `FacetSelfDescription.t.sol` or the `Check facet self-descriptions` CI step fails after a
+   facet gained, lost or changed a function, regenerate them:
+
+   ```bash
+   cd l1-contracts
+   forge build
+   yarn facet-selectors --fix
+   ```
+
+   Then commit the rewritten facets. Never edit a `selectors()` list by hand.
+
 ## Order of Work
 
 Two rules decide when to run what. The whole-repo gates run **once**, after the source is final.

@@ -37,6 +37,10 @@ jobs:
       - name: Build artifacts
         run: yarn l1 build:foundry
 
+      - name: Check facet self-descriptions
+        # Each facet's `selectors()` is generated from its ABI; a stale one names the fix.
+        run: yarn l1 facet-selectors --check
+
       # `deploy-scripts/` is outside the default forge build set (`src`/`test`),
       # so scripts that are only invoked at runtime via `forge script` would
       # otherwise bit-rot without CI noticing. Compile them all explicitly.
