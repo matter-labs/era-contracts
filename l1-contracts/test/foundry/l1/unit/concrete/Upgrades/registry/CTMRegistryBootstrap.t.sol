@@ -3,7 +3,12 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {RegistryInventoryLengthMismatch} from "contracts/common/L1ContractErrors.sol";
+import {
+    GenesisBatchHashZero,
+    RegistryEmptySelectors,
+    RegistryInventoryLengthMismatch,
+    ZeroAddress
+} from "contracts/common/L1ContractErrors.sol";
 import {
     L2EcosystemContract,
     L2_ECOSYSTEM_CONTRACT_COUNT
@@ -114,8 +119,36 @@ contract CTMRegistryBootstrapTest is Test {
         ReleaseManifest memory manifest = _genesisManifest();
         manifest.genesisUpgrade = address(0);
 
-        vm.expectRevert();
+        vm.expectRevert(ZeroAddress.selector);
         new CTMRelease(manifest);
+    }
+
+    /// @dev Batch zero of every chain created from the release commits to this hash; the CTM no
+    ///      longer re-checks it, so the release is the only place it is refused.
+    function test_constructorRevertsOnZeroGenesisBatchHash() public {
+        ReleaseManifest memory manifest = _genesisManifest();
+        manifest.genesis.genesisBatchHash = bytes32(0);
+
+        vm.expectRevert(GenesisBatchHashZero.selector);
+        new CTMRelease(manifest);
+    }
+
+    /// @dev Construction does not read routing (members may be deployed in the same transaction),
+    ///      so a selector-less facet pins; `validate()`, which every installing path runs, refuses
+    ///      it.
+    function test_validateRevertsOnASelectorlessFacet() public {
+        ReleaseManifest memory manifest = _genesisManifest();
+        address selectorless = facetAddrs[1];
+        vm.mockCall(
+            selectorless,
+            abi.encodeWithSelector(ISelfDescribingFacet.selectors.selector),
+            abi.encode(new bytes4[](0))
+        );
+        CTMRelease release = new CTMRelease(manifest);
+        assertEq(release.manifestHash(), keccak256(abi.encode(manifest)), "the manifest still pins");
+
+        vm.expectRevert(abi.encodeWithSelector(RegistryEmptySelectors.selector, selectorless));
+        release.validate();
     }
 
     // ---- L2 bytecode table ----

@@ -28,8 +28,6 @@ import {AdminZero, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol"
 import {ProtocolVersionTooSmall} from "../upgrades/ZkSyncUpgradeErrors.sol";
 import {
     ChainAlreadyLive,
-    GenesisBatchHashZero,
-    GenesisUpgradeZero,
     MigrationsNotPaused,
     NoCommittedUpgradeCutForVersion,
     ReleaseProtocolVersionMismatch,
@@ -135,10 +133,16 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     // slither-disable-next-line uninitialized-state,unused-state
     mapping(uint256 protocolVersion => uint256) internal __DEPRECATED_newChainCreationParamsBlock;
 
-    /// @dev Retained only to preserve the upgradeable storage layout. The verifier is part of the
-    /// installed chain state and is pinned by the release (`ICTMRelease.verifier`), so both the
-    /// genesis path and the upgrade path read it from the release they resolve to.
+    /// @dev Deprecated. Written by pre-v35 CTMs only; served read-only ({protocolVersionVerifier})
+    ///      to the pre-v35 upgrade engines of legacy edges. The verifier is part of the installed
+    ///      chain state and is pinned by the release (`ICTMRelease.verifier`), so both the genesis
+    ///      path and the upgrade path read it from the release they resolve to.
     mapping(uint256 protocolVersion => address) internal __DEPRECATED_protocolVersionVerifier;
+
+    /// @dev Deprecated pre-v35 `defaultUpgrade` (the verifier-only upgrade engine). Slot retained
+    ///      to preserve the upgradeable storage layout.
+    // slither-disable-next-line constable-states,unused-state
+    address internal __DEPRECATED_defaultUpgrade;
 
     /// @dev The release new chains are created from — always the release OF `protocolVersion`: a
     /// release is one protocol version, and the two only ever move together ({_setCurrentRelease}).
@@ -255,7 +259,8 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
     /// @dev THE single point every release passes through — initialization, every transition and
     ///      the bootstrap edge, each right after it moved `protocolVersion`: the release's own check
-    ///      surface, its version, then the genesis params.
+    ///      surface, then its version. The genesis params need no check here: a release refuses a
+    ///      zero genesis batch hash at construction and a codeless genesis upgrade in `validate()`.
     /// @dev No codehash pin. A runtime hash cannot establish that the audited constructor
     ///      produced the object it is applied to (creation code may return canonical runtime
     ///      bytecode over storage of its own choosing), so the model does not ask the chain to
@@ -272,15 +277,6 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         uint256 releaseProtocolVersion = release.protocolVersion();
         if (releaseProtocolVersion != protocolVersion) {
             revert ReleaseProtocolVersionMismatch(protocolVersion, releaseProtocolVersion);
-        }
-        // slither-disable-next-line unused-return
-        (address genesisUpgrade, bytes32 genesisBatchHash, ) = release.genesisParams();
-
-        if (genesisUpgrade == address(0)) {
-            revert GenesisUpgradeZero();
-        }
-        if (genesisBatchHash == bytes32(0)) {
-            revert GenesisBatchHashZero();
         }
 
         currentRelease = _release;
@@ -723,6 +719,14 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     //             the bootstrap edge and the pre-v35 deadlines have passed.
     function upgradeCutHash(uint256 _protocolVersion) public view returns (bytes32) {
         return __DEPRECATED_upgradeCutHash[_protocolVersion];
+    }
+
+    /// @inheritdoc IChainTypeManager
+    // TODO(v36+): DELETE with {upgradeCutHash}, once no chain on this CTM can depart a pre-v35
+    //             version (the pre-v35 upgrade engines of those edges read the target version's
+    //             verifier here; v35+ engines read it from the release).
+    function protocolVersionVerifier(uint256 _protocolVersion) external view returns (address) {
+        return __DEPRECATED_protocolVersionVerifier[_protocolVersion];
     }
 
     /// @notice The block of a LEGACY cut commit, where its tooling finds the

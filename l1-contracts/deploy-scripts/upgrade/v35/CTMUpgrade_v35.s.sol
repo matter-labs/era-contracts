@@ -77,9 +77,10 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
 
     /// @notice The bootstrap edge authors a COMPLETE release for a pre-registry ecosystem, so
     ///         every member is expected to be new — the live ones belong to the departing,
-    ///         pre-v35 deployment.
+    ///         pre-v35 deployment. That includes the genesis engine: the live one only has the
+    ///         pre-v35 `genesisUpgrade` entrypoint, not the one the v35 Admin facet calls.
     function changedReleaseMembers() internal view virtual override returns (string[] memory members) {
-        members = new string[](8);
+        members = new string[](9);
         members[0] = "ExecutorFacet";
         members[1] = "AdminFacet";
         members[2] = "MailboxFacet";
@@ -88,6 +89,7 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
         members[5] = "CommitterFacet";
         members[6] = "DiamondInit";
         members[7] = "EIP7702Checker";
+        members[8] = "L1GenesisUpgrade";
     }
 
     /// @inheritdoc DefaultCTMUpgrade

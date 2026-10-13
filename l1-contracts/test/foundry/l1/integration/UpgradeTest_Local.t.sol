@@ -37,11 +37,29 @@ import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgra
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {IBootstrapUpgrade} from "contracts/upgrades/IBootstrapUpgrade.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
+import {IL1GenesisUpgrade} from "contracts/upgrades/IL1GenesisUpgrade.sol";
 import {RegistryBootstrapSequence} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapSequence.sol";
 import {IRegistryBootstrapSequence} from "contracts/upgrades/registry/bootstrap/IRegistryBootstrapSequence.sol";
 import {L2CanonicalTransactionLib} from "contracts/state-transition/libraries/L2CanonicalTransactionLib.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {BootstrapManifest} from "contracts/upgrades/registry/RegistryTypes.sol";
+
+/// @notice Stands in for the genesis engine a pre-v35 CTM runs: its only entrypoint is the
+///         six-argument `genesisUpgrade` the pre-v35 Admin facet called, not the argument-less one
+///         the v35 Admin facet delegatecalls. A release that kept it would make every chain
+///         creation after the bootstrap revert.
+contract LegacyGenesisEngineForLocalTest {
+    function genesisUpgrade(
+        address, // _l1GenesisUpgrade
+        uint256, // _chainId
+        uint256, // _protocolVersion
+        address, // _l1CtmDeployerAddress
+        bytes calldata, // _fixedForceDeploymentsData
+        bytes[] calldata // _factoryDeps
+    ) external pure returns (bytes32) {
+        return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
+    }
+}
 
 /// @notice Test-only v35 CTM upgrade with the same MemoryOOG mocks as the v32 local harness
 ///         (the heavy JSON/zkout reads live on the shared base). The bootstrap flow itself —
@@ -64,6 +82,16 @@ contract CTMUpgradeForLocalTest is CTMUpgrade_v35 {
     ///      which the migration composes the all-zero L2 transaction.
     function authorL2Side() internal override returns (AuthoredL2Side memory) {
         return DefaultCTMUpgrade.authorL2Side();
+    }
+
+    /// @notice Makes discovery report `_legacyEngine` as the CTM's live genesis engine.
+    /// @dev The fixture's CTM is deployed from CURRENT sources, so its real live engine already has
+    ///      the v35 entrypoint and a prepare that kept it would pass unnoticed. A production
+    ///      bootstrap departs from a pre-v35 CTM whose engine does not (see
+    ///      {LegacyGenesisEngineForLocalTest}); this substitutes only what discovery reports, so
+    ///      the prepare runs unchanged against that starting point.
+    function simulateLegacyGenesisEngine(address _legacyEngine) external {
+        ctmAddresses.stateTransition.genesisUpgrade = _legacyEngine;
     }
 }
 
@@ -109,6 +137,10 @@ abstract contract UpgradeIntegrationBootstrapFixture is
 {
     using stdToml for string;
 
+    /// @dev The pre-v35 genesis engine discovery reports as live (see
+    ///      `CTMUpgradeForLocalTest.simulateLegacyGenesisEngine`).
+    address internal legacyGenesisEngine;
+
     function createCoreUpgrade() internal override returns (DefaultCoreUpgrade) {
         return new CoreUpgradeForLocalTest();
     }
@@ -128,6 +160,9 @@ abstract contract UpgradeIntegrationBootstrapFixture is
         string memory upgradeToml = vm.readFile(string.concat(root, ECOSYSTEM_UPGRADE_INPUT));
         uint256 newProtocolVersion = upgradeToml.readUint("$.contracts.new_protocol_version");
         ctmUpgrade.setNewProtocolVersion(newProtocolVersion);
+
+        legacyGenesisEngine = address(new LegacyGenesisEngineForLocalTest());
+        CTMUpgradeForLocalTest(address(ctmUpgrade)).simulateLegacyGenesisEngine(legacyGenesisEngine);
     }
 
     /// @dev Installs the pre-v35 cut-taking entrypoint on the baseline chain through the CTM
@@ -408,16 +443,48 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
         // prepare run deployed).
         assertEq(release, bootstrap.getAddresses().stateTransition.currentRelease, "release must be the pipeline's");
 
-        // New chain created AFTER the edge geneses from the pinned release at the new version.
+        // The genesis engine is a release member like any other: the bootstrap replaces the
+        // pre-v35 engine discovery reported, and the CTM serves the release's.
+        (address releaseGenesisEngine, , ) = ICTMRelease(release).genesisParams();
+        assertTrue(releaseGenesisEngine != legacyGenesisEngine, "the release must not keep the pre-v35 engine");
+        assertTrue(releaseGenesisEngine.code.length != 0, "the release's engine is deployed");
+        assertEq(
+            IChainTypeManager(ctm).l1GenesisUpgrade(),
+            releaseGenesisEngine,
+            "the CTM serves the release's engine"
+        );
+        assertEq(
+            bootstrap.getAddresses().stateTransition.genesisUpgrade,
+            releaseGenesisEngine,
+            "the prepare reports the engine it pinned"
+        );
+
+        // New chain created AFTER the edge geneses from the pinned release at the new version, and
+        // its genesis upgrade ran: the pending L2 transaction is exactly the one the release's
+        // engine composes for it.
         assertTrue(_newChainDiamond != address(0), "new chain not registered");
         assertEq(IGetters(_newChainDiamond).getProtocolVersion(), _expectedNewVersion, "new chain wrong version");
+        address bridgehub = coreUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
+        assertEq(
+            IGetters(_newChainDiamond).getL2SystemContractsUpgradeTxHash(),
+            keccak256(
+                abi.encode(
+                    IL1GenesisUpgrade(releaseGenesisEngine).genesisUpgradeTx(
+                        release,
+                        bridgehub,
+                        NEW_CHAIN_ID,
+                        _expectedNewVersion
+                    )
+                )
+            ),
+            "the new chain carries the release engine's genesis transaction"
+        );
 
         // The whole bootstrap edge — both domains — is DERIVED from `RegistryBootstrapSequence`
         // and declared by the CTM prepare; the core prepare of this edge declares nothing, so the
         // merged bundles are exactly the object's. The harness already executed the merged stage-2
         // bundle green in `internalTest`; assert the emitted call list shape, that the completion
         // gate still holds against the final state, and that both bindings landed.
-        address bridgehub = coreUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
         address chainAssetHandler = IBridgehubBase(bridgehub).chainAssetHandler();
         EcosystemUpgradeExecutor coordinator = bootstrap.ecosystemUpgradeExecutor();
         RegistryBootstrapSequence sequence = bootstrap.bootstrapSequence();

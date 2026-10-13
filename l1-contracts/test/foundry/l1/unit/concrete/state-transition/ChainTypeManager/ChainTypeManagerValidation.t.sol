@@ -16,7 +16,7 @@ import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {ZeroAddress, GenesisBatchHashZero, GenesisUpgradeZero} from "contracts/common/L1ContractErrors.sol";
+import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
@@ -27,10 +27,10 @@ import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAss
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 
-/// @notice From v32 the CTM validates genesis params by reading them from the genesis release
-///         it is initialized with (not from an inline `ChainCreationParams`). These tests mock
-///         that release's `genesisParams` per case and assert the CTM enforces the rules (genesis
-///         upgrade non-zero, batch hash non-zero, commitment == 1).
+/// @notice Initialization and version-edge validation of a CTM over a mocked genesis release. The
+///         genesis params themselves are the release's to validate (a zero batch hash is refused
+///         by its constructor, a codeless genesis upgrade by its `validate()`), so they are tested
+///         on `CTMRelease` and, through the CTM, in `Initialize.t.sol` with real releases.
 contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
     using stdStorage for StdStorage;
 
@@ -168,24 +168,6 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
         return ChainTypeManager(address(transparentUpgradeableProxy));
     }
 
-    function _expectInitRevert(bytes4 _err) internal {
-        vm.startPrank(address(bridgehub));
-        ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
-            owner: governor,
-            validatorTimelock: validator,
-            currentRelease: Utils.TEST_GENESIS_REGISTRY,
-            serverNotifier: serverNotifier
-        });
-
-        vm.expectRevert(_err);
-        new TransparentUpgradeableProxy(
-            address(chainTypeManager),
-            admin,
-            abi.encodeCall(IChainTypeManager.initialize, ctmInitializeData)
-        );
-        vm.stopPrank();
-    }
-
     /// @dev The genesis release is where the CTM reads its initial version from, so it is
     ///      refused before anything is read from it.
     function test_RevertWhen_initializedWithoutARelease() public {
@@ -213,24 +195,6 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
         ChainTypeManager ctm = new ChainTypeManager(address(bridgehub), interopCenterAddress, address(0), address(0));
         assertEq(ctm.BRIDGE_HUB(), address(bridgehub));
         assertTrue(ctm.isZKsyncOS());
-    }
-
-    // ============================================================
-    // Genesis params validation - GenesisUpgradeZero
-    // ============================================================
-
-    function test_RevertWhen_genesisUpgradeIsZero() public {
-        _mockGenesisParams(address(0), bytes32(uint256(0x01)), 0x01);
-        _expectInitRevert(GenesisUpgradeZero.selector);
-    }
-
-    // ============================================================
-    // Genesis params validation - GenesisBatchHashZero
-    // ============================================================
-
-    function test_RevertWhen_genesisBatchHashIsZero() public {
-        _mockGenesisParams(address(genesisUpgradeContract), bytes32(0), 0x01);
-        _expectInitRevert(GenesisBatchHashZero.selector);
     }
 
     // ============================================================

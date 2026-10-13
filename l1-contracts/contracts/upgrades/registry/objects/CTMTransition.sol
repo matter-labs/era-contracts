@@ -2,30 +2,15 @@
 
 pragma solidity 0.8.28;
 
-import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
-
 import {ICommittedUpgrade} from "./ICommittedUpgrade.sol";
 import {ICTMRelease} from "./ICTMRelease.sol";
 import {ICTMTransition} from "./ICTMTransition.sol";
 import {ObjectAnchorLib} from "../libraries/ObjectAnchorLib.sol";
 import {TransitionDerivationLib} from "../libraries/TransitionDerivationLib.sol";
 import {L2PlanLib} from "../libraries/L2PlanLib.sol";
+import {VersionEdgeLib} from "../libraries/VersionEdgeLib.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
-import {SemVer} from "../../../common/libraries/SemVer.sol";
-import {MAX_ALLOWED_MINOR_VERSION_DELTA} from "../../../common/Config.sol";
-import {
-    NewProtocolMajorVersionNotZero,
-    PreviousProtocolMajorVersionNotZero,
-    ProtocolVersionMinorDeltaTooBig,
-    ProtocolVersionTooSmall
-} from "../../ZkSyncUpgradeErrors.sol";
-import {
-    PatchCannotCarryL2Upgrade,
-    PatchChangesL2GenesisState,
-    TransitionDeadlineBeforeUpgrade,
-    TransitionDeadlineZero,
-    ZeroAddress
-} from "../../../common/L1ContractErrors.sol";
+import {PatchChangesL2GenesisState, ZeroAddress} from "../../../common/L1ContractErrors.sol";
 import {L2UpgradePlan, TransitionManifest, ReleaseDiff} from "../RegistryTypes.sol";
 import {IDefaultUpgrade} from "../../IDefaultUpgrade.sol";
 import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
@@ -75,30 +60,8 @@ contract CTMTransition is ICTMTransition {
         }
         uint256 oldVersion = ICTMRelease(_manifest.fromRelease).protocolVersion();
         uint256 newVersion = ICTMRelease(_manifest.newRelease).protocolVersion();
-        // A transition only ever moves the version forward — the same rule chains enforce at
-        // execution and the CTM enforces in `setNewVersionUpgrade`. Since the edge IS the two
-        // releases' versions, this is also what refuses the same release on both edges.
-        if (newVersion <= oldVersion) {
-            revert ProtocolVersionTooSmall(oldVersion, newVersion);
-        }
         derivedOldProtocolVersion = oldVersion;
         derivedNewProtocolVersion = newVersion;
-        // A zero deadline expires the departing version the moment the edge is committed, which
-        // stops every chain still on it from committing batches before any of them can upgrade.
-        // The relative check below cannot catch it: a zeroed schedule satisfies `0 >= 0`.
-        // `upgradeTimestamp` has no such lower bound — zero there legitimately means chains may
-        // upgrade as soon as the edge is committed. Only the ZERO deadline is refused: any nonzero
-        // value passes, including one already in the past, which disables the departing version
-        // immediately. That is permitted — an incident may call for it — merely discouraged; zero
-        // is refused because it is far likelier a defaulted field than a decision.
-        if (_manifest.oldProtocolVersionDeadline == 0) {
-            revert TransitionDeadlineZero();
-        }
-        // The old version must stay usable at least until chains are allowed to upgrade,
-        // otherwise the schedule disables the old protocol before the new one is reachable.
-        if (_manifest.oldProtocolVersionDeadline < _manifest.upgradeTimestamp) {
-            revert TransitionDeadlineBeforeUpgrade(_manifest.oldProtocolVersionDeadline, _manifest.upgradeTimestamp);
-        }
 
         // The engine's code existence is checked by `validate()` on the execution paths, not
         // here — see {CoreTransition}. Both release EDGES are validated, though: the
@@ -110,36 +73,6 @@ contract CTMTransition is ICTMTransition {
         ICTMRelease(_manifest.newRelease).validate();
         ICTMRelease(_manifest.fromRelease).validate();
 
-        bool isPatch;
-        {
-            // Patch component deliberately ignored: this check is about the major.minor edge.
-            // slither-disable-next-line unused-return
-            (uint32 oldMajor, uint32 oldMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(oldVersion));
-            // slither-disable-next-line unused-return
-            (uint32 newMajor, uint32 newMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(newVersion));
-            // A SemVer PATCH edge. It may name a NEW release: a release is the immutable snapshot
-            // of the intended contracts, and replacing a verifier or a facet in that snapshot is
-            // not by itself a change of chain-visible L2 state. What a patch may not do is carry
-            // an L2 upgrade transaction — see the patch checks after the plan is combined.
-            isPatch = oldMajor == newMajor && oldMinor == newMinor;
-            // The same version-shape rules `BaseZkSyncUpgrade._setNewProtocolVersion` applies per
-            // chain. Without them a transition pins fine and `applyCTMUpgrade` bumps the CTM, after
-            // which EVERY chain upgrade reverts and only break-glass can recover.
-            // Watch out: there are plans to move ZKsync OS to major 1 to distinguish it from Era.
-            // When that lands, this pair of checks and `_setNewProtocolVersion` change together.
-            if (oldMajor != 0) {
-                revert PreviousProtocolMajorVersionNotZero();
-            }
-            if (newMajor != 0) {
-                revert NewProtocolMajorVersionNotZero();
-            }
-            // Safe: majors are both zero and the packed new version is strictly greater, so the
-            // minor cannot have decreased.
-            uint256 minorDelta = newMinor - oldMinor;
-            if (minorDelta > MAX_ALLOWED_MINOR_VERSION_DELTA) {
-                revert ProtocolVersionMinorDeltaTooBig(MAX_ALLOWED_MINOR_VERSION_DELTA, minorDelta);
-            }
-        }
         // The FINAL plan: the target release's table-derived set, then the authored delegate and
         // extras at their bytecode-derived addresses, with the factory dependencies of everything
         // installed — constructed, never authored.
@@ -150,18 +83,20 @@ contract CTMTransition is ICTMTransition {
             ),
             _manifest.l2Plan
         );
-        // A delegate is itself deployed, so a plan has an L2 side exactly when it deploys.
-        bool hasL2Side = derivedPlan.deployments.length != 0;
-        // A PATCH edge may move L1 code (the verifier, facets, CTM-domain proxy rows) but never
-        // the chains' L2 side: `BaseZkSyncUpgrade._setL2SystemContractUpgrade` refuses an L2
-        // protocol upgrade transaction on a patch (`PatchCantSetUpgradeTxn`), and a patch
-        // deliberately does NOT require an earlier L2 upgrade to be finalized first — a pending
-        // one must survive the patch untouched. Refused HERE, before governance can commit a
-        // transition that would bump the CTM and then revert on every chain.
+        // Since the edge IS the two releases' versions, the version check is also what refuses
+        // the same release on both edges. A delegate is itself deployed, so a plan has an L2 side
+        // exactly when it deploys.
+        bool isPatch = VersionEdgeLib.requireValidEdge({
+            _oldVersion: oldVersion,
+            _newVersion: newVersion,
+            _oldVersionDeadline: _manifest.oldProtocolVersionDeadline,
+            _upgradeTimestamp: _manifest.upgradeTimestamp,
+            _hasL2Side: derivedPlan.deployments.length != 0
+        });
+        // A SemVer PATCH edge may name a NEW release — replacing a verifier or a facet in the
+        // snapshot is not by itself a change of chain-visible L2 state — but never the chains' L2
+        // side.
         if (isPatch) {
-            if (hasL2Side) {
-                revert PatchCannotCarryL2Upgrade();
-            }
             // An empty DERIVED deployment list is not enough on its own: it only proves the two
             // L2 bytecode tables agree. The rest of the release's L2/genesis description — the
             // force-deployment blob and the genesis batch a new chain starts from, and the VM the

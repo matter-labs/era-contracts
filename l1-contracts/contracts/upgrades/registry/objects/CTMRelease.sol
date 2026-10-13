@@ -5,7 +5,9 @@ pragma solidity 0.8.28;
 import {ICTMRelease} from "./ICTMRelease.sol";
 import {ObjectAnchorLib} from "../libraries/ObjectAnchorLib.sol";
 import {ReleaseFacetReader} from "../libraries/ReleaseFacetReader.sol";
+import {ISelfDescribingFacet} from "../../../state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 import {
+    GenesisBatchHashZero,
     RegistryDuplicateFacetRow,
     RegistryEmptySelectors,
     RegistryInventoryLengthMismatch,
@@ -37,6 +39,11 @@ contract CTMRelease is ICTMRelease {
             _manifest.verifier == address(0)
         ) {
             revert ZeroAddress();
+        }
+        // Batch zero of every chain created from this release commits to it, and nothing else on
+        // the install path can tell a zero hash from a defaulted field.
+        if (_manifest.genesis.genesisBatchHash == bytes32(0)) {
+            revert GenesisBatchHashZero();
         }
 
         // Code existence is deliberately NOT checked here: a release may legitimately be
@@ -127,10 +134,16 @@ contract CTMRelease is ICTMRelease {
         _requireUniqueFacetRows(m.genesisFacets);
         uint256 facetsLength = m.genesisFacets.length;
         for (uint256 i = 0; i < facetsLength; ++i) {
+            address facet = m.genesisFacets[i].facet;
             // Not merely defensive: the facets are the one member set this contract READS
             // through (`ISelfDescribingFacet.selectors()`), and a codeless target answers that
             // read with an empty revert instead of a usable failure.
-            ObjectAnchorLib.requireCode(m.genesisFacets[i].facet);
+            ObjectAnchorLib.requireCode(facet);
+            // A selector-less row would reach the installing paths (`DiamondInit`, the bootstrap
+            // engine) as an empty `Add` cut, which `Diamond.diamondCut` rejects on every chain.
+            if (ISelfDescribingFacet(facet).selectors().length == 0) {
+                revert RegistryEmptySelectors(facet);
+            }
         }
     }
 

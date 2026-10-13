@@ -271,10 +271,10 @@ contract UtilsCallMockerTest is Test {
             abi.encodeWithSelector(ICTMRelease.genesisFacets.selector),
             abi.encode(new GenesisFacet[](0))
         );
-        // Genesis params the CTM validates when its current release is set and reads back via
-        // `storedBatchZero()` / `l1GenesisUpgrade()`. All non-zero so both Era and ZKsyncOS
-        // validation passes; fixtures that actually run the genesis upgrade (i.e. create a chain
-        // through the CTM) re-mock `genesisParams` with their real genesis-upgrade address.
+        // Genesis params the CTM reads back via `storedBatchZero()` / `l1GenesisUpgrade()`. All
+        // non-zero, as a real release requires; fixtures that actually run the genesis upgrade
+        // (i.e. create a chain through the CTM) re-mock `genesisParams` with their real
+        // genesis-upgrade address.
         vm.mockCall(
             genesisRegistry,
             abi.encodeWithSelector(ICTMRelease.genesisParams.selector),

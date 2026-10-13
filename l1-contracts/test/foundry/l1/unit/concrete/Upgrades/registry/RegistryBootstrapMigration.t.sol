@@ -17,6 +17,7 @@ import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {IL2DelegateCalldataComposer} from "contracts/upgrades/registry/objects/IL2DelegateCalldataComposer.sol";
 import {FixedDelegateCalldataComposer} from "contracts/dev-contracts/FixedDelegateCalldataComposer.sol";
 import {MockProxyUpgradeInitImpl} from "contracts/dev-contracts/test/MockProxyUpgradeInitImpl.sol";
+import {MockSelfDescribingFacet} from "contracts/dev-contracts/test/MockSelfDescribingFacet.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
@@ -36,6 +37,7 @@ import {Call} from "contracts/governance/Common.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {BYTECODE_INFO_LENGTH} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 import {
+    MAX_ALLOWED_MINOR_VERSION_DELTA,
     MAX_NEW_FACTORY_DEPS,
     UPGRADE_TX_MAX_GAS_LIMIT,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
@@ -60,13 +62,23 @@ import {
     L2PlanNeedsDelegate,
     L2PlanTooManyFactoryDeps,
     MigrationPaused,
+    PatchCannotCarryL2Upgrade,
     ProxyUpgradeRowMismatch,
+    RegistryEmptySelectors,
     RegistryTargetHasNoCode,
     RegistryDuplicateProxyRow,
     TimerNotStarted,
+    TransitionDeadlineBeforeUpgrade,
+    TransitionDeadlineZero,
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
 import {OutdatedProtocolVersion} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {
+    NewProtocolMajorVersionNotZero,
+    PreviousProtocolMajorVersionNotZero,
+    ProtocolVersionMinorDeltaTooBig,
+    ProtocolVersionTooSmall
+} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
 import {
     AuthoredL2Plan,
     BootstrapManifest,
@@ -1423,5 +1435,124 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     ) internal view returns (BootstrapManifest memory manifest) {
         manifest = _manifest();
         manifest.expectedProtocolVersion = _expectedVersion;
+    }
+
+    // ─────────────────────────── selector-less release member ───────────────────────────
+
+    /// @dev The bootstrap engine reinstalls the release's facets with one `Add` per row, so a
+    ///      selector-less facet would make every chain's crossing revert. The migration refuses the
+    ///      release before it spends itself, so the engine never sees one.
+    function test_revertWhen_releaseHasASelectorlessFacet() public {
+        address emptyFacet = address(new MockSelfDescribingFacet(new bytes4[](0)));
+        facetCuts[0].facet = emptyFacet;
+        BootstrapManifest memory manifest = _manifest();
+        manifest.currentRelease = address(_deployRelease(new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT)));
+        RegistryBootstrapMigration authorized = _deployAndAuthorize(manifest);
+
+        vm.expectRevert(abi.encodeWithSelector(RegistryEmptySelectors.selector, emptyFacet));
+        authorized.migrate();
+        assertFalse(authorized.executed(), "a refused edge must stay unspent");
+        assertEq(chainContractAddress.protocolVersion(), manifest.expectedProtocolVersion, "the CTM did not move");
+    }
+
+    // ─────────────────── edge rules (shared with CTMTransition) ───────────────────
+
+    /// @dev A genesis release at `_version` over the fixture's members and `_l2BytecodeInfos`.
+    function _releaseAtVersion(
+        uint256 _version,
+        bytes[] memory _l2BytecodeInfos
+    ) internal returns (CTMRelease release) {
+        uint256 fixtureVersion = newVersion;
+        newVersion = _version;
+        release = _deployRelease(_l2BytecodeInfos);
+        newVersion = fixtureVersion;
+    }
+
+    function _emptyTable() internal pure returns (bytes[] memory) {
+        return new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
+    }
+
+    function test_revertWhen_bootstrapDeadlineIsZero() public {
+        BootstrapManifest memory manifest = _manifest();
+        manifest.oldProtocolVersionDeadline = 0;
+
+        vm.expectRevert(TransitionDeadlineZero.selector);
+        new RegistryBootstrapMigration(manifest);
+    }
+
+    function test_revertWhen_bootstrapDeadlineIsBeforeTheUpgradeTimestamp() public {
+        BootstrapManifest memory manifest = _manifest();
+        manifest.upgradeTimestamp = PLAN_UPGRADE_TIMESTAMP;
+        manifest.oldProtocolVersionDeadline = PLAN_UPGRADE_TIMESTAMP - 1;
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                TransitionDeadlineBeforeUpgrade.selector,
+                PLAN_UPGRADE_TIMESTAMP - 1,
+                PLAN_UPGRADE_TIMESTAMP
+            )
+        );
+        new RegistryBootstrapMigration(manifest);
+    }
+
+    function test_revertWhen_bootstrapDoesNotMoveTheVersionForward() public {
+        BootstrapManifest memory manifest = _manifestWithExpectedVersion(newVersion);
+
+        vm.expectRevert(abi.encodeWithSelector(ProtocolVersionTooSmall.selector, newVersion, newVersion));
+        new RegistryBootstrapMigration(manifest);
+    }
+
+    function test_revertWhen_bootstrapDepartsFromANonzeroMajor() public {
+        BootstrapManifest memory manifest = _manifestWithExpectedVersion(SemVer.packSemVer(1, 0, 0));
+        manifest.currentRelease = address(_releaseAtVersion(SemVer.packSemVer(1, 1, 0), _emptyTable()));
+
+        vm.expectRevert(PreviousProtocolMajorVersionNotZero.selector);
+        new RegistryBootstrapMigration(manifest);
+    }
+
+    function test_revertWhen_bootstrapTargetsANonzeroMajor() public {
+        BootstrapManifest memory manifest = _manifest();
+        manifest.currentRelease = address(_releaseAtVersion(SemVer.packSemVer(1, 0, 0), _emptyTable()));
+
+        vm.expectRevert(NewProtocolMajorVersionNotZero.selector);
+        new RegistryBootstrapMigration(manifest);
+    }
+
+    function test_revertWhen_bootstrapMinorDeltaIsTooBig() public {
+        // The fixture CTM departs from 0.0.0.
+        uint32 tooFar = uint32(MAX_ALLOWED_MINOR_VERSION_DELTA) + 1;
+        BootstrapManifest memory manifest = _manifest();
+        manifest.currentRelease = address(_releaseAtVersion(SemVer.packSemVer(0, tooFar, 0), _emptyTable()));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ProtocolVersionMinorDeltaTooBig.selector,
+                MAX_ALLOWED_MINOR_VERSION_DELTA,
+                uint256(tooFar)
+            )
+        );
+        new RegistryBootstrapMigration(manifest);
+    }
+
+    /// @dev Chains refuse an L2 upgrade transaction on a patch edge (`PatchCantSetUpgradeTxn`), and
+    ///      a bootstrap release installs its whole L2 table.
+    function test_revertWhen_bootstrapPatchCarriesAnL2Side() public {
+        bytes[] memory table = _emptyTable();
+        table[uint256(L2EcosystemContract.L2Bridgehub)] = L2PlanFixtures.bytecodeInfo(BRIDGEHUB_IMPL_CODE);
+        BootstrapManifest memory manifest = _manifestWithL2Plan(_authoredPlan());
+        manifest.expectedProtocolVersion = newVersion;
+        manifest.currentRelease = address(_releaseAtVersion(newVersion + 1, table));
+
+        vm.expectRevert(PatchCannotCarryL2Upgrade.selector);
+        new RegistryBootstrapMigration(manifest);
+    }
+
+    function test_bootstrapPatchWithoutAnL2SideConstructs() public {
+        BootstrapManifest memory manifest = _manifestWithExpectedVersion(newVersion);
+        manifest.currentRelease = address(_releaseAtVersion(newVersion + 1, _emptyTable()));
+
+        RegistryBootstrapMigration patch = new RegistryBootstrapMigration(manifest);
+        assertEq(patch.newProtocolVersion(), newVersion + 1, "the edge targets the release's version");
+        assertEq(patch.l2Plan().deployments.length, 0, "and carries no L2 side");
     }
 }

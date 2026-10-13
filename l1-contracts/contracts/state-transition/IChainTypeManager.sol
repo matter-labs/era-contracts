@@ -91,6 +91,12 @@ interface IChainTypeManager {
     ///      facets that verify handed cut bytes. Registry-driven edges commit only the transition.
     function upgradeCutHash(uint256 _protocolVersion) external view returns (bytes32);
 
+    /// @notice The verifier a pre-v35 CTM recorded for `_protocolVersion`; zero for every version
+    ///         committed by the registry model.
+    /// @dev Deprecated. Served only for the deployed pre-v35 upgrade engines, which read the
+    ///      verifier of the version a chain crosses a legacy edge to from here.
+    function protocolVersionVerifier(uint256 _protocolVersion) external view returns (address);
+
     function protocolVersion() external view returns (uint256);
 
     /// @notice The timestamp until which `_protocolVersion` can be used.

@@ -204,8 +204,10 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
 
     /// @inheritdoc ChainTypeManagerTest
     /// @dev The genesis release, describing the chain's routing at version 0: the fixture chain is
-    ///      created from it and hop 1 departs from it.
+    ///      created from it and hop 1 departs from it. Installing it validates that every facet
+    ///      self-describes, which the fixture's test facets only do once mocked.
     function _fixtureGenesisRelease() internal virtual override returns (address) {
+        _mockFacetSelfDescriptions(facetCuts);
         return address(new CTMRelease(_releaseManifest(address(0), address(testnetVerifier), 0)));
     }
 

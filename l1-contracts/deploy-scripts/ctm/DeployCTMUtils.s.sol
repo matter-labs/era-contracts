@@ -113,6 +113,10 @@ abstract contract DeployCTMUtils is DeployUtils {
         facets.committerFacet = _deployReleaseFacet("CommitterFacet", live.committerFacet, true);
         deployAdditionalReleaseFacets();
         facets.diamondInit = _deployReleaseMember("DiamondInit", live.diamondInit);
+        ctmAddresses.stateTransition.genesisUpgrade = _deployReleaseMember(
+            "L1GenesisUpgrade",
+            ctmAddresses.stateTransition.genesisUpgrade
+        );
         ctmAddresses.stateTransition.currentRelease = deployCurrentRelease();
     }
 

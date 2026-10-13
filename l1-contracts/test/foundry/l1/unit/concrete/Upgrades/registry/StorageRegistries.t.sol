@@ -1198,16 +1198,21 @@ contract StorageRegistriesTest is Test {
 
     // ─────────────────────────── routing hygiene ───────────────────────────
 
-    function test_releaseDoesNotValidateRouting() public {
-        // Deliberate non-check: a facet describing no selectors constructs fine — the release is
-        // pinned data, and `Diamond.diamondCut` rejects empty routing (`NoFunctionsForDiamondCut`)
-        // when a chain is actually created from it.
+    function test_selectorlessFacetPinsButNoTransitionDerivesTowardIt() public {
+        // A facet describing no selectors constructs — the release is pinned data and does not
+        // read routing at construction — but `validate()` refuses it, so a transition toward it
+        // is refused before it could derive (and a chain later install) an empty `Add` cut.
         address emptyFacet = address(new MockSelfDescribingFacet(new bytes4[](0)));
         ReleaseManifest memory manifest = _newReleaseManifest();
         manifest.genesisFacets[1].facet = emptyFacet;
 
         CTMRelease release = new CTMRelease(manifest);
         assertEq(release.manifestHash(), keccak256(abi.encode(manifest)), "unvalidated routing still pins");
+
+        TransitionManifest memory transitionManifest = _transitionManifest();
+        transitionManifest.newRelease = address(release);
+        vm.expectRevert(abi.encodeWithSelector(RegistryEmptySelectors.selector, emptyFacet));
+        new CTMTransition(transitionManifest);
     }
 
     function test_revertWhen_releaseHasNoFacets() public {

@@ -18,6 +18,7 @@ import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainA
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {IEcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/IEcosystemUpgradeOperation.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ProxyUpgradeRow} from "contracts/upgrades/registry/RegistryTypes.sol";
 import {
     CTMContract,
@@ -114,6 +115,10 @@ contract CTMUpgradeMixed is RecurringCTMUpgradeForTests {
     }
 }
 
+/// @notice A chain-release hop that changes no release member: every member is reused and only
+///         the version moves.
+contract CTMUpgradeVersionOnly is RecurringCTMUpgradeForTests {}
+
 /// @notice An infrastructure-only hop that deploys nothing at all — the empty operation.
 contract CTMUpgradeEmpty is RecurringCTMUpgradeForTests {
     function upgradeKind() public pure override returns (UpgradeKind) {
@@ -173,6 +178,9 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationBootstrapFi
     string internal constant SAME_VERSION_INPUT = "/upgrade-envs/foundry-upgrade.toml";
     /// @dev The upgrade input naming the next minor: what a chain-release hop is given.
     string internal constant NEXT_VERSION_INPUT = "/upgrade-envs/foundry-upgrade-recurring.toml";
+    /// @dev The upgrade input one minor past {NEXT_VERSION_INPUT}: a hop departing from the version
+    ///      a first chain-release hop left the CTM at.
+    string internal constant LAGGING_CHAINS_INPUT = "/upgrade-envs/foundry-upgrade-recurring-lagging.toml";
 
     /// @dev The version a chain-release hop targets: {NEXT_VERSION_INPUT}'s `latest_protocol_version`, read
     ///      rather than restated so the fixture inputs alone carry the version numbers.
@@ -186,6 +194,9 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationBootstrapFi
     /// @dev Fresh per release, as production rotates the CREATE2 salt every release — without which
     ///      a redeployment of unchanged code lands back on the live address.
     bytes32 internal constant HOP_SALT = keccak256("recurring-hop");
+    /// @dev The salt of a SECOND hop in one test: it must not land on the first hop's (already
+    ///      started) timer.
+    bytes32 internal constant SECOND_HOP_SALT = keccak256("recurring-hop-2");
 
     /// @dev Everything an infrastructure-only operation must leave exactly as it found it.
     struct ChainFacingState {
@@ -365,6 +376,62 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationBootstrapFi
         assertEq(IChainTypeManager(inputs.ctm).protocolVersion(), _nextVersion(), "the version leg landed");
     }
 
+    /// @notice Discovery reads a registry-era CTM's release members off its `currentRelease`, not
+    ///         off "a chain at the CTM's version": once an edge is committed, no chain need be at
+    ///         that version yet. A prepare against such a CTM reuses every live member and builds a
+    ///         valid release over them, which the CTM then installs.
+    function test_prepareWhileEveryChainLags_reusesTheLiveReleaseMembers() public {
+        // A first hop commits the next version; no chain follows it.
+        RecurringCTMUpgradeForTests firstHop = new CTMUpgradeVerifierRelease();
+        _prepareHop(new CoreUpgradeNoEcosystemLeg(), firstHop, NEXT_VERSION_INPUT, "recurring-lagging-first");
+        _runOperation(IEcosystemUpgradeOperation(firstHop.preparedOperation()));
+        uint256 ctmVersion = IChainTypeManager(inputs.ctm).protocolVersion();
+        assertEq(ctmVersion, _nextVersion(), "the first hop moved the CTM");
+        address[] memory chains = IBridgehubBase(inputs.bridgehub).getAllZKChains();
+        assertTrue(chains.length != 0, "the fixture must have chains");
+        for (uint256 i = 0; i < chains.length; ++i) {
+            assertTrue(IGetters(chains[i]).getProtocolVersion() < ctmVersion, "every chain lags the CTM");
+        }
+        ICTMRelease liveRelease = ICTMRelease(IChainTypeManager(inputs.ctm).currentRelease());
+
+        RecurringCTMUpgradeForTests secondHop = new CTMUpgradeVersionOnly();
+        _prepareHopWithSalt(
+            new CoreUpgradeNoEcosystemLeg(),
+            secondHop,
+            LAGGING_CHAINS_INPUT,
+            "recurring-lagging-second",
+            SECOND_HOP_SALT
+        );
+
+        // ── Every member of the new release is the live release's ──
+        ICTMRelease newRelease = ICTMRelease(secondHop.getAddresses().stateTransition.currentRelease);
+        assertTrue(address(newRelease) != address(liveRelease), "a version bump pins a release of its own");
+        newRelease.validate();
+        assertEq(
+            keccak256(abi.encode(newRelease.genesisFacets())),
+            keccak256(abi.encode(liveRelease.genesisFacets())),
+            "every facet row, freezability included, is the live one"
+        );
+        assertEq(newRelease.diamondInit(), liveRelease.diamondInit(), "DiamondInit reused");
+        assertEq(newRelease.verifier(), liveRelease.verifier(), "verifier reused");
+        (address newEngine, , ) = newRelease.genesisParams();
+        (address liveEngine, , ) = liveRelease.genesisParams();
+        assertEq(newEngine, liveEngine, "genesis engine reused");
+
+        ICTMTransition transition = ICTMTransition(secondHop.preparedTransition());
+        assertEq(transition.fromRelease(), address(liveRelease), "the edge departs from the live release");
+        assertEq(transition.facetCuts().length, 0, "reusing every facet derives no facet cut");
+
+        // ── The CTM installs it ──
+        _runOperation(IEcosystemUpgradeOperation(secondHop.preparedOperation()));
+        assertEq(
+            IChainTypeManager(inputs.ctm).protocolVersion(),
+            newRelease.protocolVersion(),
+            "the CTM committed the edge"
+        );
+        assertEq(IChainTypeManager(inputs.ctm).currentRelease(), address(newRelease), "and installed the release");
+    }
+
     // ───────────────────────────── refusals ─────────────────────────────
 
     /// @notice An operation that changes nothing is refused at PREPARATION, where the message can
@@ -470,11 +537,20 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationBootstrapFi
         string memory _input,
         string memory _outName
     ) internal returns (RecurringCTMUpgradeForTests) {
+        return _initCTMHopWithSalt(_hop, _input, _outName, HOP_SALT);
+    }
+
+    function _initCTMHopWithSalt(
+        RecurringCTMUpgradeForTests _hop,
+        string memory _input,
+        string memory _outName,
+        bytes32 _salt
+    ) internal returns (RecurringCTMUpgradeForTests) {
         // solhint-disable-next-line func-named-parameters
         _hop.initializeWithArgs(
             inputs.ctm,
             inputs.rollupDAManager,
-            HOP_SALT,
+            _salt,
             _input,
             string.concat("/script-out/foundry-upgrade/", _outName, "-ctm.toml"),
             inputs.governance,
@@ -509,6 +585,28 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationBootstrapFi
         string memory _outName
     ) internal {
         _initHop(_core, _hop, _input, _outName);
+        _finishPrepare(_core, _hop);
+    }
+
+    /// @dev {_prepareHop} under `_salt` for both prepares.
+    function _prepareHopWithSalt(
+        CoreUpgradeNoEcosystemLeg _core,
+        RecurringCTMUpgradeForTests _hop,
+        string memory _input,
+        string memory _outName,
+        bytes32 _salt
+    ) internal {
+        _core.initializeWithArgs(
+            inputs.bridgehub,
+            _salt,
+            _input,
+            string.concat("/script-out/foundry-upgrade/", _outName, "-core.toml")
+        );
+        _initCTMHopWithSalt(_hop, _input, _outName, _salt);
+        _finishPrepare(_core, _hop);
+    }
+
+    function _finishPrepare(CoreUpgradeNoEcosystemLeg _core, RecurringCTMUpgradeForTests _hop) internal {
         _core.prepareEcosystemUpgrade();
         _hop.setEcosystemUpgradeExecutor(_core.getEcosystemUpgradeExecutor());
         _hop.setCoreTransition(address(_core.coreTransition()));

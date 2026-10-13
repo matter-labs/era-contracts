@@ -45,8 +45,9 @@ interface ICTMRelease {
     function verifyChainRouting(address _chain) external view returns (bool);
 
     /// @notice Reverts unless every contract this release names (DiamondInit, genesis upgrade,
-    ///         verifier, every genesis facet) is deployed code. THE enforcement surface: the
-    ///         paths that install or apply a release call it.
+    ///         verifier, every genesis facet) is deployed code and every genesis facet describes at
+    ///         least one selector. THE enforcement surface: the paths that install or apply a
+    ///         release call it.
     /// @dev It does NOT attest that the code is the reviewed code — that is governance's
     ///      approval of this object's member ADDRESSES, established off-chain before approval
     ///      (see {docs/registry-driven-upgrades.md}).

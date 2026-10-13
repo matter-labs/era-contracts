@@ -75,10 +75,14 @@ Finished, and described where it now lives:
   L1 delta (`ReleaseMemberReuse.t.sol`).
 - Replacing a live member is a change of SCOPE and must be INTENDED: the prepare refuses to replace
   any member the version does not name in `changedReleaseMembers()`. The v35 bootstrap declares
-  the whole set, since it authors a complete release for a pre-registry ecosystem.
-- `DiamondInit` comes from the CTM's current RELEASE. It is the genesis cut's init target rather
-  than a routed facet, so introspection reported zero and every upgrade deployed a fresh one —
-  found by the pipeline's reuse assertion.
+  the whole set, since it authors a complete release for a pre-registry ecosystem — the genesis
+  engine (`L1GenesisUpgrade`) included: the pre-v35 one lacks the entrypoint the v35 Admin facet
+  calls, so a release that kept it could create no chain.
+- A registry-era CTM's members (facets, `DiamondInit`, verifier, genesis engine) come from its
+  current RELEASE. Introspection used to read them off a chain at the CTM's version — and could
+  not see `DiamondInit`, the genesis cut's init target, at all — so after a commit no chain had
+  followed yet a prepare found no members. Only a pre-registry CTM (the bootstrap source) is still
+  discovered through a chain.
 - Two findings fixed here: a hash taken from a build artifact while the object is deployed from
   the script's own compiled copy can differ (CBOR metadata records the remappings), so registry
   objects are deployed from the same artifact a reviewer reproduces

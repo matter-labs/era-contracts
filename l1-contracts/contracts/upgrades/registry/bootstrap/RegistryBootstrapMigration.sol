@@ -19,6 +19,7 @@ import {IChainAssetHandlerBase} from "../../../core/chain-asset-handler/IChainAs
 import {GovernanceUpgradeTimer} from "../../GovernanceUpgradeTimer.sol";
 import {BytecodesSupplier} from "../../BytecodesSupplier.sol";
 import {L2PlanLib} from "../libraries/L2PlanLib.sol";
+import {VersionEdgeLib} from "../libraries/VersionEdgeLib.sol";
 import {IRegistryBootstrapMigration} from "./IRegistryBootstrapMigration.sol";
 import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
 import {
@@ -99,16 +100,26 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
         // state, installed in full — there is no departing release to diff against) plus the
         // authored delegate and extras, with the same shape rules ({L2PlanLib.build}).
         ICTMRelease release = ICTMRelease(_manifest.currentRelease);
-        derivedNewProtocolVersion = release.protocolVersion();
-        encodedL2Plan = abi.encode(
-            L2PlanLib.build(
-                TransitionDerivationLib.deriveL2DeploymentsFromTable(
-                    release.l2BytecodeInfos(),
-                    release.l2SystemProxyBytecodeInfo()
-                ),
-                _manifest.l2Plan
-            )
+        uint256 newVersion = release.protocolVersion();
+        derivedNewProtocolVersion = newVersion;
+        L2UpgradePlan memory plan = L2PlanLib.build(
+            TransitionDerivationLib.deriveL2DeploymentsFromTable(
+                release.l2BytecodeInfos(),
+                release.l2SystemProxyBytecodeInfo()
+            ),
+            _manifest.l2Plan
         );
+        // Held to the edge rules of a `CTMTransition`: chains cross this edge through the same
+        // per-chain version checks, so an edge they would refuse must not be committable.
+        // slither-disable-next-line unused-return
+        VersionEdgeLib.requireValidEdge({
+            _oldVersion: _manifest.expectedProtocolVersion,
+            _newVersion: newVersion,
+            _oldVersionDeadline: _manifest.oldProtocolVersionDeadline,
+            _upgradeTimestamp: _manifest.upgradeTimestamp,
+            _hasL2Side: plan.deployments.length != 0
+        });
+        encodedL2Plan = abi.encode(plan);
         encodedManifest = abi.encode(_manifest);
     }
 

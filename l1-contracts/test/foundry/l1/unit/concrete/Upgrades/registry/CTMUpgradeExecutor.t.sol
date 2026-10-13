@@ -134,7 +134,10 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
 
     /// @inheritdoc ChainTypeManagerTest
     /// @dev The departing release every fixture transition names, at the fixture CTM's version 0.
+    ///      Installing it validates that every facet self-describes, which the fixture's test facets
+    ///      only do once mocked.
     function _fixtureGenesisRelease() internal override returns (address) {
+        _mockFacetSelfDescriptions(facetCuts);
         fromRelease = _deployRelease(1, 0);
         return address(fromRelease);
     }

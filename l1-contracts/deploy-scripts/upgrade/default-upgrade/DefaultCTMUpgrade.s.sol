@@ -42,7 +42,6 @@ import {ReleaseMemberProbe} from "./ReleaseMemberProbe.sol";
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 import {CTMUpgradeParams, UpgradeKind} from "./UpgradeParams.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
-import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
 import {IProxyUpgradeInitializable} from "contracts/upgrades/registry/IUpgradeInit.sol";
@@ -694,8 +693,8 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     ///         "change one contract" cannot quietly become "replace the facet set" because the
     ///         local build differs from the one that produced the live code.
     /// @dev Names are the `deploySimpleContract` names of the members that pass through
-    ///      {DeployCTMUtils._deployReleaseMember}: the six facets, `DiamondInit` and
-    ///      `EIP7702Checker`. The verifier is not among them — a version that replaces it does so
+    ///      {DeployCTMUtils._deployReleaseMember}: the six facets, `DiamondInit`, `L1GenesisUpgrade`
+    ///      and `EIP7702Checker`. The verifier is not among them — a version that replaces it does so
     ///      by overriding the deploy step, which IS the declaration. The default is EMPTY: a
     ///      recurring upgrade that changes nothing about the release reuses all of it, and the
     ///      release object itself.
@@ -848,16 +847,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
 
         config.ownerAddress = ctmAddresses.admin.governance;
 
-        // `DiamondInit` is the genesis cut's INIT target, not a routed facet, so a chain's routing
-        // cannot expose it and introspection leaves it zero. Its canonical source is the CTM's own
-        // current release — without reading it there, every upgrade deploys a fresh one and moves
-        // the release even when nothing about the release changed. A pre-registry CTM has no
-        // release, so the bootstrap edge still deploys one.
-        address liveRelease = ctmAddresses.stateTransition.currentRelease;
-        if (liveRelease != address(0) && liveRelease.code.length != 0) {
-            ctmAddresses.stateTransition.facets.diamondInit = ICTMRelease(liveRelease).diamondInit();
-        }
-
         address representativeChain = AddressIntrospector.getRepresentativeZkChain(bridgehubAddr);
         if (representativeChain != address(0)) {
             discoveredRepresentativeZkChain = AddressIntrospector.getZkChainAddresses(IZKChain(representativeChain));
@@ -867,7 +856,12 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             console.log("No registered chain in bridgehub, using up-to-date addresses");
         }
 
-        upToDateZkChain = AddressIntrospector.getUptoDateZkChainAddresses(ChainTypeManager(ctm));
+        // A pre-registry CTM has no release to read its members from, so discovery read them off a
+        // chain at the CTM's version — which must therefore exist. A registry-era CTM's members
+        // come from its release, whatever version its chains are at.
+        if (ctmAddresses.stateTransition.currentRelease == address(0)) {
+            upToDateZkChain = AddressIntrospector.getUptoDateZkChainAddresses(ChainTypeManager(ctm));
+        }
 
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
         newConfig.oldProtocolVersion = ctmProtocolVersion;

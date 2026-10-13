@@ -146,7 +146,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         // be the reusable implementation — a one-shot migration like `V32UpgradeZKsyncOS` would be
         // replayed by every upgrade that reused it.
         deployedUpgradeEngine = deploySimpleContract("DefaultUpgrade");
-        (ctmAddresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade");
 
         // The single owner chainAdmin does not have a separate control restriction contract.
         // We set to it to zero explicitly so that it is clear to the reader.
