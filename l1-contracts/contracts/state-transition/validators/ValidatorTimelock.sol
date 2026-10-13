@@ -162,9 +162,9 @@ contract ValidatorTimelock is
     }
 
     /// @dev Reverts if the delay exceeds `MAX_EXECUTION_DELAY`.
-    function _checkExecutionDelayWithinBounds(uint32 _executionDelay) internal pure {
-        if (_executionDelay > MAX_EXECUTION_DELAY) {
-            revert ExecutionDelayTooLarge(_executionDelay, MAX_EXECUTION_DELAY);
+    function _checkExecutionDelayWithinBounds(uint32 _delay) internal pure {
+        if (_delay > MAX_EXECUTION_DELAY) {
+            revert ExecutionDelayTooLarge(_delay, MAX_EXECUTION_DELAY);
         }
     }
 
