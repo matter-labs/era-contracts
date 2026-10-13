@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
-import {IInteropFeeManager} from "contracts/core/interop-fee/IInteropFeeManager.sol";
+import {IL1InteropFeeManager} from "contracts/core/interop-fee/IL1InteropFeeManager.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {InteropRoot} from "contracts/common/Messaging.sol";
@@ -23,7 +23,7 @@ import {
 /// batch-processing tests.
 contract DependencyInteropRootsHarness is ExecutorFacet {
     // Only the dependency-root check is exercised, which never charges the interop fee.
-    constructor() ExecutorFacet(block.chainid, IInteropFeeManager(address(1))) {}
+    constructor() ExecutorFacet(block.chainid, IL1InteropFeeManager(address(1))) {}
 
     function setBridgehub(address _bridgehub) external {
         s.bridgehub = _bridgehub;

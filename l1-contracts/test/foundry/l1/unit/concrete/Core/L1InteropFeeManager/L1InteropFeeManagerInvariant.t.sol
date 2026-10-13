@@ -4,15 +4,15 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {InteropFeeManager} from "contracts/core/interop-fee/InteropFeeManager.sol";
+import {L1InteropFeeManager} from "contracts/core/interop-fee/L1InteropFeeManager.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
-import {ChainRegistryStub, ZKChainStub} from "./InteropFeeManager.t.sol";
+import {ChainRegistryStub, ZKChainStub} from "./L1InteropFeeManager.t.sol";
 
 /// @dev Drives the manager through every state-changing entry point, each from its authorized caller, and tracks
 /// the value that moved through it.
-contract InteropFeeManagerHandler is Test {
-    InteropFeeManager internal immutable MANAGER;
+contract L1InteropFeeManagerHandler is Test {
+    L1InteropFeeManager internal immutable MANAGER;
     address internal immutable OWNER;
     address internal immutable WITHDRAWAL_RECEIVER = makeAddr("withdrawalReceiver");
 
@@ -25,7 +25,7 @@ contract InteropFeeManagerHandler is Test {
     uint256 public ghostCharged;
     uint256 public ghostSwept;
 
-    constructor(InteropFeeManager _manager, address _owner, ChainRegistryStub _registry, uint256[] memory _chainIds) {
+    constructor(L1InteropFeeManager _manager, address _owner, ChainRegistryStub _registry, uint256[] memory _chainIds) {
         MANAGER = _manager;
         OWNER = _owner;
         chainIds = _chainIds;
@@ -90,28 +90,28 @@ contract InteropFeeManagerHandler is Test {
     }
 }
 
-contract InteropFeeManagerInvariantTest is Test {
-    InteropFeeManager internal manager;
-    InteropFeeManagerHandler internal handler;
+contract L1InteropFeeManagerInvariantTest is Test {
+    L1InteropFeeManager internal manager;
+    L1InteropFeeManagerHandler internal handler;
     address internal recipient = makeAddr("recipient");
 
     function setUp() public {
         address owner = makeAddr("owner");
         ChainRegistryStub registry = new ChainRegistryStub();
-        InteropFeeManager impl = new InteropFeeManager(IBridgehubBase(address(registry)));
-        manager = InteropFeeManager(
+        L1InteropFeeManager impl = new L1InteropFeeManager(IBridgehubBase(address(registry)));
+        manager = L1InteropFeeManager(
             address(
                 new TransparentUpgradeableProxy(
                     address(impl),
                     makeAddr("proxyAdmin"),
-                    abi.encodeCall(InteropFeeManager.initialize, (owner, recipient))
+                    abi.encodeCall(L1InteropFeeManager.initialize, (owner, recipient))
                 )
             )
         );
 
         uint256[] memory chainIds = new uint256[](3);
         (chainIds[0], chainIds[1], chainIds[2]) = (271, 272, 273);
-        handler = new InteropFeeManagerHandler(manager, owner, registry, chainIds);
+        handler = new L1InteropFeeManagerHandler(manager, owner, registry, chainIds);
         targetContract(address(handler));
     }
 

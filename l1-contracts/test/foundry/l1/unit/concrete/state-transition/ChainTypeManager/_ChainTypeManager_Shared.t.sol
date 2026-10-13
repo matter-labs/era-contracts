@@ -19,7 +19,7 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
 import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
-import {IInteropFeeManager} from "contracts/core/interop-fee/IInteropFeeManager.sol";
+import {IL1InteropFeeManager} from "contracts/core/interop-fee/IL1InteropFeeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
@@ -142,7 +142,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         );
         facetCuts.push(
             Diamond.FacetCut({
-                facet: address(new ExecutorFacet(block.chainid, IInteropFeeManager(makeAddr("interopFeeManager")))),
+                facet: address(new ExecutorFacet(block.chainid, IL1InteropFeeManager(makeAddr("interopFeeManager")))),
                 action: Diamond.Action.Add,
                 isFreezable: true,
                 selectors: Utils.getExecutorSelectors()

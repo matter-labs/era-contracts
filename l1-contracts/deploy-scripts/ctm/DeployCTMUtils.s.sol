@@ -18,7 +18,7 @@ import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol"
 
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
-import {InteropFeeManager} from "contracts/core/interop-fee/InteropFeeManager.sol";
+import {L1InteropFeeManager} from "contracts/core/interop-fee/L1InteropFeeManager.sol";
 
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
 import {ChainCreationParamsLib} from "./ChainCreationParamsLib.sol";
@@ -302,7 +302,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         } else if (compareStrings(contractName, "MultisigCommitter")) {
             // Same constructor as ValidatorTimelock (it derives from it): the bridgehub immutable.
             return abi.encode(coreAddresses.bridgehub.proxies.bridgehub);
-        } else if (compareStrings(contractName, "InteropFeeManager")) {
+        } else if (compareStrings(contractName, "L1InteropFeeManager")) {
             return abi.encode(coreAddresses.bridgehub.proxies.bridgehub);
         } else {
             return
@@ -359,11 +359,11 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encodeCall(BytecodesSupplier.initialize, ());
         } else if (compareStrings(contractName, "PermissionlessValidator")) {
             return abi.encodeCall(PermissionlessValidator.initialize, ());
-        } else if (compareStrings(contractName, "InteropFeeManager")) {
+        } else if (compareStrings(contractName, "L1InteropFeeManager")) {
             // Governance owns the switch from the start, and fees accrue to it until it routes them elsewhere.
             return
                 abi.encodeCall(
-                    InteropFeeManager.initialize,
+                    L1InteropFeeManager.initialize,
                     (ctmAddresses.admin.governance, ctmAddresses.admin.governance)
                 );
         } else {

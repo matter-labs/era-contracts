@@ -10,7 +10,7 @@ import {IExecutor} from "../../chain-interfaces/IExecutor.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
-import {IInteropFeeManager} from "../../../core/interop-fee/IInteropFeeManager.sol";
+import {IL1InteropFeeManager} from "../../../core/interop-fee/IL1InteropFeeManager.sol";
 import {
     CantExecuteUnprovenBatches,
     InvalidMessageRoot,
@@ -49,9 +49,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     uint256 internal immutable L1_CHAIN_ID;
 
     /// @dev Exposed as {getInteropFeeManager}.
-    IInteropFeeManager internal immutable INTEROP_FEE_MANAGER;
+    IL1InteropFeeManager internal immutable INTEROP_FEE_MANAGER;
 
-    constructor(uint256 _l1ChainId, IInteropFeeManager _interopFeeManager) {
+    constructor(uint256 _l1ChainId, IL1InteropFeeManager _interopFeeManager) {
         // On L1 the manager is called for every interop batch, even with the switch off; off L1 it is never called.
         require(_l1ChainId != block.chainid || address(_interopFeeManager) != address(0), ZeroAddress());
         L1_CHAIN_ID = _l1ChainId;

@@ -26,7 +26,7 @@ import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.s
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {TestExecutor} from "contracts/dev-contracts/test/TestExecutor.sol";
 import {TestCommitter} from "contracts/dev-contracts/test/TestCommitter.sol";
-import {InteropFeeManager} from "contracts/core/interop-fee/InteropFeeManager.sol";
+import {L1InteropFeeManager} from "contracts/core/interop-fee/L1InteropFeeManager.sol";
 import {UtilsFacet} from "../Utils/UtilsFacet.sol";
 
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
@@ -67,7 +67,7 @@ contract ExecutorTest is UtilsCallMockerTest {
     AdminFacet internal admin;
     TestExecutor internal executor;
     TestCommitter internal committer;
-    InteropFeeManager internal interopFeeManager;
+    L1InteropFeeManager internal interopFeeManager;
     GettersFacet internal getters;
     MailboxFacet internal mailbox;
     // UtilsFacet is attached to every diamond by default (see constructor) so tests can manipulate chain state.
@@ -286,12 +286,12 @@ contract ExecutorTest is UtilsCallMockerTest {
 
         admin = new AdminFacet(block.chainid, rollupDAManager);
         getters = new GettersFacet();
-        interopFeeManager = InteropFeeManager(
+        interopFeeManager = L1InteropFeeManager(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new InteropFeeManager(IBridgehubBase(address(dummyBridgehub)))),
+                    address(new L1InteropFeeManager(IBridgehubBase(address(dummyBridgehub)))),
                     makeAddr("interopFeeManagerProxyAdmin"),
-                    abi.encodeCall(InteropFeeManager.initialize, (owner, makeAddr("interopFeeRecipient")))
+                    abi.encodeCall(L1InteropFeeManager.initialize, (owner, makeAddr("interopFeeRecipient")))
                 )
             )
         );

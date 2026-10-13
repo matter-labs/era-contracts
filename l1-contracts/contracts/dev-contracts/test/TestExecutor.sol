@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 import {ExecutorFacet} from "../../state-transition/chain-deps/facets/Executor.sol";
-import {IInteropFeeManager} from "../../core/interop-fee/IInteropFeeManager.sol";
+import {IL1InteropFeeManager} from "../../core/interop-fee/IL1InteropFeeManager.sol";
 import {PriorityOperation, PriorityQueue} from "../../state-transition/libraries/PriorityQueue.sol";
 
 pragma solidity 0.8.28;
@@ -9,7 +9,7 @@ pragma solidity 0.8.28;
 contract TestExecutor is ExecutorFacet {
     using PriorityQueue for PriorityQueue.Queue;
 
-    constructor(IInteropFeeManager _interopFeeManager) ExecutorFacet(block.chainid, _interopFeeManager) {}
+    constructor(IL1InteropFeeManager _interopFeeManager) ExecutorFacet(block.chainid, _interopFeeManager) {}
 
     function setPriorityTreeStartIndex(uint256 _startIndex) external {
         s.priorityTree.startIndex = _startIndex;

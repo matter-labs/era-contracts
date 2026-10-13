@@ -6,7 +6,7 @@ pragma solidity ^0.8.21;
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The L1 interop fee switch: per-chain prepaid balances that chains are charged from when their batches
 /// execute. See {protocol-docs/interop-fee.md}.
-interface IInteropFeeManager {
+interface IL1InteropFeeManager {
     /// @notice Emitted when the owner changes the fee charged per interop fee unit.
     event NewFeePerUnit(uint256 oldFeePerUnit, uint256 newFeePerUnit);
 

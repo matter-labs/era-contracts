@@ -10,7 +10,7 @@ import {IL1DAValidator, L1DAValidatorOutput} from "contracts/state-transition/ch
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
 import {PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2TransactionRequestDirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {IInteropFeeManager} from "contracts/core/interop-fee/IInteropFeeManager.sol";
+import {IL1InteropFeeManager} from "contracts/core/interop-fee/IL1InteropFeeManager.sol";
 
 contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
     function setUp() public {
@@ -92,7 +92,7 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
 
         vm.expectCall(
             address(interopFeeManager),
-            abi.encodeWithSelector(IInteropFeeManager.chargeInteropFee.selector),
+            abi.encodeWithSelector(IL1InteropFeeManager.chargeInteropFee.selector),
             0
         );
         permissionlessValidator.settleBatchesSharedBridge({

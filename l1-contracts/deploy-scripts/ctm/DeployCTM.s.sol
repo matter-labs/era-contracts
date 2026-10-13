@@ -27,7 +27,7 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
 import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
-import {IInteropFeeManager} from "contracts/core/interop-fee/IInteropFeeManager.sol";
+import {IL1InteropFeeManager} from "contracts/core/interop-fee/IL1InteropFeeManager.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {CTMDeployedAddresses, Config, DeployCTMUtils} from "./DeployCTMUtils.s.sol";
@@ -173,7 +173,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         initializeGeneratedData();
 
         // The Executor facet takes the fee manager as an immutable, so it has to exist first.
-        (, ctmAddresses.l1Specific.interopFeeManager) = deployTuppWithContract("InteropFeeManager");
+        (, ctmAddresses.l1Specific.interopFeeManager) = deployTuppWithContract("L1InteropFeeManager");
 
         deployStateTransitionDiamondFacets();
         (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(CTMContract.ChainTypeManager);
@@ -640,7 +640,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             false
         );
         // Only its selectors are read; any non-zero manager satisfies the constructor on every chain.
-        ExecutorFacet executorFacet = new ExecutorFacet(1, IInteropFeeManager(address(1)));
+        ExecutorFacet executorFacet = new ExecutorFacet(1, IL1InteropFeeManager(address(1)));
         MigratorFacet migratorFacet = new MigratorFacet(1, false);
         CommitterFacet committerFacet = new CommitterFacet(1);
         bytes4[] memory adminFacetSelectors = Utils.getAllSelectors(address(adminFacet).code);

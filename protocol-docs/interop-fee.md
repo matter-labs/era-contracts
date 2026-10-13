@@ -37,7 +37,7 @@ The batch output layout is pinned by golden vectors shared with ZKsync OS:
 
 ## Charging and enforcement
 
-`ExecutorFacet` calls `InteropFeeManager.chargeInteropFee(chainId, batchNumber, units)` for every batch it executes,
+`ExecutorFacet` calls `L1InteropFeeManager.chargeInteropFee(chainId, batchNumber, units)` for every batch it executes,
 when:
 
 - `interopFeeUnits != 0`: batches without interop never touch the manager;
@@ -57,7 +57,7 @@ reverted batch with the same number.
 
 ## The switch
 
-`DeployCTM` deploys an `InteropFeeManager` proxy with the CTM, as does the CTM upgrade that introduces it; later
+`DeployCTM` deploys an `L1InteropFeeManager` proxy with the CTM, as does the CTM upgrade that introduces it; later
 upgrades keep the one the current `ExecutorFacet` charges, which holds the chains' prepaid balances. It is passed to
 the `ExecutorFacet` as an immutable and can be read as `getInteropFeeManager()` on the L1 diamond of any chain from v35
 on. Its owner is protocol governance from initialization, and controls:

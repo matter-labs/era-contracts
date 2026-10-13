@@ -32,7 +32,7 @@ const ANVIL_INTEROP_DEV_ARTIFACTS: DevArtifact[] = [
     reason: "spec 13 and the live-interop helpers read the imported (root, timestamp) tuple via its ABI",
   },
   {
-    contractPath: "contracts/core/interop-fee/InteropFeeManager.sol",
+    contractPath: "contracts/core/interop-fee/L1InteropFeeManager.sol",
     reason: "spec 14 reads the L1 interop fee manager and round-trips a chain's prepaid balance via its ABI",
   },
   {

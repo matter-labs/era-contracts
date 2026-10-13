@@ -4,8 +4,8 @@ pragma solidity 0.8.28;
 import {Test, stdError} from "forge-std/Test.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {InteropFeeManager} from "contracts/core/interop-fee/InteropFeeManager.sol";
-import {IInteropFeeManager} from "contracts/core/interop-fee/IInteropFeeManager.sol";
+import {L1InteropFeeManager} from "contracts/core/interop-fee/L1InteropFeeManager.sol";
+import {IL1InteropFeeManager} from "contracts/core/interop-fee/IL1InteropFeeManager.sol";
 import {InsufficientInteropFeeBalance} from "contracts/core/interop-fee/InteropFeeErrors.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {ZKChainNotRegistered} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
@@ -37,11 +37,11 @@ contract ZKChainStub {
 
 /// @dev Calls back into the manager when it receives ether, and records how the nested call reverted.
 contract ReentrantReceiver {
-    InteropFeeManager internal immutable MANAGER;
+    L1InteropFeeManager internal immutable MANAGER;
     bytes internal reentry;
     bytes public reentryRevertData;
 
-    constructor(InteropFeeManager _manager) {
+    constructor(L1InteropFeeManager _manager) {
         MANAGER = _manager;
     }
 
@@ -63,14 +63,14 @@ contract ReentrantReceiver {
 /// @dev Isolates the fee manager from the Bridgehub and the diamond: it only reads `getZKChain` and `getAdmin`,
 /// so minimal stand-ins keep the setup readable. Settlement with a real diamond is covered in
 /// `BatchProcessing/InteropFee.t.sol`.
-contract InteropFeeManagerTest is Test {
+contract L1InteropFeeManagerTest is Test {
     uint256 internal constant CHAIN_ID = 271;
     uint256 internal constant OTHER_CHAIN_ID = 272;
     uint256 internal constant UNREGISTERED_CHAIN_ID = 273;
     uint256 internal constant FEE_PER_UNIT = 0.001 ether;
 
     ChainRegistryStub internal registry;
-    InteropFeeManager internal manager;
+    L1InteropFeeManager internal manager;
     address internal owner = makeAddr("owner");
     address internal recipient = makeAddr("recipient");
     address internal chainAdmin = makeAddr("chainAdmin");
@@ -81,13 +81,13 @@ contract InteropFeeManagerTest is Test {
         zkChain = address(new ZKChainStub(chainAdmin));
         registry.register(CHAIN_ID, zkChain);
 
-        InteropFeeManager impl = new InteropFeeManager(IBridgehubBase(address(registry)));
-        manager = InteropFeeManager(
+        L1InteropFeeManager impl = new L1InteropFeeManager(IBridgehubBase(address(registry)));
+        manager = L1InteropFeeManager(
             address(
                 new TransparentUpgradeableProxy(
                     address(impl),
                     makeAddr("proxyAdmin"),
-                    abi.encodeCall(InteropFeeManager.initialize, (owner, recipient))
+                    abi.encodeCall(L1InteropFeeManager.initialize, (owner, recipient))
                 )
             )
         );
@@ -98,15 +98,15 @@ contract InteropFeeManagerTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test_initialize_startsSwitchedOff() public {
-        InteropFeeManager impl = new InteropFeeManager(IBridgehubBase(address(registry)));
+        L1InteropFeeManager impl = new L1InteropFeeManager(IBridgehubBase(address(registry)));
         vm.expectEmit();
-        emit IInteropFeeManager.NewFeeRecipient(address(0), recipient);
-        InteropFeeManager freshManager = InteropFeeManager(
+        emit IL1InteropFeeManager.NewFeeRecipient(address(0), recipient);
+        L1InteropFeeManager freshManager = L1InteropFeeManager(
             address(
                 new TransparentUpgradeableProxy(
                     address(impl),
                     makeAddr("proxyAdmin"),
-                    abi.encodeCall(InteropFeeManager.initialize, (owner, recipient))
+                    abi.encodeCall(L1InteropFeeManager.initialize, (owner, recipient))
                 )
             )
         );
@@ -125,28 +125,28 @@ contract InteropFeeManagerTest is Test {
     }
 
     function test_revertWhen_implementationInitialized() public {
-        InteropFeeManager impl = new InteropFeeManager(IBridgehubBase(address(registry)));
+        L1InteropFeeManager impl = new L1InteropFeeManager(IBridgehubBase(address(registry)));
         vm.expectRevert(SlotOccupied.selector);
         impl.initialize(owner, recipient);
     }
 
     function test_revertWhen_initializeWithZeroOwner() public {
-        InteropFeeManager impl = new InteropFeeManager(IBridgehubBase(address(registry)));
+        L1InteropFeeManager impl = new L1InteropFeeManager(IBridgehubBase(address(registry)));
         vm.expectRevert(ZeroAddress.selector);
         new TransparentUpgradeableProxy(
             address(impl),
             makeAddr("proxyAdmin"),
-            abi.encodeCall(InteropFeeManager.initialize, (address(0), recipient))
+            abi.encodeCall(L1InteropFeeManager.initialize, (address(0), recipient))
         );
     }
 
     function test_revertWhen_initializeWithZeroRecipient() public {
-        InteropFeeManager impl = new InteropFeeManager(IBridgehubBase(address(registry)));
+        L1InteropFeeManager impl = new L1InteropFeeManager(IBridgehubBase(address(registry)));
         vm.expectRevert(ZeroAddress.selector);
         new TransparentUpgradeableProxy(
             address(impl),
             makeAddr("proxyAdmin"),
-            abi.encodeCall(InteropFeeManager.initialize, (owner, address(0)))
+            abi.encodeCall(L1InteropFeeManager.initialize, (owner, address(0)))
         );
     }
 
@@ -156,14 +156,14 @@ contract InteropFeeManagerTest is Test {
 
     function test_setFeePerUnit() public {
         vm.expectEmit(address(manager));
-        emit IInteropFeeManager.NewFeePerUnit(0, FEE_PER_UNIT);
+        emit IL1InteropFeeManager.NewFeePerUnit(0, FEE_PER_UNIT);
         vm.prank(owner);
         manager.setFeePerUnit(FEE_PER_UNIT);
         assertEq(manager.feePerUnit(), FEE_PER_UNIT);
 
         // Turning the switch back off is a plain update to zero.
         vm.expectEmit(address(manager));
-        emit IInteropFeeManager.NewFeePerUnit(FEE_PER_UNIT, 0);
+        emit IL1InteropFeeManager.NewFeePerUnit(FEE_PER_UNIT, 0);
         vm.prank(owner);
         manager.setFeePerUnit(0);
         assertEq(manager.feePerUnit(), 0);
@@ -178,7 +178,7 @@ contract InteropFeeManagerTest is Test {
     function test_setFeeRecipient() public {
         address newRecipient = makeAddr("newRecipient");
         vm.expectEmit(address(manager));
-        emit IInteropFeeManager.NewFeeRecipient(recipient, newRecipient);
+        emit IL1InteropFeeManager.NewFeeRecipient(recipient, newRecipient);
         vm.prank(owner);
         manager.setFeeRecipient(newRecipient);
         assertEq(manager.feeRecipient(), newRecipient);
@@ -205,7 +205,7 @@ contract InteropFeeManagerTest is Test {
         vm.deal(depositor, 2 ether);
 
         vm.expectEmit(address(manager));
-        emit IInteropFeeManager.ChainBalanceDeposited(CHAIN_ID, depositor, 1 ether);
+        emit IL1InteropFeeManager.ChainBalanceDeposited(CHAIN_ID, depositor, 1 ether);
         vm.prank(depositor);
         manager.deposit{value: 1 ether}(CHAIN_ID);
 
@@ -232,7 +232,7 @@ contract InteropFeeManagerTest is Test {
         address payable to = payable(makeAddr("to"));
 
         vm.expectEmit(address(manager));
-        emit IInteropFeeManager.ChainBalanceWithdrawn(CHAIN_ID, to, 0.4 ether);
+        emit IL1InteropFeeManager.ChainBalanceWithdrawn(CHAIN_ID, to, 0.4 ether);
         vm.prank(chainAdmin);
         manager.withdraw(CHAIN_ID, to, 0.4 ether);
 
@@ -282,7 +282,7 @@ contract InteropFeeManagerTest is Test {
         registry.register(OTHER_CHAIN_ID, address(new ZKChainStub(address(admin))));
         vm.deal(address(this), 1 ether);
         manager.deposit{value: 1 ether}(OTHER_CHAIN_ID);
-        admin.setReentry(abi.encodeCall(InteropFeeManager.withdraw, (OTHER_CHAIN_ID, address(admin), 0.4 ether)));
+        admin.setReentry(abi.encodeCall(L1InteropFeeManager.withdraw, (OTHER_CHAIN_ID, address(admin), 0.4 ether)));
 
         admin.withdraw(OTHER_CHAIN_ID, 0.4 ether);
 
@@ -300,7 +300,7 @@ contract InteropFeeManagerTest is Test {
         _setFee(FEE_PER_UNIT);
 
         vm.expectEmit(address(manager));
-        emit IInteropFeeManager.InteropFeeCharged(CHAIN_ID, 5, 3, 3 * FEE_PER_UNIT);
+        emit IL1InteropFeeManager.InteropFeeCharged(CHAIN_ID, 5, 3, 3 * FEE_PER_UNIT);
         vm.prank(zkChain);
         manager.chargeInteropFee(CHAIN_ID, 5, 3);
 
@@ -388,7 +388,7 @@ contract InteropFeeManagerTest is Test {
         _accrue(3);
 
         vm.expectEmit(address(manager));
-        emit IInteropFeeManager.FeesSwept(recipient, 3 * FEE_PER_UNIT);
+        emit IL1InteropFeeManager.FeesSwept(recipient, 3 * FEE_PER_UNIT);
         // Permissionless: the destination is fixed by the owner.
         vm.prank(makeAddr("anyone"));
         manager.sweep();
@@ -420,7 +420,7 @@ contract InteropFeeManagerTest is Test {
     function test_sweep_cannotBeReentered() public {
         _accrue(3);
         ReentrantReceiver reentrantRecipient = new ReentrantReceiver(manager);
-        reentrantRecipient.setReentry(abi.encodeCall(InteropFeeManager.sweep, ()));
+        reentrantRecipient.setReentry(abi.encodeCall(L1InteropFeeManager.sweep, ()));
         _setRecipient(address(reentrantRecipient));
 
         manager.sweep();

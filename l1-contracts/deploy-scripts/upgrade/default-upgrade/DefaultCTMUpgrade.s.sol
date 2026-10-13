@@ -317,7 +317,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
 
         // Zero only in the release that introduces the manager; see {protocol-docs/interop-fee.md#the-switch}.
         if (ctmAddresses.l1Specific.interopFeeManager == address(0)) {
-            (, ctmAddresses.l1Specific.interopFeeManager) = deployTuppWithContract("InteropFeeManager");
+            (, ctmAddresses.l1Specific.interopFeeManager) = deployTuppWithContract("L1InteropFeeManager");
         }
 
         deployStateTransitionDiamondFacets();

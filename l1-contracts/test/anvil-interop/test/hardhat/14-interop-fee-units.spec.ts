@@ -104,7 +104,7 @@ describe("14 - Interop fee units", function () {
     directSettledChainId = getChainIdByRole(state.chains.config, "directSettled");
 
     l1Provider = createProvider(state.chains.l1!.rpcUrl);
-    feeManager = new Contract(state.ctmAddresses.interopFeeManager, getAbi("InteropFeeManager"), l1Provider);
+    feeManager = new Contract(state.ctmAddresses.interopFeeManager, getAbi("L1InteropFeeManager"), l1Provider);
   });
 
   it("deploys the L1 fee manager switched off and owned by the CTM's governance", async () => {

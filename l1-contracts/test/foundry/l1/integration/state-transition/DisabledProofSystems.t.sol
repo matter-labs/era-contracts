@@ -6,7 +6,7 @@ import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
-import {IInteropFeeManager} from "contracts/core/interop-fee/IInteropFeeManager.sol";
+import {IL1InteropFeeManager} from "contracts/core/interop-fee/IL1InteropFeeManager.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
@@ -276,7 +276,7 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
         selectors = new bytes4[](1);
         selectors[0] = IExecutor.proveBatchesSharedBridge.selector;
         cuts[2] = _cut(
-            address(new ExecutorFacet(block.chainid, IInteropFeeManager(makeAddr("interopFeeManager")))),
+            address(new ExecutorFacet(block.chainid, IL1InteropFeeManager(makeAddr("interopFeeManager")))),
             selectors
         );
         selectors = new bytes4[](6);

@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
-import {IInteropFeeManager} from "./IInteropFeeManager.sol";
+import {IL1InteropFeeManager} from "./IL1InteropFeeManager.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
 import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
@@ -21,20 +21,20 @@ import {InsufficientInteropFeeBalance} from "./InteropFeeErrors.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The L1 interop fee switch. See {protocol-docs/interop-fee.md}.
-contract InteropFeeManager is IInteropFeeManager, ReentrancyGuard, Ownable2StepUpgradeable {
+contract L1InteropFeeManager is IL1InteropFeeManager, ReentrancyGuard, Ownable2StepUpgradeable {
     /// @notice The ecosystem's Bridgehub, used to resolve a chain id to its diamond proxy.
     IBridgehubBase public immutable BRIDGE_HUB;
 
-    /// @inheritdoc IInteropFeeManager
+    /// @inheritdoc IL1InteropFeeManager
     uint256 public feePerUnit;
 
-    /// @inheritdoc IInteropFeeManager
+    /// @inheritdoc IL1InteropFeeManager
     address public feeRecipient;
 
-    /// @inheritdoc IInteropFeeManager
+    /// @inheritdoc IL1InteropFeeManager
     uint256 public accruedFees;
 
-    /// @inheritdoc IInteropFeeManager
+    /// @inheritdoc IL1InteropFeeManager
     mapping(uint256 chainId => uint256 balance) public chainBalance;
 
     /// @dev Contract is expected to be used as proxy implementation.
@@ -55,14 +55,14 @@ contract InteropFeeManager is IInteropFeeManager, ReentrancyGuard, Ownable2StepU
         emit NewFeeRecipient(address(0), _feeRecipient);
     }
 
-    /// @inheritdoc IInteropFeeManager
+    /// @inheritdoc IL1InteropFeeManager
     function setFeePerUnit(uint256 _feePerUnit) external onlyOwner {
         uint256 oldFeePerUnit = feePerUnit;
         feePerUnit = _feePerUnit;
         emit NewFeePerUnit(oldFeePerUnit, _feePerUnit);
     }
 
-    /// @inheritdoc IInteropFeeManager
+    /// @inheritdoc IL1InteropFeeManager
     function setFeeRecipient(address _feeRecipient) external onlyOwner {
         require(_feeRecipient != address(0), ZeroAddress());
         address oldFeeRecipient = feeRecipient;
@@ -70,7 +70,7 @@ contract InteropFeeManager is IInteropFeeManager, ReentrancyGuard, Ownable2StepU
         emit NewFeeRecipient(oldFeeRecipient, _feeRecipient);
     }
 
-    /// @inheritdoc IInteropFeeManager
+    /// @inheritdoc IL1InteropFeeManager
     function deposit(uint256 _chainId) external payable {
         require(msg.value != 0, AmountMustBeGreaterThanZero());
         // Only a registered chain's balance can ever be charged or withdrawn.
@@ -79,7 +79,7 @@ contract InteropFeeManager is IInteropFeeManager, ReentrancyGuard, Ownable2StepU
         emit ChainBalanceDeposited(_chainId, msg.sender, msg.value);
     }
 
-    /// @inheritdoc IInteropFeeManager
+    /// @inheritdoc IL1InteropFeeManager
     function withdraw(uint256 _chainId, address _to, uint256 _amount) external nonReentrant {
         require(msg.sender == IGetters(_getZKChain(_chainId)).getAdmin(), Unauthorized(msg.sender));
         require(_to != address(0), ZeroAddress());
@@ -91,7 +91,7 @@ contract InteropFeeManager is IInteropFeeManager, ReentrancyGuard, Ownable2StepU
         _sendEth(_to, _amount);
     }
 
-    /// @inheritdoc IInteropFeeManager
+    /// @inheritdoc IL1InteropFeeManager
     function chargeInteropFee(uint256 _chainId, uint256 _batchNumber, uint256 _units) external {
         uint256 fee = feePerUnit * _units;
         if (fee == 0) {
@@ -105,7 +105,7 @@ contract InteropFeeManager is IInteropFeeManager, ReentrancyGuard, Ownable2StepU
         emit InteropFeeCharged(_chainId, _batchNumber, _units, fee);
     }
 
-    /// @inheritdoc IInteropFeeManager
+    /// @inheritdoc IL1InteropFeeManager
     function sweep() external nonReentrant {
         uint256 amount = accruedFees;
         if (amount == 0) {

@@ -7,14 +7,14 @@ import {ExecutorTest} from "./_Executor_Shared.t.sol";
 import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
-import {IInteropFeeManager} from "contracts/core/interop-fee/IInteropFeeManager.sol";
+import {IL1InteropFeeManager} from "contracts/core/interop-fee/IL1InteropFeeManager.sol";
 import {InsufficientInteropFeeBalance} from "contracts/core/interop-fee/InteropFeeErrors.sol";
 import {Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {DummyL2L1Messenger} from "contracts/dev-contracts/test/DummyL2L1Messenger.sol";
 
-/// @notice The interop fee through a real diamond and a real `InteropFeeManager`: commits record each batch's count,
+/// @notice The interop fee through a real diamond and a real `L1InteropFeeManager`: commits record each batch's count,
 /// execution charges it, and the chain admin withdraws. See {protocol-docs/interop-fee.md}.
 contract InteropFeeTest is ExecutorTest {
     uint256 internal constant FEE_PER_UNIT = 0.001 ether;
@@ -27,7 +27,7 @@ contract InteropFeeTest is ExecutorTest {
         IExecutor.StoredBatchInfo memory stored = _commitAndProve(_batchWithUnits(3));
 
         vm.expectEmit(address(interopFeeManager));
-        emit IInteropFeeManager.InteropFeeCharged(l2ChainId, 1, 3, 3 * FEE_PER_UNIT);
+        emit IL1InteropFeeManager.InteropFeeCharged(l2ChainId, 1, 3, 3 * FEE_PER_UNIT);
         _execute(stored);
 
         assertEq(getters.getTotalBatchesExecuted(), 1);
@@ -41,9 +41,9 @@ contract InteropFeeTest is ExecutorTest {
         IExecutor.StoredBatchInfo[] memory batches = _commitAndProveTwoBatches(2, 3);
 
         vm.expectEmit(address(interopFeeManager));
-        emit IInteropFeeManager.InteropFeeCharged(l2ChainId, 1, 2, 2 * FEE_PER_UNIT);
+        emit IL1InteropFeeManager.InteropFeeCharged(l2ChainId, 1, 2, 2 * FEE_PER_UNIT);
         vm.expectEmit(address(interopFeeManager));
-        emit IInteropFeeManager.InteropFeeCharged(l2ChainId, 2, 3, 3 * FEE_PER_UNIT);
+        emit IL1InteropFeeManager.InteropFeeCharged(l2ChainId, 2, 3, 3 * FEE_PER_UNIT);
         _execute(batches);
 
         assertEq(getters.getTotalBatchesExecuted(), 2);
@@ -67,7 +67,7 @@ contract InteropFeeTest is ExecutorTest {
 
         vm.expectCall(
             address(interopFeeManager),
-            abi.encodeWithSelector(IInteropFeeManager.chargeInteropFee.selector),
+            abi.encodeWithSelector(IL1InteropFeeManager.chargeInteropFee.selector),
             0
         );
         _commitAndProve(_batchWithUnits(3));
@@ -99,7 +99,7 @@ contract InteropFeeTest is ExecutorTest {
 
         vm.expectCall(
             address(interopFeeManager),
-            abi.encodeWithSelector(IInteropFeeManager.chargeInteropFee.selector),
+            abi.encodeWithSelector(IL1InteropFeeManager.chargeInteropFee.selector),
             0
         );
         _execute(stored);
@@ -147,7 +147,7 @@ contract InteropFeeTest is ExecutorTest {
         IExecutor.StoredBatchInfo memory stored = _commitAndProve(_batchWithUnits(0));
         vm.expectCall(
             address(interopFeeManager),
-            abi.encodeWithSelector(IInteropFeeManager.chargeInteropFee.selector),
+            abi.encodeWithSelector(IL1InteropFeeManager.chargeInteropFee.selector),
             0
         );
         _execute(stored);
@@ -186,7 +186,7 @@ contract InteropFeeTest is ExecutorTest {
 
     function test_revertWhen_executorOnL1HasNoFeeManager() public {
         vm.expectRevert(ZeroAddress.selector);
-        new ExecutorFacet(block.chainid, IInteropFeeManager(address(0)));
+        new ExecutorFacet(block.chainid, IL1InteropFeeManager(address(0)));
     }
 
     /// @dev Pins the settlement-layer condition of the charge.
@@ -202,7 +202,7 @@ contract InteropFeeTest is ExecutorTest {
 
         vm.expectCall(
             address(interopFeeManager),
-            abi.encodeWithSelector(IInteropFeeManager.chargeInteropFee.selector),
+            abi.encodeWithSelector(IL1InteropFeeManager.chargeInteropFee.selector),
             0
         );
         _execute(stored);

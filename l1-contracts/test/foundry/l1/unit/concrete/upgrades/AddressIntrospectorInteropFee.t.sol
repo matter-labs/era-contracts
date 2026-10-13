@@ -9,7 +9,7 @@ import {FIRST_PROTOCOL_VERSION_WITH_INTEROP_FEE} from "deploy-scripts/utils/Type
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
-import {IInteropFeeManager} from "contracts/core/interop-fee/IInteropFeeManager.sol";
+import {IL1InteropFeeManager} from "contracts/core/interop-fee/IL1InteropFeeManager.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
 /// @notice Fee manager discovery used by the default upgrade scripts: a release from v35 on reuses the manager the
@@ -24,7 +24,7 @@ contract AddressIntrospectorInteropFeeTest is Test {
     function setUp() public {
         ctm = ChainTypeManager(makeAddr("ctm"));
         manager = makeAddr("interopFeeManager");
-        executorFacet = address(new ExecutorFacet(block.chainid, IInteropFeeManager(manager)));
+        executorFacet = address(new ExecutorFacet(block.chainid, IL1InteropFeeManager(manager)));
     }
 
     function test_reusesTheManagerOfTheCurrentExecutor() public {
