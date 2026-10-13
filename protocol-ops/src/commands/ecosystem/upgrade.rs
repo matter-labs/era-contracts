@@ -1532,7 +1532,7 @@ mod release_script_tests {
         assert!(help.contains("--upgrade-input-path"));
     }
 
-    /// The Foundry full-flow upgrade test of the default edge (`UpgradeTestv34_Local`, the registry
+    /// The Foundry full-flow upgrade test of the default edge (`UpgradeTest_Local`, the registry
     /// bootstrap) must run the scripts this command prepares with by default: its CTM and core test
     /// subclasses extend the default CTM and core scripts. A release that changes a default here fails
     /// this until that test is moved onto the new scripts too.
@@ -1547,17 +1547,16 @@ mod release_script_tests {
         };
         let args = UpgradePrepareAllArgs::try_parse_from(["prepare"]).unwrap();
 
-        let local_test =
-            read("l1-contracts/test/foundry/l1/integration/UpgradeTestv34_Local.t.sol");
+        let local_test = read("l1-contracts/test/foundry/l1/integration/UpgradeTest_Local.t.sol");
         let ctm = contract_name(&args.ctm_script_path);
         assert!(
             local_test.contains(&format!(" is {ctm} {{")),
-            "UpgradeTestv34_Local's CTM test subclass must extend the default CTM script {ctm}"
+            "UpgradeTest_Local's CTM test subclass must extend the default CTM script {ctm}"
         );
         let core = contract_name(&args.core_script_path);
         assert!(
             local_test.contains(&format!(" is {core} {{")),
-            "UpgradeTestv34_Local's core test subclass must extend the default core script {core}"
+            "UpgradeTest_Local's core test subclass must extend the default core script {core}"
         );
     }
 

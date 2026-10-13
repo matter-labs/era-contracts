@@ -74,13 +74,13 @@ executor is the long-lived owner.
 ## L2 delegate composition
 
 The manifest carries no delegate calldata. `AuthoredL2Plan` supplies the delegate bytecode info,
-extra bytecode infos and a codehash-pinned `IL2DelegateCalldataComposer` (v34:
-`L2V34DelegateCalldataComposer`). `L2PlanLib` constructs the deployments, delegate address and
+extra bytecode infos and a codehash-pinned `IL2DelegateCalldataComposer` (by default
+`L2DefaultDelegateCalldataComposer`). `L2PlanLib` constructs the deployments, delegate address and
 factory-dependency hashes from those inputs.
 
 `CTMUpgradeComposer` asks the pinned composer for final calldata using the target release,
-Bridgehub and chain ID. The v34 composer reads the chain-specific force-deployment data directly;
-the execution engine no longer decodes placeholders or understands the v34 delegate ABI.
+Bridgehub and chain ID. The default composer reads the chain-specific force-deployment data directly;
+the execution engine no longer decodes placeholders or understands the delegate ABI.
 
 ## The upgrade timer
 

@@ -69,9 +69,9 @@ contract DefaultUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         return _transition(fromRelease, newRelease, _upgradeTimestamp, address(engine), _delegatePlan());
     }
 
-    /// @dev The same hop with the REAL v34 composer pinned (see the shared fixture).
-    function _v34Transition() internal returns (CTMTransition) {
-        return _transition(fromRelease, newRelease, 0, address(engine), _v34Plan());
+    /// @dev The same hop with the REAL default composer pinned (see the shared fixture).
+    function _defaultComposerTransition() internal returns (CTMTransition) {
+        return _transition(fromRelease, newRelease, 0, address(engine), _defaultComposerPlan());
     }
 
     function test_upgradeFromTransition_appliesTheCommittedTransition() public {
@@ -232,14 +232,18 @@ contract DefaultUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
 
     // ─────────────────────────── one-pass per-chain composition ───────────────────────────
 
-    /// @dev The REAL v34 composer through the engine: the transaction the chain commits carries
+    /// @dev The REAL default composer through the engine: the transaction the chain commits carries
     ///      THIS chain's `ZKChainSpecificForceDeploymentsData`, composed in the same pass as the
     ///      rest of the transaction — there is no later rewrite, and the served view IS the
     ///      committed transaction. The ecosystem the composer reads is mocked (see the shared
     ///      fixture); the values that land in the transaction are what is under test.
     function test_upgradeFromTransition_commitsTheTransactionComposedForThisChain() public {
-        CTMTransition transition = _v34Transition();
-        L2CanonicalTransaction memory expectedTx = _expectedV34L2Tx(transition.l2Plan(), protocolVersion, ETH_CHAIN_ID);
+        CTMTransition transition = _defaultComposerTransition();
+        L2CanonicalTransaction memory expectedTx = _expectedDefaultComposerL2Tx(
+            transition.l2Plan(),
+            protocolVersion,
+            ETH_CHAIN_ID
+        );
         bytes32 expectedHash = keccak256(abi.encode(expectedTx));
 
         vm.expectEmit(address(engine));
@@ -263,8 +267,8 @@ contract DefaultUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
     ///      this layer (a REAL token here), not from its origin-chain address, which has no code.
     function test_upgradeFromTransition_readsAnERC20BaseTokenFromItsLocalRepresentation() public {
         engine.setChainId(ERC20_CHAIN_ID);
-        CTMTransition transition = _v34Transition();
-        L2CanonicalTransaction memory expectedTx = _expectedV34L2Tx(
+        CTMTransition transition = _defaultComposerTransition();
+        L2CanonicalTransaction memory expectedTx = _expectedDefaultComposerL2Tx(
             transition.l2Plan(),
             protocolVersion,
             ERC20_CHAIN_ID
@@ -290,7 +294,7 @@ contract DefaultUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
     /// @dev Two chains of one ecosystem never receive the same transaction: only the per-chain
     ///      half differs, everything ecosystem-wide is shared.
     function test_l2UpgradeTx_isComposedPerChain() public {
-        CTMTransition transition = _v34Transition();
+        CTMTransition transition = _defaultComposerTransition();
 
         L2CanonicalTransaction memory forEthChain = engine.l2UpgradeTx(
             address(transition),
@@ -310,8 +314,8 @@ contract DefaultUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         assertEq(forEthChain.txType, forErc20Chain.txType);
         assertEq(forEthChain.nonce, forErc20Chain.nonce);
         assertEq(abi.encode(forEthChain.factoryDeps), abi.encode(forErc20Chain.factoryDeps));
-        (address ethDeployer, bytes memory ethFixed, ) = this.decodeV34Upgrade(_delegateCalldata(forEthChain.data));
-        (address erc20Deployer, bytes memory erc20Fixed, ) = this.decodeV34Upgrade(
+        (address ethDeployer, bytes memory ethFixed, ) = this.decodeDefaultUpgrade(_delegateCalldata(forEthChain.data));
+        (address erc20Deployer, bytes memory erc20Fixed, ) = this.decodeDefaultUpgrade(
             _delegateCalldata(forErc20Chain.data)
         );
         assertEq(ethDeployer, erc20Deployer, "the CTM deployer is ecosystem-wide");
@@ -323,7 +327,7 @@ contract DefaultUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
     /// @dev The transition is the read entry point and the engine the composition code: the
     ///      object forwards to the pinned engine and serves exactly what the chain commits.
     function test_l2UpgradeTx_transitionForwardsToThePinnedEngine() public {
-        CTMTransition transition = _v34Transition();
+        CTMTransition transition = _defaultComposerTransition();
 
         vm.expectCall(
             address(engine),

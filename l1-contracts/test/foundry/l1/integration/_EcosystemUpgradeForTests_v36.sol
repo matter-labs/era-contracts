@@ -3,17 +3,17 @@ pragma solidity 0.8.28;
 
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {CoreUpgrade_v35} from "deploy-scripts/upgrade/v35/CoreUpgrade_v35.s.sol";
-import {CTMUpgrade_v35} from "deploy-scripts/upgrade/v35/CTMUpgrade_v35.s.sol";
+import {CoreUpgrade_v36} from "deploy-scripts/upgrade/v36/CoreUpgrade_v36.s.sol";
+import {CTMUpgrade_v36} from "deploy-scripts/upgrade/v36/CTMUpgrade_v36.s.sol";
 import {TrimmedUpgradeOutput} from "./_EcosystemUpgradeForTests.sol";
 
-/// @notice Memory-trimmed test variants of the v35 (first registry-driven) Core/CTM prepare
+/// @notice Memory-trimmed test variants of the v36 (first registry-driven) Core/CTM prepare
 ///         scripts, driven by the anvil-interop pipeline upgrade runner through protocol-ops
-///         right after the v34 bootstrap hop (`--core-script-path` / `--ctm-script-path`).
+///         right after the v35 bootstrap hop (`--core-script-path` / `--ctm-script-path`).
 
-/// @dev Same trimming as the v34 variant: the target version comes from the upgrade input, and the
+/// @dev Same trimming as the bootstrap variant: the target version comes from the upgrade input, and the
 ///      output carries only what the runner and the merger read.
-contract CTMUpgradeForTests_v35 is CTMUpgrade_v35 {
+contract CTMUpgradeForTests_v36 is CTMUpgrade_v36 {
     using stdToml for string;
 
     // solhint-disable-next-line func-named-parameters
@@ -66,4 +66,4 @@ contract CTMUpgradeForTests_v35 is CTMUpgrade_v35 {
 }
 
 /// @dev Core upgrade for the harness; the version script needs no trimming on the core side.
-contract CoreUpgradeForTests_v35 is CoreUpgrade_v35 {}
+contract CoreUpgradeForTests_v36 is CoreUpgrade_v36 {}

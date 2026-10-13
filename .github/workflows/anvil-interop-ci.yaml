@@ -94,12 +94,13 @@ jobs:
         run: |
           bash cleanup.sh
 
-  # The v33 -> v34 upgrade (the bootstrap edge): loads the FROZEN departing-version chain
-  # states, runs the real CTMUpgrade_v34 / CoreUpgrade_v34 prepare through protocol-ops, replays
-  # the deployer + governance bundles (incl. the four-call bootstrap handover + migrate()),
-  # crosses the chains via the legacy handed-cut entrypoint and relays the L2 upgrade
-  # transactions.
-  upgrade-v33-to-v34-test:
+  # Latest upgrade test: boots the previous release's chain states (`upgradeSourceStateVersion` in
+  # config/anvil-config.json), prepares the upgrade with protocol-ops' default scripts, executes the
+  # governance calls and per-chain upgrades, and checks every chain reached the genesis protocol version.
+  # On this release the default upgrade is the registry bootstrap edge (the four-call handover +
+  # migrate(), chains crossing via the legacy handed-cut entrypoint), followed by a patch and a
+  # recurring registry-driven hop on the same chains.
+  upgrade-test:
     runs-on: ubuntu-latest
     timeout-minutes: 40
 
@@ -109,16 +110,48 @@ jobs:
         with:
           submodules: true
 
-      - name: Setup anvil-interop environment
-        uses: ./.github/actions/setup-anvil-interop
-        with:
-          artifacts: full
+      # The committed chain states need a state-compatible Anvil, while the
+      # release bytecode is reproduced with the `build` Forge pin.
+      - name: Install Anvil toolchain (state-compatible with committed states)
+        uses: ./.github/actions/install-foundry
 
-      - name: Run the v33 -> v34 upgrade test
+      - name: Preserve the pinned Anvil before switching to the build toolchain
+        run: cp "$(command -v anvil)" "$RUNNER_TEMP/anvil-pinned"
+
+      - name: Install foundry
+        uses: ./.github/actions/install-foundry
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      # Reuses the artifacts l1-contracts-ci built for this commit rather than compiling them again.
+      # Via the action, not a bare cache restore: the prefix key can land a previous commit's `out`,
+      # and without the pruning a deleted contract's stale ABI would reach the upgrade harness.
+      - name: Warm solc build cache
+        uses: ./.github/actions/warm-solc-cache
+
+      - name: Build da-contracts artifacts
+        run: yarn da build:foundry
+
+      - name: Build l1-contracts artifacts
+        run: yarn l1 build:foundry
+
+      - name: Install anvil-interop dependencies
         working-directory: l1-contracts/test/anvil-interop
+        run: yarn install
+
+      - name: Run the latest upgrade test
+        working-directory: l1-contracts/test/anvil-interop
+        env:
+          ANVIL_BIN: ${{ runner.temp }}/anvil-pinned
         run: |
-          echo "Running the v33 -> v34 (bootstrap) upgrade test..."
-          yarn ts-node run-v33-to-v34-upgrade-test.ts
+          yarn test:upgrade
 
       - name: Cleanup
         if: always()
@@ -126,8 +159,9 @@ jobs:
         run: |
           bash cleanup.sh
 
-  # The v34 -> v35 upgrade: the registry-driven hop through the bound executors.
-  upgrade-v34-to-v35-test:
+  # The recurring registry-driven hop through the bound executors, over objects the harness deploys
+  # itself on the current-genesis chain states (`stateVersion`).
+  upgrade-recurring-test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -142,11 +176,10 @@ jobs:
         with:
           artifacts: full
 
-      - name: Run the v34 -> v35 upgrade test
+      - name: Run the recurring upgrade test
         working-directory: l1-contracts/test/anvil-interop
         run: |
-          echo "Running the v34 -> v35 (registry-driven) upgrade test..."
-          yarn ts-node run-v34-to-v35-upgrade-test.ts
+          yarn test:upgrade-recurring
 
       - name: Cleanup
         if: always()

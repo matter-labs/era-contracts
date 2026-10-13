@@ -7,7 +7,7 @@
 - `.github/workflows/pre-merge-checks.yaml` — `check-hashes`, `check-selectors`, `check-zkstack-out`, `check-zksync-os-genesis`, `state-generation-check`, and the `pre-merge-verified` gate. Skipped while a PR is a draft (see "CI tiers" below).
 - `.github/workflows/build-contract-artifacts.yaml` — the `build` job (`workflow_call`) `pre-merge-checks` uses; `l1-contracts-ci` keeps its own inline copy because its build is a coverage matrix. `.github/actions/restore-ci-artifacts` is how their other jobs read what either built.
 - `.github/workflows/l1-contracts-foundry-ci.yaml` — foundry test build + contract-size check.
-- `.github/workflows/anvil-interop-ci.yaml` — interop integration test, v33→v34 (bootstrap) and v34→v35 (registry-driven) upgrade tests.
+- `.github/workflows/anvil-interop-ci.yaml` — interop integration test, v34→v35 (bootstrap) and v35→v36 (registry-driven) upgrade tests.
 - `.github/workflows/update-generated-artifacts.yaml` — the one-dispatch regen (hashes + selectors + zkstack-out, then chain states) that clears every pre-merge check.
 - `recompute_hashes.sh` — one-shot rebuild + recompute + write hashes.
 - `package.json`, `l1-contracts/package.json`, `da-contracts/package.json` — top-level scripts referenced below.
@@ -66,7 +66,7 @@ Doing steps 3-5 before step 1 is the most common time-sink.
 
 ## 1. Tests
 
-This is where the bulk of regressions surface — get this green first. Three test suites in CI: **foundry** (per-project), **anvil-interop** (full L1↔L2 flow), and the **upgrade pipelines** (v33 → v34 and v34 → v35, real-state replay).
+This is where the bulk of regressions surface — get this green first. Three test suites in CI: **foundry** (per-project), **anvil-interop** (full L1↔L2 flow), and the **upgrade pipelines** (v34 → v35 and v35 → v36, real-state replay).
 
 ### Install the pinned Foundry release
 
@@ -140,21 +140,21 @@ Commit the regenerated `chain-states/` files alongside the contract change. CI n
 Two runners cover the two shapes of upgrade, and CI runs each as its own job in
 `anvil-interop-ci.yaml`.
 
-`run-v33-to-v34-upgrade-test.ts` is the **bootstrap** edge: it drives protocol-ops's split
+`run-upgrade-test.ts` is the **bootstrap** edge: it drives protocol-ops's split
 flow (`ecosystem upgrade-prepare-all` to deploy core + per-CTM contracts and emit merged
 governance calls, `ecosystem upgrade-governance` to replay stages 0/1/2, then `chain upgrade`
 per chain), which installs the registry objects and hands ecosystem authority to the
 executors. It then chains follow-up hops through the same tooling to prove the installed
 model keeps working: a same-minor verifier patch, then a subsequent minor upgrade.
 
-`run-v34-to-v35-upgrade-test.ts` is the **steady-state** edge, driven at the object level
+`run-recurring-upgrade-test.ts` is the **steady-state** edge, driven at the object level
 rather than through the governance-calldata scripts. `REGEN_REGISTRIES=1` regenerates its
 manifest fixture.
 
 ```bash
 cd l1-contracts/test/anvil-interop
-yarn ts-node run-v33-to-v34-upgrade-test.ts
-yarn ts-node run-v34-to-v35-upgrade-test.ts
+yarn ts-node run-upgrade-test.ts
+yarn ts-node run-recurring-upgrade-test.ts
 ```
 
 Pass `ANVIL_INTEROP_PORT_OFFSET=<n>` to either when another anvil set is already up.
@@ -166,7 +166,7 @@ Prerequisites: same as anvil-interop tests (both foundry builds done). Plus:
 
 Common failures:
 
-- **"Script not found: deploy-scripts/upgrade/v34/CoreUpgrade_v34.s.sol"** or **`CTMUpgrade_v34.s.sol`** — `yarn l1 build:foundry` not run, or the test override path is wrong.
+- **"Script not found: deploy-scripts/upgrade/v35/CoreUpgrade_v35.s.sol"** or **`CTMUpgrade_v35.s.sol`** — `yarn l1 build:foundry` not run, or the test override path is wrong.
 - **"call to non-contract address 0x0…"** — usually the upgrade script reading an address before the contract is deployed/registered. Use `cast run <txhash>` against the still-running anvil to get the trace; see `AGENTS.md` "Debugging Failed Transactions with cast run" for the recipe.
 - **"vm.writeToml: path not allowed"** — script-out path concatenation issue. Check that `vm.projectRoot()` is concatenated once, not twice.
 

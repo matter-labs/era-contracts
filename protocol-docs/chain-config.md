@@ -52,15 +52,11 @@ must still be decoded using their original formats.
 Before upgrading across the v34 boundary, all committed batches must be executed or reverted. This
 keeps the new executor from treating legacy batch-output hashes as full public-input hashes.
 
-v34 is prepared by `CTMUpgrade_v34`, the default CTM upgrade with one change: the cut runs
-`V34UpgradeZKsyncOS`, which adds the priority gas-limit clamp described in
-{protocol-docs/l1-transaction-gas-limit.md} to `DefaultUpgradeZKsyncOS`. The CTM default stays
-`DefaultUpgradeZKsyncOS`. Its all-executed check enforces the boundary above. The L2 transaction
-force-deploys `L2DefaultUpgrade` and delegates to it, with the chain's
-`ZKChainSpecificForceDeploymentsData` substituted on L1 by `DefaultUpgradeZKsyncOS.getL2UpgradeTxData`.
+The v34 per-chain upgrade also applied the priority gas-limit clamp described in
+{protocol-docs/l1-transaction-gas-limit.md}, and its all-executed check enforces the boundary above.
 
-v34 is prepared from its release branch with `DefaultCoreUpgrade` and `CTMUpgrade_v34`, with its inputs under
-`upgrade-envs/v0.34.0-chain-config/`. Later releases' branches no longer carry its scripts.
+v34 is prepared from its release branch, with its inputs under `upgrade-envs/v0.34.0-chain-config/`. Later
+releases' branches no longer carry its scripts.
 
 Config setters retain their existing guard against updates with unproved committed batches to keep
 this commitment-format upgrade from also changing the existing administrative update policy. This

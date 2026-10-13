@@ -313,7 +313,7 @@ impl<'a> UpgradeInner<'a> {
         // land them at the same address without per-CTM differentiation, and the
         // downstream gov-replay's second `startTimer()` on that contract would
         // revert. Named environments keep CREATE2 salts keyed by registered CTM
-        // (`upgrade-envs/v0.34.0-registry/<env>.toml [create2_salts.per_ctm]`);
+        // (`upgrade-envs/v0.35.0-upgrade-system/<env>.toml [create2_salts.per_ctm]`);
         // legacy local fixtures fall back to a fresh random salt.
         let create2_salt = inputs
             .create2_factory_salt_per_ctm

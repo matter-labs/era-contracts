@@ -34,7 +34,7 @@ Finished, and described where it now lives:
   `EcosystemUpgradeOperation`; the domain executors (`CoreUpgradeExecutor`, `CTMUpgradeExecutor`)
   only answer the coordinator's callbacks. The three calls are derived from the operation; the Rust merger
   copies bundles and composes nothing. Spec: `protocol-docs/ecosystem-upgrade-coordination.md`.
-- **`UpgradeStageValidator` is retired from the v34 path.** Its checks are absorbed: `migrate()`
+- **`UpgradeStageValidator` is retired from the v35 path.** Its checks are absorbed: `migrate()`
   checks the timer's deadline, the CTM's version-edge commit refuses to run unpaused, and
   `validateApplied()` refuses while the CTM's migrations are still paused. The contract remains
   only because the v31 verifier reads its deployment.
@@ -60,7 +60,7 @@ Finished, and described where it now lives:
   L2 transaction and delegate-calldata composition are gone.
 - The equivalence evidence is field-level and independent: the bootstrap unit suite builds the
   expected proposal and transaction from the manifest inputs (`RegistryBootstrapMigration.t.sol`),
-  and `UpgradeTestv34_Local` decodes the cut the prepare shipped and reads it back field by field.
+  and `UpgradeTest_Local` decodes the cut the prepare shipped and reads it back field by field.
 - `AdminFunctions.upgradeChainFromCTM` selects the cut-reading entrypoint first
   (`UpgradeChainCall.requiresCut`) and reconstructs a cut only for a pre-bootstrap chain.
   `DefaultChainUpgrade.executeUpgrade` is deleted (the chain's `executeUpgrade` is
@@ -74,7 +74,7 @@ Finished, and described where it now lives:
   match. A release whose members all reused is reused itself and the transition derives an empty
   L1 delta (`ReleaseMemberReuse.t.sol`).
 - Replacing a live member is a change of SCOPE and must be INTENDED: the prepare refuses to replace
-  any member the version does not name in `changedReleaseMembers()`. The v34 bootstrap declares
+  any member the version does not name in `changedReleaseMembers()`. The v35 bootstrap declares
   the whole set, since it authors a complete release for a pre-registry ecosystem.
 - `DiamondInit` comes from the CTM's current RELEASE. It is the genesis cut's init target rather
   than a routed facet, so introspection reported zero and every upgrade deployed a fresh one —

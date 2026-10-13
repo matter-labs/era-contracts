@@ -66,7 +66,7 @@ contract SeqImplNew {
 }
 
 /// @notice Tests that the bootstrap edge's governance sequence is DERIVED from the objects the
-///         edge already deploys, and that the derivation is the same sequence the two v34 prepare
+///         edge already deploys, and that the derivation is the same sequence the two v35 prepare
 ///         scripts used to author by hand (see {LegacyBootstrapSequence}).
 /// @dev Driven against real objects throughout — a real `ChainTypeManager`, real OpenZeppelin
 ///      `ProxyAdmin`s for both domains, a real `CoreTransition` and a real

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {CoreUpgrade_v35} from "deploy-scripts/upgrade/v35/CoreUpgrade_v35.s.sol";
-import {CTMUpgradeForTests_v35} from "./_EcosystemUpgradeForTests_v35.sol";
+import {CoreUpgrade_v36} from "deploy-scripts/upgrade/v36/CoreUpgrade_v36.s.sol";
+import {CTMUpgradeForTests_v36} from "./_EcosystemUpgradeForTests_v36.sol";
 
 /// @notice A same-minor PATCH prepare: it replaces the VERIFIER and nothing else. The release is
 ///         the immutable snapshot of the intended contracts, so the new verifier is published as a
@@ -14,11 +14,11 @@ import {CTMUpgradeForTests_v35} from "./_EcosystemUpgradeForTests_v35.sol";
 
 /// @dev A patch has no ecosystem leg at all, so nothing is deployed here and no `CoreTransition`
 ///      exists for the transition to name.
-contract CoreUpgradeForTests_v35_1 is CoreUpgrade_v35 {
+contract CoreUpgradeForTests_v36_1 is CoreUpgrade_v36 {
     function deployNewEcosystemContractsL1() public virtual override {}
 }
 
-contract CTMUpgradeForTests_v35_1 is CTMUpgradeForTests_v35 {
+contract CTMUpgradeForTests_v36_1 is CTMUpgradeForTests_v36 {
     /// @notice The one change of this patch: a fresh verifier, which the release then pins and the
     ///         upgrade engine installs on every chain from the composed proposal.
     function deployNewCTMContracts() public virtual override {

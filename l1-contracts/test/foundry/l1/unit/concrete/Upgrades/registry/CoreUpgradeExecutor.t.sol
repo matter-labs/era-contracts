@@ -93,7 +93,7 @@ contract CoreUpgradeExecutorTest is Test {
         coreTransition = _deployRegistry(rows);
 
         // The executor is BOUND to (and owns) one immutable ecosystem ProxyAdmin, mirroring the
-        // production ownership chain; the owner then points it at the coordinator (the v34
+        // production ownership chain; the owner then points it at the coordinator (the v35
         // bootstrap's stage-2 binding).
         coreExecutor = new CoreUpgradeExecutor(ecosystemGovernor, proxyAdmin);
         proxyAdmin.transferOwnership(address(coreExecutor));

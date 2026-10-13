@@ -25,7 +25,7 @@ The upgrade can be safely finalized on L1 once:
    calldata: a registry-driven cut (`upgradeFromTransition(transition)` /
    `upgradeFromBootstrap(migration)`) names the object the engine reads at
    execution, so the transaction is read back through `l2UpgradeTx` on the
-   engine / migration; a legacy pre-v34 cut embeds it in `ProposedUpgrade`.
+   engine / migration; a legacy pre-v35 cut embeds it in `ProposedUpgrade`.
 3. For a legacy cut, replays the per-chain upgrade-data rewrite for v31+ upgrades
    (trying the current ABI, then the legacy ABI used by already-published upgrades).
    Computes the canonical tx hash: `keccak256(tx.abi_encode())`.

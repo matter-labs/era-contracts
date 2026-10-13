@@ -35,7 +35,7 @@ import {Utils} from "../../utils/Utils.sol";
 ///         prepare deploys names the core transition, and the coordinator's stage 1 applies it through
 ///         the `CoreUpgradeExecutor`. Anything a version script still needs governance to do is
 ///         declared as an external action and listed in the output.
-/// @dev Version scripts inherit and override; the v34 bootstrap edge overrides the object
+/// @dev Version scripts inherit and override; the v35 bootstrap edge overrides the object
 ///      deployment and declares every call of its one-time edge.
 contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     using stdToml for string;

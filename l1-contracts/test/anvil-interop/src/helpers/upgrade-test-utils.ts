@@ -4,8 +4,36 @@
  * runner is their remaining consumer.
  */
 
+import * as fs from "fs";
+import * as path from "path";
 import { ethers } from "ethers";
+import { SEMVER_MAJOR_OFFSET, SEMVER_MINOR_OFFSET } from "../core/const";
 import type { ChainRole } from "../core/types";
+
+// The genesis config the default upgrade scripts read their target version from.
+const ZKSYNC_OS_GENESIS_PATH = path.resolve(__dirname, "../../../../../configs/genesis/zksync-os/latest.json");
+
+export type SemVer = { major: number; minor: number; patch: number };
+
+/**
+ * The protocol version in the ZKsync OS genesis config: the version `DefaultCoreUpgrade` / `DefaultCTMUpgrade`
+ * upgrade to, so the target of protocol-ops' default upgrade.
+ */
+export function readGenesisSemVer(): SemVer {
+  const genesis = JSON.parse(fs.readFileSync(ZKSYNC_OS_GENESIS_PATH, "utf-8")) as {
+    protocol_semantic_version: SemVer;
+  };
+  return genesis.protocol_semantic_version;
+}
+
+/** `version` packed like `SemVer.packSemVer`, as a hex string. */
+export function packProtocolVersion(version: SemVer): string {
+  return ethers.BigNumber.from(version.major)
+    .shl(SEMVER_MAJOR_OFFSET)
+    .or(ethers.BigNumber.from(version.minor).shl(SEMVER_MINOR_OFFSET))
+    .or(version.patch)
+    .toHexString();
+}
 
 /**
  * Test-only compatibility bridge: the pre-generated chain states still carry the genesis-upgrade

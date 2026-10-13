@@ -37,28 +37,29 @@ contract UpgradeChainCallTest is Test {
     ///      current version rather than encoding one shape for everyone.
     function test_theTwoShapesAreDistinct() public pure {
         bytes4 withCut = bytes4(UpgradeChainCall.encode(CHAIN, _version(31), _cut()));
-        bytes4 readsCut = bytes4(UpgradeChainCall.encode(CHAIN, _version(34), _cut()));
+        bytes4 readsCut = bytes4(UpgradeChainCall.encode(CHAIN, _version(35), _cut()));
         assertTrue(withCut != readsCut, "shapes must not collide");
     }
 
-    /// @dev v32 and v33 still ship the cut-taking facet, so the boundary is v34 and not the version
+    /// @dev v32 through v34 still ship the cut-taking facet, so the boundary is v35 and not the version
     ///      at which the CTM stopped needing a handed cut.
-    function test_v33StillTakesTheCut() public pure {
+    function test_v34StillTakesTheCut() public pure {
         assertTrue(UpgradeChainCall.requiresCut(_version(33)), "v33 is handed its cut");
-        assertFalse(UpgradeChainCall.requiresCut(_version(34)), "v34 reads its own");
+        assertTrue(UpgradeChainCall.requiresCut(_version(34)), "v34 is handed its cut");
+        assertFalse(UpgradeChainCall.requiresCut(_version(35)), "v35 reads its own");
     }
 
-    function test_v34EncodesTheCutReadingCall() public pure {
-        bytes memory encoded = UpgradeChainCall.encode(CHAIN, _version(34), _cut());
-        assertEq(encoded, abi.encodeCall(IAdmin.upgradeChainFromVersion, (CHAIN, _version(34))), "no cut is carried");
+    function test_v35EncodesTheCutReadingCall() public pure {
+        bytes memory encoded = UpgradeChainCall.encode(CHAIN, _version(35), _cut());
+        assertEq(encoded, abi.encodeCall(IAdmin.upgradeChainFromVersion, (CHAIN, _version(35))), "no cut is carried");
     }
 
-    /// @dev The property this encoder exists for: a v34+ caller holds no cut to hand over — a
+    /// @dev The property this encoder exists for: a v35+ caller holds no cut to hand over — a
     ///      registry-driven edge commits no log to reconstruct one from — so the bytes must not be
     ///      decoded before the shape is chosen.
-    function test_v34EncodesWithoutTouchingTheEncodedCut() public pure {
-        bytes memory encoded = UpgradeChainCall.encodeFromEncodedCut(CHAIN, _version(34), bytes(""));
-        assertEq(encoded, UpgradeChainCall.encodeWithoutCut(CHAIN, _version(34)), "empty cut bytes are ignored");
+    function test_v35EncodesWithoutTouchingTheEncodedCut() public pure {
+        bytes memory encoded = UpgradeChainCall.encodeFromEncodedCut(CHAIN, _version(35), bytes(""));
+        assertEq(encoded, UpgradeChainCall.encodeWithoutCut(CHAIN, _version(35)), "empty cut bytes are ignored");
     }
 
     function test_legacyDecodesTheEncodedCutItIsHanded() public pure {
@@ -72,6 +73,6 @@ contract UpgradeChainCallTest is Test {
 
     function test_revertWhen_encodingWithoutACutForAChainThatNeedsOne() public {
         vm.expectRevert("chain predates the cut-reading entrypoint");
-        UpgradeChainCall.encodeWithoutCut(CHAIN, _version(33));
+        UpgradeChainCall.encodeWithoutCut(CHAIN, _version(34));
     }
 }

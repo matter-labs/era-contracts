@@ -4,7 +4,7 @@
 # first — the hop runs with one still pending. Substituted by the harness like
 # bootstrap-upgrade.toml; only `contracts.new_protocol_version` is consumed.
 
-old_protocol_version = 0x2200000000
+old_protocol_version = 0x2300000000
 bridgehub_proxy_address = "0x0000000000000000000000000000000000000000"
 owner_address = "0x0000000000000000000000000000000000000000"
 
@@ -22,5 +22,5 @@ recursion_circuits_set_vks_hash = "0x0000000000000000000000000000000000000000000
 bootloader_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
 default_aa_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
 evm_emulator_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
-latest_protocol_version = 0x2200000001
-new_protocol_version = 0x2200000001
+latest_protocol_version = 0x2300000001
+new_protocol_version = 0x2300000001

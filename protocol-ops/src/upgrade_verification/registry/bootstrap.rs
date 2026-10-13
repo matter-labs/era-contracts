@@ -209,7 +209,7 @@ pub(crate) async fn verify<P: Provider>(
     )
     .await?;
     // GOVERNANCE starts the bootstrap's timer, not an executor: at stage 0 the executor does
-    // not hold the CTM domain yet (`CTMUpgrade_v34.timerGovernance`). Only every LATER upgrade
+    // not hold the CTM domain yet (`CTMUpgrade_v35.timerGovernance`). Only every LATER upgrade
     // binds its timer to the coordinator.
     verify_timer_construction(
         provider,

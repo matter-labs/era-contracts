@@ -43,7 +43,7 @@ pub enum EcosystemCommands {
     /// `--governance-toml` explicitly.
     #[command(name = "upgrade-governance")]
     UpgradeGovernance(UpgradeGovernanceArgs),
-    /// Verify a v34 registry-driven upgrade package — a recurring operation or the one-time
+    /// Verify a v35 registry-driven upgrade package — a recurring operation or the one-time
     /// bootstrap edge, decided from the package itself. Checks object provenance and
     /// construction, the authority binding and the owner it lands on, every proxy row's
     /// departing implementation, readiness, and that the governance calldata invokes the

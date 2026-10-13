@@ -19,7 +19,7 @@
  *      machine-to-machine.
  *   3. Deploy the fixed `CTMRelease` + `CTMTransition` + `CoreTransition` implementations and
  *      initialize them (write-once) from the COMMITTED manifest
- *      scripts/registry-manifests/v34-local.json — the reviewable per-upgrade artifact:
+ *      scripts/registry-manifests/v35-local.json — the reviewable per-upgrade artifact:
  *      - the RELEASE describes what a chain at the target version IS (complete facet set,
  *        DiamondInit, base-system hashes, genesis params) and the version that state IS;
  *      - the TRANSITION describes how the CURRENT release becomes that release (facet swaps,
@@ -31,7 +31,7 @@
  *      (EMIT mode, `yarn regen:registry-manifest`) the runner instead rebuilds the manifest from
  *      the LIVE deployment and writes it to the committed path, then continues exactly like
  *      consume mode — the regenerated manifest is meant to be committed.
- *   4. BOOTSTRAP STAGE ("v33 -> v34", see bootstrap-upgrade-stage.ts): cross the one-time entry
+ *   4. BOOTSTRAP STAGE ("v34 -> v35", see bootstrap-upgrade-stage.ts): cross the one-time entry
  *      edge into the registry model through `RegistryBootstrapMigration` — legacy cut-taking
  *      commit (the ONLY writer of the deprecated `upgradeCutHash`), the CTM implementation swap
  *      as a source-checked proxy row, the install of the bootstrap release (the live release's
@@ -40,9 +40,9 @@
  *      itself completes the executor's accept. The migration COMPOSES the cut on-chain from
  *      that release's table plus the authored delegate; each chain crosses the edge through
  *      the legacy 3-arg `upgradeChainFromVersion`, HANDED that cut, exactly like production
- *      pre-v34 chains, and the composed L2 transaction is relayed to each L2 stand-in through
+ *      pre-v35 chains, and the composed L2 transaction is relayed to each L2 stand-in through
  *      the real `L2ComplexUpgrader`.
- *   5. Execute the registry-driven hop ("v34 -> v35") purely through the executors' fixed entrypoints
+ *   5. Execute the registry-driven hop ("v35 -> v36") purely through the executors' fixed entrypoints
  *      (`stage0/stage1/stage2(operation)` on the coordinator, per-chain
  *      `upgradeChain(transition, chainId)`) — no generic delegatecall modules and no
  *      stage-0/1/2 governance calldata anywhere. The schedule (upgrade timestamp, old-version
@@ -114,7 +114,7 @@ const l1ContractsDir = path.resolve(anvilInteropDir, "../..");
 const SEMVER_MINOR_SHIFT = 32;
 
 // Manifest tag (kept in the JSON for human orientation) and the CTM entry consumed here.
-const REGISTRY_TAG = "V34";
+const REGISTRY_TAG = "V35";
 const CTM_REGISTRY_NAME = "ZKsyncOS";
 
 // The fixed release/CTM-transition/core-transition implementations live here; the incremental forge
@@ -122,7 +122,7 @@ const CTM_REGISTRY_NAME = "ZKsyncOS";
 // Committed manifest for the local (chain-states) environment — the reviewable per-upgrade
 // artifact the upgrade objects are initialized from. The default CONSUME mode reads it as-is;
 // the EMIT mode (REGEN_REGISTRIES=1) rewrites it so the diff can be reviewed and committed.
-const REGISTRY_MANIFEST_REL = "scripts/registry-manifests/v34-local.json";
+const REGISTRY_MANIFEST_REL = "scripts/registry-manifests/v35-local.json";
 
 // Set REGEN_REGISTRIES=1 to run in EMIT mode (see module docs).
 const REGEN_ENV_VAR = "REGEN_REGISTRIES";
@@ -348,7 +348,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       throw regenRegistries ? error : staleRegistriesError(error);
     }
 
-    // ── 5. Bootstrap stage: the one-time entry edge ("v33 -> v34") ──
+    // ── 5. Bootstrap stage: the one-time entry edge ("v34 -> v35") ──
     // Authority reaches the executors THROUGH the migration — the production handover — so the
     // registry-driven hop below runs against a bootstrap-produced ownership state.
     console.log("\n── Bootstrap stage: crossing the entry edge via RegistryBootstrapMigration ──");
@@ -472,7 +472,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     await clearGenesisUpgradeTxHash(l1Provider, upgradeChains);
 
     // The bootstrap's stage-2 governance actions, in the order the prepare declares them
-    // (`CTMUpgrade_v34._declareBootstrapActions`): lift the ecosystem pause, bind the coordinator
+    // (`CTMUpgrade_v35._declareBootstrapActions`): lift the ecosystem pause, bind the coordinator
     // to the CTM executor the edge just handed the whole CTM domain to, then let the edge assert
     // its own completion — `validateApplied()` gates on BOTH, so neither may be deferred to the
     // recurring hop below.
@@ -504,12 +504,12 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       }
     );
 
-    // ── 6. Execute the registry-driven upgrade through the coordinator ("v34 -> v35") ──
+    // ── 6. Execute the registry-driven upgrade through the coordinator ("v35 -> v36") ──
     console.log("\n── Executing registry-driven upgrade via the coordinator ──");
 
     // The ECOSYSTEM ProxyAdmin (MessageRoot et al.) is separate from the CTM's own ProxyAdmin
     // the bootstrap handed over; governance hands it to the core executor directly (1-step) and
-    // binds that executor to the coordinator — the v34 core prepare's stage-1/2 actions.
+    // binds that executor to the coordinator — the v35 core prepare's stage-1/2 actions.
     const ecosystemProxyAdmin = new ethers.Contract(live.ecosystemProxyAdmin, getAbi("ProxyAdmin"), l1Provider);
     const ecosystemProxyAdminOwner: string = await ecosystemProxyAdmin.owner();
     if (ecosystemProxyAdminOwner.toLowerCase() !== deployed.coreExecutor.toLowerCase()) {
@@ -697,7 +697,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
 
 type LiveUpgradeInputs = {
   oldVersion: ethers.BigNumber;
-  /** The bootstrap edge's target ("v34") — also the registry-driven hop's departure. */
+  /** The bootstrap edge's target ("v35") — also the registry-driven hop's departure. */
   midVersion: ethers.BigNumber;
   newVersion: ethers.BigNumber;
   oldVersionString: string;
@@ -745,8 +745,8 @@ async function readLiveUpgradeInputs(
     throw new Error(`Unexpected packed protocol version ${oldVersion.toString()}`);
   }
   const oldMinor = oldVersion.div(minorShift).toNumber();
-  // Two synthetic edges: the bootstrap crosses V -> V+1 (the "v33 -> v34" model), the
-  // registry-driven hop then crosses V+1 -> V+2 (the "v34 -> v35" model).
+  // Two synthetic edges: the bootstrap crosses V -> V+1 (the "v34 -> v35" model), the
+  // registry-driven hop then crosses V+1 -> V+2 (the "v35 -> v36" model).
   const midVersion = ethers.BigNumber.from(oldMinor + 1).mul(minorShift);
   const newVersion = ethers.BigNumber.from(oldMinor + 2).mul(minorShift);
 
@@ -929,7 +929,7 @@ async function deployUpgradeMachinery(
   const newVerifierPlonk = await deployDeterministic("ZKsyncOSVerifierPlonk", []);
   // The ecosystem domain first: its executor owns the ecosystem ProxyAdmin, the coordinator is
   // constructed over it, and the CTM executor is then constructed answering to the coordinator
-  // (the shape the v34 bootstrap leaves behind).
+  // (the shape the v35 bootstrap leaves behind).
   const coreExecutor = await deploy("CoreUpgradeExecutor", [deployer.address, params.ecosystemProxyAdmin]);
   const coordinator = await deploy("EcosystemUpgradeExecutor", [deployer.address, coreExecutor]);
   const machinery = {
@@ -1156,7 +1156,7 @@ async function buildRegistryManifest(
   return {
     tag: REGISTRY_TAG,
     oldVersion: live.oldVersionString,
-    // The bootstrap edge's target ("v34"): the registry-driven hop below departs FROM it.
+    // The bootstrap edge's target ("v35"): the registry-driven hop below departs FROM it.
     bootstrapVersion: live.midVersionString,
     newVersion: live.newVersionString,
     // The one-time entry edge into the registry model — consumed by

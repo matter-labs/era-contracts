@@ -8,11 +8,11 @@ import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
 import {HashMismatch, ProtocolIdMismatch, ProtocolIdNotGreater} from "../../common/L1ContractErrors.sol";
 
 /// @title LegacyTestAdminFacet
-/// @notice Test-only reimplementation of the pre-v34 cut-taking chain upgrade entrypoint: the
+/// @notice Test-only reimplementation of the pre-v35 cut-taking chain upgrade entrypoint: the
 ///         caller hands the diamond cut and the facet verifies it against the hash the chain's
 ///         CTM committed (`upgradeCutHash`).
 /// @dev The anvil bootstrap-upgrade test installs this facet on chains built from CURRENT
-///      sources so they can cross the bootstrap edge exactly like production pre-v34 chains do —
+///      sources so they can cross the bootstrap edge exactly like production pre-v35 chains do —
 ///      the current AdminFacet reads its cut from the CTM and cannot take one. Faithful to the
 ///      historical implementation except for the ServerNotifier timestamp gate, which only
 ///      applied to non-admin callers (the test calls as the chain admin).

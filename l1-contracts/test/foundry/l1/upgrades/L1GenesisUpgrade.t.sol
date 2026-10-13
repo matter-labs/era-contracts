@@ -200,7 +200,7 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
             release,
             0,
             address(upgradeEngine),
-            _v34Plan()
+            _defaultComposerPlan()
         );
 
         L2CanonicalTransaction memory genesisTx = _composedGenesisTx(ETH_CHAIN_ID);
@@ -242,7 +242,7 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
             release,
             0,
             address(upgradeEngine),
-            _v34Plan()
+            _defaultComposerPlan()
         );
 
         (
@@ -251,7 +251,7 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
             bytes memory genesisFixed,
             bytes memory genesisPerChain
         ) = this.decodeGenesisUpgrade(_innerCalldata(_composedGenesisTx(ERC20_CHAIN_ID).data));
-        (address upgradeDeployer, bytes memory upgradeFixed, bytes memory upgradePerChain) = this.decodeV34Upgrade(
+        (address upgradeDeployer, bytes memory upgradeFixed, bytes memory upgradePerChain) = this.decodeDefaultUpgrade(
             _delegateCalldata(upgradeEngine.l2UpgradeTx(address(transition), mockBridgehub, ERC20_CHAIN_ID).data)
         );
 
@@ -324,11 +324,11 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         return abi.decode(perChainData, (ZKChainSpecificForceDeploymentsData));
     }
 
-    /// @dev What the v34 delegate composer produces for `_chainId` at the same release — the
+    /// @dev What the default delegate composer produces for `_chainId` at the same release — the
     ///      upgrade path's answer to the same question genesis answers.
     function _upgradePathPerChainData(uint256 _chainId) internal view returns (bytes memory) {
-        (, , bytes memory perChainData) = this.decodeV34Upgrade(
-            v34Composer.composeDelegateCalldata(release, mockBridgehub, _chainId)
+        (, , bytes memory perChainData) = this.decodeDefaultUpgrade(
+            defaultComposer.composeDelegateCalldata(release, mockBridgehub, _chainId)
         );
         return perChainData;
     }

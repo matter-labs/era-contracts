@@ -1,5 +1,5 @@
 # Foundry-specific upgrade configuration for the RECURRING hops the local pipeline tests run on
-# top of the v34 bootstrap fixture (test/foundry/l1/integration/UpgradeTestRecurring_Local.t.sol).
+# top of the v35 bootstrap fixture (test/foundry/l1/integration/UpgradeTestRecurring_Local.t.sol).
 #
 # The bootstrap hop leaves the ecosystem at v36.0.0 (`foundry-upgrade.toml`'s
 # `new_protocol_version`), so a chain-release hop from there targets v37.0.0. An

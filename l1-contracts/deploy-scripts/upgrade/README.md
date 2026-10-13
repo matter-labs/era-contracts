@@ -19,10 +19,10 @@ review from the [root README review guide](../../../README.md#reviewing-registry
   the merge derives them; anything else a version needs governance (or an admin) to do goes through
   `declareExternalAction` (`ExternalActionsLib`) and is listed in the output's `external_actions`.
   `DefaultChainUpgrade` is the legacy handed-cut per-chain leg the Foundry integration tests use.
-- `v35/` — the first registry-driven release and the template for the next one: `CoreUpgrade_v35`
-  deploys one fresh `L1MessageRoot`; `CTMUpgrade_v35` overrides nothing.
-- `v34/` — the bootstrap edge: `CoreUpgrade_v34` also deploys the `CoreUpgradeExecutor` and the
-  coordinator; `CTMUpgrade_v34` deploys the `CTMUpgradeExecutor` (constructed answering to that
+- `v36/` — the first registry-driven release and the template for the next one: `CoreUpgrade_v36`
+  deploys one fresh `L1MessageRoot`; `CTMUpgrade_v36` overrides nothing.
+- `v35/` — the bootstrap edge: `CoreUpgrade_v35` also deploys the `CoreUpgradeExecutor` and the
+  coordinator; `CTMUpgrade_v35` deploys the `CTMUpgradeExecutor` (constructed answering to that
   coordinator), the `RegistryBootstrapMigration` and the `RegistryBootstrapSequence` over both
   objects, and declares every call of the one-time edge by reading it off that sequence.
 - `SystemContractsProcessing.s.sol` — the L2 force-deployment set shared by genesis and upgrades.
@@ -32,7 +32,7 @@ One-off scripts of shipped upgrades live on their release branches, not here.
 ## 1. Inputs
 
 Per-environment inputs are `upgrade-envs/<version>/<env>.toml` (see
-`upgrade-envs/v0.34.0-registry/`), permanent values `upgrade-envs/permanent-values/<env>.toml`.
+`upgrade-envs/v0.35.0-upgrade-system/`), permanent values `upgrade-envs/permanent-values/<env>.toml`.
 Keep inputs minimal — the prepare reads the departing version, the live implementations, the
 CTM's owner and the ecosystem `ProxyAdmin`'s owner from L1. One input cannot be derived and must
 be carried forward from the previous prepare's output: `[contracts] eip7702_checker`
@@ -51,7 +51,7 @@ On one anvil fork of L1, in this order:
 2. The core prepare (`noGovernancePrepare`): implementations, then `CoreTransition` (none when the
    run deployed no ecosystem implementation). Output `[registry]`: `core_transition_addr`,
    `core_upgrade_executor_addr`, `ecosystem_upgrade_executor_addr` — the executor and coordinator
-   read from the live `ProxyAdmin` owner, or deployed by the v34 prepare.
+   read from the live `ProxyAdmin` owner, or deployed by the v35 prepare.
 3. Each ZKsync OS CTM prepare, in input order (Era CTMs are skipped): every release member is
    reused when it already runs the code the current sources produce and redeployed only when the
    version names it in `changedReleaseMembers()`; a release whose members all reused is reused
@@ -130,7 +130,7 @@ lifecycle that cannot complete is cleared with `EcosystemUpgradeExecutor.abandon
 ## 7. Chain crossing
 
 After stage 1, each chain crosses on its own: `protocol-ops chain upgrade` runs
-`AdminFunctions.upgradeChainFromCTM`, which selects the cut-reading entrypoint for a chain at v34
+`AdminFunctions.upgradeChainFromCTM`, which selects the cut-reading entrypoint for a chain at v35
 or later and reconstructs a cut only for a chain that predates it (`UpgradeChainCall.requiresCut`).
 Who may trigger the crossing and when is `CTMUpgradeExecutor.upgradeChain`'s policy (architecture
 document, "Flow: upgrading"). `chain set-upgrade-timestamp` schedules it on the ServerNotifier
@@ -145,7 +145,7 @@ external consumers is required before rollout.
 
 ## Preparing the scripts for a new upgrade
 
-Start from `v35/`: inherit the `Default*Upgrade` bases, override `deployNew*Contracts` with the
+Start from `v36/`: inherit the `Default*Upgrade` bases, override `deployNew*Contracts` with the
 contracts the release changes, name every release member you replace in `changedReleaseMembers()`,
 and keep everything else derived.
 
@@ -168,24 +168,24 @@ successful prepare from the output alone.
 
 A release whose L2 built-ins change must also author the L2
 side (`authorL2Side`: delegate/extra bytecode infos, the pinned composer and the bytecode
-artifacts needed to publish the constructed plan’s factory dependencies — `CTMUpgrade_v34` shows the shape) because the release-pair derivation puts the
+artifacts needed to publish the constructed plan’s factory dependencies — `CTMUpgrade_v35` shows the shape) because the release-pair derivation puts the
 changed built-ins in the L2 leg. Any governance or admin call the version needs beyond the three
 coordinator calls is a `declareExternalAction`.
 
 ## Testing an upgrade end to end
 
-- `test/foundry/l1/integration/UpgradeTestv34_Local.t.sol` — the bootstrap edge through the real
+- `test/foundry/l1/integration/UpgradeTest_Local.t.sol` — the bootstrap edge through the real
   prepare pipeline, in-forge, including the chain crossing via the legacy cut-taking leg.
 - `test/foundry/l1/integration/UpgradeTestRecurring_Local.t.sol` — RECURRING prepares on the
   ecosystem that fixture leaves behind: the infrastructure-only, chain-release and mixed shapes
   preparation can emit, and the four it must refuse (an empty operation, either version/kind
   contradiction, an orphaned deployment on either domain).
-- `test/anvil-interop/run-v33-to-v34-upgrade-test.ts` — the bootstrap driven end to end by
+- `test/anvil-interop/run-upgrade-test.ts` — the bootstrap driven end to end by
   protocol-ops against the frozen departing-version chain states, then two registry-driven hops
   on the same chains: a same-minor verifier patch (run with the bootstrap's L2 transaction still
-  pending, required to derive no facet cut) and the v35 minor hop (required to reuse the live
+  pending, required to derive no facet cut) and the v36 minor hop (required to reuse the live
   release). Each hop's merged artifact is asserted to be exactly the three coordinator calls.
-- `test/anvil-interop/run-v34-to-v35-upgrade-test.ts` — the registry-driven hop with objects
+- `test/anvil-interop/run-recurring-upgrade-test.ts` — the registry-driven hop with objects
   deployed by the harness itself.
 - `test/foundry/l1/unit/concrete/Upgrades/registry/` — the lifecycle, coordination, executor,
   foreign-admin-row and individual-upgrade suites.

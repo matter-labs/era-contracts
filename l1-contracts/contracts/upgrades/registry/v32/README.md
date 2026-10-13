@@ -7,7 +7,7 @@ from an audited manifest. There is no per-version generated `.sol` file and no `
 
 ## Where the data lives
 
-- **Manifest (source of truth):** `scripts/registry-manifests/v32-local.json` — the audited
+- **Manifest (source of truth):** `scripts/registry-manifests/v35-local.json` — the audited
   values (facets, DiamondInit, base-system hashes, force-deployments, genesis params for the
   release; version, verifier, facet transitions, L2 deployments for the transition). Auditors
   verify a deployed registry by re-deriving its `manifestHash` from this file.
@@ -21,9 +21,9 @@ from an audited manifest. There is no per-version generated `.sol` file and no `
 ## How they are consumed
 
 The anvil registry-driven upgrade test
-(`test/anvil-interop/run-registry-driven-upgrade-test.ts`) deploys the registries from the
+(`test/anvil-interop/run-recurring-upgrade-test.ts`) deploys the registries from the
 manifest against the deterministic local ecosystem
-(`test/anvil-interop/chain-states/v0.32.0`) and drives the upgrade through the on-chain
+(`test/anvil-interop/chain-states/<stateVersion>`) and drives the upgrade through the on-chain
 executor/module path, asserting `validate()` succeeds against the live deployment. The objects
 themselves are built with the `registry-deterministic` foundry profile (CBOR-metadata-free, so
 byte-identical across macOS and CI) — which is what lets a reviewer's own build reproduce the
@@ -34,10 +34,10 @@ reproducible.
 
 ```bash
 cd l1-contracts/test/anvil-interop
-yarn regen:v32-registries   # = REGEN_REGISTRIES=1 ts-node run-registry-driven-upgrade-test.ts
+yarn regen:registry-manifest   # = REGEN_REGISTRIES=1 ts-node run-recurring-upgrade-test.ts
 ```
 
-This re-derives `scripts/registry-manifests/v32-local.json` from a fresh deployment and re-runs
+This re-derives `scripts/registry-manifests/v35-local.json` from a fresh deployment and re-runs
 the full upgrade test against it. Review and commit the manifest diff. If the test's `validate()`
 check fails on committed data, the manifest is stale — regenerate it.
 

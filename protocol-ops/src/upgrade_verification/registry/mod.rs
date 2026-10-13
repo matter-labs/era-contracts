@@ -6,7 +6,7 @@
 //! calldata: every release produced different calls, so every release needed its own re-derivation
 //! of them. A registry-driven package inverts that. Governance signs three calls naming one
 //! write-once object, and everything executable is derived on-chain from that object at execution
-//! time. What a reviewer checks is therefore the same for v35 as for v36 — the objects, and that
+//! time. What a reviewer checks is therefore the same for v36 as for v37 — the objects, and that
 //! the signed transaction invokes them — so there is one verifier, not one per release.
 //!
 //! The single exception is the one-time BOOTSTRAP edge ([`bootstrap`]), and it is an exception

@@ -317,8 +317,8 @@ pub(crate) fn expect_canonical_construction(
 }
 
 /// The constructor arguments of the lifecycle objects, ABI-encoded exactly as the prepare passes
-/// them (`abi.encode(...)` of the constructor's parameter list, in `CoreUpgrade_v34` /
-/// `CTMUpgrade_v34` / `DefaultCTMUpgrade.getCreationCalldata`).
+/// them (`abi.encode(...)` of the constructor's parameter list, in `CoreUpgrade_v35` /
+/// `CTMUpgrade_v35` / `DefaultCTMUpgrade.getCreationCalldata`).
 ///
 /// Every value is a REVIEWED one — the manifest's, the package's or the reviewer's — never a
 /// read off the object: an object answers with whatever it was built from, so a check that took

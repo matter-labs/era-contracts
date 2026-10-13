@@ -627,7 +627,7 @@ Two properties that look like omissions but are not:
   composes the L2 transaction with the same `CTMUpgradeComposer` transitions use. The engine
   itself is version-independent and holds no release: a chain that crosses the edge after the CTM
   has moved on still lands on the release its own committed migration names. Chains crossing
-  the edge run pre-v34 facets and take these bytes by hand (`upgradeCut()`), through the legacy
+  the edge run pre-v35 facets and take these bytes by hand (`upgradeCut()`), through the legacy
   cut-taking chain entrypoint; `upgradeTransition` stays zero for the departing version.
 
 `validateApplied()` is the stage-2 gate: executed, version reached, release and anchor installed,
@@ -668,7 +668,7 @@ registry. Completion is structural rather than a bundle convention, so a package
 not end in that gate is a package that does not match its object — which is why `protocol-ops`
 reports its absence as an error rather than a warning.
 
-Which calls ride which stage is the runbook's business; `UpgradeTestv34_Local.t.sol` and the anvil
+Which calls ride which stage is the runbook's business; `UpgradeTest_Local.t.sol` and the anvil
 pipeline drive the whole edge through the real prepares, and
 `RegistryBootstrapSequence.t.sol` holds the derived sequence against the one the scripts authored
 before it existed.

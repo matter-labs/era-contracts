@@ -50,18 +50,18 @@ Most subcommands flatten **`SharedRunArgs`** from `common/args.rs`:
 
 ## Preparing an upgrade
 
-`ecosystem upgrade-prepare-all` defaults to the current release's scripts, `CoreUpgrade_v34` and `CTMUpgrade_v34`
-under `l1-contracts/deploy-scripts/upgrade/v34/` (the one-time bootstrap edge onto registry-driven upgrades), using
-`upgrade-envs/v0.34.0-registry/local.toml` for a local upgrade. The recurring registry-driven edge,
-`CoreUpgrade_v35` and `CTMUpgrade_v35` under `l1-contracts/deploy-scripts/upgrade/v35/`, is selected with
+`ecosystem upgrade-prepare-all` defaults to the current release's scripts, `CoreUpgrade_v35` and `CTMUpgrade_v35`
+under `l1-contracts/deploy-scripts/upgrade/v35/` (the one-time bootstrap edge onto registry-driven upgrades), using
+`upgrade-envs/v0.35.0-upgrade-system/local.toml` for a local upgrade. The recurring registry-driven edge,
+`CoreUpgrade_v36` and `CTMUpgrade_v36` under `l1-contracts/deploy-scripts/upgrade/v36/`, is selected with
 `--core-script-path` / `--ctm-script-path`.
 With `--env <name>` the input is `<release dir>/<name>.toml` (see [Environment inputs](#environment-inputs));
 missing inputs fail before deployment.
 
 `--ctm-script-path`, `--core-script-path`, and `--upgrade-input-path` are visible in `--help`.
 Historical preparations must select the matching scripts and input explicitly. The anvil upgrade tests
-(`l1-contracts/test/anvil-interop/run-v33-to-v34-upgrade-test.ts` for the bootstrap edge,
-`run-v34-to-v35-upgrade-test.ts` for the recurring one) pass their test subclasses of these scripts explicitly. See
+(`l1-contracts/test/anvil-interop/run-upgrade-test.ts` for the bootstrap edge,
+`run-recurring-upgrade-test.ts` for the recurring one) pass their test subclasses of these scripts explicitly. See
 [the activation requirements](../protocol-docs/chain-config.md#activation).
 
 ## Environment inputs

@@ -443,7 +443,7 @@ mod tests {
         ])
     }
 
-    /// A trio deployed the way the v34 prepare deploys them: the core executor over the
+    /// A trio deployed the way the v35 prepare deploys them: the core executor over the
     /// ecosystem admin, the coordinator over the core executor, the CTM executor answering to
     /// the coordinator — all for `owner`, all under one salt.
     struct Trio {

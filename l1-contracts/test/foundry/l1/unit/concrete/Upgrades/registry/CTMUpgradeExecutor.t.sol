@@ -46,7 +46,7 @@ import {
 /// @notice The shared fixture of the registry executor suites (`CTMUpgradeExecutorTest`,
 ///         `CTMUpgradeLifecycleTest`, `CTMUpgradeForeignAdminRowTest`): a real ZKsyncOS CTM with
 ///         one chain, the coordinator and the two domain executors (each owning its own
-///         `ProxyAdmin`) wired the way the v34 bootstrap leaves them, the fixture's REAL
+///         `ProxyAdmin`) wired the way the v35 bootstrap leaves them, the fixture's REAL
 ///         `L1ChainAssetHandler` as the migration-pause holder, and real write-once
 ///         release/transition objects. See {protocol-docs/ecosystem-upgrade-coordination.md}.
 /// @dev Every fixture transition departs from the fixture's current release toward `release`.
@@ -83,7 +83,7 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
         _mockGetZKChainFromBridgehub(chainAddress);
 
         // The ecosystem domain: its executor owns the ecosystem ProxyAdmin, and the coordinator is
-        // constructed over it. The core executor is then pointed at the coordinator (the v34
+        // constructed over it. The core executor is then pointed at the coordinator (the v35
         // bootstrap's stage-2 binding).
         ecosystemProxyAdmin = new ProxyAdmin();
         coreExecutor = new CoreUpgradeExecutor(governor, ecosystemProxyAdmin);

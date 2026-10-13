@@ -278,7 +278,7 @@ contract AdminFunctions is Script, IAdminFunctions {
         _ensureProxyAdminOwnedByGovernance(l1Nullifier, _governance, _wraps);
     }
 
-    /// @dev Whether `_ctm` (a registry-era CTM, v34+) is owned by a `CTMUpgradeExecutor` bound to
+    /// @dev Whether `_ctm` (a registry-era CTM, v35+) is owned by a `CTMUpgradeExecutor` bound to
     ///      it and owned by `_governance`: the CTM domain — the CTM and its ProxyAdmin — then lives
     ///      where the bootstrap edge put it. A registry-era CTM owned by any other contract is a
     ///      misconfiguration this fails on (the executor getters revert on a stranger).
@@ -290,7 +290,7 @@ contract AdminFunctions is Script, IAdminFunctions {
         if (_ctmOwner == _governance || _ctmOwner.code.length == 0) {
             return false;
         }
-        if (IChainTypeManager(_ctm).protocolVersion() < UpgradeChainCall.V34_THRESHOLD) {
+        if (IChainTypeManager(_ctm).protocolVersion() < UpgradeChainCall.V35_THRESHOLD) {
             return false;
         }
         CTMUpgradeExecutor executor = CTMUpgradeExecutor(payable(_ctmOwner));
@@ -655,7 +655,7 @@ contract AdminFunctions is Script, IAdminFunctions {
         );
 
         // Pick the call the chain's CURRENT generation exposes FIRST, and only reconstruct a cut
-        // for the legacy edge that is handed one. A v34+ chain reads the cut from its own CTM, and
+        // for the legacy edge that is handed one. A v35+ chain reads the cut from its own CTM, and
         // a registry-driven edge leaves nothing to reconstruct from (`upgradeCutDataBlock` is
         // deprecated and zero), so fetching one first would revert on the supported path.
         bytes memory callData;

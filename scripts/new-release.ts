@@ -31,8 +31,9 @@ import { join, relative } from "path";
 //      given), `stateVersion` moves to the new release, and the previous source chain states are deleted.
 //   5. `l1-contracts/deploy-scripts/upgrade/v<minor>/`: the new release's `CoreUpgrade_v<minor>` and
 //      `CTMUpgrade_v<minor>`, generated as plain subclasses of `DefaultCoreUpgrade` / `DefaultCTMUpgrade` for the
-//      release's own preparation to go into. The outgoing release's scripts are deleted, and protocol-ops'
-//      prepare defaults and the Foundry full-flow test (`UpgradeTest_Local`) move onto the new ones.
+//      release's own preparation to go into, unless the branch already carries them (a next edge prepared and
+//      tested ahead of the bump), in which case they are kept. The outgoing release's scripts are deleted, and
+//      protocol-ops' prepare defaults and the Foundry full-flow test (`UpgradeTest_Local`) move onto the new ones.
 //
 // What it leaves to you (printed at the end): regenerating the new release's chain states, reviewing the
 // copied per-environment inputs, and removing or updating whatever still uses the outgoing release's scripts
@@ -234,11 +235,15 @@ function main(): void {
   // 5. Release scripts.
   const currentScriptsDir = join(UPGRADE_SCRIPTS_DIR, `v${current.minor}`);
   const nextScriptsDir = join(UPGRADE_SCRIPTS_DIR, `v${next.minor}`);
-  if (fs.existsSync(nextScriptsDir)) {
-    throw new Error(`${repoPath(nextScriptsDir)} already exists`);
-  }
   for (const kind of RELEASE_SCRIPT_KINDS) {
-    write(join(nextScriptsDir, `${kind}Upgrade_v${next.minor}.s.sol`), releaseScript(kind, next));
+    const script = join(nextScriptsDir, `${kind}Upgrade_v${next.minor}.s.sol`);
+    if (!fs.existsSync(script)) {
+      write(script, releaseScript(kind, next));
+    } else if (fs.readFileSync(script, "utf-8").includes(`contract ${kind}Upgrade_v${next.minor} is `)) {
+      changed.push(`keep   ${repoPath(script)}`);
+    } else {
+      throw new Error(`${repoPath(script)} exists but does not define ${kind}Upgrade_v${next.minor}`);
+    }
   }
   const outgoingNames = RELEASE_SCRIPT_KINDS.map((kind) => `${kind}Upgrade_v${current.minor}`);
   const moveToNextScripts = (path: string, contents: string) => {

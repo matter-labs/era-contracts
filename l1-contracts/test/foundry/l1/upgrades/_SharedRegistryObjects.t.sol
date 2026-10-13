@@ -9,7 +9,7 @@ import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.s
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {MockSelfDescribingFacet} from "contracts/dev-contracts/test/MockSelfDescribingFacet.sol";
 import {FixedDelegateCalldataComposer} from "contracts/dev-contracts/FixedDelegateCalldataComposer.sol";
-import {L2V34DelegateCalldataComposer} from "contracts/upgrades/L2V34DelegateCalldataComposer.sol";
+import {L2DefaultDelegateCalldataComposer} from "contracts/upgrades/L2DefaultDelegateCalldataComposer.sol";
 import {IL2DefaultUpgrade} from "contracts/upgrades/IL2DefaultUpgrade.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
@@ -65,12 +65,12 @@ abstract contract RegistryObjectsFixture is Test {
     FixedDelegateCalldataComposer internal delegateComposer;
     bytes internal fixtureDelegateCalldata;
 
-    /// @dev The REAL v34 composer, for the per-chain composition tests. The ecosystem it reads
+    /// @dev The REAL default composer, for the per-chain composition tests. The ecosystem it reads
     ///      through the Bridgehub — the CTM deployer, the asset router and the native token vault —
     ///      is mocked by {_mockEcosystemForComposer}: this fixture has no live vault, and what is
     ///      under test is which values land in the composed transaction, not how the vault stores
     ///      them. The ERC20 base token IS real, since its metadata is what the composer reads.
-    L2V34DelegateCalldataComposer internal v34Composer;
+    L2DefaultDelegateCalldataComposer internal defaultComposer;
     address internal mockAssetRouter = makeAddr("mockAssetRouter");
     address internal mockNativeTokenVault = makeAddr("mockNativeTokenVault");
     address internal ctmDeployerStub = makeAddr("ctmDeployer");
@@ -125,13 +125,13 @@ abstract contract RegistryObjectsFixture is Test {
         upgradeTimerStub = _deployedStub("upgradeTimer");
         ctmStub = makeAddr("ctm");
         delegateComposer = new FixedDelegateCalldataComposer(_delegateCalldata);
-        v34Composer = new L2V34DelegateCalldataComposer();
+        defaultComposer = new L2DefaultDelegateCalldataComposer();
         erc20LocalToken = new TestnetERC20Token(ERC20_NAME, ERC20_SYMBOL, uint8(ERC20_DECIMALS));
         noMetadataToken = new NoMetadataToken();
         bytes32MetadataToken = new Bytes32MetadataToken(bytes32("Maker"), bytes32("MKR"), uint8(ERC20_DECIMALS));
     }
 
-    /// @dev Mocks the ecosystem behind `_bridgehub` for the two fixture chains (see {v34Composer}).
+    /// @dev Mocks the ecosystem behind `_bridgehub` for the two fixture chains (see {defaultComposer}).
     function _mockEcosystemForComposer(address _bridgehub, address _ctmDeployer) internal {
         vm.mockCall(_bridgehub, abi.encodeCall(IBridgehubBase.l1CtmDeployer, ()), abi.encode(_ctmDeployer));
         vm.mockCall(_bridgehub, abi.encodeCall(IBridgehubBase.assetRouter, ()), abi.encode(mockAssetRouter));
@@ -254,9 +254,9 @@ abstract contract RegistryObjectsFixture is Test {
         return _planWithComposer(address(delegateComposer));
     }
 
-    /// @dev {_delegatePlan} with the REAL v34 composer in place of the fixed stand-in.
-    function _v34Plan() internal view returns (AuthoredL2Plan memory) {
-        return _planWithComposer(address(v34Composer));
+    /// @dev {_delegatePlan} with the REAL default composer in place of the fixed stand-in.
+    function _defaultComposerPlan() internal view returns (AuthoredL2Plan memory) {
+        return _planWithComposer(address(defaultComposer));
     }
 
     function _planWithComposer(address _composer) internal pure returns (AuthoredL2Plan memory) {
@@ -333,10 +333,10 @@ abstract contract RegistryObjectsFixture is Test {
         return _expectedL2TxWithDelegateCalldata(_plan, _newProtocolVersion, fixtureDelegateCalldata);
     }
 
-    /// @dev {_expectedL2Tx} for a plan pinning the REAL v34 composer: the delegate is called with
+    /// @dev {_expectedL2Tx} for a plan pinning the REAL default composer: the delegate is called with
     ///      the release's fixed data and the per-chain data of `_chainId` read off the mocked
     ///      ecosystem.
-    function _expectedV34L2Tx(
+    function _expectedDefaultComposerL2Tx(
         L2UpgradePlan memory _plan,
         uint256 _newProtocolVersion,
         uint256 _chainId
@@ -371,7 +371,7 @@ abstract contract RegistryObjectsFixture is Test {
         transaction.factoryDeps = _plan.factoryDepHashes;
     }
 
-    /// @dev The `ZKChainSpecificForceDeploymentsData` of one of the two fixture chains, as the v34
+    /// @dev The `ZKChainSpecificForceDeploymentsData` of one of the two fixture chains, as the default
     ///      composer must read it off the mocked ecosystem.
     function _expectedPerChainData(uint256 _chainId) internal view returns (bytes memory) {
         // The recorded address is always the token's representation on THIS layer, which for the
@@ -443,9 +443,9 @@ abstract contract RegistryObjectsFixture is Test {
         (, , delegateCalldata) = this.decodeUniversalCall(_txData);
     }
 
-    /// @dev The per-chain half of a composed v34 payload.
+    /// @dev The per-chain half of a composed `L2DefaultUpgrade` payload.
     function _perChainData(bytes memory _txData) internal view returns (ZKChainSpecificForceDeploymentsData memory) {
-        (, , bytes memory perChainData) = this.decodeV34Upgrade(_delegateCalldata(_txData));
+        (, , bytes memory perChainData) = this.decodeDefaultUpgrade(_delegateCalldata(_txData));
         return abi.decode(perChainData, (ZKChainSpecificForceDeploymentsData));
     }
 
@@ -463,7 +463,7 @@ abstract contract RegistryObjectsFixture is Test {
     }
 
     /// @dev Decodes an `IL2DefaultUpgrade.upgrade` call into its arguments.
-    function decodeV34Upgrade(
+    function decodeDefaultUpgrade(
         bytes calldata _data
     ) external pure returns (address ctmDeployer, bytes memory fixedData, bytes memory chainData) {
         assertEq(bytes32(bytes4(_data[:4])), bytes32(IL2DefaultUpgrade.upgrade.selector), "delegate selector");

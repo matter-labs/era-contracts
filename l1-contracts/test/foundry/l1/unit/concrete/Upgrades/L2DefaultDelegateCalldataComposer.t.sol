@@ -23,14 +23,14 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {RegistryObjectsFixture} from "foundry-test/l1/upgrades/_SharedRegistryObjects.t.sol";
 
-/// @notice The v34 delegate-calldata composer: the pinned code that DEFINES what `L2DefaultUpgrade`
+/// @notice The default delegate-calldata composer: the pinned code that DEFINES what `L2DefaultUpgrade`
 ///         is called with, from the target release, the ecosystem's Bridgehub and the chain the
 ///         transaction is composed for — see "L2 delegate composition" in {docs/upgrade-stage-lifecycle.md}.
 /// @dev The releases are real write-once `CTMRelease` objects. The ecosystem behind the Bridgehub
 ///      (its CTM deployer, asset router and native token vault) is mocked by the shared fixture,
 ///      which has no live vault; the ERC20 base token IS real, since its metadata is what the
 ///      composer reads. Under test is which values the composer puts in the call.
-contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
+contract L2DefaultDelegateCalldataComposerTest is RegistryObjectsFixture {
     CTMRelease internal release;
     address internal bridgehub;
 
@@ -47,13 +47,13 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
 
     // ─────────────────────────── the composed call ───────────────────────────
 
-    function test_composesV34UpgradeCallFromReleaseBridgehubAndChain() public {
+    function test_composesDefaultUpgradeCallFromReleaseBridgehubAndChain() public {
         // The composer takes its inputs live: the release's pinned data, the Bridgehub's tracker
         // and the chain's base-token registration.
         vm.expectCall(bridgehub, abi.encodeCall(IBridgehubBase.l1CtmDeployer, ()));
         vm.expectCall(bridgehub, abi.encodeCall(IBridgehubBase.baseTokenAssetId, (ETH_CHAIN_ID)));
         vm.expectCall(address(release), abi.encodeCall(ICTMRelease.fixedForceDeploymentsData, ()));
-        bytes memory composed = v34Composer.composeDelegateCalldata(
+        bytes memory composed = defaultComposer.composeDelegateCalldata(
             ICTMRelease(address(release)),
             bridgehub,
             ETH_CHAIN_ID
@@ -65,9 +65,9 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
                 IL2DefaultUpgrade.upgrade,
                 (ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(ETH_CHAIN_ID))
             ),
-            "the v34 delegate call must be the ZKsync OS upgrade with the release's fixed data and the chain's data"
+            "the delegate call must be the ZKsync OS upgrade with the release's fixed data and the chain's data"
         );
-        (address deployer, bytes memory fixedData, bytes memory chainData) = this.decodeV34Upgrade(composed);
+        (address deployer, bytes memory fixedData, bytes memory chainData) = this.decodeDefaultUpgrade(composed);
         assertEq(deployer, ctmDeployerStub, "the CTM deployer is the Bridgehub's live tracker");
         assertEq(fixedData, FIXED_FORCE_DEPLOYMENTS_DATA, "the fixed data is the release's pinned payload");
         ZKChainSpecificForceDeploymentsData memory data = abi.decode(chainData, (ZKChainSpecificForceDeploymentsData));
@@ -87,7 +87,7 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
     ///      `originToken`, which may have no code on this layer; the bridging data still describes
     ///      the token on its origin chain.
     function test_readsAnERC20BaseTokenFromItsLocalRepresentation() public {
-        bytes memory composed = v34Composer.composeDelegateCalldata(
+        bytes memory composed = defaultComposer.composeDelegateCalldata(
             ICTMRelease(address(release)),
             bridgehub,
             ERC20_CHAIN_ID
@@ -100,7 +100,7 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
                 (ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(ERC20_CHAIN_ID))
             )
         );
-        (, , bytes memory chainData) = this.decodeV34Upgrade(composed);
+        (, , bytes memory chainData) = this.decodeDefaultUpgrade(composed);
         ZKChainSpecificForceDeploymentsData memory data = abi.decode(chainData, (ZKChainSpecificForceDeploymentsData));
         assertEq(data.baseTokenMetadata.name, ERC20_NAME, "metadata not read from the local token");
         assertEq(data.baseTokenMetadata.symbol, ERC20_SYMBOL, "wrong symbol");
@@ -117,7 +117,7 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
     ///      unupgradeable the moment its metadata has to be recomposed.
     function test_composesForBaseTokensWithoutUsableMetadata() public {
         assertEq(
-            v34Composer.composeDelegateCalldata(ICTMRelease(address(release)), bridgehub, NO_METADATA_CHAIN_ID),
+            defaultComposer.composeDelegateCalldata(ICTMRelease(address(release)), bridgehub, NO_METADATA_CHAIN_ID),
             abi.encodeCall(
                 IL2DefaultUpgrade.upgrade,
                 (ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(NO_METADATA_CHAIN_ID))
@@ -125,7 +125,11 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
             "a token without metadata must compose the defaults"
         );
         assertEq(
-            v34Composer.composeDelegateCalldata(ICTMRelease(address(release)), bridgehub, BYTES32_METADATA_CHAIN_ID),
+            defaultComposer.composeDelegateCalldata(
+                ICTMRelease(address(release)),
+                bridgehub,
+                BYTES32_METADATA_CHAIN_ID
+            ),
             abi.encodeCall(
                 IL2DefaultUpgrade.upgrade,
                 (ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(BYTES32_METADATA_CHAIN_ID))
@@ -149,7 +153,7 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
         _mockEcosystemForComposer(otherBridgehub, otherDeployer);
 
         assertEq(
-            v34Composer.composeDelegateCalldata(ICTMRelease(address(otherRelease)), bridgehub, ETH_CHAIN_ID),
+            defaultComposer.composeDelegateCalldata(ICTMRelease(address(otherRelease)), bridgehub, ETH_CHAIN_ID),
             abi.encodeCall(
                 IL2DefaultUpgrade.upgrade,
                 (ctmDeployerStub, OTHER_FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(ETH_CHAIN_ID))
@@ -157,7 +161,7 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
             "the fixed data follows the release"
         );
         assertEq(
-            v34Composer.composeDelegateCalldata(ICTMRelease(address(release)), otherBridgehub, ETH_CHAIN_ID),
+            defaultComposer.composeDelegateCalldata(ICTMRelease(address(release)), otherBridgehub, ETH_CHAIN_ID),
             abi.encodeCall(
                 IL2DefaultUpgrade.upgrade,
                 (otherDeployer, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(ETH_CHAIN_ID))
@@ -169,20 +173,22 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
     /// @dev Two chains of one ecosystem: the ecosystem-wide arguments are shared, only the
     ///      per-chain data differs.
     function test_composesPerChain() public {
-        bytes memory forEthChain = v34Composer.composeDelegateCalldata(
+        bytes memory forEthChain = defaultComposer.composeDelegateCalldata(
             ICTMRelease(address(release)),
             bridgehub,
             ETH_CHAIN_ID
         );
-        bytes memory forErc20Chain = v34Composer.composeDelegateCalldata(
+        bytes memory forErc20Chain = defaultComposer.composeDelegateCalldata(
             ICTMRelease(address(release)),
             bridgehub,
             ERC20_CHAIN_ID
         );
 
         assertTrue(keccak256(forEthChain) != keccak256(forErc20Chain), "two chains must not share a call");
-        (address ethDeployer, bytes memory ethFixed, bytes memory ethChainData) = this.decodeV34Upgrade(forEthChain);
-        (address erc20Deployer, bytes memory erc20Fixed, bytes memory erc20ChainData) = this.decodeV34Upgrade(
+        (address ethDeployer, bytes memory ethFixed, bytes memory ethChainData) = this.decodeDefaultUpgrade(
+            forEthChain
+        );
+        (address erc20Deployer, bytes memory erc20Fixed, bytes memory erc20ChainData) = this.decodeDefaultUpgrade(
             forErc20Chain
         );
         assertEq(ethDeployer, erc20Deployer, "the CTM deployer is ecosystem-wide");
@@ -199,7 +205,7 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
         vm.mockCallRevert(brokenBridgehub, abi.encodeCall(IBridgehubBase.l1CtmDeployer, ()), "");
 
         vm.expectRevert();
-        v34Composer.composeDelegateCalldata(ICTMRelease(address(release)), brokenBridgehub, ETH_CHAIN_ID);
+        defaultComposer.composeDelegateCalldata(ICTMRelease(address(release)), brokenBridgehub, ETH_CHAIN_ID);
     }
 
     /// @dev A chain the ecosystem does not know has no base token to read: the composition
@@ -208,24 +214,30 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
         uint256 unknownChainId = 999;
 
         vm.expectRevert();
-        v34Composer.composeDelegateCalldata(ICTMRelease(address(release)), bridgehub, unknownChainId);
+        defaultComposer.composeDelegateCalldata(ICTMRelease(address(release)), bridgehub, unknownChainId);
     }
 
     // ─────────────────────────── through a transition ───────────────────────────
 
     /// @dev The production path: a transition names the composer and `CTMUpgradeComposer` asks it
     ///      for the delegate calldata with the TARGET release, the Bridgehub and the chain it is
-    ///      handed. The composed L2 transaction therefore carries the v34 call with that chain's
+    ///      handed. The composed L2 transaction therefore carries the `L2DefaultUpgrade` call with that chain's
     ///      data.
-    function test_transitionNamingTheComposerComposesTheV34Call() public {
+    function test_transitionNamingTheComposerComposesTheDefaultUpgradeCall() public {
         CTMRelease fromRelease = new CTMRelease(
             _releaseManifest(FIXED_FORCE_DEPLOYMENTS_DATA, _deployedStub("verifierV33"), SemVer.packSemVer(0, 33, 0))
         );
-        CTMTransition transition = _transition(fromRelease, release, 0, _deployedStub("upgradeEngine"), _v34Plan());
+        CTMTransition transition = _transition(
+            fromRelease,
+            release,
+            0,
+            _deployedStub("upgradeEngine"),
+            _defaultComposerPlan()
+        );
         transition.validate();
 
         L2UpgradePlan memory plan = transition.l2Plan();
-        assertEq(plan.delegateComposer, address(v34Composer));
+        assertEq(plan.delegateComposer, address(defaultComposer));
         L2CanonicalTransaction memory transaction = CTMUpgradeComposer.buildL2UpgradeTx(
             ICTMTransition(address(transition)),
             bridgehub,
@@ -244,7 +256,7 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
                     )
                 )
             ),
-            "the L2 transaction delegates to the v34 upgrade with the composed arguments"
+            "the L2 transaction delegates to L2DefaultUpgrade with the composed arguments"
         );
     }
 

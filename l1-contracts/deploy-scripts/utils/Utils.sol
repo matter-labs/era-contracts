@@ -324,7 +324,7 @@ library Utils {
     /// @notice The address the deterministic factory produces for `_creationCode` run on
     ///         `_constructorArgs` under `_salt`.
     /// @dev The Solidity twin of `protocol-ops`'s construction check
-    ///      (`upgrade_verification::versions::v34::construction`), which is what establishes that
+    ///      (`upgrade_verification::registry::construction`), which is what establishes that
     ///      a registry object was produced by the AUDITED constructor rather than merely running
     ///      audited runtime code. Kept in step with it by
     ///      `test/foundry/l1/upgrades/CounterfeitObject.t.sol`, which builds a counterfeit and

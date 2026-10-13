@@ -248,7 +248,8 @@ Copy-paste into a terminal (while chains are still running) to get the full exec
 ```
 test/anvil-interop/
 ├── run-hardhat-interop-test.ts    # Main entry: deployment + hardhat test runner
-├── run-v33-to-v34-upgrade-test.ts  # V34 bootstrap edge + the v35 registry-driven hop via the real prepare scripts (protocol-ops)
+├── run-upgrade-test.ts            # Default upgrade (the v35 bootstrap) + the patch and v36 hops, via protocol-ops
+├── run-recurring-upgrade-test.ts  # Registry-driven hop over harness-deployed objects (current-genesis states)
 ├── setup-and-dump-state.ts        # Generate pregenerated chain state snapshots
 ├── cleanup.sh                     # Kill Anvil processes, reset state
 ├── config/
@@ -258,7 +259,6 @@ test/anvil-interop/
 │   ├── permanent-values.toml      # Immutable protocol values
 │   └── chain-{10,11,12,13,14}.toml # Per-chain deployment params (generated)
 ├── chain-states/
-│   ├── v0.33.0/                   # FROZEN departing-version fixture (bootstrap edge input)
 │   ├── v0.34.0/                   # FROZEN previous-release snapshots (`upgradeSourceStateVersion`)
 │   └── v0.35.0/                   # Current-source Anvil state snapshots (`stateVersion`, regenerated)
 │       ├── 31337.json.gz          # L1 state dump (gzip; kept out of diffs)

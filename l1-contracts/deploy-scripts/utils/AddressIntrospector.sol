@@ -184,10 +184,10 @@ library AddressIntrospector {
             facets: facets,
             genesisUpgrade: ctm.l1GenesisUpgrade(),
             chainTypeManagerProxyAdmin: Utils.getProxyAdminAddress(ctmAddr),
-            // The release registry only exists on the CTM from v34 on — every earlier
+            // The release registry only exists on the CTM from v35 on — every earlier
             // implementation has no `currentRelease` getter at all — so it is read only off a
             // registry-era CTM and reported as zero otherwise.
-            currentRelease: ctm.protocolVersion() >= SemVer.packSemVer(0, 34, 0) ? ctm.currentRelease() : address(0)
+            currentRelease: ctm.protocolVersion() >= SemVer.packSemVer(0, 35, 0) ? ctm.currentRelease() : address(0)
         });
         info.admin = CTMAdminAddresses({
             transparentProxyAdmin: Utils.getProxyAdminAddress(ctmAddr),

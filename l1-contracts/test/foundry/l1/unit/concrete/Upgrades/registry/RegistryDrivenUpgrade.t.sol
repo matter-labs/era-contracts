@@ -142,7 +142,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
         _mockGetZKChainFromBridgehub(chainAddress);
 
         // The coordinator over the ecosystem domain, and the CTM executor constructed answering
-        // to it — the shape the v34 bootstrap leaves behind. Pausing its own CTM's migrations
+        // to it — the shape the v35 bootstrap leaves behind. Pausing its own CTM's migrations
         // needs no registration: the ChainAssetHandler derives that from CTM ownership.
         coreExecutor = new CoreUpgradeExecutor(governor, new ProxyAdmin());
         coordinator = new EcosystemUpgradeExecutor(governor, coreExecutor);

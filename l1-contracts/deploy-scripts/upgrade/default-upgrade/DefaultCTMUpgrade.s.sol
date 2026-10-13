@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 // TODO(EVM-1644): LEGACY UPGRADE PROCESS — remove once the registry-driven upgrade process
 // (contracts/upgrades/registry: EcosystemUpgradeExecutor coordinating CoreUpgradeExecutor /
 // CTMUpgradeExecutor + release/transition registries) has fully replaced off-chain
-// governance-calldata generation. Kept for the v34 bootstrap edge, which still ships stage0/1/2
+// governance-calldata generation. Kept for the v35 bootstrap edge, which still ships stage0/1/2
 // calls (the committed cut itself is already facet-less; only the call orchestration remains
 // script-composed).
 
@@ -81,7 +81,7 @@ struct AuthoredL2Side {
 ///         governance calls are `EcosystemUpgradeExecutor.stage0/1/2(operation)`, derived by the
 ///         merge from the operation's address; anything a version script still needs governance (or
 ///         an admin) to do is declared as an external action and listed in the output.
-/// @dev Version scripts inherit and override; the v34 bootstrap edge deploys no transition and
+/// @dev Version scripts inherit and override; the v35 bootstrap edge deploys no transition and
 ///      declares every call of its one-time edge instead.
 contract DefaultCTMUpgrade is Script, DeployCTMScript {
     using stdToml for string;
@@ -602,7 +602,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     ///         edge — no delegate, no extra bytecode, no composer, nothing to publish. A version
     ///         whose L2 built-ins change derives their rows from the release pair on-chain and MUST
     ///         author the delegate that initializes them and list every bytecode the resulting plan
-    ///         needs published (the v34 bootstrap shows the shape).
+    ///         needs published (the v35 bootstrap shows the shape).
     function authorL2Side() internal virtual returns (AuthoredL2Side memory side) {
         // The zero value is the L1-only side: an empty plan and nothing to publish.
         return side;
@@ -795,7 +795,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     /// @notice The step between the release deploy and the upgrade objects. Nothing on the default
     ///         path: it is where a version script hangs a deployment that needs the release to
     ///         already exist (the bootstrap edge's engine pins it as an immutable).
-    /// @dev The chain-CREATION cut is deliberately not recomputed here: from v34 the CTM builds it
+    /// @dev The chain-CREATION cut is deliberately not recomputed here: from v35 the CTM builds it
     ///      per chain creation from its pinned release, so an upgrade prepare has nothing to say
     ///      about it (see the retired `diamond_cut_data` output field).
     function generateUpgradeData() public virtual {

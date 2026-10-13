@@ -13,9 +13,9 @@ import {ICTMUpgradeExecutor} from "contracts/upgrades/registry/executors/ICTMUpg
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 
-/// @notice The bootstrap edge's governance bundles EXACTLY as the two v34 prepare scripts authored
+/// @notice The bootstrap edge's governance bundles EXACTLY as the two v35 prepare scripts authored
 ///         them before the sequence was derived on-chain: the calls
-///         `CoreUpgrade_v34._declareBootstrapActions` and `CTMUpgrade_v34._declareBootstrapActions`
+///         `CoreUpgrade_v35._declareBootstrapActions` and `CTMUpgrade_v35._declareBootstrapActions`
 ///         pushed into each phase's ledger, in the order protocol-ops merged them (the core
 ///         prepare's calls ahead of the CTM prepare's).
 /// @dev A deliberate duplicate of retired script code, kept only so `RegistryBootstrapSequence`

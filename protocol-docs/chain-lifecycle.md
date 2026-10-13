@@ -212,7 +212,7 @@ installs the protocol version's verifier, and this release deploys a fresh one, 
 proof under the old verifier would stop being provable.
 
 Address discovery (`AddressIntrospector`) reads the getters of the current release only
-(`chainRegistrationSender`, `l1InteropHandler`, `defaultUpgrade`, …): this line only upgrades ecosystems
+(`chainRegistrationSender`, `l1InteropHandler`, …): this line only upgrades ecosystems
 that are already on v33 or later, so there is no per-era discovery path to choose between.
 
 Every chain registered in the bridgehub must have run its per-chain v31 upgrade before this release, and in

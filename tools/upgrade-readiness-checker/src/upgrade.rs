@@ -54,7 +54,7 @@ pub async fn resolve_ctm(
 /// `protocol_version` and compute the canonical tx hash of the L2 upgrade
 /// transaction the committed cut resolves to for `chain_id`.
 ///
-/// Registry-driven cuts (v34+) serve the FINAL per-chain transaction through
+/// Registry-driven cuts (v35+) serve the FINAL per-chain transaction through
 /// the pinned engine / migration object. For legacy cut-taking commits, the
 /// upgrade contract mutates `l2ProtocolUpgradeTx.data` per-chain before hashing
 /// (to splice in `ZKChainSpecificForceDeploymentsData` queried from the
@@ -126,12 +126,12 @@ pub async fn find_upgrade_tx_hash(
 /// and compute `keccak256(L2CanonicalTransaction.abi_encode())`.
 ///
 /// The init calldata takes one of three shapes, told apart by its selector:
-/// - `upgradeFromTransition(transition)` — a registry-driven transition (v34+): the engine at
+/// - `upgradeFromTransition(transition)` — a registry-driven transition (v35+): the engine at
 ///   `initAddress` serves the FINAL per-chain transaction via
 ///   `l2UpgradeTx(transition, bridgehub, chainId)`;
-/// - `upgradeFromBootstrap(migration)` — the v34 bootstrap edge: the migration object serves it
+/// - `upgradeFromBootstrap(migration)` — the v35 bootstrap edge: the migration object serves it
 ///   via `l2UpgradeTx(chainId)`;
-/// - anything else is the legacy `upgrade(ProposedUpgrade)` (pre-v34 cut-taking commits), with
+/// - anything else is the legacy `upgrade(ProposedUpgrade)` (pre-v35 cut-taking commits), with
 ///   the transaction embedded in the struct after the selector and its `.data` mutated per
 ///   chain by the upgrade contract at execution — replayed here.
 async fn tx_hash_from_init_calldata(
@@ -208,7 +208,7 @@ async fn tx_hash_from_init_calldata(
 /// Pre-v31 upgrades did not rewrite the transaction data. A failure of both v31+ ABIs is
 /// fatal: silently hashing the placeholder data would make the checker wait for a transaction
 /// that can never exist.
-/// Registry-driven cuts (v34+) serve the final per-chain transaction directly and
+/// Registry-driven cuts (v35+) serve the final per-chain transaction directly and
 /// never take this path.
 async fn rebuild_tx_data_if_v31plus(
     provider: &DynProvider,

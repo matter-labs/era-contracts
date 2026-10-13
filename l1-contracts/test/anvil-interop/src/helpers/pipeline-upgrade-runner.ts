@@ -7,14 +7,14 @@
  *
  *   1. Load the frozen chain states (`chain-states/<stateVersion>`) and select target chains.
  *   2. Normalize L1 ownership (fixtures leave contracts with the deployer; governance needs them).
- *   3. (Only when the scenario asks for it) install the pre-v34 cut-taking entrypoint
+ *   3. (Only when the scenario asks for it) install the pre-v35 cut-taking entrypoint
  *      (`LegacyTestAdminFacet`) on the target chains. A fixture frozen from a branch whose
  *      Admin facet already READS its cut from the CTM needs the shim; the current frozen
  *      fixture carries the real cut-taking facet, so the chains cross natively — exactly like
- *      production pre-v34 chains.
+ *      production pre-v35 chains.
  *   4. `protocol-ops ecosystem upgrade-prepare-all` with the scenario's core/CTM script paths
  *      (deployer Safe bundles replayed onto the harness anvil), then
- *      `protocol-ops ecosystem upgrade-governance` (stage 0/1/2 bundles replayed) — for the v34
+ *      `protocol-ops ecosystem upgrade-governance` (stage 0/1/2 bundles replayed) — for the v35
  *      edge, stage 1 IS the four-call bootstrap handover + `migrate()`.
  *   5. Per-chain legacy handed-cut crossing, recorded-L2-tx verification, and the L2 relay of
  *      the proposed upgrade transaction on each chain's anvil fork.
@@ -106,9 +106,12 @@ export type PipelineUpgradeScenario = {
   targetRoles: ChainRole[];
   /** Protocol version the chains must report once the upgrade has been applied. */
   expectedProtocolVersion: string;
-  /** Forge script targets driven by protocol-ops (`--core-script-path` / `--ctm-script-path`). */
-  coreScriptPath: string;
-  ctmScriptPath: string;
+  /**
+   * Forge script targets driven by protocol-ops (`--core-script-path` / `--ctm-script-path`). Omitted,
+   * protocol-ops prepares with its defaults: the current release's scripts.
+   */
+  coreScriptPath?: string;
+  ctmScriptPath?: string;
   /**
    * Bytecode placed at the L2 upgrade transaction's decoded delegate target before the relay
    * (the anvil L2s cannot force-deploy, so the harness `anvil_setCode`s it).
@@ -118,7 +121,7 @@ export type PipelineUpgradeScenario = {
   transferL1ChainAssetHandlerOwnership?: boolean;
   /**
    * Install `LegacyTestAdminFacet` before governance. Needed ONLY for fixtures whose Admin
-   * facet is the cut-READING (v34+) variant; a fixture with the real pre-v34 cut-taking facet
+   * facet is the cut-READING (v35+) variant; a fixture with the real pre-v35 cut-taking facet
    * crosses natively, and installing the shim there collides (`FacetExists`).
    */
   installLegacyCutTakingFacet?: boolean;
@@ -253,10 +256,9 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
     }
 
     // ── Per-chain legacy crossing + L2 relay ──
-    // The cut comes from the per-CTM light output the *ForTests CTM script writes
-    // (`chain_upgrade_diamond_cut`); the file name is protocol-ops' convention
-    // (`upgrade_inner.rs`). The L2 leg is read from the migration object the cut names, exactly
-    // as the engine reads it at execution.
+    // The cut comes from the per-CTM prepare output (`chain_upgrade_diamond_cut`); the file name
+    // is protocol-ops' convention (`upgrade_inner.rs`). The L2 leg is read from the migration
+    // object the cut names, exactly as the engine reads it at execution.
     const ctmTomlPath = path.join(
       l1ContractsDir,
       "script-out",
@@ -369,9 +371,9 @@ function decodeGovernanceCalls(hex: string): Array<{ target: string; value: ethe
 
 /**
  * The registry-driven hop that follows the bootstrap on the same chains — the production shape
- * of every upgrade after v34, driven by the real toolchain end to end:
+ * of every upgrade after v35, driven by the real toolchain end to end:
  *
- *   1. protocol-ops `upgrade-prepare-all` runs the (trimmed) v35 prepares: the core prepare
+ *   1. protocol-ops `upgrade-prepare-all` runs the (trimmed) v36 prepares: the core prepare
  *      deploys one ecosystem implementation and pins it in a `CoreTransition`; the CTM prepare
  *      deploys the release and the `CTMTransition`, with its timer bound to the coordinator; the
  *      compose step then deploys the `EcosystemUpgradeOperation` naming the registry and the
@@ -710,7 +712,7 @@ async function transferL1Ownership(
  * Hand the CTM's ProxyAdmin to governance when a contract owns it.
  *
  * The fixture's CTM deployment leaves its ProxyAdmin owned by its own `Governance.sol`
- * instance; the v34 stage-1 handover (`ProxyAdmin.transferOwnership(migration)`) is emitted as
+ * instance; the v35 stage-1 handover (`ProxyAdmin.transferOwnership(migration)`) is emitted as
  * a plain governance call, so governance itself has to be the owner.
  */
 async function normalizeProxyAdminOwnerToEoa(
@@ -893,10 +895,8 @@ export async function runEcosystemUpgradeScripts(params: {
       params.upgradeHarnessInputs.create2FactorySalt,
       "--upgrade-input-path",
       params.upgradeHarnessInputs.upgradeInputArg,
-      "--core-script-path",
-      params.scenario.coreScriptPath,
-      "--ctm-script-path",
-      params.scenario.ctmScriptPath,
+      ...(params.scenario.coreScriptPath ? ["--core-script-path", params.scenario.coreScriptPath] : []),
+      ...(params.scenario.ctmScriptPath ? ["--ctm-script-path", params.scenario.ctmScriptPath] : []),
       "--additional-args=--memory-limit=536870912",
     ],
     params.upgradeHarnessInputs.envVars

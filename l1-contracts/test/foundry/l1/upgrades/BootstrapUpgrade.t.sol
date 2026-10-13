@@ -172,14 +172,18 @@ contract BootstrapUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
     }
 
     /// @dev The bootstrap edge composes its L2 leg the same one-pass, per-chain way transitions
-    ///      do (the REAL v34 composer over the mocked ecosystem — see the shared fixture): what the
+    ///      do (the REAL default composer over the mocked ecosystem — see the shared fixture): what the
     ///      chain commits is what the migration serves FOR THAT CHAIN, and another chain of the
     ///      ecosystem is served another transaction.
     function test_upgradeFromBootstrap_commitsTheTransactionComposedForThisChain() public {
         RegistryBootstrapMigration migration = new RegistryBootstrapMigration(
-            _bootstrapManifest(genesisRelease, 0, 0, address(engine), _v34Plan())
+            _bootstrapManifest(genesisRelease, 0, 0, address(engine), _defaultComposerPlan())
         );
-        L2CanonicalTransaction memory expectedTx = _expectedV34L2Tx(migration.l2Plan(), protocolVersion, ETH_CHAIN_ID);
+        L2CanonicalTransaction memory expectedTx = _expectedDefaultComposerL2Tx(
+            migration.l2Plan(),
+            protocolVersion,
+            ETH_CHAIN_ID
+        );
 
         engine.upgradeFromBootstrap(address(migration));
 

@@ -1372,7 +1372,7 @@ mod tests {
 
     // ───────────────── a release with no verifier module of its own ─────────────────
     //
-    // `CTMUpgrade_v35 is DefaultCTMUpgrade {}` — the first registry-driven release after the
+    // `CTMUpgrade_v36 is DefaultCTMUpgrade {}` — the first registry-driven release after the
     // bootstrap is an empty subclass of the base prepare. Its package therefore reaches THIS
     // path, and these drive the whole of it that runs without a chain: the merged TOML the
     // prepare emits, loaded through the same entry point production uses, and its calldata held

@@ -511,10 +511,10 @@ mod tests {
         );
     }
 
-    /// The v34 release is the one that replaces the governance set, on both PUH-governed envs.
+    /// The v35 release is the one that replaces the governance set, on both PUH-governed envs.
     /// A later release's directory simply omits the key.
     #[test]
-    fn v34_env_inputs_declare_the_governance_redeploy() {
+    fn v35_env_inputs_declare_the_governance_redeploy() {
         for env in ["stage", "mainnet"] {
             let cfg = EnvConfig::load(env).unwrap_or_else(|e| panic!("load {env}: {e}"));
             assert_eq!(cfg.governance_kind(), GovernanceKind::Puh, "{env}");

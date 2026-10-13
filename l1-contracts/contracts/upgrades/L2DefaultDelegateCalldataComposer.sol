@@ -7,13 +7,13 @@ import {ZKChainSpecificForceDeploymentsLib} from "./ZKChainSpecificForceDeployme
 import {ICTMRelease} from "./registry/objects/ICTMRelease.sol";
 import {IL2DelegateCalldataComposer} from "./registry/objects/IL2DelegateCalldataComposer.sol";
 
-/// @title L2V34DelegateCalldataComposer
+/// @title L2DefaultDelegateCalldataComposer
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice The v34 delegate call: `L2DefaultUpgrade.upgrade` re-initializes the force-deployed system
-///         contracts with the release's pinned `FixedForceDeploymentsData`, the ecosystem's live
+/// @notice The delegate call of every release: `L2DefaultUpgrade.upgrade` re-initializes the
+///         force-deployed system contracts with the release's pinned `FixedForceDeploymentsData`, the ecosystem's live
 ///         CTM deployment tracker and the chain's own `ZKChainSpecificForceDeploymentsData`.
-contract L2V34DelegateCalldataComposer is IL2DelegateCalldataComposer {
+contract L2DefaultDelegateCalldataComposer is IL2DelegateCalldataComposer {
     /// @inheritdoc IL2DelegateCalldataComposer
     function composeDelegateCalldata(
         ICTMRelease _newRelease,

@@ -1,14 +1,14 @@
 /**
- * Bootstrap stage of the registry-driven upgrade test (the "V33 -> V34" edge).
+ * Bootstrap stage of the registry-driven upgrade test (the "V34 -> V35" edge).
  *
  * Models the ONE-TIME entry of a pre-registry ecosystem into the registry-driven model through
  * `RegistryBootstrapMigration` (see the Bootstrap section of docs/registry-driven-upgrades.md),
- * in front of the generic registry-driven hop the runner already performs ("V34 -> V35"):
+ * in front of the generic registry-driven hop the runner already performs ("V35 -> V36"):
  *
  *   1. The target chains get the LEGACY cut-taking upgrade entrypoint installed
  *      (`LegacyTestAdminFacet`): the chain states are built from CURRENT sources, whose Admin
  *      facet reads its cut from the CTM — but production chains crossing the bootstrap edge run
- *      pre-v34 facets that are HANDED the cut and verify it against `upgradeCutHash`. The
+ *      pre-v35 facets that are HANDED the cut and verify it against `upgradeCutHash`. The
  *      legacy facet reproduces that entrypoint faithfully; the bootstrap cut itself removes it
  *      again, so the harness patch cancels itself out and the post-bootstrap chain state matches
  *      the release the CTM pins.
@@ -24,7 +24,7 @@
  *      left), release install, and the authority handover to the executors.
  *   4. Each chain's admin crosses the edge through the legacy 3-arg `upgradeChainFromVersion`,
  *      handing the committed cut — verified against `upgradeCutHash` exactly like production
- *      pre-v34 chains do.
+ *      pre-v35 chains do.
  *
  * After this stage the WHOLE CTM domain — the CTM and its own ProxyAdmin — is owned by
  * `CTMUpgradeExecutor`, and every later upgrade is registry-driven — which is exactly what the
@@ -73,7 +73,7 @@ export function buildBootstrapSection(
   oldVersionDeadline: string
 ): Record<string, unknown> {
   return {
-    // The pre-v34 cut-taking entrypoint the harness installs (and the bootstrap cut removes).
+    // The pre-v35 cut-taking entrypoint the harness installs (and the bootstrap cut removes).
     legacyAdminFacet: pieces.legacyAdminFacet,
     // The bootstrap engine the composed cut's init targets — the migration's `upgradeEngine`
     // (the production `BootstrapUpgrade`, which installs the release the migration names).
@@ -237,7 +237,7 @@ export async function handAuthorityToMigration(
 
 /**
  * Cross the bootstrap edge on each chain through the legacy handed-cut entrypoint, as the
- * chain's own admin — the production shape for pre-v34 chains.
+ * chain's own admin — the production shape for pre-v35 chains.
  */
 export async function crossBootstrapEdgeOnChains(
   l1Provider: ethers.providers.JsonRpcProvider,

@@ -25,7 +25,7 @@ import {
     L2_ECOSYSTEM_CONTRACT_COUNT
 } from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
-import {UpgradeIntegrationV34BootstrapFixture} from "./UpgradeTestv34_Local.t.sol";
+import {UpgradeIntegrationBootstrapFixture} from "./UpgradeTest_Local.t.sol";
 
 /*//////////////////////////////////////////////////////////////
             THE VERSION SCRIPTS THE RECURRING HOPS RUN
@@ -35,7 +35,7 @@ import {UpgradeIntegrationV34BootstrapFixture} from "./UpgradeTestv34_Local.t.so
 ///         pipeline with the two bytecode-table reads the local fixture cannot afford substituted,
 ///         plus read access to the objects the prepare deployed.
 /// @dev The substitution is not a convenience: the fixture's LIVE release was pinned with the same
-///      empty table (see `CTMUpgrade_v34_Test`), so a hop reading the real one would pin a
+///      empty table (see `CTMUpgradeForLocalTest`), so a hop reading the real one would pin a
 ///      different manifest and publish a new release for a hop that changes nothing. Everything
 ///      this file tests — the declaration, the objects, the version and release invariants — runs
 ///      unmocked.
@@ -158,14 +158,14 @@ contract CoreUpgradeOrphanedDeployment is DefaultCoreUpgrade {
 //////////////////////////////////////////////////////////////*/
 
 /// @notice RECURRING prepares run through the real production pipeline, on the registry-driven
-///         ecosystem the v34 bootstrap fixture leaves behind. The subject is what preparation can
+///         ecosystem the v35 bootstrap fixture leaves behind. The subject is what preparation can
 ///         EMIT: an infrastructure-only operation (the fleet-wide saving the model exists for — see
 ///         "Infrastructure-only operations" in {protocol-docs/ecosystem-upgrade-coordination.md}),
 ///         a chain-release one, a mixed one, and the shapes it must refuse.
 /// @dev Everything here drives `DefaultCoreUpgrade`/`DefaultCTMUpgrade` themselves; the object
 ///      layer is covered separately by `RegistryIndividualUpgrade.t.sol`, which cannot show that
 ///      PREPARATION can produce these shapes.
-contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationV34BootstrapFixture {
+contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationBootstrapFixture {
     using stdToml for string;
 
     /// @dev The upgrade input whose `latest_protocol_version` EQUALS the version the bootstrap

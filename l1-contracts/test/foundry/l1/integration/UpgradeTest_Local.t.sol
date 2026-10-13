@@ -5,8 +5,8 @@ pragma solidity ^0.8.24;
 
 import {console2 as console} from "forge-std/Script.sol";
 
-import {CTMUpgrade_v34} from "../../../../deploy-scripts/upgrade/v34/CTMUpgrade_v34.s.sol";
-import {CoreUpgrade_v34} from "../../../../deploy-scripts/upgrade/v34/CoreUpgrade_v34.s.sol";
+import {CTMUpgrade_v35} from "../../../../deploy-scripts/upgrade/v35/CTMUpgrade_v35.s.sol";
+import {CoreUpgrade_v35} from "../../../../deploy-scripts/upgrade/v35/CoreUpgrade_v35.s.sol";
 import {DefaultCoreUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCoreUpgrade.s.sol";
 import {
     AuthoredL2Side,
@@ -43,11 +43,11 @@ import {L2CanonicalTransactionLib} from "contracts/state-transition/libraries/L2
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {BootstrapManifest} from "contracts/upgrades/registry/RegistryTypes.sol";
 
-/// @notice Test-only v34 CTM upgrade with the same MemoryOOG mocks as the v32 local harness
+/// @notice Test-only v35 CTM upgrade with the same MemoryOOG mocks as the v32 local harness
 ///         (the heavy JSON/zkout reads live on the shared base). The bootstrap flow itself —
 ///         the migration deploy, the four-call stage-1 leg, the legacy cut-taking commit — runs
 ///         UNMOCKED: that is what this file exists to test.
-contract CTMUpgrade_v34_Test is CTMUpgrade_v34 {
+contract CTMUpgradeForLocalTest is CTMUpgrade_v35 {
     /// @dev Same MemoryOOG avoidance: the real builder reads every L2 contract's bytecode.
     ///      Correct length, empty rows — and no shell, since no row sits behind one.
     function getL2BytecodeInfoTable() internal override returns (bytes[] memory) {
@@ -67,16 +67,16 @@ contract CTMUpgrade_v34_Test is CTMUpgrade_v34 {
     }
 }
 
-/// @notice The v34 core prepare needs no trimming in the local fixture.
-contract CoreUpgrade_v34_Test is CoreUpgrade_v34 {}
+/// @notice The v35 core prepare needs no trimming in the local fixture.
+contract CoreUpgradeForLocalTest is CoreUpgrade_v35 {}
 
 /// @notice Chain leg of the bootstrap edge: the local baseline chain runs the CURRENT
 ///         (cut-READING) Admin facet, but the bootstrap commits the legacy cut-taking edge —
 ///         `upgradeTransition` stays zero for the departing version. The harness pre-installs
 ///         `LegacyTestAdminFacet` (the same dance the anvil bootstrap stage does), so the chain
 ///         crosses by HANDING the committed cut through the legacy 3-arg entrypoint, exactly
-///         like production pre-v34 chains will.
-contract ChainUpgrade_v34_Test is DefaultChainUpgrade {
+///         like production pre-v35 chains will.
+contract ChainUpgradeForLocalTest is DefaultChainUpgrade {
     function upgradeChain(Diamond.DiamondCutData memory diamondCutData) public override {
         bytes memory callData = abi.encodeCall(
             IAdminWithCut.upgradeChainFromVersion,
@@ -92,8 +92,8 @@ contract ChainUpgrade_v34_Test is DefaultChainUpgrade {
     }
 }
 
-/// @notice The fixture the v34 BOOTSTRAP edge leaves behind, built through the real prepare
-///         pipeline: a fresh ecosystem + Era chain at the baseline version, `CTMUpgrade_v34`
+/// @notice The fixture the v35 BOOTSTRAP edge leaves behind, built through the real prepare
+///         pipeline: a fresh ecosystem + Era chain at the baseline version, `CTMUpgrade_v35`
 ///         deploying the executor + `RegistryBootstrapMigration`, and the collapsed three-call
 ///         stage-1 leg (nominate the CTM, hand over its ProxyAdmin, `migrate()` — which itself
 ///         completes the executor's accept) performing the whole edge.
@@ -101,7 +101,7 @@ contract ChainUpgrade_v34_Test is DefaultChainUpgrade {
 ///      ecosystem is registry-driven, which is what a RECURRING prepare needs to run against (see
 ///      `UpgradeTestRecurring_Local.t.sol`). Heavy execution + event assertions run in
 ///      `setUp -> internalTest()` (RAM constraint).
-abstract contract UpgradeIntegrationV34BootstrapFixture is
+abstract contract UpgradeIntegrationBootstrapFixture is
     UpgradeIntegrationTestBase,
     L1ContractDeployer,
     ZKChainDeployer,
@@ -110,15 +110,15 @@ abstract contract UpgradeIntegrationV34BootstrapFixture is
     using stdToml for string;
 
     function createCoreUpgrade() internal override returns (DefaultCoreUpgrade) {
-        return new CoreUpgrade_v34_Test();
+        return new CoreUpgradeForLocalTest();
     }
 
     function createCTMUpgrade() internal override returns (DefaultCTMUpgrade) {
-        return new CTMUpgrade_v34_Test();
+        return new CTMUpgradeForLocalTest();
     }
 
     function createChainUpgrade() internal override returns (DefaultChainUpgrade) {
-        return new ChainUpgrade_v34_Test();
+        return new ChainUpgradeForLocalTest();
     }
 
     /// @notice Bump the CTM's new protocol version from the upgrade input TOML so the local
@@ -130,9 +130,9 @@ abstract contract UpgradeIntegrationV34BootstrapFixture is
         ctmUpgrade.setNewProtocolVersion(newProtocolVersion);
     }
 
-    /// @dev Installs the pre-v34 cut-taking entrypoint on the baseline chain through the CTM
+    /// @dev Installs the pre-v35 cut-taking entrypoint on the baseline chain through the CTM
     ///      owner's `executeUpgrade` — the production path for owner-forced cuts — BEFORE the
-    ///      CTM is handed to the migration. See {ChainUpgrade_v34_Test}.
+    ///      CTM is handed to the migration. See {ChainUpgradeForLocalTest}.
     function _installLegacyCutTakingFacet() private {
         LegacyTestAdminFacet legacyFacet = new LegacyTestAdminFacet();
         bytes4[] memory selectors = new bytes4[](1);
@@ -157,7 +157,7 @@ abstract contract UpgradeIntegrationV34BootstrapFixture is
 
     /// @dev The local fixture is Era-shaped: the CTM-domain proxies share the ecosystem's
     ///      transparentProxyAdmin. Production ZKsyncOS CTMs sit under their OWN ProxyAdmin
-    ///      (see upgrade-envs/v0.31.0-interopB), which the v34 bootstrap requires — the core
+    ///      (see upgrade-envs/v0.31.0-interopB), which the v35 bootstrap requires — the core
     ///      leg hands the ecosystem admin to the ecosystem executor, the CTM leg hands the
     ///      CTM-domain admin to the CTM executor. Model that shape by moving the CTM proxy and
     ///      the per-CTM proxies that can carry an inventory row (`CTMContract`) onto a fresh
@@ -202,10 +202,10 @@ abstract contract UpgradeIntegrationV34BootstrapFixture is
 
         ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/foundry-upgrade.toml";
         ECOSYSTEM_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-l1.toml";
-        ECOSYSTEM_OUTPUT = "/script-out/foundry-upgrade/local-v34-core-out.toml";
+        ECOSYSTEM_OUTPUT = "/script-out/foundry-upgrade/local-v35-core-out.toml";
         CTM_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-ctm.toml";
-        CTM_OUTPUT = "/script-out/foundry-upgrade/local-v34-ctm.toml";
-        CORE_OUTPUT = "/script-out/foundry-upgrade/local-v34-core.toml";
+        CTM_OUTPUT = "/script-out/foundry-upgrade/local-v35-ctm.toml";
+        CORE_OUTPUT = "/script-out/foundry-upgrade/local-v35-core.toml";
         console.log("setUp: Paths configured");
         setupUpgrade();
         console.log("setUp: Upgrade setup complete");
@@ -225,7 +225,7 @@ abstract contract UpgradeIntegrationV34BootstrapFixture is
 
 /// @notice The bootstrap edge's own assertions over the fixture above: the version bump, the
 ///         authority handover to the bound executor, and the legacy commit shape.
-contract UpgradeIntegrationTest_v34_Local is UpgradeIntegrationV34BootstrapFixture {
+contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
     using stdToml for string;
 
     /// @notice Every object the bootstrap prepare deploys is reproducible from the build
@@ -235,15 +235,15 @@ contract UpgradeIntegrationTest_v34_Local is UpgradeIntegrationV34BootstrapFixtu
     ///         from where the verifier takes it. Pinned in a real EVM over a real prepare run: a
     ///         prepare that passes an argument the constructor does not take (as this one once
     ///         did) deploys fine and is unreproducible from the constructor's own arguments.
-    function test_v34BootstrapObjectsAreReproducibleFromTheirReviewedArguments() public {
-        CTMUpgrade_v34_Test v34 = CTMUpgrade_v34_Test(address(ctmUpgrade));
+    function test_bootstrapObjectsAreReproducibleFromTheirReviewedArguments() public {
+        CTMUpgradeForLocalTest bootstrap = CTMUpgradeForLocalTest(address(ctmUpgrade));
         string memory root = vm.projectRoot();
         string memory coreOutput = vm.readFile(string.concat(root, CORE_OUTPUT));
         string memory ctmOutput = vm.readFile(string.concat(root, CTM_OUTPUT));
         (, bytes32 coreSalt) = coreUpgrade.getCreate2FactoryParams();
         (, bytes32 ctmSalt) = ctmUpgrade.getCreate2FactoryParams();
 
-        BootstrapManifest memory manifest = v34.bootstrapMigration().getManifest();
+        BootstrapManifest memory manifest = bootstrap.bootstrapMigration().getManifest();
         address coreExecutor = coreOutput.readAddress("$.registry.core_upgrade_executor_addr");
         address ecosystemProxyAdmin = coreOutput.readAddress("$.upgrade_addresses.shared.transparent_proxy_admin");
 
@@ -252,7 +252,7 @@ contract UpgradeIntegrationTest_v34_Local is UpgradeIntegrationV34BootstrapFixtu
         assertEq(ctmOutput.readAddress("$.registry.coordinator_addr"), manifest.coordinator);
         assertEq(ctmOutput.readAddress("$.registry.ctm_upgrade_executor_addr"), manifest.ctmExecutor);
         assertEq(ctmOutput.readAddress("$.registry.upgrade_timer_addr"), manifest.upgradeTimer);
-        assertEq(ctmOutput.readAddress("$.registry.bootstrap_migration_addr"), address(v34.bootstrapMigration()));
+        assertEq(ctmOutput.readAddress("$.registry.bootstrap_migration_addr"), address(bootstrap.bootstrapMigration()));
         assertEq(ctmOutput.readAddress("$.state_transition.chain_type_manager_proxy"), manifest.ctm);
         assertEq(
             ctmOutput.readAddress("$.deployed_addresses.transparent_proxy_admin"),
@@ -319,22 +319,22 @@ contract UpgradeIntegrationTest_v34_Local is UpgradeIntegrationV34BootstrapFixtu
                 vm.getCode("RegistryBootstrapMigration.sol:RegistryBootstrapMigration"),
                 abi.encode(manifest)
             ),
-            address(v34.bootstrapMigration()),
+            address(bootstrap.bootstrapMigration()),
             "the migration re-derives from the manifest it serves"
         );
         assertEq(
             DeployScriptUtils.canonicalCreate2Address(
                 ctmSalt,
                 vm.getCode("RegistryBootstrapSequence.sol:RegistryBootstrapSequence"),
-                abi.encode(address(v34.bootstrapMigration()), address(coreUpgrade.coreTransition()))
+                abi.encode(address(bootstrap.bootstrapMigration()), address(coreUpgrade.coreTransition()))
             ),
-            address(v34.bootstrapSequence()),
+            address(bootstrap.bootstrapSequence()),
             "the sequence re-derives from the migration and the core transition"
         );
     }
 
-    function test_v34BootstrapUpgrade_Local() public {
-        CTMUpgrade_v34_Test v34 = CTMUpgrade_v34_Test(address(ctmUpgrade));
+    function test_bootstrapUpgrade_Local() public {
+        CTMUpgradeForLocalTest bootstrap = CTMUpgradeForLocalTest(address(ctmUpgrade));
         address ctm = ctmUpgrade.getCTMAddress();
 
         // Protocol version bumps, on the CTM and on the chain that crossed via the legacy leg.
@@ -342,11 +342,11 @@ contract UpgradeIntegrationTest_v34_Local is UpgradeIntegrationV34BootstrapFixtu
         assertEq(IGetters(_eraDiamond).getProtocolVersion(), _expectedNewVersion, "Era chain not upgraded");
 
         // The edge is one-shot and spent.
-        assertTrue(v34.bootstrapMigration().executed(), "migration must be spent");
+        assertTrue(bootstrap.bootstrapMigration().executed(), "migration must be spent");
 
         // The WHOLE CTM domain landed under the bound executor: CTM ownership (the accept runs
         // inside `migrate()` itself) and the CTM-domain ProxyAdmin.
-        address executor = address(v34.ctmUpgradeExecutor());
+        address executor = address(bootstrap.ctmUpgradeExecutor());
         assertEq(Ownable(ctm).owner(), executor, "CTM must be owned by the executor");
         assertEq(
             Ownable(DeployScriptUtils.getProxyAdminAddress(ctm)).owner(),
@@ -375,13 +375,15 @@ contract UpgradeIntegrationTest_v34_Local is UpgradeIntegrationV34BootstrapFixtu
         assertEq(keccak256(shippedCut), _expectedUpgradeCutHash, "the shipped cut must be the committed one");
         Diamond.DiamondCutData memory cut = abi.decode(shippedCut, (Diamond.DiamondCutData));
         assertEq(cut.facetCuts.length, 0, "the bootstrap cut carries no facet cuts");
-        assertEq(cut.initAddress, v34.committedUpgradeEngine(), "the init target is the pinned engine");
+        assertEq(cut.initAddress, bootstrap.committedUpgradeEngine(), "the init target is the pinned engine");
         assertEq(
             this.decodeUpgradeInit(cut.initCalldata),
-            address(v34.bootstrapMigration()),
+            address(bootstrap.bootstrapMigration()),
             "the init names the pinned migration"
         );
-        L2CanonicalTransaction memory l2Tx = v34.bootstrapMigration().l2UpgradeTx(IGetters(_eraDiamond).getChainId());
+        L2CanonicalTransaction memory l2Tx = bootstrap.bootstrapMigration().l2UpgradeTx(
+            IGetters(_eraDiamond).getChainId()
+        );
         assertEq(
             keccak256(abi.encode(l2Tx)),
             keccak256(abi.encode(L2CanonicalTransactionLib.emptyL2CanonicalTransaction())),
@@ -404,7 +406,7 @@ contract UpgradeIntegrationTest_v34_Local is UpgradeIntegrationV34BootstrapFixtu
 
         // The genesis release is pinned as `currentRelease` (re-pointed to the release this
         // prepare run deployed).
-        assertEq(release, v34.getAddresses().stateTransition.currentRelease, "release must be the pipeline's");
+        assertEq(release, bootstrap.getAddresses().stateTransition.currentRelease, "release must be the pipeline's");
 
         // New chain created AFTER the edge geneses from the pinned release at the new version.
         assertTrue(_newChainDiamond != address(0), "new chain not registered");
@@ -417,12 +419,12 @@ contract UpgradeIntegrationTest_v34_Local is UpgradeIntegrationV34BootstrapFixtu
         // gate still holds against the final state, and that both bindings landed.
         address bridgehub = coreUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
         address chainAssetHandler = IBridgehubBase(bridgehub).chainAssetHandler();
-        EcosystemUpgradeExecutor coordinator = v34.ecosystemUpgradeExecutor();
-        RegistryBootstrapSequence sequence = v34.bootstrapSequence();
-        Call[] memory stage2 = v34.prepareStage2GovernanceCalls();
-        assertEq(stage2.length, 4, "v34 stage 2: two bindings, the unpause and the completion gate");
+        EcosystemUpgradeExecutor coordinator = bootstrap.ecosystemUpgradeExecutor();
+        RegistryBootstrapSequence sequence = bootstrap.bootstrapSequence();
+        Call[] memory stage2 = bootstrap.prepareStage2GovernanceCalls();
+        assertEq(stage2.length, 4, "v35 stage 2: two bindings, the unpause and the completion gate");
         assertEq(
-            v34.externalActionEntries().length,
+            bootstrap.externalActionEntries().length,
             13,
             "the bootstrap's CTM prepare declares every derived governance call plus its admin call"
         );
@@ -438,7 +440,7 @@ contract UpgradeIntegrationTest_v34_Local is UpgradeIntegrationV34BootstrapFixtu
         // The gate asserts BOTH domains, so this one call covers the migration's post-state check
         // and the core executor's applied-row check.
         sequence.validateApplied();
-        assertEq(sequence.MIGRATION(), address(v34.bootstrapMigration()), "the gate names this edge");
+        assertEq(sequence.MIGRATION(), address(bootstrap.bootstrapMigration()), "the gate names this edge");
         assertEq(
             CTMUpgradeExecutor(payable(executor)).coordinator(),
             address(coordinator),
@@ -467,10 +469,10 @@ contract UpgradeIntegrationTest_v34_Local is UpgradeIntegrationV34BootstrapFixtu
         // The ServerNotifier swap rode the ChainAdmin's own call (`ctm_admin_calls`), rendered from
         // the row the bootstrap manifest pins under the notifier's foreign admin — the row
         // `validateApplied()` above required applied.
-        address notifierProxy = v34.getAddresses().stateTransition.proxies.serverNotifier;
+        address notifierProxy = bootstrap.getAddresses().stateTransition.proxies.serverNotifier;
         assertEq(
             DeployScriptUtils.getImplementation(notifierProxy),
-            v34.getAddresses().stateTransition.implementations.serverNotifier,
+            bootstrap.getAddresses().stateTransition.implementations.serverNotifier,
             "the notifier runs the implementation its pinned row names"
         );
     }

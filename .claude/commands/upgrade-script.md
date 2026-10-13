@@ -30,11 +30,11 @@ the Foundry integration harness for the legacy edge.
 2. Ask the user what the release changes. Only if it needs release-specific preparation (extra contracts, a
    custom per-chain initializer, one-off governance calls), override only what the release needs in the
    generated `CoreUpgrade_v{N}` / `CTMUpgrade_v{N}`; protocol-ops and the upgrade tests already run them.
-   Use the most recent steady-state version as the template — `v35`, not `v34`:
-   - `l1-contracts/deploy-scripts/upgrade/v35/CoreUpgrade_v35.s.sol`
-   - `l1-contracts/deploy-scripts/upgrade/v35/CTMUpgrade_v35.s.sol`
+   Use the most recent steady-state version as the template — `v36`, not `v35`:
+   - `l1-contracts/deploy-scripts/upgrade/v36/CoreUpgrade_v36.s.sol`
+   - `l1-contracts/deploy-scripts/upgrade/v36/CTMUpgrade_v36.s.sol`
 
-   `v34` is the one-shot registry bootstrap edge and carries a large amount of machinery
+   `v35` is the one-shot registry bootstrap edge and carries a large amount of machinery
    (`RegistryBootstrapMigration`, the authored L2 plan, the declared bootstrap actions) that a
    normal version must NOT copy.
 
@@ -42,8 +42,8 @@ the Foundry integration harness for the legacy edge.
    replaces; anything not listed is reused from the live release, and a member that changes without
    being declared makes the prepare fail. Override it whenever the version changes chain code.
 
-4. Run `cd protocol-ops && cargo test`, the anvil upgrade tests (`yarn test:upgrade-v33-to-v34` and
-   `yarn test:upgrade-v34-to-v35` in `l1-contracts/test/anvil-interop`) and the foundry upgrade tests
+4. Run `cd protocol-ops && cargo test`, the anvil upgrade tests (`yarn test:upgrade` and
+   `yarn test:upgrade-recurring` in `l1-contracts/test/anvil-interop`) and the foundry upgrade tests
    (`forge test --ffi --match-path 'test/foundry/l1/integration/UpgradeTest*'` in `l1-contracts`).
 
 ## Key rules

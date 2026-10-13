@@ -4,8 +4,8 @@ pragma solidity 0.8.28;
 import {Vm} from "forge-std/Vm.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {CoreUpgrade_v34} from "deploy-scripts/upgrade/v34/CoreUpgrade_v34.s.sol";
-import {CTMUpgrade_v34} from "deploy-scripts/upgrade/v34/CTMUpgrade_v34.s.sol";
+import {CoreUpgrade_v35} from "deploy-scripts/upgrade/v35/CoreUpgrade_v35.s.sol";
+import {CTMUpgrade_v35} from "deploy-scripts/upgrade/v35/CTMUpgrade_v35.s.sol";
 
 /// @notice Memory-trimmed test variants of the CURRENT version's Core/CTM upgrade scripts,
 ///         driven by the anvil-interop pipeline upgrade runner through protocol-ops
@@ -20,7 +20,7 @@ import {CTMUpgrade_v34} from "deploy-scripts/upgrade/v34/CTMUpgrade_v34.s.sol";
 ///      scenario upgrading an older fixture onto this release has to say where it is going),
 ///      and writes only the minimal output the runner needs so accumulated `vm.serialize*`
 ///      JSON does not blow forge's EVM memory.
-contract CTMUpgradeForTests is CTMUpgrade_v34 {
+contract CTMUpgradeForTests is CTMUpgrade_v35 {
     using stdToml for string;
 
     // solhint-disable-next-line func-named-parameters
@@ -130,4 +130,4 @@ library TrimmedUpgradeOutput {
 }
 
 /// @dev Core upgrade for the harness; the version script needs no trimming on the core side.
-contract CoreUpgradeForTests is CoreUpgrade_v34 {}
+contract CoreUpgradeForTests is CoreUpgrade_v35 {}

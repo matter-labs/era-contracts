@@ -593,12 +593,12 @@ mod tests {
 
     // ───────────────────────── a release the tool has never heard of ─────────────────────────
     //
-    // `CTMUpgrade_v35 is DefaultCTMUpgrade {}` — an empty subclass. A v35 upgrade is an ORDINARY
-    // registry operation, so it must verify through the general path with no v35 module, no v35
-    // branch and no v35 constant anywhere in this tree. These pin that: the loader never learns
+    // `CTMUpgrade_v36 is DefaultCTMUpgrade {}` — an empty subclass. A v36 upgrade is an ORDINARY
+    // registry operation, so it must verify through the general path with no v36 module, no v36
+    // branch and no v36 constant anywhere in this tree. These pin that: the loader never learns
     // a release name, so the same code serves v36 and everything after it.
 
-    /// The merged prepare output of a v35-shaped release, in the exact shape
+    /// The merged prepare output of a v36-shaped release, in the exact shape
     /// `write_merged_ecosystem_toml` emits for a CTM prepare that deployed an operation: the
     /// derived `[operation]` section, the CTM's summary fields, and a ZERO
     /// `bootstrap_migration_addr` — the field a bootstrap fills and every later release does not.

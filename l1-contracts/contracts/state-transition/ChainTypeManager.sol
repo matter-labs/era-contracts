@@ -127,11 +127,11 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     ///      ({upgradeCutDataBlock}) otherwise.
     mapping(uint256 protocolVersion => uint256) internal __DEPRECATED_upgradeCutDataBlock;
 
-    /// @dev Retained only to preserve the upgradeable storage layout. Pre-v34 code recorded the
+    /// @dev Retained only to preserve the upgradeable storage layout. Pre-v35 code recorded the
     ///      block of a chain-creation-params change here; under the registry model the genesis
     ///      data is read directly from `currentRelease` and pin moves are announced by
     ///      `NewCurrentRelease`, so nothing writes or serves it any more.
-    // Never touched by THIS implementation by design — live chains carry pre-v34 values in it.
+    // Never touched by THIS implementation by design — live chains carry pre-v35 values in it.
     // slither-disable-next-line uninitialized-state,unused-state
     mapping(uint256 protocolVersion => uint256) internal __DEPRECATED_newChainCreationParamsBlock;
 
@@ -666,7 +666,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @dev Kept for edges whose cut cannot be derived — the pre-registry bootstrap, whose departing
     ///      version has no `fromRelease` to diff against. Registry-driven upgrades use
     ///      {setNewVersionUpgradeFromTransition}.
-    // TODO(v35): DELETE — the v34 bootstrap is the last edge committed through this path; every
+    // TODO(v36): DELETE — the v35 bootstrap is the last edge committed through this path; every
     //            later edge has a `fromRelease` and commits a transition.
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,
@@ -689,11 +689,11 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         _setCurrentRelease(_newRelease);
     }
 
-    /// @dev Re-commits the cut for a legacy-committed version (operational fix-up while pre-v34
+    /// @dev Re-commits the cut for a legacy-committed version (operational fix-up while pre-v35
     ///      chains still have to cross such an edge).
     /// @param _cutData the new diamond cut data
     /// @param _oldProtocolVersion the old protocol version
-    // TODO(v35): DELETE with {setNewVersionUpgrade} — meaningless once no version is committed
+    // TODO(v36): DELETE with {setNewVersionUpgrade} — meaningless once no version is committed
     //            through the legacy path.
     function setUpgradeDiamondCut(
         Diamond.DiamondCutData calldata _cutData,
@@ -702,12 +702,12 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         setUpgradeDiamondCutInner(_cutData, _oldProtocolVersion);
     }
 
-    /// @dev Stores the commitment pre-v34 chains verify their handed cut against
+    /// @dev Stores the commitment pre-v35 chains verify their handed cut against
     ///      ({upgradeCutHash}), plus the block number legacy tooling scans for the
     ///      `NewUpgradeCutData` log ({upgradeCutDataBlock}). These legacy values ARE the point:
-    ///      a chain departing a pre-v34 version runs pre-v34 facets, and this is the only
+    ///      a chain departing a pre-v35 version runs pre-v35 facets, and this is the only
     ///      commitment shape those facets (and their scripts) can consume.
-    // TODO(v35): DELETE with {setNewVersionUpgrade}.
+    // TODO(v36): DELETE with {setNewVersionUpgrade}.
     function setUpgradeDiamondCutInner(Diamond.DiamondCutData memory _cutData, uint256 _oldProtocolVersion) internal {
         bytes32 newCutHash = keccak256(abi.encode(_cutData));
         __DEPRECATED_upgradeCutHash[_oldProtocolVersion] = newCutHash;
@@ -717,10 +717,10 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     }
 
     /// @inheritdoc IChainTypeManager
-    // TODO(v35+): DELETE once no chain on this CTM can depart a pre-v34 version (their Admin
-    //             facets verify the handed cut against this; v34+ chains read
+    // TODO(v36+): DELETE once no chain on this CTM can depart a pre-v35 version (their Admin
+    //             facets verify the handed cut against this; v35+ chains read
     //             {upgradeCutForVersion} instead). In practice: after every chain has crossed
-    //             the bootstrap edge and the pre-v34 deadlines have passed.
+    //             the bootstrap edge and the pre-v35 deadlines have passed.
     function upgradeCutHash(uint256 _protocolVersion) public view returns (bytes32) {
         return __DEPRECATED_upgradeCutHash[_protocolVersion];
     }
@@ -728,7 +728,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @notice The block of a LEGACY cut commit, where its tooling finds the
     ///         `NewUpgradeCutData` log; zero for registry-driven edges (read the cut from
     ///         {upgradeCutForVersion} instead).
-    // TODO(v35+): DELETE with {upgradeCutHash} — chain-side scripts need it only to recover a
+    // TODO(v36+): DELETE with {upgradeCutHash} — chain-side scripts need it only to recover a
     //             legacy-committed cut from logs (`GetDiamondCutData.getDiamondCutData`).
     function upgradeCutDataBlock(uint256 _protocolVersion) public view returns (uint256) {
         return __DEPRECATED_upgradeCutDataBlock[_protocolVersion];

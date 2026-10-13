@@ -1,5 +1,5 @@
 # Foundry-specific upgrade configuration for the local pipeline tests
-# (test/foundry/l1/integration/UpgradeTestv34_Local.t.sol).
+# (test/foundry/l1/integration/UpgradeTest_Local.t.sol).
 #
 # The harness deploys at whatever `configs/genesis/*/latest.json` declares and then upgrades to
 # `new_protocol_version`, and `DefaultCTMUpgrade.initUpgrade` requires
