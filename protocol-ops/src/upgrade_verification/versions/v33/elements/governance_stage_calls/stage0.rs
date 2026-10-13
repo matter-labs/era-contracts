@@ -3,19 +3,28 @@
 //! Stage-0 shape:
 //!   `[ pauseMigration, startTimer (×N CTMs), <optional PUH-redeploy block>, <optional acceptOwnership tail> ]`
 //!
-//! The PUH-redeploy block is only emitted on **PUH-governed envs**
-//! (`governance_kind = "puh"` in permanent-values — stage / mainnet today).
-//! `upgrade-prepare-all` appends it via `puh_guardians::deploy_puh_guardians`
-//! when `bridgehub.owner()` is a ProtocolUpgradeHandler proxy. It is four
-//! calls, in this order:
-//!   1. `upgradeAndCall(puh_proxy_admin, new_impl, "")` — swaps the PUH impl,
-//!   2. `updateSecurityCouncil(new_security_council)`,
-//!   3. `updateGuardians(new_guardians)`,
-//!   4. `updateEmergencyUpgradeBoard(new_emergency_upgrade_board)`.
+//! The PUH-redeploy block is only emitted when the release ships a new
+//! zk-governance set (`upgrade-prepare-all --redeploy-zk-governance`, which
+//! records a `[zk_governance]` table and requires a PUH-governed env). It is a
+//! single call:
+//!   `upgradeAndCall(puh_proxy_admin, new_impl, initialize(new_security_council,
+//!   new_guardians, new_emergency_upgrade_board))`
 //!
-//! The three `onlySelf` setters repoint the proxy at the freshly deployed
-//! SecurityCouncil, Guardians and EmergencyUpgradeBoard (the board already
-//! embeds the new SC + Guardians as immutables, so the set stays consistent).
+//! The hook runs the new implementation's `reinitializer` initializer in the
+//! same transaction as the implementation swap, pointing the proxy at the
+//! freshly deployed SecurityCouncil, Guardians and EmergencyUpgradeBoard (the
+//! board already embeds the new SC + Guardians as immutables, so the set stays
+//! consistent).
+//!
+//! This used to be four calls — a bare impl swap with an empty hook, then three
+//! `onlySelf` setters. That left the proxy on `_initialized == 1` between the
+//! swap and the setters, in which window any caller could invoke `initialize`
+//! and install their own governance set. Both the generator and this verifier
+//! now require the initializer to ride along with the swap.
+//!
+//! The `acceptOwnership()` tail finishes the Ownable2Step handoffs the prepare
+//! pre-step (`ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps`) started: one
+//! per CTM proxy and per CTM ValidatorTimelock that governance does not own yet.
 //!
 //! [`verify_puh_immutables`] reads every immutable getter on the *new* PUH
 //! implementation and compares against either the current PUH (for "must-be-
@@ -40,9 +49,8 @@ use super::helpers::{
     verify_call_by_name,
 };
 use super::{
-    acceptOwnershipCall, updateEmergencyUpgradeBoardCall, updateGuardiansCall,
-    updateSecurityCouncilCall, upgradeAndCallCall, CallList, GovernanceStage0Calls, Ownable2Step,
-    ProtocolUpgradeHandler,
+    acceptOwnershipCall, initializeCall, upgradeAndCallCall, CallList, GovernanceStage0Calls,
+    Ownable2Step, ProtocolUpgradeHandler,
 };
 
 impl GovernanceStage0Calls {
@@ -69,26 +77,39 @@ impl GovernanceStage0Calls {
             result,
         );
 
-        // Calls 1..=N — per-CTM GovernanceUpgradeTimer.startTimer().
-        // One call per `[ctms.<flavor>]` block, in artifact order.
-        for (ctm_index, ctm) in artifact.ctms.iter().enumerate() {
+        // Calls 1..=N — per-CTM GovernanceUpgradeTimer.startTimer(), one per CTM.
+        // The prepare emits these in env-config CTM order, which can differ from
+        // `artifact.ctms` order, so match each CTM's timer to its startTimer call
+        // by target (order-independent) rather than asserting a fixed position.
+        let timer_window_end = (1 + artifact.ctms.len()).min(self.calls.elems.len());
+        for ctm in artifact.ctms.iter() {
             let timer_label = format!("{}.upgrade_timer", ctm.flavor.label());
-            if let Some(timer) = required_ctm_address(
+            let Some(timer) = required_ctm_address(
                 ctm,
                 &["deployed_addresses", "l1_governance_upgrade_timer"],
                 result,
-            ) {
-                errors += verify_call_by_address(
-                    &self.calls,
-                    1 + ctm_index,
-                    timer,
-                    &timer_label,
-                    "startTimer()",
-                    verifiers,
-                    result,
-                );
-            } else {
+            ) else {
                 errors += 1;
+                continue;
+            };
+            match (1..timer_window_end).find(|&idx| self.calls.elems[idx].target == timer) {
+                Some(idx) => {
+                    errors += verify_call_by_address(
+                        &self.calls,
+                        idx,
+                        timer,
+                        &timer_label,
+                        "startTimer()",
+                        verifiers,
+                        result,
+                    );
+                }
+                None => {
+                    result.report_error(&format!(
+                        "Stage-0 startTimer() call for {timer_label} ({timer}) not found in the timer window [1, {timer_window_end})"
+                    ));
+                    errors += 1;
+                }
             }
         }
 
@@ -102,10 +123,10 @@ impl GovernanceStage0Calls {
 
         let base_count = 1 + artifact.ctms.len();
         // `AdminFunctions.ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps`
-        // writes one deferred `acceptOwnership()` call per unique CTM whose
-        // `pendingOwner` is governance at prepare time. Derive that target set
-        // from live Bridgehub/CTM state and validate the stage-0 tail against
-        // it (instead of matching by selector count only).
+        // writes one deferred `acceptOwnership()` call per CTM proxy and per CTM
+        // ValidatorTimelock it hands to governance. Derive that target set from
+        // live state and validate the stage-0 tail against it (instead of
+        // matching by selector count only).
         let pre_gov_accept_targets = collect_pre_governance_accept_ownership_targets(
             artifact,
             verifiers,
@@ -113,8 +134,7 @@ impl GovernanceStage0Calls {
             result,
         )
         .await?;
-        // The PUH-redeploy block (4 calls: upgradeAndCall + the three update* setters) is present
-        // only when the *release* ships a new zk-governance set, which the artifact records as a
+        // The PUH-redeploy block is present only when the *release* ships a new zk-governance set, which the artifact records as a
         // `[zk_governance]` table. Keying off `puh_governed` alone was wrong: an env can be
         // PUH-governed while the release leaves the handler untouched, as v33 does.
         let redeploys_zk_governance = puh_governed && artifact.zk_governance.is_some();
@@ -123,8 +143,12 @@ impl GovernanceStage0Calls {
                 "Stage 0: no zk-governance redeploy block (release ships no new governance set)",
             );
         }
+        // The PUH-redeploy block is ONE call: the ProxyAdmin `upgradeAndCall` that
+        // swaps the PUH implementation and, in the same transaction, runs the new
+        // implementation's `initialize(securityCouncil, guardians,
+        // emergencyUpgradeBoard)` as its hook (see the module docs).
         let pre_gov_accept_tail_start = if redeploys_zk_governance {
-            base_count + 4
+            base_count + 1
         } else {
             base_count
         };
@@ -134,19 +158,11 @@ impl GovernanceStage0Calls {
             let expected_zk_governance = artifact.zk_governance.as_ref().context(
                 "PUH-governed v33 artifact is missing required top-level [zk_governance] table",
             )?;
-            // zk-governance redeploy block — PUH-governed envs only.
-            // Call `base_count`     — PUH ProxyAdmin.upgradeAndCall(PUH proxy, new impl, "").
-            // Call `base_count + 1` — PUH.updateSecurityCouncil(new security council).
-            // Call `base_count + 2` — PUH.updateGuardians(new guardians).
-            // Call `base_count + 3` — PUH.updateEmergencyUpgradeBoard(new board).
             let upgrade_idx = base_count;
-            let update_security_council_idx = base_count + 1;
-            let update_guardians_idx = base_count + 2;
-            let update_emergency_board_idx = base_count + 3;
             // OZ v5 `TransparentUpgradeableProxyAdmin.upgradeAndCall` is the
             // selector used by `puh_guardians::encode_proxy_admin_upgrade` —
             // the v4 `upgrade(address,address)` selector reverts on the v5
-            // admin. Data arg is empty (no follow-on call).
+            // admin.
             errors += verify_call_by_address(
                 &self.calls,
                 upgrade_idx,
@@ -171,12 +187,6 @@ impl GovernanceStage0Calls {
                                 decoded.implementation, expected_zk_governance.new_puh_impl
                             ));
                             errors += 1;
-                        } else if !decoded.data.is_empty() {
-                            result.report_error(&format!(
-                                "PUH upgradeAndCall #{upgrade_idx} data arg should be empty for a bare impl swap, got {} bytes",
-                                decoded.data.len()
-                            ));
-                            errors += 1;
                         } else {
                             result.report_ok(&format!(
                                 "PUH upgradeAndCall(proxy=bridgehub.owner()) → new impl {}",
@@ -197,144 +207,25 @@ impl GovernanceStage0Calls {
                                 result,
                             )
                             .await?;
+                            // The hook must be the PUH's own `reinitializer`
+                            // initializer, carrying the freshly deployed
+                            // governance set. An empty hook is the pre-fix
+                            // shape and is no longer accepted.
+                            errors += verify_puh_initialize_hook(
+                                upgrade_idx,
+                                &decoded.data,
+                                expected_zk_governance.new_security_council,
+                                expected_zk_governance.new_guardians,
+                                expected_zk_governance.new_emergency_upgrade_board,
+                                verifiers,
+                                result,
+                            )
+                            .await;
                         }
                     }
                     Err(err) => {
                         result.report_error(&format!(
                             "Failed to decode upgradeAndCall(...) at call #{upgrade_idx}: {err}"
-                        ));
-                        errors += 1;
-                    }
-                }
-            }
-            errors += verify_call_by_address(
-                &self.calls,
-                update_security_council_idx,
-                bridgehub_owner,
-                "puh_proxy",
-                "updateSecurityCouncil(address)",
-                verifiers,
-                result,
-            );
-            if let Some(call) = self.calls.elems.get(update_security_council_idx) {
-                match updateSecurityCouncilCall::abi_decode(&call.data) {
-                    Ok(decoded) => {
-                        result.report_ok(&format!(
-                            "PUH updateSecurityCouncil(new={})",
-                            decoded._newSecurityCouncil
-                        ));
-                        if decoded._newSecurityCouncil
-                            == expected_zk_governance.new_security_council
-                        {
-                            result.report_ok(
-                                "PUH updateSecurityCouncil target matches [zk_governance].new_security_council",
-                            );
-                        } else {
-                            result.report_error(&format!(
-                                "PUH updateSecurityCouncil #{update_security_council_idx} argument {} does not match [zk_governance].new_security_council {}",
-                                decoded._newSecurityCouncil, expected_zk_governance.new_security_council
-                            ));
-                            errors += 1;
-                        }
-                        errors += verify_address_has_code(
-                            &decoded._newSecurityCouncil,
-                            "PUH new SecurityCouncil",
-                            verifiers,
-                            result,
-                        )
-                        .await;
-                    }
-                    Err(err) => {
-                        result.report_error(&format!(
-                            "Failed to decode updateSecurityCouncil(...) at call #{update_security_council_idx}: {err}"
-                        ));
-                        errors += 1;
-                    }
-                }
-            }
-            errors += verify_call_by_address(
-                &self.calls,
-                update_guardians_idx,
-                bridgehub_owner,
-                "puh_proxy",
-                "updateGuardians(address)",
-                verifiers,
-                result,
-            );
-            if let Some(call) = self.calls.elems.get(update_guardians_idx) {
-                match updateGuardiansCall::abi_decode(&call.data) {
-                    Ok(decoded) => {
-                        result.report_ok(&format!(
-                            "PUH updateGuardians(new={})",
-                            decoded._newGuardians
-                        ));
-                        if decoded._newGuardians == expected_zk_governance.new_guardians {
-                            result.report_ok(
-                                "PUH updateGuardians target matches [zk_governance].new_guardians",
-                            );
-                        } else {
-                            result.report_error(&format!(
-                                "PUH updateGuardians #{update_guardians_idx} argument {} does not match [zk_governance].new_guardians {}",
-                                decoded._newGuardians, expected_zk_governance.new_guardians
-                            ));
-                            errors += 1;
-                        }
-                        errors += verify_address_has_code(
-                            &decoded._newGuardians,
-                            "PUH new Guardians",
-                            verifiers,
-                            result,
-                        )
-                        .await;
-                    }
-                    Err(err) => {
-                        result.report_error(&format!(
-                            "Failed to decode updateGuardians(...) at call #{update_guardians_idx}: {err}"
-                        ));
-                        errors += 1;
-                    }
-                }
-            }
-            errors += verify_call_by_address(
-                &self.calls,
-                update_emergency_board_idx,
-                bridgehub_owner,
-                "puh_proxy",
-                "updateEmergencyUpgradeBoard(address)",
-                verifiers,
-                result,
-            );
-            if let Some(call) = self.calls.elems.get(update_emergency_board_idx) {
-                match updateEmergencyUpgradeBoardCall::abi_decode(&call.data) {
-                    Ok(decoded) => {
-                        result.report_ok(&format!(
-                            "PUH updateEmergencyUpgradeBoard(new={})",
-                            decoded._newEmergencyUpgradeBoard
-                        ));
-                        if decoded._newEmergencyUpgradeBoard
-                            == expected_zk_governance.new_emergency_upgrade_board
-                        {
-                            result.report_ok(
-                                "PUH updateEmergencyUpgradeBoard target matches [zk_governance].new_emergency_upgrade_board",
-                            );
-                        } else {
-                            result.report_error(&format!(
-                                "PUH updateEmergencyUpgradeBoard #{update_emergency_board_idx} argument {} does not match [zk_governance].new_emergency_upgrade_board {}",
-                                decoded._newEmergencyUpgradeBoard, expected_zk_governance.new_emergency_upgrade_board
-                            ));
-                            errors += 1;
-                        }
-                        errors += verify_address_has_code(
-                            &decoded._newEmergencyUpgradeBoard,
-                            "PUH new EmergencyUpgradeBoard",
-                            verifiers,
-                            result,
-                        )
-                        .await;
-                    }
-                    Err(err) => {
-                        result.report_error(&format!(
-                            "Failed to decode updateEmergencyUpgradeBoard(...) at call #{update_emergency_board_idx}: {err}"
                         ));
                         errors += 1;
                     }
@@ -381,45 +272,144 @@ async fn collect_pre_governance_accept_ownership_targets(
     governance: Address,
     result: &mut VerificationResult,
 ) -> anyhow::Result<Vec<Address>> {
-    let mut unique_ctms = Vec::new();
+    // Candidates: each CTM proxy and its ValidatorTimelock. The prepare pre-step
+    // (`AdminFunctions.ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps`)
+    // transfers whichever of them governance does not own yet and defers the
+    // accept to stage 0. The upgrade deploys no other Ownable2Step contract that
+    // needs a governance handover: the GovernanceUpgradeTimer is constructed with
+    // the CTM owner, the L1InteropHandler is initialized straight to governance,
+    // and the ZKsync OS verifier is not Ownable.
+    let mut candidates: Vec<Address> = Vec::new();
     for ctm in &artifact.ctms {
-        let Some(ctm_proxy) = required_ctm_address(
+        if let Some(ctm_proxy) = required_ctm_address(
             ctm,
             &["state_transition", "chain_type_manager_proxy"],
             result,
-        ) else {
-            continue;
-        };
-        if ctm_proxy == Address::ZERO {
-            result.report_error(&format!(
-                "{}.chain_type_manager_proxy must not be zero while deriving stage-0 deferred acceptOwnership targets",
-                ctm.flavor.label()
-            ));
-            continue;
+        ) {
+            if ctm_proxy == Address::ZERO {
+                result.report_error(&format!(
+                    "{}.chain_type_manager_proxy must not be zero while deriving stage-0 deferred acceptOwnership targets",
+                    ctm.flavor.label()
+                ));
+            } else if !candidates.contains(&ctm_proxy) {
+                candidates.push(ctm_proxy);
+            }
         }
-        if !unique_ctms.contains(&ctm_proxy) {
-            unique_ctms.push(ctm_proxy);
+        if let Some(vt) = required_ctm_address(
+            ctm,
+            &["state_transition", "validator_timelock_addr"],
+            result,
+        ) {
+            if vt != Address::ZERO && !candidates.contains(&vt) {
+                candidates.push(vt);
+            }
         }
     }
 
     let provider = verifiers.network_verifier.get_l1_provider();
     let mut targets = Vec::new();
-    for ctm in unique_ctms {
-        let pending_owner = Ownable2Step::new(ctm, provider.clone())
-            .pendingOwner()
+    for candidate in candidates {
+        // The pre-step transfers every candidate governance does not own yet and
+        // emits a deferred `acceptOwnership()` for it, while contracts already
+        // owned by governance get neither. So the expected accept set is exactly
+        // the candidates whose live `owner()` is not governance — independent of
+        // whether the transfer has already been initiated (`pendingOwner ==
+        // governance`, e.g. on a fork where the prepare bundles were replayed) or
+        // is still pending its out-of-band step (verifying the artifact against
+        // live state before those bundles are broadcast). The live ownership state
+        // itself is checked separately in `rpc_state`.
+        let owner = Ownable2Step::new(candidate, provider.clone())
+            .owner()
             .call()
             .await
             .with_context(|| {
                 format!(
-                    "read ChainTypeManager.pendingOwner() for {ctm} while deriving stage-0 deferred acceptOwnership targets"
+                    "read owner() for {candidate} while deriving stage-0 deferred acceptOwnership targets"
                 )
             })?;
-        if pending_owner == governance {
-            targets.push(ctm);
+        if owner != governance {
+            targets.push(candidate);
         }
     }
 
     Ok(targets)
+}
+
+/// Pure half of [`verify_puh_initialize_hook`]: decode the stage-0
+/// `upgradeAndCall` hook into the governance set it installs, or say why it is
+/// not a PUH initializer. Split out so the rejection cases are unit-testable
+/// without an RPC-backed `Verifiers`.
+fn parse_puh_initialize_hook(hook: &[u8]) -> Result<(Address, Address, Address), String> {
+    if hook.is_empty() {
+        return Err("empty data arg: the impl swap must run \
+                    initialize(securityCouncil, guardians, emergencyUpgradeBoard) as its hook, \
+                    or the proxy is left initializable by anyone"
+            .to_string());
+    }
+    match initializeCall::abi_decode(hook) {
+        Ok(decoded) => Ok((
+            decoded._securityCouncil,
+            decoded._guardians,
+            decoded._emergencyUpgradeBoard,
+        )),
+        Err(err) => Err(format!(
+            "data arg is not initialize(address,address,address): {err} (got 0x{})",
+            hex::encode(hook)
+        )),
+    }
+}
+
+/// Decode the `upgradeAndCall` hook and require it to be the PUH's
+/// `initialize(securityCouncil, guardians, emergencyUpgradeBoard)` carrying the
+/// three freshly deployed governance contracts. Returns the error count.
+///
+/// `initializeCall::abi_decode` enforces the selector, which must stay equal to
+/// `PUH_INITIALIZE_SELECTOR` in `commands::ecosystem::zk_governance` — the
+/// generator side of the same call (see the test below).
+async fn verify_puh_initialize_hook(
+    upgrade_idx: usize,
+    hook: &[u8],
+    expected_security_council: Address,
+    expected_guardians: Address,
+    expected_emergency_upgrade_board: Address,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> usize {
+    let (security_council, guardians, emergency_upgrade_board) =
+        match parse_puh_initialize_hook(hook) {
+            Ok(parsed) => parsed,
+            Err(why) => {
+                result.report_error(&format!("PUH upgradeAndCall #{upgrade_idx}: {why}"));
+                return 1;
+            }
+        };
+    let mut errors = 0;
+    for (name, got, want) in [
+        (
+            "security council",
+            security_council,
+            expected_security_council,
+        ),
+        ("guardians", guardians, expected_guardians),
+        (
+            "emergency upgrade board",
+            emergency_upgrade_board,
+            expected_emergency_upgrade_board,
+        ),
+    ] {
+        if got == want {
+            result.report_ok(&format!("PUH initialize hook {name} = {got}"));
+            errors +=
+                verify_address_has_code(&got, &format!("PUH new {name}"), verifiers, result).await;
+        } else {
+            result.report_error(&format!(
+                "PUH initialize hook at #{upgrade_idx}: {name} {got} does not match \
+                 [zk_governance] {want}"
+            ));
+            errors += 1;
+        }
+    }
+    errors
 }
 
 fn verify_pre_governance_accept_ownership_tail(
@@ -507,12 +497,12 @@ fn verify_pre_governance_accept_ownership_tail(
             .collect::<Vec<_>>()
             .join(", ");
         result.report_error(&format!(
-            "Stage-0 deferred acceptOwnership tail is missing expected CTM target(s): {missing}"
+            "Stage-0 deferred acceptOwnership tail is missing expected target(s): {missing}"
         ));
         errors += 1;
     } else {
         result.report_ok(&format!(
-            "Stage-0 deferred acceptOwnership tail matches {} expected CTM target(s)",
+            "Stage-0 deferred acceptOwnership tail matches {} expected target(s)",
             expected_targets.len()
         ));
     }
@@ -672,5 +662,57 @@ fn compare_puh_expected_address(
         result.report_error(&format!(
             "{label} mismatch: expected {expected}, got {actual}"
         ));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::commands::ecosystem::zk_governance::PUH_INITIALIZE_SELECTOR;
+    use alloy::sol_types::SolCall;
+
+    /// The generator encodes the stage-0 `upgradeAndCall` hook by hand from a
+    /// literal selector; this verifier decodes it through `initializeCall`. If
+    /// the two ever disagree the upgrade would still be generated and would
+    /// still verify, but the hook would be calling something else on the PUH.
+    #[test]
+    fn the_verifier_and_generator_agree_on_the_puh_hook() {
+        assert_eq!(initializeCall::SELECTOR, PUH_INITIALIZE_SELECTOR);
+    }
+
+    #[test]
+    fn a_well_formed_hook_yields_its_governance_set() {
+        let council = Address::repeat_byte(0x33);
+        let guardians = Address::repeat_byte(0x44);
+        let board = Address::repeat_byte(0x55);
+        let hook = initializeCall {
+            _securityCouncil: council,
+            _guardians: guardians,
+            _emergencyUpgradeBoard: board,
+        }
+        .abi_encode();
+        assert_eq!(
+            parse_puh_initialize_hook(&hook),
+            Ok((council, guardians, board))
+        );
+    }
+
+    /// An empty hook is exactly the pre-fix shape: the impl swap lands but the
+    /// proxy stays initializable, so anyone can call `initialize` and install
+    /// their own governance set. It must be rejected, not passed.
+    #[test]
+    fn an_empty_hook_is_rejected() {
+        let err = parse_puh_initialize_hook(&[]).expect_err("empty hook must be rejected");
+        assert!(err.contains("initializable by anyone"), "{err}");
+    }
+
+    #[test]
+    fn some_other_call_as_the_hook_is_rejected() {
+        let err = parse_puh_initialize_hook(&acceptOwnershipCall {}.abi_encode())
+            .expect_err("a non-initializer hook must be rejected");
+        assert!(
+            err.contains("not initialize(address,address,address)"),
+            "{err}"
+        );
     }
 }

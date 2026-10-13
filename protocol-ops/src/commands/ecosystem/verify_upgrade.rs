@@ -55,9 +55,22 @@ pub struct VerifyUpgradeArgs {
     /// Stale entries (from older regens whose bytecode is no longer in
     /// AllContractsHashes) are silently skipped.
     ///
-    /// Defaults to `<l1-contracts>/upgrade-envs/v0.33.0-atomic-interop/output/<env>/transactions.txt`
+    /// Defaults to `<l1-contracts>/upgrade-envs/v0.33.0-atomic-interop/output/<env>/transactions.txt`.
+    /// Its deploys are salt-gated, so for an env whose committed log also holds
+    /// earlier broadcasts pass the deployment's own journal here and the
+    /// committed file as `--reference-transactions-log`.
     #[clap(long)]
     pub transactions_log: Option<PathBuf>,
+
+    /// A prior regen's already-broadcast deployment log for the same env, read
+    /// the same way as `--transactions-log` but exempt from the salt check.
+    /// Its deploys carry that regen's salts, and every regen rotates
+    /// `create2_factory_salt`, so gating them would flag the whole file.
+    /// Feeding it in still lets deployment provenance resolve contracts the
+    /// current prepare reuses rather than redeploys. Optional; a missing file
+    /// is treated as empty.
+    #[clap(long)]
+    pub reference_transactions_log: Option<PathBuf>,
 
     /// Print the ABI-encoded `UpgradeProposal { calls, executor: 0x0, salt: 0x0 }`
     /// for each governance stage (0/1/2) so an operator can byte-compare against
@@ -72,6 +85,9 @@ pub enum VerifyUpgradeEnv {
     Stage,
     Testnet,
     Mainnet,
+    /// ADI: a standalone ZKsync-OS ecosystem on Ethereum mainnet (L1 chainId 1), one
+    /// ZKsync-OS CTM and one chain (36900), owned by a legacy `Governance.sol`.
+    Adi,
 }
 
 impl VerifyUpgradeEnv {
@@ -80,11 +96,15 @@ impl VerifyUpgradeEnv {
             Self::Stage => "stage",
             Self::Testnet => "testnet",
             Self::Mainnet => "mainnet",
+            Self::Adi => "adi",
         }
     }
 
+    /// Whether to expect the real (non-testnet) verifier and governance bytecodes. True for
+    /// every ecosystem that sits on L1 mainnet, which is not the same as being THE canonical
+    /// mainnet ecosystem — ADI is its own ecosystem there, with `testnet_verifier = false`.
     pub fn is_mainnet(self) -> bool {
-        matches!(self, Self::Mainnet)
+        matches!(self, Self::Mainnet | Self::Adi)
     }
 
     pub fn is_stage(self) -> bool {
@@ -101,6 +121,11 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
             env_cfg.upgrade_input_path.display()
         )
     })?;
+    // Legacy Era chain id for the core withdrawal contracts (L1AssetRouter /
+    // L1Nullifier, and the force-deployment data the CTM reads off the router).
+    // Defaults to `era_chain_id` on single-era envs; split-era testnets set it
+    // explicitly in permanent-values.
+    let legacy_era_chain_id = env_cfg.legacy_era_chain_id().unwrap_or(era_chain_id);
     let message_root_era_gateway_chain_id = env_cfg.message_root_era_gateway_chain_id();
     let l1_chain_id = env_cfg.l1_chain_id().ok_or_else(|| {
         anyhow::anyhow!(
@@ -172,6 +197,9 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     ));
     logger::info(format!("Representative ZK chain ID: {era_chain_id}"));
     logger::info(format!(
+        "Legacy Era chain ID (core withdrawal contracts): {legacy_era_chain_id}"
+    ));
+    logger::info(format!(
         "L1MessageRoot ERA_GATEWAY_CHAIN_ID: {message_root_era_gateway_chain_id}"
     ));
     logger::info(format!("L1 chain ID (expected): {l1_chain_id}"));
@@ -195,6 +223,19 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         transactions_log_path.display()
     ));
 
+    let reference_tx_hashes = match args.reference_transactions_log.as_ref() {
+        Some(path) if path.is_file() => {
+            let hashes = transactions_log::read(path)?;
+            logger::info(format!(
+                "Loaded {} reference transaction hash(es) from {} (salt check not applied)",
+                hashes.len(),
+                path.display()
+            ));
+            hashes
+        }
+        _ => Vec::new(),
+    };
+
     let mut result = VerificationResult::default();
 
     let verification_result = crate::upgrade_verification::versions::v33::verify(
@@ -204,9 +245,11 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         args.contracts_commit.as_deref(),
         args.zk_governance_commit.as_str(),
         era_chain_id,
+        legacy_era_chain_id,
         message_root_era_gateway_chain_id,
         l1_chain_id,
         &tx_hashes,
+        &reference_tx_hashes,
         create2_factory,
         &expected_salts,
         zk_token_asset_id,
