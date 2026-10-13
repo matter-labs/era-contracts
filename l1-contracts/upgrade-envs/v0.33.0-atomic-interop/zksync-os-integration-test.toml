@@ -1,10 +1,16 @@
-# Upgrade input for the frozen local chain committed in zksync-os-integration-tests
-# (`tests/local-chains/`, currently v31.0 / chain 506), used by its v31 -> v33 upgrade test.
+# Upgrade input for the frozen local ecosystem committed in zksync-os-integration-tests
+# (`tests/local-chains/`, currently v31.1: a rollup and a validium), used by its v31 -> v33
+# upgrade test.
 #
 # Same content as `local.toml` in this directory — it is the same kind of freshly deployed anvil
 # ecosystem — under its own basename so the fixture is addressable as
-# `--env zksync-os-integration-test`, which also picks
+# `--env zksync-os-integration-test`, which also picks the gateway-less
 # `permanent-values/zksync-os-integration-test.toml`.
+#
+# The values below are inert on this path and kept for parity with `local.toml`: the target
+# protocol version and chain-creation params come from `configs/genesis/zksync-os/latest.json`
+# (`DefaultCoreUpgrade.loadProtocolVersionFromGenesis`), the old version from the CTM on chain,
+# and the bridgehub/CTM addresses from the caller's `--bridgehub` / `--ctm-proxy`.
 
 era_chain_id = 6565
 testnet_verifier = true
