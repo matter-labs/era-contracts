@@ -46,6 +46,7 @@ impl DeployCTMConfig {
                 governance_min_delay: initial_deployment_config.governance_min_delay,
                 validator_timelock_execution_delay: initial_deployment_config
                     .validator_timelock_execution_delay,
+                max_number_of_chains: initial_deployment_config.max_number_of_chains,
             },
         }
     }
@@ -59,6 +60,9 @@ pub struct ContractsDeployCTMConfig {
     pub governance_security_council_address: Address,
     pub governance_min_delay: u64,
     pub validator_timelock_execution_delay: u64,
+    /// Baked into every chain's L2 Bridgehub through the CTM's force
+    /// deployments. Must match the L1 Bridgehub's constructor value.
+    pub max_number_of_chains: u64,
 }
 
 // ── Output types ─────────────────────────────────────────────────────────────

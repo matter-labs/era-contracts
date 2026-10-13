@@ -287,7 +287,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         if (config.isZKsyncOS) {
             rollupDAManager.updateDAPair(
                 ctmAddresses.daAddresses.l1BlobsDAValidatorZKsyncOS,
-                getRollupL2DACommitmentScheme(),
+                L2DACommitmentScheme.BLOBS_ZKSYNC_OS,
                 true
             );
         }
@@ -311,7 +311,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         vm.startBroadcast(getDeployerAddress());
 
         ValidatorTimelock validatorTimelock = ValidatorTimelock(ctmAddresses.stateTransition.proxies.validatorTimelock);
-        validatorTimelock.transferOwnership(config.ownerAddress);
+        validatorTimelock.transferOwnership(ctmAddresses.admin.governance);
 
         IChainTypeManager ctm = IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager);
         IOwnable(address(ctm)).transferOwnership(ctmAddresses.admin.governance);
