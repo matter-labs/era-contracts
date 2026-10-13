@@ -354,9 +354,9 @@
   {
     "contractName": "l1-contracts/ExecutorFacet",
     "evmBytecodePath": "/l1-contracts/out/Executor.sol/ExecutorFacet.json",
-    "evmBytecodeHash": "0x4ac3e2f3b312da2dd956bf73f3bd058938de4fa73c4626a8de6001c5d026f9a0",
-    "evmDeployedBytecodeHash": "0xe07ac81ab7d4e98793bb90e4fa95c32f478a72a3c490e9f1aae247458f5209cc",
-    "evmDeployedBytecodeBlakeHash": "0xee89cbd86eef295ebc83fee920e227b92b239b65ec8fc69dcaa6fb8caf217488",
+    "evmBytecodeHash": "0x60f9eea93ebf075dd2ccdd19023449e2a2054fb283e083023a0f888c0a2f2e28",
+    "evmDeployedBytecodeHash": "0xa28da5d73d728b49c305aaff8d5f2b8d773036176ba19614a1b862cb4b077b58",
+    "evmDeployedBytecodeBlakeHash": "0xc2f94b6eb59e06714552bca4cf8ff072dbe472acd0152a459497c71e15b08d3d",
     "evmDeployedBytecodeLength": 10807
   },
   {
@@ -514,10 +514,10 @@
   {
     "contractName": "l1-contracts/L1InteropFeeManager",
     "evmBytecodePath": "/l1-contracts/out/L1InteropFeeManager.sol/L1InteropFeeManager.json",
-    "evmBytecodeHash": "0x31744d1da19e192eac852795df88688ecb30459fa267fdd398ab374eca9fe750",
-    "evmDeployedBytecodeHash": "0xb22b1c189d831c69c959824879014718fa15ddb1b4d902aeb85bcdc18aac8d49",
-    "evmDeployedBytecodeBlakeHash": "0xc94bd50b2991a7fd7e9e422ce1cf8801754fe31efae6570c7963b5e7707d3ae5",
-    "evmDeployedBytecodeLength": 5075
+    "evmBytecodeHash": "0x2a20c7b4082b2a1b6137185c4dfcbfcd6a92d7220e75c7606dfcedcf147efb32",
+    "evmDeployedBytecodeHash": "0x8fe2f21fd61feb24054f8c0c403799280bea57f7cf6d72be74d89c168ac9fe1e",
+    "evmDeployedBytecodeBlakeHash": "0xbeca5b1011381b84731a31658c673fdf6d60c284d75b6ebea98ff585b4000fb1",
+    "evmDeployedBytecodeLength": 7616
   },
   {
     "contractName": "l1-contracts/L1InteropHandler",
