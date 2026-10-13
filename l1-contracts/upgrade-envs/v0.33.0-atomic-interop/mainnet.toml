@@ -33,6 +33,8 @@
 # removed them. And `[gateway] chain_id`: the v33 flow has no Gateway step — `DefaultCoreUpgrade`
 # no longer reads a legacy-Gateway chain id, so the redeployed `L1MessageRoot` gets
 # `ERA_GATEWAY_CHAIN_ID = 0`.
+# Before executing: run the `L2InteropHandler` storage pre-check in
+# `protocol-docs/interop/architecture.md` (mainnet's v31 handler uses different slots).
 
 era_chain_id = 324
 testnet_verifier = false

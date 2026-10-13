@@ -190,6 +190,9 @@ not follow from swapping implementations are:
   {protocol-docs/bridging.md#populating-bridgedout-during-an-in-place-upgrade}.
 - **Atomic-interop built-ins** exist on ZKsync OS chains only. New chains get them from genesis and
   pre-existing ones from this upgrade's force deployments (next section).
+- **`L2InteropHandler` storage** shifts on an ecosystem whose v31 handler inherits `PausableUpgradeable`
+  (mainnet): v33 does not read that handler's bundle and call statuses. See
+  {protocol-docs/interop/architecture.md#l2interophandler-storage-across-the-v31--v33-upgrade}.
 
 Scope of this release's upgrade: **ZKsync OS chains that settle on L1**. `DefaultCTMUpgrade.initializeConfig`
 rejects non-OS CTMs. Gateway-settled chains are also outside this scope: their upgrade takes the

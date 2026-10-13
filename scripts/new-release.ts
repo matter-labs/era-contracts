@@ -53,6 +53,8 @@ const ENV_DIR_MACRO_RE = /(macro_rules! current_upgrade_env_dir \{\s*\(\) => \{\
 type SemVer = { major: number; minor: number; patch: number };
 
 const SALT_KEYS = ["create2_factory_salt", "legacy_gov_salt"];
+// The upgrade pipeline's descriptor (`protocol-ops/src/common/upgrade_descriptor.rs`), not an env input.
+const UPGRADE_DESCRIPTOR_FILE = "upgrade.toml";
 
 function freshSalt(): string {
   return `"0x${randomBytes(32).toString("hex")}"`;
@@ -146,8 +148,13 @@ function main(): void {
   write(join(nextEnvDirAbs, "local.toml"), localInput);
   const currentEnvDirAbs = join(UPGRADE_ENVS_DIR, currentEnvDir.replace("upgrade-envs/", ""));
   for (const file of fs.readdirSync(currentEnvDirAbs).filter((f) => f.endsWith(".toml") && f !== "local.toml")) {
-    const env = file.replace(/\.toml$/, "");
     const contents = fs.readFileSync(join(currentEnvDirAbs, file), "utf-8");
+    // `upgrade.toml` describes the pipeline, not an env: it carries over unchanged.
+    if (file === UPGRADE_DESCRIPTOR_FILE) {
+      write(join(nextEnvDirAbs, file), contents);
+      continue;
+    }
+    const env = file.replace(/\.toml$/, "");
     write(join(nextEnvDirAbs, file), rotateEnvInput(contents, env, next));
   }
 
