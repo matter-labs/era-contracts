@@ -57,12 +57,6 @@ interface IAdminLegacy {
     function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
 }
 
-/// @notice The v31 Admin facet's one-shot setter for a ZKsync OS chain's pre-v31 base-token total supply.
-/// @dev Removed from the facet in v32, so it is declared here for the chains that are still on v31.
-interface IAdminV31 {
-    function setZKsyncOSPreV31TotalSupply(uint256 _totalSupply) external returns (bytes32 canonicalTxHash);
-}
-
 /// @notice Minimal interface for OZ single-step Ownable contracts (e.g. ProxyAdmin).
 ///         Avoids calling `pendingOwner()` (Ownable2Step-only) on plain Ownable.
 interface IOwnableSingleStep {
@@ -1035,28 +1029,6 @@ contract AdminFunctions is Script, IAdminFunctions {
             target: chainInfo.diamondProxy,
             value: 0,
             data: abi.encodeCall(IAdmin.setZKsyncOSLargeContractsEnabled, (_enabled))
-        });
-
-        saveAndSendAdminTx(chainInfo.admin, _accessControlRestriction, calls, _shouldSend);
-    }
-
-    /// @notice Backfills a ZKsync OS chain's pre-v31 base-token total supply (one-shot, v31 Admin facet).
-    /// @dev Targets chains still on v31: the setter is gone from the facet since v32, which a chain can only
-    ///      reach once this value is set (see `V32UpgradeZKsyncOS`). Hence the call goes through `IAdminV31`.
-    function setZKsyncOSPreV31TotalSupply(
-        address _bridgehub,
-        address _accessControlRestriction,
-        uint256 _chainId,
-        uint256 _preV31TotalSupply,
-        bool _shouldSend
-    ) public {
-        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
-
-        Call[] memory calls = new Call[](1);
-        calls[0] = Call({
-            target: chainInfo.diamondProxy,
-            value: 0,
-            data: abi.encodeCall(IAdminV31.setZKsyncOSPreV31TotalSupply, (_preV31TotalSupply))
         });
 
         saveAndSendAdminTx(chainInfo.admin, _accessControlRestriction, calls, _shouldSend);

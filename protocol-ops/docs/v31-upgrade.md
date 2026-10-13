@@ -5,8 +5,9 @@
 > and PUVT drive that line's release (`upgrade-envs/v0.33.0-atomic-interop/`, `v0.34.0-chain-config/`),
 > `chain set-upgrade-timestamp` takes no `--new-protocol-version` (`ServerNotifier.setUpgradeTimestamp`
 > resolves the pending upgrade itself), and the version table below lives in the `draft-v31`
-> line's `versions/v31/mod.rs`. `chain set-zkos-pre-v31-total-supply` and `dev manifest-to-simulator`
-> work the same on both lines.
+> line's `versions/v31/mod.rs`. `dev manifest-to-simulator` works the same on every line. The v34
+> line has no pre-v31 total-supply backfill (`protocol-docs/bridging.md`), so the calculation script
+> and `chain set-zkos-pre-v31-total-supply` below exist only on the `draft-v31` and v33 lines.
 
 In the examples below I use `--upgrade-timestamp 1` for both Era and Zksync OS. This can be used to start an immediate upgrade.
 

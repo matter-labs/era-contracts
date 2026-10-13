@@ -2,15 +2,13 @@ use clap::Subcommand;
 
 use crate::commands::chain::{
     init::ChainInitArgs, set_da_validator_pair::ChainSetDaValidatorPairArgs,
-    set_upgrade_timestamp::ChainSetUpgradeTimestampArgs,
-    set_zkos_pre_v31_total_supply::ChainSetZkosPreV31TotalSupplyArgs, upgrade::ChainUpgradeArgs,
+    set_upgrade_timestamp::ChainSetUpgradeTimestampArgs, upgrade::ChainUpgradeArgs,
     validator::ChainValidatorArgs,
 };
 
 pub mod init;
 pub mod set_da_validator_pair;
 pub mod set_upgrade_timestamp;
-pub mod set_zkos_pre_v31_total_supply;
 pub mod upgrade;
 pub mod validator;
 
@@ -27,9 +25,6 @@ pub enum ChainCommands {
     /// Use post-upgrade, when the upgrade resets the chain's DA validator and
     /// the operator must re-set it before the chain can commit batches.
     SetDaValidatorPair(ChainSetDaValidatorPairArgs),
-    /// Set the ZKsync OS pre-v31 base-token total supply after a v31 upgrade.
-    #[command(after_help = set_zkos_pre_v31_total_supply::ORDERING_HELP)]
-    SetZkosPreV31TotalSupply(ChainSetZkosPreV31TotalSupplyArgs),
     /// Add a validator to the chain's ValidatorTimelock (all batch operator roles)
     AddValidator(ChainValidatorArgs),
     /// Remove a validator from the chain's ValidatorTimelock (revokes all batch operator roles)
@@ -42,9 +37,6 @@ pub async fn run(args: ChainCommands) -> anyhow::Result<()> {
         ChainCommands::Upgrade(args) => upgrade::run(args).await,
         ChainCommands::SetUpgradeTimestamp(args) => set_upgrade_timestamp::run(args).await,
         ChainCommands::SetDaValidatorPair(args) => set_da_validator_pair::run(args).await,
-        ChainCommands::SetZkosPreV31TotalSupply(args) => {
-            set_zkos_pre_v31_total_supply::run(args).await
-        }
         ChainCommands::AddValidator(args) => validator::run_add(args).await,
         ChainCommands::RemoveValidator(args) => validator::run_remove(args).await,
     }

@@ -20,14 +20,6 @@ zk_token_asset_id = "0xefb0794fa43edc760ef9bf5b09af2fc0a667a288453d2d55d48878897
 # Non-mainnet envs run `ZKsyncOSTestnetVerifier`, which accepts unproven batches.
 testnet_verifier = true
 
-# Split era: the core withdrawal contracts (L1AssetRouter/L1Nullifier/MailboxFacet)
-# carry the LEGACY Era chain id 270 (a placeholder — chain 270 is not registered
-# on the testnet bridgehub, so its eraDiamond is address(0)), preserved by v31.
-# The registered/new Era is 301 (`era_chain_id` in the v31 input; used by the PUH,
-# FixedForceDeployment and CTM resolution). PUVT uses this value only for the
-# core-withdrawal-contract checks.
-legacy_era_chain_id = 270
-
 [permanent_contracts]
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 # `create2_factory_salt` lives in the release input TOML

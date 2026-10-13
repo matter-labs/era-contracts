@@ -64,13 +64,6 @@ pub struct PermanentValues {
     #[serde(default)]
     pub zk_token_asset_id: Option<B256>,
     pub testnet_verifier: Option<bool>,
-    /// Legacy ZKsync Era chain id baked into the core withdrawal contracts
-    /// (L1AssetRouter / L1Nullifier / MailboxFacet `eraChainId`). On most envs
-    /// this equals the registered `era_chain_id`; on split-era testnets it
-    /// differs (e.g. 270 legacy for withdrawals vs 301 the registered Era).
-    /// Absent → callers default to `era_chain_id`.
-    #[serde(default)]
-    pub legacy_era_chain_id: Option<u64>,
     pub core_contracts: CoreContracts,
     #[serde(default)]
     pub ctm_contracts: Option<CtmContracts>,
