@@ -9,6 +9,7 @@ import {
   ANVIL_DEFAULT_ACCOUNT_ADDR,
   ANVIL_DEFAULT_PRIVATE_KEY,
   EIP1967_ADMIN_SLOT,
+  ETH_TOKEN_ADDRESS,
   INITIAL_BASE_TOKEN_HOLDER_BALANCE,
   INTEROP_ATTRIBUTE_PARSER_ADDR,
   INTEROP_CENTER_ADDR,
@@ -1121,7 +1122,10 @@ export async function verifyProtocolVersions(
   }
 }
 
-/** The CTM's interop fee manager must be deployed, on this bridgehub and switched off: the Executor charges through it. */
+/**
+ * The CTM's interop fee manager must be deployed, on this bridgehub and switched off with ether as the fee token: the
+ * Executor charges through it.
+ */
 export async function verifyInteropFeeManager(
   provider: ethers.providers.JsonRpcProvider,
   ctmAddr: string,
@@ -1142,6 +1146,10 @@ export async function verifyInteropFeeManager(
   const feePerUnit: ethers.BigNumber = await feeManager.feePerUnit();
   if (!feePerUnit.isZero()) {
     throw new Error(`Interop fee manager ${feeManagerAddr} is switched on: feePerUnit = ${feePerUnit.toString()}`);
+  }
+  const feeToken: string = await feeManager.feeToken();
+  if (feeToken.toLowerCase() !== ETH_TOKEN_ADDRESS.toLowerCase()) {
+    throw new Error(`Interop fee manager ${feeManagerAddr} charges in ${feeToken}, expected ether`);
   }
 }
 

@@ -10,6 +10,8 @@ import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IL1InteropFeeManager} from "contracts/core/interop-fee/IL1InteropFeeManager.sol";
 import {InsufficientInteropFeeBalance} from "contracts/core/interop-fee/InteropFeeErrors.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
 /// @notice The interop fee through a real diamond and a real `L1InteropFeeManager`: commits record each batch's count,
 /// execution charges it, and the chain admin withdraws. See {protocol-docs/interop-fee.md}.
@@ -24,12 +26,12 @@ contract InteropFeeTest is ExecutorTest {
         IExecutor.StoredBatchInfo memory stored = _commitAndProve(_batchWithUnits(3));
 
         vm.expectEmit(address(interopFeeManager));
-        emit IL1InteropFeeManager.InteropFeeCharged(l2ChainId, 1, 3, 3 * FEE_PER_UNIT);
+        emit IL1InteropFeeManager.InteropFeeCharged(l2ChainId, 1, ETH_TOKEN_ADDRESS, 3, 3 * FEE_PER_UNIT);
         _execute(stored);
 
         assertEq(getters.getTotalBatchesExecuted(), 1);
-        assertEq(interopFeeManager.chainBalance(l2ChainId), 1 ether - 3 * FEE_PER_UNIT);
-        assertEq(interopFeeManager.accruedFees(), 3 * FEE_PER_UNIT);
+        assertEq(interopFeeManager.chainBalance(l2ChainId, ETH_TOKEN_ADDRESS), 1 ether - 3 * FEE_PER_UNIT);
+        assertEq(interopFeeManager.accruedFees(ETH_TOKEN_ADDRESS), 3 * FEE_PER_UNIT);
     }
 
     function test_execute_chargesEachBatchOfARange() public {
@@ -38,13 +40,13 @@ contract InteropFeeTest is ExecutorTest {
         IExecutor.StoredBatchInfo[] memory batches = _commitAndProveTwoBatches(2, 3);
 
         vm.expectEmit(address(interopFeeManager));
-        emit IL1InteropFeeManager.InteropFeeCharged(l2ChainId, 1, 2, 2 * FEE_PER_UNIT);
+        emit IL1InteropFeeManager.InteropFeeCharged(l2ChainId, 1, ETH_TOKEN_ADDRESS, 2, 2 * FEE_PER_UNIT);
         vm.expectEmit(address(interopFeeManager));
-        emit IL1InteropFeeManager.InteropFeeCharged(l2ChainId, 2, 3, 3 * FEE_PER_UNIT);
+        emit IL1InteropFeeManager.InteropFeeCharged(l2ChainId, 2, ETH_TOKEN_ADDRESS, 3, 3 * FEE_PER_UNIT);
         _execute(batches);
 
         assertEq(getters.getTotalBatchesExecuted(), 2);
-        assertEq(interopFeeManager.accruedFees(), 5 * FEE_PER_UNIT);
+        assertEq(interopFeeManager.accruedFees(ETH_TOKEN_ADDRESS), 5 * FEE_PER_UNIT);
     }
 
     function test_execute_chargesTheRateInForceAtExecution() public {
@@ -55,7 +57,35 @@ contract InteropFeeTest is ExecutorTest {
         _setFee(FEE_PER_UNIT);
         _execute(stored);
 
-        assertEq(interopFeeManager.accruedFees(), 3 * FEE_PER_UNIT);
+        assertEq(interopFeeManager.accruedFees(ETH_TOKEN_ADDRESS), 3 * FEE_PER_UNIT);
+    }
+
+    function test_execute_chargesTheTokenInForceAtExecution() public {
+        _fund(1 ether);
+        IExecutor.StoredBatchInfo memory stored = _commitAndProve(_batchWithUnits(3));
+        (uint256 from, uint256 to, bytes memory data) = _encodeExecute(_single(stored));
+
+        // Switched to an ERC20 after the batch was committed and proven: the chain's ether doesn't pay for it.
+        TestnetERC20Token token = new TestnetERC20Token("Fee", "FEE", 18);
+        vm.prank(owner);
+        interopFeeManager.setFee(address(token), FEE_PER_UNIT);
+        vm.prank(validator);
+        vm.expectRevert(abi.encodeWithSelector(InsufficientInteropFeeBalance.selector, l2ChainId, 0, 3 * FEE_PER_UNIT));
+        executor.executeBatchesSharedBridge(address(0), from, to, data);
+
+        address depositor = makeAddr("depositor");
+        token.mint(depositor, 3 * FEE_PER_UNIT);
+        vm.startPrank(depositor);
+        token.approve(address(interopFeeManager), 3 * FEE_PER_UNIT);
+        interopFeeManager.deposit(l2ChainId, address(token), 3 * FEE_PER_UNIT);
+        vm.stopPrank();
+        vm.prank(validator);
+        executor.executeBatchesSharedBridge(address(0), from, to, data);
+
+        assertEq(getters.getTotalBatchesExecuted(), 1);
+        assertEq(interopFeeManager.chainBalance(l2ChainId, address(token)), 0);
+        assertEq(interopFeeManager.accruedFees(address(token)), 3 * FEE_PER_UNIT);
+        assertEq(interopFeeManager.chainBalance(l2ChainId, ETH_TOKEN_ADDRESS), 1 ether);
     }
 
     function test_commitAndProve_chargeNothing() public {
@@ -85,8 +115,8 @@ contract InteropFeeTest is ExecutorTest {
         _execute(_commitAndProve(_batchWithUnits(3)));
 
         assertEq(getters.getTotalBatchesExecuted(), 1);
-        assertEq(interopFeeManager.chainBalance(l2ChainId), 1 ether);
-        assertEq(interopFeeManager.accruedFees(), 0);
+        assertEq(interopFeeManager.chainBalance(l2ChainId, ETH_TOKEN_ADDRESS), 1 ether);
+        assertEq(interopFeeManager.accruedFees(ETH_TOKEN_ADDRESS), 0);
     }
 
     function test_execute_withoutInteropDoesNotTouchTheManager() public {
@@ -121,7 +151,7 @@ contract InteropFeeTest is ExecutorTest {
         );
         executor.executeBatchesSharedBridge(address(0), from, to, data);
         assertEq(getters.getTotalBatchesExecuted(), 0);
-        assertEq(interopFeeManager.chainBalance(l2ChainId), 2 * FEE_PER_UNIT);
+        assertEq(interopFeeManager.chainBalance(l2ChainId, ETH_TOKEN_ADDRESS), 2 * FEE_PER_UNIT);
 
         // A deposit tops the chain up; the very same batch then executes.
         _fund(FEE_PER_UNIT);
@@ -129,8 +159,8 @@ contract InteropFeeTest is ExecutorTest {
         executor.executeBatchesSharedBridge(address(0), from, to, data);
 
         assertEq(getters.getTotalBatchesExecuted(), 1);
-        assertEq(interopFeeManager.chainBalance(l2ChainId), 0);
-        assertEq(interopFeeManager.accruedFees(), 3 * FEE_PER_UNIT);
+        assertEq(interopFeeManager.chainBalance(l2ChainId, ETH_TOKEN_ADDRESS), 0);
+        assertEq(interopFeeManager.accruedFees(ETH_TOKEN_ADDRESS), 3 * FEE_PER_UNIT);
     }
 
     /// @dev The batch number committed again after the revert carries only its new count.
@@ -150,8 +180,8 @@ contract InteropFeeTest is ExecutorTest {
         _execute(stored);
 
         assertEq(getters.getTotalBatchesExecuted(), 1);
-        assertEq(interopFeeManager.chainBalance(l2ChainId), 1 ether);
-        assertEq(interopFeeManager.accruedFees(), 0);
+        assertEq(interopFeeManager.chainBalance(l2ChainId, ETH_TOKEN_ADDRESS), 1 ether);
+        assertEq(interopFeeManager.accruedFees(ETH_TOKEN_ADDRESS), 0);
     }
 
     function test_execute_recommittedBatchIsChargedItsNewCount() public {
@@ -163,7 +193,7 @@ contract InteropFeeTest is ExecutorTest {
 
         _execute(_commitAndProve(_batchWithUnits(3)));
 
-        assertEq(interopFeeManager.accruedFees(), 3 * FEE_PER_UNIT);
+        assertEq(interopFeeManager.accruedFees(ETH_TOKEN_ADDRESS), 3 * FEE_PER_UNIT);
     }
 
     function test_revertWhen_rangeExecutionCannotPayEveryBatch() public {
@@ -178,7 +208,7 @@ contract InteropFeeTest is ExecutorTest {
         executor.executeBatchesSharedBridge(address(0), from, to, data);
 
         assertEq(getters.getTotalBatchesExecuted(), 0);
-        assertEq(interopFeeManager.chainBalance(l2ChainId), 2 * FEE_PER_UNIT);
+        assertEq(interopFeeManager.chainBalance(l2ChainId, ETH_TOKEN_ADDRESS), 2 * FEE_PER_UNIT);
     }
 
     /// @dev The manager reads the chain admin from the diamond on every withdrawal, so it follows admin changes.
@@ -187,7 +217,7 @@ contract InteropFeeTest is ExecutorTest {
         address to = makeAddr("withdrawalReceiver");
         address oldAdmin = getters.getAdmin();
         vm.prank(oldAdmin);
-        interopFeeManager.withdraw(l2ChainId, to, 0.4 ether);
+        interopFeeManager.withdraw(l2ChainId, ETH_TOKEN_ADDRESS, to, 0.4 ether);
 
         address newAdmin = makeAddr("newChainAdmin");
         vm.prank(oldAdmin);
@@ -197,12 +227,12 @@ contract InteropFeeTest is ExecutorTest {
 
         vm.prank(oldAdmin);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, oldAdmin));
-        interopFeeManager.withdraw(l2ChainId, to, 0.6 ether);
+        interopFeeManager.withdraw(l2ChainId, ETH_TOKEN_ADDRESS, to, 0.6 ether);
 
         vm.prank(newAdmin);
-        interopFeeManager.withdraw(l2ChainId, to, 0.6 ether);
+        interopFeeManager.withdraw(l2ChainId, ETH_TOKEN_ADDRESS, to, 0.6 ether);
         assertEq(to.balance, 1 ether);
-        assertEq(interopFeeManager.chainBalance(l2ChainId), 0);
+        assertEq(interopFeeManager.chainBalance(l2ChainId, ETH_TOKEN_ADDRESS), 0);
     }
 
     function testFuzz_execute_chargesLinearlyInUnits(uint32 _units, uint64 _feePerUnit) public {
@@ -214,8 +244,8 @@ contract InteropFeeTest is ExecutorTest {
 
         _execute(_commitAndProve(_batchWithUnits(_units)));
 
-        assertEq(interopFeeManager.chainBalance(l2ChainId), 0);
-        assertEq(interopFeeManager.accruedFees(), fee);
+        assertEq(interopFeeManager.chainBalance(l2ChainId, ETH_TOKEN_ADDRESS), 0);
+        assertEq(interopFeeManager.accruedFees(ETH_TOKEN_ADDRESS), fee);
     }
 
     function _batchWithUnits(uint256 _units) internal view returns (CommitBatchInfoZKsyncOS memory batch) {
@@ -289,13 +319,13 @@ contract InteropFeeTest is ExecutorTest {
 
     function _setFee(uint256 _feePerUnit) internal {
         vm.prank(owner);
-        interopFeeManager.setFeePerUnit(_feePerUnit);
+        interopFeeManager.setFee(ETH_TOKEN_ADDRESS, _feePerUnit);
     }
 
     function _fund(uint256 _amount) internal {
         address depositor = makeAddr("depositor");
         vm.deal(depositor, _amount);
         vm.prank(depositor);
-        interopFeeManager.deposit{value: _amount}(l2ChainId);
+        interopFeeManager.deposit{value: _amount}(l2ChainId, ETH_TOKEN_ADDRESS, _amount);
     }
 }

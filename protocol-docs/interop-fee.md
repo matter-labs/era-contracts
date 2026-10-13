@@ -43,12 +43,12 @@ every batch it executes, when:
 - `interopFeeUnits != 0`: batches without interop never touch the manager;
 - priority mode is off: the escape hatch never depends on the fee.
 
-The manager debits the chain's **prepaid balance** (`deposit(chainId)`, payable by anyone, withdrawable only by the
-chain admin) at the `feePerUnit` in force when the batch executes, so a rate change also applies to batches already
-committed. If the balance does not cover the fee, the execution reverts: until the chain is topped up, its batches and
-the withdrawals in them can't execute, while committing and proving continue. Its priority transactions aren't processed
-either, so once the oldest has waited `PRIORITY_EXPIRATION`, anyone can activate priority mode on a chain that permits
-it (`AdminFacet.activatePriorityMode`), which reverts its unexecuted batches.
+The manager debits the chain's **prepaid balance** in the fee token (`deposit(chainId, token, amount)`, payable by
+anyone, withdrawable only by the chain admin) at the fee in force when the batch executes, so a change of rate or token
+also applies to batches already committed. If the balance does not cover the fee, the execution reverts: until the
+chain is topped up, its batches and the withdrawals in them can't execute, while committing and proving continue. Its
+priority transactions aren't processed either, so once the oldest has waited `PRIORITY_EXPIRATION`, anyone can activate
+priority mode on a chain that permits it (`AdminFacet.activatePriorityMode`), which reverts its unexecuted batches.
 
 Only proven counts of executed batches are charged. A reverted batch is never charged, whoever reverts it (the
 operator, the CTM, or priority-mode activation): every commit records its batch's count, overwriting the count of a
@@ -60,15 +60,27 @@ reverted batch with the same number.
 upgrades keep the one the current CTM points at, which holds the chains' prepaid balances. The CTM takes it as an
 immutable, `L1_INTEROP_FEE_MANAGER()`, from v35 on. Its owner is protocol governance from initialization, and controls:
 
-- `feePerUnit`: wei per interop fee unit; `0`, the initial value, turns the switch off;
-- `feeRecipient`: where the permissionless `sweep()` sends the accrued fees; initially governance.
+- the fee, a pair set with `setFee(feeToken, feePerUnit)` since a rate only means something in its token: `feeToken`
+  is ETH (`ETH_TOKEN_ADDRESS`, the initial value) or an L1 ERC20, and `feePerUnit` is in the token's smallest unit per
+  interop fee unit; `0`, the initial value, turns the switch off;
+- `feeRecipient`: where the permissionless `sweep(token)` sends the fees accrued in a token; initially governance.
 
 Users can choose the fixed per-call ZK fee, which the operator can't reprice, over the operator-set one
 ({protocol-docs/interop.md#fee-model}), so a `feePerUnit` worth more than `ZK_INTEROP_FEE` lets users make an operator
 pay more than it collects.
 
-Fees are paid in ETH. Charging only moves value between the manager's internal ledgers, so the prepaid balances plus
-the accrued fees are always backed by the contract's ETH.
+## The fee token
+
+There is one fee token at a time, and the manager only accepts deposits in it. Prepaid balances and accrued fees are
+kept per token, so a change of token leaves them in place: chain admins can still withdraw their balances in a former
+fee token, and its accrued fees can still be swept. Charging only moves value between the manager's internal ledgers,
+so for every token, the prepaid balances plus the accrued fees are always backed by the contract's holdings of it.
+
+Chains without a balance in a new fee token can't execute once it is charged. To switch without stalling them, the
+owner first sets the new token with the fee off (`setFee(newToken, 0)`), lets chains deposit it, then sets the rate.
+
+An ERC20 fee token must be standard: a deposit is credited the amount requested, so a token that takes a fee on
+transfer or rebases would leave its ledger unbacked.
 
 ## Activation
 

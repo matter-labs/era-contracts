@@ -8,7 +8,7 @@ import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfac
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
-import {PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS, PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2TransactionRequestDirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1InteropFeeManager} from "contracts/core/interop-fee/IL1InteropFeeManager.sol";
 
@@ -75,7 +75,7 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
     function test_settleBatchesSharedBridge_priorityModeIsNotChargedTheInteropFee() public {
         // Switched on without a balance; see {protocol-docs/interop-fee.md#charging-and-enforcement}.
         vm.prank(owner);
-        interopFeeManager.setFeePerUnit(1);
+        interopFeeManager.setFee(ETH_TOKEN_ADDRESS, 1);
         PriorityOpsBatchInfo[] memory priorityOps = Utils.generatePriorityOps(1, 1);
         CommitBatchInfoZKsyncOS memory commitInfo = _prepareCommitInfo(priorityOps);
         // A priority transaction can still send interop through the InteropCenter.
