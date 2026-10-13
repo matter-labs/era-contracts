@@ -3,6 +3,23 @@
 Public ZKsync OS testnet on Sepolia. Bridgehub `0xc4FD2580C3487bba18D63f50301020132342fdbD`,
 governed by the ProtocolUpgradeHandler `0x803e5E7aF1FDD504F8844E28a249203Cfa7c471D`.
 
+> **Historical: this artifact has been executed on Sepolia.** It is kept as the record of what ran. Do not
+> regenerate it or replay it.
+>
+> It predates the stage-1 reorder that puts `setNewVersionUpgrade` before `setChainCreationParams`. Here
+> the CTM gets `setChainCreationParams` first (stage-1 call 19 of 20, `0x9b016b8b`) and
+> `setNewVersionUpgrade` last (call 20, `0x8265f458`), so the current `ecosystem verify-upgrade` rejects it.
+> The results under "Validation" come from the tooling of that time.
+>
+> `setChainCreationParams` keys `newChainCreationParamsBlock` on the version the CTM is on. In this order
+> that was still v31 (`0x1f00000001`), so the call overwrote the v31 entry and left the v33 entry empty. On
+> Sepolia `newChainCreationParamsBlock(0x2100000000)` reads 0 at block 11899524, with the CTM on
+> `0x2100000000`. `GetDiamondCutData` looks the creation params up through that entry, so
+> `RegisterZKChain.s.sol` and `GatewayUtils.dumpForceDeployments` revert with `NoLogsFound` on this CTM;
+> on-chain `createNewChain` is not affected. The fix is a follow-up governance call that repeats
+> `setChainCreationParams` with the same params, now that the CTM is on v33 (#2596). It is not part of this
+> artifact.
+
 ## Scope: one CTM, not two
 
 Two CTMs are registered on this bridgehub:

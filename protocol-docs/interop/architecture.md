@@ -240,3 +240,17 @@ canonical L1 asset router.
 The protocol requires ZKsync OS bootloader support for timestamped dependency-root import and batch
 commitments to atomic IMT roots. Atomic flows are L1-settlement-only, and every participating chain
 must support protocol version v33 or newer.
+
+### `L2InteropHandler` storage across the v31 → v33 upgrade
+
+The v33 upgrade points the existing `L2_INTEROP_HANDLER_ADDR` proxy at `L2InteropHandler`, which keeps
+`bundleStatus` and `callStatus` in slots 1 and 2. Stage and testnet run a v31 handler with the same layout.
+Mainnet's v31 handler, which adi targets too, also inherits `PausableUpgradeable`. That moves those mappings
+to slots 102 and 103, so v33 does not read them. This shift is intentional: of the ecosystems with that
+handler, v33 runs as an upgrade only on adi, which has had no interop transactions, so both mappings are empty.
+v31 interop needs a Gateway, and only a chain that settles on one can send a bundle. Before upgrading an
+ecosystem with that handler onto v33, check that:
+
+- every chain's `Bridgehub.settlementLayer` is L1 (PUVT checks this too);
+- no chain's `L2_INTEROP_HANDLER_ADDR` has emitted `BundleVerified`, `BundleExecuted`, `BundleUnbundled`
+  or `CallProcessed`.

@@ -21,8 +21,13 @@ const MIN_MINOR_VERSION_WITH_VALIDIUM_DA: u64 = 33;
 
 #[derive(Serialize)]
 struct ChainUpgradeOutput {
+    chain_id: u64,
     chain_address: Address,
     admin_address: Address,
+    /// The ChainAdmin's owner, who sends the bundle; absent when an AccessControlRestriction
+    /// admin sends it instead. Read by the execution runbook (`EXECUTE.md`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    chain_admin_owner: Option<Address>,
     access_control_restriction: Address,
     /// What the upgrade changes about the chain's DA setup, if anything.
     da_move: DaMove,
@@ -61,7 +66,8 @@ struct DaPair {
 /// under a DA setup its new version no longer settles.
 ///
 /// Pass `--chain-id` to target a single chain. Omit it to loop over every
-/// chain registered on the bridgehub — each chain's bundle lands under
+/// chain registered on the bridgehub (not with `--da-mode`, which describes one
+/// chain) — each chain's bundle lands under
 /// `<--out>/<chain-id>/` so the bundles don't collide. With `--env`, the
 /// per-chain `<--out>` defaults to
 /// `upgrade-envs/.../<env>/chain-upgrades/<chain-id>/`.
@@ -114,6 +120,15 @@ pub struct ChainUpgradeArgs {
 pub async fn run(args: ChainUpgradeArgs) -> anyhow::Result<()> {
     let bridgehub = args.topology.resolve()?;
     let env_cfg = args.topology.env_config()?;
+
+    // The DA setup is chain-specific — which validator, which scheme and whether the chain
+    // publishes its pubdata at all — so one `--da-mode` cannot describe every chain of a
+    // multi-chain loop.
+    anyhow::ensure!(
+        args.da_mode.is_none() || args.chain_id.is_some(),
+        "--da-mode / --l1-da-validator require a single --chain-id (the DA setup is \
+         chain-specific and cannot be applied across all chains)"
+    );
 
     // Resolve the chain-id list up front: explicit `--chain-id` wins,
     // otherwise enumerate the bridgehub.
@@ -251,8 +266,11 @@ async fn run_one(
         &runner,
         &serde_json::json!({}),
         &ChainUpgradeOutput {
+            chain_id,
             chain_address,
             admin_address,
+            chain_admin_owner: (access_control_restriction == Address::ZERO)
+                .then_some(sender.address),
             access_control_restriction,
             da_move,
         },

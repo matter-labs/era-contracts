@@ -156,6 +156,12 @@ COPY . /contracts
 # $GITHUB_WORKSPACE/zk-governance/ so it lands inside the docker build context.
 COPY zk-governance /zk-governance
 
+# foundry-zksync resolves stable zksolc releases from the retired
+# matter-labs/zksolc-bin mirror, which never received the pinned 1.5.17, so the
+# compiler has to be fetched from era-compiler-solidity up front. Same script the
+# CI workflows run via .github/actions/install-zksync-foundry.
+RUN ./scripts/install-zksolc.sh
+
 # === Compile contracts ===
 # Bytecode drift detection (`AllContractsHashes.json` ↔ built artifacts) is
 # NOT done here — it lives in the dedicated `Update Hashes in PR` workflow
