@@ -8,6 +8,7 @@ test = "test/foundry"
 solc_version = "0.8.28"
 evm_version = "prague"
 fs_permissions = [
+    { access = "read", path = "./test/foundry/l1/integration/fixtures/" },
     { access = "read-write", path = "./script-out" },
     { access = "read-write", path = "./test/anvil-interop/" },
     { access = "read-write", path = "./test/foundry/l1/integration/deploy-scripts/script-config/" },
@@ -27,9 +28,9 @@ fs_permissions = [
     { access = "read", path = "../configs/genesis/" },
     { access = "read", path = "../configs/" },
 ]
-ignored_error_codes = ["missing-receive-ether", "code-size"]
-ignored_warnings_from = ["test", "contracts/dev-contracts"]
-suppressed_warnings = ["txorigin"]
+# Only filters what `forge build` prints; the enforced policy is `solc-warnings.json`.
+ignored_error_codes = ["missing-receive-ether", "code-size", "init-code-size"]
+ignored_warnings_from = []
 remappings = [
   "forge-std/=lib/forge-std/src/",
   "murky/=lib/murky/src/",

@@ -64,13 +64,12 @@ On one anvil fork of L1, in this order:
 4. The ServerNotifier admin call, executed on the fork as the ChainAdmin
    (`UpgradeFull::run_ctm_admin_steps`; see the
    [lifecycle document](../../../docs/upgrade-stage-lifecycle.md#servernotifier-a-row-under-a-foreign-admin)).
-5. On PUH-governed environments, the PUH/Guardians redeploy (`zk_governance.rs`); when
-   `[new_gateway]` is configured, `GatewayVotePreparation`.
+5. On PUH-governed environments, the PUH/Guardians redeploy (`zk_governance.rs`).
 6. The merge (`upgrade.rs::write_merged_ecosystem_toml`) writes `<env-out>/ecosystem.toml`: each
    stage bundle is core actions → the coordinator's `stageN(operation)`, derived from the
    `operation_addr`/`coordinator_addr` the CTM prepare reported → CTM actions, in source order,
    followed by the merger's own appends (PUH wiring and CTM `acceptOwnership` normalization in
-   stage 0, the new-Gateway bundle in stage 2). The layout is documented on that function. The
+   stage 0). The layout is documented on that function. The
    merge authors nothing and refuses a bundle whose calls are not all declared external actions —
    matched by identity, target, value and calldata alike, not by headcount
    (`check_bundle_provenance`).

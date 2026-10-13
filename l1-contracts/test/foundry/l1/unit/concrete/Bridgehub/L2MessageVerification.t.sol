@@ -3,7 +3,6 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {Merkle} from "contracts/common/libraries/Merkle.sol";
 
 import {L2MessageVerification} from "contracts/interop/L2MessageVerification.sol";
 import {L2Log, L2Message} from "contracts/common/Messaging.sol";
@@ -25,8 +24,8 @@ contract MessageRootTest is Test {
     bytes32 internal constant NON_ZERO_TIMESTAMP_INTEROP_ROOT =
         0x55765aa3f08b5bec688734c70b62b130aeb4be787d6206ed626d7675742db67d;
 
-    address bridgeHub;
-    L2MessageVerification l2MessageVerification;
+    address internal bridgeHub;
+    L2MessageVerification internal l2MessageVerification;
 
     function setUp() public {
         bridgeHub = makeAddr("bridgeHub");

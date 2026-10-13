@@ -19,7 +19,7 @@ import {L2_GENESIS_UPGRADE_ADDR} from "contracts/common/l2-helpers/L2ContractAdd
 
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
-contract createNewChainTest is ChainTypeManagerTest {
+contract CreateNewChainTest is ChainTypeManagerTest {
     function setUp() public {
         deploy();
     }

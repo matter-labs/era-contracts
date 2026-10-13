@@ -17,7 +17,7 @@ contract ValidiumL1DAValidatorTest is Test {
 
     // ============ checkDA Tests ============
 
-    function test_checkDA_validInput() public {
+    function test_checkDA_validInput() public view {
         bytes32 stateDiffHash = keccak256("state_diff");
         bytes memory operatorInput = abi.encode(stateDiffHash);
         uint256 maxBlobsSupported = 6;
@@ -35,7 +35,7 @@ contract ValidiumL1DAValidatorTest is Test {
         assertEq(output.blobsOpeningCommitments.length, maxBlobsSupported);
     }
 
-    function test_checkDA_blobArraysAreEmpty() public {
+    function test_checkDA_blobArraysAreEmpty() public view {
         bytes32 stateDiffHash = keccak256("state_diff");
         bytes memory operatorInput = abi.encode(stateDiffHash);
         uint256 maxBlobsSupported = 6;
@@ -70,7 +70,7 @@ contract ValidiumL1DAValidatorTest is Test {
         validator.checkDA(1, 100, bytes32(0), emptyInput, 6);
     }
 
-    function test_checkDA_ignoresChainIdAndBatchNumber() public {
+    function test_checkDA_ignoresChainIdAndBatchNumber() public view {
         bytes32 stateDiffHash = keccak256("state_diff");
         bytes memory operatorInput = abi.encode(stateDiffHash);
 
@@ -82,7 +82,7 @@ contract ValidiumL1DAValidatorTest is Test {
         assertEq(output1.stateDiffHash, output2.stateDiffHash);
     }
 
-    function test_checkDA_ignoresL2DAValidatorOutputHash() public {
+    function test_checkDA_ignoresL2DAValidatorOutputHash() public view {
         bytes32 stateDiffHash = keccak256("state_diff");
         bytes memory operatorInput = abi.encode(stateDiffHash);
 
@@ -94,7 +94,7 @@ contract ValidiumL1DAValidatorTest is Test {
         assertEq(output1.stateDiffHash, output2.stateDiffHash);
     }
 
-    function test_checkDA_differentMaxBlobsSupported() public {
+    function test_checkDA_differentMaxBlobsSupported() public view {
         bytes32 stateDiffHash = keccak256("state_diff");
         bytes memory operatorInput = abi.encode(stateDiffHash);
 
@@ -107,7 +107,7 @@ contract ValidiumL1DAValidatorTest is Test {
 
     // ============ Fuzz Tests ============
 
-    function testFuzz_checkDA_validStateDiffHash(bytes32 stateDiffHash) public {
+    function testFuzz_checkDA_validStateDiffHash(bytes32 stateDiffHash) public view {
         bytes memory operatorInput = abi.encode(stateDiffHash);
 
         L1DAValidatorOutput memory output = validator.checkDA(1, 100, bytes32(0), operatorInput, 6);
@@ -115,7 +115,7 @@ contract ValidiumL1DAValidatorTest is Test {
         assertEq(output.stateDiffHash, stateDiffHash);
     }
 
-    function testFuzz_checkDA_anyMaxBlobsSupported(uint8 maxBlobs) public {
+    function testFuzz_checkDA_anyMaxBlobsSupported(uint8 maxBlobs) public view {
         vm.assume(maxBlobs > 0);
 
         bytes32 stateDiffHash = keccak256("state_diff");

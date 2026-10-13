@@ -8,7 +8,7 @@ import {RegisterZKChainScript} from "deploy-scripts/ctm/RegisterZKChain.s.sol";
 import {RegisterZKChainConfig as ChainConfig} from "contracts/script-interfaces/IRegisterZKChain.sol";
 import {ETH_TOKEN_ADDRESS, L2DACommitmentScheme} from "contracts/common/Config.sol";
 
-import "@openzeppelin/contracts-v4/utils/Strings.sol";
+import {Strings} from "@openzeppelin/contracts-v4/utils/Strings.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
@@ -20,7 +20,7 @@ import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.s
 contract ZKChainDeployer is L1ContractDeployer {
     using stdStorage for StdStorage;
 
-    RegisterZKChainScript deployScript;
+    RegisterZKChainScript internal deployScript;
 
     struct ZKChainDescription {
         uint256 zkChainChainId;
@@ -37,8 +37,8 @@ contract ZKChainDeployer is L1ContractDeployer {
 
     ChainConfig internal eraConfig;
 
-    uint256 currentZKChainId = 10;
-    uint256 eraZKChainId = 9;
+    uint256 internal currentZKChainId = 10;
+    uint256 internal eraZKChainId = 9;
     uint256[] public zkChainIds;
 
     function _deployEra() internal {
@@ -142,7 +142,7 @@ contract ZKChainDeployer is L1ContractDeployer {
         uint256 __chainId,
         address __baseToken,
         uint256 __salt
-    ) internal returns (ZKChainDescription memory description) {
+    ) internal pure returns (ZKChainDescription memory description) {
         description = ZKChainDescription({
             zkChainChainId: __chainId,
             baseToken: __baseToken,
@@ -158,8 +158,6 @@ contract ZKChainDeployer is L1ContractDeployer {
     }
 
     function saveZKChainConfig(ZKChainDescription memory description) public {
-        string memory serialized;
-
         vm.serializeAddress("toml1", "owner_address", 0x70997970C51812dc3A010C7d01b50e0d17dc79C8);
         vm.serializeUint("chain", "chain_chain_id", description.zkChainChainId);
         vm.serializeAddress("chain", "base_token_addr", description.baseToken);
@@ -228,8 +226,6 @@ contract ZKChainDeployer is L1ContractDeployer {
         uint256 _chainId,
         bytes32 _baseTokenAssetId,
         address _admin,
-        uint256 _protocolVersion,
-        bytes32 _storedBatchZero,
         address _bridgehub,
         address _chainTypeManager
     ) internal returns (address) {

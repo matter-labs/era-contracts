@@ -1,7 +1,7 @@
 //! Wait until a ZKsync chain's pending protocol upgrade has been finalized.
 //!
 //! Flow:
-//!   1. Resolve the chain's ChainTypeManager on the settlement layer (L1 or gateway).
+//!   1. Resolve the chain's ChainTypeManager on the settlement layer.
 //!   2. Scan for `NewUpgradeCutData(target_protocol_version, ...)` on the CTM and
 //!      extract the embedded `L2CanonicalTransaction`.
 //!   3. Replay its v31+ per-chain data rewrite and compute
@@ -55,8 +55,6 @@ struct Cli {
     chain_id: u64,
 
     /// RPC URL of the settlement layer where the chain's bridgehub/CTM live.
-    /// For direct L1-settling chains this is the L1 RPC; for gateway-settling chains
-    /// this is the gateway L2 RPC.
     #[arg(long, env = "SETTLEMENT_RPC_URL")]
     settlement_rpc_url: String,
 

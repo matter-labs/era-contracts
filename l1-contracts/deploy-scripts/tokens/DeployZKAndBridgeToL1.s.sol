@@ -1,15 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// solhint-disable no-console
-
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-// It's required to disable lints to force the compiler to compile the contracts
-// solhint-disable no-unused-import
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
-// solhint-disable no-unused-import
 
 import {
     L2_ASSET_ROUTER_ADDR,
@@ -165,17 +160,17 @@ contract DeployZKScript is Script {
     function supplyWallet(address _bridgehub, uint256 _chainId, address _recipient, uint256 _amount) public {
         initializeConfig(_bridgehub, _chainId);
 
-        Utils.runL1L2Transaction(
-            hex"",
-            Utils.MAX_PRIORITY_TX_GAS,
-            _amount,
-            new bytes[](0),
-            _recipient,
-            config.chainId,
-            config.bridgehub,
-            config.l1SharedBridge,
-            msg.sender
-        );
+        Utils.runL1L2Transaction({
+            l2Calldata: hex"",
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            l2Value: _amount,
+            factoryDeps: new bytes[](0),
+            dstAddress: _recipient,
+            chainId: config.chainId,
+            bridgehubAddress: config.bridgehub,
+            l1SharedBridgeProxy: config.l1SharedBridge,
+            refundRecipient: msg.sender
+        });
     }
 
     function finalizeZkTokenWithdrawal(

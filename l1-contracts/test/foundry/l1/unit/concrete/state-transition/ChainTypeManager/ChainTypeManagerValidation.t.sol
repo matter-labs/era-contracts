@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
@@ -20,8 +20,6 @@ import {ZeroAddress, GenesisBatchHashZero, GenesisUpgradeZero} from "contracts/c
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
-
-import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
@@ -51,7 +49,7 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
     address internal validator;
     address internal serverNotifier;
     bytes32 internal baseTokenAssetId;
-    uint256 chainId = 112;
+    uint256 internal chainId = 112;
     address internal testnetVerifier;
 
     uint256 internal constant MAX_NUMBER_OF_ZK_CHAINS = 10;
@@ -75,7 +73,7 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
         messageroot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(address(bridgehub), 1, address(chainAssetHandler))),
+                    address(new L1MessageRoot(address(bridgehub), address(chainAssetHandler))),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initialize, ())
                 )

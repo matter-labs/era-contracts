@@ -5,6 +5,7 @@ pragma solidity ^0.8.24;
 // The canonical definitions of `L2EcosystemContract` and `ZKsyncOSUpgradeType` live in the production
 // contracts tree (they key the upgrade registries); they are re-exported here so that all
 // deploy-script importers keep working unchanged.
+// solhint-disable-next-line no-unused-import
 import {L2EcosystemContract, ZKsyncOSUpgradeType} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 /// @notice Fixed-address L2 system contracts upgraded through `SystemContractProxy`.

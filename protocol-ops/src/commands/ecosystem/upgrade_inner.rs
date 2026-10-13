@@ -25,6 +25,7 @@ use anyhow::Context;
 // `(CTMUpgradeParams)`), so this one driver serves them all; which one actually runs is decided by
 // the `--core-script-path` / `--ctm-script-path` inputs.
 use crate::common::abi::{ICTMUpgradePrepareAbi, ICoreUpgradePrepareAbi};
+use crate::common::forge::scripts::UPGRADE_CTM_OUTPUT_PATH_PREFIX;
 use crate::common::wallets::Wallet;
 use crate::common::{forge::ForgeRunner, logger};
 
@@ -78,16 +79,10 @@ pub struct PrepareInputs {
 
 /// Output of the prepare phase: the TOMLs each forge invocation wrote, in
 /// the order the governance phase should replay them (core first, then per
-/// CTM in input order, then the optional new-Gateway bring-up bundle).
+/// CTM in input order).
 pub struct PrepareOutput {
     pub core_toml: PathBuf,
     pub ctm_tomls: Vec<CtmPrepareEntry>,
-    /// Empty when the env's `[new_gateway]` block isn't set. When present,
-    /// each entry points at one `GatewayVotePreparation` output TOML (one
-    /// per CTM deployed on the gateway); the merge logic in
-    /// `upgrade::write_merged_ecosystem_toml` decodes
-    /// `governance_calls_to_execute` from each and appends to stage 2.
-    pub new_gateway_tomls: Vec<PathBuf>,
 }
 
 /// Per-CTM prepare result: where the script wrote its TOML. `prepare` rejects
@@ -153,7 +148,6 @@ impl<'a> UpgradeInner<'a> {
         Ok(PrepareOutput {
             core_toml,
             ctm_tomls: vec![ctm_entry],
-            new_gateway_tomls: Vec::new(),
         })
     }
 
@@ -330,8 +324,9 @@ impl<'a> UpgradeInner<'a> {
             "Per-CTM create2 salt: {create2_salt:#x} (ctm={ctm_proxy:#x})"
         ));
 
-        // Per-CTM output path so back-to-back prepares don't clobber each other.
-        let output_path_str = format!("/script-out/upgrade-ctm-{ctm_proxy:#x}.toml");
+        // Per-CTM output path so back-to-back prepares don't clobber each other. Version-free: the same
+        // name serves every release's prepare.
+        let output_path_str = format!("{UPGRADE_CTM_OUTPUT_PATH_PREFIX}{ctm_proxy:#x}.toml");
         let ctm_output_path = self
             .contracts_path
             .join(output_path_str.trim_start_matches('/'));

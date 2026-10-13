@@ -171,10 +171,17 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationV34Bootstra
     /// @dev The upgrade input whose `latest_protocol_version` EQUALS the version the bootstrap
     ///      left live: what an infrastructure-only hop must be given.
     string internal constant SAME_VERSION_INPUT = "/upgrade-envs/foundry-upgrade.toml";
-    /// @dev The upgrade input naming the next minor: what a chain-release hop is given. Its
-    ///      `latest_protocol_version`, v36.0.0.
+    /// @dev The upgrade input naming the next minor: what a chain-release hop is given.
     string internal constant NEXT_VERSION_INPUT = "/upgrade-envs/foundry-upgrade-recurring.toml";
-    uint256 internal constant NEXT_VERSION = 0x2400000000;
+
+    /// @dev The version a chain-release hop targets: {NEXT_VERSION_INPUT}'s `latest_protocol_version`, read
+    ///      rather than restated so the fixture inputs alone carry the version numbers.
+    function _nextVersion() internal view returns (uint256) {
+        return
+            vm.readFile(string.concat(vm.projectRoot(), NEXT_VERSION_INPUT)).readUint(
+                "$.contracts.latest_protocol_version"
+            );
+    }
 
     /// @dev Fresh per release, as production rotates the CREATE2 salt every release — without which
     ///      a redeployment of unchanged code lands back on the live address.
@@ -313,7 +320,11 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationV34Bootstra
             liveVersion,
             "the edge departs from the live version"
         );
-        assertEq(ICTMTransition(transition).newProtocolVersion(), NEXT_VERSION, "the edge targets the input's version");
+        assertEq(
+            ICTMTransition(transition).newProtocolVersion(),
+            _nextVersion(),
+            "the edge targets the input's version"
+        );
         assertTrue(ICTMTransition(transition).newRelease() != liveRelease, "a changed verifier publishes a release");
 
         IEcosystemUpgradeOperation operation = IEcosystemUpgradeOperation(hop.preparedOperation());
@@ -321,7 +332,7 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationV34Bootstra
         assertEq(operation.ctmInfrastructureRows().length, 0, "this hop changes no CTM-domain proxy");
 
         _runOperation(operation);
-        assertEq(IChainTypeManager(inputs.ctm).protocolVersion(), NEXT_VERSION, "the CTM committed the edge");
+        assertEq(IChainTypeManager(inputs.ctm).protocolVersion(), _nextVersion(), "the CTM committed the edge");
         assertEq(
             IChainTypeManager(inputs.ctm).currentRelease(),
             ICTMTransition(transition).newRelease(),
@@ -351,7 +362,7 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationV34Bootstra
             rows[0].implNew,
             "the infrastructure leg landed"
         );
-        assertEq(IChainTypeManager(inputs.ctm).protocolVersion(), NEXT_VERSION, "the version leg landed");
+        assertEq(IChainTypeManager(inputs.ctm).protocolVersion(), _nextVersion(), "the version leg landed");
     }
 
     // ───────────────────────────── refusals ─────────────────────────────
@@ -381,7 +392,7 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationV34Bootstra
             bytes(
                 string.concat(
                     "an infrastructure-only upgrade must not move the protocol version: the input names ",
-                    vm.toString(NEXT_VERSION),
+                    vm.toString(_nextVersion()),
                     " and the ChainTypeManager runs ",
                     vm.toString(IChainTypeManager(inputs.ctm).protocolVersion())
                 )

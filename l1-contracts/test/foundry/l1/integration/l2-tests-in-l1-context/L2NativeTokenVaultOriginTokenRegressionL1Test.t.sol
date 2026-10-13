@@ -2,8 +2,6 @@
 
 pragma solidity ^0.8.20;
 
-// solhint-disable gas-custom-errors
-
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
@@ -73,7 +71,7 @@ contract L2NativeTokenVaultOriginTokenRegressionL1Test is Test, SharedL2Contract
 
     /// @notice Test that originToken returns address(0) for non-existent assets
     /// @dev This tests the first branch of originToken where tokenAddress[_assetId] == address(0)
-    function test_regression_originTokenReturnsZeroForNonExistentAsset() external {
+    function test_regression_originTokenReturnsZeroForNonExistentAsset() external view {
         L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
         // Create an asset ID that doesn't exist

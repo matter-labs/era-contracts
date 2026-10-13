@@ -69,7 +69,7 @@ contract DependencyInteropRootsTest is Test {
         messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(bridgehub, 1, chainAssetHandler)),
+                    address(new L1MessageRoot(bridgehub, chainAssetHandler)),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initialize, ())
                 )
@@ -120,7 +120,6 @@ contract DependencyInteropRootsTest is Test {
     function _rollingHashStep(bytes32 _previous, InteropRoot memory _root) internal pure returns (bytes32) {
         return
             keccak256(
-                // solhint-disable-next-line func-named-parameters
                 abi.encodePacked(_previous, _root.chainId, _root.blockOrBatchNumber, _root.timestamp, _root.sides)
             );
     }

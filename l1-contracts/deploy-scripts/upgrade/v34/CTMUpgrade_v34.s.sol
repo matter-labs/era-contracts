@@ -54,7 +54,7 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
     RegistryBootstrapSequence public bootstrapSequence;
 
     /// @notice The v34 delegate-calldata composer the bootstrap manifest pins: the CODE that
-    ///         defines what `L2V34Upgrade` is called with.
+    ///         defines what `L2DefaultUpgrade` is called with.
     address public l2DelegateComposer;
 
     /// @notice The bootstrap edge deploys no transition: after the engine every edge pins, its
@@ -128,7 +128,7 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
         return deploySimpleContract("BootstrapUpgrade");
     }
 
-    /// @notice The L2 side of the bootstrap edge: the delegate's (`L2V34Upgrade`) bytecode info —
+    /// @notice The L2 side of the bootstrap edge: the delegate's (`L2DefaultUpgrade`) bytecode info —
     ///         the migration force-deploys it Unsafe at its bytecode-derived address, so it never
     ///         overwrites live code — the pinned composer that defines its arguments, and every
     ///         bytecode the composed transaction needs published — the built-ins the genesis
@@ -136,16 +136,16 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
     ///         sequencer holds each preimage when the deployments run. The table-derived
     ///         deployments come from the genesis release the manifest names, on-chain.
     /// @dev Virtual so bytecode-light test harnesses can substitute an L1-only edge: the real side
-    ///      reads the `L2V34Upgrade` artifact and every built-in's.
+    ///      reads the `L2DefaultUpgrade` artifact and every built-in's.
     function authorL2Side() internal virtual override returns (AuthoredL2Side memory side) {
         require(l2DelegateComposer != address(0), "L2 delegate composer not deployed");
         side.plan = AuthoredL2Plan({
-            delegateBytecodeInfo: Utils.getZKOSBytecodeInfoForContract("L2V34Upgrade.sol", "L2V34Upgrade"),
+            delegateBytecodeInfo: Utils.getZKOSBytecodeInfoForContract("L2DefaultUpgrade.sol", "L2DefaultUpgrade"),
             extraBytecodeInfos: new bytes[](0),
             delegateComposer: l2DelegateComposer
         });
         L2EcosystemContract[] memory delegateArtifact = new L2EcosystemContract[](1);
-        delegateArtifact[0] = L2EcosystemContract.L2V34Upgrade;
+        delegateArtifact[0] = L2EcosystemContract.L2DefaultUpgrade;
         side.factoryDependencies = CoreOnGatewayHelper.getFullListOfFactoryDependencies(delegateArtifact);
     }
 

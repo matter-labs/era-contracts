@@ -10,7 +10,7 @@ import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/co
 
 import {BridgehubInvariantTests} from "test/foundry/l1/integration/BridgehubTests.t.sol";
 
-contract Bridgehub_ConstructorCaller is BridgehubInvariantTests {
+contract BridgehubConstructorCaller is BridgehubInvariantTests {
     function setUp() public {
         prepare();
     }

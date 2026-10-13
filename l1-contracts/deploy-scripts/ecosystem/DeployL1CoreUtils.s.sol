@@ -1,41 +1,27 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-// solhint-disable no-console, gas-custom-errors
-
-import {console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {Governance} from "contracts/governance/Governance.sol";
 import {CTMDeploymentTracker} from "contracts/core/ctm-deployment/CTMDeploymentTracker.sol";
-import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
-import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
-import {DummyL1MessageRoot} from "contracts/dev-contracts/test/DummyL1MessageRoot.sol";
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
-import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
-import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {ChainRegistrationSender} from "contracts/core/chain-registration/ChainRegistrationSender.sol";
-import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {CoreDeployedAddresses} from "../utils/Types.sol";
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
 
-// solhint-disable-next-line gas-struct-packing
 struct Config {
     uint256 l1ChainId;
     address ownerAddress;
     address deployerAddress;
-    uint256 legacyGatewayChainId;
     ContractsConfig contracts;
     TokensConfig tokens;
 }
 
-// solhint-disable-next-line gas-struct-packing
 struct ContractsConfig {
     address governanceSecurityCouncilAddress;
     uint256 governanceMinDelay;
@@ -72,12 +58,6 @@ contract DeployL1CoreUtils is DeployUtils {
         config.contracts.maxNumberOfChains = toml.readUint("$.contracts.max_number_of_chains");
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
-        // Legacy Era gateway chain ID, baked into L1MessageRoot as immutable
-        // ERA_GATEWAY_CHAIN_ID and used by L1ChainAssetHandler.setHistoricalMigrationInterval
-        // to gate intervals settled on the legacy GW. Optional: absent on fresh deployments.
-        if (vm.keyExistsToml(toml, "$.gateway.chain_id")) {
-            config.legacyGatewayChainId = toml.readUint("$.gateway.chain_id");
-        }
     }
 
     ////////////////////////////// Contract deployment modes /////////////////////////////////
@@ -101,7 +81,6 @@ contract DeployL1CoreUtils is DeployUtils {
             return
                 abi.encode(
                     coreAddresses.bridgehub.proxies.bridgehub,
-                    config.legacyGatewayChainId,
                     coreAddresses.bridgehub.proxies.chainAssetHandler
                 );
         } else if (compareStrings(contractName, "CTMDeploymentTracker")) {

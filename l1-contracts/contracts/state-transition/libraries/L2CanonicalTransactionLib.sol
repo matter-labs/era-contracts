@@ -4,8 +4,8 @@ pragma solidity 0.8.28;
 
 import {L2CanonicalTransaction} from "../../common/Messaging.sol";
 import {
-    PRIORITY_TX_MAX_GAS_LIMIT,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    UPGRADE_TX_MAX_GAS_LIMIT,
     ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE
 } from "../../common/Config.sol";
 import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
@@ -55,7 +55,7 @@ library L2CanonicalTransactionLib {
         transaction.txType = ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE;
         transaction.from = uint256(uint160(L2_FORCE_DEPLOYER_ADDR));
         transaction.to = uint256(uint160(L2_COMPLEX_UPGRADER_ADDR));
-        transaction.gasLimit = PRIORITY_TX_MAX_GAS_LIMIT;
+        transaction.gasLimit = UPGRADE_TX_MAX_GAS_LIMIT;
         transaction.gasPerPubdataByteLimit = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
         transaction.nonce = protocolUpgradeNonce(_protocolVersion);
         transaction.data = _complexUpgraderCalldata;

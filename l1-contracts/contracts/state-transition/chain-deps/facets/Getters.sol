@@ -223,6 +223,21 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters, ISelfDescribingF
     }
 
     /// @inheritdoc IGetters
+    function getZKsyncOSChainConfigHash() external view returns (bytes32) {
+        return _getZKsyncOSChainConfigHash();
+    }
+
+    /// @inheritdoc IGetters
+    function isZKsyncOSL1TxFilteringEnabled() external view returns (bool) {
+        return s.zksyncOSL1TxFilteringEnabled;
+    }
+
+    /// @inheritdoc IGetters
+    function isZKsyncOSLargeContractsEnabled() external view returns (bool) {
+        return s.zksyncOSLargeContractsEnabled;
+    }
+
+    /// @inheritdoc IGetters
     function isFunctionFreezable(bytes4 _selector) external view returns (bool) {
         Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
         if (ds.selectorToFacet[_selector].facetAddress == address(0)) {
@@ -339,7 +354,7 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters, ISelfDescribingF
     ///      (see `Utils.getAllSelectors`), in ascending selector order. Guarded against drift by
     ///      FacetSelfDescription.t.sol and `yarn l1 facet-selectors --check`.
     function selectors() public pure returns (bytes4[] memory result) {
-        uint32[51] memory list = [
+        uint32[54] memory list = [
             // getPubdataPricingMode()
             uint32(0x06d49e5b),
             // getPriorityTxMaxGasLimit()
@@ -380,6 +395,8 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters, ISelfDescribingF
             uint32(0x6e9960c3),
             // getPubdataContent()
             uint32(0x70e7ef4f),
+            // isZKsyncOSLargeContractsEnabled()
+            uint32(0x747c3166),
             // storedBlockHash(uint256)
             uint32(0x74f4d30d),
             // disabledProofSystems()
@@ -390,6 +407,8 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters, ISelfDescribingF
             uint32(0x7a0ed627),
             // getL2SystemContractsUpgradeTxHash()
             uint32(0x7b30c8da),
+            // getZKsyncOSChainConfigHash()
+            uint32(0x84364651),
             // isPriorityQueueActive()
             uint32(0x8708474e),
             // getChainTypeManager()
@@ -412,6 +431,8 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters, ISelfDescribingF
             uint32(0xb22dd78e),
             // getTotalBatchesExecuted()
             uint32(0xb8c2f66f),
+            // isZKsyncOSL1TxFilteringEnabled()
+            uint32(0xbb978235),
             // isEthWithdrawalFinalized(uint256,uint256)
             uint32(0xbd7c5412),
             // isFacetFreezable(address)
@@ -443,8 +464,9 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters, ISelfDescribingF
             // getTotalBlocksCommitted()
             uint32(0xfe26699e)
         ];
-        result = new bytes4[](list.length);
-        for (uint256 i = 0; i < list.length; ++i) {
+        uint256 count = list.length;
+        result = new bytes4[](count);
+        for (uint256 i = 0; i < count; ++i) {
             result[i] = bytes4(list[i]);
         }
     }

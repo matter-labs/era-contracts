@@ -10,10 +10,7 @@ import {Call} from "contracts/governance/Common.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
 import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol";
-import {
-    CTM_CONTRACT_COUNT,
-    L2_ECOSYSTEM_CONTRACT_COUNT
-} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
+import {L2_ECOSYSTEM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
@@ -31,7 +28,7 @@ import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
-import {MAX_GAS_PER_TRANSACTION} from "contracts/common/Config.sol";
+import {PRIORITY_TX_MAX_GAS_LIMIT} from "contracts/common/Config.sol";
 import {
     L2BytecodeNotPublished,
     TransitionNotCommitted,
@@ -40,12 +37,10 @@ import {
     UpgradeNotPermissionlessYet
 } from "contracts/common/L1ContractErrors.sol";
 import {
-    AuthoredL2Plan,
     GenesisFacet,
     ReleaseGenesisData,
     ReleaseManifest,
-    TransitionManifest,
-    ProxyUpgradeRow
+    TransitionManifest
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice The shared fixture of the registry executor suites (`CTMUpgradeExecutorTest`,
@@ -287,6 +282,9 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
 ///         coordinator's ordering, authority and pause rules are CTMUpgradeLifecycle.t.sol and
 ///         EcosystemUpgradeCoordination.t.sol.
 contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
+    /// @dev A limit within the 2^24 admission cap that differs from the one a fresh chain starts with.
+    uint256 internal constant NEW_PRIORITY_TX_MAX_GAS_LIMIT = PRIORITY_TX_MAX_GAS_LIMIT / 2;
+
     function test_stage1_setsVersionCutAndCurrentRelease() public {
         _prepareAndExecute(transition);
 
@@ -338,12 +336,12 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
         calls[0] = Call({
             target: address(chainContractAddress),
             value: 0,
-            data: abi.encodeCall(IChainTypeManager.setPriorityTxMaxGasLimit, (chainId, MAX_GAS_PER_TRANSACTION))
+            data: abi.encodeCall(IChainTypeManager.setPriorityTxMaxGasLimit, (chainId, NEW_PRIORITY_TX_MAX_GAS_LIMIT))
         });
         vm.prank(governor);
         ctmExecutor.forward(calls);
 
-        assertEq(IGetters(chainAddress).getPriorityTxMaxGasLimit(), MAX_GAS_PER_TRANSACTION);
+        assertEq(IGetters(chainAddress).getPriorityTxMaxGasLimit(), NEW_PRIORITY_TX_MAX_GAS_LIMIT);
     }
 
     function test_revertWhen_forwardCalledByStranger() public {
@@ -554,14 +552,17 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
 
     function test_setPriorityTxMaxGasLimit_setsTheChainCap() public {
         uint256 oldLimit = IGetters(chainAddress).getPriorityTxMaxGasLimit();
-        assertTrue(oldLimit != MAX_GAS_PER_TRANSACTION, "the fixture must start below the cap for the change to show");
+        assertTrue(
+            oldLimit != NEW_PRIORITY_TX_MAX_GAS_LIMIT,
+            "the fixture must start at another limit for the change to show"
+        );
 
         vm.expectEmit(true, true, true, true, chainAddress);
-        emit IAdmin.NewPriorityTxMaxGasLimit(oldLimit, MAX_GAS_PER_TRANSACTION);
+        emit IAdmin.NewPriorityTxMaxGasLimit(oldLimit, NEW_PRIORITY_TX_MAX_GAS_LIMIT);
         vm.prank(governor);
-        ctmExecutor.setPriorityTxMaxGasLimit(chainId, MAX_GAS_PER_TRANSACTION);
+        ctmExecutor.setPriorityTxMaxGasLimit(chainId, NEW_PRIORITY_TX_MAX_GAS_LIMIT);
 
-        assertEq(IGetters(chainAddress).getPriorityTxMaxGasLimit(), MAX_GAS_PER_TRANSACTION);
+        assertEq(IGetters(chainAddress).getPriorityTxMaxGasLimit(), NEW_PRIORITY_TX_MAX_GAS_LIMIT);
     }
 
     function test_deactivatePriorityMode_clearsTheChainFlag() public {
@@ -608,7 +609,7 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
         vm.expectRevert("Ownable: caller is not the owner");
         ctmExecutor.setValidator(chainId, newValidator, true);
         vm.expectRevert("Ownable: caller is not the owner");
-        ctmExecutor.setPriorityTxMaxGasLimit(chainId, MAX_GAS_PER_TRANSACTION);
+        ctmExecutor.setPriorityTxMaxGasLimit(chainId, NEW_PRIORITY_TX_MAX_GAS_LIMIT);
         vm.expectRevert("Ownable: caller is not the owner");
         ctmExecutor.deactivatePriorityMode(chainId);
         vm.expectRevert("Ownable: caller is not the owner");

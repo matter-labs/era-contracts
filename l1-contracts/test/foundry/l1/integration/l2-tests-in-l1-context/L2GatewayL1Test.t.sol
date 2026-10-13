@@ -2,11 +2,8 @@
 
 pragma solidity ^0.8.20;
 
-// solhint-disable gas-custom-errors
-
-import {StdStorage, Test, console2 as console, stdStorage} from "forge-std/Test.sol";
+import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
-import "forge-std/console.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_BRIDGEHUB_ADDR,
@@ -20,15 +17,12 @@ import {
     ZKChainCommitment,
     CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET
 } from "contracts/common/Config.sol";
-import {
-    BridgehubBurnCTMAssetData,
-    BridgehubMintCTMAssetData,
-    IBridgehubBase
-} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {BridgehubBase} from "contracts/core/bridgehub/BridgehubBase.sol";
+import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
+import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {InteropBundle, InteropCall} from "contracts/common/Messaging.sol";
 import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
@@ -111,6 +105,29 @@ contract L2GatewayL1Test is Test, SharedL2ContractL1Deployer {
             diamondProxy,
             "Chain registration must be unchanged after forward"
         );
+    }
+
+    function test_forwardToL2OnGateway_revertWhen_callerIsNotInteropCenter() public {
+        finalizeDeposit();
+
+        address diamondProxy = l2Bridgehub.getZKChain(mintChainId);
+        GettersFacet getters = GettersFacet(diamondProxy);
+        uint256 priorityCountBefore = getters.getTotalPriorityTxs();
+        uint256 queueSizeBefore = getters.getPriorityQueueSize();
+
+        // Only the InteropCenter relays priority transactions to a chain on the settlement layer, not the Bridgehub.
+        address bridgehub = getters.getBridgehub();
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, bridgehub));
+        vm.prank(bridgehub);
+        IMailbox(diamondProxy).bridgehubRequestL2TransactionOnGateway(bytes32(0), 0);
+
+        address stranger = makeAddr("stranger");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, stranger));
+        vm.prank(stranger);
+        IMailbox(diamondProxy).bridgehubRequestL2TransactionOnGateway(bytes32(0), 0);
+
+        assertEq(getters.getTotalPriorityTxs(), priorityCountBefore, "totalPriorityTxs must be unchanged");
+        assertEq(getters.getPriorityQueueSize(), queueSizeBefore, "priorityQueueSize must be unchanged");
     }
 
     function test_withdrawFromGateway() public {

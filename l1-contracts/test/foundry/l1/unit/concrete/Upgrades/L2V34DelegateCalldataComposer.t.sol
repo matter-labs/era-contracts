@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {IL2V34Upgrade} from "contracts/upgrades/IL2V34Upgrade.sol";
+import {IL2DefaultUpgrade} from "contracts/upgrades/IL2DefaultUpgrade.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
@@ -23,7 +23,7 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {RegistryObjectsFixture} from "foundry-test/l1/upgrades/_SharedRegistryObjects.t.sol";
 
-/// @notice The v34 delegate-calldata composer: the pinned code that DEFINES what `L2V34Upgrade`
+/// @notice The v34 delegate-calldata composer: the pinned code that DEFINES what `L2DefaultUpgrade`
 ///         is called with, from the target release, the ecosystem's Bridgehub and the chain the
 ///         transaction is composed for — see "L2 delegate composition" in {docs/upgrade-stage-lifecycle.md}.
 /// @dev The releases are real write-once `CTMRelease` objects. The ecosystem behind the Bridgehub
@@ -62,7 +62,7 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
         assertEq(
             composed,
             abi.encodeCall(
-                IL2V34Upgrade.upgrade,
+                IL2DefaultUpgrade.upgrade,
                 (ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(ETH_CHAIN_ID))
             ),
             "the v34 delegate call must be the ZKsync OS upgrade with the release's fixed data and the chain's data"
@@ -96,7 +96,7 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
         assertEq(
             composed,
             abi.encodeCall(
-                IL2V34Upgrade.upgrade,
+                IL2DefaultUpgrade.upgrade,
                 (ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(ERC20_CHAIN_ID))
             )
         );
@@ -119,7 +119,7 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
         assertEq(
             v34Composer.composeDelegateCalldata(ICTMRelease(address(release)), bridgehub, NO_METADATA_CHAIN_ID),
             abi.encodeCall(
-                IL2V34Upgrade.upgrade,
+                IL2DefaultUpgrade.upgrade,
                 (ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(NO_METADATA_CHAIN_ID))
             ),
             "a token without metadata must compose the defaults"
@@ -127,7 +127,7 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
         assertEq(
             v34Composer.composeDelegateCalldata(ICTMRelease(address(release)), bridgehub, BYTES32_METADATA_CHAIN_ID),
             abi.encodeCall(
-                IL2V34Upgrade.upgrade,
+                IL2DefaultUpgrade.upgrade,
                 (ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(BYTES32_METADATA_CHAIN_ID))
             ),
             "a bytes32-returning token must compose the defaults too"
@@ -151,7 +151,7 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
         assertEq(
             v34Composer.composeDelegateCalldata(ICTMRelease(address(otherRelease)), bridgehub, ETH_CHAIN_ID),
             abi.encodeCall(
-                IL2V34Upgrade.upgrade,
+                IL2DefaultUpgrade.upgrade,
                 (ctmDeployerStub, OTHER_FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(ETH_CHAIN_ID))
             ),
             "the fixed data follows the release"
@@ -159,7 +159,7 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
         assertEq(
             v34Composer.composeDelegateCalldata(ICTMRelease(address(release)), otherBridgehub, ETH_CHAIN_ID),
             abi.encodeCall(
-                IL2V34Upgrade.upgrade,
+                IL2DefaultUpgrade.upgrade,
                 (otherDeployer, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(ETH_CHAIN_ID))
             ),
             "the CTM deployer follows the Bridgehub"
@@ -239,7 +239,7 @@ contract L2V34DelegateCalldataComposerTest is RegistryObjectsFixture {
                     plan.deployments,
                     plan.delegateTo,
                     abi.encodeCall(
-                        IL2V34Upgrade.upgrade,
+                        IL2DefaultUpgrade.upgrade,
                         (ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(ETH_CHAIN_ID))
                     )
                 )

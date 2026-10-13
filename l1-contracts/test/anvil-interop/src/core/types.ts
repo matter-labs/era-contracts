@@ -95,6 +95,8 @@ export interface ChainInfo {
 
 export interface DeploymentState {
   chains?: ChainInfo;
+  /** How the running chains were started: from the committed chain states, or by a fresh deployment. */
+  startedFrom?: "chainStates" | "freshDeploy";
   l1Addresses?: CoreDeployedAddresses;
   ctmAddresses?: CTMDeployedAddresses;
   chainAddresses?: ChainAddresses[];
@@ -135,13 +137,8 @@ export interface MultiChainTokenTransferResult {
   sourceToken: string;
   destinationToken: string;
   assetId: string;
-  amountWei: string;
-  sourceBalanceBefore: string;
-  sourceBalanceAfter: string;
-  destinationBalanceBefore: string;
-  destinationBalanceAfter: string;
   sourceTxHash: string;
-  targetTxHash: string | null;
+  targetTxHash: string;
 }
 
 export interface PriorityRequestData {

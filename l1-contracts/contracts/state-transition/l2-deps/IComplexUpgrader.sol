@@ -26,7 +26,6 @@ interface IComplexUpgrader {
     /// @param upgradeType the type of the upgrade.
     /// @param deployedBytecodeInfo the bytecode metadata encoded for the selected upgrade type.
     /// @param newAddress the address where the contract should be deployed.
-    // solhint-disable-next-line gas-struct-packing
     struct UniversalContractUpgradeInfo {
         ContractUpgradeType upgradeType;
         bytes deployedBytecodeInfo;

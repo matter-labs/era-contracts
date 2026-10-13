@@ -24,7 +24,7 @@ contract PushNewLeafTest is FullMerkleTest {
         assertEq(merkleTest.node(0, 0), leaf0, "Node 0,0 should be correctly inserted");
 
         // Chekcking zeros tree structure
-        assertEq(merkleTest.zeros(0), zeroHash, "Zero 0 should be correctly inserted");
+        assertEq(merkleTest.zeros(0), ZERO_HASH, "Zero 0 should be correctly inserted");
 
         // Checking the tree structure
         assertEq(merkleTestMemory._height, 0, "Height should be 0 after one insert");
@@ -34,7 +34,7 @@ contract PushNewLeafTest is FullMerkleTest {
         assertEq(merkleTestMemory._nodes[0][0], leaf0, "Node 0,0 should be correctly inserted");
 
         // Chekcking zeros tree structure
-        assertEq(merkleTestMemory._zeros[0], zeroHash, "Zero 0 should be correctly inserted");
+        assertEq(merkleTestMemory._zeros[0], ZERO_HASH, "Zero 0 should be correctly inserted");
     }
 
     function test_twoLeaves() public {
@@ -64,7 +64,7 @@ contract PushNewLeafTest is FullMerkleTest {
         assertEq(merkleTest.node(1, 0), l01Hashed, "Node 1,0 should be correctly inserted");
 
         // Checking zeros
-        bytes32 zeroHashed = keccak(zeroHash, zeroHash);
+        bytes32 zeroHashed = keccak(ZERO_HASH, ZERO_HASH);
         assertEq(merkleTest.zeros(1), zeroHashed, "Zero 1 should be correctly inserted");
 
         // Checking the tree structure
@@ -109,7 +109,7 @@ contract PushNewLeafTest is FullMerkleTest {
         // Checking parent nodes
         bytes32 l01Hashed = keccak(leaf0, leaf1);
         assertEq(merkleTest.node(1, 0), l01Hashed, "Node 1,0 should be correctly inserted");
-        // there is no leaf3 so we hash leaf2 with zero
+        // there is no leaf3 so we hash leaf2 with ZERO
         bytes32 l23Hashed = keccak(leaf2, merkleTest.zeros(0));
         assertEq(merkleTest.node(1, 1), l23Hashed, "Node 1,1 should be correctly inserted");
 
@@ -117,8 +117,8 @@ contract PushNewLeafTest is FullMerkleTest {
         bytes32 l01l23Hashed = keccak(l01Hashed, l23Hashed);
         assertEq(merkleTest.node(2, 0), l01l23Hashed, "Node 2,0 should be correctly inserted");
 
-        // Checking zero
-        bytes32 zeroHashed = keccak(zeroHash, zeroHash);
+        // Checking ZERO
+        bytes32 zeroHashed = keccak(ZERO_HASH, ZERO_HASH);
         assertEq(merkleTest.zeros(1), zeroHashed, "Zero 1 should be correctly inserted");
         bytes32 zhHashed = keccak(zeroHashed, zeroHashed);
         assertEq(merkleTest.zeros(2), zhHashed, "Zero 2 should be correctly inserted");
@@ -134,13 +134,13 @@ contract PushNewLeafTest is FullMerkleTest {
 
         // // Checking parent nodes
         // assertEq(merkleTestMemory._nodes[1][0], l01Hashed, "Node 1,0 should be correctly inserted");
-        // // there is no leaf3 so we hash leaf2 with zero
+        // // there is no leaf3 so we hash leaf2 with ZERO
         // assertEq(merkleTestMemory._nodes[1][1], l23Hashed, "Node 1,1 should be correctly inserted");
 
         // // Checking root node
         // assertEq(merkleTestMemory._nodes[2][0], l01l23Hashed, "Node 2,0 should be correctly inserted");
 
-        // // Checking zero
+        // // Checking ZERO
         // assertEq(merkleTestMemory._zeros[1], zeroHashed, "Zero 1 should be correctly inserted");
         // assertEq(merkleTestMemory._zeros[2], zhHashed, "Zero 2 should be correctly inserted");
     }

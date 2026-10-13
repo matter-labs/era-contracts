@@ -1,3 +1,4 @@
+import { expect } from "chai";
 import type { providers } from "ethers";
 import { BigNumber, Contract, ethers, Wallet } from "ethers";
 import { DeploymentRunner } from "../deployment-runner";
@@ -9,11 +10,31 @@ import {
   interopCallValueAttr,
   sendInteropBundle,
   executeBundle,
+  expectBundleEvent,
+  getBundleStatus,
   getInteropProtocolFee,
+  registerL2NativeTokenIfNeeded,
 } from "./interop-helpers";
-import { ANVIL_DEFAULT_PRIVATE_KEY, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR } from "../core/const";
+import {
+  approveTokenForNtv,
+  captureBalance,
+  expectBalanceDelta,
+  expectEvent,
+  expectNativeSpend,
+  expectSuccessfulReceipt,
+  getTokenAddressForAsset,
+  getTokenBalance,
+} from "./balance-helpers";
+import { getInteropSourceAddress, getInteropSourcePrivateKey } from "../core/accounts";
+import {
+  BundleStatus,
+  INTEROP_CENTER_ADDR,
+  L2_ASSET_ROUTER_ADDR,
+  L2_NATIVE_TOKEN_VAULT_ADDR,
+  TEST_TOKEN_DECIMALS,
+} from "../core/const";
 import { encodeNtvAssetId, encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "../core/data-encoding";
-import { createProvider } from "../core/utils";
+import { createProvider, getL2RpcUrl } from "../core/utils";
 
 type Logger = (line: string) => void;
 
@@ -62,10 +83,9 @@ export async function executeTokenTransfer(
     );
   }
 
-  const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
   const sourceProvider = createProvider(sourceChain.rpcUrl);
   const targetProvider = createProvider(targetChain.rpcUrl);
-  const sourceWallet = new Wallet(privateKey, sourceProvider);
+  const sourceWallet = new Wallet(getInteropSourcePrivateKey(), sourceProvider);
 
   const sourceToken = new Contract(sourceTokenAddr, getAbi("TestnetERC20Token"), sourceWallet);
   const sourceVault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("L2NativeTokenVault"), sourceProvider);
@@ -117,13 +137,6 @@ export async function executeTokenTransfer(
     log("\n✅ Token already registered in L2NativeTokenVault");
   }
 
-  log(`⏱️  [${elapsed()}] Reading destination balance before...`);
-  const destinationTokenBefore = await targetVault.tokenAddress(assetId);
-  const destinationBalanceBefore =
-    destinationTokenBefore === ethers.constants.AddressZero
-      ? BigNumber.from(0)
-      : await getL2TokenBalance(targetProvider, destinationTokenBefore, sourceWallet.address);
-
   const transferData = encodeBridgeBurnData(amountWei, sourceWallet.address, sourceTokenAddr);
   const depositData = encodeAssetRouterBridgehubDepositData(assetId, transferData);
 
@@ -153,41 +166,19 @@ export async function executeTokenTransfer(
   log(`\n   Transaction sent: cast run ${sendResult.txHash} -r ${sourceChain.rpcUrl}`);
   log(`   ✅ Transaction confirmed in block ${sendResult.receipt.blockNumber} [${elapsed()}]`);
 
-  let targetTxHash: string | null = null;
+  log(`⏱️  [${elapsed()}] Executing bundle directly on destination chain via L2InteropHandler...`);
+  const targetReceipt = await executeBundle(targetProvider, sendResult.bundleData, sourceChainId);
+  const targetTxHash = targetReceipt.transactionHash;
+  log(`   ✅ executeBundle tx: cast run ${targetTxHash} -r ${targetChain.rpcUrl}`);
 
-  {
-    log(`⏱️  [${elapsed()}] Executing bundle directly on destination chain via L2InteropHandler...`);
-    try {
-      const receipt = await executeBundle(targetProvider, sendResult.bundleData, sourceChainId);
-      targetTxHash = receipt.transactionHash;
-      log(`   ✅ executeBundle tx: cast run ${receipt.transactionHash} -r ${targetChain.rpcUrl}`);
-    } catch (error: unknown) {
-      const message = (error as Error)?.message || String(error);
-      log(`   ⚠️ executeBundle failed: ${message}`);
-      const failedTxHash = (error as { transactionHash?: string })?.transactionHash;
-      if (!targetTxHash && failedTxHash) {
-        targetTxHash = failedTxHash;
-        log(`   ⚠️ using reverted executeBundle tx: cast run ${failedTxHash} -r ${targetChain.rpcUrl}`);
-      }
-    }
-  }
-
-  log(`⏱️  [${elapsed()}] Reading final balances...`);
-  const sourceBalanceAfter = await getL2TokenBalance(sourceProvider, sourceTokenAddr, sourceWallet.address);
   const destinationToken = await targetVault.tokenAddress(assetId);
-  const destinationBalanceAfter =
-    destinationToken === ethers.constants.AddressZero
-      ? BigNumber.from(0)
-      : await getL2TokenBalance(targetProvider, destinationToken, sourceWallet.address);
 
   log(`Target Chain: ${targetChainId}`);
-  log(`Target Tx:    ${targetTxHash || "not found yet (relay may still be pending)"}`);
+  log(`Target Tx:    ${targetTxHash}`);
   log("");
   log("Trace commands:");
   log(`  cast run ${sendResult.txHash} -r ${sourceChain.rpcUrl}`);
-  if (targetTxHash) {
-    log(`  cast run ${targetTxHash} -r ${targetChain.rpcUrl}`);
-  }
+  log(`  cast run ${targetTxHash} -r ${targetChain.rpcUrl}`);
 
   log(`\n⏱️  [${elapsed()}] Token transfer complete`);
 
@@ -200,12 +191,61 @@ export async function executeTokenTransfer(
     sourceToken: sourceTokenAddr,
     destinationToken,
     assetId,
-    amountWei: amountWei.toString(),
-    sourceBalanceBefore: sourceBalanceBefore.toString(),
-    sourceBalanceAfter: sourceBalanceAfter.toString(),
-    destinationBalanceBefore: destinationBalanceBefore.toString(),
-    destinationBalanceAfter: destinationBalanceAfter.toString(),
     sourceTxHash: sendResult.txHash,
     targetTxHash,
   };
+}
+
+/**
+ * Transfers `amount` of the source chain's test token with {@link executeTokenTransfer} and asserts the exact
+ * outcome: source burn and fee spend, destination mint, and the bundle's send, execution and mint events.
+ */
+export async function expectTokenTransfer(options: {
+  sourceChainId: number;
+  targetChainId: number;
+  amount: BigNumber;
+  logger?: Logger;
+}): Promise<void> {
+  const { sourceChainId, targetChainId, amount } = options;
+  const state = new DeploymentRunner().loadState();
+  const sourceToken = state.testTokens![sourceChainId];
+  const sender = getInteropSourceAddress();
+  const sourceProvider = createProvider(getL2RpcUrl(state, sourceChainId));
+  const targetProvider = createProvider(getL2RpcUrl(state, targetChainId));
+  const assetId = encodeNtvAssetId(sourceChainId, sourceToken);
+  // Register and approve before the snapshot so the transfer's native spend is only its fee and gas.
+  await registerL2NativeTokenIfNeeded(sourceProvider, sourceToken);
+  await approveTokenForNtv(sourceProvider, sourceToken, amount);
+  const fee = await getInteropProtocolFee(sourceProvider);
+  const sourceBefore = await captureBalance(sourceProvider, sourceToken);
+  const destinationTokenBefore = await getTokenAddressForAsset(targetProvider, assetId);
+  const destinationBefore = await getTokenBalance(targetProvider, destinationTokenBefore, sender);
+  const result = await executeTokenTransfer({
+    sourceChainId,
+    targetChainId,
+    amount: ethers.utils.formatUnits(amount, TEST_TOKEN_DECIMALS),
+    sourceTokenAddress: sourceToken,
+    logger: options.logger,
+  });
+
+  const sourceReceipt = await expectSuccessfulReceipt(sourceProvider, result.sourceTxHash, "interop source");
+  const targetReceipt = await expectSuccessfulReceipt(targetProvider, result.targetTxHash, "interop destination");
+  const sourceAfter = await captureBalance(sourceProvider, sourceToken);
+  const destinationToken = await getTokenAddressForAsset(targetProvider, assetId);
+  const destinationAfter = await getTokenBalance(targetProvider, destinationToken, sender);
+  expectBalanceDelta(sourceBefore.token!, sourceAfter.token!, amount.mul(-1), "interop source token");
+  expectBalanceDelta(destinationBefore, destinationAfter, amount, "interop destination token");
+  expectNativeSpend(sourceBefore, sourceAfter, fee, sourceReceipt, "interop source fee");
+
+  const sent = expectEvent(sourceReceipt, "InteropCenter", INTEROP_CENTER_ADDR, "InteropBundleSent");
+  expect(sent.interopBundle.sourceChainId.toNumber()).to.equal(sourceChainId);
+  expect(sent.interopBundle.destinationChainId.toNumber()).to.equal(targetChainId);
+  expect(sent.interopBundle.calls).to.have.length(1);
+  expectBundleEvent(targetReceipt, "BundleExecuted", sent.interopBundleHash);
+  expect(await getBundleStatus(targetProvider, sent.interopBundleHash)).to.equal(BundleStatus.FullyExecuted);
+  const minted = expectEvent(targetReceipt, "L2NativeTokenVault", L2_NATIVE_TOKEN_VAULT_ADDR, "BridgeMint");
+  expect(minted.chainId.toNumber()).to.equal(sourceChainId);
+  expect(minted.assetId).to.equal(assetId);
+  expect(minted.receiver).to.equal(sender);
+  expect(minted.amount.toString()).to.equal(amount.toString());
 }

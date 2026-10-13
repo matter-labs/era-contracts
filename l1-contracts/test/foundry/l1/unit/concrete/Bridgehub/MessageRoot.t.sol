@@ -40,11 +40,11 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
 );
 
 contract MessageRootTest is Test {
-    address bridgeHub;
-    L1MessageRoot messageRoot;
-    L2MessageRoot l2MessageRoot;
-    uint256 L1_CHAIN_ID;
-    address assetTracker;
+    address internal bridgeHub;
+    L1MessageRoot internal messageRoot;
+    L2MessageRoot internal l2MessageRoot;
+    uint256 internal L1_CHAIN_ID;
+    address internal assetTracker;
 
     function setUp() public {
         bridgeHub = makeAddr("bridgeHub");
@@ -72,7 +72,7 @@ contract MessageRootTest is Test {
         messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(bridgeHub, 1, chainAssetHandler)),
+                    address(new L1MessageRoot(bridgeHub, chainAssetHandler)),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initialize, ())
                 )
@@ -137,7 +137,7 @@ contract MessageRootTest is Test {
         );
     }
 
-    function test_init() public {
+    function test_init() public view {
         // The settlement layer's own entry starts with an empty chain tree: there is no diamond to
         // report a genesis root for the layer itself, and interop proofs never target it.
         assertEq(messageRoot.getAggregatedRoot(), (MessageHashing.chainIdLeafHash(bytes32(0), block.chainid)));
@@ -253,7 +253,6 @@ contract MessageRootTest is Test {
 
     function test_RevertWhen_addChainNotBridgeHub() public {
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
-        uint256 betaChainId = uint256(uint160(makeAddr("betaChainId")));
 
         assertFalse(messageRoot.chainRegistered(alphaChainId), "alpha chain 1");
 
@@ -311,9 +310,9 @@ contract MessageRootTest is Test {
     }
 
     /// @notice The legacy (v31) entry point records the root and advances the batch counter but does
-    /// NOT touch the interop trees: only v32 executors (via `addChainBatchRootV32`) populate them, so
-    /// a non-empty chain tree implies v32-format roots. Pre-upgrade executor facets keep calling this
-    /// name, and the consecutive numbering continues seamlessly after the switch to the V32 flow.
+    /// NOT touch the interop trees: only v33 executors (via `addChainBatchRootV32`) populate them, so
+    /// a non-empty chain tree implies v33-format roots. Pre-upgrade executor facets keep calling this
+    /// name, and the consecutive numbering continues seamlessly after the switch to the v33 flow.
     function test_addChainBatchRoot_v31RecordsWithoutTreePush() public {
         address alphaChainSender = makeAddr("alphaChainSender");
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
@@ -338,11 +337,11 @@ contract MessageRootTest is Test {
         assertEq(messageRoot.getAggregatedRoot(), sharedRootBefore, "shared tree must be untouched");
         assertEq(messageRoot.chainBatchRootTimestamp(alphaChainId, 1), 0, "no leaf timestamp recorded");
 
-        // The V32 flow continues the same numbering afterwards (post-upgrade switch).
+        // The v33 flow continues the same numbering afterwards (post-upgrade switch).
         vm.prank(alphaChainSender);
-        messageRoot.addChainBatchRootV32(alphaChainId, 2, keccak256("v32-root-2"));
+        messageRoot.addChainBatchRootV32(alphaChainId, 2, keccak256("v33-root-2"));
         assertEq(messageRoot.currentChainBatchNumber(alphaChainId), 2);
-        assertTrue(messageRoot.getChainRoot(alphaChainId) != chainRootBefore, "v32 push must move the chain tree");
+        assertTrue(messageRoot.getChainRoot(alphaChainId) != chainRootBefore, "v33 push must move the chain tree");
     }
 
     function test_addChainBatchRoot_1() public {
@@ -485,7 +484,7 @@ contract MessageRootTest is Test {
         assertEq(finalBatchNumber, 3, "Final batch number should be 3");
 
         // No root assertion: the value depends on the tree implementation; the call just must not revert.
-        bytes32 finalChainRoot = messageRoot.getChainRoot(alphaChainId);
+        messageRoot.getChainRoot(alphaChainId);
     }
 
     /// @notice Verify that multiple _emitRoot calls within the same block share the same logId.

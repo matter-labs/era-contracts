@@ -7,8 +7,6 @@ pragma solidity 0.8.28;
 // governance-calldata generation. Kept for the v34 bootstrap edge, which still ships
 // script-composed stage0/1/2 calls.
 
-// solhint-disable gas-custom-errors
-
 import {Script} from "forge-std/Script.sol";
 import {Utils} from "../../utils/Utils.sol";
 
@@ -28,7 +26,7 @@ contract DefaultChainUpgrade is Script {
         address bridgehubProxyAddress;
     }
 
-    ChainConfig config;
+    ChainConfig internal config;
 
     function prepareChainWithBridgehub(uint256 chainId, address bridgehubProxyAddress) public {
         config.chainChainId = chainId;
@@ -50,13 +48,13 @@ contract DefaultChainUpgrade is Script {
     }
 
     function _adminExecuteOnChain(bytes memory _callData) private {
-        Utils.adminExecute(
-            IZKChain(config.chainDiamondProxyAddress).getAdmin(),
-            address(0),
-            config.chainDiamondProxyAddress,
-            _callData,
-            0
-        );
+        Utils.adminExecute({
+            _admin: IZKChain(config.chainDiamondProxyAddress).getAdmin(),
+            _accessControlRestriction: address(0),
+            _target: config.chainDiamondProxyAddress,
+            _data: _callData,
+            _value: 0
+        });
     }
 
     function setupConfigFromOnchain(address ctm, uint256 chainChainId) public {

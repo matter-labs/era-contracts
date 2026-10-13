@@ -6,7 +6,6 @@ import {Test} from "forge-std/Test.sol";
 import {Utils} from "./Utils.sol";
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
@@ -44,6 +43,7 @@ contract UtilsCallMockerTest is Test {
         bytes32 baseTokenAssetId,
         uint256 baseTokenAssetIdChainId
     ) public {
+        // solhint-disable-next-line func-named-parameters
         mockDiamondInitInteropCenterCallsWithAddress(
             bridgehub,
             assetRouter,
@@ -79,6 +79,7 @@ contract UtilsCallMockerTest is Test {
         address chainTypeManager,
         address permissionlessValidator
     ) public {
+        // solhint-disable-next-line func-named-parameters
         mockDiamondInitInteropCenterCallsWithAddress(
             bridgehub,
             assetRouter,
@@ -107,6 +108,7 @@ contract UtilsCallMockerTest is Test {
         if (baseTokenAssetId == bytes32(0)) {
             baseTokenAssetId = Utils.TEST_BASE_TOKEN_ASSET_ID;
         }
+        // solhint-disable-next-line func-named-parameters
         mockCtmDerivedInitValues(
             chainTypeManager,
             bridgehub,
@@ -162,6 +164,7 @@ contract UtilsCallMockerTest is Test {
         address validatorTimelock,
         bytes32 storedBatchZero
     ) public {
+        // solhint-disable-next-line func-named-parameters
         mockCtmDerivedInitValues(
             chainTypeManager,
             bridgehub,

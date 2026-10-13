@@ -6,7 +6,7 @@ import {GettersFacetTest} from "./_Getters_Shared.t.sol";
 import {PubdataContent} from "contracts/common/Config.sol";
 
 contract GetPubdataContentTest is GettersFacetTest {
-    function test_defaultsToFullPubdata() public {
+    function test_defaultsToFullPubdata() public view {
         // Fresh storage: the enum's zero value must read as FULL_PUBDATA (commit everything),
         // so chains that existed before the field was introduced keep full-pubdata behavior.
         PubdataContent received = gettersFacet.getPubdataContent();

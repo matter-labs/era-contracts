@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
@@ -29,7 +28,7 @@ contract ZKChainBaseModifiersTest is UtilsCallMockerTest {
     UtilsFacet internal utilsFacet;
     DummyBridgehub internal dummyBridgehub;
     address internal testnetVerifier = address(new ZKsyncOSTestnetVerifier(IVerifier(address(0))));
-    uint256 constant eraChainId = 9;
+    uint256 internal constant ERA_CHAIN_ID = 9;
 
     function getAdminSelectors() internal pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](15);
@@ -104,7 +103,7 @@ contract ZKChainBaseModifiersTest is UtilsCallMockerTest {
     }
 
     // Test that onlySettlementLayer passes when settlementLayer is zero
-    function test_onlySettlementLayerPassesWhenZero() public {
+    function test_onlySettlementLayerPassesWhenZero() public view {
         // By default, settlementLayer is address(0), so the modifier should pass
         address settlementLayer = utilsFacet.util_getSettlementLayer();
         assertEq(settlementLayer, address(0), "Settlement layer should be zero by default");

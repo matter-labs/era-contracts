@@ -9,7 +9,7 @@ import {
     ProofSystem,
     L2DACommitmentScheme,
     PubdataContent,
-    MAX_GAS_PER_TRANSACTION,
+    PRIORITY_TX_MAX_GAS_LIMIT,
     MAX_PRICE_CHANGE_DENOMINATOR,
     MAX_PRICE_CHANGE_NUMERATOR,
     PRICE_REFERENCE_L1_GAS,
@@ -28,8 +28,7 @@ import {
     NotL1,
     PriorityModeAlreadyAllowed,
     ExecutedIsNotConsistentWithVerified,
-    VerifiedIsNotConsistentWithCommitted,
-    NotMigrated
+    VerifiedIsNotConsistentWithCommitted
 } from "../../L1StateTransitionErrors.sol";
 import {
     AlreadyPermanentRollup,
@@ -115,13 +114,6 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
         emit ExecuteUpgrade(_diamondCut);
     }
 
-    /// @dev Requires the chain to be currently migrated (settlement layer != 0)
-    function _requireMigrated() internal view {
-        if (s.settlementLayer == address(0)) {
-            revert NotMigrated();
-        }
-    }
-
     /// @inheritdoc IAdmin
     function setPendingAdmin(address _newPendingAdmin) external onlyAdmin {
         // Save previous value into the stack to put it into the event later
@@ -155,7 +147,7 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
 
     /// @inheritdoc IAdmin
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external onlyChainTypeManager onlyL1 {
-        if (_newPriorityTxMaxGasLimit > MAX_GAS_PER_TRANSACTION) {
+        if (_newPriorityTxMaxGasLimit > PRIORITY_TX_MAX_GAS_LIMIT) {
             revert TooMuchGas();
         }
 
@@ -181,9 +173,28 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
         emit NewZKsyncOSMaxTxGasLimit(oldMaxTxGasLimit, _newMaxTxGasLimit);
     }
 
-    /// @dev The runtime chain config is read from storage when the batch proof public input is
-    /// computed, so it must not change while committed-but-unverified batches exist: those batches
-    /// were executed by ZKsync OS under the old config and would become unprovable.
+    /// @inheritdoc IAdmin
+    function setZKsyncOSL1TxFiltering(bool _enabled) external onlyAdmin onlySettlementLayer {
+        if (_enabled && s.priorityModeInfo.canBeActivated) {
+            revert NotCompatibleWithPriorityMode();
+        }
+        _enforceNoUnverifiedBatchesForChainConfigUpdate();
+
+        bool oldEnabled = s.zksyncOSL1TxFilteringEnabled;
+        s.zksyncOSL1TxFilteringEnabled = _enabled;
+        emit NewZKsyncOSL1TxFiltering(oldEnabled, _enabled);
+    }
+
+    /// @inheritdoc IAdmin
+    function setZKsyncOSLargeContractsEnabled(bool _enabled) external onlyAdmin onlySettlementLayer {
+        _enforceNoUnverifiedBatchesForChainConfigUpdate();
+
+        bool oldEnabled = s.zksyncOSLargeContractsEnabled;
+        s.zksyncOSLargeContractsEnabled = _enabled;
+        emit NewZKsyncOSLargeContracts(oldEnabled, _enabled);
+    }
+
+    /// @notice Enforces the configuration-update boundary described in {protocol-docs/chain-config.md}.
     function _enforceNoUnverifiedBatchesForChainConfigUpdate() internal view {
         if (s.totalBatchesCommitted != s.totalBatchesVerified) {
             revert ZKsyncOSChainConfigUpdateWithUnverifiedBatches(s.totalBatchesVerified, s.totalBatchesCommitted);
@@ -441,6 +452,9 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
         if (s.priorityModeInfo.canBeActivated) {
             revert PriorityModeAlreadyAllowed();
         }
+        if (s.zksyncOSL1TxFilteringEnabled) {
+            revert NotCompatibleWithPriorityMode();
+        }
         // Ensure that there is at least one priority tx with a non-zero request timestamp.
         // This guarantees that activatePriorityMode can actually function, since it relies on
         // the timestamp of the first unprocessed tx. After the v31 upgrade, old priority txs
@@ -595,11 +609,13 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
     ///      (see `Utils.getAllSelectors`), in ascending selector order. Guarded against drift by
     ///      FacetSelfDescription.t.sol and `yarn l1 facet-selectors --check`.
     function selectors() public pure returns (bytes4[] memory result) {
-        uint32[24] memory list = [
+        uint32[26] memory list = [
             // upgradeChainFromVersion(address,uint256)
             uint32(0x03129ad9),
             // acceptAdmin()
             uint32(0x0e18b681),
+            // setZKsyncOSLargeContractsEnabled(bool)
+            uint32(0x120c12c2),
             // unfreezeDiamond()
             uint32(0x17338945),
             // permanentlyAllowPriorityMode()
@@ -636,6 +652,8 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
             uint32(0xc5f1f1f5),
             // genesisUpgrade()
             uint32(0xd241f618),
+            // setZKsyncOSL1TxFiltering(bool)
+            uint32(0xdf16d0a3),
             // setPubdataContent(uint8)
             uint32(0xe51935f5),
             // setPubdataPricingMode(uint8)
@@ -645,8 +663,9 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
             // ROLLUP_DA_MANAGER()
             uint32(0xf9afb97e)
         ];
-        result = new bytes4[](list.length);
-        for (uint256 i = 0; i < list.length; ++i) {
+        uint256 count = list.length;
+        result = new bytes4[](count);
+        for (uint256 i = 0; i < count; ++i) {
             result[i] = bytes4(list[i]);
         }
     }

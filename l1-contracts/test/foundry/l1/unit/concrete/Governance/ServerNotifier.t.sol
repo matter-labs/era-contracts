@@ -12,12 +12,7 @@ import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DummyChainAssetHandler} from "contracts/dev-contracts/test/DummyChainAssetHandler.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IUpgradePreconditionChecker} from "contracts/upgrades/IUpgradePreconditionChecker.sol";
-import {
-    CutDataForProtocolVersionNotAvailable,
-    InvalidProtocolVersion,
-    Unauthorized,
-    ZeroAddress
-} from "contracts/common/L1ContractErrors.sol";
+import {CutDataForProtocolVersionNotAvailable, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 // Isolates notifier behavior from any release-specific prerequisites.
 contract UpgradePreconditionCheckerStub is IUpgradePreconditionChecker {
@@ -85,7 +80,7 @@ contract ServerNotifierTest is Test {
     }
 
     function test_setUpgradeTimestampValidProtocolVersionSucceeds() public {
-        uint deadline = block.timestamp + 7 days;
+        uint256 deadline = block.timestamp + 7 days;
 
         chainTypeManager.setUpgradeCutHash(protocolVersion, keccak256("upgradeCutHash"));
         chainTypeManager.setProtocolVersionDeadline(protocolVersion, deadline);
@@ -100,7 +95,7 @@ contract ServerNotifierTest is Test {
 
     function test_setUpgradeTimestampCutDataForProtocolVersionNotAvailableReverts() public {
         chainTypeManager.setUpgradeCutHash(protocolVersion, bytes32(0));
-        uint deadline = block.timestamp + 7 days;
+        uint256 deadline = block.timestamp + 7 days;
 
         chainTypeManager.setProtocolVersionDeadline(protocolVersion, deadline);
 
@@ -110,7 +105,7 @@ contract ServerNotifierTest is Test {
     }
 
     function test_setUpgradeTimestampInvalidCallerReverts() public {
-        uint deadline = block.timestamp + 7 days;
+        uint256 deadline = block.timestamp + 7 days;
 
         chainTypeManager.setProtocolVersionDeadline(protocolVersion, deadline);
 

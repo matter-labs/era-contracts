@@ -37,6 +37,16 @@ export function encodeEvmChainAddress(address: string, chainId: number): string 
   return "0x" + ERC7930_VERSION + ERC7930_EIP155_CHAIN_TYPE + ref.len + ref.bytes + "14" + address.slice(2);
 }
 
+/** Chain ID referenced by an EIP-155 ERC-7930 InteroperableAddress, e.g. a `sendMessage` recipient. */
+export function decodeEvmChainId(interoperableAddress: string): number {
+  const hex = interoperableAddress.slice(2);
+  const chainRefLength = parseInt(hex.slice(8, 10), 16);
+  if (hex.slice(0, 8) !== ERC7930_VERSION + ERC7930_EIP155_CHAIN_TYPE || chainRefLength === 0) {
+    throw new Error(`${interoperableAddress} is not an EIP-155 InteroperableAddress with a chain reference`);
+  }
+  return parseInt(hex.slice(10, 10 + 2 * chainRefLength), 16);
+}
+
 /**
  * Encode an address as an ERC-7930 InteroperableAddress (no chain reference).
  * Used for bundle attributes (executionAddress, unbundlerAddress) and for

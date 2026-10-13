@@ -396,8 +396,9 @@ contract MigratorFacet is ZKChainBase, IMigrator, ISelfDescribingFacet {
             // forwardedBridgeConfirmTransferResult(uint256,uint8,bytes32,address,bytes)
             uint32(0x75ceffdf)
         ];
-        result = new bytes4[](list.length);
-        for (uint256 i = 0; i < list.length; ++i) {
+        uint256 count = list.length;
+        result = new bytes4[](count);
+        for (uint256 i = 0; i < count; ++i) {
             result[i] = bytes4(list[i]);
         }
     }

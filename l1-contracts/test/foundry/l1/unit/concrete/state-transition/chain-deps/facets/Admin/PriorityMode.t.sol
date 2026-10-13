@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
 import {
-    NotCompatibleWithPriorityMode,
     OnlyPriorityMode,
     PriorityOpsRequestTimestampMissing,
     Unauthorized

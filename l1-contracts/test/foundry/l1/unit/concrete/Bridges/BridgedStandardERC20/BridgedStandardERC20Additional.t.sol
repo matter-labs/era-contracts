@@ -20,9 +20,9 @@ contract MockNTVForAdditional {
 contract BridgedStandardERC20AdditionalTest is Test {
     using stdStorage for StdStorage;
 
-    BridgedStandardERC20 implementation;
-    address originToken = address(0xBEEF);
-    bytes32 assetId = keccak256(abi.encode("assetId"));
+    BridgedStandardERC20 internal implementation;
+    address internal originToken = address(0xBEEF);
+    bytes32 internal assetId = keccak256(abi.encode("assetId"));
 
     function setUp() public {
         implementation = new BridgedStandardERC20();

@@ -8,7 +8,6 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
-import {NativeTokenVaultBase} from "contracts/bridge/ntv/NativeTokenVaultBase.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 
@@ -18,7 +17,6 @@ import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {IBridgedStandardToken} from "contracts/bridge/interfaces/IBridgedStandardToken.sol";
 import {BridgeHelper} from "contracts/bridge/BridgeHelper.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
-import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
@@ -30,7 +28,6 @@ import {TxStatus} from "contracts/common/Messaging.sol";
 import {OriginChainIdNotFound} from "contracts/common/L1ContractErrors.sol";
 import {AssetNotNativeToL1, OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
 import {InsufficientChainBalance} from "contracts/common/L1ContractErrors.sol";
-import {ILegacyL1AssetTracker} from "contracts/bridge/asset-tracker/ILegacyL1AssetTracker.sol";
 import {MockLegacyL1AssetTracker} from "../../_shared/MockLegacyL1AssetTracker.sol";
 import {MAX_TOKEN_BALANCE} from "contracts/common/Config.sol";
 

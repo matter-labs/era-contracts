@@ -192,9 +192,6 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
       value: msgValue,
     });
 
-    expect(result.txHash).to.be.a("string").and.not.equal("");
-    expect(result.interopBundle).to.not.be.null;
-
     const balAfter = await captureBalance(sourceProvider);
     expectNativeSpend(balBefore, balAfter, msgValue, result.receipt, "base token message");
     if (protocolFeesBefore) {
@@ -212,8 +209,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     // ── Execute on destination ──
     const recipientBalBefore = await getNativeBalance(destProvider, dummyRecipient);
 
-    const receipt = await executeBundle(destProvider, result.bundleData, sourceChainId);
-    expect(receipt.status).to.equal(1);
+    await executeBundle(destProvider, result.bundleData, sourceChainId);
 
     const recipientBalAfter = await getNativeBalance(destProvider, dummyRecipient);
     expectBalanceDelta(recipientBalBefore, recipientBalAfter, amount, "base token message: recipient native");
@@ -257,8 +253,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     ).to.be.true;
 
     const recipientBalBefore = await getNativeBalance(destProvider, dummyRecipient);
-    const receipt = await executeBundle(destProvider, result.bundleData, sourceChainId);
-    expect(receipt.status).to.equal(1);
+    await executeBundle(destProvider, result.bundleData, sourceChainId);
 
     const recipientBalAfter = await getNativeBalance(destProvider, dummyRecipient);
     expectBalanceDelta(recipientBalBefore, recipientBalAfter, amount, "fixed-fee base token message: recipient native");
@@ -285,9 +280,6 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
       value: msgValue,
     });
 
-    expect(result.txHash).to.be.a("string").and.not.equal("");
-    expect(result.interopBundle).to.not.be.null;
-
     const balAfter = await captureBalance(sourceProvider, sourceTokenAddress);
 
     // Token balance should decrease by exactly erc20Amount
@@ -306,8 +298,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
 
     const recipientBalBefore = await getTokenBalance(destProvider, destTokenAddr, getInteropRecipientAddress());
 
-    const receipt = await executeBundle(destProvider, result.bundleData, sourceChainId);
-    expect(receipt.status).to.equal(1);
+    await executeBundle(destProvider, result.bundleData, sourceChainId);
 
     // Re-resolve: NTV may have deployed the bridged token during executeBundle
     destTokenAddr = await getTokenAddressForAsset(destProvider, sourceAssetId);
@@ -347,9 +338,6 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
       value: msgValue,
     });
 
-    expect(result.txHash).to.be.a("string").and.not.equal("");
-    expect(result.interopBundle).to.not.be.null;
-
     const balAfter = await captureBalance(sourceProvider);
     expectNativeSpend(balBefore, balAfter, msgValue, result.receipt, "cross-base-token message");
 
@@ -363,8 +351,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
         ? await getTokenBalance(customBaseTokenProvider!, bridgedEthAddr, getInteropRecipientAddress())
         : ethers.BigNumber.from(0);
 
-    const receipt = await executeBundle(customBaseTokenProvider!, result.bundleData, sourceChainId);
-    expect(receipt.status).to.equal(1);
+    await executeBundle(customBaseTokenProvider!, result.bundleData, sourceChainId);
 
     // Re-resolve after execution (NTV may have deployed the bridged token)
     bridgedEthAddr = await getTokenAddressForAsset(customBaseTokenProvider!, ethAssetId);
@@ -411,6 +398,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     const attributes = [indirectCallAttr(amount)];
     const msgValue = customChainInteropFee.add(amount);
 
+    const senderBefore = await captureBalance(customBaseTokenProvider);
     const result = await sendInteropMessage({
       sourceProvider: customBaseTokenProvider,
       recipient,
@@ -419,8 +407,8 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
       value: msgValue,
     });
 
-    expect(result.txHash).to.be.a("string").and.not.equal("");
-    expect(result.interopBundle).to.not.be.null;
+    const senderAfter = await captureBalance(customBaseTokenProvider);
+    expectNativeSpend(senderBefore, senderAfter, msgValue, result.receipt, "custom→ETH sender");
 
     console.log(`   Custom→ETH message sent: ${result.txHash}`);
 
@@ -431,8 +419,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
         ? await getTokenBalance(destProvider, bridgedTokenAddr, getInteropRecipientAddress())
         : ethers.BigNumber.from(0);
 
-    const receipt = await executeBundle(destProvider, result.bundleData, customBaseTokenChainId);
-    expect(receipt.status).to.equal(1);
+    await executeBundle(destProvider, result.bundleData, customBaseTokenChainId);
 
     bridgedTokenAddr = await getTokenAddressForAsset(destProvider, customBaseTokenAssetId);
     expect(bridgedTokenAddr).to.not.equal(ethers.constants.AddressZero, "bridged custom token should be deployed");
@@ -498,9 +485,6 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
       value: msgValue,
     });
 
-    expect(result.txHash).to.be.a("string").and.not.equal("");
-    expect(result.interopBundle).to.not.be.null;
-
     const balAfter = await getTokenBalance(sourceProvider, bridgedTokenOnSource, getInteropSourceAddress());
     expect(
       balAfter.eq(balBefore.sub(bridgedAmount)),
@@ -514,8 +498,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
 
     const recipientBalBefore = await getTokenBalance(destProvider, destTokenAddr, getInteropRecipientAddress());
 
-    const receipt = await executeBundle(destProvider, result.bundleData, sourceChainId);
-    expect(receipt.status).to.equal(1);
+    await executeBundle(destProvider, result.bundleData, sourceChainId);
 
     const recipientBalAfter = await getTokenBalance(destProvider, destTokenAddr, getInteropRecipientAddress());
     expectBalanceDelta(recipientBalBefore, recipientBalAfter, bridgedAmount, "bridged ERC20 message: recipient token");

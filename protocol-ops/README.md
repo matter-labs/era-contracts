@@ -48,6 +48,39 @@ Most subcommands flatten **`SharedRunArgs`** from `common/args.rs`:
 > an EOA to simulate forge scripts against the Anvil fork. Extra signers (e.g.
 > **`--owner`**) stay on specific commands.
 
+## Preparing an upgrade
+
+`ecosystem upgrade-prepare-all` defaults to the current release's scripts, `CoreUpgrade_v34` and `CTMUpgrade_v34`
+under `l1-contracts/deploy-scripts/upgrade/v34/` (the one-time bootstrap edge onto registry-driven upgrades), using
+`upgrade-envs/v0.34.0-registry/local.toml` for a local upgrade. The recurring registry-driven edge,
+`CoreUpgrade_v35` and `CTMUpgrade_v35` under `l1-contracts/deploy-scripts/upgrade/v35/`, is selected with
+`--core-script-path` / `--ctm-script-path`.
+With `--env <name>` the input is `<release dir>/<name>.toml` (see [Environment inputs](#environment-inputs));
+missing inputs fail before deployment.
+
+`--ctm-script-path`, `--core-script-path`, and `--upgrade-input-path` are visible in `--help`.
+Historical preparations must select the matching scripts and input explicitly. The anvil upgrade tests
+(`l1-contracts/test/anvil-interop/run-v33-to-v34-upgrade-test.ts` for the bootstrap edge,
+`run-v34-to-v35-upgrade-test.ts` for the recurring one) pass their test subclasses of these scripts explicitly. See
+[the activation requirements](../protocol-docs/chain-config.md#activation).
+
+## Environment inputs
+
+`--env <name>` reads `upgrade-envs/permanent-values/<name>.toml` and the release input
+`<release dir>/<name>.toml`. A release input holds only what is read from it: `owner_address`, `era_chain_id`
+and the CREATE2 / legacy-Gov salts (`[contracts] create2_factory_salt`, `legacy_gov_salt`,
+`[create2_factory_salts]`, rotated every release because CREATE2 returns the previously deployed contract on a
+reused salt) and `redeploy_zk_governance` (whether this release replaces the PUH governance set) for protocol-ops,
+and `governance_upgrade_timer_initial_delay` for `DefaultCTMUpgrade`. The old
+protocol version comes from each CTM and the target from `configs/genesis/zksync-os/latest.json`. The release dir is the current release's (`current_upgrade_env_dir!` in
+`src/common/forge/scripts/mod.rs`) unless `--upgrade-env-dir` selects another (on the commands built on the
+shared `--env` topology args; `ecosystem init` / `ctm init` always use the current release). It is the only release selector: `upgrade-prepare-all` rejects an `--upgrade-input-path` outside the
+selected release dir rather than mixing one release's input with another's salts. The owner, `era_chain_id`
+and CREATE2 salts come
+from that release input, and a command that needs one of them fails when the release has no input for the
+env: it never falls back to the deployer, local's values or random salts. `yarn new-release` creates the next
+release's inputs from the current ones with fresh salts.
+
 ## Execution model
 
 Every command that generates Safe bundles runs **exclusively against a temporary Anvil fork**

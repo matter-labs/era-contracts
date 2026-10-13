@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// It's required to disable lints to force the compiler to compile the contracts
-// solhint-disable no-unused-import
-
 import {Call} from "contracts/governance/Common.sol";
 
-/// @notice Scripts that is responsible for preparing the chain to become a gateway
+/// @notice Helpers shared by the default upgrade scripts
 library UpgradeUtils {
     /// @notice Merge array of Call arrays into single Call array
     function mergeCallsArray(Call[][] memory a) public pure returns (Call[] memory result) {

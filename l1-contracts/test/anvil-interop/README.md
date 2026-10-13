@@ -37,7 +37,7 @@ yarn test:hardhat:interop --keep-chains
 
 ## Pregenerated Chain States
 
-Tests load pregenerated Anvil snapshots from `chain-states/<stateVersion>/` by default (see `chain-states/README.md`: `v0.34.0` = current, `v0.33.0` = frozen bootstrap fixture). This skips the full deployment and cuts test time from ~5 min to ~85s.
+Tests load pregenerated Anvil snapshots from `chain-states/<stateVersion>/` by default (the current snapshot version, `v0.35.0`, configured as `stateVersion` in `config/anvil-config.json`; the frozen upgrade-test fixtures are described in `chain-states/README.md`). This skips the full deployment and cuts test time from ~5 min to ~85s.
 
 The runner auto-detects pregenerated state by checking for `chain-states/<state-version>/addresses.json`. If found, it gunzips each `<chainId>.json.gz` dump and starts each Anvil process with `--load-state`. If not found (or `ANVIL_INTEROP_FRESH_DEPLOY=1`), it runs the full deployment.
 
@@ -53,6 +53,16 @@ yarn setup-and-dump
 ```
 
 This runs the full deployment with pinned settings (`blockTime=1`, `timestamp=1`) and dumps each chain's state to the `chain-states/` directory. Interval mining makes the final block height and block-indexed state wall-clock-dependent, so the CI determinism check uses `compare-chain-states.ts` to normalize the documented drift and requires every non-normalized field to match.
+
+Spec `01` compares all predeploy runtimes byte-for-byte against a reference chosen by how the chains
+were started, which the run records in its deployment state, so reruns against kept chains use the
+same one. On loaded snapshots the reference is the current sources built with the `anvil-interop`
+Foundry profile the snapshots use, so a stale snapshot fails: its setup builds those artifacts in
+`outputs/predeploy-identity<run-suffix>/`, leaving the default artifacts used by coverage intact. A
+cold identity build adds compilation time; reruns reuse that separate cache. A fresh deployment
+(`ANVIL_INTEROP_FRESH_DEPLOY=1`, `run-coverage.ts --fresh-deploy`, or no snapshots for the state
+version) installs the predeploys from `out/`, whatever profile built it, so the spec compares
+against those artifacts and skips the reference build.
 
 ## Running Tests Without Redeployment
 
@@ -124,8 +134,8 @@ Live environment variables:
 
 | Spec                         | What it tests                                                                                                                                                |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `01-deployment-verification` | L1 contracts deployed, CTM registered, all 5 L2 chains have diamond proxies, L2 system contracts present, test tokens deployed, initial chainBalance is zero |
-| `02-direct-bridge`           | L1->L2 ETH deposit + L2->L1 ETH withdrawal on chain 10 (direct L1 settlement), net flow assertions                                                           |
+| `01-deployment-verification` | L1 core contracts wired together, CTM registered, all 5 L2 chains registered on L1 with chain ID + CTM, exact predeploy runtimes, test token decimals/supply |
+| `02-direct-bridge`           | L1->L2 ETH deposit + L2->L1 ETH withdrawal, and an L1-native ERC20 round trip, on chain 10 (direct L1 settlement), net flow assertions                       |
 | `03-interop-transfer`        | Unsupported interop routes revert; only GW-settled L2<->GW-settled L2 interop is intentionally registered                                                    |
 | `04-gateway-setup`           | GW chain contracts deployed, interop chains registered on GW L2Bridgehub, GW designated as settlement layer on L1                                            |
 | `05-gateway-bridge`          | L1->L2A ETH deposit + L2A->L1 ETH withdrawal on chain 12 (via GW)                                                                                            |
@@ -169,7 +179,7 @@ Shards resolve only the contracts their own specs touched, so their file and lin
 the union takes the max hit count per line and per function. Denominators do not matter here —
 `scripts/merge-coverage.ts` rebases everything onto the Foundry LCOV. The union itself is
 covered by `test/unit/lcov-merge.test.ts`. `yarn test:unit` runs every suite under `test/unit/`
-(48 cases, ~4s), and takes a substring to narrow it: `yarn test:unit trace` runs only the trace
+(a few seconds), and takes a substring to narrow it: `yarn test:unit trace` runs only the trace
 guard. CI runs the whole set in the jobs that depend on it.
 
 Two coverage runs can coexist: pass `--port-offset N` or export `ANVIL_INTEROP_PORT_OFFSET=N`
@@ -211,6 +221,7 @@ pass as "these specs added no coverage". Both union paths use the same `lcov-mer
 | `ANVIL_INTEROP_PORT_OFFSET=N`          | Offset all chain ports by N (useful for parallel runs)                  |
 | `ANVIL_INTEROP_RUN_SUFFIX=X`           | Suffix for output dirs (set automatically by parallel workers)          |
 | `ANVIL_INTEROP_MAX_PARALLEL_WORKERS=N` | Cap concurrent test/coverage workers (0 or unset = one per spec)        |
+| `ANVIL_INTEROP_PRIVATE_KEY=0x…`        | Spec sender; token specs also need `ANVIL_INTEROP_FRESH_DEPLOY=1`       |
 | `ANVIL_COVERAGE_MODE=1`                | Start Anvil with `--steps-tracing` so traces can be collected afterward |
 
 ### CLI Parameters
@@ -248,7 +259,8 @@ test/anvil-interop/
 │   └── chain-{10,11,12,13,14}.toml # Per-chain deployment params (generated)
 ├── chain-states/
 │   ├── v0.33.0/                   # FROZEN departing-version fixture (bootstrap edge input)
-│   └── v0.34.0/                   # Current-source Anvil state snapshots (regenerated)
+│   ├── v0.34.0/                   # FROZEN previous-release snapshots (`upgradeSourceStateVersion`)
+│   └── v0.35.0/                   # Current-source Anvil state snapshots (`stateVersion`, regenerated)
 │       ├── 31337.json.gz          # L1 state dump (gzip; kept out of diffs)
 │       ├── {10,11,12,13,14}.json.gz # L2 chain state dumps (gzip)
 │       └── addresses.json         # All contract addresses + test tokens
@@ -298,7 +310,6 @@ test/anvil-interop/
 - **Batch settlement**: No real sequencer or prover; batches are never committed/proved/executed
 - **Custom pubdata pricing**: Gas and pubdata costs use Anvil defaults, not ZKsync fee models
 - **Validium mode**: All chains run as rollup (validium carries no meaning without batch settlement)
-- **Settlement fees**: `processLogsAndMessages` still uses a zero settlement fee payer; interop sends cover non-zero dynamic base-token fees and fixed ZK fees separately
 
 ### Mock Contracts
 
@@ -336,7 +347,6 @@ Contracts are first bootstrapped at hardcoded addresses via `anvil_setCode` and 
 - **L2 genesis deployment via anvil_setCode**: System contracts are bootstrapped at hardcoded addresses, not via real genesis state. Production chains get that state directly from genesis.
 - **Synthetic merkle proofs**: Encode settlement layer chain ID but contain no real cryptographic data
 - **Interop proofs**: Correct struct shape but empty proof arrays
-- **processLogsAndMessages impersonation**: The diamond proxy is impersonated instead of the operator (production uses the operator role)
 - **Settlement layer notification via impersonation**: `SystemContext.setSettlementLayerChainId` is called by impersonating the bootloader. On ZKsync OS, this is only emitted during actual migration between settlement layers (and during genesis/v31 upgrades), not at every batch
 - **Upgrade harness storage patches**: the upgrade runners apply two direct `anvil_setStorageAt` patches on L1. Before governance, `clearGenesisUpgradeTxHash` clears the genesis-upgrade tx hash the fixture's chains still carry, which a real chain's server clears once it processes the batch and which otherwise blocks a new upgrade with `PreviousUpgradeNotFinalized`. Before each per-chain upgrade, `forceBatchExecutedEqualsCommitted` copies `totalBatchesCommitted` onto `totalBatchesExecuted` so the upgrade's outstanding-batches check passes without a sequencer and prover. Both are test-only compatibility bridges, not a production upgrade flow.
 - **L2 genesis bootstrap**: `l2-genesis-upgrade-deployer.ts` still bootstraps contract code and base-token balance via Anvil RPC before relaying the real genesis transaction. Production chains get that state directly from genesis.

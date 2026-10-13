@@ -1,0 +1,19 @@
+# Upgrade input for the testnet environment on the v35 release. See protocol-ops/README.md "Environment inputs".
+
+era_chain_id = 270
+
+# Delay armed on the `GovernanceUpgradeTimer` this upgrade deploys, bounding the window between stage 0
+# and stage 1 becoming executable. The timer is a fresh contract each upgrade, so it is a per-release input.
+governance_upgrade_timer_initial_delay = 1200
+
+# `bridgehub.owner()`, the signer of every governance stage.
+owner_address = "0x803e5E7aF1FDD504F8844E28a249203Cfa7c471D"
+
+[contracts]
+# Rotated every release: CREATE2 returns the previously deployed contract if a salt is reused.
+create2_factory_salt = "0x725070df5847b0ed215cc152c9bc249f520a76cfef78c301c83f27ccda60c139"
+
+# Per-CTM CREATE2 salts, keyed by CTM proxy: each CTM prepare deploys its own `GovernanceUpgradeTimer`
+# with env-wide constructor args, so two CTMs need distinct salts.
+[create2_factory_salts]
+"0x54D55e74De9c6003E7a68a1fE70E633f05761eb5" = "0xb4f95e6181226f0b0802464bd261c6143261ba7a6b2d549a1445ec272eb7e54f"

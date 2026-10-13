@@ -126,15 +126,6 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
         _;
     }
 
-    /// @notice Checks that the message sender is the specified ZK Chain.
-    /// @param _chainId The ID of the chain that is required to be the caller.
-    modifier onlyChain(uint256 _chainId) {
-        if (msg.sender != IBridgehubBase(_getBridgehub()).getZKChain(_chainId)) {
-            revert OnlyChain(msg.sender, IBridgehubBase(_getBridgehub()).getZKChain(_chainId));
-        }
-        _;
-    }
-
     /// @notice Restricts batch-root appends to the chain's own diamond (its `Executor` calls
     /// directly while settling).
     modifier addChainBatchRootRestriction(uint256 _chainId) {
@@ -206,7 +197,7 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     }
 
     /// @dev Pushes an already-recorded chainBatchRoot into the chain tree and propagates the new chain
-    /// root into the shared tree (the interop half of the v32 flow). See {protocol-docs/message-root.md#v31-vs-v32-append-flows}.
+    /// root into the shared tree (the interop half of the v33 flow). See {protocol-docs/message-root.md#v31-vs-v33-append-flows}.
     function _pushChainBatchRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) internal {
         uint256 l1Timestamp = block.timestamp;
         chainBatchRootTimestamp[_chainId][_batchNumber] = l1Timestamp;

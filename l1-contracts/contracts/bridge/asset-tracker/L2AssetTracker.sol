@@ -51,7 +51,7 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
 
     bytes32 public BASE_TOKEN_ASSET_ID;
 
-    /// @dev L2-side accounting used to compute the amount to keep on L1 during L1 -> Gateway migration.
+    /// @dev L2-side accounting a settlement-layer migration needs to compute the amount to keep on L1; nothing reads it yet.
     mapping(bytes32 assetId => InteropL2Info info) public interopInfo;
 
     /// @notice Token total-supply snapshot captured before the token's first post-v31 bridge operation.
@@ -59,8 +59,8 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
     mapping(bytes32 assetId => SavedTotalSupply snapshot) public totalPreV31TotalSupply;
 
     /// @dev Slot previously holding `needBaseTokenTotalSupplyBackfill`. The ZKsync OS base-token
-    /// backfill it gated is complete on every chain that can take this upgrade — the shipped v32
-    /// upgrade enforced it on L1 — so this release has no backfill entry point left.
+    /// backfill it gated is complete on every chain that can take this upgrade (the v33 per-chain upgrade
+    /// enforced it on L1), so this release has no backfill entry point left.
     // slither-disable-next-line unused-state
     bool private __DEPRECATED_needBaseTokenTotalSupplyBackfill;
 

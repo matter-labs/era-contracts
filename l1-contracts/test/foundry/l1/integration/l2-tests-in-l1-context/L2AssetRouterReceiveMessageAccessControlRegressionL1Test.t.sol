@@ -2,10 +2,7 @@
 
 pragma solidity ^0.8.20;
 
-// solhint-disable gas-custom-errors
-
 import {Test} from "forge-std/Test.sol";
-import "forge-std/console.sol";
 import {Unauthorized, InvalidSelector} from "contracts/common/L1ContractErrors.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_INTEROP_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";

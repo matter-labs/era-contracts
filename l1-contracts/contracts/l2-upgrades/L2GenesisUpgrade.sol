@@ -29,7 +29,6 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade {
             revert InvalidChainId();
         }
 
-        // solhint-disable-next-line func-named-parameters
         L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
             _ctmDeployer,
             _fixedForceDeploymentsData,

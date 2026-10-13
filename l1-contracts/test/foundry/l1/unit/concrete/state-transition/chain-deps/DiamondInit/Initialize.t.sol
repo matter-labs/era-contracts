@@ -13,7 +13,7 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {EmptyAssetId, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
-import {L2DACommitmentScheme} from "contracts/common/Config.sol";
+import {L2DACommitmentScheme, PRIORITY_TX_MAX_GAS_LIMIT} from "contracts/common/Config.sol";
 
 contract InitializeTest is DiamondInitTest {
     /// @dev Builds the standard genesis cut. Kept separate from the deploy so revert tests can
@@ -119,6 +119,7 @@ contract InitializeTest is DiamondInitTest {
         assertEq(utilsFacet.util_getChainTypeManager(), Utils.TEST_CHAIN_TYPE_MANAGER);
         assertEq(utilsFacet.util_getBaseTokenAssetId(), Utils.TEST_BASE_TOKEN_ASSET_ID);
         assertEq(utilsFacet.util_getProtocolVersion(), 0);
+        assertEq(utilsFacet.util_getPriorityTxMaxGasLimit(), PRIORITY_TX_MAX_GAS_LIMIT);
 
         // Verifier is now fetched from CTM
         assertEq(address(utilsFacet.util_getVerifier()), testnetVerifier);

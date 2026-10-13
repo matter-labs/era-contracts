@@ -21,6 +21,7 @@ import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    PRIORITY_TX_MAX_GAS_LIMIT,
     SERVICE_TRANSACTION_SENDER,
     SETTLEMENT_LAYER_RELAY_SENDER,
     PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
@@ -40,7 +41,6 @@ import {DepositsPaused, NotL1, NotSettlementLayer, NotZKChain} from "../../L1Sta
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
-import {OnlyGateway} from "../../../core/bridgehub/L1BridgehubErrors.sol";
 import {IL1ChainAssetHandler} from "../../../core/chain-asset-handler/IL1ChainAssetHandler.sol";
 
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
@@ -69,13 +69,6 @@ contract MailboxFacet is ZKChainBase, IMailbox, ISelfDescribingFacet {
     modifier onlyL1() {
         if (block.chainid != L1_CHAIN_ID) {
             revert NotL1(block.chainid);
-        }
-        _;
-    }
-
-    modifier onlyGateway() {
-        if (block.chainid == L1_CHAIN_ID) {
-            revert OnlyGateway();
         }
         _;
     }
@@ -128,8 +121,6 @@ contract MailboxFacet is ZKChainBase, IMailbox, ISelfDescribingFacet {
         if (_expirationTimestamp != 0) {
             revert ValueMismatch(0, _expirationTimestamp);
         }
-        // Note during the upgrade to V31 no chain will be on GW.
-
         BridgehubL2TransactionRequest memory wrappedRequest = _wrapRequest({
             _chainId: _chainId,
             _canonicalTxHash: _canonicalTxHash,
@@ -142,7 +133,7 @@ contract MailboxFacet is ZKChainBase, IMailbox, ISelfDescribingFacet {
     function bridgehubRequestL2TransactionOnGateway(
         bytes32 _canonicalTxHash,
         uint64
-    ) external override onlyBridgehubOrInteropCenter {
+    ) external override onlyInteropCenter {
         _writePriorityOpHash(_canonicalTxHash);
         emit NewRelayedPriorityTransaction(_getTotalPriorityTxs(), _canonicalTxHash, 0);
         emit NewPriorityRequestId(_getTotalPriorityTxs(), _canonicalTxHash);
@@ -165,8 +156,7 @@ contract MailboxFacet is ZKChainBase, IMailbox, ISelfDescribingFacet {
                 contractL2: L2_INTEROP_CENTER_ADDR,
                 mintValue: 0,
                 l2Value: 0,
-                // Very large amount
-                l2GasLimit: 72_000_000,
+                l2GasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
                 l2Calldata: data,
                 l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
                 factoryDeps: new bytes[](0),
@@ -186,8 +176,7 @@ contract MailboxFacet is ZKChainBase, IMailbox, ISelfDescribingFacet {
                 contractL2: _contractL2,
                 mintValue: 0,
                 l2Value: 0,
-                // Very large amount
-                l2GasLimit: 72_000_000,
+                l2GasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
                 l2Calldata: _l2Calldata,
                 l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
                 factoryDeps: new bytes[](0),
@@ -381,7 +370,6 @@ contract MailboxFacet is ZKChainBase, IMailbox, ISelfDescribingFacet {
         emit NewPriorityRequestId(_transaction.nonce, _canonicalTxHash);
     }
 
-    // solhint-disable-next-line no-unused-vars
     function _writePriorityOpHash(bytes32 _canonicalTxHash) internal {
         s.priorityTree.push(_canonicalTxHash);
         uint256 totalPriorityTxs = s.priorityTree.getTotalPriorityTxs();
@@ -409,8 +397,9 @@ contract MailboxFacet is ZKChainBase, IMailbox, ISelfDescribingFacet {
             // bridgehubRequestL2TransactionOnGateway(bytes32,uint64)
             uint32(0xddcc9eec)
         ];
-        result = new bytes4[](list.length);
-        for (uint256 i = 0; i < list.length; ++i) {
+        uint256 count = list.length;
+        result = new bytes4[](count);
+        for (uint256 i = 0; i < count; ++i) {
             result[i] = bytes4(list[i]);
         }
     }

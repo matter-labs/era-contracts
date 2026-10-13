@@ -2,8 +2,6 @@
 
 pragma solidity ^0.8.20;
 
-// solhint-disable gas-custom-errors
-
 import {Test} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {
@@ -146,7 +144,6 @@ contract L2AssetTrackerL1Test is Test, SharedL2ContractL1Deployer {
         L2AssetTracker tracker = L2AssetTracker(L2_ASSET_TRACKER_ADDR);
         bytes32 liveBaseTokenAssetId = tracker.BASE_TOKEN_ASSET_ID();
         uint256 nonL1DestinationChainId = 505;
-        uint256 amount = 300;
 
         uint256 withdrawalsBefore = _readTotalWithdrawalsToL1(liveBaseTokenAssetId);
         uint256 chainBalanceBefore = tracker.chainBalance(block.chainid, liveBaseTokenAssetId);
@@ -214,7 +211,6 @@ contract L2AssetTrackerL1Test is Test, SharedL2ContractL1Deployer {
         });
 
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        // solhint-disable-next-line func-named-parameters
         ntv.updateL2(liveL1ChainId, liveOwner, liveWethToken, bridgingData, metadata);
 
         vm.expectRevert(BaseTokenNativeToThisChain.selector);

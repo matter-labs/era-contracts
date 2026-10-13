@@ -44,12 +44,12 @@ contract MockV31TrackerImpl {
 }
 
 /// @dev Inert delegate target for the dispatcher call: the upgrade payload itself is covered by
-/// the L2V34Upgrade tests, this suite only exercises the force-deployment loop before it.
+/// the L2DefaultUpgrade tests, this suite only exercises the force-deployment loop before it.
 contract NoopUpgradeDelegate {
     function noop() external {}
 }
 
-/// @dev The pre-v32 ComplexUpgrader behavior needed by this regression. In particular, it still
+/// @dev The pre-v33 ComplexUpgrader behavior needed by this regression. In particular, it still
 /// exposes the Era-only entry point while its universal path is the code that starts the self-upgrade.
 contract V31L2ComplexUpgrader {
     modifier onlyForceDeployer() {
@@ -323,7 +323,7 @@ contract RemovedTrackerNeutralizationTest is Test {
         assertEq(
             address(uint160(uint256(vm.load(L2_COMPLEX_UPGRADER_ADDR, IMPLEMENTATION_SLOT)))),
             expectedComplexUpgraderImpl,
-            "the ComplexUpgrader proxy must switch to the v32 implementation"
+            "the ComplexUpgrader proxy must switch to the v33 implementation"
         );
         assertEq(
             keccak256(expectedComplexUpgraderImpl.code),

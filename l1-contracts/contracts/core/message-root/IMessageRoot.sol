@@ -15,11 +15,6 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
     0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21
 );
 
-// The value that is saved in the v31UpgradeChainBatchNumber mapping for all deployed chains until the chain upgrades to v31.
-uint256 constant V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE = uint256(
-    keccak256(abi.encodePacked("V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE"))
-);
-
 /**
  * @author Matter Labs
  * @notice MessageRoot contract is responsible for storing and aggregating the roots of the batches
@@ -77,14 +72,14 @@ interface IMessageRootBase is IMessageVerification {
     function addNewChain(uint256 _chainId, uint256 _startingBatchNumber) external;
 
     /// @notice Records a chainBatchRoot WITHOUT pushing it into the interop trees — the v31,
-    /// record-only flow kept for pre-upgrade executor facets. See {protocol-docs/message-root.md#v31-vs-v32-append-flows}.
+    /// record-only flow kept for pre-upgrade executor facets. See {protocol-docs/message-root.md#v31-vs-v33-append-flows}.
     /// @param _chainId The ID of the chain whose chainBatchRoot is being recorded.
     /// @param _batchNumber The number of the batch to which _chainBatchRoot belongs.
     /// @param _chainBatchRoot The value of chainBatchRoot which is being recorded.
     function addChainBatchRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) external;
 
     /// @notice Records a chainBatchRoot AND pushes it into the chain tree and the aggregated shared
-    /// tree — the v32 flow, called by v32 executors while settling. See {protocol-docs/message-root.md#v31-vs-v32-append-flows}.
+    /// tree — the v33 flow, called by v33 executors while settling. See {protocol-docs/message-root.md#v31-vs-v33-append-flows}.
     /// @param _chainId The ID of the chain whose chainBatchRoot is being added to the chainTree.
     /// @param _batchNumber The number of the batch to which _chainBatchRoot belongs.
     /// @param _chainBatchRoot The value of chainBatchRoot which is being added.

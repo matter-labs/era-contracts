@@ -9,15 +9,15 @@ import {
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 
 contract L2TxMocker is Test {
-    address mockRefundRecipient;
-    address mockL2Contract;
-    address mockL2SharedBridge;
+    address internal mockRefundRecipient;
+    address internal mockL2Contract;
+    address internal mockL2SharedBridge;
 
-    uint256 mockL2GasLimit = 10000000;
-    uint256 mockL2GasPerPubdataByteLimit = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
+    uint256 internal mockL2GasLimit = 10000000;
+    uint256 internal mockL2GasPerPubdataByteLimit = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
 
-    bytes mockL2Calldata;
-    bytes[] mockFactoryDeps;
+    bytes internal mockL2Calldata;
+    bytes[] internal mockFactoryDeps;
 
     mapping(uint256 chainId => address l2MockContract) public chainContracts;
 
@@ -41,7 +41,7 @@ contract L2TxMocker is Test {
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit,
         bytes memory _l2CallData
-    ) internal returns (L2TransactionRequestDirect memory request) {
+    ) internal view returns (L2TransactionRequestDirect memory request) {
         request.chainId = _chainId;
         request.mintValue = _mintValue;
         request.l2Value = _l2Value;
@@ -64,7 +64,7 @@ contract L2TxMocker is Test {
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit,
         bytes memory _secondBridgeCalldata
-    ) internal returns (L2TransactionRequestTwoBridgesOuter memory request) {
+    ) internal view returns (L2TransactionRequestTwoBridgesOuter memory request) {
         request.chainId = _chainId;
         request.mintValue = _mintValue;
         request.secondBridgeAddress = _secondBridgeAddress;

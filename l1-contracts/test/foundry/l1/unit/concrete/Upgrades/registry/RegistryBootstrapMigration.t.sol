@@ -37,7 +37,7 @@ import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {BYTECODE_INFO_LENGTH} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 import {
     MAX_NEW_FACTORY_DEPS,
-    PRIORITY_TX_MAX_GAS_LIMIT,
+    UPGRADE_TX_MAX_GAS_LIMIT,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE
 } from "contracts/common/Config.sol";
@@ -320,7 +320,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         transaction.txType = ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE;
         transaction.from = uint256(uint160(L2_FORCE_DEPLOYER_ADDR));
         transaction.to = uint256(uint160(L2_COMPLEX_UPGRADER_ADDR));
-        transaction.gasLimit = PRIORITY_TX_MAX_GAS_LIMIT;
+        transaction.gasLimit = UPGRADE_TX_MAX_GAS_LIMIT;
         transaction.gasPerPubdataByteLimit = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
         (, uint32 minor, ) = SemVer.unpackSemVer(uint96(newVersion));
         transaction.nonce = minor;
@@ -533,7 +533,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         assertEq(_transaction.txType, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE, "the VM's upgrade tx type");
         assertEq(_transaction.from, uint256(uint160(L2_FORCE_DEPLOYER_ADDR)));
         assertEq(_transaction.to, uint256(uint160(L2_COMPLEX_UPGRADER_ADDR)));
-        assertEq(_transaction.gasLimit, PRIORITY_TX_MAX_GAS_LIMIT);
+        assertEq(_transaction.gasLimit, UPGRADE_TX_MAX_GAS_LIMIT);
         assertEq(_transaction.gasPerPubdataByteLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
         (, uint32 minor, ) = SemVer.unpackSemVer(uint96(newVersion));
         assertEq(_transaction.nonce, minor, "the nonce is the new minor version");

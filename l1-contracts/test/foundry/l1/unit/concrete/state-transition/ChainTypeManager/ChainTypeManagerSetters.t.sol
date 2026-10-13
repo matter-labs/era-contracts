@@ -5,9 +5,6 @@ import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 contract ChainTypeManagerSetters is ChainTypeManagerTest {
     function setUp() public {

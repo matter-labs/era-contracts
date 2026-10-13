@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.28;
 
-// solhint-disable no-console
-
 import {console2 as console} from "forge-std/Script.sol";
 import {SystemContractsProcessing} from "../upgrade/SystemContractsProcessing.s.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -16,8 +14,6 @@ import {
     L2_CHAIN_ASSET_HANDLER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ChainTypeManagerInitializeData, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 import {Utils} from "../utils/Utils.sol";
@@ -25,7 +21,6 @@ import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
 import {CTMContract, CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "../ctm/DeployCTML1OrGateway.sol";
 
 import {Facets, Verifiers} from "contracts/common/StateTransitionTypes.sol";
-import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 
 import {DAContracts} from "contracts/common/StateTransitionTypes.sol";
 import {
@@ -41,8 +36,6 @@ import {
     GatewayCTMFinalResult
 } from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 import {GenesisFacet, ReleaseGenesisData, ReleaseManifest} from "../../contracts/upgrades/registry/RegistryTypes.sol";
-
-// solhint-disable gas-custom-errors
 
 struct InnerDeployConfig {
     address deployerAddr;
@@ -217,32 +210,32 @@ library GatewayCTMDeployerHelper {
         (directAddresses, directCalldata) = _calculateDirectDeployments(_create2Salt, config, im.daResult);
         directAddresses.verifier = im.verifiersResult.verifier;
         // Last, because the manifest it commits to names every facet AND the verifier.
-        (directAddresses.currentRelease, directCalldata.currentReleaseCalldata) = _calculateBootstrapRelease(
-            _create2Salt,
-            config,
-            directAddresses,
-            _l2BytecodeInfos,
-            _l2SystemProxyBytecodeInfo
-        );
+        (directAddresses.currentRelease, directCalldata.currentReleaseCalldata) = _calculateBootstrapRelease({
+            _create2Salt: _create2Salt,
+            _config: config,
+            _direct: directAddresses,
+            _l2BytecodeInfos: _l2BytecodeInfos,
+            _l2SystemProxyBytecodeInfo: _l2SystemProxyBytecodeInfo
+        });
 
         GatewayCTMFinalResult memory ctmResult;
-        (deployers.ctmDeployer, deployerCalldata.ctmCalldata, ctmResult) = _calculateCTMDeployer(
-            _create2Salt,
-            config,
-            directAddresses,
-            im.proxyAdminResult,
-            im.validatorTimelockResult,
-            im.verifiersResult
-        );
+        (deployers.ctmDeployer, deployerCalldata.ctmCalldata, ctmResult) = _calculateCTMDeployer({
+            _create2Salt: _create2Salt,
+            config: config,
+            directAddresses: directAddresses,
+            proxyAdminResult: im.proxyAdminResult,
+            validatorTimelockResult: im.validatorTimelockResult,
+            verifiersResult: im.verifiersResult
+        });
 
-        contracts = _assembleContracts(
-            im.daResult,
-            im.proxyAdminResult,
-            im.validatorTimelockResult,
-            im.verifiersResult,
-            directAddresses,
-            ctmResult
-        );
+        contracts = _assembleContracts({
+            daResult: im.daResult,
+            proxyAdminResult: im.proxyAdminResult,
+            validatorTimelockResult: im.validatorTimelockResult,
+            verifiersResult: im.verifiersResult,
+            directAddresses: directAddresses,
+            ctmResult: ctmResult
+        });
         // Assigned after assembly to keep this function's call-site stack flat.
         contracts.stateTransition.currentRelease = directAddresses.currentRelease;
     }
@@ -477,13 +470,13 @@ library GatewayCTMDeployerHelper {
         GatewayValidatorTimelockDeployerResult memory validatorTimelockResult,
         Verifiers memory verifiersResult
     ) internal view returns (address deployer, bytes memory data, GatewayCTMFinalResult memory result) {
-        GatewayCTMFinalConfig memory ctmConfig = _buildCTMFinalConfig(
-            config,
-            directAddresses,
-            proxyAdminResult,
-            validatorTimelockResult,
-            verifiersResult
-        );
+        GatewayCTMFinalConfig memory ctmConfig = _buildCTMFinalConfig({
+            config: config,
+            directAddresses: directAddresses,
+            proxyAdminResult: proxyAdminResult,
+            validatorTimelockResult: validatorTimelockResult,
+            verifiersResult: verifiersResult
+        });
         (deployer, data) = _calculateCreate2AddressAndCalldata(
             _create2Salt,
             CTMContract.GatewayCTMDeployerCTM,
@@ -677,7 +670,7 @@ library GatewayCTMDeployerHelper {
                 serverNotifierProxy: result.serverNotifierProxy,
                 currentRelease: predictedRelease
             });
-            result.diamondCutData = _buildDiamondCutDataEncoded(config.facets, baseConfig);
+            result.diamondCutData = _buildDiamondCutDataEncoded(config.facets);
             result.chainTypeManagerProxy = _deployInternalWithParams(
                 "TransparentUpgradeableProxy",
                 "TransparentUpgradeableProxy.sol",
@@ -687,10 +680,7 @@ library GatewayCTMDeployerHelper {
         }
     }
 
-    function _buildDiamondCutDataEncoded(
-        Facets memory facets,
-        GatewayCTMDeployerConfig memory baseConfig
-    ) private pure returns (bytes memory) {
+    function _buildDiamondCutDataEncoded(Facets memory facets) private pure returns (bytes memory) {
         // Mirrors GatewayCTMDeployerCTMBase: the cut carries NO facet addresses (empty
         // `facetCuts`) and NO init payload (empty `initCalldata`), only a pointer to the genesis
         // registry set in `ChainCreationParams` below. DiamondInit reads the registry and
@@ -814,9 +804,7 @@ library GatewayCTMDeployerHelper {
 
     /// @notice Returns all factory dependencies for deployment.
     /// @dev Gateway CTM deployment needs no additional factory dependencies.
-    function getListOfFactoryDeps(
-        GatewayCTMDeployerConfig memory // config
-    ) external pure returns (bytes[] memory dependencies) {
+    function getListOfFactoryDeps() external pure returns (bytes[] memory dependencies) {
         return dependencies;
     }
 
@@ -847,9 +835,7 @@ library GatewayCTMDeployerHelper {
     /// Emit a `forge verify-contract` line for a GW-side deploy. GW contracts
     /// are EVM-equivalent (ZKsync OS), so no toolchain flag is needed — the
     /// operator supplies the GW chain id and (if required) a custom
-    /// `--verifier-url` at script invocation time. Routing into
-    /// `gw-verification-logs.txt` is handled on the Rust side based on the
-    /// emitting forge script (`GatewayVotePreparation.s.sol`).
+    /// `--verifier-url` at script invocation time.
     function _logGatewayVerifyContract(
         address contractAddr,
         string memory contractName,
@@ -859,6 +845,7 @@ library GatewayCTMDeployerHelper {
         if (constructorArgs.length == 0) {
             msgStr = string.concat("forge verify-contract ", Utils.vm.toString(contractAddr), " ", contractName);
         } else {
+            // solhint-disable-next-line func-named-parameters
             msgStr = string.concat(
                 "forge verify-contract ",
                 Utils.vm.toString(contractAddr),

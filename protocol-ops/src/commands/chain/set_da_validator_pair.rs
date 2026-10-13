@@ -30,11 +30,6 @@ struct SetDaValidatorPairOutput {
 /// Use case: post chain upgrade (e.g. v29 → v31), where the upgrade itself
 /// resets the chain's L1 DA validator and the operator must re-set it
 /// before the chain can commit batches.
-///
-/// For chains that settle on a gateway (rather than directly on L1), use
-/// `chain gateway migrate-to` — the migrate-to flow already invokes the
-/// gateway-aware variant (`setDAValidatorPairWithGateway`) as part of its
-/// Phase 3.
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct ChainSetDaValidatorPairArgs {
     #[clap(flatten)]
@@ -56,8 +51,7 @@ pub struct ChainSetDaValidatorPairArgs {
     #[clap(long, value_enum, default_value_t = DAValidatorType::Rollup)]
     pub da_mode: DAValidatorType,
 
-    /// Override the L2 DA commitment scheme derived from `--da-mode`. Gateway-settling chains
-    /// relay their pubdata and commit it as `blobs-and-pubdata-keccak256`.
+    /// Override the L2 DA commitment scheme derived from `--da-mode`.
     #[clap(long, value_enum, help_heading = "Advanced input")]
     pub l2_da_commitment_scheme: Option<L2DACommitmentScheme>,
 

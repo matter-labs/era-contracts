@@ -8,7 +8,7 @@ import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
-contract initializingCTMOwnerZeroTest is ChainTypeManagerTest {
+contract InitializingCTMOwnerZeroTest is ChainTypeManagerTest {
     function setUp() public {
         deploy();
     }

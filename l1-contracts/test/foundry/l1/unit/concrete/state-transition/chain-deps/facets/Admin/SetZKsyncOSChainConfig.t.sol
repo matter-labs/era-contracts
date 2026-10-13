@@ -71,7 +71,6 @@ contract SetZKsyncOSChainConfigTest is AdminTest {
         uint64 newMaxTxGasLimit = ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT * 2;
 
         // The old value reported is the effective one: the default, since it was never set.
-        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(adminFacet));
         emit NewZKsyncOSMaxTxGasLimit(ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT, newMaxTxGasLimit);
 

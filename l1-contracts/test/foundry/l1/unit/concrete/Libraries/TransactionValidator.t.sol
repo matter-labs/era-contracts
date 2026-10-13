@@ -54,114 +54,114 @@ contract TransactionValidatorTest is Test {
     // ============ validateUpgradeTransaction Tests ============
 
     function test_validateUpgradeTransaction_validTransaction() public pure {
-        L2CanonicalTransaction memory tx = _createValidUpgradeTransaction();
+        L2CanonicalTransaction memory transaction = _createValidUpgradeTransaction();
 
         // Should not revert
-        TransactionValidator.validateUpgradeTransaction(tx);
+        TransactionValidator.validateUpgradeTransaction(transaction);
     }
 
     function test_validateUpgradeTransaction_revertsIfFromTooLarge() public {
-        L2CanonicalTransaction memory tx = _createValidUpgradeTransaction();
-        tx.from = uint256(type(uint16).max) + 1;
+        L2CanonicalTransaction memory transaction = _createValidUpgradeTransaction();
+        transaction.from = uint256(type(uint16).max) + 1;
 
         vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.From));
-        TransactionValidator.validateUpgradeTransaction(tx);
+        TransactionValidator.validateUpgradeTransaction(transaction);
     }
 
     function test_validateUpgradeTransaction_revertsIfToTooLarge() public {
-        L2CanonicalTransaction memory tx = _createValidUpgradeTransaction();
-        tx.to = uint256(type(uint160).max) + 1;
+        L2CanonicalTransaction memory transaction = _createValidUpgradeTransaction();
+        transaction.to = uint256(type(uint160).max) + 1;
 
         vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.To));
-        TransactionValidator.validateUpgradeTransaction(tx);
+        TransactionValidator.validateUpgradeTransaction(transaction);
     }
 
     function test_validateUpgradeTransaction_revertsIfPaymasterNotZero() public {
-        L2CanonicalTransaction memory tx = _createValidUpgradeTransaction();
-        tx.paymaster = 1;
+        L2CanonicalTransaction memory transaction = _createValidUpgradeTransaction();
+        transaction.paymaster = 1;
 
         vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.Paymaster));
-        TransactionValidator.validateUpgradeTransaction(tx);
+        TransactionValidator.validateUpgradeTransaction(transaction);
     }
 
     function test_validateUpgradeTransaction_revertsIfValueNotZero() public {
-        L2CanonicalTransaction memory tx = _createValidUpgradeTransaction();
-        tx.value = 1;
+        L2CanonicalTransaction memory transaction = _createValidUpgradeTransaction();
+        transaction.value = 1;
 
         vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.Value));
-        TransactionValidator.validateUpgradeTransaction(tx);
+        TransactionValidator.validateUpgradeTransaction(transaction);
     }
 
     function test_validateUpgradeTransaction_revertsIfMaxFeeNotZero() public {
-        L2CanonicalTransaction memory tx = _createValidUpgradeTransaction();
-        tx.maxFeePerGas = 1;
+        L2CanonicalTransaction memory transaction = _createValidUpgradeTransaction();
+        transaction.maxFeePerGas = 1;
 
         vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.MaxFeePerGas));
-        TransactionValidator.validateUpgradeTransaction(tx);
+        TransactionValidator.validateUpgradeTransaction(transaction);
     }
 
     function test_validateUpgradeTransaction_revertsIfMaxPriorityFeeNotZero() public {
-        L2CanonicalTransaction memory tx = _createValidUpgradeTransaction();
-        tx.maxPriorityFeePerGas = 1;
+        L2CanonicalTransaction memory transaction = _createValidUpgradeTransaction();
+        transaction.maxPriorityFeePerGas = 1;
 
         vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.MaxPriorityFeePerGas));
-        TransactionValidator.validateUpgradeTransaction(tx);
+        TransactionValidator.validateUpgradeTransaction(transaction);
     }
 
     function test_validateUpgradeTransaction_revertsIfReserved0NotZero() public {
-        L2CanonicalTransaction memory tx = _createValidUpgradeTransaction();
-        tx.reserved[0] = 1;
+        L2CanonicalTransaction memory transaction = _createValidUpgradeTransaction();
+        transaction.reserved[0] = 1;
 
         vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.Reserved0));
-        TransactionValidator.validateUpgradeTransaction(tx);
+        TransactionValidator.validateUpgradeTransaction(transaction);
     }
 
     function test_validateUpgradeTransaction_revertsIfReserved1TooLarge() public {
-        L2CanonicalTransaction memory tx = _createValidUpgradeTransaction();
-        tx.reserved[1] = uint256(type(uint160).max) + 1;
+        L2CanonicalTransaction memory transaction = _createValidUpgradeTransaction();
+        transaction.reserved[1] = uint256(type(uint160).max) + 1;
 
         vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.Reserved1));
-        TransactionValidator.validateUpgradeTransaction(tx);
+        TransactionValidator.validateUpgradeTransaction(transaction);
     }
 
     function test_validateUpgradeTransaction_revertsIfReserved2NotZero() public {
-        L2CanonicalTransaction memory tx = _createValidUpgradeTransaction();
-        tx.reserved[2] = 1;
+        L2CanonicalTransaction memory transaction = _createValidUpgradeTransaction();
+        transaction.reserved[2] = 1;
 
         vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.Reserved2));
-        TransactionValidator.validateUpgradeTransaction(tx);
+        TransactionValidator.validateUpgradeTransaction(transaction);
     }
 
     function test_validateUpgradeTransaction_revertsIfReserved3NotZero() public {
-        L2CanonicalTransaction memory tx = _createValidUpgradeTransaction();
-        tx.reserved[3] = 1;
+        L2CanonicalTransaction memory transaction = _createValidUpgradeTransaction();
+        transaction.reserved[3] = 1;
 
         vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.Reserved3));
-        TransactionValidator.validateUpgradeTransaction(tx);
+        TransactionValidator.validateUpgradeTransaction(transaction);
     }
 
     function test_validateUpgradeTransaction_revertsIfSignatureNotEmpty() public {
-        L2CanonicalTransaction memory tx = _createValidUpgradeTransaction();
-        tx.signature = hex"1234";
+        L2CanonicalTransaction memory transaction = _createValidUpgradeTransaction();
+        transaction.signature = hex"1234";
 
         vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.Signature));
-        TransactionValidator.validateUpgradeTransaction(tx);
+        TransactionValidator.validateUpgradeTransaction(transaction);
     }
 
     function test_validateUpgradeTransaction_revertsIfPaymasterInputNotEmpty() public {
-        L2CanonicalTransaction memory tx = _createValidUpgradeTransaction();
-        tx.paymasterInput = hex"1234";
+        L2CanonicalTransaction memory transaction = _createValidUpgradeTransaction();
+        transaction.paymasterInput = hex"1234";
 
         vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.PaymasterInput));
-        TransactionValidator.validateUpgradeTransaction(tx);
+        TransactionValidator.validateUpgradeTransaction(transaction);
     }
 
     function test_validateUpgradeTransaction_revertsIfReservedDynamicNotEmpty() public {
-        L2CanonicalTransaction memory tx = _createValidUpgradeTransaction();
-        tx.reservedDynamic = hex"1234";
+        L2CanonicalTransaction memory transaction = _createValidUpgradeTransaction();
+        transaction.reservedDynamic = hex"1234";
 
         vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.ReservedDynamic));
-        TransactionValidator.validateUpgradeTransaction(tx);
+        TransactionValidator.validateUpgradeTransaction(transaction);
     }
 
     // ============ validateL1ToL2Transaction Tests ============
@@ -181,8 +181,8 @@ contract TransactionValidatorTest is Test {
         vm.expectRevert(TooMuchGas.selector);
         TransactionValidator.validateL1ToL2Transaction(
             transaction,
-            1_000_000, // priority tx max gas limit (much lower)
-            1_000_000 // priority tx max pubdata
+            1_000_000, // priority transaction max gas limit (much lower)
+            1_000_000 // priority transaction max pubdata
         );
     }
 

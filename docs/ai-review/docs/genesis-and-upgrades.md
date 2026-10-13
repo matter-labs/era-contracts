@@ -42,10 +42,11 @@ chains are supported). Its per-chain upgrade contract is:
 - DefaultUpgrade.sol (composes the per-chain L2 upgrade transaction once, from the transition's
   pinned delegate composer with the executing chain's ID and Bridgehub)
 
-And the corresponding L2 upgrade contract that should be used is:
+And the corresponding L2 upgrade contract that should be used is the release-agnostic:
 
-- L2V34Upgrade.sol (the upgrade-time re-initialization: unlike the genesis path it must NOT
-  re-run one-shot `initL2`s that already ran on the chain being upgraded)
+- L2DefaultUpgrade.sol (the upgrade-time re-initialization: it must stay safe to re-run on a chain
+  at any version from v33 on, so unlike the genesis path it never reaches a one-shot `initL2` — those
+  run at genesis only)
 
 The only assumption the upgrade logic can use is that the ComplexUpgrader contract is present
 and force deployment via the ZKsync OS hook works

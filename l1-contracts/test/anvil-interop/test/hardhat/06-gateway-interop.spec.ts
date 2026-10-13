@@ -1,9 +1,11 @@
-import { expect } from "chai";
-import { BigNumber } from "ethers";
+import { ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { executeTokenTransfer } from "../../src/helpers/token-transfer";
-import type { MultiChainTokenTransferResult } from "../../src/core/types";
+import { expectTokenTransfer } from "../../src/helpers/token-transfer";
 import { getChainIdsByRole } from "../../src/core/utils";
+import { randomBigNumber } from "../../src/helpers/balance-helpers";
+
+const TOKEN_AMOUNT_MIN = ethers.utils.parseUnits("1", 18);
+const TOKEN_AMOUNT_MAX = ethers.utils.parseUnits("10", 18);
 
 describe("06 - Gateway Interop (GW-settled chains)", function () {
   this.timeout(0);
@@ -20,54 +22,21 @@ describe("06 - Gateway Interop (GW-settled chains)", function () {
     gwSettledChainIds = getChainIdsByRole(state.chains.config, "gwSettled");
   });
 
-  /**
-   * Helper: execute a cross-chain token transfer between GW-settled chains and
-   * verify the real value movement (source-chain burn, destination-chain mint).
-   */
-  async function transferTokens(params: {
-    sourceChainId: number;
-    targetChainId: number;
-    amount: string;
-    sourceTokenAddress?: string;
-  }): Promise<MultiChainTokenTransferResult> {
-    const { sourceChainId, targetChainId, amount } = params;
-
-    const sourceToken = params.sourceTokenAddress || state.testTokens![sourceChainId];
-
-    const result = await executeTokenTransfer({
-      sourceChainId,
-      targetChainId,
-      amount,
-      sourceTokenAddress: sourceToken,
-      logger: (line: string) => console.log(`[gw-interop] ${line}`),
-    });
-
-    expect(result.sourceTxHash).to.not.be.null;
-    expect(result.targetTxHash).to.not.be.null;
-
-    const sourceBalanceDelta = BigNumber.from(result.sourceBalanceBefore).sub(result.sourceBalanceAfter);
-    const destinationBalanceDelta = BigNumber.from(result.destinationBalanceAfter).sub(result.destinationBalanceBefore);
-    expect(sourceBalanceDelta.eq(result.amountWei), "source chain burned amount mismatch").to.eq(true);
-    expect(destinationBalanceDelta.eq(result.amountWei), "destination chain minted amount mismatch").to.eq(true);
-
-    return result;
-  }
-
   it("transfers tokens between GW-settled chains", async () => {
-    await transferTokens({
+    await expectTokenTransfer({
       sourceChainId: gwSettledChainIds[0],
       targetChainId: gwSettledChainIds[1],
-      amount: "5",
-      sourceTokenAddress: state.testTokens![gwSettledChainIds[0]],
+      amount: randomBigNumber(TOKEN_AMOUNT_MIN, TOKEN_AMOUNT_MAX),
+      logger: (line: string) => console.log(`[gw-interop] ${line}`),
     });
   });
 
   it("transfers tokens in reverse direction between GW-settled chains", async () => {
-    await transferTokens({
+    await expectTokenTransfer({
       sourceChainId: gwSettledChainIds[1],
       targetChainId: gwSettledChainIds[0],
-      amount: "3",
-      sourceTokenAddress: state.testTokens![gwSettledChainIds[1]],
+      amount: randomBigNumber(TOKEN_AMOUNT_MIN, TOKEN_AMOUNT_MAX),
+      logger: (line: string) => console.log(`[gw-interop] ${line}`),
     });
   });
 });

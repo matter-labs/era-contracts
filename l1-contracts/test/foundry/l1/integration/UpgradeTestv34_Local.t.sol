@@ -207,7 +207,7 @@ abstract contract UpgradeIntegrationV34BootstrapFixture is
         CTM_OUTPUT = "/script-out/foundry-upgrade/local-v34-ctm.toml";
         CORE_OUTPUT = "/script-out/foundry-upgrade/local-v34-core.toml";
         console.log("setUp: Paths configured");
-        setupUpgrade(true);
+        setupUpgrade();
         console.log("setUp: Upgrade setup complete");
 
         _installLegacyCutTakingFacet();

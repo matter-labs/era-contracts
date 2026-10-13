@@ -10,7 +10,6 @@ import {
 import {Vm} from "forge-std/Vm.sol";
 
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
-import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 
 import {IMessageRootBase, IMessageVerification} from "contracts/core/message-root/IMessageRoot.sol";
@@ -57,12 +56,12 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         bytes[] factoryDeps;
     }
 
-    uint256 constant TEST_USERS_COUNT = 10;
+    uint256 internal constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
     bytes32 public l2TokenAssetId;
     address public tokenL1Address;
-    SimpleExecutor simpleExecutor;
+    SimpleExecutor internal simpleExecutor;
 
     // generate MAX_USERS addresses and append it to users array
     function _generateUserAddresses() internal {
@@ -452,13 +451,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
 
         // Step 2: Decode assetData into the bridge mint fields
         {
-            (
-                address originalCaller,
-                address remoteReceiver,
-                address parsedOriginToken,
-                uint256 amount,
-                bytes memory erc20Metadata
-            ) = abi.decode(assetData, (address, address, address, uint256, bytes));
+            (, address remoteReceiver, , , ) = abi.decode(assetData, (address, address, address, uint256, bytes));
 
             // Checking that caller hasn't been aliased
             assertEq(remoteReceiver, randomCaller, "Remote receiver mismatch");

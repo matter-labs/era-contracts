@@ -34,7 +34,6 @@ import {
     MigrationNotToL1,
     MigrationNumberMismatch,
     NotSystemContext,
-    OnlyChain,
     SLHasDifferentCTM,
     ZKChainNotRegistered,
     IteratedMigrationsNotSupported
@@ -105,9 +104,8 @@ abstract contract ChainAssetHandlerBase is
     IAssetRouterBase internal DEPRECATED_ASSET_ROUTER;
 
     /// @notice Used to track the number of times each chain has migrated.
-    /// @dev It is assumed that during the release of the v31 upgrade all chains settle on L1,
-    /// so they will all start with `migrationNumber` equal to 0. Note, that ZKsync Era that used to settle on ZK Gateway
-    /// will also start with migration number equal to 0.
+    /// @dev 0 until the chain first migrates; see `MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER` and
+    /// `MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1`.
     /// NOTE: this mapping may be deprecated in the future, don't rely on it!
     mapping(uint256 chainId => uint256 migrationNumber) public migrationNumber;
 
@@ -148,8 +146,8 @@ abstract contract ChainAssetHandlerBase is
     }
 
     /// @notice Only when chain migrations are enabled in the current release.
-    /// @dev A release-level ban (unlike the runtime `migrationPaused` flag); disabled in v32.
-    /// See {protocol-docs/chain-lifecycle.md#v32-chain-migrations-are-explicitly-disabled}.
+    /// @dev A release-level ban (unlike the runtime `migrationPaused` flag); disabled in v33.
+    /// See {protocol-docs/chain-lifecycle.md#v33-chain-migrations-are-explicitly-disabled}.
     modifier whenMigrationsEnabled() {
         if (!_getChainMigrationsEnabled()) {
             revert ChainMigrationsDisabled();
@@ -171,19 +169,6 @@ abstract contract ChainAssetHandlerBase is
     modifier onlySystemContext() {
         if (msg.sender != L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR) {
             revert NotSystemContext(msg.sender);
-        }
-        _;
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            V31 Upgrade
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Checks that the message sender is the specified ZK Chain.
-    /// @param _chainId The ID of the chain that is required to be the caller.
-    modifier onlyChain(uint256 _chainId) {
-        if (msg.sender != IBridgehubBase(_getBridgehub()).getZKChain(_chainId)) {
-            revert OnlyChain(msg.sender, IBridgehubBase(_getBridgehub()).getZKChain(_chainId));
         }
         _;
     }
@@ -287,8 +272,8 @@ abstract contract ChainAssetHandlerBase is
             _chainData
         );
         uint256 currentMigrationNum = migrationNumber[_chainId];
-        // Iterated migrations are not supported to avoid asset migration number complications related to token balance migration.
-        // This means a chain can migrate to GW and back to L1 but only once.
+        // Iterated migrations are not supported (see `L1ChainAssetHandler.isValidSettlementLayer`): a chain can
+        // migrate to a settlement layer and back to L1 only once.
         require(currentMigrationNum < MAX_ALLOWED_NUMBER_OF_MIGRATIONS, IteratedMigrationsNotSupported());
         ++currentMigrationNum;
         migrationNumber[_chainId] = currentMigrationNum;
@@ -385,8 +370,8 @@ abstract contract ChainAssetHandlerBase is
         );
 
         uint256 currentMigrationNumber = migrationNumber[bridgehubMintData.chainId];
-        // For repeated migrations back to L1, validate the expected migration sequence.
-        if (currentMigrationNumber != 0 && block.chainid == _getL1ChainId()) {
+        // On L1, only a chain that left with `MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER` can come back.
+        if (block.chainid == _getL1ChainId()) {
             require(
                 currentMigrationNumber == MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER,
                 MigrationNumberMismatch(MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER, currentMigrationNumber)

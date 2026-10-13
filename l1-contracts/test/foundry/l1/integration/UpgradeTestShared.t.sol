@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-// solhint-disable no-console, gas-custom-errors
-
 import {console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {Vm} from "forge-std/Vm.sol";
@@ -33,11 +31,11 @@ abstract contract UpgradeIntegrationTestBase is Test {
 
     uint256 internal constant NEW_CHAIN_ID = 555;
 
-    uint256 chainId;
+    uint256 internal chainId;
 
-    DefaultCoreUpgrade coreUpgrade;
-    DefaultCTMUpgrade ctmUpgrade;
-    DefaultChainUpgrade chainUpgrade;
+    DefaultCoreUpgrade internal coreUpgrade;
+    DefaultCTMUpgrade internal ctmUpgrade;
+    DefaultChainUpgrade internal chainUpgrade;
 
     /// @notice Per-test fixed paths for the deploy outputs the upgrade scripts read.
     string public ECOSYSTEM_INPUT = "file_1.toml";
@@ -60,7 +58,7 @@ abstract contract UpgradeIntegrationTestBase is Test {
     Call[] internal _ctmAdminCalls;
     bool internal _ctmAdminCallsPrepared;
 
-    function setupUpgrade(bool skipFactoryDepsCheck) public virtual {
+    function setupUpgrade() public virtual {
         console.log("setupUpgrade: Creating the version-specific core + CTM upgrade scripts");
         coreUpgrade = createCoreUpgrade();
         ctmUpgrade = createCTMUpgrade();
@@ -81,17 +79,17 @@ abstract contract UpgradeIntegrationTestBase is Test {
             CORE_OUTPUT
         );
         console.log("setupUpgrade: Initializing CTM upgrade");
-        ctmUpgrade.initializeWithArgs(
-            params.ctmProxy,
-            params.rollupDAManager,
-            params.create2FactorySalt,
-            params.upgradeInputPath,
-            CTM_OUTPUT,
-            params.governance,
-            params.zkTokenAssetId,
+        ctmUpgrade.initializeWithArgs({
+            ctmProxy: params.ctmProxy,
+            rollupDAManager: params.rollupDAManager,
+            create2FactorySalt: params.create2FactorySalt,
+            newConfigPath: params.upgradeInputPath,
+            _outputPath: CTM_OUTPUT,
+            governance: params.governance,
+            zkTokenAssetId: params.zkTokenAssetId,
             // Anvil fixtures run the testnet verifier, as every non-mainnet env does.
-            true
-        );
+            testnetVerifier: true
+        });
 
         console.log("setupUpgrade: Deploying new ecosystem contracts");
         coreUpgrade.deployNewEcosystemContractsL1();
@@ -223,7 +221,7 @@ abstract contract UpgradeIntegrationTestBase is Test {
         // Hook for test-specific setup before chain upgrade
         beforeChainUpgrade();
 
-        console.log("Upgrading gateway");
+        console.log("Upgrading the chain");
         // Re-arm so chain-side events (DiamondCut, NewChain, NewZKChain) are captured.
         vm.recordLogs();
 

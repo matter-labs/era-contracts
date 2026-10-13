@@ -15,7 +15,7 @@ import {
 import {L2CanonicalTransaction, TokenBridgingData, TokenMetadata} from "contracts/common/Messaging.sol";
 import {
     ETH_TOKEN_ADDRESS,
-    PRIORITY_TX_MAX_GAS_LIMIT,
+    UPGRADE_TX_MAX_GAS_LIMIT,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE
 } from "contracts/common/Config.sol";
@@ -72,7 +72,7 @@ library LegacyGenesisComposition {
                 txType: ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE,
                 from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
                 to: uint256(uint160(L2_COMPLEX_UPGRADER_ADDR)),
-                gasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
+                gasLimit: UPGRADE_TX_MAX_GAS_LIMIT,
                 gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
                 maxFeePerGas: uint256(0),
                 maxPriorityFeePerGas: uint256(0),

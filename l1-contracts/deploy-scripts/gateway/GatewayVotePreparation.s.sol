@@ -1,30 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// solhint-disable no-console, gas-custom-errors, reason-string
-
 import {console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-// It's required to disable lints to force the compiler to compile the contracts
-// solhint-disable no-unused-import
-
 import {CHAIN_MIGRATIONS_ENABLED} from "contracts/common/Config.sol";
-import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 import {Utils} from "../utils/Utils.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
-import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
@@ -32,13 +22,7 @@ import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol"
 import {CTMDeployedAddresses, StateTransitionDeployedAddresses} from "../utils/Types.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 
-import {
-    GatewayCTMDeployerHelper,
-    DirectCreate2Calldata,
-    DeployerCreate2Calldata,
-    DeployerAddresses,
-    DirectDeployedAddresses
-} from "./GatewayCTMDeployerHelper.sol";
+import {GatewayCTMDeployerHelper, DirectCreate2Calldata, DeployerCreate2Calldata} from "./GatewayCTMDeployerHelper.sol";
 import {SystemContractsProcessing} from "../upgrade/SystemContractsProcessing.s.sol";
 import {
     DeployedContracts,
@@ -67,25 +51,14 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
 
     GatewayCTMOutput internal output;
 
-    uint256 constant EXPECTED_MAX_L1_GAS_PRICE = 50 gwei;
-
-    /// Packed protocol version of v31.0.0 — anything `>=` this exposes the
-    /// `serverNotifierAddress()` getter directly. Pre-v31 CTMs predate the
-    /// getter, so we fall back to a raw storage load. Temporary shim: once
-    /// every active CTM is upgraded past v31 this branch can be deleted.
-    uint256 constant MIN_V31_PROTOCOL_VERSION = 0x1F00000000;
-    /// Storage slot of `ChainTypeManager.serverNotifierAddress`. Confirmed
-    /// via `forge inspect ChainTypeManager storage-layout`. Stays at the
-    /// same slot across v30 → v31 (verified by reading the slot on both Atlas
-    /// (v30.1) and Era (older) CTM on Sepolia). Drop with the version branch.
-    bytes32 constant SERVER_NOTIFIER_ADDRESS_SLOT = bytes32(uint256(164));
+    uint256 internal constant EXPECTED_MAX_L1_GAS_PRICE = 50 gwei;
 
     uint256 internal gatewayChainId;
     bytes internal forceDeploymentsData;
 
     address internal serverNotifier;
     address internal refundRecipient;
-    address ctm;
+    address internal ctm;
 
     GatewayCTMDeployerConfig internal gatewayCTMDeployerConfig;
 
@@ -144,7 +117,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
     ///         through L1->L2 transactions.
     /// @dev DISABLED IN v33. No gateway is deployed in this release: chain migrations are switched off
     ///      ecosystem-wide (`CHAIN_MIGRATIONS_ENABLED == false` in `Config.sol`, see
-    ///      {protocol-docs/chain-lifecycle.md#v32-chain-migrations-are-explicitly-disabled}), so no chain
+    ///      {protocol-docs/chain-lifecycle.md#v33-chain-migrations-are-explicitly-disabled}), so no chain
     ///      can ever settle on a gateway created here, and the release's gateway-side pieces are
     ///      consequently untested. Rather than emit a governance bundle that deploys an unusable — and
     ///      unverified — CTM onto an L2, this reverts.
@@ -152,10 +125,11 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
     ///      stays reachable and is still covered by `GatewayVotePreparationTests`.
     /// @dev When gateway support returns, re-enabling this is not enough: the deployed gateway CTM never
     ///      receives a `setDefaultUpgrade` call, so `createNewVerifierOnlyUpgrade` on it would revert with
-    ///      `ZeroAddress`. The upgrade path solves this in `DefaultGatewayUpgrade`
-    ///      (`deployUsedUpgradeContractGW` + `prepareSetDefaultUpgradeCallForGateway`); the fresh path needs
-    ///      the equivalent — a per-VM default upgrade among the direct CREATE2 deployments plus an L1->L2
-    ///      `IChainTypeManager.setDefaultUpgrade` in `GatewayGovernanceUtils`.
+    ///      `ZeroAddress`. `DefaultGatewayUpgrade` used to solve this on the upgrade path
+    ///      (`deployUsedUpgradeContractGW` + `prepareSetDefaultUpgradeCallForGateway`) but was removed in
+    ///      #2499, so whoever brings gateways back needs to build it here: a per-VM default upgrade among
+    ///      the direct CREATE2 deployments plus an L1->L2 `IChainTypeManager.setDefaultUpgrade` in
+    ///      `GatewayGovernanceUtils`.
     /// @dev `virtual` for the anvil-interop harness alone, which brings a gateway up to keep exercising
     ///      the machinery this release keeps but does not deploy — see `_GatewayVotePreparationForTests`.
     function deployGatewayCTM() internal virtual {
@@ -182,8 +156,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             );
 
         // Deploy all factory dependencies
-        bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps(gatewayCTMDeployerConfig);
-        for (uint i = 0; i < deps.length; i++) {
+        bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps();
+        for (uint256 i = 0; i < deps.length; i++) {
             bytes[] memory localDeps = new bytes[](1);
             localDeps[0] = deps[i];
             runGatewayL1L2TransactionWithFactoryDeps(address(0), hex"", localDeps);
@@ -249,7 +223,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
     ) internal {
         Utils.runL1L2Transaction({
             l2Calldata: data,
-            l2GasLimit: 72_000_000,
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
             l2Value: 0,
             factoryDeps: factoryDeps,
             dstAddress: to,
@@ -286,19 +260,6 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         (implementation, proxy) = deployTuppWithContractAndProxyAdmin("ServerNotifier", ecosystemProxyAdmin);
     }
 
-    /// Read the CTM's existing ServerNotifier proxy from chain. v31+ CTMs
-    /// expose a `serverNotifierAddress()` getter; pre-v31 CTMs hold the same
-    /// field at slot 164 but lack the getter, so we read storage directly.
-    /// Returns `address(0)` when the CTM never had one — caller takes the
-    /// deploy-new path in that case.
-    function _resolveExistingServerNotifier(address _ctm) internal view returns (address existing) {
-        if (IChainTypeManager(_ctm).protocolVersion() >= MIN_V31_PROTOCOL_VERSION) {
-            existing = IChainTypeManager(_ctm).serverNotifierAddress();
-        } else {
-            existing = address(uint160(uint256(vm.load(_ctm, SERVER_NOTIFIER_ADDRESS_SLOT))));
-        }
-    }
-
     function prepareForGWVoting(address bridgehubProxy, uint256 ctmRepresentativeChainId) public {
         console.log("Setting up the Gateway script");
 
@@ -320,7 +281,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         // place so the proxy address stays stable for off-chain services (the
         // server polls a hardcoded address). Only deploy a fresh proxy when
         // the CTM has never had one — initial gateway-setup case.
-        serverNotifier = _resolveExistingServerNotifier(ctm);
+        serverNotifier = IChainTypeManager(ctm).serverNotifierAddress();
 
         Call[] memory ecosystemAdminCalls;
         if (serverNotifier == address(0)) {

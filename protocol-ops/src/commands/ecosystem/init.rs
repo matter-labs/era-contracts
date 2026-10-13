@@ -77,9 +77,11 @@ pub async fn run(args: EcosystemInitArgs) -> anyhow::Result<()> {
 
     let mut runner = ForgeRunner::new(&args.shared)?;
     let sender = runner.prepare_sender(args.deployer_address).await?;
-    let owner_override = args
-        .owner
-        .or_else(|| env_cfg.as_ref().and_then(|c| c.owner_address()));
+    let owner_override = match (args.owner, env_cfg.as_ref()) {
+        (Some(owner), _) => Some(owner),
+        (None, Some(cfg)) => cfg.owner_address()?,
+        (None, None) => None,
+    };
     let owner = Wallet::resolve(owner_override, None, &sender)?;
 
     let zk_token_asset_id = args

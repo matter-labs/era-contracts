@@ -11,14 +11,9 @@ import {L2InventoryLib} from "contracts/upgrades/registry/libraries/L2InventoryL
 import {UnknownCoreContract, UnknownL2SystemContract} from "./DeployScriptErrors.sol";
 import {
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-    L2_NTV_BEACON_DEPLOYER_ADDR,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
-    L2_COMPLEX_UPGRADER_ADDR,
-    L2_VERSION_SPECIFIC_UPGRADER_ADDR,
-    L2_INTEROP_ATTRIBUTE_PARSER_ADDR,
-    L2_INTEROP_COMMITMENT_TREE_ADDR,
-    L2_ATOMIC_FLOW_MANAGER_ADDR
+    L2_COMPLEX_UPGRADER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 /// @title CoreOnGatewayHelper
@@ -146,7 +141,7 @@ library CoreOnGatewayHelper {
         if (_c == L2EcosystemContract.L2MessageVerification) return "L2MessageVerification";
         if (_c == L2EcosystemContract.L2InteropRootStorage) return "L2InteropRootStorage";
         if (_c == L2EcosystemContract.BeaconProxy) return "BeaconProxy";
-        if (_c == L2EcosystemContract.L2V34Upgrade) return "L2V34Upgrade";
+        if (_c == L2EcosystemContract.L2DefaultUpgrade) return "L2DefaultUpgrade";
         if (_c == L2EcosystemContract.BridgedStandardERC20) return "BridgedStandardERC20";
         if (_c == L2EcosystemContract.DiamondProxy) return "DiamondProxy";
         if (_c == L2EcosystemContract.ProxyAdmin) return "ProxyAdmin";

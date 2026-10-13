@@ -10,7 +10,7 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {MockSelfDescribingFacet} from "contracts/dev-contracts/test/MockSelfDescribingFacet.sol";
 import {FixedDelegateCalldataComposer} from "contracts/dev-contracts/FixedDelegateCalldataComposer.sol";
 import {L2V34DelegateCalldataComposer} from "contracts/upgrades/L2V34DelegateCalldataComposer.sol";
-import {IL2V34Upgrade} from "contracts/upgrades/IL2V34Upgrade.sol";
+import {IL2DefaultUpgrade} from "contracts/upgrades/IL2DefaultUpgrade.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
@@ -21,7 +21,7 @@ import {L2CanonicalTransactionLib} from "contracts/state-transition/libraries/L2
 import {L2CanonicalTransaction, TokenBridgingData, TokenMetadata} from "contracts/common/Messaging.sol";
 import {
     ETH_TOKEN_ADDRESS,
-    PRIORITY_TX_MAX_GAS_LIMIT,
+    UPGRADE_TX_MAX_GAS_LIMIT,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE
 } from "contracts/common/Config.sol";
@@ -140,38 +140,38 @@ abstract contract RegistryObjectsFixture is Test {
             abi.encodeCall(IL1AssetRouter.nativeTokenVault, ()),
             abi.encode(mockNativeTokenVault)
         );
-        _mockBaseToken(
-            _bridgehub,
-            ETH_CHAIN_ID,
-            ETH_BASE_TOKEN_ASSET_ID,
-            ETH_TOKEN_ADDRESS,
-            ETH_ORIGIN_CHAIN_ID,
-            ETH_TOKEN_ADDRESS
-        );
-        _mockBaseToken(
-            _bridgehub,
-            ERC20_CHAIN_ID,
-            ERC20_BASE_TOKEN_ASSET_ID,
-            erc20OriginToken,
-            ERC20_ORIGIN_CHAIN_ID,
-            address(erc20LocalToken)
-        );
-        _mockBaseToken(
-            _bridgehub,
-            NO_METADATA_CHAIN_ID,
-            NO_METADATA_BASE_TOKEN_ASSET_ID,
-            address(noMetadataToken),
-            block.chainid,
-            address(noMetadataToken)
-        );
-        _mockBaseToken(
-            _bridgehub,
-            BYTES32_METADATA_CHAIN_ID,
-            BYTES32_METADATA_BASE_TOKEN_ASSET_ID,
-            address(bytes32MetadataToken),
-            block.chainid,
-            address(bytes32MetadataToken)
-        );
+        _mockBaseToken({
+            _bridgehub: _bridgehub,
+            _chainId: ETH_CHAIN_ID,
+            _assetId: ETH_BASE_TOKEN_ASSET_ID,
+            _originToken: ETH_TOKEN_ADDRESS,
+            _originChainId: ETH_ORIGIN_CHAIN_ID,
+            _localToken: ETH_TOKEN_ADDRESS
+        });
+        _mockBaseToken({
+            _bridgehub: _bridgehub,
+            _chainId: ERC20_CHAIN_ID,
+            _assetId: ERC20_BASE_TOKEN_ASSET_ID,
+            _originToken: erc20OriginToken,
+            _originChainId: ERC20_ORIGIN_CHAIN_ID,
+            _localToken: address(erc20LocalToken)
+        });
+        _mockBaseToken({
+            _bridgehub: _bridgehub,
+            _chainId: NO_METADATA_CHAIN_ID,
+            _assetId: NO_METADATA_BASE_TOKEN_ASSET_ID,
+            _originToken: address(noMetadataToken),
+            _originChainId: block.chainid,
+            _localToken: address(noMetadataToken)
+        });
+        _mockBaseToken({
+            _bridgehub: _bridgehub,
+            _chainId: BYTES32_METADATA_CHAIN_ID,
+            _assetId: BYTES32_METADATA_BASE_TOKEN_ASSET_ID,
+            _originToken: address(bytes32MetadataToken),
+            _originChainId: block.chainid,
+            _localToken: address(bytes32MetadataToken)
+        });
     }
 
     function _mockBaseToken(
@@ -346,7 +346,7 @@ abstract contract RegistryObjectsFixture is Test {
                 _plan,
                 _newProtocolVersion,
                 abi.encodeCall(
-                    IL2V34Upgrade.upgrade,
+                    IL2DefaultUpgrade.upgrade,
                     (ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(_chainId))
                 )
             );
@@ -361,7 +361,7 @@ abstract contract RegistryObjectsFixture is Test {
         transaction.txType = ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE;
         transaction.from = uint256(uint160(L2_FORCE_DEPLOYER_ADDR));
         transaction.to = uint256(uint160(L2_COMPLEX_UPGRADER_ADDR));
-        transaction.gasLimit = PRIORITY_TX_MAX_GAS_LIMIT;
+        transaction.gasLimit = UPGRADE_TX_MAX_GAS_LIMIT;
         transaction.gasPerPubdataByteLimit = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
         transaction.nonce = _newProtocolVersion >> SEMVER_MINOR_OFFSET;
         transaction.data = abi.encodeCall(
@@ -462,11 +462,11 @@ abstract contract RegistryObjectsFixture is Test {
         return abi.decode(_data[4:], (IComplexUpgrader.UniversalContractUpgradeInfo[], address, bytes));
     }
 
-    /// @dev Decodes an `IL2V34Upgrade.upgrade` call into its arguments.
+    /// @dev Decodes an `IL2DefaultUpgrade.upgrade` call into its arguments.
     function decodeV34Upgrade(
         bytes calldata _data
     ) external pure returns (address ctmDeployer, bytes memory fixedData, bytes memory chainData) {
-        assertEq(bytes32(bytes4(_data[:4])), bytes32(IL2V34Upgrade.upgrade.selector), "delegate selector");
+        assertEq(bytes32(bytes4(_data[:4])), bytes32(IL2DefaultUpgrade.upgrade.selector), "delegate selector");
         return abi.decode(_data[4:], (address, bytes, bytes));
     }
 

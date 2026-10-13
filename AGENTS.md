@@ -8,6 +8,16 @@ Never run `pkill -f anvil`, `killall anvil`, or any blanket kill command for Anv
 
 Instead, use the `cleanup.sh` script in the anvil-interop directory, which targets only processes on known ports.
 
+## Gateway is softly deprecated
+
+v33 onwards deploys no Gateway, and its ceremony tooling is gone. The settlement-layer machinery in the contracts, the scripts that stand a Gateway up in tests, the foundry Gateway suites and the anvil-interop Gateway specs (04–06) remain so that a future settlement layer can use chain migration; removing them is tracked in EVM-1729. Support for the legacy Era Gateway is gone. Beyond keeping those tests passing, nothing depends on the Gateway.
+
+Unless the user explicitly asks about the Gateway:
+
+- Don't reason about the Gateway, Gateway-settled chains or chain migration while designing, implementing or reviewing a change, and don't add Gateway cases to new tests or docs.
+- Don't extend, refactor or rename Gateway code. Gateway-named identifiers in the core contracts (`migrateToGateway`, `InteropCenter.forwardTransactionOnGateway`, …) are ABI and stay as they are.
+- If a change breaks an existing Gateway test, the smallest fix that keeps it passing is enough.
+
 ## Code style requirements
 
 1. Avoid using magic numbers. Most constant numbers especially for system params / well known chain ids must be represented as a constant.
@@ -69,7 +79,7 @@ address result = _tryAddress(target, "someFunction()");
 ✅ **CORRECT APPROACH:**
 
 - Use real contract calls and flows to achieve the desired state
-- If a flow requires multiple steps (e.g., Token Balance Migration), implement all steps properly
+- If a flow requires multiple steps (e.g., a chain migration), implement all steps properly
 - If a relay transaction fails, fix the root cause instead of setting storage directly
 
 **WHY THIS RULE EXISTS:**
@@ -415,15 +425,33 @@ yarn lint:ts --fix
 
 # Fix formatting issues
 yarn prettier:fix
+
+# Check solc warnings (needs forge; ~5s each)
+yarn l1 solc-warnings && yarn da solc-warnings
 ```
+
+### solc warnings
+
+`forge build` is not the warning gate: `ignored_error_codes` in `foundry.toml` only filters what it
+prints, and a full `l1-contracts` build exceeds solc's cap of 256 reported warnings, so later ones are
+silently dropped. `yarn l1 solc-warnings` (`scripts/solc-warnings.ts`) is what CI enforces. It
+compiles every `.sol` under the project's `roots` without generating bytecode, which removes the
+code-size warnings (production sizes are checked by the `contract-size` CI job). Every other warning
+fails the check unless the project's `solc-warnings.json` lists it under `exceptions`, keyed by file,
+code and the first line of the flagged source. The check prints the entry to paste for each new
+warning, and fails on exceptions solc no longer reports.
+
+Fix the warning rather than adding an exception: an unused parameter an interface requires loses its
+name (`uint256,`), and a contract with a payable `fallback` gets a `receive` running the same logic.
 
 ### Pre-Push Checklist
 
 1. **Run foundry tests**: `cd l1-contracts && yarn test:foundry`
 2. **Run the errors lint**, only if an error declaration changed: `cd l1-contracts && yarn errors-lint --fix`
 3. **Run linting fixes**, one pass: `yarn lint:sol --fix --noPrompt && yarn lint:ts --fix && yarn prettier:fix`
-4. **Verify no uncommitted changes**: `git status`
-5. **Commit and push**: only after all checks pass
+4. **Check solc warnings**: `yarn l1 solc-warnings && yarn da solc-warnings`
+5. **Verify no uncommitted changes**: `git status`
+6. **Commit and push**: only after all checks pass
 
 ### Common Linting Issues
 

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.20;
-// solhint-disable gas-custom-errors
 
 import {Vm} from "forge-std/Vm.sol";
 
@@ -38,15 +37,15 @@ abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils
         vm.deal(address(this), 1000 ether);
         vm.recordLogs();
 
-        bytes32 bundleHash = InteropLibrary.sendToken(
-            L1_CHAIN_ID,
-            l2TokenAddress,
-            100,
-            address(this),
-            UNBUNDLER_ADDRESS,
-            false,
-            bytes32(0)
-        );
+        bytes32 bundleHash = InteropLibrary.sendToken({
+            destinationChainId: L1_CHAIN_ID,
+            l2TokenAddress: l2TokenAddress,
+            amount: 100,
+            recipient: address(this),
+            unbundlerAddress: UNBUNDLER_ADDRESS,
+            useFixedFee: false,
+            salt: bytes32(0)
+        });
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         assertTrue(bundleHash != bytes32(0), "L1-destined bundle should return a non-zero hash");
@@ -139,15 +138,15 @@ abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils
         address l2TokenAddress = initializeTokenByDeposit();
         vm.deal(address(this), 1000 ether);
 
-        bytes32 bundleHash = InteropLibrary.sendToken(
-            L1_CHAIN_ID,
-            l2TokenAddress,
-            100,
-            address(this),
-            UNBUNDLER_ADDRESS,
-            true, // useFixedFee
-            bytes32(uint256(1)) // distinct salt from the non-fixed-fee happy path
-        );
+        bytes32 bundleHash = InteropLibrary.sendToken({
+            destinationChainId: L1_CHAIN_ID,
+            l2TokenAddress: l2TokenAddress,
+            amount: 100,
+            recipient: address(this),
+            unbundlerAddress: UNBUNDLER_ADDRESS,
+            useFixedFee: true,
+            salt: bytes32(uint256(1)) // distinct salt from the non-fixed-fee happy path
+        });
 
         assertTrue(bundleHash != bytes32(0), "fixed-fee L1 bundle should send successfully");
         assertEq(

@@ -78,7 +78,7 @@ contract MakePermanentRollupTest is AdminTest {
         utilsFacet = UtilsFacet(diamondProxy);
     }
 
-    function test_getRollupDAManager() public {
+    function test_getRollupDAManager() public view {
         address manager = adminFacet.getRollupDAManager();
         assertEq(manager, address(rollupDAManager));
     }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// solhint-disable no-console, gas-custom-errors, state-visibility, no-global-import, one-contract-per-file, gas-calldata-parameters, no-unused-vars, func-named-parameters
+// solhint-disable state-visibility, no-global-import
 
 pragma solidity 0.8.28;
 
@@ -26,7 +26,7 @@ import "contracts/l2-upgrades/SystemContractProxyAdmin.sol";
 import "contracts/l2-upgrades/ISystemContractProxy.sol";
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
-import {AddressHasNoCode, InvalidChainId} from "contracts/common/L1ContractErrors.sol";
+import {InvalidChainId} from "contracts/common/L1ContractErrors.sol";
 import {L2ComplexUpgrader} from "contracts/l2-upgrades/L2ComplexUpgrader.sol";
 import {L2GenesisUpgrade} from "contracts/l2-upgrades/L2GenesisUpgrade.sol";
 
@@ -335,7 +335,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
     }
 
     /// @dev The atomic-interop built-ins are etched with their real code, not the generic mock, so that
-    ///      `_initializeV32Contracts` initializing them is observable (`leafCount` / `L1_CHAIN_ID`).
+    ///      `_initContractsAfterWiring` initializing them is observable (`leafCount` / `L1_CHAIN_ID`).
     function _etchAtomicInteropBuiltIns() internal {
         if (L2_INTEROP_COMMITMENT_TREE_ADDR.code.length == 0) {
             vm.etch(L2_INTEROP_COMMITMENT_TREE_ADDR, address(new L2InteropCommitmentTree()).code);
@@ -347,7 +347,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
 
     /// @dev Both built-ins seeded exactly once: the tree holds its sentinel leaf and the manager the L1
     ///      chain id. `initL2` reverts on a second call, so reaching this state twice is impossible.
-    function _assertAtomicInteropInitialized() internal {
+    function _assertAtomicInteropInitialized() internal view {
         assertEq(L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafCount(), 1, "tree not seeded");
         assertEq(
             AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).L1_CHAIN_ID(),
@@ -427,8 +427,8 @@ contract MockL2ContractDeployer {
     function setBytecodeDetailsEVM(
         address _addr,
         bytes32 _bytecodeHash,
-        uint32 _bytecodeLength,
-        bytes32 _observableBytecodeHash
+        uint32 /* _bytecodeLength */,
+        bytes32 /* _observableBytecodeHash */
     ) external {
         deploymentCount[_addr]++;
         lastBytecodeHash[_addr] = _bytecodeHash;
@@ -532,13 +532,13 @@ contract MockContract {
     // L2Bridgehub.updateL2
     function updateL2(uint256, address, uint256) external {}
 
-    function deployUpgradeableBeacon(address) external returns (address) {
+    function deployUpgradeableBeacon(address) external pure returns (address) {
         return makeAddr("upgradeableBeacon");
     }
 
     function setAddresses(address, address, address, address) external {}
 
-    function WETH_TOKEN() external view returns (address) {
+    function WETH_TOKEN() external pure returns (address) {
         return makeAddr("wethToken");
     }
 
@@ -547,6 +547,8 @@ contract MockContract {
     function makeAddr(string memory name) internal pure returns (address) {
         return address(uint160(uint256(keccak256(abi.encodePacked(name)))));
     }
+
+    receive() external payable {}
 
     // Fallback to handle any other calls
     fallback() external payable {

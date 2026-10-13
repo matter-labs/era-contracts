@@ -142,7 +142,7 @@ contract SystemContractsProcessingTest is Test {
         );
     }
 
-    function test_factoryDependenciesIncludeTheNewBuiltInImplementations() public {
+    function test_factoryDependenciesIncludeTheNewBuiltInImplementations() public view {
         bytes[] memory factoryDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(new L2EcosystemContract[](0));
 
         L2EcosystemContract[2] memory builtIns = [

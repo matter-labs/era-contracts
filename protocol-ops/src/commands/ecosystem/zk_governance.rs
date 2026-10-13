@@ -131,9 +131,11 @@ pub async fn deploy_puh_guardians(
 ) -> anyhow::Result<ZkGovernanceOutcome> {
     // The current ProtocolUpgradeHandler proves messages from the Era chain, and Guardians
     // sends L1-to-L2 requests to it, so their redeployment must preserve `ERA_CHAIN_ID`.
-    let era_chain_id = inputs.env.and_then(|c| c.era_chain_id()).ok_or_else(|| {
-        anyhow::anyhow!("--env must supply era_chain_id for PUH/Guardians redeploy")
-    })?;
+    let era_chain_id = match inputs.env {
+        Some(cfg) => cfg.era_chain_id()?,
+        None => None,
+    }
+    .ok_or_else(|| anyhow::anyhow!("--env must supply era_chain_id for PUH/Guardians redeploy"))?;
     let create2_factory = inputs
         .create2_factory_override
         .or_else(|| inputs.env.and_then(|c| c.create2_factory()))

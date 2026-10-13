@@ -8,7 +8,7 @@ import {ZKChainBase} from "../state-transition/chain-deps/facets/ZKChainBase.sol
 import {IVerifier} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {TransactionValidator} from "../state-transition/libraries/TransactionValidator.sol";
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
-import {MAX_ALLOWED_MINOR_VERSION_DELTA, MAX_NEW_FACTORY_DEPS} from "../common/Config.sol";
+import {MAX_ALLOWED_MINOR_VERSION_DELTA, MAX_NEW_FACTORY_DEPS, UPGRADE_TX_MAX_GAS_LIMIT} from "../common/Config.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {
     InvalidTxType,
@@ -166,7 +166,7 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
 
         TransactionValidator.validateL1ToL2Transaction(
             _l2ProtocolUpgradeTx,
-            s.priorityTxMaxGasLimit,
+            UPGRADE_TX_MAX_GAS_LIMIT,
             s.feeParams.priorityTxMaxPubdata
         );
 

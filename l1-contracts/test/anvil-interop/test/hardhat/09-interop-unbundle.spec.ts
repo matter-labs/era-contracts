@@ -17,10 +17,11 @@ import {
   CallStatus,
   DEFAULT_TX_GAS_LIMIT,
   FAILING_CALL_CALLDATA,
+  FAILING_INTEROP_CALL_REASON,
   L2_ASSET_ROUTER_ADDR,
   L2_INTEROP_HANDLER_ADDR,
 } from "../../src/core/const";
-import { encodeEvmAddress } from "../../src/helpers/erc7930";
+import { encodeEvmAddress, encodeEvmChainAddress } from "../../src/helpers/erc7930";
 import {
   sendInteropBundle,
   executeBundle,
@@ -46,6 +47,8 @@ import {
 } from "../../src/helpers/interop-helpers";
 import type { CallStarter, InteropSendResult } from "../../src/helpers/interop-helpers";
 import {
+  captureBalance,
+  expectNativeSpend,
   getNativeBalance,
   getTokenBalance,
   approveTokenForNtv,
@@ -204,6 +207,7 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     }
 
     const protocolFeesBefore = !isLiveInteropMode() ? await snapshotAccumulatedProtocolFees(sourceProvider) : undefined;
+    const senderBefore = await captureBalance(sourceProvider, sourceTokenAddress);
     const result = await sendInteropBundle({
       sourceProvider,
       destinationChainId: destChainId,
@@ -211,6 +215,10 @@ describe("09 - Interop Unbundle (failing calls)", function () {
       bundleAttributes,
       value: valuePerBundle,
     });
+
+    const senderAfter = await captureBalance(sourceProvider, sourceTokenAddress);
+    expectNativeSpend(senderBefore, senderAfter, valuePerBundle, result.receipt, "failing bundle sender");
+    expectBalanceDelta(senderBefore.token!, senderAfter.token!, tokenAmount.mul(-1), "failing bundle sender token");
 
     if (protocolFeesBefore) {
       await expectAccumulatedProtocolFeeDelta(
@@ -221,8 +229,6 @@ describe("09 - Interop Unbundle (failing calls)", function () {
         "failing bundle"
       );
     }
-
-    expect(result.bundleHash).to.not.equal(ethers.constants.HashZero);
 
     return {
       sendResult: result,
@@ -256,13 +262,13 @@ describe("09 - Interop Unbundle (failing calls)", function () {
   }
 
   it("Cannot unbundle a non-verified bundle", async () => {
-    const { bundleData } = await sendAndPrepareBundle({ withUnbundlerAddress: true });
+    const { bundleData, bundleHash } = await sendAndPrepareBundle({ withUnbundlerAddress: true });
 
     const callStatuses = [CallStatus.Executed, CallStatus.Cancelled, CallStatus.Executed];
     await expectRevert(
       () => simulateUnbundleBundle(destProvider, bundleData, callStatuses, getInteropUnbundlerPrivateKey()),
       "unbundle non-verified bundle",
-      customError("L2InteropHandler", "CanNotUnbundle(bytes32)"),
+      customError("L2InteropHandler", "CanNotUnbundle(bytes32)", [bundleHash]),
       destProvider
     );
   });
@@ -271,12 +277,16 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     const { sendResult, bundleData, bundleHash } = await sendAndPrepareBundle({ withUnbundlerAddress: true });
 
     // First, simulate atomic executeBundle - should revert because call 1 will fail.
-    await expectRevert(() => executeOrSimulateFailingBundle(sendResult), "executeBundle with failing call");
+    await expectRevert(
+      () => executeOrSimulateFailingBundle(sendResult),
+      "executeBundle with failing call",
+      FAILING_INTEROP_CALL_REASON,
+      destProvider
+    );
 
     // Now call verifyBundle - should succeed
     const verifyReceipt = await verifyBundle(destProvider, bundleData, sourceChainId);
-    console.log(`   verifyBundle tx: ${verifyReceipt.transactionHash}, status: ${verifyReceipt.status}`);
-    expect(verifyReceipt.status, "verifyBundle tx should succeed").to.equal(1);
+    console.log(`   verifyBundle tx: ${verifyReceipt.transactionHash}`);
 
     // Check bundleStatus == BundleStatus.Verified (1)
     const status = await getBundleStatus(destProvider, bundleHash);
@@ -285,7 +295,7 @@ describe("09 - Interop Unbundle (failing calls)", function () {
   });
 
   it("Cannot unbundle from the wrong unbundler address", async () => {
-    const { bundleData } = await sendAndPrepareBundle({ withUnbundlerAddress: true });
+    const { bundleData, bundleHash } = await sendAndPrepareBundle({ withUnbundlerAddress: true });
 
     // Verify the bundle first so we can attempt unbundle
     await verifyBundle(destProvider, bundleData, sourceChainId);
@@ -295,7 +305,11 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     await expectRevert(
       () => simulateUnbundleBundle(destProvider, bundleData, callStatuses),
       "unbundle from wrong address",
-      customError("L2InteropHandler", "UnbundlingNotAllowed(bytes32,bytes,bytes)"),
+      customError("L2InteropHandler", "UnbundlingNotAllowed(bytes32,bytes,bytes)", [
+        bundleHash,
+        encodeEvmChainAddress(getInteropSourceAddress(), destChainId),
+        encodeEvmAddress(getInteropUnbundlerAddress()),
+      ]),
       destProvider
     );
   });
@@ -310,7 +324,9 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     const callStatuses = [CallStatus.Unprocessed, CallStatus.Executed, CallStatus.Unprocessed];
     await expectRevert(
       () => unbundleBundle(destProvider, bundleData, callStatuses, getInteropUnbundlerPrivateKey()),
-      "execute a failing call"
+      "execute a failing call",
+      FAILING_INTEROP_CALL_REASON,
+      destProvider
     );
   });
 
@@ -400,7 +416,7 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     await expectRevert(
       () => simulateUnbundleBundle(destProvider, bundleData, callStatuses, getInteropUnbundlerPrivateKey()),
       "re-execute processed calls",
-      customError("L2InteropHandler", "CallNotExecutable(bytes32,uint256)"),
+      customError("L2InteropHandler", "CallNotExecutable(bytes32,uint256)", [bundleHash, 0]),
       destProvider
     );
   });
@@ -431,7 +447,7 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     await expectRevert(
       () => simulateUnbundleBundle(destProvider, bundleData, callStatuses, getInteropUnbundlerPrivateKey()),
       "execute a cancelled call",
-      customError("L2InteropHandler", "CallNotExecutable(bytes32,uint256)"),
+      customError("L2InteropHandler", "CallNotExecutable(bytes32,uint256)", [bundleHash, 1]),
       destProvider
     );
   });
@@ -440,7 +456,12 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     const { sendResult, bundleHash, baseAmount, tokenAmount } = await sendAndPrepareBundle({});
 
     // Simulate atomic executeBundle first - should revert (failing call).
-    await expectRevert(() => executeOrSimulateFailingBundle(sendResult), "executeBundle with failing call");
+    await expectRevert(
+      () => executeOrSimulateFailingBundle(sendResult),
+      "executeBundle with failing call",
+      FAILING_INTEROP_CALL_REASON,
+      destProvider
+    );
 
     // Build the final call statuses: execute calls 0 and 2, cancel call 1
     const finalCallStatuses = [CallStatus.Executed, CallStatus.Cancelled, CallStatus.Executed];

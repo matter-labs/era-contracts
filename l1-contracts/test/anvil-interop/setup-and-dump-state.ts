@@ -7,6 +7,14 @@ import { AnvilManager } from "./src/daemons/anvil-manager";
 import { DeploymentRunner } from "./src/deployment-runner";
 
 async function main(): Promise<void> {
+  // Setup deploys the test tokens and seeds the wrapped ZK under the interop source key, so another key
+  // would move them to other addresses and accounts than the committed snapshots.
+  if (process.env.ANVIL_INTEROP_PRIVATE_KEY) {
+    throw new Error(
+      "Unset ANVIL_INTEROP_PRIVATE_KEY: the committed chain states are generated with the default account"
+    );
+  }
+
   // Use the anvil-interop Foundry profile which disables CBOR metadata,
   // producing deterministic bytecode across platforms (macOS vs Linux CI).
   process.env.FOUNDRY_PROFILE = "anvil-interop";
@@ -27,14 +35,14 @@ async function main(): Promise<void> {
     fs.rmSync(stateDir, { recursive: true, force: true });
     const dumpStatePaths = runner.buildDumpStatePaths(stateDir);
 
-    // Run full deployment + test tokens + TBM with pinned inputs:
+    // Run full deployment + test tokens + wrapped-ZK seeding with pinned inputs:
     // - blockTime 1 = match the fresh-deploy harness's known-good mining cadence
     // - timestamp 1 = fixed genesis timestamp
     // - dumpStatePaths = Anvil will dump state to these files on exit
     // Contract bytecode and addresses are deterministic. Interval mining makes the final block height
     // and block-indexed state wall-clock-dependent; compare-chain-states.ts normalizes that documented
     // drift in CI.
-    const { l1Addresses, ctmAddresses, chainAddresses } = await runner.deployAndSetupWithTBM(anvilManager, {
+    const { l1Addresses, ctmAddresses, chainAddresses } = await runner.deployAndSetupWithWrappedZk(anvilManager, {
       startChainOptions: { blockTime: 1, timestamp: 1, dumpStatePaths },
     });
 

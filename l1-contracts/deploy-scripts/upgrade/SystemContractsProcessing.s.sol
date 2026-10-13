@@ -1,21 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {console2 as console} from "forge-std/Script.sol";
 import {Utils} from "../utils/Utils.sol";
 import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
-import {
-    L2_REMOVED_GW_ASSET_TRACKER_ADDR,
-    L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_REMOVED_GW_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {L2EcosystemContract, L2SystemContract} from "../ecosystem/CoreContract.sol";
 import {L2_ECOSYSTEM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {TransitionDerivationLib} from "contracts/upgrades/registry/libraries/TransitionDerivationLib.sol";
 import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";
 import {DeduplicateBytecodesCountMismatch} from "../ecosystem/DeployScriptErrors.sol";
-
-// solhint-disable no-console
 
 /// @dev Fixed-address L2EcosystemContract entries backed by l1-contracts bytecodes,
 ///      upgraded via universal force deployments.
@@ -167,7 +161,7 @@ library SystemContractsProcessing {
     ///      - SystemContractProxyAdmin: a direct-deployed ProxyAdmin already present from genesis
     ///        (owned by the ComplexUpgrader); re-deploying it would require an unsafe overwrite.
     ///      - L2WrappedBaseToken: upgrades must not touch the impl (since v31).
-    ///      - L2V34Upgrade: the version-specific delegate is an UNSAFE deployment at a
+    ///      - L2DefaultUpgrade: the version-specific delegate is an UNSAFE deployment at a
     ///        bytecode-derived address — constructed from the pinned
     ///        `AuthoredL2Plan.delegateBytecodeInfo`, never table-derived. No OTHER unsafe
     ///        deployment can ride along, by construction rather than by review: this table's
@@ -237,8 +231,8 @@ library SystemContractsProcessing {
 
     /// @notice Proxy upgrades that neutralize the removed v31 GWAssetTracker.
     /// @dev v31 deployed the GWAssetTracker as a system-proxied built-in on every ZKsync OS chain.
-    /// v32 deletes the contract, so the upgrade swaps its proxy's implementation for `EmptyContract`
-    /// — otherwise the retired tracker code would stay callable. Chains created on v32 get the same
+    /// v33 deletes the contract, so the upgrade swaps its proxy's implementation for `EmptyContract`
+    /// — otherwise the retired tracker code would stay callable. Chains created on v33 get the same
     /// EmptyContract-backed proxy from genesis, so fresh and upgraded chains match at the reserved
     /// address.
     /// @dev The v31 GWAssetTracker could collect wrapped-ZK settlement fees on a live gateway, but no

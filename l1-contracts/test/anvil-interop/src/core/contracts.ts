@@ -6,6 +6,7 @@
  */
 
 import type { JsonFragment } from "@ethersproject/abi";
+import * as path from "path";
 import {
   loadAbiFromOut,
   loadBytecodeFromOut,
@@ -111,7 +112,7 @@ const ARTIFACTS = {
   IAtomicFlowManager: "IAtomicFlowManager.sol/IAtomicFlowManager.json",
   L2MessageVerification: "L2MessageVerification.sol/L2MessageVerification.json",
   L2InteropRootStorage: "L2InteropRootStorage.sol/L2InteropRootStorage.json",
-  L2V34Upgrade: "L2V34Upgrade.sol/L2V34Upgrade.json",
+  L2DefaultUpgrade: "L2DefaultUpgrade.sol/L2DefaultUpgrade.json",
   UpgradeableBeaconDeployer: "UpgradeableBeaconDeployer.sol/UpgradeableBeaconDeployer.json",
 } as const;
 
@@ -143,4 +144,14 @@ export function getDeterministicBytecode(name: ContractName): string {
 /** Creation (init) bytecode from the deterministic (CBOR-metadata-free) build. */
 export function getDeterministicCreationBytecode(name: ContractName): string {
   return loadDeterministicCreationBytecodeFromOut(ARTIFACTS[name]);
+}
+
+/** Solidity contract name behind `name`, which can differ from the harness name. */
+export function getSolidityContractName(name: ContractName): string {
+  return path.basename(ARTIFACTS[name], ".json");
+}
+
+/** Name of the Solidity source file that defines `name`, e.g. `SystemContext.sol`. */
+export function getSoliditySourceFileName(name: ContractName): string {
+  return path.dirname(ARTIFACTS[name]);
 }

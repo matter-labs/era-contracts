@@ -76,6 +76,7 @@ export async function approveToken(
   const erc20 = new Contract(tokenAddress, getAbi("TestnetERC20Token"), wallet);
   const approveTx = await erc20.approve(spender, amount);
   await approveTx.wait();
+  expect((await erc20.allowance(wallet.address, spender)).toString(), "approved allowance").to.equal(amount.toString());
 }
 
 /**
@@ -139,11 +140,42 @@ export function expectBalanceDelta(before: BigNumber, after: BigNumber, expected
   ).to.be.true;
 }
 
+/** Assert `txHash` names a mined, successful transaction and return its receipt. */
+export async function expectSuccessfulReceipt(
+  provider: providers.JsonRpcProvider,
+  txHash: string | null,
+  label: string
+): Promise<providers.TransactionReceipt> {
+  expect(txHash, `${label}: transaction must have been submitted`).to.match(/^0x[0-9a-fA-F]{64}$/);
+  const receipt = await provider.getTransactionReceipt(txHash!);
+  expect(receipt, `${label}: transaction must be mined`).to.exist;
+  expect(receipt.status, `${label}: transaction must succeed`).to.equal(1);
+  return receipt;
+}
+
+/** Assert one event from the expected emitter, then expose its decoded arguments for outcome checks. */
+export function expectEvent(
+  receipt: providers.TransactionReceipt,
+  contract: ContractName,
+  address: string,
+  eventName: string
+): ethers.utils.Result {
+  const iface = new ethers.utils.Interface(getAbi(contract));
+  const topic = iface.getEventTopic(eventName);
+  const logs = receipt.logs.filter(
+    (log) => log.address.toLowerCase() === address.toLowerCase() && log.topics[0] === topic
+  );
+  expect(logs, `${eventName} from ${address}`).to.have.length(1);
+  return iface.parseLog(logs[0]).args;
+}
+
 interface EthersLikeError {
+  argument?: string;
+  value?: unknown;
   body?: string;
   data?: unknown;
   error?: unknown;
-  receipt?: { blockNumber?: number };
+  receipt?: { blockNumber?: number; status?: number };
   transaction?: {
     data?: string;
     from?: string;
@@ -156,23 +188,33 @@ interface EthersLikeError {
 export interface CustomErrorExpectation {
   contract: ContractName;
   signature: string;
+  args: readonly unknown[];
 }
 
 type ExpectedRevert = string | CustomErrorExpectation;
 
-export function customError(contract: ContractName, signature: string): CustomErrorExpectation {
-  return { contract, signature };
+/** Expect `contract`'s custom error `signature` with `args`: the whole ABI-encoded error must match, not only its selector. */
+export function customError(
+  contract: ContractName,
+  signature: string,
+  args: readonly unknown[]
+): CustomErrorExpectation {
+  return { contract, signature, args };
 }
 
-function resolveExpectedReason(expectedReason: ExpectedRevert): { matchValue: string; description: string } {
+function resolveExpectedReason(expectedReason: ExpectedRevert): { expectedData: string; description: string } {
   if (typeof expectedReason === "string") {
-    return { matchValue: expectedReason, description: expectedReason };
+    const encodedReason =
+      ethers.utils.id("Error(string)").slice(0, 10) +
+      ethers.utils.defaultAbiCoder.encode(["string"], [expectedReason]).slice(2);
+    return { expectedData: encodedReason, description: expectedReason };
   }
 
-  const selector = new ethers.utils.Interface(getAbi(expectedReason.contract)).getSighash(expectedReason.signature);
+  const { contract, signature, args } = expectedReason;
+  const iface = new ethers.utils.Interface(getAbi(contract));
   return {
-    matchValue: selector,
-    description: `${expectedReason.contract}.${expectedReason.signature} (${selector})`,
+    expectedData: iface.encodeErrorResult(signature, args),
+    description: `${contract}.${signature} with (${args.join(", ")})`,
   };
 }
 
@@ -182,6 +224,12 @@ function extractRevertData(err: unknown): string {
   const errorWithData = err as EthersLikeError;
   const nestedErrorData = extractRevertData(errorWithData.error);
   if (nestedErrorData !== "" && nestedErrorData !== "0x") return nestedErrorData;
+
+  // staticPreviewHash decodes the intentional preview revert; other custom errors surface
+  // as ethers ABI decoding errors with the original revert bytes in argument="data"/value.
+  if (errorWithData.argument === "data" && typeof errorWithData.value === "string") {
+    return errorWithData.value;
+  }
 
   const directData = errorWithData.data;
   if (typeof directData === "string" && directData !== "" && directData !== "0x") return directData;
@@ -204,60 +252,57 @@ function extractRevertData(err: unknown): string {
   return "";
 }
 
-async function extractRevertDataFromCall(provider: providers.JsonRpcProvider, err: EthersLikeError): Promise<string> {
+/**
+ * Replays a mined, reverted transaction with `eth_call` on its parent block's state and returns the revert data,
+ * or "" when the replay does not revert. Raw `eth_call`, because `JsonRpcProvider.call` resolves with a reverting
+ * call's revert bytes (its `checkError("call")`) as if they were return data.
+ */
+async function replayRevertData(provider: providers.JsonRpcProvider, err: EthersLikeError): Promise<string> {
   const tx = err.transaction;
-  if (!tx?.to || !tx.data) return "";
+  const blockNumber = err.receipt?.blockNumber;
+  if (err.receipt?.status !== 0 || blockNumber === undefined || !tx?.to || !tx.data) return "";
 
   try {
-    await provider.call(
+    // Interval mining (`--block-time`) can put other transactions before this one in its block; they are not replayed.
+    await provider.send("eth_call", [
       {
         to: tx.to,
         from: tx.from,
         data: tx.data,
-        value: tx.value,
-        gasLimit: tx.gasLimit,
+        value: ethers.utils.hexValue(tx.value ?? 0),
+        gas: tx.gasLimit && ethers.utils.hexValue(tx.gasLimit),
       },
-      err.receipt?.blockNumber
-    );
+      ethers.utils.hexValue(blockNumber - 1),
+    ]);
   } catch (callErr: unknown) {
     return extractRevertData(callErr);
   }
-
   return "";
 }
 
 /**
- * Assert that an async call reverts (throws).
- * Optionally match the error message / revert data against a selector or ABI-derived custom error.
+ * Assert that an async call reverts with `expectedReason`: an `Error(string)` reason or a {@link customError}.
+ * Needs `provider` when the thrown error carries no revert data, as for a mined transaction that reverted.
  */
 export async function expectRevert(
   fn: () => Promise<unknown>,
   label: string,
-  expectedReason?: ExpectedRevert,
+  expectedReason: ExpectedRevert,
   provider?: providers.JsonRpcProvider
 ): Promise<void> {
   try {
     await fn();
   } catch (err: unknown) {
-    if (expectedReason) {
-      const { matchValue, description } = resolveExpectedReason(expectedReason);
-      // Check both the JS error message and the on-chain revert data
-      const msg = err instanceof Error ? err.message : String(err);
-      const hasReasonInMessage = msg.includes(matchValue);
-      const errorWithData = typeof err === "object" && err !== null ? (err as EthersLikeError) : undefined;
-      let errorData = extractRevertData(err);
-      if ((errorData === "" || errorData === "0x") && provider && errorWithData) {
-        const recoveredData = await extractRevertDataFromCall(provider, errorWithData);
-        if (recoveredData) {
-          errorData = recoveredData;
-        }
-      }
-      const hasReasonInData = errorData.includes(matchValue);
-      expect(
-        hasReasonInMessage || hasReasonInData,
-        `${label}: revert reason mismatch — expected ${description} in message or data.\nMessage: ${msg.slice(0, 200)}\nData: ${String(errorData).slice(0, 200)}`
-      ).to.be.true;
+    const { expectedData, description } = resolveExpectedReason(expectedReason);
+    const msg = err instanceof Error ? err.message : String(err);
+    let errorData = extractRevertData(err);
+    if ((errorData === "" || errorData === "0x") && provider && typeof err === "object" && err !== null) {
+      errorData = await replayRevertData(provider, err as EthersLikeError);
     }
+    expect(
+      errorData.toLowerCase() === expectedData.toLowerCase(),
+      `${label}: revert reason mismatch — expected ${description} in revert data.\nMessage: ${msg.slice(0, 200)}\nData: ${errorData}`
+    ).to.be.true;
     return; // reverted as expected
   }
   expect.fail(`${label}: expected revert but call succeeded`);

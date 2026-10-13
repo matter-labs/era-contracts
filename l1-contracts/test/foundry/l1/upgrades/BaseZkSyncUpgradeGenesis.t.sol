@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
-
 import {BaseZkSyncUpgradeGenesis} from "contracts/upgrades/BaseZkSyncUpgradeGenesis.sol";
 import {
     PreviousUpgradeBatchNotCleared,
@@ -31,7 +29,7 @@ contract DummyBaseZkSyncUpgradeGenesis is BaseZkSyncUpgradeGenesis, BaseUpgradeU
 }
 
 contract BaseZkSyncUpgradeGenesisTest is BaseUpgrade {
-    DummyBaseZkSyncUpgradeGenesis baseZkSyncUpgrade;
+    DummyBaseZkSyncUpgradeGenesis internal baseZkSyncUpgrade;
 
     function setUp() public {
         baseZkSyncUpgrade = new DummyBaseZkSyncUpgradeGenesis();

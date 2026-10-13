@@ -8,13 +8,10 @@ pragma solidity 0.8.28;
 // calls (the committed cut itself is already facet-less; only the call orchestration remains
 // script-composed).
 
-// solhint-disable no-console, gas-custom-errors
-
 import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Utils} from "../../utils/Utils.sol";
@@ -23,11 +20,8 @@ import {StateTransitionContracts} from "contracts/common/StateTransitionTypes.so
 
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
-import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
 
@@ -37,13 +31,8 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {CTMDeployedAddresses} from "../../ctm/DeployCTMUtils.s.sol";
 
 import {BytecodePublisher} from "../../utils/bytecode/BytecodePublisher.s.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
-import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
-import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
-import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
-import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
@@ -53,14 +42,12 @@ import {ReleaseMemberProbe} from "./ReleaseMemberProbe.sol";
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 import {CTMUpgradeParams, UpgradeKind} from "./UpgradeParams.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
-import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
 import {IProxyUpgradeInitializable} from "contracts/upgrades/registry/IUpgradeInit.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
-import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {
     AuthoredL2Plan,
     OperationManifest,
@@ -103,7 +90,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     /// @dev Deployed on first use; see {ReleaseMemberProbe} for why it is a separate contract.
     ReleaseMemberProbe internal releaseMemberProbe;
 
-    // solhint-disable-next-line gas-struct-packing
     struct UpgradeDeployedAddresses {
         address upgradeTimer;
         /// @dev The lifecycle coordinator (an input, see `CTMUpgradeParams`): the timer's governance
@@ -123,14 +109,11 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         address upgradeEngine;
     }
 
-    // solhint-disable-next-line gas-struct-packing
     struct AdditionalConfig {
         address ctm;
         uint256 oldProtocolVersion;
         address ecosystemAdminAddress;
         uint256 governanceUpgradeTimerInitialDelay;
-        bool hasPreV32IntrospectionOverride;
-        bool usePreV32IntrospectionOverride;
     }
 
     /// @notice Internal state of the upgrade script
@@ -182,17 +165,16 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     /// @notice Single-call entry point invoked by the protocol-ops CLI's `upgrade-prepare-all`,
     ///         once per CTM proxy (`ICTMUpgradePrepare` in `contracts/script-interfaces/IUpgradePrepare.sol`).
     function noGovernancePrepare(CTMUpgradeParams memory _params) public virtual {
-        // solhint-disable-next-line func-named-parameters
-        initializeWithArgs(
-            _params.ctmProxy,
-            _params.rollupDAManager,
-            _params.create2FactorySalt,
-            _params.upgradeInputPath,
-            _params.outputPath,
-            _params.governance,
-            _params.zkTokenAssetId,
-            _params.testnetVerifier
-        );
+        initializeWithArgs({
+            ctmProxy: _params.ctmProxy,
+            rollupDAManager: _params.rollupDAManager,
+            create2FactorySalt: _params.create2FactorySalt,
+            newConfigPath: _params.upgradeInputPath,
+            _outputPath: _params.outputPath,
+            governance: _params.governance,
+            zkTokenAssetId: _params.zkTokenAssetId,
+            testnetVerifier: _params.testnetVerifier
+        });
         if (_params.chainRegistrationSender != address(0)) {
             coreAddresses.bridgehub.proxies.chainRegistrationSender = _params.chainRegistrationSender;
         }
@@ -216,15 +198,15 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     ) public virtual {
         string memory root = vm.projectRoot();
         newConfigPath = string.concat(root, newConfigPath);
-        initializeConfigFromArgs(
-            ctmProxy,
-            rollupDAManager,
-            create2FactorySalt,
-            newConfigPath,
-            governance,
-            zkTokenAssetId,
-            testnetVerifier
-        );
+        initializeConfigFromArgs({
+            ctmProxy: ctmProxy,
+            rollupDAManager: rollupDAManager,
+            create2FactorySalt: create2FactorySalt,
+            newConfigPath: newConfigPath,
+            governance: governance,
+            zkTokenAssetId: zkTokenAssetId,
+            testnetVerifier: testnetVerifier
+        });
 
         console.log("Initialized config from %s", newConfigPath);
         upgradeConfig.outputPath = string.concat(root, _outputPath);
@@ -304,12 +286,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         // packed version the emitted `setNewVersionUpgrade` must carry.
         if (toml.keyExists("$.contracts.latest_protocol_version")) {
             chainCreationParams.latestProtocolVersion = toml.readUint("$.contracts.latest_protocol_version");
-        }
-
-        // Optional override for pre-v32 introspection selection
-        if (toml.keyExists("$.pre_v32_introspection")) {
-            newConfig.hasPreV32IntrospectionOverride = true;
-            newConfig.usePreV32IntrospectionOverride = toml.readBool("$.pre_v32_introspection");
         }
 
         initializeConfig(chainCreationParams, permanentConfig, governance);
@@ -561,6 +537,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             }
             require(
                 accountedFor,
+                // solhint-disable-next-line func-named-parameters
                 string.concat(
                     "orphaned CTM-domain deployment at inventory slot ",
                     vm.toString(i),
@@ -863,28 +840,11 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         // Verify CTM contract exists
         require(ctm.code.length > 0, "CTM contract does not exist at specified address");
 
-        // CTM exists - get bridgehub and determine which introspection to use
         address bridgehubAddr = ChainTypeManager(ctm).BRIDGE_HUB();
         bridgehub = L1Bridgehub(bridgehubAddr);
 
-        bool preV32Ecosystem;
-        if (newConfig.hasPreV32IntrospectionOverride) {
-            preV32Ecosystem = newConfig.usePreV32IntrospectionOverride;
-        } else if (!AddressIntrospector.hasRegisteredChains(bridgehubAddr)) {
-            // A chainless ecosystem has no protocol version to inspect. It cannot have been upgraded into
-            // existence either, so it was deployed from scratch with the current contracts.
-            preV32Ecosystem = false;
-        } else {
-            preV32Ecosystem = AddressIntrospector.shouldUsePreV32Introspection(bridgehubAddr);
-        }
-
-        if (preV32Ecosystem) {
-            ctmAddresses = AddressIntrospector.getCTMAddressesV31(ctm);
-            coreAddresses = AddressIntrospector.getCoreDeployedAddressesV31(bridgehubAddr);
-        } else {
-            ctmAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManager(ctm));
-            coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubAddr);
-        }
+        ctmAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManager(ctm));
+        coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubAddr);
 
         config.ownerAddress = ctmAddresses.admin.governance;
 

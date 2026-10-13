@@ -35,7 +35,7 @@ export const L2_BASE_TOKEN_HOLDER_ADDR = "0x000000000000000000000000000000000001
 // L2_INTEROP_COMMITMENT_TREE_ADDR / L2_ATOMIC_FLOW_MANAGER_ADDR in
 // contracts/common/l2-helpers/L2ContractAddresses.sol. Slot 0x10013 is intentionally
 // skipped: it previously hosted the removed L2GlobalInteropRootImporter.
-// The removed v31 GWAssetTracker, neutralized to EmptyContract by the v32 upgrade.
+// The removed v31 GWAssetTracker, neutralized to EmptyContract by the v33 upgrade.
 export const L2_REMOVED_GW_ASSET_TRACKER_ADDR = "0x0000000000000000000000000000000000010010";
 export const L2_INTEROP_COMMITMENT_TREE_ADDR = "0x0000000000000000000000000000000000010012";
 export const L2_ATOMIC_FLOW_MANAGER_ADDR = "0x0000000000000000000000000000000000010014";
@@ -102,19 +102,6 @@ export const INTEROP_BUNDLE_SENT_TOPIC = utils.id(INTEROP_BUNDLE_SENT_SIGNATURE)
 // AddressAliasHelper offset: uint160(0x1111000000000000000000000000000000001111)
 export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
 
-// Merkle tree constants for processLogsAndMessages
-export const L2_TO_L1_LOGS_MERKLE_TREE_DEPTH = 15;
-
-// keccak256(new bytes(88)) — from contracts/common/Config.sol.
-export const L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH = "0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba";
-
-// From IMessageRoot.sol — keccak256(abi.encodePacked(new bytes(96)))
-export const CHAIN_TREE_EMPTY_ENTRY_HASH = "0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21";
-export const SHARED_ROOT_TREE_EMPTY_HASH = "0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21";
-
-// From MessageHashing.sol:16 — keccak256("zkSync:ChainIdLeaf")
-export const CHAIN_ID_LEAF_PADDING = "0x39bc69363bb9e26cf14240de4e22569e95cf175cfbcf1ade1a47a253b4bf7f61";
-
 // L2 bootloader address (used for failed deposit logs)
 export const L2_BOOTLOADER_ADDR = "0x0000000000000000000000000000000000008001";
 
@@ -161,3 +148,8 @@ export enum CallStatus {
 
 // Selector for a non-existent function: someVeryUnfortunateCall()
 export const FAILING_CALL_CALLDATA = "0x00056d83";
+export const FAILING_INTEROP_CALL_REASON = "Intentional interop receiver failure";
+
+// From SemVer.sol: bit offsets of the minor and major components in a packed protocol version.
+export const SEMVER_MINOR_OFFSET = 32;
+export const SEMVER_MAJOR_OFFSET = 64;

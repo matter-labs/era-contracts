@@ -3,7 +3,7 @@
 import type { BigNumber, providers } from "ethers";
 import { ethers, Wallet, ContractFactory } from "ethers";
 import { DeploymentRunner } from "../deployment-runner";
-import { ANVIL_DEFAULT_PRIVATE_KEY, TEST_TOKEN_DECIMALS, TEST_TOKEN_MINT_AMOUNT_UNITS } from "../core/const";
+import { TEST_TOKEN_DECIMALS, TEST_TOKEN_MINT_AMOUNT_UNITS } from "../core/const";
 import { getAbi, getCreationBytecode } from "../core/contracts";
 import { getInteropSourcePrivateKey } from "../core/accounts";
 import * as fs from "fs";
@@ -49,7 +49,7 @@ export async function deployTestTokens(): Promise<void> {
     throw new Error("L2 chains not found");
   }
 
-  const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
+  const privateKey = getInteropSourcePrivateKey();
 
   // Load TestnetERC20Token artifact
   const artifactPath = path.join(__dirname, "../../../../out/TestnetERC20Token.sol/TestnetERC20Token.json");

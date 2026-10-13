@@ -84,7 +84,7 @@ library L2InventoryLib {
         if (_member == L2EcosystemContract.L2InteropRootStorage) {
             return L2_INTEROP_ROOT_STORAGE_ADDR;
         }
-        if (_member == L2EcosystemContract.L2V34Upgrade) {
+        if (_member == L2EcosystemContract.L2DefaultUpgrade) {
             return L2_VERSION_SPECIFIC_UPGRADER_ADDR;
         }
         if (_member == L2EcosystemContract.L2InteropCommitmentTree) {

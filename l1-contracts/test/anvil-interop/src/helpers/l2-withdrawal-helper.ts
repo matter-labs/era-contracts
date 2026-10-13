@@ -1,18 +1,28 @@
 import type { BigNumber } from "ethers";
 import { Contract, Wallet, ethers } from "ethers";
+import { expect } from "chai";
 import { buildWithdrawalMerkleProof, getSettlementLayerChainId, createProvider } from "../core/utils";
 import { getAbi } from "../core/contracts";
+import { getInteropSourceAddress, getInteropSourcePrivateKey } from "../core/accounts";
 import {
-  ANVIL_DEFAULT_PRIVATE_KEY,
   ETH_TOKEN_ADDRESS,
   INTEROP_CENTER_ADDR,
   L2_ASSET_ROUTER_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
 } from "../core/const";
-import { encodeAssetRouterBridgehubDepositData, encodeBridgeBurnData, encodeNtvAssetId } from "../core/data-encoding";
+import { encodeAssetRouterBridgehubDepositData, encodeBridgeBurnData } from "../core/data-encoding";
 import type { CoreDeployedAddresses } from "../core/types";
 import { indirectCallAttr, interopCallValueAttr, sendInteropBundle } from "./interop-helpers";
 import { encodeEvmAddress } from "./erc7930";
+import { runtimeConfig } from "../core/runtime-config";
+import {
+  expectBalanceDelta,
+  expectEvent,
+  expectNativeSpend,
+  expectSuccessfulReceipt,
+  getAssetIdForToken,
+} from "./balance-helpers";
+import { getL1BaseTokenAssetId, getL1BridgedOut } from "./bridged-out-helper";
 
 export interface WithdrawETHParams {
   l1RpcUrl: string;
@@ -55,13 +65,6 @@ export interface InitiateWithdrawalParams {
 
 export interface InitiateErc20WithdrawalParams extends InitiateWithdrawalParams {
   l2TokenAddress: string;
-  /**
-   * Chain where the token originates. For an L2-native token this is the L2
-   * chain id; for an L1-native token bridged to L2 this is `L1_CHAIN_ID`. The
-   * value feeds `DataEncoding.encodeNTVAssetId` so the resulting `assetId`
-   * matches what the L2 `NativeTokenVault` assigned on registration.
-   */
-  tokenOriginChainId: number;
 }
 
 /**
@@ -72,11 +75,10 @@ export interface InitiateErc20WithdrawalParams extends InitiateWithdrawalParams 
  */
 export async function initiateEthWithdrawal(params: InitiateWithdrawalParams): Promise<PendingWithdrawal> {
   const { l2RpcUrl, l1RpcUrl, chainId, l1Addresses, amount } = params;
-  const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
 
   const l2Provider = createProvider(l2RpcUrl);
   const l1Provider = createProvider(l1RpcUrl);
-  const l2Wallet = new Wallet(privateKey, l2Provider);
+  const l2Wallet = new Wallet(getInteropSourcePrivateKey(), l2Provider);
   const l1Recipient = params.l1Recipient || l2Wallet.address;
 
   // The base-token assetId is the ETH NTV assetId (identical on L1 and L2).
@@ -126,17 +128,15 @@ export async function initiateEthWithdrawal(params: InitiateWithdrawalParams): P
  * {protocol-docs/bridging.md#deposit-initiation-source-side}.
  */
 export async function initiateErc20Withdrawal(params: InitiateErc20WithdrawalParams): Promise<PendingWithdrawal> {
-  const { l2RpcUrl, l1RpcUrl, l2TokenAddress, tokenOriginChainId, chainId, amount } = params;
-  const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
+  const { l2RpcUrl, l1RpcUrl, l2TokenAddress, chainId, amount } = params;
 
   const l2Provider = createProvider(l2RpcUrl);
   const l1Provider = createProvider(l1RpcUrl);
-  const l2Wallet = new Wallet(privateKey, l2Provider);
+  const l2Wallet = new Wallet(getInteropSourcePrivateKey(), l2Provider);
   const l1Recipient = params.l1Recipient || l2Wallet.address;
 
-  // `assetId` is a deterministic function of (origin chain, token address); the
-  // L2 NTV assigns the same value during `registerToken`.
-  const assetId = encodeNtvAssetId(tokenOriginChainId, l2TokenAddress);
+  // Read from the L2 NTV: a bridged token's assetId is keyed by its origin token, not by its L2 address.
+  const assetId = await getAssetIdForToken(l2Provider, l2TokenAddress);
 
   // The burn pulls the tokens from the original caller (the `sendBundle` sender) via the NTV,
   // hence the NTV approval.
@@ -183,9 +183,8 @@ export async function initiateErc20Withdrawal(params: InitiateErc20WithdrawalPar
  * (the nullifier points to the handler, which re-invokes the L1 asset router's `finalizeDeposit`).
  *
  * Returns `{ success: true, txHash }` if the L1 tx lands, otherwise
- * `{ success: false, errorMessage, revertData }` — callers can drive the
- * "attempt → revert → retry" pattern the source TBM suite uses around
- * `InsufficientChainBalance`. When the call reverts, `revertData` carries the
+ * `{ success: false, errorMessage, revertData }`, so callers can drive an
+ * "attempt → revert → retry" pattern. When the call reverts, `revertData` carries the
  * 4-byte selector (plus args) so callers can match the exact custom error.
  */
 export async function finalizeWithdrawalOnL1(
@@ -197,7 +196,7 @@ export async function finalizeWithdrawalOnL1(
 
   const settlementLayerChainId = await getSettlementLayerChainId(l1Provider, l1Addresses.bridgehub, pending.chainId);
 
-  const l1Wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
+  const l1Wallet = new Wallet(getInteropSourcePrivateKey(), l1Provider);
   const l1Nullifier = new Contract(l1Addresses.l1NullifierProxy, getAbi("L1Nullifier"), l1Provider);
   const interopHandlerAddress = await l1Nullifier.l1InteropHandler();
   const l1InteropHandler = new Contract(interopHandlerAddress, getAbi("L1InteropHandler"), l1Wallet);
@@ -263,6 +262,48 @@ export async function withdrawETHFromL2(params: WithdrawETHParams): Promise<With
     l1TxHash: result.success && result.txHash ? result.txHash : null,
     amount: params.amount,
   };
+}
+
+/**
+ * Withdraws `amount` ETH with {@link withdrawETHFromL2} and asserts the exact outcome: the L2 send and its L1
+ * finalization succeed, the sender pays exactly `amount` plus gas, L1 executes the sent bundle and mints `amount`
+ * to `l1Recipient`, and L1NativeTokenVault.bridgedOut[ETH] shrinks by `amount`.
+ */
+export async function expectEthWithdrawal(params: WithdrawETHParams & { l1Recipient: string }): Promise<void> {
+  const { l1RpcUrl, chainId, l1Addresses, amount, l1Recipient } = params;
+  const sender = getInteropSourceAddress();
+  const l1Provider = createProvider(l1RpcUrl);
+  const l2Provider = createProvider(params.l2RpcUrl);
+  const senderL2Before = await l2Provider.getBalance(sender);
+  const recipientL1Before = await l1Provider.getBalance(l1Recipient);
+  const l1Ntv = l1Addresses.l1NativeTokenVault;
+  const ethAssetId = await getL1BaseTokenAssetId(l1RpcUrl, l1Ntv);
+  const bridgedOutBefore = await getL1BridgedOut(l1RpcUrl, l1Ntv, ethAssetId);
+
+  const result = await withdrawETHFromL2(params);
+
+  const l2Receipt = await expectSuccessfulReceipt(l2Provider, result.l2TxHash, "withdrawal L2");
+  const l1Receipt = await expectSuccessfulReceipt(l1Provider, result.l1TxHash, "withdrawal L1 finalization");
+  const senderL2After = await l2Provider.getBalance(sender);
+  expectNativeSpend({ native: senderL2Before }, { native: senderL2After }, amount, l2Receipt, "withdrawal sender L2");
+  const sent = expectEvent(l2Receipt, "InteropCenter", INTEROP_CENTER_ADDR, "InteropBundleSent");
+  expect(sent.interopBundle.sourceChainId.toNumber()).to.equal(chainId);
+  expect(sent.interopBundle.destinationChainId.toNumber()).to.equal(runtimeConfig.l1ChainId);
+  expect(sent.interopBundle.calls).to.have.length(1);
+  const nullifier = new Contract(l1Addresses.l1NullifierProxy, getAbi("L1Nullifier"), l1Provider);
+  const executed = expectEvent(l1Receipt, "L1InteropHandler", await nullifier.l1InteropHandler(), "BundleExecuted");
+  expect(executed.bundleHash).to.equal(sent.interopBundleHash);
+  const finalized = expectEvent(l1Receipt, "L1AssetRouter", l1Addresses.l1SharedBridge, "DepositFinalizedAssetRouter");
+  expect(finalized.sourceChainId.toNumber()).to.equal(chainId);
+  expect(finalized.assetId).to.equal(ethAssetId);
+  const minted = expectEvent(l1Receipt, "L1NativeTokenVault", l1Ntv, "BridgeMint");
+  expect(minted.chainId.toNumber()).to.equal(chainId);
+  expect(minted.assetId).to.equal(ethAssetId);
+  expect(minted.receiver).to.equal(l1Recipient);
+  expect(minted.amount.toString()).to.equal(amount.toString());
+  expectBalanceDelta(recipientL1Before, await l1Provider.getBalance(l1Recipient), amount, "withdrawal recipient L1");
+  const bridgedOutAfter = await getL1BridgedOut(l1RpcUrl, l1Ntv, ethAssetId);
+  expectBalanceDelta(bridgedOutBefore, bridgedOutAfter, amount.mul(-1), "L1NativeTokenVault.bridgedOut[ETH]");
 }
 
 // Monotonic counter keeping (chainId, l2BatchNumber, l2MessageIndex) unique

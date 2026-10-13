@@ -8,6 +8,10 @@ contract EventOnFallback {
 
     event Called(address msgSender, uint256 value, bytes data);
 
+    receive() external payable {
+        emit Called(msg.sender, msg.value, "");
+    }
+
     fallback() external payable {
         emit Called(msg.sender, msg.value, msg.data);
     }

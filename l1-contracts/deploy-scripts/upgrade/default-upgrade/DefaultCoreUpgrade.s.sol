@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// solhint-disable no-console, gas-custom-errors
-
 import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {stdToml} from "forge-std/StdToml.sol";
@@ -23,7 +21,7 @@ import {
     L1EcosystemContract,
     L1_ECOSYSTEM_CONTRACT_COUNT
 } from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
-import {BridgehubAddresses, CoreDeployedAddresses} from "../../utils/Types.sol";
+import {BridgehubAddresses} from "../../utils/Types.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {CoreUpgradeParams} from "./UpgradeParams.sol";
@@ -56,12 +54,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         bool initialized;
         string outputPath;
     }
-
-    struct AdditionalConfigParams {
-        bool hasPreV32IntrospectionOverride;
-        bool usePreV32IntrospectionOverride;
-    }
-    AdditionalConfigParams internal additionalConfig;
 
     EcosystemUpgradeConfig internal upgradeConfig;
 
@@ -224,6 +216,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             }
             require(
                 accountedFor,
+                // solhint-disable-next-line func-named-parameters
                 string.concat(
                     "orphaned ecosystem deployment at inventory slot ",
                     vm.toString(i),
@@ -353,30 +346,14 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         bytes32 create2FactorySalt,
         string memory upgradeInputPath
     ) public virtual {
-        string memory upgradeToml = vm.readFile(upgradeInputPath);
+        // The core half reads no key from the upgrade input, but the input is still required to exist so
+        // that a mistyped path fails here rather than in the CTM half.
+        require(vm.isFile(upgradeInputPath), "upgrade input not found");
 
         // Only override the salt when explicitly provided (non-zero).
         // When zero, the script falls back to the CREATE2_FACTORY_SALT env var or built-in default.
         if (create2FactorySalt != bytes32(0)) {
             setCreate2Salt(create2FactorySalt);
-        }
-
-        // Only ZKsync OS ecosystems can be upgraded onto this release.
-
-        // Optional override for pre-v32 introspection selection. Autodetection reads the protocol version of
-        // a registered chain, which lags the L1 contracts: an ecosystem whose core contracts are already v32
-        // while its chains have not upgraded yet (mid-upgrade, or a fixture deployed from current code with a
-        // v31 genesis) must state so here.
-        if (upgradeToml.keyExists("$.pre_v32_introspection")) {
-            additionalConfig.hasPreV32IntrospectionOverride = true;
-            additionalConfig.usePreV32IntrospectionOverride = upgradeToml.readBool("$.pre_v32_introspection");
-        }
-
-        // Legacy Era gateway chain ID — baked into L1MessageRoot as immutable
-        // ERA_GATEWAY_CHAIN_ID. Read from the upgrade input TOML ([legacy_gateway] section)
-        // so the constructor gets the right value. Optional: absent on fresh/local.
-        if (upgradeToml.keyExists("$.legacy_gateway.chain_id")) {
-            config.legacyGatewayChainId = upgradeToml.readUint("$.legacy_gateway.chain_id");
         }
 
         coreAddresses.bridgehub.proxies.bridgehub = bridgehubProxyAddress;
@@ -403,24 +380,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     function setAddressesBasedOnBridgehub() internal virtual {
         address bridgehubProxy = coreAddresses.bridgehub.proxies.bridgehub;
 
-        bool preV32Ecosystem;
-        if (additionalConfig.hasPreV32IntrospectionOverride) {
-            preV32Ecosystem = additionalConfig.usePreV32IntrospectionOverride;
-        } else if (!AddressIntrospector.hasRegisteredChains(bridgehubProxy)) {
-            // A chainless ecosystem has no protocol version to inspect. It cannot have been upgraded into
-            // existence either, so it was deployed from scratch with the current contracts.
-            preV32Ecosystem = false;
-        } else {
-            preV32Ecosystem = AddressIntrospector.shouldUsePreV32Introspection(bridgehubProxy);
-        }
-
-        if (preV32Ecosystem) {
-            // v31 ecosystem: the nullifier has no `l1InteropHandler` getter yet, so the discovered
-            // address stays zero and the upgrade deploys the handler itself.
-            coreAddresses = AddressIntrospector.getCoreDeployedAddressesV31(bridgehubProxy);
-        } else {
-            coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubProxy);
-        }
+        coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubProxy);
     }
 
     function saveOutput(string memory outputPath) internal virtual {

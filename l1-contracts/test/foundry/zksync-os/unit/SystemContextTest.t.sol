@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {
     L2_BOOTLOADER_ADDRESS,
@@ -11,7 +11,6 @@ import {
 import {SystemContext} from "contracts/l2-system/zksync-os/SystemContext.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
-import {IL2ChainAssetHandler} from "contracts/core/chain-asset-handler/IL2ChainAssetHandler.sol";
 
 contract SystemContextTest is Test {
     SystemContext internal systemContext;

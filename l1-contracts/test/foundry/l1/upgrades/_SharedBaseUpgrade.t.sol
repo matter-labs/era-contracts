@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {
-    PRIORITY_TX_MAX_GAS_LIMIT,
+    UPGRADE_TX_MAX_GAS_LIMIT,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE
 } from "contracts/common/Config.sol";
@@ -19,7 +19,7 @@ import {SemVer} from "contracts/common/libraries/SemVer.sol";
 /// @notice The hand-built inputs of the shared storage part (`BaseZkSyncUpgrade._upgrade`):
 ///         a well-formed L2 upgrade transaction, the version it moves to, its schedule and verifier.
 contract BaseUpgrade is Test {
-    L2CanonicalTransaction l2CanonicalTransaction;
+    L2CanonicalTransaction internal l2CanonicalTransaction;
 
     /// @dev The version the prepared upgrade moves to.
     uint256 public protocolVersion;
@@ -44,7 +44,7 @@ contract BaseUpgrade is Test {
             txType: ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE,
             from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
             to: uint256(uint160(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR)),
-            gasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
+            gasLimit: UPGRADE_TX_MAX_GAS_LIMIT,
             gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
             maxFeePerGas: uint256(0),
             maxPriorityFeePerGas: uint256(0),

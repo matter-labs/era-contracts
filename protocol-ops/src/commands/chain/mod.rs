@@ -1,13 +1,11 @@
 use clap::Subcommand;
 
 use crate::commands::chain::{
-    gateway::GatewayCommands, init::ChainInitArgs,
-    set_da_validator_pair::ChainSetDaValidatorPairArgs,
+    init::ChainInitArgs, set_da_validator_pair::ChainSetDaValidatorPairArgs,
     set_upgrade_timestamp::ChainSetUpgradeTimestampArgs, upgrade::ChainUpgradeArgs,
     validator::ChainValidatorArgs,
 };
 
-pub mod gateway;
 pub mod init;
 pub mod set_da_validator_pair;
 pub mod set_upgrade_timestamp;
@@ -31,9 +29,6 @@ pub enum ChainCommands {
     AddValidator(ChainValidatorArgs),
     /// Remove a validator from the chain's ValidatorTimelock (revokes all batch operator roles)
     RemoveValidator(ChainValidatorArgs),
-    /// Gateway operations: converting a chain into a gateway or migrating to one
-    #[command(subcommand)]
-    Gateway(GatewayCommands),
 }
 
 pub async fn run(args: ChainCommands) -> anyhow::Result<()> {
@@ -44,6 +39,5 @@ pub async fn run(args: ChainCommands) -> anyhow::Result<()> {
         ChainCommands::SetDaValidatorPair(args) => set_da_validator_pair::run(args).await,
         ChainCommands::AddValidator(args) => validator::run_add(args).await,
         ChainCommands::RemoveValidator(args) => validator::run_remove(args).await,
-        ChainCommands::Gateway(cmd) => gateway::run(cmd).await,
     }
 }

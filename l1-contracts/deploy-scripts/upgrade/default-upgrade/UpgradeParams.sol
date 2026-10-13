@@ -16,7 +16,6 @@ enum UpgradeKind {
 
 /// @notice Parameters for the ecosystem upgrade entry point.
 ///         Passed as a struct to avoid stack-depth issues as the parameter list grows.
-// solhint-disable-next-line gas-struct-packing
 struct EcosystemUpgradeParams {
     address bridgehubProxyAddress;
     address ctmProxy;
@@ -33,7 +32,6 @@ struct EcosystemUpgradeParams {
 }
 
 /// @notice Parameters for the standalone core upgrade entry point.
-// solhint-disable-next-line gas-struct-packing
 struct CoreUpgradeParams {
     address bridgehubProxyAddress;
     bytes32 create2FactorySalt;
@@ -44,7 +42,6 @@ struct CoreUpgradeParams {
 /// @notice Parameters for the standalone CTM upgrade entry point
 ///         (`DefaultCTMUpgrade.noGovernancePrepare`) when running once per target CTM in a
 ///         multi-CTM ecosystem.
-// solhint-disable-next-line gas-struct-packing
 struct CTMUpgradeParams {
     address ctmProxy;
     /// @notice The CTM's rollup `DAManager`, an AdminFacet constructor argument. No CTM- or

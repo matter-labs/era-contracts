@@ -32,7 +32,15 @@ contract MockContract {
         results.push(result);
     }
 
+    receive() external payable {
+        _handleCall();
+    }
+
     fallback() external payable {
+        _handleCall();
+    }
+
+    function _handleCall() internal {
         bytes memory data = msg.data;
         bytes32 inputKeccak = keccak256(data);
 

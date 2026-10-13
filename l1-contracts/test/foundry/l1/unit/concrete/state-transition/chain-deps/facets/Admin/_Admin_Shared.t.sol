@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
-
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
@@ -22,13 +20,15 @@ contract AdminTest is UtilsCallMockerTest {
     DummyBridgehub internal dummyBridgehub;
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](19);
+        bytes4[] memory selectors = new bytes4[](21);
         uint256 i = 0;
         selectors[i++] = IAdmin.setPendingAdmin.selector;
         selectors[i++] = IAdmin.acceptAdmin.selector;
         selectors[i++] = IAdmin.setValidator.selector;
         selectors[i++] = IAdmin.setPriorityTxMaxGasLimit.selector;
         selectors[i++] = IAdmin.setZKsyncOSMaxTxGasLimit.selector;
+        selectors[i++] = IAdmin.setZKsyncOSL1TxFiltering.selector;
+        selectors[i++] = IAdmin.setZKsyncOSLargeContractsEnabled.selector;
         selectors[i++] = IAdmin.changeFeeParams.selector;
         selectors[i++] = IAdmin.setTokenMultiplier.selector;
         selectors[i++] = IAdmin.upgradeChainFromVersion.selector;

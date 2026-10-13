@@ -5,21 +5,16 @@ import {Test} from "forge-std/Test.sol";
 
 import {L2WrappedBaseToken} from "contracts/bridge/L2WrappedBaseToken.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts-v4/proxy/ERC1967/ERC1967Proxy.sol";
-import {
-    BridgeMintNotImplemented,
-    Unauthorized,
-    WithdrawFailed,
-    ZeroAddress
-} from "contracts/common/L1ContractErrors.sol";
+import {BridgeMintNotImplemented, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 /// @notice Unit tests for L2WrappedBaseToken contract
 contract L2WrappedBaseTokenTest is Test {
-    L2WrappedBaseToken implementation;
-    L2WrappedBaseToken token;
-    address l2Bridge;
-    address l1Address;
-    bytes32 baseTokenAssetId;
+    L2WrappedBaseToken internal implementation;
+    L2WrappedBaseToken internal token;
+    address internal l2Bridge;
+    address internal l1Address;
+    bytes32 internal baseTokenAssetId;
 
     function setUp() public {
         implementation = new L2WrappedBaseToken();

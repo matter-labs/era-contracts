@@ -1,13 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Vm.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {LEGACY_PRIORITY_TX_MAX_GAS_LIMIT} from "test/foundry/TestConstants.sol";
 
 import {BaseZkSyncUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 
 import {
     MAX_ALLOWED_MINOR_VERSION_DELTA,
     MAX_NEW_FACTORY_DEPS,
+    PRIORITY_TX_MAX_GAS_LIMIT,
+    UPGRADE_TX_MAX_GAS_LIMIT,
     ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE
 } from "contracts/common/Config.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
@@ -22,7 +26,13 @@ import {
     ProtocolVersionMinorDeltaTooBig,
     ProtocolVersionTooSmall
 } from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
-import {TimeNotReached, TooManyFactoryDeps} from "contracts/common/L1ContractErrors.sol";
+import {
+    PubdataGreaterThanLimit,
+    TimeNotReached,
+    TooManyFactoryDeps,
+    TooMuchGas,
+    ValidateTxnNotEnoughGas
+} from "contracts/common/L1ContractErrors.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 
@@ -46,19 +56,108 @@ contract DummyBaseZkSyncUpgrade is BaseZkSyncUpgrade, BaseUpgradeUtils {
 ///         and nonce, the transition caps factory deps and refuses an L2 side on a patch); they
 ///         stay as the engine's own last line.
 contract BaseZkSyncUpgradeTest is BaseUpgrade {
-    DummyBaseZkSyncUpgrade baseZkSyncUpgrade;
+    DummyBaseZkSyncUpgrade internal baseZkSyncUpgrade;
 
     function setUp() public {
         baseZkSyncUpgrade = new DummyBaseZkSyncUpgrade();
 
         _prepareUpgrade();
 
-        baseZkSyncUpgrade.setPriorityTxMaxGasLimit(1 ether);
+        // Isolate the upgrade from the admin setter to model pre-upgrade chain storage.
+        baseZkSyncUpgrade.setPriorityTxMaxGasLimit(LEGACY_PRIORITY_TX_MAX_GAS_LIMIT);
         baseZkSyncUpgrade.setPriorityTxMaxPubdata(1000000);
     }
 
     function _upgrade() internal returns (bytes32) {
         return baseZkSyncUpgrade.upgrade(protocolVersion, upgradeTimestamp, verifier, l2CanonicalTransaction);
+    }
+
+    function test_revertWhen_UpgradeExceedsUpgradeGasCeiling() public {
+        _assertUpgradeGasLimitRejected(UPGRADE_TX_MAX_GAS_LIMIT + 1);
+    }
+
+    function testFuzz_revertWhen_UpgradeExceedsUpgradeGasCeiling(uint256 _gasLimit) public {
+        _assertUpgradeGasLimitRejected(bound(_gasLimit, UPGRADE_TX_MAX_GAS_LIMIT + 1, type(uint256).max));
+    }
+
+    function _assertUpgradeGasLimitRejected(uint256 _gasLimit) internal {
+        l2CanonicalTransaction.gasLimit = _gasLimit;
+        uint256 versionBefore = baseZkSyncUpgrade.getProtocolVersion();
+        address verifierBefore = baseZkSyncUpgrade.getVerifier();
+
+        vm.expectRevert(TooMuchGas.selector);
+        _upgrade();
+
+        assertEq(baseZkSyncUpgrade.getProtocolVersion(), versionBefore);
+        assertEq(baseZkSyncUpgrade.getVerifier(), verifierBefore);
+        assertEq(baseZkSyncUpgrade.getPriorityTxMaxGasLimit(), LEGACY_PRIORITY_TX_MAX_GAS_LIMIT);
+        assertEq(baseZkSyncUpgrade.getL2SystemContractsUpgradeTxHash(), bytes32(0));
+    }
+
+    // The generic upgrade validates the upgrade tx against its own ceiling and leaves the chain's
+    // priority admission limit untouched.
+    function test_UpgradeAtUpgradeGasCeiling() public {
+        _assertUpgradePreservesGasLimit(LEGACY_PRIORITY_TX_MAX_GAS_LIMIT);
+    }
+
+    function test_UpgradeOneGasAbovePriorityCeiling() public {
+        l2CanonicalTransaction.gasLimit = PRIORITY_TX_MAX_GAS_LIMIT + 1;
+        _assertUpgradePreservesGasLimit(PRIORITY_TX_MAX_GAS_LIMIT);
+    }
+
+    function testFuzz_UpgradeAbovePriorityCeiling(uint256 _gasLimit) public {
+        l2CanonicalTransaction.gasLimit = bound(_gasLimit, PRIORITY_TX_MAX_GAS_LIMIT + 1, UPGRADE_TX_MAX_GAS_LIMIT);
+        _assertUpgradePreservesGasLimit(PRIORITY_TX_MAX_GAS_LIMIT);
+    }
+
+    function test_revertWhen_UpgradeExceedsPubdataLimit() public {
+        uint256 requiredPubdata = UPGRADE_TX_MAX_GAS_LIMIT / l2CanonicalTransaction.gasPerPubdataByteLimit;
+        uint32 maxPubdata = uint32(requiredPubdata - 1);
+        baseZkSyncUpgrade.setPriorityTxMaxPubdata(maxPubdata);
+
+        vm.expectRevert(abi.encodeWithSelector(PubdataGreaterThanLimit.selector, maxPubdata, requiredPubdata));
+        _upgrade();
+
+        assertEq(baseZkSyncUpgrade.getL2SystemContractsUpgradeTxHash(), bytes32(0));
+        assertEq(baseZkSyncUpgrade.getPriorityTxMaxGasLimit(), LEGACY_PRIORITY_TX_MAX_GAS_LIMIT);
+    }
+
+    function test_revertWhen_UpgradeBelowMinimumGas() public {
+        l2CanonicalTransaction.gasLimit = 0;
+
+        vm.expectRevert(ValidateTxnNotEnoughGas.selector);
+        _upgrade();
+
+        assertEq(baseZkSyncUpgrade.getL2SystemContractsUpgradeTxHash(), bytes32(0));
+        assertEq(baseZkSyncUpgrade.getPriorityTxMaxGasLimit(), LEGACY_PRIORITY_TX_MAX_GAS_LIMIT);
+    }
+
+    function test_UpgradePreservesZeroGasLimit() public {
+        _assertUpgradePreservesGasLimit(0);
+    }
+
+    function testFuzz_UpgradePreservesStoredGasLimit(uint256 _storedLimit) public {
+        _assertUpgradePreservesGasLimit(_storedLimit);
+    }
+
+    function _assertUpgradePreservesGasLimit(uint256 _storedLimit) internal {
+        baseZkSyncUpgrade.setPriorityTxMaxGasLimit(_storedLimit);
+        bytes32 expectedTxHash = keccak256(abi.encode(l2CanonicalTransaction));
+        vm.recordLogs();
+        vm.expectEmit(true, true, false, true, address(baseZkSyncUpgrade));
+        emit BaseZkSyncUpgrade.UpgradeComplete(protocolVersion, expectedTxHash, l2CanonicalTransaction);
+
+        bytes32 txHash = _upgrade();
+
+        assertEq(txHash, expectedTxHash);
+        assertEq(baseZkSyncUpgrade.getL2SystemContractsUpgradeTxHash(), expectedTxHash);
+        assertEq(baseZkSyncUpgrade.getPriorityTxMaxGasLimit(), _storedLimit);
+        assertEq(baseZkSyncUpgrade.getProtocolVersion(), protocolVersion);
+        assertEq(baseZkSyncUpgrade.getVerifier(), verifier);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i; i < logs.length; i++) {
+            assertNotEq(logs[i].topics[0], IAdmin.NewPriorityTxMaxGasLimit.selector);
+        }
     }
 
     // Upgrade is not ready yet
