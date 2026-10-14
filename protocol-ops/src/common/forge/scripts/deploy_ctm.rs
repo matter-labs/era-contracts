@@ -182,6 +182,7 @@ mod tests {
              genesis_upgrade_addr = {a}\n\
              default_upgrade_addr = {a}\n\
              bytecodes_supplier_addr = {a}\n\
+             interop_fee_manager_proxy_addr = {a}\n\
              {extra}"
         )
     }
